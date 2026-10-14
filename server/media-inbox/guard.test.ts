@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { companyDomain, firstNameOf, holdingReply, machineReason, replyProblem, replySubject } from "./guard";
+import { companyDomain, firstNameOf, formMessage, holdingReply, machineReason, replyProblem, replySubject } from "./guard";
+import { parseGoogleForm } from "./browse";
 import { parseDecision } from "./ai";
 import { stripQuoted, composeMail } from "./mailbox";
 
@@ -179,4 +180,28 @@ describe("sending ramp and templates", () => {
       expect(replyProblem(b)).toBeNull();
     }
   });
+});
+
+describe("formMessage — our first email, as a form message", () => {
+  it("drops the greeting, the stop line and the sign-off", () => {
+    const m = formMessage(`Hi Acme team,\n\nConstructHUB is software for US contractors.\n\nIf this isn't something you handle, reply "stop" and we won't email you again.\n\nBest regards,`);
+    expect(m).toBe("ConstructHUB is software for US contractors.");
+  });
+});
+
+describe("parseGoogleForm — a Google Form's questions and answer keys", () => {
+  const data = [null, ["Intro", [
+    [1, "Company Name:", null, 0, [[111, null, 1]]],
+    [2, "Countries", null, 4, [[222, [["US"], ["Canada"]], 1]]],
+  ], null, null, null, null, null, null, "Partner Form"], "/x", "Partner Form"];
+  const html = `<script>var FB_PUBLIC_LOAD_DATA_ = ${JSON.stringify(data)};</script>`;
+  it("reads fields, options and the formResponse endpoint", () => {
+    const g = parseGoogleForm(html, "https://docs.google.com/forms/d/e/abc/viewform?usp=send_form")!;
+    expect(g.fields).toEqual([
+      { key: "entry.111", label: "Company Name:", type: "text", required: true },
+      { key: "entry.222", label: "Countries", type: "checkbox-group", required: true, options: ["US", "Canada"] },
+    ]);
+    expect(g.googleForm?.action).toBe("https://docs.google.com/forms/d/e/abc/formResponse");
+  });
+  it("returns null for a page that is not a Google Form", () => expect(parseGoogleForm("<html></html>", "https://x.com")).toBeNull());
 });

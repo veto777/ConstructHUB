@@ -410,14 +410,44 @@ export async function unreadAutoReplies(limit = 20) {
   return r.rows.filter((x) => x.partner_id) as { id: number; thread_key: string | null; from_email: string; body: string; partner_id: number }[];
 }
 
-export async function saveNextStep(messageId: number, partnerId: number, step: { nextStep: string | null; link: string | null; contact: string | null; summary: string }) {
+export async function saveNextStep(messageId: number, partnerId: number, step: { nextStep: string | null; link: string | null; contact: string | null; contactRole?: string | null; summary: string }) {
   const action = [step.nextStep, step.link, step.contact ? `Contact: ${step.contact}` : null].filter(Boolean).join(" — ");
-  await db().query(`UPDATE media_messages SET attempts = 1, partner_id = $2, reason = concat_ws(' · ', reason, $3::text) WHERE id = $1`,
-    [messageId, partnerId, action ? `Next step: ${action}` : `Auto-reply read: ${step.summary}`]);
+  await db().query(
+    `UPDATE media_messages SET attempts = 1, partner_id = $2, reason = concat_ws(' · ', reason, $3::text), next_link = $4, next_contact = $5, next_contact_role = $6,
+       acted_at = CASE WHEN $4::text IS NULL AND $5::text IS NULL THEN now() END WHERE id = $1`,
+    [messageId, partnerId, action ? `Next step: ${action}` : `Auto-reply read: ${step.summary}`, step.link, step.contact, step.contactRole ?? null]);
   if (action) await db().query(
-    `UPDATE media_partners SET to_finalize = concat_ws(' · ', to_finalize, $2::text), owner_question = COALESCE(owner_question, $3),
-       summary = concat_ws(' ', summary, $4::text), updated_at = now() WHERE id = $1`,
-    [partnerId, action, step.link || step.nextStep ? `Their auto-reply asks for a next step: ${action}` : null, `Auto-reply: ${step.summary}`]);
+    `UPDATE media_partners SET to_finalize = $2, summary = concat_ws(' ', summary, $3::text), updated_at = now() WHERE id = $1`,
+    [partnerId, `Doing it automatically: ${action}`, `Auto-reply: ${step.summary}`]);
+}
+
+export type PendingAction = {
+  id: number; partnerId: number; company: string; domain: string | null; triedEmails: string[]; threadKey: string | null;
+  link: string | null; contact: string | null; contactRole: string | null;
+};
+/** Auto-reply next steps not yet carried out, for companies still in play. */
+export async function pendingActions(limit = 5): Promise<PendingAction[]> {
+  const r = await db().query(
+    `SELECT m.id, m.partner_id, p.company, p.domain, p.tried_emails, m.thread_key, m.next_link, m.next_contact, m.next_contact_role
+       FROM media_messages m JOIN media_partners p ON p.id = m.partner_id
+      WHERE m.acted_at IS NULL AND (m.next_link IS NOT NULL OR m.next_contact IS NOT NULL) AND p.status <> 'declined'
+      ORDER BY m.id LIMIT $1`, [limit]);
+  return r.rows.map((x) => ({ id: x.id, partnerId: x.partner_id, company: x.company, domain: x.domain, triedEmails: x.tried_emails ?? [], threadKey: x.thread_key, link: x.next_link, contact: x.next_contact, contactRole: x.next_contact_role }));
+}
+
+/** What the executor did: on the auto-reply and on the company's record (a price or a blocked form reaches the owner). */
+export async function recordAction(messageId: number, partnerId: number, r: { result: string; toFinalize: string | null; costTerms?: string | null; ownerQuestion?: string | null }) {
+  await db().query(`UPDATE media_messages SET acted_at = now(), action_result = $2 WHERE id = $1`, [messageId, r.result]);
+  await db().query(
+    `UPDATE media_partners SET to_finalize = $2, cost_terms = CASE WHEN $3::text IS NULL OR cost_terms LIKE '%' || $3 || '%' THEN cost_terms ELSE concat_ws(' · ', cost_terms, $3::text) END,
+       owner_question = COALESCE($4, owner_question), summary = concat_ws(' ', summary, $5::text), updated_at = now() WHERE id = $1`,
+    [partnerId, r.toFinalize, r.costTerms ?? null, r.ownerQuestion ?? null, r.result]);
+}
+
+/** The first email we sent in a thread (what a new contact is sent). */
+export async function firstOutbound(partnerId: number): Promise<{ subject: string; body: string } | null> {
+  const r = await db().query(`SELECT subject, body FROM media_messages WHERE partner_id = $1 AND direction = 'out' AND purpose = 'outreach' ORDER BY id LIMIT 1`, [partnerId]);
+  return r.rows[0] ?? null;
 }
 
 export async function markAutoReplyTried(messageId: number) {

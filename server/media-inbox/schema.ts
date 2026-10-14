@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS media_outreach_queue (
  source text NOT NULL, queued_at timestamptz NOT NULL DEFAULT now(), sent_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS media_outreach_queue_status ON media_outreach_queue(status, id);
+-- Auto-reply next steps, acted on automatically (owner, 2026-10-14: "do everything automatically").
+ALTER TABLE media_messages ADD COLUMN IF NOT EXISTS next_link text, ADD COLUMN IF NOT EXISTS next_contact text,
+ ADD COLUMN IF NOT EXISTS next_contact_role text, ADD COLUMN IF NOT EXISTS acted_at timestamptz, ADD COLUMN IF NOT EXISTS action_result text;
 CREATE TABLE IF NOT EXISTS media_inbox_state (
  mailbox text PRIMARY KEY, uid_validity text, last_uid bigint NOT NULL DEFAULT 0,
  last_pass_at timestamptz, last_pass_error text

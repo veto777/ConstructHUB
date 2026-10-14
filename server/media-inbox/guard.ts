@@ -91,3 +91,9 @@ const OPT_OUT = /^\W*(stop|unsubscribe)\W*$|\b(unsubscribe|remove (me|us)( from 
 export function isOptOut(body: string): boolean {
   return OPT_OUT.test(body.split("\n").slice(0, 8).join("\n"));
 }
+
+/** Our first email as a form message: no greeting, no "Best regards", no stop line (a form is not an email). */
+export function formMessage(firstBody: string): string {
+  return firstBody.trim().replace(/^(hi|hello|dear)[^\n]*\n+/i, "").split(/\n+best regards,?/i)[0]
+    .split("\n").filter((l) => !/reply\s+["“]?stop|unsubscribe/i.test(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}

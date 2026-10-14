@@ -96,7 +96,11 @@ export async function fetchSince(lastUid: number, uidValidity: string | null): P
         });
       }
       // Read in Gmail once stored here (owner, 2026-10-14: an unread email looks ignored). Stored = it will be handled.
-      if (messages.length) await client.messageFlagsAdd(messages.map((m) => m.uid).join(","), ["\\Seen"], { uid: true }).catch(() => undefined);
+      if (messages.length) {
+        const ok = await client.messageFlagsAdd(messages.map((m) => m.uid).join(","), ["\\Seen"], { uid: true })
+          .catch((e) => { console.error(`[media-inbox] marking read in Gmail failed: ${e?.message ?? e}`); return false; });
+        if (!ok) console.error(`[media-inbox] Gmail did not mark UIDs ${messages.map((m) => m.uid).join(",")} read`);
+      }
     } finally {
       lock.release();
     }
