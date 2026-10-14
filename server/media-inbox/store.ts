@@ -187,7 +187,7 @@ export async function addAgreedPartner(p: PartnerRow): Promise<{ addedTo: string
   let addedTo: string | null = null;
   if (p.kind === "directory") {
     const note = `Partner agreement via media@ (${when}): ${p.agreement ?? "agreed"}`.slice(0, 1000);
-    const hit = await db().query(`UPDATE listing_directories SET notes = concat_ws(' · ', notes, $2), active = true, updated_at = now() WHERE domain = $1 RETURNING id`, [p.domain, note]);
+    const hit = await db().query(`UPDATE listing_directories SET notes = concat_ws(' · ', notes, $2::text), active = true, updated_at = now() WHERE domain = $1 RETURNING id`, [p.domain, note]);
     if (!hit.rows[0]) {
       const taken = await db().query(`SELECT 1 FROM listing_directories WHERE name = $1`, [p.company]);
       await db().query(
