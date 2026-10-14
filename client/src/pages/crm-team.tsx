@@ -754,10 +754,12 @@ export default function CrmTeamPage() {
                 />
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex flex-col sm:flex-row gap-2">
+                {/* The email box never shrinks below a usable width: with the mobile field and the division picker the row
+                    is too long for a narrow page beside the CRM menu, so the controls wrap onto a second line instead. */}
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
                   <Input placeholder="name@company.com" value={inviteEmail} type="email"
                     data-testid="input-invite-email"
-                    onChange={(e) => setInviteEmail(e.target.value)} className="flex-1" />
+                    onChange={(e) => setInviteEmail(e.target.value)} className="flex-1 sm:min-w-[16rem]" />
                   {smsStatus?.configured && (
                     <Input placeholder="mobile (optional) — also text it" value={invitePhone} type="tel"
                       data-testid="input-invite-phone"
