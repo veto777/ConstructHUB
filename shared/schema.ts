@@ -435,6 +435,8 @@ export const catalogueDirectories = pgTable("listing_directories", {
   active: boolean("active").notNull().default(true),
   source: text("source").notNull(),
   notes: text("notes"),
+  authority: jsonb("authority"),
+  authorityAt: timestamp("authority_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

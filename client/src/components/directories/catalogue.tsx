@@ -399,7 +399,13 @@ export function Catalogue({
                       {directory.grade}
                     </StatusPill>
                   ) : (
-                    "—"
+                    <span
+                      title={["maps_nav", "social", "ai"].includes(directory.category)
+                        ? "Not graded: maps, social and AI platforms are not backlink sources"
+                        : "Not graded yet"}
+                    >
+                      —
+                    </span>
                   )}
                 </td>
                 <td className="p-3">

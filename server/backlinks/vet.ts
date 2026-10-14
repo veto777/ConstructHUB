@@ -238,7 +238,10 @@ export function gradeSource(hint: BacklinkKind, s: BacklinkSignals, m: BacklinkM
   const relTotal = s.rel.dofollow + s.rel.nofollow + s.rel.sponsored;
   const linkType: LinkType = relTotal < 3 ? "unknown" : s.rel.sponsored / relTotal > 0.5 ? "sponsored" : s.rel.nofollow / relTotal > 0.6 ? "nofollow" : "dofollow";
   const stop = (why: string): Grade => ({ kind, tier: "X", score: 0, reasons: [...reasons, why], linkType });
-  if (isExcluded(normalizeDomain(s.fetchedUrl) ?? "")) return stop("A platform where anyone can post, not a publisher");
+  // Directories and citations are joined by being listed: a profile on Yelp, BBB or a state licence lookup IS the
+  // citation. Only the curated directory catalogue brings such domains in (discovery and imports drop them).
+  const listed = kind === "directory" || kind === "citation";
+  if (!listed && isExcluded(normalizeDomain(s.fetchedUrl) ?? "")) return stop("A platform where anyone can post, not a publisher");
   if (BOT_WALL.has(s.httpStatus)) return gradeBlocked(kind, s.httpStatus, m, linkType);
   if (s.httpStatus >= 400 || s.httpStatus === 0) return stop(`The site answered ${s.httpStatus || "nothing"}`);
   if (s.parked) return stop("Parked or for-sale domain");
@@ -249,12 +252,11 @@ export function gradeSource(hint: BacklinkKind, s: BacklinkSignals, m: BacklinkM
   // 2026-10-13 hard rules (owner: "fix everything"): a source is real only when the SITE invites it, the site is about
   // the trades (for content links), and it is a publisher — not a list, a seller, a job board or a foreign-market site.
   const site = normalizeDomain(s.fetchedUrl) ?? "";
-  if (isExcluded(site)) return stop("A platform where anyone can post, not a publisher");
+  if (!listed && isExcluded(site)) return stop("A platform where anyone can post, not a publisher");
   const tld = foreignTld(site);
   if (tld) return stop(`A site for an audience outside the US (.${tld})`);
   if (s.listPage) return stop(`The page found is ${s.listPage}, not a publisher`);
-  // Directories and citations are joined by being listed: their own public directory page counts as the way in.
-  const listed = kind === "directory" || kind === "citation";
+  // Their own public directory page counts as the way in.
   const entryUrl = s.submissionUrl ?? (listed ? s.directoryUrl ?? null : null);
   if (!entryUrl) return stop(s.profilePage
     ? "Found on a user profile — the site itself does not invite submissions"

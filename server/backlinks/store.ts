@@ -161,6 +161,22 @@ export async function needingMetrics(limit: number): Promise<{ id: number; domai
   return r.rows;
 }
 
+/** Catalogue directories whose DR is known nowhere: not in this database with a rank, and not measured on the catalogue (or 90+ days ago). */
+export async function directoriesNeedingAuthority(limit: number): Promise<string[]> {
+  const exists = await db().query(`SELECT to_regclass('listing_directories') IS NOT NULL AS ok`);
+  if (!exists.rows[0]?.ok) return [];
+  const r = await db().query(
+    `SELECT DISTINCT d.domain FROM listing_directories d
+      WHERE d.active AND d.domain IS NOT NULL AND (d.authority_at IS NULL OR d.authority_at < now() - interval '90 days')
+        AND NOT EXISTS (SELECT 1 FROM backlink_sources b WHERE b.domain = d.domain AND b.metrics ? 'rank')
+      ORDER BY d.domain LIMIT $1`, [limit]);
+  return r.rows.map((x) => x.domain);
+}
+
+export async function saveDirectoryAuthority(domain: string, metrics: BacklinkMetrics) {
+  await db().query(`UPDATE listing_directories SET authority = $2, authority_at = now() WHERE domain = $1`, [domain, JSON.stringify(metrics)]);
+}
+
 /** Store measured authority and the grade it leads to (a source with outreach under way keeps its status unless it fails now). */
 export async function saveMetrics(id: number, metrics: BacklinkMetrics, g: Grade) {
   await db().query(

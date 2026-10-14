@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS listing_directories (
  requires_postcard boolean, paid boolean, active boolean NOT NULL DEFAULT true, source text NOT NULL, notes text,
  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
 );
+-- Authority (domain rank, spam, traffic) for directories the Backlinks database does not hold (maps, social, AI):
+-- filled by the backlinks worker so every directory shows a DR (2026-10-14).
+ALTER TABLE listing_directories ADD COLUMN IF NOT EXISTS authority jsonb, ADD COLUMN IF NOT EXISTS authority_at timestamptz;
 CREATE TABLE IF NOT EXISTS listings (
  id serial PRIMARY KEY, profile_id integer NOT NULL REFERENCES listing_profiles(id) ON DELETE CASCADE,
  directory_id integer NOT NULL REFERENCES listing_directories(id),
