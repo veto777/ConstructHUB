@@ -20,7 +20,8 @@
  * makes the YouTube thumbnail.
  *
  * Every ffmpeg runs under the machine-wide encode lock, niced, with 4 threads: this box also serves
- * production. The cards are our own artwork and type (brand.ts) — no generated footage, no music.
+ * production. The cards are our own artwork and type (brand.ts) — no generated footage. A quiet music
+ * bed sits under the narration (music.ts; `--no-music` leaves it out).
  */
 import fs from "fs";
 import path from "path";
@@ -30,6 +31,7 @@ import {
 } from "./lib";
 import { endCardHtml, introCardHtml, renderStill } from "./brand";
 import { helpEntry } from "../../shared/help/registry";
+import { bedFilter, bedFor, bedInputs, mixFilter } from "./music";
 
 const FPS = 30;
 const FF = ["-hide_banner", "-loglevel", "error", "-y", "-threads", "4"];
@@ -143,8 +145,8 @@ export function chaptersOf(steps: { chapter?: string }[], title: string, startOf
 export const chapterLines = (chapters: Chapter[]): string[] => chapters.length ? ["", "Chapters", ...chapters.map((c) => `${c.at} ${c.title}`)] : [];
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (!args._[0]) throw new Error("Usage: tsx scripts/tutorials/mux.ts <script.json> [--out DIR]");
+  const args = parseArgs(process.argv.slice(2), ["no-music"]);
+  if (!args._[0]) throw new Error("Usage: tsx scripts/tutorials/mux.ts <script.json> [--out DIR] [--no-music]");
   const { script, title } = loadScript(args._[0]);
   const dir = outDir(args, script.helpKey);
   const at = (f: string) => path.join(dir, f);
@@ -162,6 +164,8 @@ async function main() {
   const cardMs = Math.round(flagNum(args, "card", film ? 0.8 : 1.8) * 1000), endCardMs = Math.round(flagNum(args, "end", film ? 2.5 : 4) * 1000);
   if (cardMs > 2000) throw new Error("the intro card is 2 s at most");
   const crf = flagNum(args, "crf", 23);
+  // The music bed (owner, 2026-10-14): one of the ad tracks, 20 dB under the voice, by tool group.
+  const music = args.flags["no-music"] === true ? null : bedFor(script.helpKey);
   const { width, height } = timings.video ?? timings.viewport;
 
   // 1 ── Tie the recorder's clock to the video's: find the two black sync frames record.ts showed.
@@ -214,7 +218,8 @@ async function main() {
       + `scale=${width}:${height}:flags=lanczos,fade=t=in:st=0:d=${fade}:color=white,fade=t=out:st=${(bodyMs / 1000 - fade).toFixed(2)}:d=${fade}:color=white,format=yuv420p,setsar=1[body]`,
     `[2:v]${still("end", endS, `fade=t=in:st=0:d=${fade}:color=white,`)}`,
     `[intro][body][end]concat=n=3:v=1:a=0[v]`,
-    `[3:a]${loudnorm},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[a]`,
+    `[3:a]${loudnorm},aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[${music ? "voice" : "a"}]`,
+    ...(music ? [bedFilter(4, totalMs / 1000), mixFilter("voice")] : []),
   ].join(";");
   await run("ffmpeg", [
     ...FF,
@@ -222,6 +227,7 @@ async function main() {
     "-i", at("raw.mkv"),
     "-loop", "1", "-framerate", String(FPS), "-t", String(endS), "-i", at("_end.png"),
     "-i", at("narration.wav"),
+    ...(music ? bedInputs(music) : []),
     "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
     "-c:v", "libx264", "-profile:v", "high", "-preset", "medium", "-crf", String(crf), "-pix_fmt", "yuv420p", "-r", String(FPS), "-g", String(FPS * 2),
     "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
@@ -274,6 +280,7 @@ async function main() {
 
   fs.writeFileSync(at("video.json"), JSON.stringify({
     helpKey: script.helpKey, durationSec, width, height, clockOffsetMs: offsetMs, clockDriftMs: driftMs, cardMs, endCardMs, cues: cues.length, loudness, files,
+    music: music ? { bed: music.file, start: music.start } : null,
   }, null, 2) + "\n");
   console.log(`walkthrough.mp4  ${width}x${height}  ${durationSec}s  ${(files.video.bytes / 1e6).toFixed(2)} MB  ${loudness.lufs} LUFS, true peak ${loudness.truePeakDb} dBTP  `
     + `(clock offset ${offsetMs} ms, drift ${driftMs ?? "n/a"} ms, ${cues.length} caption cues, ${chapters.length} chapters)`);
