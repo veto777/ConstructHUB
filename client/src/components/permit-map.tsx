@@ -42,7 +42,8 @@ interface MapData {
   portals: MapPortal[];
 }
 
-const MAX_ZOOM = 32;
+// Owner, 2026-10-14: "make sure you can zoom in even more" (was 32).
+const MAX_ZOOM = 128;
 
 type Cell = { key: string; lat: number; lng: number; portals: MapPortal[]; hasCounty: boolean };
 
@@ -146,7 +147,7 @@ function PermitMapInner({ onPick }: { onPick: (p: MapPortal) => void }) {
   const reset = () => { setZoom(1); setCenter([-97, 38]); setSelected(null); };
   // Names appear once the dots have been separated (individual portals).
   const showNames = zoom >= 4.5;
-  const stateLabelSize = Math.max(2.6, 9 / Math.sqrt(zoom));
+  const stateLabelSize = 9 / Math.pow(zoom, 0.75); // grows only a little on screen as you zoom in
 
   return (
     <MapFrame>
@@ -192,15 +193,17 @@ function PermitMapInner({ onPick }: { onPick: (p: MapPortal) => void }) {
                   })}
                 </Geographies>
                 {cells.map((c) => {
-                  const r = (c.hasCounty ? 4.2 : 2.9) / Math.sqrt(zoom);
+                  // Sizes are map units, which the zoom multiplies: dots grow only gently on screen as you zoom in…
+                  const r = (c.hasCounty ? 4.2 : 2.9) / Math.pow(zoom, 0.8);
                   const single = c.portals.length === 1;
-                  const nameFont = Math.max(2.2, 7 / Math.sqrt(zoom));
+                  // …and names stay one small size on screen at every zoom (owner, 2026-10-14: "make the font smaller").
+                  const nameFont = 11 / zoom;
                   const label = single ? c.portals[0].jurisdiction : `${c.portals.length} portals`;
                   return (
                     <Marker key={c.key} coordinates={[c.lng, c.lat]} onClick={() => setSelected(c)} style={{ default: { cursor: "pointer" }, hover: { cursor: "pointer" }, pressed: {} }}>
                       {/* Enlarged transparent hit target so the dot is easy to click/tap. */}
-                      <circle r={Math.max(r + 2.5, 6 / Math.sqrt(zoom))} fill="transparent" />
-                      <circle r={r} fill="var(--map-dot)" stroke="var(--map-dot-stroke)" strokeWidth={r > 3 ? 1 : 0.6} opacity={0.94} />
+                      <circle r={Math.max(r * 1.8, 8 / zoom)} fill="transparent" />
+                      <circle r={r} fill="var(--map-dot)" stroke="var(--map-dot-stroke)" strokeWidth={Math.min(1, r * 0.25)} opacity={0.94} />
                       {c.portals.length > 1 && zoom < 4.5 && (
                         <text textAnchor="middle" y={r * 0.5} fontSize={r * 1.1} fill="var(--map-dot-stroke)" style={{ pointerEvents: "none", fontWeight: 700 }}>{c.portals.length}</text>
                       )}
