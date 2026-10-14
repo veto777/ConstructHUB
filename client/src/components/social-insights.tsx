@@ -15,6 +15,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { NetworkBadge, networkName } from "@/components/social-week";
 
 type AccountStats = {
   accountId: string; platform: string; name: string; days: number;
@@ -62,7 +63,7 @@ export function SocialAccountStats({ businessId }: { businessId: number | null }
             <article key={a.accountId} className="space-y-2 rounded-lg border p-3" data-testid={`stats-account-${a.accountId}`}>
               <div className="flex items-baseline justify-between gap-2">
                 <p className="truncate text-sm font-medium">{a.name}</p>
-                <span className="text-xs g-text-2">{NETWORK[a.platform] ?? a.platform}</span>
+                <NetworkBadge platform={a.platform} label={NETWORK[a.platform] ?? networkName(a.platform)} className="shrink-0 text-xs g-text-2" />
               </div>
               {a.error ? (
                 <p role="alert" className="text-xs g-closed">{a.error}</p>

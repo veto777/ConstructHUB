@@ -32,7 +32,7 @@ import { SocialAccountStats, SocialPostInsights } from "@/components/social-insi
 import { useLocation } from "wouter";
 import { ToolBarSlot } from "@/components/tool/shell";
 import { socialHref, socialViewOf, type SocialView } from "@/components/social-tool/nav";
-import { NetworkIcon, SocialWeek } from "@/components/social-week";
+import { NetworkBadge, NetworkIcon, SocialWeek, networkName } from "@/components/social-week";
 import { XPreview } from "@/components/social-x";
 import { TikTokDeclaration, TikTokPanel } from "@/components/social-tiktok";
 
@@ -89,7 +89,7 @@ const VIEW_HEAD: Record<SocialView, [string, string]> = {
   posts: ["Posts", "Drafts, scheduled, published and failed posts, newest first."],
   analytics: ["Analytics", "Followers, reach and engagement for each connected account, and your published posts."],
   inbox: ["Inbox", "Comments on your published posts. Open Comments on a post to reply, hide or delete."],
-  accounts: ["Accounts", "Connect Facebook, Instagram, Threads, TikTok and YouTube, and choose where posts go."],
+  accounts: ["Accounts", "Connect your social accounts and choose where posts go."],
   auto: ["Auto mode", "Let ConstructHUB write posts for you on a schedule, as drafts or straight to your accounts."],
   guides: ["Guides", "Step-by-step help for Social Media."],
 };
@@ -151,6 +151,10 @@ export default function SocialMediaPage() {
   const planRequired = planRequiredFrom(businesses.error);
   const noBusinesses = !businesses.isError && !!businesses.data && (businesses.data.total ?? 0) === 0 && !(businesses.data.items ?? []).length;
   const chosen = business && valid;
+  // One business only: there is no "All clients" to be in (the menu has no such row), so ?business=all opens that business
+  // instead of a page that asks for a choice it cannot show (owner, 2026-10-13: "doesnt let you choose anything").
+  const onlyId = businesses.data?.total === 1 && businesses.data?.items?.length === 1 ? String(businesses.data.items[0].id) : null;
+  useEffect(() => { if (business === "all" && onlyId) setBusiness(onlyId, true); }, [business, onlyId]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <AppPage>
       {!planRequired && <ToolBarSlot><BusinessSwitch business={chosen ? business : null} items={businesses.data?.items ?? []} total={businesses.data?.total ?? 0} onChange={(v) => { if (v) { setBusiness(v, true); return; } const p = new URLSearchParams(window.location.search); p.delete("business"); p.set("pick", "1"); navigate(`${path}?${p}`); }} /></ToolBarSlot>}
@@ -530,7 +534,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
       {!all && tab === "overview" && <SocialOverview business={String(businessId)} businessId={businessId} accounts={accounts} />}
       {!all && tab === "overview" && <SocialWeek businessId={businessId} all={false} business={String(businessId)} />}
       {tab === "one-business" && (
-        <Notice tone="info" title="Choose one business" testId="notice-social-one-business">
+        <Notice tone="info" title="Choose one business" testId="notice-social-one-business" action={<OpenOneBusiness view={view} />}>
           {view === "compose" ? "Posts are written for one business at a time." : view === "auto" ? "Auto mode is set for each business." : view === "accounts" ? "Accounts are connected for each business." : "This view is for one business at a time."} Pick it in the Business menu above.
         </Notice>
       )}
@@ -589,7 +593,8 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                         checked={!!d}
                         onChange={(e) => choose(a, e.target.checked)}
                       />
-                      {a.name} · {a.platform}
+                      <NetworkIcon platform={a.platform} />
+                      {a.name} · {networkName(a.platform)}
                     </label>
                     {d && (
                       <div className="space-y-2">
@@ -694,11 +699,11 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
             </label>
             {[...new Set(destinations.map((d) => d.platform))].map((p) => (
               <label className="block space-y-1" key={p}>
-                <span className="text-sm">
-                  {p === "x" ? "X" : p} text tweak · {characterCount(p, tweaks[p] ?? text)}
+                <span className="flex items-center gap-1.5 text-sm">
+                  <NetworkIcon platform={p} /> {networkName(p)} text tweak · {characterCount(p, tweaks[p] ?? text)}
                 </span>
                 <Textarea
-                  aria-label={`${p === "x" ? "X" : p} text tweak`}
+                  aria-label={`${networkName(p)} text tweak`}
                   value={tweaks[p] ?? text}
                   onChange={(e) =>
                     setTweaks({ ...tweaks, [p]: e.target.value })
@@ -1317,7 +1322,7 @@ function PostRow({
         {["draft", "queued"].includes(p.state) && <input type="checkbox" aria-label={`Select post ${p.id}`} checked={selected} onChange={e => onSelect(e.target.checked)} />}
         <span className={`g-chip g-chip--sm ${p.state === "failed" ? "g-closed" : p.state === "published" ? "g-open" : ""}`}>{p.state}</span>
         <span className="g-card__title g-card__title--md">{p.business_name || "Legacy / unassigned"}</span>
-        <span className="text-sm g-text-2">{p.payload.post.content.platform}</span>
+        <NetworkBadge platform={p.payload.post.content.platform} className="text-sm g-text-2" />
         <span className="text-sm g-text-2">
           · {when.toLocaleString()}
         </span>
@@ -1403,8 +1408,8 @@ function PostRow({
             <AlertDialogTitle>Cancel this {p.state === "draft" ? "draft" : "post"}?</AlertDialogTitle>
             <AlertDialogDescription>
               {p.state === "queued"
-                ? `It is queued for ${when.toLocaleString()} on ${p.payload.post.content.platform} and won't be published.`
-                : `The draft for ${p.payload.post.content.platform} is removed from the queue.`}{" "}
+                ? `It is queued for ${when.toLocaleString()} on ${networkName(p.payload.post.content.platform)} and won't be published.`
+                : `The draft for ${networkName(p.payload.post.content.platform)} is removed from the queue.`}{" "}
               This can't be undone; compose a new post if you change your mind.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1415,6 +1420,23 @@ function PostRow({
         </AlertDialogContent>
       </AlertDialog>
     </article>
+  );
+}
+
+/** Open buttons for the "Choose one business" notice: the first businesses by name, then the full list (owner, 2026-10-13). */
+function OpenOneBusiness({ view }: { view: SocialView }) {
+  const [, navigate] = useLocation();
+  const businesses = useQuery<any>({
+    queryKey: ["/api/social", "businesses", "", 0, "all"],
+    queryFn: async () => (await apiRequest("GET", `/api/social/businesses?${new URLSearchParams({ search: "", offset: "0", linked: "all" })}`)).json(),
+  });
+  const items: any[] = (businesses.data?.items ?? []).slice(0, 6);
+  const total: number = businesses.data?.total ?? 0;
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {items.map((b) => <GooglePill key={b.id} size="sm" label={`Open ${b.business_name}${b.city ? ` · ${b.city}` : ""}`} onClick={() => navigate(socialHref(view, String(b.id)))} testId={`button-open-business-${b.id}`} />)}
+      {total > items.length && <GooglePill size="sm" variant="outline" label={`All ${total} businesses…`} onClick={() => navigate(socialHref(view, null, { pick: "1" }))} />}
+    </span>
   );
 }
 
@@ -1429,7 +1451,7 @@ function BusinessSwitch({ business, items, total, onChange }: { business: string
         {!business && <option value="">Choose a business…</option>}
         {!listed && <option value={business!}>This business</option>}
         {items.map((b) => <option key={b.id} value={String(b.id)}>{b.business_name}{b.city ? ` · ${b.city}` : ""}</option>)}
-        {total > 1 && <option value="all">All clients (calendar and posts)</option>}
+        {(total > 1 || business === "all") && <option value="all">All clients (calendar and posts)</option>}
         <option value="__pick">{total > 1 ? `All ${total} businesses and bulk actions…` : "Business list…"}</option>
       </select>
     </label>

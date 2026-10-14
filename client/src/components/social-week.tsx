@@ -8,7 +8,7 @@ import { useQueries } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { IconType } from "react-icons";
-import { FaBluesky, FaFacebook, FaGoogle, FaInstagram, FaLinkedin, FaPinterest, FaThreads, FaTiktok, FaXTwitter, FaYoutube } from "react-icons/fa6";
+import { FaBluesky, FaFacebook, FaGoogle, FaInstagram, FaLinkedin, FaMastodon, FaPinterest, FaReddit, FaThreads, FaTiktok, FaTumblr, FaXTwitter, FaYoutube } from "react-icons/fa6";
 import { apiRequest } from "@/lib/queryClient";
 import { GooglePill } from "@/components/google";
 import { socialHref } from "@/components/social-tool/nav";
@@ -20,11 +20,19 @@ export const NETWORK_ICON: Record<string, { icon: IconType; color: string; name:
   twitter: { icon: FaXTwitter, color: "currentColor", name: "X" }, linkedin: { icon: FaLinkedin, color: "#0A66C2", name: "LinkedIn" },
   youtube: { icon: FaYoutube, color: "#FF0000", name: "YouTube" }, pinterest: { icon: FaPinterest, color: "#BD081C", name: "Pinterest" },
   bluesky: { icon: FaBluesky, color: "#1185FE", name: "Bluesky" }, gbp: { icon: FaGoogle, color: "#4285F4", name: "Google" },
+  instagram_direct: { icon: FaInstagram, color: "#E4405F", name: "Instagram" }, mastodon: { icon: FaMastodon, color: "#6364FF", name: "Mastodon" },
+  tumblr: { icon: FaTumblr, color: "#36465D", name: "Tumblr" }, reddit: { icon: FaReddit, color: "#FF4500", name: "Reddit" },
 };
+/** The network's proper name ("tumblr" → "Tumblr"); unknown ids come back as they are. */
+export const networkName = (platform: string) => NETWORK_ICON[platform]?.name ?? platform;
 export function NetworkIcon({ platform, className = "h-4 w-4" }: { platform: string; className?: string }) {
   const n = NETWORK_ICON[platform];
   if (!n) return <span className="text-xs g-text-2">{platform}</span>;
-  return <n.icon className={className} style={{ color: n.color }} aria-label={n.name} role="img" />;
+  return <n.icon className={`${className} shrink-0`} style={{ color: n.color }} aria-label={n.name} role="img" />;
+}
+/** Logo + name, wherever a network is named (owner, 2026-10-13: "anywhere there are brands they better have brands"). */
+export function NetworkBadge({ platform, label, className = "", iconClassName = "h-4 w-4" }: { platform: string; label?: string; className?: string; iconClassName?: string }) {
+  return <span className={`inline-flex items-center gap-1.5 ${className}`}><NetworkIcon platform={platform} className={iconClassName} /><span>{label ?? networkName(platform)}</span></span>;
 }
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
