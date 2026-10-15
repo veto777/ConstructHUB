@@ -21,7 +21,8 @@
  * report shows the code.
  */
 import type { EnforcementHit } from "@shared/research-reports";
-import { USER_AGENT, rateLimitHost } from "../http";
+import { fetchWithDeadline, rateLimitHost } from "../http";
+import { adverseFrom } from "../adverse";
 import { clean, csvRecords, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
@@ -35,8 +36,10 @@ const TDEC_APP = "https://dataviewers.tdec.tn.gov/dataviewers/f?p=999001";
 const TDEC_PAGE = "https://dataviewers.tdec.tn.gov/dataviewers/r/tdec_reports/tdec-enforcementdataviewer999001/home";
 
 /** Organization words: a respondent without one is taken to be a person and skipped. */
-const ORG = /\b(L\.?L\.?C|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|L\.?P|LLP|LTD|PLLC|P\.?C|PARTNERS|PARTNERSHIP|ENTERPRISES?|CONSTRUCTION|CONTRACTING|CONTRACTORS?|BUILDERS?|HOMES|DEVELOPMENT|DEVELOPERS?|PROPERTIES|PROPERTY|GROUP|SERVICES?|INDUSTRIES|UTILITY|UTILITIES|DISTRICT|AUTHORITY|BOARD|CITY|COUNTY|TOWN|ASSOCIATION|TRUST|BANK|CHURCH|SCHOOL|UNIVERSITY|HOSPITAL|FARMS?|MART|MARKET|OIL|PETROLEUM|ENERGY|EXCAVATING|PAVING|LANDFILL|MINING|QUARRY|STONE|ASPHALT|CONCRETE|MATERIALS|SAND|GRAVEL|TRUCKING|PLUMBING|ELECTRIC|ROOFING|DEMOLITION|ENVIRONMENTAL|DBA|D\/B\/A|USA|AMERICA)\b/i;
+const ORG = /\b(L\.?L\.?C|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|L\.?P|LLP|LTD|PLLC|P\.?C|PARTNERS|PARTNERSHIP|ENTERPRISES?|CONSTRUCTION|CONTRACTING|CONTRACTORS?|BUILDERS?|HOMES|DEVELOPMENT|DEVELOPERS?|PROPERTIES|PROPERTY|GROUP|SERVICES?|INDUSTRIES|UTILITY|UTILITIES|DISTRICT|AUTHORITY|BOARD|CITY|COUNTY|TOWN|ASSOCIATION|TRUST|BANK|CHURCH|SCHOOL|UNIVERSITY|HOSPITAL|FARMS?|MART|MARKET|OIL|PETROLEUM|ENERGY|EXCAVATING|PAVING|LANDFILL|MINING|QUARRY|STONE ?WORKS|ASPHALT|CONCRETE|MATERIALS|SAND AND GRAVEL|SAND & GRAVEL|GRAVEL|TRUCKING|PLUMBING|ELECTRIC|ROOFING|DEMOLITION|ENVIRONMENTAL|DBA|D\/B\/A|USA|AMERICA)\b/i;
 const ORDER = /order|settlement|cost recovery|judgment/i;
+// Words that are surnames as well (Stone, Smart, Pool, Brothers, Hammers) are left out of both lists, or kept only in a
+// form a surname can't take ("STONE WORKS", "POOLS", "& BROTHERS"): "John Stone" is a person (audit 2026-10-15, decision 5).
 
 export const tdecIsOrganization = (name: string | null): boolean => !!name && ORG.test(name);
 
@@ -49,7 +52,8 @@ export function tdecHit(r: Record<string, string>, violation: string | null): En
     city: clean(r.County) ? `${clean(r.County)} County` : null,
     detail: [division ? `TDEC division code ${division}` : null, violation ? `violation: ${violation}` : null, clean(r.Site) ? `site: ${clean(r.Site)}` : null,
       clean(r["EFO Name"]) ? `${clean(r["EFO Name"])} field office` : null].filter(Boolean).join("; ") || null,
-    amount: null, adverse: type && ORDER.test(type) ? true : null,
+    // From the case type's own words (an order, settlement or judgment); a dismissed or withdrawn case is not adverse.
+    amount: null, adverse: adverseFrom([type, status].filter(Boolean).join("; "), { adverse: ORDER }),
   };
 }
 
@@ -59,7 +63,7 @@ async function tdecCsv(page: number, session: { id: string; cookie: string } | n
   let url = `${TDEC_APP}:${page}:${s?.id ?? 0}:CSV::::`;
   for (let hop = 0; hop < 3; hop++) {
     await rateLimitHost(url, 2000);
-    const res = await fetch(url, { headers: { "user-agent": USER_AGENT, ...(s?.cookie ? { cookie: s.cookie } : {}) }, redirect: "manual" });
+    const res = await fetchWithDeadline(url, { headers: s?.cookie ? { cookie: s.cookie } : {}, redirect: "manual" }, 5 * 60_000);
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location");
       const id = loc?.match(/session=(\d+)/)?.[1];
@@ -168,7 +172,7 @@ export function parseTnDar(text: string): DarRow[] {
 }
 
 /** Organization words for a contractor respondent (the TDEC list, plus trades and the words these reports use). */
-const DAR_ORG = /\b(L\.?L\.?C|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|L\.?P|LLP|LTD|PLLC|P\.?C|GP|PARTNERS|PARTNERSHIP|ENTERPRISES?|CONSTRUCTION|CONTRACTING|CONTRACTORS?|BUILDERS?|BUILDING|HOMES?|DEVELOPMENT|DEVELOPERS?|PROPERTIES|PROPERTY|GROUP|SERVICES?|SOLUTIONS|INDUSTRIES|ROOFING|ROOF|RESTORATION|REMODELING|RENOVATIONS?|IMPROVEMENTS?|POOLS?|PLUMBING|ELECTRIC(AL)?|MECHANICAL|HEATING|AIR|HVAC|EXTERIORS?|SIDING|GUTTERS?|WINDOWS?|DOORS?|PAINTING|CONCRETE|PAVING|EXCAVATING|LANDSCAPING|FENCE|FENCING|DESIGNS?|SYSTEMS|SECURITY|SMART|TECHNOLOGIES|TECHNOLOGY|CONSULTING|MANAGEMENT|INVESTMENTS?|HOLDINGS|NEWCO|USA|AMERICA|SOLAR|ENERGY|REMODEL|REMODELER|HARDSCAPES?|FLOORING|SEPTIC|OUTDOORS?|COUNTERTOPS|LANDSCAPE|IRON WORKS|RENOVATORS|CONSULTANTS|DECKS?|DECK PRO|STRUCTURES|FINISHING|BUILDINGS|DEMOLITION|CABINETRY|CABINETS|TURNKEY|REALTY|VENTURES|CRAWL ?SPACE|BUILDS|BUILT|HOMEWORKS|RECONSTRUCTION|MAINTENANCE|FIRM|FOUNDATION|ROOFERS?|PROFESSIONALS?|OPERATIONS|LAWN|BROTHERS|CARPENTRY|RESIDENTIAL|HARDWOOD|GARDENS|PAINTERS|UNLIMITED|BUILDCO|HAMMERS|REMOVAL|ASSOCIATES|EXPERTS|XPERTS|WORX|INTERIORS|METAL|SAFETY|DBA|D\/B\/A)\b|\.com\b/i;
+const DAR_ORG = /\b(L\.?L\.?C|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|L\.?P|LLP|LTD|PLLC|P\.?C|GP|PARTNERS|PARTNERSHIP|ENTERPRISES?|CONSTRUCTION|CONTRACTING|CONTRACTORS?|BUILDERS?|BUILDING|HOMES?|DEVELOPMENT|DEVELOPERS?|PROPERTIES|PROPERTY|GROUP|SERVICES?|SOLUTIONS|INDUSTRIES|ROOFING|ROOF|RESTORATION|REMODELING|RENOVATIONS?|IMPROVEMENTS?|POOLS|PLUMBING|ELECTRIC(AL)?|MECHANICAL|HEATING|AIR|HVAC|EXTERIORS?|SIDING|GUTTERS?|WINDOWS?|DOORS?|PAINTING|CONCRETE|PAVING|EXCAVATING|LANDSCAPING|FENCE|FENCING|DESIGNS?|SYSTEMS|SECURITY|TECHNOLOGIES|TECHNOLOGY|CONSULTING|MANAGEMENT|INVESTMENTS?|HOLDINGS|NEWCO|USA|AMERICA|SOLAR|ENERGY|REMODEL|REMODELER|HARDSCAPES?|FLOORING|SEPTIC|OUTDOORS?|COUNTERTOPS|LANDSCAPE|IRON WORKS|RENOVATORS|CONSULTANTS|DECKS?|DECK PRO|STRUCTURES|FINISHING|BUILDINGS|DEMOLITION|CABINETRY|CABINETS|TURNKEY|REALTY|VENTURES|CRAWL ?SPACE|BUILDS|BUILT|HOMEWORKS|RECONSTRUCTION|MAINTENANCE|FIRM|FOUNDATION|ROOFERS?|PROFESSIONALS?|OPERATIONS|LAWN|(?<=& |AND )BROTHERS|CARPENTRY|RESIDENTIAL|HARDWOOD|GARDENS|PAINTERS|UNLIMITED|BUILDCO|REMOVAL|ASSOCIATES|EXPERTS|XPERTS|WORX|INTERIORS|METAL|SAFETY|DBA|D\/B\/A)\b|\.com\b/i;
 const DBA = /\s+(?:dba|d\/b\/a|doing business as)\s+/i;
 
 /** The business named on a row, or null when the respondent is an individual (FCRA: companies only). */
@@ -189,7 +193,8 @@ export function darHit(r: DarRow, sourceUrl: string): EnforcementHit | null {
     state: "TN", source: "TN Board for Licensing Contractors and Alarm Systems Contractors Board disciplinary actions", sourceUrl, category: "discipline",
     name, id: null, date: usDate(r.date), endDate: null, status: r.action, city: r.location,
     detail: `${r.program}. Violation: ${r.violation}`, amount: fine ? Number(fine[1].replace(/,/g, "")) : null,
-    adverse: /penalt|revo|suspen|costs|probation|cease|desist/i.test(r.action) ? true : null,
+    // From the action's own words; "no civil penalty", dismissed or withdrawn → false, checked first (decision 2).
+    adverse: adverseFrom(r.action, { adverse: /penalt|revo|suspen|costs|probation|cease|desist/i }),
   };
 }
 
@@ -199,7 +204,7 @@ async function darPdfs(): Promise<string[]> {
   const urls = new Set<string>();
   for (const page of [DAR_PAGE, DAR_ARCHIVE]) {
     await rateLimitHost(page, 1500);
-    const res = await fetch(page, { headers: { "user-agent": USER_AGENT } });
+    const res = await fetchWithDeadline(page, {}, 60_000);
     if (!res.ok) throw new Error(`${page} returned HTTP ${res.status}`);
     for (const m of (await res.text()).matchAll(/href="([^"]*\/regboards\/dar\/(\d{4})\/[^"]+\.pdf)"/gi)) {
       if (Number(m[2]) >= year - 2) urls.add(new URL(m[1], page).toString());

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hicEnforcement, hicToHit, parseHicResponse } from "./ma";
+import { hicEnforcement, hicToHit, parseAuraContext, parseHicResponse } from "./ma";
 import { pipeRecords } from "./lib/g2-mylicense";
 
 // One registration from the Contractor Hub search response of 2026-10-15 (email and phone left out).
@@ -29,6 +29,21 @@ describe("MA Contractor Hub", () => {
     ]);
     expect(enf[1].status).toBe("Hearing decision: Revoke");
     expect(enf.every((e) => e.licenseNumber === "158845")).toBe(true);
+  });
+  it("marks a hearing adverse only from its own decision or fine (audit 2026-10-15)", () => {
+    const [a] = parseHicResponse(JSON.stringify(HIC));
+    // "Suspend" is the third decision word the registry uses (seen live 2026-10-15 with Reprimand and Revoke).
+    const decided = (d: string | undefined, fine: number) => hicEnforcement({ ...a, PublicComplaintAccount: [{ Docket_Number__c: "2018-196", Hearing_Decision__c: d, Total_Fine_Amount__c: fine }], Guaranty_Fund_Applications__r: [], Cases2__r: [] })[0];
+    expect(decided("Suspend", 0).adverse).toBe(true);
+    expect(decided(undefined, 0).adverse).toBeNull(); // no decision on the record: unknown, not adverse
+    expect(decided(undefined, 2400).adverse).toBe(true); // a fine imposed is the decision's own outcome
+    expect(decided(undefined, 0).status).toBe("Hearing decision");
+  });
+  it("reads the page's own Aura framework id instead of a made-up one", () => {
+    // Saved from contractorhub.mass.gov/s/hic-contractor-search, 2026-10-15 (URL-encoded in the page).
+    const page = "A%2241%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22fwuid%22%3A%22SGRNczhXdnNHNDNKUWhIdXFhdFJlUWtVMjdnTGFERUU2S3FfSVdrcU92bkExNS4zLjE2MDEw%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221888_-kKAFK7UHxK1kDSaicKEkw%22%7D%2C%22apce%22%3A1 100% stray";
+    expect(parseAuraContext(page)).toEqual({ fwuid: "SGRNczhXdnNHNDNKUWhIdXFhdFJlUWtVMjdnTGFERUU2S3FfSVdrcU92bkExNS4zLjE2MDEw", app: "1888_-kKAFK7UHxK1kDSaicKEkw" });
+    expect(() => parseAuraContext("<html>maintenance</html>")).toThrow(/layout changed/);
   });
   it("rejects a failed search instead of reporting no records", () => {
     expect(() => parseHicResponse(JSON.stringify({ actions: [{ state: "ERROR", error: [{ message: "x" }] }] }))).toThrow();

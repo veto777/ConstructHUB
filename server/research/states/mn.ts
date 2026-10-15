@@ -22,6 +22,8 @@ import { promisify } from "node:util";
 import { politeFetch } from "../http";
 import { decodeEntities } from "../bulk-sources";
 import { clean, csvRecords, download, usDate, type BulkHit } from "../bulk";
+import { adverseFrom, hasEnded } from "../adverse";
+import { looksLikeBusiness } from "./lib/business-name";
 import type { StatePack } from "./types";
 
 const run = promisify(execFile);
@@ -90,7 +92,8 @@ async function* dliFlagged(): AsyncIterable<BulkHit> {
         name: [name, dba].filter(Boolean).join(" / "), id: clean(r.Lic_Number), date: null, endDate: null,
         status: status ? `License status: ${status}` : null, city: clean(r.City),
         detail: `DLI's license data marks this ${clean(r.License_Subtype) ?? "license"} (${clean(r.Lic_Number) ?? "no number"}) with an enforcement action; the orders are on DLI's enforcement-actions pages`,
-        amount: null, adverse: status && /revoked|suspended/i.test(status) ? true : null,
+        // The license's own status is the only outcome this file gives: revoked/suspended is adverse, anything else unknown.
+        amount: null, adverse: adverseFrom(status, { adverse: /revoked|suspended/i }) ? true : null,
         address: mnAddress(r), phone: clean(r.Phone_No), licenseNumber: clean(r.Lic_Number),
       },
       business: [name, dba].filter(Boolean).join(" "), person: null,
@@ -108,7 +111,12 @@ const DLI_ORDER_PAGES = [
 const DLI_ORDERS_PAGE = "https://www.dli.mn.gov/workers/homeowners/file-complaint-and-view-enforcement-actions";
 
 /** A respondent caption that names a business (the PDFs also list individuals alone, who are skipped: FCRA). */
-const BUSINESS = /\b(LLC|L\.L\.C\.?|INC\.?|INCORPORATED|CORP\.?|CORPORATION|CO\.|COMPANY|LTD\.?|LLP|PLLC|LP|DBA|D\/B\/A)(?=$|[\s,.)])|\b(construction|roofing|exteriors|restoration|builders?|homes|remodel\w*|renovations?|contracting|contractors?|services?|electric\w*|plumbing|heating|mechanical|solutions|enterprises|group|painting|handyman|properties|siding|design)\b/i;
+const BUSINESS = /\b(LLC|L\.L\.C\.?|INC\.?|INCORPORATED|CORP\.?|CORPORATION|CO\.|COMPANY|LTD\.?|LLP|PLLC|LP|DBA|D\/B\/A)(?=$|[\s,.)])|\b(construction|roofing|exteriors|restoration|builders?|remodel\w*|renovations?|contracting|contractors?|services?|electric\w*|plumbing|heating|mechanical|solutions|enterprises|group|painting|handyman|properties|siding|design)\b/i;
+// ("Homes" is left out: it is a surname too. Audit 2026-10-15, decision 5.)
+
+/** Adverse from an order's own text (audit 2026-10-15, decision 2); null when the text names no sanction. */
+export const mnOrderAdverse = (order: string): boolean | null =>
+  adverseFrom(order, { adverse: /revoke|revocation|suspend|censure|cease and desist|monetary penalty|\bfine|deni(?:ed|al)/i });
 
 export type MnOrder = { name: string; location: string | null; order: string; date: string | null; amount: number | null; cases: string | null; licenses: string[] };
 
@@ -153,7 +161,7 @@ export function parseMnOrders(text: string): MnOrder[] {
 }
 
 async function pdfText(path: string): Promise<string> {
-  try { return (await run("pdftotext", ["-layout", path, "-"], { maxBuffer: 64 << 20 })).stdout; }
+  try { return (await run("pdftotext", ["-layout", path, "-"], { maxBuffer: 64 << 20, timeout: 120_000 })).stdout; }
   catch (err: any) { throw new Error(err?.code === "ENOENT" ? "pdftotext (poppler-utils) is not installed" : String(err?.message ?? err)); }
 }
 
@@ -182,7 +190,9 @@ async function* dliOrders(): AsyncIterable<BulkHit> {
             state: "MN", source: "Minnesota DLI enforcement actions (residential building, electrical, plumbing)", sourceUrl: url,
             category: "discipline", name: o.name, id: o.cases, date: o.date, endDate: null, status: clean(kind) ?? "Order issued",
             city: o.location, detail: `${o.order.slice(0, 900)}${/consent/i.test(kind ?? "") ? " (DLI: a consent order is not a finding of fact or admission of guilt)" : ""}`,
-            amount: o.amount, adverse: true, licenseNumber: o.licenses.join(", ") || null,
+            // From the order's own words: revoked, censured, cease and desist, a monetary penalty, … (a consent order
+            // with none of these, or a dismissal, is not marked adverse).
+            amount: o.amount, adverse: mnOrderAdverse(o.order), licenseNumber: o.licenses.join(", ") || null,
           },
           business: o.name, person: null, keys: { licenses: o.licenses },
         };
@@ -200,7 +210,8 @@ export function parseMnDebarred(html: string): MnDebarred[] {
   const out: MnDebarred[] = [];
   for (const m of Array.from(html.matchAll(/toggleDiv\('(\d+)'\)">([^<]+)<\/a>[\s\S]*?<div id="\1"[^>]*>([\s\S]*?)<\/table>/g))) {
     const name = text(m[2]);
-    if (!name || /,\s*an individual\b/i.test(name)) continue; // individuals: FCRA, companies only
+    // Individuals: FCRA, companies only (the list marks most "…, an individual"; a bare personal name counts as one too).
+    if (!name || /,\s*an individual\b/i.test(name) || !looksLikeBusiness(name)) continue;
     const fields: Record<string, string> = {};
     let owner: string | null = null;
     const lines: string[] = [];
@@ -218,29 +229,32 @@ export function parseMnDebarred(html: string): MnDebarred[] {
   return out;
 }
 
+/** One listed vendor as a report record; null when it lists no suspension or debarment date. */
+export function mnDebarHit(v: MnDebarred, today = new Date().toISOString().slice(0, 10)): BulkHit | null {
+  const f = v.fields;
+  const debarred = usDate(f["Debarment Date"]), debarEnd = usDate(f["Debarment End Date"]);
+  const susp = usDate(f["Suspension Date"]), suspEnd = usDate(f["Suspension End Date"]);
+  const end = debarred ? debarEnd : suspEnd;
+  const what = debarred ? "Debarred" : susp ? "Suspended" : null;
+  if (!what) return null;
+  return {
+    kind: "enforcement",
+    hit: {
+      state: "MN", source: "Minnesota suspended and debarred vendors (Office of State Procurement)", sourceUrl: MN_DEBAR,
+      category: "debarment", name: v.name, id: null, date: debarred ?? susp, endDate: end,
+      status: end && end < today ? `${what}; period ended ${end}` : what, city: v.city,
+      detail: [clean(f["Cause of Suspension or Debarment"]), debarred && susp ? `Suspended ${susp} to ${suspEnd ?? "?"} before the debarment` : null].filter(Boolean).join(". ") || null,
+      // A debarment or suspension whose period is over is not adverse today; one still running is.
+      amount: null, adverse: hasEnded(end, today) ? false : true, address: v.address,
+    },
+    business: v.name, person: null, keys: { addresses: [v.address] },
+  };
+}
+
 async function* mnDebarred(): AsyncIterable<BulkHit> {
   const res = await politeFetch(MN_DEBAR, {}, { minDelayMs: 2000 });
   if (!res.ok) throw new Error(`debarment page returned HTTP ${res.status}`);
-  const today = new Date().toISOString().slice(0, 10);
-  for (const v of parseMnDebarred(await res.text())) {
-    const f = v.fields;
-    const debarred = usDate(f["Debarment Date"]), debarEnd = usDate(f["Debarment End Date"]);
-    const susp = usDate(f["Suspension Date"]), suspEnd = usDate(f["Suspension End Date"]);
-    const end = debarred ? debarEnd : suspEnd;
-    const what = debarred ? "Debarred" : susp ? "Suspended" : null;
-    if (!what) continue;
-    yield {
-      kind: "enforcement",
-      hit: {
-        state: "MN", source: "Minnesota suspended and debarred vendors (Office of State Procurement)", sourceUrl: MN_DEBAR,
-        category: "debarment", name: v.name, id: null, date: debarred ?? susp, endDate: end,
-        status: end && end < today ? `${what}; period ended ${end}` : what, city: v.city,
-        detail: [clean(f["Cause of Suspension or Debarment"]), debarred && susp ? `Suspended ${susp} to ${suspEnd ?? "?"} before the debarment` : null].filter(Boolean).join(". ") || null,
-        amount: null, adverse: true, address: v.address,
-      },
-      business: v.name, person: null, keys: { addresses: [v.address] },
-    };
-  }
+  for (const v of parseMnDebarred(await res.text())) { const h = mnDebarHit(v); if (h) yield h; }
 }
 
 export const pack: StatePack = {
@@ -252,8 +266,10 @@ export const pack: StatePack = {
       load: dliFlagged, companiesOnly: true, category: "discipline" },
     { id: "mn-dli-orders", state: "MN", label: "Minnesota DLI enforcement actions (residential building, electrical, plumbing)", pageUrl: DLI_ORDERS_PAGE,
       everyHours: 24 * 7, minRows: 480, load: dliOrders, companiesOnly: true, category: "discipline" },
+    // 20 of 44 names on 2026-10-15 read as businesses (bare personal names such as "Jacob Roy" are left out, and so are
+    // a few organizations without a business word); the floor sits under that.
     { id: "mn-debarred", state: "MN", label: "Minnesota suspended and debarred vendors (Office of State Procurement)", pageUrl: MN_DEBAR,
-      everyHours: 24, minRows: 20, load: mnDebarred, companiesOnly: true, category: "debarment", utcHours: [6, 7, 8, 9, 10, 11] },
+      everyHours: 24, minRows: 15, load: mnDebarred, companiesOnly: true, category: "debarment", utcHours: [6, 7, 8, 9, 10, 11] },
   ],
   blocked: [
     "DLI license lookup (ims.dli.mn.gov): not needed, the same data is the nightly export loaded above",

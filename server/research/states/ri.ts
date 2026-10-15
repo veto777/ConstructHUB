@@ -21,6 +21,9 @@ import { normLicense, type IdQuery } from "../identifiers";
 import { tokens, wholeWordMatch } from "../licenses";
 import { FormSession, formFields, tableRows, textOf, splitName } from "./lib/g2-aspnet";
 import { promises as fs } from "node:fs";
+import { adverseFrom } from "../adverse";
+import { looksLikeBusiness } from "./lib/business-name";
+import { capNote, withNote } from "../notes";
 import type { StatePack } from "./types";
 
 // ── DLT trade licenses ───────────────────────────────────────────────────────────────────────────────────────
@@ -74,7 +77,10 @@ class DltSession {
 
   private async current() { return (this.page ??= await this.s.text(this.url)); }
 
-  /** One search; returns every grid row (up to 3 pages). */
+  /** Set by search(): the grid had pages past the third, which are not read. */
+  morePages = false;
+
+  /** One search; returns every grid row (up to 3 pages; `morePages` says when there were more). */
   async search(fields: Record<string, string>, gridName: string, gridId: string): Promise<GridRow[]> {
     const page = await this.current();
     const form = formFields(page.html);
@@ -86,8 +92,12 @@ class DltSession {
     this.page = await this.s.text(this.url, form, this.url);
     if (/Please select a/i.test(this.page.html) && !this.page.html.includes(gridId)) throw new Error("the lookup rejected the search");
     const rows = parseDltGrid(this.page.html, gridId);
-    for (const p of pageLinks(this.page.html, gridName).filter((p) => /^Page\$[23]$/.test(p))) {
-      rows.push(...parseDltGrid((await this.postBack(gridName, p)).html, gridId));
+    const links = pageLinks(this.page.html, gridName);
+    this.morePages = links.some((p) => Number(p.slice(5)) > 3);
+    for (const p of links.filter((p) => /^Page\$[23]$/.test(p))) {
+      const next = parseDltGrid((await this.postBack(gridName, p)).html, gridId);
+      rows.push(...next);
+      if (pageLinks(this.page!.html, gridName).some((q) => Number(q.slice(5)) > 3)) this.morePages = true;
     }
     return rows;
   }
@@ -131,22 +141,25 @@ async function dltLicenseSearch(name: string, kind: "person" | "company"): Promi
     if (!parts) return [];
     for (const t of PERSON_TRADES) searches.push({ trade: t, fields: { cboTrade: t, txtLastName: parts.last.slice(0, 30), txtFirstName: parts.first.slice(0, 30) } });
   }
+  const notes: string[] = [];
   for (const { trade, fields } of searches) {
     const rows = (await sess.search(fields, `${M}gvLicenseSearchResults`, "MainContent_gvLicenseSearchResults"))
       .filter((r) => kind === "person" ? nameOk([r.cells["First Name"], r.cells.MI, r.cells["Last Name"]].join(" ")) : BUSINESS_TRADES.includes(trade) ? nameOk(r.cells["Corporation Name"]) : true);
+    if (sess.morePages) notes.push(`${trade}: the lookup had more than 3 pages of results; only the first 3 were read`);
+    if (rows.length > MAX_DETAILS) notes.push(`${trade}: ${capNote(MAX_DETAILS, rows.length, "licenses")}`);
     for (const r of rows.slice(0, MAX_DETAILS)) {
       const d = r.target ? parseDltDetail((await sess.postBack(r.target)).html) : {};
       const hit = dltHit(trade, r, d, kind === "company" ? "business" : "principal");
       if (kind === "company" ? nameOk(hit.businessName) : wholeWordMatch(name, hit)) hits.push(hit);
     }
   }
-  return hits;
+  return withNote(hits, notes.join("; ") || null);
 }
 
-async function dltSearchBy(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license") return []; // the lookup's phone box takes one unexplained format; no street search
+async function dltSearchBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null; // the lookup's phone box takes one unexplained format; no street search
   const n = normLicense(q.value);
-  if (!n) return [];
+  if (!n) return null;
   const sess = new DltSession(DLT_LICENSES);
   for (const trade of [...PERSON_TRADES, ...BUSINESS_TRADES]) {
     const rows = (await sess.search({ cboTrade: trade, txtLicenseNumber: q.value.trim().slice(0, 12) }, `${M}gvLicenseSearchResults`, "MainContent_gvLicenseSearchResults"))
@@ -154,7 +167,7 @@ async function dltSearchBy(q: IdQuery): Promise<LicenseHit[]> {
     if (!rows.length) continue;
     const out: LicenseHit[] = [];
     for (const r of rows.slice(0, MAX_DETAILS)) out.push(dltHit(trade, r, r.target ? parseDltDetail((await sess.postBack(r.target)).html) : {}, "license"));
-    return out;
+    return withNote(out, rows.length > MAX_DETAILS ? capNote(MAX_DETAILS, rows.length, "licenses") : null);
   }
   return [];
 }
@@ -164,24 +177,37 @@ async function dltViolations(name: string): Promise<EnforcementHit[]> {
   const sess = new DltSession(DLT_VIOLATIONS);
   const want = tokens(name);
   const out: EnforcementHit[] = [];
+  const notes: string[] = [];
   for (const type of ["Violations", "Violations History"]) {
     const rows = (await sess.search({ cboTrade: type, txtCompanyName: name.slice(0, 30) }, `${M}gvViolationSearchResults`, "MainContent_gvViolationSearchResults"))
       .filter((r) => { const have = new Set(tokens(r.cells.Company ?? "")); return want.every((w) => have.has(w)); });
-    for (const r of rows.slice(0, 15)) {
+    if (sess.morePages) notes.push(`${type}: the lookup had more than 3 pages of results; only the first 3 were read`);
+    if (rows.length > MAX_VIOLATIONS) notes.push(`${type}: ${capNote(MAX_VIOLATIONS, rows.length, "violations")}`);
+    for (const r of rows.slice(0, MAX_VIOLATIONS)) {
       const d = r.target ? parseDltDetail((await sess.postBack(r.target)).html) : {};
-      const code = d["Violation Status"];
-      const cease = usDate(d["Cease & Desist Date"]);
-      out.push({
-        state: "RI", source: "Rhode Island DLT Professional Regulation violations", sourceUrl: DLT_VIOLATIONS, category: "discipline",
-        name: d.Company ?? r.cells.Company ?? null, id: d["Violation #"] ?? r.license, date: usDate(d["Violation Date"]), endDate: null,
-        status: [type === "Violations History" ? "Violation history" : "Violation", code ? `status code ${code}` : null].filter(Boolean).join(", "),
-        city: cityOf(d.Address ?? null),
-        detail: [d["Violation Description"]?.replace(/\.+$/, ""), cease ? `Cease and desist date ${cease}` : null, d["Hearing Result"] ? `Hearing result: ${d["Hearing Result"]}` : null].filter(Boolean).join(". ") || null,
-        amount: null, adverse: true, address: d.Address ?? null, phone: d.Phone ?? null, licenseNumber: d["License #"] ?? (r.cells["License Number"] || null),
-      });
+      out.push(dltViolationHit(type, r, d));
     }
   }
-  return out;
+  return withNote(out, notes.join("; ") || null);
+}
+
+const MAX_VIOLATIONS = 15;
+
+/** One violation. `adverse` comes from the hearing result (audit 2026-10-15, decision 2): dismissed → false; a
+ *  sanction → true; no hearing result, a cease-and-desist date is the publisher's own record of an order → true;
+ *  neither → null. The status code's meaning isn't published, so it is shown as a code. */
+export function dltViolationHit(type: string, r: GridRow, d: Record<string, string | null>): EnforcementHit {
+  const code = d["Violation Status"];
+  const cease = usDate(d["Cease & Desist Date"]);
+  const hearing = adverseFrom(d["Hearing Result"], { adverse: /\bfined?\b|penalt|revo|suspen|guilty|cease|sanction|reprimand|probation|order/i });
+  return {
+    state: "RI", source: "Rhode Island DLT Professional Regulation violations", sourceUrl: DLT_VIOLATIONS, category: "discipline",
+    name: d.Company ?? r.cells.Company ?? null, id: d["Violation #"] ?? r.license, date: usDate(d["Violation Date"]), endDate: null,
+    status: [type === "Violations History" ? "Violation history" : "Violation", code ? `status code ${code}` : null].filter(Boolean).join(", "),
+    city: cityOf(d.Address ?? null),
+    detail: [d["Violation Description"]?.replace(/\.+$/, ""), cease ? `Cease and desist date ${cease}` : null, d["Hearing Result"] ? `Hearing result: ${d["Hearing Result"]}` : null].filter(Boolean).join(". ") || null,
+    amount: null, adverse: hearing ?? (cease ? true : null), address: d.Address ?? null, phone: d.Phone ?? null, licenseNumber: d["License #"] ?? (r.cells["License Number"] || null),
+  };
 }
 
 // ── DBR online rosters ───────────────────────────────────────────────────────────────────────────────────────
@@ -194,33 +220,49 @@ const DBR_ROSTERS = [
   { page: "landscapeArchitectRoster", label: "landscape architects" },
   { page: "solarRetailerRoster", label: "solar retailers" },
 ];
-const ENTITY = /\b(LLC|L\.L\.C|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LLP|PLLC|PC|P\.C|LP|GROUP|ASSOCIATES|PARTNERS|ENGINEERING|ARCHITECTS|SERVICES|SOLAR|ENERGY|POWER|TRUST)\b\.?/i;
+
+/**
+ * Which columns hold the status and the expiration date. The landscape-architect roster's header names them in a
+ * different order than its rows hold them (header: Effective Date, Expiration Date, License Status; rows: status,
+ * effective, expiration; checked 2026-10-15), so the status column is the one of the three whose values aren't
+ * dates, and of the two date columns the right-hand one is the expiration date (effective comes first in every
+ * roster). A row with no value in that column has no expiration date: null, never the effective date.
+ */
+export function rosterColumns(header: string[], rows: string[][]): { status: number; expires: number } {
+  const three = ["License Status", "Effective Date", "Expiration Date"].map((h) => header.indexOf(h)).filter((i) => i >= 0).sort((a, b) => a - b);
+  const isDate = (v: string | undefined) => /^\d{2}-\d{2}-\d{4}$/.test((v ?? "").trim());
+  const textCount = (i: number) => rows.filter((r) => (r[i] ?? "").trim() && !isDate(r[i])).length;
+  const status = three.reduce((a, b) => (textCount(b) > textCount(a) ? b : a), three[0]);
+  const dateCols = three.filter((i) => i !== status);
+  return { status, expires: dateCols[dateCols.length - 1] };
+}
 
 async function* riRostersLoader(): AsyncIterable<BulkHit> {
   for (const r of DBR_ROSTERS) {
     const path = await download(DBR_ROSTER(r.page));
     try {
       let header: string[] | null = null;
-      for await (const row of csvRows(path)) {
-        if (!header) { header = row.map((h) => h.trim()); continue; }
+      const data: string[][] = [];
+      for await (const row of csvRows(path)) { if (!header) header = row.map((h) => h.trim()); else data.push(row); }
+      if (!header) continue;
+      const cols = rosterColumns(header, data);
+      for (const row of data) {
         const get = (h: string) => clean(row[header!.indexOf(h)]);
         const name = get("Name"), type = get("License Type"), no = get("License No.");
         if (!name || !no) continue;
-        // The landscape-architect roster's header names the status and date columns in a different order than its
-        // rows hold them, so the three are told apart by their values.
-        const three = [header.indexOf("License Status"), header.indexOf("Effective Date"), header.indexOf("Expiration Date")].map((i) => clean(row[i]));
-        const status = three.find((v) => v && !/\d/.test(v)) ?? null;
-        const dates = three.filter((v) => v && /^\d{2}-\d{2}-\d{4}$/.test(v)).map((v) => usDate(v));
-        const expires = dates.length ? dates[dates.length - 1] : null;
-        const firm = /Certificate of Authorization/i.test(type ?? "") || (r.page === "solarRetailerRoster" && ENTITY.test(name));
-        const address = clean([get("Address 1"), get("Address 2"), get("City"), get("State"), get("Zip Code")].filter(Boolean).join(", "));
+        const status = clean(row[cols.status]);
+        const exp = clean(row[cols.expires]);
+        const expires = exp && /^\d{2}-\d{2}-\d{4}$/.test(exp) ? usDate(exp) : null;
+        const firm = /Certificate of Authorization/i.test(type ?? "") || (r.page === "solarRetailerRoster" && looksLikeBusiness(name));
+        // An individual's address is a person's: city, state and ZIP only, and no address key (audit 2026-10-15, decision 4).
+        const address = clean([...(firm ? [get("Address 1"), get("Address 2")] : []), get("City"), get("State"), get("Zip Code")].filter(Boolean).join(", "));
         const hit: LicenseHit = {
           state: "RI", source: "Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",
           sourceUrl: DBR_ROSTERS_PAGE, businessName: firm ? name : null, licenseNumber: no, licenseType: type, specialty: null,
           status, principal: firm ? null : name, city: get("City"), expires, matchedOn: firm ? "business" : "principal",
           address, people: firm ? [] : [{ name, role: null }],
         };
-        yield { kind: "license", hit, business: firm ? name : null, person: firm ? null : name, keys: { licenses: [no], addresses: [address] } };
+        yield { kind: "license", hit, business: firm ? name : null, person: firm ? null : name, keys: { licenses: [no], addresses: firm ? [address] : [] } };
       }
     } finally {
       await fs.rm(path, { force: true });

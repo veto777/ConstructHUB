@@ -20,6 +20,8 @@ import { addressKeys, addressMatches, normLicense, type IdQuery } from "../ident
 import { download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { promises as fs } from "node:fs";
 import { firstAmount, tableRows, text } from "./lib/g4-html";
+import { adverseFrom } from "../adverse";
+import { capNote, withNote } from "../notes";
 import type { StatePack } from "./types";
 
 const HOST = "http://search.msboc.us";
@@ -79,7 +81,7 @@ export function parseMsDetail(html: string): MsDetail {
 }
 
 async function msDetails(rows: MsResultRow[], matchedOn: LicenseHit["matchedOn"], name: string | null, page?: string): Promise<LicenseHit[]> {
-  const hits: LicenseHit[] = [];
+  const hits: LicenseHit[] = withNote([], rows.length > MAX_DETAILS ? capNote(MAX_DETAILS, rows.length, "licenses (each one's detail page is read)") : null);
   for (const row of rows.slice(0, MAX_DETAILS)) {
     let html = page;
     if (!html) {
@@ -121,8 +123,11 @@ async function msQuery(body: string, advanced: boolean, matchedOn: LicenseHit["m
     const row = { detail: `${HOST}/Detail.cfm?ContractorID=${id}&ContractorType=${type}&varDataSource=${type === "Residential" ? "BOCRes" : "BOC"}`, type, name: d.name, address: d.address };
     return keep(row) ? msDetails([row], matchedOn, name, html) : [];
   }
-  if (!/Records \d+ through \d+ of \d+/i.test(html)) throw new Error("MSBOC returned an unexpected page");
-  return msDetails(parseMsResults(html).filter(keep), matchedOn, name);
+  const count = html.match(/Records \d+ through (\d+) of (\d+)/i);
+  if (!count) throw new Error("MSBOC returned an unexpected page");
+  const hits = await msDetails(parseMsResults(html).filter(keep), matchedOn, name);
+  // The board shows at most `maxrecords` rows; more than that are not on the page.
+  return Number(count[2]) > Number(count[1]) ? withNote(hits, `the board's search listed ${count[1]} of ${count[2]} records; the rest were not read`) : hits;
 }
 
 /** Companies by name (the board's Keyword search), people by qualifying-party name (QualName); then each detail page. */
@@ -138,34 +143,42 @@ export async function searchMsboc(name: string, kind: "person" | "company"): Pro
  * By license number (the advanced search's Lic field, digits only as the board asks) or by street address (the Zip
  * field, then rows whose address is the query's). The board offers no phone search.
  */
-export async function searchMsbocBy(q: IdQuery): Promise<LicenseHit[]> {
+export async function searchMsbocBy(q: IdQuery): Promise<LicenseHit[] | null> {
   if (q.type === "license") {
     const digits = q.value.match(/\d+/)?.[0];
-    if (!digits) return [];
+    if (!digits) return null;
     const want = normLicense(q.value);
     return (await msQuery(form({ ...BLANK, Lic: digits, Advanced: "1", maxrecords: "100" }), true, "license", null, () => true))
       .filter((h) => normLicense(h.licenseNumber) === want);
   }
   if (q.type === "address") {
     const zip = addressKeys(q.value).find((k) => k.startsWith("z:"))?.slice(2);
-    if (!zip) return [];
+    if (!zip) return null; // the board searches addresses by ZIP only: without one it can't be searched
     return msQuery(form({ ...BLANK, Zip: zip, Advanced: "1", maxrecords: "250" }), true, "address", null, (r) => addressMatches(q.value, r.address));
   }
-  return [];
+  return null; // the board offers no phone search
 }
 
 // ── Complaints and violations ───────────────────────────────────────────────────────────────────────────────
 
-/** "04/02/24" → "2024-04-02" (the violations page prints two-digit years). */
-export function msShortDate(v: string | null): string | null {
+/**
+ * "04/02/24" → "2024-04-02" (the violations page prints two-digit years). The page lists recent complaints only (2023
+ * to today on 2026-10-15), so a two-digit year is read as 20YY up to the current year; a later one could be 19YY or a
+ * typo, so it is null rather than a guessed century (the raw text stays in the record's detail).
+ */
+export function msShortDate(v: string | null, now = new Date()): string | null {
   const m = v?.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
   if (!m) return null;
   const yy = Number(m[3]);
-  const year = m[3].length === 4 ? yy : yy + (yy <= (new Date().getFullYear() % 100) + 1 ? 2000 : 1900);
+  const year = m[3].length === 4 ? yy : yy <= now.getFullYear() % 100 ? 2000 + yy : null;
+  const mo = Number(m[1]), d = Number(m[2]);
+  if (year == null || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
   return `${year}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
 }
 
-const MS_ADVERSE = /PENALT|FINE|REVOK|SUSPEN|CEASE AND DESIST/i;
+// The board's resolution words (checked 2026-10-15: "ASSESS CIVIL PENALTY …", "PUBLIC REPRIMAND", "SETTLED FOR $…",
+// "SUSPEND LICENSE"). The not-adverse words are tested first ("Dismissed, no penalty imposed" contains "penalty").
+const MS_ADVERSE = /PENALT|\bFINED?\b|REVOK|SUSPEN|CEASE AND DESIST|REPRIMAND|SETTLED FOR \$/i;
 const MS_NOT_ADVERSE = /DISMISS|NO VIOLATION|UNFOUNDED|NO ACTION/i;
 
 export function parseMsViolations(html: string, type: string, sourceUrl: string): EnforcementHit[] {
@@ -179,10 +192,11 @@ export function parseMsViolations(html: string, type: string, sourceUrl: string)
       state: "MS", source: "Mississippi State Board of Contractors complaints and violations", sourceUrl,
       category: "complaint", name, id: null, date: msShortDate(text(m[4])), endDate: msShortDate(text(m[5])),
       status: text(m[1]), city: null,
-      detail: [`${type} contractor`, text(m[2]) ? `violation of ${text(m[2])}` : null, text(m[6]) ? `Complaint: ${text(m[6])}` : null, resolution ? `Resolution: ${resolution}` : null]
+      detail: [`${type} contractor`, text(m[2]) ? `violation of ${text(m[2])}` : null, text(m[6]) ? `Complaint: ${text(m[6])}` : null, resolution ? `Resolution: ${resolution}` : null,
+        text(m[4]) && !msShortDate(text(m[4])) ? `complaint date as printed: ${text(m[4])}` : null, text(m[5]) && !msShortDate(text(m[5])) ? `resolution date as printed: ${text(m[5])}` : null]
         .filter(Boolean).join(". ").slice(0, 900),
       amount: firstAmount(resolution),
-      adverse: resolution ? (MS_ADVERSE.test(resolution) ? true : MS_NOT_ADVERSE.test(resolution) ? false : null) : null,
+      adverse: adverseFrom(resolution, { adverse: MS_ADVERSE, notAdverse: MS_NOT_ADVERSE }),
     });
   }
   return out;
@@ -221,14 +235,17 @@ export function parseMsExport(html: string, code: string): EnforcementHit[] {
   const out: EnforcementHit[] = [];
   for (const r of tableRows(html)) {
     if (r.length < 7 || !r[1] || /^Type$/i.test(r[0] ?? "")) continue;
-    const lic = r[2]?.match(/^(\S+)\s+(.*)$/);
+    const lic = r[2]?.match(/^(\S+)\s*(.*)$/);
+    // The row's own status words ("Revoked Expired", "Suspended"); the requested filter is only a cross-check.
+    const words = lic?.[2]?.trim() || null;
+    const own = words?.match(/revoked|suspended/i)?.[0].toLowerCase() ?? null;
     out.push({
       state: "MS", source: "Mississippi State Board of Contractors revoked and suspended licenses", sourceUrl: SEARCH_PAGE,
       category: "discipline", name: r[1], id: lic?.[1] ?? null, date: null, endDate: null,
-      status: `License ${MS_STATUS[code].toLowerCase()}${lic?.[2] && /expired/i.test(lic[2]) ? " (and expired)" : ""}`,
+      status: own ? `License ${own}${/expired/i.test(words ?? "") ? " (and expired)" : ""}` : words ? `License status: ${words}` : "License status not published",
       city: [r[4], r[5]].filter(Boolean).join(", ") || null,
-      detail: `${r[0] ?? ""} license${lic?.[1] ? ` ${lic[1]}` : ""}, listed by the board with status ${code} (${MS_STATUS[code]})`.trim(),
-      amount: null, adverse: true,
+      detail: `${r[0] ?? ""} license${lic?.[1] ? ` ${lic[1]}` : ""}, listed by the board in its ${MS_STATUS[code].toLowerCase()} search${words ? ` with status "${words}"` : ""}`.trim(),
+      amount: null, adverse: own ? true : null,
       address: [r[3], r[4], [r[5], r[6]].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null, phone: r[7] ?? null, licenseNumber: lic?.[1] ?? null,
     });
   }

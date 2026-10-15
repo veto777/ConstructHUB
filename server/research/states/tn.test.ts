@@ -58,6 +58,20 @@ describe("TN Board for Licensing Contractors disciplinary action reports", () =>
     });
   });
 
+  it("reads adverse from the action's own words, not-adverse words first (audit 2026-10-15)", () => {
+    const base = parseTnDar(DAR_2024_02).find((r) => r.respondent.startsWith("Caldwell"))!;
+    // Actions as the 2024–2026 reports print them.
+    expect(darHit({ ...base, action: "Civil penalty waived if they applied for licensure" }, "u")?.adverse).toBe(false);
+    expect(darHit({ ...base, action: "$1,500 civil penalty" }, "u")?.adverse).toBe(true);
+    expect(darHit({ ...base, action: "Respondent signed a declaration that he is no longer conducting unlicensed activity" }, "u")?.adverse).toBeNull();
+  });
+
+  it("does not take a surname for a business word", () => {
+    for (const n of ["John Stone", "Mike Smart", "Ian Pool", "Smith Brothers"]) expect(darBusiness(n)).toBeNull();
+    expect(darBusiness("Smith & Brothers")).toBe("Smith & Brothers");
+    expect(tdecIsOrganization("John Stone")).toBe(false);
+  });
+
   it("leaves individuals out and keeps the business of a dba", () => {
     expect(darBusiness("James, Ian M.")).toBeNull();
     expect(darBusiness("Roman D. Pauta")).toBeNull();
