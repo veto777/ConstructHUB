@@ -1,5 +1,7 @@
 /**
- * Check one state pack (server/research/states/<st>.ts) live, the way a report would use it.
+ * Check one state's sources live, the way a report would use it: every source the registry has for the state (the
+ * original tables in ../server/research, the state pack in server/research/states/<st>.ts and the city/county
+ * sources). --use-loaded searches bulk files already loaded in DATABASE_URL without downloading them again.
  *
  *   DATABASE_URL=<a scratch db> npx tsx script/research-state-check.ts OH --company "Acme Roofing" [--person "John Smith"]
  *     [--license "EC123"] [--phone "614 555 0100"] [--address "100 Main St 43215"] [--bulk] [--only <bulk id>]
@@ -11,8 +13,10 @@
 import { loadSource, searchBulk, searchBulkBy } from "../server/research/bulk";
 import type { IdQuery } from "../server/research/identifiers";
 import { searchLicenses, searchLicensesBy } from "../server/research/licenses";
-import { namedIn, searchComplaints } from "../server/research/records";
-import { searchPackEnforcement } from "../server/research/registry";
+import { complaintSourcesFor, namedIn, searchComplaints } from "../server/research/records";
+import { allBulkSourcesFor, allLicenseSourcesFor, liveLicenseSearchesFor, searchPackEnforcement } from "../server/research/registry";
+import { searchStateEnforcement } from "../server/research/state-records";
+import { sourceStatus } from "../server/research/bulk";
 import { STATE_PACKS } from "../server/research/states";
 import { pool } from "../server/db";
 
@@ -23,10 +27,11 @@ const company = opt("--company");
 const person = opt("--person");
 const only = opt("--only");
 const ids: IdQuery[] = (["license", "phone", "address"] as const).flatMap((t) => { const v = opt(`--${t}`); return v ? [{ type: t, value: v }] : []; });
-const withBulk = args.includes("--bulk") || !!only;
+const useLoaded = args.includes("--use-loaded");
+const withBulk = args.includes("--bulk") || !!only || useLoaded;
 
 const pack = STATE_PACKS.find((p) => p.state === state);
-if (!pack) { console.error(`no pack for ${state}`); process.exit(2); }
+if (!/^[A-Z]{2}$/.test(state)) { console.error("usage: research-state-check.ts <ST> …"); process.exit(2); }
 if (withBulk && /constructhub-live|5433/.test(process.env.DATABASE_URL ?? "")) { console.error("refusing to load bulk files into a live-looking database"); process.exit(2); }
 
 let failed = 0;
@@ -46,34 +51,42 @@ const subjects: { name: string; kind: "company" | "person" }[] = [
 ];
 
 async function main() {
-  console.log(`${state}: checked ${pack!.checked || "(empty pack)"}`);
-  for (const src of pack!.licenses ?? []) {
+  console.log(`${state}: pack checked ${pack?.checked || "(no pack)"}`);
+  for (const src of allLicenseSourcesFor(state)) {
     console.log(`license dataset: ${src.source} (${src.datasetUrl})`);
     for (const s of subjects) await attempt(`${s.kind} "${s.name}"`, async () => { const h = await searchLicenses(src, s.name, s.kind); show(`${s.kind} "${s.name}"`, h.length, h); });
     for (const q of ids) await attempt(`${q.type} "${q.value}"`, async () => { const h = await searchLicensesBy(src, q); show(`${q.type} "${q.value}"`, h?.length, h); });
   }
-  for (const src of pack!.liveLicenses ?? []) {
+  for (const src of liveLicenseSearchesFor(state)) {
     console.log(`live license search: ${src.source} (${src.sourceUrl})`);
     for (const s of subjects) await attempt(`${s.kind} "${s.name}"`, async () => { const h = await src.search(s.name, s.kind); show(`${s.kind} "${s.name}"`, h.length, h); });
     if (src.searchBy) for (const q of ids) await attempt(`${q.type} "${q.value}"`, async () => { const h = await src.searchBy!(q); show(`${q.type} "${q.value}"`, h?.length, h); });
   }
-  if (company && (pack!.enforcement?.length || pack!.liveEnforcement?.length)) {
-    console.log(`enforcement (company "${company}")`);
-    const r = await searchPackEnforcement(company, state, (n) => namedIn(company, ...(n ?? "").split(" / ")));
-    for (const src of r.sources) { console.log(`  ${src.source}: ${src.searched ? "searched" : "NOT SEARCHED"}, ${src.note}`); if (!src.searched) failed++; }
-    for (const h of r.hits.slice(0, 3)) console.log(`    ${JSON.stringify(h).slice(0, 400)}`);
+  if (company) {
+    console.log(`live enforcement (company "${company}")`);
+    const matches = (n: string | null) => namedIn(company, ...(n ?? "").split(" / "));
+    for (const r of [await searchStateEnforcement(company, state, matches), await searchPackEnforcement(company, state, matches)]) {
+      for (const src of r.sources) { console.log(`  ${src.source}: ${src.searched ? "searched" : "NOT SEARCHED"}, ${src.note}`); if (!src.searched) failed++; }
+      for (const h of r.hits.slice(0, 3)) console.log(`    ${JSON.stringify(h).slice(0, 400)}`);
+    }
   }
-  for (const src of pack!.complaints ?? []) {
+  for (const src of complaintSourcesFor(state)) {
     console.log(`complaints: ${src.source}`);
     if (company) await attempt(`company "${company}"`, async () => { const h = await searchComplaints(src, company); show(`company "${company}"`, h.length, h); });
   }
   if (withBulk) {
-    for (const src of (pack!.bulk ?? []).filter((b) => !only || b.id === only)) {
+    for (const src of allBulkSourcesFor(state).filter((b) => !only || b.id === only)) {
       console.log(`bulk: ${src.id} — ${src.label} (${src.pageUrl})`);
       const t0 = Date.now();
       await attempt("load", async () => {
-        const n = await loadSource(src);
-        console.log(`  loaded ${n} rows in ${Math.round((Date.now() - t0) / 1000)}s (floor ${src.minRows})`);
+        if (useLoaded) {
+          const st = await sourceStatus(src.id);
+          if (!st.loaded) { console.log("  not loaded in this database (skipped)"); return; }
+          console.log(`  using the load of ${st.loadedAt} (${st.rows} rows, floor ${src.minRows})`);
+        } else {
+          const n = await loadSource(src);
+          console.log(`  loaded ${n} rows in ${Math.round((Date.now() - t0) / 1000)}s (floor ${src.minRows})`);
+        }
         for (const s of subjects) {
           if (src.companiesOnly && s.kind === "person") continue;
           const { hits } = await searchBulk(src, s.name, s.kind, 50);
@@ -82,8 +95,8 @@ async function main() {
         for (const q of ids) { const { hits } = await searchBulkBy(src, q, 50); show(`${q.type} "${q.value}"`, hits.length, hits); }
       });
     }
-  } else if (pack!.bulk?.length) {
-    console.log(`(${pack!.bulk.length} bulk source(s) not loaded; pass --bulk)`);
+  } else if (allBulkSourcesFor(state).length) {
+    console.log(`(${allBulkSourcesFor(state).length} bulk source(s) not searched; pass --bulk, --only <id> or --use-loaded)`);
   }
   console.log(failed ? `${failed} FAILURE(S)` : "OK");
 }
