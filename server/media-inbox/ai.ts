@@ -179,6 +179,49 @@ export async function extractNextStep(thread: ThreadMessage[], env: NodeJS.Proce
   }, env);
 }
 
+export const PARTNER_CLASSES = ["listing_directory", "trade_association", "chamber", "news", "publisher", "government", "business", "software", "other"] as const;
+export type PartnerClass = (typeof PARTNER_CLASSES)[number];
+const CLASSIFY_SYSTEM = `You sort websites for a company that builds relationships with places where US contractors get listed or featured.
+For each site, from its domain and page titles, answer with one class:
+- listing_directory: an online business directory or listings site that lists many unrelated local businesses (Yelp-like, a city or regional business directory, a home-services directory). NOT a members-only directory of an organisation, and NOT a directory for one non-trade audience (schools, homeschooling, churches).
+- trade_association: a construction or home-trade association, builders' exchange or union (home builders association, NARI, AGC, ABC, NECA, PHCC, ACCA, roofing / remodelers / masonry / painting associations).
+- chamber: a chamber of commerce, business alliance or downtown/economic development organisation with a member directory.
+- news: a newspaper, magazine or local news site.
+- publisher: a blog or content site that takes articles.
+- government: a city, county, state or federal body, or a licence lookup.
+- business: a single company (a contractor, a manufacturer, a dealer locator, a utility).
+- software: a software or app company, including listing-management, review, marketing and AI tools, and people-search or
+  background-check sites. These are never a listing_directory even when they list businesses.
+- other: anything else (political parties, schools, alumni, bar or medical or realtor associations, hobby clubs, unclear pages).
+Also give "name": the organisation's own name as its titles write it (e.g. "Rochester Area Chamber of Commerce"), or null when
+the titles do not name it. Never invent a name.
+Answer only JSON: {"sites":[{"domain":"...","class":"...","name":"..."}]} with every domain you were given.`;
+
+/** A name the AI read is kept only when each of its words is on the site's titles or domain (nothing made up). */
+export function nameIsOnPage(name: string, site: { domain: string; title: string | null; homeTitle: string | null }): boolean {
+  const hay = `${site.title ?? ""} ${site.homeTitle ?? ""} ${site.domain}`.toLowerCase().replace(/&amp;/g, "&");
+  const words = name.toLowerCase().split(/[^a-z0-9&]+/).filter((w) => w.length >= 3 && !["the", "and", "inc"].includes(w));
+  return words.length > 0 && words.every((w) => hay.includes(w));
+}
+
+/** Sort vetted directories by what they are (our API first). Domains the answer leaves out stay unclassified. */
+export async function classifySites(sites: { domain: string; title: string | null; homeTitle: string | null }[], env: NodeJS.ProcessEnv = process.env): Promise<{ classes: Map<string, PartnerClass>; names: Map<string, string>; provider: string }> {
+  const user = sites.map((s) => `${s.domain} | ${(s.title ?? "").slice(0, 120)} | ${(s.homeTitle ?? "").slice(0, 120)}`).join("\n");
+  const byDomain = new Map(sites.map((s) => [s.domain, s]));
+  return askJson(user, CLASSIFY_SYSTEM, (j) => {
+    const classes = new Map<string, PartnerClass>();
+    const names = new Map<string, string>();
+    for (const x of Array.isArray(j?.sites) ? j.sites : []) {
+      const site = typeof x?.domain === "string" ? byDomain.get(x.domain) : undefined;
+      if (!site || !(PARTNER_CLASSES as readonly string[]).includes(x.class)) continue;
+      classes.set(site.domain, x.class);
+      if (typeof x.name === "string" && x.name.trim().length >= 3 && x.name.length <= 100 && nameIsOnPage(x.name.trim(), site)) names.set(site.domain, x.name.trim());
+    }
+    if (!classes.size) throw new Error("No usable classes in the answer");
+    return { classes, names };
+  }, env);
+}
+
 /** Who we are on a web form (the same details as the email signature, server/email-signature.ts). */
 export const FORM_IDENTITY = {
   company: "ConstructHUB", website: "https://constructhub.us", email: "media@constructhub.us", phone: "(832) 399-0560",

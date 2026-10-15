@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildQueryBank, hitsFromItems, isExcluded, normalizeDomain, parseImportLine, QUERY_TEMPLATES, NICHES, US_STATES } from "./discover";
-import { analyzePage, classifyKind, gradeSource, mergeSignals } from "./vet";
+import { analyzePage, classifyKind, decodeCfEmail, gradeSource, mergeSignals, spelledOutEmails, vetDeps } from "./vet";
+import { contactLinks, findContacts } from "./contacts";
+import { listPages, relatedSites } from "./expand";
 import { composePitch, siteName, pickEmail, sendBlocker, outreachConfig, withFooter } from "./outreach";
 import { fetchMetrics, metricsDeps } from "./metrics";
 import type { BacklinkSignals } from "@shared/backlinks";
@@ -320,5 +322,74 @@ describe("DR, the 0–100 figure both pages show", () => {
     expect(toDr(402)).toBe(40);
     expect(reasonWithDr("+25 domain rank 497")).toBe("+25 DR 50");
     expect(reasonWithDr("-10 low domain rank 120")).toBe("-10 low DR 12");
+  });
+});
+
+describe("contact finder", () => {
+  it("decodes Cloudflare-protected and spelled-out addresses", () => {
+    // "news@site.com" XOR 0x2a, key first
+    const hex = "2a" + Buffer.from("news@site.com").map((b) => b ^ 0x2a).toString("hex");
+    expect(decodeCfEmail(hex)).toBe("news@site.com");
+    expect(decodeCfEmail("zz")).toBeNull();
+    expect(spelledOutEmails("Tips: editor [at] site [dot] com or ads(at)site.com. Next")).toEqual(["editor@site.com", "ads@site.com"]);
+    const p = page(`<html><body><a href="/cdn-cgi/l/email-protection#${hex}">email</a><span class="__cf_email__" data-cfemail="${hex}">[email protected]</span> ${words(50)}</body></html>`, "https://site.com/contact");
+    expect(p.emails).toEqual(["news@site.com"]);
+  });
+  it("ranks same-site contact pages first and ignores other sites", () => {
+    const links = contactLinks(`<a href="/about">About</a><a href="https://other.com/contact">x</a><a href="/advertise">Advertise</a>
+      <a href="/contact-us">Contact us</a><a href="/blog/roofing">Roofing</a><a href="/media-kit.pdf">kit</a>`, "https://site.com/", "site.com");
+    expect(links).toEqual(["https://site.com/contact-us", "https://site.com/advertise", "https://site.com/about"]);
+  });
+  it("reads the linked contact page when the home page has no address", async () => {
+    const pages: Record<string, string> = {
+      "https://site.com/": `<a href="/reach-us">Contact</a>`,
+      "https://site.com/reach-us": `<p>Write to editor@site.com or a@gmail.com</p>`,
+    };
+    const orig = vetDeps.fetch;
+    vetDeps.fetch = async (url: string) => (pages[url] ? { url, status: 200, body: pages[url], bytes: 0, headers: {}, redirects: [] } : { url, status: 404, body: "", bytes: 0, headers: {}, redirects: [] });
+    try {
+      expect(await findContacts("site.com")).toEqual({ emails: ["editor@site.com", "a@gmail.com"], contactUrl: "https://site.com/reach-us", pagesRead: 2 });
+    } finally { vetDeps.fetch = orig; }
+  });
+});
+
+describe("expansion — organisations link to their own kind", () => {
+  it("keeps other sites that name themselves a chamber, association, directory or newspaper", () => {
+    const html = `<a href="https://www.otherchamber.org/">Greater Dayton Chamber of Commerce</a>
+      <a href="https://hbaofx.com">Home Builders Association of X</a>
+      <a href="https://smithroofing.com">Smith Roofing</a>
+      <a href="https://www.facebook.com/chamber">Chamber on Facebook</a>
+      <a href="/about">About our chamber</a>
+      <a href="https://valleyherald.com/">Valley Herald</a>
+      <a href="https://shop.mychamber.org/">Our chamber shop</a>`;
+    const r = relatedSites(html, "https://mychamber.org/links", "mychamber.org");
+    expect(r.map((x) => [x.domain, x.kind])).toEqual([["otherchamber.org", "directory"], ["hbaofx.com", "directory"], ["valleyherald.com", "editorial"]]);
+    expect(listPages(`<a href="/community-links">Community Links</a><a href="/news">News</a><a href="https://x.com/links">x</a>`, "https://mychamber.org/", "mychamber.org"))
+      .toEqual(["https://mychamber.org/community-links"]);
+  });
+});
+
+describe("discovery through the standard queue", () => {
+  it("posts searches tagged with their query id and collects their organic hits", async () => {
+    const { discoverDeps, postSearches, collectSearch, discoveryEstimateUsd } = await import("./discover");
+    const orig = discoverDeps.request;
+    const calls: any[] = [];
+    discoverDeps.request = (async (method: string, path: string, body?: any) => {
+      calls.push({ method, path, body });
+      if (path.endsWith("task_post")) return { status_code: 20000, tasks: [
+        { id: "t1", status_code: 20100, cost: 0.006, data: { tag: "7" } },
+        { id: "t2", status_code: 40501, cost: 0, data: { tag: "8" } },
+      ] };
+      if (path.includes("t-pending")) return { status_code: 20000, tasks: [{ status_code: 40602 }] };
+      return { status_code: 20000, tasks: [{ status_code: 20000, result: [{ items: [{ type: "organic", url: "https://a.com/x", rank_absolute: 1 }] }] }] };
+    }) as any;
+    try {
+      expect(await postSearches([{ id: 7, query: "a" }, { id: 8, query: "b" }])).toEqual({ posted: [{ id: 7, taskId: "t1" }], costUsd: 0.006 });
+      expect(calls[0].body[0]).toMatchObject({ keyword: "a", tag: "7", priority: 1, depth: 100 });
+      expect(await collectSearch("t-pending")).toEqual({ status: "pending" });
+      expect(await collectSearch("t1")).toEqual({ status: "done", hits: [{ domain: "a.com", url: "https://a.com/x", title: null, position: 1 }] });
+      expect(calls.at(-1).path).toBe("/serp/google/organic/task_get/regular/t1");
+      expect(discoveryEstimateUsd("standard")).toBeLessThan(discoveryEstimateUsd() / 3);
+    } finally { discoverDeps.request = orig; }
   });
 });
