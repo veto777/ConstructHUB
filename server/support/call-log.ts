@@ -16,6 +16,7 @@ import { INGEST_ENGINE } from "../voice/ingest";
 import { normalizeE164 } from "../voice/profile-store";
 
 export const SUPPORT_CALL_OUTCOME_TICKET = "support_ticket";
+const STALE_MS = 2 * 3_600_000;
 const CATEGORY_LABEL: Record<string, string> = { payment: "Payment or billing", login: "Login", technical: "Something in the app", data: "Missing data", other: "Other" };
 
 let cachedOrg: { id: string | null; at: number } | null = null;
@@ -43,7 +44,10 @@ export function supportCallToRow(c: SupportCallRow, orgId: string, lineNumber: s
   const s = c.state && typeof c.state === "object" ? c.state : {};
   const verified = !!c.verified_at || s.verified === true;
   const started = new Date(c.created_at);
-  const ended = c.ended_at ? new Date(c.ended_at) : null;
+  // Calls before the ended_at column (2026-10-09) never got an end: a row untouched for two hours is over, its
+  // last update the best end time we have (a live call is updated every turn).
+  const stale = !c.ended_at && Date.now() - new Date(c.updated_at).getTime() > STALE_MS;
+  const ended = c.ended_at ? new Date(c.ended_at) : stale ? new Date(c.updated_at) : null;
   const duration = ended ? Math.max(0, Math.round((ended.getTime() - started.getTime()) / 1000)) : (c.metered_seconds || null);
   const turns: { role: string; text: string }[] = Array.isArray(s.aiTurns) ? s.aiTurns : [];
   const transcript = turns
@@ -107,12 +111,13 @@ export function mirrorSupportCallSoon(callSid: string): void {
   void mirrorSupportCall(callSid);
 }
 
-/** On boot: every support call not yet in the brand's log (calls taken before the mirror existed). */
+/** On boot: every support call not yet in the brand's log, and every mirrored call still "in progress" after two quiet hours. */
 export async function backfillSupportCallLog(): Promise<number> {
   const orgId = await supportCallLogOrgId();
   if (!orgId) return 0;
   const { rows } = await pool.query(
-    `SELECT c.call_sid FROM support_calls c LEFT JOIN voice_calls v ON v.call_sid = c.call_sid WHERE v.id IS NULL ORDER BY c.created_at`);
+    `SELECT c.call_sid FROM support_calls c LEFT JOIN voice_calls v ON v.call_sid = c.call_sid
+      WHERE v.id IS NULL OR (v.outcome IS NULL AND c.updated_at < now() - interval '2 hours') ORDER BY c.created_at`);
   let n = 0;
   for (const r of rows) if (await mirrorSupportCall(r.call_sid)) n++;
   if (n) console.log(`[support] call log: mirrored ${n} earlier call(s) into the brand's Call Assistant`);

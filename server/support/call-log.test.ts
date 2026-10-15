@@ -48,6 +48,17 @@ describe("support call log → brand Call Assistant", () => {
     expect(r.summary).toBe("Support line (Gabe, keypad line) · caller not verified");
   });
 
+  it("a call that never got an end but went quiet two hours ago is over", () => {
+    const r = supportCallToRow({
+      call_sid: "SUPTESTz", caller_number: "+18135550100", state: { verified: false, step: "ask_id", aiTurns: [] }, user_id: null, verified_at: null, ticket_id: null,
+      created_at: new Date(Date.now() - 4 * 3_600_000), updated_at: new Date(Date.now() - 3 * 3_600_000 - 30_000), line: "engine", metered_seconds: 0, ended_at: null,
+      ticket_number: null, ticket_title: null, ticket_category: null, ticket_severity: null, ticket_status: null, account_email: null,
+    }, ORG, null);
+    expect(r.outcome).toBe("info");
+    expect(r.durationSeconds).toBe(3_600 - 30);
+    expect(r.summary).not.toContain("in progress");
+  });
+
   it("mirrors, re-mirrors after a ticket, and backfills only what is missing", async () => {
     await pool.query("insert into support_calls(call_sid, caller_number, state, user_id, verified_at, line, ended_at) values ($1,$2,$3,$4,now(),'engine',now())",
       [SID, "+18135550100", JSON.stringify({ verified: true, step: "done", aiTurns: [{ role: "caller", text: "hi" }] }), userId]);
