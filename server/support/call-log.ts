@@ -117,7 +117,7 @@ export async function backfillSupportCallLog(): Promise<number> {
   if (!orgId) return 0;
   const { rows } = await pool.query(
     `SELECT c.call_sid FROM support_calls c LEFT JOIN voice_calls v ON v.call_sid = c.call_sid
-      WHERE v.id IS NULL OR (v.outcome IS NULL AND c.updated_at < now() - interval '2 hours') ORDER BY c.created_at`);
+      WHERE v.id IS NULL OR (v.ended_at IS NULL AND c.updated_at < now() - interval '2 hours') ORDER BY c.created_at`);
   let n = 0;
   for (const r of rows) if (await mirrorSupportCall(r.call_sid)) n++;
   if (n) console.log(`[support] call log: mirrored ${n} earlier call(s) into the brand's Call Assistant`);
