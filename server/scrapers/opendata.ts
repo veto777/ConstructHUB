@@ -1316,6 +1316,7 @@ export function keyWhere(d: Dataset, keys: string[]): string {
   if (keys.some(k => /[%_\\]/.test(k))) throw new Error("Contact key contains LIKE metacharacters; refusing an inexact prefix match");
   return "(" + keys.map(k => `${field} LIKE ${literal(k + c.keySeparator + "%")}`).join(" OR ") + ")";
 }
+export const MAX_CONTACT_KEYS = 1000;
 export const KEY_CHUNK = { socrata: 100, arcgis: 40, ckan: 100, carto: 100 } as const;
 export function recentWhere(d: Dataset, since: string): string {
   if (!/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(since) || !Number.isFinite(Date.parse(since))) throw new Error("Invalid ISO since date");
@@ -1450,7 +1451,9 @@ async function contactSearch(ctx: AdapterCtx, d: Dataset, q: { type: PermitSearc
     if (c.license) { const v = textValue(row[c.license]); if (v) entry.licenses.add(v); }
     byKey.set(key, entry);
   }
-  const keys = [...byKey.keys()], seen = new Set(own.map(r => r.permitNumber)), out = [...own];
+  // A big builder can hold tens of thousands of permits (Harris County: 48,912 for Lennar); fetching every one by key
+  // would take longer than any search. The first MAX_CONTACT_KEYS keys are fetched; the rest are left out.
+  const keys = [...byKey.keys()].slice(0, MAX_CONTACT_KEYS), seen = new Set(own.map(r => r.permitNumber)), out = [...own];
   for (let i = 0; i < keys.length; i += KEY_CHUNK[d.kind]) {
     for (const record of await query(ctx, d, keyWhere(d, keys.slice(i, i + KEY_CHUNK[d.kind])))) {
       if (seen.has(record.permitNumber)) continue;
