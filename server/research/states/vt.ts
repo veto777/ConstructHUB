@@ -98,6 +98,7 @@ export const pack: StatePack = {
       pageUrl: OPR_PAGE, everyHours: 24 * 7, minRows: 14_000, load: vtOprLoader },
   ],
   blocked: [
+    "Secretary of State business search (bizfilings.vermont.gov): an Angular app over api.bizfilings.vermont.gov; not built yet (the path tried led to the account login)",
     "OPR conduct decisions (Zoho Creator search) and monthly discipline reports (PDF): almost all are against individual licensees, which reports don't search for enforcement (companies only)",
   ],
 };
