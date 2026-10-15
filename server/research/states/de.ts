@@ -19,8 +19,7 @@ const soda = (id: string) => ({ datasetUrl: `https://data.delaware.gov/d/${id}`,
 
 const LICENSES: LicenseSource[] = [
   { state: "DE", source: "Delaware Division of Revenue contractor business licenses", ...soda("5zy2-grhr"),
-    fields: { businessName: "business_name", licenseNumber: null, licenseType: "category", specialty: "trade_name", status: null, principal: null, city: "city", expires: "current_license_valid_to" },
-    // license_number is a number column the shared license-number search can't query: left out until it casts (::text).
+    fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "category", specialty: "trade_name", status: null, principal: null, city: "city", expires: "current_license_valid_to" },
     personField: null, address: "address_1", zip: "zip",
     filter: "category in ('RESIDENT CONTRACTOR','NON-RESIDENT CONTRACTOR','CONSTRUCTION MANAGER','CONSTRUCTION TRANSPORTATION CONTRACTOR','NON-RESIDENT CONST TRANSPORT CONTRACTOR')" },
   { state: "DE", source: "Delaware Division of Professional Regulation (architects, surveyors, geologists, home inspectors)", ...soda("pjnv-eaih"),
@@ -28,8 +27,8 @@ const LICENSES: LicenseSource[] = [
     personField: ["first_name", "last_name"],
     filter: "profession_id in ('Architecture','Landscape Architecture','Land Surveyors','Geologists','Home Inspectors')" },
   { state: "DE", source: "Delaware DNREC water well and pump installer contractors", ...soda("2dnk-irgr"),
-    fields: { businessName: "orgname", licenseNumber: null, licenseType: "licensesubtype", specialty: null, status: "licstatus", principal: null, city: null, expires: "licenseexpires" },
-    personField: null, address: "workaddress", phone: "workphone" }, // licensenumber: a number column too (left out)
+    fields: { businessName: "orgname", licenseNumber: "licensenumber", licenseType: "licensesubtype", specialty: null, status: "licstatus", principal: null, city: null, expires: "licenseexpires" },
+    personField: null, address: "workaddress", phone: "workphone" },
   { state: "DE", source: "Delaware DNREC on-site wastewater system licensees", ...soda("56uc-mvju"),
     fields: { businessName: "companyname", licenseNumber: "licensenumber", licenseType: "licensesubtype", specialty: null, status: "licstatus", principal: "displayname", city: null, expires: null },
     personField: "displayname", address: "companyaddress", phone: "companyphone" },

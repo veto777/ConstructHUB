@@ -52,7 +52,7 @@ const LICENSES: LicenseSource[] = [
     personField: ["first_name", "last_name"] },
   { state: "NY", source: "New York DOL mold contractor licenses", ...soda(NY, "ikqx-ispy"),
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: "dba_name", status: "license_status", principal: null, city: "city", expires: "expiration_date" },
-    personField: null, address: ["address", "address_2"], zip: "zip_code" }, // phone is a number column here: `like` can't search it
+    personField: null, address: ["address", "address_2"], zip: "zip_code", phone: "phone" },
   { state: "NY", source: "New York DOL mold individual licenses", ...soda(NY, "h6jr-vxqt"),
     fields: { businessName: null, licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: null, expires: "expiration_date" },
     personField: ["first_name", "last_name"] },
@@ -66,14 +66,10 @@ const LICENSES: LicenseSource[] = [
     fields: { businessName: null, licenseNumber: "certificate_number", licenseType: "class", specialty: null, status: "certificate_status", principal: null, city: null, expires: "expiration_date" },
     personField: ["first_name", "last_name"] },
   { state: "NY", source: "New York DOS licensed home inspectors", ...soda(NY, "r9fr-48vu"),
-    // "uid" (the license number) is a number column, which the shared license-number search (upper(...) in (...))
-    // can't query: it is left out until that search casts it (::text), rather than fail every identifier search here.
-    fields: { businessName: "hi_business_name", licenseNumber: null, licenseType: null, specialty: null, status: null, principal: null, city: "business_city", expires: "current_expire_date" },
+    fields: { businessName: "hi_business_name", licenseNumber: "uid", licenseType: null, specialty: null, status: null, principal: null, city: "business_city", expires: "current_expire_date" },
     personField: ["first_name", "middle_initial", "last_name"], address: ["business_street", "business_apt_unit"], zip: "business_zip_code" },
   { state: "NY", source: "New York City DOB licenses (contractors and trades)", ...soda(NYC, "t8hj-ruu2"),
-    fields: { businessName: "business_name", licenseNumber: null, licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: "license_business_city", expires: null },
-    // license_number is a number column the shared license-number search can't query (left out until it casts with
-    // ::text), and the house number is its own column, so an address search can't match it (the address is shown).
+    fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: "license_business_city", expires: null },
     personField: ["first_name", "last_name"], address: ["business_house_number", "business_street_name"], zip: "business_zip_code", phone: "business_phone_number" },
   { state: "NY", source: "New York City DCWP home improvement contractor licenses", ...soda(NYC, "w7w3-xahh"),
     fields: { businessName: "business_name", licenseNumber: "license_nbr", licenseType: "business_category", specialty: "dba_trade_name", status: "license_status", principal: null, city: "address_city", expires: "lic_expir_dd" },

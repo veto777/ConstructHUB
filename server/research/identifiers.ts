@@ -34,7 +34,8 @@ export function addressKeys(v: string | null | undefined): string[] {
   const box = t.match(/\bP\s?O\s?BOX\s+(\d+)/) ?? t.match(/\bBOX\s+(\d+)/);
   if (box) out.push(`a:POBOX ${box[1]}`);
   else {
-    const m = t.match(/^(\d+[A-Z]?)(?:-\d+)?\s+(.+)$/);
+    // A hyphenated number ("251-21", Queens) is one building: kept whole.
+    const m = t.match(/^(\d+[A-Z]?(?:-\d+[A-Z]?)?)\s+(.+)$/);
     if (m) {
       const word = m[2].split(" ").find((w) => !DIRECTIONS.has(w) && /[A-Z0-9]/.test(w));
       if (word) out.push(`a:${m[1]} ${word}`);
