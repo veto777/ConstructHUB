@@ -2,6 +2,7 @@
  * Parsers of ./bulk-sources.ts against small snippets of the real published files (rows copied from the downloads
  * of 2026-10-14/15; the Sunbiz record's FEI number is blanked).
  */
+import { personNamed } from "./xref";
 import { describe, expect, it } from "vitest";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,7 +10,7 @@ import { join } from "node:path";
 import type { BulkHit } from "./bulk";
 import { indexWords } from "./bulk";
 import {
-  cslbRows, flApplicantRows, flComplaintRows, flDisciplineCases, flLicenseIndex, flLicenseRows, flQualifiers, sunbizCorporation,
+  cslbRows, parseCaDebarments, flApplicantRows, flComplaintRows, flDisciplineCases, flLicenseIndex, flLicenseRows, flQualifiers, sunbizCorporation,
 } from "./bulk-sources";
 
 async function file(text: string): Promise<string> {
@@ -118,13 +119,49 @@ describe("California CSLB master + personnel", () => {
       ],
     });
     expect(words(lic)).toEqual(expect.arrayContaining(["l:141212", "t:4144627750", "a:12100 SILVER", "z:53225", "p:WAHNER", "b:SPRINKMANN"]));
-    // One row per person (found by a principal-name check), the Work Comp suspension as enforcement, and a
-    // personnel-only license (88 is not in this master sample) with the AKA name indexed too.
-    expect(rest.filter((h) => h.kind === "license" && h.hit.source.endsWith("(personnel)")).map((h) => (h.hit as any).principal))
-      .toEqual(["PETER WILLIAM SPRINKMANN", "WILLIAM E JR SPRINKMANN", "CLARENCE Q WAHNER", "LYNN LUYET BRUNS"]);
+    // One hit per license (audit 2026-10-15): no second hit per person. A person is found through the license's own
+    // people (the runner's re-check takes one person at a time). The personnel-only license (88 is not in this master
+    // sample) is one hit too, with its AKA name indexed.
+    expect(rest.filter((h) => h.kind === "license" && (h.hit as any).licenseNumber === "141212")).toEqual([]);
+    expect(personNamed("Clarence Q Wahner", lic.hit as any)).toBe(true);
+    expect(personNamed("Peter Wahner", lic.hit as any)).toBe(false);
+    expect(rest.filter((h) => h.kind === "license").map((h) => [(h.hit as any).licenseNumber, (h.hit as any).principal])).toEqual([["88", "LYNN LUYET BRUNS"]]);
     const enf = rest.find((h) => h.kind === "enforcement")!;
     expect(enf.hit).toMatchObject({ category: "discipline", status: "Work Comp Susp", licenseNumber: "141212", adverse: true });
     const bruns = rest[rest.length - 1];
     expect(words(bruns)).toEqual(expect.arrayContaining(["p:KETTERING", "p:LAVON", "p:BRUNS"]));
+  });
+});
+
+describe("audit follow-ups (A5)", () => {
+  it("FL: a status code DBPR's codebook doesn't list is shown as 'code X', never raw or guessed", async () => {
+    // The second sample row with its primary status changed to a letter the codebook doesn't define.
+    const p = await file(FL_LICENSEES.split("\n")[1].replace(`"C","A","10/31/1983"`, `"Z","A","10/31/1983"`) + "\n");
+    const hits = await all(flLicenseRows(p, "Florida DBPR construction licenses (CILB)", "https://example.invalid", await flQualifiers([p])));
+    await fs.rm(p);
+    expect((hits[0].hit as any).status).toBe("code Z, Active");
+  });
+
+  // Rows of https://www.dir.ca.gov/dlse/debar.html as served on 2026-10-15 (the last one is the page's contact table).
+  const DLSE = `<table><tr>
+  <td style="text-align:left"><p><strong>MILES CONSTRUCTION GROUP, INC., a <br />California Corporation</strong><br /><br />CSLB License Number: 976339.</p></td>
+  <td><p><strong>7/23/2025 through 7/23/2028</strong><br /><a class="pdf_link" href="/DLSE/Decision/40-63204.pdf">Decision 40-63204 </a></p></td>
+</tr><tr>
+  <td style="text-align:left"><p><strong>MICHAEL FLOORING, INC.;<br> BENNY MICHAEL</strong><br /><br />CSLB License Number: 874947</p></td>
+  <td><p><strong>9/13/24 through 9/13/27</strong><br /><a class="pdf_link" href="/DLSE/Decision/SC-7278.pdf">Decision SC 7278 </a></p>
+  <p>The debarment order is currently stayed by order of the Kern County Superior Court</p></td>
+</tr><tr>
+  <td>Division of Workers' Compensation</td>
+  <td>Benefits for work-related injuries and illnesses</td>
+  <td>1-800-736-7401</td>
+</tr></table>`;
+  it("CA debarments: adverse from the status (running true, over false, stayed unknown); the contact table is not a debarment", () => {
+    const now = parseCaDebarments(DLSE, "2026-10-15").map((h) => h.hit as any);
+    expect(now.map((h) => [h.id, h.status, h.adverse])).toEqual([
+      ["976339", "Debarred", true],
+      ["874947", "Stayed by a court (see decision)", null],
+    ]);
+    const later = parseCaDebarments(DLSE, "2028-08-01").map((h) => h.hit as any);
+    expect(later[0]).toMatchObject({ status: "Debarment period over", adverse: false, endDate: "2028-07-23" });
   });
 });

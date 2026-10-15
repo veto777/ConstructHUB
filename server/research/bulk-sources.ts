@@ -30,7 +30,8 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { inflateSync } from "node:zlib";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { USER_AGENT, rateLimitHost } from "../scrapers/polite-fetch";
+import { USER_AGENT, fetchWithDeadline, rateLimitHost } from "./http";
+import { adverseFrom } from "./adverse";
 import { clean, csvRecords, csvRows, download, lines, plainRequest, saveResponse, usDate, type BulkHit, type BulkSource } from "./bulk";
 import type { IdKeys } from "./identifiers";
 
@@ -138,8 +139,12 @@ const FL_CLASSES: Record<string, Record<string, string>> = {
 };
 const flOccupation = (occ: string) => FL_OCCUPATIONS[occ] ?? `occupation code ${occ}`;
 const flClass = (occ: string, cls: string | null) => (cls ? FL_CLASSES[occ]?.[cls] ?? `class code ${cls}` : null);
+// Primary and secondary status codes, from DBPR's codebook "Understanding DBPR Codes"
+// (https://www2.myfloridalicense.com/about-us/understanding-dbpr-codes/, checked 2026-10-15). A code it doesn't list
+// is shown as "code X", never guessed.
 const FL_PRIMARY: Record<string, string> = { C: "Current", P: "Probation", S: "Suspended" };
 const FL_SECONDARY: Record<string, string> = { A: "Active", I: "Inactive" };
+const flCode = (table: Record<string, string>, v: string | undefined) => { const c = clean(v); return c ? table[c] ?? `code ${c}` : null; };
 
 /**
  * One row of a DBPR licensee extract, by the published layout ("File Layout Information" on the public-records page,
@@ -177,7 +182,7 @@ export async function* flLicenseRows(path: string, label: string, page: string, 
   for await (const r of csvRows(path)) {
     const row = flRow(r);
     if (!row) continue;
-    const status = [FL_PRIMARY[r[13].trim()] ?? clean(r[13]), FL_SECONDARY[r[14].trim()] ?? clean(r[14])].filter(Boolean).join(", ") || null;
+    const status = [flCode(FL_PRIMARY, r[13]), flCode(FL_SECONDARY, r[14])].filter(Boolean).join(", ") || null;
     const business = row.isBusiness ? row.name : row.dba;
     // A business license carries everyone DBPR lists under its name; an individual's license carries that individual.
     const people = row.isBusiness ? qualifiers.get(nameKey(row.name)) ?? (row.dba ? qualifiers.get(nameKey(row.dba)) : null) ?? [] : row.name ? [{ name: flipName(row.name)!, role: flRole(row) }] : [];
@@ -389,7 +394,7 @@ const cookieOf = (res: Response) => (res.headers.getSetCookie?.() ?? []).map((c)
 
 async function* flStopWorkLoader(): AsyncIterable<BulkHit> {
   await rateLimitHost(FL_SWO, 2000);
-  const page = await fetch(FL_SWO, { headers: { "user-agent": USER_AGENT } });
+  const page = await fetchWithDeadline(FL_SWO, { headers: { "user-agent": USER_AGENT } }, 60_000);
   if (!page.ok) throw new Error(`stop-work query page returned HTTP ${page.status}`);
   const html = await page.text();
   const form = formFields(html);
@@ -748,15 +753,8 @@ export async function* cslbRows(masterPath: string, personnelPath: string): Asyn
       kind: "license", hit: { ...base, principal: isPerson ? soleOwner : null, matchedOn: "business" },
       business: businessNames, person: isPerson ? soleOwner ?? name : null, people: people.flatMap((p) => [p.raw, ...p.aka]), keys,
     };
-    // Each person on the license also gets a row in their own name (the license, seen from them), so a person search
-    // that checks the named principal still finds it.
-    for (const p of people) {
-      if (/^joint venture/i.test(p.role ?? "")) continue;
-      yield {
-        kind: "license", hit: { ...base, source: "California CSLB contractor licenses (personnel)", principal: p.name, matchedOn: "principal", specialty: [p.role, base.specialty].filter(Boolean).join(". ") || null },
-        business: null, person: [p.raw, ...p.aka].join(" "), keys,
-      };
-    }
+    // Everyone on the license is in `people` of this one hit and in its index words: a person search finds the
+    // license through them (the runner re-checks one person at a time), so no second hit per person (audit 2026-10-15).
     // A suspension, probation, pending case or disciplinary bond is a CSLB enforcement fact on the license itself.
     const bond = clean(r.DBCaseNo);
     if ((primary && primary !== "CLEAR" && CSLB_DISCIPLINE.test(primary)) || (secondary && CSLB_DISCIPLINE.test(secondary)) || bond) {
@@ -771,21 +769,20 @@ export async function* cslbRows(masterPath: string, personnelPath: string): Asyn
       }, businessNames, keys);
     }
   }
-  // Personnel of a license that is no longer in the master list: still a real record of the person.
+  // Personnel of a license that is no longer in the master list: still a real record of those people, one hit per license.
   for (const [no, people] of Array.from(personnel.entries())) {
     if (inMaster.has(no)) continue;
-    for (const p of people) {
-      if (/^joint venture/i.test(p.role ?? "")) continue;
-      yield {
-        kind: "license",
-        hit: {
-          state: "CA", source: "California CSLB contractor licenses (personnel)", sourceUrl: CSLB, businessName: null, licenseNumber: no,
-          licenseType: "Contractor license", specialty: p.role, status: "Not in the current license list", principal: p.name, city: null, expires: null,
-          matchedOn: "principal", people: people.map(({ name, role }) => ({ name, role })),
-        },
-        business: null, person: [p.raw, ...p.aka].join(" "), keys: { licenses: [no] },
-      };
-    }
+    const named = people.filter((p) => !/^joint venture/i.test(p.role ?? ""));
+    if (!named.length) continue;
+    yield {
+      kind: "license",
+      hit: {
+        state: "CA", source: "California CSLB contractor licenses (personnel)", sourceUrl: CSLB, businessName: null, licenseNumber: no,
+        licenseType: "Contractor license", specialty: null, status: "Not in the current license list", principal: named.length === 1 ? named[0].name : null,
+        city: null, expires: null, matchedOn: "principal", people: people.map(({ name, role }) => ({ name, role })),
+      },
+      business: null, person: null, people: named.flatMap((p) => [p.raw, ...p.aka]), keys: { licenses: [no] },
+    };
   }
 }
 
@@ -909,7 +906,7 @@ async function* caCslbRevokedLoader(): AsyncIterable<BulkHit> {
   const urls: string[] = [];
   for (let y = new Date().getUTCFullYear(); y >= CSLB_REVOKED_FIRST_YEAR; y--) {
     await rateLimitHost(CSLB_REVOKED_YEARS, 2000);
-    const res = await fetch(`${CSLB_REVOKED_YEARS}?Year=${y}`, { headers: { "user-agent": USER_AGENT } });
+    const res = await fetchWithDeadline(`${CSLB_REVOKED_YEARS}?Year=${y}`, { headers: { "user-agent": USER_AGENT } }, 60_000);
     if (!res.ok) throw new Error(`CSLB revoked-list page ${y} returned HTTP ${res.status}`);
     for (const m of Array.from((await res.text()).matchAll(/href="([^"]*\/Revoked\/Revoked\d{6}[^"]*\.pdf)"/gi))) {
       const u = new URL(m[1].replace(/ /g, "%20"), CSLB_REVOKED_YEARS).toString();
@@ -947,11 +944,11 @@ const DCA_BOARDS: { folder: string; label: string }[] = [
 async function* caDcaLoader(): AsyncIterable<BulkHit> {
   for (const board of DCA_BOARDS) {
     await rateLimitHost("https://www.dca.ca.gov/", 1500);
-    const token = (await (await fetch("https://www.dca.ca.gov/boxToken/getToken", { headers: { "user-agent": USER_AGENT } })).text()).trim();
+    const token = (await (await fetchWithDeadline("https://www.dca.ca.gov/boxToken/getToken", { headers: { "user-agent": USER_AGENT } }, 60_000)).text()).trim();
     if (!token || /\s|</.test(token)) throw new Error("DCA did not return a Box token");
     const auth = { authorization: `Bearer ${token}`, "user-agent": USER_AGENT };
     await rateLimitHost("https://api.box.com/", 1000);
-    const items = await (await fetch(`https://api.box.com/2.0/folders/${board.folder}/items?limit=1000`, { headers: auth })).json() as { entries?: { id: string; name: string; type: string }[] };
+    const items = await (await fetchWithDeadline(`https://api.box.com/2.0/folders/${board.folder}/items?limit=1000`, { headers: auth }, 60_000)).json() as { entries?: { id: string; name: string; type: string }[] };
     const data = (items.entries ?? []).filter((e) => e.type === "file" && /_Data\d+\.(xls|txt|csv)$/i.test(e.name));
     if (!data.length) throw new Error(`no data file in DCA folder ${board.folder}`);
     for (const file of data) {
@@ -982,15 +979,18 @@ async function* caDcaLoader(): AsyncIterable<BulkHit> {
 
 // ── California DIR certified electricians ────────────────────────────────────────────────────────────────────
 const DIR_ECU_PAGE = "https://data.ca.gov/dataset/dir-electrician-certification-unit-ecu";
-const DIR_ECU_FILES: { resource: string; type: string }[] = [
-  { resource: "291bacb8-2fdb-4d9c-a330-113781ce2f59", type: "Certified Electrician" },
-  { resource: "f0b9e36d-32be-408d-8dd9-4d539becfdc8", type: "Electrician Trainee" },
+// The publisher's own file downloads (publish.data.ca.gov, linked from the dataset page; its robots.txt allows them).
+// data.ca.gov's /datastore/dump/ is disallowed by its robots.txt (checked 2026-10-15), so it is not used.
+const DIR_ECU_DATASET = "https://publish.data.ca.gov/dataset/469f1d7f-81dd-4e5b-a2db-ad4eece1134b/resource";
+const DIR_ECU_FILES: { url: string; type: string }[] = [
+  { url: `${DIR_ECU_DATASET}/291bacb8-2fdb-4d9c-a330-113781ce2f59/download/certified_electrician_list.csv`, type: "Certified Electrician" },
+  { url: `${DIR_ECU_DATASET}/f0b9e36d-32be-408d-8dd9-4d539becfdc8/download/electrician_trainee_list.csv`, type: "Electrician Trainee" },
 ];
 
 async function* caElectriciansLoader(): AsyncIterable<BulkHit> {
   for (const f of DIR_ECU_FILES) {
-    // CKAN's datastore dump: the whole resource as CSV with a header row.
-    for await (const r of fromFile(await download(`https://data.ca.gov/datastore/dump/${f.resource}`), (p) => csvRecords(p))) {
+    // The whole resource as CSV with a header row: ELECTRICIAN_NAME, ZIP_CODE, CERTIFICATE_NUMBER, EXPIRATION_DATE (MM/DD/YYYY).
+    for await (const r of fromFile(await download(f.url), (p) => csvRecords(p))) {
       const raw = clean(r.ELECTRICIAN_NAME);
       if (!raw) continue;
       const who = flipName(raw);
@@ -999,7 +999,7 @@ async function* caElectriciansLoader(): AsyncIterable<BulkHit> {
         hit: {
           state: "CA", source: "California DIR electrician certification", sourceUrl: DIR_ECU_PAGE, businessName: null,
           licenseNumber: clean(r.CERTIFICATE_NUMBER), licenseType: f.type, specialty: null, status: null, principal: who,
-          city: clean(r.ZIP_CODE) ? `ZIP ${clean(r.ZIP_CODE)}` : null, expires: clean(r.EXPIRATION_DATE)?.slice(0, 10) ?? null, matchedOn: "principal",
+          city: clean(r.ZIP_CODE) ? `ZIP ${clean(r.ZIP_CODE)}` : null, expires: usDate(r.EXPIRATION_DATE) ?? (/^\d{4}-\d{2}-\d{2}/.test(r.EXPIRATION_DATE ?? "") ? r.EXPIRATION_DATE.slice(0, 10) : null), matchedOn: "principal",
           ...(who ? { people: [{ name: who, role: f.type }] } : {}),
         },
         business: null, person: raw, keys: { licenses: [clean(r.CERTIFICATE_NUMBER)] }, // the file gives a ZIP only, no street
@@ -1013,11 +1013,18 @@ const DLSE_DEBAR = "https://www.dir.ca.gov/dlse/debar.html";
 
 async function* caDebarmentsLoader(): AsyncIterable<BulkHit> {
   await rateLimitHost(DLSE_DEBAR, 1500);
-  const res = await fetch(DLSE_DEBAR, { headers: { "user-agent": USER_AGENT } });
+  const res = await fetchWithDeadline(DLSE_DEBAR, { headers: { "user-agent": USER_AGENT } }, 60_000);
   if (!res.ok) throw new Error(`debarment page returned HTTP ${res.status}`);
-  const html = await res.text();
+  yield* parseCaDebarments(await res.text());
+}
+
+/**
+ * The debarment table's rows. A row whose period has no date is not a debarment: the page ends with the DIR contact
+ * table ("Division of Workers' Compensation | Benefits for … | 1-800-…"), which has the same two-cell shape.
+ */
+export function parseCaDebarments(html: string, today = new Date().toISOString().slice(0, 10)): BulkHit[] {
+  const out: BulkHit[] = [];
   const text = (s: string) => clean(decodeEntities(s.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ")));
-  const today = new Date().toISOString().slice(0, 10);
   for (const m of Array.from(html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g))) {
     const cells = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c) => c[1]);
     if (cells.length < 2) continue;
@@ -1025,6 +1032,7 @@ async function* caDebarmentsLoader(): AsyncIterable<BulkHit> {
     if (!who || !period || /name of contractor/i.test(who)) continue;
     // Dates are written M/D/YYYY, and on some rows M/D/YY ("9/13/24 through 9/13/27"): a two-digit year is 20YY.
     const dates = Array.from(period.matchAll(/\b(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\b/g)).map((d) => usDate(`${d[1]}/${d[2]}/${d[3].length === 2 ? `20${d[3]}` : d[3]}`));
+    if (!dates.some(Boolean)) continue;
     const from = dates[0] ?? null, to = dates[1] ?? null;
     const pdf = cells[1].match(/href="([^"]+\.pdf)"/i)?.[1];
     const stayed = /stay/i.test(period);
@@ -1032,14 +1040,18 @@ async function* caDebarmentsLoader(): AsyncIterable<BulkHit> {
     // "CSB # 699574", "CLSB#710322"; some rows name two licenses.
     const licenses = Array.from(who.matchAll(/\b(?:CSLB|CSB|CLSB)\s*(?:License\s*)?(?:Number|No\.?|#)\s*:?\s*#?\s*(\d{5,7})\b/gi)).map((x) => x[1]);
     const licenseNumber = licenses[0] ?? null;
-    yield enf({
+    const ended = !!to && to < today;
+    out.push(enf({
       state: "CA", source: "California Labor Commissioner public-works debarments", sourceUrl: pdf ? new URL(pdf, DLSE_DEBAR).toString() : DLSE_DEBAR,
       category: "debarment", name: who.replace(/\s*\b(?:CSLB|CSB|CLSB)\s*(?:License\s*)?(?:Number|No\.?|#)\s*:?.*$/i, ""), id: licenseNumber,
       date: from, endDate: to,
-      status: stayed ? "Stayed by a court (see decision)" : to && to < today ? "Debarment period over" : "Debarred",
-      city: null, detail: period, amount: null, adverse: true, licenseNumber,
-    }, who, { licenses });
+      status: stayed ? "Stayed by a court (see decision)" : ended ? "Debarment period over" : "Debarred",
+      // From the status itself (audit 2026-10-15): a running debarment is adverse, one whose period is over is not,
+      // a stayed one is unknown.
+      city: null, detail: period, amount: null, adverse: stayed ? null : adverseFrom("Debarred", { ended }), licenseNumber,
+    }, who, { licenses }));
   }
+  return out;
 }
 
 // ── The list ─────────────────────────────────────────────────────────────────────────────────────────────────
