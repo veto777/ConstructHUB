@@ -18,8 +18,8 @@ describe("coverage manifest (from the registry)", () => {
 
   it("lists the original tables' sources with what the code says about them", () => {
     const by = (st: string, label: string) => manifest.states.find((s) => s.state === st)!.sources.find((x) => x.label === label);
-    // A Socrata dataset: identifiers from its declared fields (WA: business, principals join, license number).
-    expect(by("WA", "Washington L&I contractor licenses")).toMatchObject({ kinds: ["licenses"], ids: ["name", "owner", "license"], mode: "live" });
+    // A Socrata dataset: identifiers from its declared fields (WA: business, principals join, license number, phone, address).
+    expect(by("WA", "Washington L&I contractor licenses")).toMatchObject({ kinds: ["licenses"], ids: ["name", "owner", "license", "phone", "address"], mode: "live" });
     // A file: a daily download, its loaded rows decide the rest.
     expect(by("FL", "Florida stop-work orders (Division of Workers' Compensation)")).toMatchObject({ kinds: ["stop_work"], mode: "file", refreshHours: 24, companiesOnly: true, fileId: "fl-stop-work" });
     // The original live enforcement, from the report's own source list.
