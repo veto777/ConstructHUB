@@ -103,8 +103,8 @@ export function ResearchOffer({ compact = false }: { compact?: boolean }) {
           Give us names of people or companies, the states and the trades you care about. The report finds contractors by
           name, owner, license number, phone or address and links related licenses: we search the state license records and
           every city and county permit portal we can reach there, follow the license numbers, phones, addresses and people we
-          find to other licenses and businesses tied to them, and add consumer complaints, state discipline and enforcement
-          records, federal lawsuits and OSHA inspections for companies. You get a sourced report.
+          find to other licenses and businesses tied to them, and add consumer complaints and state discipline and enforcement
+          records for companies. You get a sourced report.
           {" "}{formatUsd(RESEARCH_STANDARD_CENTS)} for one name in one state, {formatUsd(RESEARCH_EXTENDED_CENTS)} for up to five names in up to three states.
           Paid up front and non-refundable. Nothing is guaranteed.
         </p>

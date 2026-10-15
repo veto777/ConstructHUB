@@ -101,7 +101,7 @@ export function withFacets(src: CoverageSource, facets: CoverageFacets | undefin
 export function coverageNote(s: CoverageState): string | null {
   const licenses = s.sources.filter((x) => x.kinds.includes("licenses")).length;
   const records = s.sources.filter((x) => !x.kinds.includes("licenses")).length;
-  const fallback = "permit portals, the nationwide federal court and OSHA records, and the cross-reference of any license numbers, phones and addresses you give";
+  const fallback = "permit portals, the nationwide records listed below, and the cross-reference of any license numbers, phones and addresses you give";
   if (!licenses && !records) return `We don't search any of this state's own records yet, so reports here rely on ${fallback}.`;
   if (!licenses) {
     return s.unavailableCount

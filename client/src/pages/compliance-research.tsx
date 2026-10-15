@@ -118,8 +118,8 @@ export default function ResearchOrderPage() {
           and links related licenses: it searches the state contractor-license records and every city and county permit portal
           we can reach in those states, then follows the license numbers, phones, addresses and people on what it finds to other
           licenses and businesses tied to them. For a company it also pulls consumer complaints, state
-          enforcement records (licensing-board discipline, stop-work orders, tax liens, debarments, environmental orders),
-          and OSHA safety inspections. Every finding links to its official
+          enforcement records (licensing-board discipline, stop-work orders, tax liens, debarments, environmental orders).
+          Every finding links to its official
           source. Reports are usually ready the same day.
         </p>
       </header>
@@ -129,7 +129,7 @@ export default function ResearchOrderPage() {
         <ul className="space-y-1.5 text-sm list-disc pl-5">
           <li>Searches every source we have in each state you pick, by name, owner, license number, phone or address. What we have differs by state: the link below lists it.</li>
           <li>Cross-references what it finds. Other licenses and businesses that share a license number, phone, address or person show up too, and each one says what ties it.</li>
-          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens) and OSHA inspections for companies.</li>
+          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens) for companies.</li>
         </ul>
         <Link href={RESEARCH_COVERAGE_PATH} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline" data-testid="link-research-coverage">
           See exactly what we search in your state <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
