@@ -791,11 +791,13 @@ const louisville: BulkSource = {
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, sanFrancisco, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade, lasVegas, tucson, sacramentoCounty, louisville];
+// NYC DOB/DCWP licenses, the Montgomery County (MD) licenses, NYC DOB discipline and DCWP complaints are searched
+// live by the NY and MD packs (states/ny.ts, states/md.ts), so they aren't listed here twice.
+export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, phlTrade, phlViolations, cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, sanFrancisco, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade, lasVegas, tucson, sacramentoCounty, louisville];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
-export const LOCAL_ENFORCEMENT: SodaEnforcement[] = [...nycEnforcement];
+export const LOCAL_ENFORCEMENT: SodaEnforcement[] = nycEnforcement.filter((e) => /6bgk-3dad/.test(e.url)); // ECB violations only (see above)
 /** Other city and county enforcement searches, by state. */
 export const LOCAL_LIVE_ENFORCEMENT: Record<string, LiveEnforcementSearch[]> = {};
 
