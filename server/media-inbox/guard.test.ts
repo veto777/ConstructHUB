@@ -201,6 +201,14 @@ describe("classifySites — vetted directories sorted before any email", () => {
   });
 });
 
+describe("queueClassified never cold-emails a listing-management vendor", () => {
+  it("matches vendors and their sub-domains only", async () => {
+    const { NOT_A_RELATIONSHIP } = await import("./store");
+    for (const d of ["synup.com", "get.nicejob.com", "yext.com", "serviceagent.ai"]) expect(NOT_A_RELATIONSHIP.test(d)).toBe(true);
+    for (const d of ["mozillachamber.org", "nariatlanta.org", "ezlocal.com"]) expect(NOT_A_RELATIONSHIP.test(d)).toBe(false);
+  });
+});
+
 describe("formMessage — our first email, as a form message", () => {
   it("drops the greeting, the stop line and the sign-off", () => {
     const m = formMessage(`Hi Acme team,\n\nConstructHUB is software for US contractors.\n\nIf this isn't something you handle, reply "stop" and we won't email you again.\n\nBest regards,`);

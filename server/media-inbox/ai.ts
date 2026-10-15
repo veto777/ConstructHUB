@@ -179,17 +179,19 @@ export async function extractNextStep(thread: ThreadMessage[], env: NodeJS.Proce
   }, env);
 }
 
-export const PARTNER_CLASSES = ["listing_directory", "trade_association", "chamber", "news", "publisher", "government", "business", "other"] as const;
+export const PARTNER_CLASSES = ["listing_directory", "trade_association", "chamber", "news", "publisher", "government", "business", "software", "other"] as const;
 export type PartnerClass = (typeof PARTNER_CLASSES)[number];
 const CLASSIFY_SYSTEM = `You sort websites for a company that builds relationships with places where US contractors get listed or featured.
 For each site, from its domain and page titles, answer with one class:
-- listing_directory: an online business directory or listings site that lists many unrelated local businesses (Yelp-like, a city or regional business directory, a home-services directory). NOT a members-only directory of an organisation.
+- listing_directory: an online business directory or listings site that lists many unrelated local businesses (Yelp-like, a city or regional business directory, a home-services directory). NOT a members-only directory of an organisation, and NOT a directory for one non-trade audience (schools, homeschooling, churches).
 - trade_association: a construction or home-trade association, builders' exchange or union (home builders association, NARI, AGC, ABC, NECA, PHCC, ACCA, roofing / remodelers / masonry / painting associations).
 - chamber: a chamber of commerce, business alliance or downtown/economic development organisation with a member directory.
 - news: a newspaper, magazine or local news site.
 - publisher: a blog or content site that takes articles.
 - government: a city, county, state or federal body, or a licence lookup.
 - business: a single company (a contractor, a manufacturer, a dealer locator, a utility).
+- software: a software or app company, including listing-management, review, marketing and AI tools, and people-search or
+  background-check sites. These are never a listing_directory even when they list businesses.
 - other: anything else (political parties, schools, alumni, bar or medical or realtor associations, hobby clubs, unclear pages).
 Also give "name": the organisation's own name as its titles write it (e.g. "Rochester Area Chamber of Commerce"), or null when
 the titles do not name it. Never invent a name.

@@ -342,6 +342,8 @@ export async function saveClasses(classes: Map<string, string>, names: Map<strin
  * chamber the member-resource email, a newspaper the news email. Government sites and webmail addresses (often a member's, not the organisation's)
  * are never queued.
  */
+/** Listing-management vendors and competitors: support@ already asked them for quotes (2026-10-13), never cold-emailed here. */
+export const NOT_A_RELATIONSHIP = /(^|\.)(yext|synup|uberall|brightlocal|whitespark|birdeye|podium|nicejob|gatherup|reputation|vendasta|semrush|moz|localeze|neustar|advice-local|loganix|ubersuggest|serviceagent)\.[a-z.]+$/i;
 export async function queueClassified(pick: (emails: string[]) => string | null, name: (domain: string, signals: any) => string): Promise<number> {
   const r = await db().query(
     `SELECT s.domain, s.partner_class, s.partner_name, s.contact_emails, s.signals FROM backlink_sources s
@@ -351,7 +353,7 @@ export async function queueClassified(pick: (emails: string[]) => string | null,
       ORDER BY s.tier, s.score DESC NULLS LAST`);
   let added = 0;
   for (const x of r.rows) {
-    if (/\.(gov|mil|edu)$/.test(x.domain)) continue;
+    if (/\.(gov|mil|edu)$/.test(x.domain) || NOT_A_RELATIONSHIP.test(x.domain)) continue;
     const to = pick((x.contact_emails as string[]).filter((e) => !NOT_A_PARTNER_ADDRESS.test(e) && !FREE_MAIL_ADDR.test(e)));
     if (!to) continue;
     const ins = await db().query(
