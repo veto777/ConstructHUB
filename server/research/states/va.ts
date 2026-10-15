@@ -10,6 +10,7 @@
  *                           and Landscape Architects: individuals and business entities
  *     va-dpor-alhi          Board for Asbestos, Lead, and Home Inspectors: asbestos and lead abatement contractors,
  *                           home inspectors
+ *   Every regulant row carries its license number and address (DPOR publishes no phones) as search keys.
  *   Live (data.virginia.gov CKAN datastore, published there by the State Corporation Commission):
  *     SCC corporations and LLCs: status and status reason (business_status). The open-data copies are dated: the
  *     corporation file was last loaded 2024-11-14 and the LLC file 2026-03-24, and the LLC file stops at 1,048,575 rows.
@@ -97,15 +98,22 @@ export function vaRegulantHit(r: Record<string, string>, list: DporList, source:
   const who = clean(r["INDIVIDUAL NAME"]);
   const business = clean(r["BUSINESS NAME"]);
   if (!who && !business) return null;
+  const licenseNumber = board && occ && cert ? `${board}${occ}${cert}` : clean(cert);
+  const zip = clean(r["FIVE DIGIT ZIP CODE"]), ext = clean(r["ZIP CODE EXTENSION"]);
+  const street = [clean(r["FIRST LINE ADDRESS"]), clean(r["SECOND LINE ADDRESS"]), clean(r["P O BOX #"])].filter(Boolean).join(", ");
+  const place = [clean(r.CITY), [clean(r.STATE), zip ? (ext && ext !== "0000" ? `${zip}-${ext}` : zip) : null].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const address = [street, place, clean(r.PROVINCE), clean(r.COUNTRY), clean(r["POSTAL CODE"])].filter(Boolean).join(", ") || null;
   const hit: LicenseHit = {
     state: "VA", source, sourceUrl: DPOR_PAGE,
-    businessName: business, licenseNumber: board && occ && cert ? `${board}${occ}${cert}` : clean(cert),
+    businessName: business, licenseNumber,
     licenseType: list.type, specialty: vaSpecialties(r["LICENSE SPECIALTY"], board),
     // The lists hold current licenses only (DPOR names the files "__crnt"); DPOR publishes no status column.
     status: "Current (on DPOR's regulant list)", principal: who, city: [clean(r.CITY), clean(r.STATE)].filter(Boolean).join(", ") || null,
     expires: usDate(r["EXPIRATION DATE"]), matchedOn: business ? "business" : "principal",
+    // DPOR leaves phone numbers out of the lists. The file doesn't say what the individual on a firm's row is.
+    address, phone: null, people: who ? [{ name: who, role: business ? null : "Licensee" }] : [],
   };
-  return { kind: "license", hit, business, person: who };
+  return { kind: "license", hit, business, person: who, keys: { licenses: [licenseNumber], addresses: [address] } };
 }
 
 function dporLoader(lists: DporList[], source: string): () => AsyncIterable<BulkHit> {
@@ -150,7 +158,8 @@ export function sccHit(r: Record<string, unknown>, ds: (typeof SCC_DATASETS)[num
     endDate: status && /^INACTIVE/.test(status) ? anySccDate(r["Status Date"]) : null,
     status: `${ds.kind}: ${[status, reason && reason.toUpperCase() !== status ? reason : null].filter(Boolean).join(", ") || "status not given"}`,
     city: [s(r.City), s(r.State)].filter(Boolean).join(", ") || null,
-    detail: [s(r.IncorpState) ? `Formed in ${s(r.IncorpState)}` : null, anySccDate(r["Status Date"]) ? `status date ${anySccDate(r["Status Date"])}` : null,
+    address: [s(r.Street1), s(r.Street2), s(r.City), [s(r.State), s(r.Zip)].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null,
+    detail: [s(r["RA-Name"]) ? `Registered agent ${s(r["RA-Name"])}` : null, s(r.IncorpState) ? `Formed in ${s(r.IncorpState)}` : null, anySccDate(r["Status Date"]) ? `status date ${anySccDate(r["Status Date"])}` : null,
       `SCC open-data copy loaded ${ds.loaded}`].filter(Boolean).join("; "),
     amount: null, adverse: reason && SCC_ADVERSE.test(reason) ? true : null,
   };

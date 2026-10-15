@@ -7,13 +7,16 @@
  *   NC Board of Examiners of Electrical Contractors (arls-public.ncbeec.org): licenses and their qualifiers
  *   NC State Board of Examiners of Plumbing, Heating & Fire Sprinkler Contractors (public.nclicensing.org): licenses
  *     and their classification holders (this board shows no license status)
+ *
+ * Each board is also searched by license number, phone and street address (the portal's own form fields). Every hit
+ * carries the published address, phone and people (qualifiers, classification holders, contact) with their roles.
  */
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
-import { searchArlsLicenses, searchArlsMatters, type ArlsBoard } from "./lib/g3-arls";
+import { searchArlsBy, searchArlsLicenses, searchArlsMatters, type ArlsBoard } from "./lib/g3-arls";
 
 const NCLBGC: ArlsBoard = {
   state: "NC", source: "NC Licensing Board for General Contractors", base: "https://portal.nclbgc.org",
-  classField: "ClassificationDefinitionIdnt", licenseLabel: "General Contractor License", mattersPath: "/Public/_ShowNCLBGCPublicMatters/",
+  classField: "ClassificationDefinitionIdnt", licenseLabel: "General Contractor License", qualifierField: true, mattersPath: "/Public/_ShowNCLBGCPublicMatters/",
 };
 const NCBEEC: ArlsBoard = {
   state: "NC", source: "NC Board of Examiners of Electrical Contractors", base: "https://arls-public.ncbeec.org",
@@ -24,7 +27,7 @@ const NCPHFS: ArlsBoard = {
   classField: "ClassificationDefinitionIdnt", licenseLabel: "Plumbing, Heating or Fire Sprinkler Contractor License", noQualifiers: true,
 };
 
-const live = (b: ArlsBoard): LiveLicenseSearch => ({ source: b.source, sourceUrl: `${b.base}/Public/Search`, search: (name, kind) => searchArlsLicenses(b, name, kind) });
+const live = (b: ArlsBoard): LiveLicenseSearch => ({ source: b.source, sourceUrl: `${b.base}/Public/Search`, search: (name, kind) => searchArlsLicenses(b, name, kind), searchBy: (q) => searchArlsBy(b, q) });
 
 const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [
   { source: "NC Licensing Board for General Contractors: disciplinary actions", scope: "Disciplinary actions on general contractor licenses, 2022 to today", search: (name) => searchArlsMatters(NCLBGC, name) },

@@ -15,6 +15,7 @@ import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { politeFetch, sleep } from "../../../scrapers/polite-fetch";
 import { usDate } from "../../bulk";
 import { tokens } from "../../licenses";
+import { addressMatches, normLicense, normPhone, type IdQuery } from "../../identifiers";
 import { hasAllWords, htmlText } from "./g3-common";
 
 export type ArlsBoard = {
@@ -28,6 +29,8 @@ export type ArlsBoard = {
   licenseLabel: string;
   /** The board's public-matters endpoint, when it has one whose layout was seen live. */
   mattersPath?: string;
+  /** The search form has a separate qualifier-number box (NCLBGC). */
+  qualifierField?: boolean;
   /** The board shows a license's people as "Classification Holders" and has no qualifiers list. */
   noQualifiers?: boolean;
 };
@@ -44,11 +47,23 @@ export function parseArlsSearch(html: string): ArlsRow[] {
     if (!key || cells.length < 3) continue;
     out.push({
       key, account: htmlText(cells[0].match(/<a [^>]*>([^<]*)<\/a>/)?.[1]) ?? "", notActive: /License Not Active/i.test(cells[0]),
-      type: htmlText(cells[1]), owner: htmlText(cells[cells.length - 1]),
+      // "Name AKA: Other Name Other Name": the names, once each, joined like other multi-name records.
+      type: htmlText(cells[1]), owner: ownerNames(htmlText(cells[cells.length - 1])),
     });
   }
   return out;
 }
+
+const ownerNames = (v: string | null): string | null => {
+  if (!v || !/\bAKA:/.test(v)) return v;
+  const [first, rest] = v.split(/\s*\bAKA:\s*/, 2);
+  const names = [first.trim()];
+  // The AKA list is the other names run together; the first name repeated is dropped.
+  let r = rest.trim();
+  while (r.startsWith(first.trim())) r = r.slice(first.trim().length).trim();
+  if (r) names.push(r);
+  return names.join(" / ");
+};
 
 export type ArlsDetails = {
   fields: Record<string, string | null>;
@@ -103,18 +118,22 @@ export function parseArlsMatters(html: string, base: string): { caseNo: string |
 }
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────────────────────────────────────
-/** GET/POST with the polite limiter, retrying a refused connection (public.nclicensing.org drops some connections). */
+/**
+ * GET/POST with the polite limiter (one request per 3 s per board). public.nclicensing.org drops some connections and
+ * portal.nclbgc.org answers HTTP 400 for a minute or two after a burst (seen 2026-10-15): both are retried, slowly.
+ */
 async function arlsText(url: string, init: RequestInit = {}): Promise<string> {
   let last: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await sleep(attempt * 45_000);
     try {
-      const res = await politeFetch(url, { ...init, headers: { "x-requested-with": "XMLHttpRequest", ...(init.headers ?? {}) } }, { minDelayMs: 2000 });
-      if (!res.ok) throw new Error(`${new URL(url).host} returned HTTP ${res.status}`);
-      return await res.text();
+      const res = await politeFetch(url, { ...init, headers: { "x-requested-with": "XMLHttpRequest", ...(init.headers ?? {}) } }, { minDelayMs: 3000 });
+      if (res.ok) return await res.text();
+      last = new Error(`${new URL(url).host} returned HTTP ${res.status}`);
+      if (res.status !== 400) throw last;
     } catch (err) {
       last = err;
-      if (/HTTP \d/.test(String((err as Error)?.message))) throw err;
-      await sleep(5000 * (attempt + 1));
+      if (/HTTP (?!400)\d/.test(String((err as Error)?.message))) throw err;
     }
   }
   throw last;
@@ -122,31 +141,73 @@ async function arlsText(url: string, init: RequestInit = {}): Promise<string> {
 
 const cache = new Map<string, { at: number; rows: Promise<ArlsRow[]> }>();
 
-/** The search, cached for 10 minutes so a report's license and enforcement passes share one request. */
-export function arlsSearch(board: ArlsBoard, name: string, kind: "person" | "company"): Promise<ArlsRow[]> {
-  const words = tokens(name);
-  const key = `${board.base}|${kind}|${words.join(" ")}`;
+type SearchFields = Partial<Record<"AccountNumber" | "QualifierAccountNumber" | "CompanyName" | "FirstName" | "LastName" | "PhoneNumber" | "streetAddress", string>>;
+
+/** One search of the portal's form, cached for 10 minutes so a report's license and enforcement passes share it. */
+function arlsPost(board: ArlsBoard, fields: SearchFields): Promise<ArlsRow[]> {
+  const key = `${board.base}|${JSON.stringify(fields)}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < 10 * 60_000) return hit.rows;
-  const form = new URLSearchParams({ [board.classField]: "", AccountNumber: "", CompanyName: "", FirstName: "", LastName: "", PhoneNumber: "", streetAddress: "", PostalCode: "", City: "", StateCode: "" });
-  if (kind === "company") form.set("CompanyName", name.trim().slice(0, 100));
-  else { form.set("FirstName", words[0] ?? ""); form.set("LastName", words[words.length - 1] ?? ""); }
+  const form = new URLSearchParams({ [board.classField]: "", AccountNumber: "", ...(board.qualifierField ? { QualifierAccountNumber: "" } : {}), CompanyName: "", FirstName: "", LastName: "", PhoneNumber: "", streetAddress: "", PostalCode: "", City: "", StateCode: "" });
+  for (const [k, v] of Object.entries(fields)) form.set(k, v ?? "");
   const rows = (async () => {
-    if (kind === "person" ? words.length < 2 : name.trim().length < 3) return [];
     const html = await arlsText(`${board.base}/Public/_Search/`, { method: "POST", body: form.toString(), headers: { "content-type": "application/x-www-form-urlencoded; charset=UTF-8" } });
+    if (/No results found for search criteria/i.test(html)) return [];
     if (!/Search Results/i.test(html)) throw new Error(`${new URL(board.base).host} returned an unexpected page`);
-    return parseArlsSearch(html);
+    const seen = new Set<string>();
+    return parseArlsSearch(html).filter((r) => !seen.has(r.key) && !!seen.add(r.key));
   })();
   rows.catch(() => cache.delete(key));
   cache.set(key, { at: Date.now(), rows });
   return rows;
 }
 
+/** A name search: company name ("contains"), or a person's first and last word. */
+export function arlsSearch(board: ArlsBoard, name: string, kind: "person" | "company"): Promise<ArlsRow[]> {
+  const words = tokens(name);
+  if (kind === "person" ? words.length < 2 : name.trim().length < 3) return Promise.resolve([]);
+  return arlsPost(board, kind === "company" ? { CompanyName: name.trim().slice(0, 100) } : { FirstName: words[0], LastName: words[words.length - 1] });
+}
+
 const MAX_ACCOUNTS = 8;
+const addressLines = (address: string | null | undefined): string[] =>
+  (address ?? "").split(/<br\s*\/?>/i).map(htmlText).filter((v): v is string => !!v);
 const cityOf = (address: string | null | undefined): string | null => {
-  const last = (address ?? "").split(/<br\s*\/?>/i).map(htmlText).filter(Boolean).pop() ?? null;
+  const last = addressLines(address).pop() ?? null;
   return last ? last.replace(/\s+\d{5}(-\d{4})?$/, "").trim() || null : null;
 };
+
+/** One account's details (and qualifiers) as a license hit. */
+async function accountHit(board: ArlsBoard, row: ArlsRow, matchedOn: LicenseHit["matchedOn"]): Promise<LicenseHit & { lines?: string[] }> {
+  const d = parseArlsDetails(await arlsText(`${board.base}/Public/_ShowAccountDetails/?key=${row.key}&Source=Search`));
+  const f = d.fields;
+  const isQualifier = !!f["Qualifier #"];
+  const people: { name: string; role: string | null }[] = [];
+  const add = (name: string | null | undefined, role: string) => { if (name && !people.some((p) => p.name === name)) people.push({ name, role }); };
+  if (isQualifier) add(f.Name, "Qualifier");
+  else {
+    for (const h of d.holders) add(h.replace(/:.*$/, "").trim(), `Classification holder${h.includes(":") ? ` (${h.replace(/^[^:]*:\s*/, "")})` : ""}`);
+    if (f.Company && f.Name) add(f.Name, "Contact");
+    if (!board.noQualifiers) {
+      const q = parseArlsQualifiers(await arlsText(`${board.base}/Public/_ShowAccountQualifiers/?key=${row.key}`));
+      for (const x of q.filter((x) => !x.status || /active/i.test(x.status))) add(x.name, `Qualifier${x.number ? ` ${x.number}` : ""}`);
+    }
+  }
+  const business = isQualifier ? d.qualifierFor.map((q) => q.licensee).filter(Boolean).join(" / ") || null : f.Company ?? f.Name ?? row.owner;
+  const accountType = f["Account Type"];
+  // The address block's first line can be an attention name (NCBEEC); the address is every line as published.
+  const address = addressLines(f.Address).join(", ") || null;
+  return {
+    state: board.state, source: board.source, sourceUrl: `${board.base}/Public/Search`,
+    businessName: business, licenseNumber: f["License #"] ?? f["Qualifier #"] ?? row.account,
+    licenseType: isQualifier ? "Qualifier (responsible person on a license)" : !accountType || accountType === "License" ? board.licenseLabel : accountType,
+    specialty: [d.classifications.join(", ") || null, f["License Limitation"] ? `Limitation: ${f["License Limitation"]}` : null,
+      isQualifier && d.qualifierFor.length ? `Qualifier for ${d.qualifierFor.map((q) => `${q.licensee} (${q.license}${q.status ? `, ${q.status}` : ""})`).join("; ")}` : null].filter(Boolean).join(". ") || null,
+    status: f.Status ?? (row.notActive ? "License not active" : null), principal: people.map((p) => p.name).join(", ") || null,
+    city: cityOf(f.Address), expires: usDate(f["Expiration Date"]), matchedOn,
+    address, phone: f.Phone ?? null, people, lines: addressLines(f.Address),
+  };
+}
 
 /** License hits for a name on one board: the search, then the details (and qualifiers) of each matching account. */
 export async function searchArlsLicenses(board: ArlsBoard, name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
@@ -157,34 +218,39 @@ export async function searchArlsLicenses(board: ArlsBoard, name: string, kind: "
     : [...rows.filter((r) => hasAllWords(name, r.owner)), ...rows.filter((r) => !hasAllWords(name, r.owner))]).slice(0, MAX_ACCOUNTS);
   const out: LicenseHit[] = [];
   for (const row of wanted) {
-    const d = parseArlsDetails(await arlsText(`${board.base}/Public/_ShowAccountDetails/?key=${row.key}&Source=Search`));
-    const f = d.fields;
-    const isQualifier = !!f["Qualifier #"];
-    let people: string[] = [];
-    if (isQualifier) people = [f.Name].filter((v): v is string => !!v);
-    else {
-      people = d.holders.map((h) => h.replace(/:.*$/, "").trim()).filter(Boolean);
-      if (f.Company && f.Name) people.push(f.Name);
-      if (!board.noQualifiers) {
-        const q = parseArlsQualifiers(await arlsText(`${board.base}/Public/_ShowAccountQualifiers/?key=${row.key}`));
-        people.push(...q.filter((x) => !x.status || /active/i.test(x.status)).map((x) => x.name));
-      }
-    }
-    people = Array.from(new Set(people));
-    const business = isQualifier ? d.qualifierFor.map((q) => q.licensee).filter(Boolean).join(" / ") || null : f.Company ?? f.Name ?? row.owner;
-    if (kind === "person" && !people.some((p) => hasAllWords(name, p))) continue;
-    if (kind === "company" && !hasAllWords(name, business, row.owner)) continue;
-    const accountType = f["Account Type"];
-    const status = f.Status ?? (row.notActive ? "License not active" : null);
-    out.push({
-      state: board.state, source: board.source, sourceUrl: `${board.base}/Public/Search`,
-      businessName: business, licenseNumber: f["License #"] ?? f["Qualifier #"] ?? row.account,
-      licenseType: isQualifier ? "Qualifier (responsible person on a license)" : !accountType || accountType === "License" ? board.licenseLabel : accountType,
-      specialty: [d.classifications.join(", ") || null, f["License Limitation"] ? `Limitation: ${f["License Limitation"]}` : null,
-        isQualifier && d.qualifierFor.length ? `Qualifier for ${d.qualifierFor.map((q) => `${q.licensee} (${q.license}${q.status ? `, ${q.status}` : ""})`).join("; ")}` : null].filter(Boolean).join(". ") || null,
-      status, principal: people.join(", ") || null, city: cityOf(f.Address),
-      expires: usDate(f["Expiration Date"]), matchedOn: kind === "company" ? "business" : "principal",
-    });
+    const { lines: _lines, ...h } = await accountHit(board, row, kind === "company" ? "business" : "principal");
+    if (kind === "person" && !(h.people ?? []).some((p) => hasAllWords(name, p.name))) continue;
+    if (kind === "company" && !hasAllWords(name, h.businessName, row.owner)) continue;
+    out.push(h);
+  }
+  return out;
+}
+
+/** License number ("L.03194", "Q.00290" or digits), phone or street address, checked again on each account's details. */
+export async function searchArlsBy(board: ArlsBoard, q: IdQuery): Promise<LicenseHit[]> {
+  let fields: SearchFields | null = null;
+  if (q.type === "license") {
+    const m = q.value.trim().toUpperCase().match(/^(?:(L|Q|QUAL\.L)\.?)?\s*0*(\d+)(?:-\d+)?$/);
+    if (m) fields = m[1]?.startsWith("Q") && board.qualifierField ? { QualifierAccountNumber: m[2] } : { AccountNumber: m[2] };
+  } else if (q.type === "phone") {
+    const n = normPhone(q.value);
+    if (n) fields = { PhoneNumber: n };
+  } else {
+    const street = q.value.split(",")[0].trim().slice(0, 50);
+    if (/^\d+\s+\S/.test(street)) fields = { streetAddress: street };
+  }
+  if (!fields) return [];
+  const rows = (await arlsPost(board, fields)).slice(0, MAX_ACCOUNTS);
+  const out: LicenseHit[] = [];
+  for (const row of rows) {
+    const { lines = [], ...h } = await accountHit(board, row, q.type);
+    // "L.03194" must be L.03194 (the electrical board has a U.03194); bare digits match any prefix.
+    const want = normLicense(q.value) ?? "", have = normLicense(h.licenseNumber) ?? "";
+    const ok = q.type === "license" ? (/^[A-Z]/.test(want) ? have === want : have.replace(/^[A-Z]+0*/, "") === want.replace(/^0*/, ""))
+      : q.type === "phone" ? normPhone(h.phone) === normPhone(q.value)
+      // The block can hold an attention line, a PO box and a street: any street line with the city line matches.
+      : lines.slice(0, -1).some((l) => addressMatches(q.value, `${l}, ${lines[lines.length - 1]}`));
+    if (ok) out.push(h);
   }
   return out;
 }
@@ -201,8 +267,8 @@ export async function searchArlsMatters(board: ArlsBoard, name: string): Promise
         state: board.state, source: `${board.source}: disciplinary actions`, sourceUrl: m.doc ?? `${board.base}/Public/Search`, category: "discipline",
         name: row.owner, id: m.caseNo, date: m.date, endDate: null,
         status: `Disciplinary action, case ${m.caseNo ?? "(no number)"}; the board's order is the linked document`,
-        city: null, detail: [`License ${row.account}`, m.heading ? `Listed under "${m.heading}"` : null].filter(Boolean).join(". "),
-        amount: null, adverse: null,
+        city: null, detail: m.heading ? `Listed under "${m.heading}"` : null,
+        amount: null, adverse: null, licenseNumber: row.account,
       });
     }
   }
