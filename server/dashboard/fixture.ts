@@ -128,7 +128,7 @@ function checklistFor(plan: PlanKey | null, scenario: DashboardFixtureScenario):
   const items: (DashboardChecklistItem & { applies: boolean })[] = [
     { key: "connectGoogle", label: "Connect Google", description: "Link the Google account that manages your Business Profile.", done: full, href: "/locations", surface: "app", applies: true },
     { key: "addLocation", label: "Add a location", description: "Pick the business locations you want to manage here.", done: full, href: "/locations", surface: "app", applies: true },
-    { key: "turnOnGuard", label: "Turn on Profile Guard", description: "Open a location in Locations and turn on its Profile Guard: an alert when someone edits your Google profile.", done: full, href: "/locations", surface: "app", applies: !!plan },
+    { key: "turnOnGuard", label: "Turn on Profile Watch", description: "Open a location in Locations and turn on its Profile Watch: an alert when someone edits your Google profile.", done: full, href: "/locations", surface: "app", applies: !!plan },
     { key: "runSiteScan", label: "Run a Site Scan", description: "See what's holding your website back in Google.", done: full, href: "/site-scan", surface: "app", applies: !!plan },
     { key: "requestReviews", label: "Ask for a review", description: "Send your last happy customer a review request.", done: false, href: "/google-reviews", surface: "app", applies: true },
     { key: "protectWebsite", label: "Protect your website", description: "Add Click Guard to the site your ads point at.", done: full, href: "/google-ads", surface: "app", applies: !!l && l.protectedSites !== 0 },
@@ -146,7 +146,7 @@ function recentFor(now: Date, scenario: DashboardFixtureScenario): DashboardRece
   return [
     { id: "n:sample-2", at: ago(now, 20 * 60_000), source: "notification", title: "New 5-star review", body: "A new review is waiting on a reply.", href: "/google-reviews", surface: "app", severity: "info", unread: true },
     { id: "c:sample-3", at: ago(now, 2 * HOUR), source: "crm", title: "A client approved (signed) estimate 1042", href: "/crm/estimates", surface: "portal", severity: "info" },
-    { id: "n:sample-4", at: ago(now, 6 * HOUR), source: "notification", title: "Profile Guard caught an edit", body: "Someone suggested a new phone number for a location.", href: "/locations", surface: "app", severity: "warning", unread: true },
+    { id: "n:sample-4", at: ago(now, 6 * HOUR), source: "notification", title: "Profile Watch caught an edit", body: "Someone suggested a new phone number for a location.", href: "/locations", surface: "app", severity: "warning", unread: true },
     { id: "c:sample-5", at: ago(now, DAY), source: "crm", title: "A client paid $2,400.00 by CARD", href: "/crm/payments", surface: "portal", severity: "info" },
     { id: "n:sample-6", at: ago(now, 2 * DAY), source: "notification", title: "Site Scan finished", body: "Score 82.", href: "/site-scan", surface: "app", severity: "info" },
   ];

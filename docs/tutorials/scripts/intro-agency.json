@@ -20,7 +20,7 @@
       "action": "highlight",
       "selector": "select[aria-label=\"Location status\"]",
       "caption": "Filter by status",
-      "narration": "Filter by status: synced, needs reconnect, not linked, Guard alerts, unanswered reviews or failed posts."
+      "narration": "Filter by status: synced, needs reconnect, not linked, Watch alerts, unanswered reviews or failed posts."
     },
     {
       "action": "select",
@@ -53,14 +53,14 @@
       "action": "highlight",
       "selector": "select[aria-label=\"Bulk action\"]",
       "caption": "Pick the action",
-      "narration": "Then pick the action: sync, assign to a client, Guard mode, AI replies, a post batch, or Site Scans."
+      "narration": "Then pick the action: sync, assign to a client, Watch mode, AI replies, a post batch, or Site Scans."
     },
     {
       "action": "select",
       "selector": "select[aria-label=\"Bulk action\"]",
-      "value": "Set Guard mode",
-      "caption": "Set Guard mode",
-      "narration": "Set Guard mode asks which mode, and reminds you each location needs an approved snapshot first."
+      "value": "Set Watch mode",
+      "caption": "Set Watch mode",
+      "narration": "Set Watch mode asks which mode, and reminds you each location needs an approved snapshot first."
     },
     {
       "action": "highlight",

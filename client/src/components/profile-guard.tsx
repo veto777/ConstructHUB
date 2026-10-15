@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { GbpLinkCell, useGbpLinkage } from '@/components/gbp-connection';
+import { InfoTip } from '@/components/info-tip';
 /** Google failures arrive as {message,kind,needsAuth}; turn the ones a contractor can act on into plain next steps. */
 export function guardErrorMessage(e: unknown): string {
   let body: any = null;
@@ -21,7 +22,7 @@ const pretty=(v:any)=>v===null||v===undefined?'Not set':typeof v==='string'?v:JS
 export function GuardStatus({id}:{id:number}) {
   const {data,error}=useQuery<any[]>({queryKey:['/api/gbp/guard/status']});
   const g=data?.find(g=>g.id===id);
-  return <span className="text-xs">{error?'Guard unavailable':!g?'Checking guard…':`Guard: ${g.mode}${g.pending?` · ${g.pending} pending`:''}${g.last_error?' · needs attention':''}`}</span>;
+  return <span className="text-xs">{error?'Watch unavailable':!g?'Checking watch…':`Watch: ${g.mode}${g.pending?` · ${g.pending} pending`:''}${g.last_error?' · needs attention':''}`}</span>;
 }
 export function GoogleReport({type,id}:{type:'changes'|'reviews';id:number}) {
   const [open,setOpen]=useState(false),[explanation,setExplanation]=useState('');
@@ -45,10 +46,10 @@ export function GoogleReport({type,id}:{type:'changes'|'reviews';id:number}) {
 function GuardUnlinked({locationId}:{locationId:number}) {
   const {data}=useGbpLinkage();
   const ready=data?.locations.find(l=>l.id===locationId)?.state==='available';
-  return <Card data-testid="card-guard-unlinked"><CardHeader className="pb-3"><CardTitle className="text-base">Profile Guard</CardTitle>
+  return <Card data-testid="card-guard-unlinked"><CardHeader className="pb-3"><CardTitle className="text-base">Profile Watch</CardTitle>
     <CardDescription>Link this profile to check for changes every 15 minutes.</CardDescription></CardHeader>
     <CardContent className="space-y-3 text-sm">{ready
-      ?<><p>This listing is on a Google account you've connected. Link it to turn on Profile Guard.</p><GbpLinkCell locationId={locationId}/></>
+      ?<><p>This listing is on a Google account you've connected. Link it to turn on Profile Watch.</p><GbpLinkCell locationId={locationId}/></>
       :<><p>It works once this location is linked to its Google Business Profile listing. Connect the Google account that manages the listing; if the listing is found there, you can link it here.</p>
         <Button asChild variant="outline" size="sm"><a href="/api/gbp/connect" data-testid="link-guard-connect-gbp">Connect Google Business Profile</a></Button></>}
     </CardContent></Card>;
@@ -57,22 +58,22 @@ export function ProfileGuard({locationId,linked}:{locationId:number;linked:boole
   const url=`/api/gbp/locations/${locationId}/guard`,{toast}=useToast();
   const {data,error}=useQuery<any>({queryKey:[url],enabled:linked,refetchInterval:30000});
   const [mode,setMode]=useState<string|null>(null),[watched,setWatched]=useState<string[]|null>(null),[preview,setPreview]=useState<any>(null);
-  const mutation=useMutation({mutationFn:async({method,path,body}:{method:string;path:string;body?:any})=>(await apiRequest(method,path,body)).json(),onSuccess:()=>{void queryClient.invalidateQueries({queryKey:[url]});void queryClient.invalidateQueries({queryKey:['/api/gbp/guard/status']});},onError:(e:Error)=>toast({title:'Profile Guard',description:guardErrorMessage(e),variant:'destructive'})});
+  const mutation=useMutation({mutationFn:async({method,path,body}:{method:string;path:string;body?:any})=>(await apiRequest(method,path,body)).json(),onSuccess:()=>{void queryClient.invalidateQueries({queryKey:[url]});void queryClient.invalidateQueries({queryKey:['/api/gbp/guard/status']});},onError:(e:Error)=>toast({title:'Profile Watch',description:guardErrorMessage(e),variant:'destructive'})});
   if(!linked)return <GuardUnlinked locationId={locationId}/>;
-  if(error)return <p role="alert">Unable to load Profile Guard.</p>;
-  if(!data)return <p>Loading Profile Guard…</p>;
+  if(error)return <p role="alert">Unable to load Profile Watch.</p>;
+  if(!data)return <p>Loading Profile Watch…</p>;
   const selected:string[]=watched??(data.snapshot?data.watched:Object.keys(fieldLabels));
   const act=(method:string,path:string,body?:any)=>mutation.mutateAsync({method,path,body});
-  return <div role="region" aria-label="Profile Guard"><Section title="Profile Guard" contentClassName="space-y-4 text-sm">
+  return <div role="region" aria-label="Profile Watch"><Section title={<span className="inline-flex items-center gap-1">Profile Watch <InfoTip k="profile-watch" /></span>} contentClassName="space-y-4 text-sm">
     <details><summary className="cursor-pointer py-2">How checks work</summary><p className="text-sm">Checks every 15 minutes. Lockdown reasserts approved values after detection; it cannot block Google edits. Google may delay publication. Public suggestions cannot be distinguished reliably from other Google updates.</p></details>
     <p>Current mode: {data.mode}. {data.checkedAt?`Last checked ${new Date(data.checkedAt).toLocaleString()}`:'Not checked yet'}</p>
     {data.lastError&&<p role="alert">{data.lastError}</p>}
-    <label className="block">Mode <select aria-label="Guard mode" className="border rounded p-2 bg-background" value={mode??data.mode} onChange={e=>setMode(e.target.value)}><option value="off">Off</option><option value="notify">Notify</option><option value="lockdown">Lockdown (auto-reject)</option></select></label>
+    <label className="block">Mode <select aria-label="Watch mode" className="border rounded p-2 bg-background" value={mode??data.mode} onChange={e=>setMode(e.target.value)}><option value="off">Off</option><option value="notify">Notify</option><option value="lockdown">Lockdown (auto-reject)</option></select></label>
     <details><summary className="cursor-pointer py-2">Watched fields</summary><fieldset className="grid grid-cols-2 gap-2"><legend>Watched fields</legend>{Object.entries(fieldLabels).map(([f,label])=><label key={f} className="text-sm flex gap-2"><input type="checkbox" checked={selected.includes(f)} onChange={e=>setWatched(e.target.checked?[...selected,f]:selected.filter(x=>x!==f))}/>{label}</label>)}</fieldset></details>
     {!data.snapshot&&<Button variant="outline" disabled={mutation.isPending} onClick={()=>act('POST',url+'/preview').then(setPreview).catch(()=>{})}>Preview current Google values</Button>}
     {(data.snapshot||preview)&&<details open={!data.snapshot}><summary>{data.snapshot?'Owner-approved snapshot':'Review these values before approving your snapshot'}</summary><dl>{Object.entries(data.snapshot??preview.snapshot).map(([f,v])=><div key={f} className="border-b py-2"><dt className="font-medium">{fieldLabels[f]}</dt><dd className="whitespace-pre-wrap break-all text-sm">{pretty(v)}</dd></div>)}</dl></details>}
-    <p className="text-xs text-muted-foreground">Saving Guard settings asks you to confirm it’s you (password, authenticator or an emailed code): once, then not again for 12 hours. This stops anyone using a signed-in session from quietly turning Guard off.</p>
-    <Button disabled={mutation.isPending} onClick={()=>act('PUT',url,{mode:mode??data.mode,watched:selected,...(!data.snapshot&&preview?{token:preview.token}:{})}).then(()=>{setPreview(null);toast({title:'Profile Guard settings saved'});}).catch(()=>{})}>{!data.snapshot&&preview?'Approve snapshot and save settings':'Save guard settings'}</Button>
+    <p className="text-xs text-muted-foreground">Saving Profile Watch settings asks you to confirm it’s you (password, authenticator or an emailed code): once, then not again for 12 hours. This stops anyone using a signed-in session from quietly turning Profile Watch off.</p>
+    <Button disabled={mutation.isPending} onClick={()=>act('PUT',url,{mode:mode??data.mode,watched:selected,...(!data.snapshot&&preview?{token:preview.token}:{})}).then(()=>{setPreview(null);toast({title:'Profile Watch settings saved'});}).catch(()=>{})}>{!data.snapshot&&preview?'Approve snapshot and save settings':'Save watch settings'}</Button>
     <Button className="ml-2" variant="outline" disabled={mutation.isPending||data.mode==='off'} onClick={()=>act('POST',url+'/check').catch(()=>{})}>Check now</Button>
     <h3 className="font-semibold">Pending changes and history</h3>
     {!data.changes.length&&<p>No detected changes.</p>}

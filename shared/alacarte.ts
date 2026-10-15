@@ -110,7 +110,7 @@ export type AlacarteItem = {
 /**
  * What a stand-alone account (no plan) starts from before its à la carte items
  * are applied: nothing, except the rates that are not usage caps (the slowest
- * Profile Guard cadence, the API's per-minute rate) and the keep-history default.
+ * Profile Watch cadence, the API's per-minute rate) and the keep-history default.
  */
 export const STANDALONE_BASE_LIMITS: PlanLimits = {
   locations: 0, clientWorkspaces: 0, textingNumbersIncluded: 0, historyDays: 90, gabeQuestions: 0, guardCadenceMinutes: 60,
@@ -126,7 +126,7 @@ const item = (
 
 // ── The price book (owner-steered proposal v2, 2026-10-10) ───────────────────
 export const ALACARTE: Record<AlacarteKey, AlacarteItem> = {
-  gbp: item("gbp", "Google Business Profile + Profile Guard",
+  gbp: item("gbp", "Google Business Profile + Profile Watch",
     "One Google listing, synced and watched: every unapproved edit is caught hourly and can be locked back to the value you approved.",
     3900, 2400, { limits: { locations: 1, reviewTemplates: 5 } }, "gbp", { unit: "location" }),
   reviews: item("reviews", "Google Reviews",

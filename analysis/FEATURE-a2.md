@@ -59,7 +59,7 @@ Sources checked for the guidance include [Google SEO Starter Guide](https://deve
 
 ## Previous rounds (historical)
 
-# Feature lane a2 — Profile Guard and review management
+# Feature lane a2 — Profile Watch and review management
 
 Implemented in `/home/veto/ConstructHUB-a2`, branch `lane/a2`, starting at main
 `7d2f1d4`. Only local port 8139 and `constructhub_dev_a2` were used. No deployment,
@@ -68,7 +68,7 @@ Provider HTTP/AI/publishing were injected or mocked in tests; email used the sin
 
 ## What was built and how to use it
 
-- **Locations → open a linked location → Profile Guard.** Preview Google's current
+- **Locations → open a linked location → Profile Watch.** Preview Google's current
   values, inspect the proposed snapshot, select watched fields, verify identity,
   then approve the snapshot and save Off, Notify, or Lockdown. All three modes and
   each watched field are per location. The Locations table shows mode, pending

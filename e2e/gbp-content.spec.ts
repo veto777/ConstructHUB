@@ -122,7 +122,7 @@ test('Link & sync reports a partial Google failure instead of claiming every fie
     await page.route('**/api/locations/99882', route => route.fulfill({ json: fixture }));
     await page.route('**/api/gbp/linkage', route => route.fulfill({ json: { accounts: [], errors: [], locations: [{ id: fixture.id, state: 'available', listing: { accountResource: 'accounts/fixture', gbpName: 'locations/fixture', grantSubject: 'fixture' } }] } }));
     await page.route('**/api/gbp/import', route => { linked = route.request().postDataJSON(); return route.fulfill({ json: { imported: 1, synced: { [fixture.id]: { profile: { warnings: ['Social profiles unavailable'] }, reviews: { kind: 'permission', message: 'Google denied reviews access' } } } } }); });
-    // Per-location Link & sync lives on an unlinked location's Profile Guard tab when a connected account manages the listing.
+    // Per-location Link & sync lives on an unlinked location's Profile Watch tab when a connected account manages the listing.
     await page.goto('/locations?location=99882&tab=guard');
     await expect(page.getByTestId('card-guard-unlinked')).toBeVisible();
     await page.getByTestId('button-link-gbp-99882').click();

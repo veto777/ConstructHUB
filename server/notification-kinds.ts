@@ -13,7 +13,7 @@ export const NOTIFICATION_KINDS = {
   "security.password_changed": { label: "Your password was changed", inApp: true, email: true, security: true },
   "gbp.profile_change": { label: "Your Google Business Profile changed outside ConstructHUB", inApp: true, email: true },
   "gbp.suggested_edit": { label: "Google or the public suggested an edit to your profile", inApp: true, email: true },
-  "gbp.change_reverted": { label: "Profile Guard reverted a change", inApp: true, email: true },
+  "gbp.change_reverted": { label: "Profile Watch reverted a change", inApp: true, email: true },
   "gbp.new_review": { label: "A new Google review arrived", inApp: true, email: true },
   "yelp.new_review": { label: "A new Yelp review arrived", inApp: true, email: true },
   // A review-request score below the owner's threshold (shared/review-flow.ts): the client's private feedback, at once.

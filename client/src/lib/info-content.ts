@@ -21,6 +21,19 @@ export interface InfoEntry {
 }
 
 export const INFO_CONTENT: Record<string, InfoEntry> = {
+  /* ── Google Business ─────────────────────────────────────────────────── */
+
+  "profile-watch": {
+    title: "Profile Watch",
+    body: [
+      "Profile Watch keeps an eye on your Google Business Profile so nobody changes it behind your back. You approve a snapshot of your listing — name, phone, website, address, hours, categories and the fields you tick — and ConstructHUB checks Google every 15 minutes to see whether any of them changed.",
+      "Why bother: competitors, spammers and Google's own suggestions can edit a listing, and a wrong phone number or a closed-for-good flag costs calls the same day. Most owners only notice weeks later.",
+      "Notify tells you the moment a watched field differs from your approved values, with what changed, and lets you approve or reject it. Lockdown goes further: it puts the approved values back on Google after a change is detected. Google can still take time to publish, and it cannot stop an edit before it happens.",
+      "Example: someone changes your phone number on Google at 2 pm. By 2:15 Profile Watch has spotted it, and on Lockdown your real number is already on its way back.",
+      "Saving Profile Watch settings asks you to confirm it's you (password, authenticator or an emailed code) once every 12 hours, so a borrowed signed-in session can't quietly switch it off.",
+    ],
+  },
+
   /* ── Main pages ──────────────────────────────────────────────────────── */
 
   dashboard: {
@@ -182,7 +195,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     title: "Delete this location from ConstructHUB",
     body: [
       "This only removes the location from ConstructHUB. If it has a Google Business Profile listing, that listing is not deleted, closed or changed — its reviews and photos on Google stay exactly as they are.",
-      "What goes away is ConstructHUB's copy: the synced reviews and stats stored here, Profile Guard settings and history, AI reply settings, scheduled posts and photos, this business's Social Media connections, settings and posts, and citation campaigns for this location.",
+      "What goes away is ConstructHUB's copy: the synced reviews and stats stored here, Profile Watch settings and history, AI reply settings, scheduled posts and photos, this business's Social Media connections, settings and posts, and citation campaigns for this location.",
       "Changed your mind later? Add it again with Add Location(s): use Import from GBP if the listing is on a Google account you've connected, or Search Google otherwise. Its ConstructHUB history won't come back; a listing imported from a connected Google account syncs its Google reviews, photos and stats again.",
       "To remove a listing from Google itself, do that in Google Business Profile — ConstructHUB never deletes Google listings.",
     ],

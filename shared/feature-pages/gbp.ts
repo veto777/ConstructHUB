@@ -13,12 +13,12 @@ import { joinNames } from "../plan-copy";
  *   - automatic sync every six hours while connected, only on an active plan: server/agency/jobs.ts (syncDue, scheduleSyncs)
  *   - what a sync reads (profile fields, business + customer photos, reviews, daily performance; 90 days first,
  *     then a one-time back-fill of PERFORMANCE_HISTORY_DAYS; "verified listings only" message): server/gbp/service.ts syncLocation
- *   - the tabs (Insights, Profile Guard, Location Info, Services, Photos & Videos, Social Profiles, Settings,
+ *   - the tabs (Insights, Profile Watch, Location Info, Services, Photos & Videos, Social Profiles, Settings,
  *     Citations), the performance metrics and "not final yet" days: client/src/pages/locations.tsx
  *   - the citation checklist (Google row filled from the linked listing, the rest marked by the owner):
  *     server/routes.ts /api/citations/campaigns/:id/run and PATCH /api/citations/:id
  *   - removing a location never touches the Google listing: locations.tsx SettingsTab copy, DELETE /api/locations/:id
- *   - Agency bulk actions (sync, link, Guard mode…): client/src/components/agency-workspace.tsx
+ *   - Agency bulk actions (sync, link, Watch mode…): client/src/components/agency-workspace.tsx
  */
 
 const LOCATIONS: FeatureAllowance = { limit: "locations", unit: "Google Business Profile locations", period: "count" };
@@ -36,9 +36,9 @@ export const GBP_COMPARE: FeatureCompare = {
     { name: "Local Falcon", plan: "Falcon Guard", price: { kind: "per_unit", cents: 10, unit: "location" }, note: "checks twice a day", source: "https://www.localfalcon.com/report-types/falcon-guard" },
   ],
   onlyUs: [
-    "Profile Guard checks on a schedule you set — hourly on this item, faster on the bigger plans — and Lockdown writes your approved value back and confirms Google accepted it.",
+    "Profile Watch checks on a schedule you set — hourly on this item, faster on the bigger plans — and Lockdown writes your approved value back and confirms Google accepted it.",
     "Every change keeps the old and new value, when it was found and what Google reported, with a ready report for Google's official form.",
-    "Changing Guard settings asks for your password, authenticator or an emailed code, so a signed-in session can't quietly switch it off.",
+    "Changing Profile Watch settings asks for your password, authenticator or an emailed code, so a signed-in session can't quietly switch it off.",
     "Your Google performance history keeps growing past Google's own window, synced every six hours.",
   ],
   theyNotUs: "Bulk listing distribution to other directories (Synup, and BrightLocal's listing tools) — here you keep a citation checklist you mark yourself.",
@@ -72,7 +72,7 @@ const page: FeaturePage = {
     },
     {
       title: "Work from one page",
-      body: "Open a location to read its insights, turn on Profile Guard, keep its social links and work through its citation checklist.",
+      body: "Open a location to read its insights, turn on Profile Watch, keep its social links and work through its citation checklist.",
     },
   ],
   cards: [
@@ -103,8 +103,8 @@ const page: FeaturePage = {
     },
     {
       icon: "shield",
-      title: "Profile Guard built in",
-      body: "Each linked location has its own Profile Guard tab, so edit alerts sit right next to the listing they watch.",
+      title: "Profile Watch built in",
+      body: "Each linked location has its own Profile Watch tab, so edit alerts sit right next to the listing they watch.",
     },
     {
       icon: "users",
@@ -114,7 +114,7 @@ const page: FeaturePage = {
     {
       icon: "layers",
       title: "Bulk tools on Agency",
-      body: `On the ${PLANS.agency.name} plan, sync, link, set Profile Guard and schedule posts across many client locations at once.`,
+      body: `On the ${PLANS.agency.name} plan, sync, link, set Profile Watch and schedule posts across many client locations at once.`,
     },
   ],
   spotlight: {
@@ -143,7 +143,7 @@ const page: FeaturePage = {
     },
     {
       title: "Companies with several locations",
-      body: "Every branch's listing on one page, each with its own figures, photos and Profile Guard.",
+      body: "Every branch's listing on one page, each with its own figures, photos and Profile Watch.",
     },
     {
       title: "Agencies managing client profiles",
@@ -158,7 +158,7 @@ const page: FeaturePage = {
   faqs: [
     {
       q: "What do I need to connect?",
-      a: "A Google account that owns or manages your Business Profile listing. You sign in with Google once and approve access to manage the listing. You can also add a business by searching Google, but syncing, insights and Profile Guard need the listing linked through a connected account.",
+      a: "A Google account that owns or manages your Business Profile listing. You sign in with Google once and approve access to manage the listing. You can also add a business by searching Google, but syncing, insights and Profile Watch need the listing linked through a connected account.",
     },
     {
       q: "Which plans include it, and how many locations?",

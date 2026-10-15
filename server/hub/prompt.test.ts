@@ -120,7 +120,7 @@ describe("knowledge pack", () => {
   });
 
   it("each call's knowledge slice stays within the size cap and always has the core sections", () => {
-    const greedy = sectionsFor(["permits locations profile guard reviews posts photos ranking grid site scan citations social click guard ip tracker vpn competitors google ads cloudflare domains agency reinstatement crm notifications master class done-for-you"]);
+    const greedy = sectionsFor(["permits locations profile watch reviews posts photos ranking grid site scan citations social click guard ip tracker vpn competitors google ads cloudflare domains agency reinstatement crm notifications master class done-for-you"]);
     for (const slice of [knowledgeSlice(book, greedy), ...PRESET_IDS.map((id) => buildPresetMessages(id)[0].content)]) {
       expect(slice.length).toBeLessThanOrEqual(KNOWLEDGE_SLICE_MAX + 12_000); // + rules and links for the full prompt
     }

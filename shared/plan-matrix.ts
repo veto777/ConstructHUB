@@ -125,7 +125,7 @@ export function businessToolsMatrix(): PlanMatrixSection[] {
     { key: "teamSeats", label: "Team seats", cell: (p) => count(p.limits.agencySeats) },
     { key: "clientWorkspaces", label: "Client workspaces, roles, bulk actions, email onboarding", cell: (p) => count(p.limits.clientWorkspaces) },
     // ── Google Business Profile & reviews ─────────────────────────────────
-    { key: "guardCadence", label: "Profile Guard check cadence", cell: (p) => `Every ${p.limits.guardCadenceMinutes} min` },
+    { key: "guardCadence", label: "Profile Watch check cadence", cell: (p) => `Every ${p.limits.guardCadenceMinutes} min` },
     {
       key: "reviewAlerts", label: "Review alerts + AI reply drafts",
       // Stated on Solo; every plan above inherits it through its "Everything in …" bullet.

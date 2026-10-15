@@ -75,7 +75,7 @@ Growth sidebar → **Google Business → Social Media** (`/social-media`) and **
 - Existing `notifyUser` delivers `social.post_published` and `social.post_failed` according to existing preferences. Uncertain submissions also use `social.post_failed` with explanatory text. No notification system or `KIND_DEFAULTS` edits were introduced. Activity-only strings: `social.connected`, `social.disconnected`, `social.auto_changed`; no new notification-kind map is needed.
 - Auto mode: destinations, evenly spaced daily/weekly cadence, rotating content mix, business instructions, examples, IANA timezone, overnight blackout hours, approval vs explicit fully automatic permission, and a bounded per-user daily AI generation budget via `takeBudget`. Uses the existing OpenAI configuration through an injectable generator. Generated text remains labelled AI-generated, with approval drafts as the default.
 - Real content sources: saved business profile, project photos from Media Library, synced Google review text, explicit contractor offer text, and recent published GBP standard updates. `Sync recent GBP updates` uses the existing multi-account Google client and quota gate, scoped to linked locations. The same import runs before automatic GBP generation. It accepts only `LIVE` / `STANDARD` posts from the last 30 days, filters media URLs, and reconciles each complete location snapshot. It does not depend on the other lane's Posts & Photos table. Offers/GBP text may also be entered manually.
-- Guides cover connection, manual posts, auto mode, and the requested generic Profile Guard, AI review replies, Posts & Photos and Security walkthroughs. Other-lane labels are explicitly described as rollout-dependent.
+- Guides cover connection, manual posts, auto mode, and the requested generic Profile Watch, AI review replies, Posts & Photos and Security walkthroughs. Other-lane labels are explicitly described as rollout-dependent.
 
 ## Files and migration
 
@@ -110,7 +110,7 @@ The original API-key setup for the third-party posting provider was removed (202
 
 ### Other feature walkthroughs (generic pending merge)
 
-- **Profile Guard:** Open the location's Profile Guard. Choose Off, Notify or Lockdown. Review detected changes, approve/reject as appropriate, and use reporting to inspect actions and failed restorations.
+- **Profile Watch:** Open the location's Profile Watch. Choose Off, Notify or Lockdown. Review detected changes, approve/reject as appropriate, and use reporting to inspect actions and failed restorations.
 - **AI review replies:** Open Google Reviews, sync reviews, generate a draft, check facts/tone/privacy, edit and publish or retain the draft. Automatic reply settings are an explicit publishing permission. Check posted status.
 - **Posts & Photos:** Select the business and real media/update, generate and review an AI caption if wanted, set the schedule and confirm. Follow queue status and fix connection/media failures before retrying.
 - **Security:** In Settings → Security, enable and verify 2FA, keep recovery codes private, remember only personal devices, remove old devices, complete requested re-authentication, set notification preferences, and inspect the activity log for unfamiliar connections/devices.

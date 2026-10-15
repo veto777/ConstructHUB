@@ -71,7 +71,7 @@ BUILDER NOTES (strip every HTML comment before the pack reaches the model).
 
 ConstructHUB (constructhub.us) is an online platform for construction contractors and for agencies that market contractors. One account covers the following; the CRM is a separate product with its own plans (section 3), and the AI Call Assistant is a separate service with its own subscription (section 30) — a platform plan includes neither:
 
-- **Growth tools** (the main app at constructhub.us): permit office directory and permit search, property records finder, Google Business Profile tools (Locations, Profile Guard, reviews and AI replies, Posts & Photos, ranking grid, citations), Site Scan, Social Media, website and ad-traffic protection (Click Guard, IP Tracker, VPN Shield), Competitor Intel, the ConstructHUB SEO tools (included with {{AGENCY_PLAN}}, or added on a smaller plan), and the agency workspace tools ({{AGENCY_WORKSPACE_PLANS}}).
+- **Growth tools** (the main app at constructhub.us): permit office directory and permit search, property records finder, Google Business Profile tools (Locations, Profile Watch, reviews and AI replies, Posts & Photos, ranking grid, citations), Site Scan, Social Media, website and ad-traffic protection (Click Guard, IP Tracker, VPN Shield), Competitor Intel, the ConstructHUB SEO tools (included with {{AGENCY_PLAN}}, or added on a smaller plan), and the agency workspace tools ({{AGENCY_WORKSPACE_PLANS}}).
 - **The ConstructHub CRM** (opens at portal.constructhub.us): clients, estimates with e-signature, invoices, online payments into your own Stripe account, price book, pipeline, projects, schedule, team roles, messaging and texting.
 - **A client portal**: every client you add to the CRM gets a private page where they read estimates, sign, pay, message you and see their documents.
 - **The AI Call Assistant** ({{CALL_ASSISTANT_STATUS}}): an AI receptionist that answers your business calls on a local number and files every real caller as a lead in the CRM (section 30).
@@ -109,7 +109,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 ### Recommended first steps after subscribing
 1. **Settings → Security & activity:** turn on two-factor sign-in (section 25).
 2. **Locations:** click **Connect Google Business Profile**, then **Add Location(s) → Import from GBP** (section 5).
-3. On each location, turn on **Profile Guard** (section 6) and set up **AI review replies** (section 8).
+3. On each location, turn on **Profile Watch** (section 6) and set up **AI review replies** (section 8).
 4. **Google Reviews:** add your review link and send your first review request (section 8).
 5. If your plan includes it, **Click Guard:** add your website and install the tracking code (section 15).
 6. **CRM** (a separate product: it needs its own CRM plan, section 3): click **ConstructHub CRM** at the top of the sidebar, fill in your company profile, build your price book, connect Stripe and invite your team (section 24).
@@ -127,7 +127,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 {{ALACARTE_LINES}}
 - The two other separate products — the CRM and the AI Call Assistant — are each bought on their own cards, with or without a plan. The client texting number is an add-on only.
 - Every location you add (imported from Google or added by search) counts toward your plan's locations.
-- Profile Guard checks: {{GUARD_CADENCE_LINE}}.
+- Profile Watch checks: {{GUARD_CADENCE_LINE}}.
 - AI review replies: every plan drafts replies for you to approve; publishing them automatically is included with {{AUTO_REPLY_PLANS}}.
 - Saved review-request templates per plan: {{REVIEW_TEMPLATES_LINE}}.
 - Ranking-grid credits a scan costs (one credit per 25 grid points, rounded up): {{GRID_CREDIT_COSTS}}.
@@ -155,7 +155,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 
 ## 5. Locations and connecting Google Business Profile
 
-**What it does:** Locations is where each business lives (yours, or your clients' if you're an agency). Linking a location to its Google Business Profile listing syncs its reviews, photos, services and Google performance numbers, and unlocks Profile Guard, AI replies and Posts & Photos.
+**What it does:** Locations is where each business lives (yours, or your clients' if you're an agency). Linking a location to its Google Business Profile listing syncs its reviews, photos, services and Google performance numbers, and unlocks Profile Watch, AI replies and Posts & Photos.
 
 **Plan:** every plan; how many locations you can add depends on the plan, and outgrowing a plan means moving up to the next one — there is no per-location pricing and no extra-location add-on.
 
@@ -174,16 +174,16 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 
 **Location page tabs:**
 - **Insights:** Google performance (searches and Maps views on desktop and mobile, calls, website clicks, direction requests and more), for the last 30 days up to 18 months or all stored history, by day, week or month. Google reports with a delay of a few days, so the newest days are marked not final. Google itself keeps only about 18 months of history; ConstructHUB keeps every day it syncs, so your history grows past that over time.
-- **Profile Guard** (section 6), **Location Info** (name, address, phone, website, categories, hours, service areas, opening date as Google has them), **Services** (synced from Google; edit them in Google), **Photos & Videos** (business and customer photos on the listing), **Social Profiles** (your social media links), **Settings**, **Citations** (section 13).
+- **Profile Watch** (section 6), **Location Info** (name, address, phone, website, categories, hours, service areas, opening date as Google has them), **Services** (synced from Google; edit them in Google), **Photos & Videos** (business and customer photos on the listing), **Social Profiles** (your social media links), **Settings**, **Citations** (section 13).
 
 **Unlink, delete, disconnect:**
 - **Unlink** stops syncing and removes the synced Google data from ConstructHUB. The listing on Google is not touched.
-- **Delete Location** removes the location and everything ConstructHUB stored for it (synced reviews and stats, Guard settings and history, AI reply settings, scheduled posts and photos, its Social Media setup, citation campaigns). It never deletes or changes the Google listing. It can't be undone.
+- **Delete Location** removes the location and everything ConstructHUB stored for it (synced reviews and stats, Profile Watch settings and history, AI reply settings, scheduled posts and photos, its Social Media setup, citation campaigns). It never deletes or changes the Google listing. It can't be undone.
 - **Disconnecting a Google account** removes ConstructHUB's access to it, stops its syncing and removes the reviews and stats synced through it. Your locations stay.
 
 **Honest limits:** ConstructHUB doesn't create or verify Google listings (Google does that; the done-for-you service can help). The per-location notification email on the Settings tab is saved but not used yet.
 
-## 6. Profile Guard
+## 6. Profile Watch
 
 **What it does:** watches a linked listing for changes to the fields you choose: business name, phone numbers, website, address, categories, description, regular and special hours, service area, opening date and open or closed status. It compares Google's live values with a snapshot you approved and alerts you to differences. How often it checks, by plan: {{GUARD_CADENCE_LINE}}.
 
@@ -192,10 +192,10 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 **Plan:** any paid plan, on up to as many locations as your plan covers.
 
 **Set it up:**
-1. Locations → open a linked location → **Profile Guard**.
+1. Locations → open a linked location → **Profile Watch**.
 2. Choose **Watched fields**, click **Preview current Google values**, and check the proposed snapshot carefully.
 3. Pick a mode, confirm it's you (asked once, then not again for 12 hours), and click **Approve snapshot and save settings**.
-4. Later changes to the mode use **Save guard settings**.
+4. Later changes to the mode use **Save watch settings**.
 
 **Day to day:** **Check now** runs a check immediately. Under **Pending changes and history**, **Approve** accepts Google's new value into your snapshot and **Reject** restores your approved value at Google. **Report** gathers the evidence and opens Google's official form: copy the report, submit the form at Google, then click **I submitted the form — mark reported** (that only records it in ConstructHUB).
 
@@ -203,7 +203,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 
 ## 7. GMB Edit Monitor and the AI Review Response Generator
 
-- **GMB Edit Monitor** (Google Business → GMB Edit Monitor): add any Google listing by name, address or Maps link and click **Check Now** to capture a baseline. Later checks compare it with Google's public data (name, phone, hours, review count, photo count, address and more) and keep a history of every change found. **Check All** checks every listing. Checks run only when you click; there are no automatic checks or alerts. For automatic watching of your own linked listings, use Profile Guard.
+- **GMB Edit Monitor** (Google Business → GMB Edit Monitor): add any Google listing by name, address or Maps link and click **Check Now** to capture a baseline. Later checks compare it with Google's public data (name, phone, hours, review count, photo count, address and more) and keep a history of every change found. **Check All** checks every listing. Checks run only when you click; there are no automatic checks or alerts. For automatic watching of your own linked listings, use Profile Watch.
 - **AI Review Response Generator** (same page): paste a customer review, enter your business name (and the reviewer's name if you like), choose a tone such as Empathetic for negative reviews or Grateful for positive ones, and generate a reply. Edit it, copy it and paste it as your reply on Google. It warns you about aggressive wording. To publish replies straight to Google, use Google Reviews → Google Profile Reviews instead.
 
 ## 8. Google Reviews: review requests, profile reviews and AI replies
@@ -338,7 +338,7 @@ Needs a connected Google account and a linked location. Reviews sync with the lo
 
 **Agency tools:** **Bulk actions** writes one update for many businesses using {business}, {city} and {phone}, as drafts or queued posts; set per-business cadence; the **All-clients calendar** searches and filters every client's posts and approves or cancels up to 100 at once.
 
-**Honest limits:** "queued" or "submitted" is not the same as published; if a status is uncertain, check the account on the network before posting again. Disconnecting stops ConstructHUB's queue and auto mode but can't recall posts a network already published. AI never invents business facts; missing sources are reported instead. The **Guides** tab on the Social Media page has these walkthroughs plus guides for Profile Guard, AI review replies, Posts & Photos, Security, Site Scan, Cloudflare and Search Console.
+**Honest limits:** "queued" or "submitted" is not the same as published; if a status is uncertain, check the account on the network before posting again. Disconnecting stops ConstructHUB's queue and auto mode but can't recall posts a network already published. AI never invents business facts; missing sources are reported instead. The **Guides** tab on the Social Media page has these walkthroughs plus guides for Profile Watch, AI review replies, Posts & Photos, Security, Site Scan, Cloudflare and Search Console.
 
 ## 15. Click Guard (click-fraud protection for Google Ads)
 
@@ -474,7 +474,7 @@ Open **Agency** under Google Business. Tabs: Locations, Clients, Team, Onboardin
 - **Clients:** client records with contact email, notes, tags and an optional folder; assign locations to clients.
 - **Team:** add members who already have a ConstructHUB login, with roles owner, admin, manager or viewer, and give them access to all clients or only assigned ones. These seats are the platform plan's team seats; the CRM is a separate product with its own seats (section 24).
 - **Onboarding (Google manager access):** choose the client and the connected agency Google email, enter the exact business name and an address or Place ID, and click **Email manager instructions**. The client keeps ownership and adds the agency email as a **Manager** in their Business Profile settings → People and access; no client sign-in to ConstructHUB is needed. ConstructHUB spots the invitation, accepts clear matches, links the listing to that client and starts the first sync. Status goes sent → opened → invitation received → accepted → linked (or expired). Reminders go after three and six days, and requests expire after 30 days. **Auto-accept all** location invitations is an option (off by default).
-- **Bulk actions on Locations:** select the page or every matching location, then sync, link and sync, unlink, assign a client, set Profile Guard mode (each location needs an approved snapshot first), set AI replies for future reviews (including auto-publishing future 3 to 5 star replies), queue approved posts or photos, run Site Scans or export a CSV. The dashboard counts locations that are synced, need reconnecting, are unlinked, or have Guard alerts, unanswered reviews or failed posts.
+- **Bulk actions on Locations:** select the page or every matching location, then sync, link and sync, unlink, assign a client, set Profile Watch mode (each location needs an approved snapshot first), set AI replies for future reviews (including auto-publishing future 3 to 5 star replies), queue approved posts or photos, run Site Scans or export a CSV. The dashboard counts locations that are synced, need reconnecting, are unlinked, or have Watch alerts, unanswered reviews or failed posts.
 - **Jobs:** progress and failures for queued work.
 - White-label Site Scan PDFs (section 12) and the agency tools in Social Media (section 14) round it out.
 
@@ -564,11 +564,11 @@ Texting clients needs your own registered number, because carriers no longer let
 
 ## 25. Notifications, security and your account
 
-**Notifications (growth app):** the bell in the header shows recent notices. Settings → **Notifications** sets how you get each kind (security emails are always on). Examples: new Google reviews, replies posted, Profile Guard changes and reversions, posts and social posts published or failed, Site Scan completed or regressed, Google or Cloudflare connections, domain changes and mail alerts. CRM notifications are set separately in CRM Settings.
+**Notifications (growth app):** the bell in the header shows recent notices. Settings → **Notifications** sets how you get each kind (security emails are always on). Examples: new Google reviews, replies posted, Profile Watch changes and reversions, posts and social posts published or failed, Site Scan completed or regressed, Google or Cloudflare connections, domain changes and mail alerts. CRM notifications are set separately in CRM Settings.
 
 **Two-factor sign-in:** Settings → **Security & activity** → **Enable 2FA** → scan the QR code with an authenticator app (Google Authenticator, Authy or any TOTP app) → enter the 6-digit code → **Verify & Enable**. Save the recovery codes privately (each works once). At sign-in you can tick **Remember this device for 30 days**; only do that on a private device, and revoke old devices under Remembered devices.
 
-**"Confirm it's you":** sensitive actions (security settings, connecting Google, Profile Guard, Cloudflare, domain changes and similar) ask for your password, authenticator code or a 6-digit code emailed to you (valid 10 minutes).
+**"Confirm it's you":** sensitive actions (security settings, connecting Google, Profile Watch, Cloudflare, domain changes and similar) ask for your password, authenticator code or a 6-digit code emailed to you (valid 10 minutes).
 
 **Account activity:** the latest 200 events, filterable by type and date. If you see a Google connection you don't recognize, disconnect it there and reset your password.
 

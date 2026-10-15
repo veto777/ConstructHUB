@@ -164,7 +164,7 @@ const page: FeaturePage = {
         "help before taking the case, and a case we take on has one price per project, shown on this page.",
       "Google alone decides whether a profile is reinstated, so nobody can promise the outcome, and this service " +
         "doesn't work around Google's rules. The aim is a profile that follows them. Once a profile is back, Profile " +
-        "Guard in ConstructHUB can watch its fields and tell you when one changes.",
+        "Profile Watch in ConstructHUB can watch its fields and tell you when one changes.",
     ],
   },
   related: ["gbp", "profileGuard", "reviews"],

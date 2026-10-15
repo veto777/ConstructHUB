@@ -18,10 +18,10 @@ describe("à la carte Stripe prices", () => {
     expect(alacartePriceSpec("gbp", "standalone", "month")).toMatchObject({
       lookupKey: "chub_v1_alacarte_gbp_standalone_month_3900",
       role: { kind: "alacarte", key: "gbp", tier: "standalone", interval: "month" },
-      params: { unit_amount: 3900, recurring: { interval: "month" }, product_data: { name: "ConstructHUB Google Business Profile + Profile Guard" } },
+      params: { unit_amount: 3900, recurring: { interval: "month" }, product_data: { name: "ConstructHUB Google Business Profile + Profile Watch" } },
     });
     expect(alacartePriceSpec("gbp", "addon", "year")).toMatchObject({
-      lookupKey: "chub_v1_alacarte_gbp_addon_year_26400", params: { unit_amount: 26400, product_data: { name: "ConstructHUB Google Business Profile + Profile Guard (add-on price)" } },
+      lookupKey: "chub_v1_alacarte_gbp_addon_year_26400", params: { unit_amount: 26400, product_data: { name: "ConstructHUB Google Business Profile + Profile Watch (add-on price)" } },
     });
     expect(alacartePriceSpec("permits", "standalone", "year").lookupKey).toBe("chub_v1_alacarte_permits_standalone_year_218900");
     // An overlapping add-on's tier carries that add-on's cents (its own yearly price too).

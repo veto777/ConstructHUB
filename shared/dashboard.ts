@@ -91,7 +91,7 @@ export const DASHBOARD_TILES: readonly DashboardTileDef[] = [
   // ── Grow ─────────────────────────────────────────────────────────────────
   { key: "gbp", group: "grow", title: "Google Business Profile", description: "Connect Google and link the locations you manage.", href: "/locations", surface: "app", gate: { kind: "plan" }, links: [{ label: "GMB Edit Monitor", href: "/gmb-monitor", surface: "app" }] },
   { key: "reviews", group: "grow", title: "Google Reviews", description: "Your rating, new reviews and the ones still waiting on a reply.", href: "/google-reviews", surface: "app", gate: { kind: "plan" }, flag: "SHOW_GOOGLE_REVIEWS" },
-  { key: "profileGuard", group: "grow", title: "Profile Guard", description: "Alerts when someone edits your Google profile. Turn it on per location in Locations.", href: "/locations", surface: "app", gate: { kind: "plan" } },
+  { key: "profileGuard", group: "grow", title: "Profile Watch", description: "Alerts when someone edits your Google profile. Turn it on per location in Locations.", href: "/locations", surface: "app", gate: { kind: "plan" } },
   { key: "rankingGrid", group: "grow", title: "GMB Ranking Grid", description: "Where you rank on the map, street by street.", href: "/ranking-grid", surface: "app", gate: { kind: "plan" } },
   { key: "gbpContent", group: "grow", title: "Posts & Photos", description: "Scheduled Google posts and photo uploads.", href: "/gbp-content", surface: "app", gate: { kind: "plan" } },
   { key: "social", group: "grow", title: "Social Media", description: "Posts queued and published across your social accounts.", href: "/social-media", surface: "app", gate: { kind: "module", module: "socialPublishing" } },

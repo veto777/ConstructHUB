@@ -51,7 +51,7 @@ SELECT setval(pg_get_serial_sequence('agency_clients','id'), GREATEST((SELECT ma
 
 -- ---- the agency's own (sample) Google account, which manages the client listings below. Its tokens are
 -- placeholders that are never used: expires_at is far ahead so nothing refreshes, the client locations have
--- no photos (no media fetch) and no Profile Guard, and sync_status.last_attempt is in the future so the
+-- no photos (no media fetch) and no Profile Watch, and sync_status.last_attempt is in the future so the
 -- agency sync scheduler (6-hour cadence) skips them.
 INSERT INTO gbp_grants(user_id,google_subject,email,scopes,access_token,refresh_token,expires_at,reconnect_required,updated_at)
 VALUES (1,'fs-b-agency-subject','sam@riveragrowth.example',ARRAY['https://www.googleapis.com/auth/business.manage']::text[],

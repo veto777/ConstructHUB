@@ -9,7 +9,7 @@ test.beforeAll(async()=>{
   if(!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(url.pathname)||!['localhost','127.0.0.1'].includes(url.hostname))throw Error('a2 only');
   email=`guard-auth-${Date.now()}@example.invalid`;
   user=(await pool.query('INSERT INTO users(email,password_hash,email_verified) VALUES($1,$2,true) RETURNING id',[email,await bcrypt.hash(password,4)])).rows[0].id;
-  // Profile Guard is a paid feature: give the fixture account a plan so the step-up check is what's tested.
+  // Profile Watch is a paid feature: give the fixture account a plan so the step-up check is what's tested.
   await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'starter','active')",[user]);
   location=(await pool.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name) VALUES($1,'Guard auth fixture','accounts/authfixture','locations/authfixture') RETURNING id",[user])).rows[0].id;
   await pool.query('INSERT INTO gbp_guard(user_id,location_id,snapshot,watched) VALUES($1,$2,$3,$4)',[user,location,JSON.stringify({title:'Guard auth fixture'}),['title']]);
@@ -30,8 +30,8 @@ test('real Guard settings require shared step-up and retry the saved mode with b
   await pool.query("UPDATE session SET sess=(sess::jsonb-'recentAuth'-'profileGuardAuth')::json WHERE sess->'passport'->>'user'=$1",[String(user)]);
   await page.goto(`/locations?location=${location}`);
   await page.getByTestId('tab-guard').click();
-  await page.getByLabel('Guard mode').selectOption('notify');
-  await page.getByRole('button',{name:'Save guard settings',exact:true}).click();
+  await page.getByLabel('Watch mode').selectOption('notify');
+  await page.getByRole('button',{name:'Save watch settings',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible();
   expect((await pool.query('SELECT mode FROM gbp_guard WHERE location_id=$1',[location])).rows[0].mode).toBe('off');
   await page.getByLabel('Verification',{exact:true}).fill(password);

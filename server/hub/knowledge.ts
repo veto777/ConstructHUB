@@ -143,7 +143,7 @@ export function splitSections(pack: string): Section[] {
 const SECTION_KEYWORDS: Record<number, RegExp> = {
   4: /\b(permits?|portals?|databases?|directory|property|appraisers?|assessors?|search history|jurisdictions?|county|counties)\b/,
   5: /\b(locations?|connect(ing)? google|business profile|gbp|gmb|listings?|sync(ing)?|import from gbp|insights?|unlink)\b/,
-  6: /\b(profile guard|guard|lockdown|snapshot|watched fields|edits? (to|on) my (listing|profile))\b/,
+  6: /\b(profile watch|profile guard|watch|guard|lockdown|snapshot|watched fields|edits? (to|on) my (listing|profile))\b/,
   7: /\b(edit monitor|gmb monitor|review response generator|response generator)\b/,
   8: /\b(reviews?|review requests?|ai repl(y|ies)|replies|reply|referral|reminders?)\b/,
   9: /\b(posts?|posting|updates?|offers?|events?|schedul\w* posts?|publish\w*)\b/,

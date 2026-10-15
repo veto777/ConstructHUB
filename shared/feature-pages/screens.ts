@@ -103,7 +103,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
     {"src":"/feature-shots/permits-2.webp","alt":"The search area picker for Colorado listing each county with its number of searchable permit portals and the cities under it.","caption":"Pick a state, county or city to search","url":"constructhub.us/search","width":1600,"height":1000},
   ],
   "profileGuard": [
-    {"src":"/feature-shots/profileGuard-1.webp","alt":"Profile Guard for the Denver location listing detected Google profile edits, such as a changed website and category, with the approved value beside the detected value and Approve or Reject buttons.","caption":"Profile Guard catches edits to your Google profile","url":"constructhub.us/locations?location=910001&tab=guard","width":1600,"height":1000},
+    {"src":"/feature-shots/profileGuard-1.webp","alt":"Profile Watch for the Denver location listing detected Google profile edits, such as a changed website and category, with the approved value beside the detected value and Approve or Reject buttons.","caption":"Profile Watch catches edits to your Google profile","url":"constructhub.us/locations?location=910001&tab=guard","width":1600,"height":1000},
     {"src":"/feature-shots/profileGuard-2.webp","alt":"GMB Edit Monitor with watched Google listings and the edit history of Summit Roofing Co., showing before and after values for website, category and phone changes.","caption":"Edit history with before and after values","url":"constructhub.us/gmb-monitor","width":1600,"height":1000},
   ],
   "property": [

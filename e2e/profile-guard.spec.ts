@@ -25,7 +25,7 @@ test('owner previews a snapshot, reauthenticates, changes guard mode, approves/r
   });
   await page.route('**/api/gbp/reports/changes/11',r=>{if(r.request().method()==='POST')reported=true;return r.fulfill({json:{text:'Business: Guard browser fixture\nApproved name → Outside name\nDetected: 2026-09-29',formUrl:'https://support.google.com/business/contact/business_redressal_form',listingUrl:'https://www.google.com/maps?cid=1',reportedAt:reported?'2026-09-29':null}})});
   await page.goto(`/locations?location=${location.id}`);await page.getByTestId('tab-guard').click();
-  await page.getByLabel('Guard mode').selectOption('notify');await page.getByRole('button',{name:'Preview current Google values'}).click();await expect(page.getByText('Approved name',{exact:true})).toBeVisible();
+  await page.getByLabel('Watch mode').selectOption('notify');await page.getByRole('button',{name:'Preview current Google values'}).click();await expect(page.getByText('Approved name',{exact:true})).toBeVisible();
   await expect(page.getByText('Google-only accounts need an authenticator or password configured in Settings.',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Approve snapshot and save settings'}).click();
   await expect(page.getByRole('dialog')).toContainText('Nothing is sent to anyone else');
@@ -65,7 +65,7 @@ test('mobile Guard snapshot and history keep long URLs and report actions within
   await page.goto(`/locations?location=${location.id}`);
   await page.getByTestId('tab-guard').click();
   await page.getByText('Owner-approved snapshot',{exact:true}).click();
-  const guard=page.getByRole('region',{name:'Profile Guard',exact:true});
+  const guard=page.getByRole('region',{name:'Profile Watch',exact:true});
   await expect(guard.getByRole('button',{name:'Report',exact:true})).toBeVisible();
   const overflow=await guard.evaluate(el=>({scroll:el.scrollWidth,width:el.clientWidth}));
   expect(overflow.scroll).toBeLessThanOrEqual(overflow.width+1);

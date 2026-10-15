@@ -28,7 +28,7 @@ export async function buildChecklist(ctx: DashboardContext, log: (key: string, e
       done: async () => (await ctx.locations()) > 0,
     },
     {
-      key: "turnOnGuard", label: "Turn on Profile Guard", description: "Open a location in Locations and turn on its Profile Guard: an alert when someone edits your Google profile.",
+      key: "turnOnGuard", label: "Turn on Profile Watch", description: "Open a location in Locations and turn on its Profile Watch: an alert when someone edits your Google profile.",
       href: "/locations", surface: "app", applies: hasPlan,
       done: () => exists("SELECT 1 FROM gbp_guard WHERE user_id=$1 AND mode <> 'off' LIMIT 1", [userId]),
     },

@@ -348,7 +348,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess, initialTab }: { onCreated:
               <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2" data-testid="gbp-import-needs-plan">
                 <p className="text-sm">
                   <strong>Your Google profile{gbpLocations.length !== 1 ? "s were" : " was"} found.</strong> Importing {gbpLocations.length !== 1 ? "them" : "it"} into
-                  ConstructHUB — and opening {gbpLocations.length !== 1 ? "their" : "its"} profile page with insights, reviews, posts and Profile Guard — needs a plan,
+                  ConstructHUB — and opening {gbpLocations.length !== 1 ? "their" : "its"} profile page with insights, reviews, posts and Profile Watch — needs a plan,
                   from {formatUsd(STARTING_MONTHLY_CENTS)}/month.
                 </p>
                 <Button asChild className="w-full gap-2" data-testid="button-gbp-see-plans"><a href="/pricing">See plans to import</a></Button>
@@ -390,7 +390,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
 
   const tabItems = [
     { value: "insights", label: "Insights", icon: BarChart3 },
-    { value: "guard", label: "Profile Guard", icon: Lock },
+    { value: "guard", label: "Profile Watch", icon: Lock },
     { value: "info", label: "Location Info", icon: Building2 },
     { value: "services", label: "Services", icon: Tag },
     { value: "photos", label: "Photos & Videos", icon: Image },
@@ -1033,7 +1033,7 @@ function SettingsTab({ location, onDeleted }: { location: BusinessLocation; onDe
                   : "ConstructHUB permanently removes this location and its data:"}</p>
                 <ul className="list-disc pl-5 space-y-0.5">
                   <li>synced Google reviews, photos and performance stats</li>
-                  <li>Profile Guard settings and history</li>
+                  <li>Profile Watch settings and history</li>
                   <li>AI reply settings, scheduled Google posts and photos</li>
                   <li>Social Media connections, settings and posts for this business</li>
                   <li>citation campaigns and their checklist marks</li>

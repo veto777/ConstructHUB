@@ -100,7 +100,7 @@ export type CrmPlan = {
  * separate service of its own, shared/plans.ts); tier-specific gaps are added per plan.
  */
 const PLATFORM_NOT_INCLUDED: readonly string[] = [
-  "Google Business Profile tools — Profile Guard, review alerts, AI replies, ranking grid",
+  "Google Business Profile tools — Profile Watch, review alerts, AI replies, ranking grid",
   "Click Guard, IP Tracker and VPN Shield (click-fraud protection)",
   "Permit and property-record search",
   "Site Scans, Competitor Intel and ConstructHUB SEO",

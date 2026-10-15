@@ -47,7 +47,7 @@ export type PlanLimits = {
   historyDays: number;
   /** Gabe (the Hub assistant) questions per calendar month (-1 = unlimited). */
   gabeQuestions: number;
-  /** Profile Guard check cadence in minutes. */
+  /** Profile Watch check cadence in minutes. */
   guardCadenceMinutes: number;
   /** Ranking-grid credits per month (Agency: per location). */
   gridCredits: number;
@@ -329,7 +329,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     tagline: "One Google profile, managed and protected.",
     features: [
       "1 Google Business Profile location",
-      "Profile Guard edit alerts (checks every hour)",
+      "Profile Watch edit alerts (checks every hour)",
       "Review alerts and AI reply drafts you approve",
       "5 review reply templates",
       "10 permit searches / month",
@@ -366,7 +366,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "Everything in Solo",
       "10 Google Business Profile locations",
       "3 team seats",
-      "Profile Guard checks every 30 min",
+      "Profile Watch checks every 30 min",
       "20 review reply templates",
       "Review reminders to your customers (email; text coming soon)",
       "50 permit searches / month",
@@ -401,7 +401,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "Everything in Team",
       "25 Google Business Profile locations",
       "5 team seats",
-      "Profile Guard checks every 15 min",
+      "Profile Watch checks every 15 min",
       "AI review replies publish automatically",
       "AI posts and photo captions on a schedule",
       "Google Ads & LSA manager (manager account, IP exclusions)",
@@ -482,7 +482,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "Everything in Agency",
       "Unlimited locations, seats, client workspaces and websites",
       "Unlimited (fair use) permit searches, Site Scans and Gabe questions",
-      "Profile Guard checks every 5 min",
+      "Profile Watch checks every 5 min",
       "The full SEO suite — 5,000 tracked keywords and $60 of SEO data / month",
       "White-label reports under your own brand",
       "2 client-texting numbers included",

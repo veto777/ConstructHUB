@@ -35,7 +35,7 @@ What the product does that a video had to work around (not narrated):
   prefix + site text, never by number.
 - The sub-menu toggle state persists inside one browser context (a dry run that collapses it hides
   `subnav-agency-*` for the rest of that run); a fresh produce starts expanded.
-- Profile Guard's "Owner-approved snapshot" and change cards print raw JSON for Categories
+- Profile Watch's "Owner-approved snapshot" and change cards print raw JSON for Categories
   (`{"primaryCategory": {"name": "categories/gcid:roofing_contractor"}}`). In frame on the guard video; not read out.
 - The Agency bulk action filmed is "Assign client" (local, no Google call: `UPDATE business_locations`), assigning
   the two Summit listings to the client they already belong to; the worker runs every 15 s so Jobs shows

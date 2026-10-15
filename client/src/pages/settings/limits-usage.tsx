@@ -185,10 +185,10 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         },
         {
           key: "guardCadenceMinutes",
-          label: "Profile Guard edit checks",
+          label: "Profile Watch edit checks",
           included: `Every ${formatCount(allowances.guardCadenceMinutes)} min`,
           used: null,
-          hint: "How often Profile Guard compares your listing with its approved snapshot.",
+          hint: "How often Profile Watch compares your listing with its approved snapshot.",
         },
         meterRow("gridCredits", "Ranking-grid credits", usage.rankings, allowances.gridCredits, {
           hint: "One credit per 25 grid points.",

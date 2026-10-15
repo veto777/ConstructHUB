@@ -289,7 +289,7 @@ describe('routes: the same guard as the profile PATCH, Google fully mocked', () 
     expect(lastPatch!.body).toEqual({});
     expect(res.json.mock.calls[0][0].verdicts).toEqual({ 'profile.description': 'applied' });
   });
-  it('reports a review as pending (not saved), remembers it for Profile Guard, and Guard adopts it when it lands', async () => {
+  it('reports a review as pending (not saved), remembers it for Profile Watch, and Guard adopts it when it lands', async () => {
     // Establish a Guard snapshot of the current values first.
     const client = new GoogleClient(async () => 'fixture-token', http as any, new Limiter(() => 0, async () => {}), async () => {});
     const preview = await previewSnapshot(user, id, client);

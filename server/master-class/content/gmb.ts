@@ -125,7 +125,7 @@ export const GMB: ModuleLessons = {
           ] },
         ] },
         { type: "tip", text: "**Never retaliate.** Do not post fake reviews or ask friends to do so. Report suspected violations, respond factually and retain relevant evidence." },
-        { type: "in-app", text: "Profile Guard (in [Locations](/locations), per location) keeps an approved snapshot of your profile, watches for changes and can restore them, and its Report step assembles the evidence for Google's official form — you submit it yourself." },
+        { type: "in-app", text: "Profile Watch (in [Locations](/locations), per location) keeps an approved snapshot of your profile, watches for changes and can restore them, and its Report step assembles the evidence for Google's official form — you submit it yourself." },
       ],
     },
     {

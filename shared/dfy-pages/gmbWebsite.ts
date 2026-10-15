@@ -19,7 +19,7 @@ import type { DfyPage } from "./types";
  *     the Google tools need a listing you have Owner or Manager access to: server/data/hub-knowledge.md
  *     (sections 6 "Honest limits" and 28 "Do I need a Google Business Profile?")
  *   - what a linked listing syncs (reviews, photos, services, performance): server/gbp/service.ts syncLocation,
- *     shared/feature-pages/gbp.ts; Profile Guard watches the fields you choose: shared/feature-pages/profileGuard.ts;
+ *     shared/feature-pages/gbp.ts; Profile Watch watches the fields you choose: shared/feature-pages/profileGuard.ts;
  *     Posts & Photos schedules posts and photos: shared/feature-pages/gbpContent.ts; Photo Optimizer renames,
  *     geotags and describes photos: shared/feature-pages/media.ts; Site Scan: shared/feature-pages/siteScan.ts
  *   - Site Scan's local checks (name, street address and phone matched against the linked profile; a page whose
@@ -102,7 +102,7 @@ const page: DfyPage = {
       label: "With a plan",
       title: "Tools that work with your new profile and site",
       items: [
-        "Google Business Profile sync", "Profile Guard", "Google Reviews", "Posts & Photos", "Photo Optimizer",
+        "Google Business Profile sync", "Profile Watch", "Google Reviews", "Posts & Photos", "Photo Optimizer",
         "GMB Ranking Grid", "Site Scan",
       ],
       note: "These are software in a ConstructHUB plan, priced on the Pricing page; the setup service doesn't include a plan.",

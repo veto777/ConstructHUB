@@ -85,7 +85,7 @@ const MODULE_DETAILS: Record<ModuleKey, string[]> = {
   agencyWorkspace: [
     "Client workspaces with folders, tags and per-client location lists.",
     "Team roles (owner, admin, manager, viewer), with access to every client or only the ones you assign.",
-    "Bulk actions across locations: sync, link, Profile Guard mode, AI reply settings, scheduled posts and Site Scans.",
+    "Bulk actions across locations: sync, link, Profile Watch mode, AI reply settings, scheduled posts and Site Scans.",
     "Email onboarding: clients add your agency Google account as a Manager, and matching invitations are accepted and linked.",
     "CSV export of any filtered location list.",
   ],

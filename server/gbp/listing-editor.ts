@@ -15,7 +15,7 @@
  *
  * Every write is logged (account_activity gbp.profile_change) and the account holder is notified at
  * once — Google's third-party policy: "provide notice to the end-client of the change within 48 hours".
- * Profile Guard learns the new approved value for applied fields; a pending field is remembered as an
+ * Profile Watch learns the new approved value for applied fields; a pending field is remembered as an
  * 'owner-pending' change so checkGuard recognises it as ours when Google publishes it (guard.ts).
  *
  * Gating: the same as the existing PATCH /api/gbp/locations/:id/profile — a signed-in account (the

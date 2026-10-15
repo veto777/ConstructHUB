@@ -1,7 +1,7 @@
 {
   "$schema": "../../../shared/help/step-script.schema.json",
   "helpKey": "intro-profile-guard",
-  "title": "Profile Guard",
+  "title": "Profile Watch",
   "viewport": {
     "width": 1024,
     "height": 576
@@ -12,9 +12,9 @@
     {
       "action": "goto",
       "url": "/locations?location=910001&tab=guard",
-      "caption": "Profile Guard",
+      "caption": "Profile Watch",
       "chapter": "Edits caught",
-      "narration": "This is Profile Guard. It checks your Google listing on a schedule and compares it with the values you approved."
+      "narration": "This is Profile Watch. It checks your Google listing on a schedule and compares it with the values you approved."
     },
     {
       "action": "highlight",
@@ -24,7 +24,7 @@
     },
     {
       "action": "highlight",
-      "selector": "select[aria-label=\"Guard mode\"]",
+      "selector": "select[aria-label=\"Watch mode\"]",
       "caption": "Off, Notify or Lockdown",
       "narration": "Notify alerts you to each change. Lockdown also writes your approved value back to Google once a change is found."
     },
@@ -40,7 +40,7 @@
       "offset": 60,
       "caption": "Pending changes and history",
       "chapter": "Approved versus detected",
-      "narration": "Below, every change Profile Guard has found on this listing."
+      "narration": "Below, every change Profile Watch has found on this listing."
     },
     {
       "action": "highlight",
@@ -90,16 +90,16 @@
     {
       "action": "highlight",
       "selector": "[data-testid=\"link-nav-locations\"]",
-      "caption": "Profile Guard: a tab on every location",
-      "narration": "Profile Guard is a tab on every linked location, under Locations."
+      "caption": "Profile Watch: a tab on every location",
+      "narration": "Profile Watch is a tab on every linked location, under Locations."
     }
   ],
   "youtube": {
-    "title": "Profile Guard in about a minute | ConstructHUB",
-    "description": "A one-minute tour of Profile Guard in ConstructHUB: it checks your Google Business Profile on a schedule, shows each detected change next to the value you approved, lets you approve or reject it, and keeps the history with Google's evidence. GMB Edit Monitor does on-demand checks of any public listing.",
+    "title": "Profile Watch in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Profile Watch in ConstructHUB: it checks your Google Business Profile on a schedule, shows each detected change next to the value you approved, lets you approve or reject it, and keeps the history with Google's evidence. GMB Edit Monitor does on-demand checks of any public listing.",
     "tags": [
       "ConstructHUB",
-      "Profile Guard",
+      "Profile Watch",
       "Google Business Profile",
       "edit alerts",
       "GBP changes",
@@ -113,7 +113,7 @@
   "thumbnail": {
     "headline": "Catch Every Listing Edit",
     "accent": "Every",
-    "kicker": "Profile Guard",
+    "kicker": "Profile Watch",
     "step": 5
   }
 }

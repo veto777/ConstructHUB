@@ -1,4 +1,4 @@
-# AUDIT3 a2 — Profile Guard, reviews and AI replies
+# AUDIT3 a2 — Profile Watch, reviews and AI replies
 
 Audited 2026-09-29 in `/home/veto/ConstructHUB-a2`, port **8139**, database **constructhub_dev_a2**. Read `CLAUDE.md`, the shipped-features HANDOFF section and feature reports, especially `FEATURE-a2.md` and the a1 security integration contract. Seven defects fixed in separate commits, each with a regression assertion/test. No deployment, push, production access, real Google writes, paid AI calls or outgoing SMTP. Provider responses and AI output are explicitly labelled test fixtures, not business data.
 

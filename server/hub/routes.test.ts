@@ -235,9 +235,9 @@ describe("chat flow", () => {
     expect(forged.status).toBe(400);
     expect(forged.data.code).toBe("tampered");
 
-    const first = await env.say("What is Profile Guard?", 7);
+    const first = await env.say("What is Profile Watch?", 7);
     const turns = [
-      { role: "user", content: "What is Profile Guard?" },
+      { role: "user", content: "What is Profile Watch?" },
       { role: "assistant", content: first.data.reply, index: 1, sig: first.data.sig },
       { role: "user", content: "And for user B?" },
     ];

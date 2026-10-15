@@ -10,7 +10,7 @@ export const HUB_OPEN_EVENT = "constructhub:hub-open";
 const HOW: Record<DashboardChecklistKey, string> = {
   connectGoogle: "connect Google",
   addLocation: "add a location",
-  turnOnGuard: "turn on Profile Guard",
+  turnOnGuard: "turn on Profile Watch",
   runSiteScan: "run a Site Scan",
   requestReviews: "ask a customer for a review",
   protectWebsite: "protect your website with Click Guard",

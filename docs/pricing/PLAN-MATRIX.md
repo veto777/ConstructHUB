@@ -13,7 +13,7 @@ Money is in US dollars. Yearly platform billing is 11× the monthly price (1 mon
 | Team seats | 1 | 3 | 5 | 10 | 🟣 Unlimited |
 | Client workspaces, roles, bulk actions, email onboarding | ❌ | ❌ | ❌ | 10 | 🟣 Unlimited |
 | **Google Business Profile & reviews** |  |  |  |  |  |
-| Profile Guard check cadence | Every 60 min | Every 30 min | Every 15 min | Every 15 min | Every 5 min |
+| Profile Watch check cadence | Every 60 min | Every 30 min | Every 15 min | Every 15 min | Every 5 min |
 | Review alerts + AI reply drafts | ✅ | ✅ | ✅ | ✅ | ✅ |
 | AI review replies publish automatically | ❌ | ❌ | ✅ | ✅ | ✅ |
 | AI posts and photo captions on a schedule | ❌ | ❌ | ✅ | ✅ | ✅ |

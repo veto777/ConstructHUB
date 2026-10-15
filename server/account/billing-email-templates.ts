@@ -282,7 +282,7 @@ export function welcomeEmail(input: { displayName: string | null; email: string;
     steps: [
       // No trial promise here: the trial is granted (or refused) by the server at checkout.
       { text: "Choose a plan — you can change or cancel it any time.", url: `${base}/pricing` },
-      { text: "Connect your Google Business Profile for review alerts, posts and Profile Guard.", url: `${base}/google-business` },
+      { text: "Connect your Google Business Profile for review alerts, posts and Profile Watch.", url: `${base}/google-business` },
       { text: "Set up the CRM: estimates, invoices and payments for your jobs.", url: `${base}/crm` },
       { text: "Search permits and appraiser records for your area.", url: `${base}/databases` },
       { text: "Turn on two-factor sign-in to keep your account yours.", url: `${base}/settings?tab=security` },

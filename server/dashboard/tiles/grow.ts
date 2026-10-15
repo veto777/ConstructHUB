@@ -1,5 +1,5 @@
 /**
- * Grow: Google Business Profile, reviews, Profile Guard, ranking grid,
+ * Grow: Google Business Profile, reviews, Profile Watch, ranking grid,
  * posts & photos, social, Site Scan, media. Every query is scoped to the
  * signed-in user (user_id = $1). SPEC §3.5.
  */
@@ -62,7 +62,7 @@ export const growTiles: TileSources = {
       dq("SELECT count(*)::int pending, min(location_id) location_id FROM gbp_guard_changes WHERE user_id=$1 AND status='pending'", [ctx.userId]),
     ]);
     if (!int(g.total) && !int(c.pending)) return EMPTY;
-    // Profile Guard lives on each location's page (Locations → a location → Profile Guard):
+    // Profile Watch lives on each location's page (Locations → a location → Profile Watch):
     // open the location with edits waiting, else the first guarded one.
     const target = num(c.location_id) ?? num(g.location_id);
     return ok([

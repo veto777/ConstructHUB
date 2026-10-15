@@ -98,7 +98,7 @@ export const HUB_PAGES: Record<PageKey, { name: string; sections: number[] }> = 
   "pricing": { name: "Pricing", sections: [3] },
   "permits": { name: "Permits & Databases", sections: [4] },
   "locations": { name: "Locations", sections: [5] },
-  "profile-guard": { name: "Profile Guard", sections: [6] },
+  "profile-guard": { name: "Profile Watch", sections: [6] },
   "gmb-monitor": { name: "GMB Edit Monitor", sections: [7] },
   "reviews": { name: "Google Reviews", sections: [8] },
   "posts": { name: "Posts & Photos", sections: [9] },

@@ -134,7 +134,7 @@ function Editor({ location, others }: { location: any; others: any[] }) {
     <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6" data-testid="listing-editor">
       <div className="space-y-5 sm:space-y-6">
         {data.location.metadata?.hasPendingEdits && !pendingAtGoogle.length && <Notice tone="warning" testId="notice-google-pending">Google reports edits under review on this listing (made outside ConstructHUB or earlier). Values below are what Google publishes now.</Notice>}
-        {pendingAtGoogle.length > 0 && <Notice tone="warning" testId="notice-our-pending" title="Google is reviewing your earlier edits">{pendingAtGoogle.map((p) => <span key={p.field} className="block">{labelOf(p.field)} → <code className="text-xs">{typeof p.value === "string" ? p.value : JSON.stringify(p.value)}</code> (since {new Date(p.since).toLocaleDateString()})</span>)}<span className="mt-1 block text-xs">Shown as pending, not saved. Profile Guard will recognise the value when Google publishes it.</span></Notice>}
+        {pendingAtGoogle.length > 0 && <Notice tone="warning" testId="notice-our-pending" title="Google is reviewing your earlier edits">{pendingAtGoogle.map((p) => <span key={p.field} className="block">{labelOf(p.field)} → <code className="text-xs">{typeof p.value === "string" ? p.value : JSON.stringify(p.value)}</code> (since {new Date(p.since).toLocaleDateString()})</span>)}<span className="mt-1 block text-xs">Shown as pending, not saved. Profile Watch will recognise the value when Google publishes it.</span></Notice>}
         {data.attributesError && <Notice tone="warning" testId="notice-attributes-error">Attributes could not be loaded: {data.attributesError}. The other fields can still be edited.</Notice>}
 
         <Section title="Name and categories" icon={Store}>
@@ -236,7 +236,7 @@ function Editor({ location, others }: { location: any; others: any[] }) {
             <Button className="flex-1" disabled={!changeCount || errorCount > 0 || save.isPending} onClick={() => save.mutate()} data-testid="button-save-listing">{save.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="mr-1 h-4 w-4" aria-hidden="true" />}Save to Google</Button>
             <Button variant="outline" disabled={!changeCount || save.isPending} onClick={reset} data-testid="button-reset-listing"><RotateCcw className="mr-1 h-4 w-4" aria-hidden="true" />Reset</Button>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">Only changed fields are sent. Every save is recorded in your account activity and Profile Guard, and you get a notice of the change.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Only changed fields are sent. Every save is recorded in your account activity and Profile Watch, and you get a notice of the change.</p>
         </Section>
       </aside>
 

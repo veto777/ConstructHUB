@@ -204,7 +204,7 @@ export const PER_LOCATION_PLAN: PlanKey = "agency";
 
 /**
  * Numeric PlanLimits that are not usage caps, so they are not made unlimited
- * for platform admins: Profile Guard's check cadence (admins get the fastest any
+ * for platform admins: Profile Watch's check cadence (admins get the fastest any
  * plan buys), the public API's requests per minute per key (a rate, kept from
  * the top plan), and the per-location multipliers (moot once the monthly base
  * is unlimited, so 0).
@@ -216,7 +216,7 @@ export const ADMIN_NON_CAP_LIMITS = ["guardCadenceMinutes", "apiRatePerMinute", 
  * usage limit unlimited (-1) — monthly quotas (searches, grid credits, Site
  * Scans, Competitor scans, texts, API units) and counts (locations, protected
  * sites, seats, review templates) — automatic AI reply publishing, and the
- * fastest Profile Guard cadence. Built from PlanLimits' own keys, so a limit
+ * fastest Profile Watch cadence. Built from PlanLimits' own keys, so a limit
  * added to the price book later is unlimited for admins by default.
  */
 export function platformAdminAllowances(): PlanLimits {

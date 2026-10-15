@@ -44,8 +44,8 @@
     "wait": 500
    }
   ],
-  "alt": "Profile Guard for the Denver location listing detected Google profile edits, such as a changed website and category, with the approved value beside the detected value and Approve or Reject buttons.",
-  "caption": "Profile Guard catches edits to your Google profile"
+  "alt": "Profile Watch for the Denver location listing detected Google profile edits, such as a changed website and category, with the approved value beside the detected value and Approve or Reject buttons.",
+  "caption": "Profile Watch catches edits to your Google profile"
  },
  {
   "key": "profileGuard",

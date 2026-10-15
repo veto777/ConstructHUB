@@ -57,7 +57,7 @@ export const LISTINGS: Listing[] = [
     description: `ConstructHUB is the growth toolkit for construction contractors. This app opens your ConstructHUB account on iPhone, so the tools you use on the web go with you to the job site.
 
 WHAT'S IN THE APP
-• Google Business Profile: your locations, Profile Guard alerts when your listing is edited, your reviews with AI-drafted replies, and posts and photos.
+• Google Business Profile: your locations, Profile Watch alerts when your listing is edited, your reviews with AI-drafted replies, and posts and photos.
 • Ranking grid: see where your business shows up on the map across your service area.
 • Permit office directory: find the permit office and online permit portal for a city or county.
 • Property records: find the county appraiser or assessor office for a property.
@@ -76,7 +76,7 @@ Your ConstructHUB account works the same on the web and in the app. Running jobs
     supportUrl: "https://constructhub.us/support", marketingUrl: "https://constructhub.us/", privacyPolicyUrl: "https://constructhub.us/privacy",
     messagingAndChat: false,
     reviewNotes: `WHAT THIS APP IS
-ConstructHUB: Contractor Tools opens a contractor's ConstructHUB account (constructhub.us): the AI Call Assistant dashboard, Google Business Profile tools (Profile Guard, reviews, posts), the ranking grid, the permit office directory, property records and Site Scan. ConstructHUB CRM, submitted separately by the same team, is a different product (clients, estimates, jobs, invoices) — the two apps share only the sign-in.
+ConstructHUB: Contractor Tools opens a contractor's ConstructHUB account (constructhub.us): the AI Call Assistant dashboard, Google Business Profile tools (Profile Watch, reviews, posts), the ranking grid, the permit office directory, property records and Site Scan. ConstructHUB CRM, submitted separately by the same team, is a different product (clients, estimates, jobs, invoices) — the two apps share only the sign-in.
 
 WHAT TO TRY
 Database Directory (permit offices by city or county), Property Records, Site Scan (enter any website address), Settings → Phone tab bar, Settings → Notifications → "Turn on" (push), Settings → My account → Delete account. Google Business Profile tools show their empty state: they need the business owner's own Google account, which a reviewer can't connect. The AI Call Assistant answers a business's own phone line; the demo account has no phone line connected, so that screen says it isn't on this account.

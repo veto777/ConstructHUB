@@ -9,7 +9,7 @@ import type { DashboardTileKey } from "@shared/dashboard";
 
 /** The setup call to action on an "empty" tile. */
 export const CTA_START: Partial<Record<DashboardTileKey, string>> = {
-  gbp: "Connect Google", reviews: "Send a review request", profileGuard: "Turn on Profile Guard", rankingGrid: "Run a grid",
+  gbp: "Connect Google", reviews: "Send a review request", profileGuard: "Turn on Profile Watch", rankingGrid: "Run a grid",
   gbpContent: "Schedule a post", social: "Connect social accounts", siteScan: "Run a Site Scan", media: "Upload photos",
   clickGuard: "Protect a website", ipTracker: "Add the tracking script", vpnShield: "Turn on VPN Shield", cloudflare: "Connect Cloudflare",
   searchConsole: "Connect Search Console", domains: "Connect a registrar", mailAlerts: "Get your forwarding address",

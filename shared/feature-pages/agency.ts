@@ -13,12 +13,12 @@ import { ADDONS, PLANS, planForModule } from "../plans";
  *     client/src/pages/agency.tsx (Team tab copy)
  *   - seats on the agency workspace team (agencySeats + the Extra team seat add-on):
  *     PLANS.growth.limits.agencySeats, ADDONS.extra_seat
- *   - bulk actions (sync, link & sync, unlink, assign client, Guard mode, AI reply settings, post/photo batch,
+ *   - bulk actions (sync, link & sync, unlink, assign client, Watch mode, AI reply settings, post/photo batch,
  *     Site Scans), select a page or all matching, queued with a Jobs log: server/agency/jobs.ts bulkInput,
  *     client/src/components/agency-workspace.tsx
- *   - Guard needs an approved snapshot per location; unlink doesn't remove the listing from Google:
+ *   - Profile Watch needs an approved snapshot per location; unlink doesn't remove the listing from Google:
  *     client/src/components/agency-workspace.tsx (bulk form copy)
- *   - status counts and filters (synced, needs reconnect, not linked, Guard alerts, unanswered reviews, failed
+ *   - status counts and filters (synced, needs reconnect, not linked, Watch alerts, unanswered reviews, failed
  *     posts): client/src/components/agency-workspace.tsx, server/agency/access.ts dashboard()
  *   - CSV export of selected / matching locations: server/agency/routes.ts GET /export
  *   - email onboarding: client adds the agency email as Manager, keeps ownership, no client OAuth; invitation
@@ -80,7 +80,7 @@ const page: FeaturePage = {
     {
       icon: "layers",
       title: "Bulk actions",
-      body: "Sync, link or unlink, assign to a client, set Profile Guard's mode, set AI review replies, schedule a post or photo batch, or start Site Scans across your selection.",
+      body: "Sync, link or unlink, assign to a client, set Profile Watch's mode, set AI review replies, schedule a post or photo batch, or start Site Scans across your selection.",
     },
     {
       icon: "mail",
@@ -90,7 +90,7 @@ const page: FeaturePage = {
     {
       icon: "filter",
       title: "See what needs attention",
-      body: "Counts and filters for locations that are synced, need reconnecting or aren't linked, and for Guard alerts, unanswered reviews and failed posts.",
+      body: "Counts and filters for locations that are synced, need reconnecting or aren't linked, and for Watch alerts, unanswered reviews and failed posts.",
     },
     {
       icon: "history",
@@ -148,7 +148,7 @@ const page: FeaturePage = {
     },
     {
       q: "Does a bulk action change Google right away?",
-      a: "It is queued and runs in the background; Jobs shows each location's progress and any failure. Profile Guard needs an approved snapshot for each location before it can be switched on, and each location scanned uses one Site Scan from your account's monthly allowance.",
+      a: "It is queued and runs in the background; Jobs shows each location's progress and any failure. Profile Watch needs an approved snapshot for each location before it can be switched on, and each location scanned uses one Site Scan from your account's monthly allowance.",
     },
     {
       q: "What doesn't it do?",
@@ -177,7 +177,7 @@ const page: FeaturePage = {
         "to your agency account is accepted, and one that matches no request stays unassigned rather than guessed onto a " +
         "client.",
       "Bulk actions run in the background. Select locations on a page, or everything that matches your filters, and " +
-        "queue a sync, a link or unlink, a client assignment, Profile Guard's mode, AI review reply settings, a batch of " +
+        "queue a sync, a link or unlink, a client assignment, Profile Watch's mode, AI review reply settings, a batch of " +
         "posts or photos, or Site Scans. Each location is its own job in the Jobs log. A temporary Google error is " +
         "retried a few times with growing waits, a Google rate limit waits an hour, and anything that still fails shows " +
         "its error.",

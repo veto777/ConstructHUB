@@ -188,7 +188,7 @@ describe("red-team model outputs", () => {
   });
 
   it("a real ConstructHUB button label is not an action claim", () => {
-    expect(delivered("Then click **I submitted the form — mark reported** in Profile Guard.")).toContain("I submitted the form");
+    expect(delivered("Then click **I submitted the form — mark reported** in Profile Watch.")).toContain("I submitted the form");
   });
 });
 
@@ -388,8 +388,8 @@ describe("F1: the visitor's own words echoed back (O18)", () => {
     expect(withEcho("To connect your Google Business Profile and turn on review alerts, open **Locations** and click **Connect Google Business Profile**.", [q]).ok).toBe(true);
     const situation = "I run a roofing company with three crews and two offices in Texas. Which plan fits?";
     expect(withEcho("With three crews and two offices in Texas, **Growth** fits: it covers 3 locations and 10 CRM seats.", [situation]).ok).toBe(true);
-    const quoted = "You said Profile Guard checks: Solo every 60 minutes, Team every 30 minutes, Pro every 15 minutes, Agency every 15 minutes and Unlimited every 5 minutes. Why the difference?";
-    expect(withEcho("**Profile Guard** checks: Solo every 60 minutes, Team every 30 minutes, Pro every 15 minutes, Agency every 15 minutes and Unlimited every 5 minutes. That is how often it looks at your listing.", [quoted]).ok).toBe(true);
+    const quoted = "You said Profile Watch checks: Solo every 60 minutes, Team every 30 minutes, Pro every 15 minutes, Agency every 15 minutes and Unlimited every 5 minutes. Why the difference?";
+    expect(withEcho("**Profile Watch** checks: Solo every 60 minutes, Team every 30 minutes, Pro every 15 minutes, Agency every 15 minutes and Unlimited every 5 minutes. That is how often it looks at your listing.", [quoted]).ok).toBe(true);
     const earlier = "Open the client and click View as client to see exactly what your customer sees in the portal.";
     expect(withEcho(`Yes. ${earlier}`, [`Earlier you told me: ${earlier} Where is that button?`], [earlier]).ok).toBe(true);
   });
@@ -484,7 +484,7 @@ describe("formatting can't hide what a visitor reads (checks run on the delivere
     const usd = (cents: number) => formatUsd(cents);
     const prices = `**Pro**: ${usd(PLANS.pro.monthlyCents)}/month or ${usd(PLANS.pro.annualCents)}/year. **Starter** is ${usd(PLANS.starter.monthlyCents)}/month.`;
     expect(delivered(prices)).toBe(prices);
-    const heading = `**Starter**\n- ${usd(PLANS.starter.monthlyCents)}/month\n- Profile Guard`;
+    const heading = `**Starter**\n- ${usd(PLANS.starter.monthlyCents)}/month\n- Profile Watch`;
     expect(delivered(heading)).toBe(heading);
     expect(delivered("Cañon City permits are in the [Database Directory](/databases).")).toBe("Cañon City permits are in the [Database Directory](/databases).");
     expect(delivered("Use the **Click Guard** _tracking_ script.")).toBe("Use the **Click Guard** tracking script.");
@@ -756,8 +756,8 @@ describe("OpenAI-style answers (Gabe on OpenAI, owner 2026-10-08): plain markdow
   it("a markdown heading, * bullets, an em dash and a trailing rule are tidied, not blocked (O5 / O17 strip)", () => {
     const answer = `### Pricing\n\n* **Pro** — ${pro}.\n* **Starter** — ${usd(PLANS.starter.monthlyCents)}/month.\n\nSee [Pricing](/pricing) for every plan.\n\n---`;
     expect(delivered(answer)).toBe(`Pricing\n\n- **Pro** — ${pro}.\n- **Starter** — ${usd(PLANS.starter.monthlyCents)}/month.\n\nSee [Pricing](/pricing) for every plan.`);
-    expect(delivered("Sure — here's the short version:\n\n**Profile Guard** watches your Google Business Profile for changes and tells you when one happens."))
-      .toBe("Sure — here's the short version:\n\n**Profile Guard** watches your Google Business Profile for changes and tells you when one happens.");
+    expect(delivered("Sure — here's the short version:\n\n**Profile Watch** watches your Google Business Profile for changes and tells you when one happens."))
+      .toBe("Sure — here's the short version:\n\n**Profile Watch** watches your Google Business Profile for changes and tells you when one happens.");
   });
 
   it("the same markdown dressing changes nothing for the forbidden: prompt dump, vendor names, invented prices, customer counts", () => {

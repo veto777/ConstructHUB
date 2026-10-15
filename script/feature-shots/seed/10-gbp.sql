@@ -1,4 +1,4 @@
--- Feature-shot sample data, "gbp" group: Locations (Google Business Profile), Profile Guard + GMB Edit Monitor,
+-- Feature-shot sample data, "gbp" group: Locations (Google Business Profile), Profile Watch + GMB Edit Monitor,
 -- Posts & Photos, Ranking Grid, Competitor Intel, Mail Alerts, Domains. Sample data only, for user 1
 -- ("Summit Roofing Co."). Lane DBs (constructhub_dev_*) only.
 -- Idempotent: every row it inserts uses a fixed id in the 910000 range (or hangs off one, or uses a
@@ -107,9 +107,9 @@ FROM (VALUES (910001, 1.0), (910002, 0.55), (910003, 0.36)) l(id, scale),
 -- (Google reviews for these locations come from 20-reviews.sql.)
 
 -- ===================================================================================================
--- Profile Guard (gbp_guard, gbp_guard_changes)
+-- Profile Watch (gbp_guard, gbp_guard_changes)
 -- ===================================================================================================
--- last_attempt in the future keeps the lane's Profile Guard worker (every minute) from checking Google with the
+-- last_attempt in the future keeps the lane's Profile Watch worker (every minute) from checking Google with the
 -- token-less sample grant, which would invalidate the grant and purge the sample data.
 INSERT INTO gbp_guard (location_id, user_id, mode, watched, snapshot, observed, checked_at, last_attempt, last_error, updated_at)
 SELECT l.id, 1, l.mode,

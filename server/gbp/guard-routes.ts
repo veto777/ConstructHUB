@@ -12,14 +12,14 @@ import { defaults, replySettingsSchema, saveReplySettings, previewBackfill, conf
 import { RECENT_AUTH_MS, markRecentAuth, validTotp } from '../account-security';
 
 declare module 'express-session' { interface SessionData { profileGuardAuth?:{userId:number;at:number} } }
-/** Shared 12-hour step-up (account-security); Guard's own verify form sets the same marker. No dev bypass. */
+/** Shared 12-hour step-up (account-security); Profile Watch's own verify form sets the same marker. No dev bypass. */
 export function guardRecentAuthOk(req:Request,userId:number) {
   const now=Date.now(), shared=req.session?.recentAuth, local=req.session?.profileGuardAuth;
   return (!!shared&&shared.userId===userId&&shared.at<=now&&now-shared.at<RECENT_AUTH_MS)
     || (!!local&&local.userId===userId&&local.at<=now&&now-local.at<=5*60_000);
 }
 export function requireGuardRecentAuth(req:Request,userId:number) {
-  if(!guardRecentAuthOk(req,userId)) throw new GoogleError('auth','Verify your identity again to change Profile Guard mode',403);
+  if(!guardRecentAuthOk(req,userId)) throw new GoogleError('auth','Verify your identity again to change Profile Watch mode',403);
 }
 export async function verifyGuardIdentity(userId:number,input:unknown) {
   const {password,code}=z.object({password:z.string().max(200).optional(),code:z.string().regex(/^\d{6}$/).optional()}).strict().parse(input);
@@ -71,7 +71,7 @@ export function registerProfileGuardRoutes(app:Express,auth:(req:any,res:any)=>a
   route('put',base,async(req,res,u)=>{
     const input=configSchema.parse(req.body),id=idParam.parse(req.params.id);
     // {reauth:true} makes the app's request helper open the shared verification modal and retry.
-    if(!guardRecentAuthOk(req,u)){res.status(403).json({reauth:true,message:'Verify your identity to change Profile Guard mode'});return;}
+    if(!guardRecentAuthOk(req,u)){res.status(403).json({reauth:true,message:'Verify your identity to change Profile Watch mode'});return;}
     await configureGuard(u,id,input.mode,[...new Set(input.watched)],input.token,req);
     if(input.mode==='lockdown')await checkGuard(u,id);
     res.json({ok:true});

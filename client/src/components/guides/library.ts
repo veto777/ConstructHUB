@@ -129,10 +129,10 @@ export const WALKTHROUGHS: Walkthrough[] = [
     ],
   },
   {
-    id: "profile-guard", topic: "google", title: "Profile Guard", href: "/locations", open: "Open Locations",
+    id: "profile-guard", topic: "google", title: "Profile Watch", href: "/locations", open: "Open Locations",
     steps: [
-      "Open Locations, open a linked business location, then Profile Guard. Choose Watched fields and Preview current Google values. Inspect the proposed snapshot before approving it.",
-      "Choose Off, Notify or Lockdown. Use Verify identity with the requested credentials, then Approve snapshot and save settings. For an existing snapshot, use Save guard settings. Lockdown restores detected changes; it cannot block edits at Google.",
+      "Open Locations, open a linked business location, then Profile Watch. Choose Watched fields and Preview current Google values. Inspect the proposed snapshot before approving it.",
+      "Choose Off, Notify or Lockdown. Use Verify identity with the requested credentials, then Approve snapshot and save settings. For an existing snapshot, use Save watch settings. Lockdown restores detected changes; it cannot block edits at Google.",
       "Use Check now to inspect changes. Approve accepts a detected value into your snapshot; Reject attempts to restore the approved value at Google. Check pending changes and failure messages afterward.",
       "Report opens evidence, not a submitted complaint. Choose Copy report and Open Google's official form, complete the form at Google, then I submitted the form — mark reported. The receipt is local to ConstructHUB.",
     ],

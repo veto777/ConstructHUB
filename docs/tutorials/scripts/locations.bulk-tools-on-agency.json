@@ -17,9 +17,9 @@
     { "action": "scroll-to", "selector": "legend:has-text(\"Apply to selected locations\")", "offset": 160, "caption": "Apply to selected locations",
       "narration": "Apply to selected locations appears under the list." },
     { "action": "highlight", "selector": "select[aria-label=\"Bulk action\"]", "caption": "The actions", "chapter": "Pick an action",
-      "narration": "Sync now, Link & sync, Unlink, Assign client, Set Guard mode, or a post batch." },
-    { "action": "select", "selector": "select[aria-label=\"Bulk action\"]", "value": "Set Guard mode", "caption": "Set Guard mode",
-      "narration": "Set Guard mode picks Off, Notify or Lockdown for every ticked listing." },
+      "narration": "Sync now, Link & sync, Unlink, Assign client, Set Watch mode, or a post batch." },
+    { "action": "select", "selector": "select[aria-label=\"Bulk action\"]", "value": "Set Watch mode", "caption": "Set Watch mode",
+      "narration": "Set Watch mode picks Off, Notify or Lockdown for every ticked listing." },
     { "action": "highlight", "selector": "p:has-text(\"Enabling requires a previously approved snapshot\")", "caption": "Needs an approved snapshot",
       "narration": "It needs an approved snapshot on each location first; the others fail safely." },
     { "action": "select", "selector": "select[aria-label=\"Bulk action\"]", "value": "Assign client", "caption": "Assign client", "chapter": "Queue it",
@@ -37,7 +37,7 @@
   ],
   "youtube": {
     "title": "How to run bulk actions across client locations | ConstructHUB",
-    "description": "The Agency workspace in ConstructHUB on the Agency plan: tick client locations, pick one action for all of them, and queue it. Sync now, Link & sync, Unlink, Assign client, Set Guard mode, AI reply settings or a post batch. Jobs lists every queued action with its progress and failures.",
+    "description": "The Agency workspace in ConstructHUB on the Agency plan: tick client locations, pick one action for all of them, and queue it. Sync now, Link & sync, Unlink, Assign client, Set Watch mode, AI reply settings or a post batch. Jobs lists every queued action with its progress and failures.",
     "tags": ["ConstructHUB", "agency", "bulk actions", "multi-location", "Google Business Profile", "GBP management", "marketing agency", "contractor software"],
     "playlist": "ConstructHUB tutorials",
     "category": 28

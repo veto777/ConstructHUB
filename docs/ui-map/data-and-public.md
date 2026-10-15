@@ -487,7 +487,7 @@ Header row repeats the 4 plan prices via the same `planPriceCents` (pricing.tsx:
 |---|---|---|---|---|---|---|
 | Header prices Starter/Pro/Growth/Agency (4 cells) | prices | Repeat of card prices at current interval | pricing.tsx:442-449 | same as plan cards | tsx recompute ✓ | OK |
 | Row "Google Business Profile locations" / `row-compare-locations` (cells `cell-compare-locations-*`) | compare row | 1 / 1 / 3 / "10 included, then per location" | pricing.tsx:457-465; pricing-display.ts:192-193 | `limits.locations` 1/1/3/10 | tsx ✓ | OK |
-| Row "Profile Guard edit checks" / `row-compare-guard` | compare row | "Every 15 min" ×3, Agency "Every 30 min" | pricing-display.ts:194 | `limits.guardCadenceMinutes` 15/15/15/30 | tsx ✓ | OK |
+| Row "Profile Watch edit checks" / `row-compare-guard` | compare row | "Every 15 min" ×3, Agency "Every 30 min" | pricing-display.ts:194 | `limits.guardCadenceMinutes` 15/15/15/30 | tsx ✓ | OK |
 | Row "AI review replies publish automatically" / `row-compare-autoPublish` | compare row | ✗ / ✓ / ✓ / ✓ | pricing-display.ts:195 | `limits.autoPublishAiReplies` false/true/true/true | tsx ✓ | OK |
 | Row "Review reply templates" / `row-compare-templates` | compare row | 5 / 20 / 20 / 50 | pricing-display.ts:196 | `limits.reviewTemplates` | tsx ✓ | OK |
 | Row "Ranking-grid credits" / `row-compare-grid` | compare row | "5 / mo" / "15 / mo" / "30 / mo" / "2 per location / mo" | pricing-display.ts:197-198 | `gridCredits` 5/15/30/0, `gridCreditsPerLocation` agency 2 | tsx ✓ | OK |
@@ -678,7 +678,7 @@ Renderer `client/src/components/feature-landing/dfy-landing.tsx` (all 5 template
 - Content `shared/dfy-pages/formation.ts`; slug `business-formation`; status ready; catalogIds `["dfy_formation"]` → $5,500 ≥ $1,000 ⇒ kind "sales" ✓. Sections rendered: how, cards, audience, pricing, faq (5), in-depth, related, cta (no spotlight — correct, content has none). Related: businessBuild, gmbWebsite, masterClass — all resolve. Headless: title "Contractor License & LLC Filing, Done for You | ConstructHUB" ✓.
 
 ### gmb-website-setup
-- `gmbWebsite.ts`; catalogIds `["dfy_gmb_website"]` → $15,000 ⇒ sales ✓. Sections: how, cards, **spotlight**, audience, pricing, faq (4), in-depth, related, cta. Spotlight's plan-tools panel ("Google Business Profile sync, Profile Guard, … Site Scan") lists features whose pages exist; the panel note correctly says those tools are plan software priced on the Pricing page, not part of the service. Related: seoAds, gbp, siteScan ✓.
+- `gmbWebsite.ts`; catalogIds `["dfy_gmb_website"]` → $15,000 ⇒ sales ✓. Sections: how, cards, **spotlight**, audience, pricing, faq (4), in-depth, related, cta. Spotlight's plan-tools panel ("Google Business Profile sync, Profile Watch, … Site Scan") lists features whose pages exist; the panel note correctly says those tools are plan software priced on the Pricing page, not part of the service. Related: seoAds, gbp, siteScan ✓.
 
 ### seo-ads-management
 - `seoAds.ts`; catalogIds `["dfy_seo_ads"]` → $7,500 ⇒ sales ✓ (also in SEO_CONTRACT_REQUIRED_IDS — signed contract before payment; the page's copy says 6-month agreement, matches `SEO_PACKAGES.dfy_seo_ads.termMonths: 6`, server/routes.ts:4708). Sections: how, cards, audience, pricing, faq (5), in-depth, related, cta. Related: seoContracts, clickGuard, lsaLeads ✓.
@@ -964,7 +964,7 @@ Column key — Backend: "—" means no server involvement (static/anchor). Statu
 |---|---|---|---|---|---|---|
 | "Get started" button | anchor | Scrolls to the first guide (`#guide-0`) | guides.tsx:114 | — | code read | OK |
 | "Connect your website" nav link | anchor | Jumps to the Cloudflare/Search-Console walkthrough (`#guide-connection`) | guides.tsx:117 | — | code read | OK |
-| 9 guide nav links (Connect your social accounts, Manual posting, Auto mode, Agency social workflows, Profile Guard, AI review replies, Posts & Photos, Security, Site Scan) | anchors | Jumps to `#guide-0` … `#guide-8` | guides.tsx:118 | — | code read | OK |
+| 9 guide nav links (Connect your social accounts, Manual posting, Auto mode, Agency social workflows, Profile Watch, AI review replies, Posts & Photos, Security, Site Scan) | anchors | Jumps to `#guide-0` … `#guide-8` | guides.tsx:118 | — | code read | OK |
 | SiteConnectionGuide (guide-connection) | content | 3 cards: "Put a client site behind Cloudflare" (5 steps), "Connect Cloudflare to ConstructHUB" (7 paragraphs), "Connect Google Search Console" (5 steps + 2 notes) | site-connection-guide.tsx:2-186 | — | code read | OK |
 | "Cloudflare setup instructions" link | external link | Opens Cloudflare docs full-setup page | site-connection-guide.tsx:41-48 | — | curl -L → 200 | OK |
 | "Cloudflare role reference" link | external link | Opens Cloudflare members-roles docs | site-connection-guide.tsx:113-120 | — | curl -L → 200 | OK |
@@ -982,7 +982,7 @@ Column key — Backend: "—" means no server involvement (static/anchor). Statu
 | "Open Social Media" button | app link | `/social-media` | guides.tsx:124 | — | route exists | OK |
 | Steps of "Agency social workflows" (5) | text | Bulk actions, per-business cadence, all-clients calendar (up to 100 posts per bulk action) | guides.tsx:41-51 | — | code read | OK |
 | "Open Social Media" button | app link | `/social-media` | guides.tsx:124 | — | route exists | OK |
-| Steps of "Profile Guard" (4) | text | Watched-fields snapshot / Lockdown / Google-report flow | guides.tsx:52-61 | — | code read | OK |
+| Steps of "Profile Watch" (4) | text | Watched-fields snapshot / Lockdown / Google-report flow | guides.tsx:52-61 | — | code read | OK |
 | "Open Locations" button | app link | `/locations` | guides.tsx:124 | — | route exists App.tsx:179 | OK |
 | Steps of "AI review replies" (4) | text | AI reply settings, backfill preview (≤50 reviews, 10-min preview expiry) | guides.tsx:62-71 | — | code read | OK |
 | "Open Google Reviews" button | app link | `/google-reviews` | guides.tsx:124 | — | route exists App.tsx:223 (SHOW_GOOGLE_REVIEWS=true, features.ts:26) | OK |
@@ -1518,7 +1518,7 @@ Pro/Growth/Agency (autoPublishAiReplies) ✓ price book; reviewTemplates 5/20/20
 "deleted requests go to a trash" — /api/review-requests trash (routes.ts) ✓; "Google doesn't tell us
 whether a review was posted" — honest-negative, n/a.
 
-### profile-guard (Profile Guard) — grow — kind "plan" + locations allowance — ready
+### profile-guard (Profile Watch) — grow — kind "plan" + locations allowance — ready
 Claims: 11 watched fields ✓ (server/gbp/guard.ts:10 GUARD_FIELDS, 11 entries); cadence line computed
 from guardCadenceMinutes (15 min Starter/Pro/Growth, 30 Agency) ✓ price book + runGuardWorker;
 "confirm it's you, once per 12 hours" ✓ (guard-routes.ts); GMB Edit Monitor on-demand only, no
@@ -1777,7 +1777,7 @@ App CTA "Open Reinstatement" → /reinstatement; tryIt "Send a free case review 
 /reinstatement (client reinstatement.tsx:183,228) and Hub knowledge (server/hub/knowledge.ts:59), so
 page, card and Hub agree; request form needs no account, free, rate-limited, emails team with
 reply-to = requester ✓ (server/routes.ts /api/reinstatement/request, reinstatementLimit); soft vs
-hard suspension descriptions ✓ (client reinstatement.tsx); "Google alone decides" ✓; Profile Guard
+hard suspension descriptions ✓ (client reinstatement.tsx); "Google alone decides" ✓; Profile Watch
 cross-link ✓.
 
 ### gabe (Gabe) — platform — kind "account" — ready

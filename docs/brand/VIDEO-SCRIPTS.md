@@ -190,7 +190,7 @@ stubbed response.
 | 6 | Results, portal by portal | Each portal shows whether it was searched, so an empty list never hides a failed search. |
 | 7 | Property Records | Property Records lists county assessor and appraiser offices, with a link to each one's records site. |
 | 8 | Google Profile with a real listing | Connect your Google Business Profile to see each location's details and its numbers. |
-| 9 | Profile Guard | Profile Guard checks your listing on a schedule and tells you when something changes. |
+| 9 | Profile Watch | Profile Watch checks your listing on a schedule and tells you when something changes. |
 | 10 | Google Reviews | Ask every client for a review after the job, and answer reviews with reply drafts you approve. |
 | 11 | Site Scan report | Site Scan reads your website the way a search engine does, and lists what to fix. |
 | 12 | Ranking Grid map | The ranking grid shows where your business comes up across your service area. |

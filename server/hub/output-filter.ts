@@ -163,7 +163,7 @@ const ALACARTE_PHRASE = /(?:^|[^\p{L}])[àa][ -]la[ -]carte(?![\p{L}])/iu;
 const ALACARTE_ITEM_NAMES = new RegExp(
   "\\b(" + [
     ...ALACARTE_KEYS.map((k) => ALACARTE[k].name), ...ALACARTE_LINKED.map((l) => l.name), ...ALACARTE_ADDON_ONLY.map((a) => a.name),
-    "Profile Guard", "Click Guard", "IP Tracker", "VPN Shield", "Site Scan", "Site Scans", "SEO suite", "SEO suites", "the CRM", "JobCam",
+    "Profile Watch", "Click Guard", "IP Tracker", "VPN Shield", "Site Scan", "Site Scans", "SEO suite", "SEO suites", "the CRM", "JobCam",
     "every tool", "any tool", "any single tool", "each tool", "single tool", "single tools", "the tools", "every single tool", "a tool", "one tool", "tools",
   ].map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")).join("|") + ")(?![\\p{L}])", "iu");
 /** A sentence about the SEO tools (for the amounts it may carry). */

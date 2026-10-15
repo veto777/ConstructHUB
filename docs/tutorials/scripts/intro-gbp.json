@@ -86,9 +86,9 @@
     {
       "action": "click",
       "selector": "[data-testid=\"tab-guard\"]",
-      "caption": "Profile Guard",
-      "narration": "Profile Guard, the edit alert, has its own tab on every linked listing. It gets its own video.",
-      "chapter": "Profile Guard"
+      "caption": "Profile Watch",
+      "narration": "Profile Watch, the edit alert, has its own tab on every linked listing. It gets its own video.",
+      "chapter": "Profile Watch"
     },
     {
       "action": "highlight",
@@ -99,7 +99,7 @@
   ],
   "youtube": {
     "title": "Google Business Profile in about a minute | ConstructHUB",
-    "description": "A one-minute tour of Locations in ConstructHUB: every Google Business Profile you manage in one list, each with Google's performance figures, the profile details and services as Google has them, a citation checklist and its own Profile Guard tab, synced from Google every six hours.",
+    "description": "A one-minute tour of Locations in ConstructHUB: every Google Business Profile you manage in one list, each with Google's performance figures, the profile details and services as Google has them, a citation checklist and its own Profile Watch tab, synced from Google every six hours.",
     "tags": [
       "ConstructHUB",
       "Google Business Profile",

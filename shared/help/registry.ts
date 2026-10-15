@@ -372,7 +372,7 @@ const entries: Draft[] = [
   {
     key: "locations", group: "Google Business", route: "/locations", title: "Locations",
     whatItIs: "Where each business lives — yours, or your clients’ if you are an agency.",
-    whatItDoes: "Linking a location to its Google Business Profile listing syncs its reviews, photos, services and Google performance numbers, and unlocks Profile Guard, AI replies and Posts & Photos. A location’s page has Insights, Profile Guard, Location Info, Services, Photos & Videos, Social Profiles, Settings and Citations.",
+    whatItDoes: "Linking a location to its Google Business Profile listing syncs its reviews, photos, services and Google performance numbers, and unlocks Profile Watch, AI replies and Posts & Photos. A location’s page has Insights, Profile Watch, Location Info, Services, Photos & Videos, Social Profiles, Settings and Citations.",
     howToUse: [
       "Sidebar → Google Business → Locations → Connect Google Business Profile, and sign in with the Google account that is an Owner or Manager of the listing.",
       "Choose Add Location(s): “Import from GBP” lists the listings in your connected Google accounts; “Search Google” finds one by name, address or Maps link.",
@@ -383,11 +383,11 @@ const entries: Draft[] = [
     needs: ["Any plan; how many locations you can add depends on the plan.", "A Google account that owns or manages the listing."],
   },
   {
-    key: "profile-guard", group: "Google Business", route: "/locations", title: "Profile Guard",
+    key: "profile-guard", group: "Google Business", route: "/locations", title: "Profile Watch",
     whatItIs: "A watch on a linked Google listing for changes to the fields you choose.",
     whatItDoes: "Compares Google’s live values with a snapshot you approved and alerts you to differences. Modes: Off, Notify (alert only) and Lockdown (puts your approved values back after a change is detected).",
     howToUse: [
-      "Locations → open a linked location → Profile Guard.",
+      "Locations → open a linked location → Profile Watch.",
       "Choose the watched fields, click “Preview current Google values” and check the proposed snapshot carefully.",
       "Pick a mode, confirm it’s you, and click “Approve snapshot and save settings”.",
       "Later, use “Check now”, and Approve or Reject under “Pending changes and history”.",
@@ -458,7 +458,7 @@ const entries: Draft[] = [
       "Click “Check Now” again later, or “Check All”, to compare.",
       "For a reply draft, paste a review, enter your business name, pick a tone and generate; edit it and paste it on Google yourself.",
     ],
-    howItWorks: "Checks run only when you click; there are no automatic checks or alerts here. For automatic watching of your own linked listings, use Profile Guard.",
+    howItWorks: "Checks run only when you click; there are no automatic checks or alerts here. For automatic watching of your own linked listings, use Profile Watch.",
   },
   {
     key: "ranking-grid", group: "Google Business", route: "/ranking-grid", title: "GMB Ranking Grid",

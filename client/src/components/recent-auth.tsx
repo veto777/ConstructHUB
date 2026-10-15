@@ -14,7 +14,7 @@ export function requestRecentAuth(): Promise<void> {
   }).finally(()=>{pending=null;});
   return pending;
 }
-/** Reusable for Profile Guard and other sensitive actions. apiRequest also retries 403 reauth. */
+/** Reusable for Profile Watch and other sensitive actions. apiRequest also retries 403 reauth. */
 export function useRecentAuth() { return { verify:requestRecentAuth, request:apiRequest }; }
 /** Set while a Google connect waits for verification: a Google step-up leaves the page, so it returns here to restart the connect. */
 let gbpConnectPending=false;

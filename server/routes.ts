@@ -214,7 +214,7 @@ export async function registerRoutes(
 
   /**
    * Plan gates in front of routes other modules register: Business Profile
-   * import (location count), Profile Guard (a paid feature, one guard per
+   * import (location count), Profile Watch (a paid feature, one guard per
    * covered location) and the AI reply mode (automatic publishing needs a plan
    * that includes it). Registered after the agency access check, so the
    * workspace owner's plan applies, and before those routes.
@@ -247,7 +247,7 @@ export async function registerRoutes(
       if (!user) return;
       if (req.body?.mode === "off") return next();
       try {
-        const ent = await requirePlan(res, user.id, "Profile Guard");
+        const ent = await requirePlan(res, user.id, "Profile Watch");
         if (!ent) return;
         const id = Number(req.params.id);
         const { rows: [r] } = await pool.query("SELECT count(*)::int n FROM gbp_guard WHERE user_id=$1 AND mode<>'off' AND location_id<>$2", [user.id, Number.isSafeInteger(id) ? id : 0]);
@@ -257,7 +257,7 @@ export async function registerRoutes(
           const raise = raiseHint(ent, "locations", ["location"]);
           return void sendLimitReached(res, {
             feature: "guardedLocations", limit, used: r.n, upgradePlan: raise.upgradePlan, addon: raise.addon,
-            message: `Profile Guard is on for ${plural(r.n, "location")}, and your ${accessPlanName(ent)} plan covers ${plural(limit, "location")}. Turn Guard off on another location first. ${raise.text}`.trim(),
+            message: `Profile Watch is on for ${plural(r.n, "location")}, and your ${accessPlanName(ent)} plan covers ${plural(limit, "location")}. Turn Guard off on another location first. ${raise.text}`.trim(),
           });
         }
         next();

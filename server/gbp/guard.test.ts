@@ -37,7 +37,7 @@ beforeAll(async()=>{
 });
 afterAll(async()=>{await pool.query('DELETE FROM subscriptions WHERE user_id=ANY($1)',[[user,other]]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1)',[[user,other]]);await pool.query('DELETE FROM users WHERE id=ANY($1)',[[user,other]]);await pool.end();});
 const changes=async()=> (await pool.query('SELECT * FROM gbp_guard_changes WHERE location_id=$1 ORDER BY id',[id])).rows;
-describe('Profile Guard with real lane Postgres and mocked Google',()=>{
+describe('Profile Watch with real lane Postgres and mocked Google',()=>{
   it('validates profile field types and blocks metadata/path injection',()=>{
     expect(()=>ownerProfileInput.parse({fields:{websiteUri:'javascript:alert(1)'}})).toThrow();
     expect(()=>ownerProfileInput.parse({fields:{title:{bad:'shape'}}})).toThrow();

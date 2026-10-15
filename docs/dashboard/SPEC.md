@@ -62,7 +62,7 @@ with their source.
 | 9 | Google Business: Domains | `/domains` | `/api/domains/connections` | module `domainsMailAlerts` | domains watched (`managed_domains`); expiring within 30 days (`state->>'expires'`); auto-renew off (`state->>'autoRenew' = 'false'`) |
 | 10 | Google Business: Mail alerts | `/mail-alerts` | `/api/mail-alerts/settings` | module `domainsMailAlerts` | unread alerts (`mail_alert_messages.read_at IS NULL`); alerts in the last 7 days |
 | 11 | Google Business: Posts & Photos | `/gbp-content` | `/api/gbp/content/*` | `requirePlan` (GBP management) | scheduled (`gbp_content_jobs.status='queued'`); published in 30 days (`status='published'`); need attention (`status IN ('failed','uncertain','rejected')`) |
-| 12 | Google Business: GMB Edit Monitor (Profile Guard) | `/gmb-monitor` | `/api/gbp/guard/status` | `requirePlan` (Profile Guard) | locations guarded (`gbp_guard.mode<>'off'`) / allowance; edits awaiting review (`gbp_guard_changes.status='pending'`); last check (`max(checked_at)`) |
+| 12 | Google Business: GMB Edit Monitor (Profile Watch) | `/gmb-monitor` | `/api/gbp/guard/status` | `requirePlan` (Profile Watch) | locations guarded (`gbp_guard.mode<>'off'`) / allowance; edits awaiting review (`gbp_guard_changes.status='pending'`); last check (`max(checked_at)`) |
 | 13 | Google Business: Ranking Grid | `/ranking-grid` | `/api/ranking-grid/scans` | `rankings` meter | credits used / limit (`growth_budgets`); last grid and its `average_rank` (`ranking_grid_scans`, latest `status='completed'`) |
 | 14 | Google Business: Photo Optimizer + Media Library | `/photos`, `/media-library` | `/api/media/folders` | `photos` meter (any plan, fair use) | photos stored (`media_photos`); folders (`media_folders`) |
 | 15 | Google Business: Reinstatement | `/reinstatement` | none (service page) | none | link tile only |
@@ -349,7 +349,7 @@ All tiles use the same rule: when a feature has never been used (no grant, no ro
 │ CRM snapshot: Pipeline $184,500 · Open estimates 4 ($62,300) · Jobs won 12 · Open invoices $9,800 · Sold, not scheduled 2 · Clients 38   [Open the CRM →] │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │ GROW            (grid 1 / 2 / 3 / 4 columns at <640 / sm / lg / 2xl)          │
-│ [GBP] [Reviews] [Profile Guard] [Ranking Grid] [Posts] [Social] [Site Scan] [Photos] │
+│ [GBP] [Reviews] [Profile Watch] [Ranking Grid] [Posts] [Social] [Site Scan] [Photos] │
 │ PROTECT  [Click Guard] [IP Tracker] [VPN Shield] [Cloudflare🔒] …             │
 │ WIN JOBS [Permits] [Property] [Competitors] [Ads manager🔒] [LSA Leads]       │
 │ RUN THE BUSINESS [Schedule] [Leads] [Texting] [AI Call Assistant · Soon] [Agency🔒] │

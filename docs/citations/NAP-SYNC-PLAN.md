@@ -22,7 +22,7 @@ control on the core 70 **plus** a long tail nobody else bothers with — contrac
 
 ## 2. What we already have (reuse, don't rebuild)
 - **GBP Business Information API — approved 2026-09-23.** `server/gbp/listing-editor.ts` writes NAP, hours,
-  categories, attributes, description with per-field verdicts; `server/gbp/guard.ts` (Profile Guard) detects every
+  categories, attributes, description with per-field verdicts; `server/gbp/guard.ts` (Profile Watch) detects every
   change on Google — the **trigger** for a sync.
 - **Citation checklist** — `citation_campaigns` / `citations` tables + `/api/citations/campaigns*` (30 directories,
   manually verified, `nap_consistent` column). Becomes the listings ledger.

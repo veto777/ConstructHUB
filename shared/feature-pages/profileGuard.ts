@@ -5,7 +5,7 @@ import { PLANS, PLAN_KEYS } from "../plans";
 import { joinNames, planNamesWhere } from "../plan-copy";
 
 /**
- * Profile Guard (the "Profile Guard" tab of a location in Locations; the dashboard tile's name) — every claim
+ * Profile Watch (the "Profile Watch" tab of a location in Locations; the dashboard tile's name) — every claim
  * is backed by the code in `sources`:
  *   - needs a location linked to its Google listing through a connected account: client/src/components/profile-guard.tsx
  *     (GuardUnlinked), server/gbp/guard.ts (clientFor + the location's gbp_location_name)
@@ -41,17 +41,17 @@ const page: FeaturePage = {
   slug: "profile-guard",
   group: "grow",
   status: "ready",
-  title: "Profile Guard",
+  title: "Profile Watch",
   kicker: "Edit alerts",
   headline: { lead: "Know When Your Google Profile ", swipe: "Gets Changed" },
   lede:
-    "Profile Guard checks your Google Business Profile on a schedule, compares it with the values you approved, " +
+    "Profile Watch checks your Google Business Profile on a schedule, compares it with the values you approved, " +
     "and alerts you when your name, phone, website, hours or other details change. In Lockdown it puts your values back.",
   hero: { mascot: "standing", bubble: "I'll keep an eye on your listing." },
   steps: [
     {
       title: "Link your location",
-      body: "Profile Guard works on a location linked to its Google listing through a Google account you've connected.",
+      body: "Profile Watch works on a location linked to its Google listing through a Google account you've connected.",
     },
     {
       title: "Approve your snapshot",
@@ -80,7 +80,7 @@ const page: FeaturePage = {
     {
       icon: "lock",
       title: "Lockdown",
-      body: "After a change is found, Profile Guard writes your approved value back to Google and checks that Google accepted it.",
+      body: "After a change is found, Profile Watch writes your approved value back to Google and checks that Google accepted it.",
     },
     {
       icon: "bell",
@@ -100,7 +100,7 @@ const page: FeaturePage = {
     {
       icon: "key",
       title: "Settings that need you",
-      body: "Changing Guard settings asks for your password, authenticator or an emailed code, so a signed-in session can't quietly switch it off.",
+      body: "Changing Profile Watch settings asks for your password, authenticator or an emailed code, so a signed-in session can't quietly switch it off.",
     },
     {
       icon: "search",
@@ -123,7 +123,7 @@ const page: FeaturePage = {
       items: [
         "Field", "Approved value", "Detected value", "Detected at", "Source", "Status", "Google's evidence", "Reported to Google",
       ],
-      note: "Approve, reject or report each one from the location's Profile Guard tab.",
+      note: "Approve, reject or report each one from the location's Profile Watch tab.",
     },
   },
   audience: [
@@ -133,7 +133,7 @@ const page: FeaturePage = {
     },
     {
       title: "Multi-location companies",
-      body: "Guard every branch's listing, each with its own snapshot and history.",
+      body: "Watch every branch's listing, each with its own snapshot and history.",
     },
     {
       title: "Agencies",
@@ -143,12 +143,12 @@ const page: FeaturePage = {
   pricing: {
     kind: "plan",
     allowance: GUARDED,
-    note: `Guard can run on as many locations as your plan covers, extra locations included. Checks run ${CADENCE_LINE}.`,
+    note: `Profile Watch can run on as many locations as your plan covers, extra locations included. Checks run ${CADENCE_LINE}.`,
   },
   faqs: [
     {
       q: "What does it need from me?",
-      a: "A location linked to its Google listing through a connected Google account with owner or manager access. When you save Guard settings, you confirm it's you once; it doesn't ask again for 12 hours.",
+      a: "A location linked to its Google listing through a connected Google account with owner or manager access. When you save Profile Watch settings, you confirm it's you once; it doesn't ask again for 12 hours.",
     },
     {
       q: "Which plans include it, and how often does it check?",
@@ -156,11 +156,11 @@ const page: FeaturePage = {
     },
     {
       q: "Can it stop someone from editing my profile?",
-      a: `No. Google lets the public and Google itself change listings. Profile Guard finds a change at its next check, as often as every ${FASTEST} minutes, and in Lockdown it restores your approved value. Google may take a while to show the restored value on Maps.`,
+      a: `No. Google lets the public and Google itself change listings. Profile Watch finds a change at its next check, as often as every ${FASTEST} minutes, and in Lockdown it restores your approved value. Google may take a while to show the restored value on Maps.`,
     },
     {
       q: "Will it tell me who made the change?",
-      a: "No. Google doesn't identify who edited a listing. Profile Guard shows what changed, when it found it, and what Google reported about the change.",
+      a: "No. Google doesn't identify who edited a listing. Profile Watch shows what changed, when it found it, and what Google reported about the change.",
     },
     {
       q: "What is the GMB Edit Monitor?",
@@ -178,33 +178,33 @@ const page: FeaturePage = {
     paragraphs: [
       "Anyone can suggest an edit to a Google Business Profile, and Google can change a listing itself. A different " +
         "phone number, new hours or another website on your listing can go unnoticed until a customer can't reach you. " +
-        "Profile Guard is the edit alert that watches for it, and in Lockdown it puts your own values back.",
-      "It starts from a snapshot you approve. Profile Guard reads the values Google has now, you choose which of the " +
+        "Profile Watch is the edit alert that watches for it, and in Lockdown it puts your own values back.",
+      "It starts from a snapshot you approve. Profile Watch reads the values Google has now, you choose which of the " +
         "eleven fields to watch, and those values become your baseline. At every check it reads your listing twice: " +
         "the live version, and Google's own record of what it has changed. Each watched field is compared with your " +
         "baseline in a way that ignores harmless differences, such as the order your categories are listed in, so an " +
         "alert means a value really changed.",
-      "When a field differs, Profile Guard records the change with your approved value, the new value, when it was " +
+      "When a field differs, Profile Watch records the change with your approved value, the new value, when it was " +
         "found and what Google reported about it, and alerts you in the app and by email. If the change shows up in " +
         "Google's record, the alert says it came from Google; otherwise it says the edit was made outside " +
         "ConstructHUB. Google doesn't say who made an edit, so neither does the alert. A change still waiting for your " +
         "decision isn't announced again at every check.",
       "In Notify mode you decide: approve the new value into your snapshot, or reject it and your approved value is " +
         "written back to Google. Lockdown does that on its own after each check. Either way, only the changed field is " +
-        "sent, and Profile Guard then confirms that Google's answer matches your value; if Google doesn't confirm it, " +
+        "sent, and Profile Watch then confirms that Google's answer matches your value; if Google doesn't confirm it, " +
         "the change keeps an error instead of being marked restored. Lockdown can't stop an edit from happening, and a " +
         "restored value can take a while to show on Google Maps.",
       `Checks run on your plan's schedule, as often as every ${FASTEST} minutes, and only while the plan is active. ` +
-        "If a plan lapses, your Guard settings stay and checks start again when a plan is back.",
+        "If a plan lapses, your Profile Watch settings stay and checks start again when a plan is back.",
     ],
   },
-  // Profile Guard is sold with the Google Business Profile item (shared/alacarte.ts gbp): the same comparison.
+  // Profile Watch is sold with the Google Business Profile item (shared/alacarte.ts gbp): the same comparison.
   compare: GBP_COMPARE,
   related: ["gbp", "reinstatement", "reviews"],
   app: { href: "/locations", surface: "app", label: "Open Locations" },
   headings: {
     steps: { title: "Guarded in ", em: "Four\u00a0Steps" },
-    cards: { title: "What Profile Guard ", em: "Watches" },
+    cards: { title: "What Profile Watch ", em: "Watches" },
     faq: { title: "Before You ", em: "Turn It On" },
   },
   seo: {

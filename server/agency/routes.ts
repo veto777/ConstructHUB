@@ -176,7 +176,7 @@ export function registerAgencyRoutes(app:Express) {
   route('get','/locations/:id',async(req,res,a)=>res.json(await locationAccess(a,positiveId.parse(req.params.id))));
   route('post','/bulk',async(req,res,a)=>{
     const b=bulkInput.parse(req.body);
-    if(b.action==='guard'&&!guardRecentAuthOk(req,a.actor))return res.status(403).json({reauth:true,message:'Verify your identity to change Profile Guard mode'});
+    if(b.action==='guard'&&!guardRecentAuthOk(req,a.actor))return res.status(403).json({reauth:true,message:'Verify your identity to change Profile Watch mode'});
     res.status(202).json(await queueBulk(a,b));
   });
   // CSV export of the workspace's locations (same filters as /locations; optional ?ids

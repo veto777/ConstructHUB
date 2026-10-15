@@ -41,7 +41,7 @@ Audited 2026-09-29 in `/home/veto/ConstructHUB-a4`, port **8159**, database **co
 | Content source CRUD | Real route create/list/delete; other-owner deletion denied | PASS |
 | Social guides | Verify actual composer, queue, auto controls against page code and browser walkthrough | PASS |
 | Security walkthrough | Compare shipped Security & activity, Enable 2FA / Verify & Enable, recovery/device, notification and activity labels; guide browser assertions and direct route link | FIXED `cffba7f` |
-| Profile Guard walkthrough | Compare actual preview, identity verification, snapshot approval, Approve/Reject and manual Google reporting controls; browser guide assertions | FIXED `cffba7f` |
+| Profile Watch walkthrough | Compare actual preview, identity verification, snapshot approval, Approve/Reject and manual Google reporting controls; browser guide assertions | FIXED `cffba7f` |
 | AI replies walkthrough | Compare actual location/settings/scope/backfill/draft controls; explain explicit auto-publication and low-rating policy | FIXED `cffba7f` |
 | Posts & Photos walkthrough | Compare actual upload/caption/style/batch/cadence/approval/history labels; explain unsaved drafts and uncertain retry | FIXED `cffba7f` |
 | Site Scan walkthrough | Added linked-location/no-comparison, scan/progress, AI drafts, PDF/shares/revocation, monthly history and public verification instructions; browser follows route | FIXED `cffba7f` |

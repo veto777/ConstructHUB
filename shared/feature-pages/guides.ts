@@ -46,7 +46,7 @@ const page: FeaturePage = {
     },
     {
       title: "Pick the job in front of you",
-      body: "A site behind Cloudflare, Search Console, Profile Guard, review replies, posting or Site Scan: each walkthrough names the buttons in order.",
+      body: "A site behind Cloudflare, Search Console, Profile Watch, review replies, posting or Site Scan: each walkthrough names the buttons in order.",
     },
     {
       title: "Do it alongside",
@@ -86,7 +86,7 @@ const page: FeaturePage = {
     {
       icon: "list",
       title: "Setup walkthroughs",
-      body: "Profile Guard, AI review replies, Posts & Photos scheduling, social posting and auto mode, account security and Site Scan, button by button, with a checkbox per step and a search across every step.",
+      body: "Profile Watch, AI review replies, Posts & Photos scheduling, social posting and auto mode, account security and Site Scan, button by button, with a checkbox per step and a search across every step.",
     },
   ],
   spotlight: {
@@ -119,7 +119,7 @@ const page: FeaturePage = {
     },
     {
       title: "New ConstructHUB accounts",
-      body: "Follow the walkthroughs to set up Profile Guard, review replies, posting and Site Scan the first time.",
+      body: "Follow the walkthroughs to set up Profile Watch, review replies, posting and Site Scan the first time.",
     },
   ],
   pricing: {
@@ -175,7 +175,7 @@ const page: FeaturePage = {
         "if you return late calls in the morning, and think twice before turning on message leads.",
       "The setup walkthroughs also say what a button does not do, which is where most setup mistakes happen. A " +
         "generated review reply is a draft until it is published. Retrying a Google post whose result is uncertain " +
-        "can publish it twice, so check Google first. Profile Guard's Lockdown restores changes but can't stop an " +
+        "can publish it twice, so check Google first. Profile Watch's Lockdown restores changes but can't stop an " +
         "edit at Google. A Site Scan share link can be read by anyone who has it. Opening a security notice doesn't " +
         "disconnect anything. The site connection guide warns you to keep your email records before you switch " +
         "nameservers, and that the switch can take up to 48 hours.",

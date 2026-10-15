@@ -231,7 +231,7 @@ describe("buildDashboard (development database)", () => {
     expect(value(p, "reviews", "unanswered")).toBe(1);
     expect(value(p, "profileGuard", "guarded")).toBe(1);
     expect(value(p, "profileGuard", "pending")).toBe(1);
-    // Profile Guard lives on the location's page, not the older GMB Edit Monitor.
+    // Profile Watch lives on the location's page, not the older GMB Edit Monitor.
     expect(tile(p, "profileGuard").cta).toMatchObject({ label: "Review edits", href: expect.stringMatching(/^\/locations\?location=\d+&tab=guard$/) });
     expect(p.checklist.find((c) => c.key === "turnOnGuard")?.href).toBe("/locations");
     // Property Records is a link, never a platform-wide count shown as the account's.

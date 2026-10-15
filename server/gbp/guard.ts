@@ -195,5 +195,5 @@ export async function runGuardWorker(check=checkGuard,onlyUser?:number) {
 }
 export function startGuardWorker() {
   if(process.env.GBP_SYNC_DISABLED==='true')return;
-  const timer=setInterval(()=>void runGuardWorker().catch((e)=>{console.error('Profile Guard worker failed');void recordFailure('job','Profile Guard worker tick',e);}),60_000);timer.unref();return timer;
+  const timer=setInterval(()=>void runGuardWorker().catch((e)=>{console.error('Profile Watch worker failed');void recordFailure('job','Profile Watch worker tick',e);}),60_000);timer.unref();return timer;
 }

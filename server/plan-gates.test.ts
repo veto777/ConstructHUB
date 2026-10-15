@@ -147,7 +147,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     expect((await api("/api/gbp/import", none, "POST", { locations: [] })).status).toBe(402);
   });
 
-  it("gates citations, review templates, photos, Profile Guard and the AI reply mode", async () => {
+  it("gates citations, review templates, photos, Profile Watch and the AI reply mode", async () => {
     expect((await api("/api/citations/campaigns", none, "POST", { campaignName: "P-Gates", businessName: "P-Gates" })).status).toBe(402);
     expect((await api("/api/citations/campaigns", starter, "POST", { campaignName: "P-Gates", businessName: "P-Gates" })).status).toBe(200);
     await pool.query("delete from citation_campaigns where user_id=$1", [starter.id]);
@@ -170,7 +170,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     const guard = await api("/api/gbp/locations/2147483647/guard", none, "PUT", { mode: "notify", watched: [] });
     expect(guard.status).toBe(402);
     expect(guard.body.requiredPlan).toBe("starter");
-    // Starter covers one location, so Profile Guard runs on one at a time; turning it off is always allowed.
+    // Starter covers one location, so Profile Watch runs on one at a time; turning it off is always allowed.
     const { rows: [loc] } = await pool.query("select id from business_locations where user_id=$1 limit 1", [starter.id]);
     await pool.query("insert into gbp_guard(user_id,location_id,mode,watched) values($1,$2,'notify','{}')", [starter.id, loc.id]);
     const second = await api("/api/gbp/locations/2147483647/guard", starter, "PUT", { mode: "notify", watched: [] });
