@@ -102,8 +102,8 @@ export function bulkFinder(src: BulkSource): LicenseFinder {
       return { hits: found, searched: true, note: `${found.length} match(es) in the file of ${status.loadedAt?.slice(0, 10)}` };
     },
     byId: async (q) => {
-      const { hits, status } = await searchBulkBy(src, q);
-      if (!status.loaded) throw new Error("not loaded yet");
+      // A file not loaded yet is already reported with the name searches; here it simply has nothing.
+      const { hits } = await searchBulkBy(src, q);
       return stored(hits);
     },
   };

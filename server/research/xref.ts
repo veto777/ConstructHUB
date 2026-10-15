@@ -57,6 +57,40 @@ export function personNamed(name: string, hit: Pick<LicenseHit, "principal" | "p
   return [hit.principal, ...(hit.people ?? []).map((p) => p.name)].some((v) => { const have = new Set(tokens(v ?? "")); return want.every((w) => have.has(w)); });
 }
 
+/**
+ * A stricter person check for the cross-reference hop, where a name is all that links two licenses: a middle initial
+ * on the name must agree ("Douglas W Smith" is not "Douglas C Smith" or "Douglas Lyle Smith"; plain "Douglas Smith" is
+ * still a candidate). The report says that a link by name alone may be a different person.
+ */
+export function samePerson(name: string, hit: Pick<LicenseHit, "principal" | "people">): boolean {
+  const words = (v: string) => v.toUpperCase().split(/[^A-Z0-9']+/).filter(Boolean);
+  const initials = words(name).filter((w) => w.length === 1);
+  const full = tokens(name);
+  if (!full.length) return false;
+  return [hit.principal, ...(hit.people ?? []).map((p) => p.name)].some((v) => {
+    const have = words(v ?? "");
+    if (!full.every((w) => have.includes(w))) return false;
+    const rest = have.filter((w) => !full.includes(w));
+    return initials.every((i) => rest.some((w) => w[0] === i));
+  });
+}
+
+const SUFFIXES = new Set(["INC", "INCORPORATED", "LLC", "CORP", "CORPORATION", "CO", "COMPANY", "LTD", "LIMITED", "LP", "LLP", "PLLC", "PA", "PC", "THE"]);
+/** A business name without punctuation, corporate suffixes or a trailing "DBA …": "D & S Electric, Inc." → "D S ELECTRIC". */
+export function businessCore(name: string): string {
+  const first = name.toUpperCase().replace(/^\s*(D\/?B\/?A:?|DOING BUSINESS AS)\s+/, "").split(/\b(?:D\/B\/A|DBA|DOING BUSINESS AS)\b/)[0];
+  return first.replace(/L\.L\.C\./g, "LLC").replace(/[^A-Z0-9]+/g, " ").trim().split(" ").filter((w) => w && !SUFFIXES.has(w)).join(" ");
+}
+/**
+ * The record names exactly this business (any of its " / "-separated names, suffixes aside). Enforcement records of a
+ * related business are kept only on this match: a word match would tie "D & S Electric Inc" to every "… Electric Inc".
+ */
+export function businessNamed(business: string, recordName: string | null | undefined): boolean {
+  const want = businessCore(business);
+  if (!want) return false;
+  return (recordName ?? "").split(/\s+\/\s+/).some((part) => businessCore(part) === want);
+}
+
 /** The re-check every name hit gets: the business name for a company, one named person for a person. */
 export function nameMatches(name: string, kind: "person" | "company", hit: LicenseHit): boolean {
   return kind === "company" ? wholeWordMatch(name, { businessName: hit.businessName, principal: null }) : personNamed(name, hit);
@@ -189,7 +223,7 @@ export function licenseRef(h: LicenseHit): string {
 }
 
 const STRENGTH: Record<RelatedTie, number> = Object.fromEntries(RELATED_TIES.map((t, i) => [t, RELATED_TIES.length - i])) as Record<RelatedTie, number>;
-const bizKey = (name: string) => name.toUpperCase().replace(/[^A-Z0-9&]+/g, " ").trim();
+const bizKey = (name: string) => businessCore(name) || name.toUpperCase().replace(/[^A-Z0-9&]+/g, " ").trim();
 const distinctBusinesses = (hits: LicenseHit[]) => new Set(hits.map((h) => bizKey(h.businessName ?? h.principal ?? "")).filter(Boolean)).size;
 
 export type XrefInput = {
@@ -298,7 +332,7 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
     const found: LicenseHit[] = [];
     for (const f of finders) {
       if (!f.byName || f.companiesOnly) continue;
-      try { found.push(...(await f.byName(hop.name, hop.kind)).hits.filter((h) => nameMatches(hop.name, hop.kind, h))); }
+      try { found.push(...(await f.byName(hop.name, hop.kind)).hits.filter((h) => hop.kind === "person" ? samePerson(hop.name, h) : nameMatches(hop.name, hop.kind, h))); }
       catch (err: any) { notes.push(`Could not search "${hop.name}" in ${f.label}: ${String(err?.message ?? err).slice(0, 120)}`); }
     }
     const fresh = found.filter((h) => !own.find(h));
@@ -332,14 +366,18 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
     else { cur.ties++; if (STRENGTH[tie] > STRENGTH[cur.tie]) Object.assign(cur, { tie, via }); }
   };
   if (subject.kind === "person") for (const h of ownList) consider(h.businessName, "business", `${subject.name} is named on its ${licenseRef(h)}`);
-  for (const h of related.list) consider(h.businessName, h.relatedTie ?? "address", h.relatedVia ?? "");
+  for (const h of related.list) consider(h.businessName, h.relatedTie ?? "address", (h.relatedVia ?? "").replace(/this license/g, h.licenseNumber ? `its license ${h.licenseNumber}` : "its license"));
   const ranked = Array.from(businesses.values()).sort((a, b) => STRENGTH[b.tie] - STRENGTH[a.tie] || b.ties - a.ties || a.name.localeCompare(b.name));
   if (ranked.length > MAX_RELATED_BUSINESSES) notes.push(`State enforcement records were searched for the ${MAX_RELATED_BUSINESSES} most closely tied businesses; not for ${ranked.slice(MAX_RELATED_BUSINESSES).map((b) => b.name).join(", ")}.`);
   for (const b of ranked.slice(0, MAX_RELATED_BUSINESSES)) {
     try {
-      const r = await x.enforcementSearch(b.name);
-      for (const e of r.hits) addEnforcement(e, b.tie, `a record of ${b.name}, which is tied to this name: ${b.via}`);
-      log(`xref enforcement "${b.name}": ${r.hits.length} record(s)`);
+      // Also without "Inc"/"LLC": agencies often file a record under the bare name. The exact-name check follows.
+      const names = Array.from(new Set([b.name, businessCore(b.name)].filter((n) => tokens(n).length)));
+      const r = { hits: [] as EnforcementHit[] };
+      for (const n of names) r.hits.push(...(await x.enforcementSearch(n)).hits);
+      const mine = r.hits.filter((e) => businessNamed(b.name, e.name));
+      for (const e of mine) addEnforcement(e, b.tie, `a record of ${b.name}, which is tied to this name: ${b.via}`);
+      log(`xref enforcement "${b.name}": ${mine.length} record(s) naming exactly this business (of ${r.hits.length} word matches)`);
     } catch (err: any) {
       notes.push(`Could not search enforcement records for ${b.name}: ${String(err?.message ?? err).slice(0, 120)}`);
     }

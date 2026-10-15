@@ -4,7 +4,8 @@ import { researchOrderSchema, researchTierFor } from "@shared/research-reports";
 import { idWords, queryWords, type IdQuery } from "./identifiers";
 import { tokens } from "./licenses";
 import {
-  crossReference, LicenseSet, MAX_BUSINESSES_PER_TIE, MAX_ID_SEARCHES, nameMatches, personNamed, searchCustomerIds, subjectIds,
+  businessCore, businessNamed, crossReference, LicenseSet, MAX_BUSINESSES_PER_TIE, MAX_ID_SEARCHES, nameMatches, personNamed, samePerson,
+  searchCustomerIds, subjectIds,
   type LicenseFinder,
 } from "./xref";
 
@@ -91,6 +92,26 @@ describe("person re-check", () => {
     expect(personNamed("John Doe", ROWS[4])).toBe(false);
     expect(personNamed("Mary Doe", ROWS[4])).toBe(true);
     expect(personNamed("Jane Doe", { principal: "DOE, JANE A", people: [] })).toBe(true);
+  });
+});
+
+describe("cross-reference name checks (cases seen in the FL ECLB file)", () => {
+  it("a middle initial must agree when a name is the only link", () => {
+    const who = (principal: string) => ({ principal, people: [] });
+    expect(samePerson("DOUGLAS W SMITH", who("DOUGLAS W SMITH"))).toBe(true);
+    expect(samePerson("DOUGLAS W SMITH", who("DOUGLAS WAYNE SMITH"))).toBe(true);
+    expect(samePerson("DOUGLAS W SMITH", who("DOUGLAS SMITH"))).toBe(false);
+    expect(samePerson("DOUGLAS W SMITH", who("DOUGLAS C SMITH"))).toBe(false);
+    expect(samePerson("DOUGLAS W SMITH", who("JASON DOUGLAS SMITH"))).toBe(false);
+    expect(samePerson("DOUGLAS SMITH", who("DOUGLAS LEE SMITH"))).toBe(true);
+  });
+  it("an enforcement record must name exactly the related business", () => {
+    expect(businessCore("D & S Electric, Inc.")).toBe("D S ELECTRIC");
+    expect(businessCore("REDWIRE, LLC DBA REDWIRE")).toBe("REDWIRE");
+    expect(businessNamed("D & S ELECTRIC INC.", "SMITH, DOUGLAS / DBA D & S ELECTRIC INC")).toBe(true);
+    expect(businessNamed("D & S ELECTRIC INC.", "HINCKLEY, JASON / DBA HINCKLEY ELECTRIC, INC")).toBe(false);
+    expect(businessNamed("REDWIRE, LLC DBA REDWIRE", "REDWIRE LLC")).toBe(true);
+    expect(businessNamed("INC", "ANY INC")).toBe(false);
   });
 });
 
