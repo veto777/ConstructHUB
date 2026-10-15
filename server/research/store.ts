@@ -4,6 +4,7 @@
  * the price and tier are the server's, never the client's.
  */
 import { pool } from "../db";
+import { reportHit } from "./privacy";
 import type {
   ResearchOrderInput, ResearchOrderView, ResearchPreview, ResearchReport, ResearchStatus, ResearchTier,
 } from "@shared/research-reports";
@@ -47,11 +48,28 @@ export type ResearchOrderRow = {
 
 const iso = (d: Date | null) => (d ? new Date(d).toISOString() : null);
 
+/**
+ * A stored report as shown today (round 4, decision 2): license statuses follow the report subject and holder under
+ * the current rules, and a person's report carries no enforcement records, whenever the report was generated.
+ */
+export function shownReport(r: ResearchReport | null): ResearchReport | null {
+  if (!r) return r;
+  return {
+    ...r,
+    subjects: r.subjects.map((s) => ({
+      ...s,
+      licenses: s.licenses.map((h) => reportHit(h, s.kind)),
+      ...(s.relatedLicenses ? { relatedLicenses: s.relatedLicenses.map((h) => reportHit(h, s.kind)) } : {}),
+      ...(s.kind === "person" ? { complaints: [], courtCases: [], osha: [], enforcement: [], ...(s.relatedEnforcement ? { relatedEnforcement: [] } : {}) } : {}),
+    })),
+  };
+}
+
 export function orderView(row: ResearchOrderRow): ResearchOrderView {
   const { agreeNonRefundable: _a, agreeNoGuarantee: _b, agreeNotFcra: _c, ...input } = row.input;
   return {
     id: row.id, status: row.status, tier: row.tier, priceCents: row.price_cents, input,
-    preview: row.preview, report: row.status === "complete" ? row.report : null, error: row.status === "failed" ? row.error : null,
+    preview: row.preview, report: row.status === "complete" ? shownReport(row.report) : null, error: row.status === "failed" ? row.error : null,
     createdAt: iso(row.created_at)!, paidAt: iso(row.paid_at), completedAt: iso(row.completed_at),
   };
 }

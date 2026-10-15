@@ -59,6 +59,11 @@ export type CoverageSource = {
   local?: boolean;
   /** Searched for companies only (enforcement, complaints and court records). */
   companiesOnly: boolean;
+  /**
+   * Searched only when the running server is set up for it (round 4: OSHA needs the Labor Department key). The page
+   * lists it only when /api/research-reports/coverage-runtime says the server has it; never decided at build time.
+   */
+  needs?: keyof CoverageRuntime;
   /** The official page a reader can open. */
   url: string | null;
   /** Files: what it is found by was read from a sample of its first rows (a load made before full facets). */
@@ -84,6 +89,13 @@ export type CoverageManifest = {
 };
 
 /** Live facets of the daily files, from the loaded rows (what they're really indexed by). */
+/** What the running server can search beyond the build's manifest (decided from the server's own settings). */
+export type CoverageRuntime = { osha: boolean };
+
+/** The nationwide sources the running server really searches (a `needs` source only when the server has it). */
+export const nationwideNow = <T extends Pick<CoverageSource, "needs">>(list: T[], runtime: CoverageRuntime | undefined): T[] =>
+  list.filter((n) => !n.needs || runtime?.[n.needs] === true);
+
 export type CoverageFacets = Record<string, { rows: number; loadedAt: string | null; ids: CoverageId[]; kinds: CoverageKind[]; sampled?: boolean }>;
 
 /** A source's identifiers and kinds, with a file's loaded facets applied when there are some. */

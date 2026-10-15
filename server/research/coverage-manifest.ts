@@ -172,11 +172,13 @@ export async function buildCoverageManifest(): Promise<CoverageManifest> {
 
   // Nationwide records: whatever the report lists with a nationwide scope.
   const all = await searchCompanyRecords(PROBE_COMPANY, []);
-  // A source that needs a key this build doesn't hold ("Not searched yet": OSHA without DOL_API_KEY), or one switched
-  // off ("Not searched by ConstructHUB": CourtListener, robots.txt), is not claimed.
+  // A source switched off ("Not searched by ConstructHUB": CourtListener, robots.txt) is not claimed. OSHA is listed
+  // with `needs: "osha"` whether or not the BUILD holds the Labor Department key: the running server decides
+  // (coverage.ts coverageRuntime; round 4).
   const nationwide: CoverageSource[] = all.sources
-    .filter((s) => /^all /i.test(s.scope) && s.note !== "Not searched yet" && !s.note.startsWith("Not searched by ConstructHUB"))
-    .map((s) => ({ label: s.source, kinds: [/OSHA/.test(s.source) ? "other" as const : kindOfLabel(s.source)], ids: ["name" as const], mode: "live" as const, companiesOnly: true, url: null }));
+    .filter((s) => /^all /i.test(s.scope) && !s.note.startsWith("Not searched by ConstructHUB"))
+    .map((s) => ({ label: s.source, kinds: [/OSHA/.test(s.source) ? "other" as const : kindOfLabel(s.source)], ids: ["name" as const], mode: "live" as const, companiesOnly: true, url: null,
+      ...(s.category === "osha" ? { needs: "osha" as const } : {}) }));
 
   return { generatedAt: new Date().toISOString(), states, nationwide };
 }

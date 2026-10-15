@@ -11,7 +11,7 @@ function log(message: string, source = "scraper") {
 import { liveSearchOutcome, scrapeFailureReason } from "./live-search-outcome";
 import type { AdapterCtx, PermitRecord, PermitSearchType, PortalAdapter } from "./scrapers/types";
 import { USER_AGENT as ADAPTER_USER_AGENT } from "./scrapers/polite-fetch";
-import { afterResearchRequest, beforeResearchRequest, guardResearchContext } from "./scrapers/research-transport";
+import { guardResearchContext, researchPost } from "./scrapers/research-transport";
 
 // CHROMIUM_PATH wins. The Replit-era Nix build is used only where it exists;
 // anywhere else playwright-core launches its own managed headless build (the
@@ -966,9 +966,8 @@ export async function scrapeEnerGov(
     // Build the observed advanced request explicitly; the bootstrap keyword
     // response is not the user's address search and must never be saved.
     const template = enerGovSearchRequest(response.request().postDataJSON(), searchTerm, searchType);
-    await beforeResearchRequest(apiUrl);
-    const first = await context.request.post(apiUrl, { headers, data: template, timeout: 20_000 });
-    afterResearchRequest(apiUrl, first.status(), first.headers()['retry-after']);
+    // In a research search, researchPost follows redirects hop by hop through the guard.
+    const first = await researchPost(context.request, apiUrl, { headers, data: template, timeout: 20_000 });
     if (!first.ok()) throw new Error(`EnerGov search returned HTTP ${first.status()}`);
     let data = await first.json();
     const seen = new Set<string>();
@@ -986,11 +985,9 @@ export async function scrapeEnerGov(
       if (!parsed.results.length) throw new Error('EnerGov pagination ended before the advertised last page');
       if (pg === 100) throw new Error('EnerGov search exceeds 100 pages; narrow the search');
       // BrowserContext.request carries the same cookies as the portal session.
-      await beforeResearchRequest(apiUrl);
-      const next = await context.request.post(apiUrl, {
+      const next = await researchPost(context.request, apiUrl, {
         headers, data: enerGovPageRequest(template, pg + 1), timeout: 20_000,
       });
-      afterResearchRequest(apiUrl, next.status(), next.headers()['retry-after']);
       if (!next.ok()) throw new Error(`EnerGov page ${pg + 1} returned HTTP ${next.status()}`);
       data = await next.json();
     }

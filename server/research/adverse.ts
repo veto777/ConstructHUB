@@ -24,8 +24,11 @@ export const ADVERSE = /\brevo(?:ked|cation|ke)\b|\bsuspen(?:ded|sion|d)\b|\bfin
 /** Words that undo or hold an outcome: the record doesn't say what stands afterwards. */
 export const REVERSAL = /\blift(?:ed|ing)?\b|\brescind|\brevers(?:ed|al|ing)\b|\bset aside\b|\bstay(?:ed|s)?\b|\bvacat|\boverturn|\bannul/i;
 
-/** A negation right after a word: "fine not imposed", "dismissal was not granted", "penalty never assessed". */
-const NEGATED_AFTER = /^\s+(?:(?:was|were|is|has|have|had|been|be|being)\s+)*(?:not|never|no longer)\b/i;
+/**
+ * A negation right after a word, or after the one word it describes: "fine not imposed", "dismissal was not granted",
+ * "penalty never assessed", "disciplinary action was never taken".
+ */
+const NEGATED_AFTER = /^\s+(?:[a-z-]+\s+)?(?:(?:was|were|is|has|have|had|been|be|being)\s+)*(?:not|never|no longer)\b/i;
 
 /**
  * A sanction word under a negation: "not revoked", "no suspension", "without a penalty", "no civil penalty",
@@ -44,6 +47,12 @@ export type AdverseOptions = {
 
 const global = (re: RegExp) => new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
 
+/**
+ * Where the matched word really ends: several patterns match a stem ("dismiss", "disciplin"), and a negation is read
+ * after the whole word ("Dismissal not granted", "Discipline not imposed"), not inside its suffix.
+ */
+const wordEnd = (t: string, b: number) => b + (/^[a-z]*/i.exec(t.slice(b))?.[0].length ?? 0);
+
 /** True / false / null from the publisher's outcome text (see the top of the file). */
 export function adverseFrom(outcome: string | null | undefined, opts: AdverseOptions = {}): boolean | null {
   const t = (outcome ?? "").replace(/\s+/g, " ").trim();
@@ -51,13 +60,13 @@ export function adverseFrom(outcome: string | null | undefined, opts: AdverseOpt
   if (REVERSAL.test(t)) return null;
   const negated = (a: number, b: number) => NEGATOR.test(t.slice(Math.max(0, a - 40), a)) || NEGATED_AFTER.test(t.slice(b, b + 40));
   // Spans of not-adverse wording: a sanction word inside one ("not guilty") is part of it, not a sanction.
-  const spans = [NOT_ADVERSE, ...(opts.notAdverse ? [opts.notAdverse] : [])].flatMap((re) => Array.from(t.matchAll(global(re)), (m) => [m.index!, m.index! + m[0].length]));
+  const spans = [NOT_ADVERSE, ...(opts.notAdverse ? [opts.notAdverse] : [])].flatMap((re) => Array.from(t.matchAll(global(re)), (m) => [m.index!, wordEnd(t, m.index! + m[0].length)]));
   // A negated clearance ("case not dismissed") is not a clean answer either way.
   if (spans.some(([a, b]) => negated(a, b))) return null;
   const cleared = spans.length > 0;
   let sanction = false;
   for (const m of t.matchAll(global(opts.adverse ?? ADVERSE))) {
-    const [a, b] = [m.index!, m.index! + m[0].length];
+    const [a, b] = [m.index!, wordEnd(t, m.index! + m[0].length)];
     if (spans.some(([x, y]) => a < y && b > x)) continue;
     // A negated sanction ("not revoked", "fine not imposed") is not a clean answer either way.
     if (negated(a, b)) return null;

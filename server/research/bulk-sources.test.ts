@@ -193,7 +193,7 @@ describe("round 2 (A6)", () => {
   it("decision 3: an FL complaint against an individual (no DBA, no entity form) is left out; a business is kept", async () => {
     expect(flRespondentIsBusiness("SMITH, JOHN", [])).toBe(false);
     expect(flRespondentIsBusiness("JOHN STEEL", [])).toBe(false);
-    expect(flRespondentIsBusiness("SMITH, JOHN", ["SMITH ROOFING"])).toBe(true);
+    expect(flRespondentIsBusiness("SMITH, JOHN", ["DBA: SMITH ROOFING"])).toBe(true); // a DBA needs its marker (round 4, decision 4)
     expect(flRespondentIsBusiness("ACME HOLDINGS CO", [])).toBe(true);
     const complaints = await file([
       `"0603","DOE, JANE","Broward","616 SW 8TH AVE.","","","FORT LAUDERDALE","FL","33315","Certified Roofing Contractor","2020031679","Unlicensed Activity","","Closed after legal review","11/23/2020",""`,
@@ -248,6 +248,7 @@ describe("FL complaint respondents: a placeholder DBA is no DBA (live 2026-10-15
   it("RUSH, JOHN / N/A is an individual; a real DBA still makes a business", () => {
     expect(flRespondentIsBusiness("RUSH, JOHN", ["N/A"])).toBe(false);
     expect(flRespondentIsBusiness("UNKNOWN, STEVEN", ["UNKNOWN"])).toBe(false);
-    expect(flRespondentIsBusiness("MUNCY, WILLIAM", ["MUNCY ROOFING, LLC"])).toBe(true);
+    expect(flRespondentIsBusiness("MUNCY, WILLIAM", ["D/B/A MUNCY ROOFING, LLC"])).toBe(true);
+    expect(flRespondentIsBusiness("MUNCY, WILLIAM", ["MUNCY ROOFING, LLC"])).toBe(false); // no DBA marker: an address line (round 4, decision 4)
   });
 });

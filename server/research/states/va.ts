@@ -158,10 +158,19 @@ const APELSCIDLA = "Virginia DPOR architects, engineers, land surveyors and land
 const ALHI = "Virginia DPOR asbestos and lead abatement contractors, home inspectors";
 
 // Row counts on 2026-10-15: contractors 88,119 rows, APELSCIDLA 46,836, ALHI 1,157.
+/**
+ * A row stored before round 3 (round 4, decision 3): today's holder from the list its license type names, by the same
+ * rule as vaRegulantHit (a contractor-class row without a business name is unknown).
+ */
+export const vaLegacyHolder = (lists: DporList[]) => (h: LicenseHit): LicenseHit["holder"] => {
+  const list = lists.find((l) => l.type === h.licenseType);
+  return !list ? null : list.holder === "business" && !h.businessName ? null : list.holder;
+};
+
 const BULK: BulkSource[] = [
-  { id: "va-dpor-contractors", state: "VA", label: CONTRACTORS, pageUrl: DPOR_PAGE, everyHours: 24, minRows: 60_000, load: dporLoader(CONTRACTOR_LISTS, CONTRACTORS) },
-  { id: "va-dpor-apelscidla", state: "VA", label: APELSCIDLA, pageUrl: DPOR_PAGE, everyHours: 24 * 7, minRows: 32_000, load: dporLoader(APELSCIDLA_LISTS, APELSCIDLA) },
-  { id: "va-dpor-alhi", state: "VA", label: ALHI, pageUrl: DPOR_PAGE, everyHours: 24 * 7, minRows: 800, load: dporLoader(ALHI_LISTS, ALHI) },
+  { id: "va-dpor-contractors", state: "VA", label: CONTRACTORS, pageUrl: DPOR_PAGE, everyHours: 24, minRows: 60_000, load: dporLoader(CONTRACTOR_LISTS, CONTRACTORS), legacyHolder: vaLegacyHolder(CONTRACTOR_LISTS) },
+  { id: "va-dpor-apelscidla", state: "VA", label: APELSCIDLA, pageUrl: DPOR_PAGE, everyHours: 24 * 7, minRows: 32_000, load: dporLoader(APELSCIDLA_LISTS, APELSCIDLA), legacyHolder: vaLegacyHolder(APELSCIDLA_LISTS) },
+  { id: "va-dpor-alhi", state: "VA", label: ALHI, pageUrl: DPOR_PAGE, everyHours: 24 * 7, minRows: 800, load: dporLoader(ALHI_LISTS, ALHI), legacyHolder: vaLegacyHolder(ALHI_LISTS) },
 ];
 
 // ── SCC business entities (data.virginia.gov) ────────────────────────────────────────────────────────────────

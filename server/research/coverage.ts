@@ -5,13 +5,21 @@
  */
 import type { EnforcementCategory } from "@shared/research-reports";
 import {
-  KIND_OF_CATEGORY, COVERAGE_ID_ORDER, COVERAGE_KIND_ORDER, type CoverageFacets, type CoverageId, type CoverageKind,
+  KIND_OF_CATEGORY, COVERAGE_ID_ORDER, COVERAGE_KIND_ORDER, type CoverageFacets, type CoverageId, type CoverageKind, type CoverageRuntime,
 } from "@shared/research-coverage";
 import { pool } from "../db";
 import { KEY_VERSION, bulkSchemaReady } from "./bulk";
 
 const sortIds = (ids: Iterable<CoverageId>) => COVERAGE_ID_ORDER.filter((i) => new Set(ids).has(i));
 const sortKinds = (kinds: Iterable<CoverageKind>) => COVERAGE_KIND_ORDER.filter((k) => new Set(kinds).has(k));
+
+/**
+ * What this server can search beyond the build's manifest, from its own environment at run time (round 4): OSHA when
+ * it holds the Labor Department key (the key itself is never sent).
+ */
+export function coverageRuntime(): CoverageRuntime {
+  return { osha: !!process.env.DOL_API_KEY };
+}
 
 // ── Run-time facets of the daily files ────────────────────────────────────────────────────────────────────────────
 

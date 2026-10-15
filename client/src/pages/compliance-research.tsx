@@ -23,7 +23,7 @@ import {
   RESEARCH_TIERS, RESEARCH_TRADES, RESEARCH_TRADE_KEYS, RESEARCH_PATH, COMPLIANCE_PATH,
   RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA, researchTierFor,
   RESEARCH_MAX_LICENSE_NUMBERS, RESEARCH_MAX_PHONES, RESEARCH_MAX_ADDRESSES, RELATED_TIES, cleanLicenseNumber, formatPhone, cleanAddress,
-  type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie, ENFORCEMENT_KINDS, anySearched, recordKindOf as kindOf, reportSummary, subjectLicensesSearched,
+  type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie, ENFORCEMENT_KINDS, anySearched, recordKindOf as kindOf, reportSummary, subjectLicensesSearched, previewRecordsLine,
 } from "@shared/research-reports";
 import { RESEARCH_COVERAGE_PATH } from "@shared/research-coverage";
 import { ComplianceFrame } from "./compliance";
@@ -118,8 +118,8 @@ export default function ResearchOrderPage() {
           and links related licenses: it searches the state contractor-license records and every city and county permit portal
           we can reach in those states, then follows the license numbers, phones, addresses and people on what it finds to other
           licenses and businesses tied to them. For a company it also pulls consumer complaints, state
-          enforcement records (licensing-board discipline, stop-work orders, tax liens, debarments, environmental orders).
-          Every finding links to its official
+          enforcement records (licensing-board discipline, stop-work orders, tax liens, debarments, environmental orders),
+          and OSHA inspections (federal). Every finding links to its official
           source. Reports are usually ready the same day.
         </p>
       </header>
@@ -129,7 +129,7 @@ export default function ResearchOrderPage() {
         <ul className="space-y-1.5 text-sm list-disc pl-5">
           <li>Searches every source we have in each state you pick, by name, owner, license number, phone or address. What we have differs by state: the link below lists it.</li>
           <li>Cross-references what it finds. Other licenses and businesses that share a license number, phone, address or person show up too, and each one says what ties it.</li>
-          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens) for companies.</li>
+          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens) and OSHA inspections (federal) for companies.</li>
         </ul>
         <Link href={RESEARCH_COVERAGE_PATH} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline" data-testid="link-research-coverage">
           See exactly what we search in your state <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -635,9 +635,7 @@ export function ResearchOrderStatusPage() {
                     ? <p>{o.preview.licenseMatches} license record(s) match in {o.preview.licenseSourceStates.join(", ")} state license data{o.preview.identifierMatches ? `, ${o.preview.identifierMatches} of them found by a license number, phone or address you gave` : ""}.</p>
                     : <p>We don't search state license records for {o.input.states.join(", ")} yet. The report covers permit portals only there.</p>}
                   {Object.entries(o.preview.portalsByState).map(([st, n]) => <p key={st}>The report will search {n} live permit portal(s) in {stateName(st)} by name.</p>)}
-                  {o.preview.records && (o.preview.records.complaints > 0 || o.preview.records.courtCases > 0 || o.preview.records.osha > 0 || (o.preview.records.enforcement ?? 0) > 0) && (
-                    <p data-testid="text-preview-records">Records on file: {o.preview.records.complaints} consumer complaint(s){o.preview.records.enforcement ? `, ${o.preview.records.enforcement} state enforcement or standing record(s)` : ""}{o.preview.records.courtCases ? `, about ${o.preview.records.courtCases} federal court docket(s)` : ""}{o.preview.records.osha ? ` and ${o.preview.records.osha} OSHA inspection(s)` : ""}.</p>
-                  )}
+                  {previewRecordsLine(o.preview.records) && <p data-testid="text-preview-records">{previewRecordsLine(o.preview.records)}</p>}
                   <p className="text-muted-foreground">Details, permit matches, related licenses and businesses, and sources come with the full report.</p>
                 </div>
               )}

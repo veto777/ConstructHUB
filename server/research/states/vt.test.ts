@@ -55,7 +55,9 @@ describe("VT OPR rosters (audit round 2)", () => {
       // A redirect to a disallowed path is stopped before the browser follows it.
       expect(moved.fulfill).not.toHaveBeenCalled();
       expect(moved.abort).toHaveBeenCalled();
-      expect(img.continue).toHaveBeenCalled();
+      // A style, script or image is fetched here too (its redirects guarded hop by hop), not handed to the browser.
+      expect(img.fetch).toHaveBeenCalled();
+      expect(img.continue).not.toHaveBeenCalled();
       expect(() => check()).toThrow(PortalBlockedError); // robots.txt refusals of page loads stop the load too
       onResponse({ url: () => "https://vt.example.test/public/x", status: () => 403, headers: () => ({}) });
       expect(hostBlocked("https://vt.example.test/anything")).not.toBeNull();

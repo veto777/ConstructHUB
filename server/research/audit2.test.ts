@@ -114,7 +114,7 @@ describe("decisions 1 and 2: holder privacy and no discipline on a license", () 
   });
   it("discipline never shows on a license; a business's becomes an enforcement record", () => {
     const person = lic({ principal: "JOHN DOE", holder: "individual", licenseNumber: "E-1", status: "Active", discipline: "Previous disciplinary actions: probation 2019" });
-    expect("discipline" in reportHit(person)).toBe(false);
+    expect("discipline" in reportHit(person, "person")).toBe(false);
     expect(disciplineRecord(person)).toBeNull();
     const biz = lic({ businessName: "ACME LLC", holder: "business", licenseNumber: "C-9", discipline: "Probation 2019" });
     expect(disciplineRecord(biz)).toMatchObject({ category: "discipline", name: "ACME LLC", licenseNumber: "C-9", adverse: null, detail: expect.stringContaining("Probation 2019") });

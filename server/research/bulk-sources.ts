@@ -32,9 +32,9 @@ import { inflateSync } from "node:zlib";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { USER_AGENT, fetchWithDeadline, rateLimitHost, rethrowIfBlocked } from "./http";
 import { adverseFrom } from "./adverse";
-import { looksLikeBusiness } from "./states/lib/business-name";
+import { TRAILING_SUFFIX, looksLikeBusiness, looksLikeBusinessTrailingSuffix } from "./states/lib/business-name";
 import { clean, csvRecords, csvRows, download, lines, plainRequest, saveResponse, usDate, type BulkHit, type BulkSource } from "./bulk";
-import { localityOf, type IdKeys } from "./identifiers";
+import { type IdKeys } from "./identifiers";
 import { tokens } from "./licenses";
 
 const run = promisify(execFile);
@@ -281,8 +281,8 @@ export async function flDisciplineCases(paths: string[]): Promise<Map<string, Fl
     const lines = [r["Address Line 1"], r["Address Line 2"], r["Address Line 3"]];
     const c = cases.get(id) ?? {
       id, licType: clean(r["License Type"]), licNo: clean(r["License Nbr"]), name,
-      dbas: lines.map((l) => clean(l)?.match(/^DBA:?\s*(.+)$/i)?.[1] ?? null).filter((v): v is string => !!v),
-      lines: lines.filter((l) => !/^\s*DBA\b/i.test(l ?? "")), city: clean(r.City), state: clean(r.State), zip: clean(r["ZIP Code"]), county: clean(r.County),
+      dbas: lines.map((l) => clean(l)).filter((v): v is string => !!v && !!flDbaOf(v)),
+      lines: lines.filter((l) => !flDbaOf(clean(l))), city: clean(r.City), state: clean(r.State), zip: clean(r["ZIP Code"]), county: clean(r.County),
       classification: clean(r.Classification), entered: usDate(r["Entered Date"]), disposition: clean(r.Disposition), dispDate: usDate(r["Disposition Date"]),
       discipline: [], violations: [],
     };
@@ -314,24 +314,57 @@ const caseAdverse = (disposition: string | null, discipline: string[]) =>
   disposition ? flDispositionAdverse(disposition)
     : discipline.length ? adverseFrom(discipline.join("; "), { adverse: /citation|\bfine|revok|suspen|cease/i }) : null;
 
-/** A business entity form in the name itself (DBPR's complaint files publish no entity type). */
-const ENTITY = /\b(?:inc|incorporated|llc|l\.l\.c|corp|corporation|co|company|ltd|limited|lp|llp|pllc|pa|p\.a|pc|p\.c)\b\.?/i;
+/**
+ * The markers DBPR prints before another name, in an address line or after the respondent's name (round 4, decision
+ * 4): "D/B/A", "DBA", "T/A" introduce a trade name; "A/K/A", "AKA" an alias, which in these files is mostly the
+ * person's own other name ("A/K/A SAGY S. HERZANO", seen live 2026-10-15). A line without a marker is an address
+ * line, never a DBA ("ATTN JANE DOE", "SUITE B").
+ */
+const NAME_MARKER = /(?<![a-z0-9])(d\s?\/\s?b\s?\/\s?a|dba|t\s?\/\s?a|a\s?\/\s?k\s?\/\s?a|aka)(?![a-z0-9])[:.]?\s*/gi;
+/** Text split at its markers: what comes before the first one, then each marked name with its kind. */
+function markedNames(text: string): { own: string; marked: { alias: boolean; value: string }[] } {
+  const parts = text.split(NAME_MARKER);
+  const marked: { alias: boolean; value: string }[] = [];
+  for (let i = 1; i + 1 < parts.length; i += 2) {
+    const value = parts[i + 1].replace(/^[\s\-–:,]+|[\s\-–:,]+$/g, "");
+    if (value) marked.push({ alias: /k|^aka$/i.test(parts[i].replace(/[\s/]/g, "")), value });
+  }
+  return { own: parts[0].replace(/[\s\-–:,]+$/g, "").trim(), marked };
+}
+/**
+ * The business names a marked line gives (null when the line doesn't start with a marker: an address line). A trade
+ * name counts; an alias only when it reads as a business itself ("IVOLT LLC"), never a person's other name.
+ */
+export const flDbaOf = (line: string | null | undefined): string[] | null => {
+  const { own, marked } = markedNames(line ?? "");
+  if (own.replace(/^[\s\-–]+/, "") || !marked.length) return null;
+  return tradeNames(marked);
+};
+const tradeNames = (marked: { alias: boolean; value: string }[]) => marked.filter((m) => !m.alias || looksLikeBusinessTrailingSuffix(m.value)).map((m) => m.value);
 /** What DBPR prints in a DBA slot when there is none ("RUSH, JOHN / N/A", "UNKNOWN, STEVEN / UNKNOWN", seen live 2026-10-15). */
 const DBA_PLACEHOLDER = /^\s*(?:n\/?a|none|unknown|same|-+|\.)\s*$/i;
 const sameWords = (a: string, b: string) => { const x = tokens(a).sort().join(" "), y = tokens(b).sort().join(" "); return !!x && x === y; };
 
 /**
- * Who a complaint is about (DBPR's complaint files publish no entity type; round 3, decision 2):
- *   - a respondent whose name carries an entity form or reads as a business → that business (its record as published);
+ * Who a complaint is about (DBPR's complaint files publish no entity type; round 3, decision 2; round 4, decision 4):
+ *   - a respondent whose name reads as a business → that business (its record as published). An entity form counts
+ *     only as the name's last word (", LLC", " INC", " CO"): "CO, JOHN" is a person named Co;
  *   - an individual doing business under a DBA → the DBA, the business: the record names the DBA only (`person`
- *     null), with city, state and ZIP but no street, phone or address key;
+ *     null), with city, state and ZIP but no street, phone or address key. A DBA is a trade name DBPR marks as one
+ *     ("D/B/A", "DBA", "T/A"; an "A/K/A" alias only when it reads as a business), after the respondent's name or at
+ *     the start of an address line; an unmarked address line is never a DBA;
  *   - an individual with no DBA (or a placeholder one, or one that is only their own name) → left out (FCRA).
+ * `lines` are the candidate lines as published (address lines, or the discipline file's DBA lines), marker included.
  */
-export function flRespondent(name: string, dbas: string[]): { name: string; business: string; dbaOnly: boolean } | null {
-  // "D/B/A LOYAL ROOFERS", "- HANDY SOLUTIONS USA": the DBA name without DBPR's prefix.
-  const real = dbas.map((d) => d.replace(/^[\s\-–]*(?:d\/?b\/?a\b[:.]?\s*)?/i, "").trim())
-    .filter((d) => d && !DBA_PLACEHOLDER.test(d) && !sameWords(d, name));
-  if (ENTITY.test(name) || looksLikeBusiness(name)) return { name: [name, ...real].join(" / "), business: [name, ...real].join(" "), dbaOnly: false };
+export function flRespondent(name: string, lines: string[]): { name: string; business: string; dbaOnly: boolean } | null {
+  // "SMITH, JOHN D/B/A ACME ROOFING": the person and the trade name.
+  const { own, marked } = markedNames(name);
+  const real = Array.from(new Set([...tradeNames(marked), ...lines.flatMap((l) => flDbaOf(l) ?? [])]))
+    .filter((d) => !DBA_PLACEHOLDER.test(d) && !sameWords(d, own));
+  // "GREEN, GENERAL H" is a person in DBPR's "LAST, FIRST M" form: a trade word in it ("general") doesn't make it a
+  // business; only an entity word at its end does.
+  const personForm = !!own && /^[a-z'-]+(?:\s+(?:jr|sr|ii|iii|iv)\.?)?,\s*[a-z'-]+(?:\s+[a-z'.-]+)?$/i.test(own) && !TRAILING_SUFFIX.test(own);
+  if (own && !personForm && looksLikeBusinessTrailingSuffix(own)) return { name: [own, ...real].join(" / "), business: [own, ...real].join(" "), dbaOnly: false };
   return real.length ? { name: real.join(" / "), business: real.join(" "), dbaOnly: true } : null;
 }
 export const flRespondentIsBusiness = (name: string, dbas: string[]) => flRespondent(name, dbas) !== null;
@@ -340,18 +373,16 @@ export const flRespondentIsBusiness = (name: string, dbas: string[]) => flRespon
 const localityLine = (city: string | null, state: string | null, zip: string | null) => [city, state, zip5(zip)].map((v) => clean(v)).filter(Boolean).join(" ") || null;
 
 /**
- * A complaint row loaded before round 3 (read time; round 3, decision 4): the same rule on what it stored. "NAME /
- * DBA / …" is split back into the respondent and the DBA names; an individual's row with a DBA becomes the DBA's,
- * without a street; one without a DBA is dropped.
+ * A complaint row loaded before PAYLOAD_VERSION 4 (read time; round 3, decision 4; round 4, decision 4): the same
+ * rule on what it stored. "NAME / DBA / …" is split back into the respondent and the names after it. The stored names
+ * lost their DBA marker, so they can't be shown to be DBAs any more: a respondent who reads as a business keeps its
+ * record under its own name only, and anyone else's record is dropped until the file reloads.
  */
 export function flLegacyComplaint(h: EnforcementHit): EnforcementHit | null {
-  const [first, ...rest] = (h.name ?? "").split(" / ").map((v) => v.trim()).filter(Boolean);
+  const [first] = (h.name ?? "").split(" / ").map((v) => v.trim()).filter(Boolean);
   if (!first) return null;
-  const who = flRespondent(first, rest);
-  if (!who) return null;
-  if (!who.dbaOnly) return { ...h, name: who.name };
-  const locality = h.address ? localityOf(h.address) : null;
-  return { ...h, name: who.name, address: locality, phone: null };
+  const who = flRespondent(first, []);
+  return who && !who.dbaOnly ? { ...h, name: who.name } : null;
 }
 
 export async function* flComplaintRows(complaintPaths: string[], cases: Map<string, FlCase>, licenses: Map<string, string>): AsyncIterable<BulkHit> {
@@ -363,10 +394,11 @@ export async function* flComplaintRows(complaintPaths: string[], cases: Map<stri
     if (r.length < 15 || !/^0[68]/.test(r[0])) continue; // construction (06xx) and electrical (08xx) only
     const name = clean(r[1]);
     if (!name) continue;
-    // DBPR puts DBA names in the address lines; a line with no digits is a name, not a street.
+    // DBPR puts DBA names in the address lines, behind a DBA marker ("D/B/A LOYAL ROOFERS"); every other line is
+    // the address as published (round 4, decision 4: "ATTN JANE DOE" is not a DBA).
     const addrLines = [r[3], r[4], r[5]];
-    const dbas = addrLines.map(clean).filter((v): v is string => !!v && !/\d/.test(v)).map((v) => v.replace(/^DBA:?\s*/i, ""));
-    const street = addrLines.filter((l) => /\d/.test(l ?? ""));
+    const dbas = addrLines.map(clean).filter((v): v is string => !!v && !!flDbaOf(v));
+    const street = addrLines.filter((l) => !!clean(l) && !flDbaOf(clean(l)));
     const id = clean(r[10]);
     const c = id ? cases.get(id) : undefined;
     if (id) seen.add(id);
@@ -1160,9 +1192,10 @@ export const BULK_SOURCES: BulkSource[] = [
   // Quarterly file (January, April, July, October): checked monthly so a new quarter is picked up within weeks.
   { id: "fl-sunbiz-officers", state: "FL", label: "Florida Division of Corporations (Sunbiz) filings of licensed contractors", pageUrl: SUNBIZ_QUARTERLY, everyHours: 24 * 30, minRows: 105_000,
     load: flSunbizOfficersLoader },
-  // 26,001 rows loaded live 2026-10-15 once individual respondents were left out (49,360 with them); floor about 80%.
-  { id: "fl-dbpr-complaints", state: "FL", label: "Florida DBPR complaints and discipline (construction and electrical)", pageUrl: FL_COMPLAINTS_PAGE, everyHours: 24, minRows: 21_000,
-    legacyEnforcement: flLegacyComplaint,
+  // 26,001 rows loaded live 2026-10-15 once individual respondents were left out (49,360 with them); 20,669 once a DBA
+  // needed its marker (round 4, decision 4), which is row shape 1. Floor about 80%.
+  { id: "fl-dbpr-complaints", state: "FL", label: "Florida DBPR complaints and discipline (construction and electrical)", pageUrl: FL_COMPLAINTS_PAGE, everyHours: 24, minRows: 16_500,
+    rowShape: 1, legacyEnforcement: flLegacyComplaint,
     load: flComplaintsLoader, companiesOnly: true },
   { id: "fl-stop-work", state: "FL", label: "Florida stop-work orders (Division of Workers' Compensation)", pageUrl: FL_SWO, everyHours: 24, minRows: 40_000,
     load: flStopWorkLoader, companiesOnly: true },
@@ -1172,7 +1205,10 @@ export const BULK_SOURCES: BulkSource[] = [
     load: txPlumbingLoader },
   // CSLB streams slowly in the daytime and cuts downloads off at about 150 s: fetch it in the small hours, Pacific time.
   { id: "ca-cslb", state: "CA", label: "California CSLB contractor licenses", pageUrl: CSLB, everyHours: 20, minRows: 185_000, // one hit per license since 2026-10-15: 264,352 rows on that day (was ~668k with a row per person)
-    rowShapeChangedAt: "2026-10-15",
+    // Row shape 1: one row per license (2026-10-15). Its first load under shape 1 is not compared with the old shape's.
+    rowShape: 1,
+    // A row stored before round 3 kept the BusinessType in its license type: "Contractor license (Sole Owner)".
+    legacyHolder: (h) => cslbHolder(h.licenseType?.match(/^Contractor license \((.+)\)$/)?.[1]),
     // Starts 09–11 UTC only: a load begun at 12:52 UTC on 2026-10-15 was cut off on every try.
     utcHours: CSLB_START_HOURS,
     load: caCslbLoader },

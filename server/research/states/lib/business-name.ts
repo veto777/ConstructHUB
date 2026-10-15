@@ -44,11 +44,21 @@ const TRADE = new Set(`
   landscapers landscaper renovators insulators refrigerating waterproofers
 `.trim().split(/\s+/));
 
+/**
+ * Entity forms as the name's last word only (", LLC", " INC", " CO." at the end; round 4, decision 4): for a source
+ * that prints people as "LAST, FIRST", where "CO, JOHN" or "PA, MARY" is a surname, not an entity form.
+ */
+export const TRAILING_SUFFIX = /(?:^|[\s,])(?:inc|incorporated|llc|l\.?\s?l\.?\s?c|corp|corporation|co|company|companies|ltd|limited|lp|l\.p|llp|l\.l\.p|lllp|pllc|p\.?l\.?l\.?c|pc|p\.\s?c|pa|p\.\s?a|plc|na|assn|association|cooperative|co-op)\.?\s*$/i;
+
 /** True when the name reads as a business by the rules above. */
-export function looksLikeBusiness(name: string | null | undefined): boolean {
+export const looksLikeBusiness = (name: string | null | undefined): boolean => readsAsBusiness(name, SUFFIX);
+/** looksLikeBusiness, with a corporate suffix counted only as the name's last word (TRAILING_SUFFIX). */
+export const looksLikeBusinessTrailingSuffix = (name: string | null | undefined): boolean => readsAsBusiness(name, TRAILING_SUFFIX);
+
+function readsAsBusiness(name: string | null | undefined, suffix: RegExp): boolean {
   const t = (name ?? "").replace(/\s+/g, " ").trim();
   if (!t) return false;
-  if (SUFFIX.test(t) || FAMILY.test(t) || DBA.test(t)) return true;
+  if (suffix.test(t) || FAMILY.test(t) || DBA.test(t)) return true;
   const words = t.toLowerCase().split(/[^a-z0-9&']+/).filter(Boolean);
   // Digits are no sign of a business: names in rosters and PDFs often carry a case number or a date.
   if (words.some((w) => TRADE.has(w))) return true;

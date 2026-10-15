@@ -34,11 +34,11 @@ import { nameSearchable, searchLicenses, searchLicensesBy, type LicenseSource } 
 import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy, type BulkSource, type StoredHit } from "./bulk";
 import type { LiveLicenseSearch } from "./states/types";
 import { crossReference, enforcementKey, LicenseSet, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
-import { companyNamed, personMatches } from "./licenses";
+import { companyNamed, onePersonField, personMatches } from "./licenses";
 import { ALL_BULK_SOURCES, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
 import { capNote, noteOf } from "./notes";
 import { disciplineRecord, privateHit, reportHit } from "./privacy";
-import { guard, guardBrowser, noteResponse, politeFetch, releaseHost, withRun } from "./http";
+import { guard, guardBrowser, noteResponse, politeFetch, releaseHost, withRun, type Turn } from "./http";
 import { researchTransport, type ResearchTransport } from "../scrapers/research-transport";
 import type { IdQuery } from "./identifiers";
 import { previewCompanyRecords, searchCompanyRecords, searchEnforcement } from "./records";
@@ -87,7 +87,8 @@ export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | 
   for (const s of input.subjects.filter((x) => x.kind === "company")) {
     const r = await previewCompanyRecords(s.name, input.states);
     records = records
-      ? { complaints: records.complaints + r.complaints, courtCases: records.courtCases + r.courtCases, osha: records.osha + r.osha, enforcement: (records.enforcement ?? 0) + r.enforcement, searched: Array.from(new Set([...records.searched, ...r.searched])) }
+      ? { complaints: records.complaints + r.complaints, courtCases: records.courtCases + r.courtCases, osha: records.osha + r.osha, enforcement: (records.enforcement ?? 0) + (r.enforcement ?? 0), searched: Array.from(new Set([...records.searched, ...r.searched])),
+          ran: { complaints: !!(records.ran?.complaints || r.ran?.complaints), courtCases: !!(records.ran?.courtCases || r.ran?.courtCases), osha: !!(records.ran?.osha || r.ran?.osha), enforcement: !!(records.ran?.enforcement || r.ran?.enforcement) } }
       : r;
   }
   return { licenseMatches, identifierMatches, licenseSourceStates, portalsByState: Object.fromEntries(Array.from(portals, ([s, l]) => [s, l.length])), ...(records ? { records } : {}) };
@@ -217,8 +218,9 @@ export function lacksNameSearch(message: string): boolean {
 const PERMIT_TRANSPORT: ResearchTransport = {
   fetch: (url, init, opts) => politeFetch(url, init, opts),
   guardContext: async (context) => { await guardBrowser(context as Parameters<typeof guardBrowser>[0]); },
-  before: (url) => guard(url),
-  after: (url, status, retryAfter) => { releaseHost(url); noteResponse(url, status, retryAfter); },
+  before: (url, holdMs) => guard(url, 1000, holdMs),
+  // The request's own turn is released (round 4, finding 12): a late answer never ends another request's turn.
+  after: (url, status, retryAfter, turn) => { releaseHost(url, turn as Turn); noteResponse(url, status, retryAfter); },
 };
 
 /** A portal refused by robots.txt or an access denial reads as that, not as a failed search. */
@@ -321,13 +323,14 @@ export function namesMatch(name: string, row: any, kind: "person" | "company" = 
 /**
  * The separate people one permit name field holds (round 3, decision 7): split on " and ", "&", ";", "/" and line
  * breaks ("Jane Smith and John Doe" → two names). A part that still reads as more than one name (more than four name
- * words, or "LAST, FIRST, LAST, FIRST") is left out: it gives no person match rather than pooling two people's words.
+ * words, "Jane Smith, John Doe" or "LAST, FIRST, LAST, FIRST"; round 4, decision 7: a comma is "LAST, FIRST" only with
+ * exactly two parts and one surname word) is left out: it gives no person match rather than pooling two people's words.
  */
 export function personParts(field: string): string[] {
   return field.split(/\s+and\s+|&|;|\/|\r?\n/i).map((p) => p.replace(/\s+/g, " ").trim()).filter((p) => {
     if (!p) return false;
     const words = p.split(/[\s,.]+/).filter((w) => /[a-z]{2,}/i.test(w) && !/^(?:jr|sr|ii|iii|iv)$/i.test(w));
-    return words.length <= 4 && (p.match(/,/g) ?? []).length < 2;
+    return words.length <= 4 && onePersonField(p);
   });
 }
 
@@ -411,7 +414,8 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
     const rel = new LicenseSet();
     for (const h of xref.related) rel.add(h);
     for (const h of ids.matched) {
-      if (own.find(h)) continue;
+      // A copy of an own record merges into it (its discipline included) rather than being dropped (round 4, finding 8).
+      if (own.find(h)) { own.add(h); continue; }
       const dup = rel.find(h);
       if (!dup) rel.add(h);
       else if (h.relatedVia && !dup.relatedVia?.includes(h.relatedVia)) dup.relatedVia = `${dup.relatedVia}; also ${h.relatedVia}`;
@@ -424,10 +428,10 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       for (const h of own.list) { const e = disciplineRecord(h); if (e && !seenEnf.has(enforcementKey(e))) { seenEnf.add(enforcementKey(e)); enforcement.push(e); } }
       for (const h of rel.list) { const e = disciplineRecord(h); if (e && !seenEnf.has(enforcementKey(e))) { seenEnf.add(enforcementKey(e)); relatedEnforcement.push(e); } }
     }
-    const relatedLicenses = rel.list.map(reportHit);
+    const relatedLicenses = rel.list.map((h) => reportHit(h, subject.kind));
     log(`cross-reference for "${subject.name}": ${relatedLicenses.length} related license(s), ${relatedEnforcement.length} related enforcement record(s), ${xref.idSearches} identifier search(es)${xref.notes.length ? `; ${xref.notes.join(" | ")}` : ""}`);
     subjects.push({
-      name: subject.name, kind: subject.kind, licenses: own.list.map(reportHit), permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)),
+      name: subject.name, kind: subject.kind, licenses: own.list.map((h) => reportHit(h, subject.kind)), permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)),
       complaints: records.complaints, courtCases: records.courtCases, osha: records.osha, enforcement, recordSources: records.sources,
       identifierSearches: ids.searches, relatedLicenses, relatedEnforcement, relatedNotes: [...ids.notes, ...xref.notes],
     });

@@ -23,7 +23,7 @@ import {
   RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA,
 } from "@shared/research-reports";
 import { buildPreview, drainResearchQueue } from "./runner";
-import { coverageFacets } from "./coverage";
+import { coverageFacets, coverageRuntime } from "./coverage";
 import { createOrder, getOrder, listOrders, markPaid, orderView, retryOrder, setCheckoutSession } from "./store";
 
 export const RESEARCH_CHECKOUT_TYPE = "research_report";
@@ -107,6 +107,12 @@ export function registerResearchRoutes(app: Express, deps: Deps) {
       console.error("[research] coverage facets failed:", err);
       res.status(503).json({});
     }
+  });
+
+  // What the running server searches beyond the build's manifest (OSHA when it holds the Labor Department key).
+  app.get("/api/research-reports/coverage-runtime", (_req, res) => {
+    res.set("Cache-Control", "public, max-age=600");
+    res.json(coverageRuntime());
   });
 
   app.get("/api/research-reports/orders", async (req, res) => {

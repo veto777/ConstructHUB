@@ -101,7 +101,9 @@ const OTHERS: LicenseSource[] = [
   { state: "TX", source: "Texas TDLR licenses (electrical, A/C, appliance, elevator, well)", ...soda("data.texas.gov", "7358-krk7"),
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: "license_subtype", status: null, principal: "owner_name", city: "business_city_state_zip", expires: "license_expiration_date_mmddccyy" },
     personField: "owner_name",
-    address: ["business_address_line1", "business_address_line2", "business_city_state_zip"], phone: ["business_telephone", "owner_telephone"],
+    address: ["business_address_line1", "business_address_line2", "business_city_state_zip"], phone: "business_telephone",
+    // Contacts follow their published role (round 4, decision 5): owner_telephone is the owner's own number and is never
+    // kept, not even for a contractor class without a business number.
     // The contractor classes are a business's license; electricians, technicians, installers and drillers hold their own
     // (the license types of the filter below; any other is unknown).
     holder: (r) => entityHolder(r.license_type, {
@@ -418,7 +420,21 @@ export function companyNamed(name: string, business: string | null | undefined):
  * ONE person's name holds every full word of the searched name, and a middle initial given on both sides agrees:
  * "John A Smith" is not "John B Smith" (or "John Bert Smith"); "John A Smith" and "John Smith" stay candidates.
  */
+/**
+ * True when a name field with commas still holds ONE person (round 4, decision 7): "LAST, FIRST [MIDDLE]", exactly two
+ * parts with a single surname word before the comma ("Smith, John A", "Smith Jr, John", "John Smith, Jr."). Two full
+ * names ("Jane Smith, John Doe") or more parts are a list of people, and no single person's match is read from them.
+ */
+export function onePersonField(field: string): boolean {
+  const t = field.replace(/,\s*(?:jr|sr|ii|iii|iv)\.?\s*(?=,|$)/gi, "").trim();
+  const parts = t.split(",");
+  if (parts.length === 1) return true;
+  if (parts.length !== 2 || !parts[1].trim()) return false;
+  return parts[0].split(/[\s.]+/).filter((w) => /[a-z]{2,}/i.test(w) && !GENERATION.has(w.toUpperCase())).length === 1;
+}
+
 export function personMatches(name: string, person: string | null | undefined): boolean {
+  if (person && !onePersonField(person)) return false;
   const want = nameWords(name), have = nameWords(person ?? "");
   const full = want.filter((w) => w.length >= 2);
   if (!full.length || !full.every((w) => have.includes(w))) return false;
