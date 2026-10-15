@@ -144,13 +144,17 @@ export async function saveVetting(job: VetJob, token: string, signals: BacklinkS
   return true;
 }
 
-/** Qualified sources that published no email, never searched for contacts (or not for 90 days). */
+/**
+ * Sources that published no email, never searched for contacts (or not for 90 days): qualified ones, and rejected ones the
+ * media inbox sorted as a directory, association, chamber or newspaper (server/media-inbox/store.ts needingClass).
+ */
 export async function needingContacts(limit: number): Promise<{ id: number; domain: string; contactUrl: string | null }[]> {
   const r = await db().query(
     `SELECT id, domain, contact_url "contactUrl" FROM backlink_sources
-      WHERE status = 'qualified' AND cardinality(contact_emails) = 0
+      WHERE cardinality(contact_emails) = 0
+        AND (status = 'qualified' OR (status = 'rejected' AND partner_class IN ('listing_directory', 'trade_association', 'chamber', 'news')))
         AND (contacts_checked_at IS NULL OR contacts_checked_at < now() - interval '90 days')
-      ORDER BY tier NULLS LAST, score DESC NULLS LAST, id LIMIT $1`, [limit]);
+      ORDER BY status = 'qualified' DESC, tier NULLS LAST, score DESC NULLS LAST, id LIMIT $1`, [limit]);
   return r.rows;
 }
 
