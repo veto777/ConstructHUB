@@ -8,6 +8,8 @@
  *   NY  New York City DCWP home-improvement contractor and construction-labor-provider licenses (bulk)
  *   DC  District of Columbia DLCP basic business licenses: contractor and construction services (general
  *       contractors / construction managers, home-improvement contractors), with owners and registered agents (bulk)
+ *   CA  Los Angeles Office of Finance active business tax registrations, construction NAICS codes (23…) (bulk)
+ *   WA  Seattle active business license tax certificates, construction NAICS codes (23…) (bulk)
  *   CA  Long Beach business licenses in the "Contracting" categories (bulk)
  *   CO  Boulder licensed contractors (bulk)
  *   TX  Arlington registered contractors (bulk)
@@ -26,7 +28,7 @@
  *   PA  Philadelphia L&I contractor violations (bulk, companies only)
  */
 import type { LicenseHit } from "@shared/research-reports";
-import type { LicenseSource } from "../licenses";
+import { tokens, type LicenseSource } from "../licenses";
 import { clean, type BulkHit, type BulkSource } from "../bulk";
 import type { SodaEnforcement } from "../state-records";
 import type { LiveEnforcementSearch, LiveLicenseSearch } from "./types";
@@ -454,10 +456,59 @@ const arlington: BulkSource = {
   },
 };
 
+// ── Los Angeles and Seattle: business tax registrations, construction trades by NAICS code ────────────────────────
+const LA_BUSINESSES = soda("data.lacity.org", "6rrh-rzua");
+const losAngeles: BulkSource = {
+  id: "ca-la-construction-businesses", state: "CA", label: "Los Angeles business tax registrations (construction)", pageUrl: LA_BUSINESSES.datasetUrl,
+  everyHours: 24 * 7, minRows: 38_000,
+  load: async function* () {
+    for await (const r of sodaAll(LA_BUSINESSES.url, "starts_with(naics,'23')")) {
+      const name = txt(r, "business_name"), dba = txt(r, "dba_name");
+      if (!name && !dba) continue;
+      const address = addressLine([txt(r, "street_address")], txt(r, "city"), "CA", txt(r, "zip_code"));
+      const mailing = addressLine([txt(r, "mailing_address")], txt(r, "mailing_city"), null, txt(r, "mailing_zip_code"));
+      const h = licenseHit({
+        state: "CA", source: "Los Angeles business tax registrations", sourceUrl: LA_BUSINESSES.datasetUrl,
+        businessName: name && dba && dba.toUpperCase() !== name.toUpperCase() ? `${name} (d/b/a ${dba})` : name ?? dba,
+        licenseNumber: txt(r, "location_account"), licenseType: "Business tax registration", specialty: txt(r, "primary_naics_description"),
+        status: "Active", principal: null, city: txt(r, "city"), expires: null, address, phone: null, people: [],
+      });
+      if (h.keys) h.keys.addresses = [address, mailing];
+      yield h;
+    }
+  },
+};
+
+const SEA_BUSINESSES = soda("cos-data.seattle.gov", "wnbq-64tb");
+const seattle: BulkSource = {
+  id: "wa-seattle-construction-businesses", state: "WA", label: "Seattle business license tax certificates (construction)", pageUrl: SEA_BUSINESSES.datasetUrl,
+  everyHours: 24, minRows: 6_400,
+  load: async function* () {
+    for await (const r of sodaAll(SEA_BUSINESSES.url, "starts_with(naics_code,'23')")) {
+      const legal = txt(r, "business_legal_name"), trade = txt(r, "trade_name");
+      if (!legal) continue;
+      const sole = txt(r, "ownership_type") === "Sole proprietorship";
+      const h = licenseHit({
+        state: "WA", source: "Seattle business license tax certificates", sourceUrl: SEA_BUSINESSES.datasetUrl,
+        businessName: sole ? (trade && !namesMatch(trade, legal) ? trade : null) : trade && trade.toUpperCase() !== legal.toUpperCase() ? `${legal} (${trade})` : legal,
+        licenseNumber: txt(r, "city_account_number"), licenseType: "Business license tax certificate (active)", specialty: txt(r, "naics_description"),
+        status: "Active", principal: sole ? legal : null, city: txt(r, "city"), expires: null,
+        address: addressLine([txt(r, "street_address")], txt(r, "city"), txt(r, "state"), txt(r, "zip")), phone: txt(r, "business_phone"),
+        people: [{ name: sole ? legal : null, role: "Owner (sole proprietor)" }],
+      });
+      // The state UBI ties the certificate to Washington L&I and Secretary of State records.
+      if (h.keys) h.keys.licenses = [txt(r, "city_account_number"), txt(r, "ubi")];
+      yield h;
+    }
+  },
+};
+/** "RASUL ABDURAKHMANOV" and "ABDURAKHMANOV RASUL" are one name. */
+const namesMatch = (a: string, b: string) => tokens(a).sort().join(" ") === tokens(b).sort().join(" ");
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington];
+export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, seattle];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
