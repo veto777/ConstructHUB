@@ -104,10 +104,17 @@ const NOT_A_LICENSE = /CE Sponsor|CPC (Provider|Class)|Instructor|In-Training/i;
 function njRosterLoader(label: string, lists: { profession: string; business: boolean }[]): () => AsyncIterable<BulkHit> {
   return async function* () {
     for (const list of lists) {
-      const path = await myLicenseRoster(list.profession, list.business);
-      try {
+      // The site sometimes answers a download with an error page: try up to three times, a minute apart.
+      let path = "";
+      for (let attempt = 1; ; attempt++) {
+        path = await myLicenseRoster(list.profession, list.business);
         const head = (await fs.readFile(path, "utf8")).slice(0, 200);
-        if (!head.startsWith("full_name|")) throw new Error(`NJ DCA ${list.profession} roster has an unexpected layout`);
+        if (head.startsWith("full_name|")) break;
+        await fs.rm(path, { force: true });
+        if (attempt >= 3) throw new Error(`NJ DCA ${list.profession} roster has an unexpected layout: ${head.replace(/\s+/g, " ").slice(0, 80)}`);
+        await new Promise((r) => setTimeout(r, 60_000));
+      }
+      try {
         for await (const r of csvRecords(path, "|")) {
           const type = clean(r.license_type_name);
           if (!type || NOT_A_LICENSE.test(type)) continue;
@@ -115,15 +122,18 @@ function njRosterLoader(label: string, lists: { profession: string; business: bo
           if (!full) continue;
           const person = list.business ? null : clean([r.first_name, r.middle_name, r.last_name, r.name_suffix].map(clean).filter(Boolean).join(" ")) ?? full;
           const business = list.business ? full : null;
+          const zip = /^\d{9}$/.test(r.addr_zipcode ?? "") ? `${r.addr_zipcode.slice(0, 5)}-${r.addr_zipcode.slice(5)}` : r.addr_zipcode; // "078654204"
+          const address = clean([r.addr_line_1, r.addr_line_2, r.addr_city, r.addr_state, zip].map(clean).filter(Boolean).join(" "));
           yield {
             kind: "license",
             hit: {
               state: "NJ", source: label, sourceUrl: MYLICENSE_PAGE, businessName: business, licenseNumber: clean(r.license_no),
               licenseType: type, specialty: clean(r.profession_name), status: clean(r.license_status_name), principal: person,
               city: [clean(r.addr_city), clean(r.addr_state)].filter(Boolean).join(", ") || null, expires: usDate(r.expiration_date),
-              matchedOn: business ? "business" : "principal",
+              matchedOn: business ? "business" : "principal", address,
             },
             business, person,
+            keys: { licenses: [r.license_no], addresses: [address] },
           };
         }
       } finally {
@@ -139,21 +149,23 @@ const NJ_DEBAR_REPORT = "https://app.powerbigov.us/view?r=eyJrIjoiZDQxYTM0MDMtMG
 
 async function* njDebarmentsLoader(): AsyncIterable<BulkHit> {
   const rows = await publicPowerBiRows(NJ_DEBAR_REPORT, "WEB_DEBARREDCONTRACTORS",
-    ["TRADE_NAME", "EMPLOYER_NUM", "EXPIRATION_DATE", "ADDRESS1", "CITY", "STATE", "COUNTY", "DEBAR_CATEGORY"]);
+    ["TRADE_NAME", "EMPLOYER_NUM", "EXPIRATION_DATE", "ADDRESS1", "ADDRESS2", "CITY", "STATE", "ZIPCODE", "COUNTY", "DEBAR_CATEGORY"]);
   const today = new Date().toISOString().slice(0, 10);
   for (const r of rows) {
     const name = clean(r.TRADE_NAME == null ? null : String(r.TRADE_NAME));
     if (!name) continue;
     const end = typeof r.EXPIRATION_DATE === "number" ? new Date(r.EXPIRATION_DATE).toISOString().slice(0, 10) : null;
     const category = clean(r.DEBAR_CATEGORY == null ? null : String(r.DEBAR_CATEGORY));
+    const address = clean(["ADDRESS1", "ADDRESS2", "CITY", "STATE", "ZIPCODE"].map((k) => (r[k] == null ? "" : String(r[k]))).join(" "));
     const hit: EnforcementHit = {
       state: "NJ", source: "New Jersey DOL prevailing-wage debarments", sourceUrl: NJ_DEBAR_PAGE, category: "debarment",
       name, id: r.EMPLOYER_NUM == null ? null : String(r.EMPLOYER_NUM), date: null, endDate: end,
       status: [category, end ? (end < today ? `through ${end} (period over)` : `through ${end}`) : null].filter(Boolean).join(" ") || null,
       city: [clean(String(r.CITY ?? "")), clean(String(r.STATE ?? ""))].filter(Boolean).join(", ") || null,
       detail: "Debarred under the New Jersey Prevailing Wage Act from bidding on or working on public works contracts", amount: null, adverse: true,
+      address,
     };
-    yield { kind: "enforcement", hit, business: name, person: null };
+    yield { kind: "enforcement", hit, business: name, person: null, keys: { addresses: [address] } };
   }
 }
 
@@ -163,16 +175,24 @@ const NJ_WALL_FILE = "https://www.nj.gov/labor/ea/assets/PDFs/Wall_Dataset.xlsx"
 const NJ_WATCH_PAGE = "https://nj.gov/labor/ea/osec/wageviolationlist.shtml";
 const NJ_WATCH_FILE = "https://www.nj.gov/labor/ea/assets/PDFs/WVW-List.xlsx";
 
-/** Rows as objects keyed by the header row (header text with runs of spaces collapsed). */
-async function* xlsxRecords(url: string): AsyncIterable<Record<string, string>> {
+const records = (rows: string[][]): Record<string, string>[] => {
+  const header = (rows[0] ?? []).map((h) => h.replace(/\s+/g, " ").trim());
+  return rows.slice(1).map((row) => Object.fromEntries(header.map((h, i) => [h, (row[i] ?? "").trim()])));
+};
+
+/** Rows of each worksheet asked for, as objects keyed by its header row (header text with runs of spaces collapsed). */
+async function xlsxSheets(url: string, sheets: number[]): Promise<Record<string, string>[][]> {
   const path = await download(url);
   try {
-    const rows = await readXlsx(path);
-    const header = (rows[0] ?? []).map((h) => h.replace(/\s+/g, " ").trim());
-    for (const row of rows.slice(1)) yield Object.fromEntries(header.map((h, i) => [h, (row[i] ?? "").trim()]));
+    const out: Record<string, string>[][] = [];
+    for (const n of sheets) out.push(records(await readXlsx(path, n)));
+    return out;
   } finally {
     await fs.rm(path, { force: true });
   }
+}
+async function* xlsxRecords(url: string): AsyncIterable<Record<string, string>> {
+  yield* (await xlsxSheets(url, [1]))[0];
 }
 
 const money = (v: string | undefined) => { const n = Number(v); return v && Number.isFinite(n) ? Math.round(n * 100) / 100 : null; };
@@ -180,7 +200,14 @@ const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits
 const cityOf = (address: string | undefined) => clean(address?.split(",").slice(-2).join(",").replace(/\s+\d{5}(-\d{4})?\s*$/, ""));
 
 async function* njWallLoader(): AsyncIterable<BulkHit> {
-  for await (const r of xlsxRecords(NJ_WALL_FILE)) {
+  // Sheet 2 ("Add.Locations") lists each employer's other addresses.
+  const [main, more] = await xlsxSheets(NJ_WALL_FILE, [1, 2]);
+  const others = new Map<string, string[]>();
+  for (const r of more) {
+    const n = clean(r["Name of Employer/DBA"])?.toUpperCase(), a = clean(r["Address of Employer"]);
+    if (n && a) others.set(n, [...(others.get(n) ?? []), a]);
+  }
+  for (const r of main) {
     const name = clean(r["Name of Employer/DBA"]);
     if (!name) continue;
     if (!("Violation Type" in r)) throw new Error("The WALL file has an unexpected layout");
@@ -193,9 +220,9 @@ async function* njWallLoader(): AsyncIterable<BulkHit> {
       city: cityOf(r["Employer's Principal Address"]),
       detail: [violation ? `Unpaid final judgment or order: ${violation}` : null, clean(r["Industry Type"]), owed != null ? `${usd(owed)} owed` : null,
         clean(r.County) ? `${clean(r.County)} County` : null].filter(Boolean).join(". ") || null,
-      amount: owed, adverse: true,
+      amount: owed, adverse: true, address: clean(r["Employer's Principal Address"]),
     };
-    yield { kind: "enforcement", hit, business: name, person: null };
+    yield { kind: "enforcement", hit, business: name, person: null, keys: { addresses: [r["Employer's Principal Address"], ...(others.get(name.toUpperCase()) ?? [])] } };
   }
 }
 
@@ -212,9 +239,9 @@ async function* njWatchlistLoader(): AsyncIterable<BulkHit> {
       city: cityOf(r["Employer Address"]),
       detail: [clean(r["Nature of Claim"]), Number.isFinite(workers) && workers > 0 ? `${workers} employee(s)` : null,
         wages != null ? `wages assessed ${usd(wages)}` : null, fees != null ? `fees and penalties ${usd(fees)}` : null].filter(Boolean).join(". ") || null,
-      amount: wages, adverse: true,
+      amount: wages, adverse: true, address: clean(r["Employer Address"]),
     };
-    yield { kind: "enforcement", hit, business: name, person: null };
+    yield { kind: "enforcement", hit, business: name, person: null, keys: { addresses: [r["Employer Address"]] } };
   }
 }
 

@@ -46,13 +46,13 @@ const num = (v: unknown): number | null => { const n = Number(v); return v == nu
 const LICENSES: LicenseSource[] = [
   { state: "NY", source: "New York DOL elevator contractor licenses", ...soda(NY, "jrac-r9vc"),
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: "city", expires: "expiration_date" },
-    personField: null },
+    personField: null, address: "address", zip: "zip_code", phone: "phone" },
   { state: "NY", source: "New York DOL elevator mechanic and inspector licenses", ...soda(NY, "cxfs-ya8e"),
     fields: { businessName: null, licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: null, expires: "expiration_date" },
     personField: ["first_name", "last_name"] },
   { state: "NY", source: "New York DOL mold contractor licenses", ...soda(NY, "ikqx-ispy"),
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: "dba_name", status: "license_status", principal: null, city: "city", expires: "expiration_date" },
-    personField: null },
+    personField: null, address: ["address", "address_2"], zip: "zip_code" }, // phone is a number column here: `like` can't search it
   { state: "NY", source: "New York DOL mold individual licenses", ...soda(NY, "h6jr-vxqt"),
     fields: { businessName: null, licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: null, expires: "expiration_date" },
     personField: ["first_name", "last_name"] },
@@ -66,14 +66,19 @@ const LICENSES: LicenseSource[] = [
     fields: { businessName: null, licenseNumber: "certificate_number", licenseType: "class", specialty: null, status: "certificate_status", principal: null, city: null, expires: "expiration_date" },
     personField: ["first_name", "last_name"] },
   { state: "NY", source: "New York DOS licensed home inspectors", ...soda(NY, "r9fr-48vu"),
-    fields: { businessName: null, licenseNumber: "uid", licenseType: null, specialty: null, status: null, principal: null, city: "business_county", expires: "current_expire_date" },
-    personField: ["first_name", "middle_initial", "last_name"] },
+    // "uid" (the license number) is a number column, which the shared license-number search (upper(...) in (...))
+    // can't query: it is left out until that search casts it (::text), rather than fail every identifier search here.
+    fields: { businessName: "hi_business_name", licenseNumber: null, licenseType: null, specialty: null, status: null, principal: null, city: "business_city", expires: "current_expire_date" },
+    personField: ["first_name", "middle_initial", "last_name"], address: ["business_street", "business_apt_unit"], zip: "business_zip_code" },
   { state: "NY", source: "New York City DOB licenses (contractors and trades)", ...soda(NYC, "t8hj-ruu2"),
-    fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: "license_business_city", expires: null },
-    personField: ["first_name", "last_name"] },
+    fields: { businessName: "business_name", licenseNumber: null, licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: "license_business_city", expires: null },
+    // license_number is a number column the shared license-number search can't query (left out until it casts with
+    // ::text), and the house number is its own column, so an address search can't match it (the address is shown).
+    personField: ["first_name", "last_name"], address: ["business_house_number", "business_street_name"], zip: "business_zip_code", phone: "business_phone_number" },
   { state: "NY", source: "New York City DCWP home improvement contractor licenses", ...soda(NYC, "w7w3-xahh"),
     fields: { businessName: "business_name", licenseNumber: "license_nbr", licenseType: "business_category", specialty: "dba_trade_name", status: "license_status", principal: null, city: "address_city", expires: "lic_expir_dd" },
-    personField: null, filter: "business_category='Home Improvement Contractor'" },
+    personField: null, address: ["address_building", "address_street_name"], zip: "address_zip", phone: "contact_phone",
+    filter: "business_category='Home Improvement Contractor'" },
 ];
 
 const ENFORCEMENT: SodaEnforcement[] = [
@@ -98,6 +103,10 @@ const ENFORCEMENT: SodaEnforcement[] = [
       status: "Active (on the Department of State's active-entity list)", city: s(r.county) ? `${s(r.county)} County` : null,
       detail: [s(r.entity_type), s(r.jurisdiction) ? `jurisdiction ${s(r.jurisdiction)}` : null].filter(Boolean).join(", ") || null,
       amount: null, adverse: null,
+      // The entity's location when it filed one, else its address for service of process.
+      address: s(r.location_address_1)
+        ? [s(r.location_address_1), s(r.location_address_2), s(r.location_city), s(r.location_state), s(r.location_zip)].filter(Boolean).join(" ")
+        : [s(r.dos_process_address_1), s(r.dos_process_address_2), s(r.dos_process_city), s(r.dos_process_state), s(r.dos_process_zip)].filter(Boolean).join(" ") || null,
     }),
   },
   {
@@ -112,7 +121,7 @@ const ENFORCEMENT: SodaEnforcement[] = [
         category: "discipline", name: s(r.company), id: s(r.license_no), date, endDate: null, status: "Disciplinary action",
         city: null,
         detail: [s(r.license_type) ? `Against a ${s(r.license_type)} licensee of the company` : null, s(r.disposition), !date && y ? `year ${y}` : null].filter(Boolean).join(". ") || null,
-        amount: null, adverse: true,
+        amount: null, adverse: true, licenseNumber: s(r.license_no)?.replace(/^#/, "") ?? null,
       };
     },
   },
@@ -168,7 +177,7 @@ export function parseEdList(html: string, agency: "DOL" | "WCB"): EnforcementHit
       state: "NY", source: "New York DOL / Workers' Compensation Board public-work debarments", sourceUrl: EDLIST, category: "debarment",
       name: [name, dba].filter(Boolean).join(" / "), id: null, date: usDate(start), endDate,
       status: endDate && endDate < today ? "Debarment period over" : "Debarred from public work",
-      city: address ? address.split(", ").slice(-2).join(", ") : null,
+      city: address ? address.split(", ").slice(-2).join(", ") : null, address,
       detail: agency === "DOL"
         ? `Debarred under NYS Labor Law Article 8 or 9 (prevailing wage)${fiscal ? `; determination by ${fiscal === "DOL" ? "the NYS Department of Labor" : fiscal === "NYC" ? "the New York City Comptroller" : fiscal === "AG" ? "the NYS Attorney General" : fiscal === "DA" ? "a county District Attorney" : fiscal}` : ""}`
         : `Debarred by the Workers' Compensation Board under Workers' Compensation Law section 141-b${ag && ag !== "WCB" ? ` (agency ${ag})` : ""}`,

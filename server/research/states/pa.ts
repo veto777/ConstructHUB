@@ -99,8 +99,8 @@ async function* pittsburghLoader(): AsyncIterable<BulkHit> {
 const PA_DLI_DEBAR = "https://www.pa.gov/agencies/dli/resources/compliance-laws-and-regulations/labor-management-relations/labor-law/prevailing-wage/debarments-and-settlements";
 
 /** The debarment table: each row names firms, then "and <person>, individually" (people are dropped: companies only). */
-export function parseDliDebarments(html: string): { firms: string[]; address: string | null; date: string | null }[] {
-  const out: { firms: string[]; address: string | null; date: string | null }[] = [];
+export function parseDliDebarments(html: string): { firms: string[]; address: string | null; addresses: string[]; date: string | null }[] {
+  const out: { firms: string[]; address: string | null; addresses: string[]; date: string | null }[] = [];
   const table = Array.from(html.matchAll(/<table[\s\S]*?<\/table>/g)).map((m) => m[0]).find((t) => /DATE OF DEBARMENT/i.test(t)) ?? "";
   for (const row of Array.from(table.matchAll(/<tr>([\s\S]*?)<\/tr>/g))) {
     const cells = Array.from(row[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c) => c[1]);
@@ -110,8 +110,14 @@ export function parseDliDebarments(html: string): { firms: string[]; address: st
       .split("\n").map((l) => clean(l)).filter((l): l is string => !!l && !/^and$/i.test(l));
     const firms = lines.filter((l) => !/,?\s*individually$/i.test(l));
     if (!firms.length) continue;
-    const addr = decodeEntities(cells[1].replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")).split("\n").map((l) => clean(l)).filter(Boolean).join(", ");
-    out.push({ firms, address: addr || null, date: usDate(text(cells[2])) });
+    const addrLines = decodeEntities(cells[1].replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")).split("\n").map((l) => clean(l)).filter((l): l is string => !!l);
+    // An address is a street line followed by its "City, ST 12345" line, or both on one line.
+    const addresses: string[] = [];
+    for (const l of addrLines) {
+      if (/^\d|^P\.?\s?O\.?\s?Box/i.test(l) || !addresses.length) addresses.push(l);
+      else addresses[addresses.length - 1] += `, ${l}`;
+    }
+    out.push({ firms, address: addresses.join("; ") || null, addresses, date: usDate(text(cells[2])) });
   }
   return out;
 }
@@ -129,10 +135,11 @@ async function* dliDebarmentsLoader(): AsyncIterable<BulkHit> {
       name, id: null, date: r.date, endDate: end,
       status: end && end < new Date().toISOString().slice(0, 10) ? "Three-year debarment over" : "Debarred from public works contracts",
       city: null,
-      detail: [r.address ? `Address listed: ${r.address}` : null, "Under section 11(e) of the Prevailing Wage Act, no contract is awarded for 3 years after the date listed"].filter(Boolean).join(". "),
-      amount: null, adverse: true,
+      detail: [r.addresses[0] ? `Address listed: ${r.addresses[0]}` : null, "Under section 11(e) of the Prevailing Wage Act, no contract is awarded for 3 years after the date listed"].filter(Boolean).join(". "),
+      // The row's later addresses may be the named individuals' (homes): only the first, the firm's, is a key.
+      amount: null, adverse: true, address: r.addresses[0] ?? null,
     };
-    yield { kind: "enforcement", hit, business: r.firms.join(" "), person: null };
+    yield { kind: "enforcement", hit, business: r.firms.join(" "), person: null, keys: { addresses: r.addresses.slice(0, 1) } };
   }
 }
 
@@ -140,7 +147,7 @@ async function* dliDebarmentsLoader(): AsyncIterable<BulkHit> {
 const DGS_PAGE = "https://www.dgs.internet.state.pa.us/debarmentsearch/debarment/index";
 const DGS_LOOKUP = "https://www.dgs.internet.state.pa.us/debarmentsearch/Debarment/DebarmentLookup";
 
-type DgsRow = { DebarmentListId?: number; Type?: string; VendorName?: string; EffectiveDate?: string | null; EndDate?: string | null; City?: string | null; State?: string | null; AgencyName?: string | null; Reason?: string | null };
+type DgsRow = { DebarmentListId?: number; Type?: string; VendorName?: string; EffectiveDate?: string | null; EndDate?: string | null; AddressLine1?: string | null; AddressLine2?: string | null; City?: string | null; State?: string | null; Zip?: string | null; AgencyName?: string | null; Reason?: string | null };
 
 export function dgsHit(r: DgsRow, archived: boolean): EnforcementHit | null {
   const name = clean(r.VendorName);
@@ -153,6 +160,7 @@ export function dgsHit(r: DgsRow, archived: boolean): EnforcementHit | null {
     city: [clean(r.City), clean(r.State)].filter(Boolean).join(", ") || null,
     detail: [clean(r.AgencyName) ? `By the ${clean(r.AgencyName)}` : null, clean(r.Reason)].filter(Boolean).join(": ") || null,
     amount: null, adverse: true,
+    address: clean(r.AddressLine1) ? clean([r.AddressLine1, r.AddressLine2, r.City, r.State, r.Zip].map((v) => clean(v ?? null)).filter(Boolean).join(" ")) : null,
   };
 }
 
