@@ -505,6 +505,12 @@ export async function registerRoutes(
   registerMediaInboxRoutes(app, getDevUser);
   const { startMediaInboxWorker } = await import("./media-inbox/worker");
   startMediaInboxWorker();
+  // Press Releases (owner, 2026-10-15): packages, the AI writer, submissions to the wire from pressrelease@ and the
+  // daily read of its answers (server/press). Its routes and checkout fulfilment are wired in server/stripe.ts.
+  const { ensurePressSchema } = await import("./press/schema");
+  await ensurePressSchema(pool);
+  const { startPressWorker } = await import("./press/worker");
+  startPressWorker();
   // SEO toolset (server/seo): rank tracker, keyword research, backlinks,
   // competitor gap on DataForSEO pay-as-you-go, capped by SEO_MONTHLY_BUDGET_USD.
   // Guarded (server/seo/boot.ts): the schema step runs zero DDL when its stored hash matches, with lock and

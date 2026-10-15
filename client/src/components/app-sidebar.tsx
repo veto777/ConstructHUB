@@ -9,7 +9,7 @@ import { Ticket, Gift,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
   KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Code2, Bug, Link2, PlayCircle, PenLine,
-  ListChecks, ClipboardCheck, Handshake
+  ListChecks, ClipboardCheck, Handshake, Newspaper
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import { lockedLanding, toolAccess, type ToolAccessContext } from "@/lib/tool-access";
@@ -279,6 +279,8 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "VPN Shield", url: "/vpn-shield", icon: ShieldOff, logo: vpnBlockerLogo, badge: "new" },
   ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, landingUrl: "/features/competitors" }] : []),
   { title: "Compliance Dept", url: "/compliance", icon: ClipboardCheck, badge: "new" },
+  // The Press Wire (owner, 2026-10-15): packages of press releases, written by the AI and sent to the wire.
+  { title: "Press Releases", url: "/press-releases", icon: Newspaper, badge: "hot" },
   { title: "Master Class", url: "/master-class", icon: GraduationCap, logo: masterclassLogo, landingUrl: "/features/master-class" },
 ];
 
@@ -712,6 +714,17 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
                     <Link href="/admin/partnerships" data-testid="link-nav-admin-partnerships" className="flex items-center gap-2 w-full">
                       <Handshake className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                       <span>Partnerships</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* The Press Wire desk: releases on their way to the wire, the pressrelease@ mailbox, setup state. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/press"}>
+                    <Link href="/admin/press" data-testid="link-nav-admin-press" className="flex items-center gap-2 w-full">
+                      <Newspaper className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                      <span>Press Wire</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
