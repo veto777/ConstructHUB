@@ -20,7 +20,10 @@
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit } from "@shared/research-reports";
-import { USER_AGENT, politeFetch, rateLimitHost } from "../http";
+import { fetchWithDeadline, politeFetch, rateLimitHost } from "../http";
+import { hasEnded } from "../adverse";
+import { capNote, withNote } from "../notes";
+import { looksLikeBusiness } from "./lib/business-name";
 import { clean, csvRecords, download, usDate, type BulkHit } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
 import type { SodaEnforcement } from "../state-records";
@@ -108,7 +111,8 @@ export function parseDliDebarments(html: string): { firms: string[]; address: st
     // Keep the line breaks: each <br> line is a firm, "and", or a person.
     const lines = decodeEntities(cells[0].replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/[\u200b\u200c\u200d\ufeff]/g, ""))
       .split("\n").map((l) => clean(l)).filter((l): l is string => !!l && !/^and$/i.test(l));
-    const firms = lines.filter((l) => !/,?\s*individually$/i.test(l));
+    // "<person>, individually" lines are people; so is any other line that doesn't read as a business (FCRA).
+    const firms = lines.filter((l) => !/,?\s*individually$/i.test(l) && looksLikeBusiness(l));
     if (!firms.length) continue;
     const addrLines = decodeEntities(cells[1].replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")).split("\n").map((l) => clean(l)).filter((l): l is string => !!l);
     // An address is a street line followed by its "City, ST 12345" line, or both on one line.
@@ -124,20 +128,22 @@ export function parseDliDebarments(html: string): { firms: string[]; address: st
 
 async function* dliDebarmentsLoader(): AsyncIterable<BulkHit> {
   await rateLimitHost(PA_DLI_DEBAR, 1500);
-  const res = await fetch(PA_DLI_DEBAR, { headers: { "user-agent": USER_AGENT } });
+  const res = await fetchWithDeadline(PA_DLI_DEBAR, {}, 120_000);
   if (!res.ok) throw new Error(`PA L&I debarment page returned HTTP ${res.status}`);
   const rows = parseDliDebarments(await res.text());
   for (const r of rows) {
     const name = r.firms.join(" / ");
     const end = r.date ? `${Number(r.date.slice(0, 4)) + 3}${r.date.slice(4)}` : null;
+    const over = hasEnded(end);
     const hit: EnforcementHit = {
       state: "PA", source: "Pennsylvania L&I Prevailing Wage Act debarments", sourceUrl: PA_DLI_DEBAR, category: "debarment",
       name, id: null, date: r.date, endDate: end,
-      status: end && end < new Date().toISOString().slice(0, 10) ? "Three-year debarment over" : "Debarred from public works contracts",
+      status: over ? "Three-year debarment over" : "Debarred from public works contracts",
       city: null,
       detail: [r.addresses[0] ? `Address listed: ${r.addresses[0]}` : null, "Under section 11(e) of the Prevailing Wage Act, no contract is awarded for 3 years after the date listed"].filter(Boolean).join(". "),
       // The row's later addresses may be the named individuals' (homes): only the first, the firm's, is a key.
-      amount: null, adverse: true, address: r.addresses[0] ?? null,
+      // On the list is the department's finding; once the 3 years are over the debarment no longer applies.
+      amount: null, adverse: !over, address: r.addresses[0] ?? null,
     };
     yield { kind: "enforcement", hit, business: r.firms.join(" "), person: null, keys: { addresses: r.addresses.slice(0, 1) } };
   }
@@ -159,7 +165,8 @@ export function dgsHit(r: DgsRow, archived: boolean): EnforcementHit | null {
     endDate: end, status: [clean(r.Type), end ? `until ${end}` : r.EndDate?.startsWith("2099") ? "with no end date" : null, archived ? "(archived)" : null].filter(Boolean).join(" ") || null,
     city: [clean(r.City), clean(r.State)].filter(Boolean).join(", ") || null,
     detail: [clean(r.AgencyName) ? `By the ${clean(r.AgencyName)}` : null, clean(r.Reason)].filter(Boolean).join(": ") || null,
-    amount: null, adverse: true,
+    // Debarred or suspended is the agency's own action; an archived entry or one past its end date has ended.
+    amount: null, adverse: !(archived || hasEnded(end)),
     address: clean(r.AddressLine1) ? clean([r.AddressLine1, r.AddressLine2, r.City, r.State, r.Zip].map((v) => clean(v ?? null)).filter(Boolean).join(" ")) : null,
   };
 }
@@ -175,18 +182,21 @@ async function searchDgs(name: string): Promise<EnforcementHit[]> {
   if (!token) throw new Error("PA DGS debarment search page changed (no form token)");
   const cookie = (page.headers.getSetCookie?.() ?? []).map((c) => c.split(";")[0]).join("; ");
   const hits: EnforcementHit[] = [];
+  const notes: string[] = [];
   for (const archived of [false, true]) {
     const body = new URLSearchParams({ draw: "1", start: "0", length: "500", VendorName: word, SAPNumber: "", VendorUniqueId: "", ddlAgencyCode: "", Archived: String(archived) });
     const res = await politeFetch(DGS_LOOKUP, { method: "POST", body: body.toString(), headers: { "content-type": "application/x-www-form-urlencoded", RequestVerificationToken: token, referer: DGS_PAGE, ...(cookie ? { cookie } : {}) } }, { minDelayMs: 1500 });
     if (!res.ok) throw new Error(`PA DGS debarment search returned HTTP ${res.status}`);
-    const json = await res.json() as { data?: DgsRow[] };
+    const json = await res.json() as { data?: DgsRow[]; recordsFiltered?: number; recordsTotal?: number };
     if (!Array.isArray(json.data)) throw new Error("PA DGS debarment search returned an unexpected payload");
+    const total = Number(json.recordsFiltered ?? json.recordsTotal);
+    if (Number.isFinite(total) && total > json.data.length) notes.push(`${archived ? "archived list: " : ""}${capNote(json.data.length, total, `entries containing "${word}"`)}`);
     for (const r of json.data) {
       const h = dgsHit(r, archived);
       if (h && !hits.some((x) => x.id === h.id)) hits.push(h);
     }
   }
-  return hits;
+  return withNote(hits, notes.join("; ") || null);
 }
 
 // ── PA UJS web portal court cases (live) ────────────────────────────────────────────────────────────────────────
@@ -197,6 +207,8 @@ export function parseUjsCases(html: string): EnforcementHit[] {
   if (!table) throw new Error("PA UJS portal returned an unexpected page");
   const heads = Array.from(table.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)).map((h) => text(h[1]) ?? "");
   const col = (label: string) => heads.indexOf(label, 1);
+  // A renamed column would otherwise read as "no cases": the grid must still carry the columns the rows are read by.
+  for (const need of ["Docket Number", "Case Caption", "Filing Date"]) if (col(need) < 0) throw new Error(`PA UJS portal results changed (no "${need}" column)`);
   const out: EnforcementHit[] = [];
   for (const row of Array.from(table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)).slice(1)) {
     const raw = Array.from(row[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c) => c[1]);

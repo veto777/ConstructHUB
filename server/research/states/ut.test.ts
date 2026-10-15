@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCbrDetails, parseCbrRows, parseDoplEntity, parseDoplList } from "./ut";
+import { caseAdverse, citationAdverse, parseCbrDetails, parseCbrRows, parseDoplEntity, parseDoplList } from "./ut";
 
 // Snippets trimmed from live DOPL pages, 2026-10-15.
 const CBR_ROWS = `<table id="tblEntities"><tbody><tr><td class="text-left">Dennis Sheridan Johnson<td class="text-left d-none d-sm-table-cell"></td><td class="text-left d-none d-sm-table-cell"><a href="mailto:"></a></td><td class="text-left d-none d-sm-table-cell"><td><button type="button" class="button" data-eid="29700" data-pid="4001" data-bs-toggle="modal">Details</button></td></td></tr><tr><td class="text-left">AMCO American Roofing Co.<br>DBA:  &nbsp;WESLEY GREEN ROOFING AMCO ET AL &nbsp;| &nbsp;AMERICAN RAIN GUTTERS<td class="text-left d-none d-sm-table-cell"><a href="tel:8012691276">(801) 269-1276</a></td><td class="text-left d-none d-sm-table-cell"><a href="mailto:x@example.com">x@example.com</a></td><td class="text-left d-none d-sm-table-cell">Salt Lake City UT<td><button data-eid="5000" data-pid="4000">Details</button></td></td></tr></tbody></table>`;
@@ -33,5 +33,13 @@ describe("Utah DOPL", () => {
   });
   it("reads the entity list", () => {
     expect(parseDoplList(LIST)).toEqual([{ id: "11707096", name: "Rudy's Construction LLC" }]);
+  });
+  it("takes adverse from DOPL's own document titles and citation statuses (decision 2)", () => {
+    // Titles and statuses seen on DOPL entity pages on 2026-10-15.
+    expect(caseAdverse(["Stipulation and Order"])).toBe(true);
+    expect(caseAdverse(["Agency Action"])).toBeNull(); // says neither way: unknown, not adverse
+    expect(caseAdverse([])).toBeNull();
+    expect(citationAdverse("Fine Assessed - Paid")).toBe(true);
+    expect(citationAdverse("Collections")).toBe(true);
   });
 });

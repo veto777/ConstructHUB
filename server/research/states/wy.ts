@@ -15,6 +15,7 @@ import { clean } from "../bulk";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { normLicense, type IdQuery } from "../identifiers";
 import { anyDay, fetchJson, nameMatches, postJson } from "./lib/g8-common";
+import { capNote, withNote } from "../notes";
 
 const PORTAL = "https://wyelectrician.imagetrendlicense.com/lms/public/portal#/lookup";
 const API = "https://wyelectrician.imagetrendlicense.com/lms/admin/api/api";
@@ -31,15 +32,34 @@ async function certs(kind: "users" | "services", id: string): Promise<Cert[]> {
   return Array.isArray(rows) ? rows : [];
 }
 
-async function lookupServices(body: Record<string, unknown>): Promise<any[]> {
-  const rows = await postJson<any[]>(`${API}/services/PublicLookupService`, { enterprise_id: ENTERPRISE, records_offset: 0, records_total: 50, ...body }, "Wyoming licensing portal");
-  if (!Array.isArray(rows)) throw new Error("Wyoming licensing portal returned an unexpected payload");
-  return rows;
+const PAGE = 50;
+const MAX_PAGES = 6;
+
+/**
+ * Every row of one lookup, a page of 50 at a time (records_offset) until a short page. Past MAX_PAGES pages the rest
+ * is not read and `more` says so (the portal gives no total).
+ */
+export async function lookupAll(post: (offset: number) => Promise<unknown>): Promise<{ rows: any[]; more: boolean }> {
+  const rows: any[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const got = await post(page * PAGE);
+    if (!Array.isArray(got)) throw new Error("Wyoming licensing portal returned an unexpected payload");
+    rows.push(...got);
+    if (got.length < PAGE) return { rows, more: false };
+  }
+  return { rows, more: true };
 }
-async function lookupUsers(body: Record<string, unknown>): Promise<any[]> {
-  const rows = await postJson<any[]>(`${API}/users/PublicLookupUser`, { enterprise_id: ENTERPRISE, records_offset: 0, records_total: 50, from_search: true, ...body }, "Wyoming licensing portal");
-  if (!Array.isArray(rows)) throw new Error("Wyoming licensing portal returned an unexpected payload");
-  return rows;
+const lookupServices = (body: Record<string, unknown>) =>
+  lookupAll((offset) => postJson<any[]>(`${API}/services/PublicLookupService`, { enterprise_id: ENTERPRISE, records_offset: offset, records_total: PAGE, ...body }, "Wyoming licensing portal"));
+const lookupUsers = (body: Record<string, unknown>) =>
+  lookupAll((offset) => postJson<any[]>(`${API}/users/PublicLookupUser`, { enterprise_id: ENTERPRISE, records_offset: offset, records_total: PAGE, from_search: true, ...body }, "Wyoming licensing portal"));
+
+/** What a capped search left out, for the report. */
+function capped(found: number, more: boolean): string | null {
+  const notes: string[] = [];
+  if (found > MAX) notes.push(capNote(MAX, found, "matching licenses (details read for these)"));
+  if (more) notes.push(`the portal had more than ${MAX_PAGES * PAGE} name matches; the rest were not read`);
+  return notes.join("; ") || null;
 }
 
 /** A licensed business (electrical contractor): the portal gives its address, phone and primary contact. */
@@ -47,7 +67,9 @@ async function serviceHit(r: any, matchedOn: LicenseHit["matchedOn"]): Promise<L
   const own = (await certs("services", r.id)).find((c) => c.number === r.primary_license_number);
   const contact = clean(r.primary_contact_full_name) ?? clean(`${r.primary_contact_first_name ?? ""} ${r.primary_contact_last_name ?? ""}`);
   return {
-    state: "WY", source: SOURCE, sourceUrl: PORTAL, businessName: clean(String(r.service_name ?? "").replace(/^\*/, "")),
+        // A few names start with "*" (e.g. "*Intermountain Electric Service Inc", license C-29, expired 2023). The portal
+    // doesn't say what it means, so the name is shown as published rather than with the mark silently dropped.
+    state: "WY", source: SOURCE, sourceUrl: PORTAL, businessName: clean(String(r.service_name ?? "")),
     licenseNumber: clean(r.primary_license_number), licenseType: clean(r.primary_license_level) ?? clean(own?.license_category_name), specialty: null,
     status: clean(own?.status), principal: contact, city: clean(r.city), expires: anyDay(r.primary_license_expiration_date), matchedOn,
     address: [clean(r.address_line_1), clean(r.city)].filter(Boolean).join(" ") || null, phone: clean(r.phone),
@@ -69,26 +91,28 @@ async function search(name: string, kind: "person" | "company"): Promise<License
   if (words.length < 2) return [];
   const hits: LicenseHit[] = [];
   if (kind === "company") {
-    for (const r of (await lookupServices({ serviceName: words })).filter((x) => nameMatches(name, String(x.service_name ?? "").replace(/^\*/, ""))).slice(0, MAX)) hits.push(await serviceHit(r, "business"));
-    return hits;
+    const { rows, more } = await lookupServices({ serviceName: words });
+    const found = rows.filter((x) => nameMatches(name, String(x.service_name ?? "")));
+    for (const r of found.slice(0, MAX)) hits.push(await serviceHit(r, "business"));
+    return withNote(hits, capped(found.length, more));
   }
   // People: the portal searches first and last name fields; the last word is the surname.
   const parts = words.split(" ");
   const last = parts[parts.length - 1], first = parts.length > 1 ? parts[0] : undefined;
-  for (const r of (await lookupUsers({ last_name: last, ...(first ? { first_name: first } : {}) })).filter((x) => x.primary_license_number && nameMatches(name, `${x.first_name ?? ""} ${x.last_name ?? ""}`)).slice(0, MAX)) {
-    hits.push(await userHit(r, "principal"));
-  }
-  return hits;
+  const { rows, more } = await lookupUsers({ last_name: last, ...(first ? { first_name: first } : {}) });
+  const found = rows.filter((x) => x.primary_license_number && nameMatches(name, `${x.first_name ?? ""} ${x.last_name ?? ""}`));
+  for (const r of found.slice(0, MAX)) hits.push(await userHit(r, "principal"));
+  return withNote(hits, capped(found.length, more));
 }
 
 /** The portal searches license numbers (businesses and people); phone and address are not searchable there. */
-async function searchBy(q: IdQuery): Promise<LicenseHit[]> {
+async function searchBy(q: IdQuery): Promise<LicenseHit[] | null> {
   const want = q.type === "license" ? normLicense(q.value) : null;
-  if (!want) return [];
+  if (!want) return null;
   const v = q.value.trim().toUpperCase();
   const hits: LicenseHit[] = [];
-  for (const r of (await lookupServices({ primaryCertificationNumber: v })).filter((x) => normLicense(x.primary_license_number) === want).slice(0, 5)) hits.push(await serviceHit(r, "license"));
-  for (const r of (await lookupUsers({ primaryCertification: v })).filter((x) => normLicense(x.primary_license_number) === want).slice(0, 5)) hits.push(await userHit(r, "license"));
+  for (const r of (await lookupServices({ primaryCertificationNumber: v })).rows.filter((x) => normLicense(x.primary_license_number) === want).slice(0, 5)) hits.push(await serviceHit(r, "license"));
+  for (const r of (await lookupUsers({ primaryCertification: v })).rows.filter((x) => normLicense(x.primary_license_number) === want).slice(0, 5)) hits.push(await userHit(r, "license"));
   return hits;
 }
 

@@ -15,7 +15,9 @@
  * None of these publish a street address or phone; electricians and plumbers/HVAC give city and state only.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch, sleep } from "../http";
+import { PortalBlockedError, politeFetch, sleep } from "../http";
+import { withNote } from "../notes";
+import { looksLikeBusiness } from "./lib/business-name";
 import { clean, type BulkHit, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
 import { normLicense } from "../identifiers";
@@ -48,9 +50,11 @@ export function sfmHits(rows: SfmRow[], matchedOn: LicenseHit["matchedOn"]): Lic
   return Array.from(best.values());
 }
 
+// Only the honest UA, the form's content type and Accept are sent: no X-Requested-With or Referer posing as the site's
+// own page (audit 2026-10-15, decision 12; the endpoint answered the same without them on 2026-10-15).
 async function sfmRead(fields: { FirstName?: string; LastName?: string; LicenseNumber?: string }): Promise<SfmRow[]> {
   const body = new URLSearchParams({ sort: "", group: "", filter: "", FirstName: fields.FirstName ?? "", LastName: fields.LastName ?? "", City: "", LicenseNumber: fields.LicenseNumber ?? "" });
-  const res = await politeFetch(SFM_READ, { method: "POST", body: body.toString(), headers: { "content-type": "application/x-www-form-urlencoded; charset=UTF-8", "x-requested-with": "XMLHttpRequest", accept: "application/json", referer: SFM_PAGE } }, { minDelayMs: 2000 });
+  const res = await politeFetch(SFM_READ, { method: "POST", body: body.toString(), headers: { "content-type": "application/x-www-form-urlencoded; charset=UTF-8", accept: "application/json" } }, { minDelayMs: 2000 });
   if (!res.ok) throw new Error(`WV Fire Marshal search returned HTTP ${res.status}`);
   const j = await res.json() as { Data?: SfmRow[]; Errors?: unknown };
   if (!Array.isArray(j.Data)) throw new Error("WV Fire Marshal search returned an unexpected payload");
@@ -65,7 +69,7 @@ const SFM: LiveLicenseSearch = {
     return sfmHits(await sfmRead({ FirstName: w[0], LastName: w[w.length - 1] }), "principal").filter((h) => hasAllWords(name, h.principal));
   },
   searchBy: async (q: IdQuery) => {
-    if (q.type !== "license" || !normLicense(q.value)) return [];
+    if (q.type !== "license" || !normLicense(q.value)) return null; // only license numbers are searchable
     return sfmHits(await sfmRead({ LicenseNumber: q.value.trim() }), "license").filter((h) => normLicense(h.licenseNumber) === normLicense(q.value));
   },
 };
@@ -119,16 +123,19 @@ async function searchDol(list: DolList, name: string): Promise<LicenseHit[]> {
     if (best.first.total <= PER_PAGE * MAX_PAGES) break;
   }
   const hits = [...best!.first.hits];
-  const pages = Math.min(MAX_PAGES, Math.ceil(best!.first.total / PER_PAGE));
+  const all = Math.ceil(best!.first.total / PER_PAGE);
+  const pages = Math.min(MAX_PAGES, all);
   for (let p = 2; p <= pages; p++) hits.push(...parseWvDol(await dolPage(list, { contractor_name: best!.word }, p), list, "principal").hits);
-  return hits.filter((h) => hasAllWords(name, h.principal));
+  const found = hits.filter((h) => hasAllWords(name, h.principal));
+  // The list matches part of a name; past MAX_PAGES pages of the rarer word the rest is not read, and the report says so.
+  return all > pages ? withNote(found, `read the first ${pages * PER_PAGE} of ${best!.first.total} certificates containing "${best!.word}"; the rest were not checked`) : found;
 }
 
 const dolSearch = (list: DolList): LiveLicenseSearch => ({
   source: list.label, sourceUrl: WVDOL_PAGE,
   search: async (name, kind) => (kind === "person" ? searchDol(list, name) : []), // certificates are held by people
   searchBy: async (q) => {
-    if (q.type !== "license" || !normLicense(q.value)) return [];
+    if (q.type !== "license" || !normLicense(q.value)) return null; // only certificate numbers are searchable
     return parseWvDol(await dolPage(list, { wvnumber: q.value.trim().toUpperCase() }, 1), list, "license").hits.filter((h) => normLicense(h.licenseNumber) === normLicense(q.value));
   },
 });
@@ -150,6 +157,12 @@ export function parseEvs(html: string): { name: string; city: string | null; sta
   return Array.from(out.values());
 }
 
+/**
+ * The rows that name a business. A sole proprietor's "Business Name" is often the owner's own ("MACKEY VANESSA J"):
+ * such a row is a person and is left out (companies only, FCRA; audit 2026-10-15, decision 5).
+ */
+export const evsBusinesses = (html: string) => parseEvs(html).filter((r) => looksLikeBusiness(r.name));
+
 async function* evsLoader(): AsyncIterable<BulkHit> {
   for (const letter of EVS_LETTERS) {
     let html = "";
@@ -160,12 +173,13 @@ async function* evsLoader(): AsyncIterable<BulkHit> {
         html = await res.text();
         break;
       } catch (err) {
-        if (attempt >= 2) throw new Error(`EVS letter ${letter}: ${String((err as Error)?.message ?? err)}`);
+        // An access denial (401/403, robots.txt, a long Retry-After) is final: never retried around.
+        if (err instanceof PortalBlockedError || attempt >= 2) throw new Error(`EVS letter ${letter}: ${String((err as Error)?.message ?? err)}`);
         await sleep(30_000);
       }
     }
     if (!/Showing results for: Business\/DBA Name starts with/.test(html)) throw new Error(`EVS letter ${letter}: unexpected page`);
-    for (const r of parseEvs(html)) {
+    for (const r of evsBusinesses(html)) {
       const hit: EnforcementHit = {
         state: "WV", source: "WV Insurance Commissioner Employer Violator System (workers' comp default)", sourceUrl: EVS, category: "debarment",
         name: r.name, id: null, date: null, endDate: null,

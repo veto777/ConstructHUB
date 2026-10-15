@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { csvRecords } from "../bulk";
-import { sccHit, vaRegulantHit, vaSpecialties } from "./va";
+import { checkDporColumns, sccHit, vaRegulantHit, vaSpecialties } from "./va";
 
 // Rows as published in DPOR's regulant lists on 2026-10-15 (2701__crnt.txt, 2710__crnt.txt), e-mail column blanked.
 const HEADER = "BOARD\tOCCUPATION\tCERTIFICATE #\tINDIVIDUAL NAME\tBUSINESS NAME\tFIRST LINE ADDRESS\tSECOND LINE ADDRESS\tP O BOX #\tCITY\tSTATE\tFIVE DIGIT ZIP CODE\tZIP CODE EXTENSION\tPROVINCE\tCOUNTRY\tPOSTAL CODE\tEXPIRATION DATE\tCERTIFICATION DATE\tLICENSE RANK\tLICENSE SPECIALTY\tEMAILADDRESS";
@@ -20,6 +20,13 @@ async function records(text: string): Promise<Record<string, string>[]> {
 }
 
 describe("Virginia DPOR regulant lists", () => {
+  it("accepts the regulant-list layout and rejects an error page served in its place", async () => {
+    const [firm] = await records(`${HEADER}\n${FIRM}\n`);
+    expect(() => checkDporColumns(firm, "2701")).not.toThrow();
+    const [page] = await records("<!DOCTYPE html>\n<html><head><title>Page not found | DPOR</title></head></html>\n");
+    expect(() => checkDporColumns(page, "2705b")).toThrow(/not the regulant-list layout/);
+  });
+
   it("reads a contractor firm and a tradesman", async () => {
     const [firm, trad] = await records(`${HEADER}\n${FIRM}\n${TRADESMAN}\n`);
     const a = vaRegulantHit(firm, { file: "2701", type: "Class A Contractor" }, "src")!;

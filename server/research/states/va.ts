@@ -23,6 +23,7 @@ import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { politeFetch } from "../http";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { LiveEnforcementSearch, StatePack } from "./types";
+import { capNote, withNote } from "../notes";
 import { fromFile, hasAllWords } from "./lib/g3-common";
 
 // ── DPOR regulant lists ──────────────────────────────────────────────────────────────────────────────────────
@@ -116,15 +117,30 @@ export function vaRegulantHit(r: Record<string, string>, list: DporList, source:
   return { kind: "license", hit, business, person: who, keys: { licenses: [licenseNumber], addresses: [address] } };
 }
 
+/** The columns every regulant list has (DPOR's layout); a file without them is an error page or a new layout. */
+const DPOR_COLUMNS = ["BOARD", "OCCUPATION", "CERTIFICATE #", "INDIVIDUAL NAME", "BUSINESS NAME", "EXPIRATION DATE"];
+export function checkDporColumns(r: Record<string, string>, file: string): void {
+  const missing = DPOR_COLUMNS.filter((c) => !(c in r));
+  if (missing.length) throw new Error(`DPOR list ${file}: not the regulant-list layout (no ${missing.join(", ")} column); kept the previous load`);
+}
+
+/**
+ * Every list of one board. Each component file is checked on its own (its columns, and at least one row), so one
+ * file that comes back as an HTML error page fails the whole load instead of vanishing inside the board's total.
+ */
 function dporLoader(lists: DporList[], source: string): () => AsyncIterable<BulkHit> {
   return async function* () {
     for (const list of lists) {
       const url = `${DPOR_FILES}/${list.file}__crnt.txt`;
+      let rows = 0;
       for await (const r of fromFile(await download(url), (p) => csvRecords(p, "\t"))) {
+        if (!rows) checkDporColumns(r, list.file);
+        rows++;
         if ((r.BOARD ?? "") === "BOARD") continue; // a repeated header row
         const h = vaRegulantHit(r, list, source);
         if (h) yield h;
       }
+      if (!rows) throw new Error(`DPOR list ${list.file} (${list.type}) had no rows; kept the previous load`);
     }
   };
 }
@@ -173,6 +189,7 @@ const anySccDate = (v: unknown): string | null => {
 
 async function searchScc(name: string): Promise<EnforcementHit[]> {
   const out: EnforcementHit[] = [];
+  const notes: string[] = [];
   for (const ds of SCC_DATASETS) {
     const q = new URL(CKAN);
     q.searchParams.set("resource_id", ds.resource);
@@ -180,11 +197,13 @@ async function searchScc(name: string): Promise<EnforcementHit[]> {
     q.searchParams.set("limit", "100");
     const res = await politeFetch(q.toString(), { headers: { accept: "application/json" } }, { minDelayMs: 1500 });
     if (!res.ok) throw new Error(`data.virginia.gov returned HTTP ${res.status}`);
-    const body = await res.json() as { success?: boolean; result?: { records?: Record<string, unknown>[] } };
+    const body = await res.json() as { success?: boolean; result?: { records?: Record<string, unknown>[]; total?: number } };
     if (!body.success || !Array.isArray(body.result?.records)) throw new Error("data.virginia.gov returned an unexpected payload");
     for (const r of body.result!.records!) if (hasAllWords(name, String(r.Name ?? ""))) out.push(sccHit(r, ds));
+    const total = Number(body.result!.total);
+    if (Number.isFinite(total) && total > body.result!.records!.length) notes.push(`${ds.kind} file: ${capNote(body.result!.records!.length, total, "entities matching the words")}`);
   }
-  return out;
+  return withNote(out, notes.join("; ") || null);
 }
 
 const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [

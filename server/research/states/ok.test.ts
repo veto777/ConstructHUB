@@ -80,3 +80,15 @@ describe("ODOL alarm, locksmith and fire sprinkler lists", () => {
     expect(out).toContain(z.toString("latin1"));
   });
 });
+
+describe("OK CIB roofing count", () => {
+  it("reads the /count answer as a whole number (the live answer on 2026-10-15)", async () => {
+    const { roofingTotal } = await import("./ok");
+    expect(roofingTotal("6069")).toBe(6069);
+  });
+  it("throws on a count that isn't a number, so the paging guard can't pass with nothing read", async () => {
+    const { roofingTotal } = await import("./ok");
+    expect(() => roofingTotal('{"error":"Internal Server Error"}')).toThrow(/unexpected answer/);
+    expect(() => roofingTotal("")).toThrow(/unexpected answer/);
+  });
+});

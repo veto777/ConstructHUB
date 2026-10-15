@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { parseEvs, parseWvDol, sfmHits } from "./wv";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { evsBusinesses, pack, parseEvs, parseWvDol, sfmHits } from "./wv";
 
 // Saved from the live sources on 2026-10-15.
 const HVAC_PAGE = `<p>Records 1 to 24 of 6112 Records<br /><table><tr>
@@ -51,6 +51,31 @@ describe("West Virginia sources", () => {
   });
 
   it("reads Employer Violator System rows without the owner", () => {
-    expect(parseEvs(EVS_PAGE)).toEqual([{ name: "A & A SANDS CONSTRUCTION INC", city: "WILLIAMSTOWN", state: "WV", fein: "*****4532" }]);
+    expect(parseEvs(EVS_PAGE)[0]).toEqual({ name: "A & A SANDS CONSTRUCTION INC", city: "WILLIAMSTOWN", state: "WV", fein: "*****4532" });
+  });
+
+  it("leaves out an EVS row whose business name is a person's own (FCRA)", () => {
+    expect(evsBusinesses(EVS_PAGE).map((r) => r.name)).toEqual(["A & A SANDS CONSTRUCTION INC"]);
+  });
+
+  describe("the Fire Marshal search", () => {
+    afterEach(() => vi.unstubAllGlobals());
+    it("sends no header posing as the site's own page, and says when it can't search an identifier", async () => {
+      const calls: { url: string; headers: Headers }[] = [];
+      vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit = {}) => {
+        calls.push({ url: String(url), headers: new Headers(init.headers) });
+        if (String(url).endsWith("/robots.txt")) return new Response("", { status: 404 });
+        return new Response(JSON.stringify({ Data: SFM_ROWS }), { status: 200, headers: { "content-type": "application/json" } });
+      }));
+      const sfm = pack.liveLicenses!.find((s) => /Fire Marshal/.test(s.source))!;
+      expect(await sfm.searchBy!({ type: "phone", value: "304 555 0100" })).toBeNull();
+      const hits = await sfm.searchBy!({ type: "license", value: "J92921915580211" });
+      expect(hits).toHaveLength(1);
+      const post = calls.find((c) => /LicenseeSearch_Read/.test(c.url))!;
+      expect(post.headers.has("x-requested-with")).toBe(false);
+      expect(post.headers.has("referer")).toBe(false);
+      expect(post.headers.has("origin")).toBe(false);
+      expect(post.headers.get("user-agent")).toMatch(/ConstructHUB-PermitBot/);
+    });
   });
 });

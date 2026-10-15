@@ -30,6 +30,8 @@ import type { LicenseSource } from "../licenses";
 import type { SodaEnforcement } from "../state-records";
 import type { ComplaintSource } from "../records";
 import { politeFetch } from "../http";
+import { adverseFrom, hasEnded } from "../adverse";
+import { withNote } from "../notes";
 import { decodeEntities } from "../bulk-sources";
 import { clean, usDate } from "../bulk";
 import type { LiveEnforcementSearch, StatePack } from "./types";
@@ -117,7 +119,9 @@ const ENFORCEMENT: SodaEnforcement[] = [
         category: "discipline", name: s(r.company), id: s(r.license_no), date, endDate: null, status: "Disciplinary action",
         city: null,
         detail: [s(r.license_type) ? `Against a ${s(r.license_type)} licensee of the company` : null, s(r.disposition), !date && y ? `year ${y}` : null].filter(Boolean).join(". ") || null,
-        amount: null, adverse: true, licenseNumber: s(r.license_no)?.replace(/^#/, "") ?? null,
+        // From DOB's own disposition ("Fine.", "Revoked.", "Voluntary surrender."; "Warning Letter." or "ACD." say
+        // neither way): unknown is null, never assumed adverse (decision 2).
+        amount: null, adverse: adverseFrom(s(r.disposition)), licenseNumber: s(r.license_no)?.replace(/^#/, "") ?? null,
       };
     },
   },
@@ -162,26 +166,33 @@ export function parseEdList(html: string, agency: "DOL" | "WCB"): EnforcementHit
   const table = html.match(/<table id="ResultsTable"[\s\S]*?<\/table>/)?.[0] ?? "";
   const out: EnforcementHit[] = [];
   for (const m of Array.from(table.matchAll(/<tr class="(?:odd|even)">([\s\S]*?)<\/tr>/g))) {
-    const cells = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c) => text(c[1]));
+    const raw = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c) => c[1]);
+    const cells = raw.map(text);
     const c = agency === "DOL" ? cells : [cells[0], null, ...cells.slice(1)];
     if (c.length < 8) continue;
     const [ag, fiscal, , name, dba, address, start, end] = c;
     if (!name) continue;
     const endDate = usDate(end);
-    const today = new Date().toISOString().slice(0, 10);
+    const ended = hasEnded(endDate);
+    // The address cell's last line is "CITY, ST ZIP": the city is that line without the ZIP (never "NY, 12203").
+    const lastLine = text((raw[agency === "DOL" ? 5 : 4] ?? "").split(/<br\s*\/?>/i).pop() ?? "");
+    const city = lastLine ? clean(lastLine.replace(/[,\s]*\d{5}(?:-\d{4})?\s*$/, "").replace(/,\s*$/, "")) : null;
     out.push({
       state: "NY", source: "New York DOL / Workers' Compensation Board public-work debarments", sourceUrl: EDLIST, category: "debarment",
       name: [name, dba].filter(Boolean).join(" / "), id: null, date: usDate(start), endDate,
-      status: endDate && endDate < today ? "Debarment period over" : "Debarred from public work",
-      city: address ? address.split(", ").slice(-2).join(", ") : null, address,
+      status: ended ? "Debarment period over" : "Debarred from public work",
+      city: city && /[A-Za-z]/.test(city) ? city : null, address,
       detail: agency === "DOL"
         ? `Debarred under NYS Labor Law Article 8 or 9 (prevailing wage)${fiscal ? `; determination by ${fiscal === "DOL" ? "the NYS Department of Labor" : fiscal === "NYC" ? "the New York City Comptroller" : fiscal === "AG" ? "the NYS Attorney General" : fiscal === "DA" ? "a county District Attorney" : fiscal}` : ""}`
         : `Debarred by the Workers' Compensation Board under Workers' Compensation Law section 141-b${ag && ag !== "WCB" ? ` (agency ${ag})` : ""}`,
-      amount: null, adverse: true,
+      // On the list is the agency's finding; once the debarment period is over it no longer applies (decision 2).
+      amount: null, adverse: !ended,
     });
   }
   return out;
 }
+
+const EDLIST_MAX_PAGES = 6;
 
 /** The form matches names from the start: search the first two words, then the caller keeps whole-name matches. */
 async function searchEdList(name: string): Promise<EnforcementHit[]> {
@@ -189,6 +200,7 @@ async function searchEdList(name: string): Promise<EnforcementHit[]> {
   const prefix = words.slice(0, words[0]?.length >= 4 ? 2 : 3).join(" ");
   if (prefix.length < 3) return [];
   const hits: EnforcementHit[] = [];
+  const notes: string[] = [];
   const page = await politeFetch(EDLIST, {}, { minDelayMs: 1500 });
   if (!page.ok) throw new Error(`NY DOL debarment search returned HTTP ${page.status}`);
   await page.text();
@@ -199,18 +211,19 @@ async function searchEdList(name: string): Promise<EnforcementHit[]> {
       searchRadioBox: agency === "DOL" ? "dolSearch" : "wcbSearch", tin: "", employerName: prefix, employerDBAName: "", city: "", state: "", zip: "",
       debarrmentStartDate: "", debarrmentEndDate: "", ...(agency === "DOL" ? { article: "both" } : {}), agencyKey: "",
     });
-    let res = await politeFetch(EDLIST_RESULTS, { method: "POST", body: body.toString(), headers: { "content-type": "application/x-www-form-urlencoded", referer: EDLIST, ...(cookie ? { cookie } : {}) } }, { minDelayMs: 1500 });
-    for (let p = 0; p < 6; p++) {
+    let res = await politeFetch(EDLIST_RESULTS, { method: "POST", body: body.toString(), headers: { "content-type": "application/x-www-form-urlencoded", ...(cookie ? { cookie } : {}) } }, { minDelayMs: 1500 });
+    for (let p = 0; ; p++) {
       if (!res.ok) throw new Error(`NY DOL debarment search returned HTTP ${res.status}`);
       const html = await res.text();
       if (!/Nothing found to display|items? found|One item found/i.test(html)) throw new Error("NY DOL debarment search returned an unexpected page");
       hits.push(...parseEdList(html, agency));
       const next = html.match(/<a href="([^"]+)" title="Go to page \d+">Next<\/a>/)?.[1] ?? html.match(/\[<a href="([^"]+)"[^>]*>Next<\/a>/)?.[1];
       if (!next) break;
-      res = await politeFetch(new URL(decodeEntities(next), EDLIST_HOST).toString(), { headers: { referer: EDLIST_RESULTS, ...(cookie ? { cookie } : {}) } }, { minDelayMs: 1500 });
+      if (p + 1 >= EDLIST_MAX_PAGES) { notes.push(`${agency} list: read the first ${EDLIST_MAX_PAGES} pages of names starting "${prefix}"; the rest were not read`); break; }
+      res = await politeFetch(new URL(decodeEntities(next), EDLIST_HOST).toString(), { headers: cookie ? { cookie } : {} }, { minDelayMs: 1500 });
     }
   }
-  return hits;
+  return withNote(hits, notes.join("; ") || null);
 }
 
 const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [

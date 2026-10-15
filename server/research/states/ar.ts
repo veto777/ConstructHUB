@@ -23,7 +23,7 @@
  * labor.arkansas.gov's robots.txt asks for a 10-second crawl delay; the loaders wait that long between pages.
  */
 import type { LicenseHit } from "@shared/research-reports";
-import { USER_AGENT, rateLimitHost } from "../http";
+import { fetchWithDeadline, rateLimitHost } from "../http";
 import { clean, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { pdfText, textLines } from "./lib/a3-pdf";
 import type { StatePack } from "./types";
@@ -39,26 +39,31 @@ type Row = Record<string, unknown>;
 const s = (v: unknown) => clean(v == null ? null : String(v));
 
 /** One page of a roster table, the way the roster page's own DataTable asks for it (server-side paging). */
-async function metlPage(postId: string, columns: string[], form: Record<string, string>, referer: string, start: number): Promise<{ total: number; rows: Row[] }> {
+async function metlPage(postId: string, columns: string[], form: Record<string, string>, start: number): Promise<{ total: number; rows: Row[] }> {
   const q = new URLSearchParams({ draw: "1", postID: postId, start: String(start), length: String(PAGE_SIZE), "search[value]": "", "search[regex]": "false", "order[0][column]": String(Math.max(0, columns.indexOf("License_Number"))), "order[0][dir]": "asc", ...form });
   columns.forEach((c, i) => { q.set(`columns[${i}][data]`, c); q.set(`columns[${i}][searchable]`, "true"); q.set(`columns[${i}][orderable]`, "true"); q.set(`columns[${i}][search][value]`, ""); });
   await rateLimitHost(HOST, CRAWL_DELAY_MS);
-  const res = await fetch(`${HOST}/wp-json/metl/v1/all?${q}`, {
-    headers: { "user-agent": USER_AGENT, accept: "application/json, text/javascript, */*; q=0.01", referer, "x-requested-with": "XMLHttpRequest" },
-    signal: AbortSignal.timeout(180_000),
-  });
+  // The honest UA and Accept only: no X-Requested-With or Referer posing as the roster page's own script (audit
+  // 2026-10-15, decision 12; the endpoint answered the same without them).
+  const res = await fetchWithDeadline(`${HOST}/wp-json/metl/v1/all?${q}`, { headers: { accept: "application/json" } }, 180_000);
   if (!res.ok) throw new Error(`labor.arkansas.gov roster returned HTTP ${res.status}`);
-  const body = await res.json() as { recordsTotal?: number; data?: Row[] };
-  if (!Array.isArray(body.data)) throw new Error("labor.arkansas.gov roster returned an unexpected payload");
-  return { total: Number(body.recordsTotal ?? 0), rows: body.data };
+  return metlBody(await res.json());
 }
 
-async function* metlRows(postId: string, columns: string[], form: Record<string, string>, referer: string): AsyncIterable<Row> {
+/** One page's JSON: the rows and the table's total, which must be a number (else the paging check could pass empty). */
+export function metlBody(body: unknown): { total: number; rows: Row[] } {
+  const b = body as { recordsTotal?: unknown; data?: Row[] } | null;
+  const total = Number(b?.recordsTotal);
+  if (!b || !Array.isArray(b.data) || !Number.isFinite(total)) throw new Error("labor.arkansas.gov roster returned an unexpected payload");
+  return { total, rows: b.data };
+}
+
+async function* metlRows(postId: string, columns: string[], form: Record<string, string>): AsyncIterable<Row> {
   // Ordered by license number so pages don't shift; a row seen twice is yielded once.
   let start = 0, total = Infinity, got = 0;
   const seen = new Set<string>();
   while (start < total) {
-    const page = await metlPage(postId, columns, form, referer, start);
+    const page = await metlPage(postId, columns, form, start);
     total = page.total;
     if (!page.rows.length) break;
     for (const r of page.rows) {
@@ -105,12 +110,12 @@ export function hvacHit(r: Row): BulkHit | null {
 
 async function* electrical(): AsyncIterable<BulkHit> {
   const cols = ["First_Name", "Last_Name", "License_Type_Display_Name", "License_Number", "License_Status", "License_Expiration_Date", "License_Issue_Date"];
-  for await (const r of metlRows("15109", cols, { First_Name: "", Last_Name: "", License_Number: "" }, ELECTRICAL_PAGE)) { const h = electricalHit(r); if (h) yield h; }
+  for await (const r of metlRows("15109", cols, { First_Name: "", Last_Name: "", License_Number: "" })) { const h = electricalHit(r); if (h) yield h; }
 }
 
 async function* hvac(): AsyncIterable<BulkHit> {
   const cols = ["Submitter_Type", "First_Name", "Last_Name", "physicalCity", "physicalState", "License_Number", "License_Status", "License_Expiration_Date"];
-  for await (const r of metlRows("35270", cols, { firstName: "", Last_Name: "", physicalCity: "" }, HVAC_PAGE)) { const h = hvacHit(r); if (h) yield h; }
+  for await (const r of metlRows("35270", cols, { firstName: "", Last_Name: "", physicalCity: "" })) { const h = hvacHit(r); if (h) yield h; }
 }
 
 // ── Fire Protection Licensing Board rosters (PDF) ─────────────────────────────────────────────────────────────
@@ -258,7 +263,7 @@ export function parseFireRoster(text: string, roster: FireRoster): LicenseHit[] 
 /** The roster PDFs the page links right now (the board renames them each year). */
 async function fireRosterUrls(): Promise<{ url: string; roster: FireRoster }[]> {
   await rateLimitHost(HOST, CRAWL_DELAY_MS);
-  const res = await fetch(FIRE_PAGE_API, { headers: { "user-agent": USER_AGENT, accept: "application/json" }, signal: AbortSignal.timeout(60_000) });
+  const res = await fetchWithDeadline(FIRE_PAGE_API, { headers: { accept: "application/json" } }, 60_000);
   if (!res.ok) throw new Error(`Fire Protection roster page returned HTTP ${res.status}`);
   const body = await res.json() as { content?: { rendered?: string } };
   const links = Array.from((body.content?.rendered ?? "").matchAll(/href="([^"]+\.pdf)"/gi)).map((m) => m[1]);
@@ -270,7 +275,7 @@ function fireLoader(roster: FireRoster): () => AsyncIterable<BulkHit> {
     const pdf = (await fireRosterUrls()).find((u) => u.roster === roster);
     if (!pdf) throw new Error(`no ${roster} roster PDF linked from ${FIRE_PAGE}`);
     await rateLimitHost(HOST, CRAWL_DELAY_MS);
-    const res = await fetch(pdf.url, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.timeout(180_000) });
+    const res = await fetchWithDeadline(pdf.url, {}, 180_000);
     if (!res.ok) throw new Error(`${pdf.url} returned HTTP ${res.status}`);
     const { text } = await pdfText(new Uint8Array(await res.arrayBuffer()));
     for (const h of parseFireRoster(text, roster)) {

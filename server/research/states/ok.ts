@@ -47,16 +47,24 @@ export function roofingHit(r: Reg): BulkHit | null {
   return { kind: "license", hit, business: [company, dba].filter(Boolean).join(" ") || null, person, keys: { licenses: [number], phones: [hit.phone], addresses: [address] } };
 }
 
+/** The /count answer: a whole number, or the load stops (NaN would let the paging guard pass with nothing read). */
+export function roofingTotal(text: string): number {
+  const t = text.trim();
+  if (!/^\d+$/.test(t) || Number(t) <= 0) throw new Error(`CIB roofing count returned an unexpected answer: ${t.slice(0, 60)}`);
+  return Number(t);
+}
+
 async function* okRoofing(): AsyncIterable<BulkHit> {
   const countRes = await politeFetch(`${API}/count`, { headers: { accept: "application/json" } }, { minDelayMs: 2000 });
   if (!countRes.ok) throw new Error(`CIB roofing count returned HTTP ${countRes.status}`);
-  const total = Number(await countRes.text());
+  const total = roofingTotal(await countRes.text());
   const seen = new Set<string>();
   for (let offset = 0; offset < total + PAGE_SIZE; offset += PAGE_SIZE) {
     const res = await politeFetch(`${API}/search?limit=${PAGE_SIZE}&offset=${offset}`, { headers: { accept: "application/json" } }, { minDelayMs: 2000, timeoutMs: 120_000 });
     if (!res.ok) throw new Error(`CIB roofing search returned HTTP ${res.status}`);
     const rows = await res.json();
     if (!Array.isArray(rows)) throw new Error("CIB roofing search returned an unexpected payload");
+    const before = seen.size;
     for (const r of rows as Reg[]) {
       const id = String(r.id);
       if (seen.has(id)) continue;
@@ -64,7 +72,8 @@ async function* okRoofing(): AsyncIterable<BulkHit> {
       const h = roofingHit(r);
       if (h) yield h;
     }
-    if (rows.length < PAGE_SIZE) break;
+    // A short page ends the list; a full page with nothing new means the API ignored the offset (checked below).
+    if (rows.length < PAGE_SIZE || seen.size === before) break;
   }
   if (seen.size < total * 0.95) throw new Error(`CIB roofing paging returned ${seen.size} of ${total} registrations`);
 }

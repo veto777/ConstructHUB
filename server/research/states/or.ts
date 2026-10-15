@@ -18,6 +18,7 @@ import { decodeEntities } from "../bulk-sources";
 import type { BulkHit, BulkSource } from "../bulk";
 import { nameClause, sodaRows } from "../licenses";
 import type { LiveEnforcementSearch, StatePack } from "./types";
+import { hasEnded } from "../adverse";
 import { anyDay, businessParts, fetchJson, nameMatches } from "./lib/g8-common";
 
 // ── BOLI prevailing wage: List of Ineligibles + Case Closure Letters ─────────────────────────────────────────
@@ -27,10 +28,20 @@ const listItems = (list: string, query: string) =>
   `${BOLI_API}('${encodeURIComponent(list)}')/items?${query}`;
 
 type Item = Record<string, any>;
-async function spItems(url: string): Promise<Item[]> {
-  const body = await fetchJson<{ value?: Item[] }>(url, { headers: { accept: "application/json;odata=nometadata" } }, "BOLI list", 1500);
-  if (!Array.isArray(body.value)) throw new Error("BOLI list returned an unexpected payload");
-  return body.value;
+/** Every item of a list: SharePoint returns at most $top items a page and an "odata.nextLink" while more remain. */
+export async function spItems(url: string, get = (u: string) => fetchJson<{ value?: Item[]; "odata.nextLink"?: string }>(u, { headers: { accept: "application/json;odata=nometadata" } }, "BOLI list", 1500)): Promise<Item[]> {
+  const out: Item[] = [];
+  const seen = new Set<string>();
+  for (let next: string | undefined = url, page = 0; next; page++) {
+    if (seen.has(next) || page >= 50) throw new Error("BOLI list paging did not end");
+    seen.add(next);
+    const body = await get(next);
+    if (!Array.isArray(body.value)) throw new Error("BOLI list returned an unexpected payload");
+    out.push(...body.value);
+    const link = body["odata.nextLink"];
+    next = typeof link === "string" && link.startsWith("https://www.oregon.gov/") ? link : undefined;
+  }
+  return out;
 }
 
 const enf = (h: EnforcementHit, business: string, addresses: string[] = []): BulkHit =>
@@ -58,13 +69,15 @@ async function* boliLoader(): AsyncIterable<BulkHit> {
     if (!names.length) continue; // a person only: never indexed (companies only)
     const removal = anyDay(r.lhcs);
     const permanent = /\*/.test(title);
+    const ended = !permanent && hasEnded(removal, today);
     yield enf({
       state: "OR", source: "Oregon BOLI prevailing-wage List of Ineligibles (debarred)", sourceUrl: BOLI_PAGE, category: "debarment",
       name: names.join(" / "), id: null, date: anyDay(r.tdlw), endDate: removal,
-      status: permanent ? "Ineligible; not to be removed from debarment" : removal && removal < today ? "Removal date passed" : "Ineligible for public works contracts",
+      status: permanent ? "Ineligible; not to be removed from debarment" : ended ? "Removal date passed" : "Ineligible for public works contracts",
       city: null, detail: ["Ineligible to receive public works contracts subject to the Prevailing Wage Rate Law (ORS 279C.860)",
         aliases.length ? `Also listed as ${aliases.join(", ")}` : null].filter(Boolean).join(". "),
-      amount: null, adverse: true,
+      // Being on BOLI's list is the publisher's own finding; once its removal date has passed the debarment is over.
+      amount: null, adverse: !ended,
     }, [...names, ...aliases].join(" "), boliAddresses(r.Address));
   }
   // Case Closure Letters: the PDF's file name is "<contractor> - <case number>.pdf"; "Date issued" is its own field.
@@ -110,20 +123,37 @@ const WC_URL = "https://data.oregon.gov/resource/q9zj-c8r2.json";
 /** insurer_status, from the dataset's column description (DCBS, 2026-10-15). */
 const WC_STATUS: Record<string, string> = { "1": "Active coverage", "01": "Active coverage", "3": "Double coverage", "03": "Double coverage", "4": "Pending coverage", "04": "Pending coverage", "12": "Pending investigation" };
 
+/**
+ * The insurer line. DCBS: "A missing value in [record_origin] means that the employer is self-insured" (column
+ * description, 2026-10-15); self-insured rows name the employer itself as insurer. Without an insurer name nothing
+ * is said: a missing value is never turned into "self-insured" (audit 2026-10-15, decision 3).
+ */
+export function wcInsurer(r: Record<string, unknown>): string | null {
+  const insurer = clean(String(r.insurer_name ?? ""));
+  if (!insurer) return null;
+  return clean(String(r.record_origin ?? "")) ? `Insurer: ${insurer}` : `Insurer: ${insurer} (self-insured, per DCBS's record-origin code)`;
+}
+
+/** entity_code 1 is "Individual" (the dataset's column description): a person's address and phone are not shown. */
+const WC_INDIVIDUAL = "1";
+
 async function searchWorkersComp(name: string): Promise<EnforcementHit[]> {
   const rows = await sodaRows(WC_URL, `(${nameClause("legal_business_name", name)}) OR (${nameClause("dba_name", name)})`, 200, "Oregon workers' comp employers");
   return rows.filter((r) => nameMatches(name, String(r.legal_business_name ?? ""), String(r.dba_name ?? ""))).map((r) => {
     const code = clean(String(r.insurer_status ?? "")) ?? "";
     const dba = clean(String(r.dba_name ?? ""));
+    const individual = clean(String(r.entity_code ?? "")) === WC_INDIVIDUAL;
     return {
       state: "OR", source: "Oregon DCBS workers' compensation coverage (active employers)", sourceUrl: WC_DATASET, category: "business_status" as const,
       name: [clean(String(r.legal_business_name ?? "")), dba].filter(Boolean).join(" / "), id: clean(String(r.employer_num ?? "")),
+      // "liad_end_date" is the publisher's own spelling (column "Liability End Date" in the dataset's schema, checked
+      // 2026-10-15 at /api/views/q9zj-c8r2.json); there is no "liab_end_date".
       date: anyDay(r.liab_begin_date), endDate: anyDay(r.liad_end_date),
       status: `Workers' comp: ${WC_STATUS[code] ?? (code ? `code ${code}` : "status not given")}`,
       city: [clean(String(r.ppb_city ?? "")), clean(String(r.ppb_state ?? ""))].filter(Boolean).join(", ") || null,
-      address: [r.ppb_address2, r.ppb_city, r.ppb_state, r.ppb_zip].map((v) => clean(v == null ? null : String(v))).filter(Boolean).join(" ") || null,
-      phone: r.phone ? clean(`${r.phone_area ?? ""}${r.phone}`) : null,
-      detail: [clean(String(r.insurer_name ?? "")) ? `Insurer: ${clean(String(r.insurer_name))}` : (r.record_origin ? null : "Self-insured"),
+      address: [individual ? null : r.ppb_address2, r.ppb_city, r.ppb_state, r.ppb_zip].map((v) => clean(v == null ? null : String(v))).filter(Boolean).join(" ") || null,
+      phone: r.phone && !individual ? clean(`${r.phone_area ?? ""}${r.phone}`) : null,
+      detail: [wcInsurer(r),
         clean(String(r.naics_description ?? "")), clean(String(r.employees_range ?? "")) ? `${clean(String(r.employees_range))} employees` : null].filter(Boolean).join(". ") || null,
       amount: null, adverse: null,
     };

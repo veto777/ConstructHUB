@@ -17,6 +17,8 @@ import { tokens } from "../licenses";
 import { clean } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { FormSession, cellText } from "./lib/g7-aspnet";
+import { adverseFrom } from "../adverse";
+import { capNote, withNote } from "../notes";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
 
 const CBR = "https://services.commerce.utah.gov/cbr/";
@@ -86,7 +88,7 @@ async function searchCbr(name: string, kind: "person" | "company"): Promise<Lice
   // A person's name is listed in full ("Dennis Sheridan Johnson"); the registry matches the text as typed, so a person is searched by last name.
   const co = kind === "person" ? words[words.length - 1] : words.join(" ");
   const s = new FormSession(1200);
-  const post = (body: Record<string, string>) => s.request(CBR_AJAX, { method: "POST", body: new URLSearchParams(body).toString(), headers: { referer: CBR, "x-requested-with": "XMLHttpRequest" } });
+  const post = (body: Record<string, string>) => s.request(CBR_AJAX, { method: "POST", body: new URLSearchParams(body).toString(), headers: {} });
   const res = await post({ f: "as", p: "ALL", q: "ALL", co, ln: "", ct: "", st: "SEL", zp: "" });
   if (res.status !== 200) throw new Error(`Utah CBR returned HTTP ${res.status}`);
   // One match comes back as its details window instead of a list.
@@ -100,14 +102,14 @@ async function searchCbr(name: string, kind: "person" | "company"): Promise<Lice
   const rows = parseCbrRows(res.html).filter((r) => kind === "company" ? hasAll(name, `${r.name} ${r.dba ?? ""}`) : hasAll(name, r.name));
   const out: LicenseHit[] = [];
   for (const r of rows.slice(0, MAX_DETAILS)) out.push(cbrHit(r.name, r.dba, r.city, parseCbrDetails((await post({ f: "d", v: r.eid, p: r.pid })).html), kind, r.phone));
-  return out;
+  return rows.length > MAX_DETAILS ? withNote(out, capNote(MAX_DETAILS, rows.length, "matching registrations")) : out;
 }
 
 /** The registry's advanced search also takes a license number (no phone or street search). */
-async function searchCbrBy(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license" || !normLicense(q.value)) return [];
+async function searchCbrBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license" || !normLicense(q.value)) return null;
   const s = new FormSession(1200);
-  const post = (body: Record<string, string>) => s.request(CBR_AJAX, { method: "POST", body: new URLSearchParams(body).toString(), headers: { referer: CBR, "x-requested-with": "XMLHttpRequest" } });
+  const post = (body: Record<string, string>) => s.request(CBR_AJAX, { method: "POST", body: new URLSearchParams(body).toString(), headers: {} });
   const res = await post({ f: "as", p: "ALL", q: "ALL", co: "", ln: q.value.trim(), ct: "", st: "SEL", zp: "" });
   if (res.status !== 200) throw new Error(`Utah CBR returned HTTP ${res.status}`);
   const same = (h: LicenseHit) => normLicense(h.licenseNumber)?.startsWith(normLicense(q.value)!) ?? false;
@@ -116,13 +118,21 @@ async function searchCbrBy(q: IdQuery): Promise<LicenseHit[]> {
     return one ? [cbrHit(one, null, null, parseCbrDetails(res.html), "license")].filter(same) : [];
   }
   const out: LicenseHit[] = [];
-  for (const r of parseCbrRows(res.html).slice(0, MAX_DETAILS)) out.push(cbrHit(r.name, r.dba, r.city, parseCbrDetails((await post({ f: "d", v: r.eid, p: r.pid })).html), "license", r.phone));
-  return out.filter(same);
+  const rows = parseCbrRows(res.html);
+  for (const r of rows.slice(0, MAX_DETAILS)) out.push(cbrHit(r.name, r.dba, r.city, parseCbrDetails((await post({ f: "d", v: r.eid, p: r.pid })).html), "license", r.phone));
+  return rows.length > MAX_DETAILS ? withNote(out.filter(same), capNote(MAX_DETAILS, rows.length, "registrations starting with that number")) : out.filter(same);
 }
 
 // ── Agency and disciplinary actions ──────────────────────────────────────────────────────────────────────────
 
 const ADVERSE_DOC = /order|stipulat|revo|suspen|probation|surrender|reprimand|fine|penalt|denial|cease/i;
+/**
+ * A case's outcome from its document titles (DOPL's own): a dismissal, withdrawal, … among them → not adverse (tested
+ * first, decision 2); else an order, stipulation, revocation, … → adverse; no documents → unknown.
+ */
+export const caseAdverse = (titles: string[]): boolean | null => adverseFrom(titles.join("; "), { adverse: ADVERSE_DOC });
+/** A citation is DOPL's own finding unless its status says it was dismissed or withdrawn. */
+export const citationAdverse = (status: string | null | undefined): boolean => adverseFrom(`Citation issued; ${status ?? ""}`, { adverse: /citation issued/i }) ?? true;
 const isoOf = (v: string | null | undefined) => {
   const m = v?.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   return m ? `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : v?.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
@@ -148,7 +158,7 @@ export function parseDoplEntity(html: string): EnforcementHit[] {
         state: "UT", source: "Utah DOPL agency and disciplinary actions", sourceUrl: docs[0]?.url ?? DOPL_DA_PAGE,
         category: "discipline", name: entity, id: clean(c[1]), date: dates[0] ?? null, endDate: dates.length > 1 ? dates[dates.length - 1] : null,
         status: docs.length ? docs.map((d) => `${d.title}${d.date ? ` (${d.date})` : ""}`).join("; ") : "Case listed",
-        city: null, detail: licText, amount: null, adverse: docs.some((d) => ADVERSE_DOC.test(d.title)) ? true : null, licenseNumber,
+        city: null, detail: licText, amount: null, adverse: caseAdverse(docs.map((d) => d.title)), licenseNumber,
       });
     }
     for (const c of Array.from(b.matchAll(/<b>(Citation [^<]+)<\/b><\/div><div id="lic\d+cit\d+Data"[^>]*>([\s\S]*?)<\/ul>/g))) {
@@ -159,7 +169,7 @@ export function parseDoplEntity(html: string): EnforcementHit[] {
         category: "discipline", name: entity, id: clean(c[1]), date: isoOf(items.issued), endDate: null,
         status: items.status ? `Citation: ${items.status}` : "Citation issued", city: null,
         detail: [items.violation ? `Violation: ${items.violation}` : null, licText].filter(Boolean).join(". ") || null,
-        amount: amount ? Number(amount.replace(/,/g, "")) : null, adverse: true, licenseNumber,
+        amount: amount ? Number(amount.replace(/,/g, "")) : null, adverse: citationAdverse(items.status), licenseNumber,
       });
     }
   }
@@ -175,16 +185,17 @@ async function searchDoplActions(name: string): Promise<EnforcementHit[]> {
   const q = name.replace(/\s+/g, " ").trim();
   if (q.length < 3) return [];
   const s = new FormSession(1200);
-  const res = await s.request(DOPL_DA_FORM, { method: "POST", body: new URLSearchParams({ f: "S", SearchText: q.slice(0, 80), autoLoad: "0" }).toString(), headers: { referer: DOPL_DA_FORM } });
+  const res = await s.request(DOPL_DA_FORM, { method: "POST", body: new URLSearchParams({ f: "S", SearchText: q.slice(0, 80), autoLoad: "0" }).toString() });
   if (res.status !== 200) throw new Error(`Utah DOPL returned HTTP ${res.status}`);
   if (!res.html.includes('id="areaResults"')) throw new Error("Utah DOPL returned an unexpected page");
   if (/id="tblEntities"/.test(res.html)) {
     const out: EnforcementHit[] = [];
-    for (const r of parseDoplList(res.html).filter((r) => hasAll(name, r.name)).slice(0, MAX_DETAILS)) {
-      const page = await s.request(DOPL_DA_FORM, { method: "POST", body: new URLSearchParams({ f: "V", v: r.id }).toString(), headers: { referer: DOPL_DA_FORM } });
+    const list = parseDoplList(res.html).filter((r) => hasAll(name, r.name));
+    for (const r of list.slice(0, MAX_DETAILS)) {
+      const page = await s.request(DOPL_DA_FORM, { method: "POST", body: new URLSearchParams({ f: "V", v: r.id }).toString() });
       out.push(...parseDoplEntity(page.html));
     }
-    return out;
+    return list.length > MAX_DETAILS ? withNote(out, capNote(MAX_DETAILS, list.length, "matching licensees (their records were read)")) : out;
   }
   return parseDoplEntity(res.html);
 }

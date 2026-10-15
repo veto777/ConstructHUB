@@ -25,6 +25,13 @@ describe("PA DGS debarment list", () => {
     // A permanent debarment is stored with a 2099 end date: shown as no end date, not as a date.
     expect(dgsHit({ VendorName: "WMCC  INCORPORATED", Type: "Debarred", EffectiveDate: "2015-06-30T00:00:00", EndDate: "2099-12-31T00:00:00" }, false)!.status).toBe("Debarred with no end date");
   });
+  it("marks a current debarment adverse, and an archived or ended one not (decision 2)", () => {
+    const row = { DebarmentListId: 24, Type: "Debarred", VendorName: "Vince Basile Plumbing, LLC, VPJ Enterprises, Inc.", EffectiveDate: "2024-09-21T00:00:00", EndDate: "2027-09-21T00:00:00" };
+    expect(dgsHit(row, false)!.adverse).toBe(true);
+    expect(dgsHit(row, true)!.adverse).toBe(false);
+    expect(dgsHit({ ...row, EffectiveDate: "2015-06-30T00:00:00", EndDate: "2018-06-30T00:00:00" }, false)!.adverse).toBe(false);
+    expect(dgsHit({ VendorName: "WMCC  INCORPORATED", Type: "Debarred", EffectiveDate: "2015-06-30T00:00:00", EndDate: "2099-12-31T00:00:00" }, false)!.adverse).toBe(true);
+  });
 });
 
 describe("PA UJS portal results", () => {
@@ -34,5 +41,8 @@ describe("PA UJS portal results", () => {
     expect(h.name).toContain("Evb Towing v. Trio Siteworks");
     expect(h.city).toBe("MDJ-38-1-13, Montgomery County");
     expect(h.sourceUrl).toMatch(/^https:\/\/ujsportal\.pacourts\.us\/Report\/MdjDocketSheet\?docketNumber=MJ-38113-CV-0000090-2018/);
+  });
+  it("throws when a column it reads is renamed, instead of reporting no cases", () => {
+    expect(() => parseUjsCases(UJS.replace(/>Case Caption</g, ">Caption<"))).toThrow(/no "Case Caption" column/);
   });
 });
