@@ -31,7 +31,7 @@ import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { SiteConnectionGuide } from "./site-connection-guide";
 import { AppPage, Toolbar, Notice } from "@/components/app-ui";
 import { ToolTabs } from "@/components/tool";
@@ -44,7 +44,7 @@ import {
   GoogleListRow,
   GooglePill,
 } from "@/components/google";
-import { Search, CheckCircle2 } from "lucide-react";
+import { Search, CheckCircle2, ArrowLeft } from "lucide-react";
 import { HelpButton } from "@/components/help-button";
 import {
   CloudflareConnectSteps,
@@ -459,7 +459,12 @@ function MetricRows({ asset }: { asset: any }) {
     </div>
   );
 }
-export function LocationSearchSummary({ locationId }: { locationId: number }) {
+/** Only an in-app path may be a "from" link: "/locations?location=7", never "//evil" or "https://…". */
+const safeBack = (v: string | null) => (v && v.startsWith("/") && !v.startsWith("//") ? v : null);
+
+export function LocationSearchSummary({ locationId, businessName }: { locationId: number; businessName?: string }) {
+  // The Search Console page gets a way back to this location (owner 2026-10-15: "you can't get back to the google page").
+  const openHref = `/search-console?from=${encodeURIComponent(`/locations?location=${locationId}&tab=insights`)}${businessName ? `&fromLabel=${encodeURIComponent(businessName)}` : ""}`;
   // The server picks the location's linked property; linking a different one or a new sync changes
   // the answer, so the card never serves a cached result on mount and keeps polling while shown.
   const { data, error, isLoading, isFetching, refetch, dataUpdatedAt } =
@@ -506,7 +511,7 @@ export function LocationSearchSummary({ locationId }: { locationId: number }) {
             disabled={isFetching}
             onClick={() => void refetch()}
           />
-          <Link href="/search-console" className="text-primary underline">
+          <Link href={openHref} className="text-primary underline">
             Open Search Console
           </Link>
         </div>
@@ -523,7 +528,7 @@ export default function SiteConnections({
     base = `/api/${provider}`,
     { toast } = useToast();
   // Each view is its own address (/cloudflare/work-queue; components/website-tool/nav.ts); old ?tab= links land there.
-  const [tab, T] = useToolView<string>(cf ? "/cloudflare" : "/search-console", cf ? CLOUDFLARE_VIEWS : SEARCH_CONSOLE_VIEWS, "Sites"),
+  const [tab, T] = useToolView<string>(cf ? "/cloudflare" : "/search-console", cf ? CLOUDFLARE_VIEWS : SEARCH_CONSOLE_VIEWS, "Sites", ["site", "from", "fromLabel"]),
     inShell = useInToolShell(),
     [selected, Select] = useState<number[]>([]),
     [connection, C] = useState<number | null>(null),
@@ -549,6 +554,9 @@ export default function SiteConnections({
     [start, Start] = useReportParam("syncStart"),
     [end, End] = useReportParam("syncEnd");
   const [detailTab, setDetailTab] = useReportParam("detail", "Overview");
+  // Opened from a location's Insights: a way back to it, kept while switching views.
+  const fromParams = new URLSearchParams(useSearch());
+  const backTo = safeBack(fromParams.get("from")), backLabel = (fromParams.get("fromLabel") || "").slice(0, 80);
   const detail = useQuery<any>({
     queryKey: [`${base}/assets/${assetId}`],
     enabled: !!assetId,
@@ -756,6 +764,11 @@ export default function SiteConnections({
             />
           </div>
         )}
+      {backTo && (
+        <Link href={backTo} className="mb-3 inline-flex min-h-10 items-center gap-1 text-sm text-muted-foreground hover:text-foreground" data-testid="link-back-from">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to {backLabel || "Google Business"}
+        </Link>
+      )}
       {config.data && config.data.total > 0 && tab !== "Connections" &&
         new URLSearchParams(window.location.search).get("connection") !== "connected" && (
           <p className="mb-4 flex items-center gap-2 text-sm g-text" data-testid="connected-line">
