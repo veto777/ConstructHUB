@@ -16,6 +16,7 @@ import { decodeEntities } from "../bulk-sources";
 import { clean, download, type BulkHit } from "../bulk";
 import type { StatePack } from "./types";
 import { excelDate, xlsxRows } from "./lib/g5-aspnet";
+import { looksLikeBusiness } from "./lib/business-name";
 
 const DNR_PAGE = "https://dnr.wisconsin.gov/topic/Wells/Contacts.html";
 const DNR_FILES: { file: string; type: string }[] = [
@@ -26,9 +27,13 @@ const DNR_FILES: { file: string; type: string }[] = [
 const DHS_LEAD_PAGE = "https://www.dhs.wisconsin.gov/lead/hire-a-contractor.htm";
 const DHS_ASBESTOS_PAGE = "https://www.dhs.wisconsin.gov/asbestos/contractors.htm";
 
-/** A directory name that is a person ("JOHNSON, JOSHUA L"), not a business ("QUINNELL'S SEPTIC & WELL SERVICE, INC"). */
-const BUSINESS = /\b(INC|LLC|L\.L\.C|CORP|CORPORATION|CO|COMPANY|LTD|LLP|SERVICES?|DRILLING|WELLS?|PUMPS?|PUMPING|ENTERPRI[SZ]ES?|PLUMBING|SEPTIC|SUPPLY|GEOTHERMAL|ELECTRIC|HEATING|SONS|BROTHERS|BROS)\b|&/i;
-export const isPersonName = (n: string) => /^[A-Z][A-Z'.\- ]*,\s+[A-Z]/i.test(n) && !BUSINESS.test(n);
+/**
+ * A directory name that is a person ("JOHNSON, JOSHUA L"), not a business ("QUINNELL'S SEPTIC & WELL SERVICE, INC").
+ * "LAST, FIRST" is a person unless it carries a business word ("WELLS, JOHN" is a person: Wells is a surname, so only
+ * the singular WELL counts); any other form is a person unless ./lib/business-name.ts reads it as a business.
+ */
+const BUSINESS = /\b(INC|LLC|L\.L\.C|CORP|CORPORATION|CO|COMPANY|LTD|LLP|SERVICES?|DRILLING|WELL|PUMPS?|PUMPING|ENTERPRI[SZ]ES?|PLUMBING|SEPTIC|SUPPLY|GEOTHERMAL|ELECTRIC|HEATING|SONS|BROTHERS|BROS)\b|&/i;
+export const isPersonName = (n: string) => /^[A-Z][A-Z'.\- ]*,\s+[A-Z]/i.test(n) ? !BUSINESS.test(n) : !BUSINESS.test(n) && !looksLikeBusiness(n);
 const dash = (v: string | undefined) => clean(v?.replace(/^-$/, ""));
 /** Street lines (a line with no digit is a company name in the DNR files, not a street), city, state and ZIP. */
 export function wiAddress(lines: (string | undefined)[], city?: string, st?: string, zip?: string): string | null {
@@ -71,10 +76,13 @@ export function dnrRows(rows: string[][], type: string): BulkHit[] {
         specialty: updated ? `Listed in the DNR directory (${clean(updated)})` : "Listed in the DNR directory", status: null,
         principal: person ? flip(raw) : null, city: [city, st && st !== "WI" ? st : null].filter(Boolean).join(", ") || null, expires: null,
         matchedOn: person ? "principal" : "business",
-        address, phone: phones.join(", ") || null, ...(person ? { people: [{ name: flip(raw)!, role: type.replace(/ \(DNR directory\)$/, " license holder") }] } : {}),
+        // A person's mailing address and phones are a home address and phone: city only, never a key.
+        address: person ? null : address, phone: person ? null : phones[0] ?? null,
+        ...(person ? { people: [{ name: flip(raw)!, role: type.replace(/ \(DNR directory\)$/, " license holder") }] } : {}),
       },
       business: person ? null : raw, person: person ? raw : null,
-      keys: { licenses: [no], phones, addresses: [address] },
+      // Each phone is its own key ("608-555-0101, 608-555-0102" joined would match neither).
+      keys: person ? { licenses: [no] } : { licenses: [no], phones, addresses: [address] },
     });
   }
   return out;

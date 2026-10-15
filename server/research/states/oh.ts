@@ -96,14 +96,18 @@ const sfmHit = (h: SfmHit): BulkHit => ({
 /** The three SFM rosters: companies (one row each), individuals and UST people (one row per category or CE course: merged). */
 export async function* sfmRows(files: { name: string; rows: AsyncIterable<Record<string, string>> }[]): AsyncIterable<BulkHit> {
   for (const f of files) {
+    // The floor covers the three rosters together; an empty roster means that download failed, so the load stops.
+    let n = 0;
+    const counted = (h: BulkHit) => { n++; return h; };
     if (/Companies/i.test(f.name)) {
       for await (const r of f.rows) {
         const name = clean(r.Name);
         if (!name) continue;
-        yield sfmHit({ business: name, person: null, no: clean(r.Credential), type: clean(r["Licensee Type"]), specialty: null,
+        yield counted(sfmHit({ business: name, person: null, no: clean(r.Credential), type: clean(r["Licensee Type"]), specialty: null,
           status: clean(r["License Status"]), city: clean(r.City), expires: usDate(r["Expiration Date"]),
-          address: joinAddress(r["Address 1"], r["Address 2"], r.City, r.State, r["Zip Code"]), phone: clean(r.Phone) });
+          address: joinAddress(r["Address 1"], r["Address 2"], r.City, r.State, r["Zip Code"]), phone: clean(r.Phone) }));
       }
+      if (!n) throw new Error(`${f.name}: the roster came back empty`);
       continue;
     }
     // Individuals: one row per certified category (fire protection) or per CE course (UST); one hit per credential.
@@ -117,10 +121,12 @@ export async function* sfmRows(files: { name: string; rows: AsyncIterable<Record
       byCred.set(cred, e);
     }
     for (const [cred, { r, cats, employer }] of byCred) {
-      yield sfmHit({ business: employer, person: clean(r.Name), no: cred, type: clean(r["Licensee Type"]),
+      // A person with no employer on record: their phone may be their own (decision 4: no phone for an individual alone).
+      yield counted(sfmHit({ business: employer, person: clean(r.Name), no: cred, type: clean(r["Licensee Type"]),
         specialty: cats.size ? Array.from(cats).join(", ") : null, status: clean(r["License Status"]) ?? clean(r.Status), city: clean(r.City),
-        expires: usDate(r["Expiration Date"]), phone: clean(r["Work Phone"]) });
+        expires: usDate(r["Expiration Date"]), phone: employer ? clean(r["Work Phone"]) : null }));
     }
+    if (!n) throw new Error(`${f.name}: the roster came back empty`);
   }
 }
 

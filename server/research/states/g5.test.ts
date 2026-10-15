@@ -79,7 +79,7 @@ describe("Wisconsin", () => {
     ];
     const h = dnrRows(rows, "Well drilling (DNR directory)");
     expect(h).toHaveLength(2);
-    expect(h[0].hit).toMatchObject({ principal: "JOSHUA L JOHNSON", businessName: null, address: "3774 HWY 13, WISCONSIN DELLS, WI 53965", phone: "(608)253-2751, (608)253-2741" });
+    expect(h[0].hit).toMatchObject({ principal: "JOSHUA L JOHNSON", businessName: null, address: null, phone: null }); // a person: no home address or phone
     expect(h[1].hit).toMatchObject({ businessName: "MARSHALL WELL DRILLING CORP", address: "3774 ST RD 13, WISCONSIN DELLS, WI 53965-8906" });
   });
 

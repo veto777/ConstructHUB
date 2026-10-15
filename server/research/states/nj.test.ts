@@ -61,3 +61,31 @@ describe("xlsx cells", () => {
     expect(excelDate("")).toBeNull();
   });
 });
+
+describe("NJ audit fixes (2026-10-15)", () => {
+  it("an individual licensee keeps city, state and ZIP only; a business keeps its street", async () => {
+    const { njRosterHit } = await import("./nj");
+    // Column names of the DCA pipe-delimited roster; the values only exercise the layout.
+    const row = { full_name: "A B", first_name: "A", last_name: "B", license_type_name: "Journeyman Electrician", license_no: "34EJ00000000",
+      addr_line_1: "1 X St", addr_city: "Trenton", addr_state: "NJ", addr_zipcode: "086080000", license_status_name: "Active" };
+    const p = njRosterHit(row, "NJ trades", false)!;
+    expect(p.hit.address).toBe("Trenton NJ 08608-0000");
+    expect(p.keys).toEqual({ licenses: ["34EJ00000000"] });
+    const b = njRosterHit({ ...row, full_name: "B Electric LLC" }, "NJ trades", true)!;
+    expect(b.hit.address).toBe("1 X St Trenton NJ 08608-0000");
+  });
+  it("follows a redirect only within the download site", async () => {
+    const { njRedirect } = await import("./nj");
+    expect(njRedirect("https://newjersey.mylicense.com/Verification_Bulk/Search.aspx", "SearchResults.aspx")).toBe("https://newjersey.mylicense.com/Verification_Bulk/SearchResults.aspx");
+    expect(() => njRedirect("https://newjersey.mylicense.com/Verification_Bulk/Search.aspx", "https://elsewhere.example/x")).toThrow(/off the site/);
+  });
+  it("reads only the head of a file for the layout check", async () => {
+    const { fileHead } = await import("./nj");
+    const { promises: fs } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+    const path = join(tmpdir(), `nj-head-${Date.now()}`);
+    await fs.writeFile(path, "full_name|first_name\n" + "x".repeat(5000));
+    try { expect((await fileHead(path)).length).toBe(200); expect(await fileHead(path)).toMatch(/^full_name\|/); } finally { await fs.rm(path, { force: true }); }
+  });
+});

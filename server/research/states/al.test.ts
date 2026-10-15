@@ -44,3 +44,28 @@ describe("Alabama Electrical Contractors Board discipline (PDF)", () => {
     expect(aecbBusiness("Lavell E. Brooks")).toBeNull();
   });
 });
+
+describe("Alabama audit fixes (2026-10-15)", () => {
+  it("a bare person's name with a surname that is also a trade word stays a person (audit example)", () => {
+    expect(aecbBusiness("David Power")).toBeNull();
+    expect(aecbBusiness("Joe Mason")).toBeNull();
+    // Names from the PDFs above that are businesses.
+    expect(aecbBusiness("Lovelady Electrical Contractors")).toBe("Lovelady Electrical Contractors");
+    expect(aecbBusiness("Bunch Electrical Contractors LLC")).toBe("Bunch Electrical Contractors LLC");
+  });
+  it("searchBy says it can't search what the list doesn't carry (null, not an empty result)", async () => {
+    const { searchAlGcBy, searchAlAowbBy } = await import("./al");
+    expect(await searchAlGcBy({ type: "address", value: "100 Main St, Birmingham AL" })).toBeNull();
+    expect(await searchAlAowbBy({ type: "phone", value: "(205) 592-3866" })).toBeNull();
+    expect(await searchAlAowbBy({ type: "license", value: "AB-12" })).toBeNull();
+  });
+});
+
+describe("Alabama names with case numbers glued on (the 2010-2020 lists, loaded 2026-10-15)", () => {
+  it("strips the case number or date before deciding, so a person stays a person", () => {
+    for (const n of ["Milton Bullock & 2020-021", "Dexter White Date: November13, 2019", "Danny Readout & 2019-063", "Larry Walker ; 2018-014; 2018-025; 2018-027; 2018-028", "Steven A. Pritchard & 046", "Jeffery Saffold and #2016-065"]) {
+      expect(aecbBusiness(n)).toBeNull();
+    }
+    expect(aecbBusiness("Brad's Pool & Supply")).toBe("Brad's Pool & Supply");
+  });
+});

@@ -33,11 +33,35 @@ describe("HI DCCA", () => {
     expect(hits[0].hit.status).toContain("2026-04-06");
     expect(hits[0].keys).toEqual({ licenses: ["CT-39093-0"], addresses: ["91-1188 ILIAHIALOE LP EWA BEACH Hawaii 96706"] });
     expect(hits[1]).toMatchObject({ person: "ZU WEN HE", hit: { principal: "ZU WEN HE", businessName: null } });
+    // A person alone: no street address (a home address) and no address key, city/state/ZIP only; not a business word.
+    expect(hits[1].hit.address).toBe("HONOLULU Hawaii 96822");
+    expect(hits[1].keys).toEqual({ licenses: ["CT-33278-0"] });
+    expect(hits[1].business).toBeNull();
   });
   it("splits respondents into businesses and drops people", () => {
     expect(businessParts("RI-NO LLC, dba Oahu Flooring and Kyri S. Pehau")).toEqual(["RI-NO LLC", "Oahu Flooring"]);
     expect(businessParts("Arthur S. Kim dba IVIEW Security")).toEqual(["IVIEW Security"]);
     expect(businessParts("Lisa Hoang aka Kim Lien Hoang")).toEqual([]);
     expect(businessParts("ROOFING AND CONSTRUCTION LLC")).toEqual(["ROOFING AND CONSTRUCTION LLC"]);
+  });
+});
+
+describe("HI audit fixes (2026-10-15)", () => {
+  const rows = (name: string, trade: string) => [
+    ["", "Licensee  ↑", "License: License Number  ↑", "", "Class Prefix", "Classification: Classification Name", "Classification: Description", "Trade/Professional Name", "Status", "Effective Expire Date", "Business Street", "Business City", "Business State", "Business Zip Code"],
+    ["", name, "CT-33278-0", "", "BC", "B General Building", "", trade, "C - Current, Valid & In Good Standing", "9/30/2026", "3054 Lanikaula", "HONOLULU", "Hawaii", "96822"],
+  ];
+  it("a sole proprietor with a trade name: the trade name is the business, the person's name is not indexed as one", () => {
+    const [h] = parsePvlReport(rows("ZU WEN HE", "HE CONSTRUCTION"), "Hawaii Contractors License Board licenses", "contractors");
+    expect(h).toMatchObject({ business: "HE CONSTRUCTION", person: "ZU WEN HE", hit: { businessName: "HE CONSTRUCTION", principal: "ZU WEN HE" } });
+  });
+  it("a sanction text decides adverse; a bare person's name as respondent is dropped", () => {
+    // The release above with its sanction changed to "Dismissed" to exercise the not-adverse path.
+    const html = `<main><p>Respondents: Meade Electric LLC dba Maui Electricians and Zachariah J. Meade (Maui)<br>Case Number: CLB 2025-50-L<br>Sanction: Dismissed<br>Effective Date: 1-23-26</p>
+<p>Respondent: Kurt W. Williams<br>Case Number: CLB 2024-81-L<br>Sanction: $2,000 fine<br>Effective Date: 10-21-25</p><p>Copies of the decisions are available online</p></main>`;
+    const hits = parseDisciplinaryRelease(html, "https://cca.hawaii.gov/oah/x/");
+    expect(hits.map((h) => h.name)).toEqual(["Meade Electric LLC / Maui Electricians"]);
+    expect(hits[0].adverse).toBe(false);
+    expect(parseDisciplinaryRelease(release, "u")[0].adverse).toBe(true); // "$2,500 fine"
   });
 });

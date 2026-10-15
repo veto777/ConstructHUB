@@ -23,7 +23,10 @@ import type { BulkHit, BulkSource } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
 import { politeFetch } from "../http";
 import type { LiveEnforcementSearch, StatePack } from "./types";
-import { anyDay, businessParts, fetchJson, looksLikeBusiness, money, nameMatches, usd } from "./lib/g8-common";
+import { anyDay, businessParts, fetchJson, money, nameMatches, usd } from "./lib/g8-common";
+import { looksLikeBusiness } from "./lib/business-name";
+import { adverseFrom } from "../adverse";
+import { capNote, escapeRegExp, withNote } from "../notes";
 import { xlsxRows } from "./lib/g8-xlsx";
 
 // ── PVL current-license reports (Excel) ──────────────────────────────────────────────────────────────────────
@@ -55,20 +58,24 @@ export function parsePvlReport(rows: string[][], label: string, layout: "contrac
     const iName = col("Licensee"), iNo = col("License: License Number"), iClass = col("Classification: Classification Name"), iTrade = col("Trade/Professional Name"),
       iStatus = col("Status"), iExp = col("Effective Expire Date"), iStreet = col("Business Street"), iCity = col("Business City"), iSt = col("Business State"), iZip = col("Business Zip Code");
     if ([iName, iNo, iClass, iStatus, iExp].some((i) => i < 0)) throw new Error(`${label}: unexpected columns`);
-    let cur: { name: string; no: string; trade: string | null; status: string | null; exp: string | null; city: string | null; address: string | null; classes: string[] } | null = null;
+    let cur: { name: string; no: string; trade: string | null; status: string | null; exp: string | null; city: string | null; address: string | null; locality: string | null; classes: string[] } | null = null;
     const flush = () => {
       if (!cur) return;
-      const isBiz = looksLikeBusiness(cur.name) || !!cur.trade;
+      // A sole proprietor's license is under the person's name (./lib/business-name.ts decides): the person is the
+      // principal, the trade name (if any) is the business, and only the trade name is indexed as a business name.
+      const isBiz = looksLikeBusiness(cur.name);
+      const business = isBiz ? cur.name : cur.trade;
+      // A person with no trade name: the "business" address is where they live, so city, state and ZIP only.
+      const address = business ? cur.address : cur.locality;
       out.push({
         kind: "license",
         hit: {
-          state: "HI", source: label, sourceUrl: PVL_PAGE, businessName: isBiz ? cur.name : cur.trade, licenseNumber: cur.no, licenseType: "Contractor license",
+          state: "HI", source: label, sourceUrl: PVL_PAGE, businessName: business, licenseNumber: cur.no, licenseType: "Contractor license",
           specialty: cur.classes.length ? `Classes: ${cur.classes.join(", ")}` : null, status: status(cur.status ?? ""), principal: isBiz ? null : cur.name,
-          city: cur.city, expires: anyDay(cur.exp), matchedOn: isBiz ? "business" : "principal", address: cur.address,
+          city: cur.city, expires: anyDay(cur.exp), matchedOn: isBiz ? "business" : "principal", address,
         },
-        keys: { licenses: [cur.no], addresses: [cur.address] },
-        // A sole proprietor's license is under the person's name: searchable both ways (a license is a public credential).
-        business: [cur.name, cur.trade].filter(Boolean).join(" "), person: isBiz ? null : cur.name,
+        keys: business ? { licenses: [cur.no], addresses: [cur.address] } : { licenses: [cur.no] },
+        business: isBiz ? [cur.name, cur.trade].filter(Boolean).join(" ") : cur.trade, person: isBiz ? null : cur.name,
       });
       cur = null;
     };
@@ -76,7 +83,8 @@ export function parsePvlReport(rows: string[][], label: string, layout: "contrac
       const name = clean(r[iName]), no = clean(r[iNo]), cls = clean(r[iClass]);
       if (name && /^(subtotal|total)$/i.test(name)) continue;
       if (name && no) { flush(); cur = { name, no, trade: clean(r[iTrade]), status: clean(r[iStatus]), exp: clean(r[iExp]), city: clean(r[iCity]),
-        address: [r[iStreet], r[iCity], r[iSt], r[iZip]].map((v) => clean(v)).filter(Boolean).join(" ") || null, classes: [] }; }
+        address: [r[iStreet], r[iCity], r[iSt], r[iZip]].map((v) => clean(v)).filter(Boolean).join(" ") || null,
+        locality: [r[iCity], r[iSt], r[iZip]].map((v) => clean(v)).filter(Boolean).join(" ") || null, classes: [] }; }
       if (cur && cls && !cur.classes.includes(cls)) cur.classes.push(cls);
     }
     flush();
@@ -150,14 +158,16 @@ export function parseDisciplinaryRelease(html: string, url: string): Enforcement
       if (/^Respondents?\s*:/i.test(body[j])) break;
       if (/^(RICO alleges|Respondent|The Board|On or about)/i.test(body[j]) && !/^(Case Number|Sanction|Effective Date)/i.test(body[j])) { allegation = body[j]; break; }
     }
-    const names = businessParts(m[1]);
+    // businessParts drops "LAST, FIRST" people; ./lib/business-name.ts then drops bare names ("Kurt W. Williams").
+    // A name written after "dba" is a trade name, a business even without a business word.
+    const names = businessParts(m[1]).filter((n) => looksLikeBusiness(n) || new RegExp(`\\bd/?b/?a\\s+${escapeRegExp(n)}`, "i").test(m[1]));
     if (!names.length) continue; // people only: not indexed (companies only)
     const fine = sanction?.match(/\$\s?([\d,]+(?:\.\d{2})?)/)?.[1];
     out.push({
       state: "HI", source: "Hawaii DCCA disciplinary actions (construction boards)", sourceUrl: url, category: "discipline",
       name: names.join(" / "), id: caseNo, date: anyDay(effective?.match(/[\d/-]+/)?.[0]), endDate: null,
       status: sanction ? `${BOARDS[prefix]}: ${sanction}` : BOARDS[prefix], city: null,
-      detail: allegation?.slice(0, 800) ?? null, amount: fine ? Number(fine.replace(/,/g, "")) : null, adverse: true,
+      detail: allegation?.slice(0, 800) ?? null, amount: fine ? Number(fine.replace(/,/g, "")) : null, adverse: adverseFrom(sanction),
     });
   }
   return out;
@@ -173,7 +183,12 @@ async function* disciplineLoader(): AsyncIterable<BulkHit> {
   for (let page = 1; page <= 20; page++) {
     const q = new URLSearchParams({ search: "disciplinary actions", per_page: "50", page: String(page), _fields: "link,date,title,content" });
     const res = await politeFetch(`https://cca.hawaii.gov/wp-json/wp/v2/oah?${q}`, { headers: { accept: "application/json" } }, { minDelayMs: 5000, retries: 3 });
-    if (res.status === 400) break; // past the last page
+    if (res.status === 400) {
+      // Past the last page WordPress answers 400 with code "rest_post_invalid_page_number"; any other 400 is an error.
+      const err = await res.json().catch(() => null) as { code?: string } | null;
+      if (err?.code === "rest_post_invalid_page_number") break;
+      throw new Error(`DCCA releases returned HTTP 400${err?.code ? ` (${err.code})` : ""}`);
+    }
     if (!res.ok) throw new Error(`DCCA releases returned HTTP ${res.status}`);
     const items = await res.json() as { link?: string; title?: { rendered?: string }; content?: { rendered?: string } }[];
     if (!Array.isArray(items) || !items.length) break;
@@ -211,7 +226,9 @@ async function ricoSearch(q: string): Promise<RicoItem[]> {
 }
 
 /** Associated names that are not a person written "LAST, FIRST" (those are never shown or matched). */
-const businessAliases = (v: string | undefined) => (v ?? "").split(/\r?\n/).map((x) => clean(x)).filter((x): x is string => !!x && (!/,/.test(x) || looksLikeBusiness(x)));
+const businessAliases = (v: string | undefined) => (v ?? "").split(/\r?\n/).map((x) => clean(x)).filter((x): x is string => !!x && looksLikeBusiness(x));
+
+const MAX_RICO_DETAILS = 10;
 
 async function searchRico(name: string): Promise<EnforcementHit[]> {
   let items = await ricoSearch(name);
@@ -221,19 +238,24 @@ async function searchRico(name: string): Promise<EnforcementHit[]> {
     if (longest && longest !== name) items = await ricoSearch(longest);
   }
   const out: EnforcementHit[] = [];
-  for (const it of items.filter((i) => nameMatches(name, i.displayName, ...businessAliases(i.otherNames))).slice(0, 10)) {
+  const matched = items.filter((i) => nameMatches(name, i.displayName, ...businessAliases(i.otherNames)));
+  for (const it of matched.slice(0, MAX_RICO_DETAILS)) {
     const d = await fetchJson<{ item?: any; success?: boolean }>(`${RICO_API}/${it.contactId}/Details?${new URLSearchParams({ contactId: String(it.contactId), division: "RICO" })}`,
       { headers: { accept: "application/json" } }, "RICO complaint details");
     if (!d.success || !d.item) throw new Error("RICO complaint details returned an unexpected payload");
     for (const g of d.item.complaintGroups ?? []) {
-      const who = [clean(g.properName), ...businessAliases(g.otherNames)].filter(Boolean).join(" / ");
+      // A complaint group under a person's own name (a sole proprietor) is a person's record (FCRA): left out.
+      const proper = clean(g.properName);
+      const names = [proper && looksLikeBusiness(proper) ? proper : null, ...businessAliases(g.otherNames)].filter((x): x is string => !!x);
+      if (!names.length) continue;
+      const who = names.join(" / ");
       for (const c of g.priorComplaints ?? []) {
         const outcome = clean(c.outcome);
         const prefix = clean(c.complaintNumber)?.match(/^([A-Z]{3})/)?.[1];
         const fine = money(c.fineAmount), restitution = money(c.restitutionAmount), cost = money(c.costAmount);
         out.push({
           state: "HI", source: "Hawaii RICO complaints history", sourceUrl: RICO_PAGE, category: "complaint",
-          name: who || clean(it.displayName), id: clean(c.complaintNumber), date: anyDay(c.actionDate), endDate: anyDay(c.outcomeDate),
+          name: who, id: clean(c.complaintNumber), date: anyDay(c.actionDate), endDate: anyDay(c.outcomeDate),
           status: outcome ? `Outcome: ${outcome}` : "Complaint on record", city: null,
           detail: [prefix && RICO_PREFIX[prefix] ? `${RICO_PREFIX[prefix]} complaint` : null, clean(c.action?.description) ? `Latest action: ${clean(c.action.description)}` : null,
             Array.isArray(c.allegations) && c.allegations.length ? `Allegations: ${c.allegations.map((a: string) => clean(a)).filter(Boolean).join("; ")}` : null,
@@ -244,7 +266,7 @@ async function searchRico(name: string): Promise<EnforcementHit[]> {
       }
     }
   }
-  return out;
+  return withNote(out, matched.length > MAX_RICO_DETAILS ? capNote(MAX_RICO_DETAILS, matched.length, "matching names") : null);
 }
 
 const liveEnforcement: LiveEnforcementSearch[] = [

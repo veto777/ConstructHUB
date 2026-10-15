@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isConstruction, mdcPhone, phlAddress } from "./local";
+import { isConstruction, licenseHit, mdcPhone, phlAddress } from "./local";
 
 describe("local sources' parsers", () => {
   it("reads a Philadelphia permit contractor's address block", () => {
@@ -17,5 +17,20 @@ describe("local sources' parsers", () => {
     expect(isConstruction("Commercial and Institutional Building Construction")).toBe(true);
     expect(isConstruction("Food Service Contractors")).toBe(false);
     expect(isConstruction("Construction Material Wholesalers, Other")).toBe(false);
+  });
+});
+
+describe("local license rows (audit 2026-10-15)", () => {
+  const base = { state: "KY", source: "Louisville Metro contractor licenses", sourceUrl: "u", licenseNumber: "1", licenseType: null, specialty: null, status: null,
+    city: "LOUISVILLE", expires: null, address: "1 X ST, LOUISVILLE, KY 40202", phone: "(502) 555-0100" };
+  it("an individual's row keeps the city only: no street, no phone, no address or phone key", () => {
+    const h = licenseHit({ ...base, businessName: null, principal: "A B", people: [{ name: "A B", role: "Licensee" }] });
+    expect(h.hit).toMatchObject({ address: null, phone: null, city: "LOUISVILLE" });
+    expect(h.keys).toEqual({ licenses: ["1"] });
+  });
+  it("a business row keeps them", () => {
+    const h = licenseHit({ ...base, businessName: "B Builders LLC", principal: null, people: [] });
+    expect(h.hit).toMatchObject({ address: "1 X ST, LOUISVILLE, KY 40202", phone: "(502) 555-0100" });
+    expect(h.keys?.phones).toEqual(["(502) 555-0100"]);
   });
 });

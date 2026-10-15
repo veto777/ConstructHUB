@@ -3,9 +3,6 @@
  * city enforcement records that name contractors. Same rules and checks as a state pack (./types.ts): every dataset
  * below was opened and searched live on 2026-10-15; field names and status values are the publishers' own.
  *
- *   NY  New York City DOB licenses: general contractors, master plumbers, electrical contractors and firms,
- *       fire-suppression contractors, oil-burner installers, riggers, welders, site safety and other DOB trades (bulk)
- *   NY  New York City DCWP home-improvement contractor and construction-labor-provider licenses (bulk)
  *   DC  District of Columbia DLCP basic business licenses: contractor and construction services (general
  *       contractors / construction managers, home-improvement contractors), with owners and registered agents (bulk)
  *   CA  Los Angeles Office of Finance active business tax registrations, construction NAICS codes (23…) (bulk)
@@ -24,17 +21,16 @@
  *   NV  City of Las Vegas business licenses of type "Contractor", with owners and their titles (bulk)
  *   AZ  Tucson active business licenses, construction NAICS codes (23…) (bulk)
  *   IL  Chicago BACP home-repair licenses, with every owner and officer from the city's Business Owners dataset (bulk)
- *   MD  Montgomery County DPS licenses: building contractors (new-home builders), master and limited master
- *       electricians, limited electrical businesses, fire-system licensees (bulk)
  *   OH  Cleveland Building & Housing contractor registrations (active; bulk)
- *   TN  Nashville Metro Codes registered professional contractors and their licenses (bulk)
+ *   TN  Nashville Metro Codes registered professional contractors (bulk; the layer publishes no status)
  *   PA  Philadelphia L&I trade licenses: contractors, electrical, plumbing, fire suppression, sheet metal, home
  *       improvement, demolition, excavation (bulk; the contractor's address joined from L&I permit contractors)
  *
+ * NYC DOB and DCWP licenses, DOB discipline and DCWP complaints, and the Montgomery County (MD) licenses are searched
+ * by the NY and MD packs (./ny.ts, ./md.ts).
+ *
  * Enforcement (companies only; LOCAL_ENFORCEMENT, for ../registry.ts):
- *   NY  New York City DOB disciplinary actions against licensees (1998 to today)
  *   NY  New York City DOB / ECB (OATH) building-code violations, by respondent
- *   NY  New York City DCWP consumer complaints (Sept 2022 to today)
  *   PA  Philadelphia L&I contractor violations (bulk, companies only)
  */
 import type { LicenseHit } from "@shared/research-reports";
@@ -43,84 +39,46 @@ import { clean, type BulkHit, type BulkSource } from "../bulk";
 import type { SodaEnforcement } from "../state-records";
 import type { LiveEnforcementSearch, LiveLicenseSearch } from "./types";
 import { addressLine, arcgisAll, fullName, isoDay, sodaAll, txt } from "./lib/local-fetch";
+import { looksLikeBusiness } from "./lib/business-name";
 
 type Row = Record<string, unknown>;
 const soda = (domain: string, id: string) => ({ datasetUrl: `https://${domain}/d/${id}`, url: `https://${domain}/resource/${id}.json` });
 
-/** One license row as a bulk hit, indexed by its business name, its people, license number, phone and address. */
-function licenseHit(h: Omit<LicenseHit, "matchedOn" | "people"> & { people: { name: string | null; role: string | null }[] }): BulkHit {
+/**
+ * One license row as a bulk hit, indexed by its business name, its people, license number, phone and address. A row
+ * for an individual (no business name) keeps its city only: its street address and phone are a home address and
+ * phone (audit 2026-10-15, decision 4), so they are neither shown nor indexed.
+ */
+export function licenseHit(h: Omit<LicenseHit, "matchedOn" | "people"> & { people: { name: string | null; role: string | null }[] }): BulkHit {
   const people = h.people.filter((p): p is { name: string; role: string | null } => !!p.name);
+  const biz = !!h.businessName;
   return {
     kind: "license",
-    hit: { ...h, people, matchedOn: h.businessName ? "business" : "principal" },
+    hit: { ...h, ...(biz ? {} : { address: null, phone: null }), people, matchedOn: biz ? "business" : "principal" },
     business: h.businessName, person: people[0]?.name ?? null, people: people.slice(1).map((p) => p.name),
-    keys: { licenses: [h.licenseNumber], phones: [h.phone], addresses: [h.address] },
+    keys: biz ? { licenses: [h.licenseNumber], phones: [h.phone], addresses: [h.address] } : { licenses: [h.licenseNumber] },
   };
 }
 
-/** A name that is a company's ("ACME ROOFING LLC"), not a person's. */
-const ORG = /\b(INC|INCORPORATED|LLC|L\.L\.C|LLP|LP|CORP|CORPORATION|CO|COMPANY|LTD|GROUP|ENTERPRISES?|SERVICES?|CONSTRUCTION|CONTRACTORS?|CONTRACTING|ROOFING|ELECTRIC(AL)?|PLUMBING|HEATING|MECHANICAL|BUILDERS?|ASSOCIATES|SYSTEMS|PARTNERS|HOLDINGS|SOLUTIONS|INDUSTRIES|DEVELOPMENT|RESTORATION|RENOVATIONS?|REMODELING|HOME|HOMES|TRUST)\b/i;
+/** More keys for a row made by licenseHit; address and phone keys only on a business row (decision 4, as above). */
+function addKeys(h: BulkHit, k: { licenses?: (string | null)[]; addresses?: (string | null)[]; phones?: (string | null)[] }): void {
+  if (!h.keys) return;
+  if (k.licenses) h.keys.licenses = k.licenses;
+  if (h.kind !== "license" || !h.hit.businessName) return;
+  if (k.addresses) h.keys.addresses = k.addresses;
+  if (k.phones) h.keys.phones = k.phones;
+}
+
+/** A name that is a company's ("ACME ROOFING LLC"), not a person's ("David Power" is a person): ./lib/business-name.ts. */
+const ORG = { test: (v: string) => looksLikeBusiness(v) };
 
 /** A status field that holds something else (a phone number in a few NYC DOB rows) is no status. */
 const statusOf = (v: string | null) => (v && /[A-Za-z]/.test(v) ? v : null);
 
 // ── New York City ────────────────────────────────────────────────────────────────────────────────────────────────
-const NYC_DOB_LICENSES = soda("data.cityofnewyork.us", "t8hj-ruu2");
-const NYC_DCWP_LICENSES = soda("data.cityofnewyork.us", "w7w3-xahh");
-
-const nycDob: BulkSource = {
-  id: "ny-nyc-dob-licenses", state: "NY", label: "New York City Department of Buildings licenses (contractors and trades)",
-  pageUrl: NYC_DOB_LICENSES.datasetUrl, everyHours: 24, minRows: 72_000,
-  load: async function* () {
-    for await (const r of sodaAll(NYC_DOB_LICENSES.url)) {
-      const person = fullName(txt(r, "first_name"), txt(r, "last_name"));
-      const business = txt(r, "business_name");
-      if (!person && !business) continue;
-      yield licenseHit({
-        state: "NY", source: "New York City DOB licenses", sourceUrl: NYC_DOB_LICENSES.datasetUrl,
-        businessName: business, licenseNumber: txt(r, "license_number"), licenseType: txt(r, "license_type"), specialty: null,
-        status: statusOf(txt(r, "license_status")), principal: person, city: txt(r, "license_business_city"), expires: null,
-        address: addressLine([txt(r, "business_house_number"), txt(r, "business_street_name")], txt(r, "license_business_city"), txt(r, "business_state"), txt(r, "business_zip_code")),
-        phone: txt(r, "business_phone_number"),
-        people: [{ name: person, role: "Licensee" }],
-      });
-    }
-  },
-};
-
-const nycDcwp: BulkSource = {
-  id: "ny-nyc-dcwp-hic", state: "NY", label: "New York City DCWP home-improvement contractor licenses",
-  pageUrl: NYC_DCWP_LICENSES.datasetUrl, everyHours: 24, minRows: 13_000,
-  load: async function* () {
-    for await (const r of sodaAll(NYC_DCWP_LICENSES.url, "business_category in ('Home Improvement Contractor','Construction Labor Provider')")) {
-      const name = txt(r, "business_name"), dba = txt(r, "dba_trade_name");
-      if (!name) continue;
-      const business = dba && dba.toUpperCase() !== name.toUpperCase() ? `${name} (d/b/a ${dba})` : name;
-      yield licenseHit({
-        state: "NY", source: "New York City DCWP licenses", sourceUrl: NYC_DCWP_LICENSES.datasetUrl,
-        businessName: business, licenseNumber: txt(r, "license_nbr"), licenseType: txt(r, "business_category"), specialty: null,
-        status: txt(r, "license_status"), principal: null, city: txt(r, "address_city"), expires: isoDay(r.lic_expir_dd),
-        address: addressLine([txt(r, "address_building"), txt(r, "address_street_name")], txt(r, "address_city"), txt(r, "address_state"), txt(r, "address_zip")),
-        phone: txt(r, "contact_phone"), people: [],
-      });
-    }
-  },
-};
-
+// NYC DOB/DCWP licenses, DOB discipline and DCWP complaints are searched by the NY pack (states/ny.ts); only the
+// DOB / ECB violations are searched from here.
 const nycEnforcement: SodaEnforcement[] = [
-  {
-    state: "NY", source: "New York City DOB disciplinary actions", scope: "Actions against DOB licensees' companies, 1998 to today",
-    ...soda("data.cityofnewyork.us", "ndq3-kuef"), nameFields: ["company"],
-    toHit: (r: Row) => {
-      const lic = txt(r, "license_no")?.replace(/^#/, "") ?? null;
-      return {
-        category: "discipline", name: txt(r, "company"), id: null, date: isoDay(r.date), endDate: null,
-        status: "DOB disciplinary action", city: "New York City",
-        detail: [txt(r, "license_type") ? `${txt(r, "license_type")} license${lic ? ` #${lic}` : ""}` : null, txt(r, "disposition")].filter(Boolean).join(". ").slice(0, 800) || null,
-        amount: null, adverse: true, licenseNumber: lic,
-      };
-    },
-  },
   {
     state: "NY", source: "New York City DOB / ECB building-code violations", scope: "Violations where the company is the respondent, 1980s to today",
     ...soda("data.cityofnewyork.us", "6bgk-3dad"), nameFields: ["respondent_name"], order: "issue_date DESC",
@@ -137,20 +95,6 @@ const nycEnforcement: SodaEnforcement[] = [
         amount: Number.isFinite(penalty) && penalty > 0 ? penalty : null,
         adverse: hearing === "DISMISSED" ? false : hearing && /IN VIOLATION|IN-VIO|DEFAULT/.test(hearing) ? true : null,
         address: addressLine([txt(r, "respondent_house_number"), txt(r, "respondent_street")], txt(r, "respondent_city"), null, txt(r, "respondent_zip")),
-      };
-    },
-  },
-  {
-    state: "NY", source: "New York City DCWP consumer complaints", scope: "Complaints filed with the Department of Consumer and Worker Protection, Sept 2022 to today",
-    ...soda("data.cityofnewyork.us", "nre2-6m2s"), nameFields: ["business_name"], order: "intake_date DESC",
-    toHit: (r: Row) => {
-      const refund = Number(r.refund_amount);
-      return {
-        category: "complaint", name: txt(r, "business_name"), id: txt(r, "record_id"), date: isoDay(r.intake_date), endDate: isoDay(r.result_date),
-        status: txt(r, "result") ? `Complaint: ${txt(r, "result")}` : "Complaint", city: txt(r, "city"),
-        detail: [txt(r, "business_category"), txt(r, "complaint_code"), Number.isFinite(refund) && refund > 0 ? `refund $${refund.toLocaleString("en-US")}` : null].filter(Boolean).join(". ") || null,
-        amount: null, adverse: null,
-        address: addressLine([txt(r, "building_nbr"), txt(r, "street1")], txt(r, "city"), txt(r, "state"), txt(r, "postcode")),
       };
     },
   },
@@ -187,7 +131,9 @@ const phlTrade: BulkSource = {
   id: "pa-phl-trade-licenses", state: "PA", label: "Philadelphia L&I trade and contractor licenses", pageUrl: PHL_PAGE,
   everyHours: 24 * 7, minRows: 28_000,
   load: async function* () {
-    // The latest address each contractor gave on a permit, by commercial activity license number.
+    // An address the contractor gave on a permit, by commercial activity license number. The layer has no date, so
+    // which permit is newest is unknown: the one kept is the last in object-id order, shown as an address on file,
+    // never called the latest.
     const addr = new Map<string, string>();
     for await (const r of arcgisAll(PHL_PERMIT_CONTRACTORS, "cal_number IS NOT NULL", "cal_number,contractor_address,objectid")) {
       const a = phlAddress(r.contractor_address == null ? null : String(r.contractor_address));
@@ -208,7 +154,7 @@ const phlTrade: BulkSource = {
         address: cal ? addr.get(cal) ?? null : null, phone: null,
         people: [{ name: who, role: "Licensee" }],
       });
-      if (h.keys) h.keys.licenses = [txt(r, "licensenumber"), cal];
+      addKeys(h, { licenses: [txt(r, "licensenumber"), cal] });
       yield h;
     }
   },
@@ -236,48 +182,6 @@ const phlViolations: BulkSource = {
   },
 };
 
-// ── Montgomery County, Maryland (Department of Permitting Services) ─────────────────────────────────────────────
-type MocoSet = { id: string; slug: string; label: string; floor: number; f: { no: string; type: string; who: string; extra?: string; trade?: string; addr: string; addr2: string; zip: string; phone?: string; expires: string } };
-const MOCO_STD = { no: "licenseno", type: "licensetype", who: "applicant", addr: "addr1", addr2: "addr2", zip: "zip", expires: "expiredate" };
-const MOCO: MocoSet[] = [
-  { id: "c7hs-c9qq", slug: "builders", label: "Montgomery County (MD) building contractor licenses", floor: 1_700, f: { ...MOCO_STD, extra: "additionalapplicant", trade: "businessname", phone: "telephone" } },
-  { id: "v8mn-6i2r", slug: "master-electricians", label: "Montgomery County (MD) master electrician licenses", floor: 2_900, f: MOCO_STD },
-  { id: "f637-ajic", slug: "limited-master-electricians", label: "Montgomery County (MD) limited master electrician licenses", floor: 400, f: MOCO_STD },
-  { id: "rmjr-4zb9", slug: "limited-electrical-businesses", label: "Montgomery County (MD) limited electrical business licenses", floor: 290, f: MOCO_STD },
-  { id: "yjd7-guhd", slug: "fire-systems", label: "Montgomery County (MD) fire-system licenses", floor: 560,
-    f: { no: "license_number", type: "license_type", who: "applicant", addr: "address1", addr2: "address2", zip: "zip_code", expires: "expired_date" } },
-];
-
-const mocoSource = (m: MocoSet): BulkSource => {
-  const ds = soda("data.montgomerycountymd.gov", m.id);
-  return {
-    id: `md-moco-${m.slug}`, state: "MD", label: m.label, pageUrl: ds.datasetUrl, everyHours: 24 * 7, minRows: m.floor,
-    load: async function* () {
-      for await (const r of sodaAll(ds.url)) {
-        const raw = txt(r, m.f.who);
-        if (!raw || /^TEST ONLY/i.test(raw)) continue;
-        // A few names carry the county's own markers ("BAD - ", "EXPIRED - ", " - INACTIVE LIMITED MASTER"): searched
-        // without them, and shown as published in the specialty line.
-        const marked = /\b(BAD|EXPIRED)\s+-\s|\s-\s+INACTIVE\b/i.test(raw);
-        const applicant = clean(raw.replace(/^[_\s]+/, "").replace(/\b(BAD|EXPIRED)\s+-\s+/gi, " ").replace(/\s+-\s+INACTIVE\b.*$/i, ""));
-        if (!applicant) continue;
-        const trade = m.f.trade ? txt(r, m.f.trade) : null;
-        const extra = m.f.extra ? txt(r, m.f.extra) : null;
-        const isOrg = ORG.test(applicant) || !!trade || m.slug === "limited-electrical-businesses";
-        const business = isOrg ? (trade && trade.toUpperCase() !== applicant.toUpperCase() ? `${applicant} (${trade})` : applicant) : null;
-        yield licenseHit({
-          state: "MD", source: m.label, sourceUrl: ds.datasetUrl,
-          businessName: business, licenseNumber: txt(r, m.f.no), licenseType: txt(r, m.f.type), specialty: [txt(r, "scope_limitation"), marked ? `name as published: ${raw}` : null].filter(Boolean).join("; ") || null,
-          status: null, principal: isOrg ? extra : applicant, city: txt(r, "city"), expires: isoDay(r[m.f.expires]),
-          address: addressLine([txt(r, m.f.addr)], txt(r, "city"), txt(r, "state"), txt(r, m.f.zip)),
-          phone: m.f.phone ? txt(r, m.f.phone) : null,
-          people: [{ name: isOrg ? extra : applicant, role: isOrg ? "Additional applicant" : "Licensee" }],
-        });
-      }
-    },
-  };
-};
-
 // ── Cleveland, Ohio ──────────────────────────────────────────────────────────────────────────────────────────────
 const CLE = "https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/Active_Contractor_Registrations/FeatureServer/0";
 const CLE_PAGE = "https://www.arcgis.com/home/item.html?id=92e169a99d7b42ae97f6c28a7f7e9a19";
@@ -295,7 +199,7 @@ const cleveland: BulkSource = {
         address: addressLine([txt(r, "B1_ADDRESS1"), txt(r, "B1_ADDRESS2")], txt(r, "B1_CITY"), txt(r, "B1_STATE"), txt(r, "B1_ZIP")),
         phone: txt(r, "B1_PHONE1"), people: [],
       });
-      if (h.keys) h.keys.licenses = [txt(r, "B1_ALT_ID"), rrp];
+      addKeys(h, { licenses: [txt(r, "B1_ALT_ID"), rrp] });
       yield h;
     }
   },
@@ -312,7 +216,8 @@ const nashville: BulkSource = {
       if (!name) continue;
       yield licenseHit({
         state: "TN", source: "Nashville registered professional contractors", sourceUrl: NASH_PAGE,
-        businessName: name, licenseNumber: null, licenseType: txt(r, "Prof__Type"), specialty: null, status: "Active (registered with Metro Codes)",
+        // The layer publishes no status field: what it is (Metro Codes' registered contractors) goes in the specialty line.
+        businessName: name, licenseNumber: null, licenseType: txt(r, "Prof__Type"), specialty: "Listed in Metro Codes' registered professional contractors", status: null,
         principal: null, city: txt(r, "City"), expires: null,
         address: addressLine([txt(r, "Address")], txt(r, "City"), txt(r, "ST"), txt(r, "ZIP")), phone: null, people: [],
       });
@@ -391,7 +296,7 @@ const dcContractors: BulkSource = {
         city: premise?.split(",")[1]?.trim() ?? null, expires: isoDay(r.LICENSEENDDATE), address: premise, phone: null,
         people: [{ name: owner ?? (sole ? entity : null), role: "Owner" }, { name: agent && agent !== owner ? agent : null, role: "Registered agent" }],
       });
-      if (h.keys) h.keys.addresses = [premise, billing];
+      addKeys(h, { addresses: [premise, billing] });
       yield h;
     }
   },
@@ -483,7 +388,7 @@ const losAngeles: BulkSource = {
         licenseNumber: txt(r, "location_account"), licenseType: "Business tax registration", specialty: txt(r, "primary_naics_description"),
         status: "Active", principal: null, city: txt(r, "city"), expires: null, address, phone: null, people: [],
       });
-      if (h.keys) h.keys.addresses = [address, mailing];
+      addKeys(h, { addresses: [address, mailing] });
       yield h;
     }
   },
@@ -508,7 +413,7 @@ const sanFrancisco: BulkSource = {
         status: closed ? `Location closed ${closed}` : "Location open", principal: ownerIsOrg ? null : owner, city: txt(r, "city"), expires: null,
         address, phone: null, people: [{ name: ownerIsOrg ? null : owner, role: "Owner" }],
       });
-      if (h.keys) { h.keys.licenses = [txt(r, "certificate_number"), txt(r, "ttxid")]; h.keys.addresses = [address, mailing]; }
+      addKeys(h, { licenses: [txt(r, "certificate_number"), txt(r, "ttxid")], addresses: [address, mailing] });
       yield h;
     }
   },
@@ -532,7 +437,7 @@ const seattle: BulkSource = {
         people: [{ name: sole ? legal : null, role: "Owner (sole proprietor)" }],
       });
       // The state UBI ties the certificate to Washington L&I and Secretary of State records.
-      if (h.keys) h.keys.licenses = [txt(r, "city_account_number"), txt(r, "ubi")];
+      addKeys(h, { licenses: [txt(r, "city_account_number"), txt(r, "ubi")] });
       yield h;
     }
   },
@@ -567,7 +472,7 @@ const newOrleans: BulkSource = {
         status: "Licensed", principal: person, city: txt(r, "city"), expires: null, address, phone: txt(r, "phonenumber"),
         people: [{ name: person, role: "Owner" }],
       });
-      if (h.keys) h.keys.addresses = [address, mailing];
+      addKeys(h, { addresses: [address, mailing] });
       yield h;
     }
   },
@@ -595,7 +500,7 @@ const batonRouge: BulkSource = {
         city: txt(r, "tphysicalcity"), expires: null, address: address ?? mailing, phone: null,
         people: [{ name: contact && !ORG.test(contact) ? contact : null, role: "Account contact" }],
       });
-      if (h.keys) h.keys.addresses = [address, mailing];
+      addKeys(h, { addresses: [address, mailing] });
       yield h;
     }
   },
@@ -643,7 +548,7 @@ const norfolk: BulkSource = {
         address: location ?? mailing, phone: null,
         people: [{ name: ownerIsOrg ? null : owner, role: "Primary owner" }],
       });
-      if (h.keys) h.keys.addresses = [location, mailing];
+      addKeys(h, { addresses: [location, mailing] });
       yield h;
     }
   },
@@ -681,7 +586,7 @@ const miamiDade: BulkSource = {
         status: code ? `code ${code} (as of 2024-10-25)` : null, principal: tradesman, city: txt(r, "CONTRACTOR_CITY"), expires: null,
         address, phone, people: [{ name: tradesman, role: "Tradesman" }],
       });
-      if (h.keys) { h.keys.phones = [phone, tPhone]; h.keys.addresses = [address, tAddress]; }
+      addKeys(h, { phones: [phone, tPhone], addresses: [address, tAddress] });
       yield h;
     }
   },
@@ -695,8 +600,12 @@ const lasVegas: BulkSource = {
   load: async function* () {
     // One row per owner of a license: gather each license's owners ("Donald Terry - Manager").
     const byLicense = new Map<string, { row: Row; people: { name: string; role: string | null }[] }>();
-    for await (const r of arcgisAll(LV, "Type_of_Business = 'Contractor'")) {
-      const no = txt(r, "License__") ?? `row ${txt(r, "ObjectId")}`;
+    let oid: string | null = null;
+    for await (const r of arcgisAll(LV, "Type_of_Business = 'Contractor'", "*", 2000, { onMeta: (m) => { oid = m.oid; } })) {
+      // A row without a license number is its own record, keyed by the layer's real object-id field (from its metadata).
+      const rowId = oid ? txt(r, oid) : null;
+      const no = txt(r, "License__") ?? (rowId ? `row ${rowId}` : null);
+      if (!no) throw new Error("Las Vegas business licenses: a row has neither a license number nor an object id");
       const entry = byLicense.get(no) ?? { row: r, people: [] };
       const owner = txt(r, "Owner_and_Owner_Title");
       const m = owner?.match(/^(.*?)\s+-\s+([^-]+)$/);
@@ -797,7 +706,7 @@ export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, phlTrade, phlViolati
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
-export const LOCAL_ENFORCEMENT: SodaEnforcement[] = nycEnforcement.filter((e) => /6bgk-3dad/.test(e.url)); // ECB violations only (see above)
+export const LOCAL_ENFORCEMENT: SodaEnforcement[] = nycEnforcement; // ECB violations only (see above)
 /** Other city and county enforcement searches, by state. */
 export const LOCAL_LIVE_ENFORCEMENT: Record<string, LiveEnforcementSearch[]> = {};
 
