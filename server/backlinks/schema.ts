@@ -44,7 +44,6 @@ export async function ensureBacklinkSchema() {
     CREATE INDEX IF NOT EXISTS backlink_sources_kind_tier ON backlink_sources(kind, tier);
     ALTER TABLE backlink_sources ADD COLUMN IF NOT EXISTS contacts_checked_at timestamptz;
     ALTER TABLE backlink_sources ADD COLUMN IF NOT EXISTS expanded_at timestamptz;
-    ALTER TABLE backlink_queries ADD COLUMN IF NOT EXISTS task_id text, ADD COLUMN IF NOT EXISTS task_posted_at timestamptz;
     CREATE TABLE IF NOT EXISTS backlink_queries (
       id serial PRIMARY KEY,
       kind text NOT NULL,
@@ -57,6 +56,9 @@ export async function ensureBacklinkSchema() {
       last_run_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+    -- After the CREATE: on a fresh database the ALTER used to run first and the boot died with
+    -- "relation backlink_queries does not exist" (only existing databases ever got past it).
+    ALTER TABLE backlink_queries ADD COLUMN IF NOT EXISTS task_id text, ADD COLUMN IF NOT EXISTS task_posted_at timestamptz;
     CREATE TABLE IF NOT EXISTS backlink_events (
       id bigserial PRIMARY KEY,
       source_id integer NOT NULL REFERENCES backlink_sources(id) ON DELETE CASCADE,

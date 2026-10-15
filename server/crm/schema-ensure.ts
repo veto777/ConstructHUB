@@ -483,9 +483,6 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     ALTER TABLE crm_appointments ADD COLUMN IF NOT EXISTS created_by_member_id varchar;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS invoice_id varchar;
-    ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS author_member_id varchar;
-    ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS estimate_id varchar;
-    ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS to_member_id varchar;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS note text;
     ALTER TABLE crm_projects ADD COLUMN IF NOT EXISTS division_id varchar;
     ALTER TABLE crm_members ADD COLUMN IF NOT EXISTS division_id varchar;
@@ -663,6 +660,11 @@ export async function ensureCrmSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS crm_attachments_ref_idx ON crm_attachments (kind, ref_id);
     CREATE INDEX IF NOT EXISTS crm_client_comments_customer_idx ON crm_client_comments (customer_id);
     CREATE INDEX IF NOT EXISTS crm_client_comments_org_idx ON crm_client_comments (org_id);
+    -- Additive columns, after the CREATE: they used to sit in the "additive columns" block above, which
+    -- runs first and would fail on a fresh database (the table did not exist yet).
+    ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS author_member_id varchar;
+    ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS estimate_id varchar;
+    ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS to_member_id varchar;
   `);
 
   // ── Client 360: contractor notes + financing click log ───────────────────

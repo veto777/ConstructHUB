@@ -24,6 +24,8 @@ export function GuardStatus({id}:{id:number}) {
   const g=data?.find(g=>g.id===id);
   return <span className="text-xs">{error?'Watch unavailable':!g?'Checking watch…':`Watch: ${g.mode}${g.pending?` · ${g.pending} pending`:''}${g.last_error?' · needs attention':''}`}</span>;
 }
+/** Google's own page on reporting a review that violates its policies (owner 2026-10-15: link it, without the tracking query). */
+export const GOOGLE_REPORT_REVIEW_HELP='https://support.google.com/business/answer/4596773';
 export function GoogleReport({type,id}:{type:'changes'|'reviews';id:number}) {
   const [open,setOpen]=useState(false),[explanation,setExplanation]=useState('');
   const {toast}=useToast(),url=`/api/gbp/reports/${type}/${id}`;
@@ -33,6 +35,7 @@ export function GoogleReport({type,id}:{type:'changes'|'reviews';id:number}) {
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>Prepare report for Google</DialogTitle><DialogDescription>Google receives this report only when you submit Google's form. Marking it reported here only updates ConstructHUB.</DialogDescription></DialogHeader>
       {error?<p role="alert">Could not load report.</p>:!data?<p>Loading evidence…</p>:<>
         <p className="text-sm">{type==='changes'?"Google's redressal form is for misleading or fraudulent business information. For ordinary corrections, use your Business Profile. Paste the listing link into Google's form.":'Select this business and review in the Reviews Management Tool. A negative rating alone is not a policy violation.'}</p>
+        {type==='reviews'&&<p className="text-sm"><a className="underline" href={GOOGLE_REPORT_REVIEW_HELP} target="_blank" rel="noreferrer" data-testid="link-google-report-review-help">What Google removes, and how a report is handled ↗</a></p>}
         {data.listingUrl?<a className="underline" href={data.listingUrl} target="_blank" rel="noreferrer">Open listing on Google Maps</a>:<p>Listing link unavailable. Find the listing on Google Maps before submitting.</p>}
         <label>Evidence from ConstructHUB<Textarea aria-label="Report evidence" readOnly rows={9} value={data.text}/></label>
         <label>Your explanation and evidence<Textarea value={explanation} onChange={e=>setExplanation(e.target.value)} placeholder="Describe the issue and include supporting evidence; do not invent facts."/></label>

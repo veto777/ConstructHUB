@@ -3,7 +3,7 @@ import { AgencyWorkspace, Pager, fullAddress, useAgencyFilter } from "@/componen
 import { inNativeApp } from "@/lib/app-shell";
 import { STARTING_MONTHLY_CENTS, formatUsd } from "@shared/plan-copy";
 import { LocationSearchSummary } from "./site-connections";
-import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
+import { ProfileGuard, GuardStatus, GoogleReport, GOOGLE_REPORT_REVIEW_HELP } from "@/components/profile-guard";
 import { GbpConnection } from "@/components/gbp-connection";
 import { startGbpConnect } from "@/components/recent-auth";
 import { InfoTip } from "@/components/info-tip";
@@ -740,6 +740,7 @@ ${r.comment || "(no text)"}`;
       <div>
         <div className="flex items-center gap-1"><h3 className="text-base font-semibold">Reviews</h3><InfoTip k="location-reviews" /></div>
         <p className="text-xs text-muted-foreground max-w-xl">Every review on your Google listing is saved here on each sync. When one disappears, is edited or comes back, it is logged with its full text and you get an alert, so a review a competitor reported never just vanishes without a name.</p>
+        <p className="text-xs text-muted-foreground max-w-xl">A review that breaks Google's rules (spam, a fake, a conflict of interest, off-topic or offensive) can be reported from the list below. <a className="underline" href={GOOGLE_REPORT_REVIEW_HELP} target="_blank" rel="noopener noreferrer" data-testid="link-google-report-review-help">How Google handles review reports ↗</a></p>
       </div>
       <div className="grid grid-cols-3 gap-3">
         <button type="button" onClick={() => setView("all")} className={`rounded-lg border p-3 text-center ${view === "all" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`} data-testid="reviews-count-live"><p className="text-2xl font-bold">{data ? live.length : "—"}</p><p className="text-xs text-muted-foreground">On Google now{location.avgRating ? ` · ${location.avgRating}★` : ""}</p></button>
@@ -789,6 +790,10 @@ ${r.comment || "(no text)"}`;
                 <div className="flex flex-wrap items-center gap-2">{r.reviewer_photo_url && <img src={r.reviewer_photo_url} alt="" className="h-6 w-6 rounded-full" loading="lazy" />}<span className="font-medium">{r.reviewer_name || "A reviewer"}</span><Stars n={r.rating} /><span className="text-xs text-muted-foreground">{fmtDay(r.review_date)}</span>{r.edit_count > 0 && <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-300">edited {r.edit_count}×</span>}{r.reply_comment ? <span className="text-[11px] text-muted-foreground">replied</span> : <span className="text-[11px] text-destructive">no reply</span>}</div>
                 <p className="whitespace-pre-wrap">{r.comment || "(no text)"}</p>
                 {r.previous && (r.previous.comment !== r.comment || r.previous.rating !== r.rating) && <p className="text-xs text-muted-foreground">Before the edit: <Stars n={r.previous.rating} /> {r.previous.comment || "(no text)"}</p>}
+                <div className="flex flex-wrap gap-2 pt-1" data-testid={`review-actions-${r.id}`}>
+                  <GoogleReport type="reviews" id={r.id} />
+                  <Button size="sm" variant="outline" onClick={() => void copy(r)}>{copied === r.id ? "Copied" : "Copy the text"}</Button>
+                </div>
               </li>))}</ul>
           )}
           <div className="p-3 border-t"><Button asChild size="sm" variant="outline"><a href={`/google-reviews/reviews?location=${location.id}`}>Reply to reviews</a></Button></div>
