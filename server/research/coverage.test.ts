@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { STATE_CODES } from "@shared/research-reports";
-import { coverageNote, withFacets, type CoverageManifest, type CoverageSource, type CoverageState } from "@shared/research-coverage";
+import { coverageNote, nationwideNow, withFacets, type CoverageManifest, type CoverageSource, type CoverageState } from "@shared/research-coverage";
 import { buildCoverageManifest, installNetworkGuard, kindOfLabel, probe } from "./coverage-manifest";
 
 // The guard stubs this worker's network for good: every search below is a probe, never a real request.
@@ -29,11 +29,13 @@ describe("coverage manifest (from the registry)", () => {
 
   it("every source can be searched some way, and nationwide records are listed once", () => {
     for (const s of manifest.states) for (const src of s.sources) expect(src.ids.length, `${s.state}: ${src.label}`).toBeGreaterThan(0);
-    // OSHA needs DOL_API_KEY: a build without the key doesn't claim it. CourtListener is off (its robots.txt
-    // disallows us), so it isn't claimed either (audit 2026-10-15).
+    // CourtListener is off (its robots.txt disallows us), so it isn't claimed (audit 2026-10-15). OSHA is listed with
+    // `needs: "osha"` whatever the build holds: the running server's key decides whether the page shows it (round 4).
     expect(manifest.nationwide.some((n) => /CourtListener/.test(n.label))).toBe(false);
-    if (process.env.DOL_API_KEY) expect(manifest.nationwide.some((n) => /OSHA/.test(n.label))).toBe(true);
-    if (!process.env.DOL_API_KEY) expect(manifest.nationwide.some((n) => /OSHA/.test(n.label))).toBe(false);
+    expect(manifest.nationwide.find((n) => /OSHA/.test(n.label))).toMatchObject({ needs: "osha" });
+    expect(nationwideNow(manifest.nationwide, { osha: false }).some((n) => /OSHA/.test(n.label))).toBe(false);
+    expect(nationwideNow(manifest.nationwide, { osha: true }).some((n) => /OSHA/.test(n.label))).toBe(true);
+    expect(nationwideNow(manifest.nationwide, undefined).some((n) => /OSHA/.test(n.label))).toBe(false);
   });
 
   it("never publishes the blocked lists, only how many there are", () => {

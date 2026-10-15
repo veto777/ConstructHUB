@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button";
 import { stateName } from "@/lib/voice-studio";
 import { COMPLIANCE_PATH, RESEARCH_PATH } from "@shared/research-reports";
 import {
-  COVERAGE_ID_LABELS, COVERAGE_KIND_LABELS, COVERAGE_KIND_ORDER, RESEARCH_COVERAGE_PATH, coverageNote, withFacets,
-  type CoverageFacets, type CoverageSource, type CoverageState,
+  COVERAGE_ID_LABELS, COVERAGE_KIND_LABELS, COVERAGE_KIND_ORDER, RESEARCH_COVERAGE_PATH, coverageNote, nationwideNow, withFacets,
+  type CoverageFacets, type CoverageRuntime, type CoverageSource, type CoverageState,
 } from "@shared/research-coverage";
 import { ComplianceFrame } from "./compliance";
 
@@ -108,6 +108,7 @@ export default function ResearchCoveragePage() {
   const [picked, setPicked] = useHashState();
   // The loaded files' real identifiers. Optional: the page reads fine without them (and is prerendered without them).
   const { data: facets } = useQuery<CoverageFacets>({ queryKey: ["/api/research-reports/coverage-facets"], retry: false, staleTime: 3600_000 });
+  const { data: runtime } = useQuery<CoverageRuntime>({ queryKey: ["/api/research-reports/coverage-runtime"], retry: false, staleTime: 600_000 });
   const states = useMemo(() => [...manifest.states].sort((a, b) => stateName(a.state).localeCompare(stateName(b.state))), []);
   const current = picked ? manifest.states.find((s) => s.state === picked) ?? null : null;
   const totals = useMemo(() => ({
@@ -159,7 +160,7 @@ export default function ResearchCoveragePage() {
         <h2 className="text-xl font-semibold">In every state</h2>
         <ul className="space-y-1.5 text-sm list-disc pl-5">
           <li>Every city and county permit portal we can reach in the states you pick, searched by name.</li>
-          {manifest.nationwide.map((n) => <li key={n.label}>{n.label}, for companies.</li>)}
+          {nationwideNow(manifest.nationwide, runtime).map((n) => <li key={n.label}>{n.label}, for companies.</li>)}
           <li>
             A cross-reference of what we find: the license numbers, phones, addresses and people on a contractor's licenses are
             searched again, so other licenses and businesses tied to them show up in the report, each with the link that ties it.
