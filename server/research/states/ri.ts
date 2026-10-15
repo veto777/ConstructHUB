@@ -235,7 +235,7 @@ export const pack: StatePack = {
     { source: "Rhode Island DLT trade licenses (Professional Regulation)", sourceUrl: DLT_LICENSES, search: dltLicenseSearch, searchBy: dltSearchBy },
   ],
   liveEnforcement: [
-    { source: "Rhode Island DLT Professional Regulation violations", scope: "Current violations and violation history of the DLT trades", search: dltViolations },
+    { source: "Rhode Island DLT Professional Regulation violations", scope: "Current violations and violation history of the DLT trades", category: "discipline", search: dltViolations },
   ],
   bulk: [
     { id: "ri-dbr-rosters", state: "RI", label: "Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",

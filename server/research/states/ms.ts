@@ -251,7 +251,7 @@ async function* msRevokedSuspended(): AsyncIterable<BulkHit> {
 const BULK: BulkSource[] = [
   {
     id: "ms-msboc-revoked-suspended", state: "MS", label: "Mississippi State Board of Contractors revoked and suspended licenses",
-    pageUrl: SEARCH_PAGE, everyHours: 24, minRows: 64, companiesOnly: true, load: msRevokedSuspended,
+    pageUrl: SEARCH_PAGE, everyHours: 24, minRows: 64, companiesOnly: true, category: "discipline", load: msRevokedSuspended,
   },
 ];
 
@@ -259,7 +259,7 @@ export const pack: StatePack = {
   state: "MS",
   checked: "2026-10-15",
   liveLicenses: [{ source: "Mississippi State Board of Contractors", sourceUrl: SEARCH_PAGE, search: searchMsboc, searchBy: searchMsbocBy }],
-  liveEnforcement: [{ source: "Mississippi State Board of Contractors complaints and violations", scope: "Commercial and residential complaints the board publishes, with their resolutions", search: searchMsViolations }],
+  liveEnforcement: [{ source: "Mississippi State Board of Contractors complaints and violations", scope: "Commercial and residential complaints the board publishes, with their resolutions", category: "complaint", search: searchMsViolations }],
   bulk: BULK,
   blocked: [
     "MSBOC Excel export of every license (search.msboc.us ViewExcel): works, but carries no classification, expiration or qualifying party, so the live search with detail pages is used instead",

@@ -96,7 +96,7 @@ const IA_ASBESTOS_PERMITS: BulkSource = {
 
 const IA_SOS_ACTIVE: BulkSource = {
   id: "ia-sos-active", state: "IA", label: "Iowa Secretary of State active business entities", pageUrl: hubPage(554),
-  everyHours: 24 * 7, minRows: 240_000, companiesOnly: true, // 348,270 on 2026-10-15
+  everyHours: 24 * 7, minRows: 240_000, companiesOnly: true, category: "business_status", // 348,270 on 2026-10-15
   load: async function* () {
     for await (const r of hubRows(554)) {
       const name = clean(r.legal_name);

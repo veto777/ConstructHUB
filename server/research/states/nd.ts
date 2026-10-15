@@ -77,7 +77,7 @@ const ND_CONTRACTORS: LiveLicenseSearch = {
 
 const ND_SOS_STATUS: LiveEnforcementSearch = {
   source: "North Dakota Secretary of State business entity status", scope: "Every business filing, active and inactive",
-  search: async (name) => {
+  category: "business_status", search: async (name) => {
     const rows = (await fsSearch("business", name.trim())).filter((r) => hasAllWords(name, r.TITLE?.[0])).slice(0, 10);
     const out: EnforcementHit[] = [];
     for (const r of rows) {

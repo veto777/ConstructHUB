@@ -152,7 +152,7 @@ async function* laViolations(): AsyncIterable<BulkHit> {
 const BULK: BulkSource[] = [
   {
     id: "la-lslbc-violations", state: "LA", label: "Louisiana State Licensing Board for Contractors violations",
-    pageUrl: VIOLATIONS_PAGE, everyHours: 24 * 7, minRows: 2800, companiesOnly: true, load: laViolations,
+    pageUrl: VIOLATIONS_PAGE, everyHours: 24 * 7, minRows: 2800, companiesOnly: true, category: "discipline", load: laViolations,
   },
 ];
 

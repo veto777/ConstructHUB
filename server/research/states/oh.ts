@@ -150,7 +150,7 @@ export const pack: StatePack = {
     "Ohio does not license general or residential contractors statewide; the Construction Industry Licensing Board licenses commercial electrical, HVAC, plumbing, hydronics and refrigeration contractors (searched above), and local building departments regulate residential contractors",
   blocked: [
     "elicense.ohio.gov (Salesforce license lookup for the other Commerce boards and OCILB board actions): the page carries a CAPTCHA",
-    "Ohio Secretary of State business reports (ohiosos.gov): HTTP 403 with a maintenance page on 2026-10-15; recheck later",
+    "Ohio Secretary of State business reports (ohiosos.gov): HTTP 403 with a \"Website Maintenance\" page on 2026-10-15, and again on the retry at 06:52 UTC from tower1 and vb11 (robots.txt and businesssearch.ohiosos.gov too); recheck later",
     "OCILB disciplinary actions: no published list or download found on com.ohio.gov",
     "Ohio Facilities Construction Commission debarment list (R.C. 153.02): no published list found",
   ],

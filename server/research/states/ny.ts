@@ -214,7 +214,7 @@ async function searchEdList(name: string): Promise<EnforcementHit[]> {
 }
 
 const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [
-  { source: "New York DOL / Workers' Compensation Board public-work debarments", scope: "Contractors barred from public work (prevailing-wage and workers' comp violations)", search: searchEdList },
+  { source: "New York DOL / Workers' Compensation Board public-work debarments", scope: "Contractors barred from public work (prevailing-wage and workers' comp violations)", category: "debarment", search: searchEdList },
 ];
 
 export const pack: StatePack = {

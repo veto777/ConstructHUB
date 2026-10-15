@@ -238,12 +238,12 @@ const liveLicenses: LiveLicenseSearch[] = [
 const bulk: BulkSource[] = [
   {
     id: "nv-nscb-discipline", state: "NV", label: "Nevada State Contractors Board disciplinary and board actions (2001 to today)",
-    pageUrl: NSCB_DISCIPLINE_PAGE, everyHours: 24 * 7, minRows: 4700, companiesOnly: true, load: nscbDisciplineLoader,
+    pageUrl: NSCB_DISCIPLINE_PAGE, everyHours: 24 * 7, minRows: 4700, companiesOnly: true, category: "discipline", load: nscbDisciplineLoader,
   },
 ];
 
 const liveEnforcement: LiveEnforcementSearch[] = [
-  { source: "Nevada Labor Commissioner disqualified contractors", scope: "Contractors barred from public works contracts (NRS 338.017), current list", search: searchNvDisqualified },
+  { source: "Nevada Labor Commissioner disqualified contractors", scope: "Contractors barred from public works contracts (NRS 338.017), current list", category: "debarment", search: searchNvDisqualified },
 ];
 
 export const pack: StatePack = {

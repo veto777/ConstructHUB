@@ -194,7 +194,7 @@ const liveLicenses: LiveLicenseSearch[] = [
 ];
 
 const liveEnforcement: LiveEnforcementSearch[] = [
-  { source: "Utah DOPL agency and disciplinary actions", scope: "Disciplinary cases (with their orders) and citations, every DOPL profession", search: searchDoplActions },
+  { source: "Utah DOPL agency and disciplinary actions", scope: "Disciplinary cases (with their orders) and citations, every DOPL profession", category: "discipline", search: searchDoplActions },
 ];
 
 export const pack: StatePack = {
