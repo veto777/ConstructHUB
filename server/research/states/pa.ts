@@ -67,7 +67,7 @@ const PGH_FILES: { resource: string; label: string; people: boolean }[] = [
   { resource: "51470435-a36f-4385-aee2-1c4766214a9a", label: "Pittsburgh PLI trade licenses", people: true },
 ];
 
-async function* pittsburghLoader(): AsyncIterable<BulkHit> {
+export async function* pittsburghLoader(): AsyncIterable<BulkHit> {
   for (const f of PGH_FILES) {
     // The datastore API, a page at a time (the CSV dump endpoint answers 502 at times).
     for (let offset = 0; ; offset += 5000) {
@@ -269,17 +269,17 @@ export const pack: StatePack = {
   checked: "2026-10-15",
   bulk: [
     { id: "pa-philadelphia", state: "PA", label: "Philadelphia L&I trade licenses", pageUrl: PHL_PAGE, everyHours: 24, minRows: 35_000, load: phillyLoader },
-    { id: "pa-pittsburgh", state: "PA", label: "Pittsburgh PLI contractor and trade licenses", pageUrl: PGH_PAGE, everyHours: 24 * 7, minRows: 7_000, load: pittsburghLoader },
     { id: "pa-dli-debarments", state: "PA", label: "Pennsylvania L&I Prevailing Wage Act debarments", pageUrl: PA_DLI_DEBAR, everyHours: 24 * 7, minRows: 3,
       load: dliDebarmentsLoader, companiesOnly: true, category: "debarment" },
   ],
   enforcement: ENFORCEMENT,
   liveEnforcement: LIVE_ENFORCEMENT,
-  noStatewideGcLicense: "Pennsylvania does not license general contractors statewide; home improvement contractors register with the Attorney General, and trades are licensed by municipalities (Philadelphia's and Pittsburgh's are searched above)",
+  noStatewideGcLicense: "Pennsylvania does not license general contractors statewide; home improvement contractors register with the Attorney General, and trades are licensed by municipalities (Philadelphia's are searched above)",
   blocked: [
     "PA Attorney General home improvement contractor registry (hicsearch.attorneygeneral.gov): Cloudflare Turnstile CAPTCHA on the search and its .xlsx download",
     "PA Department of State PALS license verification (pals.pa.gov; architects, engineers, crane operators and other state boards): the search loads Google reCAPTCHA v3",
     "PA Attorney General consumer complaints: no open dataset on data.pa.gov",
+    "Pittsburgh PLI contractor and trade licenses (data.wprdc.org): robots.txt disallows /api/ and /datastore/dump/ for every agent (checked 2026-10-15); the loader is kept (pittsburghLoader) but not registered",
     "PA Common Pleas civil cases: not on the UJS web portal (county systems only)",
   ],
 };
