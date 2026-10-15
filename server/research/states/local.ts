@@ -17,6 +17,7 @@
  *   LA  East Baton Rouge Parish business registrations, NAICS group "Construction" (bulk)
  *   MO  Kansas City business license holders, construction business types (bulk)
  *   VA  Norfolk business licenses, construction NAICS (bulk)
+ *   FL  Miami-Dade County contractor licenses with their tradesmen (the county's layer, last updated 2024-10-25; bulk)
  *   IL  Chicago BACP home-repair licenses, with every owner and officer from the city's Business Owners dataset (bulk)
  *   MD  Montgomery County DPS licenses: building contractors (new-home builders), master and limited master
  *       electricians, limited electrical businesses, fire-system licensees (bulk)
@@ -618,10 +619,48 @@ const norfolk: BulkSource = {
   },
 };
 
+// ── Miami-Dade County ────────────────────────────────────────────────────────────────────────────────────────────
+// The county's "Contractor" layer stopped updating on 2024-10-25 (its newest renewal and issue dates); still the
+// county's own record of every contractor license, its tradesman, phones and addresses. Status letters are
+// unexplained by the publisher, so they are shown as codes.
+const MDC = "https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/contractor_daily_data/FeatureServer/0";
+const MDC_PAGE = "https://www.arcgis.com/home/item.html?id=1a2cb89e4c134eae80074395fd90d5b0";
+/** Area code and a seven-digit number stored as integers (305, 6650239) → "3056650239"; null when either is 0. */
+const mdcPhone = (area: unknown, num: unknown) => {
+  const a = Number(area), n = Number(num);
+  return a > 0 && n > 0 ? `${a}${String(n).padStart(7, "0")}` : null;
+};
+const mdcZip = (v: unknown) => { const t = v == null ? "" : String(v); return t.length === 9 ? t.slice(0, 5) : t.length === 5 ? t : null; };
+const miamiDade: BulkSource = {
+  id: "fl-miami-dade-contractors", state: "FL", label: "Miami-Dade County contractor licenses", pageUrl: MDC_PAGE, everyHours: 24 * 7, minRows: 15_000,
+  load: async function* () {
+    for await (const r of arcgisAll(MDC)) {
+      const name = txt(r, "CONTRACTOR_NAME"), dba = txt(r, "CONTR_DBA_NAME");
+      if (!name) continue;
+      const tradesman = txt(r, "TRADESMEN_NAME"); // published last name first ("PERAZA GEORGE")
+      const code = txt(r, "CONTRACTOR_STATUS");
+      const trades = Array.from({ length: 10 }, (_, i) => txt(r, `TRADE_CATEGORY_DESC_${i + 1}`)).filter(Boolean);
+      const phone = mdcPhone(r.CONTRACTOR_AREA_CODE, r.CONTRACTOR_PHONE);
+      const tPhone = mdcPhone(r.TRADESMAN_AREA_CODE, r.TRADESMAN_PHONE);
+      const address = addressLine([txt(r, "CONTRACTOR_ADDRESS")], txt(r, "CONTRACTOR_CITY"), txt(r, "CONTRACTOR_STATE"), mdcZip(r.CONTRACTOR_ZIPCODE));
+      const tAddress = addressLine([txt(r, "TRADESMEN_ADDRESS")], txt(r, "TRADESMAN_CITY"), txt(r, "TRADESMAN_STATE"), mdcZip(r.TRADESMAN_ZIPCODE));
+      const h = licenseHit({
+        state: "FL", source: "Miami-Dade County contractor licenses", sourceUrl: MDC_PAGE,
+        businessName: dba && dba.toUpperCase() !== name.toUpperCase() ? `${name} (d/b/a ${dba})` : name,
+        licenseNumber: txt(r, "CONTRACTOR_NUMBER"), licenseType: txt(r, "TRADE_CLASS_DESC"), specialty: trades.join(", ") || null,
+        status: code ? `code ${code} (as of 2024-10-25)` : null, principal: tradesman, city: txt(r, "CONTRACTOR_CITY"), expires: null,
+        address, phone, people: [{ name: tradesman, role: "Tradesman" }],
+      });
+      if (h.keys) { h.keys.phones = [phone, tPhone]; h.keys.addresses = [address, tAddress]; }
+      yield h;
+    }
+  },
+};
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, seattle, newOrleans, batonRouge, kansasCity, norfolk];
+export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
