@@ -315,13 +315,21 @@ export async function queueVettedDirectories(pick: (emails: string[]) => string 
 
 const FREE_MAIL_ADDR = /@(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|aol|icloud|proton(mail)?)\./i;
 
-/** Vetted directories (any tier) that publish an email and were never classified. Government sites never reach the AI. */
+/**
+ * Sites the relationship emails can use, never classified: vetted directories, and sites the Backlinks grade rejected
+ * only because no page invites guest posts (a trade association or newspaper still is a relationship; 2026-10-15).
+ * Government sites never reach the AI.
+ */
+export const RESCUABLE_SQL = `status = 'rejected' AND signals IS NOT NULL
+  AND EXISTS (SELECT 1 FROM unnest(reasons) r WHERE r LIKE 'No page on the site invites%')
+  AND NOT EXISTS (SELECT 1 FROM unnest(reasons) r WHERE r NOT LIKE 'No page on the site invites%' AND r NOT LIKE '+%')`;
 export async function needingClass(limit: number): Promise<{ domain: string; title: string | null; homeTitle: string | null }[]> {
   const r = await db().query(
     `SELECT domain, signals->>'title' AS title, signals->>'homeTitle' AS "homeTitle" FROM backlink_sources
-      WHERE status = 'qualified' AND kind IN ('directory', 'citation') AND cardinality(contact_emails) > 0 AND partner_class IS NULL
+      WHERE partner_class IS NULL
+        AND ((status = 'qualified' AND kind IN ('directory', 'citation')) OR (${RESCUABLE_SQL}))
         AND domain !~ '\\.(gov|mil|edu)$' AND domain !~ '\\.(state|k12|co|ci|city|us)\\.[a-z]{2}\\.us$'
-      ORDER BY tier, score DESC NULLS LAST LIMIT $1`, [limit]);
+      ORDER BY status = 'qualified' DESC, cardinality(contact_emails) > 0 DESC, tier, score DESC NULLS LAST LIMIT $1`, [limit]);
   return r.rows;
 }
 export async function saveClasses(classes: Map<string, string>, names: Map<string, string> = new Map()) {
@@ -330,14 +338,14 @@ export async function saveClasses(classes: Map<string, string>, names: Map<strin
 }
 
 /**
- * Queue classified directories (2026-10-15): a listing directory gets the Directory Sync email, a trade association or
- * chamber the member-resource email. Government sites and webmail addresses (often a member's, not the organisation's)
+ * Queue classified sites (2026-10-15): a listing directory gets the Directory Sync email, a trade association or
+ * chamber the member-resource email, a newspaper the news email. Government sites and webmail addresses (often a member's, not the organisation's)
  * are never queued.
  */
 export async function queueClassified(pick: (emails: string[]) => string | null, name: (domain: string, signals: any) => string): Promise<number> {
   const r = await db().query(
     `SELECT s.domain, s.partner_class, s.partner_name, s.contact_emails, s.signals FROM backlink_sources s
-      WHERE s.status = 'qualified' AND s.partner_class IN ('listing_directory', 'trade_association', 'chamber') AND cardinality(s.contact_emails) > 0
+      WHERE s.status IN ('qualified', 'rejected') AND s.partner_class IN ('listing_directory', 'trade_association', 'chamber', 'news') AND cardinality(s.contact_emails) > 0
         AND NOT EXISTS (SELECT 1 FROM media_outreach_queue q WHERE q.domain = s.domain)
         AND NOT EXISTS (SELECT 1 FROM media_partners p WHERE p.domain = s.domain)
       ORDER BY s.tier, s.score DESC NULLS LAST`);
@@ -348,7 +356,7 @@ export async function queueClassified(pick: (emails: string[]) => string | null,
     if (!to) continue;
     const ins = await db().query(
       `INSERT INTO media_outreach_queue (domain, company, kind, to_email, source) VALUES ($1, $2, $3, $4, 'backlinks-classified') ON CONFLICT (domain) DO NOTHING RETURNING id`,
-      [x.domain, (x.partner_name ?? name(x.domain, x.signals)).slice(0, 120), x.partner_class === "listing_directory" ? "directory" : "association", to.toLowerCase()]);
+      [x.domain, (x.partner_name ?? name(x.domain, x.signals)).slice(0, 120), ({ listing_directory: "directory", news: "news" } as Record<string, string>)[x.partner_class] ?? "association", to.toLowerCase()]);
     if (ins.rows[0]) added++;
   }
   return added;

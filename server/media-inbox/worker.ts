@@ -333,7 +333,7 @@ export function dailyAllowance(daysSending: number, env: NodeJS.ProcessEnv = pro
 const perDay = (env: NodeJS.ProcessEnv = process.env) => dailyAllowance(0, env);
 export const outreachPerDay = perDay;
 
-export const CLASSIFY_BATCH = 25, CLASSIFY_BATCHES_PER_PASS = 4;
+export const CLASSIFY_BATCH = 25, CLASSIFY_BATCHES_PER_PASS = 8;
 /** Sort vetted directories into listing directories, trade associations, chambers and the rest (ai.ts classifySites). */
 export async function classifyDirectories(): Promise<number> {
   let n = 0;
