@@ -184,8 +184,10 @@ export function verifyEnforcement(details: any, businessName: string, url: strin
       city: clean(w.CountyName) ? `${clean(w.CountyName)} County` : city,
       detail: [`State tax warrant filed by ${clean(w.PlaintiffName) ?? "L&I"}`, clean(w.CauseNumber) ? `superior court cause ${clean(w.CauseNumber)}` : null,
         money(w.ComplaintAmount) ? `amount ${usd(money(w.ComplaintAmount))}` : null, money(w.PaymentAmount) ? `paid ${usd(money(w.PaymentAmount))}` : null].filter(Boolean).join(", "),
-      // A tax warrant filed in superior court is adverse unless its status says it was dismissed or withdrawn.
-      amount: money(w.ComplaintAmount), adverse: adverseFrom(status) === false ? false : true,
+      // The filing is said in the detail ("State tax warrant filed …"); `adverse` is the warrant's current outcome
+      // (round 5, decision 8): a vacated warrant is not adverse, otherwise the status's own words decide, and a status
+      // that says neither way (or none) stays unknown.
+      amount: money(w.ComplaintAmount), adverse: status && /\bvacat/i.test(status) ? false : adverseFrom(status),
     });
   }
   for (const l of c.Lapses ?? []) {

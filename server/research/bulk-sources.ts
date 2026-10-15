@@ -32,7 +32,7 @@ import { inflateSync } from "node:zlib";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { USER_AGENT, fetchWithDeadline, rateLimitHost, rethrowIfBlocked } from "./http";
 import { adverseFrom } from "./adverse";
-import { TRAILING_SUFFIX, looksLikeBusiness, looksLikeBusinessTrailingSuffix } from "./states/lib/business-name";
+import { looksLikeBusiness, looksLikeBusinessTrailingSuffix, personNameForm } from "./states/lib/business-name";
 import { clean, csvRecords, csvRows, download, lines, plainRequest, saveResponse, usDate, type BulkHit, type BulkSource } from "./bulk";
 import { type IdKeys } from "./identifiers";
 import { tokens } from "./licenses";
@@ -361,9 +361,10 @@ export function flRespondent(name: string, lines: string[]): { name: string; bus
   const { own, marked } = markedNames(name);
   const real = Array.from(new Set([...tradeNames(marked), ...lines.flatMap((l) => flDbaOf(l) ?? [])]))
     .filter((d) => !DBA_PLACEHOLDER.test(d) && !sameWords(d, own));
-  // "GREEN, GENERAL H" is a person in DBPR's "LAST, FIRST M" form: a trade word in it ("general") doesn't make it a
-  // business; only an entity word at its end does.
-  const personForm = !!own && /^[a-z'-]+(?:\s+(?:jr|sr|ii|iii|iv)\.?)?,\s*[a-z'-]+(?:\s+[a-z'.-]+)?$/i.test(own) && !TRAILING_SUFFIX.test(own);
+  // "GREEN, GENERAL H, JR." and "VAN DYKE, GENERAL H" are people in DBPR's "LAST, FIRST M" form: a trade word in
+  // them ("general") doesn't make them businesses, and a form that might be a person ("AIR CONDITIONING, JESSE") isn't
+  // shown to be one either (A10, decision 3). Only an entity word at the end, or a name with no personal form, can be.
+  const personForm = !!own && personNameForm(own) !== null;
   if (own && !personForm && looksLikeBusinessTrailingSuffix(own)) return { name: [own, ...real].join(" / "), business: [own, ...real].join(" "), dbaOnly: false };
   return real.length ? { name: real.join(" / "), business: real.join(" "), dbaOnly: true } : null;
 }
@@ -373,14 +374,18 @@ export const flRespondentIsBusiness = (name: string, dbas: string[]) => flRespon
 const localityLine = (city: string | null, state: string | null, zip: string | null) => [city, state, zip5(zip)].map((v) => clean(v)).filter(Boolean).join(" ") || null;
 
 /**
- * A complaint row loaded before PAYLOAD_VERSION 4 (read time; round 3, decision 4; round 4, decision 4): the same
+ * A complaint row loaded before PAYLOAD_VERSION 5 (read time; round 3, decision 4; round 4, decision 4; A10): the same
  * rule on what it stored. "NAME / DBA / …" is split back into the respondent and the names after it. The stored names
  * lost their DBA marker, so they can't be shown to be DBAs any more: a respondent who reads as a business keeps its
- * record under its own name only, and anyone else's record is dropped until the file reloads.
+ * record under its own name only, and anyone else's record is dropped until the file reloads. A version-4 row only
+ * needs the personal-form check.
  */
-export function flLegacyComplaint(h: EnforcementHit): EnforcementHit | null {
+export function flLegacyComplaint(h: EnforcementHit, storedVersion = 0): EnforcementHit | null {
   const [first] = (h.name ?? "").split(" / ").map((v) => v.trim()).filter(Boolean);
   if (!first) return null;
+  // A version-4 row was made under today's rule but for personal name forms (A10, decision 3): its DBA-only records
+  // (the DBA's name, locality only) stand; a record whose first name has a personal form is dropped.
+  if (storedVersion >= 4) return personNameForm(first) === null ? h : null;
   const who = flRespondent(first, []);
   return who && !who.dbaOnly ? { ...h, name: who.name } : null;
 }
@@ -1195,7 +1200,7 @@ export const BULK_SOURCES: BulkSource[] = [
   // 26,001 rows loaded live 2026-10-15 once individual respondents were left out (49,360 with them); 20,669 once a DBA
   // needed its marker (round 4, decision 4), which is row shape 1. Floor about 80%.
   { id: "fl-dbpr-complaints", state: "FL", label: "Florida DBPR complaints and discipline (construction and electrical)", pageUrl: FL_COMPLAINTS_PAGE, everyHours: 24, minRows: 16_500,
-    rowShape: 1, legacyEnforcement: flLegacyComplaint,
+    rowShape: 1, legacyEnforcement: flLegacyComplaint, enforcementRuleVersion: 5,
     load: flComplaintsLoader, companiesOnly: true },
   { id: "fl-stop-work", state: "FL", label: "Florida stop-work orders (Division of Workers' Compensation)", pageUrl: FL_SWO, everyHours: 24, minRows: 40_000,
     load: flStopWorkLoader, companiesOnly: true },

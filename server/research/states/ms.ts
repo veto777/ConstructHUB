@@ -93,7 +93,8 @@ async function msDetails(rows: MsResultRow[], matchedOn: LicenseHit["matchedOn"]
     const want = tokens(name ?? "");
     const quals = Array.from(new Set(d.classes.map((c) => c.qualifier).filter((q): q is string => !!q)));
     // A person search names the qualifying party it matched; any other search lists the license's qualifiers.
-    const principal = matchedOn === "principal" ? quals.filter((q) => { const have = new Set(tokens(q)); return want.every((w) => have.has(w)); }).join(" / ") || null : quals.join(" / ") || null;
+    // One person per field (round 5, decision 4): never several qualifiers joined into one name; all are in `people`.
+    const principal = (matchedOn === "principal" ? quals.filter((q) => { const have = new Set(tokens(q)); return want.every((w) => have.has(w)); })[0] : quals.length === 1 ? quals[0] : null) ?? null;
     const people = [
       ...quals.map((q) => ({ name: q, role: `Qualifying party (${d.classes.filter((c) => c.qualifier === q).map((c) => c.cls).join(", ")})` })),
       ...d.officers.map((o) => ({ name: o.name, role: o.title })),

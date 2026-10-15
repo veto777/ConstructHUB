@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { pool } from "../db";
-import { USER_AGENT, fetchWithDeadline, guard, noteResponse, sleep, withRun } from "./http";
+import { USER_AGENT, fetchWithDeadline, guard, isHtmlType, noteResponse, refuseChallengeBody, sleep, withRun } from "./http";
 import type { EnforcementCategory, EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { tokens } from "./licenses";
 import { addressMatches, idWords, queryWords, type IdKeys, type IdQuery } from "./identifiers";
@@ -76,7 +76,12 @@ export type BulkSource = {
    * For an enforcement row stored before PAYLOAD_VERSION: the source's current rule on who a record is about, run on
    * what was stored (null drops it). Without it, an older row is kept only when its name reads as a business.
    */
-  legacyEnforcement?: (h: EnforcementHit) => EnforcementHit | null;
+  legacyEnforcement?: (h: EnforcementHit, storedVersion: number) => EnforcementHit | null;
+  /**
+   * The payload version from which this source's enforcement rows follow its current rule (default
+   * ENFORCEMENT_RULE_VERSION). A source whose subject rule changed raises it, and only its older rows are re-read.
+   */
+  enforcementRuleVersion?: number;
 };
 
 const DDL = `
@@ -99,6 +104,11 @@ CREATE INDEX IF NOT EXISTS research_bulk_rows_source ON research_bulk_rows (sour
 ALTER TABLE research_bulk_sources ADD COLUMN IF NOT EXISTS facets jsonb;
 ALTER TABLE research_bulk_sources ADD COLUMN IF NOT EXISTS key_version integer NOT NULL DEFAULT 0;
 ALTER TABLE research_bulk_sources ADD COLUMN IF NOT EXISTS row_shape integer NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS research_bulk_jobs (
+  name text PRIMARY KEY,
+  done_at timestamptz NOT NULL DEFAULT now(),
+  detail jsonb
+);
 `;
 
 /**
@@ -118,11 +128,16 @@ export const KEY_VERSION = 3;
  * enforcement subject checked again (BulkSource.legacyEnforcement, or the business-name rule), since the rule that
  * let it in has changed. Raise it when a classifier changes.
  */
-export const PAYLOAD_VERSION = 4;
+export const PAYLOAD_VERSION = 5;
 /*
  * Version 4 (round 4, decision 4): a Florida DBA needs a DBA marker, and entity abbreviations count only as the
  * name's last word. Older complaint rows are re-read by flLegacyComplaint.
+ * Version 5 (A10, decision 3): FL personal name forms (suffixes, compound surnames, "might be a person") are never a
+ * business. Only FL complaints re-reads its version-4 rows (its enforcementRuleVersion is 5).
  */
+
+/** The version from which an enforcement row is current for a source that sets no enforcementRuleVersion of its own. */
+export const ENFORCEMENT_RULE_VERSION = 4;
 
 /**
  * The payload version from which a stored license row's `holder` is today's rule (round 3's publisher-only holders).
@@ -265,6 +280,63 @@ async function loadSourceRun(src: BulkSource): Promise<number> {
   return n;
 }
 
+/** One pass of purgeLegacyKeys reads this many table pages at a time (a TID range scan: about 2,000 rows, no sort). */
+const PURGE_PAGES = 200;
+/** Bump to run the purge again under a newer rule. */
+export const PURGE_JOB = "purge-legacy-contact-keys-v1";
+
+/**
+ * The phone and street keys ("t:", "a:") of stored rows that today's rules don't allow, removed from the index once,
+ * whether or not their source ever reloads (A10, decision 5): a license row whose holder is not a business by today's
+ * rule (readStored: the stored holder from before HOLDER_VERSION is recomputed by the source's legacyHolder, or else
+ * unknown), and an enforcement row that its source's current subject rule drops or strips of its address. The row
+ * itself stays (it is still found by name or license number, and read through readStored); only those keys go.
+ *
+ * Done in place: one pass over the table's pages, PURGE_PAGES pages per read (a TID range scan), an UPDATE of the affected rows only
+ * (no copy of the table, no VACUUM FULL; autovacuum reclaims the old row versions). Recorded in research_bulk_jobs, so
+ * it runs once. `sources` gives each row's legacy hooks by source id (a source no longer listed has none).
+ */
+export async function purgeLegacyKeys(sources: BulkSource[], log = (m: string) => console.log(`[research-bulk] ${m}`)): Promise<{ scanned: number; purged: number; bySource: Record<string, number> } | null> {
+  await bulkSchemaReady();
+  const { rows: done } = await pool.query(`SELECT 1 FROM research_bulk_jobs WHERE name = $1`, [PURGE_JOB]);
+  if (done.length) return null;
+  const byId = new Map(sources.map((s) => [s.id, s]));
+  // The table's pages as they are now: a row the purge rewrites lands at the end, already without those keys.
+  const { rows: [size] } = await pool.query(`SELECT (pg_relation_size('research_bulk_rows') / current_setting('block_size')::bigint)::bigint AS pages`);
+  const pages = Number(size?.pages ?? 0);
+  let scanned = 0, purged = 0;
+  const bySource: Record<string, number> = {};
+  for (let page = 0; page < pages; page += PURGE_PAGES) {
+    const { rows } = await pool.query(
+      `SELECT ctid::text AS tid, source, words, hit FROM research_bulk_rows WHERE ctid >= $1::tid AND ctid < $2::tid`,
+      [`(${page},0)`, `(${page + PURGE_PAGES},0)`],
+    );
+    scanned += rows.length;
+    const updates: { ctid: string; words: string[] }[] = [];
+    for (const r of rows) {
+      const contact = (r.words as string[]).filter((w) => w.startsWith("a:") || w.startsWith("t:"));
+      if (!contact.length) continue;
+      const read = readStored(byId.get(r.source) ?? {}, r.hit);
+      if (read?.keysSafe) continue;
+      updates.push({ ctid: r.tid, words: (r.words as string[]).filter((w) => !w.startsWith("a:") && !w.startsWith("t:")) });
+      bySource[r.source] = (bySource[r.source] ?? 0) + 1;
+    }
+    if (updates.length) {
+      await pool.query(
+        // "ctid = ANY" keeps it a TID scan of those rows only.
+        `UPDATE research_bulk_rows r SET words = u.words FROM jsonb_to_recordset($1::jsonb) AS u(ctid text, words text[])
+         WHERE r.ctid = ANY($2::tid[]) AND r.ctid = u.ctid::tid`,
+        [JSON.stringify(updates), updates.map((u) => u.ctid)],
+      );
+      purged += updates.length;
+    }
+    await sleep(20);
+  }
+  await pool.query(`INSERT INTO research_bulk_jobs (name, detail) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`, [PURGE_JOB, JSON.stringify({ scanned, purged, bySource })]);
+  log(`purged phone/address keys of ${purged} stored row(s) that today's rules don't allow (${scanned} scanned)`);
+  return { scanned, purged, bySource };
+}
+
 export type BulkStatus = { loaded: boolean; rows: number; loadedAt: string | null; error: string | null; keyVersion: number };
 
 export async function sourceStatus(id: string): Promise<BulkStatus> {
@@ -283,7 +355,7 @@ export type StoredHit = { kind: "license"; hit: LicenseHit } | { kind: "enforcem
  * A license row stored before HOLDER_VERSION doesn't keep the holder it was stored with (round 4, decision 3): it gets
  * the source's current rule on the stored fields (legacyHolder), or null.
  */
-export function readRow(src: Pick<BulkSource, "legacyEnforcement" | "legacyHolder">, row: { k: "license" | "enforcement"; h: any; v?: number }): StoredHit | null {
+export function readRow(src: Pick<BulkSource, "legacyEnforcement" | "legacyHolder" | "enforcementRuleVersion">, row: { k: "license" | "enforcement"; h: any; v?: number }): StoredHit | null {
   return readStored(src, row)?.stored ?? null;
 }
 
@@ -293,7 +365,7 @@ export function readRow(src: Pick<BulkSource, "legacyEnforcement" | "legacyHolde
  * check left its address as stored. A key stored under an older rule never matches otherwise, whether or not the
  * source has reloaded since.
  */
-export function readStored(src: Pick<BulkSource, "legacyEnforcement" | "legacyHolder">, row: { k: "license" | "enforcement"; h: any; v?: number }): { stored: StoredHit; keysSafe: boolean } | null {
+export function readStored(src: Pick<BulkSource, "legacyEnforcement" | "legacyHolder" | "enforcementRuleVersion">, row: { k: "license" | "enforcement"; h: any; v?: number }): { stored: StoredHit; keysSafe: boolean } | null {
   const v = row.v ?? 0;
   if (row.k === "license") {
     const stored = row.h as LicenseHit;
@@ -305,8 +377,8 @@ export function readStored(src: Pick<BulkSource, "legacyEnforcement" | "legacyHo
     return { stored: { kind: "license", hit: rest as LicenseHit }, keysSafe };
   }
   const h = row.h as EnforcementHit;
-  if (v >= PAYLOAD_VERSION) return { stored: { kind: "enforcement", hit: h }, keysSafe: true };
-  const fixed = src.legacyEnforcement ? src.legacyEnforcement(h) : (h.name ?? "").split(/\s+\/\s+|;/).some((n) => looksLikeBusiness(n)) ? h : null;
+  if (v >= (src.enforcementRuleVersion ?? ENFORCEMENT_RULE_VERSION)) return { stored: { kind: "enforcement", hit: h }, keysSafe: true };
+  const fixed = src.legacyEnforcement ? src.legacyEnforcement(h, v) : (h.name ?? "").split(/\s+\/\s+|;/).some((n) => looksLikeBusiness(n)) ? h : null;
   return fixed ? { stored: { kind: "enforcement", hit: fixed }, keysSafe: (fixed.address ?? null) === (h.address ?? null) && (fixed.phone ?? null) === (h.phone ?? null) } : null;
 }
 
@@ -415,13 +487,24 @@ export async function plainRequest(url: string, opts: { method?: string; headers
   // A 401/403 blocks the host for every caller; a Retry-After sets its cooldown.
   try { noteResponse(url, res.statusCode ?? 0, res.headers["retry-after"] as string | undefined); }
   catch (err) { res.resume(); throw err; }
+  // The URL that answered, for the challenge check when the body is read (A10, finding 6).
+  answeredUrl.set(res, url);
   return res;
 }
+
+const answeredUrl = new WeakMap<IncomingMessage, string>();
+/** A 2xx HTML body from plainRequest checked for a bot challenge (blocks the host that answered, and throws). */
+const checkPlainBody = (res: IncomingMessage, body: string) => {
+  const url = answeredUrl.get(res);
+  if (url && isHtmlType(String(res.headers["content-type"] ?? ""))) refuseChallengeBody(url, res.statusCode ?? 0, body);
+};
 
 export async function readText(res: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const c of res) chunks.push(c as Buffer);
-  return Buffer.concat(chunks).toString("utf8");
+  const text = Buffer.concat(chunks).toString("utf8");
+  checkPlainBody(res, text);
+  return text;
 }
 
 /** Stream a plainRequest response to a temp file (the caller deletes it). */
@@ -430,6 +513,11 @@ export async function saveResponse(res: IncomingMessage): Promise<string> {
   const path = join(tmpdir(), `ch-bulk-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   try { await pipeline(res, createWriteStream(path)); }
   catch (err) { await fs.rm(path, { force: true }); throw err; }
+  // An HTML answer where a file was expected may be a bot challenge (A10, finding 6): its start is checked.
+  if (answeredUrl.has(res) && isHtmlType(String(res.headers["content-type"] ?? ""))) {
+    const head = await fs.open(path).then(async (fh) => { const b = Buffer.alloc(64 * 1024); const { bytesRead } = await fh.read(b, 0, b.length, 0); await fh.close(); return b.subarray(0, bytesRead).toString("utf8"); });
+    try { checkPlainBody(res, head); } catch (err) { await fs.rm(path, { force: true }); throw err; }
+  }
   // A cut-off chunked response can end "cleanly"; a Content-Length mismatch is the one check available.
   const want = Number(res.headers["content-length"]);
   if (want && (await fs.stat(path)).size !== want) { await fs.rm(path, { force: true }); throw new Error("download cut off"); }

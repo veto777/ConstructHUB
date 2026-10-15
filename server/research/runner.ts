@@ -31,7 +31,7 @@ import {
 } from "@shared/research-reports";
 import { SITE_ORIGIN as SITE } from "@shared/seo";
 import { nameSearchable, searchLicenses, searchLicensesBy, type LicenseSource } from "./licenses";
-import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy, sourceStatus, type BulkSource, type StoredHit } from "./bulk";
+import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy, sourceStatus, purgeLegacyKeys, type BulkSource, type StoredHit } from "./bulk";
 import { SAM_SOURCE_ID } from "./sam";
 import { setKnowledgeFact } from "../hub/knowledge";
 import type { LiveLicenseSearch } from "./states/types";
@@ -40,7 +40,7 @@ import { companyNamed, onePersonField, personMatches } from "./licenses";
 import { ALL_BULK_SOURCES, nationwideBulkSources, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
 import { capNote, noteOf } from "./notes";
 import { disciplineRecord, privateHit, reportHit } from "./privacy";
-import { guard, guardBrowser, noteResponse, politeFetch, releaseHost, withRun, type Turn } from "./http";
+import { guard, guardBrowser, noteResponse, politeFetch, refuseChallengeBody, releaseHost, withRun, type Turn } from "./http";
 import { researchTransport, type ResearchTransport } from "../scrapers/research-transport";
 import type { IdQuery } from "./identifiers";
 import { previewCompanyRecords, searchCompanyRecords, searchEnforcement } from "./records";
@@ -70,12 +70,18 @@ export async function portalsInStates(states: string[]): Promise<Map<string, Db[
 export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | "states">): Promise<ResearchPreview> {
   let licenseMatches = 0, identifierMatches = 0;
   const licenseSourceStates = input.states.filter(hasLicenseSources);
+  // Where a license search really ran (round 5, decision 10): a source that throws or isn't available doesn't count.
+  const searchedStates = new Set<string>();
   for (const s of input.subjects) {
     const finders = [...input.states.flatMap((st) => findersFor(st)), ...nationwideFinders()];
     const found = new LicenseSet();
     for (const f of finders) {
       if (!f.byName || f.companiesOnly) continue;
-      try { for (const h of (await f.byName(s.name, s.kind)).hits) found.add(h); } catch { /* the preview is a hint, not the report */ }
+      try {
+        const r = await f.byName(s.name, s.kind);
+        for (const h of r.hits) found.add(h);
+        if (r.searched) searchedStates.add(f.state);
+      } catch { /* the preview is a hint, not the report */ }
     }
     const before = found.list.length;
     const ids = await searchCustomerIds(finders, subjectIds(s), s).catch(() => null);
@@ -93,7 +99,7 @@ export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | 
           ran: { complaints: !!(records.ran?.complaints || r.ran?.complaints), courtCases: !!(records.ran?.courtCases || r.ran?.courtCases), osha: !!(records.ran?.osha || r.ran?.osha), enforcement: !!(records.ran?.enforcement || r.ran?.enforcement) } }
       : r;
   }
-  return { licenseMatches, identifierMatches, licenseSourceStates, portalsByState: Object.fromEntries(Array.from(portals, ([s, l]) => [s, l.length])), ...(records ? { records } : {}) };
+  return { licenseMatches, identifierMatches, licenseSourceStates, licenseSearchedStates: input.states.filter((st) => searchedStates.has(st)), portalsByState: Object.fromEntries(Array.from(portals, ([s, l]) => [s, l.length])), ...(records ? { records } : {}) };
 }
 
 const stored = (hits: StoredHit[]): FinderResult => ({
@@ -226,6 +232,8 @@ const PERMIT_TRANSPORT: ResearchTransport = {
   before: (url, holdMs) => guard(url, 1000, holdMs),
   // The request's own turn is released (round 4, finding 12): a late answer never ends another request's turn.
   after: (url, status, retryAfter, turn) => { releaseHost(url, turn as Turn); noteResponse(url, status, retryAfter); },
+  // A 2xx challenge page on an EnerGov API post blocks the host that answered (round 5, decision 6).
+  checkBody: refuseChallengeBody,
 };
 
 /** A portal refused by robots.txt or an access denial reads as that, not as a failed search. */
@@ -326,17 +334,14 @@ export function namesMatch(name: string, row: any, kind: "person" | "company" = 
 }
 
 /**
- * The separate people one permit name field holds (round 3, decision 7): split on " and ", "&", ";", "/" and line
- * breaks ("Jane Smith and John Doe" → two names). A part that still reads as more than one name (more than four name
- * words, "Jane Smith, John Doe" or "LAST, FIRST, LAST, FIRST"; round 4, decision 7: a comma is "LAST, FIRST" only with
- * exactly two parts and one surname word) is left out: it gives no person match rather than pooling two people's words.
+ * The person a permit name field holds, through the one shared single-person check (round 5, decision 4): a field
+ * that lists several people ("Jane Smith and John Doe", "Jane Smith / John Doe", "J Smith, John Doe") gives no
+ * person match at all, rather than one read from pooled or split words.
  */
 export function personParts(field: string): string[] {
-  return field.split(/\s+and\s+|&|;|\/|\r?\n/i).map((p) => p.replace(/\s+/g, " ").trim()).filter((p) => {
-    if (!p) return false;
-    const words = p.split(/[\s,.]+/).filter((w) => /[a-z]{2,}/i.test(w) && !/^(?:jr|sr|ii|iii|iv)$/i.test(w));
-    return words.length <= 4 && onePersonField(p);
-  });
+  // The separators are read on the field as published (a line break is one), before spaces are tidied.
+  const p = field.replace(/\s+/g, " ").trim();
+  return p && onePersonField(field) ? [p] : [];
 }
 
 /** Names a results list shows without saying their role (SmartGov's party column). */
@@ -532,6 +537,10 @@ export function startResearchWorker(): void {
   // The state bulk files (hundreds of MB a day): production only, unless a dev server asks with RESEARCH_BULK=on.
   if (process.env.RESEARCH_BULK === "on" || (process.env.NODE_ENV === "production" && process.env.RESEARCH_BULK !== "off")) {
     const refresh = () => void refreshDueSources(ALL_BULK_SOURCES).catch((err) => console.error("[research-bulk] refresh:", err));
+    // Once: unsafe legacy phone/address keys come off stored rows whether or not their source reloads (round 5,
+    // decision 5). Small page-range batches, no table copy.
+    setTimeout(() => void purgeLegacyKeys(ALL_BULK_SOURCES).then((r) => { if (r) console.log(`[research-bulk] legacy key purge: ${JSON.stringify(r)}`); })
+      .catch((err) => console.error("[research-bulk] legacy key purge:", err)), 60_000).unref?.();
     setTimeout(refresh, 3 * 60_000).unref?.();
     setInterval(refresh, 60 * 60_000).unref?.();
   }

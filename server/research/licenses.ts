@@ -421,16 +421,22 @@ export function companyNamed(name: string, business: string | null | undefined):
  * "John A Smith" is not "John B Smith" (or "John Bert Smith"); "John A Smith" and "John Smith" stay candidates.
  */
 /**
- * True when a name field with commas still holds ONE person (round 4, decision 7): "LAST, FIRST [MIDDLE]", exactly two
- * parts with a single surname word before the comma ("Smith, John A", "Smith Jr, John", "John Smith, Jr."). Two full
- * names ("Jane Smith, John Doe") or more parts are a list of people, and no single person's match is read from them.
+ * The one shared single-person check (round 5, decision 4), used by licenses, permits, the cross-reference and the
+ * runner. A name field is ONE person only when it has no list separator ("/", "&", ";", " and ", a line break), at most
+ * two comma parts ("LAST, FIRST [M]", one surname word before the comma, initials counted as words; a trailing
+ * generational suffix such as ", Jr." aside) and at most four name words. Anything else is a list of people: no single
+ * person's match is read from it ("J Smith, John Doe", "Jane Smith / John Doe").
  */
 export function onePersonField(field: string): boolean {
-  const t = field.replace(/,\s*(?:jr|sr|ii|iii|iv)\.?\s*(?=,|$)/gi, "").trim();
+  const raw = field.replace(/\s+/g, " ").trim();
+  if (!raw || /[\/&;\r\n]|\band\b/i.test(field)) return false;
+  const t = raw.replace(/,\s*(?:jr|sr|ii|iii|iv)\.?\s*(?=,|$)/gi, "").trim();
+  const words = (v: string) => v.split(/[\s.,]+/).filter((w) => /[a-z]/i.test(w) && !GENERATION.has(w.toUpperCase()));
+  if (words(t).length > 4) return false;
   const parts = t.split(",");
   if (parts.length === 1) return true;
   if (parts.length !== 2 || !parts[1].trim()) return false;
-  return parts[0].split(/[\s.]+/).filter((w) => /[a-z]{2,}/i.test(w) && !GENERATION.has(w.toUpperCase())).length === 1;
+  return words(parts[0]).length === 1;
 }
 
 export function personMatches(name: string, person: string | null | undefined): boolean {

@@ -231,7 +231,16 @@ export type ResearchSubjectReport = {
   relatedNotes?: string[];
 };
 
+/**
+ * The version of the rules a stored report was made under (A10, decision 5). 2: license holders are the publisher's
+ * own (round 3) and recomputed for old bulk rows (round 4). A report without it is older: shown with today's rules,
+ * and a holder it can't verify is treated as unknown (server/research/store.ts shownReport).
+ */
+export const REPORT_SNAPSHOT_VERSION = 2;
+
 export type ResearchReport = {
+  /** REPORT_SNAPSHOT_VERSION when the report was saved (absent: an older report). */
+  snapshotVersion?: number;
   generatedAt: string;
   states: string[]; trades: string[]; sinceYear: number | null;
   subjects: ResearchSubjectReport[];
@@ -245,6 +254,11 @@ export type ResearchPreview = {
   /** Of those, found by a license number, phone or address (absent on older previews). */
   identifierMatches?: number;
   licenseSourceStates: string[];
+  /**
+   * States where a license search really ran for the preview (round 5, decision 10): a configured source that failed is
+   * not one. Absent on older previews.
+   */
+  licenseSearchedStates?: string[];
   portalsByState: Record<string, number>;
   /** Companies only: complaint, federal case and OSHA inspection counts (absent on older previews). */
   records?: { complaints: number; courtCases: number; osha: number; enforcement?: number; searched: string[];
@@ -276,7 +290,9 @@ export const ENFORCEMENT_KINDS: SourceKind[] = ["enforcement", "state_court"];
 export const anySearched = (sources: RecordSource[] | undefined, kinds: SourceKind[]) => !!sources?.some((r) => kinds.includes(recordKindOf(r)) && r.searched);
 
 /** True when a subject's license search ran against at least one source (by name or by an identifier). */
-export const subjectLicensesSearched = (s: ResearchSubjectReport) => s.licenseSources.some((x) => x.searched) || !!s.identifierSearches?.some((x) => (x.licenseSourcesSearched ?? x.sourcesSearched) !== 0);
+// An identifier search counts only with its license-source count (round 5, decision 10): an older report without it,
+// whose generic count may be an enforcement file, reads as not searched by identifier.
+export const subjectLicensesSearched = (s: ResearchSubjectReport) => s.licenseSources.some((x) => x.searched) || !!s.identifierSearches?.some((x) => (x.licenseSourcesSearched ?? 0) > 0);
 
 /**
  * A report's one-line summary: each count backed by a source of its own kind that ran, everything else named as
@@ -318,4 +334,20 @@ export function previewRecordsLine(r: ResearchPreview["records"]): string | null
   if (!parts.some((p) => !/^0 |^about 0 /.test(p))) return null;
   const list = (l: string[]) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} and ${l[l.length - 1]}` : l[0]);
   return `Records on file: ${list(parts)}.${not.length ? ` Not searched in this preview: ${list(not)}.` : ""}`;
+}
+
+/**
+ * The preview's license line (round 5, decision 10): a count only for states where a license search really ran.
+ * Configured states whose search failed are named as not searched; an older preview (no licenseSearchedStates) reads as
+ * before. Null when the states have no license source at all.
+ */
+export function previewLicenseLine(p: Pick<ResearchPreview, "licenseMatches" | "identifierMatches" | "licenseSourceStates" | "licenseSearchedStates">): string | null {
+  if (!p.licenseSourceStates.length) return null;
+  const ran = p.licenseSearchedStates ?? p.licenseSourceStates;
+  const missed = p.licenseSourceStates.filter((s) => !ran.includes(s));
+  const found = ran.length
+    ? `${p.licenseMatches} license record(s) match in ${ran.join(", ")} state license data${p.identifierMatches ? `, ${p.identifierMatches} of them found by a license number, phone or address you gave` : ""}.`
+    : "";
+  const not = missed.length ? `State license records for ${missed.join(", ")} could not be searched for this preview; the report tries again.` : "";
+  return [found, not].filter(Boolean).join(" ");
 }

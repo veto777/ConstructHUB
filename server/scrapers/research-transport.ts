@@ -21,6 +21,11 @@ export type ResearchTransport = {
   before: (url: string, holdMs?: number) => Promise<unknown>;
   /** After it (or after it failed, status 0): ends that turn, then notes the answer's status and Retry-After. */
   after: (url: string, status: number, retryAfter?: string | null, turn?: unknown) => void;
+  /**
+   * A 2xx HTML answer's body, checked for a bot challenge (A10, finding 6): throws, and blocks the host that answered,
+   * when it is one.
+   */
+  checkBody?: (url: string, status: number, body: string) => void;
 };
 
 export const researchTransport = new AsyncLocalStorage<ResearchTransport>();
@@ -64,7 +69,14 @@ export async function researchPost(request: APIRequestContext, url: string, opts
     }
     store.after(cur, res.status(), res.headers()["retry-after"], turn);
     const loc = res.headers()["location"];
-    if (!REDIRECTS.has(res.status()) || !loc) return res;
+    if (!REDIRECTS.has(res.status()) || !loc) {
+      // A challenge page in place of the API's answer stops the search and blocks its host (A10, finding 6).
+      if (store.checkBody && res.status() >= 200 && res.status() < 300 && /\b(?:text\/html|application\/xhtml\+xml)\b/i.test(res.headers()["content-type"] ?? "")) {
+        try { store.checkBody(cur, res.status(), (await res.body()).subarray(0, 64 * 1024).toString("utf8")); }
+        catch (err) { await res.dispose().catch(() => undefined); throw err; }
+      }
+      return res;
+    }
     await res.dispose().catch(() => undefined);
     if (hop + 1 >= MAX_HOPS) throw new Error(`more than ${MAX_HOPS} redirects from ${url}`);
     const next = new URL(loc, cur);

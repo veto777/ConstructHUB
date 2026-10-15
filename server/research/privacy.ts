@@ -37,29 +37,32 @@ export function entityHolder(v: unknown, lists: { business: RegExp; individual: 
 /** Words of standing a license status may keep for an individual, as published (round 3, decision 1). */
 const STANDING = "active|inactive|current|clear|expired|delinquent|null and void|revoked|suspended|surrendered|valid|issued|licensed|lapsed|cancell?ed|retired|closed|deceased|void|renewed|(?:in )?good standing";
 const STANDING_RE = new RegExp(`^(${STANDING})\\b(.*)$`, "i");
-/** Words that make a status piece disciplinary (or about a case) rather than standing. */
-const DISCIPLINARY = /probation|disciplin|citation|\bcited\b|pending|\bcase\b|complaint|reprimand|censure|\bfined?\b|consent|\border\b|restrict|condition|monitor|stipulat|sanction|violation|investigat|hearing|summary|emergency|warning|admonish|letter of concern|corrective|action/i;
+
+/** The one applicant wording a source writes for itself (FL DBPR applicants, bulk-sources.ts): kept as it is. */
+export const APPLICANT_STATUS = "Applicant: an application is on file with DBPR (not a license)";
+/** A date as publishers print one ("2026-10-15", "10/15/2026", "Oct 15, 2026"), optionally after "on", "as of", "since"… */
+const DATE_TAIL = /^(?:(?:on|as of|since|effective|eff\.?|through|thru|until|expires?|exp\.?)\s+)?(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|[a-z]{3,9}\.? \d{1,2},? \d{4})$/i;
 
 /**
- * An individual's license status split into standing words (kept, as published) and everything else (moved to
- * `discipline`): "Probation, Active" → "Active" + "Probation"; "Active - Pending Case" → "Active" + "Pending Case";
- * "Disciplined" → null + "Disciplined"; "Inactive per Request" stays. A piece that is neither (an unlisted word) moves
- * too: only standing words are left on an individual's status.
+ * A license status reduced to recognized standing phrases (round 3, decision 1; round 5, decision 2): each piece that
+ * starts with a standing phrase keeps that phrase, and a published date right after it; everything else, trailing
+ * text included, moves to `discipline`. "Probation, Active" → "Active" + "Probation"; "Active with civil penalty of
+ * $500" → "Active" + "with civil penalty of $500"; "Active since 01/02/2020" stays; "Disciplined" → null.
  */
 export function standingStatus(status: string | null | undefined): { status: string | null; moved: string | null } {
   const t = (status ?? "").replace(/\s+/g, " ").trim();
   if (!t) return { status: null, moved: null };
-  // An applicant list's own wording ("Applicant: an application is on file … (not a license)") is not a license status.
-  if (/^applicant\b/i.test(t)) return { status: t, moved: null };
+  if (t === APPLICANT_STATUS) return { status: t, moved: null };
   const keep: string[] = [], moved: string[] = [];
-  for (const raw of t.split(/\s*[,;|/]\s*|\s+-\s+|\s*\(\s*|\s*\)\s*/)) {
+  for (const raw of t.split(/\s*[;|]\s*|,\s*(?![^()]*\))|\s+-\s+|\s*\(\s*|\s*\)\s*/)) {
     const piece = raw.trim();
     if (!piece) continue;
     const m = piece.match(STANDING_RE);
     if (!m) { moved.push(piece); continue; }
     const rest = m[2].trim();
-    if (rest && DISCIPLINARY.test(rest)) { keep.push(m[1]); moved.push(rest.replace(/^(?:with|on|under|and|-|:)\s+/i, "")); }
-    else keep.push(piece);
+    if (!rest || DATE_TAIL.test(rest)) { keep.push(piece); continue; }
+    keep.push(m[1]);
+    moved.push(rest);
   }
   return { status: keep.length ? Array.from(new Set(keep)).join(", ") : null, moved: moved.length ? moved.join("; ") : null };
 }

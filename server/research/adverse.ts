@@ -4,7 +4,8 @@
  *
  *   - no outcome published, or one that says neither way → null (unknown is never turned into a fact);
  *   - a negated sanction or a negated clearance, on either side ("not revoked", "no suspension", "without penalty",
- *     "fine not imposed", "case not dismissed") → null;
+ *     "fine not imposed", "case not dismissed") → null; so is any other negation word in the outcome's clause
+ *     ("Disciplinary action has still not been taken", "Not subject to any discipline"; round 5, decision 1);
  *   - a reversal or suspension of the outcome ("lifted", "rescinded", "reversed", "set aside", "stayed", "vacated",
  *     "overturned") → null: what stands afterwards isn't stated (round 3, decision 6);
  *   - words of both kinds ("License revoked; hearing waived", "Dismissed, penalty paid") → null;
@@ -53,6 +54,27 @@ const global = (re: RegExp) => new RegExp(re.source, re.flags.includes("g") ? re
  */
 const wordEnd = (t: string, b: number) => b + (/^[a-z]*/i.exec(t.slice(b))?.[0].length ?? 0);
 
+/** A negation word: anywhere in an outcome's clause (outside a not-adverse phrase) it leaves the outcome unknown. */
+const NEGATION = /\b(?:not|no|never|without|none|nor|neither|non)\b|n't\b/gi;
+
+/** True when a clause (split at . ; ! ? and line breaks) holds an outcome word and a negation outside the not-adverse phrases. */
+function negatedClause(t: string, spans: number[][], opts: AdverseOptions): boolean {
+  const outcome = new RegExp(`${(opts.adverse ?? ADVERSE).source}|${NOT_ADVERSE.source}${opts.notAdverse ? `|${opts.notAdverse.source}` : ""}`, "i");
+  let start = 0;
+  for (const clause of t.split(/(?<=[.;!?\n])/)) {
+    const [a, b] = [start, start + clause.length];
+    start = b;
+    if (!outcome.test(clause)) continue;
+    // A source's own outcome phrase may carry its negation too (WA L&I "Not Satisfied": a penalty still owed).
+    const own = opts.adverse ? Array.from(clause.matchAll(global(opts.adverse)), (m) => [a + m.index!, a + m.index! + m[0].length]) : [];
+    for (const m of clause.matchAll(NEGATION)) {
+      const at = a + m.index!;
+      if (![...spans, ...own].some(([x, y]) => at >= x && at < y)) return true;
+    }
+  }
+  return false;
+}
+
 /** True / false / null from the publisher's outcome text (see the top of the file). */
 export function adverseFrom(outcome: string | null | undefined, opts: AdverseOptions = {}): boolean | null {
   const t = (outcome ?? "").replace(/\s+/g, " ").trim();
@@ -63,6 +85,10 @@ export function adverseFrom(outcome: string | null | undefined, opts: AdverseOpt
   const spans = [NOT_ADVERSE, ...(opts.notAdverse ? [opts.notAdverse] : [])].flatMap((re) => Array.from(t.matchAll(global(re)), (m) => [m.index!, wordEnd(t, m.index! + m[0].length)]));
   // A negated clearance ("case not dismissed") is not a clean answer either way.
   if (spans.some(([a, b]) => negated(a, b))) return null;
+  // Any other negation word in a clause that holds an outcome makes it uncertain (round 5, decision 1): "Disciplinary
+  // action has still not been taken", "Not subject to any discipline". Only a recognized not-adverse phrase ("no
+  // action", "not sustained") may carry its own negation.
+  if (negatedClause(t, spans, opts)) return null;
   const cleared = spans.length > 0;
   let sanction = false;
   for (const m of t.matchAll(global(opts.adverse ?? ADVERSE))) {
