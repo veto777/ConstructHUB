@@ -9,6 +9,9 @@ describe("research records", () => {
     expect(namedIn("Bella", "DaBella Exteriors")).toBe(false);
     expect(namedIn("Smith Roofing", "Roofing by Smith LLC")).toBe(true);
     expect(namedIn("Smith Roofing", "Locksmith Roofing")).toBe(false);
+    expect(namedIn("D & S Electric Inc", "B & J ELECTRIC INC")).toBe(false);
+    expect(namedIn("D & S Electric Inc", "D&S ELECTRIC, INC.")).toBe(true);
+    expect(namedIn("D & S Electric Inc", "D & S ELECTRIC INC.")).toBe(true);
   });
   it("maps federal district and bankruptcy courts to their state, never appellate courts", () => {
     expect(courtState("wawd")).toBe("WA");

@@ -7,7 +7,11 @@
  *      other where a portal offers only one; a slow portal is retried, one missing that field gets its next search type.
  *      Matches are read back from the stored results, so each one links to its source record.
  *   3. For companies: state AG consumer complaints, federal court dockets and federal OSHA inspections (./records).
- *   4. Trades flag matching permits (listed first); a since-year drops older permits (undated ones are kept, marked).
+ *   4. Search by anything and cross-reference (./xref): every license source is searched by the license numbers,
+ *      phones and addresses the customer gave, then one hop out from the subject's own records (their license
+ *      numbers, phones, addresses, people and businesses) to the related licenses and businesses, each marked with
+ *      its tie, plus state enforcement records for the most closely tied businesses.
+ *   5. Trades flag matching permits (listed first); a since-year drops older permits (undated ones are kept, marked).
  *
  * Every portal is reported with what happened (searched, not searched, error), so the report says what was covered
  * and never turns "we could not search it" into "nothing found". One order runs at a time; a restart re-queues it.
@@ -23,13 +27,15 @@ import { escapeHtml } from "../route-guards";
 import {
   RESEARCH_TRADES, RESEARCH_PATH, RESEARCH_NO_GUARANTEE,
   type ResearchOrderInput, type ResearchReport, type ResearchSubjectReport, type PermitHit, type PortalCoverage,
-  type ResearchPreview, type ResearchTrade, type LicenseHit,
+  type ResearchPreview, type ResearchTrade, type LicenseHit, type EnforcementHit,
 } from "@shared/research-reports";
 import { SITE_ORIGIN as SITE } from "@shared/seo";
-import { searchLicenses, wholeWordMatch } from "./licenses";
-import { refreshDueSources, searchBulk } from "./bulk";
+import { searchLicenses, searchLicensesBy, type LicenseSource } from "./licenses";
+import { refreshDueSources, searchBulk, searchBulkBy, type BulkSource, type StoredHit } from "./bulk";
+import type { LiveLicenseSearch } from "./states/types";
+import { crossReference, LicenseSet, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
 import { ALL_BULK_SOURCES, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
-import { previewCompanyRecords, searchCompanyRecords } from "./records";
+import { previewCompanyRecords, searchCompanyRecords, searchEnforcement } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
 
 const MAX_PERMITS_PER_SUBJECT = 1000;
@@ -52,22 +58,22 @@ export async function portalsInStates(states: string[]): Promise<Map<string, Db[
   return out;
 }
 
-/** The free preview shown before payment: license matches now, and the portal count the report will sweep. */
+/** The free preview shown before payment: license matches (by name and by identifier) and the portal count. */
 export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | "states">): Promise<ResearchPreview> {
-  let licenseMatches = 0;
-  const licenseSourceStates: string[] = [];
-  for (const state of input.states) {
-    const sources = licenseSourcesFor(state);
-    if (hasLicenseSources(state)) licenseSourceStates.push(state);
-    for (const src of sources) for (const s of input.subjects) {
-      try { licenseMatches += (await searchLicenses(src, s.name, s.kind)).length; } catch { /* the preview is a hint, not the report */ }
+  let licenseMatches = 0, identifierMatches = 0;
+  const licenseSourceStates = input.states.filter(hasLicenseSources);
+  for (const s of input.subjects) {
+    const finders = input.states.flatMap((st) => findersFor(st));
+    const found = new LicenseSet();
+    for (const f of finders) {
+      if (!f.byName || f.companiesOnly) continue;
+      try { for (const h of (await f.byName(s.name, s.kind)).hits) found.add(h); } catch { /* the preview is a hint, not the report */ }
     }
-    for (const src of liveLicenseSearchesFor(state)) for (const s of input.subjects) {
-      try { licenseMatches += (await src.search(s.name, s.kind)).length; } catch { /* ditto */ }
-    }
-    for (const src of bulkLicenseSources(state)) for (const s of input.subjects) {
-      try { licenseMatches += (await searchBulkLicenses(src, s.name, s.kind)).hits.length; } catch { /* ditto */ }
-    }
+    const before = found.list.length;
+    const ids = await searchCustomerIds(finders, subjectIds(s), s.kind).catch(() => null);
+    for (const h of ids?.licenses ?? []) found.add(h);
+    licenseMatches += found.list.length;
+    identifierMatches += found.list.length - before;
   }
   const portals = await portalsInStates(input.states);
   let records: ResearchPreview["records"];
@@ -77,18 +83,58 @@ export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | 
       ? { complaints: records.complaints + r.complaints, courtCases: records.courtCases + r.courtCases, osha: records.osha + r.osha, enforcement: (records.enforcement ?? 0) + r.enforcement, searched: Array.from(new Set([...records.searched, ...r.searched])) }
       : r;
   }
-  return { licenseMatches, licenseSourceStates, portalsByState: Object.fromEntries(Array.from(portals, ([s, l]) => [s, l.length])), ...(records ? { records } : {}) };
+  return { licenseMatches, identifierMatches, licenseSourceStates, portalsByState: Object.fromEntries(Array.from(portals, ([s, l]) => [s, l.length])), ...(records ? { records } : {}) };
 }
 
-const bulkLicenseSources = (state: string) => bulkSourcesFor(state).filter((s) => !s.companiesOnly);
+const stored = (hits: StoredHit[]): FinderResult => ({
+  licenses: hits.filter((h): h is { kind: "license"; hit: LicenseHit } => h.kind === "license").map((h) => h.hit),
+  enforcement: hits.filter((h): h is { kind: "enforcement"; hit: EnforcementHit } => h.kind === "enforcement").map((h) => h.hit),
+});
 
-/** License hits from one indexed state file: business name for a company, the people on the license for a person. */
-async function searchBulkLicenses(src: ReturnType<typeof bulkSourcesFor>[number], name: string, kind: "person" | "company") {
-  const { hits, status } = await searchBulk(src, name, kind);
-  const found = hits.filter((h): h is { kind: "license"; hit: LicenseHit } => h.kind === "license")
-    .map((h) => ({ ...h.hit, matchedOn: kind === "company" ? "business" as const : "principal" as const }))
-    .filter((h) => wholeWordMatch(name, kind === "company" ? { businessName: h.businessName, principal: null } : { businessName: null, principal: h.principal }));
-  return { hits: found, status };
+/** An indexed state file. License files are searched by name (re-checked: the index can join words of two people) and identifier; enforcement files by identifier. */
+export function bulkFinder(src: BulkSource): LicenseFinder {
+  return {
+    state: src.state, label: src.label, companiesOnly: !!src.companiesOnly,
+    byName: src.companiesOnly ? undefined : async (name, kind) => {
+      const { hits, status } = await searchBulk(src, name, kind);
+      if (!status.loaded) return { hits: [], searched: false, note: "Not loaded yet (the state's file is downloaded daily)" };
+      const found = stored(hits).licenses.map((h) => ({ ...h, matchedOn: kind === "company" ? "business" as const : "principal" as const })).filter((h) => nameMatches(name, kind, h));
+      return { hits: found, searched: true, note: `${found.length} match(es) in the file of ${status.loadedAt?.slice(0, 10)}` };
+    },
+    byId: async (q) => {
+      // A file not loaded yet is already reported with the name searches; here it simply has nothing.
+      const { hits } = await searchBulkBy(src, q);
+      return stored(hits);
+    },
+  };
+}
+
+/** A Socrata license dataset. */
+export function sodaFinder(src: LicenseSource): LicenseFinder {
+  return {
+    state: src.state, label: src.source,
+    byName: async (name, kind) => { const hits = await searchLicenses(src, name, kind); return { hits, searched: true, note: `${hits.length} match(es)` }; },
+    byId: async (q) => ({ licenses: await searchLicensesBy(src, q), enforcement: [] }),
+  };
+}
+
+/** A state's own lookup (a pack's live search). */
+export function liveFinder(state: string, src: LiveLicenseSearch): LicenseFinder {
+  return {
+    state, label: src.source,
+    byName: async (name, kind) => { const hits = (await src.search(name, kind)).filter((h) => nameMatches(name, kind, h)); return { hits, searched: true, note: `${hits.length} match(es)` }; },
+    byId: src.searchBy ? async (q) => ({ licenses: await src.searchBy!(q), enforcement: [] }) : undefined,
+  };
+}
+
+/** Every searchable source in one state, in the order the report lists them. */
+export function findersFor(state: string): LicenseFinder[] {
+  return [
+    ...bulkSourcesFor(state).filter((s) => !s.companiesOnly).map(bulkFinder),
+    ...licenseSourcesFor(state).map(sodaFinder),
+    ...liveLicenseSearchesFor(state).map((s) => liveFinder(state, s)),
+    ...bulkSourcesFor(state).filter((s) => s.companiesOnly).map(bulkFinder),
+  ];
 }
 
 function tradesFor(text: string, trades: ResearchTrade[]): string[] {
@@ -226,42 +272,34 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
   const portals = await portalsInStates(input.states);
   const subjects: ResearchSubjectReport[] = [];
   for (const subject of input.subjects) {
-    const licenses: LicenseHit[] = [];
+    const own = new LicenseSet();
     const licenseSources: ResearchSubjectReport["licenseSources"] = [];
+    const finders: LicenseFinder[] = [];
     for (const state of input.states) {
-      const sources = licenseSourcesFor(state);
       if (!hasLicenseSources(state)) licenseSources.push({ state, source: "State license records", searched: false, note: "We don't search this state's license records yet" });
-      for (const src of bulkLicenseSources(state)) {
+      const list = findersFor(state);
+      finders.push(...list);
+      const searchByName = async (f: LicenseFinder) => {
+        if (!f.byName) return;
         try {
-          const { hits, status } = await searchBulkLicenses(src, subject.name, subject.kind);
-          if (!status.loaded) { licenseSources.push({ state, source: src.label, searched: false, note: "Not loaded yet (the state's file is downloaded daily)" }); continue; }
-          licenses.push(...hits);
-          licenseSources.push({ state, source: src.label, searched: true, note: `${hits.length} match(es) in the file of ${status.loadedAt?.slice(0, 10)}` });
+          const r = await f.byName(subject.name, subject.kind);
+          for (const h of r.hits) own.add(h);
+          licenseSources.push({ state, source: f.label, searched: r.searched, note: r.note });
         } catch (err: any) {
-          licenseSources.push({ state, source: src.label, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+          licenseSources.push({ state, source: f.label, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
         }
-      }
+      };
+      // The bulk files first, then the "no statewide GC license" note, then the live sources (the report's order).
+      const isBulk = (f: LicenseFinder) => bulkSourcesFor(state).some((b) => b.label === f.label);
+      for (const f of list.filter(isBulk)) await searchByName(f);
       const noGc = noStatewideGcLicense(state);
       if (noGc) licenseSources.push({ state, source: "Statewide general contractor license", searched: false, note: noGc });
-      for (const src of sources) {
-        try {
-          const hits = await searchLicenses(src, subject.name, subject.kind);
-          licenses.push(...hits);
-          licenseSources.push({ state, source: src.source, searched: true, note: `${hits.length} match(es)` });
-        } catch (err: any) {
-          licenseSources.push({ state, source: src.source, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
-        }
-      }
-      for (const src of liveLicenseSearchesFor(state)) {
-        try {
-          const hits = (await src.search(subject.name, subject.kind)).filter((h) => wholeWordMatch(subject.name, subject.kind === "company" ? { businessName: h.businessName, principal: null } : { businessName: null, principal: h.principal }));
-          licenses.push(...hits);
-          licenseSources.push({ state, source: src.source, searched: true, note: `${hits.length} match(es)` });
-        } catch (err: any) {
-          licenseSources.push({ state, source: src.source, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
-        }
-      }
+      for (const f of list.filter((f) => !isBulk(f))) await searchByName(f);
     }
+    // The customer's license numbers, phones and addresses: the subject's own records, found another way.
+    const ids = await searchCustomerIds(finders, subjectIds(subject), subject.kind);
+    for (const h of ids.licenses) own.add(h);
+    if (ids.searches.length) log(`identifiers for "${subject.name}": ${ids.searches.map((x) => `${x.query}: ${x.found}`).join(", ")}`);
     const dbs = input.states.flatMap((s) => portals.get(s) ?? []);
     const { coverage, rows } = await sweepPortals(order.user_id, subject.name, subject.kind, dbs, log);
     const dedup = new Map<string, PermitHit>();
@@ -278,9 +316,16 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       ? await searchCompanyRecords(subject.name, input.states)
       : { complaints: [], courtCases: [], osha: [], enforcement: [], sources: [{ source: "Complaints, lawsuits, enforcement and OSHA records", scope: "", searched: false, note: "Searched for companies only, not for individual people" }] };
     log(`records for "${subject.name}": ${records.complaints.length} complaint(s), ${records.courtCases.length} federal case(s), ${records.osha.length} OSHA inspection(s), ${records.enforcement.length} enforcement record(s)`);
+    const xref = await crossReference({
+      subject, own, finders, searchedIds: ids.searchedIds, idSearchesUsed: ids.used, ownEnforcement: records.enforcement,
+      enforcementSearch: (name) => searchEnforcement(name, input.states), log,
+    });
+    const relatedEnforcement = [...ids.enforcement, ...xref.relatedEnforcement];
+    log(`cross-reference for "${subject.name}": ${xref.related.length} related license(s), ${relatedEnforcement.length} related enforcement record(s), ${xref.idSearches} identifier search(es)${xref.notes.length ? `; ${xref.notes.join(" | ")}` : ""}`);
     subjects.push({
-      name: subject.name, kind: subject.kind, licenses, permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)),
+      name: subject.name, kind: subject.kind, licenses: own.list, permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)),
       complaints: records.complaints, courtCases: records.courtCases, osha: records.osha, enforcement: records.enforcement, recordSources: records.sources,
+      identifierSearches: ids.searches, relatedLicenses: xref.related, relatedEnforcement, relatedNotes: [...ids.notes, ...xref.notes],
     });
   }
   const allCoverage = subjects.flatMap((s) => s.portals);
@@ -296,6 +341,7 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       courtCases: subjects.reduce((n, s) => n + (s.courtCases?.length ?? 0), 0),
       osha: subjects.reduce((n, s) => n + (s.osha?.length ?? 0), 0),
       enforcement: subjects.reduce((n, s) => n + (s.enforcement?.length ?? 0), 0),
+      related: subjects.reduce((n, s) => n + (s.relatedLicenses?.length ?? 0) + (s.relatedEnforcement?.length ?? 0), 0),
     },
   };
 }
@@ -305,7 +351,8 @@ async function sendReportEmails(order: ResearchOrderRow, report: ResearchReport)
   const names = order.input.subjects.map((s) => s.name).join(", ");
   const t = report.totals;
   const records = t.complaints || t.courtCases || t.osha || t.enforcement ? `, ${t.complaints ?? 0} consumer complaint(s), ${t.enforcement ?? 0} state enforcement or standing record(s), ${t.courtCases ?? 0} federal court case(s) and ${t.osha ?? 0} OSHA inspection(s)` : "";
-  const summary = `${t.licenses} license record(s) and ${t.permits} permit(s) across ${t.portalsSearched} searched portal(s)${records}`;
+  const related = t.related ? `, plus ${t.related} related record(s) of other licenses and businesses tied to the same license numbers, phones, addresses or people` : "";
+  const summary = `${t.licenses} license record(s) and ${t.permits} permit(s) across ${t.portalsSearched} searched portal(s)${records}${related}`;
   await sendWithFallback({
     from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
     to: order.email,

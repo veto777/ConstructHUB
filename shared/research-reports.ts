@@ -7,6 +7,7 @@
  * the runner, so the price the page shows is the price the server charges.
  */
 import { z } from "zod";
+import { addressKeys, normLicense, normPhone } from "./identifiers";
 import {
   RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS, RESEARCH_EXTENDED_MAX_NAMES, RESEARCH_EXTENDED_MAX_STATES,
 } from "./plans";
@@ -60,10 +61,39 @@ export const RESEARCH_NOT_FCRA =
 
 const text = (label: string, max: number) => z.string({ required_error: `${label} is required` }).trim().max(max, `${label} is too long`);
 
+/** Limits on the identifiers one name may carry (they don't count as extra names for the price). */
+export const RESEARCH_MAX_LICENSE_NUMBERS = 5;
+export const RESEARCH_MAX_PHONES = 3;
+export const RESEARCH_MAX_ADDRESSES = 3;
+
+/** A list of optional identifiers: blanks dropped, each checked and normalized by shared/identifiers.ts, duplicates merged. */
+const idList = (label: string, max: number, max1: number, check: (v: string) => string | null, bad: string) =>
+  z.preprocess(
+    (v) => (Array.isArray(v) ? v.filter((x) => !(typeof x === "string" && x.trim() === "")) : v),
+    z.array(z.string().trim().max(max1, `${label} is too long`).transform((v, ctx) => {
+      const out = check(v);
+      if (!out) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: `"${v.slice(0, 40)}" ${bad}` }); return z.NEVER; }
+      return out;
+    })).max(max, `Up to ${max} ${label.toLowerCase()}s per name`),
+  ).optional().transform((l) => (l?.length ? Array.from(new Set(l)) : undefined));
+
+/** A license number as the customer typed it (uppercased, spaces collapsed): sources store some with dashes. */
+export const cleanLicenseNumber = (v: string): string | null => (normLicense(v) ? v.toUpperCase().replace(/\s+/g, " ").trim() : null);
+/** A phone as (206) 555-0142. */
+export const formatPhone = (v: string): string | null => { const n = normPhone(v); return n ? `(${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}` : null; };
+/** A street address with a house number (a city alone is not one), spaces collapsed. */
+export const cleanAddress = (v: string): string | null => (addressKeys(v).length ? v.replace(/\s+/g, " ").trim() : null);
+
 export const researchSubjectSchema = z.object({
   name: text("Name", 120).min(2, "Each name needs at least 2 characters"),
+  /** "person" also covers owners: it matches the people named on licenses (owners, officers, qualifiers). */
   kind: z.enum(["person", "company"]),
+  /** Optional ways to find the same contractor besides the name (orders before 2026-10-15 have none). */
+  licenseNumbers: idList("License number", RESEARCH_MAX_LICENSE_NUMBERS, 40, cleanLicenseNumber, "doesn't look like a license number (it needs at least 3 letters or digits, one of them a digit)"),
+  phones: idList("Phone number", RESEARCH_MAX_PHONES, 30, formatPhone, "isn't a 10-digit US phone number"),
+  addresses: idList("Address", RESEARCH_MAX_ADDRESSES, 200, cleanAddress, "needs a house number and street, e.g. 123 Main St, Tampa FL 33602"),
 });
+export type ResearchSubjectInput = z.infer<typeof researchSubjectSchema>;
 
 export const researchOrderSchema = z.object({
   subjects: z.array(researchSubjectSchema).min(1, "Add at least one name").max(RESEARCH_EXTENDED_MAX_NAMES, `Up to ${RESEARCH_EXTENDED_MAX_NAMES} names per report`),
@@ -92,9 +122,18 @@ export type LicenseHit = {
   address?: string | null; phone?: string | null;
   /** Everyone the source names on the license: owners, officers, qualifiers, responsible managing employees. */
   people?: { name: string; role: string | null }[];
-  /** Set by the cross-reference pass: why a record found through another record belongs to the subject. */
+  /** Set by the cross-reference pass: why a record found through another record is tied to the subject. */
   relatedVia?: string | null;
+  /** The kind of tie, for grouping (set with relatedVia). */
+  relatedTie?: RelatedTie;
 };
+
+/**
+ * How a related record is tied to the subject's own: the same license number, phone or street address, a person
+ * named on both, or a business named on the subject's license. Strongest first.
+ */
+export type RelatedTie = "license" | "phone" | "person" | "business" | "address";
+export const RELATED_TIES: RelatedTie[] = ["license", "phone", "person", "business", "address"];
 
 export type PermitHit = {
   jurisdiction: string; permitNumber: string | null; permitType: string | null; status: string | null;
@@ -138,6 +177,7 @@ export type EnforcementHit = {
   address?: string | null; phone?: string | null; licenseNumber?: string | null;
   /** Set by the cross-reference pass (a record of a business tied to the subject through a license, phone or address). */
   relatedVia?: string | null;
+  relatedTie?: RelatedTie;
 };
 
 export type RecordSource = { source: string; scope: string; searched: boolean; note: string };
@@ -152,18 +192,31 @@ export type ResearchSubjectReport = {
   /** State enforcement and standing records (reports made before 2026-10-15 have none). */
   enforcement?: EnforcementHit[];
   recordSources?: RecordSource[];
+  /** Searches by the license numbers, phones and addresses the customer gave (reports before 2026-10-15 have none). */
+  identifierSearches?: { query: string; found: number; note: string }[];
+  /**
+   * The cross-reference pass: records of other licenses and businesses tied to the subject's own records (same
+   * license number, phone or address, or a person named on both). Never the subject's own: each carries relatedVia.
+   */
+  relatedLicenses?: LicenseHit[];
+  relatedEnforcement?: EnforcementHit[];
+  /** What the cross-reference pass searched, and what it left out (caps, ties too common to mean anything). */
+  relatedNotes?: string[];
 };
 
 export type ResearchReport = {
   generatedAt: string;
   states: string[]; trades: string[]; sinceYear: number | null;
   subjects: ResearchSubjectReport[];
-  totals: { licenses: number; permits: number; portalsSearched: number; portalsNotSearched: number; complaints?: number; courtCases?: number; osha?: number; enforcement?: number };
+  totals: { licenses: number; permits: number; portalsSearched: number; portalsNotSearched: number; complaints?: number; courtCases?: number; osha?: number; enforcement?: number; related?: number };
 };
 
 /** The free look before paying: license matches now, and how many live portals the full report will sweep. */
 export type ResearchPreview = {
+  /** Every license record found, by name or by an identifier the customer gave. */
   licenseMatches: number;
+  /** Of those, found by a license number, phone or address (absent on older previews). */
+  identifierMatches?: number;
   licenseSourceStates: string[];
   portalsByState: Record<string, number>;
   /** Companies only: complaint, federal case and OSHA inspection counts (absent on older previews). */
