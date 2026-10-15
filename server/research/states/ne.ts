@@ -8,15 +8,19 @@
  *   live  Nebraska State Electrical Division licenses and registrations (the division's public search on Tyler
  *         State Regulatory Central): contractors, journeymen, apprentices, fire alarm installers and the rest,
  *         with status and the contact address; searched by name, credential number or street address.
+ *   ne-eca-unpaid  Department of Labor list of contractors with unpaid fines for Employee Classification Act
+ *         (worker misclassification) violations, a PDF linked from the Labor Standards contractor overview page (read with ./lib/g6-pdf.ts).
  *
  * Nebraska has no state general-contractor license; contractors register with the Department of Labor (above).
  */
 import type { LicenseHit } from "@shared/research-reports";
-import { clean, usDate } from "../bulk";
+import { promises as fs } from "node:fs";
+import { clean, download, usDate, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
 import { politeFetch } from "../../scrapers/polite-fetch";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { htmlText, joinAddr } from "./lib/g6-common";
+import { pdfTable } from "./lib/g6-pdf";
 
 // ── NE DOL contractor registration ───────────────────────────────────────────────────────────────────────────
 const CONREG = "https://dol.nebraska.gov/conreg";
@@ -167,10 +171,45 @@ const NE_ELECTRICAL: LiveLicenseSearch = {
   },
 };
 
+// ── Employee Classification Act: contractors with unpaid fines (PDF) ─────────────────────────────────────────
+const ECA_PAGE = "https://dol.nebraska.gov/LaborStandards/Contractors/Overview";
+
+const NE_ECA: BulkSource = {
+  id: "ne-eca-unpaid", state: "NE", label: "Nebraska DOL contractors with unpaid Employee Classification Act fines", pageUrl: ECA_PAGE,
+  everyHours: 24 * 7, minRows: 25, companiesOnly: true, // 36 on 2026-10-15
+  load: async function* () {
+    // The file's link changes when it is replaced; find it on the overview page by its label.
+    const page = await politeFetch(ECA_PAGE, {}, { minDelayMs: 1500 });
+    if (!page.ok) throw new Error(`Nebraska ECA page returned HTTP ${page.status}`);
+    const href = (await page.text()).match(/href="([^"]+)"[^>]*>\s*Contractors with Unpaid Fines for ECA Violations/i)?.[1];
+    if (!href) throw new Error("Nebraska ECA page has no unpaid-fines link");
+    const path = await download(new URL(href, ECA_PAGE).toString());
+    let rows;
+    try { rows = pdfTable(await fs.readFile(path), ["Business Name", "Address", "City", "State", "Zip", "DBA"]); } finally { await fs.rm(path, { force: true }); }
+    for (const { cells: c } of rows) {
+      const name = clean(c["business name"]);
+      if (!name) continue;
+      const dba = clean(c.dba);
+      const address = joinAddr(c.address, c.city, c.state, c.zip);
+      yield {
+        kind: "enforcement", business: [name, dba].filter(Boolean).join(" "), person: null, keys: { addresses: [address] },
+        hit: {
+          state: "NE", source: "Nebraska DOL contractors with unpaid Employee Classification Act fines", sourceUrl: ECA_PAGE, category: "wage",
+          name: dba ? `${name} / ${dba}` : name, id: null, date: null, endDate: null,
+          status: "Listed as having an unpaid fine for an Employee Classification Act violation", city: clean(c.city),
+          detail: "The Employee Classification Act covers misclassifying construction workers as independent contractors.",
+          amount: null, adverse: true, address, phone: null, licenseNumber: null,
+        },
+      };
+    }
+  },
+};
+
 export const pack: StatePack = {
   state: "NE",
   checked: "2026-10-15",
   liveLicenses: [NE_CONREG, NE_ELECTRICAL],
+  bulk: [NE_ECA],
   noStatewideGcLicense:
     "Nebraska does not license general contractors statewide; contractors register with the Department of Labor (searched above), and electricians are licensed by the State Electrical Division",
   blocked: [

@@ -347,9 +347,11 @@ export function pdfTable(buf: Uint8Array, header: string[]): { page: number; y: 
       continue;
     }
     if (!cols) continue;
-    // Runs left of the first column (a city printed a little left of its header) belong to the first column.
-    const starts = cols.map((c, i) => (i === 0 ? -Infinity : c.x));
-    const cells = toColumns(line, starts);
+    // A run belongs to the column whose header starts nearest to its left: the boundary between two columns is
+    // halfway between their headers (right-aligned numbers start left of their header; a city printed a little
+    // left of the first header still belongs to the first column).
+    const starts = cols.map((c, i) => (i === 0 ? -Infinity : (cols![i - 1].x + c.x) / 2));
+    const cells = toColumns(line, starts, 0);
     out.push({ page: line[0].page, y: line[0].y, cells: Object.fromEntries(cols.map((c, i) => [c.label, cells[i]])) });
   }
   return out;
