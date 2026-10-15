@@ -113,6 +113,10 @@ async function session(ctx: AdapterCtx): Promise<Session> {
 export function searchRequest(template: Json, value: string, type: PermitSearchType): Json {
   const payload = enerGovSearchRequest(template, value, type);
   const criteria = payload.PermitCriteria;
+  // The keyword box matches ANY word unless the form's "Exact Match" box is ticked: "Able Construction" hit
+  // 106,870 Cape Coral permits (every "construction"), past the 100-page cap, and Sunrise's 3,161 OR-hits cost
+  // 64 page requests for zero real matches. A name is a phrase; search it as one.
+  if (type === 'keyword' && 'ExactMatch' in payload) payload.ExactMatch = true;
   criteria.PermitTypeId ??= 'none';
   criteria.PermitStatusId ??= 'none';
   const sort = template.PermitSortList?.find((s: Json) => ['PermitNumber.keyword', 'PermitNumber'].includes(s.Key))?.Key;

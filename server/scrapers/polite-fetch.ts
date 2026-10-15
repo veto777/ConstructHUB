@@ -56,6 +56,10 @@ export async function politeFetch(url: string, init: RequestInit = {}, opts: Pol
     const headers = new Headers(init.headers ?? {});
     if (!headers.has("user-agent")) headers.set("user-agent", USER_AGENT);
     if (!headers.has("accept")) headers.set("accept", "text/html,application/json;q=0.9,*/*;q=0.8");
+    // A session's first request has an empty jar. An empty `Cookie:` header is malformed, and F5 ASM
+    // front ends (CentralSquare's aspgov.com Click2Gov/eTRAKiT hosts) answer it with an
+    // "Error Occurred ... support ID" page instead of the portal. Send no header at all instead.
+    if (headers.has("cookie") && !headers.get("cookie")!.trim()) headers.delete("cookie");
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     let res: Response;

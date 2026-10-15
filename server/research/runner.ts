@@ -115,9 +115,21 @@ function searchTypesFor(d: Db, kind: "person" | "company"): string[] {
 
 /** A failure worth one more try: the portal was slow (same search again) or lacks that search field (the next type). */
 export function retryPlan(message: string): "same" | "next" | null {
-  if (/aborted|timed out|timeout|ETIMEDOUT|ECONNRESET|socket hang up/i.test(message)) return "same";
+  // "fetch failed" is a dropped connection; BS&A's "Object reference not set" is its own server fault (it hit most
+  // FL tenants for two minutes on 2026-10-15 and passed on the next try).
+  if (/aborted|timed out|timeout|ETIMEDOUT|ECONNRESET|socket hang up|fetch failed|Object reference not set to an instance/i.test(message)) return "same";
   if (/field unavailable|does not expose|requested search field/i.test(message)) return "next";
   return null;
+}
+
+/**
+ * The portal itself offers no public name, company or keyword search: the tenant hides the field (SmartGov
+ * tenants that publish no contact names, eTRAKiT tenants without a contractor/keyword box, a Click2Gov site with
+ * only permit/address/parcel forms) or publishes no searchable records at all (GovWell with no public dashboard).
+ * Reported like a platform without name search, not as a failure, once every search type has been tried.
+ */
+export function lacksNameSearch(message: string): boolean {
+  return /field unavailable|does not expose|requested search field|(?:company|name|keyword) search form unavailable|has no published public record dashboards/i.test(message);
 }
 
 /** One live search of a set of portals with one search type, read back as coverage per portal. */
@@ -176,6 +188,9 @@ async function sweepPortals(userId: number, name: string, kind: "person" | "comp
         const plan = retryPlan(c.message);
         if (plan === "same" && !p.retriedSame) next.push({ ...p, retriedSame: true });
         else if (plan === "next" && p.i + 1 < p.types.length) next.push({ ...p, i: p.i + 1 });
+        else if (lacksNameSearch(c.message)) {
+          final.set(p.d.id, { ...c, outcome: "not_searched", message: `This portal has no public name or company search (${c.message.replace(/^Not searched:\s*/i, "")})` });
+        }
       }
     }
     if (next.length) log(`retrying ${next.length} portal(s)`);
