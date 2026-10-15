@@ -23,6 +23,26 @@ export interface InfoEntry {
 export const INFO_CONTENT: Record<string, InfoEntry> = {
   /* ── Google Business ─────────────────────────────────────────────────── */
 
+  "location-reviews": {
+    title: "Reviews",
+    body: [
+      "Every review on your Google listing is copied here each time the location syncs (every few hours), with the reviewer, stars, text, date and your reply.",
+      "Why that matters: reviews disappear. A competitor reports a good one, Google's filter takes it down, and all you see is 107 yesterday and 106 today. Here the one that vanished is named, its full text is kept, and you get an alert the moment the sync notices — bell, email and phone push. The same for a review whose stars or text changed, and for one that comes back.",
+      "Removed: the reviews Google no longer returns, with the full text and a Copy button, so you can quote it when you ask Google to restore it (the link is right there).",
+      "Changes: the log — new, edited, removed, restored — newest first. The first sync of a listing is history, not news, so nothing is logged until something actually changes.",
+      "On Google now: everything currently on the listing, with an edited marker where the reviewer changed their mind and a no-reply marker where you still owe one. Reply from the Google Reviews page.",
+    ],
+  },
+
+  fileloaded: {
+    title: "What is FileLoaded?",
+    body: [
+      "FileLoaded is cloud storage, like Dropbox or Google Drive: you make a project, drop files into it from your phone or computer, and they sit there safely.",
+      "The difference: every FileLoaded project has its own API key, so a program can read the files without a person clicking download. Most storage services do not offer that on a plain folder. That is why bulk posts can pull photos straight out of a project, every day, on its own.",
+      "To use it: open the project in FileLoaded, copy its API key (it starts with flp_), paste it here with the project name, press Check the project, and the photos are counted before anything starts. The key is stored encrypted and used only to fetch these photos.",
+    ],
+  },
+
   "bulk-posts": {
     title: "Bulk posts",
     body: [

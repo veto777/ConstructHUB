@@ -2,6 +2,7 @@ import { getEntitlements, locationCount, sendLocationLimit, sendPlanRequired } f
 import type { Response } from 'express';
 import { pool } from '../db';
 import { logActivity, notifyUser } from '../account-events';
+import { recordReviewChanges, notifyReviewChanges, type ReviewEvent } from './review-changes';
 import { GoogleClient, GoogleError, mapLocation, mapPerformance, mapProfile, performancePath, resource, PROFILE_READ_MASK } from './client';
 import { accessToken, grantUsable, invalidate, soleSubject } from './grants';
 import type { PoolClient } from 'pg';
@@ -199,7 +200,10 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           const parent = `${l.gbp_account_name}/${l.gbp_location_name}`;
           const reviews = (await client.pages('reviews',`/v4/${parent}/reviews`,'reviews')).map(r => mapReview(r,parent));
           await c.query('BEGIN');
+          let changes: ReviewEvent[] = [];
           try {
+            // What the listing had before this snapshot, so removed and edited reviews are named, not just counted.
+            const {rows:before} = await c.query(`SELECT id,google_review_id,reviewer_name,rating,comment,review_date,reply_comment,google_deleted FROM google_profile_reviews WHERE user_id=$1 AND location_id=$2 AND google_review_id LIKE $3`,[userId,id,`${parent}/reviews/%`]);
             // Only a complete successful snapshot can mark missing reviews deleted.
             await c.query(`UPDATE google_profile_reviews SET google_deleted=true WHERE user_id=$1 AND location_id=$2 AND google_review_id LIKE $3`,[userId,id,`${parent}/reviews/%`]);
             for (const r of reviews) await c.query(`INSERT INTO google_profile_reviews(user_id,location_id,google_review_id,reviewer_name,reviewer_photo_url,rating,comment,review_date,reply_comment,reply_date,reply_status,google_deleted)
@@ -207,13 +211,15 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
               ON CONFLICT(user_id,google_review_id) WHERE google_review_id LIKE 'accounts/%/locations/%/reviews/%'
               DO UPDATE SET reviewer_name=$4,reviewer_photo_url=$5,rating=$6,comment=$7,review_date=$8,reply_comment=$9,reply_date=$10,reply_status=$11,google_deleted=false,updated_at=now()`,
               [userId,id,r.name,r.reviewer,r.photo,r.rating,r.comment,r.date,r.reply,r.replyDate,r.reply?'posted':'draft']);
+            changes = await recordReviewChanges(c, userId, id, before, reviews);
             await c.query('COMMIT');
           } catch(e) { await c.query('ROLLBACK'); throw e; }
+          if (changes.some(e => e.kind !== 'added')) await notifyReviewChanges(userId, id, l.business_name, changes).catch(() => {});
           await c.query(`UPDATE business_locations SET review_count=s.n,avg_rating=s.avg,updated_at=now() FROM
             (SELECT count(*)::int n, round(avg(rating)::numeric,2)::real avg FROM google_profile_reviews WHERE user_id=$2 AND location_id=$1 AND NOT google_deleted AND google_review_id LIKE 'accounts/%') s WHERE id=$1`,[id,userId]);
           const { notifyNewReviews } = await import('./review-automation');
           await notifyNewReviews(userId,id);
-          result.reviews = {count:reviews.length};
+          result.reviews = {count:reviews.length, removed:changes.filter(e=>e.kind==='removed').length, edited:changes.filter(e=>e.kind==='edited').length};
         } else {
           const {rows:[s]} = await c.query('SELECT cursor_date::text FROM gbp_sync_status WHERE location_id=$1 AND kind=$2',[id,kind]);
           const end = new Date(); end.setUTCDate(end.getUTCDate()-1);

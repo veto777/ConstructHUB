@@ -101,7 +101,7 @@ export function BulkPosts({ locationId }: { locationId: number }) {
             <p className="font-medium">Where are the photos?</p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant={source === "library" ? "secondary" : "outline"} onClick={() => setSource("library")} data-testid="bulk-source-library"><Upload className="mr-2 h-4 w-4" />Upload from this device</Button>
-              {runs.data?.fileloaded && <Button type="button" variant={source === "fileloaded" ? "secondary" : "outline"} onClick={() => setSource("fileloaded")} data-testid="bulk-source-fileloaded">FileLoaded project</Button>}
+              {runs.data?.fileloaded && <span className="inline-flex items-center"><Button type="button" variant={source === "fileloaded" ? "secondary" : "outline"} onClick={() => setSource("fileloaded")} data-testid="bulk-source-fileloaded">FileLoaded project</Button><InfoTip k="fileloaded" /></span>}
               <Button type="button" variant={source === "dropbox" ? "secondary" : "outline"} onClick={() => setSource("dropbox")} data-testid="bulk-source-dropbox"><BrandIcon brand="dropbox" className="mr-2 h-4 w-4" />Dropbox shared link</Button>
             </div>
             {source === "library" && (
@@ -114,13 +114,13 @@ export function BulkPosts({ locationId }: { locationId: number }) {
               <div className="space-y-2">
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label className="block">Project name<Input value={slug} onChange={(e) => { setSlug(e.target.value); setChecked(null); }} placeholder="the project's slug" /></label>
-                  <label className="block">Project key<Input type="password" value={key} onChange={(e) => { setKey(e.target.value); setChecked(null); }} placeholder="flp_… from the project's Key panel" autoComplete="off" /></label>
+                  <label className="block">Project's API key<Input type="password" value={key} onChange={(e) => { setKey(e.target.value); setChecked(null); }} placeholder="flp_… from the project's API key panel" autoComplete="off" /></label>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="button" variant="outline" size="sm" disabled={!slug || !key || check.isPending} onClick={() => check.mutate()}>{check.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Check the project</Button>
                   {checked && <span className="text-xs text-muted-foreground">{checked.count} photo{checked.count === 1 ? "" : "s"} found{checked.sample.length ? ` — ${checked.sample.join(", ")}${checked.count > checked.sample.length ? ", …" : ""}` : ""}</span>}
                 </div>
-                <p className="text-xs text-muted-foreground">The key is stored encrypted and used only to download these photos. Photos post in filename order, so number them if the order matters.</p>
+                <p className="text-xs text-muted-foreground">The API key is stored encrypted and used only to download these photos. Photos post in filename order, so number them if the order matters.</p>
               </div>
             )}
             {source === "dropbox" && (

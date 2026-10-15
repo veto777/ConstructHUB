@@ -15,6 +15,10 @@ export const NOTIFICATION_KINDS = {
   "gbp.suggested_edit": { label: "Google or the public suggested an edit to your profile", inApp: true, email: true },
   "gbp.change_reverted": { label: "Profile Watch reverted a change", inApp: true, email: true },
   "gbp.new_review": { label: "A new Google review arrived", inApp: true, email: true },
+  // Reviews that vanish (often a competitor's report) or change — the owner learns which one, at once.
+  "gbp.review_removed": { label: "A Google review disappeared from your listing", inApp: true, email: true },
+  "gbp.review_edited": { label: "A Google review on your listing was edited", inApp: true, email: true },
+  "gbp.review_restored": { label: "A removed Google review is back", inApp: true, email: false },
   "yelp.new_review": { label: "A new Yelp review arrived", inApp: true, email: true },
   // A review-request score below the owner's threshold (shared/review-flow.ts): the client's private feedback, at once.
   "reviews.private_feedback": { label: "A client's private feedback scored below your threshold", inApp: true, email: true },

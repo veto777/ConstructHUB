@@ -392,6 +392,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
 
   const tabItems = [
     { value: "insights", label: "Insights", icon: BarChart3 },
+    { value: "reviews", label: "Reviews", icon: Star },
     { value: "guard", label: "Profile Watch", icon: Lock },
     { value: "info", label: "Location Info", icon: Building2 },
     { value: "services", label: "Services", icon: Tag },
@@ -440,6 +441,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
 
           <div className="flex-1 min-w-0">
             {activeTab === "insights" && <div className="space-y-4"><LocationSearchSummary locationId={location.id} businessName={location.businessName}/><InsightsTab location={location} /></div>}
+            {activeTab === "reviews" && <ReviewsTab location={location} />}
             {activeTab === "guard" && <ProfileGuard locationId={location.id} linked={!!location.gbpLocationName} />}
             {activeTab === "info" && <LocationInfoTab location={location} />}
             {activeTab === "services" && <ServicesTab location={location} />}
@@ -704,6 +706,95 @@ function ServicesTab({ location }: { location: BusinessLocation }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+type ReviewRow = { id: number; reviewer_name: string | null; reviewer_photo_url: string | null; rating: number | null; comment: string | null; review_date: string | null; reply_comment: string | null; reply_status: string | null; reply_date: string | null; google_deleted: boolean; deleted_at: string | null; edited_at: string | null; edit_count: number; previous: { reviewer_name?: string | null; rating?: number | null; comment?: string | null } | null };
+type ReviewEventRow = { id: number; review_id: number | null; kind: "added" | "edited" | "removed" | "restored"; before: { reviewer_name?: string | null; rating?: number | null; comment?: string | null; review_date?: string | null } | null; after: { reviewer_name?: string | null; rating?: number | null; comment?: string | null; review_date?: string | null } | null; created_at: string };
+const fmtDay = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "");
+const fmtWhen = (d: string | null | undefined) => (d ? new Date(d).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
+function Stars({ n }: { n: number | null | undefined }) {
+  return <span className="inline-flex items-center gap-0.5 text-amber-500" aria-label={n ? `${n} stars` : "unrated"}>{[1, 2, 3, 4, 5].map((i) => <Star key={i} className={`h-3.5 w-3.5 ${n && i <= n ? "fill-current" : "opacity-25"}`} />)}</span>;
+}
+
+/** Reviews: every review Google returns, saved here; the ones Google stopped returning, with their full text; and the
+ * change log — so "107 yesterday, 106 today" always has a name attached (owner 2026-10-15). */
+function ReviewsTab({ location }: { location: BusinessLocation }) {
+  const linked = !!location.gbpLocationName;
+  const { data, isLoading, error } = useQuery<{ live: ReviewRow[]; removed: ReviewRow[]; events: ReviewEventRow[]; syncedAt: string | null; syncError: string | null; edited: number }>({
+    queryKey: [`/api/gbp/locations/${location.id}/reviews`], enabled: linked, refetchInterval: 60_000,
+  });
+  const [view, setView] = useState<"changes" | "removed" | "all">("changes");
+  const [copied, setCopied] = useState<number | null>(null);
+  const copy = async (r: ReviewRow) => {
+    const txt = `${r.rating ?? "?"}-star review by ${r.reviewer_name || "a reviewer"}${r.review_date ? ` on ${fmtDay(r.review_date)}` : ""}:
+${r.comment || "(no text)"}`;
+    try { await navigator.clipboard.writeText(txt); setCopied(r.id); setTimeout(() => setCopied(null), 2000); } catch { /* clipboard blocked: the text is on screen */ }
+  };
+  if (!linked) return <Card><CardContent className="p-4 space-y-3 text-sm text-muted-foreground"><p>Link this location to its Google Business Profile and its reviews are saved here on every sync, with an alert the moment one disappears or changes.</p><GbpLinkCell locationId={location.id} /></CardContent></Card>;
+  const kindLabel: Record<ReviewEventRow["kind"], string> = { added: "New review", edited: "Edited", removed: "Removed by Google", restored: "Back on Google" };
+  const kindClass: Record<ReviewEventRow["kind"], string> = { added: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300", edited: "bg-amber-500/10 text-amber-700 dark:text-amber-300", removed: "bg-red-500/10 text-red-700 dark:text-red-300", restored: "bg-sky-500/10 text-sky-700 dark:text-sky-300" };
+  const live = data?.live ?? [], removed = data?.removed ?? [], events = data?.events ?? [];
+  return (
+    <div className="space-y-4" data-testid="tab-reviews">
+      <div>
+        <div className="flex items-center gap-1"><h3 className="text-base font-semibold">Reviews</h3><InfoTip k="location-reviews" /></div>
+        <p className="text-xs text-muted-foreground max-w-xl">Every review on your Google listing is saved here on each sync. When one disappears, is edited or comes back, it is logged with its full text and you get an alert, so a review a competitor reported never just vanishes without a name.</p>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <button type="button" onClick={() => setView("all")} className={`rounded-lg border p-3 text-center ${view === "all" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`} data-testid="reviews-count-live"><p className="text-2xl font-bold">{data ? live.length : "—"}</p><p className="text-xs text-muted-foreground">On Google now{location.avgRating ? ` · ${location.avgRating}★` : ""}</p></button>
+        <button type="button" onClick={() => setView("removed")} className={`rounded-lg border p-3 text-center ${view === "removed" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`} data-testid="reviews-count-removed"><p className={`text-2xl font-bold ${removed.length ? "text-destructive" : ""}`}>{data ? removed.length : "—"}</p><p className="text-xs text-muted-foreground">Removed (text saved)</p></button>
+        <button type="button" onClick={() => setView("changes")} className={`rounded-lg border p-3 text-center ${view === "changes" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`} data-testid="reviews-count-changes"><p className="text-2xl font-bold">{data ? events.length : "—"}</p><p className="text-xs text-muted-foreground">Changes logged</p></button>
+      </div>
+      <p className="text-xs text-muted-foreground">{data?.syncedAt ? `Last checked ${fmtWhen(data.syncedAt)} · checked again every few hours` : "Not checked yet"}{data?.syncError ? ` · ${data.syncError}` : ""}</p>
+      {error && <p role="alert" className="text-sm text-destructive">Could not load the reviews.</p>}
+      {isLoading && <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}
+
+      {data && view === "changes" && (
+        <Card><CardContent className="p-0">
+          {!events.length ? <p className="p-4 text-sm text-muted-foreground">No changes since the reviews were first saved. The first sync is history, not news; from here on every new, edited, removed or restored review shows up on this list and in your alerts.</p> : (
+            <ul className="divide-y">{events.map((e) => { const r = e.kind === "removed" ? e.before : e.after; return (
+              <li key={e.id} className="p-3 text-sm space-y-1" data-testid={`review-event-${e.id}`}>
+                <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${kindClass[e.kind]}`}>{kindLabel[e.kind]}</span><span className="text-xs text-muted-foreground">{fmtWhen(e.created_at)}</span><span className="font-medium">{r?.reviewer_name || "A reviewer"}</span><Stars n={r?.rating} />{r?.review_date && <span className="text-xs text-muted-foreground">reviewed {fmtDay(r.review_date)}</span>}</div>
+                {e.kind === "edited" && e.before && e.after && (e.before.rating !== e.after.rating) && <p className="text-xs">Rating: <Stars n={e.before.rating} /> → <Stars n={e.after.rating} /></p>}
+                {e.kind === "edited" && e.before?.comment !== e.after?.comment && <p className="text-xs text-muted-foreground line-through whitespace-pre-wrap">{e.before?.comment || "(no text)"}</p>}
+                <p className="whitespace-pre-wrap">{r?.comment || "(no text)"}</p>
+              </li>); })}</ul>
+          )}
+        </CardContent></Card>
+      )}
+
+      {data && view === "removed" && (
+        <Card><CardContent className="p-0">
+          {!removed.length ? <p className="p-4 text-sm text-muted-foreground">Nothing has been removed. If Google ever drops one, its full text stays here and you are alerted.</p> : (
+            <ul className="divide-y">{removed.map((r) => (
+              <li key={r.id} className="p-3 text-sm space-y-1" data-testid={`review-removed-${r.id}`}>
+                <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{r.reviewer_name || "A reviewer"}</span><Stars n={r.rating} />{r.review_date && <span className="text-xs text-muted-foreground">reviewed {fmtDay(r.review_date)}</span>}<span className="text-xs text-destructive">gone since {fmtWhen(r.deleted_at) || "an earlier sync"}</span></div>
+                <p className="whitespace-pre-wrap">{r.comment || "(no text)"}</p>
+                {r.reply_comment && <p className="text-xs text-muted-foreground">Your reply: {r.reply_comment}</p>}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button size="sm" variant="outline" onClick={() => void copy(r)}>{copied === r.id ? "Copied" : "Copy the text"}</Button>
+                  <Button asChild size="sm" variant="outline"><a href="https://support.google.com/business/contact/review_removal_restoration" target="_blank" rel="noopener noreferrer">Ask Google to restore it ↗</a></Button>
+                </div>
+              </li>))}</ul>
+          )}
+        </CardContent></Card>
+      )}
+
+      {data && view === "all" && (
+        <Card><CardContent className="p-0">
+          {!live.length ? <p className="p-4 text-sm text-muted-foreground">No reviews on the listing yet.</p> : (
+            <ul className="divide-y">{live.map((r) => (
+              <li key={r.id} className="p-3 text-sm space-y-1" data-testid={`review-${r.id}`}>
+                <div className="flex flex-wrap items-center gap-2">{r.reviewer_photo_url && <img src={r.reviewer_photo_url} alt="" className="h-6 w-6 rounded-full" loading="lazy" />}<span className="font-medium">{r.reviewer_name || "A reviewer"}</span><Stars n={r.rating} /><span className="text-xs text-muted-foreground">{fmtDay(r.review_date)}</span>{r.edit_count > 0 && <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-300">edited {r.edit_count}×</span>}{r.reply_comment ? <span className="text-[11px] text-muted-foreground">replied</span> : <span className="text-[11px] text-destructive">no reply</span>}</div>
+                <p className="whitespace-pre-wrap">{r.comment || "(no text)"}</p>
+                {r.previous && (r.previous.comment !== r.comment || r.previous.rating !== r.rating) && <p className="text-xs text-muted-foreground">Before the edit: <Stars n={r.previous.rating} /> {r.previous.comment || "(no text)"}</p>}
+              </li>))}</ul>
+          )}
+          <div className="p-3 border-t"><Button asChild size="sm" variant="outline"><a href={`/google-reviews/reviews?location=${location.id}`}>Reply to reviews</a></Button></div>
+        </CardContent></Card>
+      )}
+    </div>
   );
 }
 

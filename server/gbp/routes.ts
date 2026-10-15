@@ -138,6 +138,19 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
   });
   // The Locations detail "Photos" tab grid: photos synced from the Business Profile (business or customer
   // source), newest first, with the total count and last sync time for "Show more".
+  // The location's Reviews tab: every review Google returns, the ones it stopped returning (full text kept), and the
+  // change log (added / edited / removed / restored) — server/gbp/review-changes.ts.
+  route('get','/api/gbp/locations/:id/reviews',async(req,res,userId)=>{
+    const id=Number(req.params.id);
+    const {rows:[l]}=await pool.query('SELECT id,review_count,avg_rating FROM business_locations WHERE id=$1 AND user_id=$2',[id,userId]);
+    if(!l) throw new GoogleError('invalid','Location not found',404);
+    const cols='id,reviewer_name,reviewer_photo_url,rating,comment,review_date,reply_comment,reply_status,reply_date,google_deleted,deleted_at,edited_at,edit_count,previous,created_at';
+    const {rows:live}=await pool.query(`SELECT ${cols} FROM google_profile_reviews WHERE user_id=$1 AND location_id=$2 AND NOT google_deleted AND google_review_id LIKE 'accounts/%' ORDER BY review_date DESC NULLS LAST LIMIT 1000`,[userId,id]);
+    const {rows:removed}=await pool.query(`SELECT ${cols} FROM google_profile_reviews WHERE user_id=$1 AND location_id=$2 AND google_deleted AND google_review_id LIKE 'accounts/%' ORDER BY deleted_at DESC NULLS LAST, updated_at DESC LIMIT 500`,[userId,id]);
+    const {rows:events}=await pool.query('SELECT id,review_id,kind,before,after,created_at FROM gbp_review_events WHERE user_id=$1 AND location_id=$2 ORDER BY created_at DESC LIMIT 300',[userId,id]);
+    const {rows:[s]}=await pool.query("SELECT last_success,last_error FROM gbp_sync_status WHERE location_id=$1 AND kind='reviews'",[id]);
+    res.json({live,removed,events,syncedAt:s?.last_success??null,syncError:s?.last_error??null,edited:live.filter(r=>r.edit_count>0).length});
+  });
   route('get','/api/gbp/locations/:id/media',async(req,res,userId)=>{
     const id=Number(req.params.id),source=req.query.source==='customer'?'customer':'business';
     const {rows:[l]}=await pool.query('SELECT id FROM business_locations WHERE id=$1 AND user_id=$2',[id,userId]);

@@ -919,6 +919,11 @@ export const googleProfileReviews = pgTable("google_profile_reviews", {
   replyStatus: text("reply_status").notNull().default("draft"),
   replyError: text("reply_error"),
   googleDeleted: boolean("google_deleted").notNull().default(false),
+  // When Google stopped returning it / when its text or rating last changed (the prior version is kept).
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  editedAt: timestamp("edited_at", { withTimezone: true }),
+  editCount: integer("edit_count").notNull().default(0),
+  previous: jsonb("previous"),
   replyDate: timestamp("reply_date"),
   internalNote: text("internal_note"),
   isNew: boolean("is_new").default(true),

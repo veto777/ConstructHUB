@@ -38,6 +38,17 @@ export async function ensureGbpSchema() {
     ALTER TABLE google_profile_reviews ADD COLUMN IF NOT EXISTS reply_status text NOT NULL DEFAULT 'draft';
     ALTER TABLE google_profile_reviews ADD COLUMN IF NOT EXISTS reply_error text;
     ALTER TABLE google_profile_reviews ADD COLUMN IF NOT EXISTS google_deleted boolean NOT NULL DEFAULT false;
+    -- Removed / edited reviews keep their history (server/gbp/review-changes.ts).
+    ALTER TABLE google_profile_reviews ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+    ALTER TABLE google_profile_reviews ADD COLUMN IF NOT EXISTS edited_at timestamptz;
+    ALTER TABLE google_profile_reviews ADD COLUMN IF NOT EXISTS edit_count integer NOT NULL DEFAULT 0;
+    ALTER TABLE google_profile_reviews ADD COLUMN IF NOT EXISTS previous jsonb;
+    CREATE TABLE IF NOT EXISTS gbp_review_events (
+      id bigserial PRIMARY KEY, user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      location_id integer NOT NULL REFERENCES business_locations(id) ON DELETE CASCADE,
+      review_id integer, google_review_id text NOT NULL, kind text NOT NULL, before jsonb, after jsonb,
+      created_at timestamptz NOT NULL DEFAULT now());
+    CREATE INDEX IF NOT EXISTS gbp_review_events_location ON gbp_review_events(location_id, created_at DESC);
     CREATE UNIQUE INDEX IF NOT EXISTS gbp_review_identity ON google_profile_reviews(user_id, google_review_id) WHERE google_review_id LIKE 'accounts/%/locations/%/reviews/%';
     UPDATE google_profile_reviews SET reply_draft=COALESCE(reply_draft,reply_comment),reply_comment=NULL,reply_date=NULL WHERE reply_status='draft' AND reply_comment IS NOT NULL;
     CREATE TABLE IF NOT EXISTS gbp_sync_status (
