@@ -543,7 +543,7 @@ const namesMatch = (a: string, b: string) => tokens(a).sort().join(" ") === toke
 // ── Business-license registries labeled with NAICS titles: kept to construction contractors ───────────────────────
 const CONSTRUCTION_TITLE = /\b(contractors?|construction|builders)\b/i;
 const NOT_CONSTRUCTION = /food service|apparel|cut and sew|wholesal|material|machinery|equipment rental|leasing|manufactur|dealers|retail|stores/i;
-const isConstruction = (title: string | null) => !!title && CONSTRUCTION_TITLE.test(title) && !NOT_CONSTRUCTION.test(title);
+export const isConstruction = (title: string | null) => !!title && CONSTRUCTION_TITLE.test(title) && !NOT_CONSTRUCTION.test(title);
 const TITLE_WHERE = (f: string) => `${f} like '%Contractor%' OR ${f} like '%Construction%' OR ${f} like '%Builders%'`;
 
 const NOLA = soda("data.nola.gov", "hjcd-grvu");
@@ -655,10 +655,10 @@ const norfolk: BulkSource = {
 // unexplained by the publisher, so they are shown as codes.
 const MDC = "https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/contractor_daily_data/FeatureServer/0";
 const MDC_PAGE = "https://www.arcgis.com/home/item.html?id=1a2cb89e4c134eae80074395fd90d5b0";
-/** Area code and a seven-digit number stored as integers (305, 6650239) → "3056650239"; null when either is 0. */
-const mdcPhone = (area: unknown, num: unknown) => {
+/** Area code and a seven-digit number stored as integers (305, 6650239) → "3056650239"; null unless both are whole. */
+export const mdcPhone = (area: unknown, num: unknown) => {
   const a = Number(area), n = Number(num);
-  return a > 0 && n > 0 ? `${a}${String(n).padStart(7, "0")}` : null;
+  return a >= 200 && a <= 999 && n >= 2_000_000 && n <= 9_999_999 ? `${a}${n}` : null;
 };
 const mdcZip = (v: unknown) => { const t = v == null ? "" : String(v); return t.length === 9 ? t.slice(0, 5) : t.length === 5 ? t : null; };
 const miamiDade: BulkSource = {
@@ -798,3 +798,22 @@ export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 export const LOCAL_ENFORCEMENT: SodaEnforcement[] = [...nycEnforcement];
 /** Other city and county enforcement searches, by state. */
 export const LOCAL_LIVE_ENFORCEMENT: Record<string, LiveEnforcementSearch[]> = {};
+
+/**
+ * City and county sources looked at on 2026-10-15 and not used (for the next person; not shown in reports). Cities
+ * missing from both lists publish no contractor license or registration data we could find on their portals.
+ */
+export const LOCAL_BLOCKED: string[] = [
+  "Pittsburgh PLI licensed contractors and trade licenses, Allegheny County registered master plumbers (data.wprdc.org): robots.txt disallows /datastore/dump/ and /api/ for every agent",
+  "Henderson NV business licenses (maps.cityofhenderson.com OpenDataGovernment/0): a 2022 snapshot, every contractor license expired in 2023",
+  "Howard County MD electric and utility trade licenses (opendata.howardcountymd.gov qa5k-m2n2): license numbers only, no names",
+  "Dallas active contractors (dallasopendata.com jhgk-eg9m): last updated 2017-03-31",
+  "Denver business licenses (data.colorado.gov s9wt-dsfz, ArcGIS ODC_active_business_licenses): no contractor license types; Denver's contractor licenses are not published",
+  "Detroit BSEED business licenses (current): no contractor license types",
+  "Cincinnati business licenses (data.cincinnati-oh.gov 7dk3-gngs): no contractor license types",
+  "St. Louis business licenses 2024 (ArcGIS Business_License_2024): no business type to keep construction to",
+  "Atlanta business licenses (ArcGIS GBL_WFL1): last updated 2023-04-24; the 2026 layer covers Main Street districts only",
+  "San Diego County building permits - contractors (data.sandiegocounty.gov 76h4-nnmj): contractors on permits, not a license list (CSLB numbers already searched statewide)",
+  "New York City stop-work orders: DOB publishes them only on complaint dispositions by property, never naming the contractor",
+  "Chicago contractor violations: no dataset names contractors (Building Violations are by property); Chicago general-contractor and trade licenses are not on the portal",
+];
