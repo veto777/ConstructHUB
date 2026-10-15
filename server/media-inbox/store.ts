@@ -315,6 +315,46 @@ export async function queueVettedDirectories(pick: (emails: string[]) => string 
 
 const FREE_MAIL_ADDR = /@(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|aol|icloud|proton(mail)?)\./i;
 
+/** Vetted directories (any tier) that publish an email and were never classified. Government sites never reach the AI. */
+export async function needingClass(limit: number): Promise<{ domain: string; title: string | null; homeTitle: string | null }[]> {
+  const r = await db().query(
+    `SELECT domain, signals->>'title' AS title, signals->>'homeTitle' AS "homeTitle" FROM backlink_sources
+      WHERE status = 'qualified' AND kind IN ('directory', 'citation') AND cardinality(contact_emails) > 0 AND partner_class IS NULL
+        AND domain !~ '\\.(gov|mil|edu)$' AND domain !~ '\\.(state|k12|co|ci|city|us)\\.[a-z]{2}\\.us$'
+      ORDER BY tier, score DESC NULLS LAST LIMIT $1`, [limit]);
+  return r.rows;
+}
+export async function saveClasses(classes: Map<string, string>, names: Map<string, string> = new Map()) {
+  for (const [domain, cls] of classes)
+    await db().query(`UPDATE backlink_sources SET partner_class = $2, partner_name = $3, partner_class_at = now() WHERE domain = $1`, [domain, cls, names.get(domain) ?? null]);
+}
+
+/**
+ * Queue classified directories (2026-10-15): a listing directory gets the Directory Sync email, a trade association or
+ * chamber the member-resource email. Government sites and webmail addresses (often a member's, not the organisation's)
+ * are never queued.
+ */
+export async function queueClassified(pick: (emails: string[]) => string | null, name: (domain: string, signals: any) => string): Promise<number> {
+  const r = await db().query(
+    `SELECT s.domain, s.partner_class, s.partner_name, s.contact_emails, s.signals FROM backlink_sources s
+      WHERE s.status = 'qualified' AND s.partner_class IN ('listing_directory', 'trade_association', 'chamber') AND cardinality(s.contact_emails) > 0
+        AND NOT EXISTS (SELECT 1 FROM media_outreach_queue q WHERE q.domain = s.domain)
+        AND NOT EXISTS (SELECT 1 FROM media_partners p WHERE p.domain = s.domain)
+      ORDER BY s.tier, s.score DESC NULLS LAST`);
+  let added = 0;
+  for (const x of r.rows) {
+    if (/\.(gov|mil|edu)$/.test(x.domain)) continue;
+    const to = pick((x.contact_emails as string[]).filter((e) => !NOT_A_PARTNER_ADDRESS.test(e) && !FREE_MAIL_ADDR.test(e)));
+    if (!to) continue;
+    const ins = await db().query(
+      `INSERT INTO media_outreach_queue (domain, company, kind, to_email, source) VALUES ($1, $2, $3, $4, 'backlinks-classified') ON CONFLICT (domain) DO NOTHING RETURNING id`,
+      [x.domain, (x.partner_name ?? name(x.domain, x.signals)).slice(0, 120), x.partner_class === "listing_directory" ? "directory" : "association", to.toLowerCase()]);
+    if (ins.rows[0]) added++;
+  }
+  return added;
+}
+
+
 /**
  * Queue vetted article / guest-post sites and news outlets (Backlinks kinds guest_post, editorial, press_release; tier
  * A or B; at least 500 Google visits a month — below that it is a contractor's own blog or a link farm; publishes an
