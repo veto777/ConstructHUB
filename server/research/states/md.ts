@@ -59,7 +59,7 @@ const LICENSES: LicenseSource[] = [
     fields: { businessName: "applicant", licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: null, principal: "applicant", city: "city", expires: "expired_date" },
     personField: "applicant", address: "address1", zip: "zip_code",
     // A fire system license names its holder and then the company they work for ("Austin Moss Ace Fire Exstinguisher
-    // Service Inc", live 2026-10-16): the person's own license; the employer doesn't make it a business's.
+    // Service Inc", live 2026-10-15): the person's own license; the employer doesn't make it a business's.
     holder: () => "individual" },
 ];
 

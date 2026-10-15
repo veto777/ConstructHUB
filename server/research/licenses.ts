@@ -77,7 +77,7 @@ const WA: LicenseSource = {
   personField: "primaryprincipalname",
   principals: { url: "https://data.wa.gov/resource/4xk5-x9j6.json", nameField: "principalname", licenseField: "contractorlicensenumber", businessField: "businessname" },
   address: ["address1", "address2", "city", "state"], zip: "zip", phone: "phonenumber",
-  // businesstypecodedesc, checked 2026-10-16: Individual (a sole proprietor), Corporation, Limited Liability Company,
+  // businesstypecodedesc, checked 2026-10-15: Individual (a sole proprietor), Corporation, Limited Liability Company,
   // Partnership, Limited Liability Partnership, Joint Venture, Association, Trust, or blank (round 3, decision 3:
   // only these listed values decide; anything else is unknown).
   holder: (r) => entityHolder(r.businesstypecodedesc, {
@@ -124,7 +124,7 @@ const OTHERS: LicenseSource[] = [
     fields: { businessName: "businessname", licenseNumber: "fullcredentialcode", licenseType: "credential", specialty: "credentialsubcategory", status: "status", principal: "name", city: "city", expires: "expirationdate" },
     personField: "name",
     address: ["address", "city", "state"], zip: "zip", people: [{ field: "name", role: "Credential holder" }],
-    // `type`, checked 2026-10-16: INDIVIDUAL, EMPLOYEE ONLY and SOLE PROPRIETOR are a person; BUSINESS, COMPANY,
+    // `type`, checked 2026-10-15: INDIVIDUAL, EMPLOYEE ONLY and SOLE PROPRIETOR are a person; BUSINESS, COMPANY,
     // CORPORATION (and "CORPORATION  LTD (LIMITED)"), LIMITED LIABILITY COMPANY (and "(SINGLE MEMBER)"), LIMITED
     // LIABILITY PARTNERSHIP, PARTNERSHIP and GOVERNMENT AGENCY an entity; ENFORCEMENT ENTRY, LBD BRAND, SITE and blank unknown.
     holder: (r) => entityHolder(r.type, {
@@ -144,7 +144,7 @@ const OTHERS: LicenseSource[] = [
     // The licensee and its responsible managing individual are two names, never one person (audit 2026-10-15).
     personField: { anyOf: ["full_name", "rmi_name"] },
     address: ["address", "city", "state"], zip: "zip_code", phone: "phone_number",
-    // license_type, checked 2026-10-16. CCB's contractor endorsements are a business's license (RGC, RSC, RLC, RD,
+    // license_type, checked 2026-10-15. CCB's contractor endorsements are a business's license (RGC, RSC, RLC, RD,
     // CGC1/2, CSC1/2, CD, RHSC, RHISC, RLSC, RHEPSC, LBPR); OCHI (certified home inspector) and OCLS (certified
     // locksmith) are a person's certification; any other code (RRC, CF) is unknown.
     holder: (r) => entityHolder(r.license_type, {
@@ -161,7 +161,7 @@ const OTHERS: LicenseSource[] = [
     // Journeyman and other individual licenses (lictype "J-General Journeyman", "JP-Journeyman Plumber", …) name a
     // person; contractor and business licenses ("C-Electrical Contractor", "BB-Boiler Business") a business.
     isBusiness: (r) => /contractor|business/i.test(String(r.lictype ?? "")) || looksLikeBusiness(String(r.full_name ?? "")),
-    // The license class decides who holds it, not how the name reads (lictype, checked 2026-10-16): contractor and
+    // The license class decides who holds it, not how the name reads (lictype, checked 2026-10-15): contractor and
     // business classes are a business's; journeyman, supervising, limited, mechanic, installer and qualified-person
     // classes a person's; the combination classes (BP, BE, BH, EM, PM, PP, PBH) are unknown.
     holder: (r) => entityHolder(r.lictype, {
@@ -179,7 +179,7 @@ const OTHERS: LicenseSource[] = [
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: "description", status: "license_status", principal: null, city: "city", expires: "expiration_date" },
     personField: ["first_name", "middle", "last_name"],
     people: [{ field: ["first_name", "middle", "last_name", "suffix"], role: "Licensee", roleField: "description" }],
-    // `business`, checked 2026-10-16: Y (a business's license) or N (an individual's).
+    // `business`, checked 2026-10-15: Y (a business's license) or N (an individual's).
     holder: (r) => (r.business === "Y" ? "business" : r.business === "N" ? "individual" : null),
     filter: "license_type='ROOFING CONTRACTOR'" },
   { state: "NY", source: "New York DOL contractor registry (public work)", ...soda("data.ny.gov", "i4jv-zkey"),
@@ -188,7 +188,7 @@ const OTHERS: LicenseSource[] = [
     address: ["address", "address_2", "city", "state"], zip: "zip_code", phone: "phone",
     // One field listing several officers: each is a person of their own (the principal is the first one listed).
     people: [{ field: "business_officers", role: "Business officer", split: "," }],
-    // business_type, checked 2026-10-16: Corporation, LLC, LLP, Partnership, Association, Trust, Government, or Sole Proprietorship.
+    // business_type, checked 2026-10-15: Corporation, LLC, LLP, Partnership, Association, Trust, Government, or Sole Proprietorship.
     holder: (r) => entityHolder(r.business_type, { business: /^(?:corporation|llc|llp|partnership|association|trust|government)$/i, individual: /^sole proprietorship$/i }) },
 ];
 
@@ -288,7 +288,7 @@ function rowPeople(src: LicenseSource, row: Record<string, unknown>, business: s
 }
 
 /**
- * A dataset's date as YYYY-MM-DD. Checked live 2026-10-16: WA, Austin, CO, CT, DE, VT and NY publish ISO timestamps
+ * A dataset's date as YYYY-MM-DD. Checked live 2026-10-15: WA, Austin, CO, CT, DE, VT and NY publish ISO timestamps
  * ("2027-12-31T00:00:00.000", cut to the day); TX TDLR, OR CCB, OR BCD and IL IDFPR publish text month/day/year
  * ("06/30/2025", "7/1/2029"), which used to be shown as published. Anything else is not a date (null).
  */

@@ -176,7 +176,7 @@ export function moHolder(rat: string | null, _name: string | null): "business" |
  */
 export function moStatus(status: string, fields: Record<string, string>): { status: string; discipline: string | null } {
   const disc = fields["Current Discipline Status"], prior = fields["Previous Disciplinary Actions"];
-  // "None" and "None Current/Previous" (seen live 2026-10-16) both mean no current discipline.
+  // "None" and "None Current/Previous" (seen live 2026-10-15) both mean no current discipline.
   const discipline = [disc && !/^none\b/i.test(disc.trim()) ? `current discipline: ${disc}` : null, prior && !/^no$/i.test(prior.trim()) ? `previous disciplinary actions: ${prior}` : null].filter(Boolean).join("; ");
   return { status: status === "Active" ? "Active" : "Not active", discipline: discipline || null };
 }

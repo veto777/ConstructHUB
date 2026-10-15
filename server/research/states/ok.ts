@@ -43,7 +43,7 @@ export function roofingHit(r: Reg): BulkHit | null {
     licenseType: s(r.tradeName), specialty: r.commercialEndorsement === true ? "Commercial endorsement" : null,
     status: s(r.statusName), principal: person, city: [s(r.company_city), s(r.company_state)].filter(Boolean).join(", ") || null,
     expires: s(r.renewalDate)?.slice(0, 10) ?? null, matchedOn: company ? "business" : "principal",
-    // company_type, checked 2026-10-16: Corporation, LLC, Partnership, Sole Proprietorship or blank (round 2,
+    // company_type, checked 2026-10-15: Corporation, LLC, Partnership, Sole Proprietorship or blank (round 2,
     // decisions 2 and 3: the publisher's entity type, not the presence of a company name). Any other value is
     // unknown (round 3, decision 3).
     holder: entityHolder(r.company_type, { business: /^(?:corporation|llc|partnership)$/i, individual: /^sole proprietorship$/i }),

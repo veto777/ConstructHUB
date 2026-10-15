@@ -64,7 +64,7 @@ export function licenseHit(h: Omit<LicenseHit, "matchedOn" | "people" | "holder"
 
 /*
  * Holders (round 3, decision 3): an entity or ownership type goes through the shared entityHolder (../privacy.ts)
- * with the values each dataset publishes (checked 2026-10-16), anything unlisted unknown. A file that is a register of
+ * with the values each dataset publishes (checked 2026-10-15), anything unlisted unknown. A file that is a register of
  * businesses by the publisher's own definition (a city's contractor registrations or business licenses in the
  * business's legal name) is "business". A name that reads like a company never makes a holder a business: such
  * datasets publish no type, so their holder is null.
@@ -297,7 +297,7 @@ const chicagoHomeRepair: BulkSource = {
 // ── Washington, DC (Department of Licensing and Consumer Protection) ─────────────────────────────────────────────
 const DC_BBL = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/DCRA/FeatureServer/0";
 const DC_PAGE = "https://www.arcgis.com/home/item.html?id=85bf98d3915f412c8a4de706f2d13513";
-/** ENTITYTYPE values of the contractor rows, checked 2026-10-16; "For Profit", "Unknown", "Trade Name" and "Name Registration" are on neither list. */
+/** ENTITYTYPE values of the contractor rows, checked 2026-10-15; "For Profit", "Unknown", "Trade Name" and "Name Registration" are on neither list. */
 export const DC_BUSINESS_TYPES = /^(?:(?:domestic |foreign )?(?:business corporation|nonprofit corporation|limited liability company|limited liability partnership|limited partnership)|corporation \((?:for|non)[- ]profit\)|limited liability company \(llc\)|limited liability partnership \(llp\)|limited partnership \(lp\)|partnership|general partnership|limited cooperative association|joint venture|government|federal government)$/i;
 export const DC_INDIVIDUAL_TYPES = /^(?:(?:domestic |foreign )?sole proprietor|sole proprietorship)$/i;
 const dcAddress = (v: string | null) => clean(v?.replace(/,\s*USA$/i, "").replace(/\s+,/g, ",") ?? null);
@@ -350,7 +350,7 @@ const longBeach: BulkSource = {
         state: "CA", source: "Long Beach business licenses", sourceUrl: LB_PAGE,
         businessName: sole ? dba : dba && full && dba.toUpperCase() !== full.toUpperCase() ? `${full} (d/b/a ${dba})` : full ?? dba,
         licenseNumber: no, licenseType: cat, specialty: txt(r, "COMPANYTYPE"), status: txt(r, "LICSTATUS"), principal: sole ? full : null,
-        // COMPANYTYPE, checked 2026-10-16: CORP, LLC, LLP, PARTNER, NON-PROFIT, SOLE (or blank).
+        // COMPANYTYPE, checked 2026-10-15: CORP, LLC, LLP, PARTNER, NON-PROFIT, SOLE (or blank).
         holder: entityHolder(txt(r, "COMPANYTYPE"), { business: /^(?:CORP|LLC|LLP|PARTNER|NON-PROFIT)$/, individual: /^SOLE$/ }),
         city: outside ? null : "Long Beach", expires: null,
         address: site ? (outside ? site : addressLine([site], "LONG BEACH", "CA", zip)) : null, phone: null,
@@ -467,7 +467,7 @@ const seattle: BulkSource = {
         businessName: sole ? (trade && !namesMatch(trade, legal) ? trade : null) : trade && trade.toUpperCase() !== legal.toUpperCase() ? `${legal} (${trade})` : legal,
         licenseNumber: txt(r, "city_account_number"), licenseType: "Business license tax certificate (active)", specialty: txt(r, "naics_description"),
         status: "Active", principal: sole ? legal : null, city: txt(r, "city"), expires: null,
-        // ownership_type, checked 2026-10-16; "Other" is on neither list.
+        // ownership_type, checked 2026-10-15; "Other" is on neither list.
         holder: entityHolder(txt(r, "ownership_type"), {
           business: /^(?:corporation|non profit corporation|association|joint venture|general partnership|limited partnership|limited liability ptrs llp|limited liability limited ptrs|llc - (?:multi|single) member|llc limited liability co)$/i,
           individual: /^sole proprietorship$/i,

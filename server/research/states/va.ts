@@ -50,7 +50,7 @@ const CONTRACTOR_LISTS: DporList[] = [
   { file: "2718", type: "Certified Elevator Mechanic", holder: "individual" },
   { file: "2719", type: "Certified Water Well Systems Provider", holder: "individual" },
   { file: "2720", type: "Certified Accessibility Mechanic", holder: "individual" },
-  // Only filled during a declared state of emergency: the published file is its header alone (checked 2026-10-16).
+  // Only filled during a declared state of emergency: the published file is its header alone (checked 2026-10-15).
   { file: "2721", type: "Emergency Elevator Mechanic (declared state of emergency)", holder: "individual", mayBeEmpty: true },
   { file: "2723", type: "Certified Automatic Fire Sprinkler Inspector", holder: "individual" },
 ];

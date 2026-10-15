@@ -1,5 +1,5 @@
 /**
- * Regression tests for the core fixes of the round-3 Codex audit (2026-10-16, decisions 1–13). Each would have caught
+ * Regression tests for the core fixes of the round-3 Codex audit (2026-10-15, decisions 1–13). Each would have caught
  * its finding. Cross-reference fixes are in audit3-xref.test.ts; pack-specific fixes in states/<st>.test.ts.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -118,7 +118,7 @@ describe("decision 5: HTTP", () => {
     expect(r.denied).toBeTruthy();
     expect(calls).toEqual(["https://d.example.test/robots.txt"]);
   });
-  it("a robots.txt that redirects to another path on its own host is read there (mopro.mo.gov, 2026-10-16)", async () => {
+  it("a robots.txt that redirects to another path on its own host is read there (mopro.mo.gov, 2026-10-15)", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input: any) => String(input) === "https://e.example.test/robots.txt"
       ? new Response("", { status: 301, headers: { location: "https://e.example.test/license/robots.txt" } })
       : new Response("User-agent: *\nDisallow: /private/\n", { status: 200, headers: { "content-type": "text/plain" } }));

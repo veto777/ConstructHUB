@@ -45,7 +45,7 @@ export function bblActivity(v: string | null): string | null {
 }
 
 /**
- * Who holds the license, from ENTITYTYPE and the endorsement (round 2, decision 2; values checked 2026-10-16): a
+ * Who holds the license, from ENTITYTYPE and the endorsement (round 2, decision 2; values checked 2026-10-15): a
  * Home Improvement Salesperson endorsement and a sole proprietor (Domestic/Foreign Sole Proprietor, Sole
  * Proprietorship) are an individual; the listed entity types (corporations, LLCs, partnerships, government, …;
  * ./local.ts DC_BUSINESS_TYPES) a business; anything else ("Trade Name", "Name Registration", "Unknown", "For

@@ -101,7 +101,7 @@ export function verifyLicenseHit(details: any, row: VerifyRow | null, matchedOn:
     expires: anyDay(c.ExpirationDate), matchedOn,
     // A tradesperson's address is a home address: only a business's address is kept. A certificate (no UBI) is the
     // tradesperson's own (round 2, decision 2). A registration with a UBI says who holds it in BusinessType (checked
-    // live 2026-10-16: "Individual" for a sole proprietor, who has a UBI too); round 3, decision 3: only the listed
+    // live 2026-10-15: "Individual" for a sole proprietor, who has a UBI too); round 3, decision 3: only the listed
     // entity types make it a business's, so a sole proprietor's home address and phone stay out.
     holder: isTrades ? "individual" : verifyHolder(c.BusinessType),
     address: isTrades || verifyHolder(c.BusinessType) !== "business" ? null : verifyAddress(c),
