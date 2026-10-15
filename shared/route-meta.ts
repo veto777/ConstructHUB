@@ -60,6 +60,11 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
     description:
       "A sourced report that finds contractors by name, owner, license number, phone or address and links related licenses, permits, complaints and enforcement.",
   },
+  "/compliance/research/coverage": {
+    title: "What Research Reports Search, State by State | ConstructHUB",
+    description:
+      "Every official source a research report checks in each state: license boards, discipline, stop-work orders, debarments, and how each one is searched.",
+  },
   "/reinstatement": {
     title: "Request GBP Reinstatement Help | ConstructHUB",
     description:

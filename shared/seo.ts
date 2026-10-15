@@ -52,6 +52,7 @@ export const MARKETING_ROUTES: readonly string[] = [
   REINSTATEMENT_PATH,
   "/compliance",
   "/compliance/research",
+  "/compliance/research/coverage",
   "/pricing",
   "/google-business",
   "/google-ads-guide",
@@ -70,6 +71,7 @@ const PAGE_NAMES: Record<string, string> = {
   [REINSTATEMENT_PATH]: "GBP Reinstatement",
   "/compliance": "Compliance Dept",
   "/compliance/research": "Research Reports",
+  "/compliance/research/coverage": "What We Search",
   "/pricing": "Pricing",
   "/google-business": "Google Business Profile",
   "/google-ads-guide": "Google Ads Guide",
@@ -98,6 +100,8 @@ export function routeSourceFile(path: string): string | null {
     [REINSTATEMENT_PATH]: "client/src/pages/reinstatement.tsx",
     "/compliance": "shared/compliance/state-agencies.json",
     "/compliance/research": "client/src/pages/compliance-research.tsx",
+    // The page's content is the source registry: dated by the last change to any state pack.
+    "/compliance/research/coverage": "server/research/states",
     "/pricing": "client/src/pages/pricing.tsx",
     "/google-business": "client/src/pages/google-business.tsx",
     "/google-ads-guide": "client/src/pages/google-ads-guide.tsx",
@@ -202,6 +206,7 @@ export function breadcrumbTrail(path: string): { name: string; path: string }[] 
   if (path === CALL_ASSISTANT_PATH) return [home, { name: PAGE_NAMES[FEATURES_PATH], path: FEATURES_PATH }, { name: PAGE_NAMES[path], path }];
   if (path === REINSTATEMENT_PATH) return [home, { name: PAGE_NAMES[DFY_PATH], path: DFY_PATH }, { name: PAGE_NAMES[path], path }];
   if (path === "/compliance/research") return [home, { name: PAGE_NAMES["/compliance"], path: "/compliance" }, { name: PAGE_NAMES[path], path }];
+  if (path === "/compliance/research/coverage") return [home, { name: PAGE_NAMES["/compliance"], path: "/compliance" }, { name: PAGE_NAMES["/compliance/research"], path: "/compliance/research" }, { name: PAGE_NAMES[path], path }];
   const name = PAGE_NAMES[path] ?? ROUTE_META[path]?.title.replace(/\s*\|\s*ConstructHUB$/, "");
   return name ? [home, { name, path }] : [home];
 }
