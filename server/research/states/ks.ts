@@ -150,11 +150,14 @@ const KS_ELEVATOR_MECHANICS: BulkSource = {
 export const pack: StatePack = {
   state: "KS",
   checked: "2026-10-15",
-  liveLicenses: [KS_KSBTP],
+  // KSBTP (KS_KSBTP above) is not searched: its site says "Any commercial use is expressly prohibited" of its lists
+  // (K.S.A. 45-220(c)), and a paid report is commercial use. Kept for the day the board allows it.
+  liveLicenses: [],
   bulk: [KS_ELEVATOR_CONTRACTORS, KS_ELEVATOR_MECHANICS],
   noStatewideGcLicense:
-    "Kansas does not license general contractors statewide (cities and counties license contractors and most trades); engineers, architects and surveyors are licensed by the Board of Technical Professions and elevator contractors by the State Fire Marshal (both searched above), and roofers register with the Attorney General",
+    "Kansas does not license general contractors statewide (cities and counties license contractors and most trades); elevator contractors are licensed by the State Fire Marshal (searched above), engineers, architects and surveyors by the Board of Technical Professions (not searched: the board prohibits commercial use of its records), and roofers register with the Attorney General",
   blocked: [
+    "Kansas Board of Technical Professions verification (licensing.ks.gov): searchable, but the site prohibits any commercial use of its lists (K.S.A. 45-220(c)); not used in paid reports",
     "Kansas Attorney General roofing contractor registration directory (ag.ks.gov): HTTP 403 (Akamai) to our declared crawler",
     "KDHE licensed asbestos abatement contractors and lead activity firms (kdhe.ks.gov DocumentCenter PDFs): HTTP 403 to our declared crawler",
     "Kansas Secretary of State business entity search: robots.txt disallows /eforms/BusinessEntity/Search.aspx and the page serves an AWS WAF CAPTCHA",
