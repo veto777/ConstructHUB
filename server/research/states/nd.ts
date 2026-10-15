@@ -14,6 +14,9 @@ import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { clean, usDate } from "../bulk";
 import { politeFetch } from "../http";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
+import type { IdQuery } from "../identifiers";
+import { capNote, noteOf, withNote } from "../notes";
+import { looksLikeBusiness } from "./lib/business-name";
 import { htmlText, isoDay } from "./lib/g6-common";
 
 // ── ND Secretary of State FirstStop ──────────────────────────────────────────────────────────────────────────
@@ -31,40 +34,69 @@ async function fsJson<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** FirstStop's row limits (checked 2026-10-15: "Construction" stops at exactly 100 contractors and 1,000 businesses). */
+const FS_MAX = { contractor: 100, business: 1000 } as const;
+
 async function fsSearch(kind: "contractor" | "business", value: string): Promise<FsRow[]> {
   const r = await fsJson<{ rows?: Record<string, FsRow> }>(`/api/Records/${kind}search`, { SEARCH_VALUE: value, STARTS_WITH_YN: false, ACTIVE_ONLY_YN: false });
-  return Object.values(r?.rows ?? {});
+  // An answer without rows (an error object) is an error, never "no records".
+  if (!r?.rows || typeof r.rows !== "object") throw new Error("ND Secretary of State returned an unexpected payload");
+  const rows = Object.values(r.rows);
+  return withNote(rows, rows.length >= FS_MAX[kind] ? capNote(FS_MAX[kind], null, "names the register returned") : null);
 }
 
 const detailMap = (d: FsDetail): Record<string, string> =>
   Object.fromEntries((d.DRAWER_DETAIL_LIST ?? []).map((x) => [x.LABEL, clean(x.VALUE?.replace(/\s*\n\s*/g, ", ")) ?? ""]));
 
-async function fsDetail(kind: "contractor" | "business", id: number): Promise<Record<string, string>> {
-  try { return detailMap(await fsJson<FsDetail>(`/api/FilingDetail/${kind}/${id}/false`)); } catch { return {}; }
+/** The filing's detail drawer; null when it could not be read (the caller counts and notes it). */
+async function fsDetail(kind: "contractor" | "business", id: number): Promise<Record<string, string> | null> {
+  try { return detailMap(await fsJson<FsDetail>(`/api/FilingDetail/${kind}/${id}/false`)); } catch { return null; }
 }
+
+/** The notes for a list whose details were read for the first `cap` rows only. */
+const fsNotes = (found: number, cap: number, failed: number, base: string | null, what: string, details: string) => [
+  base, found > cap ? `${details} read for the first ${cap} of ${found} ${what}; the rest are listed as the search shows them` : null,
+  failed ? `the filing details could not be read for ${failed} of them` : null,
+].filter(Boolean).join("; ");
 
 const fsPage = (kind: string) => `${FS}/search/${kind}`;
 
 export function ndContractorHit(r: FsRow, d: Record<string, string>, matchedOn: LicenseHit["matchedOn"]): LicenseHit {
-  const [name, cls] = r.TITLE ?? [];
+  const [title, cls] = r.TITLE ?? [];
   const klass = clean(cls?.split(/\s+-\s+/)[0]);
+  // A license issued under a person's own name ("BOB JOHNSON") is the person's, not a business name; "EUGENE JOHNSON
+  // DBA JOHNSON CONSTRUCTION" is the trade name held by the person.
+  const whole = clean(title);
+  const dba = whole?.match(/^(.+?)\s+(?:DBA|D\/B\/A)\s+(.+)$/i);
+  const name = dba ? clean(dba[2]) : whole;
+  const person = dba ? clean(dba[1]) : name && !looksLikeBusiness(name) ? name : null;
   const standing = ["Standing - WSI", "Standing - Job Service", "Standing - Business", "Standing - Other"]
     .filter((k) => d[k]).map((k) => `${k.replace("Standing - ", "")} standing ${d[k].toLowerCase()}`);
   return {
     state: "ND", source: "North Dakota Secretary of State contractor licenses", sourceUrl: fsPage("contractor"),
-    businessName: clean(name), licenseNumber: clean(d["License Num"]) ?? clean(cls?.split(/\s+-\s+/)[1]),
+    businessName: person && !dba ? null : name, licenseNumber: clean(d["License Num"]) ?? clean(cls?.split(/\s+-\s+/)[1]),
     licenseType: klass ? `Contractor license, ${klass}` : "Contractor license", specialty: null,
-    status: [clean(r.STATUS), clean(r.STANDING), ...standing].filter(Boolean).join("; ") || null, principal: null,
+    status: [clean(r.STATUS), clean(r.STANDING), ...standing].filter(Boolean).join("; ") || null, principal: person,
     city: clean(d["Mailing Address"]?.match(/(?:^|,)\s*([^,]+),\s*[A-Z]{2}\s+\d{5}/)?.[1]), expires: usDate(d["Renewal Date"]),
-    matchedOn, address: clean(d["Mailing Address"]), phone: clean(d["Business Phone"]), people: [],
+    matchedOn, address: clean(d["Mailing Address"]), phone: clean(d["Business Phone"]), people: person ? [{ name: person, role: dba ? "Doing business as the name above" : "Licensee" }] : [],
   };
 }
 
+/** Detail drawers opened per search: politeness caps, noted when hit. */
+const ND_CONTRACTOR_DETAILS = 15;
+const ND_BUSINESS_DETAILS = 10;
+
 async function ndContractors(value: string, matchedOn: LicenseHit["matchedOn"], keep: (r: FsRow) => boolean): Promise<LicenseHit[]> {
-  const rows = (await fsSearch("contractor", value)).filter(keep).slice(0, 15);
+  const found = await fsSearch("contractor", value);
+  const rows = found.filter(keep);
   const out: LicenseHit[] = [];
-  for (const r of rows) out.push(ndContractorHit(r, await fsDetail("contractor", r.ID), matchedOn));
-  return out;
+  let failed = 0;
+  for (const [i, r] of rows.entries()) {
+    const d = i < ND_CONTRACTOR_DETAILS ? await fsDetail("contractor", r.ID) : {};
+    if (!d) failed++;
+    out.push(ndContractorHit(r, d ?? {}, matchedOn));
+  }
+  return withNote(out, fsNotes(rows.length, ND_CONTRACTOR_DETAILS, failed, noteOf(found), "licenses", "license number, address, phone and standing"));
 }
 
 const words = (v: string) => v.toUpperCase().split(/[^A-Z0-9&']+/).filter((w) => w.length >= 2);
@@ -78,10 +110,14 @@ const ND_CONTRACTORS: LiveLicenseSearch = {
 const ND_SOS_STATUS: LiveEnforcementSearch = {
   source: "North Dakota Secretary of State business entity status", scope: "Every business filing, active and inactive",
   category: "business_status", search: async (name) => {
-    const rows = (await fsSearch("business", name.trim())).filter((r) => hasAllWords(name, r.TITLE?.[0])).slice(0, 10);
+    const found = await fsSearch("business", name.trim());
+    const all = found.filter((r) => hasAllWords(name, r.TITLE?.[0]));
     const out: EnforcementHit[] = [];
-    for (const r of rows) {
-      const d = await fsDetail("business", r.ID);
+    let failed = 0;
+    for (const [i, r] of all.entries()) {
+      const got = i < ND_BUSINESS_DETAILS ? await fsDetail("business", r.ID) : {};
+      if (!got) failed++;
+      const d = got ?? {};
       const standing = ["Standing - AR", "Standing - RA", "Standing - Other"].filter((k) => d[k]).map((k) => `${k.replace("Standing - ", "")} standing ${d[k].toLowerCase()}`);
       out.push({
         state: "ND", source: "North Dakota Secretary of State business entity status", sourceUrl: fsPage("business"), category: "business_status",
@@ -92,7 +128,7 @@ const ND_SOS_STATUS: LiveEnforcementSearch = {
         amount: null, adverse: /revok|forfeit/i.test(r.STATUS ?? "") ? true : null, address: clean(d["Principal Address"]) ?? clean(d["Mailing Address"]), phone: null, licenseNumber: null,
       });
     }
-    return out;
+    return withNote(out, fsNotes(all.length, ND_BUSINESS_DETAILS, failed, noteOf(found), "filings", "standing, addresses and registered agent"));
   },
 };
 
@@ -135,6 +171,16 @@ const electricianHit = (c: string[], matchedOn: LicenseHit["matchedOn"]): Licens
   };
 };
 
+/**
+ * The board's form takes digits only, so letters are compared here: "ABC12345" (another board's number) is not
+ * electrician 12345, while "12345" or "#12345" is.
+ */
+export function sameElectricianNumber(q: IdQuery, licenseNumber: string | null): boolean {
+  const letters = (v: string) => v.toUpperCase().replace(/[^A-Z]/g, "");
+  const digits = (v: string) => v.replace(/\D/g, "");
+  return !!licenseNumber && digits(licenseNumber) === digits(q.value) && letters(licenseNumber) === letters(q.value);
+}
+
 const SUFFIX = /\b(INC|INCORPORATED|LLC|L L C|CO|CORP|CORPORATION|COMPANY|LTD|LC|PLLC|LLP)\b\.?/gi;
 const stripSuffix = (n: string) => clean(n.replace(/[.,]/g, " ").replace(SUFFIX, " ")) ?? n;
 
@@ -155,9 +201,9 @@ const ND_ELECTRICAL: LiveLicenseSearch = {
   },
   searchBy: async (q) => {
     const n = q.type === "license" ? q.value.replace(/\D/g, "") : "";
-    if (n.length < 4 || n.length > 5) return []; // the board's form takes the 4 or 5 digit number
+    if (n.length < 4 || n.length > 5) return null; // the board's form takes the 4 or 5 digit number
     return sebRows(await sebPost(SEB_ELECTRICIAN, { LastName: "", LicenseNum: n })).map((c) => electricianHit(c, "license"))
-      .filter((h) => (h.licenseNumber ?? "").replace(/\D/g, "") === n);
+      .filter((h) => sameElectricianNumber(q, h.licenseNumber));
   },
 };
 
@@ -173,7 +219,7 @@ async function plbSearch(filter: string, validOnly: boolean): Promise<PlbRow[]> 
   if (!res.ok) throw new Error(`ND State Plumbing Board returned HTTP ${res.status}`);
   const rows = await res.json();
   if (!Array.isArray(rows)) throw new Error("ND State Plumbing Board returned an unexpected payload");
-  return rows;
+  return withNote(rows, rows.length >= 100 ? capNote(100, null, "licenses the lookup returned") : null);
 }
 
 async function plbHits(filter: string, matchedOn: LicenseHit["matchedOn"]): Promise<LicenseHit[]> {
@@ -181,13 +227,13 @@ async function plbHits(filter: string, matchedOn: LicenseHit["matchedOn"]): Prom
   if (!all.length) return [];
   // The lookup's own "valid only" filter marks which licenses the board counts as current.
   const valid = new Set((await plbSearch(filter, true)).map((r) => r.id));
-  return all.map((r) => ({
+  return withNote(all.map((r) => ({
     state: "ND", source: "North Dakota State Plumbing Board licenses", sourceUrl: PLB_PAGE,
     businessName: null, licenseNumber: clean(r.licenseNum), licenseType: clean(r.licenseType?.name),
     specialty: clean(r.licenseLevel?.title ?? r.licenseLevel?.name), status: valid.has(r.id) ? "Valid" : "Not valid (not in the board's current-license list)",
     principal: clean(r.licenseHolderName), city: null, expires: isoDay(r.validUntil), matchedOn,
     people: r.licenseHolderName ? [{ name: r.licenseHolderName, role: clean(r.licenseType?.name) }] : [],
-  }));
+  } as LicenseHit)), noteOf(all));
 }
 
 const ND_PLUMBING: LiveLicenseSearch = {
@@ -199,7 +245,7 @@ const ND_PLUMBING: LiveLicenseSearch = {
   },
   searchBy: async (q) => q.type === "license" && q.value.trim().length >= 3
     ? (await plbHits(q.value.trim(), "license")).filter((h) => (h.licenseNumber ?? "").toUpperCase() === q.value.trim().toUpperCase())
-    : [],
+    : null,
 };
 
 export const pack: StatePack = {

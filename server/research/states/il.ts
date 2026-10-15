@@ -20,6 +20,12 @@ import { addressKeys, addressMatches, normLicense, normPhone, type IdQuery } fro
 import { decodeEntities } from "../bulk-sources";
 import { clean, usDate } from "../bulk";
 import type { StatePack } from "./types";
+import { adverseFrom, hasEnded } from "../adverse";
+import { looksLikeBusiness } from "./lib/business-name";
+
+/** The license number as typed and with its punctuation stripped, quoted for SoQL ("062-012345" and "062012345"). */
+export const licenseForms = (v: string): string[] =>
+  Array.from(new Set([v.trim().toUpperCase(), normLicense(v)].filter((x): x is string => !!x))).map((x) => `'${x.replace(/'/g, "''")}'`);
 
 const soda = (domain: string, id: string) => ({ datasetUrl: `https://${domain}/d/${id}`, url: `https://${domain}/resource/${id}.json` });
 const IDFPR = soda("data.illinois.gov", "pzzh-kp68");
@@ -76,19 +82,19 @@ function idphSearch(url: string, label: string, toHit: (r: Record<string, unknow
       const where = kind === "company" ? nameClause(f.company, name) : nameClause(f.person, name);
       return (await sodaRows(url, where, 200, label)).map((r) => toHit(r, kind === "company" ? "business" : "principal")).filter((h) => wholeWordMatch(name, h));
     },
-    searchBy: async (q: IdQuery): Promise<LicenseHit[]> => {
+    searchBy: async (q: IdQuery): Promise<LicenseHit[] | null> => {
       let where: string | null = null;
       if (q.type === "license") {
         const n = normLicense(q.value);
         if (n && f.numericLicense) where = /^\d+$/.test(n) ? `${f.license} = ${Number(n)}` : null;
-        else if (n) where = `upper(${f.license}) = '${n.replace(/'/g, "''")}'`;
+        else if (n) where = `upper(${f.license}) in (${licenseForms(q.value).join(",")})`;
       }
       if (q.type === "phone") { const n = normPhone(q.value); if (n) where = `${f.phone} like '%${n.slice(0, 3)}%${n.slice(3, 6)}%${n.slice(6)}%'`; }
       if (q.type === "address") {
         const key = addressKeys(q.value).find((k) => k.startsWith("a:") && !k.startsWith("a:POBOX"));
         if (key) { const [num, word] = key.slice(2).split(" "); where = `upper(${f.address}) like '${num} %${word.replace(/'/g, "''")}%'`; }
       }
-      if (!where) return [];
+      if (!where) return null; // not an identifier this dataset can take
       return (await sodaRows(url, where, 200, label)).map((r) => toHit(r, q.type)).filter((h) =>
         q.type === "license" ? normLicense(h.licenseNumber) === normLicense(q.value)
           : q.type === "phone" ? normPhone(h.phone) === normPhone(q.value) : addressMatches(q.value, h.address));
@@ -128,12 +134,12 @@ async function searchIdfprDesign(name: string, kind: "person" | "company"): Prom
   return out;
 }
 
-async function searchIdfprDesignBy(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license") return []; // the file publishes no street address or phone
+async function searchIdfprDesignBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null; // the file publishes no street address or phone
   const n = normLicense(q.value);
-  if (!n) return [];
+  if (!n) return null;
   const seen = new Set<string>();
-  return (await sodaRows(IDFPR.url, `license_number = '${n.replace(/'/g, "''")}' AND (${IDFPR_DESIGN})`, 50, IDFPR_DESIGN_SOURCE))
+  return (await sodaRows(IDFPR.url, `upper(license_number) in (${licenseForms(q.value).join(",")}) AND (${IDFPR_DESIGN})`, 50, IDFPR_DESIGN_SOURCE))
     .map((r) => ({ ...idfprLicenseHit(r, "company"), matchedOn: "license" as const }))
     .filter((h) => { const k = `${h.licenseNumber}|${h.licenseType}`; if (seen.has(k)) return false; seen.add(k); return true; });
 }
@@ -144,13 +150,15 @@ const str = (v: unknown) => clean(v == null ? null : String(v));
 export function idfprDisciplineHit(r: Record<string, unknown>): EnforcementHit {
   const action = str(r.action), reason = str(r.discipline_reason)?.replace(/\.+\s*$/, "") ?? null;
   const fine = action && /fine/i.test(action) ? reason?.match(/\$\s?([\d,]+(?:\.\d{2})?)/g) : null;
-  const names = [str(r.business_name), str(r.businessdba)].filter(Boolean);
+  // IDFPR marks some sole proprietors business = Y under their own name ("JOHN R KING"): only business names are kept (FCRA).
+  const names = [str(r.business_name), str(r.businessdba)].filter((n): n is string => !!n && looksLikeBusiness(n));
   return {
     state: "IL", source: "Illinois IDFPR discipline (roofing contractors, design firms, home inspectors)", sourceUrl: IDFPR.datasetUrl,
     category: "discipline", name: names.join(" / ") || null, id: str(r.case_number), date: usDate(str(r.discipline_start_date)), endDate: null,
     status: action ?? "IDFPR marks this license as disciplined", city: str(r.city),
     detail: [reason, `${str(r.description) ?? str(r.license_type) ?? "License"} ${str(r.license_number) ?? ""}, status ${str(r.license_status) ?? "not given"}`.trim()].filter(Boolean).join(". "),
-    amount: fine && fine.length === 1 ? Number(fine[0].replace(/[$,\s]/g, "")) : null, adverse: true,
+    // IDFPR marks the license disciplined (ever_disciplined = Y); only an action that says otherwise makes it not adverse.
+    amount: fine && fine.length === 1 ? Number(fine[0].replace(/[$,\s]/g, "")) : null, adverse: adverseFrom(action) !== false,
     licenseNumber: str(r.license_number),
   };
 }
@@ -163,18 +171,30 @@ async function searchIdfprDiscipline(name: string): Promise<EnforcementHit[]> {
 // ── IDOL Prevailing Wage Act debarments ──────────────────────────────────────────────────────────────────────
 const IDOL_DEBAR = "https://labor.illinois.gov/laws-rules/conmed/debarred-contractors.html";
 
-export function parseIdolDebarred(html: string): EnforcementHit[] {
+const NUMBERS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+
+/**
+ * Each "<Contractor> has been debarred from any public works project for a period of <N years> effective <date>"
+ * sentence. The detail is that sentence only; the page's general statement about the Act is the source's scope, not a
+ * finding about each row. The end date is the effective date plus the period when the period is in whole years.
+ */
+export function parseIdolDebarred(html: string, today?: string): EnforcementHit[] {
   const text = decodeEntities(html.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ");
   const out: EnforcementHit[] = [];
   for (const m of Array.from(text.matchAll(/([A-Z0-9][^:;]{1,150}?)\s+(?:has|have) been debarred from any public works project for a period of ([^.]{1,40}?) effective ([A-Z][a-z]+ \d{1,2}, \d{4})/g))) {
     const name = clean(m[1]);
+    if (!looksLikeBusiness(name)) continue; // companies only (FCRA)
     const d = new Date(`${m[3]} UTC`);
+    const start = Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+    const yrs = m[2].trim().toLowerCase().match(/^(\d+|one|two|three|four|five|six|seven|eight|nine|ten) years?$/)?.[1];
+    const years = yrs ? NUMBERS[yrs] ?? Number(yrs) : null;
+    const end = start && years ? `${Number(start.slice(0, 4)) + years}${start.slice(4)}` : null;
+    const over = hasEnded(end, today);
     out.push({
       state: "IL", source: "Illinois Department of Labor public-works debarments (Prevailing Wage Act)", sourceUrl: IDOL_DEBAR,
-      category: "debarment", name, id: null, date: Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10), endDate: null,
-      status: `Debarred from public works for ${clean(m[2])}`, city: null,
-      detail: clean(`${m[0]}. IDOL: found to have disregarded obligations to employees under the Prevailing Wage Act on two separate occasions`),
-      amount: null, adverse: true,
+      category: "debarment", name, id: null, date: start, endDate: end,
+      status: over ? `Debarment period over (${end})` : `Debarred from public works for ${clean(m[2])}`, city: null,
+      detail: clean(m[0]), amount: null, adverse: !over,
     });
   }
   return out;
@@ -202,7 +222,7 @@ export const pack: StatePack = {
   liveEnforcement: [
     { source: "Illinois IDFPR discipline (roofing contractors, design firms, home inspectors)", scope: "Business licenses IDFPR marks as disciplined, with case, action and reason",
       category: "discipline", search: searchIdfprDiscipline },
-    { source: "Illinois Department of Labor public-works debarments (Prevailing Wage Act)", scope: "The contractors IDOL currently lists as debarred",
+    { source: "Illinois Department of Labor public-works debarments (Prevailing Wage Act)", scope: "The contractors IDOL currently lists as debarred under section 11a of the Prevailing Wage Act",
       category: "debarment", search: () => searchIdolDebarred() },
   ],
   noStatewideGcLicense:

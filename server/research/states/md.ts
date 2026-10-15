@@ -19,7 +19,9 @@
  *   Montgomery County Office of Consumer Protection investigations          ey5a-vyri
  */
 import type { EnforcementHit } from "@shared/research-reports";
-import { USER_AGENT, rateLimitHost } from "../http";
+import { politeText } from "../http";
+import { hasEnded } from "../adverse";
+import { looksLikeBusiness } from "./lib/business-name";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
 import type { LicenseSource } from "../licenses";
@@ -69,8 +71,6 @@ const COMPLAINTS: ComplaintSource[] = [
 
 // ── Maryland Board of Public Works debarments ───────────────────────────────────────────────────────────────────
 const BPW = "https://bpw.prod.maryland.gov/bpw-programs/procurement/debarments";
-/** Entries that name a company (the lists mix firms and individuals; individuals are left out: companies only). */
-const COMPANY = /\b(inc|incorporated|llc|l\.l\.c|co|corp|corporation|company|associates|services|construction|mechanical|equipment|enterprises|group|ltd|lp|llp|pc|contractors?|elevator|boiler|heating|electric|paving|builders|industries)\b\.?/i;
 
 export function parseBpwDebarments(html: string): { list: string; name: string; term: string | null }[] {
   const out: { list: string; name: string; term: string | null }[] = [];
@@ -84,27 +84,35 @@ export function parseBpwDebarments(html: string): { list: string; name: string; 
       if (!name || /^person\/company$/i.test(name) || /^none$/i.test(name)) continue;
       // "Michael Wilson, President, Classic Construction, Inc.": an officer's own entry, not the firm's.
       if (/,\s*(president|secretary|owner|treasurer|vice president|ceo)\b/i.test(name)) continue;
-      if (!COMPANY.test(name) || /\bM(r|s|rs)\.\s/.test(name)) continue; // a note naming a person ("… associated with Mr. X")
-      out.push({ list: heading, name, term: cells[1] ?? null });
+      // Entries that name a company only (the lists mix firms and individuals: companies only, FCRA).
+      if (/\bM(r|s|rs)\.\s/.test(name)) continue; // a note naming a person ("… associated with Mr. X")
+      // "Montgomery Mechanical Services and Richard Stewart": the person is left out, the firm kept. A firm name with
+      // "and" in it ("Polar Bear Heating and Air Conditioning Co. Inc.") stays whole.
+      const parts = name.split(/\s+and\s+/i);
+      const firms = parts.every(looksLikeBusiness) ? [name] : parts.filter(looksLikeBusiness);
+      for (const firm of firms) out.push({ list: heading, name: firm, term: cells[1] ?? null });
     }
   }
   return out;
 }
 
+/** One entry as a report hit: a debarment whose term has ended is not adverse. */
+export function bpwHit(r: { list: string; name: string; term: string | null }, today?: string): EnforcementHit {
+  const dates = Array.from((r.term ?? "").matchAll(/(\d{1,2}\/\d{1,2}\/\d{4})/g)).map((m) => usDate(m[1]));
+  const end = dates[1] ?? null;
+  const over = hasEnded(end, today);
+  return {
+    state: "MD", source: "Maryland Board of Public Works debarments", sourceUrl: BPW, category: "debarment",
+    name: r.name, id: null, date: dates[0] ?? null, endDate: end,
+    status: over ? `Debarment period over (${r.term})` : r.term ? `Debarred: ${r.term}` : "Debarred", city: null,
+    detail: /public body/i.test(r.list) ? "Barred from doing business with any public body in Maryland (State, units and local governments)" : "Barred from doing business with the State of Maryland",
+    amount: null, adverse: !over,
+  };
+}
+
 async function* bpwLoader(): AsyncIterable<BulkHit> {
-  await rateLimitHost(BPW, 1500);
-  const res = await fetch(BPW, { headers: { "user-agent": USER_AGENT } });
-  if (!res.ok) throw new Error(`Maryland BPW debarment page returned HTTP ${res.status}`);
-  for (const r of parseBpwDebarments(await res.text())) {
-    const dates = Array.from((r.term ?? "").matchAll(/(\d{1,2}\/\d{1,2}\/\d{4})/g)).map((m) => usDate(m[1]));
-    const hit: EnforcementHit = {
-      state: "MD", source: "Maryland Board of Public Works debarments", sourceUrl: BPW, category: "debarment",
-      name: r.name, id: null, date: dates[0] ?? null, endDate: dates[1] ?? null,
-      status: r.term ? `Debarred: ${r.term}` : "Debarred", city: null,
-      detail: /public body/i.test(r.list) ? "Barred from doing business with any public body in Maryland (State, units and local governments)" : "Barred from doing business with the State of Maryland",
-      amount: null, adverse: true,
-    };
-    yield { kind: "enforcement", hit, business: r.name, person: null };
+  for (const r of parseBpwDebarments(await politeText(BPW, {}, { minDelayMs: 1500 }))) {
+    yield { kind: "enforcement", hit: bpwHit(r), business: r.name, person: null };
   }
 }
 

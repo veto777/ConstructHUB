@@ -160,7 +160,10 @@ const splitPeople = (src: LicenseSource, row: Record<string, unknown>): { name: 
 
 function toHit(src: LicenseSource, row: Record<string, unknown>, matchedOn: LicenseHit["matchedOn"], principal?: string | null): LicenseHit {
   const expires = str(row, src.fields.expires);
-  const business = src.isBusiness && !src.isBusiness(row) ? null : str(row, src.fields.businessName);
+  // One field that is both the business and the person (an "applicant"): a business only when it reads as one.
+  const sameField = !src.isBusiness && !!src.fields.businessName && src.fields.businessName === src.fields.principal;
+  const holder = str(row, src.fields.businessName);
+  const business = (src.isBusiness ? !src.isBusiness(row) : sameField && !looksLikeBusiness(holder)) ? null : holder;
   const people = splitPeople(src, row);
   return {
     state: src.state, source: src.source, sourceUrl: src.datasetUrl,

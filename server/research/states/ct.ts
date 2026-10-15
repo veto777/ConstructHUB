@@ -15,7 +15,12 @@ import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { promisify } from "node:util";
 import type { EnforcementHit } from "@shared/research-reports";
-import { USER_AGENT, rateLimitHost } from "../http";
+import { politeText } from "../http";
+import { adverseFrom, hasEnded } from "../adverse";
+import { looksLikeBusiness } from "./lib/business-name";
+
+/** DEEP orders name people too ("Steve Defrancesco and Jacyln Defrancesco"): only a business name is kept (FCRA). */
+const respondent = (r: Row) => { const n = s(r.respondent); return n && looksLikeBusiness(n) ? n : null; };
 import { clean, download, usDate, type BulkHit } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
 import type { SodaEnforcement } from "../state-records";
@@ -52,11 +57,12 @@ const DEEP_RECENT: SodaEnforcement = {
     const penalty = num(r.penalty_amount);
     const pdf = (r.path as { url?: string } | undefined)?.url ?? null;
     return {
-      category: "environmental", name: s(r.respondent), id: s(r.order_number)?.replace(/\.pdf$/i, "") ?? null, date: day(r.date_issued), endDate: null,
-      status: s(r.type_of_enforcement) ?? "Order", city: s(r.town),
+      category: "environmental", name: respondent(r), id: s(r.order_number)?.replace(/\.pdf$/i, "") ?? null, date: day(r.date_issued), endDate: null,
+      status: s(r.type_of_enforcement), city: s(r.town),
       detail: [s(r.deep_program) ? `${s(r.deep_program)} program` : null, s(r.violation_description), s(r.violation_citation) ? `Cites ${s(r.violation_citation)}` : null,
         penalty != null ? `penalty $${penalty.toLocaleString("en-US")}` : null, pdf ? `Order: ${pdf}` : null].filter(Boolean).join(". ").slice(0, 900) || null,
-      amount: penalty, adverse: true,
+      // A penalty the order assesses is adverse; otherwise only the order type's own words decide (a consent order alone is not).
+      amount: penalty, adverse: penalty != null && penalty > 0 ? true : adverseFrom(s(r.type_of_enforcement)),
       address: clean([s(r.violation_address), s(r.town)].filter(Boolean).join(", ")),
     };
   },
@@ -70,10 +76,10 @@ const DEEP_OLDER: SodaEnforcement = {
     const amount = action?.match(/\$\s?([\d,]+(?:\.\d{2})?)/)?.[1];
     const pdf = (r.path as { url?: string } | undefined)?.url ?? null;
     return {
-      category: "environmental", name: s(r.respondent), id: s(r.consentorder)?.replace(/\.pdf$/i, "") ?? null, date: day(r.date), endDate: null,
+      category: "environmental", name: respondent(r), id: s(r.consentorder)?.replace(/\.pdf$/i, "") ?? null, date: day(r.date), endDate: null,
       status: "Enforcement action", city: s(r.town),
       detail: [s(r.program) ? `${s(r.program)} program` : null, s(r.enforcement_title), action, pdf ? `Order: ${pdf}` : null].filter(Boolean).join(". ").slice(0, 900) || null,
-      amount: amount ? Number(amount.replace(/,/g, "")) : null, adverse: true,
+      amount: amount ? Number(amount.replace(/,/g, "")) : null, adverse: adverseFrom(action),
     };
   },
 };
@@ -112,26 +118,30 @@ export function parseDebarmentText(text: string): { name: string; city: string |
   return out;
 }
 
-async function* ctDebarmentLoader(): AsyncIterable<BulkHit> {
-  await rateLimitHost(DOL_DEBAR_PAGE, 1500);
-  const res = await fetch(DOL_DEBAR_PAGE, { headers: { "user-agent": USER_AGENT } });
-  if (!res.ok) throw new Error(`debarment page returned HTTP ${res.status}`);
-  const list = newestDebarmentList(await res.text());
-  if (!list) throw new Error("no debarment list linked on the page");
-  const pdf = await download(list.url);
-  let text: string;
-  try { text = (await run("pdftotext", ["-layout", pdf, "-"], { maxBuffer: 8 << 20 })).stdout; }
-  finally { await fs.rm(pdf, { force: true }); }
-  for (const f of parseDebarmentText(text)) {
+/** The list's own text, checked for the heading and the column titles before any line is read as a firm. */
+export function debarmentHits(text: string, list: { url: string; date: string }, today?: string): EnforcementHit[] {
+  if (!/DEBARMENT LIST/.test(text) || !/Expiration Date/i.test(text)) throw new Error("the debarment PDF doesn't have the list's heading (layout changed)");
+  return parseDebarmentText(text).map((f) => {
     const ends = usDate(f.expires) ?? (/^\w+ \d{1,2}, \d{4}$/.test(f.expires) ? new Date(`${f.expires} 12:00 UTC`).toISOString().slice(0, 10) : null);
-    const hit: EnforcementHit = {
+    const ended = hasEnded(ends, today);
+    return {
       state: "CT", source: "Connecticut Department of Labor debarment list", sourceUrl: list.url, category: "debarment",
-      name: f.name, id: null, date: null, endDate: ends, status: /indefinite/i.test(f.expires) ? "Debarred indefinitely" : ends ? `Debarred until ${ends}` : `Debarred (expiration: ${f.expires})`,
-      city: f.city, detail: `On the debarment list of ${list.date} (CGS 31-53a): no state or public works contract may be awarded to the firm, or to a firm it has an interest in, until the expiration date`,
-      amount: null, adverse: true,
+      name: f.name, id: null, date: null, endDate: ends,
+      status: /indefinite/i.test(f.expires) ? "Debarred indefinitely" : ends ? (ended ? `Debarment period over (${ends})` : `Debarred until ${ends}`) : `Debarred (expiration: ${f.expires})`,
+      city: f.city, detail: `On the debarment list of ${list.date} (CGS 31-53a)`,
+      amount: null, adverse: !ended,
     };
-    yield { kind: "enforcement", hit, business: f.name, person: null };
-  }
+  });
+}
+
+async function* ctDebarmentLoader(): AsyncIterable<BulkHit> {
+  const list = newestDebarmentList(await politeText(DOL_DEBAR_PAGE, {}, { minDelayMs: 1500 }));
+  if (!list) throw new Error("no debarment list linked on the page");
+  const pdf = await download(list.url, {}, 5 * 60_000);
+  let text: string;
+  try { text = (await run("pdftotext", ["-layout", pdf, "-"], { maxBuffer: 8 << 20, timeout: 120_000 })).stdout; }
+  finally { await fs.rm(pdf, { force: true }); }
+  for (const hit of debarmentHits(text, list)) yield { kind: "enforcement", hit, business: hit.name, person: null };
 }
 
 export const pack: StatePack = {
@@ -139,7 +149,9 @@ export const pack: StatePack = {
   checked: "2026-10-15",
   enforcement: [BUSINESS_REGISTRY, DEEP_RECENT, DEEP_OLDER],
   bulk: [
-    { id: "ct-dol-debarment", state: "CT", label: "Connecticut Department of Labor debarment list", pageUrl: DOL_DEBAR_PAGE, everyHours: 24 * 7, minRows: 5,
+    { id: "ct-dol-debarment", state: "CT", label: "Connecticut Department of Labor debarment list", pageUrl: DOL_DEBAR_PAGE, everyHours: 24 * 7,
+      // The September 23, 2025 list names 8 firms (checked 2026-10-15); firms do come off it, so the floor leaves room.
+      minRows: 6,
       load: ctDebarmentLoader, companiesOnly: true, category: "debarment" },
   ],
   blocked: [

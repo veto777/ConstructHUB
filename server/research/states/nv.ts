@@ -21,6 +21,9 @@ import type { BulkHit, BulkSource } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { FormSession, cellText, tableRows } from "./lib/g7-aspnet";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
+import { withNote } from "../notes";
+import { hasEnded } from "../adverse";
+import { looksLikeBusiness } from "./lib/business-name";
 
 const NSCB_APP = "https://app.nvcontractorsboard.com/Clients/NVSCB/Public";
 const NSCB_LICENSE_SEARCH = `${NSCB_APP}/ContractorLicenseSearch/ContractorLicenseSearch.aspx`;
@@ -86,10 +89,11 @@ const MAX_DETAILS = 10;
 
 /** Open each hit's License Details page (a postback from the results page) for its addresses, phone, expiration and people. */
 async function withNscbDetails(s: FormSession, results: { url: string; html: string }, hits: NscbHit[]): Promise<LicenseHit[]> {
+  let failed = 0;
   for (const h of hits.slice(0, MAX_DETAILS)) {
     if (!h.detailsTarget) continue;
     const page = await s.postBack(results.url, results.html, { __EVENTTARGET: h.detailsTarget, __EVENTARGUMENT: "" }).catch(() => null);
-    if (!page || page.status !== 200 || !/lblLicNum/.test(page.html)) continue;
+    if (!page || page.status !== 200 || !/lblLicNum/.test(page.html)) { failed++; continue; }
     const d = parseNscbDetails(page.html);
     h.address = d.address ?? d.mailing;
     h.phone = d.phone ?? d.mailPhone;
@@ -98,7 +102,10 @@ async function withNscbDetails(s: FormSession, results: { url: string; html: str
     if (d.people.length) h.people = d.people;
     if (d.mailing && d.address && d.mailing !== d.address) h.specialty = [h.specialty, `Mailing address ${d.mailing}`].filter(Boolean).join(". ");
   }
-  return hits.map(({ detailsTarget: _t, ...h }) => h);
+  return withNote(hits.map(({ detailsTarget: _t, ...h }) => h), [
+    hits.length > MAX_DETAILS ? `address, phone, expiration and people read for the first ${MAX_DETAILS} of ${hits.length} licenses` : null,
+    failed ? `the License Details page could not be read for ${failed} license(s)` : null,
+  ].filter(Boolean).join("; "));
 }
 
 async function nscbSearch(by: "1" | "2" | "12", fields: Record<string, string>, kind: "person" | "company" | "license", keep: (h: NscbHit) => boolean): Promise<LicenseHit[]> {
@@ -123,10 +130,10 @@ async function searchNscbLicenses(name: string, kind: "person" | "company"): Pro
 }
 
 /** The NSCB search also takes a license number (it has no phone or address search). */
-async function searchNscbBy(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license") return [];
+async function searchNscbBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null;
   const want = normLicense(q.value);
-  if (!want) return [];
+  if (!want) return null;
   return nscbSearch("1", { [`${P}inputLicenseNumber`]: q.value.trim() }, "license", (h) => normLicense(h.licenseNumber)?.replace(/^0+/, "") === want.replace(/^0+/, ""));
 }
 
@@ -173,6 +180,8 @@ async function* nscbDisciplineLoader(): AsyncIterable<BulkHit> {
   });
   if (res.status !== 200) throw new Error(`NSCB returned HTTP ${res.status}`);
   for (const h of parseNscbDiscipline(res.html)) {
+    // The board disciplines individuals too ("SMITH, JOHN"): only businesses are loaded (companies only, FCRA).
+    if (!looksLikeBusiness(h.name)) continue;
     const others = Array.from(h.detail?.matchAll(/also lists license (\S+)/g) ?? []).map((m) => m[1]);
     yield { kind: "enforcement", hit: h, business: h.name, person: null, keys: { licenses: [h.licenseNumber, ...others] } };
   }
@@ -184,7 +193,9 @@ async function* nscbDisciplineLoader(): AsyncIterable<BulkHit> {
  * The list is one HTML table in blocks: the contractor's name line(s) and address lines in the first column, the
  * corporate officers in the second, the suspension period in the third; blank rows separate the blocks.
  */
-export function parseNvDisqualified(html: string): EnforcementHit[] {
+const longDay = (v: string): string | null => { const d = new Date(`${v} 12:00 UTC`); return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); };
+
+export function parseNvDisqualified(html: string, today?: string): EnforcementHit[] {
   const table = html.match(/<table[\s\S]*?Suspension[\s\S]*?<\/table>/i)?.[0];
   if (!table) return [];
   const blocks: string[][][] = [];
@@ -201,17 +212,23 @@ export function parseNvDisqualified(html: string): EnforcementHit[] {
     const col0 = b.map((r) => r[0]?.trim()).filter(Boolean) as string[];
     // The first line is always a name (some start with a digit: "360 Pro Carpentry LLC"); the address starts at the next street or PO box line.
     const firstAddress = col0.findIndex((l, i) => i > 0 && /^\d|^P\.?\s?O\.?\s?Box/i.test(l));
-    const names = (firstAddress < 0 ? col0.slice(0, 1) : col0.slice(0, firstAddress)).map((n) => n.replace(/^DBA\s+/i, "dba "));
+    const lines = (firstAddress < 0 ? col0.slice(0, 1) : col0.slice(0, firstAddress)).map((n) => n.replace(/^DBA\s+/i, "dba "));
     const periodText = clean(b.map((r) => r[2] ?? "").join(" "));
-    if (!names.length || !periodText) continue; // a note row ("Updated October 13, 2026"), not a contractor
+    if (!lines.length || !periodText) continue; // a note row ("Updated October 13, 2026"), not a contractor
+    // Companies only: a name line that is a person's ("Stuart Spear", "John Ray Phenix") is left out; a "dba" line is a trade name.
+    const names = lines.filter((n) => /^dba\s/i.test(n) || looksLikeBusiness(n)).map((n) => n.replace(/^dba\s+/i, ""));
+    if (!names.length) continue;
     const cityLine = firstAddress >= 0 ? col0.slice(firstAddress).map((l) => l.match(/^([A-Za-z .'-]+?),?\s+([A-Z]{2})\s+\d{5}/)).find(Boolean) : null;
     const period = periodText;
+    // "July 18, 2025 to July 18, 2028": the period's own dates; "Until the suspension is lifted" has none.
+    const [from, to] = Array.from(period.matchAll(/([A-Z][a-z]+ \d{1,2}, \d{4})/g), (m) => longDay(m[1]));
+    const over = hasEnded(to, today);
     out.push({
       state: "NV", source: "Nevada Labor Commissioner disqualified contractors", sourceUrl: NV_LABOR_DISQUALIFIED,
-      category: "debarment", name: names.join(" / "), id: null, date: null, endDate: null,
-      status: period ? `Disqualified from public works: ${period}` : "Disqualified from public works",
+      category: "debarment", name: names.join(" / "), id: null, date: from ?? null, endDate: to ?? null,
+      status: over ? `Disqualification period over: ${period}` : `Disqualified from public works: ${period}`,
       city: cityLine ? `${cityLine[1].trim()}, ${cityLine[2]}` : null,
-      detail: "May not be awarded a public works contract or subcontract (NRS 338.017)", amount: null, adverse: true,
+      detail: "On the Labor Commissioner's list of contractors disqualified under NRS 338.017", amount: null, adverse: !over,
       address: firstAddress >= 0 ? clean(col0.slice(firstAddress).join(", ")) : null,
     });
   }

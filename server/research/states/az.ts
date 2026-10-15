@@ -19,6 +19,8 @@ import { tokens } from "../licenses";
 import { clean } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { auraApex, type AuraSite } from "./lib/g7-aura";
+import { adverseFrom } from "../adverse";
+import { capNote, withNote } from "../notes";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
 
 const ROC: AuraSite = { origin: "https://azroc.my.site.com", page: "/AZRoc/s/contractor-search" };
@@ -40,7 +42,20 @@ const MAX_DETAILS = 15;
 export const contactName = (v: string | null | undefined) => clean(v?.replace(/\([^)]*\)\s*$/, ""));
 /** "Kenneth Eugene Mackey (Member;Qualifying Party) " → "Member; Qualifying Party". */
 const contactRole = (v: string | null | undefined) => clean(v?.match(/\(([^)]*)\)\s*$/)?.[1]?.replace(/;/g, "; ")) ?? null;
-const hasAll = (name: string, v: string | null) => { const have = new Set(tokens(v ?? "")); return tokens(name).every((w) => have.has(w)); };
+const letters = (v: string | null | undefined) => (v ?? "").toUpperCase().split(/[^A-Z0-9']+/).filter(Boolean);
+/** Every word of the name, single letters included, is a word of v ("D & S Electric" is not "A & B Electric"). */
+const hasAll = (name: string, v: string | null) => { const have = new Set(letters(v)); return tokens(name).length > 0 && letters(name).every((w) => have.has(w)); };
+/**
+ * The same person: every full word of the name is on the record, and a middle initial on the name agrees with a middle
+ * name the record gives ("John Q Smith" is not "John R Smith"; plain "John Smith" stays a candidate).
+ */
+export function samePersonName(name: string, v: string | null): boolean {
+  const want = letters(name), have = letters(v);
+  const full = want.filter((w) => w.length > 1);
+  if (!full.length || !full.every((w) => have.includes(w))) return false;
+  const extra = have.filter((w) => !full.includes(w));
+  return want.filter((w) => w.length === 1).every((i) => !extra.length || extra.some((w) => w[0] === i));
+}
 
 async function rocSearch(searchKey: string): Promise<RocAccount[]> {
   const rows = await auraApex<RocAccount[] | null>(ROC, "apex://ARCP_ContractorSearch/ACTION$getRecords", { searchKey, classification: null, city: "" });
@@ -62,8 +77,8 @@ export function rocLicenseHits(rows: RocAccount[], name: string, kind: "person" 
   const out: (LicenseHit & { licenseId: string })[] = [];
   for (const a of rows) {
     const people = Array.from(new Set((a.accountContactData ?? []).map((c) => contactName(c.contactName)).filter((v): v is string => !!v)));
-    const matchedPerson = kind === "person" ? people.find((p) => hasAll(name, p)) ?? null : null;
-    if (kind === "company" ? !hasAll(name, a.accountName ?? null) : kind === "person" && !matchedPerson && !(a.licenseData ?? []).some((l) => hasAll(name, l.qpName))) continue;
+    const matchedPerson = kind === "person" ? people.find((p) => samePersonName(name, p)) ?? null : null;
+    if (kind === "company" ? !hasAll(name, a.accountName ?? null) : kind === "person" && !matchedPerson && !(a.licenseData ?? []).some((l) => samePersonName(name, l.qpName))) continue;
     const roles = new Map<string, string[]>();
     for (const c of a.accountContactData ?? []) {
       const n = contactName(c.contactName);
@@ -80,7 +95,7 @@ export function rocLicenseHits(rows: RocAccount[], name: string, kind: "person" 
         state: "AZ", source: "Arizona Registrar of Contractors licenses", sourceUrl: licensePage(l.licenseId),
         businessName: clean(a.accountName), licenseNumber: clean(l.licenseNo), licenseType: clean(l.subType), specialty: null,
         status: clean(l.status),
-        principal: kind === "person" ? (qp && hasAll(name, qp) ? qp : matchedPerson ?? qp) : qp ?? people[0] ?? null,
+        principal: kind === "person" ? (qp && samePersonName(name, qp) ? qp : matchedPerson ?? qp) : qp ?? people[0] ?? null,
         city: clean(a.address), expires: null, matchedOn: kind === "company" ? "business" : kind === "license" ? "license" : "principal",
         phone: clean(a.phone),
         people: Array.from(named, ([n, r]) => ({ name: n, role: Array.from(new Set(r)).join("; ") || null })),
@@ -92,23 +107,28 @@ export function rocLicenseHits(rows: RocAccount[], name: string, kind: "person" 
 
 async function withDetails(hits: (LicenseHit & { licenseId: string })[]): Promise<LicenseHit[]> {
   // The license page adds the class description and the renewed-through date.
+  let failed = 0;
   for (const h of hits.slice(0, MAX_DETAILS)) {
     const d = await auraApex<RocDetail | null>(ROC, "apex://ARCP_ContractorSearch/ACTION$getLicenseDetail", { licenseId: h.licenseId }).catch(() => null);
-    if (!d) continue;
+    if (!d) { failed++; continue; }
     h.licenseType = clean(d.licenseDescription) ?? h.licenseType;
     h.expires = /^\d{4}-\d{2}-\d{2}$/.test(d.renewalThr ?? "") ? d.renewalThr! : null;
     h.status = clean(d.licenseStatus) ?? h.status;
   }
-  return hits.map(({ licenseId: _id, ...h }) => h);
+  const out = hits.map(({ licenseId: _id, ...h }) => h);
+  return withNote(out, [
+    hits.length > MAX_DETAILS ? `class description and renewal date read for the first ${MAX_DETAILS} of ${hits.length} licenses` : null,
+    failed ? `the license page could not be read for ${failed} license(s), shown as the search lists them` : null,
+  ].filter(Boolean).join("; "));
 }
 
 const searchRocLicenses = async (name: string, kind: "person" | "company") => withDetails(rocLicenseHits(await accountsFor(name, kind), name, kind));
 
 /** The ROC search also takes a license number ("ROC 128499" or "128499"); it does not search phones or addresses. */
-async function searchRocBy(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license") return [];
+async function searchRocBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null;
   const want = normLicense(q.value)?.replace(/^ROC/, "");
-  if (!want) return [];
+  if (!want) return null;
   const rows = await rocSearch(want);
   return withDetails(rocLicenseHits(rows, "", "license").filter((h) => normLicense(h.licenseNumber)?.replace(/^ROC/, "") === want));
 }
@@ -128,21 +148,21 @@ export function rocComplaintHit(c: RocComplaint, fallbackName: string | null, li
     detail: [licenseNo ?? clean(c.License_Number_Respondent__r?.Name) ? `License ${licenseNo ?? clean(c.License_Number_Respondent__r?.Name)}` : null,
       clean(c.Allegations__c) ? `Allegations: ${clean(c.Allegations__c!.replace(/;/g, "; "))}` : null,
       outcome ? `Outcome: ${outcome}` : null].filter(Boolean).join(". ") || null,
-    amount: null, adverse: type === "Disciplined" ? true : null,
+    // The ROC's own case type and outcome: a disciplined case is adverse unless its outcome says otherwise.
+    amount: null, adverse: type === "Disciplined" ? adverseFrom(outcome) !== false : adverseFrom(outcome),
     licenseNumber: licenseNo ?? clean(c.License_Number_Respondent__r?.Name),
   };
 }
 
 async function searchRocComplaints(name: string): Promise<EnforcementHit[]> {
   const rows = (await accountsFor(name, "company")).filter((a) => hasAll(name, a.accountName ?? null));
+  const licenses = rows.flatMap((a) => (a.licenseData ?? []).map((l) => ({ a, l })));
   const out: EnforcementHit[] = [];
-  let calls = 0;
-  for (const a of rows) for (const l of a.licenseData ?? []) {
-    if (calls++ >= MAX_DETAILS) break;
+  for (const { a, l } of licenses.slice(0, MAX_DETAILS)) {
     const r = await auraApex<{ complaintDataList?: RocComplaint[] } | null>(ROC, "apex://ARCP_ContractorSearch/ACTION$getAllComplaintsDetail", { licenseId: l.licenseId });
     for (const c of r?.complaintDataList ?? []) out.push(rocComplaintHit(c, clean(a.accountName), clean(l.licenseNo), l.licenseId));
   }
-  return out;
+  return withNote(out, licenses.length > MAX_DETAILS ? capNote(MAX_DETAILS, licenses.length, "licenses' complaint lists") : null);
 }
 
 const liveLicenses: LiveLicenseSearch[] = [

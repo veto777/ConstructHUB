@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { conregHit, parseConregDetail, srcHit } from "./ne";
+import { conregHit, neAddressHits, parseConregDetail, srcHit } from "./ne";
 
 // Trimmed from dol.nebraska.gov/conreg/Contractor/Details/2636526, 2026-10-15.
 const DETAIL = `<h2>Contractor Details</h2><dl><dt>Contractor/Subcontractor Name</dt><dd>KIEWIT BUILDING GROUP INC.</dd><dt>Corporation Name</dt><dd>KIEWIT BUILDING GROUP INC.</dd><dt>Business Contact Email</dt><dd></dd><dt>Business Entity</dt><dd>Corporation</dd><dt>Address</dt><dd>1550 Mike Fahey Street<br/>OMAHA, NE 68102</dd><dt>City</dt><dd>OMAHA</dd><dt>State</dt><dd>NE</dd><dt>Zip</dt><dd>68102</dd><dt>Telephone</dt><dd>4023422052</dd><dt>Registration Number</dt><dd>26365-26</dd><dt>Registration Expiration</dt><dd>9/1/2027</dd><dt>Sales Tax Option</dt><dd>2</dd><dt>Number of Employees</dt><dd>600</dd><dt>Worker's Compensation Status</dt><dd>Certificate on File (does not cover owners/corporate officials)</dd></dl> Print `;
@@ -28,5 +28,21 @@ describe("Nebraska State Electrical Division search", () => {
     const h = srcHit({ id: "C186984", title: "MILANUK, MARSHALL M", subtitle: "Individual", details: [{ label: "Credential Details", values: ["Electrical Contractor", "Pending", "Denied by Agency"] }] }, "principal")!;
     expect(h.licenseNumber).toBeNull();
     expect(h.status).toBe("Application pending; Denied by Agency");
+  });
+});
+
+describe("Nebraska (audit 2026-10-15)", () => {
+  it("a value with regex characters in it can't break the address cleanup", () => {
+    const d = { ...parseConregDetail(DETAIL), City: "OMAHA (", Address: "1550 Mike Fahey Street OMAHA (, NE 68102" };
+    expect(() => conregHit("2636526", d, "business")).not.toThrow();
+    expect(conregHit("2636526", d, "business")!.address).toBe("1550 Mike Fahey Street OMAHA ( NE 68102");
+  });
+  it("an address search keeps only records at that address", () => {
+    const row = { id: "C24216", title: "MILANUK, MARCUS J", subtitle: "Individual", chips: { items: [{ label: "Address" }] }, details: [
+      { label: "Credential Details", values: ["Electrical Contractor", "EC 03136", "Active", "12/31/2026"] },
+      { label: "Primary Contact Information", values: ["", "17998 RD 52", "", "OSHKOSH, Nebraska 69154-6048", "United States"] },
+    ] };
+    expect(neAddressHits([row], "17998 RD 52 OSHKOSH, Nebraska 69154-6048")).toHaveLength(1);
+    expect(neAddressHits([row], "17990 RD 52 OSHKOSH, Nebraska 69154-6048")).toHaveLength(0);
   });
 });

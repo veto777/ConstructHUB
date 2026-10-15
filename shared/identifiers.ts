@@ -41,6 +41,8 @@ const STREET_TYPES: Record<string, string> = {
 };
 const UNIT = /^(?:STE|SUITE|APT|APARTMENT|UNIT|BLDG|BUILDING|FL|FLOOR|RM|ROOM|SPC|SPACE|LOT|DEPT|PMB|TRLR|#)$/;
 const STATES = new Set("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR".split(" "));
+/** Full state names as written in some files ("OSHKOSH, Nebraska 69154"), → their USPS code. */
+const STATE_NAMES: Record<string, string> = Object.fromEntries(("ALABAMA AL|ALASKA AK|ARIZONA AZ|ARKANSAS AR|CALIFORNIA CA|COLORADO CO|CONNECTICUT CT|DELAWARE DE|FLORIDA FL|GEORGIA GA|HAWAII HI|IDAHO ID|ILLINOIS IL|INDIANA IN|IOWA IA|KANSAS KS|KENTUCKY KY|LOUISIANA LA|MAINE ME|MARYLAND MD|MASSACHUSETTS MA|MICHIGAN MI|MINNESOTA MN|MISSISSIPPI MS|MISSOURI MO|MONTANA MT|NEBRASKA NE|NEVADA NV|NEW HAMPSHIRE NH|NEW JERSEY NJ|NEW MEXICO NM|NEW YORK NY|NORTH CAROLINA NC|NORTH DAKOTA ND|OHIO OH|OKLAHOMA OK|OREGON OR|PENNSYLVANIA PA|RHODE ISLAND RI|SOUTH CAROLINA SC|SOUTH DAKOTA SD|TENNESSEE TN|TEXAS TX|UTAH UT|VERMONT VT|VIRGINIA VA|WASHINGTON WA|WEST VIRGINIA WV|WISCONSIN WI|WYOMING WY").split("|").map((x) => [x.slice(0, -3), x.slice(-2)]));
 const CITY_WORDS: Record<string, string> = { SAINT: "ST", MOUNT: "MT", FORT: "FT" };
 
 /** A street address taken apart: house number, directions, street name words, suffix, city and ZIP (null: not given). */
@@ -100,9 +102,15 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
     cityWords.push(all[k]);
   }
   let state: string | null = null;
-  while (cityWords.length && (STATES.has(cityWords[cityWords.length - 1]) || /^\d+$/.test(cityWords[cityWords.length - 1]))) {
-    const w = cityWords.pop()!;
-    if (STATES.has(w)) state ??= w;
+  for (;;) {
+    const n = cityWords.length;
+    if (!n) break;
+    const two = n >= 2 ? STATE_NAMES[`${cityWords[n - 2]} ${cityWords[n - 1]}`] : undefined;
+    if (two && n > 2) { cityWords.splice(n - 2); state ??= two; continue; }
+    const w = cityWords[n - 1];
+    if (STATES.has(w) || /^\d+$/.test(w)) { cityWords.pop(); if (STATES.has(w)) state ??= w; continue; }
+    if (STATE_NAMES[w] && n > 1) { cityWords.pop(); state ??= STATE_NAMES[w]; continue; }
+    break;
   }
   const city = (typeAt >= 0 || segs.length > 1) && cityWords.length ? cityWords.map((w) => CITY_WORDS[w] ?? w).join(" ") : null;
   return { number: m[1], box: false, pre, name, type, post, city, state: state && (typeAt >= 0 || segs.length > 1) ? state : null, zip };

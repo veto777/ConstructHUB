@@ -74,6 +74,8 @@ describe("matching keeps single letters and one person per name (decision 6)", (
     expect(localityOf("123 N. Main St., Ste 4, Seattle WA 98101")).toBe("SEATTLE WA 98101");
     // The index key stays house number + first street word (old rows keep working); addressMatches decides.
     expect(addressKeys("123 Lake View Road")).toEqual(["a:123 LAKE"]);
+    // A full state name is the state, not part of the city (NE files write "OSHKOSH, Nebraska 69154").
+    expect(addressMatches("17998 Rd 52, Oshkosh NE 69154", "17998 RD 52, OSHKOSH, Nebraska 69154")).toBe(true);
   });
 });
 
@@ -98,8 +100,20 @@ describe("home addresses (decision 4)", () => {
 describe("business or person (decision 5)", () => {
   it("a bare two- or three-word name is a person unless it has a suffix, a dba or a trade word that isn't a surname", async () => {
     const { looksLikeBusiness } = await import("./states/lib/business-name");
-    for (const p of ["David Power", "Joe Mason", "John Wells", "Mary Homes", "WELLS, JOHN", "Milton Bullock 2020-021"]) expect([p, looksLikeBusiness(p)]).toEqual([p, false]);
-    for (const b of ["Power Electric LLC", "Smith & Sons", "John Doe dba Doe Roofing", "Bright Solar", "Acme", "D & S Electric"]) expect([b, looksLikeBusiness(b)]).toEqual([b, true]);
+    for (const p of ["David Power", "Joe Mason", "John Wells", "Mary Homes", "WELLS, JOHN", "Milton Bullock 2020-021", "Daryl Kitchen"]) expect([p, looksLikeBusiness(p)]).toEqual([p, false]);
+    for (const b of ["Power Electric LLC", "Smith & Sons", "John Doe dba Doe Roofing", "Bright Solar", "Acme", "D & S Electric", "SURE BET PAINTING", "PAUL DAVIS OF RENO LAKE TAHOE", "R & R BACKHOE"]) expect([b, looksLikeBusiness(b)]).toEqual([b, true]);
+  });
+});
+
+describe("one field for business and person (MD applicants)", () => {
+  it("an individual applicant is not put in businessName", async () => {
+    const { searchLicensesBy } = await import("./licenses");
+    const src = { state: "MD", source: "T", datasetUrl: "https://x.test", url: "https://x.test/r.json", personField: "applicant",
+      fields: { businessName: "applicant", licenseNumber: "lic", licenseType: null, specialty: null, status: null, principal: "applicant", city: null, expires: null } };
+    const rows = [{ applicant: "JOHN Q PUBLIC", lic: "B-100" }, { applicant: "ACME BUILDERS LLC", lic: "B-100" }];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u) => String(u).includes("robots.txt") ? new Response("", { status: 404 }) : new Response(JSON.stringify(rows), { status: 200 }));
+    const hits = (await searchLicensesBy(src as any, { type: "license", value: "B-100" }))!;
+    expect(hits.map((h) => [h.businessName, h.principal])).toEqual([[null, "JOHN Q PUBLIC"], ["ACME BUILDERS LLC", "ACME BUILDERS LLC"]]);
   });
 });
 

@@ -15,7 +15,7 @@ const FAMILY = /&\s*sons?\b|\band sons?\b|\bbros\b|\bbrothers\b/i;
 const DBA = /\bd\/?b\/?a\b|\bdoing business as\b|\ba\/k\/a\b|\bt\/a\b|\btrading as\b/i;
 /**
  * Trade and business words that are not common U.S. surnames. Words that are surnames as well (Power, Mason,
- * Carpenter, Painter, Stone, Wood, Wells, Glass, Homes, Turner, Crane, Fuller, Brick, Field, Hall, Bell, …) are left out
+ * Carpenter, Painter, Stone, Wood, Wells, Kitchen, Glass, Homes, Turner, Crane, Fuller, Brick, Field, Hall, Bell, …) are left out
  * on purpose: "David Power" and "Joe Mason" are people.
  */
 const TRADE = new Set(`
@@ -27,13 +27,14 @@ const TRADE = new Set(`
   equipment erectors excavating excavation exteriors fabrication fabricators fence fencing fire fireplace fireplaces
   flooring floors foundation foundations framing garage gas general glazing grading group gutter gutters handyman
   hauling heating holdings home improvement improvements industrial industries installation installations
-  installers insulation interiors irrigation kitchen kitchens landscape landscaping lawn lighting maintenance
+  installers insulation interiors irrigation kitchens landscape landscaping lawn lighting maintenance
   management manufacturing masonry mechanical mechanics metals mobile network networks paving pest plumbing pools
   products project projects properties property protection pump pumping realty refrigeration remodeling remodelers
   renovation renovations repair repairs residential restoration roofing roofers sales sanitation security septic
   service services sheet siding signs solar solutions specialties specialty sprinkler sprinklers steel storage
   structures supply surfaces systems technical technologies technology telecom telecommunications tile tiling
-  towers tree trucking underground utilities utility ventilation waterproofing welding windows wiring works
+  towers tree trucking painting painters sign graphics sunrooms patios const ironworks woodworking granite
+  backhoe countertops imports detection studio resort casino underground utilities utility ventilation waterproofing welding windows wiring works
 `.trim().split(/\s+/));
 const TRADE_STEMS = /^(?:hvac|hvacr|plumb|electr|construct|roof|remodel|excavat|landscap|renovat|insulat|irrigat|refrigerat|waterproof)/i;
 
@@ -45,6 +46,8 @@ export function looksLikeBusiness(name: string | null | undefined): boolean {
   const words = t.toLowerCase().split(/[^a-z0-9&']+/).filter(Boolean);
   // Digits are no sign of a business: names in rosters and PDFs often carry a case number or a date.
   if (words.some((w) => TRADE.has(w) || TRADE_STEMS.test(w))) return true;
+  // "The …" / "(THE)" and "<name> of <place>" franchises ("Paul Davis of Reno Lake Tahoe") are businesses.
+  if (/^the\s|\(the\)/i.test(t) || (/\sof\s/i.test(t) && words.length >= 4)) return true;
   // "LAST, FIRST" is a person; a single word with no comma is a trade name.
   return words.length === 1 && !t.includes(",");
 }

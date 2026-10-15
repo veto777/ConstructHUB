@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contactName, rocComplaintHit, rocLicenseHits, type RocAccount } from "./az";
+import { contactName, rocComplaintHit, rocLicenseHits, samePersonName, type RocAccount } from "./az";
 
 // Trimmed from a live ROC getRecords answer, 2026-10-15.
 const ROWS: RocAccount[] = [
@@ -36,5 +36,19 @@ describe("Arizona ROC", () => {
     expect(hit).toMatchObject({ category: "discipline", name: "TOUGH TURTLE TURF LLC", id: "2025-02504", endDate: "2025-07-29", adverse: true, status: "Closed (Disciplined)", licenseNumber: "ROC 341825" });
     expect(hit.detail).toContain("Outcome: Legal - Revoked");
     expect(JSON.stringify(hit)).not.toMatch(/Complainant/);
+  });
+  it("keeps middle initials and single letters in the identity check (audit 2026-10-15)", () => {
+    expect(samePersonName("Douglas G Mack", "Douglas Guy Mack")).toBe(true);
+    expect(samePersonName("Douglas R Mack", "Douglas Guy Mack")).toBe(false);
+    expect(samePersonName("Douglas R Mack", "Douglas Mack")).toBe(true); // no middle on the record: still a candidate
+    expect(rocLicenseHits(ROWS, "Douglas R Mack", "person")).toHaveLength(0);
+    const ds: RocAccount[] = [{ ...ROWS[1], accountName: "A & B Mechanical Services LLC" }];
+    expect(rocLicenseHits(ds, "D & S Mechanical Services", "company")).toHaveLength(0);
+    expect(rocLicenseHits(ds, "A & B Mechanical Services", "company")).toHaveLength(1);
+  });
+  it("adverse comes from the ROC's own case type and outcome", () => {
+    const c = { Name: "2025-1", Complaint_Type__c: "Disciplined", Complaint_Outcome_Multi__c: "Legal - Revoked" };
+    expect(rocComplaintHit(c, "X LLC", null, "id").adverse).toBe(true);
+    expect(rocComplaintHit({ Name: "2025-2", Status__c: "Open", Complaint_Type__c: "Pending" }, "X LLC", null, "id").adverse).toBeNull();
   });
 });
