@@ -20,6 +20,7 @@
  *   VA  Norfolk business licenses, construction NAICS (bulk)
  *   FL  Miami-Dade County contractor licenses with their tradesmen (the county's layer, last updated 2024-10-25; bulk)
  *   CA  Sacramento County (unincorporated) business licenses whose activity is construction work (bulk)
+ *   KY  Louisville Metro active contractors (Office of Construction Review; the layer as of 2022-06-19; bulk)
  *   NV  City of Las Vegas business licenses of type "Contractor", with owners and their titles (bulk)
  *   AZ  Tucson active business licenses, construction NAICS codes (23…) (bulk)
  *   IL  Chicago BACP home-repair licenses, with every owner and officer from the city's Business Owners dataset (bulk)
@@ -765,10 +766,32 @@ const sacramentoCounty: BulkSource = {
   },
 };
 
+// ── Louisville Metro ─────────────────────────────────────────────────────────────────────────────────────────────
+// Last updated 2022-06-19; kept for its names, license numbers, phones and addresses, with that date on the status.
+const LOU = "https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/Louisville_Metro_KY_Active_Contractors/FeatureServer/0";
+const LOU_PAGE = "https://www.arcgis.com/home/item.html?id=267c8cf7a9254e5aaf6c22cfa43f4122";
+const louisville: BulkSource = {
+  id: "ky-louisville-contractors", state: "KY", label: "Louisville Metro contractor licenses (as of 2022-06-19)", pageUrl: LOU_PAGE, everyHours: 24 * 7, minRows: 2_200,
+  load: async function* () {
+    for await (const r of arcgisAll(LOU)) {
+      const name = txt(r, "FULLNAME");
+      if (!name) continue;
+      const isOrg = ORG.test(name);
+      yield licenseHit({
+        state: "KY", source: "Louisville Metro contractor licenses", sourceUrl: LOU_PAGE,
+        businessName: isOrg ? name : null, licenseNumber: txt(r, "LICENSENO"), licenseType: txt(r, "DESCRIPTION"), specialty: txt(r, "CATEGORY"),
+        status: "Listed as active on 2022-06-19 (the layer's last update)", principal: isOrg ? null : name, city: txt(r, "CITY"), expires: isoDay(r.EXPIRATIONDATE),
+        address: addressLine([txt(r, "ADDRESS1"), txt(r, "ADDRESS2")], txt(r, "CITY"), txt(r, "STATE"), txt(r, "ZIPCODE")), phone: txt(r, "DAYTIMEPHONE"),
+        people: [{ name: isOrg ? null : name, role: "Licensee" }],
+      });
+    }
+  },
+};
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, sanFrancisco, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade, lasVegas, tucson, sacramentoCounty];
+export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, sanFrancisco, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade, lasVegas, tucson, sacramentoCounty, louisville];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
