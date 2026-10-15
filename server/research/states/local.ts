@@ -6,6 +6,11 @@
  *   NY  New York City DOB licenses: general contractors, master plumbers, electrical contractors and firms,
  *       fire-suppression contractors, oil-burner installers, riggers, welders, site safety and other DOB trades (bulk)
  *   NY  New York City DCWP home-improvement contractor and construction-labor-provider licenses (bulk)
+ *   DC  District of Columbia DLCP basic business licenses: contractor and construction services (general
+ *       contractors / construction managers, home-improvement contractors), with owners and registered agents (bulk)
+ *   CA  Long Beach business licenses in the "Contracting" categories (bulk)
+ *   CO  Boulder licensed contractors (bulk)
+ *   TX  Arlington registered contractors (bulk)
  *   IL  Chicago BACP home-repair licenses, with every owner and officer from the city's Business Owners dataset (bulk)
  *   MD  Montgomery County DPS licenses: building contractors (new-home builders), master and limited master
  *       electricians, limited electrical businesses, fire-system licensees (bulk)
@@ -350,10 +355,109 @@ const chicagoHomeRepair: BulkSource = {
   },
 };
 
+// ── Washington, DC (Department of Licensing and Consumer Protection) ─────────────────────────────────────────────
+const DC_BBL = "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/DCRA/FeatureServer/0";
+const DC_PAGE = "https://www.arcgis.com/home/item.html?id=85bf98d3915f412c8a4de706f2d13513";
+const dcAddress = (v: string | null) => clean(v?.replace(/,\s*USA$/i, "").replace(/\s+,/g, ",") ?? null);
+const dcContractors: BulkSource = {
+  id: "dc-dlcp-contractors", state: "DC", label: "DC basic business licenses (contractors and construction)", pageUrl: DC_PAGE,
+  everyHours: 24, minRows: 14_000,
+  load: async function* () {
+    for await (const r of arcgisAll(DC_BBL, "CATEGORYSERVICETYPE='Contractor and Construction Services'")) {
+      const entity = txt(r, "ENTITYNAME"), trade = txt(r, "ENTITYTRADENAME");
+      if (!entity) continue;
+      const owner = fullName(txt(r, "BUSINESSOWNERFIRSTNAME"), txt(r, "BUSINESSOWNERMIDDLENAME"), txt(r, "BUSINESSOWNERLASTNAME"));
+      const agent = fullName(txt(r, "AGENTFIRSTNAME"), txt(r, "AGENTMIDDLENAME"), txt(r, "AGENTLASTNAME")) ?? txt(r, "AGENTENTITY");
+      const sole = /sole proprietor/i.test(txt(r, "ENTITYTYPE") ?? "");
+      const premise = dcAddress(txt(r, "PREMISEADDRESS")), billing = dcAddress(txt(r, "BILLINGADDRESS"));
+      const business = trade && !/^N\/?A$/i.test(trade) && trade.toUpperCase() !== entity.toUpperCase() ? `${entity} (t/a ${trade})` : entity;
+      // The dataset has no separate license-number field; CUSTOMERNUMBER is the record's number.
+      const h = licenseHit({
+        state: "DC", source: "DC basic business licenses", sourceUrl: DC_PAGE,
+        businessName: sole && !trade ? null : business, licenseNumber: txt(r, "CUSTOMERNUMBER"), licenseType: txt(r, "BUSINESSACTIVITY"),
+        specialty: txt(r, "ENTITYTYPE"), status: txt(r, "LICENSESTATUS"), principal: owner ?? (sole ? entity : null),
+        city: premise?.split(",")[1]?.trim() ?? null, expires: isoDay(r.LICENSEENDDATE), address: premise, phone: null,
+        people: [{ name: owner ?? (sole ? entity : null), role: "Owner" }, { name: agent && agent !== owner ? agent : null, role: "Registered agent" }],
+      });
+      if (h.keys) h.keys.addresses = [premise, billing];
+      yield h;
+    }
+  },
+};
+
+// ── Long Beach, California ───────────────────────────────────────────────────────────────────────────────────────
+const LB = "https://services6.arcgis.com/yCArG7wGXGyWLqav/arcgis/rest/services/Business_Licenses_Public_View/FeatureServer/0";
+const LB_PAGE = "https://www.arcgis.com/home/item.html?id=54d45ca9c4554062a02df49ec1ea2b2a";
+const longBeach: BulkSource = {
+  id: "ca-long-beach-contractors", state: "CA", label: "Long Beach business licenses (contracting)", pageUrl: LB_PAGE, everyHours: 24, minRows: 20_000,
+  load: async function* () {
+    const seen = new Set<string>();
+    for await (const r of arcgisAll(LB, "LICCATDESC LIKE 'Contracting%'")) {
+      const no = txt(r, "LICENSENO"), cat = txt(r, "LICCATDESC");
+      const key = `${no}|${cat}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const full = txt(r, "FULLNAME"), dba = txt(r, "DBANAME");
+      if (!full && !dba) continue;
+      const sole = txt(r, "COMPANYTYPE") === "SOLE";
+      const site = clean(txt(r, "SITELOCATION")?.replace(/^OUTSIDE LONG BEACH\s*/i, "") ?? null);
+      const outside = txt(r, "OUTSIDECITY") === "Yes";
+      const zip = txt(r, "ZIP");
+      yield licenseHit({
+        state: "CA", source: "Long Beach business licenses", sourceUrl: LB_PAGE,
+        businessName: sole ? dba : dba && full && dba.toUpperCase() !== full.toUpperCase() ? `${full} (d/b/a ${dba})` : full ?? dba,
+        licenseNumber: no, licenseType: cat, specialty: txt(r, "COMPANYTYPE"), status: txt(r, "LICSTATUS"), principal: sole ? full : null,
+        city: outside ? null : "Long Beach", expires: null,
+        address: site ? (outside ? site : addressLine([site], "LONG BEACH", "CA", zip)) : null, phone: null,
+        people: [{ name: sole ? full : null, role: "Owner (sole proprietor)" }],
+      });
+    }
+  },
+};
+
+// ── Boulder, Colorado ────────────────────────────────────────────────────────────────────────────────────────────
+const BOULDER = "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/Licensed_Contractors/FeatureServer/0";
+const BOULDER_PAGE = "https://www.arcgis.com/home/item.html?id=ef02bbe733464632aa0d2628177d6c9e";
+const boulder: BulkSource = {
+  id: "co-boulder-contractors", state: "CO", label: "Boulder licensed contractors", pageUrl: BOULDER_PAGE, everyHours: 24, minRows: 2_100,
+  load: async function* () {
+    for await (const r of arcgisAll(BOULDER)) {
+      const name = txt(r, "CompanyName");
+      if (!name) continue;
+      yield licenseHit({
+        state: "CO", source: "Boulder licensed contractors", sourceUrl: BOULDER_PAGE,
+        businessName: name, licenseNumber: txt(r, "LicenseNumber"), licenseType: txt(r, "LicenseType"), specialty: txt(r, "LicenseClassification"),
+        status: txt(r, "LicenseStatus"), principal: null, city: null, expires: isoDay(r.ExpirationDate),
+        address: txt(r, "Address"), phone: txt(r, "BusinessPhone"), people: [],
+      });
+    }
+  },
+};
+
+// ── Arlington, Texas ─────────────────────────────────────────────────────────────────────────────────────────────
+const ARL = "https://gis2.arlingtontx.gov/agsext2/rest/services/OpenData/OD_Table/MapServer/8";
+const ARL_PAGE = "https://www.arcgis.com/home/item.html?id=5fd231ff8afa49b9809552337697ded3";
+const arlington: BulkSource = {
+  id: "tx-arlington-contractors", state: "TX", label: "Arlington (TX) registered contractors", pageUrl: ARL_PAGE, everyHours: 24 * 7, minRows: 2_700,
+  load: async function* () {
+    // "Home Owner Registration" rows are homeowners pulling their own permits, not contractors.
+    for await (const r of arcgisAll(ARL, "ContractorType <> 'Home Owner Registration'")) {
+      const name = txt(r, "BusinessName"), contact = txt(r, "Contact");
+      if (!name && !contact) continue;
+      yield licenseHit({
+        state: "TX", source: "Arlington registered contractors", sourceUrl: ARL_PAGE,
+        businessName: name, licenseNumber: null, licenseType: txt(r, "ContractorType"), specialty: null, status: "Registered",
+        principal: contact, city: null, expires: null, address: txt(r, "Address"), phone: txt(r, "Phone"),
+        people: [{ name: contact, role: "Contact" }],
+      });
+    }
+  },
+};
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville];
+export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
