@@ -123,11 +123,12 @@ describe("decisions 1 and 2: holder privacy and no discipline on a license", () 
 
 describe("decision 6: robots.txt and access", () => {
   const robots = (status: number, body = "", type = "text/plain") => new Response(body, { status, headers: { "content-type": type } });
-  it("2xx parses; 404/410 and a plain app page allow; 401, 403, 5xx, a network failure or a challenge page disallow", async () => {
+  it("2xx parses; 4xx and a plain app page allow; 5xx, a network failure or a challenge page disallow", async () => {
     const answers: Record<string, () => Response> = {
       "a.test": () => robots(200, "User-agent: *\nDisallow: /private"),
       "b.test": () => robots(404), "c.test": () => robots(410),
-      "d.test": () => robots(403), "e.test": () => robots(401), "f.test": () => robots(503),
+      "d.test": () => robots(403, "Invalid URL"), "e.test": () => robots(401), "f.test": () => robots(503),
+      "j.test": () => robots(403, "<html><title>Just a moment...</title><body>cf-chl</body></html>", "text/html"),
       "g.test": () => robots(200, "<!doctype html><html><body>Checking your browser</body></html>", "text/html"),
       "i.test": () => robots(200, "<!doctype html><html><head><title>CIB Verify</title></head><body><div id=\"root\"></div></body></html>", "text/html"),
     };
@@ -140,7 +141,9 @@ describe("decision 6: robots.txt and access", () => {
     expect(await robotsAllowed("https://a.test/private/x")).toBe(false);
     expect(await robotsAllowed("https://b.test/x")).toBe(true);
     expect(await robotsAllowed("https://c.test/x")).toBe(true);
-    for (const h of ["d", "e", "f", "g", "h"]) expect(await robotsAllowed(`https://${h}.test/x`), h).toBe(false);
+    // RFC 9309: a 401/403 robots.txt is "unavailable", so no rules (ArcGIS REST answers "Invalid URL", Box an empty 401).
+    for (const h of ["d", "e"]) expect(await robotsAllowed(`https://${h}.test/x`), h).toBe(true);
+    for (const h of ["f", "g", "h", "j"]) expect(await robotsAllowed(`https://${h}.test/x`), h).toBe(false);
     // An app page served for every path (no robots file at all) is not a refusal.
     expect(await robotsAllowed("https://i.test/x")).toBe(true);
   });

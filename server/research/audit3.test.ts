@@ -98,14 +98,20 @@ describe("decision 5: HTTP", () => {
       calls.push(u);
       expect(init?.redirect).toBe("manual");
       if (u === "https://a.example.test/robots.txt") return new Response("", { status: 301, headers: { location: "https://b.example.test/robots.txt" } });
-      if (u === "https://b.example.test/robots.txt") return new Response("blocked", { status: 403 });
+      if (u === "https://b.example.test/robots.txt") return new Response("<html><title>Attention Required! | Cloudflare</title></html>", { status: 403 });
       return new Response("", { status: 404 });
     });
     const r = await robotsFor("https://a.example.test");
-    expect(r.denied).toMatch(/HTTP 403/);
+    expect(r.denied).toBeTruthy();
     expect(calls).toEqual(["https://a.example.test/robots.txt", "https://b.example.test/robots.txt"]);
     // B answered 403: B is blocked, not A.
     await expect(guard("https://b.example.test/x", 10)).rejects.toBeInstanceOf(PortalBlockedError);
+  });
+  it("a plain 403 on robots.txt is no robots file and blocks nothing (RFC 9309)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input: any) => String(input).endsWith("/robots.txt") ? new Response("Invalid URL", { status: 403 }) : new Response("ok"));
+    const r = await robotsFor("https://arcgis.example.test");
+    expect(r.denied).toBeUndefined();
+    await expect(guard("https://arcgis.example.test/x", 10)).resolves.toBeUndefined();
   });
   it("a robots.txt redirect to an already blocked host is not sent", async () => {
     blockHost("https://c.example.test/", 403, "HTTP 403");

@@ -268,13 +268,17 @@ async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status
         res = await Promise.race([own(cur), new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timed out")), 15_000))]);
       } else {
         const r = await fetch(cur, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.timeout(15_000), redirect: "manual" });
-        const ok = r.status >= 200 && r.status < 300;
-        res = { status: r.status, location: r.headers.get("location"), retryAfter: r.headers.get("retry-after"), text: ok ? await r.text() : (await r.body?.cancel().catch(() => undefined), "") };
+        const read = r.status >= 200 && r.status < 500 && !REDIRECTS.has(r.status);
+        res = { status: r.status, location: r.headers.get("location"), retryAfter: r.headers.get("retry-after"), text: read ? (await r.text()).slice(0, 200_000) : (await r.body?.cancel().catch(() => undefined), "") };
       }
     } finally {
       releaseHost(cur);
     }
-    noteResponse(cur, res.status, res.retryAfter);
+    // A 401/403 on robots.txt is not a refusal of the host by itself (RFC 9309 §2.3.1.3: robots.txt "unavailable"):
+    // robotsFor() decides from the answer. Many open-data API hosts (ArcGIS REST "Invalid URL", api.box.com) answer
+    // every unknown path that way. A 401/403 on a data request still blocks the host (noteResponse there).
+    // A challenge page with that 401/403 is a refusal: it blocks the host that answered.
+    if ((res.status !== 401 && res.status !== 403) || ROBOTS_REFUSAL_PAGE.test(res.text.slice(0, 20_000))) noteResponse(cur, res.status, res.retryAfter);
     if (!REDIRECTS.has(res.status) || !res.location) return res;
     if (hop + 1 >= ROBOTS_HOPS) throw new Error(`more than ${ROBOTS_HOPS} redirects for robots.txt`);
     const next = new URL(res.location, cur);
@@ -284,12 +288,16 @@ async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status
 }
 
 /**
- * What robots.txt says for one origin (round 2, decision 6): 2xx → its rules (an HTML page instead of a robots file
- * is a challenge: denied); 404/410 → no rules; 401, 403, 429, 5xx, a timeout or a network failure → denied for an
- * hour, then fetched again. Other 4xx answers mean "no robots.txt" (RFC 9309 §2.3.1.3).
+ * What robots.txt says for one origin (RFC 9309): 2xx → its rules (a challenge page instead: denied; any other HTML
+ * page: no rules); a 4xx, 401 and 403 included → no rules, unless the page is a challenge; 429, 5xx, a timeout or a
+ * network failure → denied for an hour, then fetched again.
  */
-/** Words of a bot challenge, a block page or an error page (Cloudflare, Akamai, Imperva, F5, CAPTCHAs, server errors). */
-const ROBOTS_REFUSAL_PAGE = /just a moment|checking your browser|attention required|cf-chl|cf_chl|challenge-platform|captcha|access denied|request rejected|forbidden|incapsula|_incapsula_|perimeterx|px-captcha|akamai|reference #|are you a robot|unusual traffic|blocked|not authorized|unauthorized|error\s*(?:4|5)\d\d|server error|service unavailable|bad gateway/i;
+/**
+ * Words of a bot challenge or a WAF block page (Cloudflare, Akamai, Imperva, F5, PerimeterX, CAPTCHAs), or of a server
+ * that is down. Such an answer to robots.txt refuses the host for an hour, whatever its status code. A plain 401/403/404
+ * page ("Invalid URL", an empty 401) is not one: it means there is no robots.txt.
+ */
+const ROBOTS_REFUSAL_PAGE = /just a moment|checking your browser|attention required|cf-chl|cf_chl|challenge-platform|captcha|access denied|request rejected|incapsula|perimeterx|px-captcha|are you a robot|unusual traffic|bot detection|server error|service unavailable|bad gateway/i;
 
 export async function robotsFor(origin: string, chain: Set<string> = new Set()): Promise<{ rules: Rule[]; denied?: string }> {
   const hit = robotsCache.get(origin);
@@ -308,8 +316,9 @@ export async function robotsFor(origin: string, chain: Set<string> = new Set()):
         entry = html && ROBOTS_REFUSAL_PAGE.test(res.text.slice(0, 20_000))
           ? { rules: [], denied: "robots.txt answered with a challenge or error page" }
           : { rules: !html && /user-agent\s*:/i.test(res.text) ? parseRobots(res.text) : [] };
-      } else if (res.status === 404 || res.status === 410) entry = { rules: [] };
-      else if (res.status === 401 || res.status === 403 || res.status === 429 || res.status >= 500) entry = { rules: [], denied: `robots.txt answered HTTP ${res.status}` };
+      } else if (res.status === 429 || res.status >= 500) entry = { rules: [], denied: `robots.txt answered HTTP ${res.status}` };
+      // Any other 4xx (401, 403, 404, 410…) means no robots.txt (RFC 9309 §2.3.1.3), unless the page is a challenge.
+      else if (res.status >= 400 && res.status < 500) entry = ROBOTS_REFUSAL_PAGE.test(res.text.slice(0, 20_000)) ? { rules: [], denied: `robots.txt answered HTTP ${res.status} with a challenge page` } : { rules: [] };
       else if (REDIRECTS.has(res.status)) entry = { rules: [], denied: "robots.txt redirected without a location" };
       else entry = { rules: [] };
     } catch (err) {
