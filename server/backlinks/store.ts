@@ -39,15 +39,33 @@ export type QueryRow = { id: number; kind: BacklinkKind; niche: string; query: s
 export async function dueQueries(limit: number, repeatDays = 60): Promise<QueryRow[]> {
   const r = await db().query(
     `SELECT id, kind, niche, query FROM backlink_queries
-      WHERE last_run_at IS NULL OR last_run_at < now() - make_interval(days => $2)
+      WHERE task_id IS NULL AND (last_run_at IS NULL OR last_run_at < now() - make_interval(days => $2))
       ORDER BY last_run_at NULLS FIRST, id LIMIT $1`, [limit, repeatDays]);
   return r.rows;
 }
 
 export async function recordQueryRun(id: number, found: number, newFound: number, costUsd: number) {
   await db().query(
-    `UPDATE backlink_queries SET runs = runs + 1, found = found + $2, new_found = new_found + $3, cost_usd = cost_usd + $4, last_run_at = now() WHERE id = $1`,
+    `UPDATE backlink_queries SET runs = runs + 1, found = found + $2, new_found = new_found + $3, cost_usd = cost_usd + $4, last_run_at = now(), task_id = NULL WHERE id = $1`,
     [id, found, newFound, costUsd]);
+}
+
+/** A search posted to the standard queue (worker.ts runQueuedDiscovery); what it cost is counted now. */
+export async function markPosted(id: number, taskId: string, costUsd: number) {
+  await db().query(`UPDATE backlink_queries SET task_id = $2, task_posted_at = now(), cost_usd = cost_usd + $3 WHERE id = $1`, [id, taskId, costUsd]);
+}
+/** Posted searches to collect: a minute old at least. One over a day old is given up (it is due again later). */
+export async function postedQueries(limit: number): Promise<(QueryRow & { taskId: string; stale: boolean })[]> {
+  const r = await db().query(
+    `SELECT id, kind, niche, query, task_id "taskId", task_posted_at < now() - interval '1 day' stale FROM backlink_queries
+      WHERE task_id IS NOT NULL AND task_posted_at < now() - interval '1 minute' ORDER BY task_posted_at LIMIT $1`, [limit]);
+  return r.rows;
+}
+export async function dropTask(id: number) { await db().query(`UPDATE backlink_queries SET task_id = NULL WHERE id = $1`, [id]); }
+/** Searches started today: run live, or posted to the queue. */
+export async function searchesToday(): Promise<number> {
+  const r = await db().query(`SELECT count(*)::int n FROM backlink_queries WHERE greatest(last_run_at, task_posted_at) >= date_trunc('day', now())`);
+  return Number(r.rows[0]?.n ?? 0);
 }
 
 // ── Spend ───────────────────────────────────────────────────────────────────

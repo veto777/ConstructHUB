@@ -5,7 +5,7 @@
  * vendor's live price (server/seo/pricing.ts); no search operators, which the vendor bills 5x.
  */
 import type { BacklinkKind } from "@shared/backlinks";
-import { request, assertOk, taskItems } from "../seo/dataforseo";
+import { request, assertOk, taskItems, isTaskInProgress, isNoResultsTask, DataForSeoError } from "../seo/dataforseo";
 import { SERP_PAGE_USD } from "../seo/pricing";
 
 /** Trades and adjacent topics a contractor's link can sit on. */
@@ -33,6 +33,9 @@ export const QUERY_TEMPLATES: Record<Exclude<BacklinkKind, "pbn">, { per: "niche
     { per: "niche", t: `{n} blog "accepting guest posts"` },
     { per: "niche", t: `{n} blog "guest author"` },
     { per: "niche", t: `{n} "contribute an article"` },
+    { per: "niche", t: `{n} "contributor guidelines"` },
+    { per: "niche", t: `{n} "submit an article"` },
+    { per: "state", t: `{s} home improvement blog "write for us"` },
   ],
   press_release: [
     { per: "once", t: `"submit press release" free` },
@@ -52,6 +55,10 @@ export const QUERY_TEMPLATES: Record<Exclude<BacklinkKind, "pbn">, { per: "niche
     { per: "state", t: `{s} chamber of commerce "member directory" contractors` },
     { per: "state", t: `{s} home builders association "member directory"` },
     { per: "state", t: `{s} remodelers association members` },
+    { per: "state", t: `{s} roofing contractors association` },
+    { per: "state", t: `{s} plumbing heating cooling contractors association` },
+    { per: "state", t: `{s} electrical contractors association chapter` },
+    { per: "state", t: `{s} local business directory "list your business" free` },
   ],
   resource_page: [
     { per: "niche", t: `{n} "helpful resources" homeowners` },
@@ -61,6 +68,7 @@ export const QUERY_TEMPLATES: Record<Exclude<BacklinkKind, "pbn">, { per: "niche
     { per: "niche", t: `{n} magazine "submit a story"` },
     { per: "niche", t: `{n} news "contributors"` },
     { per: "state", t: `{s} local news "submit a news tip"` },
+    { per: "state", t: `{s} community newspaper "submit news"` },
     { per: "once", t: `"journalist requests" home improvement experts` },
   ],
 };
@@ -128,7 +136,7 @@ export function parseImportLine(line: string): { domain: string; url: string } |
 
 export const DISCOVERY_DEPTH = 100;
 /** Upper bound for one discovery query: every page of 10 at the live price. */
-export const discoveryEstimateUsd = () => Math.ceil(DISCOVERY_DEPTH / 10) * SERP_PAGE_USD.live;
+export const discoveryEstimateUsd = (queue: keyof typeof SERP_PAGE_USD = "live") => Math.ceil(DISCOVERY_DEPTH / 10) * SERP_PAGE_USD[queue];
 
 export type SerpHit = { domain: string; url: string; title: string | null; position: number };
 
@@ -155,4 +163,34 @@ export async function searchOnce(query: string): Promise<{ hits: SerpHit[]; cost
   const costUsd = typeof task.cost === "number" ? task.cost : discoveryEstimateUsd();
   const items = (taskItems(task) as any[]) ?? [];
   return { hits: hitsFromItems(items), costUsd };
+}
+
+/**
+ * The worker's searches go through DataForSEO's standard queue: the same Google results a few minutes later at under a
+ * third of the live price ($0.0006 a page against $0.002). `tag` carries our query id. Charged when posted.
+ */
+export async function postSearches(queries: { id: number; query: string }[]): Promise<{ posted: { id: number; taskId: string }[]; costUsd: number }> {
+  const res = await discoverDeps.request("POST", "/serp/google/organic/task_post", queries.map((q) => ({
+    keyword: q.query, location_code: 2840, language_code: "en", depth: DISCOVERY_DEPTH, priority: 1, tag: String(q.id),
+  })));
+  if (!res || res.status_code !== 20000) throw new DataForSeoError("invalid", res?.status_message || "DataForSEO task_post failed", 0, res?.status_code);
+  const posted: { id: number; taskId: string }[] = [];
+  let costUsd = 0;
+  for (const t of res.tasks ?? []) {
+    if (typeof t.cost === "number") costUsd += t.cost;
+    const id = Number(t.data?.tag);
+    if (t.status_code === 20100 && t.id && Number.isInteger(id)) posted.push({ id, taskId: t.id });
+  }
+  return { posted, costUsd };
+}
+
+export type CollectedSearch = { status: "pending" } | { status: "failed"; message: string } | { status: "done"; hits: SerpHit[] };
+/** Collect one queued search (free). */
+export async function collectSearch(taskId: string): Promise<CollectedSearch> {
+  const res = await discoverDeps.request("GET", `/serp/google/organic/task_get/regular/${encodeURIComponent(taskId)}`);
+  const task = res?.tasks?.[0];
+  if (!res || res.status_code !== 20000 || !task) throw new DataForSeoError("upstream", res?.status_message || "DataForSEO task_get failed", 0, res?.status_code);
+  if (isTaskInProgress(task)) return { status: "pending" };
+  if (task.status_code !== 20000) return isNoResultsTask(task) ? { status: "done", hits: [] } : { status: "failed", message: task.status_message || `task failed (${task.status_code})` };
+  return { status: "done", hits: hitsFromItems(taskItems(task) as any[]) };
 }

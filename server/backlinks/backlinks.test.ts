@@ -368,3 +368,28 @@ describe("expansion — organisations link to their own kind", () => {
       .toEqual(["https://mychamber.org/community-links"]);
   });
 });
+
+describe("discovery through the standard queue", () => {
+  it("posts searches tagged with their query id and collects their organic hits", async () => {
+    const { discoverDeps, postSearches, collectSearch, discoveryEstimateUsd } = await import("./discover");
+    const orig = discoverDeps.request;
+    const calls: any[] = [];
+    discoverDeps.request = (async (method: string, path: string, body?: any) => {
+      calls.push({ method, path, body });
+      if (path.endsWith("task_post")) return { status_code: 20000, tasks: [
+        { id: "t1", status_code: 20100, cost: 0.006, data: { tag: "7" } },
+        { id: "t2", status_code: 40501, cost: 0, data: { tag: "8" } },
+      ] };
+      if (path.includes("t-pending")) return { status_code: 20000, tasks: [{ status_code: 40602 }] };
+      return { status_code: 20000, tasks: [{ status_code: 20000, result: [{ items: [{ type: "organic", url: "https://a.com/x", rank_absolute: 1 }] }] }] };
+    }) as any;
+    try {
+      expect(await postSearches([{ id: 7, query: "a" }, { id: 8, query: "b" }])).toEqual({ posted: [{ id: 7, taskId: "t1" }], costUsd: 0.006 });
+      expect(calls[0].body[0]).toMatchObject({ keyword: "a", tag: "7", priority: 1, depth: 100 });
+      expect(await collectSearch("t-pending")).toEqual({ status: "pending" });
+      expect(await collectSearch("t1")).toEqual({ status: "done", hits: [{ domain: "a.com", url: "https://a.com/x", title: null, position: 1 }] });
+      expect(calls.at(-1).path).toBe("/serp/google/organic/task_get/regular/t1");
+      expect(discoveryEstimateUsd("standard")).toBeLessThan(discoveryEstimateUsd() / 3);
+    } finally { discoverDeps.request = orig; }
+  });
+});
