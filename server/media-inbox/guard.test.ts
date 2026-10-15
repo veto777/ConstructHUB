@@ -183,6 +183,24 @@ describe("sending ramp and templates", () => {
   });
 });
 
+describe("classifySites — vetted directories sorted before any email", () => {
+  it("keeps only given domains and known classes", async () => {
+    const { aiDeps, classifySites } = await import("./ai");
+    const orig = aiDeps.fetch;
+    aiDeps.fetch = async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ sites: [
+      { domain: "abcchamber.org", class: "chamber", name: "ABC Chamber of Commerce" }, { domain: "nari-x.org", class: "trade_association", name: "National Association of Remodelers" },
+      { domain: "made-up.com", class: "listing_directory" }, { domain: "dir.com", class: "spaceship" },
+    ] }) } }] }));
+    try {
+      const r = await classifySites([{ domain: "abcchamber.org", title: "Member Directory", homeTitle: "Home - ABC Chamber of Commerce" }, { domain: "nari-x.org", title: null, homeTitle: null }, { domain: "dir.com", title: null, homeTitle: null }],
+        { AI_INTEGRATIONS_OPENAI_BASE_URL: "http://tc/api", AI_INTEGRATIONS_OPENAI_API_KEY: "a" } as any);
+      expect([...r.classes]).toEqual([["abcchamber.org", "chamber"], ["nari-x.org", "trade_association"]]);
+      // A name not on the site's titles is dropped (nothing made up).
+      expect([...r.names]).toEqual([["abcchamber.org", "ABC Chamber of Commerce"]]);
+    } finally { aiDeps.fetch = orig; }
+  });
+});
+
 describe("formMessage — our first email, as a form message", () => {
   it("drops the greeting, the stop line and the sign-off", () => {
     const m = formMessage(`Hi Acme team,\n\nConstructHUB is software for US contractors.\n\nIf this isn't something you handle, reply "stop" and we won't email you again.\n\nBest regards,`);
