@@ -61,6 +61,8 @@ const toHit = (r: ReturnType<typeof parseKsbtpResults>[number], facility: boolea
     businessName: facility ? r.name : null, licenseNumber: r.number, licenseType: r.type, specialty: null, status: r.status,
     principal: who, city: loc ? `${clean(loc[1])}, ${loc[2]}` : r.location, expires: r.expires, matchedOn,
     people: who ? [{ name: who, role: r.type }] : [],
+    // The board's facility (firm) lookup or its individual lookup: the publisher's own split.
+    holder: facility ? "business" : "individual",
   };
 };
 
@@ -122,6 +124,7 @@ const KS_ELEVATOR_CONTRACTORS: BulkSource = {
         businessName: company, licenseNumber: null, licenseType: "Elevator contractor", specialty: null,
         status: asOf ? `Listed in the State Fire Marshal's licensed elevator contractor directory of ${asOf}` : "Listed in the State Fire Marshal's licensed elevator contractor directory",
         principal: contact, city: null, expires: null, matchedOn: "business", phone, people: contact ? [{ name: contact, role: "Contact" }] : [],
+        holder: "business",
       };
       yield { kind: "license", hit, business: company, person: contact, keys: { phones: [phone] } } satisfies BulkHit;
     }
@@ -141,6 +144,8 @@ const KS_ELEVATOR_MECHANICS: BulkSource = {
         businessName: company, licenseNumber: null, licenseType: "Elevator mechanic", specialty: null,
         status: asOf ? `Listed in the State Fire Marshal's licensed elevator mechanic directory of ${asOf}` : "Listed in the State Fire Marshal's licensed elevator mechanic directory",
         principal: who, city: null, expires: null, matchedOn: "principal", phone, people: [{ name: who, role: "Elevator mechanic" }],
+        // A mechanic's license is the mechanic's own; the company is the employer.
+        holder: "individual",
       };
       yield { kind: "license", hit, business: company, person: who, keys: { phones: [phone] } } satisfies BulkHit;
     }

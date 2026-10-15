@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseArlsDetails, parseArlsMatters, parseArlsQualifiers, parseArlsSearch } from "./lib/g3-arls";
+import { arlsHolder, parseArlsDetails, parseArlsMatters, parseArlsQualifiers, parseArlsSearch } from "./lib/g3-arls";
 
 // Fragments as the three NC ARLS portals returned them on 2026-10-15 (blank lines removed).
 const SEARCH_PERSON = "                <tbody>\n                            <tr>\n                                <td>\n                                        <a onclick=\"ShowAccountDetails( 't%2br0smg2s8s9SguyDew3Gw%3d%3d' );\" title=\"View Account Details\" href=\"#void\">Q.00290</a>\n                                </td>\n                                <td style=\"\">Qualifier</td>\n                                <td>\n                                    Shannon K. Douglas\n                                </td>\n                            </tr>\n                            <tr>\n                                <td>\n                                        <a onclick=\"ShowAccountDetails( '7DH9N5bBtJYe8mCKu7IxDQ%3d%3d' );\" title=\"View Account Details\" href=\"#void\">Q.24503</a>\n                                                <span style=\"color: red; font-weight: bold\">&nbsp; - &nbsp; License Not Active</span>\n                                </td>\n                                <td style=\"\">Qualifier</td>\n                                <td>\n                                    Shannon W. Douglas\n                                </td>\n                            </tr>\n                </tbody>\n"; // portal.nclbgc.org _Search, FirstName=Shannon LastName=Douglas
@@ -72,5 +72,15 @@ describe("ARLS qualifiers and cache (audit 2026-10-15)", () => {
       pruneArlsCache(Date.now() + 11 * 60_000);
       expect(arlsCacheSize()).toBe(0);
     } finally { vi.unstubAllGlobals(); }
+  });
+});
+
+describe("ARLS holder (audit round 2, decision 2)", () => {
+  it("a qualifier's own account is the person's, whatever licensees it qualifies for; a license account is the business's", () => {
+    expect(arlsHolder(true, "Qualifier")).toBe("individual");
+    expect(arlsHolder(true, null)).toBe("individual");
+    expect(arlsHolder(false, "License")).toBe("business");
+    expect(arlsHolder(false, null)).toBe("business");
+    expect(arlsHolder(false, "Registration")).toBeNull();
   });
 });

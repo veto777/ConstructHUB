@@ -61,7 +61,10 @@ describe("TN Board for Licensing Contractors disciplinary action reports", () =>
   it("reads adverse from the action's own words, not-adverse words first (audit 2026-10-15)", () => {
     const base = parseTnDar(DAR_2024_02).find((r) => r.respondent.startsWith("Caldwell"))!;
     // Actions as the 2024–2026 reports print them.
-    expect(darHit({ ...base, action: "Civil penalty waived if they applied for licensure" }, "u")?.adverse).toBe(false);
+    // A penalty and a waiver in one action is mixed wording: unknown (round 2, decision 4); the action text is shown as published.
+    expect(darHit({ ...base, action: "Civil penalty waived if they applied for licensure" }, "u")?.adverse).toBeNull();
+    expect(darHit({ ...base, action: "Case dismissed" }, "u")?.adverse).toBe(false);
+    expect(darHit({ ...base, action: "No civil penalty assessed" }, "u")?.adverse).toBeNull();
     expect(darHit({ ...base, action: "$1,500 civil penalty" }, "u")?.adverse).toBe(true);
     expect(darHit({ ...base, action: "Respondent signed a declaration that he is no longer conducting unlicensed activity" }, "u")?.adverse).toBeNull();
   });

@@ -26,3 +26,14 @@ describe("KY capped searches (audit 2026-10-15)", () => {
     expect(await searchKyHbcBy({ type: "phone", value: "(502) 573-0365" })).toBeNull();
   });
 });
+
+describe("Kentucky round-2 audit (2026-10-16)", () => {
+  it("the license type decides the holder (decision 2)", async () => {
+    const { kyHolder } = await import("./ky");
+    expect(kyHolder("Master Plumber")).toBe("individual");
+    expect(kyHolder("Electrical Contractor - Business")).toBe("business");
+    expect(kyHolder("HVAC Master Contractor")).toBe("individual");
+    expect(kyHolder("Fire Sprinkler Contractor")).toBe("business");
+    expect(kyHolder(null)).toBeNull();
+  });
+});

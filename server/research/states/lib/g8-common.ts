@@ -23,7 +23,10 @@ export async function fetchJson<T = any>(url: string, init: RequestInit = {}, la
 export const postJson = <T = any>(url: string, body: unknown, label: string, minDelayMs = 1000, headers: Record<string, string> = {}) =>
   fetchJson<T>(url, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json; charset=utf-8", accept: "application/json", ...headers } }, label, minDelayMs);
 
-/** "MM/DD/YYYY" (any time after it ignored), "YYYY-MM-DD…" or "M-D-YY" → YYYY-MM-DD; anything else → null. */
+/**
+ * "MM/DD/YYYY" (any time after it ignored) or "YYYY-MM-DD…" → YYYY-MM-DD; anything else → null. A two-digit year
+ * ("M-D-YY") is null: its century would be a guess (round 2, decision 13).
+ */
 export function anyDay(v: unknown): string | null {
   const s = clean(v == null ? null : String(v));
   if (!s) return null;
@@ -31,8 +34,6 @@ export function anyDay(v: unknown): string | null {
   if (m) return Number(m[1]) >= 1900 ? `${m[1]}-${m[2]}-${m[3]}` : null;
   m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/);
   if (m) return Number(m[3]) >= 1900 ? `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : null;
-  m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2})$/);
-  if (m) { const y = Number(m[3]); return `${y >= 70 ? 1900 + y : 2000 + y}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`; }
   return null;
 }
 

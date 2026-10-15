@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moIsBusiness, parseMoDetail } from "./mo";
+import { moHolder, moIsBusiness, moStatus, parseMoDetail } from "./mo";
 
 describe("MO PRO licensee detail", () => {
   it("reads license fields, the address and the people named", () => {
@@ -21,5 +21,21 @@ describe("MO PRO licensee kind (audit 2026-10-15)", () => {
     expect(moIsBusiness("Electrical Contractor", "Precision Electric LLC")).toBe(true);
     expect(moIsBusiness("Engineering Corporation", "Amptron Electric Company")).toBe(true);
     expect(moIsBusiness("Professional Engineer", "Mark E Davis")).toBe(false);
+  });
+});
+
+describe("MO PRO discipline and holder (audit round 2, decisions 1 and 2)", () => {
+  it("keeps discipline out of the status: the status word alone, the discipline apart", () => {
+    const r = moStatus("Non Active", { "Current Discipline Status": "Probation", "Previous Disciplinary Actions": "Yes" });
+    expect(r.status).toBe("Not active");
+    expect(r.status).not.toMatch(/disciplin|probation/i);
+    expect(r.discipline).toBe("current discipline: Probation; previous disciplinary actions: Yes");
+    expect(moStatus("Active", { "Current Discipline Status": "None", "Previous Disciplinary Actions": "No" })).toEqual({ status: "Active", discipline: null });
+  });
+  it("the holder comes from the license class", () => {
+    expect(moHolder("Engineering Corporation", "Amptron Electric Company")).toBe("business");
+    expect(moHolder("Professional Engineer", "Mark E Davis")).toBe("individual");
+    expect(moHolder("Electrical Contractor", "Precision Electric LLC")).toBe("business");
+    expect(moHolder("Electrical Contractor", "Mark E Davis")).toBeNull();
   });
 });

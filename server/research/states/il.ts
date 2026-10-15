@@ -20,7 +20,8 @@ import { addressKeys, addressMatches, normLicense, normPhone, type IdQuery } fro
 import { decodeEntities } from "../bulk-sources";
 import { clean, usDate } from "../bulk";
 import type { StatePack } from "./types";
-import { adverseFrom, hasEnded } from "../adverse";
+import { ADVERSE, NOT_ADVERSE, adverseFrom, hasEnded } from "../adverse";
+import { noteOf, withNote } from "../notes";
 import { looksLikeBusiness } from "./lib/business-name";
 
 /** The license number as typed and with its punctuation stripped, quoted for SoQL ("062-012345" and "062012345"). */
@@ -37,7 +38,9 @@ const IDFPR_DISCIPLINE_TYPES = "license_type in ('ROOFING CONTRACTOR','ARCHITECT
 const LICENSES: LicenseSource[] = [
   { state: "IL", source: "Illinois IDPH licensed asbestos workers", ...soda("data.illinois.gov", "437c-unzu"),
     fields: { businessName: null, licenseNumber: "id", licenseType: null, specialty: null, status: null, principal: null, city: "city", expires: null },
-    personField: ["first_name", "last_name"] },
+    personField: ["first_name", "last_name"],
+    // An asbestos worker license is the worker's own.
+    holder: () => "individual" },
 ];
 
 // ── IDPH asbestos contractors and professionals (live: "NA" stands for a withheld address or phone) ──────────
@@ -59,6 +62,8 @@ export function asbContractorHit(r: Record<string, unknown>, matchedOn: LicenseH
     city: [na(r.city), na(r.state) !== "IL" ? na(r.state) : null].filter(Boolean).join(", ") || null,
     expires: str(r.cert_expiration_date)?.slice(0, 10) ?? null, matchedOn,
     address: joinAddr(r.address, r.city, r.state, r.zip), phone: na(r.phone), ...(contact ? { people: [{ name: contact, role: "Contact person" }] } : {}),
+    // A licensed abatement contractor (the firm holds the license).
+    holder: "business",
   };
 }
 
@@ -72,6 +77,8 @@ export function asbProfessionalHit(r: Record<string, unknown>, matchedOn: Licens
     principal: who, city: na(r.company_city), expires: null, matchedOn,
     address: joinAddr(r.company_address, r.company_city, r.company_state, r.company_zip), phone: na(r.company_phone),
     ...(who ? { people: [{ name: who, role: roles }] } : {}),
+    // The professional's own license: the company is their employer, which doesn't make the contact a business's.
+    holder: "individual",
   };
 }
 
@@ -80,7 +87,9 @@ function idphSearch(url: string, label: string, toHit: (r: Record<string, unknow
   return {
     search: async (name: string, kind: "person" | "company"): Promise<LicenseHit[]> => {
       const where = kind === "company" ? nameClause(f.company, name) : nameClause(f.person, name);
-      return (await sodaRows(url, where, 200, label)).map((r) => toHit(r, kind === "company" ? "business" : "principal")).filter((h) => wholeWordMatch(name, h));
+      const rows = await sodaRows(url, where, 200, label);
+      // The page's cap note travels with the hits (round 2, decision 9).
+      return withNote(rows.map((r) => toHit(r, kind === "company" ? "business" : "principal")).filter((h) => wholeWordMatch(name, h)), noteOf(rows));
     },
     searchBy: async (q: IdQuery): Promise<LicenseHit[] | null> => {
       let where: string | null = null;
@@ -95,9 +104,10 @@ function idphSearch(url: string, label: string, toHit: (r: Record<string, unknow
         if (key) { const [num, word] = key.slice(2).split(" "); where = `upper(${f.address}) like '${num} %${word.replace(/'/g, "''")}%'`; }
       }
       if (!where) return null; // not an identifier this dataset can take
-      return (await sodaRows(url, where, 200, label)).map((r) => toHit(r, q.type)).filter((h) =>
+      const rows = await sodaRows(url, where, 200, label);
+      return withNote(rows.map((r) => toHit(r, q.type)).filter((h) =>
         q.type === "license" ? normLicense(h.licenseNumber) === normLicense(q.value)
-          : q.type === "phone" ? normPhone(h.phone) === normPhone(q.value) : addressMatches(q.value, h.address));
+          : q.type === "phone" ? normPhone(h.phone) === normPhone(q.value) : addressMatches(q.value, h.address)), noteOf(rows));
     },
   };
 }
@@ -115,6 +125,8 @@ export function idfprLicenseHit(r: Record<string, unknown>, kind: "person" | "co
     status: str(r.license_status), principal: person, city: [str(r.city), str(r.state) && str(r.state) !== "IL" ? str(r.state) : null].filter(Boolean).join(", ") || null,
     expires: usDate(str(r.expiration_date)), matchedOn: kind === "company" ? "business" : "principal",
     ...(person ? { people: [{ name: person, role: str(r.description) }] } : {}),
+    // IDFPR's own business flag: Y a business's license, N an individual's.
+    holder: str(r.business) === "Y" ? "business" : str(r.business) === "N" ? "individual" : null,
   };
 }
 
@@ -124,14 +136,15 @@ async function searchIdfprDesign(name: string, kind: "person" | "company"): Prom
     : `${nameClause(["first_name", "middle", "last_name"], name)} AND business='N'`;
   const seen = new Set<string>();
   const out: LicenseHit[] = [];
-  for (const r of await sodaRows(IDFPR.url, `${where} AND (${IDFPR_DESIGN})`, 500, IDFPR_DESIGN_SOURCE)) {
+  const rows = await sodaRows(IDFPR.url, `${where} AND (${IDFPR_DESIGN})`, 500, IDFPR_DESIGN_SOURCE);
+  for (const r of rows) {
     const h = idfprLicenseHit(r, kind);
     const key = `${h.licenseNumber}|${h.licenseType}`;
     if (seen.has(key) || !wholeWordMatch(name, h)) continue;
     seen.add(key);
     out.push(h);
   }
-  return out;
+  return withNote(out, noteOf(rows));
 }
 
 async function searchIdfprDesignBy(q: IdQuery): Promise<LicenseHit[] | null> {
@@ -139,13 +152,23 @@ async function searchIdfprDesignBy(q: IdQuery): Promise<LicenseHit[] | null> {
   const n = normLicense(q.value);
   if (!n) return null;
   const seen = new Set<string>();
-  return (await sodaRows(IDFPR.url, `upper(license_number) in (${licenseForms(q.value).join(",")}) AND (${IDFPR_DESIGN})`, 50, IDFPR_DESIGN_SOURCE))
-    .map((r) => ({ ...idfprLicenseHit(r, "company"), matchedOn: "license" as const }))
-    .filter((h) => { const k = `${h.licenseNumber}|${h.licenseType}`; if (seen.has(k)) return false; seen.add(k); return true; });
+  const rows = await sodaRows(IDFPR.url, `upper(license_number) in (${licenseForms(q.value).join(",")}) AND (${IDFPR_DESIGN})`, 50, IDFPR_DESIGN_SOURCE);
+  return withNote(rows.map((r) => ({ ...idfprLicenseHit(r, "company"), matchedOn: "license" as const }))
+    .filter((h) => { const k = `${h.licenseNumber}|${h.licenseType}`; if (seen.has(k)) return false; seen.add(k); return true; }), noteOf(rows));
 }
 
 // ── IDFPR discipline ─────────────────────────────────────────────────────────────────────────────────────────
 const str = (v: unknown) => clean(v == null ? null : String(v));
+
+/**
+ * A record the publisher itself flags as disciplined: the action's clean answer when it gives one; null when its
+ * words are mixed or negated ("revoked; hearing waived", "no fine"); true when it has no outcome words at all.
+ */
+export function flaggedAdverse(action: string | null): boolean | null {
+  const a = adverseFrom(action);
+  if (a !== null || !action) return a ?? true;
+  return ADVERSE.test(action) || NOT_ADVERSE.test(action) ? null : true;
+}
 
 export function idfprDisciplineHit(r: Record<string, unknown>): EnforcementHit {
   const action = str(r.action), reason = str(r.discipline_reason)?.replace(/\.+\s*$/, "") ?? null;
@@ -157,8 +180,9 @@ export function idfprDisciplineHit(r: Record<string, unknown>): EnforcementHit {
     category: "discipline", name: names.join(" / ") || null, id: str(r.case_number), date: usDate(str(r.discipline_start_date)), endDate: null,
     status: action ?? "IDFPR marks this license as disciplined", city: str(r.city),
     detail: [reason, `${str(r.description) ?? str(r.license_type) ?? "License"} ${str(r.license_number) ?? ""}, status ${str(r.license_status) ?? "not given"}`.trim()].filter(Boolean).join(". "),
-    // IDFPR marks the license disciplined (ever_disciplined = Y); only an action that says otherwise makes it not adverse.
-    amount: fine && fine.length === 1 ? Number(fine[0].replace(/[$,\s]/g, "")) : null, adverse: adverseFrom(action) !== false,
+    // IDFPR marks the license disciplined (ever_disciplined = Y): adverse when the action says nothing either way; an
+    // action that clears it is not; mixed or negated wording is unknown (round 2, decision 4).
+    amount: fine && fine.length === 1 ? Number(fine[0].replace(/[$,\s]/g, "")) : null, adverse: flaggedAdverse(action),
     licenseNumber: str(r.license_number),
   };
 }

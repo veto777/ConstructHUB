@@ -21,7 +21,7 @@
  * report shows the code.
  */
 import type { EnforcementHit } from "@shared/research-reports";
-import { fetchWithDeadline, rateLimitHost } from "../http";
+import { fetchWithDeadline, rateLimitHost, rethrowIfBlocked } from "../http";
 import { adverseFrom } from "../adverse";
 import { clean, csvRecords, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { promises as fs } from "node:fs";
@@ -84,7 +84,8 @@ async function tdecCsv(page: number, session: { id: string; cookie: string } | n
 async function* tdecLoader(): AsyncIterable<BulkHit> {
   const respondents = await tdecCsv(700, null);
   let cases: string | null = null;
-  try { cases = (await tdecCsv(710, respondents.session)).path; } catch { cases = null; } // violation types are a bonus
+  // Violation types are a bonus: a failure skips them, but an access denial stops the load (round 2, decision 6).
+  try { cases = (await tdecCsv(710, respondents.session)).path; } catch (err) { rethrowIfBlocked(err); cases = null; }
   const violations = new Map<string, string>();
   if (cases) for await (const r of fromFile(cases, (p) => csvRecords(p))) { const no = clean(r["Case Number"]), v = clean(r["Violation Type"]); if (no && v) violations.set(no, v); }
   for await (const r of fromFile(respondents.path, (p) => csvRecords(p))) {
@@ -193,7 +194,8 @@ export function darHit(r: DarRow, sourceUrl: string): EnforcementHit | null {
     state: "TN", source: "TN Board for Licensing Contractors and Alarm Systems Contractors Board disciplinary actions", sourceUrl, category: "discipline",
     name, id: null, date: usDate(r.date), endDate: null, status: r.action, city: r.location,
     detail: `${r.program}. Violation: ${r.violation}`, amount: fine ? Number(fine[1].replace(/,/g, "")) : null,
-    // From the action's own words; "no civil penalty", dismissed or withdrawn → false, checked first (decision 2).
+    // From the action's own words: dismissed or withdrawn → false; a penalty, revocation, … → true; mixed or negated
+    // wording ("civil penalty waived", "no civil penalty") → null (round 2, decision 4).
     adverse: adverseFrom(r.action, { adverse: /penalt|revo|suspen|costs|probation|cease|desist/i }),
   };
 }

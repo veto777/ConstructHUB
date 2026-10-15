@@ -30,8 +30,9 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { inflateSync } from "node:zlib";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { USER_AGENT, fetchWithDeadline, rateLimitHost } from "./http";
+import { USER_AGENT, fetchWithDeadline, rateLimitHost, rethrowIfBlocked } from "./http";
 import { adverseFrom } from "./adverse";
+import { looksLikeBusiness } from "./states/lib/business-name";
 import { clean, csvRecords, csvRows, download, lines, plainRequest, saveResponse, usDate, type BulkHit, type BulkSource } from "./bulk";
 import type { IdKeys } from "./identifiers";
 
@@ -41,11 +42,15 @@ async function* fromFile<T>(path: string, fn: (p: string) => AsyncIterable<T>): 
   try { yield* fn(path); } finally { await fs.rm(path, { force: true }); }
 }
 
+/** How long one unzip may run. */
+export const UNZIP_TIMEOUT_MS = 15 * 60_000;
+
 /** The single member of a zip, extracted to a temp file (Info-ZIP reads Deflate64, which Sunbiz uses). */
 async function unzipTo(zip: string, member?: string): Promise<string> {
   const dir = await fs.mkdtemp(join(tmpdir(), "ch-unzip-"));
   try {
-    await run("unzip", ["-q", "-o", zip, ...(member ? [member] : []), "-d", dir], { maxBuffer: 1 << 20 });
+    // A time limit (the process is killed past it): a damaged or huge zip can't hold the daily refresh (round 2, decision 13).
+    await run("unzip", ["-q", "-o", zip, ...(member ? [member] : []), "-d", dir], { maxBuffer: 1 << 20, timeout: UNZIP_TIMEOUT_MS, killSignal: "SIGKILL" });
     const files = await fs.readdir(dir);
     if (!files.length) throw new Error("empty zip");
     const out = join(tmpdir(), `ch-bulk-${Date.now()}-${files[0]}`);
@@ -65,11 +70,11 @@ const flipName = (v: string | null) => {
   return m ? clean(`${m[2]} ${m[1]}`) : clean(v);
 };
 type Person = { name: string; role: string | null };
-type Extra = { people?: Person[]; keys?: IdKeys };
+type Extra = { people?: Person[]; keys?: IdKeys; component?: string };
 /** A license row: its people go on the hit (with roles) and into the person index; its keys into the identifier index. */
 const lic = (h: Omit<LicenseHit, "matchedOn">, business: string | null, personName: string | null, x: Extra = {}): BulkHit =>
-  ({ kind: "license", hit: { ...h, matchedOn: business ? "business" : "principal", ...(x.people?.length ? { people: x.people } : {}) }, business, person: personName, ...(x.people?.length ? { people: x.people.map((p) => p.name) } : {}), ...(x.keys ? { keys: x.keys } : {}) });
-const enf = (h: EnforcementHit, business: string | null, keys?: IdKeys): BulkHit => ({ kind: "enforcement", hit: h, business, person: null, ...(keys ? { keys } : {}) });
+  ({ kind: "license", hit: { ...h, matchedOn: business ? "business" : "principal", ...(x.people?.length ? { people: x.people } : {}) }, business, person: personName, ...(x.people?.length ? { people: x.people.map((p) => p.name) } : {}), ...(x.keys ? { keys: x.keys } : {}), ...(x.component ? { component: x.component } : {}) });
+const enf = (h: EnforcementHit, business: string | null, keys?: IdKeys, component?: string): BulkHit => ({ kind: "enforcement", hit: h, business, person: null, ...(keys ? { keys } : {}), ...(component ? { component } : {}) });
 
 /** Street lines, then "CITY ST ZIP": the display address. Lines that are only the city again are dropped. */
 /** "330683353" → "33068-3353" (fixed-width files drop the dash, which hides the ZIP from ./identifiers.ts). */
@@ -158,7 +163,10 @@ function flRow(r: string[]): FlRow | null {
   const occ = r[1].trim();
   if (/^(PVDR|CRS\d*)$/.test(occ)) return null; // course providers and courses
   return {
-    occ, name: clean(r[2]), dba: /^INDIVIDUAL$/i.test(r[3].trim()) ? null : clean(r[3]), isBusiness: occ === "QB",
+    // QB (Construction Business Information) and QC (Qualified Business Organization) are the business's own record;
+    // every other occupation (a certified or registered contractor, a financially responsible officer) is a licensed
+    // individual, whatever business their DBA column names.
+    occ, name: clean(r[2]), dba: /^INDIVIDUAL$/i.test(r[3].trim()) ? null : clean(r[3]), isBusiness: occ === "QB" || occ === "QC",
     number: clean(r[12]), full: clean(r[20]) ?? clean(r[12]), lines: [r[5], r[6], r[7]], city: clean(r[8]), state: clean(r[9]), zip: clean(r[10]),
   };
 }
@@ -192,6 +200,8 @@ export async function* flLicenseRows(path: string, label: string, page: string, 
       licenseType: flOccupation(row.occ), specialty: flClass(row.occ, clean(r[4])), status,
       principal: row.isBusiness ? null : flipName(row.name), city: row.city, expires: usDate(r[17]),
       address: joinAddress(row.lines, row.city, row.state, row.zip), phone: null,
+      // The occupation says who holds it: a qualifier's license is the individual's even with a DBA (round 2, decision 2).
+      holder: row.isBusiness ? "business" as const : "individual" as const,
     };
     yield lic(hit, row.isBusiness ? [row.name, row.dba].filter(Boolean).join(" ") || null : row.dba, row.isBusiness ? null : row.name, {
       people, keys: { licenses: [row.full], addresses: addressKeysOf(row.lines, row.city, row.state, row.zip) },
@@ -219,7 +229,7 @@ const FL_APPLICANT_FILES: { url: string; page: string }[] = [
   { url: "https://www2.myfloridalicense.com/sto/file_download/extracts/elec_app.csv", page: FL_ECLB_PAGE },
 ];
 
-export async function* flApplicantRows(path: string, page: string): AsyncIterable<BulkHit> {
+export async function* flApplicantRows(path: string, page: string, component?: string): AsyncIterable<BulkHit> {
   for await (const r of csvRows(path)) {
     if (r.length < 14 || !/^\d{4}$/.test(r[0].trim())) continue;
     const who = person(clean(r[4]), clean(r[2]), clean(r[3]), clean(r[5]));
@@ -229,13 +239,13 @@ export async function* flApplicantRows(path: string, page: string): AsyncIterabl
       state: "FL", source: "Florida DBPR license applicants (construction and electrical)", sourceUrl: page,
       businessName: null, licenseNumber: null, licenseType: clean(r[1]), specialty: null,
       status: "Applicant: an application is on file with DBPR (not a license)", principal: who, city, expires: null,
-      address: joinAddress([r[6], r[7]], city, st, zip), phone,
-    }, null, who, { people: [{ name: who, role: "Applicant" }], keys: { phones: [phone], addresses: addressKeysOf([r[6], r[7]], city, st, zip) } });
+      address: joinAddress([r[6], r[7]], city, st, zip), phone, holder: "individual",
+    }, null, who, { people: [{ name: who, role: "Applicant" }], keys: { phones: [phone], addresses: addressKeysOf([r[6], r[7]], city, st, zip) }, component });
   }
 }
 
 async function* flApplicantsLoader(): AsyncIterable<BulkHit> {
-  for (const f of FL_APPLICANT_FILES) yield* fromFile(await download(f.url), (p) => flApplicantRows(p, f.page));
+  for (const f of FL_APPLICANT_FILES) yield* fromFile(await download(f.url), (p) => flApplicantRows(p, f.page, f.url.split("/").pop()));
 }
 
 // ── Florida DBPR public complaints and CILB discipline ───────────────────────────────────────────────────────
@@ -297,9 +307,20 @@ export async function flLicenseIndex(paths: string[]): Promise<Map<string, strin
 }
 const fullLicense = (idx: Map<string, string>, type: string | null, no: string | null) => (type && no && /^\d+$/.test(no) ? idx.get(`${type.toUpperCase()}|${Number(no)}`) ?? null : null);
 
+/** From the disposition, in DBPR's words (round 2, decision 4: words of both kinds, or a negated sanction, are null). */
+export const flDispositionAdverse = (disposition: string | null) => adverseFrom(disposition, { adverse: FL_ADVERSE, notAdverse: FL_NOT_ADVERSE });
 const caseAdverse = (disposition: string | null, discipline: string[]) =>
-  disposition ? (FL_ADVERSE.test(disposition) ? true : FL_NOT_ADVERSE.test(disposition) ? false : null)
-    : discipline.some((d) => /citation|fine|revok|suspen|cease/i.test(d)) ? true : null;
+  disposition ? flDispositionAdverse(disposition)
+    : discipline.length ? adverseFrom(discipline.join("; "), { adverse: /citation|\bfine|revok|suspen|cease/i }) : null;
+
+/** A business entity form in the name itself (DBPR's complaint files publish no entity type). */
+const ENTITY = /\b(?:inc|incorporated|llc|l\.l\.c|corp|corporation|co|company|ltd|limited|lp|llp|pllc|pa|p\.a|pc|p\.c)\b\.?/i;
+/**
+ * A complaint respondent is a business when the record names a DBA or the name carries an entity form, or (no entity
+ * type being published) reads as one by the shared classifier. Anyone else is an individual: the row is left out, so
+ * it is neither indexed as a business nor returned in company enforcement results (FCRA; round 2, decision 3).
+ */
+export const flRespondentIsBusiness = (name: string, dbas: string[]) => dbas.length > 0 || ENTITY.test(name) || looksLikeBusiness(name);
 
 export async function* flComplaintRows(complaintPaths: string[], cases: Map<string, FlCase>, licenses: Map<string, string>): AsyncIterable<BulkHit> {
   const seen = new Set<string>();
@@ -317,6 +338,7 @@ export async function* flComplaintRows(complaintPaths: string[], cases: Map<stri
     const id = clean(r[10]);
     const c = id ? cases.get(id) : undefined;
     if (id) seen.add(id);
+    if (!flRespondentIsBusiness(name, dbas)) continue;
     const disposition = clean(r[13]);
     const discipline = clean(r[15]?.replace(/;$/, "").replace(/;/g, "; ").replace(/,/g, " on "));
     const licenseNumber = c ? fullLicense(licenses, c.licType, c.licNo) ?? c.licNo : null;
@@ -326,13 +348,14 @@ export async function* flComplaintRows(complaintPaths: string[], cases: Map<stri
       category: "complaint", name: [name, ...dbas].join(" / "), id, date: usDate(r[12]), endDate: usDate(r[14]),
       status: disposition, city,
       detail: [clean(r[11]), clean(r[9]), discipline ? `Discipline: ${discipline}` : null, c?.licType && c.licNo ? `On ${c.licType} license ${licenseNumber}` : null].filter(Boolean).join(". ") || null,
-      amount: null, adverse: disposition ? (FL_ADVERSE.test(disposition) ? true : FL_NOT_ADVERSE.test(disposition) ? false : null) : null,
+      amount: null, adverse: flDispositionAdverse(disposition),
       address: joinAddress(street, city, st, zip), licenseNumber,
-    }, [name, ...dbas].join(" "), { licenses: [licenseNumber], addresses: addressKeysOf(street, city, st, zip) });
+    }, [name, ...dbas].join(" "), { licenses: [licenseNumber], addresses: addressKeysOf(street, city, st, zip) }, "complaints");
   }
   // Discipline cases the complaint extracts don't list.
   for (const c of Array.from(cases.values())) {
     if (seen.has(c.id)) continue;
+    if (!flRespondentIsBusiness(c.name, c.dbas)) continue;
     const licenseNumber = fullLicense(licenses, c.licType, c.licNo) ?? c.licNo;
     yield enf({
       state: "FL", source: "Florida DBPR complaints and discipline (construction and electrical)", sourceUrl: FL_CILB_PAGE,
@@ -585,7 +608,7 @@ export function sunbizCorporation(l: string): { hit: LicenseHit; name: string; p
       licenseType: `Business entity filing, not a license (${type ? SUNBIZ_FILING[type] ?? `type ${type}` : "type not given"}; document ${doc})`,
       specialty: [filed && usDate(filed) ? `Filed ${usDate(filed)}` : null, more ? "Sunbiz lists more than six officers; this file names six" : null].filter(Boolean).join(". ") || null,
       status: status ? SUNBIZ_STATUS[status] ?? `code ${status}` : null, principal: null, city, expires: null, matchedOn: "business",
-      address, phone: null, people,
+      address, phone: null, people, holder: "business", // a corporation, LLC or partnership filing
     },
   };
 }
@@ -647,10 +670,14 @@ async function* txPlumbingLoader(): AsyncIterable<BulkHit> {
         businessName: company, licenseNumber: clean(r.LICENSE_NBR), licenseType: list.type, specialty: null,
         status: clean(r.LIC_STATUS), principal: who, city: city ?? (clean(r.COUNTY) ? `${clean(r.COUNTY)} County` : null),
         expires: usDate(r.EXPIRATION_DTE), address: joinAddress(street, city, st, zip), phone,
+        // Every TSBPE license (master, journeyman, tradesman, inspector, apprentice) is a person's own; the company is
+        // their employer, so the street and phone are an individual's (round 2, decision 2).
+        holder: "individual" as const,
       };
       yield {
         kind: "license", hit: { ...hit, matchedOn: company ? "business" : "principal", ...(who ? { people: [{ name: who, role: list.type }] } : {}) },
         business: company, person: who, keys: { licenses: [hit.licenseNumber], phones: [phone], addresses: addressKeysOf(street, city, st, zip) },
+        component: list.type,
       };
     }
   }
@@ -674,6 +701,8 @@ async function cslbFile(file: "MasterLicenseData" | "PersonnelData"): Promise<st
       if (!/text\/csv/i.test(String(res.headers["content-type"] ?? ""))) { res.resume(); throw new Error(`CSLB sent ${res.headers["content-type"] ?? "no file"} (HTTP ${res.statusCode})`); }
       return await saveResponse(res);
     } catch (err) {
+      // An access denial (401/403, robots.txt, a cooldown too long) is never retried (round 2, decision 6).
+      rethrowIfBlocked(err);
       last = err;
       await new Promise((r) => setTimeout(r, 60_000 * (attempt + 1)));
     }
@@ -682,6 +711,12 @@ async function cslbFile(file: "MasterLicenseData" | "PersonnelData"): Promise<st
 }
 
 const CSLB_DISCIPLINE = /susp|probation|pending case|cit|judgement|judgment|disc|revok|arb/i;
+/** CSLB's own sanction words in its status fields (a pending case, a citation or a bond is not an outcome). */
+const CSLB_SANCTION = /\bsusp|revok|\bprobation\b|judg(?:e)?ment/i;
+export const cslbHolder = (type: string | undefined): "business" | "individual" | null => {
+  const t = clean(type);
+  return !t ? null : /sole owner/i.test(t) ? "individual" : "business";
+};
 
 /** "DAVIS                              DANA           MICHAEL" (last, first, middle) → "DANA MICHAEL DAVIS". */
 const cslbName = (raw: string) => { const [last, ...rest] = raw.trim().split(/\s{2,}/); return clean(`${rest.join(" ")} ${last ?? ""}`); };
@@ -745,6 +780,8 @@ export async function* cslbRows(masterPath: string, personnelPath: string): Asyn
     const keys: IdKeys = { licenses: [no], phones: [phone], addresses: addressKeysOf(street, city, st, zip) };
     const base = {
       state: "CA", source: "California CSLB contractor licenses", sourceUrl: CSLB, businessName: name, licenseNumber: no,
+      // BusinessType: "Sole Owner" is a person's license; a corporation, LLC, partnership or joint venture a business's.
+      holder: cslbHolder(r.BusinessType),
       licenseType: clean(r.BusinessType) ? `Contractor license (${clean(r.BusinessType)})` : "Contractor license",
       specialty: classes ? `Classes ${classes}` : null, status, city, expires, address, phone,
       people: people.map(({ name, role }) => ({ name, role })),
@@ -765,8 +802,11 @@ export async function* cslbRows(masterPath: string, personnelPath: string): Asyn
         detail: [bond ? `Disciplinary bond ${clean(r.DBNumber) ?? ""} for case ${bond}${clean(r.DBBondReason) ? ` (${clean(r.DBBondReason)})` : ""}` : null,
           `License ${no}`].filter(Boolean).join(". "),
         amount: Number.isFinite(amount) && amount > 0 ? amount : null,
-        adverse: primary && primary !== "CLEAR" ? true : null, address, phone, licenseNumber: no,
-      }, businessNames, keys);
+        // From CSLB's own status words (round 2, decision 4): a suspension or revocation is adverse; a pending case or a
+        // bond alone is not an outcome (null).
+        adverse: adverseFrom([primary, secondary].filter((v) => v && v !== "CLEAR").join("; "), { adverse: CSLB_SANCTION }),
+        address: isPerson ? null : address, phone: isPerson ? null : phone, licenseNumber: no,
+      }, businessNames, isPerson ? { licenses: [no] } : keys);
     }
   }
   // Personnel of a license that is no longer in the master list: still a real record of those people, one hit per license.
@@ -779,7 +819,7 @@ export async function* cslbRows(masterPath: string, personnelPath: string): Asyn
       hit: {
         state: "CA", source: "California CSLB contractor licenses (personnel)", sourceUrl: CSLB, businessName: null, licenseNumber: no,
         licenseType: "Contractor license", specialty: null, status: "Not in the current license list", principal: named.length === 1 ? named[0].name : null,
-        city: null, expires: null, matchedOn: "principal", people: people.map(({ name, role }) => ({ name, role })),
+        city: null, expires: null, matchedOn: "principal", people: people.map(({ name, role }) => ({ name, role })), holder: null,
       },
       business: null, person: null, people: named.flatMap((p) => [p.raw, ...p.aka]), keys: { licenses: [no] },
     };
@@ -967,10 +1007,12 @@ async function* caDcaLoader(): AsyncIterable<BulkHit> {
             licenseNumber: no, licenseType: type, specialty: clean(r["Speciality Code"]),
             status: clean(r["License Status"]), principal: who, city, expires: dt(r["Expiration Date"]),
             matchedOn: isOrg ? "business" : "principal", address: joinAddress(street, city, st, zip), phone: null,
+            // DCA's own Indiv/Org column says who holds it.
+            holder: isOrg ? "business" : "individual",
             ...(who ? { people: [{ name: who, role: type ? `Licensee (${type})` : "Licensee" }] } : {}),
           },
           business: isOrg ? orgOrLast : null, person: who,
-          keys: { licenses: [no], addresses: addressKeysOf(street, city, st, zip) },
+          keys: { licenses: [no], addresses: addressKeysOf(street, city, st, zip) }, component: board.label,
         };
       }
     }
@@ -1000,9 +1042,11 @@ async function* caElectriciansLoader(): AsyncIterable<BulkHit> {
           state: "CA", source: "California DIR electrician certification", sourceUrl: DIR_ECU_PAGE, businessName: null,
           licenseNumber: clean(r.CERTIFICATE_NUMBER), licenseType: f.type, specialty: null, status: null, principal: who,
           city: clean(r.ZIP_CODE) ? `ZIP ${clean(r.ZIP_CODE)}` : null, expires: usDate(r.EXPIRATION_DATE) ?? (/^\d{4}-\d{2}-\d{2}/.test(r.EXPIRATION_DATE ?? "") ? r.EXPIRATION_DATE.slice(0, 10) : null), matchedOn: "principal",
+          holder: "individual", // an electrician's own certificate
           ...(who ? { people: [{ name: who, role: f.type }] } : {}),
         },
         business: null, person: raw, keys: { licenses: [clean(r.CERTIFICATE_NUMBER)] }, // the file gives a ZIP only, no street
+        component: f.type,
       };
     }
   }
@@ -1041,9 +1085,12 @@ export function parseCaDebarments(html: string, today = new Date().toISOString()
     const licenses = Array.from(who.matchAll(/\b(?:CSLB|CSB|CLSB)\s*(?:License\s*)?(?:Number|No\.?|#)\s*:?\s*#?\s*(\d{5,7})\b/gi)).map((x) => x[1]);
     const licenseNumber = licenses[0] ?? null;
     const ended = !!to && to < today;
+    // A debarred individual (no business named on the row) is left out: enforcement is companies only (FCRA; round 2, decision 3).
+    const named = who.replace(/\s*\b(?:CSLB|CSB|CLSB)\s*(?:License\s*)?(?:Number|No\.?|#)\s*:?.*$/i, "");
+    if (!named.split(/;|\s+and\s+/i).some((part) => looksLikeBusiness(part))) continue;
     out.push(enf({
       state: "CA", source: "California Labor Commissioner public-works debarments", sourceUrl: pdf ? new URL(pdf, DLSE_DEBAR).toString() : DLSE_DEBAR,
-      category: "debarment", name: who.replace(/\s*\b(?:CSLB|CSB|CLSB)\s*(?:License\s*)?(?:Number|No\.?|#)\s*:?.*$/i, ""), id: licenseNumber,
+      category: "debarment", name: named, id: licenseNumber,
       date: from, endDate: to,
       status: stayed ? "Stayed by a court (see decision)" : ended ? "Debarment period over" : "Debarred",
       // From the status itself (audit 2026-10-15): a running debarment is adverse, one whose period is over is not,
@@ -1054,6 +1101,10 @@ export function parseCaDebarments(html: string, today = new Date().toISOString()
   return out;
 }
 
+// Components (bulk.ts, round 2 decision 10): a source read from several published files tags each row with its file
+// (FL applicants: constr_app.csv / elec_app.csv; FL complaints: the complaint extracts; TSBPE: each list; DCA: each
+// board; DIR: electricians / trainees), so a load in which one file comes back short is kept out. Derived rows whose
+// count moves on its own (CSLB enforcement facts, personnel-only licenses, discipline-only cases) carry none.
 // ── The list ─────────────────────────────────────────────────────────────────────────────────────────────────
 export const BULK_SOURCES: BulkSource[] = [
   { id: "fl-cilb", state: "FL", label: "Florida DBPR construction licenses (CILB)", pageUrl: FL_CILB_PAGE, everyHours: 24, minRows: 200_000,

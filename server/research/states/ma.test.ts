@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hicEnforcement, hicToHit, parseAuraContext, parseHicResponse } from "./ma";
+import { hicEnforcement, hicToHit, pack, parseAuraContext, parseHicResponse, searchHic } from "./ma";
+import { PortalBlockedError, blockHost, resetHostState } from "../http";
 import { pipeRecords } from "./lib/g2-mylicense";
 
 // One registration from the Contractor Hub search response of 2026-10-15 (email and phone left out).
@@ -57,5 +58,21 @@ describe("MyLicense download", () => {
       "AARON BABIKIAN|CSFA-106775|Construction Supervisor 1 & 2 Family|Active|7/17/2029 12:00:00 AM|9 HENRY DRIVE||LINCOLN RI  02865|LINCOLN|Providence|RI|02865|\n";
     expect(Array.from(pipeRecords(text))).toEqual([expect.objectContaining({ full_name: "AARON BABIKIAN", license_no: "CSFA-106775", addr_zipcode: "02865" })]);
     expect(() => Array.from(pipeRecords("<html>"))).toThrow();
+  });
+});
+
+describe("MA holder, kinds and the guarded HIC client (audit round 2, decisions 2, 6 and 8)", () => {
+  it("the registry's own account type says who holds a registration", () => {
+    expect(hicToHit({ Name: "ACME HOME IMPROVEMENT LLC", IsPersonAccount: false }, "business").holder).toBe("business");
+    expect(hicToHit({ Name: "JOHN SMITH", IsPersonAccount: true }, "principal").holder).toBe("individual");
+  });
+  it("the Fire Services certificates (people only) declare it", () => {
+    expect(pack.liveLicenses?.find((l) => /Fire Services/.test(l.source))?.kinds).toEqual(["person"]);
+  });
+  it("the HIC client goes through the host guard: a host that denied access gets no request", async () => {
+    blockHost("https://contractorhub.mass.gov/s/hic-contractor-search", 403, "HTTP 403");
+    try {
+      await expect(searchHic({ name: "Acme" })).rejects.toBeInstanceOf(PortalBlockedError);
+    } finally { resetHostState(); }
   });
 });

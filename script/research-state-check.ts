@@ -19,6 +19,8 @@ import { searchStateEnforcement } from "../server/research/state-records";
 import { sourceStatus } from "../server/research/bulk";
 import { STATE_PACKS } from "../server/research/states";
 import { pool } from "../server/db";
+import { disciplineRecord, reportHit } from "../server/research/privacy";
+import type { LicenseHit } from "@shared/research-reports";
 
 const args = process.argv.slice(2);
 const state = (args[0] ?? "").toUpperCase();
@@ -35,12 +37,27 @@ if (!/^[A-Z]{2}$/.test(state)) { console.error("usage: research-state-check.ts <
 if (withBulk && /constructhub-live|5433/.test(process.env.DATABASE_URL ?? "")) { console.error("refusing to load bulk files into a live-looking database"); process.exit(2); }
 
 let failed = 0;
+/**
+ * How a report shows a license hit (audit round 2, decisions 1 and 2): the holder, the street and phone left after
+ * privateHit, and what happens to disciplinary text (an enforcement record for a business, dropped for anyone else).
+ */
+const asReport = (raw: unknown): string | null => {
+  const h = (raw && typeof raw === "object" && "kind" in raw && (raw as { kind: string }).kind === "license" ? (raw as { hit: LicenseHit }).hit : raw) as LicenseHit;
+  if (!h || typeof h !== "object" || !("matchedOn" in h)) return null;
+  const shown = reportHit(h);
+  const disc = h.discipline ? (disciplineRecord(h) ? "→ enforcement record (business holder)" : "→ dropped (not a business holder)") : "none";
+  return `report view: holder=${h.holder ?? "null"} status=${JSON.stringify(shown.status)} address=${JSON.stringify(shown.address ?? null)} phone=${JSON.stringify(shown.phone ?? null)} discipline ${disc}`;
+};
 const show = (label: string, n: number | undefined, sample: unknown[] | null) => {
   // A searchBy that can't search this kind of identifier returns null: "not searched", not 0.
   if (sample == null) { console.log(`  ${label}: not searched (this source can't search by it)`); return; }
   const note = (sample as { note?: string }).note;
   console.log(`  ${label}: ${n}${note ? ` (${note})` : ""}`);
-  for (const h of sample.slice(0, 2)) console.log(`    ${JSON.stringify(h).slice(0, 400)}`);
+  for (const h of sample.slice(0, 2)) {
+    console.log(`    ${JSON.stringify(h).slice(0, 400)}`);
+    const view = asReport(h);
+    if (view) console.log(`      ${view}`);
+  }
 };
 const attempt = async (label: string, fn: () => Promise<void>) => {
   try { await fn(); } catch (err: any) { failed++; console.log(`  ${label}: FAILED ${String(err?.message ?? err).slice(0, 300)}`); }
@@ -59,7 +76,10 @@ async function main() {
   }
   for (const src of liveLicenseSearchesFor(state)) {
     console.log(`live license search: ${src.source} (${src.sourceUrl})`);
-    for (const s of subjects) await attempt(`${s.kind} "${s.name}"`, async () => { const h = await src.search(s.name, s.kind); show(`${s.kind} "${s.name}"`, h.length, h); });
+    for (const s of subjects) await attempt(`${s.kind} "${s.name}"`, async () => {
+      if (src.kinds && !src.kinds.includes(s.kind)) { console.log(`  ${s.kind} "${s.name}": not searched (this lookup has no ${s.kind} search)`); return; }
+      const h = await src.search(s.name, s.kind); show(`${s.kind} "${s.name}"`, h.length, h);
+    });
     if (src.searchBy) for (const q of ids) await attempt(`${q.type} "${q.value}"`, async () => { const h = await src.searchBy!(q); show(`${q.type} "${q.value}"`, h?.length, h); });
   }
   if (company) {

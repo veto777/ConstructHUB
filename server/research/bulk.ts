@@ -149,9 +149,12 @@ async function loadSourceRun(src: BulkSource): Promise<number> {
   await bulkSchemaReady();
   await pool.query(`INSERT INTO research_bulk_sources (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`, [src.id]);
   await pool.query(`UPDATE research_bulk_sources SET attempted_at = now() WHERE id = $1`, [src.id]);
-  const { rows: [cur] } = await pool.query(`SELECT generation, row_count, loaded_at, facets FROM research_bulk_sources WHERE id = $1`, [src.id]);
+  const { rows: [cur] } = await pool.query(`SELECT generation, row_count, loaded_at, facets, key_version FROM research_bulk_sources WHERE id = $1`, [src.id]);
   const gen = Number(cur.generation) + 1;
-  const prev = cur.loaded_at ? { rows: Number(cur.row_count ?? 0), components: (cur.facets?.components ?? null) as Record<string, number> | null } : null;
+  // The previous load counts only when it was made under the same format: a format change (CSLB went from one row
+  // per person to one per license) is not a cut-off download.
+  const prev = cur.loaded_at && Number(cur.key_version ?? 0) >= KEY_VERSION
+    ? { rows: Number(cur.row_count ?? 0), components: (cur.facets?.components ?? null) as Record<string, number> | null } : null;
   await pool.query(`DELETE FROM research_bulk_rows WHERE source = $1 AND generation = $2`, [src.id, gen]);
   let n = 0;
   let batch: { words: string[]; hit: unknown }[] = [];

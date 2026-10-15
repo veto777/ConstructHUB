@@ -15,7 +15,8 @@ describe("HI DCCA", () => {
   it("keeps construction-board cases with a business respondent, never a person", () => {
     const hits = parseDisciplinaryRelease(release, "https://cca.hawaii.gov/oah/x/");
     expect(hits).toHaveLength(1);
-    expect(hits[0]).toMatchObject({ name: "Meade Electric LLC / Maui Electricians", id: "CLB 2025-50-L", date: "2026-01-23", amount: 2500, category: "discipline" });
+    // "Effective Date: 1-23-26": a two-digit year is not given a guessed century (round 2, decision 13), so no date.
+    expect(hits[0]).toMatchObject({ name: "Meade Electric LLC / Maui Electricians", id: "CLB 2025-50-L", date: null, amount: 2500, category: "discipline" });
     expect(hits[0].status).toBe("Contractors License Board: $2,500 fine");
     expect(hits[0].detail).toMatch(/^RICO alleges/);
   });
@@ -63,5 +64,20 @@ describe("HI audit fixes (2026-10-15)", () => {
     expect(hits.map((h) => h.name)).toEqual(["Meade Electric LLC / Maui Electricians"]);
     expect(hits[0].adverse).toBe(false);
     expect(parseDisciplinaryRelease(release, "u")[0].adverse).toBe(true); // "$2,500 fine"
+  });
+});
+
+describe("HI round-2 audit (2026-10-16)", () => {
+  const rows = (name: string, trade: string) => [
+    ["", "Licensee  ↑", "License: License Number  ↑", "", "Class Prefix", "Classification: Classification Name", "Classification: Description", "Trade/Professional Name", "Status", "Effective Expire Date", "Business Street", "Business City", "Business State", "Business Zip Code"],
+    ["", name, "CT-33278-0", "", "BC", "B General Building", "", trade, "C - Current, Valid & In Good Standing", "9/30/2026", "3054 Lanikaula", "HONOLULU", "Hawaii", "96822"],
+  ];
+  it("a trade name doesn't make a sole proprietor's record a business's: holder individual, no street, no address key (decision 2)", () => {
+    const [h] = parsePvlReport(rows("ZU WEN HE", "HE CONSTRUCTION"), "Hawaii Contractors License Board licenses", "contractors");
+    expect(h.hit).toMatchObject({ businessName: "HE CONSTRUCTION", holder: "individual", address: "HONOLULU Hawaii 96822" });
+    expect(h.keys).toEqual({ licenses: ["CT-33278-0"] });
+    const [b] = parsePvlReport(rows("22&W CONSTRUCTION INC", ""), "Hawaii Contractors License Board licenses", "contractors");
+    expect(b.hit).toMatchObject({ holder: "business", address: "3054 Lanikaula HONOLULU Hawaii 96822" });
+    expect(b.component).toBe("Hawaii Contractors License Board licenses");
   });
 });

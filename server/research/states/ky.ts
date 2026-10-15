@@ -86,12 +86,25 @@ export async function kyRows(name: string, search = kySearch): Promise<{ rows: K
   return { rows: Array.from(seen.values()), note: capped.length ? `some matches may be missing (${capped.join("; ")})` : null };
 }
 
+/**
+ * Who holds the license, from its type as the department lists it (round 2, decision 2): a contractor or business
+ * license is a business's (unless the type says individual); a master, journeyman, apprentice, electrician,
+ * inspector, installer or certificate of competency is the person's own; anything else isn't stated (null).
+ */
+export function kyHolder(type: string | null): "business" | "individual" | null {
+  const t = type ?? "";
+  if (/individual|master|journeyman|apprentice|electrician|inspector|installer|certificate|competency/i.test(t)) return "individual";
+  if (/contractor|business/i.test(t)) return "business";
+  return null;
+}
+
 const toHit = (r: KyRow, matchedOn: LicenseHit["matchedOn"]): LicenseHit => {
   const person = isPersonName(r.name) ? flipName(r.name) : null;
   return {
     state: "KY", source: "Kentucky Department of Housing, Buildings and Construction", sourceUrl: r.id ? `https://dhbc.ky.gov/Search/HBC_Lic_Details.aspx?id=${r.id}` : PAGE,
     businessName: r.dba ?? (person ? null : r.name), licenseNumber: r.number, licenseType: r.type, specialty: null, status: r.status,
     principal: person, city: null, expires: r.expires, matchedOn, people: person ? [{ name: person, role: "Licensee" }] : [],
+    holder: kyHolder(r.type),
   };
 };
 

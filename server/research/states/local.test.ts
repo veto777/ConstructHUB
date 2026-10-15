@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isConstruction, licenseHit, mdcPhone, phlAddress } from "./local";
+import { PHL_BUSINESS_TYPES, entityHolder, isConstruction, licenseHit, mdcPhone, phlAddress } from "./local";
 
 describe("local sources' parsers", () => {
   it("reads a Philadelphia permit contractor's address block", () => {
@@ -24,13 +24,30 @@ describe("local license rows (audit 2026-10-15)", () => {
   const base = { state: "KY", source: "Louisville Metro contractor licenses", sourceUrl: "u", licenseNumber: "1", licenseType: null, specialty: null, status: null,
     city: "LOUISVILLE", expires: null, address: "1 X ST, LOUISVILLE, KY 40202", phone: "(502) 555-0100" };
   it("an individual's row keeps the city only: no street, no phone, no address or phone key", () => {
-    const h = licenseHit({ ...base, businessName: null, principal: "A B", people: [{ name: "A B", role: "Licensee" }] });
+    const h = licenseHit({ ...base, businessName: null, holder: "individual", principal: "A B", people: [{ name: "A B", role: "Licensee" }] });
     expect(h.hit).toMatchObject({ address: null, phone: null, city: "LOUISVILLE" });
     expect(h.keys).toEqual({ licenses: ["1"] });
   });
   it("a business row keeps them", () => {
-    const h = licenseHit({ ...base, businessName: "B Builders LLC", principal: null, people: [] });
-    expect(h.hit).toMatchObject({ address: "1 X ST, LOUISVILLE, KY 40202", phone: "(502) 555-0100" });
+    const h = licenseHit({ ...base, businessName: "B Builders LLC", holder: "business", principal: null, people: [] });
+    expect(h.hit).toMatchObject({ address: "1 X ST, LOUISVILLE, KY 40202", phone: "(502) 555-0100", holder: "business" });
     expect(h.keys?.phones).toEqual(["(502) 555-0100"]);
+  });
+  // Round 2, decision 2: privacy follows the holder, not the presence of a business name.
+  it("an individual's or unknown holder's row with a trade name attached still keeps the city only", () => {
+    for (const holder of ["individual", null] as const) {
+      const h = licenseHit({ ...base, businessName: "JW ELECTRICAL CONTRACTORS INC", holder, principal: "JOHN WEITORT", people: [{ name: "JOHN WEITORT", role: "Licensee" }] });
+      expect(h.hit).toMatchObject({ address: null, phone: null, businessName: "JW ELECTRICAL CONTRACTORS INC" });
+      expect(h.keys).toEqual({ licenses: ["1"] });
+    }
+  });
+  it("holders from the publisher's own entity type and license class", () => {
+    expect(entityHolder("SOLE", /^SOLE$/i)).toBe("individual");
+    expect(entityHolder("CORP", /^SOLE$/i)).toBe("business");
+    expect(entityHolder(null, /^SOLE$/i)).toBeNull();
+    expect(entityHolder("Sole proprietorship", /sole proprietorship/i)).toBe("individual");
+    expect(PHL_BUSINESS_TYPES.test("ELECTRICAL CONTRACTOR")).toBe(true);
+    expect(PHL_BUSINESS_TYPES.test("PLUMBER JOURNEYMAN")).toBe(false);
+    expect(PHL_BUSINESS_TYPES.test("FIRE SUPPRESSION WORKER")).toBe(false);
   });
 });

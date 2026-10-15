@@ -62,3 +62,21 @@ describe("NYC DOB disciplinary actions", () => {
     expect(dob.toHit({ company: "X" }).adverse).toBeNull();
   });
 });
+
+describe("NY license holders (audit round 2, decision 2)", () => {
+  it("each dataset says who holds the license: a firm or contractor business, or a person", async () => {
+    const { pack } = await import("./ny");
+    const by = (label: RegExp) => pack.licenses!.find((l) => label.test(l.source))!;
+    expect(pack.licenses!.every((l) => typeof l.holder === "function")).toBe(true);
+    expect(by(/elevator contractor/).holder!({})).toBe("business");
+    expect(by(/mold individual/).holder!({})).toBe("individual");
+    expect(by(/home inspectors/).holder!({ hi_business_name: "ACME INSPECTIONS LLC" })).toBe("individual");
+    const dob = by(/City DOB licenses/);
+    expect(dob.holder!({ license_type: "GENERAL CONTRACTOR" })).toBe("business");
+    expect(dob.holder!({ license_type: "MASTER PLUMBER", business_name: "ACME PLUMBING INC" })).toBe("individual");
+    expect(dob.holder!({ license_type: "ELEVATOR AGENCY / INSPECTOR" })).toBeNull();
+    const hic = by(/home improvement/);
+    expect(hic.holder!({ license_type: "Premises" })).toBe("business");
+    expect(hic.holder!({ license_type: "Individual" })).toBe("individual");
+  });
+});

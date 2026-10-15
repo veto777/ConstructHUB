@@ -29,3 +29,37 @@ describe("Illinois (audit 2026-10-15)", () => {
     expect(idfprDisciplineHit(row).name).toBeNull();
   });
 });
+
+describe("Illinois round-2 audit (2026-10-16)", () => {
+  it("holders: IDFPR's own business flag; asbestos firms are businesses, professionals and workers individuals (decision 2)", async () => {
+    const { asbContractorHit, asbProfessionalHit, idfprLicenseHit, pack } = await import("./il");
+    expect(idfprLicenseHit({ business: "Y", business_name: "ACME DESIGN LTD" }, "company").holder).toBe("business");
+    expect(idfprLicenseHit({ business: "N", first_name: "JANE", last_name: "DOE" }, "person").holder).toBe("individual");
+    expect(asbContractorHit({ contractor_name: "ACME ABATEMENT INC" }, "business").holder).toBe("business");
+    expect(asbProfessionalHit({ first_name: "JANE", last_name: "DOE", company_name: "ACME ABATEMENT INC", company_address: "1 Main St" }, "principal").holder).toBe("individual");
+    expect(pack.licenses![0].holder!({})).toBe("individual");
+  });
+  it("IDFPR discipline: mixed or negated action wording is unknown; no action words keep IDFPR's disciplined flag (decision 4)", async () => {
+    const { flaggedAdverse } = await import("./il");
+    expect(flaggedAdverse(null)).toBe(true);
+    expect(flaggedAdverse("Consent order")).toBe(true);
+    expect(flaggedAdverse("Fine")).toBe(true);
+    expect(flaggedAdverse("Dismissed")).toBe(false);
+    expect(flaggedAdverse("Reprimand; fine waived")).toBeNull();
+    expect(flaggedAdverse("No fine imposed")).toBeNull();
+  });
+  it("a capped page's note survives the map and filter (decision 9)", async () => {
+    const { vi } = await import("vitest");
+    const { resetHostState } = await import("../http");
+    const { noteOf } = await import("../notes");
+    resetHostState();
+    const rows = Array.from({ length: 200 }, (_, i) => ({ contractor_name: i ? `OTHER ${i} INC` : "ACME ABATEMENT INC", contractor_id_numb: String(i) }));
+    vi.stubGlobal("fetch", vi.fn(async (u: string) => /robots\.txt$/.test(u) ? new Response("", { status: 404 }) : new Response(JSON.stringify(rows), { status: 200 })));
+    try {
+      const { pack } = await import("./il");
+      const hits = await pack.liveLicenses![1].search("Acme Abatement", "company");
+      expect(hits).toHaveLength(1);
+      expect(noteOf(hits)).toMatch(/showing the first 200/);
+    } finally { vi.unstubAllGlobals(); resetHostState(); }
+  }, 20_000);
+});

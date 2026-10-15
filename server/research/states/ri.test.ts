@@ -37,6 +37,20 @@ describe("RI audit fixes (2026-10-15)", () => {
     expect(dltViolationHit("Violations", row, { ...d, "Cease & Desist Date": null }).adverse).toBeNull();
     expect(dltViolationHit("Violations", row, { ...d, "Hearing Result": "Dismissed" }).adverse).toBe(false);
   });
+  it("round 2: a mixed or negated hearing result stays unknown, even with a cease-and-desist date (decision 4)", () => {
+    const row = { license: "7581", target: null, cells: { Company: "BERARDUCCI ELECTRIC" } };
+    const d: Record<string, string | null> = { "Violation #": "7581", Company: "BERARDUCCI ELECTRIC", "Cease & Desist Date": "01/02/2025" };
+    expect(dltViolationHit("Violations", row, { ...d, "Hearing Result": "Fine waived" }).adverse).toBeNull();
+    expect(dltViolationHit("Violations", row, { ...d, "Hearing Result": "No penalty imposed" }).adverse).toBeNull();
+    expect(dltViolationHit("Violations", row, { ...d, "Hearing Result": "Fined $500" }).adverse).toBe(true);
+  });
+  it("round 2: an electrician's license is the person's even with the employer named (decision 2)", async () => {
+    const { dltHit } = await import("./ri");
+    const row = { license: "A-1234", target: null, cells: { "First Name": "JOHN", MI: null, "Last Name": "SMITH" } };
+    const d = { Company: "ACME ELECTRIC INC", Address: "12 Elm St, Cranston, RI 02910", Telephone: "401-555-0100" };
+    expect(dltHit("Electrician", row, d, "principal")).toMatchObject({ businessName: "ACME ELECTRIC INC", holder: "individual" });
+    expect(dltHit("Alarm Company", { ...row, cells: { "Corporation Name": "ACME ALARM INC" } }, d, "business").holder).toBe("business");
+  });
 
   it("finds the expiration column by its values and never takes the effective date for it", () => {
     // The landscape-architect roster as downloaded 2026-10-15: its header names the last three columns

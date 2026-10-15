@@ -48,3 +48,23 @@ describe("g8 businessParts", () => {
     expect(businessParts("John and Mary Smith")).toEqual([]);
   });
 });
+
+describe("Oregon cap notes (audit round 2, decision 9)", () => {
+  it("workers' comp and the SOS registry keep the page's cap note through filter and map", async () => {
+    const { vi, afterEach: _a } = await import("vitest");
+    const { searchSos, searchWorkersComp } = await import("./or");
+    const { noteOf } = await import("../notes");
+    const { resetHostState } = await import("../http");
+    resetHostState();
+    const rows = Array.from({ length: 200 }, (_, i) => ({ legal_business_name: `ACME ROOFING ${i} LLC`, business_name: `ACME ROOFING ${i} LLC`, insurer_status: "1", entity_code: "2" }));
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) =>
+      String(u).endsWith("/robots.txt") ? new Response("", { status: 404 }) : new Response(JSON.stringify(rows), { status: 200, headers: { "content-type": "application/json" } }));
+    try {
+      const wc = await searchWorkersComp("Acme Roofing");
+      expect(wc.length).toBe(200);
+      expect(noteOf(wc)).toMatch(/showing the first 200/);
+      const sos = await searchSos("Acme Roofing");
+      expect(noteOf(sos)).toMatch(/showing the first 200/);
+    } finally { spy.mockRestore(); }
+  });
+});

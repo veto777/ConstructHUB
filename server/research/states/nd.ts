@@ -12,7 +12,7 @@
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { clean, usDate } from "../bulk";
-import { politeFetch } from "../http";
+import { politeFetch, rethrowIfBlocked } from "../http";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
 import type { IdQuery } from "../identifiers";
 import { capNote, noteOf, withNote } from "../notes";
@@ -50,7 +50,8 @@ const detailMap = (d: FsDetail): Record<string, string> =>
 
 /** The filing's detail drawer; null when it could not be read (the caller counts and notes it). */
 async function fsDetail(kind: "contractor" | "business", id: number): Promise<Record<string, string> | null> {
-  try { return detailMap(await fsJson<FsDetail>(`/api/FilingDetail/${kind}/${id}/false`)); } catch { return null; }
+  // An access denial stops the search (the host is blocked); any other failure is counted and noted (round 2, decision 6).
+  try { return detailMap(await fsJson<FsDetail>(`/api/FilingDetail/${kind}/${id}/false`)); } catch (err) { rethrowIfBlocked(err); return null; }
 }
 
 /** The notes for a list whose details were read for the first `cap` rows only. */
@@ -79,7 +80,19 @@ export function ndContractorHit(r: FsRow, d: Record<string, string>, matchedOn: 
     status: [clean(r.STATUS), clean(r.STANDING), ...standing].filter(Boolean).join("; ") || null, principal: person,
     city: clean(d["Mailing Address"]?.match(/(?:^|,)\s*([^,]+),\s*[A-Z]{2}\s+\d{5}/)?.[1]), expires: usDate(d["Renewal Date"]),
     matchedOn, address: clean(d["Mailing Address"]), phone: clean(d["Business Phone"]), people: person ? [{ name: person, role: dba ? "Doing business as the name above" : "Licensee" }] : [],
+    holder: ndContractorHolder(whole),
   };
+}
+
+/**
+ * Who holds an ND contractor license (round 2, decision 2). The register publishes no entity type, only the name it
+ * was issued under: "<person> DBA <trade name>" is a person's own license; a name that reads as a business is the
+ * business's; a bare personal name ("BOB JOHNSON") is left unknown, so its contacts are kept private.
+ */
+export function ndContractorHolder(title: string | null): "business" | "individual" | null {
+  if (!title) return null;
+  if (/\s(?:DBA|D\/B\/A)\s/i.test(title)) return "individual";
+  return looksLikeBusiness(title) ? "business" : null;
 }
 
 /** Detail drawers opened per search: politeness caps, noted when hit. */
@@ -105,6 +118,8 @@ const hasAllWords = (name: string, title: string | null | undefined) => { const 
 const ND_CONTRACTORS: LiveLicenseSearch = {
   source: "North Dakota Secretary of State contractor licenses", sourceUrl: fsPage("contractor"),
   search: async (name, kind) => kind === "person" ? [] : ndContractors(name.trim(), "business", (r) => hasAllWords(name, r.TITLE?.[0])),
+  // The register searches business names only (round 2, decision 8: a person is "not searched", never "0 found").
+  kinds: ["company"],
 };
 
 const ND_SOS_STATUS: LiveEnforcementSearch = {
@@ -160,6 +175,7 @@ const contractorHit = (c: string[], matchedOn: LicenseHit["matchedOn"]): License
   businessName: clean(c[1]), licenseNumber: null, licenseType: "Electrical contractor", specialty: null,
   status: "Listed by the board's licensed-contractor search", principal: clean(c[0]), city: clean(c[2]), expires: null, matchedOn,
   people: c[0] ? [{ name: c[0], role: "Master electrician" }] : [],
+  holder: "business", // the board's licensed electrical contractors: a business with its master electrician
 });
 
 const electricianHit = (c: string[], matchedOn: LicenseHit["matchedOn"]): LicenseHit => {
@@ -168,6 +184,7 @@ const electricianHit = (c: string[], matchedOn: LicenseHit["matchedOn"]): Licens
     state: "ND", source: "North Dakota State Electrical Board electricians", sourceUrl: SEB_ELECTRICIAN,
     businessName: null, licenseNumber: clean(c[1]), licenseType: clean(type), specialty: null, status: clean(status) ?? null,
     principal: clean(c[0]), city: null, expires: usDate(c[3]), matchedOn, people: c[0] ? [{ name: c[0], role: clean(type) }] : [],
+    holder: "individual", // an electrician's own license
   };
 };
 
@@ -233,6 +250,7 @@ async function plbHits(filter: string, matchedOn: LicenseHit["matchedOn"]): Prom
     specialty: clean(r.licenseLevel?.title ?? r.licenseLevel?.name), status: valid.has(r.id) ? "Valid" : "Not valid (not in the board's current-license list)",
     principal: clean(r.licenseHolderName), city: null, expires: isoDay(r.validUntil), matchedOn,
     people: r.licenseHolderName ? [{ name: r.licenseHolderName, role: clean(r.licenseType?.name) }] : [],
+    holder: "individual", // the board licenses individuals
   } as LicenseHit)), noteOf(all));
 }
 
@@ -243,9 +261,12 @@ const ND_PLUMBING: LiveLicenseSearch = {
     // The filter matches the whole name as typed ("Alex Johnson").
     return name.trim().length < 3 ? [] : plbHits(name.trim(), "principal");
   },
-  searchBy: async (q) => q.type === "license" && q.value.trim().length >= 3
-    ? (await plbHits(q.value.trim(), "license")).filter((h) => (h.licenseNumber ?? "").toUpperCase() === q.value.trim().toUpperCase())
-    : null,
+  searchBy: async (q) => {
+    if (q.type !== "license" || q.value.trim().length < 3) return null;
+    const hits = await plbHits(q.value.trim(), "license");
+    return withNote(hits.filter((h) => (h.licenseNumber ?? "").toUpperCase() === q.value.trim().toUpperCase()), noteOf(hits));
+  },
+  kinds: ["person"],
 };
 
 export const pack: StatePack = {

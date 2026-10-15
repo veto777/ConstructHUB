@@ -30,38 +30,42 @@ import { fromFile, hasAllWords } from "./lib/g3-common";
 const DPOR_PAGE = "https://www.dpor.virginia.gov/RegulantLists";
 const DPOR_FILES = "https://www.dpor.virginia.gov/sites/default/files/Records%20and%20Documents/Regulant%20List";
 
-/** File stem → the list's name on the regulant-list page. */
-type DporList = { file: string; type: string };
+/**
+ * File stem → the list's name on the regulant-list page. `holder`: who the list licenses, from its class (round 2,
+ * decision 2): contractor, firm and entity lists license businesses; tradesman, mechanic, inspector and professional
+ * lists license people (a business name on their row is where they work).
+ */
+type DporList = { file: string; type: string; holder: "business" | "individual" };
 const CONTRACTOR_LISTS: DporList[] = [
-  { file: "2701", type: "Class A Contractor" },
-  { file: "2705a", type: "Class A Contractor" },
-  { file: "2705b", type: "Class B Contractor" },
-  { file: "2705c", type: "Class C Contractor" },
-  { file: "2703", type: "Temporary Contractor" },
-  { file: "2707", type: "Residential Building Energy Analyst Firm" },
-  { file: "2722", type: "Residential Building Energy Analyst" },
-  { file: "2709", type: "Residential Tradesman" },
-  { file: "2710", type: "Tradesman" },
-  { file: "2717", type: "Backflow Prevention Device Worker" },
-  { file: "2718", type: "Certified Elevator Mechanic" },
-  { file: "2719", type: "Certified Water Well Systems Provider" },
-  { file: "2720", type: "Certified Accessibility Mechanic" },
-  { file: "2721", type: "Emergency Elevator Mechanic (declared state of emergency)" },
-  { file: "2723", type: "Certified Automatic Fire Sprinkler Inspector" },
+  { file: "2701", type: "Class A Contractor", holder: "business" },
+  { file: "2705a", type: "Class A Contractor", holder: "business" },
+  { file: "2705b", type: "Class B Contractor", holder: "business" },
+  { file: "2705c", type: "Class C Contractor", holder: "business" },
+  { file: "2703", type: "Temporary Contractor", holder: "business" },
+  { file: "2707", type: "Residential Building Energy Analyst Firm", holder: "business" },
+  { file: "2722", type: "Residential Building Energy Analyst", holder: "individual" },
+  { file: "2709", type: "Residential Tradesman", holder: "individual" },
+  { file: "2710", type: "Tradesman", holder: "individual" },
+  { file: "2717", type: "Backflow Prevention Device Worker", holder: "individual" },
+  { file: "2718", type: "Certified Elevator Mechanic", holder: "individual" },
+  { file: "2719", type: "Certified Water Well Systems Provider", holder: "individual" },
+  { file: "2720", type: "Certified Accessibility Mechanic", holder: "individual" },
+  { file: "2721", type: "Emergency Elevator Mechanic (declared state of emergency)", holder: "individual" },
+  { file: "2723", type: "Certified Automatic Fire Sprinkler Inspector", holder: "individual" },
 ];
 const APELSCIDLA_LISTS: DporList[] = [
-  { file: "0401", type: "Architect" },
-  { file: "0402", type: "Professional Engineer" },
-  { file: "0403", type: "Land Surveyor" },
-  { file: "0406", type: "Landscape Architect" },
-  { file: "0405", type: "Professional Corporation (architects, engineers, surveyors, landscape architects)" },
-  { file: "0407", type: "Business Entity (architects, engineers, surveyors, landscape architects)" },
-  { file: "0413", type: "Professional LLC (architects, engineers, surveyors, landscape architects)" },
+  { file: "0401", type: "Architect", holder: "individual" },
+  { file: "0402", type: "Professional Engineer", holder: "individual" },
+  { file: "0403", type: "Land Surveyor", holder: "individual" },
+  { file: "0406", type: "Landscape Architect", holder: "individual" },
+  { file: "0405", type: "Professional Corporation (architects, engineers, surveyors, landscape architects)", holder: "business" },
+  { file: "0407", type: "Business Entity (architects, engineers, surveyors, landscape architects)", holder: "business" },
+  { file: "0413", type: "Professional LLC (architects, engineers, surveyors, landscape architects)", holder: "business" },
 ];
 const ALHI_LISTS: DporList[] = [
-  { file: "3306", type: "Asbestos Contractor" },
-  { file: "3358", type: "Lead Abatement Contractor" },
-  { file: "3380", type: "Home Inspector" },
+  { file: "3306", type: "Asbestos Contractor", holder: "business" },
+  { file: "3358", type: "Lead Abatement Contractor", holder: "business" },
+  { file: "3380", type: "Home Inspector", holder: "individual" },
 ];
 
 /** 18 VAC 50-22-20 and -30, as printed in DPOR's "Contractor's License Classifications & Specialties". */
@@ -111,6 +115,8 @@ export function vaRegulantHit(r: Record<string, string>, list: DporList, source:
     // The lists hold current licenses only (DPOR names the files "__crnt"); DPOR publishes no status column.
     status: "Current (on DPOR's regulant list)", principal: who, city: [clean(r.CITY), clean(r.STATE)].filter(Boolean).join(", ") || null,
     expires: usDate(r["EXPIRATION DATE"]), matchedOn: business ? "business" : "principal",
+    // A contractor-class row naming only an individual (no business name) doesn't say whether it is a sole proprietor's.
+    holder: list.holder === "business" && !business ? null : list.holder,
     // DPOR leaves phone numbers out of the lists. The file doesn't say what the individual on a firm's row is.
     address, phone: null, people: who ? [{ name: who, role: business ? null : "Licensee" }] : [],
   };
@@ -138,7 +144,8 @@ function dporLoader(lists: DporList[], source: string): () => AsyncIterable<Bulk
         rows++;
         if ((r.BOARD ?? "") === "BOARD") continue; // a repeated header row
         const h = vaRegulantHit(r, list, source);
-        if (h) yield h;
+        // Each list file is a component: the 70% rule applies to it on its own (round 2, decision 10).
+        if (h) yield { ...h, component: `${list.file} ${list.type}` };
       }
       if (!rows) throw new Error(`DPOR list ${list.file} (${list.type}) had no rows; kept the previous load`);
     }

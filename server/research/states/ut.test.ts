@@ -41,5 +41,19 @@ describe("Utah DOPL", () => {
     expect(caseAdverse([])).toBeNull();
     expect(citationAdverse("Fine Assessed - Paid")).toBe(true);
     expect(citationAdverse("Collections")).toBe(true);
+    // Round 2, decision 4: only DOPL's own status decides; none, or one that says neither way, is unknown.
+    expect(citationAdverse(null)).toBeNull();
+    expect(citationAdverse("Pending")).toBeNull();
+    expect(citationAdverse("Dismissed")).toBe(false);
+    expect(citationAdverse("Fine Assessed - Dismissed")).toBeNull();
+  });
+});
+
+describe("Utah CBR holders (audit round 2, decision 2)", () => {
+  it("an electrician's registration is the person's, a contractor's the business's", async () => {
+    const { cbrHit } = await import("./ut");
+    const d = parseCbrDetails(CBR_DETAILS);
+    expect(cbrHit("Acme Roofing LLC", null, "Ogden UT", d, "company").holder).toBe("business");
+    expect(cbrHit("Jane Doe", "Doe Electric", "Ogden UT", { ...d, profession: "Electrician", type: "Journeyman Electrician" }, "person").holder).toBe("individual");
   });
 });

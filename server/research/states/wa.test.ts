@@ -61,3 +61,19 @@ describe("WA L&I Verify", () => {
     expect(t).toMatchObject({ principal: "JOSEPH S BEARD", businessName: null, address: null });
   });
 });
+
+describe("WA L&I Verify (audit round 2)", () => {
+  it("reads L&I's own 'Not Satisfied' as a penalty owed, not as a negation; mixed wording is unknown (decision 4)", () => {
+    const one = (StatusDescription: string) =>
+      verifyEnforcement({ Contractor: { ...details.Contractor, Violations: [{ ...details.Contractor.Violations[0], StatusDescription }], Summons: [], Warrants: [], Lapses: [] } }, "ABSOLUTE ROOFING", "u")[0].adverse;
+    expect(one("Not Satisfied")).toBe(true);
+    expect(one("Satisfied")).toBe(true);
+    expect(one("Dismissed")).toBe(false);
+    expect(one("Paid; vacated on appeal")).toBeNull();
+  });
+  it("a certificate is the tradesperson's, a UBI registration the business's; the certificate lookup searches people only (decisions 2, 8)", () => {
+    expect(verifyLicenseHit(details, null, "license").holder).toBe("business");
+    expect(verifyLicenseHit({ Contractor: { LicenseNumber: "BEARDJS867P8", UbiNumber: "", BusinessName: "BEARD, JOSEPH S" } }, null, "principal").holder).toBe("individual");
+    expect(pack.liveLicenses![0].kinds).toEqual(["person"]);
+  });
+});

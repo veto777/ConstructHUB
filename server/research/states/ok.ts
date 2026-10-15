@@ -17,6 +17,7 @@
 import type { LicenseHit } from "@shared/research-reports";
 import { inflateSync } from "node:zlib";
 import { politeFetch } from "../http";
+import { entityHolder } from "../licenses";
 import { clean, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { jsLayoutText, pdfText, textLines } from "./lib/a3-pdf";
 import type { StatePack } from "./types";
@@ -42,6 +43,9 @@ export function roofingHit(r: Reg): BulkHit | null {
     licenseType: s(r.tradeName), specialty: r.commercialEndorsement === true ? "Commercial endorsement" : null,
     status: s(r.statusName), principal: person, city: [s(r.company_city), s(r.company_state)].filter(Boolean).join(", ") || null,
     expires: s(r.renewalDate)?.slice(0, 10) ?? null, matchedOn: company ? "business" : "principal",
+    // company_type, checked 2026-10-16: Corporation, LLC, Partnership, Sole Proprietorship or blank (round 2,
+    // decisions 2 and 3: the publisher's entity type, not the presence of a company name).
+    holder: entityHolder(r.company_type, /^sole proprietorship$/i),
     address, phone: s(r.company_telephone), people: person ? [{ name: person, role: null }] : [],
   };
   return { kind: "license", hit, business: [company, dba].filter(Boolean).join(" ") || null, person, keys: { licenses: [number], phones: [hit.phone], addresses: [address] } };
@@ -221,7 +225,10 @@ function repairCuts(rows: OdolRow[], cut: { row: OdolRow; raw: string; nameTail:
   }
 }
 
-/** "FS-M; LS-T" → "Fire Sprinkler (Manager); Locksmith (Technician)", with the legend printed in the same PDF. */
+/**
+ * "FS-M; LS-T" → "Fire Sprinkler (Manager); Locksmith (Technician)", with the legend printed in the same PDF. A code
+ * the legend doesn't print is shown as "code X" (round 2, decision 13), never left bare as if it were a name.
+ */
 export function expandEndorsements(codes: string | null, legend: Map<string, string>): string | null {
   if (!codes) return null;
   return codes.split(/;\s*/).map((raw) => {
@@ -229,10 +236,10 @@ export function expandEndorsements(codes: string | null, legend: Map<string, str
     const whole = legend.get(c) ?? legend.get(c.replace(/-/g, " "));
     if (whole) return whole; // "90 Day TRAINEE", "CCTV-RSA" (the legend's "CCTV RSA")
     const dash = c.indexOf("-");
-    if (dash < 0) return c;
+    if (dash < 0) return `code ${c}`;
     const type = legend.get(c.slice(0, dash)), suf = c.slice(dash + 1);
     const sufName = legend.get(`-${suf}`) ?? legend.get(suf);
-    return type ? `${type} (${sufName ?? suf})` : c; // a code the legend doesn't print stays as printed
+    return type ? `${type} (${sufName ?? `code ${suf}`})` : `code ${c}`;
   }).join("; ");
 }
 
@@ -257,6 +264,7 @@ function odolLoader(kind: OdolKind): () => AsyncIterable<BulkHit> {
         licenseType: company ? "Alarm, locksmith or fire sprinkler company license" : "Alarm, locksmith or fire sprinkler individual license",
         specialty: company ? r.served : expandEndorsements(r.served, legend), status: "Active (on the Department of Labor's list of active licenses)",
         principal: person, city: null, expires: r.expires, matchedOn: company ? "business" : "principal",
+        holder: company ? "business" : "individual",
         address: null, phone: null, people: person ? [{ name: person, role: null }] : [],
       };
       yield { kind: "license", hit, business: company ? r.name : null, person, keys: { licenses: [r.license] } };

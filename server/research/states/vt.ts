@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { LicenseHit } from "@shared/research-reports";
 import { CHROMIUM_ARGS, USER_AGENT } from "../../scrapers/polite-fetch";
+import { guard, hostBlocked, noteResponse, robotsAllowed } from "../http";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { xlsxRecords } from "./lib/g2-xlsx";
 import type { StatePack } from "./types";
@@ -36,8 +37,11 @@ const ROSTERS: { profession: string; type: string; business?: boolean }[] = [
 const STATUSES = ["Active", "Inactive per Request", "Expired", "Disciplined"];
 
 /** Download one roster through the guest page; returns the saved .xlsx path (the caller deletes it). */
-async function fetchRoster(page: any, r: { profession: string; type: string }): Promise<string> {
+async function fetchRoster(page: any, r: { profession: string; type: string }, check: () => void): Promise<string> {
+  // The navigation itself passes the same guard as every other request (round 2, decision 6).
+  await guard(OPR_LOOKUP, 2000);
   await page.goto(OPR_LOOKUP, { waitUntil: "networkidle", timeout: 120_000 });
+  check();
   await page.click("button:has-text('PROFESSION ROSTER DOWNLOAD')");
   await page.waitForTimeout(3000);
   const professions = await page.$$("select[name='$PpyDisplayHarness$pProductIds']");
@@ -50,9 +54,30 @@ async function fetchRoster(page: any, r: { profession: string; type: string }): 
   await page.waitForTimeout(3000);
   for (const s of STATUSES) { await page.getByLabel(s, { exact: true }).check(); await page.waitForTimeout(1500); }
   const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 180_000 }), page.click("button[name^='NGLPRosterDownload']")]);
+  check();
   const path = join(tmpdir(), `ch-vt-opr-${Date.now()}-${Math.random().toString(36).slice(2)}.xlsx`);
   await dl.saveAs(path);
   return path;
+}
+
+/**
+ * Puts a browser page behind the research HTTP guard (round 2, decision 6): every request the page makes is aborted
+ * when its host has denied access or robots.txt doesn't allow it, and every response tells the shared host state
+ * (a 401/403 blocks the host; a Retry-After sets its cooldown). The returned check throws the first access denial
+ * seen, so the load stops instead of moving on.
+ */
+export async function guardPage(page: any): Promise<() => void> {
+  let denied: unknown = null;
+  await page.route("**/*", async (route: any) => {
+    const url: string = route.request().url();
+    if (!/^https?:/i.test(url)) return route.continue();
+    if (hostBlocked(url) || !(await robotsAllowed(url))) return route.abort("blockedbyclient");
+    return route.continue();
+  });
+  page.on("response", (res: any) => {
+    try { noteResponse(res.url(), res.status(), res.headers()["retry-after"]); } catch (err) { denied ??= err; }
+  });
+  return () => { if (denied) throw denied; };
 }
 
 /**
@@ -69,14 +94,21 @@ export function vtRosterHit(x: Record<string, string>, r: { type: string; busine
   const street = [x["AddressLine 1"] ?? x.Address1, x["AddressLine 2"] ?? x.Address2].map((v) => clean(v)).filter(Boolean);
   const address = clean((business ? [...street, ...locality] : locality).join(", "));
   const supervisor = clean(x.Supervisor);
+  // "Disciplined" is OPR's roster status for a disciplined licensee: disciplinary information, not a license status
+  // (round 2, decision 1). It moves to `discipline` (dropped for an individual; a business's becomes an enforcement record).
+  const status = clean(x.Status);
+  const disciplined = !!status && /disciplin/i.test(status);
   const hit: LicenseHit = {
     state: "VT", source: "Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
     sourceUrl: OPR_PAGE, businessName: business, licenseNumber: no, licenseType: r.type, specialty: clean(x.Specialty),
-    status: clean(x.Status), principal: who, city: clean(x.City), expires: usDate(x["License Expiration"]),
+    status: disciplined ? null : status, principal: who, city: clean(x.City), expires: usDate(x["License Expiration"]),
     matchedOn: business ? "business" : "principal", address,
+    // The roster type says who holds the license: "Residential Contractor - Business" a business, every other roster a person.
+    holder: r.business ? "business" : "individual",
+    ...(disciplined ? { discipline: `OPR roster status: ${status}` } : {}),
     people: [...(who ? [{ name: who, role: null }] : []), ...(supervisor ? [{ name: supervisor, role: "Supervisor" }] : [])],
   };
-  return { kind: "license", hit, business, person: who, people: supervisor ? [supervisor] : undefined, keys: business ? { licenses: [no], addresses: [address] } : { licenses: [no] } };
+  return { kind: "license", hit, business, person: who, people: supervisor ? [supervisor] : undefined, keys: business ? { licenses: [no], addresses: [address] } : { licenses: [no] }, component: r.type };
 }
 
 async function* vtOprLoader(): AsyncIterable<BulkHit> {
@@ -85,8 +117,9 @@ async function* vtOprLoader(): AsyncIterable<BulkHit> {
   try {
     const context = await browser.newContext({ userAgent: USER_AGENT, acceptDownloads: true });
     const page = await context.newPage();
+    const check = await guardPage(page);
     for (const r of ROSTERS) {
-      const path = await fetchRoster(page, r);
+      const path = await fetchRoster(page, r, check);
       try {
         for (const x of await xlsxRecords(path)) {
           const h = vtRosterHit(x, r);

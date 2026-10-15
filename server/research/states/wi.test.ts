@@ -24,3 +24,13 @@ describe("WI audit fixes (2026-10-15)", () => {
     expect(isPersonName("MARSHALL WELL DRILLING CORP")).toBe(false);
   });
 });
+
+describe("WI holders (audit round 2, decision 2)", () => {
+  it("a person is the holder; a legal entity's name is a business; a trade-sounding name alone is unknown", () => {
+    const [p, b] = dnrRows(ROWS, "Well drilling (DNR directory)");
+    expect(p.hit.holder).toBe("individual");
+    expect(b.hit.holder).toBe("business");
+    const rows = [...ROWS.slice(0, 2), ["-", "7000", "QUINNELL'S SEPTIC & WELL SERVICE", "(608)555-0101", "-", "1 MAIN ST", "-", "MADISON", "WI", "53703", "x"]];
+    expect(dnrRows(rows, "Well drilling (DNR directory)")[0].hit.holder).toBeNull();
+  });
+});

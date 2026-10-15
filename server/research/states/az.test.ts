@@ -52,3 +52,34 @@ describe("Arizona ROC", () => {
     expect(rocComplaintHit({ Name: "2025-2", Status__c: "Open", Complaint_Type__c: "Pending" }, "X LLC", null, "id").adverse).toBeNull();
   });
 });
+
+describe("Arizona round-2 audit (2026-10-16)", () => {
+  it("a ROC license is the account's (a business), with its people listed apart (decision 2)", () => {
+    expect(rocLicenseHits(ROWS, "Sun Valley Remodeling", "company").every((h) => h.holder === "business")).toBe(true);
+  });
+  it("a disciplined case: the outcome's clean answer; mixed or negated wording is unknown (decision 4)", async () => {
+    const { disciplinedAdverse } = await import("./az");
+    expect(disciplinedAdverse(null)).toBe(true);
+    expect(disciplinedAdverse("Corrective work completed")).toBe(true);
+    expect(disciplinedAdverse("License revoked")).toBe(true);
+    expect(disciplinedAdverse("Dismissed")).toBe(false);
+    expect(disciplinedAdverse("License revoked; hearing waived")).toBeNull();
+    expect(disciplinedAdverse("License not revoked")).toBeNull();
+  });
+  it("an access denial on a license page stops the search instead of moving on (decision 6)", async () => {
+    const { vi } = await import("vitest");
+    const { PortalBlockedError, resetHostState } = await import("../http");
+    resetHostState();
+    const page = `<script>var x = ${encodeURIComponent('"fwuid":"FW1","APPLICATION@markup://siteforce:communityApp":"APP1"')};</script>`;
+    const ok = (v: unknown) => new Response(JSON.stringify({ actions: [{ state: "SUCCESS", returnValue: v }] }), { status: 200 });
+    vi.stubGlobal("fetch", vi.fn(async (u: string, init?: RequestInit) => {
+      if (/robots\.txt$/.test(u)) return new Response("", { status: 404 });
+      if (!init?.body) return new Response(page, { status: 200 });
+      return /getLicenseDetail/.test(String(init.body)) ? new Response("denied", { status: 403 }) : ok(ROWS);
+    }));
+    try {
+      const { pack } = await import("./az");
+      await expect(pack.liveLicenses![0].search("Sun Valley Remodeling", "company")).rejects.toBeInstanceOf(PortalBlockedError);
+    } finally { vi.unstubAllGlobals(); resetHostState(); }
+  }, 20_000);
+});

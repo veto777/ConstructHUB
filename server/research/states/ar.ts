@@ -91,8 +91,11 @@ export function electricalHit(r: Row): BulkHit | null {
     licenseNumber: number, licenseType: s(r.License_Type_Display_Name), specialty: null,
     status: s(r.License_Status), principal: person, city: null, expires: day(r.License_Expiration_Date), matchedOn: "principal",
     people: [{ name: person, role: "Licensee" }],
+    // A named roster row is a person's own license (business rows carry no name and are skipped above).
+    holder: "individual",
   };
-  return { kind: "license", hit, business: null, person, keys: { licenses: [number] } };
+  // Each license type is a component: one type falling far short of its last count keeps the old load (decision 10).
+  return { kind: "license", hit, business: null, person, keys: { licenses: [number] }, component: hit.licenseType ?? "no type" };
 }
 
 export function hvacHit(r: Row): BulkHit | null {
@@ -104,6 +107,7 @@ export function hvacHit(r: Row): BulkHit | null {
     licenseNumber: number, licenseType: null, specialty: null, status: s(r.License_Status), principal: person,
     city: [s(r.physicalCity), s(r.physicalState)].filter(Boolean).join(", ") || null, expires: day(r.License_Expiration_Date), matchedOn: "principal",
     people: [{ name: person, role: "Licensee" }],
+    holder: "individual",
   };
   return { kind: "license", hit, business: null, person, keys: { licenses: [number] } };
 }
@@ -227,6 +231,8 @@ export function parseFireRoster(text: string, roster: FireRoster): LicenseHit[] 
           state: "AR", source: FIRE_LABEL[roster], sourceUrl: FIRE_PAGE, businessName: company, licenseNumber: number,
           licenseType: roster === "sprinkler" ? "Sprinkler company license" : "Portable and fixed fire-extinguishing systems company license",
           specialty, status, principal: null, city: null, expires: null, matchedOn: "business", phone, people: [],
+          // A company license (the rosters list licensed companies and their branch offices).
+          holder: "business",
         },
       };
       continue;
@@ -283,6 +289,7 @@ function fireLoader(roster: FireRoster): () => AsyncIterable<BulkHit> {
       yield {
         kind: "license", hit, business: hit.businessName, person: null, people: (hit.people ?? []).map((p) => p.name),
         keys: { licenses: [hit.licenseNumber], phones: [hit.phone], addresses: [hit.address] },
+        component: /^branch office/i.test(hit.specialty ?? "") ? "branch offices" : "companies",
       };
     }
   };

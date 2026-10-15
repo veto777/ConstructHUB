@@ -19,7 +19,8 @@ import { tokens } from "../licenses";
 import { clean } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { auraApex, type AuraSite } from "./lib/g7-aura";
-import { adverseFrom } from "../adverse";
+import { ADVERSE, NOT_ADVERSE, adverseFrom } from "../adverse";
+import { rethrowIfBlocked } from "../http";
 import { capNote, withNote } from "../notes";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
 
@@ -99,6 +100,8 @@ export function rocLicenseHits(rows: RocAccount[], name: string, kind: "person" 
         city: clean(a.address), expires: null, matchedOn: kind === "company" ? "business" : kind === "license" ? "license" : "principal",
         phone: clean(a.phone),
         people: Array.from(named, ([n, r]) => ({ name: n, role: Array.from(new Set(r)).join("; ") || null })),
+        // A ROC license is a contractor's license held by the account (the business); its people are listed apart.
+        holder: "business",
       });
     }
   }
@@ -109,7 +112,8 @@ async function withDetails(hits: (LicenseHit & { licenseId: string })[]): Promis
   // The license page adds the class description and the renewed-through date.
   let failed = 0;
   for (const h of hits.slice(0, MAX_DETAILS)) {
-    const d = await auraApex<RocDetail | null>(ROC, "apex://ARCP_ContractorSearch/ACTION$getLicenseDetail", { licenseId: h.licenseId }).catch(() => null);
+    // One license page that fails is noted; an access denial stops the search (round 2, decision 6).
+    const d = await auraApex<RocDetail | null>(ROC, "apex://ARCP_ContractorSearch/ACTION$getLicenseDetail", { licenseId: h.licenseId }).catch((err) => { rethrowIfBlocked(err); return null; });
     if (!d) { failed++; continue; }
     h.licenseType = clean(d.licenseDescription) ?? h.licenseType;
     h.expires = /^\d{4}-\d{2}-\d{2}$/.test(d.renewalThr ?? "") ? d.renewalThr! : null;
@@ -133,6 +137,13 @@ async function searchRocBy(q: IdQuery): Promise<LicenseHit[] | null> {
   return withDetails(rocLicenseHits(rows, "", "license").filter((h) => normLicense(h.licenseNumber)?.replace(/^ROC/, "") === want));
 }
 
+/** A case the ROC types "Disciplined": the outcome's clean answer; null when mixed or negated; true with no outcome words. */
+export function disciplinedAdverse(outcome: string | null): boolean | null {
+  const a = adverseFrom(outcome);
+  if (a !== null || !outcome) return a ?? true;
+  return ADVERSE.test(outcome) || NOT_ADVERSE.test(outcome) ? null : true;
+}
+
 /** One complaint as the ROC lists it on a license (the complainant is left out). */
 export function rocComplaintHit(c: RocComplaint, fallbackName: string | null, licenseNo: string | null, licenseId: string): EnforcementHit {
   const type = clean(c.Complaint_Type__c);
@@ -148,8 +159,9 @@ export function rocComplaintHit(c: RocComplaint, fallbackName: string | null, li
     detail: [licenseNo ?? clean(c.License_Number_Respondent__r?.Name) ? `License ${licenseNo ?? clean(c.License_Number_Respondent__r?.Name)}` : null,
       clean(c.Allegations__c) ? `Allegations: ${clean(c.Allegations__c!.replace(/;/g, "; "))}` : null,
       outcome ? `Outcome: ${outcome}` : null].filter(Boolean).join(". ") || null,
-    // The ROC's own case type and outcome: a disciplined case is adverse unless its outcome says otherwise.
-    amount: null, adverse: type === "Disciplined" ? adverseFrom(outcome) !== false : adverseFrom(outcome),
+    // The ROC's own case type and outcome: a disciplined case is adverse unless its outcome says otherwise; an outcome
+    // with mixed or negated wording is unknown (round 2, decision 4).
+    amount: null, adverse: type === "Disciplined" ? disciplinedAdverse(outcome) : adverseFrom(outcome),
     licenseNumber: licenseNo ?? clean(c.License_Number_Respondent__r?.Name),
   };
 }

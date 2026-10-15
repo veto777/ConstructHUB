@@ -79,3 +79,26 @@ describe("West Virginia sources", () => {
     });
   });
 });
+
+describe("West Virginia (audit round 2)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("the person-only lookups say so, and their licenses are individuals' (decisions 2, 8)", () => {
+    for (const s of pack.liveLicenses!) expect(s.kinds).toEqual(["person"]);
+    expect(sfmHits(SFM_ROWS as any, "principal").every((h) => h.holder === "individual")).toBe(true);
+  });
+  it("an EVS access denial stops the load at once, as a PortalBlockedError, with no retry (decision 6)", async () => {
+    const { PortalBlockedError, resetHostState } = await import("../http");
+    resetHostState();
+    let pages = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (String(url).endsWith("/robots.txt")) return new Response("", { status: 404 });
+      pages++;
+      return new Response("denied", { status: 403 });
+    }));
+    const evs = pack.bulk!.find((b) => b.id === "wv-oic-evs")!;
+    const it = evs.load()[Symbol.asyncIterator]();
+    await expect(it.next()).rejects.toBeInstanceOf(PortalBlockedError);
+    expect(pages).toBe(1);
+    resetHostState();
+  });
+});

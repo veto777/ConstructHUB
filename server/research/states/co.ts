@@ -35,6 +35,8 @@ const licenses: LicenseSource[] = [
     ...soda("data.colorado.gov", "7s5z-vewr"),
     fields: { businessName: "entityname", licenseNumber: "licensenumber", licenseType: "licensetype", specialty: "subcategory", status: "licensestatusdescription", principal: null, city: "city", expires: "licenseexpirationdate" },
     personField: ["firstname", "middlename", "lastname"],
+    // Every type listed is a person's own credential (architect, engineer, surveyor, radon professional, work permit).
+    holder: () => "individual",
     filter: `licensetype in (${DORA_TYPES.map((t) => `'${t}'`).join(",")})`,
   },
 ];

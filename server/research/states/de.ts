@@ -21,20 +21,31 @@ const LICENSES: LicenseSource[] = [
   { state: "DE", source: "Delaware Division of Revenue contractor business licenses", ...soda("5zy2-grhr"),
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "category", specialty: "trade_name", status: null, principal: null, city: "city", expires: "current_license_valid_to" },
     personField: null, address: "address_1", zip: "zip",
+    // A Division of Revenue business license: the business holds it.
+    holder: () => "business",
     filter: "category in ('RESIDENT CONTRACTOR','NON-RESIDENT CONTRACTOR','CONSTRUCTION MANAGER','CONSTRUCTION TRANSPORTATION CONTRACTOR','NON-RESIDENT CONST TRANSPORT CONTRACTOR')" },
   { state: "DE", source: "Delaware Division of Professional Regulation (architects, surveyors, geologists, home inspectors)", ...soda("pjnv-eaih"),
     fields: { businessName: null, licenseNumber: "license_no", licenseType: "license_type", specialty: "profession_id", status: "license_status", principal: null, city: "city", expires: "expiration_date" },
     personField: ["first_name", "last_name"],
+    // A person's own professional license.
+    holder: () => "individual",
     filter: "profession_id in ('Architecture','Landscape Architecture','Land Surveyors','Geologists','Home Inspectors')" },
   { state: "DE", source: "Delaware DNREC water well and pump installer contractors", ...soda("2dnk-irgr"),
     fields: { businessName: "orgname", licenseNumber: "licensenumber", licenseType: "licensesubtype", specialty: null, status: "licstatus", principal: null, city: null, expires: "licenseexpires" },
-    personField: null, address: "workaddress", phone: "workphone" },
+    personField: null, address: "workaddress", phone: "workphone",
+    // licensesubtype, checked 2026-10-16: "Water Well Contractor" or "Pump Installer Contractor", a contractor's license.
+    holder: (r) => (/contractor/i.test(String(r.licensesubtype ?? "")) ? "business" : null) },
   { state: "DE", source: "Delaware DNREC on-site wastewater system licensees", ...soda("56uc-mvju"),
     fields: { businessName: "companyname", licenseNumber: "licensenumber", licenseType: "licensesubtype", specialty: null, status: "licstatus", principal: "displayname", city: null, expires: null },
-    personField: "displayname", address: "companyaddress", phone: "companyphone" },
+    personField: "displayname", address: "companyaddress", phone: "companyphone",
+    // licensesubtype, checked 2026-10-16: Class E (System Contractor) and Class F (Liquid Waste) are a contractor's or
+    // hauler's license; Classes A-D, H and I (testers, designers, evaluators, inspectors) are the named person's own.
+    holder: (r) => (/^Class [EF]\b/.test(String(r.licensesubtype ?? "")) ? "business" : r.licensesubtype ? "individual" : null) },
   { state: "DE", source: "Delaware DNREC certified asbestos firms", ...soda("f677-ahd9"),
     fields: { businessName: "name", licenseNumber: "certno", licenseType: "certtype", specialty: null, status: null, principal: null, city: "city", expires: "expdate" },
-    personField: null, address: "address1", zip: "zipcode", phone: "phone1" },
+    personField: null, address: "address1", zip: "zipcode", phone: "phone1",
+    // Certified firms (Class A/B contractors, professional service firms).
+    holder: () => "business" },
 ];
 
 export const pack: StatePack = {

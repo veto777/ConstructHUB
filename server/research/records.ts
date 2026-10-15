@@ -12,7 +12,7 @@
  * Every dataset here was checked live (CLAUDE.md: never fabricate government data). A source that could not be
  * searched is reported as not searched, never as "nothing found".
  */
-import { politeFetch } from "./http";
+import { politeFetch, rethrowIfBlocked } from "./http";
 import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordSource } from "@shared/research-reports";
 import { nameClause, sodaRows, tokens } from "./licenses";
 import { BULK_LIMIT, searchBulk } from "./bulk";
@@ -176,7 +176,7 @@ export async function searchOsha(name: string): Promise<Noted<OshaHit>> {
         hit.seriousViolations = mine.filter((x) => ["S", "W", "R"].includes(String(x.viol_type ?? "").toUpperCase())).length;
         hit.penalty = mine.reduce((sum, x) => sum + (num(x.current_penalty) ?? num(x.initial_penalty) ?? 0), 0);
       }
-    } catch { /* the inspections stand without their violation detail */ }
+    } catch (err) { rethrowIfBlocked(err); /* the inspections stand without their violation detail */ }
   }
   return withNote(out.sort((a, b) => String(b.opened ?? "").localeCompare(String(a.opened ?? ""))), capped);
 }

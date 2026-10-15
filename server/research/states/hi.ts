@@ -61,20 +61,23 @@ export function parsePvlReport(rows: string[][], label: string, layout: "contrac
     let cur: { name: string; no: string; trade: string | null; status: string | null; exp: string | null; city: string | null; address: string | null; locality: string | null; classes: string[] } | null = null;
     const flush = () => {
       if (!cur) return;
-      // A sole proprietor's license is under the person's name (./lib/business-name.ts decides): the person is the
-      // principal, the trade name (if any) is the business, and only the trade name is indexed as a business name.
+      // A sole proprietor's license is under the person's name (./lib/business-name.ts decides; the report has no
+      // entity type): the person is the principal, the trade name (if any) is the business, and only the trade name
+      // is indexed as a business name. The holder is still the person: a trade name doesn't make their address a
+      // business's (round 2, decision 2), so city, state and ZIP only.
       const isBiz = looksLikeBusiness(cur.name);
       const business = isBiz ? cur.name : cur.trade;
-      // A person with no trade name: the "business" address is where they live, so city, state and ZIP only.
-      const address = business ? cur.address : cur.locality;
+      const address = isBiz ? cur.address : cur.locality;
       out.push({
         kind: "license",
         hit: {
           state: "HI", source: label, sourceUrl: PVL_PAGE, businessName: business, licenseNumber: cur.no, licenseType: "Contractor license",
           specialty: cur.classes.length ? `Classes: ${cur.classes.join(", ")}` : null, status: status(cur.status ?? ""), principal: isBiz ? null : cur.name,
           city: cur.city, expires: anyDay(cur.exp), matchedOn: isBiz ? "business" : "principal", address,
+          holder: isBiz ? "business" : "individual",
         },
-        keys: business ? { licenses: [cur.no], addresses: [cur.address] } : { licenses: [cur.no] },
+        keys: isBiz ? { licenses: [cur.no], addresses: [cur.address] } : { licenses: [cur.no] },
+        component: label,
         business: isBiz ? [cur.name, cur.trade].filter(Boolean).join(" ") : cur.trade, person: isBiz ? null : cur.name,
       });
       cur = null;
@@ -104,8 +107,9 @@ export function parsePvlReport(rows: string[][], label: string, layout: "contrac
         hit: {
           state: "HI", source: label, sourceUrl: PVL_PAGE, businessName: isBiz ? name : null, licenseNumber: no, licenseType: type, specialty: null,
           status: status(r[iStatus] ?? ""), principal: isBiz ? null : name, city: null, expires: anyDay(r[iExp]), matchedOn: isBiz ? "business" : "principal",
+          holder: isBiz ? "business" : "individual",
         },
-        business: isBiz ? name : null, person: isBiz ? null : name, keys: { licenses: [no] },
+        business: isBiz ? name : null, person: isBiz ? null : name, keys: { licenses: [no] }, component: label,
       });
     }
   }

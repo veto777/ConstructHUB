@@ -76,6 +76,9 @@ export function conregHit(id: string, d: Record<string, string>, matchedOn: Lice
     principal: person, city: [clean(d["City"]), clean(d["State"])].filter(Boolean).join(", ") || null,
     expires: usDate(d["Registration Expiration"]), matchedOn,
     address: joinAddr(street, d["City"], d["State"], d["Zip"]), phone: clean(d["Telephone"]), people: person ? [{ name: person, role: "Sole proprietor" }] : [],
+    // The registration's own "Business Entity" says who holds it (round 2, decisions 2 and 3): a sole proprietorship is
+    // the person's, whatever name it trades under; any other entity a business; none given, unknown.
+    holder: d["Business Entity"] ? (/sole/i.test(d["Business Entity"]) ? "individual" : "business") : null,
   };
 }
 
@@ -94,6 +97,7 @@ async function conregHits(searches: Record<string, string>[], matchedOn: License
   let failed = 0;
   for (const id of ids.slice(0, CONREG_DETAILS)) {
     const res = await politeFetch(`${CONREG}/Contractor/Details/${id}`, {}, { minDelayMs: 1200 });
+    // politeFetch throws on 401/403 (the host is then blocked); any other HTTP error is one page, counted and noted.
     if (!res.ok) { failed++; await res.body?.cancel().catch(() => undefined); continue; }
     const h = conregHit(id, parseConregDetail(await res.text()), matchedOn);
     if (h) out.push(h);
@@ -166,6 +170,7 @@ export function srcHit(r: SrcResult, matchedOn: LicenseHit["matchedOn"]): Licens
     status: pending ? [clean("Application pending"), clean(cred[2])].filter(Boolean).join("; ") : clean(cred[2]),
     principal: who, city: clean(cityState?.replace(/\s+\d{5}(-\d{4})?$/, "")), expires: pending ? null : usDate(cred[3]),
     matchedOn, address: joinAddr(contact[1], contact[2], cityState), people: [{ name: who, role: clean(cred[0]) }],
+    holder: "individual", // electrical credentials are issued to people
   };
 }
 
@@ -200,6 +205,8 @@ const NE_ELECTRICAL: LiveLicenseSearch = {
     }
     return null;
   },
+  // No business-name search: a company is "not searched", never "0 found" (round 2, decision 8).
+  kinds: ["person"],
 };
 
 // ── Employee Classification Act: contractors with unpaid fines (PDF) ─────────────────────────────────────────

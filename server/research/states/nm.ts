@@ -47,6 +47,7 @@ export function rldLicenseHit(r: RldLicense): LicenseHit {
     expires: /^\d{4}-\d{2}-\d{2}$/.test(r.periodEnd__c ?? "") ? r.periodEnd__c! : null, matchedOn: "principal",
     address: [clean(r.License_Holder_City__c), [clean(r.License_Holder_State__c), clean(r.License_Holder_Postal_Code__c)].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null,
     people: clean(r.License_Holder_Name__c) ? [{ name: clean(r.License_Holder_Name__c)!, role: clean(r.Regulatory_Authorization_Type_Name__c) }] : [],
+    holder: "individual", // these boards license individuals (round 2, decision 2)
   };
 }
 
@@ -100,7 +101,7 @@ export function parseNmSos(data: unknown): NmSosRow[] {
 }
 
 const liveLicenses: LiveLicenseSearch[] = [
-  { source: "New Mexico RLD home inspector and landscape architect licenses", sourceUrl: RLD_SEARCH_PAGE, search: searchRld },
+  { source: "New Mexico RLD home inspector and landscape architect licenses", sourceUrl: RLD_SEARCH_PAGE, search: searchRld, kinds: ["person"] },
 ];
 
 const liveEnforcement: LiveEnforcementSearch[] = [

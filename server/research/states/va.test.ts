@@ -29,13 +29,20 @@ describe("Virginia DPOR regulant lists", () => {
 
   it("reads a contractor firm and a tradesman", async () => {
     const [firm, trad] = await records(`${HEADER}\n${FIRM}\n${TRADESMAN}\n`);
-    const a = vaRegulantHit(firm, { file: "2701", type: "Class A Contractor" }, "src")!;
+    const a = vaRegulantHit(firm, { file: "2701", type: "Class A Contractor", holder: "business" as const }, "src")!;
     expect(a.business).toBe("LANTZ CONSTRUCTION COMPANY");
     expect(a.hit).toMatchObject({ licenseNumber: "2701006397", licenseType: "Class A Contractor", expires: "2028-01-31", city: "BROADWAY, VA", principal: null,
       specialty: "CBC (Commercial building), RBC (Residential building)", matchedOn: "business" });
-    const t = vaRegulantHit(trad, { file: "2710", type: "Tradesman" }, "src")!;
+    const t = vaRegulantHit(trad, { file: "2710", type: "Tradesman", holder: "individual" as const }, "src")!;
     expect(t.person).toBe("DERRICK S SHIFFLETT");
     expect(t.hit).toMatchObject({ licenseNumber: "2710070965", businessName: null, specialty: "MPLB (Master Plumber)", matchedOn: "principal" });
+    // Round 2, decision 2: the list's class decides who holds the license.
+    expect(a.hit.holder).toBe("business");
+    expect(t.hit.holder).toBe("individual");
+    // A tradesman row with an employer named is still the tradesman's license.
+    expect(vaRegulantHit({ ...trad, "BUSINESS NAME": "SHIFFLETT PLUMBING LLC" }, { file: "2710", type: "Tradesman", holder: "individual" }, "src")!.hit.holder).toBe("individual");
+    // A contractor row naming only a person doesn't say whether it is a sole proprietor's.
+    expect(vaRegulantHit({ ...firm, "BUSINESS NAME": "", "INDIVIDUAL NAME": "JOHN DOE" }, { file: "2701", type: "Class A Contractor", holder: "business" }, "src")!.hit.holder).toBeNull();
   });
 
   it("shows codes DPOR doesn't define as codes", () => {

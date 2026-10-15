@@ -14,3 +14,9 @@ describe("Colorado pack", () => {
     expect(pack.licenses![0].filter).not.toContain("'RN'");
   });
 });
+
+describe("Colorado round-2 audit (2026-10-16)", () => {
+  it("every DORA type searched here is a person's own credential (decision 2)", () => {
+    expect(pack.licenses![0].holder!({ licensetype: "PE", entityname: "Some Firm" })).toBe("individual");
+  });
+});

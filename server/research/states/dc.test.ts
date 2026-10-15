@@ -52,3 +52,18 @@ describe("DC basic business licenses", () => {
     expect(c.hit.businessName).toBe("IMAGE PAINTING & DRYWALL");
   });
 });
+
+describe("DC round-2 audit (2026-10-16)", () => {
+  it("the holder comes from ENTITYTYPE and the endorsement, never from a trade name (decision 2)", async () => {
+    const { bblHolder } = await import("./dc");
+    expect(bblHolder("Domestic Limited Liability Company", "General Contractor/Construction Manager (A, B, C,")).toBe("business");
+    expect(bblHolder("Sole Proprietorship", "Home Improvement Contractor")).toBe("individual");
+    expect(bblHolder("Foreign Sole Proprietor", "Home Improvement Contractor")).toBe("individual");
+    expect(bblHolder("Corporation (For Profit)", "Home Improvement Salesperson")).toBe("individual");
+    expect(bblHolder("Trade Name", "Home Improvement Contractor")).toBeNull();
+    expect(bblHolder(null, "Home Improvement Contractor")).toBeNull();
+    const h = bblHit({ CUSTOMERNUMBER: "39900493", LICENSESTATUS: "Active", BUSINESSACTIVITY: "Home Improvement Contractor", ENTITYTYPE: "Sole Proprietorship",
+      PREMISEADDRESS: "1219 KENYON ST NW, WASHINGTON, DC, 20010, USA", ENTITYNAME: "JAMES A BENJAMIN", ENTITYTRADENAME: "H.T.W.T." })!;
+    expect(h.hit).toMatchObject({ businessName: "H.T.W.T.", holder: "individual" });
+  });
+});

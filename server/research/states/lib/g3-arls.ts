@@ -230,7 +230,18 @@ async function accountHit(board: ArlsBoard, row: ArlsRow, matchedOn: LicenseHit[
     status: f.Status ?? (row.notActive ? "License not active" : null), principal: people[0]?.name ?? null,
     city: cityOf(f.Address), expires: usDate(f["Expiration Date"]), matchedOn,
     address, phone: f.Phone ?? null, people, lines: addressLines(f.Address),
+    holder: arlsHolder(isQualifier, accountType),
   };
+}
+
+/**
+ * Who holds an account (round 2, decision 2). A qualifier account is the person's own, however many licensees it
+ * qualifies for (their names are not the qualifier's business). A license account is a contractor license: the
+ * business's. Any other account type the portal shows is left unknown.
+ */
+export function arlsHolder(isQualifier: boolean, accountType: string | null | undefined): "business" | "individual" | null {
+  if (isQualifier) return "individual";
+  return !accountType || accountType === "License" ? "business" : null;
 }
 
 /** License hits for a name on one board: the search, then the details (and qualifiers) of each matching account. */

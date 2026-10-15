@@ -92,7 +92,9 @@ export function verifyLicenseHit(details: any, row: VerifyRow | null, matchedOn:
     status: clean(c.StatusDescription) ?? clean(row?.Status), principal: isTrades ? flip(name) : (people.size ? Array.from(people.keys())[0] : null),
     city: [clean(c.City) ?? clean(row?.City), clean(c.State) ?? clean(row?.State)].filter(Boolean).join(", ") || null,
     expires: anyDay(c.ExpirationDate), matchedOn,
-    // A tradesperson's address is a home address: only a business's address is kept.
+    // A tradesperson's address is a home address: only a business's address is kept. A certificate (no UBI) is the
+    // tradesperson's own; a registration with a UBI is the business's (round 2, decision 2).
+    holder: isTrades ? "individual" : "business",
     address: isTrades ? null : verifyAddress(c), phone: isTrades ? null : verifyPhone(c),
     people: Array.from(people, ([n, role]) => ({ name: n, role })),
   };
@@ -143,8 +145,9 @@ export function verifyEnforcement(details: any, businessName: string, url: strin
       detail: [clean(v.ItemTypeDescription), clean(v.Description), clean(v.RcwCode), money(v.ViolationAmount) ? `penalty ${usd(money(v.ViolationAmount))}` : null,
         due ? `${usd(due)} due` : null].filter(Boolean).join(". ").slice(0, 800) || null,
       // From the infraction's own status: dismissed/vacated → false; "Satisfied"/"Not Satisfied"/paid/final → true; no
-      // status, or one still open to appeal → null (audit 2026-10-15, decision 2).
-      amount: money(v.ViolationAmount), adverse: adverseFrom(status, { adverse: /satisf|paid|final|upheld|affirm|due|collect/i }),
+      // status, or one still open to appeal → null (audit 2026-10-15, decision 2). "Not Satisfied" is L&I's phrase for
+      // a penalty still owed, matched whole so it isn't read as a negation (round 2, decision 4).
+      amount: money(v.ViolationAmount), adverse: adverseFrom(status, { adverse: /\bnot satisfied\b|\bsatisf|\bpaid\b|\bfinal\b|\bupheld\b|\baffirm|\bdue\b|\bcollect/i }),
     });
   }
   for (const s of c.Summons ?? []) {
@@ -206,7 +209,8 @@ async function searchVerifyEnforcement(name: string): Promise<EnforcementHit[]> 
   return withNote(withNote(hits, noteOf(found)), targets.length > MAX_DETAILS ? capNote(MAX_DETAILS, targets.length, "matching licenses and violations (their records were read)") : null);
 }
 
-const verifyLicenses: LiveLicenseSearch = { source: "Washington L&I tradesperson certificates (Verify)", sourceUrl: VERIFY, search: searchTradespeople, searchBy: searchByLicense };
+// Tradesperson certificates are searched for people only (businesses: the data.wa.gov dataset): a company name is not searched here (round 2, decision 8).
+const verifyLicenses: LiveLicenseSearch = { source: "Washington L&I tradesperson certificates (Verify)", sourceUrl: VERIFY, search: searchTradespeople, searchBy: searchByLicense, kinds: ["person"] };
 
 const verifyEnforcementSearches: LiveEnforcementSearch[] = [{
   source: "Washington L&I Verify (infractions, bond lawsuits, tax warrants, suspensions)",

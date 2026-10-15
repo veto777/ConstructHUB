@@ -18,3 +18,25 @@ describe("Wyoming licensing portal paging", () => {
     await expect(lookupAll(async () => ({ error: "x" }))).rejects.toThrow(/unexpected payload/);
   });
 });
+
+describe("Wyoming holders (audit round 2, decision 2)", () => {
+  it("a licensed business (service) is a business's license, an electrician (user) a person's", async () => {
+    const { vi } = await import("vitest");
+    const { pack } = await import("./wy");
+    const { resetHostState } = await import("../http");
+    resetHostState();
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u.endsWith("/robots.txt")) return new Response("", { status: 404 });
+      const json = (v: unknown) => new Response(JSON.stringify(v), { status: 200, headers: { "content-type": "application/json" } });
+      if (/PublicLookupService/.test(u)) return json([{ id: "s1", service_name: "Acme Electric Inc", primary_license_number: "C-1", city: "Casper" }]);
+      if (/PublicLookupUser/.test(u)) return json([{ id: "u1", first_name: "Jane", last_name: "Doe", primary_license_number: "J-1" }]);
+      return json([{ number: /services/.test(u) ? "C-1" : "J-1", status: "Active" }]);
+    }));
+    try {
+      const s = pack.liveLicenses![0];
+      expect((await s.search("Acme Electric Inc", "company"))[0].holder).toBe("business");
+      expect((await s.search("Jane Doe", "person"))[0].holder).toBe("individual");
+    } finally { vi.unstubAllGlobals(); resetHostState(); }
+  });
+});

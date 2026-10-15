@@ -20,7 +20,7 @@
 import type { LicenseHit } from "@shared/research-reports";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
-import { politeFetch } from "../http";
+import { politeFetch, rethrowIfBlocked } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { capNote, escapeRegExp, noteOf, withNote } from "../notes";
 import { Session, fromFile, hiddenInputs, htmlText, isoDay, joinAddr, unzipFirst } from "./lib/g6-common";
@@ -36,6 +36,7 @@ async function* hubRows(id: number): AsyncIterable<Record<string, string>> {
 }
 
 const person = (first: string | null | undefined, last: string | null | undefined) => clean([first, last].filter(Boolean).join(" "));
+/** `holder` is set by each file from what the license is (round 2, decision 2), never from a business name being present. */
 const lic = (h: Omit<LicenseHit, "matchedOn">, business: string | null, personName: string | null, keys: BulkHit["keys"]): BulkHit =>
   ({ kind: "license", hit: { ...h, matchedOn: business ? "business" : "principal" }, business, person: personName, keys });
 
@@ -52,6 +53,8 @@ const IA_CONTRACTORS: BulkSource = {
         businessName: business, licenseNumber: clean(r.registration_number), licenseType: "Construction contractor registration",
         specialty: clean(r.primary_activity), status: "Registered", principal: owner, city: clean(r.city), expires: isoDay(r.expire_date),
         address, phone: clean(r.phone), people: owner ? [{ name: owner, role: null }] : [],
+        // A contractor registration is the contracting business's (by its class).
+        holder: "business",
       }, business, owner, { licenses: [r.registration_number], phones: [r.phone], addresses: [address] });
     }
   },
@@ -70,6 +73,8 @@ const IA_ASBESTOS: BulkSource = {
         licenseNumber: clean(r.registration_number), licenseType: r.license_type ? `Asbestos ${clean(r.license_type)?.toLowerCase()}` : "Asbestos license",
         specialty: null, status: clean(r.status), principal: who, city: clean(r.city), expires: isoDay(r.expire_date),
         address, phone: clean(r.phone), people: [{ name: who, role: clean(r.license_type) }],
+        // Worker, supervisor, inspector, planner and designer licenses: the person's own.
+        holder: "individual",
       }, null, who, { licenses: [r.registration_number], phones: [r.phone], addresses: [address] });
     }
   },
@@ -90,6 +95,7 @@ const IA_ASBESTOS_PERMITS: BulkSource = {
         licenseNumber: clean(r.permit_number), licenseType: "Asbestos abatement business permit", specialty: null,
         status: clean(r.status), principal: contact, city: clean(r.city), expires: isoDay(r.expire_date),
         address, phone: clean(r.phone), people: contact ? [{ name: contact, role: "Contact" }] : [],
+        holder: "business",
       }, business, contact, { licenses: [r.permit_number], phones: [r.phone], addresses: [address] });
     }
   },
@@ -195,7 +201,7 @@ async function iaElectricalSearch(fields: Record<string, string>, button: string
           const d = parseIaElectricalDetail(await s.text(IA_EL_DETAIL + r.id, {}, "Iowa electrical detail"));
           ({ contact, phone } = d);
           status ??= d.status;
-        } catch { failed++; /* the row stands without it, and the note says so */ }
+        } catch (err) { rethrowIfBlocked(err); failed++; /* the row stands without it, and the note says so */ }
       }
     }
     hits.push({
@@ -205,6 +211,8 @@ async function iaElectricalSearch(fields: Record<string, string>, button: string
       city: [r.city, r.state].filter(Boolean).join(", ") || null, expires: r.expires,
       matchedOn: isBusiness ? "business" : "principal", phone, address: r.street ? joinAddr(r.street, r.city, r.state) : null,
       people: contact ? [{ name: contact, role: "Contact" }] : !isBusiness && r.name ? [{ name: r.name, role: r.type }] : [],
+      // The license type decides: a contractor license is the business's, a master/journeyman/apprentice license the person's.
+      holder: isBusiness ? "business" : "individual",
     });
   }
   return withNote(hits, [
@@ -253,6 +261,7 @@ export function itToHit(r: ItRow, matchedOn: LicenseHit["matchedOn"]): LicenseHi
     specialty: sv(r.primary_license_level), status: sv(r.primary_license_status), principal: null,
     city: [sv(r.city), sv(r.abbrev)].filter(Boolean).join(", ") || null, expires: isoDay(r.primary_license_expiration_date),
     matchedOn, address: joinAddr(sv(r.address_line_1), sv(r.city), sv(r.abbrev), sv(r.postal_code)), phone: sv(r.phone), people: [],
+    holder: "business",
   };
 }
 
@@ -270,6 +279,7 @@ const IT_MAX = 300;
 
 const IA_FIRE_ALARM: LiveLicenseSearch = {
   source: "Iowa DIAL fire protection and alarm system contractors", sourceUrl: IT_PAGE,
+  kinds: ["company"],
   search: async (name, kind) => {
     if (kind === "person") return []; // the business lookup names companies only
     const n = searchName(name);

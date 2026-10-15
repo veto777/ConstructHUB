@@ -42,6 +42,18 @@ export function bblActivity(v: string | null): string | null {
   return /[,(]\s*$/.test(v) ? `${v} (list cut off in the source)` : v;
 }
 
+/**
+ * Who holds the license, from ENTITYTYPE and the endorsement (round 2, decision 2; values checked 2026-10-16): a
+ * Home Improvement Salesperson endorsement and a sole proprietor (Domestic/Foreign Sole Proprietor, Sole
+ * Proprietorship) are an individual; "Trade Name", "Name Registration", "Unknown" or blank don't say (null); every
+ * other entity type (corporations, LLCs, partnerships, government, …) is a business. The trade name never decides.
+ */
+export function bblHolder(entityType: string | null, activity: string | null): "business" | "individual" | null {
+  if (/salesperson/i.test(activity ?? "") || /sole propriet/i.test(entityType ?? "")) return "individual";
+  if (!entityType || /^(?:trade name|name registration|unknown)$/i.test(entityType)) return null;
+  return "business";
+}
+
 export function bblHit(r: Attrs): BulkHit | null {
   const entity = a(r, "ENTITYNAME"), trade = a(r, "ENTITYTRADENAME");
   if (!entity && !trade) return null;
@@ -66,6 +78,7 @@ export function bblHit(r: Attrs): BulkHit | null {
       specialty: a(r, "ENTITYTYPE"), status: a(r, "LICENSESTATUS"), principal: owner ?? (sole ? entity : null),
       city: premises?.split(",").slice(-2).join(",").trim() ?? null, expires: epochDay(r.LICENSEENDDATE),
       matchedOn: "business", address: premises ?? billing, people,
+      holder: bblHolder(a(r, "ENTITYTYPE"), a(r, "BUSINESSACTIVITY")),
     },
     business: business ? business.replace(/ \/ /g, " ") : null, person: owner ?? (sole ? entity : null), people: [agent],
     keys: { licenses: [license], addresses: [premises, billing] },

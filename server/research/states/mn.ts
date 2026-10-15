@@ -38,10 +38,11 @@ const DLI_FILES = [
 /** "VOLUNTARY TERMINATION" and "Voluntary Termination" are the same status in DLI's files: one casing. */
 const titleCase = (v: string | null) => v && v.toLowerCase().replace(/(^|[\s-])([a-z])/g, (_, a, b) => a + b.toUpperCase());
 
-async function* dliRows(): AsyncIterable<Record<string, string>> {
+/** Every row of every DLI file, with the file it came from (a component of the load: round 2, decision 10). */
+async function* dliRows(): AsyncIterable<Record<string, string> & { __file?: string }> {
   for (const f of DLI_FILES) {
     const path = await download(`${DLI_DATA}${f}.csv`);
-    try { yield* csvRecords(path); } finally { await fs.rm(path, { force: true }); }
+    try { for await (const r of csvRecords(path)) yield Object.assign(r, { __file: f }); } finally { await fs.rm(path, { force: true }); }
   }
 }
 
@@ -68,6 +69,8 @@ export function mnLicense(r: Record<string, string>): BulkHit | null {
       city: [clean(r.City), st && st !== "MN" ? st : null].filter(Boolean).join(", ") || null, expires: usDate(r.Exp_Date),
       matchedOn: isBusiness || dba ? "business" : "principal",
       address, phone, ...(isBusiness ? {} : { people: [{ name, role: clean(r.License_Subtype) }] }),
+      // DLI's own Bus_Pers column says who holds it; a person's DBA doesn't make it a business's (round 2, decision 2).
+      holder: isBusiness ? "business" : clean(r.Bus_Pers) ? "individual" : null,
     },
     business: isBusiness ? [name, dba].filter(Boolean).join(" ") : dba, person: isBusiness ? null : name,
     keys: { licenses: [r.Lic_Number], phones: [phone], addresses: [address] },
@@ -75,7 +78,7 @@ export function mnLicense(r: Record<string, string>): BulkHit | null {
 }
 
 async function* dliLicenses(): AsyncIterable<BulkHit> {
-  for await (const r of dliRows()) { const h = mnLicense(r); if (h) yield h; }
+  for await (const r of dliRows()) { const h = mnLicense(r); if (h) yield { ...h, component: r.__file }; }
 }
 
 async function* dliFlagged(): AsyncIterable<BulkHit> {

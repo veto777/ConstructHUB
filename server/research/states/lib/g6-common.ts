@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { clean } from "../../bulk";
 import { decodeEntities } from "../../bulk-sources";
-import { PortalBlockedError, fetchWithDeadline, rateLimitHost } from "../../http";
+import { fetchWithDeadline } from "../../http";
 
 const run = promisify(execFile);
 
@@ -74,11 +74,11 @@ export class Session {
   /** One request (60 s deadline over the body too; robots.txt honored; 401/403 end the search), redirects followed by hand. */
   async fetch(url: string, init: RequestInit = {}, hops = 0): Promise<Response> {
     if (hops > MAX_REDIRECTS) throw new Error(`more than ${MAX_REDIRECTS} redirects from ${url}`);
-    await rateLimitHost(url, this.minDelayMs);
     const headers = new Headers(init.headers ?? {});
     if (this.jar.size) headers.set("cookie", Array.from(this.jar, ([k, v]) => `${k}=${v}`).join("; "));
-    const res = await fetchWithDeadline(url, { ...init, headers, redirect: "manual" }, 60_000);
-    if (res.status === 401 || res.status === 403) { await res.body?.cancel().catch(() => undefined); throw new PortalBlockedError(url, res.status); }
+    // fetchWithDeadline guards every hop (the host's block and cooldown, robots.txt, the rate limit) and throws
+    // PortalBlockedError on a 401/403, which blocks the host for every caller (round 2, decision 6).
+    const res = await fetchWithDeadline(url, { ...init, headers, redirect: "manual" }, 60_000, this.minDelayMs);
     for (const c of res.headers.getSetCookie?.() ?? []) {
       const [kv] = c.split(";");
       const i = kv.indexOf("=");

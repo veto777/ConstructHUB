@@ -45,26 +45,32 @@ type Row = Record<string, unknown>;
 const soda = (domain: string, id: string) => ({ datasetUrl: `https://${domain}/d/${id}`, url: `https://${domain}/resource/${id}.json` });
 
 /**
- * One license row as a bulk hit, indexed by its business name, its people, license number, phone and address. A row
- * for an individual (no business name) keeps its city only: its street address and phone are a home address and
- * phone (audit 2026-10-15, decision 4), so they are neither shown nor indexed.
+ * One license row as a bulk hit, indexed by its business name, its people, license number, phone and address. The
+ * holder comes from what the publisher says (license class, entity or ownership type; audit round 2, decision 2):
+ * only a business holder keeps its street address and phone. An individual's row, or one whose holder the publisher
+ * doesn't state, keeps its city only, even with a trade name attached: its street and phone may be a home address
+ * and phone, so they are neither shown nor indexed.
  */
-export function licenseHit(h: Omit<LicenseHit, "matchedOn" | "people"> & { people: { name: string | null; role: string | null }[] }): BulkHit {
+export function licenseHit(h: Omit<LicenseHit, "matchedOn" | "people" | "holder"> & { holder: "business" | "individual" | null; people: { name: string | null; role: string | null }[] }): BulkHit {
   const people = h.people.filter((p): p is { name: string; role: string | null } => !!p.name);
-  const biz = !!h.businessName;
+  const biz = h.holder === "business";
   return {
     kind: "license",
-    hit: { ...h, ...(biz ? {} : { address: null, phone: null }), people, matchedOn: biz ? "business" : "principal" },
+    hit: { ...h, ...(biz ? {} : { address: null, phone: null }), people, matchedOn: h.businessName ? "business" : "principal" },
     business: h.businessName, person: people[0]?.name ?? null, people: people.slice(1).map((p) => p.name),
     keys: biz ? { licenses: [h.licenseNumber], phones: [h.phone], addresses: [h.address] } : { licenses: [h.licenseNumber] },
   };
 }
 
+/** A publisher's sole-proprietor / individual entity type → "individual"; any other given type → "business"; none → null. */
+export const entityHolder = (type: string | null, individual: RegExp): "business" | "individual" | null =>
+  !type ? null : individual.test(type) ? "individual" : "business";
+
 /** More keys for a row made by licenseHit; address and phone keys only on a business row (decision 4, as above). */
 function addKeys(h: BulkHit, k: { licenses?: (string | null)[]; addresses?: (string | null)[]; phones?: (string | null)[] }): void {
   if (!h.keys) return;
   if (k.licenses) h.keys.licenses = k.licenses;
-  if (h.kind !== "license" || !h.hit.businessName) return;
+  if (h.kind !== "license" || h.hit.holder !== "business") return;
   if (k.addresses) h.keys.addresses = k.addresses;
   if (k.phones) h.keys.phones = k.phones;
 }
@@ -127,6 +133,8 @@ export function phlAddress(v: string | null): string | null {
 }
 
 /** "JOHN WEITORT DBA: JW ELECTRICAL CONTRACTORS INC" → the licensee and the trade name. */
+/** Philadelphia license types that are a business's (contractors, home improvement, demolition, curb setting); the rest (plumbers, fire suppression workers, sheet metal technicians, apprentices) are a person's own. */
+export const PHL_BUSINESS_TYPES = /CONTRACTOR|HOME IMPROVEMENT|DEMOLITION|CURB SETTER/;
 const phlDba = (v: string | null) => { const m = v?.match(/^(.*?)\s+DBA:\s*(.*)$/i); return m ? { who: m[1].trim() || null, dba: m[2].trim() || null } : { who: v, dba: null }; };
 
 const phlTrade: BulkSource = {
@@ -152,6 +160,7 @@ const phlTrade: BulkSource = {
       const h = licenseHit({
         state: "PA", source: "Philadelphia L&I trade licenses", sourceUrl: PHL_PAGE,
         businessName: company, licenseNumber: txt(r, "licensenumber"), licenseType: txt(r, "licensetype"), specialty: null,
+        holder: txt(r, "licensetype") ? (PHL_BUSINESS_TYPES.test(txt(r, "licensetype")!) ? "business" : "individual") : null,
         status: txt(r, "licensestatus"), principal: who, city: "Philadelphia", expires: isoDay(r.expirationdate),
         address: cal ? addr.get(cal) ?? null : null, phone: null,
         people: [{ name: who, role: "Licensee" }],
@@ -198,6 +207,7 @@ const cleveland: BulkSource = {
         state: "OH", source: "Cleveland contractor registrations", sourceUrl: CLE_PAGE,
         businessName: name, licenseNumber: txt(r, "B1_ALT_ID"), licenseType: txt(r, "CONTRACTOR_LICENSE_TYPE"),
         specialty: rrp ? `EPA lead-safe (RRP) certification ${rrp}` : null, status: txt(r, "STATUS"), principal: null, city: txt(r, "B1_CITY"), expires: null,
+        holder: "business", // a contractor registration, in the business's name
         address: addressLine([txt(r, "B1_ADDRESS1"), txt(r, "B1_ADDRESS2")], txt(r, "B1_CITY"), txt(r, "B1_STATE"), txt(r, "B1_ZIP")),
         phone: txt(r, "B1_PHONE1"), people: [],
       });
@@ -220,6 +230,7 @@ const nashville: BulkSource = {
         state: "TN", source: "Nashville registered professional contractors", sourceUrl: NASH_PAGE,
         // The layer publishes no status field: what it is (Metro Codes' registered contractors) goes in the specialty line.
         businessName: name, licenseNumber: null, licenseType: txt(r, "Prof__Type"), specialty: "Listed in Metro Codes' registered professional contractors", status: null,
+        holder: "business", // a company's contractor registration (Company_Name)
         principal: null, city: txt(r, "City"), expires: null,
         address: addressLine([txt(r, "Address")], txt(r, "City"), txt(r, "ST"), txt(r, "ZIP")), phone: null, people: [],
       });
@@ -268,6 +279,7 @@ const chicagoHomeRepair: BulkSource = {
         state: "IL", source: "Chicago business licenses (home repair)", sourceUrl: CHI_LICENSES.datasetUrl,
         businessName: business, licenseNumber: txt(r, "license_number"), licenseType: txt(r, "license_description"), specialty: null,
         status: code ? CHI_STATUS[code] ?? `code ${code}` : null, principal: people[0]?.name ?? null, city: txt(r, "city"), expires: isoDay(r.expiration_date),
+        holder: "business", // a business license, in the legal name of the business
         address: addressLine([txt(r, "address")], txt(r, "city"), txt(r, "state"), txt(r, "zip_code")), phone: null, people,
       });
     }
@@ -295,6 +307,7 @@ const dcContractors: BulkSource = {
         state: "DC", source: "DC basic business licenses", sourceUrl: DC_PAGE,
         businessName: sole && !trade ? null : business, licenseNumber: txt(r, "CUSTOMERNUMBER"), licenseType: txt(r, "BUSINESSACTIVITY"),
         specialty: txt(r, "ENTITYTYPE"), status: txt(r, "LICENSESTATUS"), principal: owner ?? (sole ? entity : null),
+        holder: entityHolder(txt(r, "ENTITYTYPE"), /sole proprietor|individual/i),
         city: premise?.split(",")[1]?.trim() ?? null, expires: isoDay(r.LICENSEENDDATE), address: premise, phone: null,
         people: [{ name: owner ?? (sole ? entity : null), role: "Owner" }, { name: agent && agent !== owner ? agent : null, role: "Registered agent" }],
       });
@@ -326,6 +339,7 @@ const longBeach: BulkSource = {
         state: "CA", source: "Long Beach business licenses", sourceUrl: LB_PAGE,
         businessName: sole ? dba : dba && full && dba.toUpperCase() !== full.toUpperCase() ? `${full} (d/b/a ${dba})` : full ?? dba,
         licenseNumber: no, licenseType: cat, specialty: txt(r, "COMPANYTYPE"), status: txt(r, "LICSTATUS"), principal: sole ? full : null,
+        holder: entityHolder(txt(r, "COMPANYTYPE"), /^SOLE$/i),
         city: outside ? null : "Long Beach", expires: null,
         address: site ? (outside ? site : addressLine([site], "LONG BEACH", "CA", zip)) : null, phone: null,
         people: [{ name: sole ? full : null, role: "Owner (sole proprietor)" }],
@@ -347,6 +361,7 @@ const boulder: BulkSource = {
         state: "CO", source: "Boulder licensed contractors", sourceUrl: BOULDER_PAGE,
         businessName: name, licenseNumber: txt(r, "LicenseNumber"), licenseType: txt(r, "LicenseType"), specialty: txt(r, "LicenseClassification"),
         status: txt(r, "LicenseStatus"), principal: null, city: null, expires: isoDay(r.ExpirationDate),
+        holder: "business", // a contractor license in the company's name (CompanyName)
         address: txt(r, "Address"), phone: txt(r, "BusinessPhone"), people: [],
       });
     }
@@ -367,6 +382,7 @@ const arlington: BulkSource = {
         state: "TX", source: "Arlington registered contractors", sourceUrl: ARL_PAGE,
         businessName: name, licenseNumber: null, licenseType: txt(r, "ContractorType"), specialty: null, status: "Registered",
         principal: contact, city: null, expires: null, address: txt(r, "Address"), phone: txt(r, "Phone"),
+        holder: name ? "business" : null, // a business's contractor registration; a row with a contact only says nothing more
         people: [{ name: contact, role: "Contact" }],
       });
     }
@@ -389,6 +405,7 @@ const losAngeles: BulkSource = {
         businessName: name && dba && dba.toUpperCase() !== name.toUpperCase() ? `${name} (d/b/a ${dba})` : name ?? dba,
         licenseNumber: txt(r, "location_account"), licenseType: "Business tax registration", specialty: txt(r, "primary_naics_description"),
         status: "Active", principal: null, city: txt(r, "city"), expires: null, address, phone: null, people: [],
+        holder: "business", // a business tax registration (the dataset names no owner)
       });
       addKeys(h, { addresses: [address, mailing] });
       yield h;
@@ -413,6 +430,8 @@ const sanFrancisco: BulkSource = {
         businessName: ownerIsOrg ? (dba && dba.toUpperCase() !== owner!.toUpperCase() ? `${owner} (d/b/a ${dba})` : owner) : dba,
         licenseNumber: txt(r, "certificate_number"), licenseType: "Business registration certificate", specialty: "Construction (self-reported NAICS 23)",
         status: closed ? `Location closed ${closed}` : "Location open", principal: ownerIsOrg ? null : owner, city: txt(r, "city"), expires: null,
+        // The dataset has no ownership type: an owner that is a company is a business; a person-owned one is a person's.
+        holder: ownerIsOrg ? "business" : owner ? "individual" : null,
         address, phone: null, people: [{ name: ownerIsOrg ? null : owner, role: "Owner" }],
       });
       addKeys(h, { licenses: [txt(r, "certificate_number"), txt(r, "ttxid")], addresses: [address, mailing] });
@@ -435,6 +454,7 @@ const seattle: BulkSource = {
         businessName: sole ? (trade && !namesMatch(trade, legal) ? trade : null) : trade && trade.toUpperCase() !== legal.toUpperCase() ? `${legal} (${trade})` : legal,
         licenseNumber: txt(r, "city_account_number"), licenseType: "Business license tax certificate (active)", specialty: txt(r, "naics_description"),
         status: "Active", principal: sole ? legal : null, city: txt(r, "city"), expires: null,
+        holder: entityHolder(txt(r, "ownership_type"), /sole proprietorship/i),
         address: addressLine([txt(r, "street_address")], txt(r, "city"), txt(r, "state"), txt(r, "zip")), phone: txt(r, "business_phone"),
         people: [{ name: sole ? legal : null, role: "Owner (sole proprietor)" }],
       });
@@ -472,6 +492,8 @@ const newOrleans: BulkSource = {
         state: "LA", source: "New Orleans occupational business licenses", sourceUrl: NOLA.datasetUrl,
         businessName: business, licenseNumber: txt(r, "businesslicensenumber"), licenseType: "Occupational business license", specialty: txt(r, "businesstype"),
         status: "Licensed", principal: person, city: txt(r, "city"), expires: null, address, phone: txt(r, "phonenumber"),
+        // No ownership type: a company owner is a business; a business name over a person owner says nothing more.
+        holder: ownerIsOrg ? "business" : named ? null : "individual",
         people: [{ name: person, role: "Owner" }],
       });
       addKeys(h, { addresses: [address, mailing] });
@@ -499,6 +521,7 @@ const batonRouge: BulkSource = {
         businessName: legal && name && legal.toUpperCase() !== name.toUpperCase() ? `${legal} (${name})` : legal ?? name,
         licenseNumber: txt(r, "taccount"), licenseType: txt(r, "typename"), specialty: txt(r, "naicname"),
         status: code ? EBR_STATUS[code] ?? `code ${code}` : null, principal: contact && !ORG.test(contact) ? contact : null,
+        holder: legal && ORG.test(legal) ? "business" : null, // no ownership type: a legal name that is a company's
         city: txt(r, "tphysicalcity"), expires: null, address: address ?? mailing, phone: null,
         people: [{ name: contact && !ORG.test(contact) ? contact : null, role: "Account contact" }],
       });
@@ -523,6 +546,7 @@ const kansasCity: BulkSource = {
         businessName: name && dba && dba.toUpperCase() !== name.toUpperCase() ? `${name} (d/b/a ${dba})` : name ?? dba,
         licenseNumber: null, licenseType: "Business license", specialty: txt(r, "business_type"), status: "Licensed", principal: null,
         city: txt(r, "city"), expires: valid ? ymd(valid) : null,
+        holder: name && ORG.test(name) ? "business" : null, // no ownership type: a legal name that is a company's
         address: addressLine([txt(r, "address")], txt(r, "city"), txt(r, "state"), txt(r, "zipcode")), phone: null, people: [],
       });
     }
@@ -547,6 +571,7 @@ const norfolk: BulkSource = {
         businessName: ownerIsOrg && trade && owner!.toUpperCase() !== trade.toUpperCase() ? `${owner} (t/a ${trade})` : ownerIsOrg ? owner : trade,
         licenseNumber: null, licenseType: "Business license", specialty: txt(r, "naics"), status: null,
         principal: ownerIsOrg ? null : owner, city: null, expires: null,
+        holder: ownerIsOrg ? "business" : owner ? "individual" : null, // the primary owner: a company or a person
         address: location ?? mailing, phone: null,
         people: [{ name: ownerIsOrg ? null : owner, role: "Primary owner" }],
       });
@@ -578,17 +603,17 @@ const miamiDade: BulkSource = {
       const code = txt(r, "CONTRACTOR_STATUS");
       const trades = Array.from({ length: 10 }, (_, i) => txt(r, `TRADE_CATEGORY_DESC_${i + 1}`)).filter(Boolean);
       const phone = mdcPhone(r.CONTRACTOR_AREA_CODE, r.CONTRACTOR_PHONE);
-      const tPhone = mdcPhone(r.TRADESMAN_AREA_CODE, r.TRADESMAN_PHONE);
       const address = addressLine([txt(r, "CONTRACTOR_ADDRESS")], txt(r, "CONTRACTOR_CITY"), txt(r, "CONTRACTOR_STATE"), mdcZip(r.CONTRACTOR_ZIPCODE));
-      const tAddress = addressLine([txt(r, "TRADESMEN_ADDRESS")], txt(r, "TRADESMAN_CITY"), txt(r, "TRADESMAN_STATE"), mdcZip(r.TRADESMAN_ZIPCODE));
       const h = licenseHit({
         state: "FL", source: "Miami-Dade County contractor licenses", sourceUrl: MDC_PAGE,
         businessName: dba && dba.toUpperCase() !== name.toUpperCase() ? `${name} (d/b/a ${dba})` : name,
         licenseNumber: txt(r, "CONTRACTOR_NUMBER"), licenseType: txt(r, "TRADE_CLASS_DESC"), specialty: trades.join(", ") || null,
         status: code ? `code ${code} (as of 2024-10-25)` : null, principal: tradesman, city: txt(r, "CONTRACTOR_CITY"), expires: null,
+        holder: ORG.test(name) ? "business" : null, // the contractor: a company, or (a person's name) not stated
         address, phone, people: [{ name: tradesman, role: "Tradesman" }],
       });
-      addKeys(h, { phones: [phone, tPhone], addresses: [address, tAddress] });
+      // The tradesman's own phone and address are an individual's: never indexed (round 2, decision 2).
+      addKeys(h, { phones: [phone], addresses: [address] });
       yield h;
     }
   },
@@ -623,6 +648,7 @@ const lasVegas: BulkSource = {
         state: "NV", source: "City of Las Vegas business licenses", sourceUrl: LV_PAGE,
         businessName: name, licenseNumber: txt(r, "License__"), licenseType: txt(r, "Type_of_Business"), specialty: null,
         status: txt(r, "Status"), principal: people.find((p) => !ORG.test(p.name))?.name ?? null, city: null, expires: null,
+        holder: ORG.test(name) ? "business" : null, // a business license; a person's name as the business says nothing more
         address: addressLine([txt(r, "Address")], null, "NV", zip), phone: txt(r, "Phone"), people,
       });
     }
@@ -642,6 +668,7 @@ const tucson: BulkSource = {
         state: "AZ", source: "Tucson business licenses", sourceUrl: TUCSON_PAGE,
         businessName: name, licenseNumber: txt(r, "ACC_NUM"), licenseType: "Business license", specialty: txt(r, "NAIC_DESC"),
         status: txt(r, "LIC_STATUS"), principal: null, city: txt(r, "CITY"), expires: null,
+        holder: ORG.test(name) ? "business" : null, // no ownership type: an account name that is a company's
         address: addressLine([txt(r, "ADDRESS")], txt(r, "CITY"), txt(r, "STATE"), txt(r, "ZIP_CODE")), phone: null, people: [],
       });
     }
@@ -669,6 +696,7 @@ const sacramentoCounty: BulkSource = {
         state: "CA", source: "Sacramento County business licenses", sourceUrl: SAC_PAGE,
         businessName: name, licenseNumber: txt(r, "Record_number"), licenseType: "Business license", specialty: activity,
         status: null, principal: null, city: city || null, expires: isoDay(r.ExpirationDate),
+        holder: ORG.test(name) ? "business" : null, // no ownership type: a business name that is a company's
         // Home-based licenses are published without a street ("0") and with "Home Based Business" for the phone.
         address: txt(r, "StName") && txt(r, "stNumber") !== "0" ? addressLine([txt(r, "stNumber"), txt(r, "StName"), txt(r, "Suite")], city || null, st || null, txt(r, "Zip")) : null,
         phone: /\d{3}/.test(txt(r, "Business_Phone") ?? "") ? txt(r, "Business_Phone") : null, people: [],
@@ -692,6 +720,7 @@ const louisville: BulkSource = {
         state: "KY", source: "Louisville Metro contractor licenses", sourceUrl: LOU_PAGE,
         businessName: isOrg ? name : null, licenseNumber: txt(r, "LICENSENO"), licenseType: txt(r, "DESCRIPTION"), specialty: txt(r, "CATEGORY"),
         status: "Listed as active on 2022-06-19 (the layer's last update)", principal: isOrg ? null : name, city: txt(r, "CITY"), expires: isoDay(r.EXPIRATIONDATE),
+        holder: isOrg ? "business" : "individual", // the licensee's own name: a company's or a person's
         address: addressLine([txt(r, "ADDRESS1"), txt(r, "ADDRESS2")], txt(r, "CITY"), txt(r, "STATE"), txt(r, "ZIPCODE")), phone: txt(r, "DAYTIMEPHONE"),
         people: [{ name: isOrg ? null : name, role: "Licensee" }],
       });

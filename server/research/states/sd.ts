@@ -28,8 +28,9 @@ async function pdfRows(url: string, header: string[]) {
 const flip = (v: string | null) => { const m = v?.match(/^([^,]+),\s*(.+)$/); return m ? clean(`${m[2]} ${m[1]}`) : clean(v); };
 const titleCity = (v: string | null) => clean(v)?.toUpperCase() ?? null;
 
+/** Every list here licenses people (plumbers, specialty and septic installers): an employer on the row doesn't make the license the employer's (round 2, decision 2). */
 const lic = (h: Omit<LicenseHit, "matchedOn">, business: string | null, personName: string | null): BulkHit =>
-  ({ kind: "license", hit: { ...h, matchedOn: personName ? "principal" : "business" }, business, person: personName, keys: { licenses: [], phones: [], addresses: [] } });
+  ({ kind: "license", hit: { ...h, holder: "individual", matchedOn: personName ? "principal" : "business" }, business, person: personName, keys: { licenses: [], phones: [], addresses: [] } });
 
 /**
  * The commission's lists are grouped: a city line, then a license-type line (a long type wraps onto a second

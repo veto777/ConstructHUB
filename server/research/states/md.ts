@@ -36,25 +36,30 @@ const soda = (id: string) => ({ datasetUrl: `https://${MC}/d/${id}`, url: `https
 const LICENSES: LicenseSource[] = [
   { state: "MD", source: "Montgomery County building contractor licenses", ...soda("c7hs-c9qq"),
     fields: { businessName: "applicant", licenseNumber: "licenseno", licenseType: "licensetype", specialty: null, status: null, principal: "applicant", city: "city", expires: "expiredate" },
-    personField: "applicant", address: "addr1", zip: "zip", phone: "telephone" },
+    personField: "applicant", address: "addr1", zip: "zip", phone: "telephone",
+    // The county publishes no entity type: a business only when the applicant's name reads as one (round 2, decision 2).
+    holder: (r) => (looksLikeBusiness(String(r.applicant ?? "")) ? "business" : null) },
   { state: "MD", source: "Montgomery County electrical business licenses", ...soda("ydri-y5u9"),
     fields: { businessName: "applicant", licenseNumber: "licenseno", licenseType: "licensetype", specialty: null, status: null, principal: null, city: "city", expires: "expiredate" },
-    personField: null, address: "address1", zip: "zip" },
+    personField: null, address: "address1", zip: "zip", holder: () => "business" },
   { state: "MD", source: "Montgomery County limited electrical business licenses", ...soda("rmjr-4zb9"),
     fields: { businessName: "applicant", licenseNumber: "licenseno", licenseType: "licensetype", specialty: null, status: null, principal: null, city: "city", expires: "expiredate" },
-    personField: null, address: "addr1", zip: "zip" },
+    personField: null, address: "addr1", zip: "zip", holder: () => "business" },
   { state: "MD", source: "Montgomery County master electrician licenses", ...soda("v8mn-6i2r"),
     fields: { businessName: null, licenseNumber: "licenseno", licenseType: "licensetype", specialty: null, status: null, principal: "applicant", city: "city", expires: "expiredate" },
-    personField: "applicant", address: "addr1", zip: "zip" },
+    personField: "applicant", address: "addr1", zip: "zip", holder: () => "individual" },
   { state: "MD", source: "Montgomery County limited master electrician licenses", ...soda("f637-ajic"),
     fields: { businessName: null, licenseNumber: "licenseno", licenseType: "licensetype", specialty: "scope_limitation", status: null, principal: "applicant", city: "city", expires: "expiredate" },
-    personField: "applicant", address: "addr1", zip: "zip" },
+    personField: "applicant", address: "addr1", zip: "zip", holder: () => "individual" },
   { state: "MD", source: "Montgomery County journeyman electrician licenses", ...soda("vajy-hwge"),
     fields: { businessName: null, licenseNumber: "licenseno", licenseType: "licensetype", specialty: null, status: null, principal: "applicant", city: "city", expires: "expiredate" },
-    personField: "applicant", address: "addr1", zip: "zip" },
+    personField: "applicant", address: "addr1", zip: "zip", holder: () => "individual" },
   { state: "MD", source: "Montgomery County fire system licenses", ...soda("yjd7-guhd"),
     fields: { businessName: "applicant", licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: null, principal: "applicant", city: "city", expires: "expired_date" },
-    personField: "applicant", address: "address1", zip: "zip_code" },
+    personField: "applicant", address: "address1", zip: "zip_code",
+    // A fire system license names its holder and then the company they work for ("Austin Moss Ace Fire Exstinguisher
+    // Service Inc", live 2026-10-16): the person's own license; the employer doesn't make it a business's.
+    holder: () => "individual" },
 ];
 
 const COMPLAINTS: ComplaintSource[] = [

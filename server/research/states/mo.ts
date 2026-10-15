@@ -18,7 +18,7 @@ import type { LicenseHit } from "@shared/research-reports";
 import { wholeWordMatch, type LicenseSource } from "../licenses";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
-import { politeFetch } from "../http";
+import { politeFetch, rethrowIfBlocked } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { safeDecode, withNote } from "../notes";
 import { looksLikeBusiness } from "./lib/business-name";
@@ -80,9 +80,12 @@ function moRow(r: Record<string, string>, licenseName: string, label: string): B
   const hit: LicenseHit = {
     state: "MO", source: label, sourceUrl: MO_DOWNLOADS,
     businessName: [business, dba ? `DBA ${dba}` : null].filter(Boolean).join(" ") || null, licenseNumber: clean(r.lic_number),
-    licenseType: licenseName, specialty: clean(r.clas_description), status: discipline ? `${status ?? ""}; discipline: ${discipline}`.replace(/^; /, "") : status,
+    // The status words only; discipline goes to `discipline` (never shown on a license; round 2, decision 1).
+    licenseType: licenseName, specialty: clean(r.clas_description), status, discipline,
     principal: who, city: clean(r.ba_city), expires: isoDay(r.lic_exp_date) ?? usDate(r.lic_exp_date),
     matchedOn: isBusiness ? "business" : "principal", address,
+    // The file says who holds it: a corporation's certificate, or an entity row with no person, is a business.
+    holder: isBusiness ? "business" : "individual",
     people: who ? [{ name: who, role: isBusiness ? null : licenseName }] : [],
   };
   return { kind: "license", hit, business: [business, dba].filter(Boolean).join(" ") || null, person: who, keys: { licenses: [r.lic_number], addresses: [address] } };
@@ -154,6 +157,28 @@ const MO_DETAILS = 12;
 export const moIsBusiness = (rat: string | null, name: string | null): boolean =>
   BUSINESS_PROFESSION.test(rat ?? "") || (rat === "Electrical Contractor" && looksLikeBusiness(name));
 
+/**
+ * Who holds a MO PRO license (round 2, decision 2): a corporation's certificate is a business's; the architect,
+ * engineer, surveyor and landscape architect licenses are a person's own. The electrical contractor license is held
+ * by a person or a firm and the search doesn't say which: a business only when the name reads as one, else unknown.
+ */
+export function moHolder(rat: string | null, name: string | null): "business" | "individual" | null {
+  if (BUSINESS_PROFESSION.test(rat ?? "")) return "business";
+  if (rat === "Electrical Contractor") return looksLikeBusiness(name) ? "business" : null;
+  return rat ? "individual" : null;
+}
+
+/**
+ * The license's own status word, and the discipline the detail page publishes kept apart (round 2, decision 1): the
+ * status is "Active" or "Not active" as searched; "Current Discipline Status" and "Previous Disciplinary Actions" go
+ * to `discipline`, which a report never shows on the license.
+ */
+export function moStatus(status: string, fields: Record<string, string>): { status: string; discipline: string | null } {
+  const disc = fields["Current Discipline Status"], prior = fields["Previous Disciplinary Actions"];
+  const discipline = [disc && disc !== "None" ? `current discipline: ${disc}` : null, prior && prior !== "No" ? `previous disciplinary actions: ${prior}` : null].filter(Boolean).join("; ");
+  return { status: status === "Active" ? "Active" : "Not active", discipline: discipline || null };
+}
+
 async function moSearch(criteria: string, value: string, kind: "person" | "company" | "license"): Promise<LicenseHit[]> {
   const hits: LicenseHit[] = [];
   const notes: string[] = [];
@@ -173,16 +198,13 @@ async function moSearch(criteria: string, value: string, kind: "person" | "compa
       let d: ReturnType<typeof parseMoDetail> = { fields: {}, address: null, people: [] };
       if (i < MO_DETAILS) {
         try { d = parseMoDetail(await moApex<MoSection[]>("MODPR_LicenseSearchController", "getApplicationData", { blId: r.businessLicenseId, status, directApplication: false })); }
-        catch { failed++; }
+        catch (err) { rethrowIfBlocked(err); failed++; }
       }
-      const disc = d.fields["Current Discipline Status"], prior = d.fields["Previous Disciplinary Actions"];
-      const statusText = [status === "Active" ? "Active" : "Not active",
-        disc && disc !== "None" ? `current discipline: ${disc}` : null,
-        prior && prior !== "No" ? `previous disciplinary actions: ${prior}` : null].filter(Boolean).join("; ");
+      const { status: statusText, discipline } = moStatus(status, d.fields);
       hits.push({
         state: "MO", source: "Missouri MO PRO licensee search", sourceUrl: MO_SEARCH,
         businessName: isBusiness ? name : null, licenseNumber: clean(d.fields["License Number"]), licenseType: clean(r.rat),
-        specialty: null, status: statusText, principal: isBusiness ? null : name,
+        specialty: null, status: statusText, discipline, holder: moHolder(clean(r.rat), name), principal: isBusiness ? null : name,
         city: [clean(r.city), clean(r.state)].filter(Boolean).join(", ") || null, expires: usDate(d.fields["Expiration Date"]),
         matchedOn: kind === "license" ? "license" : isBusiness ? "business" : "principal", address: d.address,
         people: [...(!isBusiness && name ? [{ name, role: clean(r.rat) }] : []), ...d.people],
@@ -207,6 +229,8 @@ const MO_OWTS: LicenseSource = {
   datasetUrl: "https://data.mo.gov/d/nfxa-cq5r", url: "https://data.mo.gov/resource/nfxa-cq5r.json",
   fields: { businessName: "business", licenseNumber: "installer_id", licenseType: null, specialty: "installer_level", status: null, principal: null, city: "city", expires: "date_of_expiration" },
   personField: ["first_name", "mi", "last_name"], phone: "business_phone",
+  // An installer registration is the person's own (the business column is where they work).
+  holder: () => "individual",
 };
 
 export const pack: StatePack = {

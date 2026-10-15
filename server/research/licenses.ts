@@ -9,7 +9,7 @@
  * Austin publishes only names, numbers and dates; CO, DE and IL publish a city and ZIP but no street; CT, DE, OR
  * BCD, VT, CO and IL publish no phone.
  */
-import { politeFetch } from "./http";
+import { politeFetch, rethrowIfBlocked } from "./http";
 import type { LicenseHit } from "@shared/research-reports";
 import { capNote, noteOf, withNote, type Noted } from "./notes";
 import { looksLikeBusiness } from "./states/lib/business-name";
@@ -268,6 +268,21 @@ function rowPeople(src: LicenseSource, row: Record<string, unknown>, business: s
   return out;
 }
 
+/**
+ * A dataset's date as YYYY-MM-DD. Checked live 2026-10-16: WA, Austin, CO, CT, DE, VT and NY publish ISO timestamps
+ * ("2027-12-31T00:00:00.000", cut to the day); TX TDLR, OR CCB, OR BCD and IL IDFPR publish text month/day/year
+ * ("06/30/2025", "7/1/2029"), which used to be shown as published. Anything else is not a date (null).
+ */
+export function dateOf(v: string | null): string | null {
+  if (!v) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  const m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const [mo, d, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (y < 1900 || mo < 1 || mo > 12 || d < 1 || d > new Date(Date.UTC(y, mo, 0)).getUTCDate()) return null;
+  return `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+}
+
 function toHit(src: LicenseSource, row: Record<string, unknown>, matchedOn: LicenseHit["matchedOn"], principal?: string | null): LicenseHit {
   const expires = str(row, src.fields.expires);
   // One field that is both the business and the person (an "applicant"): a business only when it reads as one.
@@ -280,7 +295,7 @@ function toHit(src: LicenseSource, row: Record<string, unknown>, matchedOn: Lice
     businessName: business, licenseNumber: str(row, src.fields.licenseNumber),
     licenseType: str(row, src.fields.licenseType), specialty: str(row, src.fields.specialty),
     status: str(row, src.fields.status), principal: principal ?? personOf(src, row) ?? (business ? null : str(row, src.fields.businessName)),
-    city: str(row, src.fields.city), expires: expires ? expires.slice(0, 10) : null, matchedOn,
+    city: str(row, src.fields.city), expires: dateOf(expires), matchedOn,
     holder: src.holder ? src.holder(row) : null,
     ...(src.address ? { address: addressOf(src, row) } : {}),
     ...(src.phone ? { phone: phonesOf(src, row)[0] ?? null } : {}),
@@ -296,7 +311,8 @@ export async function withPeople(src: LicenseSource, hits: LicenseHit[]): Promis
   for (const ds of src.peopleFrom) {
     let rows: Record<string, unknown>[];
     try { rows = await sodaRows(ds.url, `${ds.licenseField} in (${ids.map(quote).join(",")}) AND ${ds.nameField} IS NOT NULL`, 1000, "People data"); }
-    catch { continue; } // the license rows stand on their own; the people are extra
+    // The license rows stand on their own; the people are extra. An access denial stops the source (round 2, decision 6).
+    catch (err) { rethrowIfBlocked(err); continue; }
     for (const r of rows) {
       const lic = str(r, ds.licenseField), raw = str(r, ds.nameField);
       if (!lic || !raw) continue;

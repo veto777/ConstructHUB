@@ -69,3 +69,29 @@ describe("Alabama names with case numbers glued on (the 2010-2020 lists, loaded 
     expect(aecbBusiness("Brad's Pool & Supply")).toBe("Brad's Pool & Supply");
   });
 });
+
+describe("Alabama round-2 audit (2026-10-16)", () => {
+  it("each lookup declares the one kind of name it searches (decision 8)", async () => {
+    const { pack } = await import("./al");
+    expect(pack.liveLicenses!.map((l) => l.kinds)).toEqual([["company"], ["person"]]);
+  });
+  it("surname-like trade words and prefixes don't make a respondent a business (decision 3)", () => {
+    expect(aecbBusiness("John Steel")).toBeNull();
+    expect(aecbBusiness("Mark Roofner")).toBeNull();
+    expect(aecbBusiness("Steel Roofing LLC")).toBe("Steel Roofing LLC");
+  });
+  it("a general contractor license is a business's; an installer license is the installer's own, whatever business it names (decision 2)", async () => {
+    const { vi } = await import("vitest");
+    const { resetHostState } = await import("../http");
+    resetHostState();
+    const rows = (n: number, cells: (i: number) => string[]) => `<table><tbody>${Array.from({ length: n }, (_, i) => `<tr>${cells(i).map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    const gc = rows(120, (i) => [i ? `OTHER ${i} INC` : "DUNN CONSTRUCTION CO INC", String(100 + i), "BIRMINGHAM", "AL", "BC", "(205) 592-3866"]);
+    const aowb = rows(120, (i) => [i ? `DOE${i}, JOHN` : "SMITH, JANE Q", String(500 + i), "Basic", "1/1/2020", "Jefferson", ""]);
+    vi.stubGlobal("fetch", vi.fn(async (u: string) => /robots\.txt$/.test(u) ? new Response("", { status: 404 }) : new Response(/AOWB/.test(u) ? aowb : gc, { status: 200 })));
+    try {
+      const { searchAlGc, searchAlAowb } = await import("./al");
+      expect((await searchAlGc("Dunn Construction", "company"))[0]).toMatchObject({ businessName: "DUNN CONSTRUCTION CO INC", holder: "business" });
+      expect((await searchAlAowb("Jane Smith", "person"))[0]).toMatchObject({ principal: "JANE Q SMITH", holder: "individual" });
+    } finally { vi.unstubAllGlobals(); resetHostState(); }
+  }, 20_000);
+});

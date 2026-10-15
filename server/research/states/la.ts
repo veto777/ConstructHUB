@@ -17,7 +17,7 @@ import { normLicense, type IdQuery } from "../identifiers";
 import { download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { firstAmount, tableRows, text } from "./lib/g4-html";
 import { adverseFrom } from "../adverse";
-import { capNote, withNote } from "../notes";
+import { capNote, noteOf, withNote } from "../notes";
 import type { StatePack } from "./types";
 
 const ARLS = "https://arlspublic.lslbc.louisiana.gov";
@@ -93,6 +93,8 @@ async function lslbcQuery(body: URLSearchParams, referer: string, matchedOn: Lic
         state: "LA", source: "Louisiana State Licensing Board for Contractors", sourceUrl: SEARCH_PAGE,
         businessName: det.name ?? row.name, licenseNumber: l.number, licenseType: l.type, specialty, status: l.status,
         principal, city: det.city, expires: l.expires, matchedOn, address: det.address, phone: det.phone, people,
+        // A contractor license (its classes held through qualifying parties) is the business's (round 2, decision 2).
+        holder: "business",
       });
     }
   }
@@ -121,7 +123,7 @@ export async function searchLslbcBy(q: IdQuery): Promise<LicenseHit[] | null> {
   const want = normLicense(q.value);
   const hits = await lslbcQuery(new URLSearchParams({ AccountNumber: String(Number(digits)), SearchType: "ByNumber" }), `${ARLS}/Public/DetailedSearch/ByNumber`, "license", null, () => true);
   const digitsOnly = /^\d+$/.test(q.value.trim());
-  return hits.filter((h) => normLicense(h.licenseNumber) === want || (digitsOnly && Number(h.licenseNumber?.match(/\d+/g)?.join("") ?? NaN) === Number(digits)));
+  return withNote(hits.filter((h) => normLicense(h.licenseNumber) === want || (digitsOnly && Number(h.licenseNumber?.match(/\d+/g)?.join("") ?? NaN) === Number(digits))), noteOf(hits));
 }
 
 // ── Contractor violations (bulk) ──────────────────────────────────────────────────────────────────────────────

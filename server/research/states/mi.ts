@@ -30,8 +30,19 @@ export const MI_LICENSE_TYPES = [
   "Manufactured Home Installer Servicer",
 ];
 
+/**
+ * Who holds a LARA license, from its type (round 2, decision 2): companies, contractors and branch offices are a
+ * business's; individual builders, masters, journeymen, technicians, installers and repairers a person's own.
+ */
+export function miHolder(type: string | null): "business" | "individual" | null {
+  if (!type) return null;
+  if (/company|contractor|\bcont$|branch office/i.test(type)) return "business";
+  if (/individual|master|journey|tech|specialist|installer|repairer|servicer/i.test(type)) return "individual";
+  return null;
+}
+
 /** One row of a LARA export (columns: License Number, License Type, Business Name, First Name, Middle Initial, Last Name, License Expiration Date, City, State, Zip). */
-export function miRow(r: Record<string, string>): BulkHit | null {
+export function miRow(r: Record<string, string>, component?: string): BulkHit | null {
   const business = clean(r["Business Name"]);
   const who = clean([r["First Name"], r["Middle Initial"], r["Last Name"]].map((v) => v?.trim()).filter(Boolean).join(" "));
   if (!business && !who) return null;
@@ -45,8 +56,11 @@ export function miRow(r: Record<string, string>): BulkHit | null {
       expires: usDate(r["License Expiration Date"]), matchedOn: business ? "business" : "principal",
       // The export names one person per license without a role; no street address or phone is published.
       address: null, phone: null, ...(who ? { people: [{ name: who, role: null }] } : {}),
+      holder: miHolder(clean(r["License Type"])),
     },
     business, person: who, keys: { licenses: [r["License Number"]] },
+    // One export per license type: each is a component, checked against its own previous count (round 2, decision 10).
+    ...(component ? { component } : {}),
   };
 }
 
@@ -55,7 +69,7 @@ async function* laraLoader(): AsyncIterable<BulkHit> {
     const path = await accelaExport("LARA", type);
     try {
       let n = 0;
-      for await (const r of csvRecords(path)) { const h = miRow(r); if (h) { n++; yield h; } }
+      for await (const r of csvRecords(path)) { const h = miRow(r, type); if (h) { n++; yield h; } }
       if (!n) throw new Error(`LARA export for ${type} was empty`);
     } finally {
       await fs.rm(path, { force: true });

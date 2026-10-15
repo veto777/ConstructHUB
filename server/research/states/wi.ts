@@ -34,6 +34,8 @@ const DHS_ASBESTOS_PAGE = "https://www.dhs.wisconsin.gov/asbestos/contractors.ht
  */
 const BUSINESS = /\b(INC|LLC|L\.L\.C|CORP|CORPORATION|CO|COMPANY|LTD|LLP|SERVICES?|DRILLING|WELL|PUMPS?|PUMPING|ENTERPRI[SZ]ES?|PLUMBING|SEPTIC|SUPPLY|GEOTHERMAL|ELECTRIC|HEATING|SONS|BROTHERS|BROS)\b|&/i;
 export const isPersonName = (n: string) => /^[A-Z][A-Z'.\- ]*,\s+[A-Z]/i.test(n) ? !BUSINESS.test(n) : !BUSINESS.test(n) && !looksLikeBusiness(n);
+/** A legal entity's name: the registered form says it is a company. */
+const ENTITY = /\b(INC|INCORPORATED|LLC|L\.L\.C|CORP|CORPORATION|CO|COMPANY|LTD|LLP)\b\.?/i;
 const dash = (v: string | undefined) => clean(v?.replace(/^-$/, ""));
 /** Street lines (a line with no digit is a company name in the DNR files, not a street), city, state and ZIP. */
 export function wiAddress(lines: (string | undefined)[], city?: string, st?: string, zip?: string): string | null {
@@ -76,6 +78,10 @@ export function dnrRows(rows: string[][], type: string): BulkHit[] {
         specialty: updated ? `Listed in the DNR directory (${clean(updated)})` : "Listed in the DNR directory", status: null,
         principal: person ? flip(raw) : null, city: [city, st && st !== "WI" ? st : null].filter(Boolean).join(", ") || null, expires: null,
         matchedOn: person ? "principal" : "business",
+        // The DNR files publish no entity type: a person's name is an individual's license, a legal entity's name
+        // (Inc, LLC, Corp, …) a business's; a name that only reads as a business ("… WELL SERVICE") is unknown
+        // (round 2, decisions 2 and 3), and its contact details stay out of the report like an individual's.
+        holder: person ? "individual" : ENTITY.test(raw) ? "business" : null,
         // A person's mailing address and phones are a home address and phone: city only, never a key.
         address: person ? null : address, phone: person ? null : phones[0] ?? null,
         ...(person ? { people: [{ name: flip(raw)!, role: type.replace(/ \(DNR directory\)$/, " license holder") }] } : {}),
@@ -91,7 +97,8 @@ export function dnrRows(rows: string[][], type: string): BulkHit[] {
 async function* dnrLoader(): AsyncIterable<BulkHit> {
   for (const f of DNR_FILES) {
     const path = await download(await linkTo(DNR_PAGE, f.file));
-    try { yield* dnrRows(await xlsxRows(path), f.type); } finally { await fs.rm(path, { force: true }); }
+    // Each directory is a component: the 70% rule applies to it on its own (round 2, decision 10).
+    try { for (const h of dnrRows(await xlsxRows(path), f.type)) yield { ...h, component: f.file }; } finally { await fs.rm(path, { force: true }); }
   }
 }
 
@@ -111,6 +118,8 @@ export function dhsRows(rows: string[][], page: string, source: string): BulkHit
         state: "WI", source, sourceUrl: page, businessName: name, licenseNumber: null, licenseType: clean(r[0]) ? `Certified ${clean(r[0])!.toLowerCase()}` : null,
         specialty: null, status: null, principal: null, city: [clean(r[4]), st && st !== "WI" ? st : null].filter(Boolean).join(", ") || null,
         expires: excelDate(r[1]), matchedOn: "business", address,
+        // DHS certifies these as companies ("Type of Company"): the company holds the certification.
+        holder: "business",
       },
       business: name, person: null, keys: { addresses: [address] },
     });
@@ -125,7 +134,7 @@ async function* dhsLoader(): AsyncIterable<BulkHit> {
   ];
   for (const l of lists) {
     const path = await download(await linkTo(l.page, l.file));
-    try { yield* dhsRows(await xlsxRows(path), l.page, l.source); } finally { await fs.rm(path, { force: true }); }
+    try { for (const h of dhsRows(await xlsxRows(path), l.page, l.source)) yield { ...h, component: l.file }; } finally { await fs.rm(path, { force: true }); }
   }
 }
 

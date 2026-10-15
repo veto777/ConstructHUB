@@ -114,7 +114,7 @@ class DltSession {
 
 const cityOf = (address: string | null) => address?.match(/,\s*([^,]+?)\s*,\s*[A-Z]{2}\s+\d{5}/)?.[1] ?? null;
 
-function dltHit(trade: string, row: GridRow, d: Record<string, string | null>, matchedOn: LicenseHit["matchedOn"]): LicenseHit {
+export function dltHit(trade: string, row: GridRow, d: Record<string, string | null>, matchedOn: LicenseHit["matchedOn"]): LicenseHit {
   const person = [row.cells["First Name"], row.cells.MI, row.cells["Last Name"]].filter(Boolean).join(" ") || d.Name || null;
   const business = row.cells["Corporation Name"] ?? d["Corporation Name"] ?? d.Company ?? null;
   const isBusiness = BUSINESS_TRADES.includes(trade);
@@ -124,6 +124,9 @@ function dltHit(trade: string, row: GridRow, d: Record<string, string | null>, m
     businessName: business, licenseNumber: row.license, licenseType: trade, specialty: null, status: null,
     principal: isBusiness ? null : person, city: cityOf(address), expires: usDate(d["Expiration Date"]), matchedOn,
     address, phone: d.Telephone ?? null,
+    // The trade decides who holds the license (round 2, decision 2): an electrician's or plumber's license is the
+    // person's even with an employer's name on it, so their address and phone stay out of the report.
+    holder: isBusiness ? "business" : "individual",
     people: isBusiness || !person ? [] : [{ name: person, role: business ? `Licensee (company: ${business})` : "Licensee" }],
   };
 }
@@ -206,7 +209,9 @@ export function dltViolationHit(type: string, r: GridRow, d: Record<string, stri
     status: [type === "Violations History" ? "Violation history" : "Violation", code ? `status code ${code}` : null].filter(Boolean).join(", "),
     city: cityOf(d.Address ?? null),
     detail: [d["Violation Description"]?.replace(/\.+$/, ""), cease ? `Cease and desist date ${cease}` : null, d["Hearing Result"] ? `Hearing result: ${d["Hearing Result"]}` : null].filter(Boolean).join(". ") || null,
-    amount: null, adverse: hearing ?? (cease ? true : null), address: d.Address ?? null, phone: d.Phone ?? null, licenseNumber: d["License #"] ?? (r.cells["License Number"] || null),
+    // A published hearing result decides (mixed or negated wording stays unknown, round 2, decision 4); only with
+    // no hearing result at all does a cease-and-desist date stand for the order.
+    amount: null, adverse: clean(d["Hearing Result"]) ? hearing : cease ? true : null, address: d.Address ?? null, phone: d.Phone ?? null, licenseNumber: d["License #"] ?? (r.cells["License Number"] || null),
   };
 }
 
@@ -253,16 +258,20 @@ async function* riRostersLoader(): AsyncIterable<BulkHit> {
         const status = clean(row[cols.status]);
         const exp = clean(row[cols.expires]);
         const expires = exp && /^\d{2}-\d{2}-\d{4}$/.test(exp) ? usDate(exp) : null;
-        const firm = /Certificate of Authorization/i.test(type ?? "") || (r.page === "solarRetailerRoster" && looksLikeBusiness(name));
+        const coa = /Certificate of Authorization/i.test(type ?? "");
+        const firm = coa || (r.page === "solarRetailerRoster" && looksLikeBusiness(name));
         // An individual's address is a person's: city, state and ZIP only, and no address key (audit 2026-10-15, decision 4).
         const address = clean([...(firm ? [get("Address 1"), get("Address 2")] : []), get("City"), get("State"), get("Zip Code")].filter(Boolean).join(", "));
         const hit: LicenseHit = {
           state: "RI", source: "Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",
           sourceUrl: DBR_ROSTERS_PAGE, businessName: firm ? name : null, licenseNumber: no, licenseType: type, specialty: null,
           status, principal: firm ? null : name, city: get("City"), expires, matchedOn: firm ? "business" : "principal",
+          // A certificate of authorization is a firm's; the professional rosters license people; the solar retailer
+          // roster doesn't say (its name only reads as a business), so its holder is unknown (round 2, decisions 2, 3).
+          holder: coa ? "business" : r.page === "solarRetailerRoster" ? null : "individual",
           address, people: firm ? [] : [{ name, role: null }],
         };
-        yield { kind: "license", hit, business: firm ? name : null, person: firm ? null : name, keys: { licenses: [no], addresses: firm ? [address] : [] } };
+        yield { kind: "license", hit, business: firm ? name : null, person: firm ? null : name, keys: { licenses: [no], addresses: firm ? [address] : [] }, component: r.label };
       }
     } finally {
       await fs.rm(path, { force: true });

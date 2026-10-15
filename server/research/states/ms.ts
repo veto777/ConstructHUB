@@ -21,7 +21,7 @@ import { download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { promises as fs } from "node:fs";
 import { firstAmount, tableRows, text } from "./lib/g4-html";
 import { adverseFrom } from "../adverse";
-import { capNote, withNote } from "../notes";
+import { capNote, noteOf, withNote } from "../notes";
 import type { StatePack } from "./types";
 
 const HOST = "http://search.msboc.us";
@@ -103,6 +103,8 @@ async function msDetails(rows: MsResultRow[], matchedOn: LicenseHit["matchedOn"]
       businessName: d.name ?? row.name, licenseNumber: d.licenseNumber, licenseType: d.type ?? row.type,
       specialty: Array.from(new Set(d.classes.map((c) => c.cls))).join(", ") || null, status: d.status, principal,
       city: d.city, expires: d.expires, matchedOn, address: d.address ?? row.address, phone: d.phone, people,
+      // A board contractor license (classes held through qualifying parties, with officers) is the business's (round 2, decision 2).
+      holder: "business",
     });
   }
   return hits;
@@ -148,8 +150,8 @@ export async function searchMsbocBy(q: IdQuery): Promise<LicenseHit[] | null> {
     const digits = q.value.match(/\d+/)?.[0];
     if (!digits) return null;
     const want = normLicense(q.value);
-    return (await msQuery(form({ ...BLANK, Lic: digits, Advanced: "1", maxrecords: "100" }), true, "license", null, () => true))
-      .filter((h) => normLicense(h.licenseNumber) === want);
+    const hits = await msQuery(form({ ...BLANK, Lic: digits, Advanced: "1", maxrecords: "100" }), true, "license", null, () => true);
+    return withNote(hits.filter((h) => normLicense(h.licenseNumber) === want), noteOf(hits));
   }
   if (q.type === "address") {
     const zip = addressKeys(q.value).find((k) => k.startsWith("z:"))?.slice(2);

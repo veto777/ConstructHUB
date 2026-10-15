@@ -16,6 +16,11 @@ describe("Oklahoma CIB roofing registrations", () => {
     expect(h.hit).toMatchObject({ businessName: "S & CM, LLC DBA MCROOF.US", licenseNumber: "80000002", status: "In Good Standing", expires: "2027-12-01", specialty: "Commercial endorsement", principal: "SCOTT A MCCOLLUM,SR", address: "722 ENTERPRISE DR #150, EDMOND, OK 73013" });
     expect(h.keys).toEqual({ licenses: ["80000002"], phones: ["405-877-7663"], addresses: ["722 ENTERPRISE DR #150, EDMOND, OK 73013"] });
   });
+  it("takes the holder from CIB's own company_type, not from the company name (round 2, decisions 2 and 3)", () => {
+    expect(roofingHit({ ...REG, company_type: "LLC" })!.hit.holder).toBe("business");
+    expect(roofingHit({ ...REG, company_type: "Sole Proprietorship" })!.hit.holder).toBe("individual");
+    expect(roofingHit({ ...REG, company_type: "" })!.hit.holder).toBeNull();
+  });
 });
 
 // Excerpts of the ODOL lists of 2026-10-08 (oklahoma.gov/labor, Active_Alarm_Licenses_Companies_100826.pdf and
@@ -48,7 +53,10 @@ describe("ODOL alarm, locksmith and fire sprinkler lists", () => {
     expect(expandEndorsements(by.A475945.served, legend)).toBe("90-Day Temporary Trainee");
     expect(expandEndorsements(by.A475173.served, legend)).toBe("CCTV Residential Stand Alone");
     expect(expandEndorsements("FS-TRAINEE", legend)).toBe("Fire Sprinkler (Trainee)");
-    expect(expandEndorsements("XYZ-T", legend)).toBe("XYZ-T"); // a code the legend doesn't print stays as printed
+    // Round 2, decision 13: a code the legend doesn't print is "code X", never shown bare.
+    expect(expandEndorsements("XYZ-T", legend)).toBe("code XYZ-T");
+    expect(expandEndorsements("FS-Q", legend)).toBe("Fire Sprinkler (code Q)");
+    expect(expandEndorsements("ZZ", legend)).toBe("code ZZ");
   });
 
   it("reads the JS reader's layout the same way, including names that run into the industries column", () => {

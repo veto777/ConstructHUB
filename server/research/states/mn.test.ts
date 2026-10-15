@@ -47,5 +47,12 @@ describe("Minnesota DLI", () => {
       Addr1: "43794 CNTY RD 9", Addr2: "", City: "HOLDINGFORD", St: "MN", Zip: "56340", Phone_No: "3202902217", Lic_Number: "PC675877", Status: "Issued", Exp_Date: "12/31/2027" })!;
     expect(h.hit).toMatchObject({ businessName: "RIPPLINGER PLUMBING INC", address: "43794 CNTY RD 9, HOLDINGFORD, MN 56340", phone: "3202902217", expires: "2027-12-31", status: "Issued" });
     expect(h.keys?.licenses).toEqual(["PC675877"]);
+    expect(h.hit).toMatchObject({ holder: "business" });
+  });
+
+  it("a person's license is the person's, a DBA notwithstanding (audit round 2, decision 2)", () => {
+    const h = mnLicense({ Bus_Pers: "Person", License_Type: "Plumbing", License_Subtype: "Master Plumber", Name: "JANE DOE", DBA_Name: "DOE PLUMBING",
+      Addr1: "12 Elm St", Addr2: "", City: "HOLDINGFORD", St: "MN", Zip: "56340", Phone_No: "3205550100", Lic_Number: "PM012345", Status: "Issued", Exp_Date: "12/31/2027" })!;
+    expect(h.hit).toMatchObject({ holder: "individual", businessName: "DOE PLUMBING" });
   });
 });

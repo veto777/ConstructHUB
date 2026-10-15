@@ -74,6 +74,8 @@ async function serviceHit(r: any, matchedOn: LicenseHit["matchedOn"]): Promise<L
     status: clean(own?.status), principal: contact, city: clean(r.city), expires: anyDay(r.primary_license_expiration_date), matchedOn,
     address: [clean(r.address_line_1), clean(r.city)].filter(Boolean).join(" ") || null, phone: clean(r.phone),
     people: contact ? [{ name: contact, role: "Primary contact" }] : [],
+    // A "service" on the portal is a licensed electrical business (round 2, decision 2).
+    holder: "business",
   };
 }
 
@@ -83,6 +85,8 @@ async function userHit(r: any, matchedOn: LicenseHit["matchedOn"]): Promise<Lice
     state: "WY", source: SOURCE, sourceUrl: PORTAL, businessName: null, licenseNumber: clean(r.primary_license_number),
     licenseType: clean(r.primary_license_levels) ?? clean(own?.license_category_name), specialty: null, status: clean(own?.status),
     principal: clean(`${r.first_name ?? ""} ${r.last_name ?? ""}`), city: null, expires: anyDay(r.primary_license_expiration_date), matchedOn,
+    // A "user" is a licensed person (electrician, apprentice, low-voltage technician).
+    holder: "individual",
   };
 }
 

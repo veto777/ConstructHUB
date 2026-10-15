@@ -66,7 +66,7 @@ export function parseCbrDetails(html: string): { profession: string | null; type
 
 const INDIVIDUAL_PROFESSIONS = /^(Electrician|Plumber|Elevator Mechanic)$/i;
 
-function cbrHit(name: string, dba: string | null, city: string | null, d: ReturnType<typeof parseCbrDetails>, kind: "person" | "company" | "license", phone: string | null = null): LicenseHit {
+export function cbrHit(name: string, dba: string | null, city: string | null, d: ReturnType<typeof parseCbrDetails>, kind: "person" | "company" | "license", phone: string | null = null): LicenseHit {
   const individual = INDIVIDUAL_PROFESSIONS.test(d.profession ?? "");
   // The registry's address is self-provided and is usually only "City ST ZIP"; it is kept as the address only when it has a street.
   const street = d.address && /^\d/.test(d.address) ? d.address : null;
@@ -77,6 +77,9 @@ function cbrHit(name: string, dba: string | null, city: string | null, d: Return
     specialty: d.qualifierType, status: "Active (listed in the registry)", principal: individual ? name : d.qualifier,
     city: city ?? (d.address && !street ? clean(d.address.replace(/\s+\d{5}(-\d{4})?$/, "")) : null), expires: d.expires,
     matchedOn: kind === "company" ? "business" : kind === "license" ? "license" : "principal",
+    // The profession decides (round 2, decision 2): an electrician's, plumber's or elevator mechanic's license is the
+    // person's (a DBA beside it doesn't change that); a contractor license is the contracting business's.
+    holder: individual ? "individual" : /contractor/i.test(d.profession ?? "") ? "business" : null,
     phone: d.phone ?? phone, ...(street ? { address: street } : {}),
     people: individual ? [{ name, role: d.type }] : d.qualifier ? [{ name: d.qualifier, role: d.qualifierType ? `Qualifier (${d.qualifierType})` : "Qualifier" }] : [],
   };
@@ -131,8 +134,13 @@ const ADVERSE_DOC = /order|stipulat|revo|suspen|probation|surrender|reprimand|fi
  * first, decision 2); else an order, stipulation, revocation, … → adverse; no documents → unknown.
  */
 export const caseAdverse = (titles: string[]): boolean | null => adverseFrom(titles.join("; "), { adverse: ADVERSE_DOC });
-/** A citation is DOPL's own finding unless its status says it was dismissed or withdrawn. */
-export const citationAdverse = (status: string | null | undefined): boolean => adverseFrom(`Citation issued; ${status ?? ""}`, { adverse: /citation issued/i }) ?? true;
+/**
+ * A citation's outcome from DOPL's own status only (round 2, decision 4): "Fine Assessed - …", "Paid" and "Collections"
+ * (statuses seen on DOPL entity pages, 2026-10-15) are a fine that stands → true; dismissed or withdrawn → false;
+ * no status, or one that says neither way ("Pending"), → null. Being listed is not itself an outcome.
+ */
+export const citationAdverse = (status: string | null | undefined): boolean | null =>
+  adverseFrom(status, { adverse: /\bfine assessed\b|\bcollections?\b|\bpaid\b|\bfined?\b|\bpenalt(?:y|ies)\b/i });
 const isoOf = (v: string | null | undefined) => {
   const m = v?.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   return m ? `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : v?.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;

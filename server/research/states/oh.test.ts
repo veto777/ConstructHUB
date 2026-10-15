@@ -17,3 +17,20 @@ describe("OH State Fire Marshal rosters (audit 2026-10-15)", () => {
     expect(h.keys?.phones).toEqual([null]);
   });
 });
+
+describe("OH holders and components (audit round 2)", () => {
+  it("an individual named with an employer is still the license holder; the companies roster is businesses; each roster is a component", async () => {
+    const withEmployer = { ...base, "Supervision Type": "Individual to Company", "Supervisor Name": "ACME FIRE PROTECTION LLC" };
+    const [ind] = await collect(sfmRows([{ name: "54 Fire Protection Individual", rows: each([withEmployer]) }]));
+    expect(ind.hit).toMatchObject({ businessName: "ACME FIRE PROTECTION LLC", holder: "individual" });
+    expect(ind.component).toBe("54 Fire Protection Individual");
+    const [co] = await collect(sfmRows([{ name: "53 Fire Protection Companies", rows: each([{ Name: "ACME FIRE PROTECTION LLC", Credential: "53.1", City: "DAYTON" }]) }]));
+    expect(co.hit).toMatchObject({ holder: "business" });
+    expect(co.component).toBe("53 Fire Protection Companies");
+  });
+  it("OCILB: the qualifying individual holds the license; a company-only row is the company's", async () => {
+    const { ocilbRow } = await import("./oh");
+    expect(ocilbRow({ Name: "JOHN Q SMITH", Company: "SMITH ELECTRIC LLC", FormattedCredential: "EL.12345", Type: "EL" })!.hit).toMatchObject({ holder: "individual" });
+    expect(ocilbRow({ Name: "", Company: "SMITH ELECTRIC LLC", FormattedCredential: "EL.12346", Type: "EL" })!.hit).toMatchObject({ holder: "business" });
+  });
+});

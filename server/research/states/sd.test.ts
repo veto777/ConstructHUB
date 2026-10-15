@@ -36,3 +36,16 @@ describe("g6 PDF table reader", () => {
     expect(rows[3]["employer name"]).toBe("68107");
   });
 });
+
+describe("SD plumbers (audit round 2)", () => {
+  it("two unnumbered plumbers of one type, John A and John B Smith, stay two licenses (decision 7)", async () => {
+    const { LicenseSet } = await import("../xref");
+    const base = { state: "SD", source: "South Dakota Plumbing Commission licensed plumbers", sourceUrl: "https://dlr.sd.gov/plumbing/consumer_info.aspx", businessName: null,
+      licenseNumber: null, licenseType: "Journeyman Plumber", specialty: null, status: "Listed as licensed", city: "SIOUX FALLS", expires: null, matchedOn: "principal" as const, holder: "individual" as const };
+    const set = new LicenseSet();
+    set.add({ ...base, principal: "JOHN A SMITH", people: [{ name: "JOHN A SMITH", role: "Journeyman Plumber" }] });
+    set.add({ ...base, principal: "JOHN B SMITH", people: [{ name: "JOHN B SMITH", role: "Journeyman Plumber" }] });
+    set.add({ ...base, principal: "JOHN A SMITH", city: "RAPID CITY", people: [{ name: "JOHN A SMITH", role: "Journeyman Plumber" }] });
+    expect(set.list.map((h) => `${h.principal}|${h.city}`)).toEqual(["JOHN A SMITH|SIOUX FALLS", "JOHN B SMITH|SIOUX FALLS", "JOHN A SMITH|RAPID CITY"]);
+  });
+});

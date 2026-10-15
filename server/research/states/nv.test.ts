@@ -97,3 +97,25 @@ describe("Nevada (audit 2026-10-15)", () => {
     expect(hits.every((h) => !/NRS 338.017\)$/.test(h.detail ?? "") || h.detail!.startsWith("On the Labor Commissioner"))).toBe(true);
   });
 });
+
+describe("Nevada (audit round 2)", () => {
+  it("an NSCB license is a contractor's business license (decision 2)", () => {
+    expect(parseNscbLicenses(LICENSES, "company").every((h) => h.holder === "business")).toBe(true);
+  });
+  it("a denied License Details request stops the loop; it never asks for the next license (decision 6)", async () => {
+    const { withNscbDetails } = await import("./nv");
+    const { PortalBlockedError } = await import("../http");
+    const hits = parseNscbLicenses(LICENSES, "company");
+    expect(hits.filter((h) => h.detailsTarget).length).toBeGreaterThan(0);
+    let calls = 0;
+    const s = { postBack: async () => { calls++; throw new PortalBlockedError("https://app.nvcontractorsboard.com/x", 403); } };
+    await expect(withNscbDetails(s as any, { url: "https://app.nvcontractorsboard.com/x", html: "" }, [...hits, ...hits.map((h) => ({ ...h }))])).rejects.toBeInstanceOf(PortalBlockedError);
+    expect(calls).toBe(1);
+    // Any other failure skips that license only.
+    let other = 0;
+    const s2 = { postBack: async () => { other++; throw new Error("socket hang up"); } };
+    const out = await withNscbDetails(s2 as any, { url: "https://app.nvcontractorsboard.com/x", html: "" }, parseNscbLicenses(LICENSES, "company"));
+    expect(out.length).toBe(2);
+    expect(other).toBe(hits.filter((h) => h.detailsTarget).length);
+  });
+});

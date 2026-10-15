@@ -43,6 +43,8 @@ export function indyRow(r: Record<string, string>): BulkHit | null {
       licenseType: clean(r["License Type"]) ? `Indianapolis ${clean(r["License Type"])} license` : null,
       specialty: ins ? `Insurance on file until ${ins}` : null, status: null, principal: null, city, expires: usDate(r["License Expiration Date"]),
       matchedOn: "business", address, phone: null,
+      // A city contractor license (the business named on it holds it).
+      holder: "business",
     },
     business, person: null, keys: { licenses: [r["License Number"], r["Business License #"]], addresses: [address] },
   };
@@ -53,7 +55,8 @@ async function* indyLoader(): AsyncIterable<BulkHit> {
     const path = await accelaExport("INDY", type);
     try {
       let n = 0;
-      for await (const r of csvRecords(path)) { const h = indyRow(r); if (h) { n++; yield h; } }
+      // Each license type's export is a component: one that falls far short of its last count keeps the old load (decision 10).
+      for await (const r of csvRecords(path)) { const h = indyRow(r); if (h) { n++; yield { ...h, component: type }; } }
       if (!n) throw new Error(`INDY export for ${type} was empty`);
     } finally {
       await fs.rm(path, { force: true });

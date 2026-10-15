@@ -139,6 +139,8 @@ export function njRosterHit(r: Record<string, string>, label: string, isBusiness
       licenseType: type, specialty: clean(r.profession_name), status: clean(r.license_status_name), principal: person,
       city: [clean(r.addr_city), clean(r.addr_state)].filter(Boolean).join(", ") || null, expires: usDate(r.expiration_date),
       matchedOn: business ? "business" : "principal", address,
+      // The roster it came from says who holds it: a business roster or an individual one (round 2, decision 2).
+      holder: isBusiness ? "business" : "individual",
     },
     business, person,
     keys: business ? { licenses: [r.license_no], addresses: [address] } : { licenses: [r.license_no] },

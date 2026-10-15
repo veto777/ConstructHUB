@@ -95,6 +95,8 @@ async function gcHits(rows: Row[], matchedOn: LicenseHit["matchedOn"]): Promise<
       specialty: r.cells[4] ?? d.specialty ?? null, status: d.extension ? `Extended to ${d.extension}` : null, principal: null,
       city: [r.cells[2], r.cells[3]].filter(Boolean).join(", ") || null, expires: usDate(d.expire), matchedOn,
       address: addr(d, "Address", "City", "state", "zip"), phone: d.phone ?? r.cells[5] ?? null,
+      // The board licenses general contractors: a contractor's (business's) license by its class.
+      holder: "business",
     });
   }
   return capped(hits, rows);
@@ -129,6 +131,8 @@ async function aowbHits(rows: Row[], matchedOn: LicenseHit["matchedOn"]): Promis
       businessName: biz, licenseNumber: r.cells[1], licenseType: r.cells[2], specialty: r.cells[5] ? `Service counties: ${r.cells[5]}` : null,
       status: d.status ?? null, principal: person, city: d.city ?? (r.cells[4] ? `${r.cells[4]} County` : null), expires: null, matchedOn,
       address: biz ? addr(d, "address", "city", "state", "zip") : null, phone: biz ? d.workPhone ?? null : null, people: person ? [{ name: person, role: "Licensee" }] : [],
+      // An installer license is the installer's own (an individual credential), whatever business it names.
+      holder: "individual",
     });
   }
   return capped(hits, rows);
@@ -293,8 +297,9 @@ export const pack: StatePack = {
   state: "AL",
   checked: "2026-10-15",
   liveLicenses: [
-    { source: "Alabama Licensing Board for General Contractors", sourceUrl: GC_LIST, search: searchAlGc, searchBy: searchAlGcBy },
-    { source: "Alabama Onsite Wastewater Board installers", sourceUrl: AOWB_LIST, search: searchAlAowb, searchBy: searchAlAowbBy },
+    // The GC list is searched by company name only, the installer list by person only (round 2, decision 8).
+    { source: "Alabama Licensing Board for General Contractors", sourceUrl: GC_LIST, search: searchAlGc, searchBy: searchAlGcBy, kinds: ["company"] },
+    { source: "Alabama Onsite Wastewater Board installers", sourceUrl: AOWB_LIST, search: searchAlAowb, searchBy: searchAlAowbBy, kinds: ["person"] },
   ],
   bulk: [
     { id: "al-aecb-discipline", state: "AL", label: AECB_SOURCE, pageUrl: AECB_DISCIPLINE, everyHours: 24 * 7, minRows: 87,

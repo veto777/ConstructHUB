@@ -28,3 +28,12 @@ describe("Iowa DIAL ImageTrend lookup", () => {
     expect(itToHit({ ...row, classification: "Tanks (registration)" }, "business")).toBeNull();
   });
 });
+
+describe("Iowa round-2 audit (2026-10-16)", () => {
+  it("fire and alarm contractors are businesses, and the business-only lookup says it searches companies only (decisions 2 and 8)", async () => {
+    const r = { classification: "Alarm", service_name: "Acme Alarms LLC - Alarm", primary_license_number: "AL-1", address_line_1: "1 Main St", city: "Ames", abbrev: "IA", postal_code: "50010" };
+    expect(itToHit(r, "business")!.holder).toBe("business");
+    const { pack } = await import("./ia");
+    expect(pack.liveLicenses!.find((l) => /fire protection/.test(l.source))!.kinds).toEqual(["company"]);
+  });
+});

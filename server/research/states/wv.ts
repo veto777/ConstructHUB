@@ -15,7 +15,7 @@
  * None of these publish a street address or phone; electricians and plumbers/HVAC give city and state only.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { PortalBlockedError, politeFetch, sleep } from "../http";
+import { politeFetch, rethrowIfBlocked, sleep } from "../http";
 import { withNote } from "../notes";
 import { looksLikeBusiness } from "./lib/business-name";
 import { clean, type BulkHit, type BulkSource } from "../bulk";
@@ -42,7 +42,7 @@ export function sfmHits(rows: SfmRow[], matchedOn: LicenseHit["matchedOn"]): Lic
       state: "WV", source: "WV State Fire Marshal electrician licenses", sourceUrl: SFM_PAGE, businessName: null, licenseNumber: no,
       licenseType: clean(r.LicenseType?.replace(/,/g, " ")), specialty: null, status: null, principal: who,
       city: [clean(r.City), clean(r.State)].filter(Boolean).join(", ") || null, expires, matchedOn,
-      address: null, phone: null, people: [{ name: who, role: "Licensee" }],
+      address: null, phone: null, people: [{ name: who, role: "Licensee" }], holder: "individual",
     };
     const prev = best.get(no);
     if (!prev || (expires ?? "") > (prev.expires ?? "")) best.set(no, hit);
@@ -63,6 +63,8 @@ async function sfmRead(fields: { FirstName?: string; LastName?: string; LicenseN
 
 const SFM: LiveLicenseSearch = {
   source: "WV State Fire Marshal electrician licenses", sourceUrl: SFM_PAGE,
+  // Electrician licenses are people's: a company name is not searched here (round 2, decision 8).
+  kinds: ["person"],
   search: async (name, kind) => {
     const w = tokens(name);
     if (kind !== "person" || w.length < 2) return []; // individual licenses only
@@ -94,7 +96,7 @@ export function parseWvDol(html: string, list: DolList, matchedOn: LicenseHit["m
       licenseType: list.type(cls),
       specialty: null, status: null, principal: who,
       city: [city, st].filter(Boolean).join(", ") || (county ? `${county} County` : null), expires: anyDate(exp), matchedOn,
-      address: null, phone: null, people: who ? [{ name: who, role: "Certificate holder" }] : [],
+      address: null, phone: null, people: who ? [{ name: who, role: "Certificate holder" }] : [], holder: "individual",
     });
   }
   if (!Number.isFinite(total)) throw new Error(`${list.label}: unexpected page`);
@@ -132,7 +134,7 @@ async function searchDol(list: DolList, name: string): Promise<LicenseHit[]> {
 }
 
 const dolSearch = (list: DolList): LiveLicenseSearch => ({
-  source: list.label, sourceUrl: WVDOL_PAGE,
+  source: list.label, sourceUrl: WVDOL_PAGE, kinds: ["person"],
   search: async (name, kind) => (kind === "person" ? searchDol(list, name) : []), // certificates are held by people
   searchBy: async (q) => {
     if (q.type !== "license" || !normLicense(q.value)) return null; // only certificate numbers are searchable
@@ -173,8 +175,10 @@ async function* evsLoader(): AsyncIterable<BulkHit> {
         html = await res.text();
         break;
       } catch (err) {
-        // An access denial (401/403, robots.txt, a long Retry-After) is final: never retried around.
-        if (err instanceof PortalBlockedError || attempt >= 2) throw new Error(`EVS letter ${letter}: ${String((err as Error)?.message ?? err)}`);
+        // An access denial (401/403, robots.txt, a long Retry-After) is final: never retried around, and it keeps its
+        // type so the load stops as blocked (round 2, decision 6).
+        rethrowIfBlocked(err);
+        if (attempt >= 2) throw new Error(`EVS letter ${letter}: ${String((err as Error)?.message ?? err)}`);
         await sleep(30_000);
       }
     }

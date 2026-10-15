@@ -48,35 +48,42 @@ const num = (v: unknown): number | null => { const n = Number(v); return v == nu
 const LICENSES: LicenseSource[] = [
   { state: "NY", source: "New York DOL elevator contractor licenses", ...soda(NY, "jrac-r9vc"),
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: "city", expires: "expiration_date" },
-    personField: null, address: "address", zip: "zip_code", phone: "phone" },
+    personField: null, address: "address", zip: "zip_code", phone: "phone", holder: () => "business" },
   { state: "NY", source: "New York DOL elevator mechanic and inspector licenses", ...soda(NY, "cxfs-ya8e"),
     fields: { businessName: null, licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: null, expires: "expiration_date" },
-    personField: ["first_name", "last_name"] },
+    personField: ["first_name", "last_name"], holder: () => "individual" },
   { state: "NY", source: "New York DOL mold contractor licenses", ...soda(NY, "ikqx-ispy"),
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: "dba_name", status: "license_status", principal: null, city: "city", expires: "expiration_date" },
-    personField: null, address: ["address", "address_2"], zip: "zip_code", phone: "phone" },
+    personField: null, address: ["address", "address_2"], zip: "zip_code", phone: "phone", holder: () => "business" },
   { state: "NY", source: "New York DOL mold individual licenses", ...soda(NY, "h6jr-vxqt"),
     fields: { businessName: null, licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: null, expires: "expiration_date" },
-    personField: ["first_name", "last_name"] },
+    personField: ["first_name", "last_name"], holder: () => "individual" },
   { state: "NY", source: "New York DOL asbestos certificates", ...soda(NY, "95bk-87hc"),
     fields: { businessName: null, licenseNumber: "certificate_number", licenseType: "endorsement_type", specialty: null, status: "certificate_status", principal: null, city: null, expires: "expiration_date" },
-    personField: ["first_name", "last_name"] },
+    personField: ["first_name", "last_name"], holder: () => "individual" },
   { state: "NY", source: "New York DOL crane operator certificates", ...soda(NY, "bu6a-ty84"),
     fields: { businessName: null, licenseNumber: "certificate_number", licenseType: "class", specialty: null, status: "certificate_status", principal: null, city: null, expires: "expiration_date" },
-    personField: ["first_name", "last_name"] },
+    personField: ["first_name", "last_name"], holder: () => "individual" },
   { state: "NY", source: "New York DOL blaster certificates", ...soda(NY, "65tz-hymq"),
     fields: { businessName: null, licenseNumber: "certificate_number", licenseType: "class", specialty: null, status: "certificate_status", principal: null, city: null, expires: "expiration_date" },
-    personField: ["first_name", "last_name"] },
+    personField: ["first_name", "last_name"], holder: () => "individual" },
   { state: "NY", source: "New York DOS licensed home inspectors", ...soda(NY, "r9fr-48vu"),
     fields: { businessName: "hi_business_name", licenseNumber: "uid", licenseType: null, specialty: null, status: null, principal: null, city: "business_city", expires: "current_expire_date" },
-    personField: ["first_name", "middle_initial", "last_name"], address: ["business_street", "business_apt_unit"], zip: "business_zip_code" },
+    // A home inspector's license is the person's; hi_business_name is where they work.
+    personField: ["first_name", "middle_initial", "last_name"], address: ["business_street", "business_apt_unit"], zip: "business_zip_code", holder: () => "individual" },
   { state: "NY", source: "New York City DOB licenses (contractors and trades)", ...soda(NYC, "t8hj-ruu2"),
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: null, status: "license_status", principal: null, city: "license_business_city", expires: null },
-    personField: ["first_name", "last_name"], address: ["business_house_number", "business_street_name"], zip: "business_zip_code", phone: "business_phone_number" },
+    personField: ["first_name", "last_name"], address: ["business_house_number", "business_street_name"], zip: "business_zip_code", phone: "business_phone_number",
+    // license_type, checked 2026-10-16: the firm and agency registrations and GENERAL CONTRACTOR are a business's;
+    // master and journeyman trades, operators, riggers, welders and the like are a person's own license; the two
+    // combined classes ("ELEVATOR AGENCY / INSPECTOR", "CONCRETE TEST LAB / SAFETY MANAGER") don't say which.
+    holder: (r) => { const t = String(r.license_type ?? "").trim(); return !t || / \/ /.test(t) ? null : /^(?:ELECTRICAL FIRM|SPECIAL INSPECTION AGENCY|GENERAL CONTRACTOR)$/.test(t) ? "business" : "individual"; } },
   { state: "NY", source: "New York City DCWP home improvement contractor licenses", ...soda(NYC, "w7w3-xahh"),
     fields: { businessName: "business_name", licenseNumber: "license_nbr", licenseType: "business_category", specialty: "dba_trade_name", status: "license_status", principal: null, city: "address_city", expires: "lic_expir_dd" },
     personField: null, address: ["address_building", "address_street_name"], zip: "address_zip", phone: "contact_phone",
-    filter: "business_category='Home Improvement Contractor'" },
+    filter: "business_category='Home Improvement Contractor'",
+    // license_type, checked 2026-10-16: "Premises" (a business's license) or "Individual".
+    holder: (r) => (r.license_type === "Premises" ? "business" : r.license_type === "Individual" ? "individual" : null) },
 ];
 
 const ENFORCEMENT: SodaEnforcement[] = [

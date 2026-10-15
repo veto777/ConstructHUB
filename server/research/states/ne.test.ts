@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { conregHit, neAddressHits, parseConregDetail, srcHit } from "./ne";
+import { conregHit, neAddressHits, pack, parseConregDetail, srcHit } from "./ne";
 
 // Trimmed from dol.nebraska.gov/conreg/Contractor/Details/2636526, 2026-10-15.
 const DETAIL = `<h2>Contractor Details</h2><dl><dt>Contractor/Subcontractor Name</dt><dd>KIEWIT BUILDING GROUP INC.</dd><dt>Corporation Name</dt><dd>KIEWIT BUILDING GROUP INC.</dd><dt>Business Contact Email</dt><dd></dd><dt>Business Entity</dt><dd>Corporation</dd><dt>Address</dt><dd>1550 Mike Fahey Street<br/>OMAHA, NE 68102</dd><dt>City</dt><dd>OMAHA</dd><dt>State</dt><dd>NE</dd><dt>Zip</dt><dd>68102</dd><dt>Telephone</dt><dd>4023422052</dd><dt>Registration Number</dt><dd>26365-26</dd><dt>Registration Expiration</dt><dd>9/1/2027</dd><dt>Sales Tax Option</dt><dd>2</dd><dt>Number of Employees</dt><dd>600</dd><dt>Worker's Compensation Status</dt><dd>Certificate on File (does not cover owners/corporate officials)</dd></dl> Print `;
@@ -44,5 +44,16 @@ describe("Nebraska (audit 2026-10-15)", () => {
     ] };
     expect(neAddressHits([row], "17998 RD 52 OSHKOSH, Nebraska 69154-6048")).toHaveLength(1);
     expect(neAddressHits([row], "17990 RD 52 OSHKOSH, Nebraska 69154-6048")).toHaveLength(0);
+  });
+});
+
+describe("NE holder and searched kinds (audit round 2, decisions 2, 3 and 8)", () => {
+  it("the registration's Business Entity decides who holds it", () => {
+    expect(conregHit("1", parseConregDetail(DETAIL), "business")?.holder).toBe("business");
+    const sole = parseConregDetail(DETAIL.replace("<dd>Corporation</dd>", "<dd>Sole Proprietorship</dd>").replace(/KIEWIT BUILDING GROUP INC\./g, "SMITH ROOFING"));
+    expect(conregHit("1", sole, "business")?.holder).toBe("individual");
+  });
+  it("the electrical lookup (people only) declares it", () => {
+    expect((pack.liveLicenses ?? []).find((l) => l.source === "Nebraska State Electrical Division licenses")?.kinds).toEqual(["person"]);
   });
 });

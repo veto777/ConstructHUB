@@ -14,7 +14,7 @@
  *     contract (NRS 338.017), with the suspension period. Companies only; the corporate officers it names are left out.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../http";
+import { politeFetch, rethrowIfBlocked } from "../http";
 import { tokens, wholeWordMatch } from "../licenses";
 import { clean } from "../bulk";
 import type { BulkHit, BulkSource } from "../bulk";
@@ -56,6 +56,8 @@ export function parseNscbLicenses(html: string, kind: "person" | "company" | "li
       specialty: [limits.join(" ") || null, bizId ? `NV business id ${bizId}` : null].filter(Boolean).join(". ") || null,
       status, principal: principal ?? null, city: [city, st].filter(Boolean).join(", ") || null, expires: null,
       matchedOn: kind === "company" ? "business" : kind === "license" ? "license" : "principal",
+      // Every NSCB license is a contractor's license (classes A, B, C-…), issued to the contracting business.
+      holder: "business",
       ...(detailsTarget ? { detailsTarget } : {}),
     });
   }
@@ -88,11 +90,12 @@ export function parseNscbDetails(html: string): { address: string | null; mailin
 const MAX_DETAILS = 10;
 
 /** Open each hit's License Details page (a postback from the results page) for its addresses, phone, expiration and people. */
-async function withNscbDetails(s: FormSession, results: { url: string; html: string }, hits: NscbHit[]): Promise<LicenseHit[]> {
+export async function withNscbDetails(s: Pick<FormSession, "postBack">, results: { url: string; html: string }, hits: NscbHit[]): Promise<LicenseHit[]> {
   let failed = 0;
   for (const h of hits.slice(0, MAX_DETAILS)) {
     if (!h.detailsTarget) continue;
-    const page = await s.postBack(results.url, results.html, { __EVENTTARGET: h.detailsTarget, __EVENTARGUMENT: "" }).catch(() => null);
+    // A denied detail request stops the search (round 2, decision 6); any other failure skips that one license.
+    const page = await s.postBack(results.url, results.html, { __EVENTTARGET: h.detailsTarget, __EVENTARGUMENT: "" }).catch((err) => { rethrowIfBlocked(err); return null; });
     if (!page || page.status !== 200 || !/lblLicNum/.test(page.html)) { failed++; continue; }
     const d = parseNscbDetails(page.html);
     h.address = d.address ?? d.mailing;

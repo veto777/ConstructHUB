@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nmSosHit, parseNmSos, rldLicenseHit } from "./nm";
+import { nmSosHit, pack, parseNmSos, rldLicenseHit } from "./nm";
 
 describe("New Mexico sources", () => {
   it("reads an RLD license; an individual's address of record is kept to city, state and ZIP", () => {
@@ -20,5 +20,16 @@ describe("NM Secretary of State answers (audit 2026-10-15)", () => {
     expect(parseNmSos({ template: [], rows: {} })).toEqual([]);
     expect(() => parseNmSos({ message: "An error has occurred." })).toThrow(/unexpected payload/);
     expect(() => parseNmSos(null)).toThrow();
+  });
+});
+
+describe("NM holder and searched kinds (audit round 2, decisions 2 and 8)", () => {
+  it("an RLD license is the individual's, and the lookup searches people only", () => {
+    expect(rldLicenseHit({ Name: "HI-1", License_Holder_Name__c: "JANE DOE" }).holder).toBe("individual");
+    expect(pack.liveLicenses?.[0].kinds).toEqual(["person"]);
+  });
+  it("BusinessStatusId is the status word (live answer 2026-10-16: template {label: \"Status\", id: \"BusinessStatusId\"}, values \"Active\", \"Revoked Final\")", () => {
+    expect(nmSosHit({ TITLE: ["BRADBURY STAMM BUILDERS, INC."], BusinessStatusId: "Revoked Final" })).toMatchObject({ status: "Secretary of State status: Revoked Final", adverse: true });
+    expect(nmSosHit({ TITLE: ["BRADBURY STAMM CONCRETE, LLC"], BusinessStatusId: "Active" }).adverse).toBeNull();
   });
 });

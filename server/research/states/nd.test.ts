@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ndContractorHit, sameElectricianNumber, sebRows } from "./nd";
+import { ndContractorHit, ndContractorHolder, pack, sameElectricianNumber, sebRows } from "./nd";
 
 describe("ND State Electrical Board results", () => {
   it("reads the table and drops the hidden separator", () => {
@@ -33,5 +33,18 @@ describe("North Dakota (audit 2026-10-15)", () => {
     expect(sameElectricianNumber({ type: "license", value: "12345" }, "12345")).toBe(true);
     expect(sameElectricianNumber({ type: "license", value: "#12345" }, "12345")).toBe(true);
     expect(sameElectricianNumber({ type: "license", value: "ABC12345" }, "12345")).toBe(false);
+  });
+});
+
+describe("ND holder and searched kinds (audit round 2, decisions 2 and 8)", () => {
+  it("a license under '<person> DBA <name>' is the person's; a business name the business's; a bare personal name unknown", () => {
+    expect(ndContractorHolder("EUGENE JOHNSON DBA JOHNSON CONSTRUCTION")).toBe("individual");
+    expect(ndContractorHolder("JOHNSON CONSTRUCTION LLC")).toBe("business");
+    expect(ndContractorHolder("BOB JOHNSON")).toBeNull();
+  });
+  it("lookups that can't search a kind of name say so", () => {
+    const kinds = Object.fromEntries((pack.liveLicenses ?? []).map((l) => [l.source, l.kinds]));
+    expect(kinds["North Dakota Secretary of State contractor licenses"]).toEqual(["company"]);
+    expect(kinds["North Dakota State Plumbing Board licenses"]).toEqual(["person"]);
   });
 });

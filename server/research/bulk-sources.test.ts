@@ -10,6 +10,7 @@ import { join } from "node:path";
 import type { BulkHit } from "./bulk";
 import { indexWords } from "./bulk";
 import {
+  UNZIP_TIMEOUT_MS, cslbHolder, flDispositionAdverse, flRespondentIsBusiness,
   cslbRows, parseCaDebarments, flApplicantRows, flComplaintRows, flDisciplineCases, flLicenseIndex, flLicenseRows, flQualifiers, sunbizCorporation,
 } from "./bulk-sources";
 
@@ -60,7 +61,7 @@ describe("Florida DBPR licensees", () => {
 
   it("merges CILB discipline into the complaints and finds the full license number in the licensee extract", async () => {
     const disc = await file(`"License Type","License Nbr","Respondent Name","Address Line 1","Address Line 2","Address Line 3","City","State","ZIP Code","County","Complaint Nbr","Classification","Entered Date","Disposition","Disposition Date","Discipline Date - Description","Violation Code"
-"Certified Building Contractor","1250703","ALLEN, JOHN DOUGLAS","500 VERA CRUZ DR",,,"DESTIN","FL","32541","OKALOOSA","2025069408","Licensed Activity","09/23/2025","Citation filed","01/23/2026","10/31/2025 - Citation","CB15"
+"Certified Building Contractor","1250703","ALLEN, JOHN DOUGLAS","500 VERA CRUZ DR","DBA GULF SHORE BUILDERS LLC",,"DESTIN","FL","32541","OKALOOSA","2025069408","Licensed Activity","09/23/2025","Citation filed","01/23/2026","10/31/2025 - Citation","CB15"
 `);
     const lic = await file(FL_LICENSEES);
     const complaints = await file(`"0603","COSTELLO, VINCENT ELIJAH","Broward","616 SW 8TH AVE.","DBA: RRR AFFORDABLE REPAIRS","","FORT LAUDERDALE","FL","33315-1069","Certified Roofing Contractor","2020031678","Unlicensed Activity","","Closed after legal review","11/23/2020",""\n`);
@@ -69,7 +70,7 @@ describe("Florida DBPR licensees", () => {
     const [c, d] = hits.map((h) => h.hit) as any[];
     expect(c).toMatchObject({ category: "complaint", name: "COSTELLO, VINCENT ELIJAH / RRR AFFORDABLE REPAIRS", address: "616 SW 8TH AVE., FORT LAUDERDALE FL 33315-1069", licenseNumber: null });
     expect(d).toMatchObject({
-      category: "discipline", name: "ALLEN, JOHN DOUGLAS", id: "2025069408", licenseNumber: "CBC1250703", status: "Citation filed", adverse: true,
+      category: "discipline", name: "ALLEN, JOHN DOUGLAS / GULF SHORE BUILDERS LLC", id: "2025069408", licenseNumber: "CBC1250703", status: "Citation filed", adverse: true,
       address: "500 VERA CRUZ DR, DESTIN FL 32541", date: "2025-09-23", endDate: "2026-01-23",
     });
     expect(d.detail).toContain("Citation on 2025-10-31");
@@ -163,5 +164,80 @@ describe("audit follow-ups (A5)", () => {
     ]);
     const later = parseCaDebarments(DLSE, "2028-08-01").map((h) => h.hit as any);
     expect(later[0]).toMatchObject({ status: "Debarment period over", adverse: false, endDate: "2028-07-23" });
+  });
+});
+
+describe("round 2 (A6)", () => {
+  it("decision 2: an FL qualifier's own license is an individual's even with a DBA; the business record is the business's", async () => {
+    const p = await file(FL_LICENSEES);
+    const hits = await all(flLicenseRows(p, "Florida DBPR construction licenses (CILB)", "https://example.invalid", await flQualifiers([p])));
+    await fs.rm(p);
+    expect(hits.map((h) => [(h.hit as any).licenseNumber ?? (h.hit as any).businessName, (h.hit as any).holder])).toEqual([
+      ["TIDEWATER HOMES, LLC", "business"], ["CBC027065", "individual"], ["FRO7804", "individual"], ["CBC1250703", "individual"],
+    ]);
+  });
+
+  it("decision 2: CSLB holder from BusinessType; TX plumbers and applicants are individuals", async () => {
+    expect(cslbHolder("Corporation")).toBe("business");
+    expect(cslbHolder("Sole Owner")).toBe("individual");
+    expect(cslbHolder("")).toBeNull();
+    const p = await file(`"0605","Certified General Contractor","JOHN","BRIAN","HUDSON","","11 FAIRCHILD LANE","","","PALM COAST","FL","32137","28","904-955-5431",""\n`);
+    const [h] = await all(flApplicantRows(p, "https://example.invalid", "constr_app.csv"));
+    await fs.rm(p);
+    expect((h.hit as any).holder).toBe("individual");
+    expect(h.component).toBe("constr_app.csv");
+  });
+
+  it("decision 3: an FL complaint against an individual (no DBA, no entity form) is left out; a business is kept", async () => {
+    expect(flRespondentIsBusiness("SMITH, JOHN", [])).toBe(false);
+    expect(flRespondentIsBusiness("JOHN STEEL", [])).toBe(false);
+    expect(flRespondentIsBusiness("SMITH, JOHN", ["SMITH ROOFING"])).toBe(true);
+    expect(flRespondentIsBusiness("ACME HOLDINGS CO", [])).toBe(true);
+    const complaints = await file([
+      `"0603","DOE, JANE","Broward","616 SW 8TH AVE.","","","FORT LAUDERDALE","FL","33315","Certified Roofing Contractor","2020031679","Unlicensed Activity","","Closed after legal review","11/23/2020",""`,
+      `"0603","COSTELLO, VINCENT ELIJAH","Broward","616 SW 8TH AVE.","DBA: RRR AFFORDABLE REPAIRS","","FORT LAUDERDALE","FL","33315-1069","Certified Roofing Contractor","2020031678","Unlicensed Activity","","Closed after legal review","11/23/2020",""`,
+    ].join("\n") + "\n");
+    const disc = await file(`"License Type","License Nbr","Respondent Name","Address Line 1","Address Line 2","Address Line 3","City","State","ZIP Code","County","Complaint Nbr","Classification","Entered Date","Disposition","Disposition Date","Discipline Date - Description","Violation Code"
+"Certified Building Contractor","1250703","ALLEN, JOHN DOUGLAS","500 VERA CRUZ DR",,,"DESTIN","FL","32541","OKALOOSA","2025069408","Licensed Activity","09/23/2025","Citation filed","01/23/2026","10/31/2025 - Citation","CB15"
+`);
+    const hits = await all(flComplaintRows([complaints], await flDisciplineCases([disc]), new Map()));
+    await Promise.all([complaints, disc].map((p) => fs.rm(p)));
+    expect(hits.map((h) => (h.hit as any).name)).toEqual(["COSTELLO, VINCENT ELIJAH / RRR AFFORDABLE REPAIRS"]);
+    expect(hits[0].component).toBe("complaints");
+  });
+
+  it("decision 4: FL dispositions follow the clean-match rule", () => {
+    expect(flDispositionAdverse("Final Order")).toBe(true);
+    expect(flDispositionAdverse("No probable cause")).toBe(false);
+    expect(flDispositionAdverse("Closed after legal review")).toBeNull();
+    expect(flDispositionAdverse("Final order; withdrawn")).toBeNull(); // both kinds of words
+    expect(flDispositionAdverse(null)).toBeNull();
+  });
+
+  it("decision 4: a CSLB pending case is not an outcome; a suspension is", async () => {
+    const head = `LicenseNo,LastUpdate,BusinessName,BUS-NAME-2,FullBusinessName,MailingAddress,City,State,County,ZIPCode,country,BusinessPhone,BusinessType,IssueDate,ReissueDate,ExpirationDate,InactivationDate,ReactivationDate,PendingSuspension,PendingClassRemoval,PendingClassReplace,PrimaryStatus,SecondaryStatus,Classifications(s),AsbestosReg,WorkersCompCoverageType,WCInsuranceCompany,WCPolicyNumber,WCEffectiveDate,WCExpirationDate,WCCancellationDate,WCSuspendDate,CBSuretyCompany,CBNumber,CBEffectiveDate,CBCancellationDate,CBAmount,WBSuretyCompany,WBNumber,WBEffectiveDate,WBCancellationDate,WBAmount,DBSuretyCompany,DBNumber,DBEffectiveDate,DBCancellationDate,DBAmount,DateRequired,DiscpCaseRegion,DBBondReason,DBCaseNo,NAME-TP-2`;
+    const row = (no: string, type: string, primary: string) => `${no},08/04/2026,ACME BUILDERS,,JOHN Q DOE,1 MAIN ST,FRESNO,CA,,93701,,(559) 555 0100,${type},10/01/2010,,01/31/2027,,,,,,${primary},,B,,,,,,,,,,,,,,,,,,,,,,,,,,,,`;
+    const master = await file(`${head}\n${row("900001", "Corporation", "Pending Case")}\n${row("900002", "Sole Owner", "Suspended")}\n`);
+    const personnel = await file(`LIC-NO,LastUpdated,REC-TP,SEQ-NO,Name-TP,Name,EMP-Titl-CDE,CL-CDE,CL-CDE-STAT,ASSN-DT,DIS-ASSN-DT,SURETY-TP,SuretyCompany,BOND-NO,BOND-AMT,EffectiveDate,CancellationDate,JointVentureLicenseType,JointVentureLicenseNumber\n`);
+    const hits = await all(cslbRows(master, personnel));
+    await Promise.all([master, personnel].map((p) => fs.rm(p)));
+    const lic = hits.filter((h) => h.kind === "license").map((h) => [(h.hit as any).licenseNumber, (h.hit as any).holder]);
+    expect(lic).toEqual([["900001", "business"], ["900002", "individual"]]);
+    const enf = hits.filter((h) => h.kind === "enforcement").map((h) => h.hit as any);
+    expect(enf.map((e) => [e.licenseNumber, e.adverse])).toEqual([["900001", null], ["900002", true]]);
+    // A sole owner's enforcement record carries no street or phone, and no phone or address key.
+    expect(enf[1]).toMatchObject({ address: null, phone: null });
+    expect(hits.find((h) => h.kind === "enforcement" && (h.hit as any).licenseNumber === "900002")!.keys).toEqual({ licenses: ["900002"] });
+  });
+
+  it("decision 3: a CA debarment naming only a person is left out", () => {
+    const html = `<table><tr><td><p><strong>JOHN DOE</strong><br />CSLB License Number: 123456</p></td><td><p><strong>7/23/2025 through 7/23/2028</strong></p></td></tr>
+<tr><td><p><strong>MICHAEL FLOORING, INC.;<br> BENNY MICHAEL</strong><br />CSLB License Number: 874947</p></td><td><p><strong>9/13/2024 through 9/13/2027</strong></p></td></tr></table>`;
+    expect(parseCaDebarments(html, "2026-10-15").map((h) => (h.hit as any).id)).toEqual(["874947"]);
+  });
+
+  it("decision 13: unzip runs under a time limit", () => {
+    expect(UNZIP_TIMEOUT_MS).toBeGreaterThan(0);
+    expect(UNZIP_TIMEOUT_MS).toBeLessThanOrEqual(30 * 60_000);
   });
 });

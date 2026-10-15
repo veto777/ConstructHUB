@@ -134,3 +134,17 @@ describe("AR roster endpoint payload", () => {
     expect(() => metlBody({ code: "rest_no_route", message: "No route was found matching the URL and request method." })).toThrow(/unexpected payload/);
   });
 });
+
+describe("Arkansas round-2 audit (2026-10-16)", () => {
+  it("roster people hold their own licenses; each electrical license type is a component (decisions 2 and 10)", () => {
+    const e = electricalHit({ First_Name: "Jane", Last_Name: "Doe", License_Number: "J-1", License_Status: "Active", License_Type_Display_Name: "Electrician - Journeyman" })!;
+    expect(e.hit.holder).toBe("individual");
+    expect(e.component).toBe("Electrician - Journeyman");
+    expect(hvacHit({ First_Name: "A", Last_Name: "B", License_Number: "1" })!.hit.holder).toBe("individual");
+  });
+  it("fire roster companies are businesses", () => {
+    const text = `ARKANSAS FIRE PROTECTION LICENSING BOARD\nACME FIRE SPRINKLER CO FSS-248   501-555-0100\n100 MAIN ST\nLITTLE ROCK, AR 72201\nOWNER: JOHN SMITH\n`;
+    const [h] = parseFireRoster(text, "sprinkler");
+    expect(h).toMatchObject({ businessName: "ACME FIRE SPRINKLER CO", holder: "business" });
+  });
+});

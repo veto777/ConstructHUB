@@ -24,13 +24,12 @@
 import { request as httpsRequest } from "node:https";
 import { rootCertificates } from "node:tls";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { USER_AGENT, rateLimitHost } from "../http";
+import { USER_AGENT, guard, noteResponse } from "../http";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { tokens, wholeWordMatch } from "../licenses";
 import { myLicenseDownload, myLicenseSearch, pipeRecords } from "./lib/g2-mylicense";
 import { splitName } from "./lib/g2-aspnet";
-import { looksLikeBusiness } from "./lib/business-name";
 import { adverseFrom } from "../adverse";
 import { capNote, noteOf, safeDecode, withNote } from "../notes";
 import type { StatePack } from "./types";
@@ -89,14 +88,21 @@ export type HicAccount = {
 
 type HicQuery = { name?: string | null; firstName?: string | null; lastName?: string | null; hicNumber?: string | null };
 
-/** One HTTPS request to the Contractor Hub (its own CA list), with a deadline over the whole exchange, body included. */
-function hicRequest(url: string, body: string | null): Promise<string> {
+/**
+ * One HTTPS request to the Contractor Hub (its own CA list), with a deadline over the whole exchange, body included.
+ * It goes through the same guard as every research request (round 2, decision 6): the host's block and cooldown,
+ * robots.txt and the rate limit before it; a 401/403 or Retry-After recorded after it. It follows no redirects.
+ */
+async function hicRequest(url: string, body: string | null): Promise<string> {
+  await guard(url, 1500);
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = { "user-agent": USER_AGENT };
     if (body != null) Object.assign(headers, { "content-type": "application/x-www-form-urlencoded; charset=UTF-8", "content-length": String(Buffer.byteLength(body)), referer: HIC_PAGE });
     const req = httpsRequest(url, {
       method: body != null ? "POST" : "GET", ca: HIC_CA, timeout: 90_000, headers,
     }, (res) => {
+      try { noteResponse(url, res.statusCode ?? 0, res.headers["retry-after"] as string | undefined); }
+      catch (err) { res.resume(); reject(err); return; }
       const chunks: Buffer[] = [];
       res.on("data", (c) => chunks.push(c as Buffer));
       res.on("end", () => (res.statusCode === 200 ? resolve(Buffer.concat(chunks).toString("utf8")) : reject(new Error(`Contractor Hub returned HTTP ${res.statusCode}`))));
@@ -121,7 +127,6 @@ export function parseAuraContext(page: string): { fwuid: string; app: string } {
 }
 async function hicContext(): Promise<{ fwuid: string; app: string }> {
   if (auraCache && Date.now() - auraCache.at < 3600_000) return auraCache;
-  await rateLimitHost(HIC_PAGE, 1500);
   auraCache = { at: Date.now(), ...parseAuraContext(await hicRequest(HIC_PAGE, null)) };
   return auraCache;
 }
@@ -137,7 +142,6 @@ export async function searchHic(q: HicQuery): Promise<HicAccount[]> {
   const { fwuid, app } = await hicContext();
   const context = { mode: "PROD", fwuid, app: "siteforce:communityApp", loaded: { "APPLICATION@markup://siteforce:communityApp": app }, dn: [], globals: {}, uad: true };
   const body = new URLSearchParams({ message: JSON.stringify(message), "aura.context": JSON.stringify(context), "aura.pageURI": "/s/hic-contractor-search", "aura.token": "null" }).toString();
-  await rateLimitHost(HIC_AURA, 1500);
   const rows = parseHicResponse(await hicRequest(HIC_AURA, body));
   return rows.length >= HIC_MAX ? withNote(rows, capNote(rows.length, null, "registrations (the registry's own limit)")) : rows;
 }
@@ -167,6 +171,8 @@ export function hicToHit(a: HicAccount, matchedOn: LicenseHit["matchedOn"]): Lic
     city: clean(a.BillingCity), expires: clean(a.Registration_Expiration_Date__c)?.slice(0, 10) ?? null, matchedOn,
     address: individual ? clean([a.BillingCity, a.BillingState, a.BillingPostalCode].filter(Boolean).join(", ")) : hicAddress(a),
     phone: individual ? null : clean(a.Phone), people: people.map((p) => ({ name: p, role: "Contact" })),
+    // The registry's own account type says who holds it (round 2, decision 2).
+    holder: a.IsPersonAccount == null ? null : a.IsPersonAccount ? "individual" : "business",
   };
 }
 
@@ -192,7 +198,8 @@ async function hicSearchBy(q: IdQuery): Promise<LicenseHit[] | null> {
   // share the digits ("CSFA-106775") is not an HIC number.
   const digits = n.match(/^(?:HIC)?(\d+)$/)?.[1];
   if (!digits) return null;
-  return (await searchHic({ hicNumber: digits })).map((a) => hicToHit(a, "license")).filter((h) => normLicense(h.licenseNumber) === digits);
+  const rows = await searchHic({ hicNumber: digits });
+  return withNote(rows.map((a) => hicToHit(a, "license")).filter((h) => normLicense(h.licenseNumber) === digits), noteOf(rows));
 }
 
 /** Hearing decisions, Guaranty Fund payments and arbitration awards on one registration (companies only). */
@@ -272,7 +279,7 @@ async function* maOpsiLoader(): AsyncIterable<BulkHit> {
         sourceUrl: OPSI, businessName: null, licenseNumber: no, licenseType: clean(g.main?.license_type_name) ?? clean(r.license_type_name),
         specialty: g.restrictions.length ? `Restrictions: ${Array.from(new Set(g.restrictions)).join(", ")}` : null,
         status: clean(r.license_status_name), principal: who, city: clean(r.addr_city), expires: usDate(r.expiration_date), matchedOn: "principal",
-        address, people: [{ name: who, role: null }],
+        address, people: [{ name: who, role: null }], holder: "individual",
       };
       yield { kind: "license", hit, business: null, person: who, keys: { licenses: [no] } };
     }
@@ -289,6 +296,7 @@ function dfsHit(r: Record<string, string | null>, matchedOn: LicenseHit["matched
     businessName: null, licenseNumber: r["License #"] ?? null, licenseType: r["License Type"] ?? null, specialty: null,
     status: r.Status ?? null, principal: r.name ?? null, city: [r.City, r.St].filter(Boolean).join(", ") || null,
     expires: usDate(r["Expiration Date"]), matchedOn, people: r.name ? [{ name: r.name, role: null }] : [],
+    holder: "individual", // certificates of competency are a person's own
   };
 }
 
@@ -306,7 +314,7 @@ async function dfsSearchBy(q: IdQuery): Promise<LicenseHit[] | null> {
   const n = normLicense(q.value);
   if (!n) return null;
   const rows = await myLicenseSearch(DFS, { t_web_lookup__license_no: q.value.trim() }, 1);
-  return rows.filter((r) => DFS_TYPES.test(r["License Type"] ?? "") && normLicense(r["License #"]) === n).map((r) => dfsHit(r, "license"));
+  return withNote(rows.filter((r) => DFS_TYPES.test(r["License Type"] ?? "") && normLicense(r["License #"]) === n).map((r) => dfsHit(r, "license")), noteOf(rows));
 }
 
 export const pack: StatePack = {
@@ -314,16 +322,17 @@ export const pack: StatePack = {
   checked: "2026-10-15",
   liveLicenses: [
     { source: "Massachusetts Home Improvement Contractor registry (OCABR)", sourceUrl: HIC_PAGE, search: hicLicenseSearch, searchBy: hicSearchBy },
-    { source: "Massachusetts Department of Fire Services certificates (oil burner, fire suppression, blasting)", sourceUrl: DFS, search: dfsSearch, searchBy: dfsSearchBy },
+    { source: "Massachusetts Department of Fire Services certificates (oil burner, fire suppression, blasting)", sourceUrl: DFS, search: dfsSearch, searchBy: dfsSearchBy, kinds: ["person"] },
   ],
   liveEnforcement: [
     {
       source: "Massachusetts HIC hearing decisions, Guaranty Fund claims and arbitration awards (OCABR)",
       scope: "Every registration the Contractor Hub holds, current and expired",
-      // Companies only (FCRA): a person account is an individual unless its name reads as a business.
+      // Companies only (FCRA): a person account is an individual, whatever its name reads like (the registry's own
+      // account type wins over the name; round 2, decision 3).
       search: async (name) => {
         const rows = await searchHic({ name });
-        return withNote(rows.filter((a) => (!a.IsPersonAccount || looksLikeBusiness(a.Name)) && wholeWordMatch(name, { businessName: clean(a.Name), principal: null })).flatMap(hicEnforcement), noteOf(rows));
+        return withNote(rows.filter((a) => !a.IsPersonAccount && wholeWordMatch(name, { businessName: clean(a.Name), principal: null })).flatMap(hicEnforcement), noteOf(rows));
       },
     },
   ],

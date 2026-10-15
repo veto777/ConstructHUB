@@ -37,6 +37,21 @@ const PHL_PAGE = "https://opendataphilly.org/datasets/licenses-and-inspections-t
 const PHL_CSV = "https://phl.carto.com/api/v2/sql?format=csv&q=" + encodeURIComponent(
   "SELECT licensenumber, licensetype, licensestatus, contactname, companyname, issuedate, expirationdate FROM trade_licenses");
 
+/**
+ * Who holds a Philadelphia trade license, from its class (round 2, decision 2; licensetype values checked
+ * 2026-10-16): inspection agencies are businesses; the master, journeyman, apprentice, technician, inspector,
+ * engineer and other personal classes are a person's, whatever company is named with them; the contractor classes
+ * (CONTRACTOR, ELECTRICAL CONTRACTOR, …, DEMOLITION, PA HOME IMPROVEMENT) are issued to people and companies alike
+ * and say neither.
+ */
+export function phillyHolder(type: string | null | undefined): "business" | "individual" | null {
+  const t = (type ?? "").toUpperCase().trim();
+  if (!t) return null;
+  if (/AGENCY$/.test(t)) return "business";
+  if (/CONTRACTOR|^DEMOLITION$|HOME IMPROVEMENT/.test(t)) return null;
+  return "individual";
+}
+
 async function* phillyLoader(): AsyncIterable<BulkHit> {
   const path = await download(PHL_CSV);
   try {
@@ -49,7 +64,7 @@ async function* phillyLoader(): AsyncIterable<BulkHit> {
         hit: {
           state: "PA", source: "Philadelphia L&I trade licenses", sourceUrl: PHL_PAGE, businessName: company, licenseNumber: clean(r.licensenumber),
           licenseType: clean(r.licensetype), specialty: null, status: clean(r.licensestatus), principal: who, city: "Philadelphia",
-          expires: iso(r.expirationdate), matchedOn: company ? "business" : "principal",
+          expires: iso(r.expirationdate), matchedOn: company ? "business" : "principal", holder: phillyHolder(r.licensetype),
         },
         business: company, person: who,
       };
@@ -88,6 +103,7 @@ export async function* pittsburghLoader(): AsyncIterable<BulkHit> {
             state: "PA", source: f.label, sourceUrl: PGH_PAGE, businessName: f.people ? null : name, licenseNumber: clean(r.license_number),
             licenseType: clean(r.license_type_name), specialty: null, status: clean(r.license_state), principal: f.people ? name : null,
             city: "Pittsburgh", expires: iso(r.expiration_date), matchedOn: f.people ? "principal" : "business",
+            holder: f.people ? "individual" : "business",
           },
           // A trade license name may be a person or a shop: both searches find it.
           business: name, person: f.people ? name : null,

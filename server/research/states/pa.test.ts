@@ -46,3 +46,14 @@ describe("PA UJS portal results", () => {
     expect(() => parseUjsCases(UJS.replace(/>Case Caption</g, ">Caption<"))).toThrow(/no "Case Caption" column/);
   });
 });
+
+describe("Philadelphia trade license holders (audit round 2, decision 2)", () => {
+  it("reads the holder from the license class, never from a company named with the person", async () => {
+    const { phillyHolder } = await import("./pa");
+    expect(phillyHolder("PLUMBER MASTER")).toBe("individual");
+    expect(phillyHolder("SHEET METAL TECHNICIAN")).toBe("individual");
+    expect(phillyHolder("SPECIAL INSPECTION AGENCY")).toBe("business");
+    expect(phillyHolder("ELECTRICAL CONTRACTOR")).toBeNull();
+    expect(phillyHolder("")).toBeNull();
+  });
+});

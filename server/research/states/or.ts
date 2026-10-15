@@ -19,6 +19,7 @@ import type { BulkHit, BulkSource } from "../bulk";
 import { nameClause, sodaRows } from "../licenses";
 import type { LiveEnforcementSearch, StatePack } from "./types";
 import { hasEnded } from "../adverse";
+import { noteOf, withNote } from "../notes";
 import { anyDay, businessParts, fetchJson, nameMatches } from "./lib/g8-common";
 
 // ── BOLI prevailing wage: List of Ineligibles + Case Closure Letters ─────────────────────────────────────────
@@ -103,9 +104,10 @@ async function* boliLoader(): AsyncIterable<BulkHit> {
 const SOS_DATASET = "https://data.oregon.gov/d/tckn-sxa6";
 const SOS_URL = "https://data.oregon.gov/resource/tckn-sxa6.json";
 
-async function searchSos(name: string): Promise<EnforcementHit[]> {
+export async function searchSos(name: string): Promise<EnforcementHit[]> {
   const rows = await sodaRows(SOS_URL, `${nameClause("business_name", name)} AND associated_name_type='PRINCIPAL PLACE OF BUSINESS'`, 200, "Oregon business registry");
-  return rows.filter((r) => nameMatches(name, String(r.business_name ?? ""))).map((r) => ({
+  // The page's cap note travels with the results (round 2, decision 9).
+  return withNote(rows.filter((r) => nameMatches(name, String(r.business_name ?? ""))).map((r) => ({
     state: "OR", source: "Oregon Secretary of State business registry (active businesses)",
     sourceUrl: typeof (r.business_details as any)?.url === "string" ? (r.business_details as any).url : SOS_DATASET,
     category: "business_status" as const, name: clean(String(r.business_name ?? "")), id: clean(String(r.registry_number ?? "")),
@@ -114,7 +116,7 @@ async function searchSos(name: string): Promise<EnforcementHit[]> {
     city: [clean(String(r.city ?? "")), clean(String(r.state ?? ""))].filter(Boolean).join(", ") || null,
     address: [r.address, r.address_continued, r.city, r.state, r.zip].map((v) => clean(v == null ? null : String(v))).filter(Boolean).join(" ") || null,
     detail: r.registry_date ? `Registered ${anyDay(r.registry_date)}` : null, amount: null, adverse: null,
-  }));
+  })), noteOf(rows));
 }
 
 // ── DCBS workers' compensation employer database ─────────────────────────────────────────────────────────────
@@ -137,9 +139,10 @@ export function wcInsurer(r: Record<string, unknown>): string | null {
 /** entity_code 1 is "Individual" (the dataset's column description): a person's address and phone are not shown. */
 const WC_INDIVIDUAL = "1";
 
-async function searchWorkersComp(name: string): Promise<EnforcementHit[]> {
+export async function searchWorkersComp(name: string): Promise<EnforcementHit[]> {
   const rows = await sodaRows(WC_URL, `(${nameClause("legal_business_name", name)}) OR (${nameClause("dba_name", name)})`, 200, "Oregon workers' comp employers");
-  return rows.filter((r) => nameMatches(name, String(r.legal_business_name ?? ""), String(r.dba_name ?? ""))).map((r) => {
+  // The page's cap note travels with the results (round 2, decision 9).
+  return withNote(rows.filter((r) => nameMatches(name, String(r.legal_business_name ?? ""), String(r.dba_name ?? ""))).map((r) => {
     const code = clean(String(r.insurer_status ?? "")) ?? "";
     const dba = clean(String(r.dba_name ?? ""));
     const individual = clean(String(r.entity_code ?? "")) === WC_INDIVIDUAL;
@@ -157,7 +160,7 @@ async function searchWorkersComp(name: string): Promise<EnforcementHit[]> {
         clean(String(r.naics_description ?? "")), clean(String(r.employees_range ?? "")) ? `${clean(String(r.employees_range))} employees` : null].filter(Boolean).join(". ") || null,
       amount: null, adverse: null,
     };
-  });
+  }), noteOf(rows));
 }
 
 const liveEnforcement: LiveEnforcementSearch[] = [

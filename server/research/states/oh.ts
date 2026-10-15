@@ -54,6 +54,9 @@ export function ocilbRow(r: Record<string, string>): BulkHit | null {
       specialty: who ? "Qualifying individual named on the license" : null, status: titleCase(clean(r.Status)), principal: who,
       city: [clean(r["Company City"]), clean(r["Company State"]) !== "OH" ? clean(r["Company State"]) : null].filter(Boolean).join(", ") || null,
       expires: usDate(r["Expiration Date"]), matchedOn: company ? "business" : "principal",
+      // OCILB licenses the qualifying individual (Name, LastName); the company is the one they qualify. A row with no
+      // individual is the company's own (round 2, decision 2: the company's address then stays).
+      holder: who ? "individual" : "business",
       address, phone, ...(who ? { people: [{ name: who, role: "Qualifying individual" }] } : {}),
     },
     business: company, person: who,
@@ -72,7 +75,8 @@ async function* ocilbLoader(): AsyncIterable<BulkHit> {
     return { boxes: [group.index], extra: [...types.map((t): [string, string] => [select[1], t]), [`${prefix}ddStates`, ""], [`${prefix}ddCounty`, ""]] };
   });
   for (const f of files) {
-    try { for await (const r of csvRecords(f.path)) { const h = ocilbRow(r); if (h) yield h; } }
+    // Each roster file is a component: the 70% rule applies to it on its own (round 2, decision 10).
+    try { for await (const r of csvRecords(f.path)) { const h = ocilbRow(r); if (h) yield { ...h, component: f.name }; } }
     finally { await fs.rm(f.path, { force: true }); }
   }
 }
@@ -81,12 +85,15 @@ async function* ocilbLoader(): AsyncIterable<BulkHit> {
 const SFM_GROUPS = [/Fire Protection Companies/i, /Fire Protection Individual/i, /UST Installer/i];
 const SFM_SOURCE = "Ohio State Fire Marshal fire protection and UST licenses";
 
-type SfmHit = { business: string | null; person: string | null; no: string | null; type: string | null; specialty: string | null; status: string | null; city: string | null; expires: string | null; address?: string | null; phone?: string | null };
+type SfmHit = { business: string | null; person: string | null; no: string | null; type: string | null; specialty: string | null; status: string | null; city: string | null; expires: string | null; address?: string | null; phone?: string | null; holder: "business" | "individual"; component: string };
 const sfmHit = (h: SfmHit): BulkHit => ({
-  kind: "license",
+  kind: "license", component: h.component,
   hit: {
     state: "OH", source: SFM_SOURCE, sourceUrl: SFM_PAGE, businessName: h.business, licenseNumber: h.no, licenseType: h.type,
     specialty: h.specialty, status: h.status, principal: h.person, city: h.city, expires: h.expires, matchedOn: h.business ? "business" : "principal",
+    // The companies roster lists businesses; the individuals and UST rosters list people (an employer named on
+    // their row doesn't make the license the employer's).
+    holder: h.holder,
     address: h.address ?? null, phone: h.phone ?? null, ...(h.person ? { people: [{ name: h.person, role: h.type }] } : {}),
   },
   business: h.business, person: h.person,
@@ -105,7 +112,7 @@ export async function* sfmRows(files: { name: string; rows: AsyncIterable<Record
         if (!name) continue;
         yield counted(sfmHit({ business: name, person: null, no: clean(r.Credential), type: clean(r["Licensee Type"]), specialty: null,
           status: clean(r["License Status"]), city: clean(r.City), expires: usDate(r["Expiration Date"]),
-          address: joinAddress(r["Address 1"], r["Address 2"], r.City, r.State, r["Zip Code"]), phone: clean(r.Phone) }));
+          address: joinAddress(r["Address 1"], r["Address 2"], r.City, r.State, r["Zip Code"]), phone: clean(r.Phone), holder: "business", component: f.name }));
       }
       if (!n) throw new Error(`${f.name}: the roster came back empty`);
       continue;
@@ -124,7 +131,7 @@ export async function* sfmRows(files: { name: string; rows: AsyncIterable<Record
       // A person with no employer on record: their phone may be their own (decision 4: no phone for an individual alone).
       yield counted(sfmHit({ business: employer, person: clean(r.Name), no: cred, type: clean(r["Licensee Type"]),
         specialty: cats.size ? Array.from(cats).join(", ") : null, status: clean(r["License Status"]) ?? clean(r.Status), city: clean(r.City),
-        expires: usDate(r["Expiration Date"]), phone: employer ? clean(r["Work Phone"]) : null }));
+        expires: usDate(r["Expiration Date"]), phone: employer ? clean(r["Work Phone"]) : null, holder: "individual", component: f.name }));
     }
     if (!n) throw new Error(`${f.name}: the roster came back empty`);
   }
