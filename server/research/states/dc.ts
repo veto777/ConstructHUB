@@ -124,12 +124,12 @@ export const pack: StatePack = {
   checked: "2026-10-15",
   bulk: [
     { id: "dc-bbl", state: "DC", label: "DC DLCP basic business licenses (construction)", pageUrl: BBL_PAGE, everyHours: 24, minRows: 25_000, load: bblLoader },
-    { id: "dc-ocp-excluded", state: "DC", label: "DC OCP excluded parties list", pageUrl: OCP, everyHours: 24 * 7, minRows: 35, load: ocpLoader, companiesOnly: true },
+    { id: "dc-ocp-excluded", state: "DC", label: "DC OCP excluded parties list", pageUrl: OCP, everyHours: 24 * 7, minRows: 35, load: ocpLoader, companiesOnly: true, category: "debarment" },
   ],
   blocked: [
     "DC DLCP occupational and professional license search (govservices.dcra.dc.gov/oplaportal; electricians, plumbers, HVAC and other Board of Industrial Trades licenses): requires an Okta login",
     "DC DLCP corporations registry (corponline.dlcp.dc.gov / boss.dc.gov): reCAPTCHA in the app",
-    "DC Superior Court eAccess (eaccess.dccourts.gov): did not answer from our network (connection timed out, 2026-10-15); no bulk data or API",
+    "DC Superior Court eAccess (eaccess.dccourts.gov): did not answer from our network (connection timed out, 2026-10-15; retried 2026-10-15 06:51 UTC from tower1 and vb11, still timing out after 30 s, robots.txt included); no bulk data or API",
     "DC DGS excluded parties list (construction): its page has no list or file in the HTML; the OCP excluded parties list (used) is the District-wide one",
   ],
 };

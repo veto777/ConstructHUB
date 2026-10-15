@@ -101,7 +101,7 @@ async function searchEpd(name: string): Promise<EnforcementHit[]> {
 }
 
 const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [
-  { source: "Georgia EPD enforcement orders", scope: "Proposed and executed EPD orders, 1998 to today (facility name)", search: searchEpd },
+  { source: "Georgia EPD enforcement orders", scope: "Proposed and executed EPD orders, 1998 to today (facility name)", category: "environmental", search: searchEpd },
 ];
 
 export const pack: StatePack = {
@@ -112,7 +112,7 @@ export const pack: StatePack = {
     "Georgia Secretary of State licensing boards (verify.sos.ga.gov: residential and general contractors, electrical, plumbing, conditioned air, low voltage, engineers): Cloudflare challenge on every page, robots.txt included",
     "Georgia Secretary of State corporations (ecorp.sos.ga.gov): Cloudflare challenge; bulk corporations data is sold ($1,000 one-time or $500/month)",
     "Georgia Insurance and Safety Fire Commissioner licensed professionals (sprinkler, elevator, boiler; Citizenserve portal): \"I am human\" check before results",
-    "Georgia DOAS suspended and debarred suppliers: PDF only, and the FY23 and FY24 lists say NONE",
-    "GSFIC debarred, suspended or ineligible firms: one PDF dated 2020-01-10",
+    "Georgia DOAS suspended and debarred suppliers (doas.ga.gov, purchasing law page): the current FY27 list (a .docx posted 2026-08) says NONE, as did FY23 and FY24; rechecked 2026-10-15",
+    "GSFIC debarred, suspended or ineligible firms (gsfic.georgia.gov): still one PDF last updated 2020-01-10, with no firms listed; rechecked 2026-10-15",
   ],
 };
