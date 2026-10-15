@@ -1,7 +1,8 @@
 /**
  * The automation: one pass a minute (BACKLINKS_WORKER_ENABLED=true) that
  *   1. searches — a few queries from the bank, within the daily query cap and the monthly budget;
- *   2. vets — leases new sources and reads them with the crawler (free: our own requests);
+ *   2. vets — leases new sources and reads them with the crawler (free: our own requests), then reads the contact
+ *      pages of qualified sources that published no email (./contacts.ts, also free);
  *   3. measures — authority for graded sources in bulk, once enough are waiting (cheap: ~$0.18 per 1,000);
  *   4. drafts — a pitch for each quality source that publishes an email;
  *   5. sends — approved pitches, only when sending is configured (./outreach.ts).
@@ -19,6 +20,7 @@ import * as store from "./store";
 import { discoveryEstimateUsd, searchOnce } from "./discover";
 import { fetchMetrics, metricsEstimateUsd, METRICS_BATCH } from "./metrics";
 import { gradeSource, readSite } from "./vet";
+import { findContacts } from "./contacts";
 import { composePitch, outreachConfig, pickEmail, PITCHED_KINDS, sendApproved } from "./outreach";
 
 const num = (v: string | undefined, d: number) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : d; };
@@ -29,7 +31,7 @@ export const workerConfig = (env: NodeJS.ProcessEnv = process.env) => ({
 });
 
 export const VET_LEASE_MS = 2 * 60_000;
-const VET_BATCH = 20, VET_CONCURRENCY = 5, QUERIES_PER_PASS = 2, METRICS_MIN_BATCH = 100;
+const VET_BATCH = 20, CONTACT_BATCH = 20, VET_CONCURRENCY = 5, QUERIES_PER_PASS = 2, METRICS_MIN_BATCH = 100;
 
 async function budgetLeft(capUsd: number) { return capUsd - (await store.monthSpend()); }
 
@@ -80,6 +82,21 @@ export async function runVetting(n = VET_BATCH): Promise<{ vetted: number; faile
     }
   }));
   return { vetted, failed };
+}
+
+/** The contact finder (./contacts.ts) for qualified sources that published no email, `VET_CONCURRENCY` at a time. */
+export async function runContactSearch(n = CONTACT_BATCH): Promise<{ searched: number; found: number }> {
+  const queue = await store.needingContacts(n);
+  let searched = 0, found = 0;
+  await Promise.all(Array.from({ length: Math.min(VET_CONCURRENCY, queue.length) }, async () => {
+    for (let s = queue.shift(); s; s = queue.shift()) {
+      const r = await findContacts(s.domain, s.contactUrl).catch(() => ({ emails: [] as string[], contactUrl: null, pagesRead: 0 }));
+      await store.saveContacts(s.id, r.emails, r.contactUrl, r.pagesRead);
+      searched++;
+      if (r.emails.length) found++;
+    }
+  }));
+  return { searched, found };
 }
 
 /** Authority for graded sources, in one bulk batch, re-grading each. `force` runs even under the minimum batch. */
@@ -148,6 +165,7 @@ export async function runPass(): Promise<void> {
       if (ranToday < cfg.queriesPerDay) await runDiscovery(Math.min(QUERIES_PER_PASS, cfg.queriesPerDay - ranToday), cfg.capUsd)
         .catch((e) => { void recordFailure("job", "Backlinks discovery", e); console.error(`[backlinks] discovery failed: ${e?.message ?? e}`); });
       await runVetting();
+      await runContactSearch();
       await runMetrics(cfg.capUsd);
       await runDirectoryAuthority(cfg.capUsd);
       await runDrafts();

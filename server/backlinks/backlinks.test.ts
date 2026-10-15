@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildQueryBank, hitsFromItems, isExcluded, normalizeDomain, parseImportLine, QUERY_TEMPLATES, NICHES, US_STATES } from "./discover";
-import { analyzePage, classifyKind, gradeSource, mergeSignals } from "./vet";
+import { analyzePage, classifyKind, decodeCfEmail, gradeSource, mergeSignals, spelledOutEmails, vetDeps } from "./vet";
+import { contactLinks, findContacts } from "./contacts";
 import { composePitch, siteName, pickEmail, sendBlocker, outreachConfig, withFooter } from "./outreach";
 import { fetchMetrics, metricsDeps } from "./metrics";
 import type { BacklinkSignals } from "@shared/backlinks";
@@ -320,5 +321,33 @@ describe("DR, the 0–100 figure both pages show", () => {
     expect(toDr(402)).toBe(40);
     expect(reasonWithDr("+25 domain rank 497")).toBe("+25 DR 50");
     expect(reasonWithDr("-10 low domain rank 120")).toBe("-10 low DR 12");
+  });
+});
+
+describe("contact finder", () => {
+  it("decodes Cloudflare-protected and spelled-out addresses", () => {
+    // "news@site.com" XOR 0x2a, key first
+    const hex = "2a" + Buffer.from("news@site.com").map((b) => b ^ 0x2a).toString("hex");
+    expect(decodeCfEmail(hex)).toBe("news@site.com");
+    expect(decodeCfEmail("zz")).toBeNull();
+    expect(spelledOutEmails("Tips: editor [at] site [dot] com or ads(at)site.com. Next")).toEqual(["editor@site.com", "ads@site.com"]);
+    const p = page(`<html><body><a href="/cdn-cgi/l/email-protection#${hex}">email</a><span class="__cf_email__" data-cfemail="${hex}">[email protected]</span> ${words(50)}</body></html>`, "https://site.com/contact");
+    expect(p.emails).toEqual(["news@site.com"]);
+  });
+  it("ranks same-site contact pages first and ignores other sites", () => {
+    const links = contactLinks(`<a href="/about">About</a><a href="https://other.com/contact">x</a><a href="/advertise">Advertise</a>
+      <a href="/contact-us">Contact us</a><a href="/blog/roofing">Roofing</a><a href="/media-kit.pdf">kit</a>`, "https://site.com/", "site.com");
+    expect(links).toEqual(["https://site.com/contact-us", "https://site.com/advertise", "https://site.com/about"]);
+  });
+  it("reads the linked contact page when the home page has no address", async () => {
+    const pages: Record<string, string> = {
+      "https://site.com/": `<a href="/reach-us">Contact</a>`,
+      "https://site.com/reach-us": `<p>Write to editor@site.com or a@gmail.com</p>`,
+    };
+    const orig = vetDeps.fetch;
+    vetDeps.fetch = async (url: string) => (pages[url] ? { url, status: 200, body: pages[url], bytes: 0, headers: {}, redirects: [] } : { url, status: 404, body: "", bytes: 0, headers: {}, redirects: [] });
+    try {
+      expect(await findContacts("site.com")).toEqual({ emails: ["editor@site.com", "a@gmail.com"], contactUrl: "https://site.com/reach-us", pagesRead: 2 });
+    } finally { vetDeps.fetch = orig; }
   });
 });
