@@ -1,3 +1,37 @@
+## 🧭 2026-10-15 — every page explains itself: "i" + walkthrough, facelifts, sample previews (branch `debug/review-report-competitor-sort`)
+- **Owner's program (given page by page on 2026-10-15):** every app page carries an "i" beside its title that says in
+  plain words what the page is for and how to use it, with the walkthrough playing **inside** the panel; bare forms
+  and "…" grids get the SEO-Suite look (stat row, cards, pills); every empty state shows a badged **sample preview**
+  that disappears the moment real data exists (never for permit/compliance records); every preset filter also takes
+  a typed value. Rules kept in the debug session's memory; the process is fix → Kimi review → closed.
+- **Plumbing:** `shared/help/registry.ts` `helpKeyForRoute` (exact route, longest prefix, feature over section,
+  then the entry named after the route, then shortest key) + `alsoAt`; `PageHeader`, `GoogleSectionHeader as="h1"`
+  and `CrmPageHeader` mount `<HelpButton>` by route (`helpKey="…"` overrides, `helpKey={null}` turns it off); the
+  tool shell shows a crumb-row "i" only when a page mounted none (React context claim in `lib/use-help-entry.ts`,
+  InfoTips count); the panel plays the walkthrough inline and falls back to the feature's intro film
+  (`INTRO_FALLBACKS`; `HelpEntry.film`/`videoSource`; `video` still means "own walkthrough", so the Tutorials
+  badge stays honest). `client/src/components/sample-preview.tsx` is the one sample wrapper. Audits:
+  `npx tsx scripts/tutorials/audit-help-routes.ts` (every app route resolves) and
+  `node scripts/tutorials/audit-help-pages.cjs <base> --out DIR --list` (opens each "i", plays the film).
+- **Entries:** one file per entry under `shared/help/entries/<group>/<key>.ts`, then `npx tsx
+  scripts/tutorials/gen-index.ts`; `server/help-registry.test.ts` enforces shape, routes and the fallback map.
+- **Also in the batch:** SEO dashboard "Look up any website" + "Add to my sites"; Google Business Profile as a Social
+  Media channel (existing GBP queue API); removed Google reviews → "Report a missing review to Google" (official
+  pages `support.google.com/business/answer/10313341`, `/business/gethelp`; the old `review_removal_restoration`
+  form is a 404) with a "Copy for Google" evidence button; JobCam in the sidebar Tools (portal link); Tutorials
+  hides `/admin*` and `/lsa-account-manager*` entries from clients; Agency QA fixes (settings form loads saved
+  values, role refusals are 403 in words, Google refresh is 409 without an account).
+- **Earlier the same day (deployed):** Competitor Intel listings ordered best-rated first (NULL ratings were leading);
+  "Report review" on the location Reviews tab with Google's report page; fresh-database boot fixed
+  (`backlinks/schema.ts`, `crm/schema-ensure.ts` altered tables before creating them; `backlinks/schema-order.test.ts`
+  scans every bootstrap file).
+- **Production env:** `DOMAINS_WORKER_ENABLED=true` must be set on vb11 `~/ConstructHUB-live/.env` for Domains
+  imports/checks to run (it was missing; the page said "background processing is off").
+- **Known leftovers:** GMB monitor "response tone" is preset-only (`server/ai-features.ts` only knows two tones);
+  `/invite/:code` cannot carry an entry (pattern routes); follow-up cadence stays weekly/biweekly by an earlier owner
+  decision; `docs/tutorials/scripts/intro-competitors.json` targets old selectors (re-record needs an update);
+  `e2e/sitescan.spec.ts` references the pre-Switch monthly-rescan buttons (pre-existing drift).
+
 ## 🔔 2026-10-10 — Permit alerts (branch `permits/alerts`, NOT deployed)
 - **What:** owner's order ("track contractors or specific trades in your area, get alerts when a permit is issued for a
   specific address"). A **watch** (`permit_watches`: address | parcel | contractor | trade_area, params + channels +
