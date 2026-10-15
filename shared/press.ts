@@ -3,9 +3,9 @@
  * the news, the AI writes the release to the wire's content guidelines, we send it to the wire, read the wire's
  * answers from the pressrelease@ mailbox and email the customer the live link and the distribution report.
  *
- * Pricing (owner): double the wire's rate; buy 12 and get 2 free; one release a month for the best results.
- * The wire's standard rates (its 2026-10-15 quote): Budget $487 a release, Premium $1,205 a release. Bundles the
- * wire sells us (40/80/120/200 releases at 25–55% off) lower OUR cost, never the customer's price.
+ * Pricing (owner): double what the wire charges per release; buy 12 and get 2 free; one release a month for the best
+ * results. The wire's 2026-10-15 quote: Budget $365.25 a release (the 40-release bundle, 25% off), Premium $903.75
+ * (its $1,205 rate less the same 25%). A bigger bundle (35–55% off) lowers OUR cost, never the customer's price.
  *
  * The distributor is never named as our supplier: on the page it is one outlet among the rest (owner).
  */
@@ -13,8 +13,8 @@
 export type PressTier = "budget" | "premium";
 export const PRESS_TIERS: readonly PressTier[] = ["budget", "premium"];
 
-/** What the wire charges us per release at its standard rate, in cents. */
-export const PRESS_WIRE_RATE_CENTS: Record<PressTier, number> = { budget: 48_700, premium: 120_500 };
+/** What the wire charges us per release (its 40-release bundle rate, 25% off), in cents. */
+export const PRESS_WIRE_RATE_CENTS: Record<PressTier, number> = { budget: 36_525, premium: 90_375 };
 /** What a customer pays per release: double the wire's rate (owner). */
 export const PRESS_RELEASE_PRICE_CENTS: Record<PressTier, number> = { budget: PRESS_WIRE_RATE_CENTS.budget * 2, premium: PRESS_WIRE_RATE_CENTS.premium * 2 };
 
