@@ -291,7 +291,7 @@ async function searchNjBusinessNames(name: string): Promise<EnforcementHit[]> {
 }
 
 const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [
-  { source: "New Jersey Division of Revenue business entity records", scope: "Every business entity on file, by name", search: searchNjBusinessNames },
+  { source: "New Jersey Division of Revenue business entity records", scope: "Every business entity on file, by name", category: "business_status", search: searchNjBusinessNames },
 ];
 
 export const pack: StatePack = {
@@ -312,11 +312,11 @@ export const pack: StatePack = {
         { profession: "Home Inspection Advisory Comm", business: false },
       ]) },
     { id: "nj-debarments", state: "NJ", label: "New Jersey DOL prevailing-wage debarments", pageUrl: NJ_DEBAR_PAGE, everyHours: 24, minRows: 100,
-      load: njDebarmentsLoader, companiesOnly: true },
+      load: njDebarmentsLoader, companiesOnly: true, category: "debarment" },
     { id: "nj-wall", state: "NJ", label: "New Jersey DOL Workplace Accountability in Labor List (The WALL)", pageUrl: NJ_WALL_PAGE, everyHours: 24 * 7, minRows: 280,
-      load: njWallLoader, companiesOnly: true },
+      load: njWallLoader, companiesOnly: true, category: "wage" },
     { id: "nj-watchlist", state: "NJ", label: "New Jersey DOL Wage Violation Watchlist", pageUrl: NJ_WATCH_PAGE, everyHours: 24 * 7, minRows: 750,
-      load: njWatchlistLoader, companiesOnly: true },
+      load: njWatchlistLoader, companiesOnly: true, category: "wage" },
   ],
   liveEnforcement: LIVE_ENFORCEMENT,
   noStatewideGcLicense: "New Jersey does not license general contractors statewide; home improvement contractors register with the Division of Consumer Affairs, and electricians, plumbers and HVACR contractors are licensed by their boards (all searched above)",

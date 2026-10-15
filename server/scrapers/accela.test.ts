@@ -204,3 +204,27 @@ describe("offline HTTP workflow using recorded public responses", () => {
     await expect(adapter.search(c,{type:"address",value:"100 Main"})).rejects.toThrow("public search unavailable");
   });
 });
+
+describe("self-hosted portal behind a city landing page (Plantation, FL, recorded 2026-10-15)", () => {
+  const plantation = (): AdapterCtx => ({ ...ctx(), databaseName: "Plantation", jurisdiction: "Plantation, FL",
+    searchUrl: source("plantation-landing"), portalUrl: source("plantation-landing") });
+  it("accepts a landing page without Accela markers that links to its own CapHome search", async () => {
+    respond("plantation-landing"); respond("plantation-form"); respond("plantation-company-none");
+    expect(await adapter.search(plantation(), { type: "company", value: "Able Construction" })).toEqual([]);
+    const calls = vi.mocked(politeFetch).mock.calls;
+    expect(String(calls[1][0])).toBe("https://aca.plantation.org/CitizenAccess/Cap/CapHome.aspx?module=Building&TabName=Building");
+    expect(String(calls[2][1]?.body)).toContain("txtGSBusiName=Able+Construction");
+  });
+  it("still refuses an unrelated page that neither is nor links to Accela", async () => {
+    vi.mocked(politeFetch).mockResolvedValueOnce(new Response("<html><body><a href='/permits'>Permits</a></body></html>"));
+    await expect(adapter.search({ ...plantation(), searchUrl: "https://city.example/CitizenAccess/Default.aspx" }, { type: "company", value: "x" }))
+      .rejects.toThrow("URL did not return an Accela portal");
+  });
+  it("reads the \"Record No.\" column", () => {
+    const url = source("plantation-company-page1");
+    const rows = parseAccelaRecords(fixture("plantation-company-page1"), plantation(), url, url, "PLANTATION");
+    expect(rows).toHaveLength(10);
+    expect(rows[0]).toMatchObject({ permitNumber: "R24-01072", status: "Closed", permitType: "Revision-Supplemental" });
+    expect(rows[0].address).toContain("750 NW 82 TER");
+  });
+});

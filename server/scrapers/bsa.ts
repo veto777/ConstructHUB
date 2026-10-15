@@ -245,7 +245,31 @@ async function propertyPermits(session: BsaSession, ctx: AdapterCtx, detail: { h
   throw new Error("BS&A Online permit grid exceeded 100 pages; narrow the search");
 }
 
+/**
+ * BS&A's own .NET fault ("Object reference not set to an instance of an object"). It is not a property of the
+ * request: the same search from the same server succeeds before and after, and on 2026-10-15 it hit most FL
+ * tenants for two minutes while others in the same sweep passed. A fresh public session is worth one more try.
+ */
+export function isBsaTransientFault(message: string): boolean {
+  return /BS&A Online portal error:.*Object reference not set to an instance of an object/i.test(message);
+}
+
+/** Pause before the one retry (tests set it to 0). */
+export const bsaRetry = { pauseMs: 5000 };
+
 async function search(ctx: AdapterCtx, q: { type: PermitSearchType; value: string }): Promise<PermitRecord[]> {
+  const pauseMs = bsaRetry.pauseMs;
+  try {
+    return await searchOnce(ctx, q);
+  } catch (e: any) {
+    if (!isBsaTransientFault(String(e?.message ?? ""))) throw e;
+    ctx.log(`BS&A Online server fault; retrying once with a fresh session in ${pauseMs / 1000}s`);
+    await new Promise((r) => setTimeout(r, pauseMs));
+    return searchOnce(ctx, q);
+  }
+}
+
+async function searchOnce(ctx: AdapterCtx, q: { type: PermitSearchType; value: string }): Promise<PermitRecord[]> {
   const session = new BsaSession(ctx);
   if (!["address", "permit", "name"].includes(q.type)) throw new Error(`BS&A Online does not support ${q.type} search`);
   if (!q.value?.trim()) throw new Error("BS&A Online requires a nonempty search term");

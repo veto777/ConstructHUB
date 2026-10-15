@@ -42,6 +42,16 @@ describe('EnerGov tenant and request scope', () => {
     expect(searchRequest(original, 'BHQA2025-0005', 'permit').PermitCriteria.PermitNumber).toBe('BHQA2025-0005');
     expect(searchRequest(original, 'Madison', 'keyword')).toMatchObject({ SearchModule: 1, FilterModule: 2, Keyword: 'Madison', PageNumber: 1 });
   });
+  it('searches a keyword (a company or person name) as an exact phrase, like the form\'s Exact Match box', () => {
+    // Without it Cape Coral matched 106,870 permits for "Able Construction" (any word), past the 100-page cap.
+    const original = criteria();
+    expect(original.ExactMatch).toBe(false);
+    expect(searchRequest(original, 'Able Construction', 'keyword').ExactMatch).toBe(true);
+    expect(original.ExactMatch).toBe(false);
+    expect(searchRequest(original, '1004 S Madison', 'address').ExactMatch).toBe(false);
+    const { ExactMatch: _, ...older } = original;
+    expect('ExactMatch' in searchRequest(older, 'Able Construction', 'keyword')).toBe(false);
+  });
   it('sets only the requested real date fields and refuses unavailable date criteria', () => {
     const q = recentRequest(criteria(), '2026-10-03T12:00:00Z', '2026-10-10T17:00:00Z', 'Issue');
     expect(q.PermitCriteria).toMatchObject({ IssueDateFrom: '2026-10-03T00:00:00', IssueDateTo: '2026-10-10T23:59:59', ApplyDateFrom: null, Address: null, PermitNumber: '' });

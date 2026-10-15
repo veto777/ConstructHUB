@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { AdapterCtx } from './types';
 import adapter, { supportedHosts, watsAdapter, eugeneAdapter, capabilitiesFor } from './city-built';
-import { parseResults } from './city-built/webapp.sjcfl.us';
+import stJohns, { parseResults, parseContractorSearch, licensesNaming } from './city-built/webapp.sjcfl.us';
 import { isoDate, assertPublicPage } from './city-built/http';
 import { PortalBlockedError } from './polite-fetch';
 vi.mock('../storage', () => ({ storage: {} }));
@@ -15,6 +15,34 @@ describe('city-built', () => {
     it('throws on the recorded server error instead of false no-results', () => expect(() => parseResults(fixture('sjc-main.html'), ctx)).toThrow());
     it('rejects unknown hosts', async () => { expect(supportedHosts).toContain('webapp.sjcfl.us'); await expect(async () => adapter.search({ ...ctx, searchUrl: 'https://example.com/' }, { type: 'permit', value: '12611699' })).rejects.toThrow('no site adapter for example.com'); });
     it('recognizes CAPTCHA in the real Alamance response', () => expect(() => assertPublicPage(fixture('alamance-search.html'), 'http://apps.alamance-nc.com/')).toThrow(PortalBlockedError));
+    it('says when WATS itself timed out instead of "missing result count"', () => {
+        expect(() => parseResults(fixture('stjohns-contractor-name-timeout.html'), ctx)).toThrow('St. Johns: portal error: Execution Timeout Expired');
+    });
+    it('reads the St. Johns contractor lookup: a license list, or the single contractor page', () => {
+        const url = 'https://webapp.sjcfl.us/watswebx/Permit/SearchCL.aspx?PermitNo=&PopUp=0';
+        expect(parseContractorSearch(fixture('stjohns-contractor-able.html'), url)).toEqual([{ clid: 'SC-CGC1504066', name: 'KLEFFMAN, JEFFREY LEE', company: 'ABLE CONSTRUCTION INC' }]);
+        const lennar = parseContractorSearch(fixture('stjohns-contractors-lennar.html'), url);
+        expect(lennar).toHaveLength(6);
+        expect(lennar[0]).toEqual({ clid: 'SC-131149938', name: 'STIMSON, JAMES LENNARD', company: 'CWC WINDOWS & DOORS INC' });
+        // The portal's substring match ("LENNARD") is not the company.
+        expect(licensesNaming(lennar, 'Lennar Homes').map(l => l.company)).not.toContain('CWC WINDOWS & DOORS INC');
+        expect(licensesNaming(lennar, 'Lennar Homes').length).toBeGreaterThan(0);
+        expect(licensesNaming(lennar, 'Joe Bland Construction')).toEqual([]);
+    });
+    it('finds a company\'s permits through its contractor license (contractor-name search times out in WATS)', async () => {
+        vi.mocked(politeFetch).mockReset();
+        for (const name of ['stjohns-contractors-lennar.html', 'stjohns-contractor-able.html', 'stjohns-permits-by-license.html', 'stjohns-permits-by-license.html'])
+            vi.mocked(politeFetch).mockResolvedValueOnce(new Response(fixture(name)));
+        const rows = await stJohns.search({ ...ctx, politeness: { minDelayMs: 0 } } as AdapterCtx, { type: 'company', value: 'Able Construction' });
+        expect(rows).toHaveLength(7);
+        expect(rows[0]).toMatchObject({ permitNumber: '12500438', address: '2839 S PONTE VEDRA BLVD', contractorName: 'ABLE CONSTRUCTION INC', contractorLicense: 'SC-CGC1504066', issuedAt: '2025-01-23' });
+        expect(rows[0].raw?.listedNames).toEqual(['ABLE CONSTRUCTION INC', 'KLEFFMAN, JEFFREY LEE']);
+        const calls = vi.mocked(politeFetch).mock.calls;
+        expect(String(calls[0][0])).toBe('https://webapp.sjcfl.us/watswebx/Permit/SearchCL.aspx?PermitNo=&PopUp=0');
+        expect(String(calls[1][1]?.body)).toContain('txtSearch=Able+Construction');
+        expect(String(calls[3][1]?.body)).toContain('txtCLId=SC-CGC1504066');
+        expect(String(calls[3][1]?.body)).not.toContain('txtCLNm=Able');
+    });
     it('normalizes dates strictly', () => { expect(isoDate('10/9/2026 4:32:25 PM')).toBe('2026-10-09'); expect(isoDate('2/30/2026')).toBeNull(); expect(isoDate('')).toBeNull(); });
 });
 import { parseResults as parseJohnston } from './city-built/www.johnstonnc.gov';
@@ -92,6 +120,10 @@ describe('additional verified public feeds', () => {
         expect(() => parsePalm(fixture('palm-main.html'), palmCtx)).toThrow('capped');
         expect(() => validatePalm(fixture('palm-search.html'), palmCtx.searchUrl)).not.toThrow();
         expect(() => validatePalm(fixture('alamance-search.html'), palmCtx.searchUrl)).toThrow(PortalBlockedError);
+    });
+    it('reads Palm Coast\'s current empty-result alert as zero permits (recorded 2026-10-15)', () => {
+        const palmCtx = { ...ctx, searchUrl: 'https://www.palmcoast.gov/building/search' };
+        expect(parsePalm(fixture('palm-company-no-match.html'), palmCtx)).toEqual([]);
     });
 });
 

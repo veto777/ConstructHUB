@@ -7,7 +7,7 @@
 import { Fragment, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, CheckCircle2, ChevronDown, FileSearch, Link2, Loader2, Plus, Printer, Trash2, XCircle } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, ChevronDown, FileSearch, Link2, Loader2, Plus, Printer, Trash2, XCircle } from "lucide-react";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ import {
   RESEARCH_MAX_LICENSE_NUMBERS, RESEARCH_MAX_PHONES, RESEARCH_MAX_ADDRESSES, RELATED_TIES, cleanLicenseNumber, formatPhone, cleanAddress,
   type ResearchOrderView, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie,
 } from "@shared/research-reports";
+import { RESEARCH_COVERAGE_PATH } from "@shared/research-coverage";
 import { ComplianceFrame } from "./compliance";
 
 /** One name on the form; the identifiers are typed as text (license numbers and phones comma-separated, addresses one per line). */
@@ -122,6 +123,18 @@ export default function ResearchOrderPage() {
           source. Reports are usually ready the same day.
         </p>
       </header>
+
+      <section className="max-w-3xl rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2" data-testid="section-research-what">
+        <h2 className="font-semibold">What a report does</h2>
+        <ul className="space-y-1.5 text-sm list-disc pl-5">
+          <li>Finds a contractor by name, owner, license number, phone or address, in all 50 states and DC.</li>
+          <li>Cross-references what it finds. Other licenses and businesses that share a license number, phone, address or person show up too, and each one says what ties it.</li>
+          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens), federal court cases and OSHA inspections for companies.</li>
+        </ul>
+        <Link href={RESEARCH_COVERAGE_PATH} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline" data-testid="link-research-coverage">
+          See exactly what we search in your state <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
+      </section>
 
       {/* Picking a card shapes the form; the price always follows what's entered (one name in one state is Standard). */}
       <div className="grid gap-3 sm:grid-cols-2 max-w-3xl" role="group" aria-label="Report size">
@@ -282,7 +295,7 @@ const ExtA = ({ href, children }: { href: string; children: React.ReactNode }) =
 
 const ENFORCEMENT_LABELS: Record<EnforcementCategory, string> = {
   discipline: "Licensing-board discipline", complaint: "Licensing-board complaints", stop_work: "Stop-work orders",
-  environmental: "Environmental enforcement", tax_lien: "Federal tax liens", debarment: "Debarments", business_status: "Business registration status",
+  environmental: "Environmental enforcement", tax_lien: "Tax liens and warrants", debarment: "Debarments", business_status: "Business registration status",
   wage: "Wage and labor violations", court_case: "State court cases",
 };
 const ENFORCEMENT_ORDER: EnforcementCategory[] = ["discipline", "stop_work", "debarment", "wage", "court_case", "tax_lien", "environmental", "complaint", "business_status"];

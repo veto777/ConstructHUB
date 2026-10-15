@@ -79,14 +79,18 @@ export function parseSmartGovResults(html: string, ctx: AdapterCtx, url: string)
   $('.search-result-item').each((_i,e) => {
     const row = $(e); const link = row.find('.search-result-title a');
     const permitNumber = link.text().trim(); if (!permitNumber) return;
-    const cols = row.find('.col-lg-3');
+    // Three columns: type/status, site address, names. Tenants that publish no site address in results (Bal Harbour,
+    // FL) send two: type/status and a wider names column. The address is then unknown, never the names.
+    let cols = row.find('.row').first().children('[class*="col-"]');
+    if (!cols.length) cols = row.find('.col-lg-3');
     const type = cols.eq(0).children('div').eq(0).text().trim() || null;
     const state = cols.eq(0).children('div').eq(1).text().trim();
     const statusDate = state.match(/,\s*(\d{1,2}\/\d{1,2}\/\d{4})\s*$/)?.[1];
     const status = state.replace(/,\s*\d{1,2}\/\d{1,2}\/\d{4}\s*$/, '').trim() || null;
-    const address = cols.eq(1).children('div').map((_j,d) => $(d).text().trim()).get().filter(s => /[\w\d]/.test(s)).join(', ') || null;
-    // The third column lists the people/companies on the permit (owner, contractor or both; the list does not say which).
-    const listedNames = cols.eq(2).children('div').map((_j,d) => $(d).text().trim()).get().filter(s => /[a-z]/i.test(s));
+    const lines = (i: number) => cols.eq(i).children('div').map((_j,d) => $(d).text().trim()).get();
+    const address = cols.length >= 3 ? lines(1).filter(s => /[\w\d]/.test(s)).join(', ') || null : null;
+    // The names column lists the people/companies on the permit (owner, contractor or both; the list does not say which).
+    const listedNames = lines(cols.length >= 3 ? 2 : 1).filter(s => /[a-z]/i.test(s));
     const action = link.attr('onclick')?.match(/['"](Detail\/[\w-]+)['"]/)?.[1];
     const form = $('form[action]').first().attr('action') ?? new URL(url).pathname.replace(/\/(Search|SearchPage)$/, '');
     records.push({ permitNumber, jurisdiction: ctx.jurisdiction, databaseId: ctx.databaseId,
@@ -125,6 +129,16 @@ export function parseSmartGovDetail(html: string, ctx: AdapterCtx, url: string):
   };
 }
 
+/** The tenant hides this search field from its public form (it hides contact names entirely on many tenants). */
+export class SmartGovFieldUnavailableError extends Error {
+  constructor(public readonly field: string) {
+    super(/^Primary(Contact|Contractor)\./.test(field)
+      ? `SmartGov search field unavailable: ${field} (this tenant does not publish name search)`
+      : `SmartGov search field unavailable: ${field}`);
+    this.name = 'SmartGovFieldUnavailableError';
+  }
+}
+
 export function smartgovSearchBody(html: string, fields: Record<string,string>): URLSearchParams {
   const body = formValues(html);
   for (const [key,value] of Object.entries(fields)) body.set(key,value);
@@ -132,13 +146,23 @@ export function smartgovSearchBody(html: string, fields: Record<string,string>):
   body.set('__submitFormValidator__', `abcd${Date.now()}z`);
   return body;
 }
+/** A stored short link (Sachse, TX: bit.ly/SachsePermits) is used only if its own redirect lands on a SmartGov tenant. */
+async function tenantUrl(ctx: AdapterCtx, request: ReturnType<typeof portalSession>): Promise<string> {
+  try { return smartgovUrl(ctx.searchUrl); } catch (e) {
+    if (new URL(ctx.searchUrl).hostname.toLowerCase() !== 'bit.ly') throw e;
+    return smartgovUrl((await request(ctx.searchUrl)).url);
+  }
+}
 async function run(ctx: AdapterCtx, fields: Record<string,string>, advanced: boolean): Promise<PermitRecord[]> {
-  const base = smartgovUrl(ctx.searchUrl); const request = portalSession(ctx);
+  const request = portalSession(ctx); const base = await tenantUrl(ctx, request);
   let page = await request(advanced ? base.replace(/Search$/, 'AdvancedSearch') : base);
   const $ = cheerio.load(page.html);
   const action = $('form[action]').first().attr('action');
   if (!action || !action.includes('ApplicationSearch')) throw new Error('SmartGov public search form unavailable');
-  for (const field of Object.keys(fields)) if (!$(`[name="${field}"]`).length) throw new Error(`SmartGov search field unavailable: ${field}`);
+  // Module=Permitting keeps license records out, but some tenants (Bal Harbour, FL) only run the permitting
+  // module and leave the selector off the form. Results are still checked to be permits below.
+  if (fields.Module && !$('[name="Module"]').length) { fields = { ...fields }; delete fields.Module; }
+  for (const field of Object.keys(fields)) if (!$(`[name="${field}"]`).length) throw new SmartGovFieldUnavailableError(field);
   const endpoint = new URL(`${action}/Search`,base).href;
   const body = smartgovSearchBody(page.html,fields);
   page = await request(endpoint,body);

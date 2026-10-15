@@ -15,7 +15,8 @@ export function parseResults(html: string, ctx: AdapterCtx): PermitRecord[] {
     validatePage(html, ctx.searchUrl);
     const $ = load(html);
     if (/capped at/i.test($.text())) throw new Error('Palm Coast: search results capped; narrow the search');
-    if (/No permits found/i.test($.text())) return [];
+    // Older pages said "No permits found"; since 2026-10 the partial is an alert: "No permits matched your search."
+    if (/No permits (?:found|matched your search)/i.test($.text())) return [];
     const table = $('table').filter((_, e) => $(e).find('th').first().text().trim() === 'Permit #');
     if (table.length !== 1) throw new Error('Palm Coast: missing permit results');
     const records: PermitRecord[] = [];

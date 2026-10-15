@@ -176,7 +176,7 @@ const ECA_PAGE = "https://dol.nebraska.gov/LaborStandards/Contractors/Overview";
 
 const NE_ECA: BulkSource = {
   id: "ne-eca-unpaid", state: "NE", label: "Nebraska DOL contractors with unpaid Employee Classification Act fines", pageUrl: ECA_PAGE,
-  everyHours: 24 * 7, minRows: 25, companiesOnly: true, // 36 on 2026-10-15
+  everyHours: 24 * 7, minRows: 25, companiesOnly: true, category: "wage", // 36 on 2026-10-15
   load: async function* () {
     // The file's link changes when it is replaced; find it on the overview page by its label.
     const page = await politeFetch(ECA_PAGE, {}, { minDelayMs: 1500 });

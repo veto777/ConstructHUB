@@ -17,14 +17,19 @@ export function publicRecordUrl(href: string | undefined, base: string): string 
   if (!href || /^(javascript:|#)/i.test(href)) return null;
   try { const u = new URL(href,base); return ['http:','https:'].includes(u.protocol) && u.origin === new URL(base).origin ? u.href : null; } catch { return null; }
 }
+/** Some tenants (Miami Lakes, FL) show raw column names: PERMIT_NO, SITE_ADDR, CONTRACTOR_NAME. */
+export function etrakitLabel(text: string): string {
+  return text.replace(/_/g,' ').replace(/\s+/g,' ').trim().replace(/\baddr$/i,'address');
+}
 /** Header-based parsing avoids treating contractor IDs or pager links as permits. */
 export function parsePermitTables(html: string, ctx: AdapterCtx, url: string, selector: string): PermitRecord[] {
   assertPublicResponse(html,url);
   const $ = cheerio.load(html); const out: PermitRecord[] = [];
   $(selector).each((_i,table) => {
     const t = $(table);
-    const headers = t.find('tr').filter((_j,r) => $(r).children('th').length > 0).first().children('th,td').map((_j,e)=>$(e).text().replace(/\s+/g,' ').trim()).get();
-    const key = headers.findIndex(h => /^(permit\s*(number|no\.?|#)?|application\s*(number|no\.?|#|id))$/i.test(h));
+    const headers = t.find('tr').filter((_j,r) => $(r).children('th').length > 0).first().children('th,td').map((_j,e)=>etrakitLabel($(e).text())).get();
+    // Aventura, FL (CentralSquare cloud) labels the column "PERMIT/PROCESS NUMBER" and the parcel "FOLIO NUMBER".
+    const key = headers.findIndex(h => /^(permit(\s*\/\s*process)?\s*(number|no\.?|#)?|application\s*(number|no\.?|#|id))$/i.test(h));
     if (key < 0) return;
     t.find('tr').each((_j,row) => {
       const r = $(row); if (r.children('th').length || r.hasClass('rgPager') || r.hasClass('rgNoRecords')) return;
@@ -33,7 +38,7 @@ export function parsePermitTables(html: string, ctx: AdapterCtx, url: string, se
       const permitNumber = values[key]; if (!permitNumber) return;
       const get = (pattern: RegExp) => {const i=headers.findIndex(h=>pattern.test(h));return i<0 ? null : values[i] || null;};
       out.push({ permitNumber, databaseId:ctx.databaseId,jurisdiction:ctx.jurisdiction,
-        address:get(/^(site\s*)?address$/i),parcel:get(/^(parcel(\s*(id|number|no\.?|#))?|apn)$/i),
+        address:get(/^(site\s*)?address$/i),parcel:get(/^(parcel(\s*(id|number|no\.?|#))?|apn|folio(\s*(number|no\.?|#))?)$/i),
         permitType:get(/^(permit\s*|application\s*)?type$/i),workClass:get(/^(permit\s*)?subtype$/i),
         description:get(/^(work\s*)?description$/i),status:get(/^(permit\s*|application\s*)?status$/i),
         issuedAt:isoDate(get(/^(date\s*issued|issued(\s*(date|on))?|issue date)$/i)),
@@ -67,10 +72,10 @@ export function etrakitSearchBody(html: string, type: PermitSearchType | 'issued
   const input = $("input[id*='txtSearchString'],input[name*='SearchString']").first();
   const btn = $("input[id*='btnSearch'],button[id*='btnSearch']").first();
   if (!by.length || !input.length || !btn.length) throw new Error('eTRAKiT public permit search form unavailable');
-  const patterns: Record<string,RegExp> = { permit:/^(permit\s*(#|number|no\.?)?)$/i,address:/^(site\s*)?address$/i,
+  const patterns: Record<string,RegExp> = { permit:/^(permit(\s*\/\s*process)?\s*(#|number|no\.?)?)$/i,address:/^(site\s*)?address$/i,
     name:/^(applicant|applicant name|owner|owner name)$/i,company:/^(contractor|contractor name)$/i,
     license:/^(contractor license|license number)$/i,keyword:/^description$/i,issued:/^(issued|issue date|date issued)$/i };
-  const option = by.find('option').filter((_i,e)=>patterns[type].test($(e).text().trim())).first();
+  const option = by.find('option').filter((_i,e)=>patterns[type].test(etrakitLabel($(e).text()))).first();
   if (!option.length) throw new Error(`eTRAKiT tenant does not expose ${type} in public permit search`);
   data.set(by.attr('name')!,option.attr('value')!);
   const operator = $("select[id*='ddSearchOper'],select[id*='ddlSearchOper']").first();
@@ -97,8 +102,52 @@ export function nextETRAKiTPostback(html: string): {target:string;argument:strin
   if (next.attr('name')) return {target:next.attr('name')!,argument:''};
   throw new Error('Unrecognized eTRAKiT next-page control');
 }
+/**
+ * eTRAKiT search pages linked from a city landing page. Only links the page itself publishes, on another host or
+ * path, and only when exactly one portal is linked; a jurisdiction's portal is never guessed.
+ */
+export function etrakitLinks(html: string, landingUrl: string): string[] {
+  const $ = cheerio.load(html); const found = new Set<string>();
+  let own: string | null = null;
+  try { own = etrakitUrl(landingUrl); } catch { /* the landing page is not itself under an eTRAKiT path */ }
+  $('a[href]').each((_i,e) => {
+    try {
+      const u = new URL($(e).attr('href')!, landingUrl);
+      // The landing site's own pages (Highlands County's /etrakit/definitions.php) are help pages, not the portal.
+      if (!['http:','https:'].includes(u.protocol) || u.origin === new URL(landingUrl).origin || u.pathname === '/' || !/etrakit/i.test(u.hostname + u.pathname)) return;
+      const search = etrakitUrl(u.href);
+      if (search !== own) found.add(search);
+    } catch { /* not an eTRAKiT application link */ }
+  });
+  return [...found];
+}
+
+/** The stored URL, or the eTRAKiT portal its landing page redirects or links to (Pinecrest, Highlands County, FL). */
+async function openSearchPage(request: ReturnType<typeof portalSession>, stored: string): Promise<{ html: string; url: string }> {
+  let direct: string | null = null;
+  try { direct = etrakitUrl(stored); } catch { /* a landing page, resolved below */ }
+  if (direct) {
+    try {
+      const page = await request(direct);
+      if (/etrakit/i.test(page.html)) return page;
+    } catch (e: any) {
+      if (e instanceof PortalBlockedError || !/^HTTP 404\b/.test(String(e?.message))) throw e;
+    }
+  }
+  const landing = await request(stored);
+  let target: string | null = null;
+  try { target = etrakitUrl(landing.url); } catch { /* not redirected to an eTRAKiT host */ }
+  if (!target || target === direct) {
+    const links = etrakitLinks(landing.html, landing.url).filter(l => l !== direct);
+    if (links.length > 1) throw new Error('Landing page links to more than one eTRAKiT portal; configure the portal URL');
+    target = links[0] ?? null;
+  }
+  if (!target || target === direct) throw new Error(direct ? 'Response is not an eTRAKiT portal' : 'Not a recognized eTRAKiT URL shape');
+  return request(target);
+}
+
 async function run(ctx:AdapterCtx,type:PermitSearchType|'issued',value:string):Promise<PermitRecord[]> {
-  const url=etrakitUrl(ctx.searchUrl); const request=portalSession(ctx); let page=await request(url);
+  const request=portalSession(ctx); let page=await openSearchPage(request,ctx.searchUrl);
   if (!/etrakit/i.test(page.html)) throw new Error('Response is not an eTRAKiT portal');
   if (/\/login\.aspx/i.test(page.url)) throw new PortalBlockedError(page.url,401,'eTRAKiT requires login; no public permit search');
   const body=etrakitSearchBody(page.html,type,value); page=await request(page.url,body);

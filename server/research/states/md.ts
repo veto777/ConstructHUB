@@ -115,7 +115,7 @@ export const pack: StatePack = {
   complaints: COMPLAINTS,
   bulk: [
     { id: "md-bpw-debarments", state: "MD", label: "Maryland Board of Public Works debarments", pageUrl: BPW, everyHours: 24 * 7, minRows: 13,
-      load: bpwLoader, companiesOnly: true },
+      load: bpwLoader, companiesOnly: true, category: "debarment" },
   ],
   noStatewideGcLicense: "Maryland does not license general contractors statewide; home improvement contractors and the electrical, plumbing and HVACR trades are licensed by Maryland Department of Labor boards (whose search we can't run automatically), and Montgomery County's contractor and electrical licenses are searched above",
   blocked: [

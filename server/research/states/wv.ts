@@ -180,7 +180,7 @@ async function* evsLoader(): AsyncIterable<BulkHit> {
 
 const BULK: BulkSource[] = [
   // 2,647 rows (business, city, masked FEIN) on 2026-10-15.
-  { id: "wv-oic-evs", state: "WV", label: "WV Employer Violator System (workers' comp default)", pageUrl: EVS, everyHours: 24 * 7, minRows: 1_500, load: evsLoader, companiesOnly: true },
+  { id: "wv-oic-evs", state: "WV", label: "WV Employer Violator System (workers' comp default)", pageUrl: EVS, everyHours: 24 * 7, minRows: 1_500, load: evsLoader, companiesOnly: true, category: "debarment" },
 ];
 
 export const pack: StatePack = {

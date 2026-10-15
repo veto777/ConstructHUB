@@ -140,7 +140,7 @@ export const pack: StatePack = {
   enforcement: [BUSINESS_REGISTRY, DEEP_RECENT, DEEP_OLDER],
   bulk: [
     { id: "ct-dol-debarment", state: "CT", label: "Connecticut Department of Labor debarment list", pageUrl: DOL_DEBAR_PAGE, everyHours: 24 * 7, minRows: 5,
-      load: ctDebarmentLoader, companiesOnly: true },
+      load: ctDebarmentLoader, companiesOnly: true, category: "debarment" },
   ],
   blocked: [
     "CT DOL stop-work orders (CGS 31-76a): the DOL describes them but publishes no list",

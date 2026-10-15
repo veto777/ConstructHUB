@@ -48,7 +48,7 @@ async function searchIdSos(name: string): Promise<EnforcementHit[]> {
 }
 
 const liveEnforcement: LiveEnforcementSearch[] = [
-  { source: "Idaho Secretary of State business entities", scope: "Every business entity and assumed business name on the Secretary of State's register (names that start with the search)", search: searchIdSos },
+  { source: "Idaho Secretary of State business entities", scope: "Every business entity and assumed business name on the Secretary of State's register (names that start with the search)", category: "business_status", search: searchIdSos },
 ];
 
 export const pack: StatePack = {

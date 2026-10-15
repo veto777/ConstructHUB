@@ -15,7 +15,7 @@
 import { MEDIA_INBOX_PARAMETERS } from "@shared/media-inbox";
 import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
-import { decide, extractNextStep, mediaAiConfigured, planForm } from "./ai";
+import { classifySites, decide, extractNextStep, mediaAiConfigured, planForm } from "./ai";
 import { closeBrowser, readPage, submitGoogleForm, submitHtmlForm } from "./browse";
 import { asksIfAi, companyDomain, firstNameOf, formMessage, holdingReply, personWillReply, isOptOut, machineReason, replyProblem, replySubject } from "./guard";
 import { pickEmail, siteName } from "../backlinks/outreach";
@@ -295,7 +295,25 @@ ${STOP_LINE}
 Best regards,`;
 }
 
-export const QUEUE_TEMPLATES: Record<string, { subject: string; body: (company: string) => string; kind: "directory" | "article" | "news" }> = {
+/** First contact for a trade association or chamber of commerce: their members are our customers (2026-10-15). */
+export function associationContactBody(company: string): string {
+  return `Hi ${company} team,
+
+ConstructHUB is software for US contractors (roofers, HVAC, plumbers, remodelers). It helps them find permits, keep their Google Business Profile and directory listings accurate, and win more local work. Many of your members are the kind of businesses we serve, so we'd like to build a relationship with ${company}.
+
+Could you tell us:
+1. Whether you list tools or services for members (a member-benefits page, resource directory or allied membership) and how a company like ours qualifies.
+2. Whether you accept articles or tips for your newsletter or blog, for example on permits, licensing or getting found online.
+3. Whether you have an API, feed or other automated way to submit them, since we're building an automated system for this.
+4. Who the right person is for partnerships, if that isn't you.
+
+${STOP_LINE}
+
+Best regards,`;
+}
+
+export const QUEUE_TEMPLATES: Record<string, { subject: string; body: (company: string) => string; kind: "directory" | "article" | "news" | "other" }> = {
+  association: { subject: "Member resource partnership: ConstructHUB (software for US contractors)", body: associationContactBody, kind: "other" },
   directory: { subject: FIRST_CONTACT_SUBJECT, body: firstContactBody, kind: "directory" },
   article: { subject: "Content partnership: ConstructHUB (software for US contractors)", body: articleContactBody, kind: "article" },
   news: { subject: "Local contractor news: partnership with ConstructHUB", body: newsContactBody, kind: "news" },
@@ -315,12 +333,29 @@ export function dailyAllowance(daysSending: number, env: NodeJS.ProcessEnv = pro
 const perDay = (env: NodeJS.ProcessEnv = process.env) => dailyAllowance(0, env);
 export const outreachPerDay = perDay;
 
+export const CLASSIFY_BATCH = 25, CLASSIFY_BATCHES_PER_PASS = 8;
+/** Sort vetted directories into listing directories, trade associations, chambers and the rest (ai.ts classifySites). */
+export async function classifyDirectories(): Promise<number> {
+  let n = 0;
+  for (let i = 0; i < CLASSIFY_BATCHES_PER_PASS; i++) {
+    const sites = await store.needingClass(CLASSIFY_BATCH);
+    if (!sites.length) break;
+    const { classes, names } = await classifySites(sites);
+    // A domain the answer left out is never emailed: it counts as "other" rather than being asked about again and again.
+    for (const s of sites) if (!classes.has(s.domain)) classes.set(s.domain, "other");
+    await store.saveClasses(classes, names);
+    n += classes.size;
+  }
+  return n;
+}
+
 /** Step 5: queue new vetted directories, then send today's share of first-contact emails (MEDIA_OUTREACH_PER_DAY). */
 export async function sendQueued(): Promise<{ queued: number; sent: number; skipped: number }> {
   const mailbox = mailboxConfig().user;
   // Directories come only from reviewed research lists (store.queueList): the crawler's directory picks were licence
   // lookups, chambers and listed businesses' own Gmail addresses (2026-10-14). Publishers need real readers (below).
-  const queued = await store.queueVettedPublishers(pickEmail, siteName);
+  await classifyDirectories().catch((e) => console.error(`[media-inbox] classifying directories failed: ${e?.message ?? e}`));
+  const queued = await store.queueVettedPublishers(pickEmail, siteName) + await store.queueClassified(pickEmail, siteName);
   const allowance = dailyAllowance(await store.daysSending());
   if (!allowance) return { queued, sent: 0, skipped: 0 };
   const room = Math.max(0, allowance - (await store.outreachSentToday()));

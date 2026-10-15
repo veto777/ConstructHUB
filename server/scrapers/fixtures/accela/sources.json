@@ -444,5 +444,61 @@
       "value": "2026-10-03"
     },
     "sha256": "857ab85c4b9afcb326c653aff792dc9cae5c55dff7342cc962d52929c7d15446"
+  },
+  {
+    "file": "plantation-landing.html.gz",
+    "url": "https://aca.plantation.org/CitizenAccess/Default.aspx",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-15T05:32:08.000Z",
+    "jurisdiction": "Plantation, FL",
+    "query": {
+      "mode": "search",
+      "type": "company",
+      "value": "Able Construction"
+    },
+    "sha256": "3d3817387b724017aa74d76846b6d7e7b285636b7268ff06ee883de98d95460e"
+  },
+  {
+    "file": "plantation-form.html.gz",
+    "url": "https://aca.plantation.org/CitizenAccess/Cap/CapHome.aspx?module=Building&TabName=Building",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-15T05:32:08.000Z",
+    "jurisdiction": "Plantation, FL",
+    "query": {
+      "mode": "search",
+      "type": "company",
+      "value": "Able Construction"
+    },
+    "sha256": "adef4c5e665b653a932cf82a30ff5e01cc026f091b1afb0102344a4c8595a6c3"
+  },
+  {
+    "file": "plantation-company-none.html.gz",
+    "url": "https://aca.plantation.org/CitizenAccess/Cap/CapHome.aspx?module=Building&TabName=Building",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-15T05:32:08.000Z",
+    "jurisdiction": "Plantation, FL",
+    "query": {
+      "mode": "search",
+      "type": "company",
+      "value": "Able Construction"
+    },
+    "sha256": "9eb7009eec5d181f3b11fe40d0efc4c2693986878954cd70d4223b3d45b7018c"
+  },
+  {
+    "file": "plantation-company-page1.html.gz",
+    "url": "https://aca.plantation.org/CitizenAccess/Cap/CapHome.aspx?module=Building&TabName=Building",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-15T05:32:08.000Z",
+    "jurisdiction": "Plantation, FL",
+    "query": {
+      "mode": "search",
+      "type": "company",
+      "value": "Pulte"
+    },
+    "sha256": "83c105d19393c011a2694ee31bd7f4f7782248083142e041c2d3f6ad883fdd97"
   }
 ]

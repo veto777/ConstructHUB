@@ -248,8 +248,8 @@ const ENFORCEMENT: SodaEnforcement[] = [
 ];
 
 const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [
-  { source: "Pennsylvania DGS debarment and suspension list", scope: "Vendors debarred or suspended from Commonwealth contracts, current and archived", search: searchDgs },
-  { source: "Pennsylvania UJS court cases (web portal)", scope: "Magisterial district, criminal and appellate dockets naming the company (not Common Pleas civil cases)", search: searchUjs },
+  { source: "Pennsylvania DGS debarment and suspension list", scope: "Vendors debarred or suspended from Commonwealth contracts, current and archived", category: "debarment", search: searchDgs },
+  { source: "Pennsylvania UJS court cases (web portal)", scope: "Magisterial district, criminal and appellate dockets naming the company (not Common Pleas civil cases)", category: "court_case", search: searchUjs },
 ];
 
 export const pack: StatePack = {
@@ -259,7 +259,7 @@ export const pack: StatePack = {
     { id: "pa-philadelphia", state: "PA", label: "Philadelphia L&I trade licenses", pageUrl: PHL_PAGE, everyHours: 24, minRows: 35_000, load: phillyLoader },
     { id: "pa-pittsburgh", state: "PA", label: "Pittsburgh PLI contractor and trade licenses", pageUrl: PGH_PAGE, everyHours: 24 * 7, minRows: 7_000, load: pittsburghLoader },
     { id: "pa-dli-debarments", state: "PA", label: "Pennsylvania L&I Prevailing Wage Act debarments", pageUrl: PA_DLI_DEBAR, everyHours: 24 * 7, minRows: 3,
-      load: dliDebarmentsLoader, companiesOnly: true },
+      load: dliDebarmentsLoader, companiesOnly: true, category: "debarment" },
   ],
   enforcement: ENFORCEMENT,
   liveEnforcement: LIVE_ENFORCEMENT,

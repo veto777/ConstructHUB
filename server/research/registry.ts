@@ -9,7 +9,7 @@ import { licenseSourcesFor, type LicenseSource } from "./licenses";
 import { searchSodaEnforcement, type SodaEnforcement } from "./state-records";
 import type { ComplaintSource } from "./records";
 import { STATE_PACKS } from "./states";
-import { LOCAL_BULK, LOCAL_LICENSES, LOCAL_LIVE } from "./states/local";
+import { LOCAL_BULK, LOCAL_ENFORCEMENT, LOCAL_LICENSES, LOCAL_LIVE, LOCAL_LIVE_ENFORCEMENT } from "./states/local";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./states/types";
 
 const PACKS = new Map<string, StatePack>(STATE_PACKS.map((p) => [p.state, p]));
@@ -44,6 +44,8 @@ export async function searchPackEnforcement(name: string, state: string, matches
   };
   for (const src of p?.enforcement ?? []) await run(src.source, src.scope, () => searchSodaEnforcement(src as SodaEnforcement, name, matches));
   for (const src of p?.liveEnforcement ?? []) await run(src.source, src.scope, () => (src as LiveEnforcementSearch).search(name));
+  for (const src of LOCAL_ENFORCEMENT.filter((x) => x.state === state)) await run(src.source, src.scope, () => searchSodaEnforcement(src, name, matches));
+  for (const src of LOCAL_LIVE_ENFORCEMENT[state] ?? []) await run(src.source, src.scope, () => src.search(name));
   return { hits, sources };
 }
 
