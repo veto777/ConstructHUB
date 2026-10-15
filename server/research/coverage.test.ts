@@ -29,8 +29,10 @@ describe("coverage manifest (from the registry)", () => {
 
   it("every source can be searched some way, and nationwide records are listed once", () => {
     for (const s of manifest.states) for (const src of s.sources) expect(src.ids.length, `${s.state}: ${src.label}`).toBeGreaterThan(0);
-    // OSHA needs DOL_API_KEY: a build without the key doesn't claim it (audit 2026-10-15).
-    expect(manifest.nationwide.map((n) => n.label)).toEqual(expect.arrayContaining([expect.stringMatching(/CourtListener/), ...(process.env.DOL_API_KEY ? [expect.stringMatching(/OSHA/)] : [])]));
+    // OSHA needs DOL_API_KEY: a build without the key doesn't claim it. CourtListener is off (its robots.txt
+    // disallows us), so it isn't claimed either (audit 2026-10-15).
+    expect(manifest.nationwide.some((n) => /CourtListener/.test(n.label))).toBe(false);
+    if (process.env.DOL_API_KEY) expect(manifest.nationwide.some((n) => /OSHA/.test(n.label))).toBe(true);
     if (!process.env.DOL_API_KEY) expect(manifest.nationwide.some((n) => /OSHA/.test(n.label))).toBe(false);
   });
 

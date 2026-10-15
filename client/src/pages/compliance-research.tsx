@@ -119,7 +119,7 @@ export default function ResearchOrderPage() {
           we can reach in those states, then follows the license numbers, phones, addresses and people on what it finds to other
           licenses and businesses tied to them. For a company it also pulls consumer complaints, state
           enforcement records (licensing-board discipline, stop-work orders, tax liens, debarments, environmental orders),
-          federal court cases and OSHA safety inspections. Every finding links to its official
+          and OSHA safety inspections. Every finding links to its official
           source. Reports are usually ready the same day.
         </p>
       </header>
@@ -129,7 +129,7 @@ export default function ResearchOrderPage() {
         <ul className="space-y-1.5 text-sm list-disc pl-5">
           <li>Searches every source we have in each state you pick, by name, owner, license number, phone or address. What we have differs by state: the link below lists it.</li>
           <li>Cross-references what it finds. Other licenses and businesses that share a license number, phone, address or person show up too, and each one says what ties it.</li>
-          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens), federal court cases and OSHA inspections for companies.</li>
+          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens) and OSHA inspections for companies.</li>
         </ul>
         <Link href={RESEARCH_COVERAGE_PATH} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline" data-testid="link-research-coverage">
           See exactly what we search in your state <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -632,7 +632,7 @@ export function ResearchOrderStatusPage() {
                     : <p>We don't search state license records for {o.input.states.join(", ")} yet. The report covers permit portals only there.</p>}
                   {Object.entries(o.preview.portalsByState).map(([st, n]) => <p key={st}>The report will search {n} live permit portal(s) in {stateName(st)} by name.</p>)}
                   {o.preview.records && (o.preview.records.complaints > 0 || o.preview.records.courtCases > 0 || o.preview.records.osha > 0 || (o.preview.records.enforcement ?? 0) > 0) && (
-                    <p data-testid="text-preview-records">Records on file: {o.preview.records.complaints} consumer complaint(s){o.preview.records.enforcement ? `, ${o.preview.records.enforcement} state enforcement or standing record(s)` : ""}, about {o.preview.records.courtCases} federal court docket(s){o.preview.records.osha ? ` and ${o.preview.records.osha} OSHA inspection(s)` : ""}.</p>
+                    <p data-testid="text-preview-records">Records on file: {o.preview.records.complaints} consumer complaint(s){o.preview.records.enforcement ? `, ${o.preview.records.enforcement} state enforcement or standing record(s)` : ""}{o.preview.records.courtCases ? `, about ${o.preview.records.courtCases} federal court docket(s)` : ""}{o.preview.records.osha ? ` and ${o.preview.records.osha} OSHA inspection(s)` : ""}.</p>
                   )}
                   <p className="text-muted-foreground">Details, permit matches, related licenses and businesses, and sources come with the full report.</p>
                 </div>
