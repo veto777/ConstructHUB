@@ -128,12 +128,14 @@ export const KEY_VERSION = 3;
  * enforcement subject checked again (BulkSource.legacyEnforcement, or the business-name rule), since the rule that
  * let it in has changed. Raise it when a classifier changes.
  */
-export const PAYLOAD_VERSION = 5;
+export const PAYLOAD_VERSION = 6;
 /*
  * Version 4 (round 4, decision 4): a Florida DBA needs a DBA marker, and entity abbreviations count only as the
  * name's last word. Older complaint rows are re-read by flLegacyComplaint.
  * Version 5 (A10, decision 3): FL personal name forms (suffixes, compound surnames, "might be a person") are never a
  * business. Only FL complaints re-reads its version-4 rows (its enforcementRuleVersion is 5).
+ * Version 6 (round 6, decision 2): an FL "SURNAME SURNAME, FIRST" form is ambiguous whatever its words ("SMITH JONES,
+ * GENERAL H"). FL complaints re-reads its version-4 and -5 rows (enforcementRuleVersion 6).
  */
 
 /** The version from which an enforcement row is current for a source that sets no enforcementRuleVersion of its own. */
@@ -283,7 +285,11 @@ async function loadSourceRun(src: BulkSource): Promise<number> {
 /** One pass of purgeLegacyKeys reads this many table pages at a time (a TID range scan: about 2,000 rows, no sort). */
 const PURGE_PAGES = 200;
 /** Bump to run the purge again under a newer rule. */
-export const PURGE_JOB = "purge-legacy-contact-keys-v1";
+export const PURGE_JOB = "purge-legacy-contact-keys-v2";
+/*
+ * v2 (round 6, decision 2): FL complaint rows stored before PAYLOAD_VERSION 6 whose respondent is now an ambiguous
+ * personal form lose their street keys too.
+ */
 
 /**
  * The phone and street keys ("t:", "a:") of stored rows that today's rules don't allow, removed from the index once,
@@ -493,7 +499,7 @@ export async function plainRequest(url: string, opts: { method?: string; headers
 }
 
 const answeredUrl = new WeakMap<IncomingMessage, string>();
-/** A 2xx HTML body from plainRequest checked for a bot challenge (blocks the host that answered, and throws). */
+/** An HTML body from plainRequest checked for a bot challenge, on any status (blocks the host that answered, and throws). */
 const checkPlainBody = (res: IncomingMessage, body: string) => {
   const url = answeredUrl.get(res);
   if (url && isHtmlType(String(res.headers["content-type"] ?? ""))) refuseChallengeBody(url, res.statusCode ?? 0, body);
@@ -509,7 +515,16 @@ export async function readText(res: IncomingMessage): Promise<string> {
 
 /** Stream a plainRequest response to a temp file (the caller deletes it). */
 export async function saveResponse(res: IncomingMessage): Promise<string> {
-  if ((res.statusCode ?? 0) >= 400) { res.resume(); throw new Error(`HTTP ${res.statusCode}`); }
+  if ((res.statusCode ?? 0) >= 400) {
+    // An error page may be a bot challenge (round 6, decision 5): its start is checked before the error is thrown.
+    if (answeredUrl.has(res) && isHtmlType(String(res.headers["content-type"] ?? ""))) {
+      let head = "";
+      for await (const c of res) { head += (c as Buffer).toString("utf8"); if (head.length >= 64 * 1024) break; }
+      res.destroy();
+      checkPlainBody(res, head);
+    } else res.resume();
+    throw new Error(`HTTP ${res.statusCode}`);
+  }
   const path = join(tmpdir(), `ch-bulk-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   try { await pipeline(res, createWriteStream(path)); }
   catch (err) { await fs.rm(path, { force: true }); throw err; }

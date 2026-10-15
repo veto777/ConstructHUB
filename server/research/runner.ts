@@ -523,7 +523,18 @@ async function noteResearchFacts(): Promise<void> {
   setKnowledgeFact("samExclusions", sam.loaded);
 }
 
+/**
+ * Once per purge version: unsafe legacy phone/address keys come off stored rows whether or not their source reloads
+ * (round 5, decision 5). It is privacy, not refresh (round 6, decision 11): it runs whatever RESEARCH_WORKER and
+ * RESEARCH_BULK say. Small page-range batches, no table copy; a database without the table only gets it created.
+ */
+export function startLegacyKeyPurge(delayMs = 60_000): void {
+  setTimeout(() => void purgeLegacyKeys(ALL_BULK_SOURCES).then((r) => { if (r) console.log(`[research-bulk] legacy key purge: ${JSON.stringify(r)}`); })
+    .catch((err) => console.error("[research-bulk] legacy key purge:", err)), delayMs).unref?.();
+}
+
 export function startResearchWorker(): void {
+  startLegacyKeyPurge();
   setTimeout(() => void noteResearchFacts().catch(() => undefined), 30_000).unref?.();
   setInterval(() => void noteResearchFacts().catch(() => undefined), 30 * 60_000).unref?.();
   if (process.env.RESEARCH_WORKER === "off") return;
@@ -537,10 +548,6 @@ export function startResearchWorker(): void {
   // The state bulk files (hundreds of MB a day): production only, unless a dev server asks with RESEARCH_BULK=on.
   if (process.env.RESEARCH_BULK === "on" || (process.env.NODE_ENV === "production" && process.env.RESEARCH_BULK !== "off")) {
     const refresh = () => void refreshDueSources(ALL_BULK_SOURCES).catch((err) => console.error("[research-bulk] refresh:", err));
-    // Once: unsafe legacy phone/address keys come off stored rows whether or not their source reloads (round 5,
-    // decision 5). Small page-range batches, no table copy.
-    setTimeout(() => void purgeLegacyKeys(ALL_BULK_SOURCES).then((r) => { if (r) console.log(`[research-bulk] legacy key purge: ${JSON.stringify(r)}`); })
-      .catch((err) => console.error("[research-bulk] legacy key purge:", err)), 60_000).unref?.();
     setTimeout(refresh, 3 * 60_000).unref?.();
     setInterval(refresh, 60 * 60_000).unref?.();
   }

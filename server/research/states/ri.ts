@@ -19,10 +19,11 @@ import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { clean, csvRows, download, usDate, type BulkHit } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { tokens, wholeWordMatch } from "../licenses";
-import { FormSession, formFields, tableRows, textOf, splitName } from "./lib/g2-aspnet";
+import { FormSession, formFields, htmlPerson, tableRows, textOf, splitName } from "./lib/g2-aspnet";
 import { promises as fs } from "node:fs";
 import { adverseFrom } from "../adverse";
 import { looksLikeBusiness } from "./lib/business-name";
+import { personText } from "../person-name";
 import { capNote, withNote } from "../notes";
 import type { StatePack } from "./types";
 
@@ -62,7 +63,8 @@ export function parseDltDetail(html: string): Record<string, string | null> {
   const out: Record<string, string | null> = {};
   for (const m of Array.from(html.matchAll(/id="MainContent_lblField(\d+)Hdr"[^>]*>([^<]*)<\/label>[\s\S]*?id="MainContent_lblField\1">([\s\S]*?)<\/span>/g))) {
     const label = textOf(m[2]);
-    if (label) out[label] = clean(textOf(m[3].replace(/<br\s*\/?>/gi, ", ")));
+    // A person's Name keeps a <br> as a list separator (round 6, decision 3); other values join their lines with ", ".
+    if (label) out[label] = label === "Name" ? htmlPerson(m[3]) : clean(textOf(m[3].replace(/<br\s*\/?>/gi, ", ")));
   }
   return out;
 }
@@ -260,6 +262,8 @@ async function* riRostersLoader(): AsyncIterable<BulkHit> {
         const expires = exp && /^\d{2}-\d{2}-\d{4}$/.test(exp) ? usDate(exp) : null;
         const coa = /Certificate of Authorization/i.test(type ?? "");
         const firm = coa || (r.page === "solarRetailerRoster" && looksLikeBusiness(name));
+        // The person as published: a list stays a list (round 6, decision 3).
+        const who = firm ? null : personText(row[header!.indexOf("Name")]) ?? name;
         // An individual's address is a person's: city, state and ZIP only, and no address key (audit 2026-10-15, decision 4).
         // A street only on a certificate of authorization (a firm by the board's definition): a solar retailer whose
         // name only reads as a business has an unknown holder (round 3, decision 3), so city, state and ZIP only.
@@ -267,13 +271,13 @@ async function* riRostersLoader(): AsyncIterable<BulkHit> {
         const hit: LicenseHit = {
           state: "RI", source: "Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",
           sourceUrl: DBR_ROSTERS_PAGE, businessName: firm ? name : null, licenseNumber: no, licenseType: type, specialty: null,
-          status, principal: firm ? null : name, city: get("City"), expires, matchedOn: firm ? "business" : "principal",
+          status, principal: who, city: get("City"), expires, matchedOn: firm ? "business" : "principal",
           // A certificate of authorization is a firm's; the professional rosters license people; the solar retailer
           // roster doesn't say (its name only reads as a business), so its holder is unknown (round 2, decisions 2, 3).
           holder: coa ? "business" : r.page === "solarRetailerRoster" ? null : "individual",
-          address, people: firm ? [] : [{ name, role: null }],
+          address, people: who ? [{ name: who, role: null }] : [],
         };
-        yield { kind: "license", hit, business: firm ? name : null, person: firm ? null : name, keys: { licenses: [no], addresses: coa ? [address] : [] }, component: r.label };
+        yield { kind: "license", hit, business: firm ? name : null, person: who, keys: { licenses: [no], addresses: coa ? [address] : [] }, component: r.label };
       }
     } finally {
       await fs.rm(path, { force: true });

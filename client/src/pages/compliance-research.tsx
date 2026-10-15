@@ -24,7 +24,7 @@ import {
   RESEARCH_TIERS, RESEARCH_TRADES, RESEARCH_TRADE_KEYS, RESEARCH_PATH, COMPLIANCE_PATH,
   RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA, researchTierFor,
   RESEARCH_MAX_LICENSE_NUMBERS, RESEARCH_MAX_PHONES, RESEARCH_MAX_ADDRESSES, RELATED_TIES, cleanLicenseNumber, formatPhone, cleanAddress,
-  type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie, ENFORCEMENT_KINDS, anySearched, recordKindOf as kindOf, reportSummary, subjectLicensesSearched, previewRecordsLine, previewLicenseLine,
+  type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie, ENFORCEMENT_KINDS, anySearched, recordKindOf as kindOf, reportSummary, subjectLicensesSearched, previewRecordsLine, previewLicenseLine, identifierSearchLine,
 } from "@shared/research-reports";
 import { RESEARCH_COVERAGE_PATH } from "@shared/research-coverage";
 import { ComplianceFrame } from "./compliance";
@@ -445,7 +445,7 @@ function LicenseTable({ rows, testId, related }: { rows: LicenseHit[]; testId: s
             <td className="py-2 pr-3">{l.businessName ?? "—"}</td>
             <td className="pr-3"><People l={l} /></td>
             <td className="pr-3 font-mono text-xs whitespace-nowrap">{l.licenseNumber ?? "—"}{!related && FOUND_BY[l.matchedOn] ? <span className="block font-sans text-muted-foreground">{FOUND_BY[l.matchedOn]}</span> : null}</td>
-            <td className="pr-3">{[l.licenseType, l.specialty].filter(Boolean).join(" · ") || "—"}</td><td className="pr-3">{l.status ?? "—"}{l.expires ? ` (exp. ${l.expires})` : ""}</td>
+            <td className="pr-3">{[l.licenseType, l.specialty].filter(Boolean).join(" · ") || "—"}</td><td className="pr-3">{l.status ?? "Status not stated"}{l.expires ? ` (exp. ${l.expires})` : ""}</td>
             <td className="pr-3">{l.address ?? l.city ?? "—"}{l.phone ? <span className="block whitespace-nowrap">{formatPhone(l.phone) ?? l.phone}</span> : null}</td>
             <td className="whitespace-nowrap"><a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">{l.state} data</a><span className="block text-xs text-muted-foreground max-w-[12rem] whitespace-normal">{l.source}</span></td>
           </tr></Fragment>))}</tbody>
@@ -456,7 +456,7 @@ function LicenseTable({ rows, testId, related }: { rows: LicenseHit[]; testId: s
             <p className="font-medium">{l.businessName ?? l.principal ?? "—"}</p>
             {related && l.relatedVia && <p className="text-xs text-muted-foreground"><Link2 className="inline h-3 w-3 mr-0.5" aria-hidden="true" />Why it's here: {l.relatedVia}</p>}
             <p><span className="font-mono text-xs">{l.licenseNumber ?? "No number"}</span> · {[l.licenseType, l.specialty].filter(Boolean).join(" · ") || "—"}</p>
-            <p>{l.status ?? "Status not published"}{l.expires ? ` (exp. ${l.expires})` : ""}</p>
+            <p>{l.status ?? "Status not stated"}{l.expires ? ` (exp. ${l.expires})` : ""}</p>
             {(l.people?.length || l.principal) && <div className="text-xs"><People l={l} /></div>}
             {(l.address || l.city || l.phone) && <p className="text-xs text-muted-foreground">{[l.address ?? l.city, l.phone ? formatPhone(l.phone) ?? l.phone : null].filter(Boolean).join(" · ")}</p>}
             {!related && FOUND_BY[l.matchedOn] && <p className="text-xs text-muted-foreground">{FOUND_BY[l.matchedOn]}</p>}
@@ -548,7 +548,7 @@ function SubjectReport({ s, i }: { s: ResearchSubjectReport; i: number }) {
           <p key={j} className="text-xs text-muted-foreground">{src.state}: {src.source}: {src.note}</p>
         ))}
         {!!s.identifierSearches?.length && (
-          <p className="text-xs text-muted-foreground" data-testid="text-identifier-searches">Also searched by {s.identifierSearches.map((x) => `${x.query} (${x.sourcesSearched === 0 ? "not searched" : `${x.found} found`}; ${x.note})`).join("; ")}.</p>
+          <p className="text-xs text-muted-foreground" data-testid="text-identifier-searches">Also searched by {s.identifierSearches.map(identifierSearchLine).join("; ")}.</p>
         )}
         {s.licenses.length > 0 && <LicenseTable rows={s.licenses} testId={`table-licenses-${i}`} />}
       </div>

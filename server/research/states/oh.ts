@@ -18,6 +18,7 @@
  */
 import { promises as fs } from "node:fs";
 import { clean, csvRecords, usDate, type BulkHit } from "../bulk";
+import { personText } from "../person-name";
 import type { StatePack } from "./types";
 import { rosterGroups, tylerRosters } from "./lib/g5-aspnet";
 
@@ -41,7 +42,7 @@ const titleCase = (v: string | null) => v && v.toLowerCase().replace(/(^|\s)([a-
 
 /** One OCILB roster row: FormattedCredential, Name, LastName, Type, Status, State, County, Effective Date, Expiration Date, Company, Company City, … */
 export function ocilbRow(r: Record<string, string>): BulkHit | null {
-  const who = clean(r.Name), company = clean(r.Company);
+  const who = personText(r.Name), company = clean(r.Company); // the person as published: a list stays a list (round 6, decision 3)
   if (!who && !company) return null;
   const type = clean(r.Type);
   const address = joinAddress(r["Company Address"], r["Company Address 2"], r["Company City"], r["Company State"], r["Company Zip"]);
@@ -130,7 +131,7 @@ export async function* sfmRows(files: { name: string; rows: AsyncIterable<Record
     }
     for (const [cred, { r, cats, employer }] of byCred) {
       // A person with no employer on record: their phone may be their own (decision 4: no phone for an individual alone).
-      yield counted(sfmHit({ business: employer, person: clean(r.Name), no: cred, type: clean(r["Licensee Type"]),
+      yield counted(sfmHit({ business: employer, person: personText(r.Name), no: cred, type: clean(r["Licensee Type"]),
         specialty: cats.size ? Array.from(cats).join(", ") : null, status: clean(r["License Status"]) ?? clean(r.Status), city: clean(r.City),
         expires: usDate(r["Expiration Date"]), phone: employer ? clean(r["Work Phone"]) : null, holder: "individual", component: f.name }));
     }

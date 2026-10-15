@@ -19,7 +19,7 @@ import { tokens } from "../licenses";
 import { addressKeys, addressMatches, normLicense, type IdQuery } from "../identifiers";
 import { download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { promises as fs } from "node:fs";
-import { firstAmount, tableRows, text } from "./lib/g4-html";
+import { firstAmount, htmlPerson, htmlRows, tableRows, text } from "./lib/g4-html";
 import { adverseFrom } from "../adverse";
 import { capNote, noteOf, withNote } from "../notes";
 import type { StatePack } from "./types";
@@ -70,9 +70,14 @@ export function parseMsDetail(html: string): MsDetail {
   const lines = addressCell.split(/<br\s*\/?>/i).map((l) => text(l)).filter((l): l is string => !!l && !/ County$/i.test(l));
   const cityState = lines[lines.length - 1]?.match(/^(.*?),\s*([A-Z]{2})\b/);
   const classTable = html.match(/<b>Class\(es\)<\/b>([\s\S]*?)(?:<\/table>|<b>Officers<\/b>)/i)?.[1] ?? "";
-  const classes = tableRows(classTable).filter((r) => r.length >= 2 && r[0] && r[0] !== "Classification").map((r) => ({ cls: r[0]!, qualifier: r[1] }));
+  // Qualifier and officer names are read with htmlPerson: a <br> between two names stays a list (round 6, decision 3).
+  const classHtml = htmlRows(classTable);
+  const classes = tableRows(classTable).map((r, i) => ({ r, h: classHtml[i] ?? [] })).filter(({ r }) => r.length >= 2 && r[0] && r[0] !== "Classification")
+    .map(({ r, h }) => ({ cls: r[0]!, qualifier: htmlPerson(h[1]) ?? r[1] }));
   const officerTable = html.match(/<b>Officers<\/b>([\s\S]*?)<\/table>/i)?.[1] ?? "";
-  const officers = tableRows(officerTable).filter((r) => r.length >= 2 && r[0] && r[0] !== "Name").map((r) => ({ name: r[0]!, title: r[1] }));
+  const officerHtml = htmlRows(officerTable);
+  const officers = tableRows(officerTable).map((r, i) => ({ r, h: officerHtml[i] ?? [] })).filter(({ r }) => r.length >= 2 && r[0] && r[0] !== "Name")
+    .map(({ r, h }) => ({ name: htmlPerson(h[0]) ?? r[0]!, title: r[1] }));
   return {
     name: text(head?.[1]), licenseNumber: text(head?.[2]), type: text(html.match(/<div id="contractorType"[^>]*>([^<]*)</)?.[1]),
     city: cityState ? `${cityState[1].trim()}, ${cityState[2]}` : null, address: lines.join(", ") || null, phone: field("Phone"),

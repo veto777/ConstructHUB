@@ -236,7 +236,12 @@ export type ResearchSubjectReport = {
  * own (round 3) and recomputed for old bulk rows (round 4). A report without it is older: shown with today's rules,
  * and a holder it can't verify is treated as unknown (server/research/store.ts shownReport).
  */
-export const REPORT_SNAPSHOT_VERSION = 2;
+export const REPORT_SNAPSHOT_VERSION = 3;
+/*
+ * 3 (round 6, decision 4): enforcement subjects and contacts follow today's rules, and relationship prose names a phone
+ * or street only when it is one the report shows. An older report has its enforcement records checked again and their
+ * contacts cut to the locality.
+ */
 
 export type ResearchReport = {
   /** REPORT_SNAPSHOT_VERSION when the report was saved (absent: an older report). */
@@ -341,9 +346,24 @@ export function previewRecordsLine(r: ResearchPreview["records"]): string | null
  * Configured states whose search failed are named as not searched; an older preview (no licenseSearchedStates) reads as
  * before. Null when the states have no license source at all.
  */
+/**
+ * One identifier search as the report lists it (round 6, decision 9): "N found" only when the search is known to have
+ * run (sourcesSearched above 0), or found something; otherwise "not searched", never "0 found".
+ */
+export function identifierSearchLine(x: NonNullable<ResearchSubjectReport["identifierSearches"]>[number]): string {
+  const ran = (x.sourcesSearched ?? 0) > 0 || x.found > 0;
+  return `${x.query} (${ran ? `${x.found} found` : "not searched"}; ${x.note})`;
+}
+
 export function previewLicenseLine(p: Pick<ResearchPreview, "licenseMatches" | "identifierMatches" | "licenseSourceStates" | "licenseSearchedStates">): string | null {
   if (!p.licenseSourceStates.length) return null;
-  const ran = p.licenseSearchedStates ?? p.licenseSourceStates;
+  // An older preview didn't record which searches ran (round 6, decision 9): its count is no "searched, 0 found".
+  if (!p.licenseSearchedStates) {
+    return p.licenseMatches > 0
+      ? `${p.licenseMatches} license record(s) found in state license data${p.identifierMatches ? `, ${p.identifierMatches} of them by a license number, phone or address you gave` : ""}. This preview didn't record whether every state's license records (${p.licenseSourceStates.join(", ")}) could be searched; the report searches them again.`
+      : `This preview didn't record whether state license records for ${p.licenseSourceStates.join(", ")} could be searched; the report searches them again.`;
+  }
+  const ran = p.licenseSearchedStates;
   const missed = p.licenseSourceStates.filter((s) => !ran.includes(s));
   const found = ran.length
     ? `${p.licenseMatches} license record(s) match in ${ran.join(", ")} state license data${p.identifierMatches ? `, ${p.identifierMatches} of them found by a license number, phone or address you gave` : ""}.`

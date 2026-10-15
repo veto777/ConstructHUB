@@ -94,10 +94,11 @@ describe("Socrata app token", () => {
   it("set: sent on Socrata API paths only", async () => {
     vi.stubEnv("SOCRATA_APP_TOKEN", "test-token-value");
     const seen = capture();
-    await politeFetch("https://data.example.test/resource/abcd-1234.json?$limit=1", {}, { minDelayMs: 0 });
+    // Approved Socrata hosts only (round 6, decision 10).
+    await politeFetch("https://data.wa.gov/resource/abcd-1234.json?$limit=1", {}, { minDelayMs: 0 });
     await politeFetch("https://arcgis.example.test/arcgis/rest/services/x/query?f=json", {}, { minDelayMs: 0 });
     expect(seen.map((s) => s.token)).toEqual(["test-token-value", null]);
-    expect(socrataAppToken("https://data.example.test/api/views/abcd-1234/rows.csv")).toBe("test-token-value");
+    expect(socrataAppToken("https://data.ny.gov/api/views/abcd-1234/rows.csv")).toBe("test-token-value");
     expect(socrataAppToken("https://www.example.test/resource/page")).toBeNull();
   });
 });

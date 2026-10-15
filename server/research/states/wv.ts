@@ -23,7 +23,7 @@ import type { IdQuery } from "../identifiers";
 import { normLicense } from "../identifiers";
 import { tokens } from "../licenses";
 import type { LiveLicenseSearch, StatePack } from "./types";
-import { anyDate, dmyDate, hasAllWords, htmlText } from "./lib/g3-common";
+import { anyDate, dmyDate, hasAllWords, htmlPerson, htmlText } from "./lib/g3-common";
 
 // ── State Fire Marshal electricians ──────────────────────────────────────────────────────────────────────────
 const SFM_PAGE = "https://sfm-permit-public.wvoasis.gov/publicdata/LicenseeSearch";
@@ -88,9 +88,11 @@ export function parseWvDol(html: string, list: DolList, matchedOn: LicenseHit["m
   const total = Number(html.match(/Records \d+ to \d+ of (\d+) Records/)?.[1] ?? NaN);
   const hits: LicenseHit[] = [];
   for (const m of Array.from(html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g))) {
-    const cells = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c) => htmlText(c[1]));
+    const raw = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c) => c[1]);
+    const cells = raw.map((c) => htmlText(c));
     if (cells.length !== 7 || !/^(PL|HVAC)\d+/.test(cells[0] ?? "")) continue;
-    const [no, who, city, st, county, cls, exp] = cells;
+    const [no, , city, st, county, cls, exp] = cells;
+    const who = htmlPerson(raw[1]); // a <br> between two names stays a list (round 6, decision 3)
     hits.push({
       state: "WV", source: list.label, sourceUrl: WVDOL_PAGE, businessName: null, licenseNumber: no,
       licenseType: list.type(cls),

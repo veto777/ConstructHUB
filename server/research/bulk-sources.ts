@@ -23,6 +23,7 @@
  * Every license and enforcement row carries its identifier keys (license numbers, phones, street addresses;
  * ./identifiers.ts) where the file publishes them, and its people with the publisher's roles (re-checked 2026-10-15).
  */
+import { flipPerson, personText } from "./person-name";
 import { execFile, spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
@@ -66,10 +67,7 @@ async function unzipTo(zip: string, member?: string): Promise<string> {
 const person = (last: string | null, first: string | null, middle?: string | null, suffix?: string | null) =>
   clean([first, middle, last, suffix].filter(Boolean).join(" "));
 /** "LAST, FIRST M" → "FIRST M LAST". */
-const flipName = (v: string | null) => {
-  const m = v?.match(/^([^,]+),\s*(.+)$/);
-  return m ? clean(`${m[2]} ${m[1]}`) : clean(v);
-};
+const flipName = (v: string | null) => flipPerson(v);
 type Person = { name: string; role: string | null };
 type Extra = { people?: Person[]; keys?: IdKeys; component?: string };
 /** A license row: its people go on the hit (with roles) and into the person index; its keys into the identifier index. */
@@ -158,7 +156,7 @@ const flCode = (table: Record<string, string>, v: string | undefined) => { const
  * City, State, Zip, County Code, License Number, Primary Status, Secondary Status, Original Licensure Date, Effective
  * Date, Expiration Date, Blank, Renewal Period, Alternate Lic#. No phone is published.
  */
-type FlRow = { occ: string; name: string | null; dba: string | null; isBusiness: boolean; number: string | null; full: string | null; lines: string[]; city: string | null; state: string | null; zip: string | null };
+type FlRow = { occ: string; name: string | null; raw: string; dba: string | null; isBusiness: boolean; number: string | null; full: string | null; lines: string[]; city: string | null; state: string | null; zip: string | null };
 function flRow(r: string[]): FlRow | null {
   if (r.length < 21) return null;
   const occ = r[1].trim();
@@ -167,7 +165,8 @@ function flRow(r: string[]): FlRow | null {
     // QB (Construction Business Information) and QC (Qualified Business Organization) are the business's own record;
     // every other occupation (a certified or registered contractor, a financially responsible officer) is a licensed
     // individual, whatever business their DBA column names.
-    occ, name: clean(r[2]), dba: /^INDIVIDUAL$/i.test(r[3].trim()) ? null : clean(r[3]), isBusiness: occ === "QB" || occ === "QC",
+    // `raw` is the Licensee Name as published: the person is read from it, so a list stays a list (round 6, decision 3).
+    occ, name: clean(r[2]), raw: r[2], dba: /^INDIVIDUAL$/i.test(r[3].trim()) ? null : clean(r[3]), isBusiness: occ === "QB" || occ === "QC",
     number: clean(r[12]), full: clean(r[20]) ?? clean(r[12]), lines: [r[5], r[6], r[7]], city: clean(r[8]), state: clean(r[9]), zip: clean(r[10]),
   };
 }
@@ -182,7 +181,7 @@ export async function flQualifiers(paths: string[]): Promise<Map<string, Person[
     const row = flRow(r);
     if (!row || row.isBusiness || !row.dba || !row.name) continue;
     const k = nameKey(row.dba);
-    (out.get(k) ?? out.set(k, []).get(k)!).push({ name: flipName(row.name)!, role: flRole(row) });
+    (out.get(k) ?? out.set(k, []).get(k)!).push({ name: flipName(row.raw)!, role: flRole(row) });
   }
   return out;
 }
@@ -194,17 +193,17 @@ export async function* flLicenseRows(path: string, label: string, page: string, 
     const status = [flCode(FL_PRIMARY, r[13]), flCode(FL_SECONDARY, r[14])].filter(Boolean).join(", ") || null;
     const business = row.isBusiness ? row.name : row.dba;
     // A business license carries everyone DBPR lists under its name; an individual's license carries that individual.
-    const people = row.isBusiness ? qualifiers.get(nameKey(row.name)) ?? (row.dba ? qualifiers.get(nameKey(row.dba)) : null) ?? [] : row.name ? [{ name: flipName(row.name)!, role: flRole(row) }] : [];
+    const people = row.isBusiness ? qualifiers.get(nameKey(row.name)) ?? (row.dba ? qualifiers.get(nameKey(row.dba)) : null) ?? [] : row.name ? [{ name: flipName(row.raw)!, role: flRole(row) }] : [];
     const hit = {
       state: "FL", source: label, sourceUrl: page,
       businessName: business, licenseNumber: row.full,
       licenseType: flOccupation(row.occ), specialty: flClass(row.occ, clean(r[4])), status,
-      principal: row.isBusiness ? null : flipName(row.name), city: row.city, expires: usDate(r[17]),
+      principal: row.isBusiness ? null : flipName(row.raw), city: row.city, expires: usDate(r[17]),
       address: joinAddress(row.lines, row.city, row.state, row.zip), phone: null,
       // The occupation says who holds it: a qualifier's license is the individual's even with a DBA (round 2, decision 2).
       holder: row.isBusiness ? "business" as const : "individual" as const,
     };
-    yield lic(hit, row.isBusiness ? [row.name, row.dba].filter(Boolean).join(" ") || null : row.dba, row.isBusiness ? null : row.name, {
+    yield lic(hit, row.isBusiness ? [row.name, row.dba].filter(Boolean).join(" ") || null : row.dba, row.isBusiness ? null : personText(row.raw), {
       people, keys: { licenses: [row.full], addresses: addressKeysOf(row.lines, row.city, row.state, row.zip) },
     });
   }
@@ -374,16 +373,16 @@ export const flRespondentIsBusiness = (name: string, dbas: string[]) => flRespon
 const localityLine = (city: string | null, state: string | null, zip: string | null) => [city, state, zip5(zip)].map((v) => clean(v)).filter(Boolean).join(" ") || null;
 
 /**
- * A complaint row loaded before PAYLOAD_VERSION 5 (read time; round 3, decision 4; round 4, decision 4; A10): the same
+ * A complaint row loaded before PAYLOAD_VERSION 6 (read time; round 3, decision 4; round 4, decision 4; A10): the same
  * rule on what it stored. "NAME / DBA / …" is split back into the respondent and the names after it. The stored names
  * lost their DBA marker, so they can't be shown to be DBAs any more: a respondent who reads as a business keeps its
  * record under its own name only, and anyone else's record is dropped until the file reloads. A version-4 row only
- * needs the personal-form check.
+ * needs the personal-form check, and so does a version-5 row (round 6, decision 2: "SMITH JONES, GENERAL H").
  */
 export function flLegacyComplaint(h: EnforcementHit, storedVersion = 0): EnforcementHit | null {
   const [first] = (h.name ?? "").split(" / ").map((v) => v.trim()).filter(Boolean);
   if (!first) return null;
-  // A version-4 row was made under today's rule but for personal name forms (A10, decision 3): its DBA-only records
+  // A version-4 or -5 row was made under today's rule but for personal name forms (A10, round 6): its DBA-only records
   // (the DBA's name, locality only) stand; a record whose first name has a personal form is dropped.
   if (storedVersion >= 4) return personNameForm(first) === null ? h : null;
   const who = flRespondent(first, []);
@@ -847,7 +846,7 @@ export async function* cslbRows(masterPath: string, personnelPath: string): Asyn
     const status = [primary, secondary].filter(Boolean).join("; ") || null;
     const classes = clean(r["Classifications(s)"]?.replace(/\|\s*/g, ", "));
     const expires = usDate(r.ExpirationDate);
-    const soleOwner = clean(r.FullBusinessName); // sole owners: "FIRST MIDDLE LAST"
+    const soleOwner = personText(r.FullBusinessName); // sole owners: "FIRST MIDDLE LAST", as published (a list stays a list)
     const isPerson = /sole owner/i.test(r.BusinessType ?? "");
     const businessNames = [name, clean(r["BUS-NAME-2"])].filter(Boolean).join(" ");
     const city = clean(r.City), st = clean(r.State), zip = clean(r.ZIPCode), phone = clean(r.BusinessPhone);
@@ -1110,9 +1109,10 @@ async function* caElectriciansLoader(): AsyncIterable<BulkHit> {
   for (const f of DIR_ECU_FILES) {
     // The whole resource as CSV with a header row: ELECTRICIAN_NAME, ZIP_CODE, CERTIFICATE_NUMBER, EXPIRATION_DATE (MM/DD/YYYY).
     for await (const r of fromFile(await download(f.url), (p) => csvRecords(p))) {
-      const raw = clean(r.ELECTRICIAN_NAME);
+      // The name as published, not collapsed first: a list stays a list (round 6, decision 3).
+      const raw = personText(r.ELECTRICIAN_NAME);
       if (!raw) continue;
-      const who = flipName(raw);
+      const who = flipName(r.ELECTRICIAN_NAME);
       yield {
         kind: "license",
         hit: {
@@ -1200,7 +1200,7 @@ export const BULK_SOURCES: BulkSource[] = [
   // 26,001 rows loaded live 2026-10-15 once individual respondents were left out (49,360 with them); 20,669 once a DBA
   // needed its marker (round 4, decision 4), which is row shape 1. Floor about 80%.
   { id: "fl-dbpr-complaints", state: "FL", label: "Florida DBPR complaints and discipline (construction and electrical)", pageUrl: FL_COMPLAINTS_PAGE, everyHours: 24, minRows: 16_500,
-    rowShape: 1, legacyEnforcement: flLegacyComplaint, enforcementRuleVersion: 5,
+    rowShape: 1, legacyEnforcement: flLegacyComplaint, enforcementRuleVersion: 6,
     load: flComplaintsLoader, companiesOnly: true },
   { id: "fl-stop-work", state: "FL", label: "Florida stop-work orders (Division of Workers' Compensation)", pageUrl: FL_SWO, everyHours: 24, minRows: 40_000,
     load: flStopWorkLoader, companiesOnly: true },

@@ -13,6 +13,7 @@
  *
  * Nebraska has no state general-contractor license; contractors register with the Department of Labor (above).
  */
+import { flipPerson } from "../person-name";
 import { entityHolder } from "../licenses";
 import type { LicenseHit } from "@shared/research-reports";
 import { promises as fs } from "node:fs";
@@ -22,7 +23,7 @@ import { politeFetch } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { capNote, escapeRegExp, noteOf, withNote } from "../notes";
 import { looksLikeBusiness } from "./lib/business-name";
-import { htmlText, joinAddr } from "./lib/g6-common";
+import { htmlPerson, htmlText, joinAddr } from "./lib/g6-common";
 import { pdfTable } from "./lib/g6-pdf";
 
 // ── NE DOL contractor registration ───────────────────────────────────────────────────────────────────────────
@@ -42,9 +43,11 @@ async function conregSearch(fields: Record<string, string>): Promise<string[]> {
   return Array.from(new Set(Array.from(html.matchAll(/\/conreg\/Contractor\/Details\/(\d+)/g), (m) => m[1])));
 }
 
+const CONREG_PERSON = "Contractor/Subcontractor Name (as a person)";
 /** The details page as label → value (the page lists labels and values in order). */
 export function parseConregDetail(html: string): Record<string, string> {
-  const t = htmlText(html.replace(/<script[\s\S]*?<\/script>/g, "")) ?? "";
+  const page = html.replace(/<script[\s\S]*?<\/script>/g, "");
+  const t = htmlText(page) ?? "";
   const body = t.slice(t.indexOf("Contractor/Subcontractor Name"), t.indexOf(" Print "));
   const labels = ["Contractor/Subcontractor Name", "Corporation Name", "Business Contact Email", "Business Entity", "Address", "City", "State", "Zip", "Telephone", "Registration Number", "Registration Expiration", "Sales Tax Option", "Number of Employees", "Worker's Compensation Status"];
   const out: Record<string, string> = {};
@@ -57,6 +60,9 @@ export function parseConregDetail(html: string): Record<string, string> {
     const v = clean(body.slice(start, end));
     if (v && !labels.includes(v)) out[labels[i]] = v;
   }
+  // The name read as a person's from the page's HTML: a <br> between two names stays a list (round 6, decision 3).
+  const person = out[labels[0]] ? htmlPerson(page.match(/Contractor\/Subcontractor Name([\s\S]*?)Corporation Name/)?.[1]) : null;
+  if (person) out[CONREG_PERSON] = person;
   return out;
 }
 
@@ -70,7 +76,7 @@ export function conregHit(id: string, d: Record<string, string>, matchedOn: Lice
   const tail = (v: string | undefined) => escapeRegExp(v ?? "");
   const street = clean(d["Address"]?.replace(new RegExp(`\\s*${d["City"] ? tail(d["City"]) : "@@"},?\\s*${tail(d["State"])}\\s*${tail(d["Zip"])}$`, "i"), ""));
   // A sole proprietor registered under their own name is a person, not a business name.
-  const person = /sole/i.test(d["Business Entity"] ?? "") && !looksLikeBusiness(name) && !corp ? name : null;
+  const person = /sole/i.test(d["Business Entity"] ?? "") && !looksLikeBusiness(name) && !corp ? d[CONREG_PERSON] ?? name : null;
   return {
     state: "NE", source: "Nebraska DOL contractor registrations", sourceUrl: `${CONREG}/Contractor/Details/${id}`,
     businessName: person ? null : corp && corp.toUpperCase() !== name.toUpperCase() ? `${name} (${corp})` : name,
@@ -159,7 +165,8 @@ async function srcSearch(lookup: string): Promise<SrcResult[]> {
 const SRC_ROWS = 50;
 
 /** "MILANUK, MARCUS J" → "MARCUS J MILANUK". */
-const flip = (v: string | null) => { const m = v?.match(/^([^,]+),\s*(.+)$/); return m ? clean(`${m[2]} ${m[1]}`) : clean(v); };
+/** "LAST, FIRST" → "FIRST LAST" for one person; a published list stays a list (../person-name.ts). */
+const flip = (v: string | null) => flipPerson(v);
 
 export function srcHit(r: SrcResult, matchedOn: LicenseHit["matchedOn"]): LicenseHit | null {
   const cred = r.details?.find((d) => d.label === "Credential Details")?.values ?? [];

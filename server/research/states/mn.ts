@@ -24,6 +24,7 @@ import { decodeEntities } from "../bulk-sources";
 import { clean, csvRecords, download, usDate, type BulkHit } from "../bulk";
 import { adverseFrom, hasEnded } from "../adverse";
 import { looksLikeBusiness } from "./lib/business-name";
+import { personText } from "../person-name";
 import type { StatePack } from "./types";
 
 const run = promisify(execFile);
@@ -59,20 +60,22 @@ export function mnLicense(r: Record<string, string>): BulkHit | null {
   const dba = clean(r.DBA_Name);
   const st = clean(r.St);
   const address = mnAddress(r), phone = clean(r.Phone_No);
+  // The person as published: a list stays a list (round 6, decision 3).
+  const who = isBusiness ? null : personText(r.Name);
   return {
     kind: "license",
     hit: {
       state: "MN", source: "Minnesota DLI licenses and registrations", sourceUrl: DLI_LOOKUP,
       businessName: isBusiness ? [name, dba ? `dba ${dba}` : null].filter(Boolean).join(" ") : dba,
       licenseNumber: clean(r.Lic_Number), licenseType: clean(r.License_Subtype) ?? clean(r.License_Type), specialty: clean(r.License_Type),
-      status: titleCase(clean(r.Status)), principal: isBusiness ? null : name,
+      status: titleCase(clean(r.Status)), principal: who,
       city: [clean(r.City), st && st !== "MN" ? st : null].filter(Boolean).join(", ") || null, expires: usDate(r.Exp_Date),
       matchedOn: isBusiness || dba ? "business" : "principal",
-      address, phone, ...(isBusiness ? {} : { people: [{ name, role: clean(r.License_Subtype) }] }),
+      address, phone, ...(who ? { people: [{ name: who, role: clean(r.License_Subtype) }] } : {}),
       // DLI's own Bus_Pers column says who holds it; a person's DBA doesn't make it a business's (round 2, decision 2).
       holder: isBusiness ? "business" : clean(r.Bus_Pers) ? "individual" : null,
     },
-    business: isBusiness ? [name, dba].filter(Boolean).join(" ") : dba, person: isBusiness ? null : name,
+    business: isBusiness ? [name, dba].filter(Boolean).join(" ") : dba, person: who,
     keys: { licenses: [r.Lic_Number], phones: [phone], addresses: [address] },
   };
 }

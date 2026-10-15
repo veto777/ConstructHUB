@@ -5,6 +5,7 @@
 import { promises as fs } from "node:fs";
 import { clean } from "../../bulk";
 import { decodeEntities } from "../../bulk-sources";
+import { personText } from "../../person-name";
 import { tokens } from "../../licenses";
 
 /** Yield from a downloaded temp file, then delete it. */
@@ -15,6 +16,14 @@ export async function* fromFile<T>(path: string, fn: (p: string) => AsyncIterabl
 /** Visible text of an HTML fragment: tags dropped, <br> as a space, entities decoded, whitespace collapsed. */
 export const htmlText = (v: string | null | undefined): string | null =>
   v == null ? null : clean(decodeEntities(v.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ")));
+
+/**
+ * A person-name cell as text (round 6, decision 3): like the helper above, but a <br> between two names stays a list
+ * (written " / ", ../../person-name.ts), so "Jane Smith<br>John Doe" is never read as one person. Whitespace in the
+ * page source is not a separator; only the <br> is.
+ */
+export const htmlPerson = (v: string | null | undefined): string | null =>
+  v == null ? null : personText(decodeEntities(v.replace(/\s+/g, " ").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")));
 
 /** Every word of the searched name is a whole word of one of the candidate names ("Smith" is not "Locksmith"). */
 export function hasAllWords(name: string, ...candidates: (string | null | undefined)[]): boolean {

@@ -25,6 +25,7 @@ import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } fr
 import type { LiveEnforcementSearch, StatePack } from "./types";
 import { capNote, withNote } from "../notes";
 import { fromFile, hasAllWords } from "./lib/g3-common";
+import { personText } from "../person-name";
 
 // ── DPOR regulant lists ──────────────────────────────────────────────────────────────────────────────────────
 const DPOR_PAGE = "https://www.dpor.virginia.gov/RegulantLists";
@@ -101,7 +102,7 @@ export function vaSpecialties(raw: string | null | undefined, board: string): st
 /** One regulant-list row → a license hit. Exported for the unit test. */
 export function vaRegulantHit(r: Record<string, string>, list: DporList, source: string): BulkHit | null {
   const board = (r.BOARD ?? "").trim(), occ = (r.OCCUPATION ?? "").trim(), cert = (r["CERTIFICATE #"] ?? "").trim();
-  const who = clean(r["INDIVIDUAL NAME"]);
+  const who = personText(r["INDIVIDUAL NAME"]); // as published: a list stays a list (round 6, decision 3)
   const business = clean(r["BUSINESS NAME"]);
   if (!who && !business) return null;
   const licenseNumber = board && occ && cert ? `${board}${occ}${cert}` : clean(cert);

@@ -14,6 +14,7 @@ import type { LicenseHit } from "@shared/research-reports";
 import { capNote, noteOf, withNote, type Noted } from "./notes";
 import { looksLikeBusiness } from "./states/lib/business-name";
 import { entityHolder } from "./privacy";
+import { flipPerson, onePersonField, personText } from "./person-name";
 import { addressKeys, addressMatches, idWords, normLicense, normPhone, type IdQuery } from "./identifiers";
 
 type Field = string | null;
@@ -248,15 +249,15 @@ const str = (row: Record<string, unknown>, field: Field): string | null => {
 const personOf = (src: LicenseSource, row: Record<string, unknown>): string | null => {
   const raw = Array.isArray(src.personField) ? src.personField.map((f) => str(row, f)).filter(Boolean).join(" ") || null : str(row, src.fields.principal);
   const split = src.people?.find((p) => p.split && p.field === src.fields.principal)?.split;
-  return raw && split ? raw.split(split).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean)[0] ?? null : raw;
+  return raw && split ? raw.split(split).map((x) => personText(x)).filter(Boolean)[0] ?? null : raw;
 };
 
 const fieldsOf = (f: string | string[] | undefined): string[] => (f == null ? [] : Array.isArray(f) ? f : [f]);
 /** "981011234" → "98101-1234" (some datasets drop the dash, which hides the ZIP from ./identifiers.ts). */
 const zipOf = (v: string | null) => (v && /^\d{9}$/.test(v) ? `${v.slice(0, 5)}-${v.slice(5)}` : v);
 const words = (v: string | null | undefined) => (v ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
-/** "LAST, FIRST M" → "FIRST M LAST"; other forms unchanged. */
-const flip = (v: string): string => { const m = v.match(/^([^,]+),\s*([^,]+)$/); return m ? `${m[2]} ${m[1]}`.replace(/\s+/g, " ").trim() : v.replace(/\s+/g, " ").trim(); };
+/** "LAST, FIRST M" → "FIRST M LAST" when the published field is one person; a list stays a list (./person-name.ts). */
+const flip = (v: string): string => flipPerson(v) ?? v;
 
 /** The address fields joined; a street line that only repeats the city, state and ZIP, or has no letter or digit, is left out. */
 function addressOf(src: LicenseSource, row: Record<string, unknown>): string | null {
@@ -281,7 +282,7 @@ function rowPeople(src: LicenseSource, row: Record<string, unknown>, business: s
     const raw = fieldsOf(p.field).map((f) => str(row, f)).filter(Boolean).join(" ");
     const role = (p.roleField && str(row, p.roleField)) || p.role;
     for (const part of p.split ? raw.split(p.split) : [raw]) {
-      const name = part.replace(/\s+/g, " ").trim();
+      const name = personText(part) ?? ""; // as published: a line break between two names stays a list (round 6, decision 3)
       // A name that is only the business name again is not a person, unless the publisher gives it its own role.
       if (name && (words(name) !== words(business) || (p.roleField && str(row, p.roleField)))) out.push({ name, role });
     }
@@ -420,24 +421,8 @@ export function companyNamed(name: string, business: string | null | undefined):
  * ONE person's name holds every full word of the searched name, and a middle initial given on both sides agrees:
  * "John A Smith" is not "John B Smith" (or "John Bert Smith"); "John A Smith" and "John Smith" stay candidates.
  */
-/**
- * The one shared single-person check (round 5, decision 4), used by licenses, permits, the cross-reference and the
- * runner. A name field is ONE person only when it has no list separator ("/", "&", ";", " and ", a line break), at most
- * two comma parts ("LAST, FIRST [M]", one surname word before the comma, initials counted as words; a trailing
- * generational suffix such as ", Jr." aside) and at most four name words. Anything else is a list of people: no single
- * person's match is read from it ("J Smith, John Doe", "Jane Smith / John Doe").
- */
-export function onePersonField(field: string): boolean {
-  const raw = field.replace(/\s+/g, " ").trim();
-  if (!raw || /[\/&;\r\n]|\band\b/i.test(field)) return false;
-  const t = raw.replace(/,\s*(?:jr|sr|ii|iii|iv)\.?\s*(?=,|$)/gi, "").trim();
-  const words = (v: string) => v.split(/[\s.,]+/).filter((w) => /[a-z]/i.test(w) && !GENERATION.has(w.toUpperCase()));
-  if (words(t).length > 4) return false;
-  const parts = t.split(",");
-  if (parts.length === 1) return true;
-  if (parts.length !== 2 || !parts[1].trim()) return false;
-  return words(parts[0]).length === 1;
-}
+/** The one shared single-person check (./person-name.ts): licenses, permits, the cross-reference and the runner. */
+export { onePersonField } from "./person-name";
 
 export function personMatches(name: string, person: string | null | undefined): boolean {
   if (person && !onePersonField(person)) return false;

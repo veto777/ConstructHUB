@@ -12,6 +12,7 @@
  */
 import type { LicenseHit } from "@shared/research-reports";
 import { clean } from "../bulk";
+import { personText } from "../person-name";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { normLicense, type IdQuery } from "../identifiers";
 import { anyDay, fetchJson, nameMatches, postJson } from "./lib/g8-common";
@@ -65,7 +66,7 @@ function capped(found: number, more: boolean): string | null {
 /** A licensed business (electrical contractor): the portal gives its address, phone and primary contact. */
 async function serviceHit(r: any, matchedOn: LicenseHit["matchedOn"]): Promise<LicenseHit> {
   const own = (await certs("services", r.id)).find((c) => c.number === r.primary_license_number);
-  const contact = clean(r.primary_contact_full_name) ?? clean(`${r.primary_contact_first_name ?? ""} ${r.primary_contact_last_name ?? ""}`);
+  const contact = personText(r.primary_contact_full_name) ?? clean(`${r.primary_contact_first_name ?? ""} ${r.primary_contact_last_name ?? ""}`);
   return {
         // A few names start with "*" (e.g. "*Intermountain Electric Service Inc", license C-29, expired 2023). The portal
     // doesn't say what it means, so the name is shown as published rather than with the mark silently dropped.

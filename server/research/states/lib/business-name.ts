@@ -75,6 +75,8 @@ const SURNAME_PARTICLES = new Set("van von der den ter de da das dos del dela de
 /** The start of an entity word that a fixed-width field cut off (LL, IN, I, COR, LT, PLL…). */
 const TRUNCATED_ENTITY = /^(?:l|ll|i|in|inc|co|cor|corp|corpo|lt|ltd|li|lim|p|pl|pll|pllc|pa|l\.?l)\.?$/i;
 const NAME_WORD = /^(?:[a-z]\.?|[a-z][a-z'’-]*\.?)$/i;
+/** Entity words that are no one's surname (unlike "Co" or "Pa"). */
+const ENTITY_WORD = /^(?:inc|incorporated|llc|l\.l\.c|corp|corporation|ltd|limited|llp|lllp|pllc|company|companies)\.?$/i;
 
 /**
  * How a "LAST, FIRST" roster prints a person (A10, decision 3): "SMITH, JOHN", "GREEN, GENERAL H, JR.", "VAN DYKE,
@@ -82,8 +84,9 @@ const NAME_WORD = /^(?:[a-z]\.?|[a-z][a-z'’-]*\.?)$/i;
  *   - "person": the name has a personal form — one surname (after its particles and suffix) before the comma and one to
  *     three name words or initials after it, or a personal suffix and no entity word at the end; a trade word in it
  *     ("GENERAL") doesn't change that;
- *   - "ambiguous": a two-or-more-word name before the comma and a first name after it ("AIR CONDITIONING, JESSE"):
- *     it might be a person, so it isn't shown to be a business;
+ *   - "ambiguous": a two-or-more-word name before the comma and one to three name words after it ("AIR
+ *     CONDITIONING, JESSE", "SMITH JONES, GENERAL H"), whatever words they are: it might be a person, so it is never
+ *     shown to be a business (round 6, decision 2);
  *   - null: no personal form (the caller's business rules decide). An entity word at the end ("…, LLC") is never a
  *     personal form.
  */
@@ -110,9 +113,13 @@ export function personNameForm(name: string | null | undefined): "person" | "amb
   if (!lastWords.length || !lastWords.every((x) => NAME_WORD.test(x))) return null;
   // DBPR cuts long names at a fixed width: "KREATIVE REMODELING SPECIALISTS, LL" ends in a cut-off entity word.
   if (lastWords.length >= 2 && firstWords.length === 1 && TRUNCATED_ENTITY.test(firstWords[0])) return null;
+  // An entity word no surname is ("AIR TODAY LLC, AIR TODAY", "GROUP INC, FLORIDA ENVIRONMENTAL") ends the part before
+  // the comma: no personal form. "CO" and "PA" are surnames too, so they don't count here.
+  if (lastWords.length >= 2 && ENTITY_WORD.test(lastWords[lastWords.length - 1])) return null;
   const core = lastWords.filter((x) => !SURNAME_PARTICLES.has(x.toLowerCase()));
   if (core.length === 1 || (core.length === 0 && lastWords.length === 1)) return "person";
-  // Two or more words before the comma with a first name after it: may be a person ("ST. JOHN SMITH, MARY"), may be
-  // a business ("AIR CONDITIONING, JESSE"). Not shown to be a business; a trade word after the comma makes it one.
-  return firstWords.length <= 2 && !firstWords.some((x) => TRADE.has(x.toLowerCase().replace(/\.$/, ""))) ? "ambiguous" : null;
+  // Two or more words before the comma with one to three name words after it: may be a person ("ST. JOHN SMITH,
+  // MARY", "SMITH JONES, GENERAL H"), may be a business ("AIR CONDITIONING, JESSE"). Never shown to be a business, a
+  // trade word after the comma included (round 6, decision 2: dropping a real business beats keeping a person).
+  return "ambiguous";
 }

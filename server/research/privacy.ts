@@ -44,15 +44,25 @@ export const APPLICANT_STATUS = "Applicant: an application is on file with DBPR 
 const DATE_TAIL = /^(?:(?:on|as of|since|effective|eff\.?|through|thru|until|expires?|exp\.?)\s+)?(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|[a-z]{3,9}\.? \d{1,2},? \d{4})$/i;
 
 /**
+ * Words that condition or negate a standing (round 6, decision 8): pending, subject to, on condition, conditional,
+ * provisional, restricted, limited, until, unless, a negation… Their status shows no standing at all.
+ */
+const CONDITIONAL = /\b(?:not|no|never|without|non|nor|pending|subject to|condition(?:s|al|ally|ed)?|provisional(?:ly)?|probationary|until|unless|if|except|restrict(?:ed|ion|ions)?|limited|limitations?|awaiting|yet|temporar(?:y|ily)|interim|under review|in process|incomplete|stay(?:ed)?)\b|n't\b/i;
+
+/**
  * A license status reduced to recognized standing phrases (round 3, decision 1; round 5, decision 2): each piece that
  * starts with a standing phrase keeps that phrase, and a published date right after it; everything else, trailing
  * text included, moves to `discipline`. "Probation, Active" → "Active" + "Probation"; "Active with civil penalty of
- * $500" → "Active" + "with civil penalty of $500"; "Active since 01/02/2020" stays; "Disciplined" → null.
+ * $500" → "Active" + "with civil penalty of $500"; "Active since 01/02/2020" stays; "Disciplined" → null; a
+ * conditioned or negated standing ("Active pending review", "Active - not yet approved") → null.
  */
 export function standingStatus(status: string | null | undefined): { status: string | null; moved: string | null } {
   const t = (status ?? "").replace(/\s+/g, " ").trim();
   if (!t) return { status: null, moved: null };
   if (t === APPLICANT_STATUS) return { status: t, moved: null };
+  // A status that conditions or negates its standing ("Active pending…", "Active subject to…", "Active - not yet
+  // approved") has no unconditional standing to show: null, which reads "Status not stated" (round 6, decision 8).
+  if (CONDITIONAL.test(t)) return { status: null, moved: t };
   const keep: string[] = [], moved: string[] = [];
   for (const raw of t.split(/\s*[;|]\s*|,\s*(?![^()]*\))|\s+-\s+|\s*\(\s*|\s*\)\s*/)) {
     const piece = raw.trim();

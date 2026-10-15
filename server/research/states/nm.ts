@@ -15,6 +15,7 @@ import { politeFetch } from "../http";
 import { adverseFrom } from "../adverse";
 import { tokens } from "../licenses";
 import { clean, usDate } from "../bulk";
+import { personText } from "../person-name";
 import { auraApex, type AuraSite } from "./lib/g7-aura";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
 
@@ -39,14 +40,15 @@ export type RldLicense = {
  * decision 4): city, state and ZIP only, no street.
  */
 export function rldLicenseHit(r: RldLicense): LicenseHit {
+  const who = personText(r.License_Holder_Name__c); // as published: a list stays a list (round 6, decision 3)
   return {
     state: "NM", source: "New Mexico RLD home inspector and landscape architect licenses", sourceUrl: RLD_SEARCH_PAGE,
     businessName: null, licenseNumber: clean(r.Name), licenseType: clean(r.Regulatory_Authorization_Type_Name__c),
-    specialty: clean(r.Regulatory_Authority__c), status: clean(r.Status), principal: clean(r.License_Holder_Name__c),
+    specialty: clean(r.Regulatory_Authority__c), status: clean(r.Status), principal: who,
     city: [clean(r.License_Holder_City__c), clean(r.License_Holder_State__c)].filter(Boolean).join(", ") || null,
     expires: /^\d{4}-\d{2}-\d{2}$/.test(r.periodEnd__c ?? "") ? r.periodEnd__c! : null, matchedOn: "principal",
     address: [clean(r.License_Holder_City__c), [clean(r.License_Holder_State__c), clean(r.License_Holder_Postal_Code__c)].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null,
-    people: clean(r.License_Holder_Name__c) ? [{ name: clean(r.License_Holder_Name__c)!, role: clean(r.Regulatory_Authorization_Type_Name__c) }] : [],
+    people: who ? [{ name: who, role: clean(r.Regulatory_Authorization_Type_Name__c) }] : [],
     holder: "individual", // these boards license individuals (round 2, decision 2)
   };
 }

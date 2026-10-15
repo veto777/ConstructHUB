@@ -13,6 +13,7 @@
  *   NV Labor Commissioner disqualified contractors: the list of contractors that may not be awarded a public works
  *     contract (NRS 338.017), with the suspension period. Companies only; the corporate officers it names are left out.
  */
+import { flipPerson, personText } from "../person-name";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { politeFetch, rethrowIfBlocked } from "../http";
 import { tokens, wholeWordMatch } from "../licenses";
@@ -54,7 +55,7 @@ export function parseNscbLicenses(html: string, kind: "person" | "company" | "li
       businessName: [legal, dba && dba !== legal ? `dba ${dba}` : null].filter(Boolean).join(" ") || null,
       licenseNumber: number, licenseType: named.join("; ") || classLines.join("; ") || null,
       specialty: [limits.join(" ") || null, bizId ? `NV business id ${bizId}` : null].filter(Boolean).join(". ") || null,
-      status, principal: principal ?? null, city: [city, st].filter(Boolean).join(", ") || null, expires: null,
+      status, principal: personText(principal), city: [city, st].filter(Boolean).join(", ") || null, expires: null,
       matchedOn: kind === "company" ? "business" : kind === "license" ? "license" : "principal",
       // Every NSCB license is a contractor's license (classes A, B, C-…), issued to the contracting business named
       // in its legal-name column, its principal listed apart (publisher's definition; kept in round 3, decision 3).
@@ -66,7 +67,8 @@ export function parseNscbLicenses(html: string, kind: "person" | "company" | "li
 }
 
 /** "RADMALL, BRANDON  VAL" → "BRANDON VAL RADMALL". */
-const flip = (v: string | null) => { const m = v?.match(/^([^,]+),\s*(.+)$/); return clean(m ? `${m[2]} ${m[1]}` : v); };
+/** "LAST, FIRST" → "FIRST LAST" for one person; a published list stays a list (../person-name.ts). */
+const flip = (v: string | null) => flipPerson(v);
 
 /** The License Details page: addresses, phones, expiration, principals (with relation) and qualified individuals (with type). */
 export function parseNscbDetails(html: string): { address: string | null; mailing: string | null; phone: string | null; mailPhone: string | null; expires: string | null; limit: string | null; people: { name: string; role: string | null }[] } {

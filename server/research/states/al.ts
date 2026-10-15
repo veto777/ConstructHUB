@@ -30,7 +30,7 @@ import { pdfText, textLines } from "./lib/a3-pdf";
 import { looksLikeBusiness } from "./lib/business-name";
 import { adverseFrom } from "../adverse";
 import { capNote, withNote } from "../notes";
-import { flipName, tableRows, text } from "./lib/g4-html";
+import { flipName, htmlPerson, tableRows, text } from "./lib/g4-html";
 import type { StatePack } from "./types";
 
 const HOST = "https://licensesearch.alabama.gov";
@@ -39,13 +39,15 @@ const AOWB_LIST = `${HOST}/AOWB`;
 const MAX_DETAILS = 15;
 const LIST_TTL_MS = 12 * 3600_000;
 
-type Row = { cells: (string | null)[]; detail: string | null };
+/** `person`: the first cell (a name) with a <br> kept as a list separator (round 6, decision 3). */
+type Row = { cells: (string | null)[]; detail: string | null; person?: string | null };
 
 /** The rows of a licensesearch.alabama.gov list table (#myDataTable or the AOWB table) with each row's detail link. */
 export function parseAlList(html: string): Row[] {
   const body = html.match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? "";
   return Array.from(body.matchAll(/<tr>([\s\S]*?)<\/tr>/g)).map((m) => ({
     cells: tableRows(`<tr>${m[1]}</tr>`)[0] ?? [],
+    person: htmlPerson(m[1].match(/<td[^>]*>([\s\S]*?)<\/td>/i)?.[1]),
     detail: m[1].match(/href="(\/[A-Za-z]+\/Details\/\d+)"/)?.[1] ?? null,
   }));
 }
@@ -123,7 +125,7 @@ async function aowbHits(rows: Row[], matchedOn: LicenseHit["matchedOn"]): Promis
   const hits: LicenseHit[] = [];
   for (const r of rows.slice(0, MAX_DETAILS)) {
     const d = r.detail ? await detail(r.detail) : {};
-    const person = flipName(r.cells[0]);
+    const person = flipName(r.person ?? r.cells[0]);
     // An installer without a business name is a person alone: their address is a home address (city only).
     const biz = d.businessName ?? null;
     hits.push({

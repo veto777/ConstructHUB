@@ -84,7 +84,8 @@ export function verifyLicenseHit(details: any, row: VerifyRow | null, matchedOn:
   const c = details.Contractor ?? {};
   const isTrades = !clean(c.UbiNumber);
   const people = new Map<string, string | null>();
-  for (const o of c.BusinesOwners ?? []) { const n = flip(clean(o.Name)); if (n) people.set(n, clean(o.RoleDescription)); }
+  // Flipped from the field as published (round 6, decision 3): a list of owners in one field stays a list.
+  for (const o of c.BusinesOwners ?? []) { const n = flip(o.Name); if (n) people.set(n, clean(o.RoleDescription)); }
   for (const g of details.Employer?.EmployerGoverningPerson ?? []) {
     const n = clean(`${g.FirstName ?? ""} ${g.LastName ?? ""}`);
     if (n && !Array.from(people.keys()).some((k) => nameMatches(n, k))) people.set(n, "Governing person (workers' comp account)");
@@ -96,7 +97,7 @@ export function verifyLicenseHit(details: any, row: VerifyRow | null, matchedOn:
     businessName: isTrades ? null : name, licenseNumber: clean(c.LicenseNumber) ?? row?.LicenseId ?? null,
     licenseType: clean(c.LicenseType) ?? clean(row?.ContractorType),
     specialty: [c.SpecialtyName1, c.SpecialtyName2].map((v: unknown) => clean(v as string)).filter((v) => v && v !== "UNUSED").join(", ") || null,
-    status: clean(c.StatusDescription) ?? clean(row?.Status), principal: isTrades ? flip(name) : (people.size ? Array.from(people.keys())[0] : null),
+    status: clean(c.StatusDescription) ?? clean(row?.Status), principal: isTrades ? flip(c.BusinessName ?? row?.BusinessName ?? null) : (people.size ? Array.from(people.keys())[0] : null),
     city: [clean(c.City) ?? clean(row?.City), clean(c.State) ?? clean(row?.State)].filter(Boolean).join(", ") || null,
     expires: anyDay(c.ExpirationDate), matchedOn,
     // A tradesperson's address is a home address: only a business's address is kept. A certificate (no UBI) is the
@@ -139,6 +140,14 @@ const SRC_INFRACTIONS = "Washington L&I contractor, electrical and plumbing infr
 const SRC_BOND_SUITS = "Washington superior-court lawsuits against contractor bonds (L&I)";
 const SRC_WARRANTS = "Washington L&I tax warrants (unpaid workers' comp premiums)";
 const SRC_LAPSES = "Washington L&I contractor registration suspensions";
+
+/**
+ * A warrant status that plainly says the warrant was vacated ("Vacated", "Warrant vacated 2024-03-01"), with no
+ * negation, request or other word in it (round 6, decision 7). "Not vacated", "Motion to vacate denied" and "Vacate
+ * requested" are not.
+ */
+export const warrantVacated = (status: string | null | undefined): boolean =>
+  /^(?:(?:tax\s+)?warrant\s+)?(?:(?:was|has been)\s+)?vacated(?:\s+(?:on\s+)?(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}))?\.?$/i.test((status ?? "").replace(/\s+/g, " ").trim());
 
 export function verifyEnforcement(details: any, businessName: string, url: string): EnforcementHit[] {
   const c = details.Contractor ?? {};
@@ -185,9 +194,10 @@ export function verifyEnforcement(details: any, businessName: string, url: strin
       detail: [`State tax warrant filed by ${clean(w.PlaintiffName) ?? "L&I"}`, clean(w.CauseNumber) ? `superior court cause ${clean(w.CauseNumber)}` : null,
         money(w.ComplaintAmount) ? `amount ${usd(money(w.ComplaintAmount))}` : null, money(w.PaymentAmount) ? `paid ${usd(money(w.PaymentAmount))}` : null].filter(Boolean).join(", "),
       // The filing is said in the detail ("State tax warrant filed …"); `adverse` is the warrant's current outcome
-      // (round 5, decision 8): a vacated warrant is not adverse, otherwise the status's own words decide, and a status
-      // that says neither way (or none) stays unknown.
-      amount: money(w.ComplaintAmount), adverse: status && /\bvacat/i.test(status) ? false : adverseFrom(status),
+      // (round 5, decision 8): only a status that plainly says the warrant was vacated is not adverse (round 6,
+      // decision 7: "Not vacated", "Motion to vacate denied" → null); otherwise the status's own words decide, and a
+      // status that says neither way (or none) stays unknown.
+      amount: money(w.ComplaintAmount), adverse: warrantVacated(status) ? false : adverseFrom(status),
     });
   }
   for (const l of c.Lapses ?? []) {

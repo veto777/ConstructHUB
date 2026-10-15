@@ -1,6 +1,7 @@
 /**
  * Small helpers shared by the g8 state packs (OR, WA, MT, WY, AK, HI). No source data lives here.
  */
+import { flipPerson } from "../../person-name";
 import { politeFetch } from "../../http";
 import { clean } from "../../bulk";
 import { tokens } from "../../licenses";
@@ -43,8 +44,7 @@ export const usd = (n: number | null) => (n == null ? null : `$${n.toLocaleStrin
 
 /** "LAST, FIRST M" → "FIRST M LAST" (names without a comma are returned as given). */
 export function flip(v: string | null | undefined): string | null {
-  const m = v?.match(/^([^,]+),\s*(.+)$/);
-  return m ? clean(`${m[2]} ${m[1]}`) : clean(v);
+  return flipPerson(v);
 }
 
 /**

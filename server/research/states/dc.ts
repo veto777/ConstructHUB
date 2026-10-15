@@ -16,6 +16,7 @@ import type { EnforcementHit } from "@shared/research-reports";
 import { politeFetch, politeText } from "../http";
 import { hasEnded } from "../adverse";
 import { looksLikeBusiness } from "./lib/business-name";
+import { personText } from "../person-name";
 import { entityHolder } from "../licenses";
 import { DC_BUSINESS_TYPES, DC_INDIVIDUAL_TYPES } from "./local";
 import { clean, type BulkHit } from "../bulk";
@@ -64,6 +65,8 @@ export function bblHit(r: Attrs): BulkHit | null {
   const sole = /sole proprietor/i.test(a(r, "ENTITYTYPE") ?? "");
   // A sole proprietor's entity name is often the person's own name: then it is the person, not a business name.
   const entityIsPerson = sole && !!entity && !looksLikeBusiness(entity);
+  // A sole proprietor's entity name as the person, as published: a list stays a list (round 6, decision 3).
+  const soleName = sole && entity ? personText(String(r.ENTITYNAME)) : null;
   const business = [entityIsPerson ? null : entity, trade && trade !== entity ? trade : null].filter(Boolean).join(" / ") || null;
   const premises = dcAddress(a(r, "PREMISEADDRESS")), billing = dcAddress(a(r, "BILLINGADDRESS"));
   const people = [
@@ -77,12 +80,12 @@ export function bblHit(r: Attrs): BulkHit | null {
       state: "DC", source: "DC DLCP basic business licenses (construction)", sourceUrl: BBL_PAGE,
       businessName: business,
       licenseNumber: license, licenseType: bblActivity(a(r, "BUSINESSACTIVITY")),
-      specialty: a(r, "ENTITYTYPE"), status: a(r, "LICENSESTATUS"), principal: owner ?? (sole ? entity : null),
+      specialty: a(r, "ENTITYTYPE"), status: a(r, "LICENSESTATUS"), principal: owner ?? soleName,
       city: premises?.split(",").slice(-2).join(",").trim() ?? null, expires: epochDay(r.LICENSEENDDATE),
       matchedOn: "business", address: premises ?? billing, people,
       holder: bblHolder(a(r, "ENTITYTYPE"), a(r, "BUSINESSACTIVITY")),
     },
-    business: business ? business.replace(/ \/ /g, " ") : null, person: owner ?? (sole ? entity : null), people: [agent],
+    business: business ? business.replace(/ \/ /g, " ") : null, person: owner ?? soleName, people: [agent],
     keys: { licenses: [license], addresses: [premises, billing] },
   };
 }

@@ -54,14 +54,50 @@ const global = (re: RegExp) => new RegExp(re.source, re.flags.includes("g") ? re
  */
 const wordEnd = (t: string, b: number) => b + (/^[a-z]*/i.exec(t.slice(b))?.[0].length ?? 0);
 
-/** A negation word: anywhere in an outcome's clause (outside a not-adverse phrase) it leaves the outcome unknown. */
-const NEGATION = /\b(?:not|no|never|without|none|nor|neither|non)\b|n't\b/gi;
+/**
+ * A negation word: anywhere in an outcome's clause (outside a not-adverse phrase) it leaves the outcome unknown. "No."
+ * before a number or license ID ("license No. BC807216", "No. 12") is the abbreviation for number, not a negation.
+ */
+const NEGATION = /\b(?:not|never|without|none|nor|neither|non)\b|\bno\b(?!\.\s*(?:#|\d|[a-z]{1,4}-?\d))|n't\b/gi;
 
-/** True when a clause (split at . ; ! ? and line breaks) holds an outcome word and a negation outside the not-adverse phrases. */
+/**
+ * Abbreviations of five letters or more ("Admin.", "Amend.", "Subsec."): shorter words never end a clause at a period
+ * (outcomeClauses), so only these need listing. Lowercase, without the period.
+ */
+const ABBREVIATIONS = new Set("admin approx amend amdts subsec subch subpt sched suppl assoc depts viols stats regul compl dismd revkd suspd".split(" "));
+
+/**
+ * The outcome text cut into clauses at ; ! ? and line breaks, and at a period only where it surely ends a sentence
+ * (round 6, decision 1): after a number ("Fined $500. Appeal not filed") or a word of five letters or more that is no
+ * abbreviation, and before a capital letter or the end. A period after an abbreviation, an initial, a short word or a
+ * word with dots inside ("Sec.", "Lic.", "No.", "U.S.") doesn't end the clause: when in doubt the clauses stay
+ * together, which only makes a negation in them count (null), never drops one.
+ */
+export function outcomeClauses(t: string): string[] {
+  const out: string[] = [];
+  let from = 0;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    let end = /[;!?\n]/.test(c);
+    if (c === ".") {
+      const before = /([A-Za-z0-9$,.'’-]+)$/.exec(t.slice(from, i))?.[1] ?? "";
+      const after = t.slice(i + 1);
+      const word = before.replace(/^[$]/, "");
+      const number = /^\d[\d,]*(?:\.\d+)?$/.test(word);
+      const plainWord = /^[A-Za-z]{5,}$/.test(word) && !ABBREVIATIONS.has(word.toLowerCase());
+      end = (number || plainWord) && (/^\s*$/.test(after) || /^\s+["'(]?[A-Z]/.test(after));
+    }
+    if (end) { out.push(t.slice(from, i + 1)); from = i + 1; }
+  }
+  if (from < t.length) out.push(t.slice(from));
+  return out;
+}
+
+/** True when a clause (outcomeClauses) holds an outcome word and a negation outside the not-adverse phrases. */
 function negatedClause(t: string, spans: number[][], opts: AdverseOptions): boolean {
   const outcome = new RegExp(`${(opts.adverse ?? ADVERSE).source}|${NOT_ADVERSE.source}${opts.notAdverse ? `|${opts.notAdverse.source}` : ""}`, "i");
   let start = 0;
-  for (const clause of t.split(/(?<=[.;!?\n])/)) {
+  for (const clause of outcomeClauses(t)) {
     const [a, b] = [start, start + clause.length];
     start = b;
     if (!outcome.test(clause)) continue;

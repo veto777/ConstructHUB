@@ -6,6 +6,7 @@
  */
 import { politeFetch } from "../../http";
 import { decodeEntities } from "../../bulk-sources";
+import { personText } from "../../person-name";
 import { clean } from "../../bulk";
 
 export class FormSession {
@@ -77,6 +78,14 @@ export function formFields(html: string): URLSearchParams {
 /** The text of an HTML fragment. */
 export const textOf = (s: string | null | undefined): string | null =>
   clean(decodeEntities((s ?? "").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ")));
+
+/**
+ * A person-name cell as text (round 6, decision 3): like the helper above, but a <br> between two names stays a list
+ * (written " / ", ../../person-name.ts), so "Jane Smith<br>John Doe" is never read as one person. Whitespace in the
+ * page source is not a separator; only the <br> is.
+ */
+export const htmlPerson = (v: string | null | undefined): string | null =>
+  v == null ? null : personText(decodeEntities(v.replace(/\s+/g, " ").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")));
 
 /** The value attribute of the named submit button (boards label the same button differently). */
 export const buttonValue = (html: string, name: string): string | null =>

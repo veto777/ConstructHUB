@@ -14,6 +14,7 @@
  * General, whose directory refuses automated requests (see blocked). The State Fire Marshal licenses elevator contractors
  * and mechanics (above).
  */
+import { flipPerson } from "../person-name";
 import type { LicenseHit } from "@shared/research-reports";
 import { promises as fs } from "node:fs";
 import { clean, download, usDate, type BulkHit, type BulkSource } from "../bulk";
@@ -51,7 +52,8 @@ async function ksbtpSearch(url: string, fields: Record<string, string>): Promise
 }
 
 /** "Smith, John A" → "John A Smith". */
-const flip = (v: string | null) => { const m = v?.match(/^([^,]+),\s*(.+)$/); return m ? clean(`${m[2]} ${m[1]}`) : v; };
+/** "LAST, FIRST" → "FIRST LAST" for one person; a published list stays a list (../person-name.ts). */
+const flip = (v: string | null) => flipPerson(v);
 
 const toHit = (r: ReturnType<typeof parseKsbtpResults>[number], facility: boolean, matchedOn: LicenseHit["matchedOn"]): LicenseHit => {
   const who = facility ? null : flip(r.name);

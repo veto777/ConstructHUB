@@ -17,7 +17,8 @@ import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./type
 import type { IdQuery } from "../identifiers";
 import { capNote, noteOf, withNote } from "../notes";
 import { looksLikeBusiness } from "./lib/business-name";
-import { htmlText, isoDay } from "./lib/g6-common";
+import { personText } from "../person-name";
+import { htmlPerson, htmlText, isoDay } from "./lib/g6-common";
 
 // ── ND Secretary of State FirstStop ──────────────────────────────────────────────────────────────────────────
 const FS = "https://firststop.sos.nd.gov";
@@ -70,7 +71,8 @@ export function ndContractorHit(r: FsRow, d: Record<string, string>, matchedOn: 
   const whole = clean(title);
   const dba = whole?.match(/^(.+?)\s+(?:DBA|D\/B\/A)\s+(.+)$/i);
   const name = dba ? clean(dba[2]) : whole;
-  const person = dba ? clean(dba[1]) : name && !looksLikeBusiness(name) ? name : null;
+  // The person as published (round 6, decision 3): a line break between two names stays a list.
+  const person = dba ? personText(title?.match(/^\s*([\s\S]+?)\s+(?:DBA|D\/B\/A)\s/i)?.[1]) ?? clean(dba[1]) : name && !looksLikeBusiness(name) ? personText(title) : null;
   const standing = ["Standing - WSI", "Standing - Job Service", "Standing - Business", "Standing - Other"]
     .filter((k) => d[k]).map((k) => `${k.replace("Standing - ", "")} standing ${d[k].toLowerCase()}`);
   return {
@@ -163,11 +165,11 @@ async function sebPost(url: string, fields: Record<string, string>): Promise<str
   return html;
 }
 
-/** Rows of the board's results table, cells as text (none: no table). */
+/** Rows of the board's results table, cells as text (none: no table). The first cell is a person's name: a <br> in it stays a list (round 6, decision 3). */
 export function sebRows(html: string): string[][] {
   const table = html.match(/<table[^>]*class="searchlicensestable"[^>]*>([\s\S]*?)<\/table>/)?.[1];
   if (!table) return [];
-  return Array.from(table.matchAll(/<tr>([\s\S]*?)<\/tr>/g)).map((r) => Array.from(r[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c) => htmlText(c[1].replace(/<span class="hide">[\s\S]*?<\/span>/g, "")) ?? "")).filter((r) => r.length);
+  return Array.from(table.matchAll(/<tr>([\s\S]*?)<\/tr>/g)).map((r) => Array.from(r[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c, i) => (i === 0 ? htmlPerson : htmlText)(c[1].replace(/<span class="hide">[\s\S]*?<\/span>/g, "")) ?? "")).filter((r) => r.length);
 }
 
 const contractorHit = (c: string[], matchedOn: LicenseHit["matchedOn"]): LicenseHit => ({
@@ -248,8 +250,8 @@ async function plbHits(filter: string, matchedOn: LicenseHit["matchedOn"]): Prom
     state: "ND", source: "North Dakota State Plumbing Board licenses", sourceUrl: PLB_PAGE,
     businessName: null, licenseNumber: clean(r.licenseNum), licenseType: clean(r.licenseType?.name),
     specialty: clean(r.licenseLevel?.title ?? r.licenseLevel?.name), status: valid.has(r.id) ? "Valid" : "Not valid (not in the board's current-license list)",
-    principal: clean(r.licenseHolderName), city: null, expires: isoDay(r.validUntil), matchedOn,
-    people: r.licenseHolderName ? [{ name: r.licenseHolderName, role: clean(r.licenseType?.name) }] : [],
+    principal: personText(r.licenseHolderName), city: null, expires: isoDay(r.validUntil), matchedOn,
+    people: personText(r.licenseHolderName) ? [{ name: personText(r.licenseHolderName)!, role: clean(r.licenseType?.name) }] : [],
     holder: "individual", // the board licenses individuals
   } as LicenseHit)), noteOf(all));
 }
