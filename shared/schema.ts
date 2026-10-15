@@ -501,6 +501,13 @@ export const citations = pgTable("citations", {
   category: text("category"),
   domainAuthority: integer("domain_authority"),
   lastChecked: timestamp("last_checked"),
+  // The citation audit (server/citations/audit.ts): who set the mark, what the finder saw and why.
+  checkSource: text("check_source"),                 // manual | audit | import
+  auditResult: text("audit_result"),                 // match | mismatch | not_found | unconfirmed | unsupported
+  auditReason: text("audit_reason"),
+  auditEvidence: jsonb("audit_evidence"),
+  auditCheckedAt: timestamp("audit_checked_at", { withTimezone: true }),
+  note: text("note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

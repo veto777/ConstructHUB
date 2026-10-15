@@ -310,15 +310,15 @@ Needs a connected Google account and a linked location. Reviews sync with the lo
 
 ## 13. Citations
 
-**What it does:** a citation is any website that lists your business name, address and phone number, such as Yelp, BBB, Apple Maps or Bing Places. Being listed with identical details everywhere helps you show up in Google Maps. ConstructHUB gives you a checklist of 30 sites contractors should be on and tracks what you find. It does not submit or edit listings for you, and a site stays "Not checked" until you mark it.
+**What it does:** a citation is any website that lists your business name, address and phone number, such as Yelp, BBB, Apple Maps or Bing Places. Being listed with identical details everywhere helps you show up in Google Maps. ConstructHUB gives you a checklist of 30 sites contractors should be on. **Run audit** reads each site for you and records what it actually found (listed and matching, listed with wrong details and which field differs, not found, or "check by hand" when a site blocks programs). You can also import a CSV of your listings and export the checklist. It does not submit or edit listings for you, and a site stays "Not checked" until it has been read or you mark it.
 
 **Plan:** every plan.
 
 **Steps:**
 1. Locations → open a location → **Citations** → **New Campaign** and give it a name.
-2. **Build checklist**.
-3. For each site, click **Search** (it looks for your business on that site through Google), then mark what you found: Listed & correct, Listed with wrong info, or Not listed. Paste the link to your listing.
-4. Fix wrong details on that site itself and add your business where it's missing. The Google row fills in automatically when the location is linked to Google.
+2. **Run audit** (it builds the checklist if there is none) and wait a few minutes; the Audit column fills in as each site is read. Audits per month depend on the plan; the Citation audit pack adds more.
+3. For a "Check by hand" row, click **Search** (it looks for your business on that site through Google), then mark what you found: Listed & correct, Listed with wrong info, or Not listed. Paste the link to your listing. Or **Import CSV** a spreadsheet of your listings (download the Template; in Excel use Save As → CSV).
+4. Fix wrong details on that site itself and add your business where it's missing, then run the audit again. The Google row fills in automatically when the location is linked to Google.
 
 ## 14. Social Media
 

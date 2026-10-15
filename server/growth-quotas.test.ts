@@ -158,7 +158,7 @@ describe("reserving quota", () => {
     for (const row of [{ email: "social@constructhub.us", plan: null }, plan("platinum", { email: "social@constructhub.us", stripe_subscription_id: null }), plan("starter", { email: "support@constructhub.us" })]) {
       mocks.row = row;
       const ent = await getEntitlements(1);
-      for (const feature of ["searches", "rankings", "siteScans", "competitorScans", "photos", "texts", "gabeQuestions"] as const) {
+      for (const feature of ["searches", "rankings", "siteScans", "competitorScans", "citationAudits", "photos", "texts", "gabeQuestions"] as const) {
         expect(monthlyLimit(ent, feature, 50), feature).toBe(-1);
         const r = await reserveQuotaFor(1, feature, 9_999);
         expect(r.ok, feature).toBe(true);

@@ -49,6 +49,8 @@ import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { db, pool } from "./db";
 import { searchQueries, scrapeSchedules, trackedDomains, permitDatabases, subscriptions, reviewTemplates, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
+import { CITATION_DIRECTORIES, LEGACY_CITATION_NAMES, citationRank } from "./citations/directories";
+import { ensureChecklist, recountCitations } from "./citations/audit";
 import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, trialInviteUrl, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
 import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
@@ -474,6 +476,11 @@ export async function registerRoutes(
   const { seedDirectories } = await import("./directories/catalogue");
   await ensureDirectorySchema(pool);
   await seedDirectories(pool);
+  // The citation audit (server/citations): audit_* columns on citations, the citation_audits progress table, routes.
+  const { ensureCitationsSchema } = await import("./citations/audit");
+  await ensureCitationsSchema();
+  const { registerCitationRoutes } = await import("./citations/routes");
+  registerCitationRoutes(app, getDevUser);
   const { registerDirectoryRoutes } = await import("./directories/routes");
   registerDirectoryRoutes(app, getDevUser);
   // Backlinks database (server/backlinks, admin-only prototype): discovery → vetting → authority → outreach drafts.
@@ -3342,43 +3349,7 @@ export async function registerRoutes(
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
-  // Checklist order: Google Business Profile first (it drives local search), then the rest by priority.
-  const CITATION_DIRECTORIES = [
-    { name: "Google Business Profile", url: "google.com", category: "Search Engine" },
-    { name: "Yelp", url: "yelp.com", category: "Review Site" },
-    { name: "BBB", url: "bbb.org", category: "Business Directory" },
-    { name: "Yellow Pages", url: "yellowpages.com", category: "Business Directory" },
-    { name: "Angi", url: "angi.com", category: "Home Services" },
-    { name: "HomeAdvisor", url: "homeadvisor.com", category: "Home Services" },
-    { name: "Houzz", url: "houzz.com", category: "Home & Design" },
-    { name: "Facebook", url: "facebook.com", category: "Social Media" },
-    { name: "Nextdoor", url: "nextdoor.com", category: "Community" },
-    { name: "Thumbtack", url: "thumbtack.com", category: "Home Services" },
-    { name: "MapQuest", url: "mapquest.com", category: "Maps & Navigation" },
-    { name: "Superpages", url: "superpages.com", category: "Business Directory" },
-    { name: "DexKnows", url: "dexknows.com", category: "Business Directory" },
-    { name: "CitySearch", url: "citysearch.com", category: "Local Search" },
-    { name: "Manta", url: "manta.com", category: "Business Directory" },
-    { name: "MerchantCircle", url: "merchantcircle.com", category: "Business Directory" },
-    { name: "Foursquare", url: "foursquare.com", category: "Local Search" },
-    { name: "Apple Maps", url: "maps.apple.com", category: "Maps & Navigation" },
-    { name: "Bing Places", url: "bing.com", category: "Search Engine" },
-    { name: "TripAdvisor", url: "tripadvisor.com", category: "Review Site" },
-    { name: "Buildzoom", url: "buildzoom.com", category: "Home Services" },
-    { name: "Porch", url: "porch.com", category: "Home Services" },
-    { name: "Bark", url: "bark.com", category: "Home Services" },
-    { name: "Expertise", url: "expertise.com", category: "Business Directory" },
-    { name: "Chamber of Commerce", url: "chamberofcommerce.com", category: "Business Directory" },
-    { name: "HotFrog", url: "hotfrog.com", category: "Business Directory" },
-    { name: "Brownbook", url: "brownbook.net", category: "Business Directory" },
-    { name: "ShowMeLocal", url: "showmelocal.com", category: "Business Directory" },
-    { name: "EZLocal", url: "ezlocal.com", category: "Business Directory" },
-    { name: "Local.com", url: "local.com", category: "Local Search" },
-  ];
-  // Checklists built before the rename carry the old name.
-  const LEGACY_CITATION_NAMES: Record<string, string> = { "Google My Business": "Google Business Profile" };
-  const citationRank = new Map(CITATION_DIRECTORIES.map((d, i) => [d.name, i]));
-
+  // The checklist (server/citations/directories.ts), the build and the recount live in server/citations/audit.ts.
   // The campaign detail's site rows: the 30-directory checklist ordered Google first, for marking each
   // site listed / listed-wrong / missing.
   app.get("/api/citations/campaigns/:id/results", async (req, res) => {
@@ -3399,44 +3370,19 @@ export async function registerRoutes(
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
-
   // Citation checklist. There is no reliable free API that tells us whether a business is listed on each
-  // directory, and guessing is fabrication (CLAUDE.md). So the owner verifies each site via a Google site:
-  // search and records the result; only the Google Business Profile row is filled from real linked data.
+  // directory, and guessing is fabrication (CLAUDE.md). The checklist starts unchecked; the owner marks rows by
+  // hand, imports a spreadsheet, or runs the audit (server/citations) which reads each directory and records what
+  // it actually saw. Only the Google Business Profile row is filled from real linked data.
   app.post("/api/citations/campaigns/:id/run", async (req, res) => {
     if (!(await requireCitationsPlan(req, res))) return;
     try {
       const user = (req as any).user;
       const id = parseInt(req.params.id);
-      const [campaign] = await db.select().from(citationCampaigns).where(and(eq(citationCampaigns.id, id), eq(citationCampaigns.userId, user.id)));
-      if (!campaign) return res.status(404).json({ message: "Campaign not found" });
-      const existing = await db.select().from(citations).where(eq(citations.campaignId, id));
-      const have = new Set(existing.map(c => LEGACY_CITATION_NAMES[c.siteName] ?? c.siteName));
-      const [loc] = campaign.locationId ? await db.select().from(businessLocations).where(and(eq(businessLocations.id, campaign.locationId), eq(businessLocations.userId, user.id))) : [];
-      for (const dir of CITATION_DIRECTORIES) {
-        if (have.has(dir.name)) continue;
-        const isGoogle = dir.url === "google.com";
-        const linked = isGoogle && !!loc?.gbpLocationName;
-        await db.insert(citations).values({
-          campaignId: id, siteName: dir.name, siteUrl: `https://${dir.url}`,
-          listingUrl: linked ? loc!.googleCid || null : null,
-          isFound: linked ? true : null, napConsistent: null,
-          category: dir.category, domainAuthority: null, lastChecked: linked ? new Date() : null,
-        });
-      }
-      await recountCitations(id);
+      await ensureChecklist(id, user.id);
       res.json({ message: "Checklist ready", campaignId: id });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { res.status(err.status || 500).json({ message: err.message }); }
   });
-
-  async function recountCitations(campaignId: number) {
-    const rows = await db.select().from(citations).where(eq(citations.campaignId, campaignId));
-    await db.update(citationCampaigns).set({
-      citationsFound: rows.filter(r => r.isFound === true).length,
-      opportunitiesFound: rows.filter(r => r.isFound === false).length,
-      lastRunAt: new Date(),
-    }).where(eq(citationCampaigns.id, campaignId));
-  }
 
   // A checklist row's status select and listing-URL save: records listed/wrong/missing/unchecked and
   // recounts the campaign's count tiles.
@@ -3456,7 +3402,7 @@ export async function registerRoutes(
       const map = { listed: [true, true], wrong: [true, false], missing: [false, null], unchecked: [null, null] } as const;
       const [isFound, napConsistent] = map[body.status];
       const [updated] = await db.update(citations).set({
-        isFound, napConsistent, lastChecked: body.status === "unchecked" ? null : new Date(),
+        isFound, napConsistent, lastChecked: body.status === "unchecked" ? null : new Date(), checkSource: "manual",
         ...(body.listingUrl !== undefined ? { listingUrl: body.listingUrl } : {}),
       }).where(eq(citations.id, id)).returning();
       await recountCitations(row.c.campaignId);

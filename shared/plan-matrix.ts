@@ -144,6 +144,7 @@ export function businessToolsMatrix(): PlanMatrixSection[] {
     { key: "siteScans", label: "Site Scans / month", cell: (p) => count(p.limits.siteScans) },
     { key: "gridScans", label: "Grid scans / month", note: GRID_CREDITS_NOTE, cell: (p) => count(p.limits.gridCredits) },
     { key: "competitorScans", label: "Competitor Intel scans / month", cell: (p) => count(p.limits.competitorScans) },
+    { key: "citationAudits", label: "Citation audits / month", cell: (p) => count(p.limits.citationAudits) },
     // ── Texting ───────────────────────────────────────────────────────────
     { key: "teamTexts", label: "Team text alert segments / month", cell: (p) => count(p.limits.teamTextSegments) },
     {
@@ -202,7 +203,7 @@ export function businessToolsMatrix(): PlanMatrixSection[] {
     { title: "Locations & people", keys: ["locations", "teamSeats", "clientWorkspaces"] },
     { title: "Google Business Profile & reviews", keys: ["guardCadence", "reviewAlerts", "autoPublish", "autoPosts", "replyTemplates", "reviewReminders"] },
     { title: "Permits & property", keys: ["permitSearches", "permitAlerts", "propertyRecords"] },
-    { title: "Websites & scans", keys: ["clickGuardSites", "siteScans", "gridScans", "competitorScans"] },
+    { title: "Websites & scans", keys: ["clickGuardSites", "siteScans", "gridScans", "competitorScans", "citationAudits"] },
     { title: "Texting", keys: ["teamTexts", "clientTextingNumber"] },
     { title: "Growth tools", keys: ["adsLsaManager", "cloudflareDomains", "socialPublishing", "publicApi", "csvExport", "history", "scheduledReports", "seoSuite", "gridWatches", "whiteLabel"] },
     { title: "Hub & extras", keys: ["gabeQuestions", "masterClass", "gbpReinstatement", "newProductSeats", "support"] },

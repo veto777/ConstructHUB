@@ -225,6 +225,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         },
         meterRow("siteScans", "Site Scans", usage.siteScans, allowances.siteScans, undefined, unl),
         meterRow("competitorScans", "Competitor Intel scans", usage.competitorScans, allowances.competitorScans, { addon: "competitor_pack" }, unl),
+        meterRow("citationAudits", "Citation audits", usage.citationAudits, allowances.citationAudits, { addon: "citation_pack" }, unl),
         // ConstructHUB SEO (rank tracker, keyword research, backlinks): a taste on Agency, the full suite on Unlimited,
         // an add-on below that (shared/plans.ts SEO_PLAN_LIMITS, ADDONS.seo_*); an account that had the tools before
         // keeps them (server/entitlements.ts seoGrandfathered).

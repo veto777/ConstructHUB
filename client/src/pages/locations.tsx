@@ -37,7 +37,7 @@ import {
   MapPin, Plus, Search, ArrowLeft, Settings, Image, Users, Link2, Globe,
   Phone, Mail, Lock, Loader2, Trash2, RefreshCw, ExternalLink, Check, X,
   ChevronDown, Building2, Tag, BarChart3, Star, TrendingUp, TrendingDown,
-  Eye, MousePointerClick, Smartphone, Monitor, Megaphone,
+  Eye, MousePointerClick, Smartphone, Monitor, Megaphone, Upload, Download, FileSpreadsheet, ScanSearch,
 } from "lucide-react";
 import { GbpContentEditor } from "@/pages/gbp-content";
 import { GbpLinkCell } from "@/components/gbp-connection";
@@ -1270,7 +1270,7 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
             <h3 className="text-base font-semibold">Citation Campaigns</h3>
             <InfoTip k="citations" />
           </div>
-          <p className="text-xs text-muted-foreground max-w-xl">A citation is a listing of your business on another site — Yelp, BBB, Angi, Apple Maps, Bing and about 25 more. Google trusts a business more when the same name, address and phone show up on all of them, and that moves you up in Maps. A campaign is a checklist of those sites for this location: ConstructHUB finds each listing with you, you mark what you found and fix anything wrong on the site itself. Press the ⓘ for the full walkthrough.</p>
+          <p className="text-xs text-muted-foreground max-w-xl">A citation is a listing of your business on another site — Yelp, BBB, Angi, Apple Maps, Bing and about 25 more. Google trusts a business more when the same name, address and phone show up on all of them, and that moves you up in Maps. A campaign is a checklist of those sites for this location. Run the audit and ConstructHUB reads each site and records what it actually found; mark the rest by hand or import a spreadsheet; then fix anything wrong on the site itself. Press the ⓘ for the full walkthrough.</p>
         </div>
         <Button size="sm" onClick={() => setShowNewCampaign(true)} data-testid="button-new-campaign">
           <Plus className="w-4 h-4 mr-1" /> New Campaign
@@ -1384,6 +1384,41 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
   );
 }
 
+function summaryLine(s: Record<string, number> | undefined): string {
+  if (!s) return "";
+  const parts: [number | undefined, string][] = [[s.match, "listed"], [s.mismatch, "listed with wrong details"], [s.not_found, "not found"], [s.unconfirmed, "to check by hand"], [s.unsupported, "manual sites"]];
+  return parts.filter(([n]) => n).map(([n, l]) => `${n} ${l}`).join(" · ");
+}
+const AUDIT_LABEL: Record<string, [string, string]> = {
+  match: ["Listed ✓", "text-green-600"], mismatch: ["Listed, wrong details", "text-yellow-600"], not_found: ["Not found", "text-red-600"],
+  unconfirmed: ["Check by hand", "text-muted-foreground"], unsupported: ["Manual site", "text-muted-foreground"],
+};
+type AuditEvidence = { how?: string; partial?: boolean; fields?: Record<string, { result: string; expected: string | null; observed: string | null }> | null; candidates?: string[]; searchUrl?: string | null };
+type AuditInfo = {
+  audit: { id: number; status: string; total: number; done: number; currentSite: string | null; summary: Record<string, number>; error: string | null; startedAt: string | null; finishedAt: string | null } | null;
+  quota: { used: number; limit: number }; ready: boolean; readyReason: string | null; capabilities: { webSearch: boolean };
+};
+
+/** What the audit saw on one site: result, the reason in plain words, each field that differs, the likely listing. */
+function AuditCell({ c }: { c: Citation }) {
+  const r = c.auditResult, reason = c.auditReason, ev = (c.auditEvidence ?? null) as AuditEvidence | null, at = c.auditCheckedAt;
+  if (!r) return <span className="text-xs text-muted-foreground">—</span>;
+  const [label, color] = AUDIT_LABEL[r] ?? [r, ""];
+  const diffs = ev?.fields ? Object.entries(ev.fields).filter(([, f]) => f.result === "differs") : [];
+  const candidate = !c.listingUrl && ev?.candidates?.[0];
+  return (
+    <div className="space-y-0.5" data-testid={`audit-${c.id}`}>
+      <p className={`text-xs font-medium ${color}`}>{label}{ev?.partial ? " (address unread)" : ""}</p>
+      {reason && <p className="text-[11px] text-muted-foreground leading-snug">{reason}</p>}
+      {diffs.map(([k, f]) => (
+        <p key={k} className="text-[11px] leading-snug"><span className="capitalize">{k.replace(/_/g, " ")}</span> on the site: <span className="text-yellow-700 dark:text-yellow-500">{f.observed ?? "—"}</span> · yours: {f.expected ?? "—"}</p>
+      ))}
+      {candidate && <a href={candidate} target="_blank" rel="noopener noreferrer" className="text-[11px] inline-flex items-center gap-1 text-foreground" data-testid={`link-candidate-${c.id}`}>Open the likely listing <ExternalLink className="w-3 h-3" /></a>}
+      {at && <p className="text-[10px] text-muted-foreground">Checked {new Date(at as any).toLocaleDateString()}</p>}
+    </div>
+  );
+}
+
 function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCampaign; location: BusinessLocation; onBack: () => void }) {
   const { toast } = useToast();
   const key = ["/api/citations/campaigns", campaign.id, "results"];
@@ -1392,6 +1427,37 @@ function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCamp
     queryClient.invalidateQueries({ queryKey: key });
     invalidateCampaigns();
   };
+
+  // The audit (server/citations): progress polled while it runs, rows refreshed as it fills them in.
+  const auditKey = [`/api/citations/campaigns/${campaign.id}/audit`];
+  const auditQ = useQuery<AuditInfo>({ queryKey: auditKey, refetchInterval: (q) => { const s = (q.state.data as AuditInfo | undefined)?.audit?.status; return s === "queued" || s === "running" ? 2500 : false; } });
+  const audit = auditQ.data?.audit ?? null;
+  const auditRunning = audit?.status === "queued" || audit?.status === "running";
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (auditRunning) queryClient.invalidateQueries({ queryKey: key });
+    if (wasRunning.current && !auditRunning) {
+      refresh();
+      if (audit?.status === "done") toast({ title: "Audit finished", description: summaryLine(audit.summary) || "Nothing could be read." });
+      if (audit?.status === "failed") toast({ title: "Audit failed", description: audit.error ?? "", variant: "destructive" });
+    }
+    wasRunning.current = !!auditRunning;
+  }, [auditRunning, audit?.done]);
+  const auditMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/citations/campaigns/${campaign.id}/audit`)).json(),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: auditKey }); refresh(); toast({ title: "Audit started", description: "Reading each directory. This takes a few minutes; rows fill in as it goes." }); },
+    onError: (err: Error) => toast({ title: "Could not start the audit", description: apiErrorMessage(err), variant: "destructive" }),
+  });
+  const fileRef = useRef<HTMLInputElement>(null);
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const res = await fetch(`/api/citations/campaigns/${campaign.id}/import`, { method: "POST", headers: { "Content-Type": "text/csv" }, body: await file.text(), credentials: "include" });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || `HTTP ${res.status}`);
+      return res.json() as Promise<{ updated: number; skipped: { line: number; reason: string }[] }>;
+    },
+    onSuccess: (r) => { refresh(); toast({ title: `${r.updated} row${r.updated === 1 ? "" : "s"} updated from the spreadsheet`, description: r.skipped.length ? `${r.skipped.length} skipped — ${r.skipped.slice(0, 3).map((s) => `line ${s.line}: ${s.reason}`).join(" ")}` : undefined }); },
+    onError: (err: Error) => toast({ title: "Import failed", description: apiErrorMessage(err), variant: "destructive" }),
+  });
 
   const buildMutation = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/citations/campaigns/${campaign.id}/run`)).json(),
@@ -1451,17 +1517,55 @@ function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCamp
           <h3 className="text-base font-semibold" data-testid="text-campaign-detail-name">{campaign.campaignName}</h3>
           <p className="text-xs text-muted-foreground">{campaign.businessName}</p>
         </div>
-        <div className="ml-auto">
-          <Button size="sm" onClick={() => buildMutation.mutate()} disabled={buildMutation.isPending} data-testid="button-run-scan">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <Button size="sm" onClick={() => auditMutation.mutate()} disabled={auditMutation.isPending || auditRunning || auditQ.data?.ready === false} title={auditQ.data?.readyReason ?? undefined} data-testid="button-run-audit">
+            {auditRunning || auditMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <ScanSearch className="w-4 h-4 mr-1" />}
+            {auditRunning ? `Auditing ${audit?.done ?? 0}/${audit?.total ?? 0}` : rows.length ? "Run audit" : "Build & audit"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => buildMutation.mutate()} disabled={buildMutation.isPending} data-testid="button-run-scan">
             {buildMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
             {rows.length ? "Update checklist" : "Build checklist"}
           </Button>
+          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importMutation.mutate(f); e.target.value = ""; }} data-testid="input-import-csv" />
+          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importMutation.isPending || !rows.length} data-testid="button-import-csv">
+            {importMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />} Import CSV
+          </Button>
+          {rows.length > 0 && (
+            <Button size="sm" variant="outline" asChild>
+              <a href={`/api/citations/campaigns/${campaign.id}/export.csv`} download data-testid="link-export-csv"><Download className="w-4 h-4 mr-1" /> Export</a>
+            </Button>
+          )}
+          <a href="/api/citations/template.csv" download className="text-xs text-muted-foreground inline-flex items-center gap-1" data-testid="link-csv-template"><FileSpreadsheet className="w-3.5 h-3.5" /> Template</a>
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        For each site, click <strong>Search</strong> — it looks for your business on that site through Google. Then mark what you
-        found. ConstructHUB doesn't guess: a site stays “Not checked” until you mark it.
+        <strong>Run audit</strong> reads each directory for you and records what it actually saw: listed and matching, listed with wrong
+        details, not found, or “check by hand” when a site blocks programs. Those rows keep the <strong>Search</strong> link — look, then mark
+        the row. <strong>Import CSV</strong> takes a spreadsheet of your listings (download the Template; in Excel use File → Save As → CSV).
+        ConstructHUB never guesses: a site it could not read stays “Not checked”.
+        {auditQ.data?.quota && auditQ.data.quota.limit !== 0 && (
+          <> {auditQ.data.quota.limit < 0 ? "Audits: unlimited on your plan." : `Audits this month: ${auditQ.data.quota.used} of ${auditQ.data.quota.limit} used.`}</>
+        )}
       </p>
+      {audit && (
+        <Card data-testid="card-audit-status">
+          <CardContent className="p-3 text-xs space-y-1.5">
+            {auditRunning ? (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading {audit.currentSite ?? "…"}</span>
+                  <span>{audit.done} / {audit.total}</span>
+                </div>
+                <div className="h-1.5 rounded bg-muted overflow-hidden"><div className="h-full bg-primary transition-all" style={{ width: `${audit.total ? Math.round((audit.done / audit.total) * 100) : 0}%` }} /></div>
+              </>
+            ) : audit.status === "failed" ? (
+              <p className="text-destructive">The last audit failed: {audit.error}</p>
+            ) : (
+              <p>Last audit {audit.finishedAt ? new Date(audit.finishedAt).toLocaleString() : ""}: {summaryLine(audit.summary) || "nothing could be read"}.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {tiles.map(([st, label, color]) => (
@@ -1490,6 +1594,7 @@ function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCamp
                 <TableHead>Site</TableHead>
                 <TableHead>Find it</TableHead>
                 <TableHead>What you found</TableHead>
+                <TableHead>Audit</TableHead>
                 <TableHead>Your listing</TableHead>
               </TableRow>
             </TableHeader>
@@ -1519,6 +1624,12 @@ function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCamp
                       <option value="wrong">Listed — wrong name/address/phone</option>
                       <option value="missing">Not listed</option>
                     </select>
+                    {c.checkSource && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{c.checkSource === "audit" ? "Set by the audit" : c.checkSource === "import" ? "From your spreadsheet" : "Your mark"}</p>
+                    )}
+                  </TableCell>
+                  <TableCell className={`${appTableCards.td} !text-foreground max-w-[20rem]`}>
+                    <AuditCell c={c} />
                   </TableCell>
                   <TableCell className={`${appTableCards.td} !text-foreground`}>
                     {hasListing(statusOf(c)) ? (

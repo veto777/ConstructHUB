@@ -133,7 +133,7 @@ export const creditsLabel = (n: number) => `${n.toLocaleString("en-US")} credit$
 /** One monthly meter as the server reports it: limit -1 = unlimited (fair use), 0 = not in the plan. */
 export type UsageMeter = { used: number; limit: number };
 
-export type UsageKey = "searches" | "rankings" | "siteScans" | "competitorScans" | "texts";
+export type UsageKey = "searches" | "rankings" | "siteScans" | "competitorScans" | "citationAudits" | "texts";
 
 /** GET /api/entitlements — the fields the client reads. */
 export type EntitlementsInfo = {
@@ -165,6 +165,7 @@ export const USAGE_METERS: readonly { key: UsageKey; label: string }[] = [
   { key: "rankings", label: "Ranking-grid credits" },
   { key: "siteScans", label: "Site Scans" },
   { key: "competitorScans", label: "Competitor Intel scans" },
+  { key: "citationAudits", label: "Citation audits" },
   { key: "texts", label: "Text segments" },
 ];
 

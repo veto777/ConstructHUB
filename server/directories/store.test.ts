@@ -122,11 +122,11 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
           loadScoutedDirectories().length,
       );
       const routes = readFileSync(
-        new URL("../routes.ts", import.meta.url),
+        new URL("../citations/directories.ts", import.meta.url),
         "utf8",
       );
       const checklist = routes
-        .split("const CITATION_DIRECTORIES = [")[1]
+        .split("CITATION_DIRECTORIES: readonly CitationDirectory[] = [")[1]
         .split("];")[0];
       for (const [, domain] of checklist.matchAll(/url: "([^"]+)"/g))
         expect(catalogue().some((d) => d.domain === domain)).toBe(true);

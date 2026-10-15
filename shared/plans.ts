@@ -53,6 +53,8 @@ export type PlanLimits = {
   gridCredits: number;
   gridCreditsPerLocation: number;
   competitorScans: number;
+  /** Citation audits per month (one audit reads every directory on a location's checklist). */
+  citationAudits: number;
   /** Click Guard + IP Tracker + VPN Shield sites. */
   protectedSites: number;
   /** Site Scans per month (Agency: per location). */
@@ -351,7 +353,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "A client-texting number on our carrier (add one)",
     ],
     limits: {
-      locations: 1, clientWorkspaces: 0, guardCadenceMinutes: 60, gridCredits: 3, gridCreditsPerLocation: 0, competitorScans: 1,
+      locations: 1, clientWorkspaces: 0, guardCadenceMinutes: 60, gridCredits: 3, gridCreditsPerLocation: 0, competitorScans: 1, citationAudits: 1,
       protectedSites: 1, siteScans: 2, siteScansPerLocation: 0, permitSearches: 10, agencySeats: 1,
       teamTextSegments: 200, clientTexting: "addon", textingNumbersIncluded: 0, autoPublishAiReplies: false, reviewTemplates: 5,
       apiUnitsPerMonth: 0, apiRatePerMinute: 60, historyDays: 90, gabeQuestions: 100,
@@ -386,7 +388,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "A client-texting number on our carrier (add one)",
     ],
     limits: {
-      locations: 10, clientWorkspaces: 0, guardCadenceMinutes: 30, gridCredits: 10, gridCreditsPerLocation: 0, competitorScans: 5,
+      locations: 10, clientWorkspaces: 0, guardCadenceMinutes: 30, gridCredits: 10, gridCreditsPerLocation: 0, competitorScans: 5, citationAudits: 3,
       protectedSites: 3, siteScans: 5, siteScansPerLocation: 0, permitSearches: 50, agencySeats: 3,
       teamTextSegments: 500, clientTexting: "addon", textingNumbersIncluded: 0, autoPublishAiReplies: false, reviewTemplates: 20,
       apiUnitsPerMonth: 0, apiRatePerMinute: 60, historyDays: 90, gabeQuestions: 300,
@@ -429,7 +431,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "A client-texting number on our carrier (add one)",
     ],
     limits: {
-      locations: 25, clientWorkspaces: 0, guardCadenceMinutes: 15, gridCredits: 20, gridCreditsPerLocation: 0, competitorScans: 10,
+      locations: 25, clientWorkspaces: 0, guardCadenceMinutes: 15, gridCredits: 20, gridCreditsPerLocation: 0, competitorScans: 10, citationAudits: 6,
       protectedSites: 10, siteScans: 15, siteScansPerLocation: 0, permitSearches: 100, agencySeats: 5,
       teamTextSegments: 1000, clientTexting: "addon", textingNumbersIncluded: 0, autoPublishAiReplies: true, reviewTemplates: 20,
       apiUnitsPerMonth: 50_000, apiRatePerMinute: 60, historyDays: 365, gabeQuestions: 1000,
@@ -467,7 +469,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "White-label reports, the Master Class, unlimited everything (Unlimited)",
     ],
     limits: {
-      locations: 100, clientWorkspaces: 10, guardCadenceMinutes: 15, gridCredits: 40, gridCreditsPerLocation: 0, competitorScans: 20,
+      locations: 100, clientWorkspaces: 10, guardCadenceMinutes: 15, gridCredits: 40, gridCreditsPerLocation: 0, competitorScans: 20, citationAudits: 12,
       protectedSites: 25, siteScans: 50, siteScansPerLocation: 0, permitSearches: 200, agencySeats: 10,
       teamTextSegments: 2000, clientTexting: "included", textingNumbersIncluded: 1, autoPublishAiReplies: true, reviewTemplates: 50,
       apiUnitsPerMonth: 250_000, apiRatePerMinute: 60, historyDays: UNLIMITED, gabeQuestions: 3000,
@@ -500,7 +502,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       CALL_ASSISTANT_NOT_INCLUDED_LINE,
     ],
     limits: {
-      locations: UNLIMITED, clientWorkspaces: UNLIMITED, guardCadenceMinutes: 5, gridCredits: 150, gridCreditsPerLocation: 0, competitorScans: 50,
+      locations: UNLIMITED, clientWorkspaces: UNLIMITED, guardCadenceMinutes: 5, gridCredits: 150, gridCreditsPerLocation: 0, competitorScans: 50, citationAudits: 30,
       protectedSites: UNLIMITED, siteScans: UNLIMITED, siteScansPerLocation: 0, permitSearches: UNLIMITED, agencySeats: UNLIMITED,
       teamTextSegments: 5000, clientTexting: "included", textingNumbersIncluded: 2, autoPublishAiReplies: true, reviewTemplates: UNLIMITED,
       apiUnitsPerMonth: UNLIMITED, apiRatePerMinute: 120, historyDays: UNLIMITED, gabeQuestions: UNLIMITED,
@@ -545,7 +547,7 @@ export function agencyMonthlyCents(locations: number): number | null {
 }
 
 export type AddonKey =
-  | "extra_location" | "extra_seat" | "protected_site" | "texting_number" | "competitor_pack" | "grid_pack" | "seo_basic" | "seo_pro"
+  | "extra_location" | "extra_seat" | "protected_site" | "texting_number" | "competitor_pack" | "grid_pack" | "citation_pack" | "seo_basic" | "seo_pro"
   | "call_assistant_lite" | "call_assistant" | "call_assistant_crew" | "call_assistant_fleet" | "call_number";
 export type Addon = {
   key: AddonKey;
@@ -647,6 +649,9 @@ export const ADDONS: Record<AddonKey, Addon> = {
   texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier for texting your clients; texts count against your plan's monthly text allowance.", monthlyCents: 2900, annualCents: 31900, setupCents: 2900, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: {} },
   competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 1900, annualCents: 20900, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: { competitorScans: 10 } },
   grid_pack: { key: "grid_pack", name: "Grid scan pack", description: "10 more ranking-grid credits each month.", monthlyCents: 1000, annualCents: 11000, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: { gridCredits: 10 } },
+  // Citation audit pack (owner 2026-10-15: "have a paid version where a scrape is performed and all citations are logged"): the
+  // audit itself comes with every paid plan (PlanLimits.citationAudits a month); this adds more. Price is the first cut.
+  citation_pack: { key: "citation_pack", name: "Citation audit pack", description: "5 more citation audits each month.", monthlyCents: 1900, annualCents: 20900, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: { citationAudits: 5 } },
   // ── ConstructHUB SEO as an add-on (owner, 2026-10-09): the suite on any plan below Unlimited. One of the two per account.
   seo_basic: { key: "seo_basic", name: "SEO suite — 1,000 keywords", description: "Site explorer, rank tracker, keyword research and backlinks: 1,000 tracked keywords and $20 of SEO data a month.", monthlyCents: 2900, annualCents: 31900, availableOn: ["starter", "team", "pro", "growth"], grants: { seoKeywords: 1000, seoCreditCents: 2000 }, exclusiveGroup: "seo_addon" },
   seo_pro: { key: "seo_pro", name: "SEO suite — 5,000 keywords", description: "The full suite: 5,000 tracked keywords and $60 of SEO data a month (what Unlimited includes).", monthlyCents: 7900, annualCents: 86900, availableOn: ["starter", "team", "pro", "growth"], grants: { seoKeywords: 5000, seoCreditCents: 6000 }, exclusiveGroup: "seo_addon" },

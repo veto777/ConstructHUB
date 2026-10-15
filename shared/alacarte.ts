@@ -114,7 +114,7 @@ export type AlacarteItem = {
  */
 export const STANDALONE_BASE_LIMITS: PlanLimits = {
   locations: 0, clientWorkspaces: 0, textingNumbersIncluded: 0, historyDays: 90, gabeQuestions: 0, guardCadenceMinutes: 60,
-  gridCredits: 0, gridCreditsPerLocation: 0, competitorScans: 0, protectedSites: 0, siteScans: 0, siteScansPerLocation: 0,
+  gridCredits: 0, gridCreditsPerLocation: 0, competitorScans: 0, citationAudits: 0, protectedSites: 0, siteScans: 0, siteScansPerLocation: 0,
   permitSearches: 0, agencySeats: 1, teamTextSegments: 0, clientTexting: "none", autoPublishAiReplies: false, reviewTemplates: 0,
   apiUnitsPerMonth: 0, apiRatePerMinute: 60, seoKeywords: 0, seoCreditCents: 0,
 };

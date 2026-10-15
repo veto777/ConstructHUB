@@ -16,7 +16,7 @@ import {
 } from "./entitlements";
 import { PLANS, gridCreditCost, type PlanKey, type PlanLimits, type AddonKey } from "@shared/plans";
 
-export type MeteredFeature = "searches" | "rankings" | "siteScans" | "competitorScans" | "photos" | "texts" | "gabeQuestions";
+export type MeteredFeature = "searches" | "rankings" | "siteScans" | "competitorScans" | "citationAudits" | "photos" | "texts" | "gabeQuestions";
 
 type Meter = {
   /** Upgrade prompt subject: "<what> is included with the Starter plan". */
@@ -35,6 +35,7 @@ export const METERS: Record<MeteredFeature, Meter> = {
   rankings: { what: "The ranking grid", unit: ["ranking-grid credit"], limit: "gridCredits", perLocation: "gridCreditsPerLocation" },
   siteScans: { what: "Site Scan", unit: ["Site Scan"], limit: "siteScans", perLocation: "siteScansPerLocation" },
   competitorScans: { what: "Competitor Intel", unit: ["Competitor Intel scan"], limit: "competitorScans", addon: "competitor_pack" },
+  citationAudits: { what: "The citation audit", unit: ["citation audit"], limit: "citationAudits", addon: "citation_pack" },
   // The photo optimizer is included on every paid plan (fair use: the growth
   // processing rate limit is the only cap), so it has no monthly count.
   photos: { what: "The Photo Optimizer", unit: ["photo"] },
