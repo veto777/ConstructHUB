@@ -425,7 +425,10 @@ export async function refreshDueSources(sources: BulkSource[], log = (m: string)
     const byId = new Map(state.map((r) => [r.id as string, r]));
     // A load under an older key format is refreshed first, whatever its interval (round 2, decision 2).
     const stale = (src: BulkSource) => { const r = byId.get(src.id); return !!r?.loaded_at && Number(r.key_version ?? 0) < KEY_VERSION; };
-    const ordered = [...sources.filter(stale), ...sources.filter((s) => !stale(s))];
+    // A source with a download window that is open now goes first, so a long queue of other reloads can't push it
+    // past its window (CSLB on 2026-10-15: reached at 12:52 UTC behind the key-format reloads, and cut off).
+    const open = (src: BulkSource) => !!src.utcHours?.includes(new Date().getUTCHours());
+    const ordered = [...sources.filter(open), ...sources.filter((s) => !open(s) && stale(s)), ...sources.filter((s) => !open(s) && !stale(s))];
     for (const src of ordered) {
       const r = byId.get(src.id);
       const due = (t: Date | null, hours: number) => !t || Date.now() - new Date(t).getTime() > hours * 3600_000;

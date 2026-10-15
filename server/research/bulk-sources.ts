@@ -693,10 +693,15 @@ const CSLB = "https://www.cslb.ca.gov/onlineservices/dataportal/ContractorList";
  * file directly. Retried: CSLB answers 503 when busy and cuts slow downloads off (a short file then fails the row
  * floor and the previous load stays).
  */
+const CSLB_START_HOURS = [9, 10, 11];
+/** CSLB serves its files fast only in the small hours, Pacific time (09–13 UTC); later tries are cut off. */
+const cslbWindowOpen = () => new Date().getUTCHours() >= 9 && new Date().getUTCHours() < 13;
 async function cslbFile(file: "MasterLicenseData" | "PersonnelData"): Promise<string> {
   const url = `https://www.cslb.ca.gov/OnlineServices/DataPortal/DownLoadFile.ashx?fName=${file}&type=C`;
   let last: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
+    // Past the window a retry only gets cut off again: stop, and the previous load stays.
+    if (attempt > 0 && !cslbWindowOpen()) throw new Error(`CSLB download window (09–13 UTC) closed after ${attempt} try(s): ${String((last as any)?.message ?? last)}`);
     try {
       await rateLimitHost(url, 2000);
       const res = await plainRequest(url, { timeoutMs: 10 * 60_000 });
@@ -1129,7 +1134,8 @@ export const BULK_SOURCES: BulkSource[] = [
     load: txPlumbingLoader },
   // CSLB streams slowly in the daytime and cuts downloads off at about 150 s: fetch it in the small hours, Pacific time.
   { id: "ca-cslb", state: "CA", label: "California CSLB contractor licenses", pageUrl: CSLB, everyHours: 20, minRows: 185_000, // one hit per license since 2026-10-15: 264,352 rows on that day (was ~668k with a row per person)
-    utcHours: [9, 10, 11, 12, 13],
+    // Starts 09–11 UTC only: a load begun at 12:52 UTC on 2026-10-15 was cut off on every try.
+    utcHours: CSLB_START_HOURS,
     load: caCslbLoader },
   { id: "ca-cslb-revoked", state: "CA", label: "California CSLB revoked licenses (monthly lists)", pageUrl: CSLB_REVOKED_YEARS, everyHours: 24 * 7, minRows: 2_250,
     utcHours: [9, 10, 11, 12, 13], load: caCslbRevokedLoader, companiesOnly: true },
