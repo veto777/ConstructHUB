@@ -18,6 +18,7 @@ describe("research identifiers", () => {
     expect(addressKeys("12345 Elm Ave")).toEqual(["a:12345 ELM"]);
     expect(addressKeys("251-21 Jericho Tpke 11426")).toEqual(["a:251-21 JERICHO", "z:11426"]);
     expect(addressMatches("251-21 Jericho Tpke", "251-63 JERICHO TURNPIKE")).toBe(false);
+    expect(addressKeys("2200-B Dominion St")).toEqual(["a:2200-B DOMINION"]);
     expect(addressKeys("PO Box 77, Austin TX 78701")).toEqual(["a:POBOX 77", "z:78701"]);
     expect(addressKeys("Seattle, WA")).toEqual([]);
     expect(addressMatches("123 Main Street 98101", "123 N MAIN ST SEATTLE WA 98101-2222")).toBe(true);
