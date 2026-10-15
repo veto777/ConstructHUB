@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { GbpConnection } from '@/components/gbp-connection';
 import { useUrlParam } from '@/hooks/use-url-param';
 import { GoogleSurface } from "@/components/google";
+import { BulkPosts } from '@/components/bulk-posts';
 
 type Photo={id:number;name:string;url:string};
 export default function GbpContentPage(){
@@ -107,6 +108,7 @@ function Editor({location,mode}:{location:string;mode:ContentMode}){
   // instead of under items that were queued earlier for further-ahead dates.
   const jobs=(data?.jobs||[]).filter((j:any)=>posts?j.kind==='post':j.kind==='photo').slice().sort((a:any,b:any)=>String(b.created_at??'').localeCompare(String(a.created_at??''))||Number(b.id)-Number(a.id)),ordered=[...jobs].sort((a,b)=>a.due_at.localeCompare(b.due_at));
   return <div className="space-y-6">
+    {posts&&<BulkPosts locationId={Number(location)}/>}
     {data&&!data.workerEnabled&&<Notice tone="warning">Publishing worker is disabled. Queued content will wait until it is enabled.</Notice>}
     {(queueError||photosError)&&<p role="alert">Unable to load the queue or media library. Please reload the page.</p>}
     {error&&<p role="alert" className="text-destructive">{error}</p>}{message&&<p role="status">{message}</p>}

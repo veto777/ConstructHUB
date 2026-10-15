@@ -7,7 +7,7 @@
 import type { IconType } from "react-icons";
 import type { LucideIcon } from "lucide-react";
 import { FaGoogle, FaYoutube, FaYelp } from "react-icons/fa6";
-import { SiCloudflare, SiGoogleads, SiGoogleanalytics, SiGooglesearchconsole, SiHouzz, SiQuickbooks, SiStripe, SiZapier } from "react-icons/si";
+import { SiCloudflare, SiDropbox, SiGoogleads, SiGoogleanalytics, SiGooglesearchconsole, SiHouzz, SiQuickbooks, SiStripe, SiZapier } from "react-icons/si";
 import { NETWORK_ICON } from "@/components/social-week";
 
 export const BRAND: Record<string, { icon: IconType; color: string; name: string }> = {
@@ -23,6 +23,7 @@ export const BRAND: Record<string, { icon: IconType; color: string; name: string
   quickbooks: { icon: SiQuickbooks, color: "#2CA01C", name: "QuickBooks" },
   zapier: { icon: SiZapier, color: "#FF4F00", name: "Zapier" },
   houzz: { icon: SiHouzz, color: "#4DBC15", name: "Houzz" },
+  dropbox: { icon: SiDropbox, color: "#0061FF", name: "Dropbox" },
   // The social networks share the same table (social-week.tsx), so "facebook" works here too.
   ...NETWORK_ICON,
 };

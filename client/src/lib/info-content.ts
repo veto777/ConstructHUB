@@ -23,6 +23,17 @@ export interface InfoEntry {
 export const INFO_CONTENT: Record<string, InfoEntry> = {
   /* ── Google Business ─────────────────────────────────────────────────── */
 
+  "bulk-posts": {
+    title: "Bulk posts",
+    body: [
+      "You have hundreds of job photos on your phone and no time to post. Bulk posts turns a folder of them into a steady stream: one Google post a day (or every few days), for as long as the photos last — three days, three months, whatever the folder holds.",
+      "Where the photos come from: upload them straight from this device, point it at a FileLoaded project with that project's key, or paste a Dropbox shared folder link. Everything is copied into your media library under the run's name, so the source can be deleted afterwards.",
+      "What happens each day: the day before a post is due, the AI looks at the photo and writes a short, upbeat caption in your style (your instructions and saved style guidance apply). The post is queued for a random minute inside your posting window, so your listing never posts at the same clock time twice. Google treats that like a person posting, not a robot.",
+      "You stay in charge: every planned post shows here with its date and caption before it goes out. Pause stops the stream; Resume re-plans the rest from today; Stop drops whatever has not posted. Posts already on Google stay.",
+      "Needs: a location linked to its Google Business Profile, and a plan with AI posts on a schedule.",
+    ],
+  },
+
   "location-posts": {
     title: "Posts & Updates",
     body: [

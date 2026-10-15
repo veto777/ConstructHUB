@@ -443,6 +443,11 @@ export async function registerRoutes(
   const { ensureGbpContentSchema, registerContentRoutes, startContentWorker } = await import("./gbp/content");
   await ensureGbpContentSchema();
   registerContentRoutes(app, getDevUser);
+  // Bulk posts: a folder of photos → one Google post a day (server/gbp/bulk-posts.ts).
+  const bulk = await import("./gbp/bulk-posts");
+  await bulk.ensureBulkPostsSchema();
+  bulk.registerBulkPostRoutes(app, getDevUser);
+  bulk.startBulkPostsWorker();
   const { registerContentUpload } = await import("./gbp/content-upload");
   registerContentUpload(app, getDevUser);
   startContentWorker();

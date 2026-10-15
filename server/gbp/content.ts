@@ -14,10 +14,10 @@ import { aiAnswer, aiErrorTag, fitChars, NO_TOOLS_RULE, withRetryNote } from '..
 import { recordFailure } from '../ops/issues';
 import { hasModule, usersWithModule, sendModuleRequired } from '../entitlements';
 
-class AutoPostsRequired extends GoogleError {
+export class AutoPostsRequired extends GoogleError {
     constructor() { super('invalid', 'AI posts on a schedule requires Pro or above', 402); }
 }
-async function requireAutoPosts(user: number) {
+export async function requireAutoPosts(user: number) {
     if (!await hasModule(user, 'autoPosts')) throw new AutoPostsRequired();
 }
 export async function ensureGbpContentSchema() {
