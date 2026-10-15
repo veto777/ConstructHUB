@@ -17,7 +17,7 @@ import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
 import { decide, extractNextStep, mediaAiConfigured, planForm } from "./ai";
 import { closeBrowser, readPage, submitGoogleForm, submitHtmlForm } from "./browse";
-import { companyDomain, firstNameOf, formMessage, holdingReply, isOptOut, machineReason, replyProblem, replySubject } from "./guard";
+import { asksIfAi, companyDomain, firstNameOf, formMessage, holdingReply, personWillReply, isOptOut, machineReason, replyProblem, replySubject } from "./guard";
 import { pickEmail, siteName } from "../backlinks/outreach";
 import { isSuppressed } from "../backlinks/store";
 import { fetchSince, mailboxConfig, mailboxConfigured, sendMail } from "./mailbox";
@@ -166,7 +166,8 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
         partnerId = newlyAgreed.partner.id;
       }
       const problem = replyProblem(d.reply);
-      if (problem) { body = holdingReply(first); status = "needs_owner"; reason = [problem, d.ownerQuestion, `Drafted by ${d.provider}`].filter(Boolean).join(" — "); }
+      if (asksIfAi(m.body)) { body = personWillReply(first); status = "needs_owner"; reason = "They asked whether we are an AI or a person — a person on the team answers this one"; }
+      else if (problem) { body = holdingReply(first); status = "needs_owner"; reason = [problem, d.ownerQuestion, `Drafted by ${d.provider}`].filter(Boolean).join(" — "); }
       else { body = d.reply; status = d.needsOwner ? "needs_owner" : "replied"; reason = [d.needsOwner ? d.ownerQuestion ?? "Owner decision needed" : null, `Answered by ${d.provider}`].filter(Boolean).join(" — "); }
     } catch (e: any) {
       if (m.attempts + 1 < MAX_ATTEMPTS) { await store.bumpAttempt(m.id, e?.message ?? String(e)); continue; }

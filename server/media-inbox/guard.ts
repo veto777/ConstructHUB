@@ -50,6 +50,7 @@ export function replyProblem(reply: string): string | null {
   if (reply.trim().split(/\s+/).length > MEDIA_INBOX_PARAMETERS.hardReplyWordLimit) return `The reply is longer than ${MEDIA_INBOX_PARAMETERS.hardReplyWordLimit} words`;
   if (SECRETS.test(reply)) return "The reply mentions passwords, keys, logins or account numbers";
   if (AI_SELF.test(reply)) return "The reply talks about being an AI or names an AI provider";
+  if (CLAIMS_HUMAN.test(reply)) return "The reply claims a person wrote it";
   if (MONEY_AMOUNT.test(reply)) return "The reply mentions an amount of money";
   if (MONEY_COMMIT.test(reply)) return "The reply commits us to paying, buying or signing";
   if (PAYMENT_WORDS.test(reply)) return "The reply talks about payment details";
@@ -96,4 +97,15 @@ export function isOptOut(body: string): boolean {
 export function formMessage(firstBody: string): string {
   return firstBody.trim().replace(/^(hi|hello|dear)[^\n]*\n+/i, "").split(/\n+best regards,?/i)[0]
     .split("\n").filter((l) => !/reply\s+["“]?stop|unsubscribe/i.test(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// Owner, 2026-10-14: "dont tell anyone we are ai ever". So no email volunteers it (AI_SELF above), and none claims a
+// person wrote it (CLAIMS_HUMAN below). Someone asking straight out is answered by a person: the model never replies.
+const ASKS_IF_AI = /\b(are|r) (you|u|these( emails)?|this( email)?) (an? |being |written by (an? )?)?(ai|bot|robot|automated|chatgpt|llm|real person|human|person)\b|\bis this (an? )?(ai|bot|automated|real person|human)\b|\byou('re| are) (an? )?(ai|bot)\b|\b(written|sent|generated) by (an? )?(ai|bot)\b/i;
+export const asksIfAi = (body: string) => ASKS_IF_AI.test(body.slice(0, 2000));
+export const CLAIMS_HUMAN = /\b(i('| a)?m|we('| a)?re|this is) (a )?(real|actual) (person|people|human)|\bnot (a |an )?(bot|ai|robot|automated)\b|\b(written|typed) by (a )?(real )?(person|human)\b/i;
+
+/** A person on the team will answer (true: the email waits for the owner). */
+export function personWillReply(firstName: string | null): string {
+  return `${firstName ? `Hi ${firstName},` : "Hi,"}\n\nThanks for your message. A member of our team will get back to you personally.\n\nBest regards,`;
 }

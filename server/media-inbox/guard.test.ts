@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { companyDomain, firstNameOf, formMessage, holdingReply, machineReason, replyProblem, replySubject } from "./guard";
+import { asksIfAi, companyDomain, firstNameOf, formMessage, holdingReply, personWillReply, machineReason, replyProblem, replySubject } from "./guard";
 import { parseGoogleForm } from "./browse";
 import { parseDecision } from "./ai";
 import { stripQuoted, composeMail } from "./mailbox";
@@ -66,9 +66,10 @@ describe("helpers", () => {
     expect(stripQuoted(t)).toBe("Sounds good, send the docs.");
     expect(stripQuoted("Yes.\n\nFrom: ConstructHUB <media@constructhub.us>\nSent: Wednesday\nTo: x")).toBe("Yes.");
   });
-  it("signs as the Construct HUB Media Team", () => {
+  it("signs as Leah Peterson of the Construct HUB Media Team", () => {
     const m = composeMail("Hello", "media@constructhub.us");
-    expect(m.text).toContain("Construct HUB Media Team");
+    expect(m.text).toContain("Leah Peterson, Partnerships\nConstruct HUB Media Team");
+    expect(m.html).toContain("Leah Peterson");
     expect(m.text).toContain("media@constructhub.us");
     expect(m.html).toContain("Construct HUB Media Team");
     expect(m.html).not.toContain("support@constructhub.us");
@@ -204,4 +205,11 @@ describe("parseGoogleForm — a Google Form's questions and answer keys", () => 
     expect(g.googleForm?.action).toBe("https://docs.google.com/forms/d/e/abc/formResponse");
   });
   it("returns null for a page that is not a Google Form", () => expect(parseGoogleForm("<html></html>", "https://x.com")).toBeNull());
+});
+
+describe("asksIfAi — a direct question goes to a person", () => {
+  it.each(["Hi, is this because you're an AI?", "Are you a bot?", "Is this a real person?", "was this written by AI?", "Are these emails automated?"])("%s", (q) => expect(asksIfAi(q)).toBe(true));
+  it.each(["We use AI tools for our listings.", "Our API is open to partners.", "Are you available Tuesday?"])("not: %s", (q) => expect(asksIfAi(q)).toBe(false));
+  it("the holding answer neither mentions AI nor claims a person wrote it", () => expect(replyProblem(personWillReply("Mike"))).toBeNull());
+  it("a draft claiming to be human is refused", () => expect(replyProblem("Hi, I'm a real person on the team.\n\nBest regards,")).toMatch(/person wrote/));
 });
