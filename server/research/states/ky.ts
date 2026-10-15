@@ -11,12 +11,13 @@
  *     licenses only.
  */
 import type { LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { normLicense, type IdQuery } from "../identifiers";
 import { usDate } from "../bulk";
 import { aspxFields, cookiesOf, flipName, isPersonName, text } from "./lib/g4-html";
 import type { StatePack } from "./types";
+import { withNote } from "../notes";
 
 const PAGE = "https://dhbc.ky.gov/Search/HBC_List_Licensees.aspx";
 const CAP = 50;
@@ -63,19 +64,26 @@ async function kySearch(name: string, division = "0", status = "", licNum = ""):
   return parseKyGrid(html);
 }
 
-/** Every row for the name, working around the 50-row cap by division, then by active status. */
-async function kyRows(name: string): Promise<KyRow[]> {
-  const first = await kySearch(name);
-  if (first.length < CAP) return first;
+/**
+ * Every row for the name, working around the 50-row cap by division, then by active status. A division still at the
+ * cap means rows are missing (inactive ones first, or even active ones): the result carries a note saying so.
+ */
+export async function kyRows(name: string, search = kySearch): Promise<{ rows: KyRow[]; note: string | null }> {
+  const first = await search(name);
+  if (first.length < CAP) return { rows: first, note: null };
   const seen = new Map<string, KyRow>();
   const add = (rows: KyRow[]) => { for (const r of rows) seen.set(`${r.id}|${r.number}|${r.type}`, r); };
   add(first);
+  const capped: string[] = [];
   for (const d of DIVISIONS) {
-    const rows = await kySearch(name, d);
+    const rows = await search(name, d);
     add(rows);
-    if (rows.length >= CAP) add(await kySearch(name, d, "Active"));
+    if (rows.length < CAP) continue;
+    const active = await search(name, d, "Active");
+    add(active);
+    capped.push(active.length >= CAP ? `division ${d}: even its active licenses reach the site's ${CAP}-row limit` : `division ${d}: its inactive licenses past the site's ${CAP}-row limit are not shown`);
   }
-  return Array.from(seen.values());
+  return { rows: Array.from(seen.values()), note: capped.length ? `some matches may be missing (${capped.join("; ")})` : null };
 }
 
 const toHit = (r: KyRow, matchedOn: LicenseHit["matchedOn"]): LicenseHit => {
@@ -92,15 +100,16 @@ export async function searchKyHbc(name: string, kind: "person" | "company"): Pro
   if (q.length < 2) return [];
   const want = tokens(name);
   const words = (v: string | null) => { const have = new Set(tokens(v ?? "")); return want.every((w) => have.has(w)); };
-  return (await kyRows(q)).map((r) => toHit(r, kind === "company" ? "business" : "principal"))
-    .filter((h) => (kind === "company" ? words(h.businessName) : words(h.principal)));
+  const { rows, note } = await kyRows(q);
+  return withNote(rows.map((r) => toHit(r, kind === "company" ? "business" : "principal"))
+    .filter((h) => (kind === "company" ? words(h.businessName) : words(h.principal))), note);
 }
 
 /** By license number (the search's License Number field, 10 characters at most). No phone or address is published. */
-export async function searchKyHbcBy(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license") return [];
+export async function searchKyHbcBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null;
   const want = normLicense(q.value);
-  if (!want || want.length > 10) return [];
+  if (!want || want.length > 10) return null;
   return (await kySearch("", "0", "", want)).filter((r) => normLicense(r.number) === want).map((r) => toHit(r, "license"));
 }
 

@@ -3,7 +3,7 @@
  * Contractors Board forms, Utah DOPL's disciplinary-action search): GET the form, post it back with its own hidden
  * fields, follow the redirect to the results page. Polite: one request at a time per host, the honest user agent.
  */
-import { politeFetch } from "../../../scrapers/polite-fetch";
+import { politeFetch } from "../../http";
 import { decodeEntities } from "../../bulk-sources";
 
 export class FormSession {

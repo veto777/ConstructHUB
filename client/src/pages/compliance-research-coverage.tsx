@@ -83,7 +83,7 @@ function StateDetail({ s, facets }: { s: CoverageState; facets: CoverageFacets |
       <div className="space-y-1">
         <h2 className="text-2xl font-semibold tracking-tight">What a report searches in {stateName(s.state)}</h2>
         <p className="text-sm text-muted-foreground">
-          {s.sources.length === 0 ? "No state or local sources yet" : <>
+          {s.sources.length === 0 ? `Not searched by ConstructHUB: ${s.unavailableCount ? `we checked ${s.unavailableCount} of this state's sources and couldn't use them (blocked to automated searches, behind an account, paid, or not searchable by name)` : "we have no source for this state yet"}` : <>
             {licenseCount(s) || "No"} license source{licenseCount(s) === 1 ? "" : "s"} and {recordCount(s) || "no"} enforcement or record source{recordCount(s) === 1 ? "" : "s"}
           </>}{s.checked ? `, last checked ${s.checked}` : ""}.
         </p>

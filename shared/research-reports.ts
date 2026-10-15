@@ -126,6 +126,8 @@ export type LicenseHit = {
   relatedVia?: string | null;
   /** The kind of tie, for grouping (set with relatedVia). */
   relatedTie?: RelatedTie;
+  /** Found only by a license number, phone or address the customer gave; it names someone else (absent before 2026-10-15). */
+  byYourIdentifier?: boolean;
 };
 
 /**
@@ -180,6 +182,8 @@ export type EnforcementHit = {
   /** Set by the cross-reference pass (a record of a business tied to the subject through a license, phone or address). */
   relatedVia?: string | null;
   relatedTie?: RelatedTie;
+  /** Found only by a license number, phone or address the customer gave (absent before 2026-10-15). */
+  byYourIdentifier?: boolean;
 };
 
 export type RecordSource = { source: string; scope: string; searched: boolean; note: string };

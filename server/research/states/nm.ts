@@ -11,7 +11,8 @@
  * only searchable through PSI's portal, which requires a CAPTCHA: listed under `blocked`, never worked around.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
+import { adverseFrom } from "../adverse";
 import { tokens } from "../licenses";
 import { clean, usDate } from "../bulk";
 import { auraApex, type AuraSite } from "./lib/g7-aura";
@@ -33,7 +34,10 @@ export type RldLicense = {
   License_Holder_State__c?: string | null; periodEnd__c?: string | null; Regulatory_Authorization_Type_Name__c?: string | null; Regulatory_Authority__c?: string | null;
 };
 
-/** One license row, with the address of record RLD publishes for it. */
+/**
+ * One license row. These boards license individuals, so the address of record is a home address (audit 2026-10-15,
+ * decision 4): city, state and ZIP only, no street.
+ */
 export function rldLicenseHit(r: RldLicense): LicenseHit {
   return {
     state: "NM", source: "New Mexico RLD home inspector and landscape architect licenses", sourceUrl: RLD_SEARCH_PAGE,
@@ -41,7 +45,7 @@ export function rldLicenseHit(r: RldLicense): LicenseHit {
     specialty: clean(r.Regulatory_Authority__c), status: clean(r.Status), principal: clean(r.License_Holder_Name__c),
     city: [clean(r.License_Holder_City__c), clean(r.License_Holder_State__c)].filter(Boolean).join(", ") || null,
     expires: /^\d{4}-\d{2}-\d{2}$/.test(r.periodEnd__c ?? "") ? r.periodEnd__c! : null, matchedOn: "principal",
-    address: clean(r.License_Holder_Street__c) ? [clean(r.License_Holder_Street__c), clean(r.License_Holder_City__c), [clean(r.License_Holder_State__c), clean(r.License_Holder_Postal_Code__c)].filter(Boolean).join(" ")].filter(Boolean).join(", ") : null,
+    address: [clean(r.License_Holder_City__c), [clean(r.License_Holder_State__c), clean(r.License_Holder_Postal_Code__c)].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null,
     people: clean(r.License_Holder_Name__c) ? [{ name: clean(r.License_Holder_Name__c)!, role: clean(r.Regulatory_Authorization_Type_Name__c) }] : [],
   };
 }
@@ -66,6 +70,7 @@ async function searchRld(name: string, kind: "person" | "company"): Promise<Lice
 
 export type NmSosRow = { RECORD_NUM?: string | null; TITLE?: (string | null)[]; RegistrationDate?: string | null; BusinessStatusId?: string | null; BusinessRecordTypeId?: string | null; FormationLocale?: string | null };
 
+/** BusinessStatusId is the status text itself ("Active", "Revoked Final"): the API's own template labels it "Status" (checked 2026-10-15). */
 export function nmSosHit(r: NmSosRow): EnforcementHit {
   const status = clean(r.BusinessStatusId);
   return {
@@ -73,7 +78,7 @@ export function nmSosHit(r: NmSosRow): EnforcementHit {
     category: "business_status", name: clean(r.TITLE?.[0]), id: clean(r.RECORD_NUM), date: usDate(r.RegistrationDate), endDate: null,
     status: status ? `Secretary of State status: ${status}` : null, city: null,
     detail: [clean(r.BusinessRecordTypeId), clean(r.FormationLocale) ? `formed in ${clean(r.FormationLocale)}` : null].filter(Boolean).join(", ") || null,
-    amount: null, adverse: /revoked|forfeit/i.test(status ?? "") ? true : null,
+    amount: null, adverse: adverseFrom(status, { adverse: /revoked|forfeit/i }),
   };
 }
 
@@ -84,9 +89,14 @@ async function searchNmSos(name: string): Promise<EnforcementHit[]> {
   const url = `${SOS_API}?SEARCH_VALUE=${encodeURIComponent(encodeURIComponent(q))}&QueryTypeId=2&BusinessRecordTypeId=0&BusinessStatusTypeId=0&FROM_MAIN_SEARCH=true`;
   const res = await politeFetch(url, { headers: { accept: "application/json", referer: SOS_SEARCH_PAGE } }, { minDelayMs: 1500 });
   if (!res.ok) throw new Error(`NM Secretary of State returned HTTP ${res.status}`);
-  const data = await res.json().catch(() => null) as { rows?: Record<string, NmSosRow> } | null;
-  if (!data || typeof data !== "object") throw new Error("NM Secretary of State returned an unexpected payload");
-  return Object.values(data.rows ?? {}).map(nmSosHit).filter((h) => hasAll(name, h.name));
+  return parseNmSos(await res.json().catch(() => null)).map(nmSosHit).filter((h) => hasAll(name, h.name));
+}
+
+/** The rows of an answer; an answer without `rows` (an error object) is an error, not "no entities" (no match is `"rows": {}`). */
+export function parseNmSos(data: unknown): NmSosRow[] {
+  const rows = (data as { rows?: unknown } | null)?.rows;
+  if (!rows || typeof rows !== "object" || Array.isArray(rows)) throw new Error("NM Secretary of State returned an unexpected payload");
+  return Object.values(rows as Record<string, NmSosRow>);
 }
 
 const liveLicenses: LiveLicenseSearch[] = [

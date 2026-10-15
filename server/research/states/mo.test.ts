@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMoDetail } from "./mo";
+import { moIsBusiness, parseMoDetail } from "./mo";
 
 describe("MO PRO licensee detail", () => {
   it("reads license fields, the address and the people named", () => {
@@ -11,5 +11,15 @@ describe("MO PRO licensee detail", () => {
     expect(d.fields["License Number"]).toBe("2019028878");
     expect(d.address).toBe("5950 Old State Rd Imperial Missouri 63052");
     expect(d.people).toEqual([]);
+  });
+});
+
+describe("MO PRO licensee kind (audit 2026-10-15)", () => {
+  it("an electrical contractor license held by a person is the person's; a corporation's certificate is the business's", () => {
+    // Names from the live MO PRO electrical download and search, 2026-10-15.
+    expect(moIsBusiness("Electrical Contractor", "Mark E Davis")).toBe(false);
+    expect(moIsBusiness("Electrical Contractor", "Precision Electric LLC")).toBe(true);
+    expect(moIsBusiness("Engineering Corporation", "Amptron Electric Company")).toBe(true);
+    expect(moIsBusiness("Professional Engineer", "Mark E Davis")).toBe(false);
   });
 });

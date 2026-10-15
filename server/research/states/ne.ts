@@ -16,9 +16,11 @@
 import type { LicenseHit } from "@shared/research-reports";
 import { promises as fs } from "node:fs";
 import { clean, download, usDate, type BulkSource } from "../bulk";
-import type { IdQuery } from "../identifiers";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { addressMatches, type IdQuery } from "../identifiers";
+import { politeFetch } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
+import { capNote, escapeRegExp, noteOf, withNote } from "../notes";
+import { looksLikeBusiness } from "./lib/business-name";
 import { htmlText, joinAddr } from "./lib/g6-common";
 import { pdfTable } from "./lib/g6-pdf";
 
@@ -26,8 +28,11 @@ import { pdfTable } from "./lib/g6-pdf";
 const CONREG = "https://dol.nebraska.gov/conreg";
 const CONREG_SEARCH = `${CONREG}/Search/AdvancedSearch`;
 
+/** Results per page the search is asked for (it answers one page). */
+const CONREG_PAGE = 25;
+
 async function conregSearch(fields: Record<string, string>): Promise<string[]> {
-  const body = new URLSearchParams({ Page: "1", ResultsPerPage: "25", TotalPages: "0" });
+  const body = new URLSearchParams({ Page: "1", ResultsPerPage: String(CONREG_PAGE), TotalPages: "0" });
   for (const [k, v] of Object.entries(fields)) body.set(`AdvancedSearch.${k}`, v);
   const res = await politeFetch(CONREG_SEARCH, { method: "POST", body: body.toString(), headers: { "content-type": "application/x-www-form-urlencoded", referer: `${CONREG}/Search` } }, { minDelayMs: 1200 });
   if (!res.ok) throw new Error(`Nebraska DOL contractor search returned HTTP ${res.status}`);
@@ -58,30 +63,45 @@ export function conregHit(id: string, d: Record<string, string>, matchedOn: Lice
   const name = clean(d["Contractor/Subcontractor Name"]);
   if (!name) return null;
   const corp = clean(d["Corporation Name"]);
-  const street = clean(d["Address"]?.replace(new RegExp(`\\s*${d["City"] ?? "@@"},?\\s*${d["State"] ?? ""}\\s*${d["Zip"] ?? ""}$`, "i"), ""));
+  const tail = (v: string | undefined) => escapeRegExp(v ?? "");
+  const street = clean(d["Address"]?.replace(new RegExp(`\\s*${d["City"] ? tail(d["City"]) : "@@"},?\\s*${tail(d["State"])}\\s*${tail(d["Zip"])}$`, "i"), ""));
+  // A sole proprietor registered under their own name is a person, not a business name.
+  const person = /sole/i.test(d["Business Entity"] ?? "") && !looksLikeBusiness(name) && !corp ? name : null;
   return {
     state: "NE", source: "Nebraska DOL contractor registrations", sourceUrl: `${CONREG}/Contractor/Details/${id}`,
-    businessName: corp && corp.toUpperCase() !== name.toUpperCase() ? `${name} (${corp})` : name,
+    businessName: person ? null : corp && corp.toUpperCase() !== name.toUpperCase() ? `${name} (${corp})` : name,
     licenseNumber: clean(d["Registration Number"]), licenseType: "Contractor registration",
     specialty: [d["Business Entity"], d["Sales Tax Option"] ? `sales tax option ${d["Sales Tax Option"]}` : null, d["Number of Employees"] ? `${d["Number of Employees"]} employees` : null].filter(Boolean).join("; ") || null,
     status: d["Worker's Compensation Status"] ? `Registered; workers' compensation: ${d["Worker's Compensation Status"]}` : "Registered",
-    principal: null, city: [clean(d["City"]), clean(d["State"])].filter(Boolean).join(", ") || null,
+    principal: person, city: [clean(d["City"]), clean(d["State"])].filter(Boolean).join(", ") || null,
     expires: usDate(d["Registration Expiration"]), matchedOn,
-    address: joinAddr(street, d["City"], d["State"], d["Zip"]), phone: clean(d["Telephone"]), people: [],
+    address: joinAddr(street, d["City"], d["State"], d["Zip"]), phone: clean(d["Telephone"]), people: person ? [{ name: person, role: "Sole proprietor" }] : [],
   };
 }
 
+/** Detail pages opened per search: a politeness cap, noted when hit. */
+const CONREG_DETAILS = 12;
+
 async function conregHits(searches: Record<string, string>[], matchedOn: LicenseHit["matchedOn"]): Promise<LicenseHit[]> {
   const ids: string[] = [];
-  for (const f of searches) for (const id of await conregSearch(f)) if (!ids.includes(id)) ids.push(id);
+  let fullPage = false;
+  for (const f of searches) {
+    const found = await conregSearch(f);
+    if (found.length >= CONREG_PAGE) fullPage = true;
+    for (const id of found) if (!ids.includes(id)) ids.push(id);
+  }
   const out: LicenseHit[] = [];
-  for (const id of ids.slice(0, 12)) {
+  let failed = 0;
+  for (const id of ids.slice(0, CONREG_DETAILS)) {
     const res = await politeFetch(`${CONREG}/Contractor/Details/${id}`, {}, { minDelayMs: 1200 });
-    if (!res.ok) continue;
+    if (!res.ok) { failed++; await res.body?.cancel().catch(() => undefined); continue; }
     const h = conregHit(id, parseConregDetail(await res.text()), matchedOn);
     if (h) out.push(h);
   }
-  return out;
+  return withNote(out, [
+    ids.length > CONREG_DETAILS ? capNote(CONREG_DETAILS, ids.length, "registrations") : fullPage ? capNote(ids.length, null, "registrations (the search's first page)") : null,
+    failed ? `${failed} registration page(s) could not be read (HTTP error)` : null,
+  ].filter(Boolean).join("; "));
 }
 
 const SUFFIX = /\b(INC|INCORPORATED|LLC|L L C|CO|CORP|CORPORATION|COMPANY|LTD|LC|PLLC|LLP)\b\.?/gi;
@@ -89,11 +109,14 @@ const stripSuffix = (n: string) => clean(n.replace(/[.,]/g, " ").replace(SUFFIX,
 
 const NE_CONREG: LiveLicenseSearch = {
   source: "Nebraska DOL contractor registrations", sourceUrl: `${CONREG}/Search`,
-  search: async (name, kind) => kind === "person" ? [] : conregHits([{ ContractorCorpName: stripSuffix(name) }, { DBAName: stripSuffix(name) }], "business"),
+  // A person is searched as a sole proprietor registered under their own name (the name field takes either).
+  search: async (name, kind) => kind === "person"
+    ? conregHits([{ ContractorCorpName: name.trim() }], "principal").then((r) => withNote(r.filter((h) => h.principal), noteOf(r)))
+    : conregHits([{ ContractorCorpName: stripSuffix(name) }, { DBAName: stripSuffix(name) }], "business"),
   searchBy: async (q: IdQuery) => {
     if (q.type === "license") return conregHits([{ RegistrationNumber: q.value.trim() }], "license");
-    if (q.type === "phone") { const d = q.value.replace(/\D/g, "").slice(-10); return d.length === 10 ? conregHits([{ PhoneNumber: d }], "phone") : []; }
-    return [];
+    if (q.type === "phone") { const d = q.value.replace(/\D/g, "").slice(-10); return d.length === 10 ? conregHits([{ PhoneNumber: d }], "phone") : null; }
+    return null;
   },
 };
 
@@ -117,13 +140,14 @@ async function srcToken(): Promise<string> {
 async function srcSearch(lookup: string): Promise<SrcResult[]> {
   const res = await politeFetch(`${SRC}/licensing/api/endpoints/v1/portal/search`, {
     method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${await srcToken()}` },
-    body: JSON.stringify({ appliedFilters: null, highlight: "true", lookupString: lookup, rows: 50, start: 0, type: "credential" }),
+    body: JSON.stringify({ appliedFilters: null, highlight: "true", lookupString: lookup, rows: SRC_ROWS, start: 0, type: "credential" }),
   }, { minDelayMs: 1200 });
   if (!res.ok) throw new Error(`Nebraska electrical search returned HTTP ${res.status}`);
   const j = await res.json() as { results?: SrcResult[] };
   if (!Array.isArray(j.results)) throw new Error("Nebraska electrical search returned an unexpected payload");
-  return j.results;
+  return withNote(j.results, j.results.length >= SRC_ROWS ? capNote(SRC_ROWS, null, "credentials the search returned") : null);
 }
+const SRC_ROWS = 50;
 
 /** "MILANUK, MARCUS J" → "MARCUS J MILANUK". */
 const flip = (v: string | null) => { const m = v?.match(/^([^,]+),\s*(.+)$/); return m ? clean(`${m[2]} ${m[1]}`) : clean(v); };
@@ -145,6 +169,10 @@ export function srcHit(r: SrcResult, matchedOn: LicenseHit["matchedOn"]): Licens
   };
 }
 
+/** Address-search rows kept only when their address really is the query's (house number, street, ZIP). */
+export const neAddressHits = (rows: SrcResult[], query: string): LicenseHit[] =>
+  rows.filter((r) => chipped(r, "Address")).map((r) => srcHit(r, "address")).filter((h): h is LicenseHit => !!h && addressMatches(query, h.address));
+
 const chipped = (r: SrcResult, label: string) => (r.chips?.items ?? []).some((c) => c.label === label);
 
 const NE_ELECTRICAL: LiveLicenseSearch = {
@@ -155,19 +183,22 @@ const NE_ELECTRICAL: LiveLicenseSearch = {
     if (w.length < 2) return [];
     // The search is a phrase match on "Last, First" when quoted (unquoted it matches any field).
     const rows = await srcSearch(`"${w[w.length - 1]}, ${w[0]}"`);
-    return rows.filter((r) => chipped(r, "Name")).map((r) => srcHit(r, "principal")).filter((h): h is LicenseHit => !!h);
+    return withNote(rows.filter((r) => chipped(r, "Name")).map((r) => srcHit(r, "principal")).filter((h): h is LicenseHit => !!h), noteOf(rows));
   },
   searchBy: async (q) => {
     if (q.type === "license") {
       const want = q.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      return (await srcSearch(q.value.trim())).filter((r) => chipped(r, "Credential Number")).map((r) => srcHit(r, "license"))
-        .filter((h): h is LicenseHit => !!h && (h.licenseNumber ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") === want);
+      const rows = await srcSearch(q.value.trim());
+      return withNote(rows.filter((r) => chipped(r, "Credential Number")).map((r) => srcHit(r, "license"))
+        .filter((h): h is LicenseHit => !!h && (h.licenseNumber ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") === want), noteOf(rows));
     }
     if (q.type === "address") {
       const street = q.value.split(",")[0].replace(/"/g, "").trim();
-      return (await srcSearch(`"${street}"`)).filter((r) => chipped(r, "Address")).map((r) => srcHit(r, "address")).filter((h): h is LicenseHit => !!h);
+      const rows = await srcSearch(`"${street}"`);
+      // The phrase search is loose: only records whose address is the one asked for are kept.
+      return withNote(neAddressHits(rows, q.value), noteOf(rows));
     }
-    return [];
+    return null;
   },
 };
 
@@ -187,9 +218,11 @@ const NE_ECA: BulkSource = {
     let rows;
     try { rows = pdfTable(await fs.readFile(path), ["Business Name", "Address", "City", "State", "Zip", "DBA"]); } finally { await fs.rm(path, { force: true }); }
     for (const { cells: c } of rows) {
-      const name = clean(c["business name"]);
+      const listed = clean(c["business name"]), trade = clean(c.dba);
+      // Companies only (FCRA): a person's own name is dropped, keeping the trade name when there is one.
+      const name = listed && looksLikeBusiness(listed) ? listed : trade && trade !== listed ? trade : null;
       if (!name) continue;
-      const dba = clean(c.dba);
+      const dba = name === listed ? trade : null;
       const address = joinAddr(c.address, c.city, c.state, c.zip);
       yield {
         kind: "enforcement", business: [name, dba].filter(Boolean).join(" "), person: null, keys: { addresses: [address] },

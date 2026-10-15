@@ -22,15 +22,21 @@ export type LiveLicenseSearch = {
   source: string;
   /** The official page a reader can open. */
   sourceUrl: string;
+  /** The hits; a search that stopped at a cap returns them through ../notes.ts withNote() so the report says so. */
   search: (name: string, kind: "person" | "company") => Promise<LicenseHit[]>;
-  /** Search by license number, phone or address, when the lookup offers it (the cross-reference pass uses it). */
-  searchBy?: (q: IdQuery) => Promise<LicenseHit[]>;
+  /**
+   * Search by license number, phone or address, when the lookup offers it (the cross-reference pass uses it).
+   * Returns null when this lookup can't search by that kind of identifier (or that value isn't one it can take):
+   * the report then says "not searched", never "searched, 0 found" (audit 2026-10-15, decision 8).
+   */
+  searchBy?: (q: IdQuery) => Promise<LicenseHit[] | null>;
 };
 
 /** An enforcement, standing or court search that isn't a Socrata dataset, run live per report (companies only). */
 export type LiveEnforcementSearch = {
   source: string;
   scope: string;
+  /** The hits; a search that stopped at a cap returns them through ../notes.ts withNote() so the report says so. */
   search: (name: string) => Promise<EnforcementHit[]>;
   /** What its records are (the category its hits carry). Optional; the coverage page guesses from the label without it. */
   category?: EnforcementCategory;

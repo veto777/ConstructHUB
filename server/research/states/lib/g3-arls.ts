@@ -12,7 +12,8 @@
  * Field labels are the portal's own. A field a board doesn't show (the plumbing board shows no status) is null.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch, sleep } from "../../../scrapers/polite-fetch";
+import { PortalBlockedError, politeFetch, sleep } from "../../http";
+import { capNote, withNote, type Noted } from "../../notes";
 import { usDate } from "../../bulk";
 import { tokens } from "../../licenses";
 import { addressMatches, normLicense, normPhone, type IdQuery } from "../../identifiers";
@@ -92,6 +93,16 @@ export function parseArlsDetails(html: string): ArlsDetails {
   };
 }
 
+/**
+ * A qualifier's role with the board's own status: "Active" (the portal's exact word) is a current qualifier; any
+ * other status ("Inactive", …) is shown as published, never folded into active (/active/ also matches "Inactive").
+ */
+export function qualifierRole(x: { number: string | null; status: string | null }): string {
+  const base = `Qualifier${x.number ? ` ${x.number}` : ""}`;
+  const st = x.status?.trim() ?? "";
+  return /^active$/i.test(st) ? base : `${base} (status: ${st || "not given"})`;
+}
+
 /** Qualifier names on a license (the qualifiers table: Name, Qualifier #, Status). */
 export function parseArlsQualifiers(html: string): { name: string; number: string | null; status: string | null }[] {
   const out: { name: string; number: string | null; status: string | null }[] = [];
@@ -127,27 +138,38 @@ async function arlsText(url: string, init: RequestInit = {}): Promise<string> {
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt) await sleep(attempt * 45_000);
     try {
-      const res = await politeFetch(url, { ...init, headers: { "x-requested-with": "XMLHttpRequest", ...(init.headers ?? {}) } }, { minDelayMs: 3000 });
+      // No X-Requested-With: the portal answers the same without it (checked 2026-10-15), and the bot doesn't pose as the
+      // portal's own page script (audit 2026-10-15, decision 12).
+      const res = await politeFetch(url, init, { minDelayMs: 3000 });
       if (res.ok) return await res.text();
       last = new Error(`${new URL(url).host} returned HTTP ${res.status}`);
       if (res.status !== 400) throw last;
     } catch (err) {
       last = err;
-      if (/HTTP (?!400)\d/.test(String((err as Error)?.message))) throw err;
+      if (err instanceof PortalBlockedError || /HTTP (?!400)\d/.test(String((err as Error)?.message))) throw err;
     }
   }
   throw last;
 }
 
 const cache = new Map<string, { at: number; rows: Promise<ArlsRow[]> }>();
+const CACHE_MS = 10 * 60_000;
+const CACHE_MAX = 200;
+/** Drops expired searches, and the oldest ones past CACHE_MAX, so the cache can't grow without bound. */
+export function pruneArlsCache(now = Date.now()): void {
+  for (const [k, v] of Array.from(cache)) if (now - v.at >= CACHE_MS) cache.delete(k);
+  while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
+}
+export const arlsCacheSize = () => cache.size;
 
 type SearchFields = Partial<Record<"AccountNumber" | "QualifierAccountNumber" | "CompanyName" | "FirstName" | "LastName" | "PhoneNumber" | "streetAddress", string>>;
 
 /** One search of the portal's form, cached for 10 minutes so a report's license and enforcement passes share it. */
 function arlsPost(board: ArlsBoard, fields: SearchFields): Promise<ArlsRow[]> {
   const key = `${board.base}|${JSON.stringify(fields)}`;
+  pruneArlsCache();
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.rows;
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.rows;
   const form = new URLSearchParams({ [board.classField]: "", AccountNumber: "", ...(board.qualifierField ? { QualifierAccountNumber: "" } : {}), CompanyName: "", FirstName: "", LastName: "", PhoneNumber: "", streetAddress: "", PostalCode: "", City: "", StateCode: "" });
   for (const [k, v] of Object.entries(fields)) form.set(k, v ?? "");
   const rows = (async () => {
@@ -190,7 +212,7 @@ async function accountHit(board: ArlsBoard, row: ArlsRow, matchedOn: LicenseHit[
     if (f.Company && f.Name) add(f.Name, "Contact");
     if (!board.noQualifiers) {
       const q = parseArlsQualifiers(await arlsText(`${board.base}/Public/_ShowAccountQualifiers/?key=${row.key}`));
-      for (const x of q.filter((x) => !x.status || /active/i.test(x.status))) add(x.name, `Qualifier${x.number ? ` ${x.number}` : ""}`);
+      for (const x of q) add(x.name, qualifierRole(x));
     }
   }
   const business = isQualifier ? d.qualifierFor.map((q) => q.licensee).filter(Boolean).join(" / ") || null : f.Company ?? f.Name ?? row.owner;
@@ -203,19 +225,22 @@ async function accountHit(board: ArlsBoard, row: ArlsRow, matchedOn: LicenseHit[
     licenseType: isQualifier ? "Qualifier (responsible person on a license)" : !accountType || accountType === "License" ? board.licenseLabel : accountType,
     specialty: [d.classifications.join(", ") || null, f["License Limitation"] ? `Limitation: ${f["License Limitation"]}` : null,
       isQualifier && d.qualifierFor.length ? `Qualifier for ${d.qualifierFor.map((q) => `${q.licensee} (${q.license}${q.status ? `, ${q.status}` : ""})`).join("; ")}` : null].filter(Boolean).join(". ") || null,
-    status: f.Status ?? (row.notActive ? "License not active" : null), principal: people.map((p) => p.name).join(", ") || null,
+    // One person as the principal (the first named); everyone is in `people`. Names joined into one string would let a
+    // search match words from two different people (audit 2026-10-15, decision 6).
+    status: f.Status ?? (row.notActive ? "License not active" : null), principal: people[0]?.name ?? null,
     city: cityOf(f.Address), expires: usDate(f["Expiration Date"]), matchedOn,
     address, phone: f.Phone ?? null, people, lines: addressLines(f.Address),
   };
 }
 
 /** License hits for a name on one board: the search, then the details (and qualifiers) of each matching account. */
-export async function searchArlsLicenses(board: ArlsBoard, name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
+export async function searchArlsLicenses(board: ArlsBoard, name: string, kind: "person" | "company"): Promise<Noted<LicenseHit>> {
   const rows = await arlsSearch(board, name, kind);
   // A company must be the row's owner. A person search returns the licenses the person is on, often under the company's
   // name, so the person is checked in each account's details: rows already showing the person's name go first.
-  const wanted = (kind === "company" ? rows.filter((r) => hasAllWords(name, r.owner))
-    : [...rows.filter((r) => hasAllWords(name, r.owner)), ...rows.filter((r) => !hasAllWords(name, r.owner))]).slice(0, MAX_ACCOUNTS);
+  const candidates = kind === "company" ? rows.filter((r) => hasAllWords(name, r.owner))
+    : [...rows.filter((r) => hasAllWords(name, r.owner)), ...rows.filter((r) => !hasAllWords(name, r.owner))];
+  const wanted = candidates.slice(0, MAX_ACCOUNTS);
   const out: LicenseHit[] = [];
   for (const row of wanted) {
     const { lines: _lines, ...h } = await accountHit(board, row, kind === "company" ? "business" : "principal");
@@ -223,11 +248,11 @@ export async function searchArlsLicenses(board: ArlsBoard, name: string, kind: "
     if (kind === "company" && !hasAllWords(name, h.businessName, row.owner)) continue;
     out.push(h);
   }
-  return out;
+  return withNote(out, candidates.length > MAX_ACCOUNTS ? capNote(MAX_ACCOUNTS, candidates.length, "accounts (their details were read)") : null);
 }
 
 /** License number ("L.03194", "Q.00290" or digits), phone or street address, checked again on each account's details. */
-export async function searchArlsBy(board: ArlsBoard, q: IdQuery): Promise<LicenseHit[]> {
+export async function searchArlsBy(board: ArlsBoard, q: IdQuery): Promise<Noted<LicenseHit> | null> {
   let fields: SearchFields | null = null;
   if (q.type === "license") {
     const m = q.value.trim().toUpperCase().match(/^(?:(L|Q|QUAL\.L)\.?)?\s*0*(\d+)(?:-\d+)?$/);
@@ -239,8 +264,9 @@ export async function searchArlsBy(board: ArlsBoard, q: IdQuery): Promise<Licens
     const street = q.value.split(",")[0].trim().slice(0, 50);
     if (/^\d+\s+\S/.test(street)) fields = { streetAddress: street };
   }
-  if (!fields) return [];
-  const rows = (await arlsPost(board, fields)).slice(0, MAX_ACCOUNTS);
+  if (!fields) return null; // not a value this form can search
+  const all = await arlsPost(board, fields);
+  const rows = all.slice(0, MAX_ACCOUNTS);
   const out: LicenseHit[] = [];
   for (const row of rows) {
     const { lines = [], ...h } = await accountHit(board, row, q.type);
@@ -252,13 +278,14 @@ export async function searchArlsBy(board: ArlsBoard, q: IdQuery): Promise<Licens
       : lines.slice(0, -1).some((l) => addressMatches(q.value, `${l}, ${lines[lines.length - 1]}`));
     if (ok) out.push(h);
   }
-  return out;
+  return withNote(out, all.length > MAX_ACCOUNTS ? capNote(MAX_ACCOUNTS, all.length, "accounts (their details were read)") : null);
 }
 
 /** Disciplinary actions on every license account whose name matches (companies only). */
-export async function searchArlsMatters(board: ArlsBoard, name: string): Promise<EnforcementHit[]> {
+export async function searchArlsMatters(board: ArlsBoard, name: string): Promise<Noted<EnforcementHit>> {
   if (!board.mattersPath) return [];
-  const rows = (await arlsSearch(board, name, "company")).filter((r) => hasAllWords(name, r.owner) && /^L\./.test(r.account)).slice(0, MAX_ACCOUNTS);
+  const all = (await arlsSearch(board, name, "company")).filter((r) => hasAllWords(name, r.owner) && /^L\./.test(r.account));
+  const rows = all.slice(0, MAX_ACCOUNTS);
   const out: EnforcementHit[] = [];
   for (const row of rows) {
     const matters = parseArlsMatters(await arlsText(`${board.base}${board.mattersPath}?key=${row.key}`), board.base);
@@ -272,5 +299,5 @@ export async function searchArlsMatters(board: ArlsBoard, name: string): Promise
       });
     }
   }
-  return out;
+  return withNote(out, all.length > MAX_ACCOUNTS ? capNote(MAX_ACCOUNTS, all.length, "licenses (their disciplinary actions were read)") : null);
 }

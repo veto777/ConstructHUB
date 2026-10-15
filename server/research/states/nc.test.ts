@@ -48,3 +48,29 @@ describe("NC ARLS portals", () => {
     expect(parseArlsQualifiers(ELEC_QUALIFIERS)).toEqual([{ name: "Lonnie Erik Holloway Sr.", number: "QUAL.L.06670", status: "Active" }]);
   });
 });
+
+describe("ARLS qualifiers and cache (audit 2026-10-15)", () => {
+  it("keeps the board's own qualifier status: only the exact word Active reads as current", async () => {
+    const { qualifierRole } = await import("./lib/g3-arls");
+    // Seen on portal.nclbgc.org for license L.07639 (Blythe Construction, Inc.), 2026-10-15.
+    expect(qualifierRole({ number: "Q.00841", status: "Active" })).toBe("Qualifier Q.00841");
+    // "/active/i" used to match this one too.
+    expect(qualifierRole({ number: "Q.00841", status: "Inactive" })).toBe("Qualifier Q.00841 (status: Inactive)");
+    expect(qualifierRole({ number: null, status: null })).toBe("Qualifier (status: not given)");
+  });
+
+  it("drops expired searches from the cache", async () => {
+    const { vi } = await import("vitest");
+    const { arlsSearch, arlsCacheSize, pruneArlsCache } = await import("./lib/g3-arls");
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => String(url).endsWith("/robots.txt")
+      ? new Response("", { status: 404 })
+      : new Response("<div>No results found for search criteria</div>", { status: 200 })));
+    try {
+      const board = { state: "NC", source: "NC Licensing Board for General Contractors", base: "https://portal.nclbgc.org", classField: "ClassificationDefinitionIdnt" as const, licenseLabel: "General Contractor License" };
+      expect(await arlsSearch(board, "Blythe Construction", "company")).toEqual([]);
+      expect(arlsCacheSize()).toBeGreaterThan(0);
+      pruneArlsCache(Date.now() + 11 * 60_000);
+      expect(arlsCacheSize()).toBe(0);
+    } finally { vi.unstubAllGlobals(); }
+  });
+});

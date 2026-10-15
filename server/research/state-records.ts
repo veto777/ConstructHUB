@@ -12,10 +12,12 @@
  * TDLR orders carry the license number. The other TCEQ datasets publish a county only.
  */
 import type { EnforcementHit, RecordSource } from "@shared/research-reports";
-import { politeFetch } from "../scrapers/polite-fetch";
+import { politeFetch } from "./http";
 import { nameClause, sodaRows } from "./licenses";
 import { decodeEntities } from "./bulk-sources";
 import { clean, usDate } from "./bulk";
+import { adverseFrom } from "./adverse";
+import { capNote, noteOf, withNote, type Noted } from "./notes";
 
 type Row = Record<string, unknown>;
 const s = (v: unknown): string | null => clean(v == null ? null : String(v));
@@ -54,7 +56,8 @@ const SODA_SOURCES: SodaEnforcement[] = [
       return {
         category: "business_status", name: s(r.taxpayer_name), id: s(r.taxpayer_number), date: day(r.sos_charter_date) ?? day(r.responsibility_beginning_date),
         endDate: day(r.sos_status_date), city: s(r.taxpayer_city),
-        status: `Right to transact business in Texas: ${TX_TRANSACT[code] ?? (code ? `code ${code}` : "ended")}`,
+        // A blank code is unknown, not "ended" (audit 2026-10-15, decision 3).
+        status: `Right to transact business in Texas: ${TX_TRANSACT[code] ?? (code ? `code ${code}` : "not published")}`,
         detail: [sos ? `Secretary of State status: ${TX_SOS[sos] ?? `code ${sos}`}` : null, s(r.secretary_of_state_sos_or_coa_file_number) ? `SOS file ${s(r.secretary_of_state_sos_or_coa_file_number)}` : null].filter(Boolean).join(". ") || null,
         amount: null, adverse: null,
         address: addr(r, ["taxpayer_address"], ["taxpayer_city", "taxpayer_state", "taxpayer_zip"]),
@@ -145,7 +148,9 @@ export function parseTdlrOrders(html: string): EnforcementHit[] {
     if (!names.length) continue;
     const date = cells[1].match(/results_text">\s*(\d{1,2}\/\d{1,2}\/\d{4})/)?.[1] ?? null;
     const order = text(cells[1].replace(/<span class="default_text">Date:<\/span>\s*<span class="results_text">[^<]*<\/span>/, ""));
-    const amount = order?.match(/\$\s?([\d,]+(?:\.\d{2})?)/)?.[1];
+    // The amount is the penalty only when the order text calls it one ("administrative penalty of $1,000"); a
+    // restitution or fee figure is left in the text, not reported as the penalty.
+    const amount = order?.match(/penalt(?:y|ies)[^$.;]{0,60}\$\s?([\d,]+(?:\.\d{2})?)/i)?.[1] ?? order?.match(/\$\s?([\d,]+(?:\.\d{2})?)[^.;]{0,40}penalt/i)?.[1];
     const license = get("license")[0] ?? null;
     out.push({
       state: "TX", source: "Texas TDLR administrative orders", sourceUrl: TDLR_FORM, category: "discipline",
@@ -153,7 +158,8 @@ export function parseTdlrOrders(html: string): EnforcementHit[] {
       status: license && /not licensed/i.test(license) ? "Order against an unlicensed respondent" : license ? `Order on license ${license}` : "Order issued",
       city: [get("city")[0], get("county")[0] ? `${get("county")[0]} County` : null].filter(Boolean).join(", ") || null,
       detail: [order, text(cells[2]) ? `Basis: ${text(cells[2])}` : null].filter(Boolean).join(" ").slice(0, 800) || null,
-      amount: amount ? Number(amount.replace(/,/g, "")) : null, adverse: true,
+      // From the order's own words: a penalty, revocation or suspension is adverse; a dismissal is not; else unknown.
+      amount: amount ? Number(amount.replace(/,/g, "")) : null, adverse: adverseFrom(order),
       licenseNumber: license && !/not licensed/i.test(license) ? license : null,
     });
   }
@@ -164,9 +170,10 @@ export function parseTdlrOrders(html: string): EnforcementHit[] {
 const MAX_ROWS = 500;
 
 /** One open-data enforcement dataset, searched by every word of the name, kept to rows that really name it. */
-export async function searchSodaEnforcement(src: SodaEnforcement, name: string, matches: (n: string | null) => boolean): Promise<EnforcementHit[]> {
+export async function searchSodaEnforcement(src: SodaEnforcement, name: string, matches: (n: string | null) => boolean): Promise<Noted<EnforcementHit>> {
   const rows = await sodaRows(src.url, nameClause(src.nameFields, name), MAX_ROWS, src.source, src.order);
-  return rows.map((r) => ({ state: src.state, source: src.source, sourceUrl: src.datasetUrl, ...src.toHit(r) })).filter((h) => matches(h.name));
+  // A full page means there may be more rows than were read: the report says so.
+  return withNote(rows.map((r) => ({ state: src.state, source: src.source, sourceUrl: src.datasetUrl, ...src.toHit(r) })).filter((h) => matches(h.name)), rows.length >= MAX_ROWS ? capNote(MAX_ROWS, null, "records read") : null);
 }
 
 export async function searchStateEnforcement(name: string, state: string, matches: (n: string | null) => boolean): Promise<{ hits: EnforcementHit[]; sources: RecordSource[] }> {
@@ -176,7 +183,7 @@ export async function searchStateEnforcement(name: string, state: string, matche
     try {
       const found = await searchSodaEnforcement(src, name, matches);
       hits.push(...found);
-      sources.push({ source: src.source, scope: src.scope, searched: true, note: `${found.length} record(s)` });
+      sources.push({ source: src.source, scope: src.scope, searched: true, note: `${found.length} record(s)${noteOf(found) ? ` (${noteOf(found)})` : ""}` });
     } catch (err: any) {
       sources.push({ source: src.source, scope: src.scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
     }

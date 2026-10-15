@@ -42,9 +42,21 @@ describe("Mississippi MSBOC parsers", () => {
   it("reads the suspended-license export", () => {
     const [h] = parseMsExport(EXPORT, "S");
     expect(h).toMatchObject({ name: "ACADIANA CUSTOM HOMES, LLC", id: "17337", licenseNumber: "17337", status: "License suspended (and expired)", phone: "601-376-8279", address: "402 GARTH FARM RD., BRANDON, MS 39042" });
+    // The status comes from the row's own words, not from which search (R or S) listed it.
+    expect(parseMsExport(EXPORT, "R")[0]).toMatchObject({ status: "License suspended (and expired)", adverse: true });
   });
   it("reads two-digit years", () => {
     expect(msShortDate("04/02/24")).toBe("2024-04-02");
-    expect(msShortDate("12/31/98")).toBe("1998-12-31");
+    // The page lists 2023 to today; a two-digit year past the current one isn't given a guessed century.
+    expect(msShortDate("12/31/98", new Date("2026-10-15"))).toBeNull();
+    expect(msShortDate("10/16/27", new Date("2026-10-15"))).toBeNull();
+    expect(msShortDate("13/02/24")).toBeNull();
+  });
+  it("tests the not-adverse words first and reads the board's own resolution words (audit 2026-10-15)", () => {
+    // Resolutions as the violations page printed them on 2026-10-15.
+    const one = (resolution: string) => parseMsViolations(VIOLATION.replace(/(Resolution:&nbsp;<\/td>\s*<td[^>]*>)[\s\S]*?(<\/td>)/, `$1${resolution}$2`), "Commercial", "x")[0];
+    expect(one("PUBLIC REPRIMAND PUBLIC REPRIMAND").adverse).toBe(true);
+    expect(one("SETTLED SETTLED FOR $972.52, REPRESENTING 1% OF THE CONTRACT AMOUNT").adverse).toBe(true);
+    expect(one("").adverse).toBeNull();
   });
 });

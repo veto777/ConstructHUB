@@ -1,9 +1,10 @@
 /**
  * Small helpers shared by the g8 state packs (OR, WA, MT, WY, AK, HI). No source data lives here.
  */
-import { politeFetch } from "../../../scrapers/polite-fetch";
+import { politeFetch } from "../../http";
 import { clean } from "../../bulk";
 import { tokens } from "../../licenses";
+import { looksLikeBusiness as sharedLooksLikeBusiness } from "./business-name";
 
 /** Every word of the searched name is a whole word of one of the fields (the same rule as ../../records namedIn). */
 export function nameMatches(name: string, ...fields: (string | null | undefined)[]): boolean {
@@ -46,12 +47,15 @@ export function flip(v: string | null | undefined): string | null {
 }
 
 /**
- * Words that mark a business name in a list that mixes companies and people (debarment and discipline lists name
- * both). Used only to decide which names are indexed for company searches; a name without one is treated as a person
- * and is never indexed (companies only, FCRA).
+ * A business name in a list that mixes companies and people (debarment and discipline lists name both): the shared
+ * rule of ./business-name.ts (a corporate suffix, "& Sons", a dba form or a trade word that is not a surname; audit
+ * 2026-10-15, decision 5), plus a few trade words these lists use. Used only to decide which names are indexed for
+ * company searches; a name without one is treated as a person and is never indexed (companies only, FCRA).
  */
-const ENTITY = /\b(L\.?\s?L\.?\s?C|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LLP|L\.?P|PLLC|DBA|D\/B\/A|ENTERPRISES?|CONSTRUCTION|CONTRACTING|CONTRACTORS?|BUILDERS?|BUILDING|ELECTRIC|ELECTRICAL|PLUMBING|ROOFING|MECHANICAL|SERVICES?|SOLAR|GROUP|HOMES?|EXCAVATION|EXCAVATING|CONCRETE|DRYWALL|PAINTING|FLOORING|LANDSCAPING|MANAGEMENT|SYSTEMS|INDUSTRIES|ASSOCIATES|PARTNERS|HOLDINGS|TRUCKING|FLAGGING|JANITORIAL|CREATIONS|SUPPLY|DESIGNS?|REMODELING|RESTORATION|PROPERTIES)\b/i;
-export const looksLikeBusiness = (v: string | null | undefined): boolean => !!v && ENTITY.test(v);
+const EXTRA = /\b(?:FLAGGING|JANITORIAL|CREATIONS|PARTNERS|PARTNERSHIP)\b/i;
+export const looksLikeBusiness = (v: string | null | undefined): boolean => !!v && (sharedLooksLikeBusiness(v) || EXTRA.test(v));
+/** The same, for a piece split out of a longer line: a lone word ("John" of "John and Mary Smith") is not a trade name. */
+const pieceIsBusiness = (v: string): boolean => /\s/.test(v.trim()) ? looksLikeBusiness(v) : looksLikeBusiness(`x ${v}`);
 
 const SUFFIX_ONLY = /^(L\.?\s?L\.?\s?C\.?|INC\.?|CORP\.?|LTD\.?|CO\.?|LLP\.?|L\.?P\.?|PLLC\.?)$/i;
 
@@ -62,7 +66,8 @@ const SUFFIX_ONLY = /^(L\.?\s?L\.?\s?C\.?|INC\.?|CORP\.?|LTD\.?|CO\.?|LLP\.?|L\.
 export function businessParts(v: string | null | undefined): string[] {
   const whole = clean((v ?? "").replace(/\*/g, "").replace(/\s*\((?:Hawai[^)]*|Maui|O[^)]*ahu|Kauai|Kaua[^)]*|Molokai|Moloka[^)]*|Lanai|L[^)]*na[^)]*i|Big Island)\)\s*$/i, ""));
   if (!whole) return [];
-  const raw = whole.split(/\s+and\s+|,\s+|;\s*/);
+  // "Smith and Sons", "Jones & Associates": one business, not two parties.
+  const raw = whole.replace(/\s+(?:and|&)\s+(?=(?:sons?|daughters?|associates|company|co)\b)/gi, " & ").split(/\s+and\s+|,\s+|;\s*/);
   const segs: string[] = [];
   for (const p of raw) {
     if (segs.length && SUFFIX_ONLY.test(p.trim())) segs[segs.length - 1] += `, ${p.trim()}`;
@@ -77,7 +82,7 @@ export function businessParts(v: string | null | undefined): string[] {
     const [owner, ...dbas] = lead ? ["", seg.replace(/^(?:dba|d\/b\/a)\s+/i, "")] : seg.split(/\s+\b(?:dba|d\/b\/a)\b\s*/i);
     const aliases = (owner ?? "").split(/\s+\b(?:aka|a\/k\/a)\b\s*/i);
     for (const p of [...aliases.map(clean), ...dbas.map(clean)].filter((x): x is string => !!x)) {
-      if (dbas.map(clean).includes(p) || looksLikeBusiness(p)) out.push(p);
+      if (dbas.map(clean).includes(p) || pieceIsBusiness(p)) out.push(p);
       else droppedPerson = true;
     }
   }

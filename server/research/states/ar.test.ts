@@ -122,3 +122,15 @@ describe("Arkansas Fire Protection Licensing Board rosters (PDF)", () => {
     expect(firePerson("KARL LIMBERG, III, PRESIDENT")).toEqual({ name: "KARL LIMBERG, III", role: "President" });
   });
 });
+
+describe("AR roster endpoint payload", () => {
+  it("reads rows and the table total", async () => {
+    const { metlBody } = await import("./ar");
+    expect(metlBody({ recordsTotal: 0, recordsFiltered: 0, data: [] })).toEqual({ total: 0, rows: [] });
+  });
+  it("throws when the total is missing, so the paging check can't pass on an empty answer", async () => {
+    const { metlBody } = await import("./ar");
+    expect(() => metlBody({ data: [] })).toThrow(/unexpected payload/);
+    expect(() => metlBody({ code: "rest_no_route", message: "No route was found matching the URL and request method." })).toThrow(/unexpected payload/);
+  });
+});

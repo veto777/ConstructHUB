@@ -8,7 +8,7 @@
  * The query result is Power BI's compressed "DSR" form: per row, `C` holds only the values that are neither repeated
  * from the previous row (bit i of `R`) nor null (bit i of `Ø`); string columns index into ValueDicts.
  */
-import { USER_AGENT, politeFetch } from "../../../scrapers/polite-fetch";
+import { USER_AGENT, politeFetch } from "../../http";
 
 type Dsr = { DS: { PH: { DM0?: DsrRow[] }[]; ValueDicts?: Record<string, unknown[]>; RT?: unknown; IC?: boolean }[] };
 type DsrRow = { S?: { N: string; T: number; DN?: string }[]; C?: unknown[]; R?: number; "Ø"?: number };

@@ -76,7 +76,7 @@ const KS_KSBTP: LiveLicenseSearch = {
     return (await ksbtpSearch(KSBTP_PERSON, { t_web_lookup__first_name: w[0], t_web_lookup__last_name: w[w.length - 1] })).map((r) => toHit(r, false, "principal"));
   },
   searchBy: async (q: IdQuery) => {
-    if (q.type !== "license") return [];
+    if (q.type !== "license") return null; // the lookup searches by name and license number only
     // License numbers carry the profession prefix ("PE1234", "E-65"), as the form asks.
     const n = q.value.trim().toUpperCase();
     const people = (await ksbtpSearch(KSBTP_PERSON, { t_web_lookup__license_no: n })).map((r) => toHit(r, false, "license"));

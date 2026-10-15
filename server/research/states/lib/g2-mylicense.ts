@@ -9,6 +9,7 @@
  * Checked live 2026-10-15. robots.txt on madpl.mylicense.com and madfs.mylicense.com: none (404).
  */
 import { FormSession, buttonValue, formFields, tableRows, textOf } from "./g2-aspnet";
+import { withNote, type Noted } from "../../notes";
 
 const actionOf = (html: string, base: string): string => {
   const a = html.match(/<form[^>]*action="([^"]*)"/i)?.[1];
@@ -75,20 +76,32 @@ export function parseMyLicenseResults(html: string, base: string): MyLicenseRow[
   return out;
 }
 
-/** Every results page of one search (at most `maxPages`). */
-export async function myLicenseSearch(base: string, fields: Record<string, string>, maxPages = 5): Promise<MyLicenseRow[]> {
+/** The grid's page links: [postback target, page number] (a "..." link carries no number and counts as "more"). */
+export function pageLinks(html: string): { target: string; page: number | null }[] {
+  return Array.from(html.matchAll(/__doPostBack\(&#39;(datagrid_results\$_ctl\d+\$_ctl\d+)&#39;,&#39;&#39;\)"[^>]*>(\d+|\.\.\.)</g))
+    .map((m) => ({ target: m[1], page: /^\d+$/.test(m[2]) ? Number(m[2]) : null }));
+}
+
+/**
+ * Every results page of one search, up to `maxPages`. When the grid links pages beyond that, the rows come back with a
+ * note saying the rest was not read (audit 2026-10-15, decision 9), never as if they were all.
+ */
+export async function myLicenseSearch(base: string, fields: Record<string, string>, maxPages = 5): Promise<Noted<MyLicenseRow>> {
   const s = new FormSession(1200);
   let page = await runSearch(s, base, fields);
   if (/There is an error with your input/i.test(page.html) && !/datagrid_results/.test(page.html)) throw new Error("the lookup rejected the search");
   const out = parseMyLicenseResults(page.html, page.url);
+  let read = 1;
   for (let n = 2; n <= maxPages; n++) {
     // Page links: __doPostBack('datagrid_results$_ctl1$_ctlK','') whose text is the page number.
-    const link = Array.from(page.html.matchAll(/__doPostBack\(&#39;(datagrid_results\$_ctl\d+\$_ctl\d+)&#39;,&#39;&#39;\)"[^>]*>(\d+)</g)).find((m) => Number(m[2]) === n);
+    const link = pageLinks(page.html).find((l) => l.page === n);
     if (!link) break;
     const form = formFields(page.html);
-    form.set("__EVENTTARGET", link[1]); form.set("__EVENTARGUMENT", "");
+    form.set("__EVENTTARGET", link.target); form.set("__EVENTARGUMENT", "");
     page = await s.text(actionOf(page.html, page.url), form, page.url);
     out.push(...parseMyLicenseResults(page.html, page.url));
+    read = n;
   }
-  return out;
+  const more = pageLinks(page.html).some((l) => l.page == null || l.page > read);
+  return withNote(out, more ? `read the first ${read} page(s) of results (${out.length} rows); the lookup had more pages, not read` : null);
 }

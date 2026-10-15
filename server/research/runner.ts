@@ -31,10 +31,13 @@ import {
 } from "@shared/research-reports";
 import { SITE_ORIGIN as SITE } from "@shared/seo";
 import { searchLicenses, searchLicensesBy, type LicenseSource } from "./licenses";
-import { refreshDueSources, searchBulk, searchBulkBy, type BulkSource, type StoredHit } from "./bulk";
+import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy, type BulkSource, type StoredHit } from "./bulk";
 import type { LiveLicenseSearch } from "./states/types";
 import { crossReference, LicenseSet, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
 import { ALL_BULK_SOURCES, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
+import { capNote, noteOf } from "./notes";
+import { privateHit } from "./privacy";
+import type { IdQuery } from "./identifiers";
 import { previewCompanyRecords, searchCompanyRecords, searchEnforcement } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
 
@@ -70,10 +73,11 @@ export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | 
       try { for (const h of (await f.byName(s.name, s.kind)).hits) found.add(h); } catch { /* the preview is a hint, not the report */ }
     }
     const before = found.list.length;
-    const ids = await searchCustomerIds(finders, subjectIds(s), s.kind).catch(() => null);
+    const ids = await searchCustomerIds(finders, subjectIds(s), s).catch(() => null);
     for (const h of ids?.licenses ?? []) found.add(h);
     licenseMatches += found.list.length;
-    identifierMatches += found.list.length - before;
+    // Records the customer's identifiers found under the subject's name, plus those under another name (shown as matched by the identifier).
+    identifierMatches += found.list.length - before + (ids?.matched.length ?? 0);
   }
   const portals = await portalsInStates(input.states);
   let records: ResearchPreview["records"];
@@ -91,6 +95,10 @@ const stored = (hits: StoredHit[]): FinderResult => ({
   enforcement: hits.filter((h): h is { kind: "enforcement"; hit: EnforcementHit } => h.kind === "enforcement").map((h) => h.hit),
 });
 
+/** "3 match(es)", plus the source's own note when it stopped at a cap ("showing the first 10 of 34 matches"). */
+const matchNote = (n: number, capped: string | null, suffix = "") => `${n} match(es)${suffix}${capped ? ` (${capped})` : ""}`;
+const idName = (q: IdQuery) => (q.type === "license" ? "license number" : q.type);
+
 /** An indexed state file. License files are searched by name (re-checked: the index can join words of two people) and identifier; enforcement files by identifier. */
 export function bulkFinder(src: BulkSource): LicenseFinder {
   return {
@@ -98,13 +106,15 @@ export function bulkFinder(src: BulkSource): LicenseFinder {
     byName: src.companiesOnly ? undefined : async (name, kind) => {
       const { hits, status } = await searchBulk(src, name, kind);
       if (!status.loaded) return { hits: [], searched: false, note: "Not loaded yet (the state's file is downloaded daily)" };
-      const found = stored(hits).licenses.map((h) => ({ ...h, matchedOn: kind === "company" ? "business" as const : "principal" as const })).filter((h) => nameMatches(name, kind, h));
-      return { hits: found, searched: true, note: `${found.length} match(es) in the file of ${status.loadedAt?.slice(0, 10)}` };
+      const found = stored(hits).licenses.map((h) => privateHit({ ...h, matchedOn: kind === "company" ? "business" as const : "principal" as const })).filter((h) => nameMatches(name, kind, h));
+      return { hits: found, searched: true, note: matchNote(found.length, hits.length >= BULK_LIMIT ? capNote(BULK_LIMIT, null, "index matches") : null, ` in the file of ${status.loadedAt?.slice(0, 10)}`) };
     },
     byId: async (q) => {
-      // A file not loaded yet is already reported with the name searches; here it simply has nothing.
-      const { hits } = await searchBulkBy(src, q);
-      return stored(hits);
+      const { hits, status } = await searchBulkBy(src, q);
+      // Not loaded yet: not searched (decision 8), never "0 found".
+      if (!status.loaded) return { licenses: [], enforcement: [], searched: false, note: "not loaded yet; the state's file is downloaded daily" };
+      const r = stored(hits);
+      return { ...r, licenses: r.licenses.map(privateHit), note: hits.length >= BULK_ID_LIMIT ? capNote(BULK_ID_LIMIT, null, "records") : undefined };
     },
   };
 }
@@ -113,8 +123,11 @@ export function bulkFinder(src: BulkSource): LicenseFinder {
 export function sodaFinder(src: LicenseSource): LicenseFinder {
   return {
     state: src.state, label: src.source,
-    byName: async (name, kind) => { const hits = await searchLicenses(src, name, kind); return { hits, searched: true, note: `${hits.length} match(es)` }; },
-    byId: async (q) => ({ licenses: await searchLicensesBy(src, q), enforcement: [] }),
+    byName: async (name, kind) => { const hits = await searchLicenses(src, name, kind); return { hits: hits.map(privateHit), searched: true, note: matchNote(hits.length, noteOf(hits)) }; },
+    byId: async (q) => {
+      const hits = await searchLicensesBy(src, q);
+      return hits ? { licenses: hits.map(privateHit), enforcement: [], note: noteOf(hits) ?? undefined } : { licenses: [], enforcement: [], searched: false, note: `this dataset has no ${idName(q)} field` };
+    },
   };
 }
 
@@ -122,8 +135,15 @@ export function sodaFinder(src: LicenseSource): LicenseFinder {
 export function liveFinder(state: string, src: LiveLicenseSearch): LicenseFinder {
   return {
     state, label: src.source,
-    byName: async (name, kind) => { const hits = (await src.search(name, kind)).filter((h) => nameMatches(name, kind, h)); return { hits, searched: true, note: `${hits.length} match(es)` }; },
-    byId: src.searchBy ? async (q) => ({ licenses: await src.searchBy!(q), enforcement: [] }) : undefined,
+    byName: async (name, kind) => {
+      const raw = await src.search(name, kind);
+      const hits = raw.filter((h) => nameMatches(name, kind, h)).map(privateHit);
+      return { hits, searched: true, note: matchNote(hits.length, noteOf(raw)) };
+    },
+    byId: src.searchBy ? async (q) => {
+      const hits = await src.searchBy!(q);
+      return hits ? { licenses: hits.map(privateHit), enforcement: [], note: noteOf(hits) ?? undefined } : { licenses: [], enforcement: [], searched: false, note: `this lookup can't search by ${idName(q)}` };
+    } : undefined,
   };
 }
 
@@ -248,17 +268,24 @@ async function sweepPortals(userId: number, name: string, kind: "person" | "comp
   return { coverage: Array.from(final.values()), rows };
 }
 
-/** True when every word of the name is a whole word of one of the record's name fields (a portal's fuzzy match is not proof). */
-function namesMatch(name: string, row: any): boolean {
+/**
+ * True when every word of the name is a whole word of ONE of the record's names (a portal's fuzzy match is not
+ * proof). A contact's name and company are separate names; the result's HTML and the description are split into
+ * their cells, lines and "Label: value" parts, so words of two people ("Applicant: Jane Smith; Owner: John Doe")
+ * never make "John Smith" (audit 2026-10-15).
+ */
+export function namesMatch(name: string, row: any): boolean {
   const tok = (v: string) => v.toLowerCase().split(/[^a-z0-9&']+/).filter((w) => w.length >= 2);
   const want = tok(name);
-  const contacts = Array.isArray(row.contacts) ? row.contacts.map((c: any) => [c?.name, c?.company].filter(Boolean).join(" ")) : [];
+  if (!want.length) return false;
+  const contacts = Array.isArray(row.contacts) ? row.contacts.flatMap((c: any) => [c?.name, c?.company]) : [];
   const record = row.rawData?.record ?? {};
   const listed = listedNamesOf(row);
-  // Rows saved before a parser learned a field still carry the result's own HTML; its text counts too.
-  const html = typeof row.rawData?.raw?.html === "string" ? row.rawData.raw.html.replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&") : "";
-  const fields = [row.contractorName, row.applicantName, record.ownerName, record.applicantName, record.contractorName, ...contacts, ...listed, row.description, html]
-    .filter((v): v is string => typeof v === "string" && v.length > 0);
+  const parts = (v: unknown): string[] => (typeof v === "string" ? v.split(/[;|\n\r\t]+|\s{2,}|\b[A-Za-z][A-Za-z ]{1,30}:/) : []);
+  // Rows saved before a parser learned a field still carry the result's own HTML; each of its cells counts on its own.
+  const html = typeof row.rawData?.raw?.html === "string" ? row.rawData.raw.html.replace(/&amp;/g, "&").split(/<[^>]*>/).flatMap(parts) : [];
+  const fields = [row.contractorName, row.applicantName, record.ownerName, record.applicantName, record.contractorName, ...contacts, ...listed, ...parts(row.description), ...html]
+    .filter((v): v is string => typeof v === "string" && v.trim().length > 0);
   return fields.some((f) => { const have = new Set(tok(f)); return want.every((w) => have.has(w)); });
 }
 
@@ -291,7 +318,7 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
     const licenseSources: ResearchSubjectReport["licenseSources"] = [];
     const finders: LicenseFinder[] = [];
     for (const state of input.states) {
-      if (!hasLicenseSources(state)) licenseSources.push({ state, source: "State license records", searched: false, note: "We don't search this state's license records yet" });
+      if (!hasLicenseSources(state)) licenseSources.push({ state, source: "State license records", searched: false, note: "Not searched by ConstructHUB: we have no license source for this state yet" });
       const list = findersFor(state);
       finders.push(...list);
       const searchByName = async (f: LicenseFinder) => {
@@ -312,7 +339,7 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       for (const f of list.filter((f) => !isBulk(f))) await searchByName(f);
     }
     // The customer's license numbers, phones and addresses: the subject's own records, found another way.
-    const ids = await searchCustomerIds(finders, subjectIds(subject), subject.kind);
+    const ids = await searchCustomerIds(finders, subjectIds(subject), subject);
     for (const h of ids.licenses) own.add(h);
     if (ids.searches.length) log(`identifiers for "${subject.name}": ${ids.searches.map((x) => `${x.query}: ${x.found}`).join(", ")}`);
     const dbs = input.states.flatMap((s) => portals.get(s) ?? []);
@@ -335,12 +362,24 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       subject, own, finders, searchedIds: ids.searchedIds, idSearchesUsed: ids.used, ownEnforcement: records.enforcement,
       enforcementSearch: (name) => searchEnforcement(name, input.states), log,
     });
-    const relatedEnforcement = [...ids.enforcement, ...xref.relatedEnforcement];
-    log(`cross-reference for "${subject.name}": ${xref.related.length} related license(s), ${relatedEnforcement.length} related enforcement record(s), ${xref.idSearches} identifier search(es)${xref.notes.length ? `; ${xref.notes.join(" | ")}` : ""}`);
+    // A person never gets enforcement records, not even related ones (FCRA; checked again here after the cross-reference).
+    const relatedEnforcement = subject.kind === "company" ? [...ids.enforcement, ...xref.relatedEnforcement] : [];
+    // A record the cross-reference ties through one of the subject's own records keeps that tie; one found only by
+    // the customer's identifier is listed as matched by it.
+    const rel = new LicenseSet();
+    for (const h of xref.related) rel.add(h);
+    for (const h of ids.matched) {
+      if (own.find(h)) continue;
+      const dup = rel.find(h);
+      if (!dup) rel.add(h);
+      else if (h.relatedVia && !dup.relatedVia?.includes(h.relatedVia)) dup.relatedVia = `${dup.relatedVia}; also ${h.relatedVia}`;
+    }
+    const relatedLicenses = rel.list;
+    log(`cross-reference for "${subject.name}": ${relatedLicenses.length} related license(s), ${relatedEnforcement.length} related enforcement record(s), ${xref.idSearches} identifier search(es)${xref.notes.length ? `; ${xref.notes.join(" | ")}` : ""}`);
     subjects.push({
       name: subject.name, kind: subject.kind, licenses: own.list, permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)),
       complaints: records.complaints, courtCases: records.courtCases, osha: records.osha, enforcement: records.enforcement, recordSources: records.sources,
-      identifierSearches: ids.searches, relatedLicenses: xref.related, relatedEnforcement, relatedNotes: [...ids.notes, ...xref.notes],
+      identifierSearches: ids.searches, relatedLicenses, relatedEnforcement, relatedNotes: [...ids.notes, ...xref.notes],
     });
   }
   const allCoverage = subjects.flatMap((s) => s.portals);

@@ -55,6 +55,30 @@ async function fetchRoster(page: any, r: { profession: string; type: string }): 
   return path;
 }
 
+/**
+ * One roster row. An individual's roster address is where they live (audit 2026-10-15): city, state and ZIP only, no
+ * street and no address key. A business row keeps its full address.
+ */
+export function vtRosterHit(x: Record<string, string>, r: { type: string; business?: boolean }): BulkHit | null {
+  const no = clean(x.LicenseNumber);
+  if (!no) return null;
+  const business = r.business ? clean(x.BusinessName) : null;
+  const who = r.business ? null : clean([x["First Name"], x["Middle Name"], x["Last Name"]].filter(Boolean).join(" "));
+  if (!business && !who) return null;
+  const locality = [x.City, x.State, x.ZipCode ?? x.Zip].map((v) => clean(v)).filter(Boolean);
+  const street = [x["AddressLine 1"] ?? x.Address1, x["AddressLine 2"] ?? x.Address2].map((v) => clean(v)).filter(Boolean);
+  const address = clean((business ? [...street, ...locality] : locality).join(", "));
+  const supervisor = clean(x.Supervisor);
+  const hit: LicenseHit = {
+    state: "VT", source: "Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
+    sourceUrl: OPR_PAGE, businessName: business, licenseNumber: no, licenseType: r.type, specialty: clean(x.Specialty),
+    status: clean(x.Status), principal: who, city: clean(x.City), expires: usDate(x["License Expiration"]),
+    matchedOn: business ? "business" : "principal", address,
+    people: [...(who ? [{ name: who, role: null }] : []), ...(supervisor ? [{ name: supervisor, role: "Supervisor" }] : [])],
+  };
+  return { kind: "license", hit, business, person: who, people: supervisor ? [supervisor] : undefined, keys: business ? { licenses: [no], addresses: [address] } : { licenses: [no] } };
+}
+
 async function* vtOprLoader(): AsyncIterable<BulkHit> {
   const { chromium } = await import("playwright-core");
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, headless: true, args: CHROMIUM_ARGS });
@@ -65,21 +89,8 @@ async function* vtOprLoader(): AsyncIterable<BulkHit> {
       const path = await fetchRoster(page, r);
       try {
         for (const x of await xlsxRecords(path)) {
-          const no = clean(x.LicenseNumber);
-          if (!no) continue;
-          const business = r.business ? clean(x.BusinessName) : null;
-          const who = r.business ? null : clean([x["First Name"], x["Middle Name"], x["Last Name"]].filter(Boolean).join(" "));
-          if (!business && !who) continue;
-          const address = clean([x["AddressLine 1"] ?? x.Address1, x["AddressLine 2"] ?? x.Address2, x.City, x.State, x.ZipCode ?? x.Zip].map((v) => clean(v)).filter(Boolean).join(", "));
-          const supervisor = clean(x.Supervisor);
-          const hit: LicenseHit = {
-            state: "VT", source: "Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
-            sourceUrl: OPR_PAGE, businessName: business, licenseNumber: no, licenseType: r.type, specialty: clean(x.Specialty),
-            status: clean(x.Status), principal: who, city: clean(x.City), expires: usDate(x["License Expiration"]),
-            matchedOn: business ? "business" : "principal", address,
-            people: [...(who ? [{ name: who, role: null }] : []), ...(supervisor ? [{ name: supervisor, role: "Supervisor" }] : [])],
-          };
-          yield { kind: "license", hit, business, person: who, people: supervisor ? [supervisor] : undefined, keys: { licenses: [no], addresses: [address] } };
+          const h = vtRosterHit(x, r);
+          if (h) yield h;
         }
       } finally {
         await fs.rm(path, { force: true });

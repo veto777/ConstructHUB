@@ -19,7 +19,7 @@
  *     is kept as Acme Electric. The "outstanding fines" lists name individuals and are left out.
  */
 import type { LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { normLicense, normPhone, type IdQuery } from "../identifiers";
 import { clean, download, usDate, type BulkHit } from "../bulk";
@@ -27,6 +27,9 @@ import { promises as fs } from "node:fs";
 import type { EnforcementHit } from "@shared/research-reports";
 import { decodeEntities } from "../bulk-sources";
 import { pdfText, textLines } from "./lib/a3-pdf";
+import { looksLikeBusiness } from "./lib/business-name";
+import { adverseFrom } from "../adverse";
+import { capNote, withNote } from "../notes";
 import { flipName, tableRows, text } from "./lib/g4-html";
 import type { StatePack } from "./types";
 
@@ -78,6 +81,9 @@ const has = (want: string[], v: string | null) => { const t = new Set(tokens(v ?
 const addr = (d: Record<string, string | null>, street: string, city: string, st: string, zip: string) =>
   [d[street], d[city], [d[st], d[zip]].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null;
 
+/** Detail pages are fetched for the first MAX_DETAILS matches; the report says when there were more. */
+const capped = (hits: LicenseHit[], rows: Row[]) => withNote(hits, rows.length > MAX_DETAILS ? capNote(MAX_DETAILS, rows.length) : null);
+
 async function gcHits(rows: Row[], matchedOn: LicenseHit["matchedOn"]): Promise<LicenseHit[]> {
   const hits: LicenseHit[] = [];
   for (const r of rows.slice(0, MAX_DETAILS)) {
@@ -91,7 +97,7 @@ async function gcHits(rows: Row[], matchedOn: LicenseHit["matchedOn"]): Promise<
       address: addr(d, "Address", "City", "state", "zip"), phone: d.phone ?? r.cells[5] ?? null,
     });
   }
-  return hits;
+  return capped(hits, rows);
 }
 
 /** General contractors by company name: NAME, LIC #, CITY, STATE, SPECIALTY, PHONE, then the detail page. */
@@ -102,11 +108,12 @@ export async function searchAlGc(name: string, kind: "person" | "company"): Prom
 }
 
 /** By license number or phone (both are columns of the list); the list has no street address to search. */
-export async function searchAlGcBy(q: IdQuery): Promise<LicenseHit[]> {
+export async function searchAlGcBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type === "address") return null; // the list has no street address
   const rows = await list(GC_LIST);
   if (q.type === "license") { const n = normLicense(q.value) ?? q.value.replace(/\D/g, ""); return gcHits(rows.filter((r) => (normLicense(r.cells[1]) ?? r.cells[1]) === n), "license"); }
-  if (q.type === "phone") { const n = normPhone(q.value); return n ? gcHits(rows.filter((r) => normPhone(r.cells[5]) === n), "phone") : []; }
-  return [];
+  const n = normPhone(q.value);
+  return n ? gcHits(rows.filter((r) => normPhone(r.cells[5]) === n), "phone") : null;
 }
 
 /** Onsite wastewater installers by person: NAME ("LAST, FIRST M"), LIC #, Type, ISSUED DATE, BASE COUNTY, SERVICE COUNTIES. */
@@ -115,14 +122,16 @@ async function aowbHits(rows: Row[], matchedOn: LicenseHit["matchedOn"]): Promis
   for (const r of rows.slice(0, MAX_DETAILS)) {
     const d = r.detail ? await detail(r.detail) : {};
     const person = flipName(r.cells[0]);
+    // An installer without a business name is a person alone: their address is a home address (city only).
+    const biz = d.businessName ?? null;
     hits.push({
       state: "AL", source: "Alabama Onsite Wastewater Board installers", sourceUrl: r.detail ? `${HOST}${r.detail}` : AOWB_LIST,
-      businessName: d.businessName ?? null, licenseNumber: r.cells[1], licenseType: r.cells[2], specialty: r.cells[5] ? `Service counties: ${r.cells[5]}` : null,
+      businessName: biz, licenseNumber: r.cells[1], licenseType: r.cells[2], specialty: r.cells[5] ? `Service counties: ${r.cells[5]}` : null,
       status: d.status ?? null, principal: person, city: d.city ?? (r.cells[4] ? `${r.cells[4]} County` : null), expires: null, matchedOn,
-      address: addr(d, "address", "city", "state", "zip"), phone: d.workPhone ?? null, people: person ? [{ name: person, role: "Licensee" }] : [],
+      address: biz ? addr(d, "address", "city", "state", "zip") : null, phone: biz ? d.workPhone ?? null : null, people: person ? [{ name: person, role: "Licensee" }] : [],
     });
   }
-  return hits;
+  return capped(hits, rows);
 }
 
 // Installer licenses only (Basic, Advanced Level 1 and 2 Installer); pumpers, manufacturers and portable toilets are not construction.
@@ -134,10 +143,11 @@ export async function searchAlAowb(name: string, kind: "person" | "company"): Pr
   return aowbHits((await installers()).filter((r) => has(want, r.cells[0])), "principal");
 }
 
-export async function searchAlAowbBy(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license") return [];
+export async function searchAlAowbBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  // Installer license numbers are digits only; a phone, an address or a lettered number can't be searched here.
+  if (q.type !== "license" || !/^\d+$/.test(q.value.trim())) return null;
   const n = q.value.replace(/\D/g, "");
-  return n ? aowbHits((await installers()).filter((r) => r.cells[1]?.replace(/\D/g, "") === n && /^\d+$/.test(q.value.trim())), "license") : [];
+  return aowbHits((await installers()).filter((r) => r.cells[1]?.replace(/\D/g, "") === n), "license");
 }
 
 // ── Electrical Contractors Board disciplinary actions (PDFs) ─────────────────────────────────────────────────────
@@ -155,18 +165,21 @@ function aecbDate(v: string | null | undefined): string | null {
   return usDate(t);
 }
 
-const BUSINESS_WORD = /\b(LLC|L\.L\.C|Inc|Incorporated|Corp|Corporation|Company|Co|Ltd|LP|LLP|PLLC|Electric|Electrical|Electricians?|Services?|Contractors?|Contracting|Construction|Builders|Enterprises?|Group|Solutions|Systems|Industries|Restoration|Improvements?|Remodeling|Repairs?|Lighting|Power|Energy|Solar|Maintenance|Homes?|Roofing|Plumbing|Mechanical|HVAC)\b/i;
 /**
- * The business a respondent names: the "dba" part when there is one, else the whole name when it is a company's
- * (a company word such as LLC, Inc or Electric); null for a person alone (FCRA: companies only).
+ * The business a respondent names: the "dba" part when there is one, else the whole name when it reads as a
+ * company's (./lib/business-name.ts: a suffix such as LLC or Inc, or a trade word that is not a surname, so
+ * "David Power" stays a person); null for a person alone (FCRA: companies only).
  */
 export function aecbBusiness(respondent: string): string | null {
-  // "Name c/o Business" is the person's mailing address, not the business as respondent: judge the name alone.
-  const t = respondent.replace(/\s+/g, " ").replace(/\s*\b[cC]\/[oO]\b.*$/, "").trim();
+  // "Name c/o Business" is the person's mailing address, not the business as respondent: judge the name alone. Case
+  // numbers and dates the 2010-2020 lists print after the name ("Milton Bullock & 2020-021", "Larry Walker ; 2018-014",
+  // "Dexter White Date: November13, 2019", "Steven A. Pritchard & 046") are not part of it.
+  const t = respondent.replace(/\s+/g, " ").replace(/\s*\b[cC]\/[oO]\b.*$/, "")
+    .replace(/\s*\bDate:.*$/i, "").replace(/\s*(?:[&;,]|\band\b)\s*#?\s*(?:\d{4}-\d{2,4}|\d{2,4})\b.*$/i, "").trim();
   // "Name dba Business" (the JS reader can glue "dbaBusiness").
   const dba = t.split(/\s*\b(?:[dD]\/?[bB]\/?[aA])(?:\b|(?=[A-Z&]))[:.]?\s*/);
   if (dba.length > 1) return clean(dba.slice(1).join(" ").replace(/^[,\s]+/, ""));
-  return BUSINESS_WORD.test(t) ? t : null;
+  return looksLikeBusiness(t) ? t : null;
 }
 
 const fineOf = (v: string | null | undefined): number | null => {
@@ -268,7 +281,7 @@ async function* aecbDiscipline(): AsyncIterable<BulkHit> {
       const hit: EnforcementHit = {
         state: "AL", source: AECB_SOURCE, sourceUrl: url, category: "discipline", name: a.business, id: a.caseNo, date: a.date, endDate: null,
         status: a.disposition ? a.disposition.slice(0, 160) : null, city: a.city, detail: a.disposition, amount: a.fine,
-        adverse: a.disposition ? AECB_ADVERSE.test(a.disposition) || null : null, licenseNumber: a.license,
+        adverse: adverseFrom(a.disposition, { adverse: AECB_ADVERSE }), licenseNumber: a.license,
       };
       yield { kind: "enforcement", hit, business: a.business, person: null, keys: { licenses: [a.license] } };
     }

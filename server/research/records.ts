@@ -3,19 +3,22 @@
  * complaints would make the report a background check; shared/research-reports.ts RESEARCH_NOT_FCRA):
  *
  *   - State attorney general consumer complaints, from official open data (WA statewide and current; OR 2017–2019).
- *   - Federal court dockets naming the company, nationwide (CourtListener's RECAP archive, free API).
+ *   - Federal court dockets naming the company, nationwide (CourtListener's RECAP archive, free API): NOT SEARCHED since
+ *     2026-10-15. courtlistener.com's robots.txt says "User-agent: *  Disallow: /" (only named search engines get other
+ *     rules), so under HARD RULE 2 the search is off (COURTLISTENER_ALLOWED). The code stays for when that changes.
  *   - Federal OSHA inspections of the company's establishments, nationwide (U.S. DOL API v4, needs DOL_API_KEY; the key
  *     goes in the query string, `like` is case-sensitive, no match is HTTP 204).
  *
  * Every dataset here was checked live (CLAUDE.md: never fabricate government data). A source that could not be
  * searched is reported as not searched, never as "nothing found".
  */
-import { politeFetch } from "../scrapers/polite-fetch";
+import { politeFetch } from "./http";
 import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordSource } from "@shared/research-reports";
 import { nameClause, sodaRows, tokens } from "./licenses";
 import { searchBulk } from "./bulk";
 import { allBulkSourcesFor as bulkSourcesFor, hasStateCourtSearch, packComplaintSourcesFor, searchPackEnforcement } from "./registry";
 import { searchStateEnforcement } from "./state-records";
+import { capNote, noteOf, withNote, type Noted } from "./notes";
 
 const MAX_COMPLAINTS = 1000;
 const MAX_CASE_PAGES = 10; // 20 dockets a page
@@ -72,12 +75,20 @@ export function complaintSourcesFor(state: string): ComplaintSource[] {
   return [...COMPLAINT_SOURCES.filter((c) => c.state === state), ...packComplaintSourcesFor(state)];
 }
 
-export async function searchComplaints(src: ComplaintSource, name: string): Promise<ComplaintHit[]> {
+export async function searchComplaints(src: ComplaintSource, name: string): Promise<Noted<ComplaintHit>> {
   const rows = await sodaRows(src.url, nameClause(src.nameField, name), MAX_COMPLAINTS, "Complaint data", `${src.dateField} DESC`);
-  return rows
+  return withNote(rows
     .map((r) => ({ state: src.state, source: src.source, sourceUrl: src.datasetUrl, ...src.toHit(r) }))
-    .filter((h) => namedIn(name, h.business));
+    .filter((h) => namedIn(name, h.business)), noteOf(rows) ? `the newest ${MAX_COMPLAINTS} word matches were checked; there are more` : null);
 }
+
+/**
+ * CourtListener's robots.txt disallows every path for unnamed agents ("Be conservative; Block everything", read
+ * 2026-10-15), so its search is not run (HARD RULE 2: never get around a robots.txt Disallow). Flip only when its
+ * robots.txt allows our agent; http.ts would refuse the requests anyway.
+ */
+export const COURTLISTENER_ALLOWED = false;
+export const COURTLISTENER_BLOCKED_NOTE = "Not searched by ConstructHUB: courtlistener.com's robots.txt disallows automated access for all but named search engines (checked 2026-10-15)";
 
 // ── Federal court dockets (CourtListener) ────────────────────────────────────────────────────────────────────────
 const COURTLISTENER = "https://www.courtlistener.com";
@@ -134,13 +145,15 @@ async function dol(dataset: string, filter: unknown, limit: number): Promise<any
 }
 
 /** Every federal OSHA inspection of an establishment with this name, nationwide, with its violations and penalties. */
-export async function searchOsha(name: string): Promise<OshaHit[]> {
+export async function searchOsha(name: string): Promise<Noted<OshaHit>> {
   const words = name.toUpperCase().replace(/[^A-Z0-9&' -]/g, " ").split(/\s+/).filter((w) => w.length >= 2);
   if (!words.length) return [];
   // `like` is case-sensitive and names are stored uppercase. The longest word narrows the search on the server;
   // whole-word matching on every word happens here.
   const longest = words.reduce((a, b) => (b.length > a.length ? b : a));
   const rows = await dol("inspection", { field: "estab_name", operator: "like", value: `%${longest}%` }, MAX_OSHA);
+  // The API answers MAX_OSHA rows at most: with a full page, inspections past it were not checked, and the report says so.
+  const capped = rows.length >= MAX_OSHA ? `only the first ${MAX_OSHA} establishments whose name contains "${longest}" were checked; there are more` : null;
   const out: OshaHit[] = [];
   for (const r of rows) {
     const activityNr = s(r.activity_nr);
@@ -165,7 +178,7 @@ export async function searchOsha(name: string): Promise<OshaHit[]> {
       }
     } catch { /* the inspections stand without their violation detail */ }
   }
-  return out.sort((a, b) => String(b.opened ?? "").localeCompare(String(a.opened ?? "")));
+  return withNote(out.sort((a, b) => String(b.opened ?? "").localeCompare(String(a.opened ?? ""))), capped);
 }
 
 // ── All of it, for one company ──────────────────────────────────────────────────────────────────────────────────
@@ -212,20 +225,21 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
   const complaints: ComplaintHit[] = [];
   for (const state of states) {
     const list = complaintSourcesFor(state);
-    if (!list.length) sources.push({ source: `${state} attorney general complaints`, scope: state, searched: false, note: "This state doesn't publish its complaints as open data" });
+    if (!list.length) sources.push({ source: `${state} attorney general complaints`, scope: state, searched: false, note: "Not searched by ConstructHUB: we have no complaint source for this state" });
     for (const src of list) {
       try {
         const hits = await searchComplaints(src, name);
         complaints.push(...hits);
-        sources.push({ source: src.source, scope: src.scope, searched: true, note: `${hits.length} complaint(s)` });
+        sources.push({ source: src.source, scope: src.scope, searched: true, note: `${hits.length} complaint(s)${noteOf(hits) ? ` (${noteOf(hits)})` : ""}` });
       } catch (err: any) {
         sources.push({ source: src.source, scope: src.scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
       }
     }
   }
-  for (const state of states) if (!hasStateCourtSearch(state)) sources.push({ source: `${state} state court cases`, scope: state, searched: false, note: "State courts don't publish searchable case data" });
+  for (const state of states) if (!hasStateCourtSearch(state)) sources.push({ source: `${state} state court cases`, scope: state, searched: false, note: "Not searched by ConstructHUB: we don't search this state's court records" });
   let courtCases: CourtCaseHit[] = [];
-  try {
+  if (!COURTLISTENER_ALLOWED) sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: false, note: COURTLISTENER_BLOCKED_NOTE });
+  else try {
     const r = await searchCourtCases(name);
     courtCases = r.cases;
     sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: true,
@@ -236,7 +250,7 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
   let osha: OshaHit[] = [];
   try {
     osha = await searchOsha(name);
-    sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: true, note: `${osha.length} inspection(s)` });
+    sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: true, note: `${osha.length} inspection(s)${noteOf(osha) ? ` (${noteOf(osha)})` : ""}` });
   } catch (err: any) {
     const msg = String(err?.message ?? err);
     sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: false,
@@ -254,7 +268,7 @@ export async function previewCompanyRecords(name: string, states: string[]): Pro
   for (const state of states) for (const src of complaintSourcesFor(state)) {
     try { complaints += (await searchComplaints(src, name)).length; searched.push(src.source); } catch { /* a hint, not the report */ }
   }
-  try { courtCases = (await searchCourtCases(name, 1)).total; searched.push("Federal court dockets"); } catch { /* ditto */ }
+  if (COURTLISTENER_ALLOWED) try { courtCases = (await searchCourtCases(name, 1)).total; searched.push("Federal court dockets"); } catch { /* ditto */ }
   if (process.env.DOL_API_KEY) {
     try { osha = (await searchOsha(name)).length; searched.push("Federal OSHA inspections"); } catch { /* ditto */ }
   }

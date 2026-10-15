@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mnLicense, parseMnDebarred, parseMnOrders } from "./mn";
+import { mnDebarHit, mnLicense, mnOrderAdverse, parseMnDebarred, parseMnOrders } from "./mn";
 
 // Saved from DLI's rbc_2026actions.pdf (pdftotext -layout), 2026-10-15.
 const ORDERS = "Residential Building Contractor Enforcement Actions\n2026 Year to Date\nAny violation of an Order of the Commissioner is a gross misdemeanor pursuant to Minn. Stat. \u00a7326B.845, subd. 1.\n\nA Consent Order is not a finding of fact or admission of guilt.\n\nFor more information about specific orders, please call 651-284-5069 or email dli.contractor@state.mn.us.\n\n\n365 Exteriors LLC (BC807216), and Gina Louis Delmedico, Individually and Richard\nAnthony Vasquez (QB806019)\n\n    \u2022   West St. Paul, MN; South St. Paul, MN\n    \u2022   Consent Order: The residential building contractor license of Respondent 365 Exteriors LLC, license No.\n        BC807216, is revoked; Respondent Richard Anthony Vasquez, who holds qualifying builder registration\n        No. QB806019, is censured; Respondent 365 Exteriors LLC shall cease and desist from acting or holding\n        itself out as a residential building contractor, residential remodeler, or residential roofer in the state of\n        Minnesota; $10,000 monetary penalty, $7,000 stayed with conditions\u2013 04/17/2026\n    \u2022   RBC2603-0038/ALF\n\n\nA-1 NXterior Restorations L.L.C. and Cindy Lee \u2013 BC753468 and QB747420\n\n    \u2022   St. Paul, MN; Sheboygan, WI\n    \u2022   Licensing Order with Penalty: The Commissioner revokes the residential building contractor license of\n        Respondent A-1 NXterior Restoration L.L.C., No. BC753468 and the qualifying builder registration of\n        Respondent Cindy Lee, registration No. QB747420; Respondents shall cease and desist from acting or\n        holding themselves out as a residential building contractor, residential remodeler, or residential roofer\n        in the state of Minnesota.; $5,000 monetary penalty \u2013 04/14/2026\n    \u2022   RBC2512-0036/ALF\n\n\n\n\nResidential Building Contractor Enforcement Actions                                                                     1\n\fAce Restoration LLC, and Aaron Christian Loth, Individually\n\n   \u2022   Champlin, MN\n   \u2022   Consent Cease and Desist Order; Respondents shall cease and desist from acting or holding themselves\n       out as a residential building contractor, residential remodeler, or residential roofer in the state of\n       Minnesota without the requisite licensure; $5,000 monetary penalty, stayed with conditions \u2013\n       02/12/2026\n   \u2022   MLT2512-0013/ALF\n\n\nAdamant Painting and Renovations, LLC, and Adam Sherman, Individually\n\n   \u2022   Farmington, MN\n   \u2022   Consent Cease and Desist Order: Respondents shall cease and desist from acting or holding themselves\n       out as a residential building contractor, residential remodeler, or residential roofer in the state of\n       Minnesota without the requisite licensure; $8,000 monetary penalty, stayed with conditions -\n       09/22/2026\n   \u2022   MLT2606-003/RNW\n\n\nAdkins, Aaron Matthew \u2013 see Inspire Renovation LLC\n\nAdvanced Building Co LLC \u2013 see Labrocca, James John\n\nAguilar, Denis\n";
@@ -21,6 +21,25 @@ describe("Minnesota DLI", () => {
     expect(d).toHaveLength(1);
     expect(d[0]).toMatchObject({ name: "3G Contracting Inc.", owner: "Jennifer Rath", city: "Norwood, MN", address: "640 Railroad Drive Ste 600, Norwood, MN 55368" });
     expect(d[0].fields["Debarment Date"]).toBe("9/26/2025");
+  });
+
+  it("marks a debarment adverse only while it runs (audit 2026-10-15)", () => {
+    const [v] = parseMnDebarred(DEBARRED); // debarred 9/26/2025 to 9/26/2026
+    expect(mnDebarHit(v, "2026-05-01")!.hit).toMatchObject({ status: "Debarred", adverse: true });
+    expect(mnDebarHit(v, "2026-10-15")!.hit).toMatchObject({ status: "Debarred; period ended 2026-09-26", adverse: false });
+  });
+
+  it("leaves out a listed name that reads as a person even without \", an individual\"", () => {
+    // "Jacob Roy" is listed that way on the page (2026-10-15); the entry's fields here are the business's above.
+    expect(parseMnDebarred(DEBARRED.replace(">3G Contracting Inc.<", ">Jacob Roy<"))).toHaveLength(0);
+  });
+
+  it("derives adverse from each order's own words", () => {
+    const o = parseMnOrders(ORDERS);
+    expect(o.map((x) => mnOrderAdverse(x.order))).toEqual([true, true, true, true]);
+    // A caption whose business word is only "Homes" (a surname too) is not taken for a business.
+    expect(parseMnOrders(ORDERS.replace("Adamant Painting and Renovations, LLC, and Adam Sherman, Individually", "Adam Homes"))
+      .some((x) => x.name === "Adam Homes")).toBe(false);
   });
 
   it("maps a license export row with its address, phone and keys", () => {

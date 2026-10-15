@@ -141,3 +141,11 @@ describe("SC DES enforcement reports", () => {
     ]);
   });
 });
+
+describe("SC adverse (audit 2026-10-15)", () => {
+  it("adverse comes from the published penalty; an order with no penalty printed is unknown", () => {
+    const [o] = parseDesReport(SEPT_2026);
+    expect(desHit(o, "u")!.adverse).toBe(true);
+    expect(desHit({ ...o, penalty: null }, "u")!.adverse).toBeNull();
+  });
+});

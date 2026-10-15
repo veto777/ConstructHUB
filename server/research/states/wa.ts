@@ -25,6 +25,8 @@ import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { clean } from "../bulk";
 import type { BulkHit, BulkSource } from "../bulk";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
+import { adverseFrom, hasEnded } from "../adverse";
+import { capNote, noteOf, withNote } from "../notes";
 import { normLicense, type IdQuery } from "../identifiers";
 import { anyDay, flip, money, nameMatches, postJson, usd } from "./lib/g8-common";
 
@@ -39,14 +41,18 @@ type VerifyRow = {
   ContractorGroup: string | null; ContractorType: string | null; City: string | null; State: string | null;
 };
 
+/** Verify's search returns at most this many rows (one page). */
+const VERIFY_PAGE = 100;
+
 /** Verify's own search (ranked, any word); the caller keeps only rows that really name the subject. */
 async function verifySearch(name: string, cat: "Name" | "LicenseId" = "Name"): Promise<VerifyRow[]> {
   const text = name.replace(cat === "Name" ? /[^A-Za-z0-9&' -]/g : /[^A-Za-z0-9*]/g, " ").replace(/\s+/g, " ").trim();
   if (text.length < 2) return [];
-  const dto = { pageNumber: 0, SearchType: 2, SortColumn: "Rank", SortOrder: "desc", pageSize: 100, ContractorTypeFilter: [], SessionID: "", SAW: "", [cat]: text, searchCat: cat, searchText: text, firstSearch: 1 };
+  const dto = { pageNumber: 0, SearchType: 2, SortColumn: "Rank", SortOrder: "desc", pageSize: VERIFY_PAGE, ContractorTypeFilter: [], SessionID: "", SAW: "", [cat]: text, searchCat: cat, searchText: text, firstSearch: 1 };
   const body = await postJson<{ d?: { SearchResult?: VerifyRow[] } }>(VERIFY_SEARCH, { dtoSrch: dto }, "L&I Verify");
   if (!Array.isArray(body.d?.SearchResult)) throw new Error("L&I Verify returned an unexpected payload");
-  return body.d!.SearchResult!;
+  const rows = body.d!.SearchResult!;
+  return rows.length >= VERIFY_PAGE ? withNote(rows, `Verify returned its limit of ${VERIFY_PAGE} results for this search (best-ranked first); less relevant ones are not checked`) : rows;
 }
 
 async function verifyDetails(ubi: string, license: string, violation: string): Promise<any> {
@@ -94,22 +100,26 @@ export function verifyLicenseHit(details: any, row: VerifyRow | null, matchedOn:
 
 async function searchTradespeople(name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
   if (kind !== "person") return []; // businesses: the data.wa.gov contractor dataset (../licenses.ts)
-  const rows = (await verifySearch(name)).filter((r) => !r.Ubi && r.LicenseId && nameMatches(name, r.BusinessName, flip(r.BusinessName)));
+  const all = await verifySearch(name);
+  const rows = all.filter((r) => !r.Ubi && r.LicenseId && nameMatches(name, r.BusinessName, flip(r.BusinessName)));
   const hits: LicenseHit[] = [];
   // The search row's status is often just "View Details"; the detail record has the certificate's own status and dates.
-  for (const r of rows.slice(0, 15)) hits.push(verifyLicenseHit(await verifyDetails("", r.LicenseId!, ""), r, "principal"));
-  return hits;
+  for (const r of rows.slice(0, MAX_TRADES)) hits.push(verifyLicenseHit(await verifyDetails("", r.LicenseId!, ""), r, "principal"));
+  return withNote(withNote(hits, noteOf(all)), rows.length > MAX_TRADES ? capNote(MAX_TRADES, rows.length, "certificates") : null);
 }
 
+/** Detail records read per search (each is one more request to L&I). */
+const MAX_TRADES = 15, MAX_BY_LICENSE = 5;
+
 /** Verify searches license, registration and certificate numbers itself (its "LicenseId" search). */
-async function searchByLicense(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license") return [];
+async function searchByLicense(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null; // Verify has no phone or street-address search
   const want = normLicense(q.value);
-  if (!want) return [];
+  if (!want) return null;
   const rows = (await verifySearch(q.value.trim(), "LicenseId")).filter((r) => r.LicenseId && normLicense(r.LicenseId) === want);
   const hits: LicenseHit[] = [];
-  for (const r of rows.slice(0, 5)) hits.push(verifyLicenseHit(await verifyDetails(r.Ubi ?? "", r.LicenseId!, ""), r, "license"));
-  return hits;
+  for (const r of rows.slice(0, MAX_BY_LICENSE)) hits.push(verifyLicenseHit(await verifyDetails(r.Ubi ?? "", r.LicenseId!, ""), r, "license"));
+  return withNote(hits, rows.length > MAX_BY_LICENSE ? capNote(MAX_BY_LICENSE, rows.length, "records") : null);
 }
 
 // ── Verify enforcement facts (companies) ─────────────────────────────────────────────────────────────────────
@@ -132,7 +142,9 @@ export function verifyEnforcement(details: any, businessName: string, url: strin
       status: status ? `Infraction: ${status}` : "Infraction issued", city: clean(v.CityName) ?? city,
       detail: [clean(v.ItemTypeDescription), clean(v.Description), clean(v.RcwCode), money(v.ViolationAmount) ? `penalty ${usd(money(v.ViolationAmount))}` : null,
         due ? `${usd(due)} due` : null].filter(Boolean).join(". ").slice(0, 800) || null,
-      amount: money(v.ViolationAmount), adverse: status && /dismiss|vacat|withdr|revers/i.test(status) ? false : true,
+      // From the infraction's own status: dismissed/vacated → false; "Satisfied"/"Not Satisfied"/paid/final → true; no
+      // status, or one still open to appeal → null (audit 2026-10-15, decision 2).
+      amount: money(v.ViolationAmount), adverse: adverseFrom(status, { adverse: /satisf|paid|final|upheld|affirm|due|collect/i }),
     });
   }
   for (const s of c.Summons ?? []) {
@@ -156,7 +168,8 @@ export function verifyEnforcement(details: any, businessName: string, url: strin
       city: clean(w.CountyName) ? `${clean(w.CountyName)} County` : city,
       detail: [`State tax warrant filed by ${clean(w.PlaintiffName) ?? "L&I"}`, clean(w.CauseNumber) ? `superior court cause ${clean(w.CauseNumber)}` : null,
         money(w.ComplaintAmount) ? `amount ${usd(money(w.ComplaintAmount))}` : null, money(w.PaymentAmount) ? `paid ${usd(money(w.PaymentAmount))}` : null].filter(Boolean).join(", "),
-      amount: money(w.ComplaintAmount), adverse: true,
+      // A tax warrant filed in superior court is adverse unless its status says it was dismissed or withdrawn.
+      amount: money(w.ComplaintAmount), adverse: adverseFrom(status) === false ? false : true,
     });
   }
   for (const l of c.Lapses ?? []) {
@@ -173,7 +186,8 @@ export function verifyEnforcement(details: any, businessName: string, url: strin
 async function searchVerifyEnforcement(name: string): Promise<EnforcementHit[]> {
   const seen = new Set<string>();
   const targets: { ubi: string; lic: string; vio: string; name: string }[] = [];
-  for (const r of await verifySearch(name)) {
+  const found = await verifySearch(name);
+  for (const r of found) {
     if (!r.Ubi && !r.ViolationId) continue; // tradespeople: not a company
     if (!nameMatches(name, r.BusinessName)) continue;
     const key = r.ViolationId ? `V${r.ViolationId}` : `${r.Ubi}|${r.LicenseId ?? ""}`;
@@ -188,7 +202,8 @@ async function searchVerifyEnforcement(name: string): Promise<EnforcementHit[]> 
   }
   // The same lawsuit or warrant shows on every license of one UBI: keep one of each.
   const keys = new Set<string>();
-  return out.filter((h) => { const k = `${h.source}|${h.id}|${h.date}|${h.status}`; if (keys.has(k)) return false; keys.add(k); return true; });
+  const hits = out.filter((h) => { const k = `${h.source}|${h.id}|${h.date}|${h.status}`; if (keys.has(k)) return false; keys.add(k); return true; });
+  return withNote(withNote(hits, noteOf(found)), targets.length > MAX_DETAILS ? capNote(MAX_DETAILS, targets.length, "matching licenses and violations (their records were read)") : null);
 }
 
 const verifyLicenses: LiveLicenseSearch = { source: "Washington L&I tradesperson certificates (Verify)", sourceUrl: VERIFY, search: searchTradespeople, searchBy: searchByLicense };
@@ -242,6 +257,12 @@ async function* lniList(url: string, extra: Record<string, string>): AsyncIterab
 const enf = (h: EnforcementHit, business: string, license: string | null): BulkHit =>
   ({ kind: "enforcement", hit: { ...h, licenseNumber: license }, business, person: null, keys: { licenses: [license] } });
 
+/** A listed debarment is adverse while it runs: past its end date it has ended, unless the status says it lasts "until" something. */
+export function debarAdverse(status: string | null, ends: string | null, today = new Date().toISOString().slice(0, 10)): boolean {
+  if (adverseFrom(status) === false) return false;
+  return !(hasEnded(ends, today) && !/until|permanent/i.test(status ?? ""));
+}
+
 async function* debarredLoader(): AsyncIterable<BulkHit> {
   const today = new Date().toISOString().slice(0, 10);
   for await (const r of lniList(`${DEBAR_PAGE}/GetDebarList`, { status_code: "", debar_begin_date: "", debar_end_date: "", penalty_due_flg: "", wage_due_flg: "" })) {
@@ -253,9 +274,12 @@ async function* debarredLoader(): AsyncIterable<BulkHit> {
     yield enf({
       state: "WA", source: "Washington L&I debarred contractors (public works)", sourceUrl: DEBAR_PAGE, category: "debarment",
       name: related ? `${name} / ${related}` : name, id: clean(r.license_id) ?? clean(r.ubi_num), date: anyDay(r.debar_begin_date), endDate: ends,
-      status: clean(r.status_desc) ?? (ends && ends < today ? "Debarment period over" : "Debarred"), city: null,
+      // L&I's own status when the row has one; otherwise from the row's own end date (not inferred from anything else).
+      status: clean(r.status_desc) ?? (hasEnded(ends, today) ? "Debarment period over" : "Debarred"), city: null,
       detail: [rcwText(clean(r.rcw_code)), owed ? `L&I lists ${owed}` : null, clean(r.ubi_num) ? `UBI ${clean(r.ubi_num)}` : null].filter(Boolean).join(". ") || null,
-      amount: null, adverse: true,
+      // A debarment whose period is over is not adverse today (audit 2026-10-15, decision 2), unless L&I's own status
+      // keeps it running past the end date ("Debarred Until Penalties Paid", "Permanent Debarment").
+      amount: null, adverse: debarAdverse(clean(r.status_desc), ends, today),
     }, [name, related].filter(Boolean).join(" "), clean(r.license_id));
   }
 }

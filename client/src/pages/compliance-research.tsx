@@ -119,7 +119,7 @@ export default function ResearchOrderPage() {
           we can reach in those states, then follows the license numbers, phones, addresses and people on what it finds to other
           licenses and businesses tied to them. For a company it also pulls consumer complaints, state
           enforcement records (licensing-board discipline, stop-work orders, tax liens, debarments, environmental orders),
-          federal court cases and OSHA safety inspections. Every finding links to its official
+          and OSHA safety inspections. Every finding links to its official
           source. Reports are usually ready the same day.
         </p>
       </header>
@@ -127,9 +127,9 @@ export default function ResearchOrderPage() {
       <section className="max-w-3xl rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2" data-testid="section-research-what">
         <h2 className="font-semibold">What a report does</h2>
         <ul className="space-y-1.5 text-sm list-disc pl-5">
-          <li>Finds a contractor by name, owner, license number, phone or address, in all 50 states and DC.</li>
+          <li>Searches every source we have in each state you pick, by name, owner, license number, phone or address. What we have differs by state: the link below lists it.</li>
           <li>Cross-references what it finds. Other licenses and businesses that share a license number, phone, address or person show up too, and each one says what ties it.</li>
-          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens), federal court cases and OSHA inspections for companies.</li>
+          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens) and OSHA inspections for companies.</li>
         </ul>
         <Link href={RESEARCH_COVERAGE_PATH} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline" data-testid="link-research-coverage">
           See exactly what we search in your state <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -381,7 +381,7 @@ function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
               <tr key={j} className="border-b align-top">
                 <td className="py-2 pr-3 whitespace-nowrap">{c.filed ?? "—"}</td>
                 <td className="pr-3"><ExtA href={c.url}>{c.caseName}</ExtA>{c.docketNumber ? <span className="block text-xs text-muted-foreground font-mono">{c.docketNumber}</span> : null}</td>
-                <td className="pr-3">{c.court ?? "—"}</td><td className="pr-3">{c.nature ?? "—"}</td><td className="pr-3 whitespace-nowrap">{c.terminated ?? "Open"}</td>
+                <td className="pr-3">{c.court ?? "—"}</td><td className="pr-3">{c.nature ?? "—"}</td><td className="pr-3 whitespace-nowrap">{c.terminated ?? "No end date published"}</td>
               </tr>))}</tbody>
           </table></div>
         )}
@@ -472,10 +472,24 @@ const TIE_LABELS: Record<RelatedTie, { title: string; caveat?: string }> = {
 /** Related licenses and businesses, grouped by the tie. None of them is the subject's own record. */
 function RelatedRecords({ s, i }: { s: ResearchSubjectReport; i: number }) {
   if (!s.relatedLicenses && !s.relatedEnforcement) return null; // reports made before 2026-10-15
-  const lic = s.relatedLicenses ?? [], enf = s.relatedEnforcement ?? [];
+  const allLic = s.relatedLicenses ?? [], allEnf = s.relatedEnforcement ?? [];
+  // Found only by an identifier the customer gave (another name on the record): shown first, on their own.
+  const yourLic = allLic.filter((h) => h.byYourIdentifier), yourEnf = allEnf.filter((h) => h.byYourIdentifier);
+  const lic = allLic.filter((h) => !h.byYourIdentifier), enf = allEnf.filter((h) => !h.byYourIdentifier);
   const groups = RELATED_TIES.map((t) => ({ t, lic: lic.filter((h) => (h.relatedTie ?? "address") === t), enf: enf.filter((h) => (h.relatedTie ?? "address") === t) })).filter((g) => g.lic.length || g.enf.length);
   return (
     <div className="space-y-3" data-testid={`section-related-${i}`}>
+      {(yourLic.length > 0 || yourEnf.length > 0) && (
+        <div className="space-y-1.5" data-testid={`related-yours-${i}`}>
+          <h3 className="font-semibold">Matched by the license number, phone or address you gave ({yourLic.length + yourEnf.length})</h3>
+          <p className="text-sm text-muted-foreground">
+            These records carry an identifier you gave us but a different name than {s.name}, so they are not shown as {s.name}'s
+            own. They may belong to someone else who shares that number or address.
+          </p>
+          {yourLic.length > 0 && <LicenseTable rows={yourLic} related testId={`table-related-yours-${i}`} />}
+          {yourEnf.length > 0 && <RelatedEnforcement rows={yourEnf} />}
+        </div>
+      )}
       <h3 className="font-semibold">Related licenses and businesses ({lic.length + enf.length})</h3>
       <p className="text-sm text-muted-foreground">
         These are not {s.name}'s own records. Each one shares a license number, phone, address or person with a record above,
@@ -618,7 +632,7 @@ export function ResearchOrderStatusPage() {
                     : <p>We don't search state license records for {o.input.states.join(", ")} yet. The report covers permit portals only there.</p>}
                   {Object.entries(o.preview.portalsByState).map(([st, n]) => <p key={st}>The report will search {n} live permit portal(s) in {stateName(st)} by name.</p>)}
                   {o.preview.records && (o.preview.records.complaints > 0 || o.preview.records.courtCases > 0 || o.preview.records.osha > 0 || (o.preview.records.enforcement ?? 0) > 0) && (
-                    <p data-testid="text-preview-records">Records on file: {o.preview.records.complaints} consumer complaint(s){o.preview.records.enforcement ? `, ${o.preview.records.enforcement} state enforcement or standing record(s)` : ""}, about {o.preview.records.courtCases} federal court docket(s){o.preview.records.osha ? ` and ${o.preview.records.osha} OSHA inspection(s)` : ""}.</p>
+                    <p data-testid="text-preview-records">Records on file: {o.preview.records.complaints} consumer complaint(s){o.preview.records.enforcement ? `, ${o.preview.records.enforcement} state enforcement or standing record(s)` : ""}{o.preview.records.courtCases ? `, about ${o.preview.records.courtCases} federal court docket(s)` : ""}{o.preview.records.osha ? ` and ${o.preview.records.osha} OSHA inspection(s)` : ""}.</p>
                   )}
                   <p className="text-muted-foreground">Details, permit matches, related licenses and businesses, and sources come with the full report.</p>
                 </div>

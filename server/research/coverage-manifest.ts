@@ -167,8 +167,10 @@ export async function buildCoverageManifest(): Promise<CoverageManifest> {
 
   // Nationwide records: whatever the report lists with a nationwide scope.
   const all = await searchCompanyRecords(PROBE_COMPANY, []);
+  // A source that needs a key this build doesn't hold ("Not searched yet": OSHA without DOL_API_KEY), or one switched
+  // off ("Not searched by ConstructHUB": CourtListener, robots.txt), is not claimed.
   const nationwide: CoverageSource[] = all.sources
-    .filter((s) => /^all /i.test(s.scope))
+    .filter((s) => /^all /i.test(s.scope) && s.note !== "Not searched yet" && !s.note.startsWith("Not searched by ConstructHUB"))
     .map((s) => ({ label: s.source, kinds: [/OSHA/.test(s.source) ? "other" as const : kindOfLabel(s.source)], ids: ["name" as const], mode: "live" as const, companiesOnly: true, url: null }));
 
   return { generatedAt: new Date().toISOString(), states, nationwide };

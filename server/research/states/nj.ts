@@ -26,7 +26,8 @@
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit } from "@shared/research-reports";
-import { USER_AGENT, politeFetch, rateLimitHost } from "../../scrapers/polite-fetch";
+import { fetchWithDeadline, politeFetch, rateLimitHost } from "../http";
+import { adverseFrom, hasEnded } from "../adverse";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
 import { excelDate, readXlsx } from "./lib/g1-xlsx";
@@ -54,23 +55,42 @@ export function aspFields(html: string): URLSearchParams {
   return form;
 }
 
+/**
+ * Where a redirect of the download site leads: only within the site itself (the old code glued a redirect to another
+ * host onto the site's own path). Anything else is an error, never followed with the session cookie.
+ */
+export function njRedirect(from: string, location: string): string {
+  const next = new URL(location, from);
+  if (!next.toString().startsWith(MYLICENSE)) throw new Error(`NJ DCA download site redirected off the site (${next.host}${next.pathname})`);
+  return next.toString();
+}
+
+/** The first bytes of a file (a header check never needs to read a whole roster). */
+export async function fileHead(path: string, bytes = 200): Promise<string> {
+  const fh = await fs.open(path, "r");
+  try { const b = Buffer.alloc(bytes); const { bytesRead } = await fh.read(b, 0, bytes, 0); return b.subarray(0, bytesRead).toString("utf8"); }
+  finally { await fh.close(); }
+}
+
 /** One profession's roster, saved to a temp file (the caller deletes it). `business`: the business-licensee search. */
 async function myLicenseRoster(profession: string, business: boolean): Promise<string> {
   const jar = new Map<string, string>();
   const keep = (res: Response) => { for (const c of res.headers.getSetCookie?.() ?? []) { const [kv] = c.split(";"); const i = kv.indexOf("="); if (i > 0) jar.set(kv.slice(0, i).trim(), kv.slice(i + 1)); } };
   const cookie = () => Array.from(jar, ([k, v]) => `${k}=${v}`).join("; ");
-  const step = async (path: string, form?: URLSearchParams): Promise<string> => {
-    const url = MYLICENSE + path;
+  const step = async (path: string, form?: URLSearchParams, hops = 0): Promise<string> => {
+    const url = new URL(path, MYLICENSE).toString();
     await rateLimitHost(url, 1500);
-    const res = await fetch(url, {
+    const res = await fetchWithDeadline(url, {
       method: form ? "POST" : "GET", body: form?.toString(), redirect: "manual",
-      headers: { "user-agent": USER_AGENT, ...(form ? { "content-type": "application/x-www-form-urlencoded" } : {}), ...(jar.size ? { cookie: cookie() } : {}) },
-    });
+      headers: { ...(form ? { "content-type": "application/x-www-form-urlencoded" } : {}), ...(jar.size ? { cookie: cookie() } : {}) },
+    }, 120_000);
     keep(res);
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location");
       if (!loc) throw new Error(`NJ DCA download site redirected without a location (HTTP ${res.status})`);
-      return step(new URL(loc, url).toString().replace(MYLICENSE, ""));
+      const next = njRedirect(url, loc);
+      if (hops >= 5) throw new Error("NJ DCA download site redirected more than 5 times");
+      return step(next, undefined, hops + 1);
     }
     if (!res.ok) throw new Error(`NJ DCA download site returned HTTP ${res.status} for ${path}`);
     return res.text();
@@ -101,6 +121,30 @@ async function myLicenseRoster(profession: string, business: boolean): Promise<s
 
 const NOT_A_LICENSE = /CE Sponsor|CPC (Provider|Class)|Instructor|In-Training/i;
 
+/** One roster row (pipe-delimited download), or null for a row that is not a license. */
+export function njRosterHit(r: Record<string, string>, label: string, isBusiness: boolean): BulkHit | null {
+  const type = clean(r.license_type_name);
+  if (!type || NOT_A_LICENSE.test(type)) return null;
+  const full = clean(r.full_name);
+  if (!full) return null;
+  const person = isBusiness ? null : clean([r.first_name, r.middle_name, r.last_name, r.name_suffix].map(clean).filter(Boolean).join(" ")) ?? full;
+  const business = isBusiness ? full : null;
+  const zip = /^\d{9}$/.test(r.addr_zipcode ?? "") ? `${r.addr_zipcode.slice(0, 5)}-${r.addr_zipcode.slice(5)}` : r.addr_zipcode; // "078654204"
+  // An individual licensee's roster address is a home address: city, state and ZIP only, never a key.
+  const address = clean([...(business ? [r.addr_line_1, r.addr_line_2] : []), r.addr_city, r.addr_state, zip].map(clean).filter(Boolean).join(" "));
+  return {
+    kind: "license",
+    hit: {
+      state: "NJ", source: label, sourceUrl: MYLICENSE_PAGE, businessName: business, licenseNumber: clean(r.license_no),
+      licenseType: type, specialty: clean(r.profession_name), status: clean(r.license_status_name), principal: person,
+      city: [clean(r.addr_city), clean(r.addr_state)].filter(Boolean).join(", ") || null, expires: usDate(r.expiration_date),
+      matchedOn: business ? "business" : "principal", address,
+    },
+    business, person,
+    keys: business ? { licenses: [r.license_no], addresses: [address] } : { licenses: [r.license_no] },
+  };
+}
+
 function njRosterLoader(label: string, lists: { profession: string; business: boolean }[]): () => AsyncIterable<BulkHit> {
   return async function* () {
     for (const list of lists) {
@@ -108,7 +152,7 @@ function njRosterLoader(label: string, lists: { profession: string; business: bo
       let path = "";
       for (let attempt = 1; ; attempt++) {
         path = await myLicenseRoster(list.profession, list.business);
-        const head = (await fs.readFile(path, "utf8")).slice(0, 200);
+        const head = await fileHead(path);
         if (head.startsWith("full_name|")) break;
         await fs.rm(path, { force: true });
         if (attempt >= 3) throw new Error(`NJ DCA ${list.profession} roster has an unexpected layout: ${head.replace(/\s+/g, " ").slice(0, 80)}`);
@@ -116,25 +160,8 @@ function njRosterLoader(label: string, lists: { profession: string; business: bo
       }
       try {
         for await (const r of csvRecords(path, "|")) {
-          const type = clean(r.license_type_name);
-          if (!type || NOT_A_LICENSE.test(type)) continue;
-          const full = clean(r.full_name);
-          if (!full) continue;
-          const person = list.business ? null : clean([r.first_name, r.middle_name, r.last_name, r.name_suffix].map(clean).filter(Boolean).join(" ")) ?? full;
-          const business = list.business ? full : null;
-          const zip = /^\d{9}$/.test(r.addr_zipcode ?? "") ? `${r.addr_zipcode.slice(0, 5)}-${r.addr_zipcode.slice(5)}` : r.addr_zipcode; // "078654204"
-          const address = clean([r.addr_line_1, r.addr_line_2, r.addr_city, r.addr_state, zip].map(clean).filter(Boolean).join(" "));
-          yield {
-            kind: "license",
-            hit: {
-              state: "NJ", source: label, sourceUrl: MYLICENSE_PAGE, businessName: business, licenseNumber: clean(r.license_no),
-              licenseType: type, specialty: clean(r.profession_name), status: clean(r.license_status_name), principal: person,
-              city: [clean(r.addr_city), clean(r.addr_state)].filter(Boolean).join(", ") || null, expires: usDate(r.expiration_date),
-              matchedOn: business ? "business" : "principal", address,
-            },
-            business, person,
-            keys: { licenses: [r.license_no], addresses: [address] },
-          };
+          const h = njRosterHit(r, label, list.business);
+          if (h) yield h;
         }
       } finally {
         await fs.rm(path, { force: true });
@@ -162,7 +189,9 @@ async function* njDebarmentsLoader(): AsyncIterable<BulkHit> {
       name, id: r.EMPLOYER_NUM == null ? null : String(r.EMPLOYER_NUM), date: null, endDate: end,
       status: [category, end ? (end < today ? `through ${end} (period over)` : `through ${end}`) : null].filter(Boolean).join(" ") || null,
       city: [clean(String(r.CITY ?? "")), clean(String(r.STATE ?? ""))].filter(Boolean).join(", ") || null,
-      detail: "Debarred under the New Jersey Prevailing Wage Act from bidding on or working on public works contracts", amount: null, adverse: true,
+      detail: "Debarred under the New Jersey Prevailing Wage Act from bidding on or working on public works contracts", amount: null,
+      // On the list means debarred; a debarment whose period is over is no longer a sanction.
+      adverse: adverseFrom("Debarred", { ended: hasEnded(end, today) }),
       address,
     };
     yield { kind: "enforcement", hit, business: name, person: null, keys: { addresses: [address] } };
@@ -220,7 +249,8 @@ async function* njWallLoader(): AsyncIterable<BulkHit> {
       city: cityOf(r["Employer's Principal Address"]),
       detail: [violation ? `Unpaid final judgment or order: ${violation}` : null, clean(r["Industry Type"]), owed != null ? `${usd(owed)} owed` : null,
         clean(r.County) ? `${clean(r.County)} County` : null].filter(Boolean).join(". ") || null,
-      amount: owed, adverse: true, address: clean(r["Employer's Principal Address"]),
+      // Every row is an unpaid final judgment or order (the list's own definition and column heading).
+      amount: owed, adverse: adverseFrom("Final order or judgment, unpaid"), address: clean(r["Employer's Principal Address"]),
     };
     yield { kind: "enforcement", hit, business: name, person: null, keys: { addresses: [r["Employer's Principal Address"], ...(others.get(name.toUpperCase()) ?? [])] } };
   }
@@ -239,7 +269,8 @@ async function* njWatchlistLoader(): AsyncIterable<BulkHit> {
       city: cityOf(r["Employer Address"]),
       detail: [clean(r["Nature of Claim"]), Number.isFinite(workers) && workers > 0 ? `${workers} employee(s)` : null,
         wages != null ? `wages assessed ${usd(wages)}` : null, fees != null ? `fees and penalties ${usd(fees)}` : null].filter(Boolean).join(". ") || null,
-      amount: wages, adverse: true, address: clean(r["Employer Address"]),
+      // Every row carries a "Date of Final Order and Judgement" (the list's own column): a final finding of a violation.
+      amount: wages, adverse: adverseFrom("Final order and judgement"), address: clean(r["Employer Address"]),
     };
     yield { kind: "enforcement", hit, business: name, person: null, keys: { addresses: [r["Employer Address"]] } };
   }

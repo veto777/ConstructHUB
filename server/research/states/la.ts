@@ -11,11 +11,13 @@
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { normLicense, type IdQuery } from "../identifiers";
 import { download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { firstAmount, tableRows, text } from "./lib/g4-html";
+import { adverseFrom } from "../adverse";
+import { capNote, withNote } from "../notes";
 import type { StatePack } from "./types";
 
 const ARLS = "https://arlspublic.lslbc.louisiana.gov";
@@ -25,16 +27,19 @@ const VIOLATIONS_PAGE = "https://lslbc.gov/contractor-violations/";
 const MAX_DETAILS = 15;
 
 /** The detail keys and names on a _DetailedSearch results table (one row per contractor, or per qualifier). */
-export function parseLaResults(html: string): { key: string; name: string | null }[] {
-  const out = new Map<string, string | null>();
+export function parseLaResults(html: string): { key: string; name: string | null; qualifiers: string[] }[] {
+  const out = new Map<string, { name: string | null; qualifiers: string[] }>();
   for (const row of Array.from(html.matchAll(/<tr>([\s\S]*?)<\/tr>/g))) {
     const links = Array.from(row[1].matchAll(/ShowAccountDetails\('([^']+)'[^>]*>([\s\S]*?)<\/a>/g));
     if (!links.length) continue;
     // ByQP rows show the qualifier first and the company second; ByName rows show the company alone.
     const company = links[links.length - 1];
-    if (!out.has(company[1])) out.set(company[1], text(company[2]));
+    const cur = out.get(company[1]) ?? { name: text(company[2]), qualifiers: [] };
+    const qp = links.length > 1 ? text(links[0][2]) : null;
+    if (qp && !cur.qualifiers.includes(qp)) cur.qualifiers.push(qp);
+    out.set(company[1], cur);
   }
-  return Array.from(out, ([key, name]) => ({ key, name }));
+  return Array.from(out, ([key, v]) => ({ key, ...v }));
 }
 
 export type LaDetail = {
@@ -62,10 +67,10 @@ export function parseLaDetail(html: string): LaDetail {
 const names = (want: string[], who: string | null) => { const have = new Set(tokens(who ?? "")); return want.every((w) => have.has(w)); };
 
 /** Post one _DetailedSearch form and read each match's detail page. */
-async function lslbcQuery(body: URLSearchParams, referer: string, matchedOn: LicenseHit["matchedOn"], name: string | null, keep: (r: { name: string | null }) => boolean): Promise<LicenseHit[]> {
+async function lslbcQuery(body: URLSearchParams, referer: string, matchedOn: LicenseHit["matchedOn"], name: string | null, keep: (r: { name: string | null; qualifiers: string[] }) => boolean): Promise<LicenseHit[]> {
   const res = await politeFetch(`${ARLS}/Public/_DetailedSearch/`, {
     method: "POST", body: body.toString(),
-    headers: { "content-type": "application/x-www-form-urlencoded", referer, "x-requested-with": "XMLHttpRequest" },
+    headers: { "content-type": "application/x-www-form-urlencoded", referer }, // no X-Requested-With: the bot doesn't pose as the page's script (audit 2026-10-15)
   }, { minDelayMs: 1100 });
   if (!res.ok) throw new Error(`LSLBC search returned HTTP ${res.status}`);
   const html = await res.text();
@@ -73,9 +78,10 @@ async function lslbcQuery(body: URLSearchParams, referer: string, matchedOn: Lic
   if (!/Search Results|Roster Entries Found/i.test(html)) throw new Error("LSLBC returned an unexpected page");
   const want = tokens(name ?? "");
   const hits: LicenseHit[] = [];
-  for (const row of parseLaResults(html).filter(keep).slice(0, MAX_DETAILS)) {
+  const rows = parseLaResults(html).filter(keep);
+  for (const row of rows.slice(0, MAX_DETAILS)) {
     const url = `${ARLS}/Public/_DisplayOnlineDetails/?key=${row.key}&Source=DetailedSearch`;
-    const d = await politeFetch(url, { headers: { referer, "x-requested-with": "XMLHttpRequest" } }, { minDelayMs: 1100 });
+    const d = await politeFetch(url, { headers: { referer } }, { minDelayMs: 1100 });
     if (!d.ok) throw new Error(`LSLBC detail returned HTTP ${d.status}`);
     const det = parseLaDetail(await d.text());
     const quals = Array.from(new Set(det.classes.map((c) => c.qualifier).filter((v): v is string => !!v)));
@@ -90,7 +96,7 @@ async function lslbcQuery(body: URLSearchParams, referer: string, matchedOn: Lic
       });
     }
   }
-  return hits;
+  return withNote(hits, rows.length > MAX_DETAILS ? capNote(MAX_DETAILS, rows.length, "contractors") : null);
 }
 
 export async function searchLslbc(name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
@@ -102,14 +108,16 @@ export async function searchLslbc(name: string, kind: "person" | "company"): Pro
   }
   const parts = q.split(" ");
   if (parts.length < 2) return [];
-  return lslbcQuery(new URLSearchParams({ QualifierLastName: parts[parts.length - 1].slice(0, 50), QualifierFirstName: parts[0].slice(0, 50), SearchType: "ByQP" }), QP_PAGE, "principal", name, () => true);
+  // Only companies whose listed qualifier is this person get a detail fetch (the search matches on the last name).
+  return lslbcQuery(new URLSearchParams({ QualifierLastName: parts[parts.length - 1].slice(0, 50), QualifierFirstName: parts[0].slice(0, 50), SearchType: "ByQP" }), QP_PAGE, "principal", name,
+    (r) => !r.qualifiers.length || r.qualifiers.some((qp) => names(want, qp)));
 }
 
 /** By license number (the board's ByNumber search takes the digits; "CL.00424", "00424" and "424" are one account). */
-export async function searchLslbcBy(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license") return [];
+export async function searchLslbcBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null; // the board searches by name, qualifier or number only
   const digits = q.value.match(/\d+/g)?.join("");
-  if (!digits || digits.length > 12) return [];
+  if (!digits || digits.length > 12) return null;
   const want = normLicense(q.value);
   const hits = await lslbcQuery(new URLSearchParams({ AccountNumber: String(Number(digits)), SearchType: "ByNumber" }), `${ARLS}/Public/DetailedSearch/ByNumber`, "license", null, () => true);
   const digitsOnly = /^\d+$/.test(q.value.trim());
@@ -127,14 +135,13 @@ export function parseLaViolations(html: string): EnforcementHit[] {
   for (const r of tableRows(table)) {
     if (r.length < 6 || !r[0]) continue;
     const action = r[5];
-    const notAdverse = action ? LA_NOT_ADVERSE.test(action) : false;
     out.push({
       state: "LA", source: "Louisiana State Licensing Board for Contractors violations", sourceUrl: VIOLATIONS_PAGE,
       category: "discipline", name: r[0], id: r[3], date: usDate(r[2]), endDate: null,
       status: action ? `Board hearing: ${action}` : "Board hearing", city: r[1],
       detail: [r[4] ? `Allegation: ${r[4]}` : null, action ? `Action taken: ${action}` : null].filter(Boolean).join(". ").slice(0, 900) || null,
       amount: firstAmount(action),
-      adverse: action ? (notAdverse ? false : LA_ADVERSE.test(action) ? true : null) : null,
+      adverse: adverseFrom(action, { adverse: LA_ADVERSE, notAdverse: LA_NOT_ADVERSE }),
     });
   }
   return out;

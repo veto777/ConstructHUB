@@ -18,8 +18,10 @@ import type { LicenseHit } from "@shared/research-reports";
 import { wholeWordMatch, type LicenseSource } from "../licenses";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
+import { safeDecode, withNote } from "../notes";
+import { looksLikeBusiness } from "./lib/business-name";
 import { fromFile, isoDay, joinAddr, unzipFirst } from "./lib/g6-common";
 
 // ── MO PRO guest Apex actions ────────────────────────────────────────────────────────────────────────────────
@@ -33,7 +35,8 @@ async function auraContext(): Promise<{ fwuid: string; app: string }> {
   if (ctxCache && Date.now() - ctxCache.at < 3600_000) return ctxCache;
   const res = await politeFetch(MO_SEARCH, {}, { minDelayMs: 1000 });
   if (!res.ok) throw new Error(`MO PRO returned HTTP ${res.status}`);
-  const page = decodeURIComponent(await res.text());
+  // The page URL-encodes its Aura context; a stray "%" elsewhere must not fail every search.
+  const page = safeDecode(await res.text());
   const fwuid = page.match(/"fwuid":"([^"]+)"/)?.[1];
   const app = page.match(/"APPLICATION@markup:\/\/siteforce:communityApp":"([^"]+)"/)?.[1];
   if (!fwuid || !app) throw new Error("MO PRO page layout changed (no Aura context)");
@@ -99,13 +102,13 @@ function moBoardLoader(board: string, label: string): () => AsyncIterable<BulkHi
   };
 }
 
-const MO_ELECTRICAL: BulkSource = {
+export const MO_ELECTRICAL: BulkSource = {
   id: "mo-dpr-electrical", state: "MO", label: "Missouri statewide electrical contractor licenses (active)", pageUrl: MO_DOWNLOADS,
   everyHours: 24, minRows: 840, // 1,201 on 2026-10-15
   load: moBoardLoader("Electrical Contractors", "Missouri statewide electrical contractor licenses"),
 };
 
-const MO_AE: BulkSource = {
+export const MO_AE: BulkSource = {
   id: "mo-dpr-ae", state: "MO", label: "Missouri architects, engineers, land surveyors and landscape architects (active)", pageUrl: MO_DOWNLOADS,
   everyHours: 24 * 7, minRows: 21_000,
   load: moBoardLoader("Architects, Engineers, Land Surveyors, and Landscape Architects", "Missouri architects, engineers, land surveyors and landscape architects"),
@@ -141,8 +144,19 @@ export function parseMoDetail(sections: MoSection[]): { fields: Record<string, s
   return { fields, address, people };
 }
 
+/** Detail pages opened per status (one Apex call each): a politeness cap, noted when hit. */
+const MO_DETAILS = 12;
+
+/**
+ * A licensee is a business on a corporation's certificate, and on an electrical contractor license when the name
+ * reads as a business (the statewide electrical license is held by a person or a firm); otherwise a person.
+ */
+export const moIsBusiness = (rat: string | null, name: string | null): boolean =>
+  BUSINESS_PROFESSION.test(rat ?? "") || (rat === "Electrical Contractor" && looksLikeBusiness(name));
+
 async function moSearch(criteria: string, value: string, kind: "person" | "company" | "license"): Promise<LicenseHit[]> {
   const hits: LicenseHit[] = [];
+  const notes: string[] = [];
   for (const status of ["Active", "Non Active"]) {
     const ids = await professionIds(status);
     if (!ids.length) continue;
@@ -150,17 +164,21 @@ async function moSearch(criteria: string, value: string, kind: "person" | "compa
       status, countyName: [], professionName: ids, searchCriteria: criteria, partialRequires: value,
     });
     // The search is a partial match ("SPE" finds "Spencer"): keep whole-word matches before fetching details.
-    const named = (rows ?? []).filter((r) => kind === "license" || wholeWordMatch(value, { businessName: r.licenseeName, principal: null }));
-    for (const r of named.slice(0, 12)) {
-      const isBusiness = BUSINESS_PROFESSION.test(r.rat ?? "");
-      if (kind === "company" && !isBusiness && r.rat !== "Electrical Contractor") continue;
+    const named = (rows ?? []).filter((r) => kind === "license" || wholeWordMatch(value, { businessName: r.licenseeName, principal: null }))
+      .filter((r) => kind !== "company" || moIsBusiness(r.rat, clean(r.licenseeName)));
+    let failed = 0;
+    for (const [i, r] of named.entries()) {
+      const name = clean(r.licenseeName);
+      const isBusiness = moIsBusiness(r.rat, name);
       let d: ReturnType<typeof parseMoDetail> = { fields: {}, address: null, people: [] };
-      try { d = parseMoDetail(await moApex<MoSection[]>("MODPR_LicenseSearchController", "getApplicationData", { blId: r.businessLicenseId, status, directApplication: false })); } catch { /* row stands alone */ }
+      if (i < MO_DETAILS) {
+        try { d = parseMoDetail(await moApex<MoSection[]>("MODPR_LicenseSearchController", "getApplicationData", { blId: r.businessLicenseId, status, directApplication: false })); }
+        catch { failed++; }
+      }
       const disc = d.fields["Current Discipline Status"], prior = d.fields["Previous Disciplinary Actions"];
       const statusText = [status === "Active" ? "Active" : "Not active",
         disc && disc !== "None" ? `current discipline: ${disc}` : null,
         prior && prior !== "No" ? `previous disciplinary actions: ${prior}` : null].filter(Boolean).join("; ");
-      const name = clean(r.licenseeName);
       hits.push({
         state: "MO", source: "Missouri MO PRO licensee search", sourceUrl: MO_SEARCH,
         businessName: isBusiness ? name : null, licenseNumber: clean(d.fields["License Number"]), licenseType: clean(r.rat),
@@ -170,14 +188,17 @@ async function moSearch(criteria: string, value: string, kind: "person" | "compa
         people: [...(!isBusiness && name ? [{ name, role: clean(r.rat) }] : []), ...d.people],
       });
     }
+    const label = status === "Active" ? "active" : "non-active";
+    if (named.length > MO_DETAILS) notes.push(`license number, address, discipline and people read for the first ${MO_DETAILS} of ${named.length} ${label} licenses; the rest are listed as the search shows them`);
+    if (failed) notes.push(`the detail page could not be read for ${failed} ${label} license(s)`);
   }
-  return hits;
+  return withNote(hits, notes.join("; "));
 }
 
 const MO_LIVE: LiveLicenseSearch = {
   source: "Missouri MO PRO licensee search", sourceUrl: MO_SEARCH,
   search: (name, kind) => moSearch("Licensee Name (Partial - enter in the textbox below)", name.trim(), kind),
-  searchBy: async (q: IdQuery) => q.type === "license" ? moSearch("License Number (Exact - enter in the textbox below)", q.value.trim(), "license") : [],
+  searchBy: async (q: IdQuery) => q.type === "license" ? moSearch("License Number (Exact - enter in the textbox below)", q.value.trim(), "license") : null,
 };
 
 // ── data.mo.gov ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -193,12 +214,16 @@ export const pack: StatePack = {
   checked: "2026-10-15",
   licenses: [MO_OWTS],
   liveLicenses: [MO_LIVE],
-  bulk: [MO_ELECTRICAL, MO_AE],
+  // MO_ELECTRICAL and MO_AE are kept for the record but not registered: their files are served from
+  // modpr.file.force.com, whose robots.txt (Salesforce's) disallows every path for all agents but Googlebot
+  // (checked 2026-10-15). The live licensee search covers the same licenses.
+  bulk: [],
   noStatewideGcLicense:
     "Missouri does not license general contractors statewide; cities and counties license contractors and trades, and the optional statewide electrical contractor license is searched above",
   blocked: [
     "Missouri Division of Labor Standards contractor debarment list (labor.mo.gov/contractor-debarment-list): reads 'No contractors debarred at this time' on 2026-10-15, nothing to search",
     "Missouri Secretary of State business entities: no free bulk file or open API (the online search is per entity)",
+    "MO PRO downloadable listings (electrical contractors; architects, engineers, land surveyors, landscape architects): the files are served from modpr.file.force.com, whose robots.txt disallows all paths for every agent but Googlebot (checked 2026-10-15), so they are not downloaded; the live licensee search covers these licenses",
     "MO PRO downloadable listings hold active licenses only; non-active licenses and discipline status come from the live licensee search",
   ],
 };

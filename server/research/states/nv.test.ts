@@ -31,6 +31,15 @@ const DISQUALIFIED = `<table border="0"><tbody>
 <tr><td>DBA Reno Patios &amp; Fireplace</td><td>President</td><td> </td></tr>
 <tr><td>910 Glendale Avenue</td><td> </td><td> </td></tr>
 <tr><td>Sparks, NV 89431</td><td> </td><td> </td></tr>
+<tr><td> </td><td> </td><td> </td></tr>
+<tr><td colspan="1">Stuart Spear</td><td colspan="1">Stuart Spear, Owner</td><td colspan="1">Until the suspension is lifted</td></tr>
+<tr><td colspan="1">dba Stuart Spear Construction</td><td colspan="1"> </td><td colspan="1"> </td></tr>
+<tr><td colspan="1">P.O. Box 18827</td><td colspan="1"> </td><td colspan="1"> </td></tr>
+<tr><td colspan="1">Reno, NV 89511</td><td colspan="1"> </td><td colspan="1"> </td></tr>
+<tr><td colspan="1"> </td><td colspan="1"> </td><td colspan="1"> </td></tr>
+<tr><td colspan="1">H2O Transportation LLC</td><td colspan="1">Araceli Espitia</td><td colspan="1">July 18, 2025 to July 18, 2028</td></tr>
+<tr><td colspan="1">681 Tarn Way</td><td colspan="1"> </td><td colspan="1"> </td></tr>
+<tr><td colspan="1">Reno, NV 89503</td><td colspan="1"> </td><td colspan="1"> </td></tr>
 </tbody></table>`;
 
 describe("Nevada sources", () => {
@@ -49,7 +58,8 @@ describe("Nevada sources", () => {
   });
   it("reads the disqualified-contractor blocks without the officers", () => {
     const hits = parseNvDisqualified(DISQUALIFIED);
-    expect(hits.map((h) => h.name)).toEqual(["360 Pro Carpentry LLC", "Affordable Patios & Sunrooms / dba Reno Patios & Fireplace"]);
+    // Both of the second block's names are businesses (patios, sunrooms), so both are kept.
+    expect(hits.map((h) => h.name).slice(0, 2)).toEqual(["360 Pro Carpentry LLC", "Affordable Patios & Sunrooms / Reno Patios & Fireplace"]);
     expect(hits[0]).toMatchObject({ city: "Las Vegas, NV", category: "debarment", adverse: true, status: "Disqualified from public works: Until the suspension is lifted" });
     expect(JSON.stringify(hits)).not.toContain("Hugo");
   });
@@ -73,5 +83,17 @@ describe("NSCB license details", () => {
       phone: "(775) 825-7856", mailPhone: "(801) 561-4911", expires: "2028-02-28", limit: "Unlimited",
       people: [{ name: "BRANDON VAL RADMALL", role: "President" }, { name: "ERIC DANIEL BLASER", role: "Qualified individual (Trade)" }],
     });
+  });
+});
+
+describe("Nevada (audit 2026-10-15)", () => {
+  it("disqualified list: a person's own name is left out, the dba kept; a dated period ends", () => {
+    const hits = parseNvDisqualified(DISQUALIFIED, "2026-10-15");
+    const names = hits.map((h) => h.name);
+    expect(names).toContain("Stuart Spear Construction");
+    expect(names.some((n) => /^Stuart Spear( \/|$)/.test(n ?? ""))).toBe(false);
+    expect(hits.find((h) => h.name === "H2O Transportation LLC")).toMatchObject({ date: "2025-07-18", endDate: "2028-07-18", adverse: true });
+    expect(parseNvDisqualified(DISQUALIFIED, "2028-08-01").find((h) => h.name === "H2O Transportation LLC")).toMatchObject({ adverse: false, status: "Disqualification period over: July 18, 2025 to July 18, 2028" });
+    expect(hits.every((h) => !/NRS 338.017\)$/.test(h.detail ?? "") || h.detail!.startsWith("On the Labor Commissioner"))).toBe(true);
   });
 });

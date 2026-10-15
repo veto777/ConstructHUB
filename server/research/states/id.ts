@@ -10,10 +10,11 @@
  * exportable "Public License List Search". Nothing there is used; see `blocked`.
  */
 import type { EnforcementHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { clean, usDate } from "../bulk";
 import type { LiveEnforcementSearch, StatePack } from "./types";
+import { capNote, withNote } from "../notes";
 
 const SOS_SEARCH_PAGE = "https://sosbiz.idaho.gov/search/business";
 const SOS_API = "https://sosbiz.idaho.gov/api/Records/businesssearch";
@@ -42,9 +43,22 @@ async function searchIdSos(name: string): Promise<EnforcementHit[]> {
     body: JSON.stringify({ SEARCH_VALUE: q, STARTS_WITH_YN: true, CRA_SEARCH_YN: false, ACTIVE_ONLY_YN: false, FILING_DATE: { start: null, end: null } }),
   }, { minDelayMs: 1500 });
   if (!res.ok) throw new Error(`Idaho Secretary of State returned HTTP ${res.status}`);
-  const data = await res.json().catch(() => null) as { rows?: Record<string, IdSosRow> } | null;
-  if (!data || typeof data !== "object") throw new Error("Idaho Secretary of State returned an unexpected payload");
-  return Object.values(data.rows ?? {}).map(idSosHit).filter((h) => hasAll(name, h.name));
+  return idSosResults(name, await res.json().catch(() => null));
+}
+
+/** The register answers at most 500 rows (checked 2026-10-15: a search for "Idaho" stops at exactly 500). */
+const MAX_ROWS = 500;
+
+/**
+ * The answer's rows (an object keyed by id; {} when nothing matches). An answer without `rows` (an error object) is
+ * an error, never "no records".
+ */
+export function idSosResults(name: string, data: unknown): EnforcementHit[] {
+  const rows = (data as { rows?: unknown } | null)?.rows;
+  if (!rows || typeof rows !== "object" || Array.isArray(rows)) throw new Error("Idaho Secretary of State returned an unexpected payload");
+  const all = Object.values(rows as Record<string, IdSosRow>);
+  const hits = all.map(idSosHit).filter((h) => hasAll(name, h.name));
+  return withNote(hits, all.length >= MAX_ROWS ? capNote(MAX_ROWS, null, "names on the register that start with this name") : null);
 }
 
 const liveEnforcement: LiveEnforcementSearch[] = [

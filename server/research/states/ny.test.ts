@@ -29,7 +29,7 @@ describe("NY DOL debarment list parser", () => {
     expect(h.name).toBe("AMERICAN PAVING, INC.");
     expect(h.date).toBe("2024-05-24");
     expect(h.endDate).toBe("2029-05-24");
-    expect(h.city).toBe("GLEN COVE, NY 11542");
+    expect(h.city).toBe("GLEN COVE, NY"); // the city line without its ZIP
     expect(h.detail).toMatch(/Article 8 or 9.*NYS Department of Labor/);
     expect(h.category).toBe("debarment");
   });
@@ -39,5 +39,26 @@ describe("NY DOL debarment list parser", () => {
     expect(h.date).toBe("2026-03-12");
     expect(h.endDate).toBe("2027-07-09");
     expect(h.detail).toMatch(/141-b/);
+    expect(h.city).toBe("NEW HYDE PARK, NY");
+  });
+  it("marks a current debarment adverse and an ended one not", () => {
+    expect(parseEdList(DOL, "DOL")[0].adverse).toBe(true);
+    const ended = parseEdList(DOL.replace("05/24/2029", "05/24/2025"), "DOL")[0];
+    expect(ended).toMatchObject({ adverse: false, status: "Debarment period over" });
+  });
+});
+
+describe("NYC DOB disciplinary actions", () => {
+  it("takes adverse from DOB's own disposition, and unknown stays unknown", async () => {
+    const { pack } = await import("./ny");
+    const dob = pack.enforcement!.find((e) => /DOB disciplinary/.test(e.source))!;
+    // Dispositions as published in ndq3-kuef (2026-10-15).
+    const row = (disposition: string) => ({ company: "X", date: "01/02/24", year: "2024", disposition });
+    expect(dob.toHit(row("Fine.")).adverse).toBe(true);
+    expect(dob.toHit(row("Voluntary surrender.")).adverse).toBe(true);
+    expect(dob.toHit(row("Revoked.")).adverse).toBe(true);
+    expect(dob.toHit(row("Warning Letter.")).adverse).toBeNull();
+    expect(dob.toHit(row("ACD.")).adverse).toBeNull();
+    expect(dob.toHit({ company: "X" }).adverse).toBeNull();
   });
 });

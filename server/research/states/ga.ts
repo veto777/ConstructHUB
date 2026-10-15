@@ -10,10 +10,11 @@
  * Cloudflare challenge, so no license source is searched here yet (see `blocked`).
  */
 import type { EnforcementHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { clean } from "../bulk";
 import { tokens } from "../licenses";
 import type { LiveEnforcementSearch, StatePack } from "./types";
+import { capNote, withNote } from "../notes";
 import { hasAllWords, htmlText } from "./lib/g3-common";
 
 const ENFO = "https://enfo.gaepd.org";
@@ -92,12 +93,16 @@ async function searchEpd(name: string): Promise<EnforcementHit[]> {
   const pages = Math.min(MAX_PAGES, Math.ceil(total / 25));
   for (let p = 2; p <= pages; p++) rows.push(...parseEpdSearch(await epdText(q(p))).rows);
   const out: EnforcementHit[] = [];
-  for (const row of rows.filter((r) => hasAllWords(name, r.facility)).slice(0, MAX_DETAILS)) {
+  const notes: string[] = [];
+  if (total > pages * 25) notes.push(`the EPD search found ${total} orders by facility name; the first ${pages * 25} were checked`);
+  const named = rows.filter((r) => hasAllWords(name, r.facility));
+  if (named.length > MAX_DETAILS) notes.push(capNote(MAX_DETAILS, named.length, "orders naming this business (each one's details page is read)"));
+  for (const row of named.slice(0, MAX_DETAILS)) {
     const url = row.details ? `${ENFO}${row.details}` : `${ENFO}/Search`;
     const d = row.details ? parseEpdDetails(await epdText(url)) : {};
     out.push(epdHit(row, d, url));
   }
-  return out.filter((h) => clean(h.name));
+  return withNote(out.filter((h) => clean(h.name)), notes.join("; ") || null);
 }
 
 const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [

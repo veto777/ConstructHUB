@@ -11,14 +11,21 @@
  *        - a person: the businesses on their licenses, and those businesses' other licenses;
  *        - a company: the people on its licenses, and the other businesses they hold licenses for.
  *   3. State enforcement for the related businesses (up to 5, strongest ties first), each hit marked with its tie.
+ *      For a company subject only: a person never gets enforcement records, not even through a related business
+ *      (FCRA; audit 2026-10-15, decision 1).
+ *
+ * A license found only by an identifier the customer gave (its name doesn't match the subject) is not the
+ * subject's own: it is listed as related, "matched by the phone you gave", and the common-tie limit applies to it.
+ * A source that could not search an identifier (a file not loaded yet, a lookup that can't search by it) is
+ * reported as not searched, never as "searched, 0 found".
  *
  * Every search goes through a LicenseFinder, so the logic here runs against fakes in tests (xref.test.ts) and against
  * the registry's real sources in the runner. Work is capped per subject; whatever a cap leaves out is said in the notes.
  */
 import type { EnforcementHit, LicenseHit, RecordSource, RelatedTie, ResearchSubjectInput } from "@shared/research-reports";
 import { RELATED_TIES } from "@shared/research-reports";
-import { describeId, normLicense, normPhone, addressKeys, type IdQuery } from "./identifiers";
-import { tokens, wholeWordMatch } from "./licenses";
+import { describeId, normLicense, normPhone, parseAddress, streetKey, type IdQuery } from "./identifiers";
+import { companyNamed, personMatches, tokens, wholeWordMatch } from "./licenses";
 
 /** Identifier searches per subject: the customer's own and the cross-reference hop together. */
 export const MAX_ID_SEARCHES = 25;
@@ -32,7 +39,11 @@ export const MAX_RELATED_BUSINESSES = 5;
  */
 export const MAX_BUSINESSES_PER_TIE = 12;
 
-export type FinderResult = { licenses: LicenseHit[]; enforcement: EnforcementHit[] };
+/**
+ * What one finder found for one identifier. `searched: false` means it could not search it (a file not loaded yet, a
+ * lookup that can't search by that kind of identifier): reported as "not searched" with `note`, never as 0 found.
+ */
+export type FinderResult = { licenses: LicenseHit[]; enforcement: EnforcementHit[]; searched?: boolean; note?: string };
 
 /** One searchable source in one state. */
 export type LicenseFinder = {
@@ -42,6 +53,7 @@ export type LicenseFinder = {
   companiesOnly?: boolean;
   /** Hits must already be whole-word matches of the name (`searched: false` when the source wasn't available). */
   byName?: (name: string, kind: "person" | "company") => Promise<{ hits: LicenseHit[]; searched: boolean; note: string }>;
+  /** `searched: false` (with a note) when it could not search that identifier. */
   byId?: (q: IdQuery) => Promise<FinderResult>;
 };
 
@@ -50,30 +62,17 @@ export type EnforcementSearch = (name: string) => Promise<{ hits: EnforcementHit
 
 // ── Matching ───────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** Every word of the name is a word of ONE person on the record (the bulk index can match words from two people). */
+/** The name is ONE person on the record, a middle initial agreeing when both give one (the bulk index can match words from two people). */
 export function personNamed(name: string, hit: Pick<LicenseHit, "principal" | "people">): boolean {
-  const want = tokens(name);
-  if (!want.length) return false;
-  return [hit.principal, ...(hit.people ?? []).map((p) => p.name)].some((v) => { const have = new Set(tokens(v ?? "")); return want.every((w) => have.has(w)); });
+  return [hit.principal, ...(hit.people ?? []).map((p) => p.name)].some((v) => personMatches(name, v));
 }
 
 /**
- * A stricter person check for the cross-reference hop, where a name is all that links two licenses: a middle initial
- * on the name must agree ("Douglas W Smith" is not "Douglas C Smith" or "Douglas Lyle Smith"; plain "Douglas Smith" is
- * still a candidate). The report says that a link by name alone may be a different person.
+ * The person check for the cross-reference hop, where a name is all that links two licenses: a middle initial on
+ * both names must agree ("Douglas W Smith" is not "Douglas C Smith" or "Douglas Lyle Smith"; plain "Douglas Smith"
+ * is still a candidate). The report says that a link by name alone may be a different person.
  */
-export function samePerson(name: string, hit: Pick<LicenseHit, "principal" | "people">): boolean {
-  const words = (v: string) => v.toUpperCase().split(/[^A-Z0-9']+/).filter(Boolean);
-  const initials = words(name).filter((w) => w.length === 1);
-  const full = tokens(name);
-  if (!full.length) return false;
-  return [hit.principal, ...(hit.people ?? []).map((p) => p.name)].some((v) => {
-    const have = words(v ?? "");
-    if (!full.every((w) => have.includes(w))) return false;
-    const rest = have.filter((w) => !full.includes(w));
-    return initials.every((i) => rest.some((w) => w[0] === i));
-  });
-}
+export const samePerson = personNamed;
 
 const SUFFIXES = new Set(["INC", "INCORPORATED", "LLC", "CORP", "CORPORATION", "CO", "COMPANY", "LTD", "LIMITED", "LP", "LLP", "PLLC", "PA", "PC", "THE"]);
 /** A business name without punctuation, corporate suffixes or a trailing "DBA …": "D & S Electric, Inc." → "D S ELECTRIC". */
@@ -93,36 +92,40 @@ export function businessNamed(business: string, recordName: string | null | unde
 
 /** The re-check every name hit gets: the business name for a company, one named person for a person. */
 export function nameMatches(name: string, kind: "person" | "company", hit: LicenseHit): boolean {
-  return kind === "company" ? wholeWordMatch(name, { businessName: hit.businessName, principal: null }) : personNamed(name, hit);
+  return kind === "company" ? companyNamed(name, hit.businessName) : personNamed(name, hit);
 }
 
 // ── Dedupe ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** State + normalized license number; records without a number fall back to their source and names. */
+/**
+ * One license: state, source (the issuing board), credential type and license number, so two boards' license 12345
+ * never merge. A record without a number falls back to its names and street (audit 2026-10-15, decision 6).
+ */
 export function licenseKey(h: LicenseHit): string {
   const n = normLicense(h.licenseNumber);
-  return n ? `${h.state}|${n}` : `${h.state}|${h.source}|${tokens(h.businessName ?? "").join(" ")}|${tokens(h.principal ?? "").join(" ")}`;
+  const base = `${h.state}|${h.source}|${(h.licenseType ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim()}`;
+  return n ? `${base}|${n}` : `${base}||${tokens(h.businessName ?? "").join(" ")}|${tokens(h.principal ?? "").join(" ")}|${streetKey(h.address) ?? ""}`;
 }
 
-const nameWords = (h: LicenseHit) => new Set([...tokens(h.businessName ?? ""), ...tokens(h.principal ?? ""), ...(h.people ?? []).flatMap((p) => tokens(p.name))]);
-/** Two records with one key are one license unless their names have nothing in common (two boards reusing a number). */
+const nameWordsOf = (h: LicenseHit) => new Set([...businessCore(h.businessName ?? "").split(" "), ...tokens(h.principal ?? ""), ...(h.people ?? []).flatMap((p) => tokens(p.name))].filter(Boolean));
+/** Two records with one key are one license unless their names (corporate suffixes aside) have nothing in common. */
 function sameLicense(a: LicenseHit, b: LicenseHit): boolean {
   if (licenseKey(a) !== licenseKey(b)) return false;
-  const wa = nameWords(a), wb = nameWords(b);
+  const wa = nameWordsOf(a), wb = nameWordsOf(b);
   if (!wa.size || !wb.size) return true;
   return Array.from(wa).some((w) => wb.has(w));
 }
 
-/** Fill what one copy lacks from the other (address, phone, people), keeping the first copy's source and match. */
+/** Fill what one copy lacks from the other (address, phone, people), keeping the first copy's source and match; everyone named on either copy is kept. */
 function merge(into: LicenseHit, other: LicenseHit): void {
   into.address ??= other.address;
   into.phone ??= other.phone;
   into.city ??= other.city;
   into.expires ??= other.expires;
-  if (other.people?.length) {
-    const have = new Set((into.people ?? []).map((p) => tokens(p.name).join(" ")));
-    into.people = [...(into.people ?? []), ...other.people.filter((p) => !have.has(tokens(p.name).join(" ")))];
-  }
+  const key = (n: string) => tokens(n).sort().join(" ");
+  const have = new Set([into.principal, ...(into.people ?? []).map((p) => p.name)].filter((v): v is string => !!v).map(key));
+  const add = [...(other.people ?? []), ...(other.principal ? [{ name: other.principal, role: null }] : [])].filter((p) => { const k = key(p.name); if (!k || have.has(k)) return false; have.add(k); return true; });
+  if (add.length) into.people = [...(into.people ?? []), ...add];
   if (into.principal == null && other.principal) into.principal = other.principal;
   if (into.businessName == null && other.businessName) into.businessName = other.businessName;
 }
@@ -162,40 +165,61 @@ export function subjectIds(s: Pick<ResearchSubjectInput, "licenseNumbers" | "pho
 export function idKey(q: IdQuery): string | null {
   if (q.type === "license") { const n = normLicense(q.value); return n ? `l:${n}` : null; }
   if (q.type === "phone") { const n = normPhone(q.value); return n ? `t:${n}` : null; }
-  const k = addressKeys(q.value);
-  return k.length ? k.join(" ") : null;
+  const p = parseAddress(q.value);
+  return p ? `a:${streetKey(q.value)}|${p.city ?? ""}|${p.zip ?? ""}` : null;
 }
 
-/** One identifier across every finder. A finder that fails is noted, never counted as "nothing found". */
-export async function searchById(finders: LicenseFinder[], q: IdQuery, kind: "person" | "company"): Promise<{ licenses: LicenseHit[]; enforcement: EnforcementHit[]; searched: number; failed: string[] }> {
-  const licenses: LicenseHit[] = [], enforcement: EnforcementHit[] = [], failed: string[] = [];
+/**
+ * One identifier across every finder. A finder that fails, or can't search it, is noted ("failed", "skipped"),
+ * never counted as "nothing found"; a search that stopped at a cap says so ("capped").
+ */
+export async function searchById(finders: LicenseFinder[], q: IdQuery, kind: "person" | "company"): Promise<{ licenses: LicenseHit[]; enforcement: EnforcementHit[]; searched: number; failed: string[]; skipped: string[]; capped: string[] }> {
+  const licenses: LicenseHit[] = [], enforcement: EnforcementHit[] = [], failed: string[] = [], skipped: string[] = [], capped: string[] = [];
   let searched = 0;
   for (const f of finders) {
     if (!f.byId || (f.companiesOnly && kind === "person")) continue;
     try {
       const r = await f.byId(q);
+      if (r.searched === false) { skipped.push(`${f.label}${r.note ? ` (${r.note})` : ""}`); continue; }
       searched++;
+      if (r.note) capped.push(`${f.label}: ${r.note}`);
       licenses.push(...r.licenses.map((h) => ({ ...h, matchedOn: q.type })));
       enforcement.push(...r.enforcement);
     } catch (err: any) {
       failed.push(`${f.label}: ${String(err?.message ?? err).slice(0, 120)}`);
     }
   }
-  return { licenses, enforcement, searched, failed };
+  return { licenses, enforcement, searched, failed, skipped, capped };
 }
 
+/** How a report says what an identifier search covered: "4 source(s) searched; not searched: …; could not search …". */
+function coverageNote(r: { searched: number; failed: string[]; skipped: string[]; capped: string[] }): string {
+  return [`${r.searched} source(s) searched`, ...r.capped, ...(r.skipped.length ? [`not searched: ${r.skipped.join(", ")}`] : []), ...r.failed.map((f) => `could not search ${f}`)].join("; ");
+}
+
+/** How many different businesses a set of records names (a tie that many share is no tie). */
+const spreadOf = (licenses: LicenseHit[], enforcement: EnforcementHit[] = []) =>
+  new Set([...licenses.map((h) => bizKey(h.businessName ?? h.principal ?? "")), ...enforcement.map((e) => bizKey(e.name ?? ""))].filter(Boolean)).size;
+
 export type CustomerIdResult = {
-  licenses: LicenseHit[]; enforcement: EnforcementHit[];
+  /** Records found by an identifier that also name the subject: the subject's own. */
+  licenses: LicenseHit[];
+  /** Records found only by the identifier (another name on them): related, "matched by the phone you gave". */
+  matched: LicenseHit[];
+  enforcement: EnforcementHit[];
   searches: { query: string; found: number; note: string }[]; searchedIds: Set<string>; used: number; notes: string[];
 };
 
 /**
- * The identifiers the customer gave, each searched in every finder. The licenses found are the subject's own
- * (matchedOn says which identifier found them). Enforcement records found this way are kept for a company only, and
- * carry the identifier as their tie, since the customer, not the record, links them to the name.
+ * The identifiers the customer gave, each searched in every finder. A license that names the subject is the
+ * subject's own (matchedOn says which identifier found it); one that names someone else is listed as matched by
+ * the identifier, not as the subject's. Enforcement records found this way are kept for a company only, and carry
+ * the identifier as their tie, since the customer, not the record, links them to the name. An identifier shared by
+ * more than MAX_BUSINESSES_PER_TIE businesses ties none of them: those records are left out and the notes say so.
  */
-export async function searchCustomerIds(finders: LicenseFinder[], ids: IdQuery[], kind: "person" | "company"): Promise<CustomerIdResult> {
-  const out: CustomerIdResult = { licenses: [], enforcement: [], searches: [], searchedIds: new Set(), used: 0, notes: [] };
+export async function searchCustomerIds(finders: LicenseFinder[], ids: IdQuery[], subject: { name: string; kind: "person" | "company" }): Promise<CustomerIdResult> {
+  const { kind } = subject;
+  const out: CustomerIdResult = { licenses: [], matched: [], enforcement: [], searches: [], searchedIds: new Set(), used: 0, notes: [] };
   for (const q of ids) {
     const key = idKey(q);
     if (!key || out.searchedIds.has(key)) continue;
@@ -203,13 +227,23 @@ export async function searchCustomerIds(finders: LicenseFinder[], ids: IdQuery[]
     out.searchedIds.add(key);
     out.used++;
     const r = await searchById(finders, q, kind);
-    out.licenses.push(...r.licenses);
-    const via = `found by the ${q.type === "license" ? "license number" : q.type} you gave (${q.value})`;
-    if (kind === "company") out.enforcement.push(...r.enforcement.map((e) => ({ ...e, relatedTie: q.type, relatedVia: via })));
-    else if (r.enforcement.length) out.notes.push(`${r.enforcement.length} enforcement record(s) carrying ${describeId(q)} are not shown: enforcement records are searched for companies only.`);
+    const named = r.licenses.filter((h) => nameMatches(subject.name, kind, h));
+    const others = r.licenses.filter((h) => !nameMatches(subject.name, kind, h));
+    const enforcement = kind === "company" ? r.enforcement : [];
+    const via = `matched by the ${q.type === "license" ? "license number" : q.type} you gave (${q.value})`;
+    out.licenses.push(...named);
+    const spread = spreadOf(others, enforcement);
+    if (spread > MAX_BUSINESSES_PER_TIE) {
+      out.notes.push(`${describeId(q)} is shared by ${spread} businesses, so it doesn't tie any one of them to this name; their records are left out.`);
+    } else {
+      out.matched.push(...others.map((h) => ({ ...h, relatedTie: q.type, relatedVia: via, byYourIdentifier: true })));
+      out.enforcement.push(...enforcement.map((e) => ({ ...e, relatedTie: q.type, relatedVia: via, byYourIdentifier: true })));
+    }
+    if (kind === "person" && r.enforcement.length) out.notes.push(`${r.enforcement.length} enforcement record(s) carrying ${describeId(q)} are not shown: enforcement records are searched for companies only.`);
     out.searches.push({
-      query: describeId(q), found: r.licenses.length + (kind === "company" ? r.enforcement.length : 0),
-      note: [`${r.searched} source(s) searched`, ...r.failed.map((f) => `could not search ${f}`)].join("; "),
+      query: describeId(q),
+      found: named.length + (spread > MAX_BUSINESSES_PER_TIE ? 0 : others.length + enforcement.length),
+      note: coverageNote(r),
     });
   }
   return out;
@@ -288,9 +322,11 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
     idSearches++;
     const r = await searchById(finders, c.q, subject.kind);
     for (const f of r.failed) notes.push(`Could not search ${describeId(c.q)} in ${f}`);
+    if (r.skipped.length) notes.push(`${describeId(c.q)} was not searched in ${r.skipped.join(", ")}.`);
+    for (const f of r.capped) notes.push(`${describeId(c.q)}: ${f}.`);
     const fresh = r.licenses.filter((h) => !own.find(h));
     const ref = licenseRef(c.from);
-    const spread = new Set([...fresh.map((h) => bizKey(h.businessName ?? h.principal ?? "")), ...r.enforcement.map((e) => bizKey(e.name ?? ""))].filter(Boolean)).size;
+    const spread = spreadOf(fresh, subject.kind === "company" ? r.enforcement : []);
     if (spread > MAX_BUSINESSES_PER_TIE) {
       notes.push(`${describeId(c.q)} (on ${ref}) is shared by ${spread} businesses, so it doesn't tie any one of them to this name; they are left out.`);
       continue;
@@ -327,13 +363,17 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
       addHop(h.businessName, "company", h, null);
     }
   }
+  const notSearched: string[] = [];
   if (hops.length > MAX_NAME_HOPS) notes.push(`${hops.length - MAX_NAME_HOPS} more name(s) on these records were not searched: ${hops.slice(MAX_NAME_HOPS).map((h) => h.name).join(", ")} (limit of ${MAX_NAME_HOPS} per name).`);
   for (const hop of hops.slice(0, MAX_NAME_HOPS)) {
     const found: LicenseHit[] = [];
     for (const f of finders) {
       if (!f.byName || f.companiesOnly) continue;
-      try { found.push(...(await f.byName(hop.name, hop.kind)).hits.filter((h) => hop.kind === "person" ? samePerson(hop.name, h) : nameMatches(hop.name, hop.kind, h))); }
-      catch (err: any) { notes.push(`Could not search "${hop.name}" in ${f.label}: ${String(err?.message ?? err).slice(0, 120)}`); }
+      try {
+        const r = await f.byName(hop.name, hop.kind);
+        if (!r.searched) { notSearched.push(`"${hop.name}" in ${f.label} (${r.note})`); continue; }
+        found.push(...r.hits.filter((h) => hop.kind === "person" ? samePerson(hop.name, h) : nameMatches(hop.name, hop.kind, h)));
+      } catch (err: any) { notes.push(`Could not search "${hop.name}" in ${f.label}: ${String(err?.message ?? err).slice(0, 120)}`); }
     }
     const fresh = found.filter((h) => !own.find(h));
     const ref = licenseRef(hop.from);
@@ -353,7 +393,9 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
     log(`xref "${hop.name}" (${hop.kind}): ${fresh.length} related license(s)`);
   }
 
-  // 3. State enforcement for the related businesses, strongest tie first.
+  if (notSearched.length) notes.push(`Not searched: ${notSearched.join("; ")}.`);
+
+  // 3. State enforcement for the related businesses, strongest tie first. Never for a person (FCRA, decision 1).
   const businesses = new Map<string, { name: string; tie: RelatedTie; via: string; ties: number }>();
   const consider = (name: string | null | undefined, tie: RelatedTie, via: string) => {
     if (!name) return;
@@ -365,8 +407,7 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
     if (!cur) businesses.set(k, { name, tie, via, ties: 1 });
     else { cur.ties++; if (STRENGTH[tie] > STRENGTH[cur.tie]) Object.assign(cur, { tie, via }); }
   };
-  if (subject.kind === "person") for (const h of ownList) consider(h.businessName, "business", `${subject.name} is named on its ${licenseRef(h)}`);
-  for (const h of related.list) consider(h.businessName, h.relatedTie ?? "address", (h.relatedVia ?? "").replace(/this license/g, h.licenseNumber ? `its license ${h.licenseNumber}` : "its license"));
+  if (subject.kind === "company") for (const h of related.list) consider(h.businessName, h.relatedTie ?? "address", (h.relatedVia ?? "").replace(/this license/g, h.licenseNumber ? `its license ${h.licenseNumber}` : "its license"));
   const ranked = Array.from(businesses.values()).sort((a, b) => STRENGTH[b.tie] - STRENGTH[a.tie] || b.ties - a.ties || a.name.localeCompare(b.name));
   if (ranked.length > MAX_RELATED_BUSINESSES) notes.push(`State enforcement records were searched for the ${MAX_RELATED_BUSINESSES} most closely tied businesses; not for ${ranked.slice(MAX_RELATED_BUSINESSES).map((b) => b.name).join(", ")}.`);
   for (const b of ranked.slice(0, MAX_RELATED_BUSINESSES)) {
@@ -374,7 +415,13 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
       // Also without "Inc"/"LLC": agencies often file a record under the bare name. The exact-name check follows.
       const names = Array.from(new Set([b.name, businessCore(b.name)].filter((n) => tokens(n).length)));
       const r = { hits: [] as EnforcementHit[] };
-      for (const n of names) r.hits.push(...(await x.enforcementSearch(n)).hits);
+      const down = new Set<string>();
+      for (const n of names) {
+        const found = await x.enforcementSearch(n);
+        r.hits.push(...found.hits);
+        for (const src of found.sources) if (!src.searched) down.add(`${src.source} (${src.note})`);
+      }
+      if (down.size) notes.push(`For ${b.name}, not searched: ${Array.from(down).join("; ")}.`);
       const mine = r.hits.filter((e) => businessNamed(b.name, e.name));
       for (const e of mine) addEnforcement(e, b.tie, `a record of ${b.name}, which is tied to this name: ${b.via}`);
       log(`xref enforcement "${b.name}": ${mine.length} record(s) naming exactly this business (of ${r.hits.length} word matches)`);

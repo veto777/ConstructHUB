@@ -20,8 +20,9 @@
 import type { LicenseHit } from "@shared/research-reports";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
+import { capNote, escapeRegExp, noteOf, withNote } from "../notes";
 import { Session, fromFile, hiddenInputs, htmlText, isoDay, joinAddr, unzipFirst } from "./lib/g6-common";
 
 // ── Iowa Data Hub bulk files ─────────────────────────────────────────────────────────────────────────────────
@@ -172,24 +173,30 @@ async function iaElectricalSearch(fields: Record<string, string>, button: string
   };
   await post([[`${F}:${button}`, "Search"]]);
   const rows: ElRow[] = [];
-  for (let page = 0; page < 4; page++) {
+  const nextOf = (h: string) => h.match(/jsfcljs\(document\.getElementById\('[^']+'\),'([^',]+),[^']+'[^)]*\);\}return false">Next Page/)?.[1];
+  let more = false;
+  for (let page = 0; ; page++) {
     rows.push(...parseIaElectricalRows(html));
-    const next = html.match(/jsfcljs\(document\.getElementById\('[^']+'\),'([^',]+),[^']+'[^)]*\);\}return false">Next Page/)?.[1];
+    const next = nextOf(html);
     if (!next) break;
+    if (page + 1 >= EL_PAGES) { more = true; break; }
     await post([[next, next]]);
   }
   const hits: LicenseHit[] = [];
-  let details = 0;
+  let details = 0, skipped = 0, failed = 0;
   for (const r of rows) {
     const isBusiness = IA_EL_CONTRACTOR.test(r.type ?? "");
     let contact: string | null = null, phone: string | null = null, status = r.status;
-    if ((isBusiness || !status) && details < 6) {
-      details++;
-      try {
-        const d = parseIaElectricalDetail(await s.text(IA_EL_DETAIL + r.id, {}, "Iowa electrical detail"));
-        ({ contact, phone } = d);
-        status ??= d.status;
-      } catch { /* the row stands without it */ }
+    if (isBusiness || !status) {
+      if (details >= EL_DETAILS) skipped++;
+      else {
+        details++;
+        try {
+          const d = parseIaElectricalDetail(await s.text(IA_EL_DETAIL + r.id, {}, "Iowa electrical detail"));
+          ({ contact, phone } = d);
+          status ??= d.status;
+        } catch { failed++; /* the row stands without it, and the note says so */ }
+      }
     }
     hits.push({
       state: "IA", source: "Iowa electrical licenses", sourceUrl: IA_EL_DETAIL + r.id,
@@ -200,8 +207,16 @@ async function iaElectricalSearch(fields: Record<string, string>, button: string
       people: contact ? [{ name: contact, role: "Contact" }] : !isBusiness && r.name ? [{ name: r.name, role: r.type }] : [],
     });
   }
-  return hits;
+  return withNote(hits, [
+    more ? capNote(rows.length, null, "licenses (the lookup's first pages)") : null,
+    skipped ? `contact and phone not read for ${skipped} license(s) past the first ${EL_DETAILS}` : null,
+    failed ? `the detail page could not be read for ${failed} license(s)` : null,
+  ].filter(Boolean).join("; "));
 }
+
+/** Result pages read per search (25 rows a page) and detail pages opened per search: politeness caps, noted when hit. */
+const EL_PAGES = 4;
+const EL_DETAILS = 6;
 
 const IA_ELECTRICAL: LiveLicenseSearch = {
   source: "Iowa electrical licenses", sourceUrl: IA_EL,
@@ -212,7 +227,7 @@ const IA_ELECTRICAL: LiveLicenseSearch = {
     return iaElectricalSearch({ firstName: words[0], lastName: words[words.length - 1] }, "j_id69");
   },
   searchBy: async (q: IdQuery) => {
-    if (q.type !== "license") return [];
+    if (q.type !== "license") return null;
     return (await iaElectricalSearch({ licenseNumber: q.value.trim().toUpperCase() }, "j_id75")).map((h) => ({ ...h, matchedOn: "license" as const }));
   },
 };
@@ -231,7 +246,7 @@ export function itToHit(r: ItRow, matchedOn: LicenseHit["matchedOn"]): LicenseHi
   const cls = sv(r.classification);
   if (!cls || !IT_TRADES.has(cls)) return null;
   // The service name ends in " - <classification>" ("Blackhawk Automatic Sprinklers, Inc. - Fire Protection").
-  const name = clean(sv(r.service_name)?.replace(new RegExp(`\\s*-\\s*${cls}$`, "i"), ""));
+  const name = clean(sv(r.service_name)?.replace(new RegExp(`\\s*-\\s*${escapeRegExp(cls)}$`, "i"), ""));
   return {
     state: "IA", source: "Iowa DIAL fire protection and alarm system contractors", sourceUrl: IT_PAGE,
     businessName: name, licenseNumber: sv(r.primary_license_number), licenseType: cls === "Alarm" ? "Alarm system contractor" : "Fire protection system contractor",
@@ -244,13 +259,14 @@ export function itToHit(r: ItRow, matchedOn: LicenseHit["matchedOn"]): LicenseHi
 async function itLookup(criteria: Record<string, string>): Promise<ItRow[]> {
   const res = await politeFetch(IT_API, {
     method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({ enterprise_id: IT_ENTERPRISE, ...criteria, records_offset: 0, records_total: 300, sort_fields: null }),
+    body: JSON.stringify({ enterprise_id: IT_ENTERPRISE, ...criteria, records_offset: 0, records_total: IT_MAX, sort_fields: null }),
   }, { minDelayMs: 1200 });
   if (!res.ok) throw new Error(`Iowa DIAL lookup returned HTTP ${res.status}`);
   const rows = await res.json();
   if (!Array.isArray(rows)) throw new Error("Iowa DIAL lookup returned an unexpected payload");
-  return rows;
+  return withNote(rows, rows.length >= IT_MAX ? capNote(IT_MAX, null, "services the lookup returned") : null);
 }
+const IT_MAX = 300;
 
 const IA_FIRE_ALARM: LiveLicenseSearch = {
   source: "Iowa DIAL fire protection and alarm system contractors", sourceUrl: IT_PAGE,
@@ -263,11 +279,12 @@ const IA_FIRE_ALARM: LiveLicenseSearch = {
       const word = n.split(/\s+/).sort((a, b) => b.length - a.length)[0];
       if (word && word.length >= 4 && word !== n) rows = await itLookup({ serviceName: word });
     }
-    return rows.map((r) => itToHit(r, "business")).filter((h): h is LicenseHit => !!h);
+    return withNote(rows.map((r) => itToHit(r, "business")).filter((h): h is LicenseHit => !!h), noteOf(rows));
   },
   searchBy: async (q) => {
-    if (q.type !== "license") return [];
-    return (await itLookup({ primaryCertificationNumber: q.value.trim().toUpperCase() })).map((r) => itToHit(r, "license")).filter((h): h is LicenseHit => !!h);
+    if (q.type !== "license") return null;
+    const rows = await itLookup({ primaryCertificationNumber: q.value.trim().toUpperCase() });
+    return withNote(rows.map((r) => itToHit(r, "license")).filter((h): h is LicenseHit => !!h), noteOf(rows));
   },
 };
 

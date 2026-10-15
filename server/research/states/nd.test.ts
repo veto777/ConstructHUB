@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ndContractorHit, sebRows } from "./nd";
+import { ndContractorHit, sameElectricianNumber, sebRows } from "./nd";
 
 describe("ND State Electrical Board results", () => {
   it("reads the table and drops the hidden separator", () => {
@@ -18,5 +18,20 @@ describe("ND Secretary of State contractor license", () => {
     );
     expect(h).toMatchObject({ businessName: "ONE CALL CONSTRUCTION, LLC", licenseNumber: "000055701", licenseType: "Contractor license, Class A", expires: "2027-03-01", city: "DICKINSON", phone: "(701) 426-3649" });
     expect(h.status).toBe("Active; Good Standing; WSI standing good");
+  });
+});
+
+describe("North Dakota (audit 2026-10-15)", () => {
+  // Rows of a live FirstStop contractorsearch for "Johnson", 2026-10-15.
+  const row = (title: string, cls: string) => ({ ID: 1, TITLE: [title, cls], RECORD_NUM: null, STATUS: "Inactive - Expired", STANDING: null, FILING_DATE: null });
+  it("a license under a person's own name is not a business name; a dba splits", () => {
+    expect(ndContractorHit(row("BOB JOHNSON", "Class D  -  36220"), {}, "business")).toMatchObject({ businessName: null, principal: "BOB JOHNSON", licenseNumber: "36220" });
+    expect(ndContractorHit(row("EUGENE JOHNSON DBA JOHNSON CONSTRUCTION", "Class A  -  4363"), {}, "business")).toMatchObject({ businessName: "JOHNSON CONSTRUCTION", principal: "EUGENE JOHNSON" });
+    expect(ndContractorHit(row("BIG JOHNSON CONSTRUCTION, LLC", "Class A  -  000053217"), {}, "business")).toMatchObject({ businessName: "BIG JOHNSON CONSTRUCTION, LLC", principal: null });
+  });
+  it("an electrician number matches only with the same letters", () => {
+    expect(sameElectricianNumber({ type: "license", value: "12345" }, "12345")).toBe(true);
+    expect(sameElectricianNumber({ type: "license", value: "#12345" }, "12345")).toBe(true);
+    expect(sameElectricianNumber({ type: "license", value: "ABC12345" }, "12345")).toBe(false);
   });
 });

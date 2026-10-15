@@ -24,12 +24,15 @@
 import { request as httpsRequest } from "node:https";
 import { rootCertificates } from "node:tls";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { USER_AGENT, rateLimitHost } from "../../scrapers/polite-fetch";
+import { USER_AGENT, rateLimitHost } from "../http";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { tokens, wholeWordMatch } from "../licenses";
 import { myLicenseDownload, myLicenseSearch, pipeRecords } from "./lib/g2-mylicense";
 import { splitName } from "./lib/g2-aspnet";
+import { looksLikeBusiness } from "./lib/business-name";
+import { adverseFrom } from "../adverse";
+import { capNote, noteOf, safeDecode, withNote } from "../notes";
 import type { StatePack } from "./types";
 
 // ── OCABR Home Improvement Contractor registry ───────────────────────────────────────────────────────────────
@@ -86,11 +89,13 @@ export type HicAccount = {
 
 type HicQuery = { name?: string | null; firstName?: string | null; lastName?: string | null; hicNumber?: string | null };
 
-function hicPost(body: string): Promise<string> {
+/** One HTTPS request to the Contractor Hub (its own CA list), with a deadline over the whole exchange, body included. */
+function hicRequest(url: string, body: string | null): Promise<string> {
   return new Promise((resolve, reject) => {
-    const req = httpsRequest(HIC_AURA, {
-      method: "POST", ca: HIC_CA, timeout: 90_000,
-      headers: { "user-agent": USER_AGENT, "content-type": "application/x-www-form-urlencoded; charset=UTF-8", "content-length": String(Buffer.byteLength(body)), referer: HIC_PAGE },
+    const headers: Record<string, string> = { "user-agent": USER_AGENT };
+    if (body != null) Object.assign(headers, { "content-type": "application/x-www-form-urlencoded; charset=UTF-8", "content-length": String(Buffer.byteLength(body)), referer: HIC_PAGE });
+    const req = httpsRequest(url, {
+      method: body != null ? "POST" : "GET", ca: HIC_CA, timeout: 90_000, headers,
     }, (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (c) => chunks.push(c as Buffer));
@@ -98,20 +103,43 @@ function hicPost(body: string): Promise<string> {
     });
     req.on("timeout", () => req.destroy(new Error("Contractor Hub timed out")));
     req.on("error", reject);
-    req.end(body);
+    const deadline = setTimeout(() => req.destroy(new Error("Contractor Hub response not finished in 120s")), 120_000);
+    deadline.unref?.();
+    req.on("close", () => clearTimeout(deadline));
+    req.end(body ?? undefined);
   });
 }
+
+let auraCache: { at: number; fwuid: string; app: string } | null = null;
+/** The search page's own Aura framework id and app version (they change with Salesforce releases), read from the page. */
+export function parseAuraContext(page: string): { fwuid: string; app: string } {
+  const text = safeDecode(page);
+  const fwuid = text.match(/"fwuid":"([^"]+)"/)?.[1];
+  const app = text.match(/"APPLICATION@markup:\/\/siteforce:communityApp":"([^"]+)"/)?.[1];
+  if (!fwuid || !app) throw new Error("Contractor Hub page layout changed (no Aura context)");
+  return { fwuid, app };
+}
+async function hicContext(): Promise<{ fwuid: string; app: string }> {
+  if (auraCache && Date.now() - auraCache.at < 3600_000) return auraCache;
+  await rateLimitHost(HIC_PAGE, 1500);
+  auraCache = { at: Date.now(), ...parseAuraContext(await hicRequest(HIC_PAGE, null)) };
+  return auraCache;
+}
+
+/** The registry's search returns at most this many registrations. */
+export const HIC_MAX = 500;
 
 /** The registry's own search (at most 500 registrations; names match anywhere in the name, as on the page). */
 export async function searchHic(q: HicQuery): Promise<HicAccount[]> {
   const jsonRequest = JSON.stringify({ name: q.name ?? null, firstName: q.firstName ?? null, lastName: q.lastName ?? null, hicNumber: q.hicNumber ?? null, city: null, zipCode: null });
   const message = { actions: [{ id: "1;a", descriptor: "aura://ApexActionController/ACTION$execute", callingDescriptor: "UNKNOWN",
     params: { namespace: "", classname: "ContractorSearchController", method: "searchContractors", params: { jsonRequest }, cacheable: false, isContinuation: false } }] };
-  // A stale framework id is accepted (the server answers with the current one and a "page has changes" note).
-  const context = { mode: "PROD", fwuid: "constructhub", app: "siteforce:communityApp", loaded: {}, dn: [], globals: {}, uad: true };
+  const { fwuid, app } = await hicContext();
+  const context = { mode: "PROD", fwuid, app: "siteforce:communityApp", loaded: { "APPLICATION@markup://siteforce:communityApp": app }, dn: [], globals: {}, uad: true };
   const body = new URLSearchParams({ message: JSON.stringify(message), "aura.context": JSON.stringify(context), "aura.pageURI": "/s/hic-contractor-search", "aura.token": "null" }).toString();
   await rateLimitHost(HIC_AURA, 1500);
-  return parseHicResponse(await hicPost(body));
+  const rows = parseHicResponse(await hicRequest(HIC_AURA, body));
+  return rows.length >= HIC_MAX ? withNote(rows, capNote(rows.length, null, "registrations (the registry's own limit)")) : rows;
 }
 
 export function parseHicResponse(text: string): HicAccount[] {
@@ -130,35 +158,40 @@ const hicPeople = (a: HicAccount) => Array.from(new Set((a.AccountContactRelatio
 export function hicToHit(a: HicAccount, matchedOn: LicenseHit["matchedOn"]): LicenseHit {
   const people = hicPeople(a);
   const name = clean(a.Name);
+  // A person account is an individual: city, state and ZIP only, no street or phone (audit 2026-10-15, decision 4).
+  const individual = !!a.IsPersonAccount;
   return {
     state: "MA", source: "Massachusetts Home Improvement Contractor registry (OCABR)", sourceUrl: HIC_PAGE,
     businessName: a.IsPersonAccount ? null : name, licenseNumber: clean(a.HIC_Number__c), licenseType: "Home Improvement Contractor registration",
     specialty: null, status: clean(a.Current_Registration_Status__c), principal: a.IsPersonAccount ? name : people[0] ?? null,
     city: clean(a.BillingCity), expires: clean(a.Registration_Expiration_Date__c)?.slice(0, 10) ?? null, matchedOn,
-    address: hicAddress(a), phone: clean(a.Phone), people: people.map((p) => ({ name: p, role: "Contact" })),
+    address: individual ? clean([a.BillingCity, a.BillingState, a.BillingPostalCode].filter(Boolean).join(", ")) : hicAddress(a),
+    phone: individual ? null : clean(a.Phone), people: people.map((p) => ({ name: p, role: "Contact" })),
   };
 }
 
 async function hicLicenseSearch(name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
   if (kind === "company") {
-    return (await searchHic({ name })).map((a) => hicToHit(a, "business")).filter((h) => wholeWordMatch(name, h));
+    const rows = await searchHic({ name });
+    return withNote(rows.map((a) => hicToHit(a, "business")).filter((h) => wholeWordMatch(name, h)), noteOf(rows));
   }
   const parts = splitName(name);
   if (!parts) return [];
   const want = tokens(name);
-  return (await searchHic({ firstName: parts.first, lastName: parts.last }))
+  const rows = await searchHic({ firstName: parts.first, lastName: parts.last });
+  return withNote(rows
     .map((a) => hicToHit(a, "principal"))
-    .filter((h) => [h.principal, ...(h.people ?? []).map((p) => p.name)].some((p) => { const have = new Set(tokens(p ?? "")); return want.every((w) => have.has(w)); }));
+    .filter((h) => [h.principal, ...(h.people ?? []).map((p) => p.name)].some((p) => { const have = new Set(tokens(p ?? "")); return want.every((w) => have.has(w)); })), noteOf(rows));
 }
 
-async function hicSearchBy(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license") return []; // the registry searches by HIC number, not by phone or street address
+async function hicSearchBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null; // the registry searches by HIC number, not by phone or street address
   const n = normLicense(q.value);
-  if (!n) return [];
+  if (!n) return null;
   // HIC numbers are plain digits ("169040", sometimes written "HIC 169040"); another board's number that happens to
   // share the digits ("CSFA-106775") is not an HIC number.
   const digits = n.match(/^(?:HIC)?(\d+)$/)?.[1];
-  if (!digits) return [];
+  if (!digits) return null;
   return (await searchHic({ hicNumber: digits })).map((a) => hicToHit(a, "license")).filter((h) => normLicense(h.licenseNumber) === digits);
 }
 
@@ -169,11 +202,14 @@ export function hicEnforcement(a: HicAccount): EnforcementHit[] {
   const out: EnforcementHit[] = [];
   for (const c of a.PublicComplaintAccount ?? []) {
     const fine = Number(c.Total_Fine_Amount__c);
+    // Adverse only from the decision itself ("Reprimand", "Revoke", "Suspension", …) or a fine it imposed; a decision
+    // the record doesn't state, or a dismissal, is not marked adverse (audit 2026-10-15, decision 2).
+    const decision = adverseFrom(c.Hearing_Decision__c, { adverse: /revo|suspen|reprimand|\bfined?\b|penalt|restitution|probation|censure|cease/i });
     out.push({ ...base, source: "Massachusetts HIC hearing decisions (OCABR)", category: "discipline", id: clean(c.Docket_Number__c),
       date: clean(c.Hearing_Decision_Date__c)?.slice(0, 10) ?? null, endDate: null,
       status: c.Hearing_Decision__c ? `Hearing decision: ${clean(c.Hearing_Decision__c)}` : "Hearing decision",
       detail: [`Docket ${clean(c.Docket_Number__c) ?? "(no number)"}`, Number.isFinite(fine) && fine > 0 ? `fine ${usd(fine)}` : null].filter(Boolean).join(", "),
-      amount: Number.isFinite(fine) && fine > 0 ? fine : null, adverse: true });
+      amount: Number.isFinite(fine) && fine > 0 ? fine : null, adverse: decision === false ? false : decision ?? (Number.isFinite(fine) && fine > 0 ? true : null) });
   }
   for (const g of a.Guaranty_Fund_Applications__r ?? []) {
     const paid = Number(g.Actual_Guaranty_Fund_Payment__c);
@@ -228,7 +264,9 @@ async function* maOpsiLoader(): AsyncIterable<BulkHit> {
       const r = g.main ?? g.first;
       const who = clean(r.full_name);
       if (!who) continue;
-      const address = clean([r.addr_line_1, r.addr_line_2, r.addr_city, r.addr_state, r.addr_zipcode].filter(Boolean).join(", "));
+      // These licenses are issued to individuals, so the address on file is a person's: city, state and ZIP only,
+      // no street, and it is not a cross-reference key (audit 2026-10-15, decision 4).
+      const address = clean([r.addr_city, r.addr_state, r.addr_zipcode].filter(Boolean).join(", "));
       const hit: LicenseHit = {
         state: "MA", source: "Massachusetts OPSI licenses (construction supervisors, pipefitters, refrigeration, sprinkler, elevator, hoisting)",
         sourceUrl: OPSI, businessName: null, licenseNumber: no, licenseType: clean(g.main?.license_type_name) ?? clean(r.license_type_name),
@@ -236,7 +274,7 @@ async function* maOpsiLoader(): AsyncIterable<BulkHit> {
         status: clean(r.license_status_name), principal: who, city: clean(r.addr_city), expires: usDate(r.expiration_date), matchedOn: "principal",
         address, people: [{ name: who, role: null }],
       };
-      yield { kind: "license", hit, business: null, person: who, keys: { licenses: [no], addresses: [address] } };
+      yield { kind: "license", hit, business: null, person: who, keys: { licenses: [no] } };
     }
   }
 }
@@ -259,13 +297,14 @@ async function dfsSearch(name: string, kind: "person" | "company"): Promise<Lice
   const parts = splitName(name);
   if (!parts) return [];
   const rows = await myLicenseSearch(DFS, { t_web_lookup__last_name: parts.last, t_web_lookup__first_name: parts.first });
-  return rows.filter((r) => DFS_TYPES.test(r["License Type"] ?? "")).map((r) => dfsHit(r, "principal")).filter((h) => wholeWordMatch(name, h));
+  // The MyLicense cap note ("showing the first N of M") rides on `rows`; keep it on the filtered list.
+  return withNote(rows.filter((r) => DFS_TYPES.test(r["License Type"] ?? "")).map((r) => dfsHit(r, "principal")).filter((h) => wholeWordMatch(name, h)), noteOf(rows));
 }
 
-async function dfsSearchBy(q: IdQuery): Promise<LicenseHit[]> {
-  if (q.type !== "license") return [];
+async function dfsSearchBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null; // a certificate lookup: by number only
   const n = normLicense(q.value);
-  if (!n) return [];
+  if (!n) return null;
   const rows = await myLicenseSearch(DFS, { t_web_lookup__license_no: q.value.trim() }, 1);
   return rows.filter((r) => DFS_TYPES.test(r["License Type"] ?? "") && normLicense(r["License #"]) === n).map((r) => dfsHit(r, "license"));
 }
@@ -281,7 +320,11 @@ export const pack: StatePack = {
     {
       source: "Massachusetts HIC hearing decisions, Guaranty Fund claims and arbitration awards (OCABR)",
       scope: "Every registration the Contractor Hub holds, current and expired",
-      search: async (name) => (await searchHic({ name })).filter((a) => wholeWordMatch(name, { businessName: clean(a.Name), principal: null })).flatMap(hicEnforcement),
+      // Companies only (FCRA): a person account is an individual unless its name reads as a business.
+      search: async (name) => {
+        const rows = await searchHic({ name });
+        return withNote(rows.filter((a) => (!a.IsPersonAccount || looksLikeBusiness(a.Name)) && wholeWordMatch(name, { businessName: clean(a.Name), principal: null })).flatMap(hicEnforcement), noteOf(rows));
+      },
     },
   ],
   bulk: [

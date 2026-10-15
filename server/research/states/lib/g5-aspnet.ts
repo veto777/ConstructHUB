@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
-import { politeFetch } from "../../../scrapers/polite-fetch";
+import { politeFetch } from "../../http";
 import { decodeEntities } from "../../bulk-sources";
 
 const run = promisify(execFile);

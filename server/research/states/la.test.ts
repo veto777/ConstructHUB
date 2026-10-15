@@ -16,7 +16,8 @@ const VIOLATIONS = `<table id="tablepress-1"><tr class="row-2"><td class="column
 
 describe("Louisiana LSLBC parsers", () => {
   it("keeps the company of a qualifier row", () => {
-    expect(parseLaResults(QP)).toEqual([{ key: "Mo%2bzfYSMdrXn1CvaUSrFFg%3d%3d", name: "WOODWARD DESIGN + BUILD, LLC" }]);
+    // The qualifier is kept too, so a person search fetches only the companies this person qualifies.
+    expect(parseLaResults(QP)).toEqual([{ key: "Mo%2bzfYSMdrXn1CvaUSrFFg%3d%3d", name: "WOODWARD DESIGN + BUILD, LLC", qualifiers: ["Flower, Paul"] }]);
   });
   it("reads a detail page", () => {
     expect(parseLaDetail(DETAIL)).toEqual({
@@ -27,5 +28,13 @@ describe("Louisiana LSLBC parsers", () => {
   });
   it("reads the violations table", () => {
     expect(parseLaViolations(VIOLATIONS)[0]).toMatchObject({ name: "MPL Concrete Finishing LLC", id: "2025-0007-02", date: "2026-06-18", city: "Hammond, Louisiana", adverse: true });
+  });
+});
+
+describe("LA audit fixes (2026-10-15)", () => {
+  it("searchBy says null for what the board can't search by", async () => {
+    const { searchLslbcBy } = await import("./la");
+    expect(await searchLslbcBy({ type: "phone", value: "(504) 822-6443" })).toBeNull();
+    expect(await searchLslbcBy({ type: "address", value: "1 Canal St, New Orleans" })).toBeNull();
   });
 });

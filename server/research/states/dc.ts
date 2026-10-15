@@ -13,7 +13,9 @@
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit } from "@shared/research-reports";
-import { USER_AGENT, politeFetch, rateLimitHost } from "../../scrapers/polite-fetch";
+import { politeFetch, politeText } from "../http";
+import { hasEnded } from "../adverse";
+import { looksLikeBusiness } from "./lib/business-name";
 import { clean, type BulkHit } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
 import type { StatePack } from "./types";
@@ -31,12 +33,24 @@ const epochDay = (v: unknown) => (typeof v === "number" && v > 0 ? new Date(v).t
 /** "1219 KENYON ST NW, WASHINGTON, DC, 20010, USA" → "1219 KENYON ST NW, WASHINGTON, DC 20010". */
 const dcAddress = (v: string | null) => clean(v?.replace(/,\s*USA$/i, "").replace(/,\s*(\d{5}(-\d{4})?)$/, " $1") ?? null);
 
+/**
+ * The endorsement as published. The field is cut at 50 characters, so "General Contractor/Construction Manager (A, B,
+ * C," stops mid-list: it is shown as it is, with a note, never completed (the classes after "C," aren't published).
+ */
+export function bblActivity(v: string | null): string | null {
+  if (!v) return null;
+  return /[,(]\s*$/.test(v) ? `${v} (list cut off in the source)` : v;
+}
+
 export function bblHit(r: Attrs): BulkHit | null {
   const entity = a(r, "ENTITYNAME"), trade = a(r, "ENTITYTRADENAME");
   if (!entity && !trade) return null;
   const owner = clean([a(r, "BUSINESSOWNERFIRSTNAME"), a(r, "BUSINESSOWNERMIDDLENAME"), a(r, "BUSINESSOWNERLASTNAME")].filter(Boolean).join(" "));
   const agent = clean([a(r, "AGENTFIRSTNAME"), a(r, "AGENTMIDDLENAME"), a(r, "AGENTLASTNAME")].filter(Boolean).join(" "));
   const sole = /sole proprietor/i.test(a(r, "ENTITYTYPE") ?? "");
+  // A sole proprietor's entity name is often the person's own name: then it is the person, not a business name.
+  const entityIsPerson = sole && !!entity && !looksLikeBusiness(entity);
+  const business = [entityIsPerson ? null : entity, trade && trade !== entity ? trade : null].filter(Boolean).join(" / ") || null;
   const premises = dcAddress(a(r, "PREMISEADDRESS")), billing = dcAddress(a(r, "BILLINGADDRESS"));
   const people = [
     ...(owner ? [{ name: owner, role: "Business owner" }] : []),
@@ -47,13 +61,13 @@ export function bblHit(r: Attrs): BulkHit | null {
     kind: "license",
     hit: {
       state: "DC", source: "DC DLCP basic business licenses (construction)", sourceUrl: BBL_PAGE,
-      businessName: [entity, trade && trade !== entity ? trade : null].filter(Boolean).join(" / ") || null,
-      licenseNumber: license, licenseType: a(r, "BUSINESSACTIVITY")?.replace(/\s*\(A, B, C,$/, " (A, B, C, D)") ?? null,
+      businessName: business,
+      licenseNumber: license, licenseType: bblActivity(a(r, "BUSINESSACTIVITY")),
       specialty: a(r, "ENTITYTYPE"), status: a(r, "LICENSESTATUS"), principal: owner ?? (sole ? entity : null),
       city: premises?.split(",").slice(-2).join(",").trim() ?? null, expires: epochDay(r.LICENSEENDDATE),
       matchedOn: "business", address: premises ?? billing, people,
     },
-    business: [entity, trade].filter(Boolean).join(" "), person: owner ?? (sole ? entity : null), people: [agent],
+    business: business ? business.replace(/ \/ /g, " ") : null, person: owner ?? (sole ? entity : null), people: [agent],
     keys: { licenses: [license], addresses: [premises, billing] },
   };
 }
@@ -85,37 +99,47 @@ export function parseOcpExcluded(html: string): { past: boolean; name: string; a
   const plain = (v: string) => clean(decodeEntities(v.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ")).replace(/[​‌‍﻿]/g, ""));
   const out: ReturnType<typeof parseOcpExcluded> = [];
   let past = false;
-  let last = 0;
+  let last = 0, tables = 0, companyTables = 0;
   for (const m of Array.from(html.matchAll(/<table[\s\S]*?<\/table>/g))) {
     if (/PAST EXCLUDED PARTIES/i.test(html.slice(last, m.index))) past = true;
     last = (m.index ?? 0) + m[0].length;
+    tables++;
     const rows = Array.from(m[0].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)).map((r) => Array.from(r[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)).map((c) => plain(c[1])));
     const head = rows[0]?.map((h) => (h ?? "").toLowerCase()) ?? [];
     if (!/name of company/.test(head[0] ?? "")) continue; // individuals' tables: companies only
+    companyTables++;
+    // The past tables carry a "Termination Date" column (the current ones "Expiration Date"): a table is past by its
+    // heading or by that column, so a reworded heading can't relabel old exclusions as current.
+    const pastTable = past || head.some((h) => /termination/.test(h));
     const col = (re: RegExp) => head.findIndex((h) => re.test(h));
     const iAddr = col(/address/), iFrom = col(/action date/), iTo = col(/expiration|termination/), iAgency = col(/agency/), iReason = col(/reason/);
     for (const r of rows.slice(1)) {
       const name = r[0];
       if (!name) continue;
-      out.push({ past, name, address: iAddr >= 0 ? r[iAddr] ?? null : null, from: iFrom >= 0 ? longDate(r[iFrom] ?? null) : null,
+      out.push({ past: pastTable, name, address: iAddr >= 0 ? r[iAddr] ?? null : null, from: iFrom >= 0 ? longDate(r[iFrom] ?? null) : null,
         to: iTo >= 0 ? longDate(r[iTo] ?? null) : null, agency: iAgency >= 0 ? r[iAgency] ?? null : null, reason: iReason >= 0 ? r[iReason] ?? null : null });
     }
   }
+  // The page always has a current and a past company table; fewer means the layout changed: fail, don't load half.
+  if (companyTables < 2) throw new Error(`DC OCP excluded parties page: ${companyTables} company table(s) of ${tables} (layout changed)`);
   return out;
 }
 
+/** One company row as a report hit: an exclusion that is past, or whose end date has passed, is not adverse. */
+export function ocpHit(r: ReturnType<typeof parseOcpExcluded>[number], today?: string): EnforcementHit {
+  const over = r.past || hasEnded(r.to, today);
+  return {
+    state: "DC", source: "DC OCP excluded parties list", sourceUrl: OCP, category: "debarment", name: r.name, id: null,
+    date: r.from, endDate: r.to,
+    status: r.past ? "Past exclusion (no longer excluded)" : over ? `Exclusion period over (${r.to})` : "Excluded from District contracts",
+    city: null, detail: [r.agency ? `Action by ${r.agency}` : null, r.reason].filter(Boolean).join(": ") || null,
+    amount: null, adverse: !over, address: r.address,
+  };
+}
+
 async function* ocpLoader(): AsyncIterable<BulkHit> {
-  await rateLimitHost(OCP, 1500);
-  const res = await fetch(OCP, { headers: { "user-agent": USER_AGENT } });
-  if (!res.ok) throw new Error(`DC OCP excluded parties page returned HTTP ${res.status}`);
-  for (const r of parseOcpExcluded(await res.text())) {
-    const hit: EnforcementHit = {
-      state: "DC", source: "DC OCP excluded parties list", sourceUrl: OCP, category: "debarment", name: r.name, id: null,
-      date: r.from, endDate: r.to, status: r.past ? "Past exclusion (no longer excluded)" : "Excluded from District contracts",
-      city: null, detail: [r.agency ? `Action by ${r.agency}` : null, r.reason].filter(Boolean).join(": ") || null,
-      amount: null, adverse: true, address: r.address,
-    };
-    yield { kind: "enforcement", hit, business: r.name, person: null, keys: { addresses: [r.address] } };
+  for (const r of parseOcpExcluded(await politeText(OCP, {}, { minDelayMs: 1500 }))) {
+    yield { kind: "enforcement", hit: ocpHit(r), business: r.name, person: null, keys: { addresses: [r.address] } };
   }
 }
 

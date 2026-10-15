@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { verifyEnforcement, verifyLicenseHit } from "./wa";
+import { debarAdverse, pack, verifyEnforcement, verifyLicenseHit } from "./wa";
 
 // Trimmed from L&I Verify GetBusinessDetails responses, 2026-10-15 (UBI 605320678, 602673413, 604984542).
 const details = {
@@ -31,6 +31,28 @@ describe("WA L&I Verify", () => {
     expect(hits[2]).toMatchObject({ id: "380725", status: "Tax warrant: Unpaid", amount: 10491.28 });
     expect(hits[3].endDate).toBe("2024-09-27");
   });
+  it("marks an infraction adverse only from its own status (audit 2026-10-15)", () => {
+    const one = (StatusDescription: string | undefined) =>
+      verifyEnforcement({ Contractor: { ...details.Contractor, Violations: [{ ...details.Contractor.Violations[0], StatusDescription }], Summons: [], Warrants: [], Lapses: [] } }, "ABSOLUTE ROOFING", "u")[0];
+    expect(one("Not Satisfied").adverse).toBe(true);
+    expect(one(undefined).adverse).toBeNull(); // no status published: unknown, never adverse by default
+    expect(one(undefined).status).toBe("Infraction issued");
+  });
+
+  it("treats a debarment as ended only when its own status doesn't keep it running", () => {
+    // Statuses on L&I's debarment list, 2026-10-15.
+    expect(debarAdverse("Debarred", "2025-01-01", "2026-10-15")).toBe(false);
+    expect(debarAdverse("Debarred", "2027-01-01", "2026-10-15")).toBe(true);
+    expect(debarAdverse("Debarred Until Penalties Paid", "2025-01-01", "2026-10-15")).toBe(true);
+    expect(debarAdverse("Permanent Debarment", null, "2026-10-15")).toBe(true);
+  });
+
+  it("says when Verify can't search by an identifier instead of reporting nothing found", async () => {
+    const verify = pack.liveLicenses![0];
+    expect(await verify.searchBy!({ type: "phone", value: "2082155090" })).toBeNull();
+    expect(await verify.searchBy!({ type: "address", value: "621 N GLENN RD SPOKANE VALLEY WA 99206" })).toBeNull();
+  });
+
   it("carries the owners on a license record and keeps no tradesperson home address", () => {
     const h = verifyLicenseHit(details, null, "license");
     expect(h.people).toEqual([{ name: "CARISSA EVE NORTON", role: "PARTNER/MEMBER" }]);

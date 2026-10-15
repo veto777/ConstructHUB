@@ -15,11 +15,12 @@
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { decodeEntities } from "../bulk-sources";
 import { clean, download, type BulkHit } from "../bulk";
 import { pdfText, textLines } from "./lib/a3-pdf";
 import type { StatePack } from "./types";
+import { adverseFrom } from "../adverse";
 
 const DES_PAGE = "https://des.sc.gov/about-scdes/programs-divisions/environmental-enforcement-actions";
 const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
@@ -183,7 +184,8 @@ export function desHit(o: DesOrder, sourceUrl: string): EnforcementHit | null {
     name: o.businesses.join(" / "), id: o.orderNumber, date: o.date, endDate: null, status: o.orderType,
     city: o.city ?? (o.county ? `${o.county.replace(/\s+County$/i, "")} County` : null),
     detail: [o.program, o.violations ? `Violations: ${o.violations}` : null].filter(Boolean).join(". ") || null,
-    amount: o.penalty, adverse: true,
+    // Adverse only from what the report publishes: a civil penalty. An order with no penalty printed stays unknown.
+    amount: o.penalty, adverse: adverseFrom(o.penalty ? "civil penalty" : null),
     ...(o.location ? { address: o.location } : {}),
   };
 }
