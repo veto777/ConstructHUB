@@ -9,6 +9,7 @@ import { startGbpConnect } from "@/components/recent-auth";
 import { InfoTip } from "@/components/info-tip";
 import { GoogleSurface } from "@/components/google";
 import { useEffect, useRef, useState } from "react";
+import { cleanSocialLink } from "@shared/social-profile-links";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
@@ -401,11 +402,18 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
   const validTab = tabItems.some((t) => t.value === tabParam && !(t.value === "citations" && !isPremiumPlus));
   const activeTab = validTab ? tabParam! : "insights";
   useEffect(() => { if (tabParam && !validTab) setTabParam(null); }, [tabParam, validTab]);
+  // The header chip: the uploaded logo, else the listing's profile photo from the last Google sync, else the icon.
+  const { data: headerMedia } = useQuery<{ items: { category?: string | null; thumbnail_url?: string | null; google_url?: string | null }[] }>({
+    queryKey: [`/api/gbp/locations/${location.id}/media?source=business&limit=60`],
+    enabled: !!location.gbpLocationName, staleTime: 5 * 60 * 1000,
+  });
+  const profilePhoto = headerMedia?.items?.find((m) => m.category === "PROFILE" || m.category === "LOGO");
+  const logo = location.logoUrl || profilePhoto?.thumbnail_url || profilePhoto?.google_url || null;
 
   return (
     <AppPage className="before:hidden">
         <Button variant="ghost" onClick={onBack} data-testid="button-back-to-list"><ArrowLeft className="mr-2 h-4 w-4"/>All locations</Button>
-        <PageHeader title={<span data-testid="text-detail-name">{location.businessName}</span>} description={fullAddress(location)||'Manage this Google Business Profile.'}/>
+        <PageHeader title={<span data-testid="text-detail-name">{location.businessName}</span>} description={fullAddress(location)||'Manage this Google Business Profile.'} image={logo} actions={<LogoButton location={location} />}/>
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex overflow-x-auto md:block md:w-48 shrink-0 gap-1 md:space-y-1">
             {tabItems.map(item => {
@@ -775,6 +783,43 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
   );
 }
 
+/** "Set logo" in the location header: upload → library photo → the location's logo, and the listing's profile photo on Google. */
+function LogoButton({ location }: { location: BusinessLocation }) {
+  const { toast } = useToast();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const onFile = async (file: File) => {
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("photo", file);
+      fd.append("pattern", "{business}-logo");
+      fd.append("title", `${location.businessName} logo`);
+      const up = await fetch(`/api/gbp/content/${location.id}/upload`, { method: "POST", body: fd, credentials: "include" });
+      if (!up.ok) throw new Error((await up.json().catch(() => ({}))).message || "Upload failed");
+      const photo = await up.json();
+      const r = await (await apiRequest("PUT", `/api/locations/${location.id}/logo`, { photoId: photo.id })).json();
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      if (r.google?.error) toast({ title: "Logo saved here, but not on Google", description: r.google.error, variant: "destructive" });
+      else if (r.google?.queued) toast({ title: "Logo saved", description: "It is being sent to your Google Business Profile now. Google can take a few minutes to show it." });
+      else toast({ title: "Logo saved" });
+    } catch (e) {
+      toast({ title: "Could not set the logo", description: apiErrorMessage(e as Error), variant: "destructive" });
+    } finally {
+      setBusy(false);
+      if (input.current) input.current.value = "";
+    }
+  };
+  return (
+    <>
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onFile(f); }} data-testid="input-location-logo" />
+      <Button variant="outline" disabled={busy} onClick={() => input.current?.click()} data-testid="button-set-logo">
+        {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Image className="mr-2 h-4 w-4" />}{location.logoUrl ? "Change logo" : "Set logo"}
+      </Button>
+    </>
+  );
+}
+
 function SocialProfilesTab({ location }: { location: BusinessLocation }) {
   const { toast } = useToast();
   const profiles = (location.socialProfiles as Record<string, string>) || {};
@@ -783,8 +828,9 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
     SOCIAL_PLATFORMS.forEach(p => { init[p.key] = profiles[p.key] || ""; });
     return init;
   });
-  // Mirrors the server: each link is blank or a full https:// URL.
-  const invalid = new Set(SOCIAL_PLATFORMS.map(p => p.key).filter(k => values[k].trim() !== "" && !isHttpsLink(values[k].trim())));
+  // Mirrors the server (shared/social-links.ts): one full https link per platform, on that platform's own domain.
+  const checks = Object.fromEntries(SOCIAL_PLATFORMS.map(p => [p.key, cleanSocialLink(p.key, values[p.key])])) as Record<string, ReturnType<typeof cleanSocialLink>>;
+  const invalid = new Set(SOCIAL_PLATFORMS.map(p => p.key).filter(k => !!checks[k].error));
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -792,8 +838,10 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
       const res = await apiRequest("PUT", `/api/locations/${location.id}`, { socialProfiles: trimmed });
       return res.json();
     },
-    onSuccess: (r: { google?: { pushed: string[]; error?: string } }) => {
+    onSuccess: (r: { socialProfiles?: Record<string, string>; google?: { pushed: string[]; error?: string } }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      // The boxes take the server's cleaned links (a short link comes back as the full profile link).
+      if (r?.socialProfiles) setValues(v => Object.fromEntries(SOCIAL_PLATFORMS.map(p => [p.key, r.socialProfiles![p.key] ?? (v[p.key].trim() ? "" : v[p.key])])));
       if (r?.google?.error) toast({ title: "Saved here, but not on Google", description: r.google.error, variant: "destructive" });
       else if (r?.google) toast({ title: "Social profiles saved to your Google Business Profile", description: "Google can take a few minutes to show them on the listing." });
       else toast({ title: "Social profiles saved" });
@@ -830,7 +878,12 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
             </div>
             {invalid.has(platform.key) && (
               <p id={`error-social-${platform.key}`} className="text-xs text-destructive sm:pl-[8.5rem]" data-testid={`text-social-error-${platform.key}`}>
-                Enter the full link, starting with https://
+                {checks[platform.key].error}
+              </p>
+            )}
+            {!invalid.has(platform.key) && checks[platform.key].short && (
+              <p className="text-xs text-muted-foreground sm:pl-[8.5rem]" data-testid={`text-social-short-${platform.key}`}>
+                Short link — it will be expanded to the full profile link when you save.
               </p>
             )}
           </div>
@@ -850,9 +903,6 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function isHttpsLink(v: string): boolean {
-  try { return new URL(v).protocol === "https:"; } catch { return false; }
-}
 
 function SettingsTab({ location, onDeleted }: { location: BusinessLocation; onDeleted: () => void }) {
   const { toast } = useToast();

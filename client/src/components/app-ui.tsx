@@ -95,8 +95,10 @@ export function AppPage({ children, width = "default", className, testId }: {
 
 /* ── Page header ────────────────────────────────────────────────────────────── */
 
-export function PageHeader({ title, description, actions, meta, back, testId, icon, accent }: {
+export function PageHeader({ title, description, actions, meta, back, testId, icon, accent, image }: {
   title: ReactNode;
+  /** A picture for the chip (a business logo) in place of the icon. */
+  image?: string | null;
   /** The page's icon chip. Defaults to the route's icon (PAGE_ICONS); pass null for none. */
   icon?: LucideIcon | null;
   accent?: Accent;
@@ -123,7 +125,11 @@ export function PageHeader({ title, description, actions, meta, back, testId, ic
       )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-          {Icon && (
+          {image ? (
+            <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5 sm:h-12 sm:w-12 sm:rounded-2xl" data-testid="page-header-image">
+              <img src={image} alt="" className="h-full w-full object-cover" />
+            </span>
+          ) : Icon && (
             <span className={cn("mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1 ring-black/5 sm:h-12 sm:w-12 sm:rounded-2xl", tone.chip)} aria-hidden="true">
               <Icon className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
             </span>

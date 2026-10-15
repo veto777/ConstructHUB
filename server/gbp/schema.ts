@@ -22,6 +22,7 @@ export async function ensureGbpSchema() {
     ALTER TABLE business_locations ADD COLUMN IF NOT EXISTS gbp_google_subject text;
     -- Set when the contractor unlinks a location: connecting a Google account must not silently re-link it.
     ALTER TABLE business_locations ADD COLUMN IF NOT EXISTS gbp_unlinked_by_user boolean NOT NULL DEFAULT false;
+    ALTER TABLE business_locations ADD COLUMN IF NOT EXISTS logo_url text;
     -- Only a Business Profile sync knows whether a business is open; new manual and Places locations start unknown (NULL).
     -- Guarded: a database without the column (older drift) must not fail the whole ensure step.
     DO $$ BEGIN

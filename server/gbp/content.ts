@@ -39,7 +39,7 @@ export async function ensureGbpContentSchema() {
       summary text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY(user_id,location_id));`);
 }
-export const categories = ['ADDITIONAL', 'EXTERIOR', 'INTERIOR', 'PRODUCT', 'AT_WORK', 'FOOD_AND_DRINK', 'MENU', 'COMMON_AREA', 'ROOMS', 'TEAMS', 'COVER'] as const;
+export const categories = ['ADDITIONAL', 'EXTERIOR', 'INTERIOR', 'PRODUCT', 'AT_WORK', 'FOOD_AND_DRINK', 'MENU', 'COMMON_AREA', 'ROOMS', 'TEAMS', 'COVER', 'PROFILE'] as const;
 const id = z.number().int().positive();
 const https = z.string().url().max(2000).refine(v => new URL(v).protocol === 'https:', 'HTTPS required');
 const localDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).refine(value => {

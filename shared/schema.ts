@@ -364,6 +364,8 @@ export const businessLocations = pgTable("business_locations", {
   // Only a Google sync knows whether a business is open; null means unknown (never assume "Open").
   openStatus: text("open_status"),
   socialProfiles: jsonb("social_profiles"),
+  // The owner's uploaded logo (a media_photos url); shown in the location header before Google's profile photo.
+  logoUrl: text("logo_url"),
   tags: text("tags").array(),
   businessPhotoCount: integer("business_photo_count").default(0),
   customerPhotoCount: integer("customer_photo_count").default(0),

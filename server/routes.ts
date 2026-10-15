@@ -2903,7 +2903,16 @@ export async function registerRoutes(
       if (!existing) return res.status(404).json({ message: "Location not found" });
       const parsed = locationUpdateInput.safeParse(req.body ?? {});
       if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
-      const { socialProfiles, ...updateFields } = parsed.data;
+      const { socialProfiles: rawSocial, ...updateFields } = parsed.data;
+      let socialProfiles = rawSocial;
+      if (socialProfiles) {
+        // One clean https link per platform on its own domain; a short link (pin.it, fb.me …) is expanded to the
+        // profile it points at. Anything else is refused with the platform named, before Google sees it.
+        const { resolveSocialLinks } = await import("./social-profile-links");
+        const r = await resolveSocialLinks(socialProfiles);
+        if (r.error) return res.status(400).json({ message: r.error });
+        socialProfiles = r.links;
+      }
       const changes: Record<string, unknown> = { ...updateFields, updatedAt: new Date() };
       if (socialProfiles) {
         // Replace the seven editable platform links; keep any other keys (e.g. from a GBP sync).
@@ -2937,6 +2946,42 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("Error updating location:", err);
       res.status(500).json({ message: "Could not save the location. Please try again." });
+    }
+  });
+
+  // The location header's "Set logo": a library photo becomes the location's logo here and, on a linked listing,
+  // is published to Google as the profile photo through the content queue (owner 2026-10-15: "allow a logo to be
+  // added to the profile place instead of that map icon"). photoId null clears the local logo only.
+  app.put("/api/locations/:id/logo", async (req, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    try {
+      const id = parseInt(req.params.id);
+      const [existing] = await db.select().from(businessLocations).where(and(eq(businessLocations.id, id), eq(businessLocations.userId, user.id)));
+      if (!existing) return res.status(404).json({ message: "Location not found" });
+      const body = z.object({ photoId: z.number().int().positive().nullable() }).safeParse(req.body ?? {});
+      if (!body.success) return res.status(400).json({ message: "Pick a photo for the logo" });
+      let logoUrl: string | null = null;
+      let google: { queued?: boolean; error?: string } | undefined;
+      if (body.data.photoId) {
+        const { rows: [photo] } = await pool.query("SELECT id,url FROM media_photos WHERE id=$1 AND user_id=$2", [body.data.photoId, user.id]);
+        if (!photo) return res.status(404).json({ message: "Photo not found" });
+        logoUrl = photo.url;
+        if (existing.gbpLocationName) {
+          try {
+            const { enqueue } = await import("./gbp/content");
+            await enqueue(user.id, id, { requestKey: randomUUID(), items: [{ kind: "photo", photoIds: [photo.id], category: "PROFILE" }], schedule: { start: new Date().toISOString() } });
+            google = { queued: true };
+          } catch (e: any) {
+            google = { error: typeof e?.message === "string" ? e.message : "Google did not take the logo" };
+          }
+        }
+      }
+      await db.update(businessLocations).set({ logoUrl, updatedAt: new Date() }).where(eq(businessLocations.id, id));
+      res.json({ logoUrl, google });
+    } catch (err: any) {
+      console.error("Error setting the location logo:", err);
+      res.status(500).json({ message: "Could not save the logo. Please try again." });
     }
   });
 
