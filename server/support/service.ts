@@ -37,6 +37,7 @@ import { customerNumberFor } from "./schema";
 import { freshState, turn, LINES, type Account, type CallState, type Category, type Channel, type Deps, type Intake, type Reply } from "./line";
 import { CLIPS, freshIvrState, ivrTurn, type ClipId, type IvrDeps, type IvrInput, type IvrReply } from "./ivr";
 import { admitIvrCall, codeSendGate, LIMITS, meterCall, minutesExhausted, realStore } from "./limits";
+import { mirrorSupportCallSoon } from "./call-log";
 
 const DAY = 24 * 3_600_000;
 let warnedPepper = false;
@@ -153,6 +154,7 @@ export async function openTicket(s: CallState, callerNumber: string, callSid: st
     if (callSid) await c.query(`UPDATE support_calls SET ticket_id = $1, updated_at = now() WHERE call_sid = $2`, [id, callSid]);
     await c.query("COMMIT");
   } catch (e) { await c.query("ROLLBACK").catch(() => {}); throw e; } finally { c.release(); }
+  if (callSid) mirrorSupportCallSoon(callSid);
   if (!recording?.sid) await sendTicketEmails(id, callerNumber);   // a recorded description: the sweep sends them once transcribed
   return { number };
 }
@@ -187,7 +189,7 @@ export async function transcribeSweep(): Promise<void> {
   const { rows } = await pool.query(
     `UPDATE support_tickets SET transcript_status = 'working', updated_at = now() WHERE id IN (
        SELECT id FROM support_tickets WHERE transcript_status = 'pending' OR (transcript_status = 'working' AND updated_at < now() - interval '3 minutes')
-       ORDER BY id LIMIT 10 FOR UPDATE SKIP LOCKED) RETURNING id, recording_sid, category, created_at`);
+       ORDER BY id LIMIT 10 FOR UPDATE SKIP LOCKED) RETURNING id, recording_sid, category, created_at, call_sid`);
   for (const t of rows) {
     let text = "";
     try {
@@ -202,6 +204,7 @@ export async function transcribeSweep(): Promise<void> {
       await pool.query(`UPDATE support_tickets SET description = $2, title = $3, transcript_status = 'done', updated_at = now() WHERE id = $1`,
         [t.id, `${text.slice(0, 4000)}\n\n(Transcribed from the caller's voice recording.)`, `${CAT_TITLE[t.category as Category] ?? "Support request"}: ${words}${text.split(/\s+/).length > 10 ? "…" : ""}`.slice(0, 120)]);
       await sendTicketEmails(t.id);
+      if (t.call_sid) mirrorSupportCallSoon(t.call_sid);
     } else if (Date.now() - new Date(t.created_at).getTime() > 15 * 60_000) {
       await pool.query(`UPDATE support_tickets SET description = 'Voice description — not transcribed; play the recording in admin.', transcript_status = 'failed', updated_at = now() WHERE id = $1`, [t.id]);
       await sendTicketEmails(t.id);
@@ -242,6 +245,7 @@ async function runIvr(callSid: string, input: IvrInput): Promise<IvrReply | null
       `UPDATE support_calls SET state = $1, user_id = $2, verified_at = CASE WHEN $3 AND verified_at IS NULL THEN now() ELSE verified_at END, updated_at = now(),
          ended_at = CASE WHEN $6 THEN COALESCE(ended_at, now()) ELSE ended_at END
        WHERE call_sid = $4 AND COALESCE((state->>'v')::int, 0) = $5`, [JSON.stringify(s), s.verified ? s.userId : null, s.verified, callSid, v0, r.end]);
+    if (w.rowCount && r.end) mirrorSupportCallSoon(callSid);
     return w.rowCount === 0 ? { play: ["still_there"], listen: {}, end: false } : r;
   } catch (e: any) { console.error("[support] ivr turn failed:", e?.message || e); return { play: ["fail"], end: true }; }
 }
@@ -257,6 +261,7 @@ const okSid = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9
 /** The line refused or wrapped up the call: its state is over (a later turn hears "wrap up") and it holds no seat. */
 async function endCall(callSid: string): Promise<void> {
   await pool.query(`UPDATE support_calls SET state = jsonb_set(state, '{step}', '"done"'), ended_at = COALESCE(ended_at, now()), updated_at = now() WHERE call_sid = $1`, [callSid]);
+  mirrorSupportCallSoon(callSid);
 }
 const FAIL: Reply = { say: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.", end: true };
 
@@ -369,12 +374,12 @@ export function registerSupportRoutes(app: Express, getDevUser: any) {
     if (!(await meterCall(callSid, Date.now())).ok) { await endCall(callSid); return res.json({ say: LINES.minutesOut, end: true }); }
     const r = await runTurn(callSid, text, String(from || ""), silence === true);
     if (!r) return res.status(409).json({ code: "not_started" });   // a turn requires start
-    if (r.reply.end) await realStore.end(callSid);
+    if (r.reply.end) { await realStore.end(callSid); mirrorSupportCallSoon(callSid); }
     res.json(r.reply);
   });
   app.post(`${VOICE_INTERNAL_PATH}/support/end`, requireVoiceInternal, async (req, res) => {
     const { callSid } = req.body || {};
-    if (okSid(callSid)) { await meterCall(callSid, Date.now()); await realStore.end(callSid); }
+    if (okSid(callSid)) { await meterCall(callSid, Date.now()); await realStore.end(callSid); mirrorSupportCallSoon(callSid); }
     res.json({ ok: true });
   });
 

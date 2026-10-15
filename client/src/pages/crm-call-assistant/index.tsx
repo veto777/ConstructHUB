@@ -214,7 +214,7 @@ export default function CrmCallAssistantPage() {
             {status.data?.external && (
               <div className="pt-4">
                 <Notice tone="info" title={`${status.data.external.name} answers your phones today`} testId="notice-studio-external">
-                  {status.data.external.name} runs from your own system, so nothing here changes how she answers. This studio sets up
+                  {status.data.external.name} runs from your own system, so nothing here changes how those calls are answered. This studio sets up
                   ConstructHUB's built-in assistant, for numbers you get on the Numbers tab.
                 </Notice>
               </div>

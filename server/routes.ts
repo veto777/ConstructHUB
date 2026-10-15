@@ -576,6 +576,9 @@ export async function registerRoutes(
     await ensureSupportSchema();
     const { registerSupportRoutes } = await import("./support/service");
     registerSupportRoutes(app, getDevUser);
+    // The support line's calls in the brand's Call Assistant (support/call-log.ts): catch up on calls taken before the mirror.
+    const { backfillSupportCallLog } = await import("./support/call-log");
+    backfillSupportCallLog().catch((e: any) => console.error("[support] call log backfill failed:", e?.message || e));
   } catch (e: any) {
     console.error("Failed to initialize the support line:", e?.message || e);
   }

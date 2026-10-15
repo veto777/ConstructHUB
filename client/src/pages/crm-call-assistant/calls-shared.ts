@@ -163,6 +163,7 @@ export const OUTCOME_LABELS: Record<string, string> = {
   lead_submitted: "Lead",
   booked: "Booked",
   alerted: "Escalated",
+  support_ticket: "Ticket opened",
   info: "Info only",
   declined: "Declined",
   out_of_area: "Out of area",
@@ -182,6 +183,7 @@ export function outcomeTone(outcome: string | null | undefined): PillTone {
   switch (outcome) {
     case "lead_submitted":
     case "booked":
+    case "support_ticket":
       return "success";
     case "alerted":
       return "warning";
