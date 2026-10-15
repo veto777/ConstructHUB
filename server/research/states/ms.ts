@@ -251,7 +251,7 @@ async function* msRevokedSuspended(): AsyncIterable<BulkHit> {
 const BULK: BulkSource[] = [
   {
     id: "ms-msboc-revoked-suspended", state: "MS", label: "Mississippi State Board of Contractors revoked and suspended licenses",
-    pageUrl: SEARCH_PAGE, everyHours: 24, minRows: 60, companiesOnly: true, load: msRevokedSuspended,
+    pageUrl: SEARCH_PAGE, everyHours: 24, minRows: 64, companiesOnly: true, load: msRevokedSuspended,
   },
 ];
 
