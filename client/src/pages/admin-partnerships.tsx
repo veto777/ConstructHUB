@@ -144,7 +144,7 @@ function SendBox() {
       </Select>
       <Input placeholder="To (email)" type="email" value={f.to} onChange={set("to")} data-testid="input-send-to" />
       <Input className="sm:col-span-2" placeholder="Subject" value={f.subject} onChange={set("subject")} />
-      <Textarea className="sm:col-span-2" rows={6} placeholder="Message (the Construct HUB Media Team signature is added)" value={f.body} onChange={set("body")} />
+      <Textarea className="sm:col-span-2" rows={6} placeholder="Message (Leah Peterson's Construct HUB Media Team signature is added)" value={f.body} onChange={set("body")} />
       <div className="sm:col-span-2">
         <Button disabled={send.isPending || !f.company || !f.to || !f.subject || !f.body} onClick={() => send.mutate()} data-testid="button-send-media">
           {send.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}Send from media@
