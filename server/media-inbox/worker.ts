@@ -268,8 +268,8 @@ export function articleContactBody(company: string): string {
 
 ConstructHUB is software for US contractors (roofers, HVAC, plumbers, remodelers). We work with contractors every day on permits, estimates, Google Business Profiles and getting found online, and we'd like to build an ongoing content partnership with ${company}.
 
-We can offer practical, original articles written for your readers: real how-tos from the contractor side, never promotional fluff. We're building an automated system for this, so could you tell us:
-1. Whether you have an API, feed or other automated way to submit articles, and how we get access.
+We can offer practical, original articles written for your readers: real how-tos from the contractor side, never promotional fluff. Could you tell us:
+1. Whether you have an API, feed or contributor portal for submitting articles, and how we get access.
 2. Your editorial guidelines and the topics you're looking for.
 3. Whether you accept regular contributors or a recurring column.
 4. How links and author bios are handled.
@@ -285,8 +285,8 @@ export function newsContactBody(company: string): string {
 
 ConstructHUB is software for US contractors. Many of our customers are local roofers, HVAC and plumbing companies with real news: new hires, expansions, community projects and storm-season advice. We'd like to build a relationship with ${company} for local contractor stories.
 
-We're building an automated system for this, so could you tell us:
-1. Whether you have an API, feed or other automated way to submit press releases, and how we get access.
+Could you tell us:
+1. Whether you have an API, feed or newsroom portal for submitting press releases, and how we get access.
 2. How you prefer to receive press releases and story pitches, and any guidelines.
 3. Whether you offer a partner or sponsored-content program for local businesses.
 
@@ -304,7 +304,7 @@ ConstructHUB is software for US contractors (roofers, HVAC, plumbers, remodelers
 Could you tell us:
 1. Whether you list tools or services for members (a member-benefits page, resource directory or allied membership) and how a company like ours qualifies.
 2. Whether you accept articles or tips for your newsletter or blog, for example on permits, licensing or getting found online.
-3. Whether you have an API, feed or other automated way to submit them, since we're building an automated system for this.
+3. Whether you have an API, feed or portal for submitting them.
 4. Who the right person is for partnerships, if that isn't you.
 
 ${STOP_LINE}

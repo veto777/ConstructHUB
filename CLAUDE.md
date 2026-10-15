@@ -27,6 +27,19 @@ reset time (a cron/wakeup that says "resume <task>"), relaunch cut-off agents in
 "If you get cut off keep working after the session is reset… especially when I told you don't stop."
 When Fable reaches its limit, switch the agents to Opus (Agent tool `model: "opus"`) and keep working — never wait for the reset.
 
+## 🚫 OWNER LAW — never let anyone outside see a bot (2026-10-15)
+Nothing we send to a platform, vendor, PR outlet, news desk, agency, directory or partner (email, ticket,
+contact form, chat, DM) may reveal that an AI, bot or script is behind ConstructHUB.
+- **Never report a CAPTCHA, bot check or blocked/failed sign-up to the company that blocked us.** Stop,
+  write it down, tell the owner; the owner decides whether a person signs up. (The 2026-10-14 email to
+  Free Law Project, "signup blocked by the captcha", got us called out as an AI and ticketed: #2648.)
+- No "automated", crawler, scraper, script, rate limit, robots.txt, headless or user-agent talk, and never
+  mention AI or name an AI provider. Never claim a person wrote it either: "are you AI?" goes to the owner.
+- Keep outreach short and plain, the way a person writes. Don't retry a human check over and over.
+- media@ enforces this in code: `server/media-inbox/guard.ts` `botTellProblem`, checked in `sendMail`.
+  Any other sender (support@, social@, a one-off script) must follow it by hand. No exceptions, even
+  under "do it, don't ask".
+
 ## 🚫 Tower boundary
 Self-contained. Never pull in another tower project's infra, domains, or accounts — see
 `~/HUB/ROUTER.md` for the specifics. Enforced by `.git/hooks/pre-commit` (tower guard).

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { asksIfAi, companyDomain, firstNameOf, formMessage, holdingReply, personWillReply, machineReason, replyProblem, replySubject } from "./guard";
+import { botTellProblem, asksIfAi, companyDomain, firstNameOf, formMessage, holdingReply, personWillReply, machineReason, replyProblem, replySubject } from "./guard";
+import { QUEUE_TEMPLATES } from "./worker";
 import { parseGoogleForm } from "./browse";
 import { parseDecision } from "./ai";
 import { stripQuoted, composeMail } from "./mailbox";
@@ -238,4 +239,30 @@ describe("asksIfAi — a direct question goes to a person", () => {
   it.each(["We use AI tools for our listings.", "Our API is open to partners.", "Are you available Tuesday?"])("not: %s", (q) => expect(asksIfAi(q)).toBe(false));
   it("the holding answer neither mentions AI nor claims a person wrote it", () => expect(replyProblem(personWillReply("Mike"))).toBeNull());
   it("a draft claiming to be human is refused", () => expect(replyProblem("Hi, I'm a real person on the team.\n\nBest regards,")).toMatch(/person wrote/));
+});
+
+describe("botTellProblem — OWNER LAW 2026-10-15: nothing we send gives away a bot or a script", () => {
+  it.each([
+    "CourtListener API account: signup blocked by the captcha",
+    "the signup page's verification puzzle wouldn't complete for us",
+    "Your reCAPTCHA keeps failing on our side.",
+    "Our sign-up was blocked, could you create the account for us?",
+    "We're building an automated system for this.",
+    "Our crawler respects robots.txt.",
+    "We hit your rate limit with our script.",
+    "Is there a programmatic way to submit?",
+    "Our scraper reads your contact page.",
+    "As an AI, I can't decide that.",
+  ])("refuses %j", (t) => {
+    expect(botTellProblem(t)).not.toBeNull();
+    expect(replyProblem(t)).not.toBeNull();
+  });
+  it.each([
+    "Could you tell us whether you have a contributor portal or feed for submitting articles?",
+    "Tips for sealing a crawl space before winter.",
+    "Thanks Jane! Could you send your API docs?",
+  ])("passes %j", (t) => expect(botTellProblem(t)).toBeNull());
+  it("every first-contact template passes", () => {
+    for (const t of Object.values(QUEUE_TEMPLATES)) expect(botTellProblem(`${t.subject}\n${t.body("Acme News")}`)).toBeNull();
+  });
 });
