@@ -986,6 +986,24 @@ export const introHelpEntry = (key: string): HelpEntry | undefined => {
 };
 export const helpEntry = (key: string): HelpEntry | undefined => BY_KEY.get(key) ?? introHelpEntry(key);
 
+/**
+ * The entry for a page path, so a page title can carry its "i" without naming a key (owner 2026-10-15: every
+ * page gets an "i" that says what it is for and how to use it, with the walkthrough inside). Exact route first,
+ * then the longest route prefix; at the same route a feature beats its sections (they share the feature's route
+ * unless a section declares a more specific one, e.g. "/cloudflare/connections"). Query and hash are ignored.
+ */
+export function helpKeyForRoute(pathname: string): string | undefined {
+  const path = (pathname.replace(/[?#].*$/, "").replace(/\/+$/, "") || "/");
+  let best: HelpEntry | undefined, bestLen = -1;
+  for (const e of HELP_ENTRIES) {
+    if (e.unlisted) continue;
+    const r = e.route.replace(/[?#].*$/, "").replace(/\/+$/, "") || "/";
+    if (r === "/" || !(path === r || path.startsWith(r + "/"))) continue;
+    if (r.length > bestLen || (r.length === bestLen && !e.parent && best?.parent)) { best = e; bestLen = r.length; }
+  }
+  return best?.key;
+}
+
 /** The features (one Tutorials card each), in sidebar order within their group. */
 export const HELP_FEATURES: readonly HelpEntry[] = HELP_ENTRIES.filter((e) => !e.parent && !e.unlisted);
 /** A feature's sections, in page order. */

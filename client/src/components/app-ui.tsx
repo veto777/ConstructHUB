@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ToolTabsList } from "@/components/tool";
+import { HelpButton } from "@/components/help-button";
+import { useHelpKeyForRoute } from "@/lib/use-help-entry";
 import { cn } from "@/lib/utils";
 export { EmptyState, StatusPill, ErrorCard, statusTone, crmTable as appTable, crmTableCards as appTableCards } from "@/components/crm-ui";
 
@@ -95,8 +97,13 @@ export function AppPage({ children, width = "default", className, testId }: {
 
 /* ── Page header ────────────────────────────────────────────────────────────── */
 
-export function PageHeader({ title, description, actions, meta, back, testId, icon, accent, image }: {
+export function PageHeader({ title, description, actions, meta, back, testId, icon, accent, image, helpKey: helpKeyProp }: {
   title: ReactNode;
+  /**
+   * The "i" beside the title (help registry key: what it's for, how to use it, the walkthrough). Left out, the
+   * header mounts the entry whose route matches the page; null turns it off (a public or sub-page with none).
+   */
+  helpKey?: string | null;
   /** A picture for the chip (a business logo) in place of the icon. */
   image?: string | null;
   /** The page's icon chip. Defaults to the route's icon (PAGE_ICONS); pass null for none. */
@@ -116,6 +123,8 @@ export function PageHeader({ title, description, actions, meta, back, testId, ic
   const auto = pageIconFor(location);
   const Icon = icon === null ? null : icon ?? auto?.icon ?? null;
   const tone = ACCENTS[accent ?? auto?.accent ?? "orange"];
+  const routeHelpKey = useHelpKeyForRoute(location);
+  const helpKey = helpKeyProp === undefined ? routeHelpKey : helpKeyProp ?? undefined;
   return (
     <header className="space-y-3" data-testid={testId}>
       {back && (
@@ -137,6 +146,7 @@ export function PageHeader({ title, description, actions, meta, back, testId, ic
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.75rem] sm:leading-9">{title}</h1>
+              {helpKey && <HelpButton k={helpKey} />}
               {meta}
             </div>
             {description && <p className="max-w-2xl text-sm text-muted-foreground sm:text-[0.9375rem]">{description}</p>}

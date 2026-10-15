@@ -15,6 +15,20 @@ export function loadHelpRegistry(): Promise<Registry> {
   return (loading ??= import("@shared/help/registry").then((m) => (registry = m)));
 }
 
+/**
+ * The help key whose route matches `pathname` (shared/help/registry.ts helpKeyForRoute): undefined until the
+ * registry has loaded, and for a page no entry covers. Page headers use it to mount their "i" automatically.
+ */
+export function useHelpKeyForRoute(pathname: string): string | undefined {
+  const [key, setKey] = useState<string | undefined>(() => registry?.helpKeyForRoute(pathname));
+  useEffect(() => {
+    let on = true;
+    loadHelpRegistry().then((m) => { if (on) setKey(m.helpKeyForRoute(pathname)); });
+    return () => { on = false; };
+  }, [pathname]);
+  return key;
+}
+
 /** The help entry for `key`: undefined until the registry has loaded (and for a key it does not have). */
 export function useHelpEntry(key: string): HelpEntry | undefined {
   const [entry, setEntry] = useState<HelpEntry | undefined>(() => registry?.helpEntry(key));

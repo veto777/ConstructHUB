@@ -117,14 +117,24 @@ const ICON_BUTTON = cn(
   "aria-expanded:bg-[var(--g-accent-soft)] aria-expanded:text-[var(--g-accent-ink)]",
 );
 
-function PanelBody({ entry, onWatch, footer }: { entry: HelpEntry; onWatch: () => void; footer?: ReactNode }) {
+/**
+ * The panel: the four parts, and the walkthrough played RIGHT HERE (owner 2026-10-15: "open a tutorial right in
+ * the i window") — "Watch the walkthrough" swaps the player in above the text; closing the panel stops it.
+ */
+function PanelBody({ entry, playing, onWatch, footer }: { entry: HelpEntry; playing: boolean; onWatch: () => void; footer?: ReactNode }) {
   return (
     <>
+      {playing && entry.video && (
+        <div className="mb-4" data-testid={`help-inline-video-${entry.key}`}>
+          <HelpVideoPlayer video={entry.video} title={entry.title} testId={`help-video-${entry.key}`} autoPlay />
+          <p className="mt-1.5 text-[12px] g-text-2">{formatDuration(entry.video.durationSec)} · {entry.video.captions ? "captions on" : "no captions"}</p>
+        </div>
+      )}
       <HelpParts entry={entry} testId={`help-body-${entry.key}`} />
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3" style={{ borderColor: "var(--g-divider)" }}>
         {entry.video ? (
-          <button type="button" className="g-pill g-pill--sm" onClick={onWatch} data-testid={`help-watch-${entry.key}`}>
-            <PlayCircle aria-hidden="true" /><span>Watch the walkthrough ({formatDuration(entry.video.durationSec)})</span>
+          <button type="button" className="g-pill g-pill--sm" onClick={onWatch} aria-pressed={playing} data-testid={`help-watch-${entry.key}`}>
+            <PlayCircle aria-hidden="true" /><span>{playing ? "Hide the walkthrough" : `Watch the walkthrough (${formatDuration(entry.video.durationSec)})`}</span>
           </button>
         ) : (
           <p className="text-[13px] g-text-2" data-testid={`help-video-soon-${entry.key}`}>Video walkthrough coming soon</p>
@@ -151,7 +161,9 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [watching, setWatching] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const titleId = useId();
+  useEffect(() => { if (!open) setPlaying(false); }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -196,9 +208,10 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
       <Info className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
     </button>
   );
-  const watch = () => { setOpen(false); setWatching(true); };
+  // The walkthrough plays inside the panel; it stops when the panel closes (the player unmounts).
+  const watch = () => setPlaying((p) => !p);
   const footer = tutorialsLink
-    ? <Link href={`/tutorials#help-${(entry.parent ?? entry.key)}`} className="g-link text-[13px]" onClick={() => setOpen(false)} data-testid={`help-all-${k}`}>All tutorials</Link>
+    ? <Link href={`/tutorials#help-${(entry.parent ?? entry.key)}`} className="g-link text-[13px]" onClick={() => setOpen(false)} data-testid={`help-all-${k}`}>Open in Tutorials</Link>
     : undefined;
 
   return (
@@ -211,7 +224,7 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
               <SheetTitle className="text-[18px] font-normal g-text" data-testid={`help-title-${k}`}>{entry.title}</SheetTitle>
               <SheetDescription className="sr-only">What it’s for, what it does, how to run it and how it works.</SheetDescription>
             </SheetHeader>
-            <PanelBody entry={entry} onWatch={watch} footer={footer} />
+            <PanelBody entry={entry} playing={playing} onWatch={watch} footer={footer} />
           </SheetContent>
         </Sheet>
       ) : (
@@ -219,11 +232,12 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
           <PopoverContent
             role="dialog" aria-labelledby={titleId} align="start" sideOffset={6} collisionPadding={12}
-            className="g-surface w-[min(26rem,calc(100vw-1.5rem))] max-h-[min(34rem,var(--radix-popover-content-available-height))] overflow-y-auto rounded-xl p-5"
+            className={cn("g-surface max-h-[min(36rem,var(--radix-popover-content-available-height))] overflow-y-auto rounded-xl p-5",
+              playing ? "w-[min(40rem,calc(100vw-1.5rem))]" : "w-[min(26rem,calc(100vw-1.5rem))]")}
             data-testid={`help-panel-${k}`}
           >
             <h3 id={titleId} className="mb-3 text-[18px] leading-6 g-text" data-testid={`help-title-${k}`}>{entry.title}</h3>
-            <PanelBody entry={entry} onWatch={watch} footer={footer} />
+            <PanelBody entry={entry} playing={playing} onWatch={watch} footer={footer} />
           </PopoverContent>
         </Popover>
       )}

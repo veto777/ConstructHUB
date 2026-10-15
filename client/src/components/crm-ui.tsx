@@ -1,8 +1,10 @@
 import * as React from "react";
 import type { LucideIcon } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { InfoTip } from "@/components/info-tip";
+import { HelpButton } from "@/components/help-button";
+import { useHelpKeyForRoute } from "@/lib/use-help-entry";
 import { cn } from "@/lib/utils";
 
 /**
@@ -50,9 +52,13 @@ export function CrmPageHeader({
   actions?: React.ReactNode;
   /** Mounts a ⓘ help dialog (lib/info-content.ts) beside the title. */
   infoKey?: string;
-  /** Sits after the ⓘ: the page’s walkthrough button (a video-only HelpButton). */
+  /** Sits after the ⓘ: the page’s walkthrough button (a video-only HelpButton). Left out, the page route's own
+   * help entry supplies it: the full "i" when the page has no InfoTip, else just the walkthrough. */
   help?: React.ReactNode;
 }) {
+  const [location] = useLocation();
+  const helpKey = useHelpKeyForRoute(location);
+  const autoHelp = help === undefined && helpKey ? <HelpButton k={helpKey} videoOnly={!!infoKey} /> : help;
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex items-center gap-3.5 min-w-0">
@@ -65,7 +71,7 @@ export function CrmPageHeader({
           <div className="flex items-center gap-1">
             <h1 className="text-2xl font-semibold tracking-tight leading-tight">{title}</h1>
             {infoKey && <InfoTip k={infoKey} />}
-            {help}
+            {autoHelp}
           </div>
           {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
