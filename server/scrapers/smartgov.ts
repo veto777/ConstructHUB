@@ -146,8 +146,15 @@ export function smartgovSearchBody(html: string, fields: Record<string,string>):
   body.set('__submitFormValidator__', `abcd${Date.now()}z`);
   return body;
 }
+/** A stored short link (Sachse, TX: bit.ly/SachsePermits) is used only if its own redirect lands on a SmartGov tenant. */
+async function tenantUrl(ctx: AdapterCtx, request: ReturnType<typeof portalSession>): Promise<string> {
+  try { return smartgovUrl(ctx.searchUrl); } catch (e) {
+    if (new URL(ctx.searchUrl).hostname.toLowerCase() !== 'bit.ly') throw e;
+    return smartgovUrl((await request(ctx.searchUrl)).url);
+  }
+}
 async function run(ctx: AdapterCtx, fields: Record<string,string>, advanced: boolean): Promise<PermitRecord[]> {
-  const base = smartgovUrl(ctx.searchUrl); const request = portalSession(ctx);
+  const request = portalSession(ctx); const base = await tenantUrl(ctx, request);
   let page = await request(advanced ? base.replace(/Search$/, 'AdvancedSearch') : base);
   const $ = cheerio.load(page.html);
   const action = $('form[action]').first().attr('action');

@@ -23,3 +23,24 @@ describe("politeFetch headers", () => {
     expect(headers.get("user-agent")).toBe(USER_AGENT);
   });
 });
+
+describe("politeFetch connection retries", () => {
+  const connectTimeout = () => Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_CONNECT_TIMEOUT" } });
+  // Addison, TX (EnerGov) intermittently took longer than Node's 10 s connect limit; curl got through.
+  it("opens a fresh connection after a connect timeout, since no request reached the server", async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(connectTimeout()).mockRejectedValueOnce(connectTimeout()).mockResolvedValueOnce(new Response("ok"));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await (await politeFetch(`https://slow.example/${Math.random()}`, {}, { minDelayMs: 0 })).text()).toBe("ok");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+  it("gives up after two retries and never retries other network errors", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(connectTimeout());
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(politeFetch(`https://down.example/${Math.random()}`, {}, { minDelayMs: 0 })).rejects.toThrow("fetch failed");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const reset = vi.fn().mockRejectedValue(Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNRESET" } }));
+    vi.stubGlobal("fetch", reset);
+    await expect(politeFetch(`https://reset.example/${Math.random()}`, {}, { minDelayMs: 0 })).rejects.toThrow("fetch failed");
+    expect(reset).toHaveBeenCalledTimes(1);
+  });
+});
