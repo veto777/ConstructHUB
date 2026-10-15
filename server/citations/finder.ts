@@ -90,13 +90,18 @@ export function candidatesFromSearchPage(html: string, baseUrl: string, dir: Cit
   const raw = unescapeJson(html);
   const hostRe = dir.url.replace(/\./g, "\\.");
   const urlRe = new RegExp(`https?://(?:[a-z0-9-]+\\.)*${hostRe}(/[^\\s"'<>\\\\)\\]]*)`, "gi");
+  // Quoted site-relative paths ("/us/wa/bellingham/profile/…") as JSON and templates carry them.
+  const relRe = /["'](\/[a-z0-9][^\s"'<>\\]{2,})["']/gi;
+  const toUrl = (text: string): URL | null => { try { return new URL(text, baseUrl); } catch { return null; } };
+  const isListing = (u: URL | null) => !!u && onDirectory(u.href, dir) && dir.listingPath.test(`${u.pathname}${u.search}`) && u.pathname !== "/";
   // Each URL's neighbourhood stops at the previous and next listing URL, so one result's text never vouches for another.
-  const hits = [...raw.matchAll(urlRe)].map((m) => ({ m, start: m.index!, end: m.index! + m[0].length }))
-    .filter(({ m }) => { try { const u = new URL(m[0]); return dir.listingPath.test(`${u.pathname}${u.search}`) && u.pathname !== "/"; } catch { return false; } });
+  const hits = [...[...raw.matchAll(urlRe)].map((m) => ({ text: m[0], start: m.index!, end: m.index! + m[0].length })),
+    ...[...raw.matchAll(relRe)].map((m) => ({ text: m[1], start: m.index! + 1, end: m.index! + 1 + m[1].length }))]
+    .filter((h) => isListing(toUrl(h.text))).sort((a, b) => a.start - b.start);
   for (let i = 0; i < hits.length; i++) {
-    const { m, start, end } = hits[i];
-    let abs: URL;
-    try { abs = new URL(m[0]); } catch { continue; }
+    const { text, start, end } = hits[i];
+    const abs = toUrl(text);
+    if (!abs) continue;
     const from = Math.max(0, start - 700, i > 0 ? hits[i - 1].end : 0);
     const to = Math.min(raw.length, end + 700, i + 1 < hits.length ? hits[i + 1].start : raw.length);
     const around = raw.slice(from, to).replace(/<[^>]+>/g, " ");
@@ -162,6 +167,16 @@ export const webSearchMode = (): "cse" | "web" | "off" => {
   return cseConfigured() ? "cse" : "web";
 };
 
+/** Parse Bing's RSS results feed (the same search with &format=rss) into result URLs. Exported for tests. */
+export function parseBingRss(xml: string): string[] {
+  const urls: string[] = [];
+  for (const m of xml.matchAll(/<item>[\s\S]*?<link>\s*([^<\s]+)\s*<\/link>[\s\S]*?<\/item>/gi)) {
+    const u = m[1].replace(/&amp;/g, "&").trim();
+    if (/^https?:\/\//.test(u) && !/(^|\.)bing\.com(:\d+)?\//.test(u) && !urls.includes(u)) urls.push(u);
+  }
+  return urls;
+}
+
 /** Parse Bing's HTML results page into result URLs. Exported for tests. */
 export function parseBing(html: string): string[] {
   const $ = cheerio.load(html);
@@ -208,7 +223,11 @@ export async function defaultWebSearch(q: string, dir: CitationDirectory): Promi
     } catch { return []; }
   }
   void dir;
-  // DuckDuckGo answers a bot wall with 202; its two HTML hosts behave differently per network, so both are tried, then Bing.
+  // Bing's RSS feed answers servers plainly and parses cleanly; DuckDuckGo (lite, then the HTML hosts, which answer a
+  // bot wall with 202 on some networks) and Bing's HTML page are the fallbacks. DuckDuckGo throttles after a burst,
+  // which is why it is not first.
+  const rss = await loadHttp(`https://www.bing.com/search?q=${encodeURIComponent(q)}&format=rss`);
+  if (!rss.blocked && rss.status === 200) { const urls = parseBingRss(rss.body); if (urls.length) return urls; }
   for (const base of ["https://lite.duckduckgo.com/lite/?q=", "https://duckduckgo.com/html/?q=", "https://html.duckduckgo.com/html/?q="]) {
     const page = await loadHttp(`${base}${encodeURIComponent(q)}`);
     if (page.blocked || page.status !== 200) continue;
@@ -279,7 +298,7 @@ export async function checkDirectory(dir: CitationDirectory, profile: BusinessPr
   }
 
   const q: SearchQuery = { name: profile.name ?? "", city: profile.city, state: profile.state, zip: profile.zip, place: placeOf(profile) };
-  let searchSaysNotFound = false, searchBlocked = false, searchNamePhone = false;
+  let searchSaysNotFound = false, searchBlocked = false, searchNamePhone = false, searchNameOnly = false;
   if (dir.search && q.name) {
     const url = dir.search(q);
     evidence.searchUrl = url;
@@ -289,6 +308,7 @@ export async function checkDirectory(dir: CitationDirectory, profile: BusinessPr
       const found = candidatesFromSearchPage(page.body, page.url, dir, profile);
       for (const c of found.candidates) if (!candidates.some((x) => x.url === c.url)) candidates.push(c);
       searchNamePhone = found.namePresent && found.phonePresent;
+      searchNameOnly = found.namePresent && !found.phonePresent;
       // The page lists businesses, none of them ours.
       searchSaysNotFound = !found.namePresent && found.listingLinks >= 3;
     }
@@ -317,8 +337,15 @@ export async function checkDirectory(dir: CitationDirectory, profile: BusinessPr
       reason: `${dir.name}'s own search shows your business with your phone number. The listing page itself could not be read, so check the address by eye.` };
   }
   if (candidates.length) {
+    const readable = (evidence.loads ?? []).filter((l) => candidates.some((c) => c.url === l.url || l.url.startsWith(c.url)) && !l.blocked && l.status >= 200 && l.status < 300).length;
     return { result: "unconfirmed", listingUrl: null, how: candidates[0].from, fields: null, partial: false, evidence,
-      reason: `Found what looks like your listing, but ${dir.name} would not let a program read it. Open the link and mark the row yourself.` };
+      reason: readable
+        ? `${dir.name} lists ${candidates.length === 1 ? "a business" : "businesses"} with this name, but ${candidates.length === 1 ? "it does not show" : "none shows"} your phone or street — probably another company called the same. Open the link to check, then mark the row.`
+        : `Found what looks like your listing, but ${dir.name} would not let a program read it. Open the link and mark the row yourself.` };
+  }
+  if (searchNameOnly) {
+    return { result: "unconfirmed", listingUrl: null, how: "search_page", fields: null, partial: false, evidence,
+      reason: `${dir.name}'s search mentions your business name, but no listing link or phone could be picked out. Use Search and mark the row yourself.` };
   }
   if (searchSaysNotFound) {
     return { result: "not_found", listingUrl: null, how: "search_page", fields: null, partial: false, evidence,

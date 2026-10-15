@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CITATION_DIRECTORIES, directoryByName, directoryOfUrl, onDirectory } from "./directories";
-import { candidatesFromSearchPage, checkDirectory, coreName, filterWebResults, nameOverlap, parseBing, parseDuckDuckGo, type BusinessProfile, type FinderDeps } from "./finder";
+import { candidatesFromSearchPage, checkDirectory, coreName, filterWebResults, nameOverlap, parseBing, parseBingRss, parseDuckDuckGo, type BusinessProfile, type FinderDeps } from "./finder";
 import { looksBlocked } from "./fetch";
 import type { Loaded } from "./fetch";
 
@@ -86,6 +86,10 @@ describe("finder: reading pages", () => {
     expect(r.listingLinks).toBeGreaterThanOrEqual(3);
     expect(r.namePresent).toBe(true);
     expect(r.phonePresent).toBe(true);
+  });
+  it("parses Bing's RSS feed, skipping the feed's own links", () => {
+    const xml = `<rss><channel><link>http://www.bing.com:80/search?q=x</link><item><title>A</title><link>https://www.yelp.com/biz/alpine-exteriors-bellingham?override_cta=Get+a+quote</link></item><item><title>B</title><link>https://www.yelp.com/biz/alpine-bellingham</link></item></channel></rss>`;
+    expect(parseBingRss(xml)).toEqual(["https://www.yelp.com/biz/alpine-exteriors-bellingham?override_cta=Get+a+quote", "https://www.yelp.com/biz/alpine-bellingham"]);
   });
   it("parses Bing's results page", () => {
     const html = `<ol id="b_results"><li class="b_algo"><h2><a href="https://www.yelp.com/biz/alpine-exteriors-bellingham">Alpine</a></h2></li><li class="b_algo"><h2><a href="https://www.bing.com/x">no</a></h2></li></ol>`;

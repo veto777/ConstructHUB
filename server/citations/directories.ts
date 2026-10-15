@@ -54,7 +54,7 @@ export const CITATION_DIRECTORIES: readonly CitationDirectory[] = [
   { name: "TripAdvisor", url: "tripadvisor.com", category: "Review Site", mode: "browser", listingPath: /Review|Profile/ },
   { name: "Buildzoom", url: "buildzoom.com", category: "Home Services", mode: "http", listingPath: /\/contractor\//, search: (q) => `https://www.buildzoom.com/search?q=${enc(q.name)}&location=${enc(q.place)}` },
   { name: "Porch", url: "porch.com", category: "Home Services", mode: "http", listingPath: /\/pp\/?$/, search: (q) => `https://porch.com/search?q=${enc(q.name)}&loc=${enc(q.place)}` },
-  { name: "Bark", url: "bark.com", category: "Home Services", mode: "http", listingPath: /\/company\//, search: (q) => `https://www.bark.com/en/us/search/?q=${enc(q.name)}` },
+  { name: "Bark", url: "bark.com", category: "Home Services", mode: "http", listingPath: /\/company\// },
   { name: "Expertise", url: "expertise.com", category: "Business Directory", mode: "http", listingPath: /^\/[a-z]{2}\/[a-z0-9-]+\/[a-z0-9-]+/ },
   { name: "Chamber of Commerce", url: "chamberofcommerce.com", category: "Business Directory", mode: "browser", listingPath: /\/business-directory\//, search: (q) => `https://www.chamberofcommerce.com/search?what=${enc(q.name)}&where=${enc(q.place)}` },
   { name: "HotFrog", url: "hotfrog.com", category: "Business Directory", mode: "browser", listingPath: /\/company\//, search: (q) => `https://www.hotfrog.com/search/us/${enc(q.name)}` },
