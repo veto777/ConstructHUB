@@ -1,6 +1,7 @@
 /**
  * The automation: one pass a minute (BACKLINKS_WORKER_ENABLED=true) that
- *   1. searches — a few queries from the bank, within the daily query cap and the monthly budget;
+ *   1. searches — posts queries from the bank to the standard queue and collects earlier ones, within the daily query
+ *      cap and the monthly budget;
  *   2. vets — leases new sources and reads them with the crawler (free: our own requests), then reads the contact
  *      pages of qualified sources that published no email (./contacts.ts, also free), and follows sorted chambers',
  *      associations', directories' and newspapers' links to more of their kind (./expand.ts, free);
@@ -11,14 +12,14 @@
  *
  *   BACKLINKS_WORKER_ENABLED=true         run the passes (default off)
  *   BACKLINKS_MONTHLY_BUDGET_USD          spend cap for searches + authority checks (default 25)
- *   BACKLINKS_QUERIES_PER_DAY             searches per day (default 40 ≈ $0.80/day at the live price)
+ *   BACKLINKS_QUERIES_PER_DAY             searches per day (default 40 ≈ $0.24/day through the standard queue)
  */
 import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { DataForSeoError, isConfigured } from "../seo/dataforseo";
 import { recordFailure } from "../ops/issues";
 import * as store from "./store";
-import { discoveryEstimateUsd, searchOnce } from "./discover";
+import { collectSearch, discoveryEstimateUsd, postSearches, searchOnce } from "./discover";
 import { fetchMetrics, metricsEstimateUsd, METRICS_BATCH } from "./metrics";
 import { gradeSource, readSite } from "./vet";
 import { findContacts } from "./contacts";
@@ -33,7 +34,8 @@ export const workerConfig = (env: NodeJS.ProcessEnv = process.env) => ({
 });
 
 export const VET_LEASE_MS = 2 * 60_000;
-const VET_BATCH = 20, CONTACT_BATCH = 20, EXPAND_BATCH = 5, VET_CONCURRENCY = 5, QUERIES_PER_PASS = 2, METRICS_MIN_BATCH = 100;
+const COLLECT_PER_PASS = 50, POSTS_PER_PASS = 20;
+const VET_BATCH = 20, CONTACT_BATCH = 20, EXPAND_BATCH = 5, VET_CONCURRENCY = 5, METRICS_MIN_BATCH = 100;
 
 async function budgetLeft(capUsd: number) { return capUsd - (await store.monthSpend()); }
 
@@ -59,6 +61,34 @@ export async function runDiscovery(n: number, capUsd = workerConfig().capUsd): P
     await store.recordQueryRun(q.id, hits.length, added, costUsd);
     out.queries++; out.found += hits.length; out.added += added; out.costUsd += costUsd;
   }
+  return out;
+}
+
+/**
+ * The worker's discovery through the standard queue: collect searches posted earlier (free), then post up to `n` more,
+ * within the monthly budget. Results arrive on a later pass.
+ */
+export async function runQueuedDiscovery(n: number, capUsd = workerConfig().capUsd): Promise<{ posted: number; collected: number; added: number; costUsd: number; stopped: string | null }> {
+  if (!isConfigured()) return { posted: 0, collected: 0, added: 0, costUsd: 0, stopped: "The search data source is not connected (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD)" };
+  const out = { posted: 0, collected: 0, added: 0, costUsd: 0, stopped: null as string | null };
+  for (const q of await store.postedQueries(COLLECT_PER_PASS)) {
+    const r = await collectSearch(q.taskId).catch((e: any) => ({ status: "failed" as const, message: String(e?.message ?? e) }));
+    if (r.status === "pending") { if (q.stale) await store.dropTask(q.id); continue; }
+    if (r.status === "failed") { console.warn(`[backlinks] search skipped ("${q.query}"): ${r.message}`); await store.recordQueryRun(q.id, 0, 0, 0); continue; }
+    const added = await store.addCandidates(r.hits, q.kind, q.query, q.niche === "general" ? null : q.niche);
+    await store.recordQueryRun(q.id, r.hits.length, added, 0);
+    out.collected++; out.added += added;
+  }
+  if (n <= 0) return out;
+  const affordable = Math.floor((await budgetLeft(capUsd)) / discoveryEstimateUsd("standard"));
+  if (affordable <= 0) { out.stopped = "Monthly budget reached"; return out; }
+  const due = await store.dueQueries(Math.min(n, affordable));
+  if (!due.length) return out;
+  const { posted, costUsd } = await postSearches(due);
+  await store.addSpend(costUsd);
+  const each = posted.length ? costUsd / posted.length : 0;
+  for (const p of posted) await store.markPosted(p.id, p.taskId, each);
+  out.posted = posted.length; out.costUsd = costUsd;
   return out;
 }
 
@@ -178,9 +208,9 @@ export async function runPass(): Promise<void> {
     if (!got) return;
     try {
       const cfg = workerConfig();
-      const ranToday = Number((await pool.query(`SELECT count(*)::int n FROM backlink_queries WHERE last_run_at >= date_trunc('day', now())`)).rows[0]?.n ?? 0);
+      const ranToday = await store.searchesToday();
       // Discovery failing (credentials, balance) must not stop vetting, which is free.
-      if (ranToday < cfg.queriesPerDay) await runDiscovery(Math.min(QUERIES_PER_PASS, cfg.queriesPerDay - ranToday), cfg.capUsd)
+      await runQueuedDiscovery(Math.max(0, Math.min(POSTS_PER_PASS, cfg.queriesPerDay - ranToday)), cfg.capUsd)
         .catch((e) => { void recordFailure("job", "Backlinks discovery", e); console.error(`[backlinks] discovery failed: ${e?.message ?? e}`); });
       await runVetting();
       await runContactSearch();
