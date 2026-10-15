@@ -15,7 +15,6 @@ import {
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AppPage, Notice, PageHeader, Section } from "@/components/app-ui";
-import { HelpButton } from "@/components/help-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -479,7 +478,7 @@ export default function PressReleasesPage() {
   return (
     <AppPage width="wide" testId="page-press-releases">
       <PageHeader
-        title={<span className="flex items-center gap-2">Press Releases <HelpButton k="press-releases" /></span>}
+        title="Press Releases"
         icon={Newspaper}
         accent="orange"
         description="Your news on the national wire: written for you, reviewed by editors, reported back to you."
