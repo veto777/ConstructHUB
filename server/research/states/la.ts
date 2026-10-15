@@ -85,7 +85,9 @@ async function lslbcQuery(body: URLSearchParams, referer: string, matchedOn: Lic
     if (!d.ok) throw new Error(`LSLBC detail returned HTTP ${d.status}`);
     const det = parseLaDetail(await d.text());
     const quals = Array.from(new Set(det.classes.map((c) => c.qualifier).filter((v): v is string => !!v)));
-    const principal = (matchedOn === "principal" ? quals.filter((v) => names(want, v)) : quals).join(" / ") || null;
+    // One person per field (round 5, decision 4): the qualifier the search matched, or the only one; every qualifier is
+    // listed in `people`, never joined into one name.
+    const principal = (matchedOn === "principal" ? quals.filter((v) => names(want, v))[0] : quals.length === 1 ? quals[0] : null) ?? null;
     const specialty = Array.from(new Set(det.classes.map((c) => c.cls))).join(", ") || null;
     const people = quals.map((q) => ({ name: q, role: `Qualifying party (${det.classes.filter((c) => c.qualifier === q).map((c) => c.cls).join(", ")})` }));
     for (const l of det.licenses.length ? det.licenses : [{ number: null, type: null, status: null, expires: null }]) {

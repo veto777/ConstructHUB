@@ -28,8 +28,9 @@ describe("decision 1: an individual's status keeps standing words only", () => {
     expect(standingStatus("Probation, Active")).toEqual({ status: "Active", moved: "Probation" });
     expect(standingStatus("Disciplined")).toEqual({ status: null, moved: "Disciplined" });
     expect(standingStatus("Active - Pending Case")).toEqual({ status: "Active", moved: "Pending Case" });
-    expect(standingStatus("Active with Conditions")).toEqual({ status: "Active", moved: "Conditions" });
-    expect(standingStatus("Inactive per Request")).toEqual({ status: "Inactive per Request", moved: null });
+    expect(standingStatus("Active with Conditions")).toEqual({ status: "Active", moved: "with Conditions" });
+    // Round 5, decision 2: only the standing phrase (and a date) stays.
+    expect(standingStatus("Inactive per Request")).toEqual({ status: "Inactive", moved: "per Request" });
     expect(standingStatus("Null and Void")).toEqual({ status: "Null and Void", moved: null });
     expect(standingStatus("Revoked")).toEqual({ status: "Revoked", moved: null });
   });
@@ -156,7 +157,8 @@ describe("decision 6: adverse is null on negation or reversal on either side", (
 
 describe("decision 7: permit name fields are split into people", () => {
   it("two people in one field are never one match", () => {
-    expect(personParts("Jane Smith and John Doe")).toEqual(["Jane Smith", "John Doe"]);
+    // Round 5, decision 4: a field that lists people gives no person match at all (no splitting).
+    expect(personParts("Jane Smith and John Doe")).toEqual([]);
     expect(namesMatch("John Smith", { contractorName: "Jane Smith and John Doe" })).toBe(false);
     expect(namesMatch("John Smith", { applicantName: "Jane Smith & John Doe" })).toBe(false);
     expect(namesMatch("John Smith", { contractorName: "Jane Smith; John Doe" })).toBe(false);
@@ -165,8 +167,8 @@ describe("decision 7: permit name fields are split into people", () => {
     // A field that still holds more than one name gives no match.
     expect(namesMatch("John Smith", { contractorName: "SMITH, JANE, DOE, JOHN" })).toBe(false);
     expect(namesMatch("John Smith", { contractorName: "Jane Smith John Doe Mary Roe" })).toBe(false);
-    // One person per part still matches.
-    expect(namesMatch("John Smith", { contractorName: "John Smith and Jane Doe" })).toBe(true);
+    // One person per field still matches; a list of people does not, even when one of them is the subject.
+    expect(namesMatch("John Smith", { contractorName: "John Smith and Jane Doe" })).toBe(false);
     expect(namesMatch("John Smith", { contractorName: "SMITH, JOHN" })).toBe(true);
   });
 });

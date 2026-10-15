@@ -5,8 +5,10 @@
  */
 import { pool } from "../db";
 import { reportHit } from "./privacy";
+import { ALL_BULK_SOURCES } from "./registry";
+import { REPORT_SNAPSHOT_VERSION } from "@shared/research-reports";
 import type {
-  ResearchOrderInput, ResearchOrderView, ResearchPreview, ResearchReport, ResearchStatus, ResearchTier,
+  LicenseHit, ResearchOrderInput, ResearchOrderView, ResearchPreview, ResearchReport, ResearchStatus, ResearchSubjectReport, ResearchTier,
 } from "@shared/research-reports";
 
 const DDL = `
@@ -48,21 +50,65 @@ export type ResearchOrderRow = {
 
 const iso = (d: Date | null) => (d ? new Date(d).toISOString() : null);
 
+/** Bulk sources whose old rows' holders can be recomputed from the stored fields, by the source name a hit carries. */
+let legacyHolders: Map<string, NonNullable<(typeof ALL_BULK_SOURCES)[number]["legacyHolder"]>> | null = null;
+
 /**
- * A stored report as shown today (round 4, decision 2): license statuses follow the report subject and holder under
- * the current rules, and a person's report carries no enforcement records, whenever the report was generated.
+ * A license from a report saved before REPORT_SNAPSHOT_VERSION 2 (A10, decision 5): a "business" holder it can't verify
+ * by today's rules is unknown (city, state and ZIP only, no phone). The holder is recomputed where the hit's source
+ * can do that from the fields it kept (CSLB's "Contractor license (Sole Owner)", VA's license type); an individual
+ * stays one.
+ */
+export function legacyReportHolder(h: LicenseHit): LicenseHit {
+  if (h.holder !== "business") return h;
+  legacyHolders ??= new Map(ALL_BULK_SOURCES.filter((s) => s.legacyHolder).map((s) => [s.label, s.legacyHolder!]));
+  const recompute = legacyHolders.get(h.source);
+  return { ...h, holder: recompute ? recompute(h) ?? null : null };
+}
+
+/** Totals of a report, counted from its subjects as shown (A10, decision 9; the same counts the runner makes). */
+export function reportTotals(subjects: ResearchSubjectReport[]): ResearchReport["totals"] {
+  const sum = (f: (s: ResearchSubjectReport) => number) => subjects.reduce((n, s) => n + f(s), 0);
+  const portals = subjects.flatMap((s) => s.portals);
+  return {
+    licenses: sum((s) => s.licenses.length),
+    permits: sum((s) => s.permits.length),
+    portalsSearched: portals.filter((c) => c.outcome === "searched").length,
+    portalsNotSearched: portals.filter((c) => c.outcome !== "searched").length,
+    complaints: sum((s) => s.complaints?.length ?? 0),
+    courtCases: sum((s) => s.courtCases?.length ?? 0),
+    osha: sum((s) => s.osha?.length ?? 0),
+    enforcement: sum((s) => s.enforcement?.length ?? 0),
+    related: sum((s) => (s.relatedLicenses?.length ?? 0) + (s.relatedEnforcement?.length ?? 0)),
+  };
+}
+
+/** What a person's report says about company-only records (the runner's own line for a person). */
+const PERSON_RECORD_SOURCES: NonNullable<ResearchSubjectReport["recordSources"]> = [{ source: "Complaints, lawsuits, enforcement and OSHA records", scope: "", searched: false, note: "Searched for companies only, not for individual people" }];
+
+/**
+ * A stored report as shown today (round 4, decision 2; A10, decisions 5 and 9): license statuses follow the report
+ * subject and holder under the current rules; a report saved before REPORT_SNAPSHOT_VERSION has its unverifiable
+ * business holders treated as unknown; a person's report carries no enforcement, complaint, court or OSHA records and
+ * says those are searched for companies only; and the totals are counted again from what is shown.
  */
 export function shownReport(r: ResearchReport | null): ResearchReport | null {
   if (!r) return r;
-  return {
-    ...r,
-    subjects: r.subjects.map((s) => ({
-      ...s,
-      licenses: s.licenses.map((h) => reportHit(h, s.kind)),
-      ...(s.relatedLicenses ? { relatedLicenses: s.relatedLicenses.map((h) => reportHit(h, s.kind)) } : {}),
-      ...(s.kind === "person" ? { complaints: [], courtCases: [], osha: [], enforcement: [], ...(s.relatedEnforcement ? { relatedEnforcement: [] } : {}) } : {}),
-    })),
-  };
+  const legacy = (r.snapshotVersion ?? 1) < REPORT_SNAPSHOT_VERSION;
+  const show = (h: LicenseHit, kind: "person" | "company") => reportHit(legacy ? legacyReportHolder(h) : h, kind);
+  const subjects = r.subjects.map((s): ResearchSubjectReport => ({
+    ...s,
+    licenses: s.licenses.map((h) => show(h, s.kind)),
+    ...(s.relatedLicenses ? { relatedLicenses: s.relatedLicenses.map((h) => show(h, s.kind)) } : {}),
+    ...(s.kind === "person" ? {
+      complaints: [], courtCases: [], osha: [], enforcement: [], ...(s.relatedEnforcement ? { relatedEnforcement: [] } : {}),
+      ...(s.recordSources ? { recordSources: PERSON_RECORD_SOURCES } : {}),
+    } : {}),
+  }));
+  const t = reportTotals(subjects);
+  // A total the stored report didn't carry (older reports) stays absent, so the page doesn't claim a search.
+  const totals = Object.fromEntries(Object.entries(t).filter(([k]) => k in r.totals || ["licenses", "permits", "portalsSearched", "portalsNotSearched"].includes(k))) as ResearchReport["totals"];
+  return { ...r, subjects, totals };
 }
 
 export function orderView(row: ResearchOrderRow): ResearchOrderView {
@@ -134,7 +180,8 @@ export async function requeueInterrupted(): Promise<number> {
 }
 
 export async function finishOrder(id: number, report: ResearchReport): Promise<void> {
-  await pool.query(`UPDATE research_orders SET status = 'complete', report = $2, completed_at = now(), error = NULL WHERE id = $1`, [id, JSON.stringify(report)]);
+  // Saved with the version of the rules it was made under (A10, decision 5).
+  await pool.query(`UPDATE research_orders SET status = 'complete', report = $2, completed_at = now(), error = NULL WHERE id = $1`, [id, JSON.stringify({ ...report, snapshotVersion: REPORT_SNAPSHOT_VERSION })]);
 }
 
 export async function failOrder(id: number, error: string): Promise<void> {

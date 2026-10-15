@@ -267,11 +267,26 @@ export function parseRobots(text: string): Rule[] {
 }
 
 const ruleRe = (path: string) => new RegExp("^" + path.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\\\$$/, "$"));
-/** RFC 9309: the longest matching rule wins; Allow wins a tie; no matching rule allows. */
+
+/**
+ * A path as RFC 9309 §2.2.2 compares it (A10, finding 7): characters outside ASCII percent-encoded as UTF-8, escapes of
+ * unreserved characters (A–Z a–z 0–9 - . _ ~) decoded, every other escape in upper case. "/%70rivate" is "/private";
+ * "/a%2Fb" stays apart from "/a/b" (a reserved character escaped means something else).
+ */
+export function normalizeRobotsPath(path: string): string {
+  const encoded = path.replace(/[^\x00-\x7f]+/g, (c) => encodeURIComponent(c));
+  return encoded.replace(/%([0-9a-f]{2})/gi, (_m, hex: string) => {
+    const ch = String.fromCharCode(parseInt(hex, 16));
+    return /[A-Za-z0-9\-._~]/.test(ch) ? ch : `%${hex.toUpperCase()}`;
+  });
+}
+
+/** RFC 9309: the longest matching rule wins; Allow wins a tie; no matching rule allows. Paths are compared normalized. */
 export function robotsAllows(rules: Rule[], pathAndQuery: string): boolean {
   let best: Rule | null = null;
+  const want = normalizeRobotsPath(pathAndQuery);
   for (const r of rules) {
-    if (!ruleRe(r.path).test(pathAndQuery)) continue;
+    if (!ruleRe(normalizeRobotsPath(r.path)).test(want)) continue;
     if (!best || r.path.length > best.path.length || (r.path.length === best.path.length && r.allow)) best = r;
   }
   return best ? best.allow : true;
@@ -353,9 +368,24 @@ const CHALLENGE_WORDS = /just a moment|checking your browser|attention required|
 /** Down words: a 2xx page instead of a robots file that says the server is down is refused like a 5xx. */
 const DOWN_WORDS = /server error|service unavailable|bad gateway/i;
 
-/** The words a reader sees on an HTML page: scripts, styles and tags removed. */
+/** Named entities a page may spell its words with (the rest decode to a space, never to nothing). */
+const NAMED_ENTITIES: Record<string, string> = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", ensp: " ", emsp: " ", thinsp: " ", hellip: "…", rsquo: "'", lsquo: "'", rdquo: '"', ldquo: '"', mdash: "-", ndash: "-" };
+
+/** HTML character references decoded (A10, finding 6: "Access&#32;denied" is "Access denied"). */
+export function decodeEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);?/gi, (m, ref: string) => {
+    if (ref[0] === "#") {
+      const code = ref[1] === "x" || ref[1] === "X" ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : " ";
+    }
+    const v = NAMED_ENTITIES[ref.toLowerCase()];
+    return v ?? (m.endsWith(";") ? " " : m);
+  });
+}
+
+/** The words a reader sees on an HTML page: scripts, styles and tags removed, character references decoded. */
 export function visibleText(html: string): string {
-  return html.replace(/<(script|style|noscript)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
+  return decodeEntities(html.replace(/<(script|style|noscript)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ");
 }
 
 export function challengePage(text: string, down = false): boolean {
@@ -366,6 +396,62 @@ export function challengePage(text: string, down = false): boolean {
   if (/^\s*(?:<\?xml[^>]*\?>\s*)?<Error>/i.test(t)) return false;
   const seen = /<[a-z!]/i.test(t) ? visibleText(t) : t;
   return CHALLENGE_WORDS.test(seen) || (down && DOWN_WORDS.test(seen));
+}
+
+/** An HTML (or XHTML) content type: the only bodies checked for a challenge. */
+export const isHtmlType = (contentType: string | null | undefined): boolean => /\b(?:text\/html|application\/xhtml\+xml)\b/i.test(contentType ?? "");
+
+/**
+ * A 2xx HTML answer that is a bot challenge (A10, finding 6): the host that sent it is blocked for the run, like a
+ * 401/403, and the request throws. Every transport calls it on a 2xx HTML body: fetch hops, the browser guard, the
+ * bulk downloads and plain requests, and the scraper's own API requests in a research run.
+ */
+export function refuseChallengeBody(url: string, status: number, body: string): void {
+  if (status < 200 || status >= 300 || !challengePage(body)) return;
+  blockHost(url, status, "a bot challenge page");
+  throw new PortalBlockedError(url, status, `${hostOf(url)} answered with a bot challenge page; no automated requests to it for this run`);
+}
+
+/** How much of an HTML body is read before it is handed on: challengePage reads the first 20,000 characters. */
+const CHALLENGE_PEEK_BYTES = 64 * 1024;
+
+/**
+ * The response with the start of its HTML body checked (refuseChallengeBody). The body still streams: the bytes read
+ * for the check are handed on first, then the rest as it arrives, so a large page or file is never held whole.
+ */
+async function checkedResponse(url: string, res: Response): Promise<Response> {
+  if (res.status < 200 || res.status >= 300 || !isHtmlType(res.headers.get("content-type")) || !res.body) return res;
+  const reader = res.body.getReader();
+  const head: Uint8Array[] = [];
+  let size = 0, done = false;
+  try {
+    while (size < CHALLENGE_PEEK_BYTES) {
+      const r = await reader.read();
+      if (r.done) { done = true; break; }
+      head.push(r.value); size += r.value.length;
+    }
+    refuseChallengeBody(url, res.status, new TextDecoder().decode(Buffer.concat(head)));
+  } catch (err) {
+    await reader.cancel().catch(() => undefined);
+    throw err;
+  }
+  const body = new ReadableStream<Uint8Array>({
+    start(ctrl) { for (const c of head) ctrl.enqueue(c); if (done) ctrl.close(); },
+    async pull(ctrl) {
+      if (done) return;
+      try {
+        const r = await reader.read();
+        if (r.done) ctrl.close(); else ctrl.enqueue(r.value);
+      } catch (err) { ctrl.error(err); }
+    },
+    cancel(reason) { return reader.cancel(reason); },
+  });
+  const headers = new Headers(res.headers);
+  // fetch() already decoded the body: the encoding and length headers would no longer describe it.
+  headers.delete("content-encoding"); headers.delete("content-length");
+  const out = new Response(body, { status: res.status, statusText: res.statusText, headers });
+  Object.defineProperty(out, "url", { value: res.url || url });
+  return out;
 }
 
 export async function robotsFor(origin: string, chain: Set<string> = new Set()): Promise<{ rules: Rule[]; denied?: string }> {
@@ -466,7 +552,13 @@ export async function guardBrowser(target: Routable, minDelayMs = 1000): Promise
         }
         try { noteResponse(cur, res.status(), res.headers()["retry-after"]); } catch (err) { deny(err); throw err; }
         const loc = res.headers()["location"];
-        if (!REDIRECTS.has(res.status()) || !loc) return await fulfill(route, res, url, cur);
+        if (!REDIRECTS.has(res.status()) || !loc) {
+          // A 2xx page that is a bot challenge blocks its host and stops the load (A10, finding 6), passive or not.
+          if (isHtmlType(res.headers()["content-type"])) {
+            try { refuseChallengeBody(cur, res.status(), (await res.body()).toString("utf8")); } catch (err) { deny(err); throw err; }
+          }
+          return await fulfill(route, res, url, cur);
+        }
         if (hop + 1 >= MAX_HOPS) throw new Error(`more than ${MAX_HOPS} redirects from ${url}`);
         const next = new URL(loc, cur);
         if (next.protocol !== "https:" && next.protocol !== "http:") throw new Error(`redirect to ${next.protocol} refused (${url})`);
@@ -553,7 +645,7 @@ async function hops(url: string, init: RequestInit, signal: AbortSignal, minDela
     try { noteResponse(cur, res.status, res.headers.get("retry-after")); }
     catch (err) { await res.body?.cancel().catch(() => undefined); throw err; }
     const loc = res.headers.get("location");
-    if (manual || !REDIRECTS.has(res.status) || !loc) return res;
+    if (manual || !REDIRECTS.has(res.status) || !loc) return await checkedResponse(cur, res);
     await res.body?.cancel().catch(() => undefined);
     if (hop + 1 >= MAX_HOPS) throw new Error(`more than ${MAX_HOPS} redirects from ${url}`);
     const next = new URL(loc, cur);

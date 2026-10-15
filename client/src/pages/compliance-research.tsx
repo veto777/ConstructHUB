@@ -19,12 +19,12 @@ import { useToast } from "@/hooks/use-toast";
 import { inNativeApp } from "@/lib/app-shell";
 import { US_STATES, stateName } from "@/lib/voice-studio";
 import { formatUsd } from "@shared/plan-copy";
-import type { CoverageRuntime } from "@shared/research-coverage";
+import { runtimeRecordsPhrase, type CoverageRuntime } from "@shared/research-coverage";
 import {
   RESEARCH_TIERS, RESEARCH_TRADES, RESEARCH_TRADE_KEYS, RESEARCH_PATH, COMPLIANCE_PATH,
   RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA, researchTierFor,
   RESEARCH_MAX_LICENSE_NUMBERS, RESEARCH_MAX_PHONES, RESEARCH_MAX_ADDRESSES, RELATED_TIES, cleanLicenseNumber, formatPhone, cleanAddress,
-  type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie, ENFORCEMENT_KINDS, anySearched, recordKindOf as kindOf, reportSummary, subjectLicensesSearched, previewRecordsLine,
+  type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie, ENFORCEMENT_KINDS, anySearched, recordKindOf as kindOf, reportSummary, subjectLicensesSearched, previewRecordsLine, previewLicenseLine,
 } from "@shared/research-reports";
 import { RESEARCH_COVERAGE_PATH } from "@shared/research-coverage";
 import { ComplianceFrame } from "./compliance";
@@ -67,7 +67,7 @@ export default function ResearchOrderPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-  // SAM.gov exclusions are named only once the running server has loaded their file (A9).
+  // OSHA and SAM.gov are named only when the running server has them (A9; round 5, decision 11): not on first render.
   const { data: runtime } = useQuery<CoverageRuntime>({ queryKey: ["/api/research-reports/coverage-runtime"], retry: false, staleTime: 600_000 });
   const { data: orders } = useQuery<ResearchOrderView[]>({ queryKey: ["/api/research-reports/orders"], enabled: !!user });
   const [subjects, setSubjects] = useState<Subject[]>([blankSubject("company")]);
@@ -121,8 +121,8 @@ export default function ResearchOrderPage() {
           and links related licenses: it searches the state contractor-license records and every city and county permit portal
           we can reach in those states, then follows the license numbers, phones, addresses and people on what it finds to other
           licenses and businesses tied to them. For a company it also pulls consumer complaints, state
-          enforcement records (licensing-board discipline, stop-work orders, tax liens, debarments, environmental orders),
-          {runtime?.samExclusions ? " federal exclusions and debarments (SAM.gov)," : ""} and OSHA inspections (federal). Every finding links to its official
+          enforcement records (licensing-board discipline, stop-work orders, tax liens, debarments, environmental orders)
+          {runtimeRecordsPhrase(runtime)}. Every finding links to its official
           source. Reports are usually ready the same day.
         </p>
       </header>
@@ -132,7 +132,7 @@ export default function ResearchOrderPage() {
         <ul className="space-y-1.5 text-sm list-disc pl-5">
           <li>Searches every source we have in each state you pick, by name, owner, license number, phone or address. What we have differs by state: the link below lists it.</li>
           <li>Cross-references what it finds. Other licenses and businesses that share a license number, phone, address or person show up too, and each one says what ties it.</li>
-          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens){runtime?.samExclusions ? ", federal exclusions and debarments (SAM.gov)" : ""} and OSHA inspections (federal) for companies.</li>
+          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens){runtimeRecordsPhrase(runtime)} for companies.</li>
         </ul>
         <Link href={RESEARCH_COVERAGE_PATH} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline" data-testid="link-research-coverage">
           See exactly what we search in your state <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -635,7 +635,7 @@ export function ResearchOrderStatusPage() {
                 <div className="rounded-lg border p-4 space-y-1 text-sm" data-testid="card-preview">
                   <p className="font-semibold">Free preview</p>
                   {o.preview.licenseSourceStates.length > 0
-                    ? <p>{o.preview.licenseMatches} license record(s) match in {o.preview.licenseSourceStates.join(", ")} state license data{o.preview.identifierMatches ? `, ${o.preview.identifierMatches} of them found by a license number, phone or address you gave` : ""}.</p>
+                    ? <p data-testid="text-preview-licenses">{previewLicenseLine(o.preview)}</p>
                     : <p>We don't search state license records for {o.input.states.join(", ")} yet. The report covers permit portals only there.</p>}
                   {Object.entries(o.preview.portalsByState).map(([st, n]) => <p key={st}>The report will search {n} live permit portal(s) in {stateName(st)} by name.</p>)}
                   {previewRecordsLine(o.preview.records) && <p data-testid="text-preview-records">{previewRecordsLine(o.preview.records)}</p>}

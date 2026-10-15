@@ -15,7 +15,7 @@
  * (a private person) is never read into a report.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { tokens } from "../licenses";
+import { onePersonField, tokens } from "../licenses";
 import { clean } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { auraApex, type AuraSite } from "./lib/g7-aura";
@@ -61,6 +61,8 @@ const hasAll = (name: string, v: string | null) => { const have = new Set(letter
  * name the record gives ("John Q Smith" is not "John R Smith"; plain "John Smith" stays a candidate).
  */
 export function samePersonName(name: string, v: string | null): boolean {
+  // One person per field, by the shared check (round 5, decision 4).
+  if (v && !onePersonField(v)) return false;
   const want = letters(name), have = letters(v);
   const full = want.filter((w) => w.length > 1);
   if (!full.length || !full.every((w) => have.includes(w))) return false;

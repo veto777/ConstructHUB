@@ -73,6 +73,8 @@ export function knowledgeTokens(): Record<string, string> {
     RESEARCH_STANDARD_PRICE: formatUsd(RESEARCH_STANDARD_CENTS),
     RESEARCH_EXTENDED_PRICE: formatUsd(RESEARCH_EXTENDED_CENTS),
     // Named only once the running server has loaded the SAM.gov file (A9; setKnowledgeFact).
+    // OSHA only when this server holds the Labor Department key (round 5, decision 11); the env is fixed for the process.
+    RESEARCH_OSHA: process.env.DOL_API_KEY ? " For a company it also searches OSHA inspections (federal), with their violations and penalties; if the Labor Department's data service is down when a report runs, the report says OSHA was not searched." : "",
     RESEARCH_SAM_EXCLUSIONS: runtimeFacts.samExclusions ? " It also checks federal exclusions and debarments (SAM.gov) for companies in any state." : "",
     ANNUAL_MONTHS: String(ANNUAL_MONTHS),
     ANNUAL_FREE_MONTHS: String(12 - ANNUAL_MONTHS),

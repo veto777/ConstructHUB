@@ -127,3 +127,17 @@ export function coverageNote(s: CoverageState): string | null {
   }
   return null;
 }
+
+/**
+ * The record sources a sales line may add, decided by the running server (round 5, decision 11): OSHA only with the
+ * Labor Department key, SAM.gov only with a loaded file. Before the answer arrives (first render, the prerendered
+ * snapshot) neither is claimed. "" / ", and OSHA inspections (federal)" / ", federal exclusions … (SAM.gov), and OSHA …".
+ */
+export function runtimeRecordsPhrase(runtime: CoverageRuntime | undefined): string {
+  const extra = [
+    ...(runtime?.samExclusions === true ? ["federal exclusions and debarments (SAM.gov)"] : []),
+    ...(runtime?.osha === true ? ["OSHA inspections (federal)"] : []),
+  ];
+  if (!extra.length) return "";
+  return extra.length === 1 ? `, and ${extra[0]}` : `, ${extra.slice(0, -1).join(", ")}, and ${extra[extra.length - 1]}`;
+}

@@ -47,7 +47,7 @@ describe("finding 2: status follows the report subject", () => {
       relatedLicenses: [lic({ holder: "business", status: "Suspended - Citation Pending", relatedVia: "x", relatedTie: "person" })],
       enforcement: [{ state: "AZ", source: "x", sourceUrl: "x", category: "discipline", name: "ACME", id: "1", date: null, endDate: null, status: null, city: null, detail: null, amount: null, adverse: null }],
     });
-    const r: ResearchReport = { generatedAt: "2026-10-15", states: ["AZ"], trades: [], sinceYear: null, subjects: [subject("person"), subject("company")], totals: { licenses: 2, permits: 0, portalsSearched: 0, portalsNotSearched: 0 } };
+    const r: ResearchReport = { snapshotVersion: 2, generatedAt: "2026-10-15", states: ["AZ"], trades: [], sinceYear: null, subjects: [subject("person"), subject("company")], totals: { licenses: 2, permits: 0, portalsSearched: 0, portalsNotSearched: 0 } };
     const shown = shownReport(r)!;
     expect(shown.subjects[0].licenses[0].status).toBe("Active");
     expect(shown.subjects[0].relatedLicenses![0].status).toBe("Suspended");
@@ -120,8 +120,8 @@ describe("finding 10: an enforcement file is not a license search; previews say 
     const ids = await searchCustomerIds([enf], [{ type: "phone", value: "8135550100" }], { name: "Acme", kind: "company" });
     const s: ResearchSubjectReport = { name: "Acme", kind: "company", licenses: [], permits: [], licenseSources: [{ state: "FL", source: "x", searched: false, note: "down" }], portals: [], identifierSearches: ids.searches };
     expect(subjectLicensesSearched(s)).toBe(false);
-    // An older report (no license count) reads as before.
-    expect(subjectLicensesSearched({ ...s, identifierSearches: [{ query: "q", found: 0, note: "", sourcesSearched: 1 }] })).toBe(true);
+    // An older report (no license count) reads as not searched by identifier (round 5, decision 10).
+    expect(subjectLicensesSearched({ ...s, identifierSearches: [{ query: "q", found: 0, note: "", sourcesSearched: 1 }] })).toBe(false);
   });
   it("a preview never prints a complaint count when no complaint source ran", () => {
     const line = previewRecordsLine({ complaints: 0, courtCases: 0, osha: 0, enforcement: 1, searched: ["x"], ran: { complaints: false, courtCases: false, osha: true, enforcement: true } });
