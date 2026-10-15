@@ -20,7 +20,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { USER_AGENT, rateLimitHost } from "../scrapers/polite-fetch";
-import { clean, csvRecords, csvRows, download, lines, usDate, type BulkHit, type BulkSource } from "./bulk";
+import { clean, csvRecords, csvRows, download, lines, plainRequest, saveResponse, usDate, type BulkHit, type BulkSource } from "./bulk";
 
 const run = promisify(execFile);
 
@@ -165,7 +165,7 @@ async function* flStopWorkLoader(): AsyncIterable<BulkHit> {
   form.set("ctl00$ContentPlaceHolder1$btnSearch", "Search");
   const path = await download(FL_SWO, {
     method: "POST", body: form.toString(),
-    headers: { "content-type": "application/x-www-form-urlencoded", referer: FL_SWO, cookie: cookieOf(page) },
+    headers: { "content-type": "application/x-www-form-urlencoded", referer: FL_SWO, ...(cookieOf(page) ? { cookie: cookieOf(page) } : {}) },
   });
   try {
     const body = await fs.readFile(path, "utf8");
@@ -273,46 +273,20 @@ async function* txPlumbingLoader(): AsyncIterable<BulkHit> {
 // ── California CSLB public data portal ───────────────────────────────────────────────────────────────────────
 const CSLB = "https://www.cslb.ca.gov/onlineservices/dataportal/ContractorList";
 
-/** A tiny cookie jar: ASP.NET re-issues its session and load-balancer cookies on each postback. */
-class Jar {
-  private c = new Map<string, string>();
-  take(res: Response) { for (const v of res.headers.getSetCookie?.() ?? []) { const [kv] = v.split(";"); const i = kv.indexOf("="); if (i > 0) this.c.set(kv.slice(0, i).trim(), kv.slice(i + 1)); } }
-  header() { return Array.from(this.c, ([k, v]) => `${k}=${v}`).join("; "); }
-}
-
-/** One CSLB file through the portal's two postbacks (pick the list, then click its CSV link). Retried: CSLB answers 503 when busy and cuts long downloads off. */
-async function cslbFile(code: "M" | "P", button: string): Promise<string> {
+/**
+ * One CSLB file. The portal's CSV links end in a redirect to DownLoadFile.ashx (checked 2026-10-14), which serves the
+ * file directly. Retried: CSLB answers 503 when busy and cuts slow downloads off (a short file then fails the row
+ * floor and the previous load stays).
+ */
+async function cslbFile(file: "MasterLicenseData" | "PersonnelData"): Promise<string> {
+  const url = `https://www.cslb.ca.gov/OnlineServices/DataPortal/DownLoadFile.ashx?fName=${file}&type=C`;
   let last: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const jar = new Jar();
-      await rateLimitHost(CSLB, 2000);
-      const page = await fetch(CSLB, { headers: { "user-agent": USER_AGENT } });
-      if (!page.ok) throw new Error(`CSLB data portal returned HTTP ${page.status}`);
-      jar.take(page);
-      const html = await page.text();
-      const h = new URLSearchParams();
-      for (const m of Array.from(html.matchAll(/<input type="hidden" name="([^"]+)" id="[^"]*" value="([^"]*)"/g))) h.set(m[1], decodeEntities(m[2]));
-      h.set("__EVENTTARGET", "ctl00$MainContent$ddlStatus");
-      h.set("ctl00$MainContent$ddlStatus", code);
-      h.set("ctl00$MainContent$smPanel", "ctl00$MainContent$uplinks|ctl00$MainContent$ddlStatus");
-      h.set("__ASYNCPOST", "true");
-      await rateLimitHost(CSLB, 2000);
-      const deltaRes = await fetch(CSLB, {
-        method: "POST", body: h.toString(),
-        headers: { "user-agent": USER_AGENT, cookie: jar.header(), "x-microsoftajax": "Delta=true", "content-type": "application/x-www-form-urlencoded; charset=utf-8" },
-      });
-      if (!deltaRes.ok) throw new Error(`CSLB list postback returned HTTP ${deltaRes.status}`);
-      jar.take(deltaRes);
-      const parts = (await deltaRes.text()).split("|");
-      const hf: Record<string, string> = {};
-      for (let i = 0; i < parts.length - 3; i++) if (parts[i] === "hiddenField") hf[parts[i + 1]] = parts[i + 2];
-      if (!hf.__VIEWSTATE) throw new Error("CSLB list postback had no form state");
-      const f = new URLSearchParams();
-      for (const k of ["__EVENTARGUMENT", "__LASTFOCUS", "__VIEWSTATE", "__VIEWSTATEGENERATOR", "__EVENTVALIDATION"]) f.set(k, hf[k] ?? "");
-      f.set("__EVENTTARGET", `ctl00$MainContent$${button}`);
-      f.set("ctl00$MainContent$ddlStatus", code);
-      return await download(CSLB, { method: "POST", body: f.toString(), headers: { cookie: jar.header(), "content-type": "application/x-www-form-urlencoded" } });
+      await rateLimitHost(url, 2000);
+      const res = await plainRequest(url, { timeoutMs: 10 * 60_000 });
+      if (!/text\/csv/i.test(String(res.headers["content-type"] ?? ""))) { res.resume(); throw new Error(`CSLB sent ${res.headers["content-type"] ?? "no file"} (HTTP ${res.statusCode})`); }
+      return await saveResponse(res);
     } catch (err) {
       last = err;
       await new Promise((r) => setTimeout(r, 60_000 * (attempt + 1)));
@@ -325,7 +299,7 @@ const CSLB_DISCIPLINE = /susp|probation|pending case|cit|judgement|judgment|disc
 
 async function* caCslbLoader(): AsyncIterable<BulkHit> {
   const byLicense = new Map<string, { name: string | null; status: string | null; city: string | null; expires: string | null; classes: string | null }>();
-  for await (const r of fromFile(await cslbFile("M", "lbMasterCSV"), (p) => csvRecords(p))) {
+  for await (const r of fromFile(await cslbFile("MasterLicenseData"), (p) => csvRecords(p))) {
     const no = clean(r.LicenseNo);
     const name = clean(r.BusinessName);
     if (!no || !name) continue;
@@ -363,7 +337,7 @@ async function* caCslbLoader(): AsyncIterable<BulkHit> {
     }
   }
   // Personnel: officers, RMOs and RMEs on each license. Their name finds the license (a person search).
-  for await (const r of fromFile(await cslbFile("P", "lbtnPersonnelcsv"), (p) => csvRecords(p))) {
+  for await (const r of fromFile(await cslbFile("PersonnelData"), (p) => csvRecords(p))) {
     if (!/principal/i.test(r["Name-TP"] ?? "")) continue;
     const no = clean(r["LIC-NO"]);
     const raw = clean(r.Name); // "LAST FIRST MIDDLE"

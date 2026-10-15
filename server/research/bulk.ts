@@ -11,6 +11,8 @@
  * Every source is listed in ./bulk-sources.ts with the date it was checked live (CLAUDE.md: never fabricate).
  */
 import { createWriteStream, createReadStream, promises as fs } from "node:fs";
+import { request as httpsRequest } from "node:https";
+import type { IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -154,11 +156,49 @@ export async function download(url: string, init: RequestInit = {}, timeoutMs = 
     const res = await fetch(url, { ...init, headers, signal: ctrl.signal, redirect: "follow" });
     if (!res.ok || !res.body) throw new Error(`HTTP ${res.status} for ${url}`);
     const path = join(tmpdir(), `ch-bulk-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    await pipeline(Readable.fromWeb(res.body as any), createWriteStream(path));
+    try { await pipeline(Readable.fromWeb(res.body as any), createWriteStream(path)); }
+    catch (err) { await fs.rm(path, { force: true }); throw err; }
     return path;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * A plain HTTPS request with only the headers given (fetch() always adds browser-style Sec-Fetch headers, which some
+ * agency firewalls reject on form posts). Follows no redirects; the caller reads the body.
+ */
+export function plainRequest(url: string, opts: { method?: string; headers?: Record<string, string>; body?: string; timeoutMs?: number } = {}): Promise<IncomingMessage> {
+  return new Promise((resolve, reject) => {
+    const body = opts.body ?? null;
+    const req = httpsRequest(url, {
+      method: opts.method ?? "GET",
+      headers: { "user-agent": USER_AGENT, ...(opts.headers ?? {}), ...(body != null ? { "content-length": String(Buffer.byteLength(body)) } : {}) },
+      timeout: opts.timeoutMs ?? 60_000,
+    }, resolve);
+    req.on("timeout", () => req.destroy(new Error(`timed out: ${url}`)));
+    req.on("error", reject);
+    if (body != null) req.write(body);
+    req.end();
+  });
+}
+
+export async function readText(res: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const c of res) chunks.push(c as Buffer);
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+/** Stream a plainRequest response to a temp file (the caller deletes it). */
+export async function saveResponse(res: IncomingMessage): Promise<string> {
+  if ((res.statusCode ?? 0) >= 400) { res.resume(); throw new Error(`HTTP ${res.statusCode}`); }
+  const path = join(tmpdir(), `ch-bulk-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  try { await pipeline(res, createWriteStream(path)); }
+  catch (err) { await fs.rm(path, { force: true }); throw err; }
+  // A cut-off chunked response can end "cleanly"; a Content-Length mismatch is the one check available.
+  const want = Number(res.headers["content-length"]);
+  if (want && (await fs.stat(path)).size !== want) { await fs.rm(path, { force: true }); throw new Error("download cut off"); }
+  return path;
 }
 
 /** Decode: UTF-8, falling back to Windows-1252 when the bytes aren't valid UTF-8 (some DBPR files). */
