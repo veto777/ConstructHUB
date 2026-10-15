@@ -158,6 +158,19 @@ export async function needingContacts(limit: number): Promise<{ id: number; doma
   return r.rows;
 }
 
+/** Sources sorted as a chamber, trade association, listing directory or newspaper whose links were never followed (./expand.ts). */
+export async function needingExpansion(limit: number): Promise<{ id: number; domain: string; discoveredUrl: string | null }[]> {
+  const r = await db().query(
+    `SELECT id, domain, discovered_url "discoveredUrl" FROM backlink_sources
+      WHERE expanded_at IS NULL AND partner_class IN ('chamber', 'trade_association', 'listing_directory', 'news')
+      ORDER BY status = 'qualified' DESC, tier NULLS LAST, id LIMIT $1`, [limit]);
+  return r.rows;
+}
+export async function markExpanded(id: number, found: number, added: number) {
+  await db().query(`UPDATE backlink_sources SET expanded_at = now() WHERE id = $1`, [id]);
+  await event(id, "expanded", { found, added });
+}
+
 /** What the contact finder read; the addresses it found join the source's own. */
 export async function saveContacts(id: number, emails: string[], contactUrl: string | null, pagesRead: number) {
   await db().query(

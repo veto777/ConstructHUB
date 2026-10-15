@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildQueryBank, hitsFromItems, isExcluded, normalizeDomain, parseImportLine, QUERY_TEMPLATES, NICHES, US_STATES } from "./discover";
 import { analyzePage, classifyKind, decodeCfEmail, gradeSource, mergeSignals, spelledOutEmails, vetDeps } from "./vet";
 import { contactLinks, findContacts } from "./contacts";
+import { listPages, relatedSites } from "./expand";
 import { composePitch, siteName, pickEmail, sendBlocker, outreachConfig, withFooter } from "./outreach";
 import { fetchMetrics, metricsDeps } from "./metrics";
 import type { BacklinkSignals } from "@shared/backlinks";
@@ -349,5 +350,21 @@ describe("contact finder", () => {
     try {
       expect(await findContacts("site.com")).toEqual({ emails: ["editor@site.com", "a@gmail.com"], contactUrl: "https://site.com/reach-us", pagesRead: 2 });
     } finally { vetDeps.fetch = orig; }
+  });
+});
+
+describe("expansion — organisations link to their own kind", () => {
+  it("keeps other sites that name themselves a chamber, association, directory or newspaper", () => {
+    const html = `<a href="https://www.otherchamber.org/">Greater Dayton Chamber of Commerce</a>
+      <a href="https://hbaofx.com">Home Builders Association of X</a>
+      <a href="https://smithroofing.com">Smith Roofing</a>
+      <a href="https://www.facebook.com/chamber">Chamber on Facebook</a>
+      <a href="/about">About our chamber</a>
+      <a href="https://valleyherald.com/">Valley Herald</a>
+      <a href="https://shop.mychamber.org/">Our chamber shop</a>`;
+    const r = relatedSites(html, "https://mychamber.org/links", "mychamber.org");
+    expect(r.map((x) => [x.domain, x.kind])).toEqual([["otherchamber.org", "directory"], ["hbaofx.com", "directory"], ["valleyherald.com", "editorial"]]);
+    expect(listPages(`<a href="/community-links">Community Links</a><a href="/news">News</a><a href="https://x.com/links">x</a>`, "https://mychamber.org/", "mychamber.org"))
+      .toEqual(["https://mychamber.org/community-links"]);
   });
 });

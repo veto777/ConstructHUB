@@ -43,6 +43,7 @@ export async function ensureBacklinkSchema() {
     CREATE INDEX IF NOT EXISTS backlink_sources_status ON backlink_sources(status, vetted_at);
     CREATE INDEX IF NOT EXISTS backlink_sources_kind_tier ON backlink_sources(kind, tier);
     ALTER TABLE backlink_sources ADD COLUMN IF NOT EXISTS contacts_checked_at timestamptz;
+    ALTER TABLE backlink_sources ADD COLUMN IF NOT EXISTS expanded_at timestamptz;
     CREATE TABLE IF NOT EXISTS backlink_queries (
       id serial PRIMARY KEY,
       kind text NOT NULL,
