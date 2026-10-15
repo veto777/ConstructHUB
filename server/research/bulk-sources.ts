@@ -1074,7 +1074,8 @@ export const BULK_SOURCES: BulkSource[] = [
   { id: "tx-tsbpe", state: "TX", label: "Texas State Board of Plumbing Examiners licensees", pageUrl: TSBPE_PAGE, everyHours: 24, minRows: 60_000,
     load: txPlumbingLoader },
   // CSLB streams slowly in the daytime and cuts downloads off at about 150 s: fetch it in the small hours, Pacific time.
-  { id: "ca-cslb", state: "CA", label: "California CSLB contractor licenses", pageUrl: CSLB, everyHours: 20, minRows: 470_000, utcHours: [9, 10, 11, 12, 13],
+  { id: "ca-cslb", state: "CA", label: "California CSLB contractor licenses", pageUrl: CSLB, everyHours: 20, minRows: 185_000, // one hit per license since 2026-10-15: 264,352 rows on that day (was ~668k with a row per person)
+    utcHours: [9, 10, 11, 12, 13],
     load: caCslbLoader },
   { id: "ca-cslb-revoked", state: "CA", label: "California CSLB revoked licenses (monthly lists)", pageUrl: CSLB_REVOKED_YEARS, everyHours: 24 * 7, minRows: 2_250,
     utcHours: [9, 10, 11, 12, 13], load: caCslbRevokedLoader, companiesOnly: true },
