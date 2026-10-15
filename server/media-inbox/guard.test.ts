@@ -66,9 +66,10 @@ describe("helpers", () => {
     expect(stripQuoted(t)).toBe("Sounds good, send the docs.");
     expect(stripQuoted("Yes.\n\nFrom: ConstructHUB <media@constructhub.us>\nSent: Wednesday\nTo: x")).toBe("Yes.");
   });
-  it("signs as the Construct HUB Media Team", () => {
+  it("signs as Leah Peterson of the Construct HUB Media Team", () => {
     const m = composeMail("Hello", "media@constructhub.us");
-    expect(m.text).toContain("Construct HUB Media Team");
+    expect(m.text).toContain("Leah Peterson, Partnerships\nConstruct HUB Media Team");
+    expect(m.html).toContain("Leah Peterson");
     expect(m.text).toContain("media@constructhub.us");
     expect(m.html).toContain("Construct HUB Media Team");
     expect(m.html).not.toContain("support@constructhub.us");

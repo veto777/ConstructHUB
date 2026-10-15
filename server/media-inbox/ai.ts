@@ -182,7 +182,7 @@ export async function extractNextStep(thread: ThreadMessage[], env: NodeJS.Proce
 /** Who we are on a web form (the same details as the email signature, server/email-signature.ts). */
 export const FORM_IDENTITY = {
   company: "ConstructHUB", website: "https://constructhub.us", email: "media@constructhub.us", phone: "(832) 399-0560",
-  name: "Construct HUB Media Team", firstName: "Construct HUB", lastName: "Media Team", title: "Partnerships", country: "United States",
+  name: "Leah Peterson", firstName: "Leah", lastName: "Peterson", title: "Partnerships, Construct HUB Media Team", country: "United States",
 };
 
 const FORM_SYSTEM = `You fill in a partner's web form for the ConstructHUB Media Team. The company's auto-reply sent us to this page.

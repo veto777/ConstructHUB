@@ -18,13 +18,15 @@ export const SIGNATURE_ICON_STYLE: "dark" | "color" = "dark";
 const escapeHtml = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** Which team signs and its mailbox: support@ by default; the media@ relationships inbox signs as its own team. */
-export type SignatureOptions = { team?: string; email?: string };
+/** Which team signs and its mailbox: support@ by default; the media@ relationships inbox signs as its own team.
+ *  `name` (with an optional `title`) heads the signature above the team (media@ signer, owner 2026-10-14). */
+export type SignatureOptions = { team?: string; email?: string; name?: string; title?: string };
 
 /** Plain-text signature, starting with the "-- " delimiter mail apps recognise. */
-export function signatureText({ team = "The ConstructHUB Team", email = SIGNATURE_EMAIL }: SignatureOptions = {}): string {
+export function signatureText({ team = "The ConstructHUB Team", email = SIGNATURE_EMAIL, name, title }: SignatureOptions = {}): string {
   return [
     "-- ",
+    ...(name ? [title ? `${name}, ${title}` : name] : []),
     team,
     "Software for US contractors",
     SIGNATURE_PHONE,
@@ -35,7 +37,7 @@ export function signatureText({ team = "The ConstructHUB Team", email = SIGNATUR
 }
 
 /** HTML signature block: inline styles and a table layout so it renders in Gmail, Outlook and Apple Mail. */
-export function signatureHtml({ team = "The ConstructHUB Team", email = SIGNATURE_EMAIL }: SignatureOptions = {}): string {
+export function signatureHtml({ team = "The ConstructHUB Team", email = SIGNATURE_EMAIL, name, title }: SignatureOptions = {}): string {
   const link = "color:#F97316;text-decoration:none;";
   // Each account as its logo (owner, 2026-10-14: "logos/icons"), hosted on constructhub.us — mail apps block SVG and data: images.
   const socials = SOCIAL_LINKS.map(
@@ -45,7 +47,8 @@ export function signatureHtml({ team = "The ConstructHUB Team", email = SIGNATUR
 <tr>
 <td style="vertical-align:top;padding:16px 14px 0 0;"><a href="${SIGNATURE_SITE}"><img src="${LOGO_URL}" alt="ConstructHUB" width="48" height="48" style="width:48px;height:48px;border-radius:10px;display:block;" /></a></td>
 <td style="vertical-align:top;padding-top:16px;font-size:13px;line-height:1.55;color:#444;">
-<div style="font-weight:700;color:#1a1a2e;">${escapeHtml(team)}</div>
+${name ? `<div style="font-weight:700;color:#1a1a2e;">${escapeHtml(name)}</div>${title ? `<div style="color:#444;">${escapeHtml(title)}</div>` : ""}` : ""}
+<div style="${name ? "color:#444;" : "font-weight:700;color:#1a1a2e;"}">${escapeHtml(team)}</div>
 <div style="color:#888;">Software for US contractors</div>
 <div><a href="tel:${PHONE_TEL}" style="${link}">${SIGNATURE_PHONE}</a></div>
 <div><a href="mailto:${escapeHtml(email)}" style="${link}">${escapeHtml(email)}</a></div>

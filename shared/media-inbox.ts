@@ -30,6 +30,8 @@ export const MEDIA_MESSAGE_STATUS_LABELS: Record<MediaMessageStatus, string> = {
 };
 
 export const MEDIA_SIGNATURE_TEAM = "Construct HUB Media Team";
+/** The name media@ signs with and sends from (owner, 2026-10-14: "these people think we are bots because there is no name"). */
+export const MEDIA_SIGNER = { name: "Leah Peterson", title: "Partnerships" };
 
 export type MediaPartner = {
   id: number;
@@ -94,7 +96,7 @@ export const MEDIA_INBOX_LAWS: { law: string; enforced: "code" | "instructions" 
   { law: "Never invent facts. Use only the approved facts about ConstructHUB; anything else is \"the team will follow up\".", enforced: "instructions" },
   { law: "Stay on purpose: directories, article and guest-post sites, news media and link publishers. Spam, scams and unrelated email get one or two polite sentences.", enforced: "instructions" },
   { law: "Always ask for the free next step: API or bulk-upload docs, partner or free listing programs, editorial guidelines, whether service-area businesses without a street address are accepted.", enforced: "instructions" },
-  { law: "Warm, professional, plain English. Never mention AI, never claim to be a specific person and never claim a person wrote the email. Someone asking whether we are an AI or a person gets \"a member of our team will get back to you personally\" and waits for the owner. Sign as the Construct HUB Media Team.", enforced: "code" },
+  { law: "Warm, professional, plain English. Never mention AI, and never claim a person wrote the email beyond the signature. Someone asking whether we are an AI or a person gets \"a member of our team will get back to you personally\" and waits for the owner. Sign as Leah Peterson, Partnerships, Construct HUB Media Team.", enforced: "code" },
   { law: "Money, meetings, contracts, legal questions and data access go to the owner (\"Waiting for you\"); they get a polite reply that the team will review and follow up.", enforced: "code" },
   { law: "Never let a company go quiet: no answer 5 days after our last email → one polite follow-up in the same thread; still nothing 5 days later → find another contact address on their website and write to them (at most 3 addresses per company, never one that is already tried).", enforced: "code" },
   { law: "Anyone who says stop, unsubscribe, remove me or not interested is never emailed again (no reply, no follow-up); every first-contact email says so.", enforced: "code" },

@@ -2,12 +2,12 @@
  * media@constructhub.us over IMAP (read) and SMTP (send), with the account's Gmail app password:
  *   MEDIA_EMAIL, MEDIA_APP_PASSWORD   the mailbox (server .env only)
  * Reads by UID past the last one seen (Gmail's thread id groups a conversation); sends threaded replies signed
- * "Construct HUB Media Team".
+ * "Leah Peterson, Partnerships — Construct HUB Media Team" (shared/media-inbox.ts MEDIA_SIGNER).
  */
 import { ImapFlow } from "imapflow";
 import { simpleParser, type AddressObject } from "mailparser";
 import nodemailer from "nodemailer";
-import { MEDIA_SIGNATURE_TEAM } from "@shared/media-inbox";
+import { MEDIA_SIGNATURE_TEAM, MEDIA_SIGNER } from "@shared/media-inbox";
 import { signatureHtml, signatureText } from "../email-signature";
 
 export const mailboxConfig = (env: NodeJS.ProcessEnv = process.env) => ({
@@ -114,7 +114,7 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 /** The email as sent: body + the media team's signature, plain text and HTML. */
 export function composeMail(body: string, user: string) {
-  const sig = { team: MEDIA_SIGNATURE_TEAM, email: user };
+  const sig = { team: MEDIA_SIGNATURE_TEAM, email: user, ...MEDIA_SIGNER };
   return {
     text: `${body.trim()}\n\n${signatureText(sig)}`,
     html: `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;">${esc(body.trim()).replace(/\n/g, "<br>")}${signatureHtml(sig)}</div>`,
@@ -133,7 +133,7 @@ export async function sendMail(m: { to: string; cc?: string | null; subject: str
   const c = mailboxConfig();
   const { text, html } = composeMail(m.body, c.user);
   const info = await mailDeps.transport().sendMail({
-    from: `"${MEDIA_SIGNATURE_TEAM}" <${c.user}>`,
+    from: `"${MEDIA_SIGNER.name} | Construct HUB" <${c.user}>`,
     to: m.to,
     ...(m.cc ? { cc: m.cc } : {}),
     subject: m.subject,
