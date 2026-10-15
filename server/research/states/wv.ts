@@ -199,8 +199,8 @@ async function* evsLoader(): AsyncIterable<BulkHit> {
 const BULK: BulkSource[] = [
   // 2,647 rows (business, city, masked FEIN) on 2026-10-15.
   { id: "wv-oic-evs", state: "WV", label: "WV Employer Violator System (workers' comp default)", pageUrl: EVS, everyHours: 24 * 7, minRows: 1_500, load: evsLoader, companiesOnly: true, category: "debarment",
-    // Individuals are left out since 2026-10-15 (2,646 → 1,721 rows): earlier loads are not a baseline.
-    rowShapeChangedAt: "2026-10-15" },
+    // Row shape 1: individuals are left out since 2026-10-15 (2,646 → 1,721 rows), so a shape-0 load is not a baseline.
+    rowShape: 1 },
 ];
 
 export const pack: StatePack = {

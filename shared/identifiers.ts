@@ -62,7 +62,12 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
   const zips = Array.from(raw.matchAll(/\b(\d{5})(?:-\d{4})?\b/g)).map((z) => z[1]);
   const zip = zips.length && !raw.startsWith(zips[zips.length - 1] + " ") && raw !== zips[zips.length - 1] ? zips[zips.length - 1] : null;
   const box = raw.match(/\bP\.?\s?O\.?\s?BOX\s+(\d+)/) ?? raw.match(/\bBOX\s+(\d+)/);
-  if (box) return { number: box[1], box: true, pre: null, name: [], type: null, post: null, city: null, state: null, zip, unit: null, partial: false };
+  if (box) {
+    // A PO box keeps its city and state (round 4, finding 9): "PO Box 77, Austin TX" is not "PO Box 77, Boston MA".
+    const after = raw.slice(box.index! + box[0].length).replace(/[,.#]/g, " ").split(" ").filter(Boolean);
+    const loc = localityWords(after.filter((w) => !/^\d{5}(?:-\d{4})?$/.test(w)));
+    return { number: box[1], box: true, pre: null, name: [], type: null, post: null, city: loc.city, state: loc.state, zip, unit: null, partial: false };
+  }
   // Commas mark the street's end when present ("123 Main, Springfield").
   const segs = raw.split(",").map((x) => x.replace(/[.#]/g, (c) => (c === "#" ? " # " : " ")).replace(/\s+/g, " ").trim()).filter(Boolean);
   // A hyphenated number ("251-21", Queens; "2200-B") is one building: kept whole.
@@ -76,20 +81,23 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
   const name: string[] = [];
   let type: string | null = null, post: string | null = null, typeAt = -1, unit: string | null = null;
   const unitOf = (v: string | undefined) => { const u = (v ?? "").replace(/^#/, ""); return /^[A-Z0-9-]+$/.test(u) && !STATES.has(u) ? u : null; };
+  // "FL" is a floor and a state: before a ZIP or at the end it is the state ("Tampa FL 33602").
+  const isUnit = (list: string[], k: number) => UNIT.test(list[k] ?? "") && !(STATES.has(list[k]) && (k + 1 >= list.length || /^\d{5}(?:-\d{4})?$/.test(list[k + 1])));
   // The suffix is a suffix word after at least one name word ("Court St": COURT is the name, ST the suffix).
   for (let j = i; j < words.length; j++) {
-    if (UNIT.test(words[j])) { unit = unitOf(words[j + 1]); break; }
+    if (isUnit(words, j)) { unit = unitOf(words[j + 1]); break; }
     if (j > i && STREET_TYPES[words[j]]) { type = STREET_TYPES[words[j]]; typeAt = j; break; }
     name.push(words[j]);
   }
   if (!name.length) return null;
   let tail: string[] = [];
+  let suffixlessState: string | null = null;
   if (typeAt >= 0) {
     let k = typeAt + 1;
     // "Highway 50", "Route 9": the number belongs to the street.
     if ((type === "HWY" || type === "RTE") && /^\d+[A-Z]?$/.test(words[k] ?? "")) name.push(words[k++]);
     if (DIRECTIONS[words[k]]) post = DIRECTIONS[words[k++]];
-    if (UNIT.test(words[k] ?? "")) { unit = unitOf(words[k + 1]); k += 2; }
+    if (isUnit(words, k)) { unit = unitOf(words[k + 1]); k += 2; }
     else if (/^#?\d+[A-Z]?$/.test(words[k] ?? "") && segs.length === 1) { unit = unitOf(words[k]); k += 1; } // "123 Main St 4"
     tail = words.slice(k);
   } else if (segs.length > 1) {
@@ -98,16 +106,28 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
   } else {
     // No suffix and no comma: where the street ends is unknown. Every word is kept (the street, then maybe the city);
     // only a trailing ZIP or state is dropped. addressMatch compares such a name by its leading words.
-    while (name.length > 1 && (/^\d{5}(?:-\d{4})?$/.test(name[name.length - 1]) || STATES.has(name[name.length - 1]))) name.pop();
+    // The state is kept (round 4, finding 9): "123 Lake View TX" is not "123 Lake View CA".
+    while (name.length > 1 && (/^\d{5}(?:-\d{4})?$/.test(name[name.length - 1]) || STATES.has(name[name.length - 1]))) {
+      const w = name.pop()!;
+      if (STATES.has(w)) suffixlessState ??= w;
+    }
   }
   const partial = typeAt < 0 && segs.length === 1;
   const cityWords: string[] = [];
   const all = [...tail, ...rest];
   for (let k = 0; k < all.length; k++) {
-    if (UNIT.test(all[k])) { unit ??= unitOf(all[k + 1]); k++; continue; } // "Ste 4": the unit and its number
+    if (isUnit(all, k)) { unit ??= unitOf(all[k + 1]); k++; continue; } // "Ste 4": the unit and its number
     if (/^\d{5}(?:-\d{4})?$/.test(all[k]) || (!cityWords.length && /^#?\d+[A-Z]?$/.test(all[k]))) continue;
     cityWords.push(all[k]);
   }
+  const loc = localityWords(cityWords);
+  const known = typeAt >= 0 || segs.length > 1;
+  return { number: m[1], box: false, pre, name, type, post, city: known ? loc.city : null, state: known ? loc.state : suffixlessState, zip, unit, partial };
+}
+
+/** City and state from the words after a street ("SAINT PAUL MN" → ST PAUL, MN); a trailing state name or code is the state. */
+function localityWords(words: string[]): { city: string | null; state: string | null } {
+  const cityWords = [...words];
   let state: string | null = null;
   for (;;) {
     const n = cityWords.length;
@@ -119,8 +139,7 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
     if (STATE_NAMES[w] && n > 1) { cityWords.pop(); state ??= STATE_NAMES[w]; continue; }
     break;
   }
-  const city = (typeAt >= 0 || segs.length > 1) && cityWords.length ? cityWords.map((w) => CITY_WORDS[w] ?? w).join(" ") : null;
-  return { number: m[1], box: false, pre, name, type, post, city, state: state && (typeAt >= 0 || segs.length > 1) ? state : null, zip, unit, partial };
+  return { city: cityWords.length ? cityWords.map((w) => CITY_WORDS[w] ?? w).join(" ") : null, state };
 }
 
 /** The city, state and ZIP of an address without its street ("SEATTLE WA 98101"); null when none is readable. */

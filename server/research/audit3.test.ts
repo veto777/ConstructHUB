@@ -36,8 +36,8 @@ describe("decision 1: an individual's status keeps standing words only", () => {
   it("FL's primary status P on a qualifier's license: the report shows Active and no discipline", () => {
     const h = privateHit(lic({ status: "Probation, Active", holder: "individual" }));
     expect(h).toMatchObject({ status: "Active", discipline: "Probation" });
-    expect(reportHit(lic({ status: "Probation, Active", holder: "individual" }))).toMatchObject({ status: "Active" });
-    expect(reportHit(lic({ status: "Probation, Active", holder: "individual" })).discipline).toBeUndefined();
+    expect(reportHit(lic({ status: "Probation, Active", holder: "individual" }), "person")).toMatchObject({ status: "Active" });
+    expect(reportHit(lic({ status: "Probation, Active", holder: "individual" }), "person").discipline).toBeUndefined();
     // An unknown holder counts as an individual; a business's status stays as published.
     expect(privateHit(lic({ status: "Probation, Active", holder: null })).status).toBe("Active");
     expect(privateHit(lic({ status: "Probation, Active", holder: "business" })).status).toBe("Probation, Active");
@@ -46,7 +46,7 @@ describe("decision 1: an individual's status keeps standing words only", () => {
 
 describe("decision 2: FL respondents with a DBA", () => {
   it("an individual's DBA makes the record the DBA's; no DBA (or a placeholder, or their own name) leaves it out", () => {
-    expect(flRespondent("SMITH, JOHN", ["ACME ROOFING"])).toEqual({ name: "ACME ROOFING", business: "ACME ROOFING", dbaOnly: true });
+    expect(flRespondent("SMITH, JOHN", ["D/B/A ACME ROOFING"])).toEqual({ name: "ACME ROOFING", business: "ACME ROOFING", dbaOnly: true });
     expect(flRespondent("SMITH, JOHN", ["N/A"])).toBeNull();
     expect(flRespondent("SMITH, JOHN", ["JOHN SMITH"])).toBeNull();
     expect(flRespondent("SMITH, JOHN", [])).toBeNull();
@@ -59,10 +59,10 @@ describe("decision 4: every generation is sanitized at read time", () => {
     const old = { k: "license" as const, h: lic({ status: "Disciplined", address: "1 Elm St, Tampa FL 33602", phone: "8135550100", discipline: "Board order 2020" }) };
     const r = readRow({}, old)!;
     expect(r.kind).toBe("license");
-    expect(r.hit).toMatchObject({ status: null, address: "TAMPA 33602", phone: null });
+    expect(r.hit).toMatchObject({ status: null, address: "TAMPA FL 33602", phone: null });
     expect((r.hit as LicenseHit).discipline).toBeUndefined();
     // A business's row keeps its street and its discipline (the runner turns that into an enforcement record).
-    const biz = readRow({}, { k: "license", h: lic({ holder: "business", address: "1 Elm St, Tampa FL 33602", discipline: "Fined" }) })!;
+    const biz = readRow({}, { k: "license", h: lic({ holder: "business", address: "1 Elm St, Tampa FL 33602", discipline: "Fined" }), v: PAYLOAD_VERSION })!;
     expect(biz.hit).toMatchObject({ address: "1 Elm St, Tampa FL 33602", discipline: "Fined" });
   });
   it("an old enforcement row about an individual is dropped by the current rule; a current one is kept", () => {
@@ -72,8 +72,8 @@ describe("decision 4: every generation is sanitized at read time", () => {
   });
   it("an old FL complaint is re-read by the respondent rule", () => {
     const src = { legacyEnforcement: flLegacyComplaint };
-    const dba = readRow(src, { k: "enforcement", h: enf({ name: "SMITH, JOHN / ACME ROOFING", address: "1 Elm St, Tampa FL 33602" }) })!;
-    expect(dba.hit).toMatchObject({ name: "ACME ROOFING", address: "TAMPA 33602", phone: null });
+    // Round 4, decision 4: the stored DBA lost its marker, so an individual's old row is dropped until the file reloads.
+    expect(readRow(src, { k: "enforcement", h: enf({ name: "SMITH, JOHN / ACME ROOFING", address: "1 Elm St, Tampa FL 33602" }) })).toBeNull();
     expect(readRow(src, { k: "enforcement", h: enf({ name: "RUSH, JOHN / N/A", address: "2 Oak St, Tampa FL 33602" }) })).toBeNull();
     expect(readRow(src, { k: "enforcement", h: enf({ name: "ACME LLC / N/A", address: "2 Oak St, Tampa FL 33602" }) })!.hit)
       .toMatchObject({ name: "ACME LLC", address: "2 Oak St, Tampa FL 33602" });
@@ -111,7 +111,7 @@ describe("decision 5: HTTP", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input: any) => String(input).endsWith("/robots.txt") ? new Response("Invalid URL", { status: 403 }) : new Response("ok"));
     const r = await robotsFor("https://arcgis.example.test");
     expect(r.denied).toBeUndefined();
-    await expect(guard("https://arcgis.example.test/x", 10)).resolves.toBeUndefined();
+    await expect(guard("https://arcgis.example.test/x", 10)).resolves.toBeTruthy();
   });
   it("a robots.txt redirect to an already blocked host is not sent", async () => {
     blockHost("https://c.example.test/", 403, "HTTP 403");
@@ -203,9 +203,9 @@ describe("decision 12: the 70% rule across a key-version change", () => {
   it("the baseline is the last full load: a key-format change doesn't reset it, a reduced load doesn't lower it", () => {
     const prev = { rows: 1000, loadedAt: "2026-10-14T10:00:00Z", facets: { components: { a: 900, b: 100 } } };
     expect(baselineOf(prev)).toEqual({ rows: 1000, components: { a: 900, b: 100 } });
-    // A source whose row shape changed on purpose isn't compared with a load made on or before that day.
-    expect(baselineOf(prev, "2026-10-15")).toBeNull();
-    expect(baselineOf({ ...prev, loadedAt: "2026-10-16T10:00:00Z" }, "2026-10-15")).not.toBeNull();
+    // A source whose row shape changed on purpose isn't compared with a load made under the older shape (round 4, decision 11).
+    expect(baselineOf(prev, 1)).toBeNull();
+    expect(baselineOf({ ...prev, rowShape: 1 }, 1)).not.toBeNull();
     const after = nextBaseline(750, { a: 700, b: 50 }, baselineOf(prev));
     expect(after).toEqual({ rows: 1000, components: { a: 900, b: 100 } });
     expect(baselineOf({ rows: 750, loadedAt: "2026-10-15T10:00:00Z", facets: { components: { a: 700, b: 50 }, baseline: after } })).toEqual(after);

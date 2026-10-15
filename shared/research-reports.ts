@@ -218,7 +218,9 @@ export type ResearchSubjectReport = {
   enforcement?: EnforcementHit[];
   recordSources?: RecordSource[];
   /** Searches by the license numbers, phones and addresses the customer gave (reports before 2026-10-15 have none). */
-  identifierSearches?: { query: string; found: number; note: string; sourcesSearched?: number }[];
+  identifierSearches?: { query: string; found: number; note: string; sourcesSearched?: number;
+    /** Of those, license sources (an enforcement file is not a license search; absent before 2026-10-15 round 4). */
+    licenseSourcesSearched?: number }[];
   /**
    * The cross-reference pass: records of other licenses and businesses tied to the subject's own records (same
    * license number, phone or address, or a person named on both). Never the subject's own: each carries relatedVia.
@@ -245,7 +247,9 @@ export type ResearchPreview = {
   licenseSourceStates: string[];
   portalsByState: Record<string, number>;
   /** Companies only: complaint, federal case and OSHA inspection counts (absent on older previews). */
-  records?: { complaints: number; courtCases: number; osha: number; enforcement?: number; searched: string[] };
+  records?: { complaints: number; courtCases: number; osha: number; enforcement?: number; searched: string[];
+    /** Which kinds were searched (round 4, finding 10): a count is shown only when its kind ran (absent on older previews). */
+    ran?: { complaints: boolean; courtCases: boolean; osha: boolean; enforcement: boolean } };
 };
 
 export type ResearchOrderView = {
@@ -272,7 +276,7 @@ export const ENFORCEMENT_KINDS: SourceKind[] = ["enforcement", "state_court"];
 export const anySearched = (sources: RecordSource[] | undefined, kinds: SourceKind[]) => !!sources?.some((r) => kinds.includes(recordKindOf(r)) && r.searched);
 
 /** True when a subject's license search ran against at least one source (by name or by an identifier). */
-export const subjectLicensesSearched = (s: ResearchSubjectReport) => s.licenseSources.some((x) => x.searched) || !!s.identifierSearches?.some((x) => x.sourcesSearched !== 0);
+export const subjectLicensesSearched = (s: ResearchSubjectReport) => s.licenseSources.some((x) => x.searched) || !!s.identifierSearches?.some((x) => (x.licenseSourcesSearched ?? x.sourcesSearched) !== 0);
 
 /**
  * A report's one-line summary: each count backed by a source of its own kind that ran, everything else named as
@@ -292,4 +296,26 @@ export function reportSummary(r: ResearchReport): string {
   }
   const list = (l: string[]) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} and ${l[l.length - 1]}` : l[0]);
   return [found.length ? `Found ${list(found)}.` : "", not.length ? `Not searched: ${list(not)}.` : ""].filter(Boolean).join(" ");
+}
+
+/**
+ * The preview's "Records on file" line (round 4, finding 10): each count only when a source of its kind ran (an older
+ * preview without `ran`: only counts above zero), and the kinds that could not be searched named as such. Null when
+ * there is nothing to say.
+ */
+export function previewRecordsLine(r: ResearchPreview["records"]): string | null {
+  if (!r) return null;
+  const ran = r.ran;
+  const parts: string[] = [], not: string[] = [];
+  const add = (did: boolean | undefined, n: number | undefined, what: string, label: string) => {
+    if (did ?? (n ?? 0) > 0) parts.push(`${n ?? 0} ${what}`);
+    else if (did === false) not.push(label);
+  };
+  add(ran?.complaints, r.complaints, "consumer complaint(s)", "consumer complaints");
+  add(ran?.enforcement, r.enforcement, "state enforcement or standing record(s)", "state enforcement records");
+  if (ran?.courtCases ?? r.courtCases > 0) parts.push(`about ${r.courtCases} federal court docket(s)`);
+  add(ran?.osha, r.osha, "OSHA inspection(s)", "OSHA inspections");
+  if (!parts.some((p) => !/^0 |^about 0 /.test(p))) return null;
+  const list = (l: string[]) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} and ${l[l.length - 1]}` : l[0]);
+  return `Records on file: ${list(parts)}.${not.length ? ` Not searched in this preview: ${list(not)}.` : ""}`;
 }

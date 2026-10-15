@@ -96,8 +96,8 @@ export function hostBlocked(url: string): { status: number; why: string } | null
 /** For tests: forget every host's state and cached robots.txt. */
 export function resetHostState(): void {
   hosts.clear(); robotsCache.clear(); robotsPending.clear();
-  for (const free of Array.from(holding.values())) free();
-  turns.clear();
+  for (const h of Array.from(holding.values())) h.end();
+  holding.clear(); turns.clear(); expiredUnreleased.clear();
 }
 
 /** The host's block as a thrown PortalBlockedError (nothing when it may be asked). */
@@ -126,14 +126,25 @@ async function waitTurn(url: string, minDelayMs: number): Promise<void> {
 
 /**
  * The per-host request queue: one guarded request per host is out at a time, so the answer to one (a 403, a
- * Retry-After) is known before the next is sent. The turn ends when the caller calls releaseHost() (after the
- * response headers, or after a failure), or after HOLD_MS at the latest.
+ * Retry-After) is known before the next is sent. Each turn is owned by its request (round 4, finding 12): guard()
+ * returns a Turn, and only that Turn's release() ends it, so a late completion can't end somebody else's turn. A turn
+ * held past its limit (HOLD_MS, or the request's own deadline) first aborts its request (Turn.signal), then ends.
  */
 const HOLD_MS = 15_000;
+export type Turn = {
+  /** Aborts when the turn is held past its limit; the request must be sent with it (fetch signal, or a timeout no longer than the limit). */
+  readonly signal: AbortSignal;
+  /** Ends this turn (once the response headers are in, or the request failed). A second call, or a call after the turn expired, does nothing. */
+  release: () => void;
+};
+type Held = { turn: Turn; expired: boolean; released: boolean; end: () => void };
 const turns = new Map<string, Promise<void>>();
-const holding = new Map<string, () => void>();
+/** The turn each host's request holds now. */
+const holding = new Map<string, Held>();
+/** Turns that expired before their owner released them (matched to a late releaseHost(url) from a caller without a Turn). */
+const expiredUnreleased = new Map<string, Held[]>();
 
-async function takeTurn(url: string, minDelayMs: number): Promise<void> {
+async function takeTurn(url: string, minDelayMs: number, holdMs = HOLD_MS): Promise<Turn> {
   const host = hostOf(url);
   const prev = turns.get(host) ?? Promise.resolve();
   let done!: () => void;
@@ -141,32 +152,65 @@ async function takeTurn(url: string, minDelayMs: number): Promise<void> {
   turns.set(host, prev.then(() => mine));
   await prev;
   try { await waitTurn(url, minDelayMs); } catch (err) { done(); throw err; }
-  let freed = false;
-  const free = () => {
-    if (freed) return;
-    freed = true;
-    clearTimeout(timer);
-    if (holding.get(host) === free) holding.delete(host);
-    done();
+  const ctrl = new AbortController();
+  const held: Held = {
+    expired: false, released: false,
+    end: () => {
+      clearTimeout(timer);
+      if (holding.get(host) === held) holding.delete(host);
+      done();
+    },
+    turn: {
+      signal: ctrl.signal,
+      release: () => {
+        if (held.released) return;
+        held.released = true;
+        if (held.expired) dropExpired(host, held); else held.end();
+      },
+    },
   };
-  const timer = setTimeout(free, HOLD_MS);
+  const timer = setTimeout(() => {
+    // Abort the request first, then hand the host to the next one.
+    held.expired = true;
+    ctrl.abort(new Error(`no answer from ${host} within ${Math.round(holdMs / 1000)}s; the request was stopped`));
+    expiredUnreleased.set(host, [...(expiredUnreleased.get(host) ?? []), held]);
+    held.end();
+  }, holdMs);
   (timer as { unref?: () => void }).unref?.();
-  holding.set(host, free);
+  holding.set(host, held);
+  return held.turn;
 }
 
-/** Ends the host's current turn (see takeTurn): call it once the response headers are in, or the request failed. */
-export function releaseHost(url: string): void { holding.get(hostOf(url))?.(); }
+function dropExpired(host: string, held: Held): void {
+  const list = (expiredUnreleased.get(host) ?? []).filter((h) => h !== held);
+  if (list.length) expiredUnreleased.set(host, list); else expiredUnreleased.delete(host);
+}
+
+/**
+ * Ends a turn. With the Turn guard() returned, only that turn ends (the way to call it). Without one (a caller that
+ * kept no Turn), a late completion is matched to an expired turn first, so it can't end the turn another request
+ * holds now; only when no turn on the host expired does it end the current one.
+ */
+export function releaseHost(url: string, turn?: Turn): void {
+  if (turn) { turn.release(); return; }
+  const host = hostOf(url);
+  const stale = expiredUnreleased.get(host)?.[0];
+  if (stale) { stale.turn.release(); return; }
+  holding.get(host)?.turn.release();
+}
 
 /**
  * Everything a request must pass before it is sent: the host's block, robots.txt, then the host's turn in its queue
  * (cooldown waited out, or a failure when longer than MAX_WAIT_MS; the rate limit; the block and cooldown checked
- * again right before dispatch). Throws PortalBlockedError when refused. The caller sends the request, calls
- * noteResponse() with the answer and releaseHost() once the headers are in (or the request failed).
+ * again right before dispatch). Throws PortalBlockedError when refused. The caller sends the request with the Turn's
+ * signal (or a timeout no longer than `holdMs`), calls noteResponse() with the answer and releaseHost(url, turn) once
+ * the headers are in (or the request failed). `holdMs` is how long the turn may be held (default HOLD_MS): past it,
+ * the request is aborted and the next one may go.
  */
-export async function guard(url: string, minDelayMs = 1000): Promise<void> {
+export async function guard(url: string, minDelayMs = 1000, holdMs = HOLD_MS): Promise<Turn> {
   refuseIfBlocked(url);
   await checkRobots(url);
-  await takeTurn(url, minDelayMs);
+  return takeTurn(url, minDelayMs, holdMs);
 }
 
 /** The rate limit plus the host's block and cooldown, checked again after the wait (for callers that check robots.txt themselves). */
@@ -260,25 +304,28 @@ async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status
       if (r.denied || !robotsAllows(r.rules, u.pathname + u.search)) throw new PortalBlockedError(cur, 0, `robots.txt redirects to ${u.host}${u.pathname}, which robots.txt does not allow`);
     }
     refuseIfBlocked(cur);
-    await takeTurn(cur, 1000);
+    const turn = await takeTurn(cur, 1000);
     let res: { status: number; text: string; location?: string | null; retryAfter?: string | null };
     try {
       const own = robotsFetchers.get(u.origin);
       if (own) {
-        res = await Promise.race([own(cur), new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timed out")), 15_000))]);
+        res = await Promise.race([own(cur), new Promise<never>((_, rej) => {
+          setTimeout(() => rej(new Error("timed out")), 15_000);
+          turn.signal.addEventListener("abort", () => rej(turn.signal.reason), { once: true });
+        })]);
       } else {
-        const r = await fetch(cur, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.timeout(15_000), redirect: "manual" });
+        const r = await fetch(cur, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.any([AbortSignal.timeout(15_000), turn.signal]), redirect: "manual" });
         const read = r.status >= 200 && r.status < 500 && !REDIRECTS.has(r.status);
         res = { status: r.status, location: r.headers.get("location"), retryAfter: r.headers.get("retry-after"), text: read ? (await r.text()).slice(0, 200_000) : (await r.body?.cancel().catch(() => undefined), "") };
       }
     } finally {
-      releaseHost(cur);
+      turn.release();
     }
     // A 401/403 on robots.txt is not a refusal of the host by itself (RFC 9309 §2.3.1.3: robots.txt "unavailable"):
     // robotsFor() decides from the answer. Many open-data API hosts (ArcGIS REST "Invalid URL", api.box.com) answer
     // every unknown path that way. A 401/403 on a data request still blocks the host (noteResponse there).
     // A challenge page with that 401/403 is a refusal: it blocks the host that answered.
-    if ((res.status !== 401 && res.status !== 403) || ROBOTS_REFUSAL_PAGE.test(res.text.slice(0, 20_000))) noteResponse(cur, res.status, res.retryAfter);
+    if ((res.status !== 401 && res.status !== 403) || ROBOTS_CHALLENGE_PAGE.test(res.text.slice(0, 20_000))) noteResponse(cur, res.status, res.retryAfter);
     if (!REDIRECTS.has(res.status) || !res.location) return res;
     if (hop + 1 >= ROBOTS_HOPS) throw new Error(`more than ${ROBOTS_HOPS} redirects for robots.txt`);
     const next = new URL(res.location, cur);
@@ -293,11 +340,13 @@ async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status
  * network failure → denied for an hour, then fetched again.
  */
 /**
- * Words of a bot challenge or a WAF block page (Cloudflare, Akamai, Imperva, F5, PerimeterX, CAPTCHAs), or of a server
- * that is down. Such an answer to robots.txt refuses the host for an hour, whatever its status code. A plain 401/403/404
- * page ("Invalid URL", an empty 401) is not one: it means there is no robots.txt.
+ * Words of a bot challenge or a WAF block page (Cloudflare, Akamai, Imperva, F5, PerimeterX, CAPTCHAs). Such an answer
+ * to robots.txt refuses the host for an hour, whatever its status code. A plain 401/403/404 page ("Invalid URL", an
+ * empty 401, IIS's "Server Error … 404 - File or directory not found") is not one: it means there is no robots.txt.
  */
-const ROBOTS_REFUSAL_PAGE = /just a moment|checking your browser|attention required|cf-chl|cf_chl|challenge-platform|captcha|access denied|request rejected|incapsula|perimeterx|px-captcha|are you a robot|unusual traffic|bot detection|server error|service unavailable|bad gateway/i;
+const ROBOTS_CHALLENGE_PAGE = /just a moment|checking your browser|attention required|cf-chl|cf_chl|challenge-platform|captcha|access denied|request rejected|incapsula|perimeterx|px-captcha|are you a robot|unusual traffic|bot detection/i;
+/** A 2xx page instead of a robots file that is a challenge, or says the server is down: refused like a 5xx. */
+const ROBOTS_REFUSAL_PAGE = new RegExp(`${ROBOTS_CHALLENGE_PAGE.source}|server error|service unavailable|bad gateway`, "i");
 
 export async function robotsFor(origin: string, chain: Set<string> = new Set()): Promise<{ rules: Rule[]; denied?: string }> {
   const hit = robotsCache.get(origin);
@@ -318,7 +367,7 @@ export async function robotsFor(origin: string, chain: Set<string> = new Set()):
           : { rules: !html && /user-agent\s*:/i.test(res.text) ? parseRobots(res.text) : [] };
       } else if (res.status === 429 || res.status >= 500) entry = { rules: [], denied: `robots.txt answered HTTP ${res.status}` };
       // Any other 4xx (401, 403, 404, 410…) means no robots.txt (RFC 9309 §2.3.1.3), unless the page is a challenge.
-      else if (res.status >= 400 && res.status < 500) entry = ROBOTS_REFUSAL_PAGE.test(res.text.slice(0, 20_000)) ? { rules: [], denied: `robots.txt answered HTTP ${res.status} with a challenge page` } : { rules: [] };
+      else if (res.status >= 400 && res.status < 500) entry = ROBOTS_CHALLENGE_PAGE.test(res.text.slice(0, 20_000)) ? { rules: [], denied: `robots.txt answered HTTP ${res.status} with a challenge page` } : { rules: [] };
       else if (REDIRECTS.has(res.status)) entry = { rules: [], denied: "robots.txt redirected without a location" };
       else entry = { rules: [] };
     } catch (err) {
@@ -360,46 +409,75 @@ const PASSIVE = new Set(["stylesheet", "script", "image", "font", "media", "mani
 type Routable = { route: (pattern: string, handler: (route: any) => Promise<unknown>) => Promise<unknown>; on: (event: "response", fn: (res: any) => void) => unknown };
 
 /**
- * Puts a browser page or context behind the guarded transport (round 3, decision 5). Every page load, XHR and fetch
- * passes the full guard (block, robots.txt, the host's queue: cooldown, rate limit, the recheck before dispatch); it
- * is sent with its redirects held back, so a redirect's target passes the guard too before the browser follows it.
- * Its answer goes to noteResponse() against the host that answered. Styles, scripts, images and fonts are checked
- * against the block, cooldown and robots.txt without the rate limit. Every other response is noted as well.
+ * Puts a browser page or context behind the guarded transport (round 3, decision 5; round 4, finding 6). Every page
+ * load, XHR and fetch passes the full guard (block, robots.txt, the host's queue: cooldown, rate limit, the recheck
+ * before dispatch). Styles, scripts, images and fonts are checked against the block, cooldown and robots.txt without
+ * the rate limit. Every request is sent from here with its redirects held back, and each redirect hop is sent from
+ * here too, after the same checks (the browser would follow a redirect without asking the route again). Each answer
+ * goes to noteResponse() against the URL that answered. The browser gets the last answer for the URL it asked for; a
+ * page that came from another address gets a <base> for it, so its relative links still point where they should.
  * The returned check throws the first access denial seen, so a load stops instead of moving on.
  */
 export async function guardBrowser(target: Routable, minDelayMs = 1000): Promise<() => void> {
   let denied: unknown = null;
   const deny = (err: unknown) => { if (err instanceof PortalBlockedError) denied ??= err; };
+  /** Requests answered here: every hop's answer is already noted (the "response" event would note the last one against the first URL). */
+  const answered = new WeakSet<object>();
   await target.route("**/*", async (route: any) => {
     const req = route.request();
     const url: string = req.url();
     if (!/^https?:/i.test(url)) return route.continue();
-    if (PASSIVE.has(req.resourceType())) {
-      const ok = !hostBlocked(url) && coolLeft(url) <= 0 && await robotsAllowed(url);
-      return ok ? route.continue() : route.abort("blockedbyclient");
-    }
-    let res: any;
+    answered.add(req);
+    const passive = PASSIVE.has(req.resourceType());
+    let cur = url, method: string = req.method?.() ?? "GET", postData: Buffer | undefined = req.postDataBuffer?.() ?? undefined;
+    let headers: Record<string, string> | undefined;
     try {
-      await guard(url, minDelayMs);
-      try { res = await route.fetch({ maxRedirects: 0 }); } finally { releaseHost(url); }
-      noteResponse(url, res.status(), res.headers()["retry-after"]);
-      const loc = res.headers()["location"];
-      if (REDIRECTS.has(res.status()) && loc) {
-        // The browser follows this redirect without asking the route again: its target passes the guard now.
-        const next = new URL(loc, url).toString();
-        await guard(next, minDelayMs);
-        releaseHost(next);
+      for (let hop = 0; ; hop++) {
+        let res: any;
+        if (passive) {
+          refuseIfBlocked(cur);
+          if (coolLeft(cur) > 0) throw new PortalBlockedError(cur, 429, `${hostOf(cur)} asked us to wait; no requests until then`);
+          await checkRobots(cur);
+          res = await route.fetch({ url: cur, method, postData, headers, maxRedirects: 0, timeout: HOLD_MS });
+        } else {
+          const turn = await guard(cur, minDelayMs);
+          // Playwright takes no abort signal here: its timeout ends the request when its turn does.
+          try { res = await route.fetch({ url: cur, method, postData, headers, maxRedirects: 0, timeout: HOLD_MS }); } finally { turn.release(); }
+        }
+        try { noteResponse(cur, res.status(), res.headers()["retry-after"]); } catch (err) { deny(err); throw err; }
+        const loc = res.headers()["location"];
+        if (!REDIRECTS.has(res.status()) || !loc) return await fulfill(route, res, url, cur);
+        if (hop + 1 >= MAX_HOPS) throw new Error(`more than ${MAX_HOPS} redirects from ${url}`);
+        const next = new URL(loc, cur);
+        if (next.protocol !== "https:" && next.protocol !== "http:") throw new Error(`redirect to ${next.protocol} refused (${url})`);
+        if (res.status() === 303 || ((res.status() === 301 || res.status() === 302) && method === "POST")) {
+          method = "GET"; postData = undefined;
+          headers = Object.fromEntries(Object.entries((req.headers?.() ?? {}) as Record<string, string>).filter(([k]) => !/^content-(?:type|length)$/i.test(k)));
+        }
+        cur = next.toString();
       }
     } catch (err) {
-      deny(err);
+      // A style, script or image refused before it was sent is left out; a refused page load, XHR or fetch, or a
+      // 401/403 answer to anything, stops the load.
+      if (!passive) deny(err);
       return route.abort(err instanceof PortalBlockedError ? "blockedbyclient" : "failed").catch(() => undefined);
     }
-    return route.fulfill({ response: res });
   });
   target.on("response", (res: any) => {
+    if (answered.has(res.request?.())) return;
     try { noteResponse(res.url(), res.status(), res.headers()["retry-after"]); } catch (err) { deny(err); }
   });
   return () => { if (denied) throw denied; };
+}
+
+/** The browser's answer: the last hop's response; an HTML page from another address gets a <base> naming it. */
+async function fulfill(route: any, res: any, asked: string, answered: string): Promise<unknown> {
+  if (answered === asked || !/text\/html/i.test(res.headers()["content-type"] ?? "")) return route.fulfill({ response: res });
+  const html = (await res.body()).toString("utf8");
+  const base = `<base href="${answered.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">`;
+  const body = /<base[\s>]/i.test(html.slice(0, 20_000)) ? html
+    : /<head(?:\s[^>]*)?>/i.test(html) ? html.replace(/<head(?:\s[^>]*)?>/i, (m: string) => m + base) : base + html;
+  return route.fulfill({ response: res, body });
 }
 
 // ── Fetch ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -416,25 +494,26 @@ function follow(signal: AbortSignal | null | undefined, ctrl: AbortController) {
  * and noteResponse() (a 401/403 blocks the host and throws; Retry-After sets the cooldown). A caller that asks for
  * redirect "manual" or "error" gets the first answer as it is. A 303, or a 301/302 after a POST, continues as a GET.
  */
-async function hops(url: string, init: RequestInit, signal: AbortSignal, minDelayMs: number, onConnectTimeout?: () => boolean): Promise<Response> {
+async function hops(url: string, init: RequestInit, signal: AbortSignal, minDelayMs: number, holdMs: number, onConnectTimeout?: () => boolean): Promise<Response> {
   const manual = init.redirect === "manual" || init.redirect === "error";
   let cur = url, method = (init.method ?? "GET").toUpperCase(), body = init.body;
   for (let hop = 0; ; hop++) {
-    await guard(cur, minDelayMs);
+    const turn = await guard(cur, minDelayMs, holdMs);
     const headers = new Headers(init.headers ?? {});
     if (!headers.has("user-agent")) headers.set("user-agent", USER_AGENT);
     if (headers.has("cookie") && !headers.get("cookie")!.trim()) headers.delete("cookie");
     if (method === "GET" || method === "HEAD") { headers.delete("content-type"); headers.delete("content-length"); }
     let res: Response;
     try {
-      res = await fetch(cur, { ...init, method, body: method === "GET" || method === "HEAD" ? undefined : body, headers, signal, redirect: "manual" });
+      // The turn's signal aborts the request if it outlives its turn (round 4, finding 12).
+      res = await fetch(cur, { ...init, method, body: method === "GET" || method === "HEAD" ? undefined : body, headers, signal: AbortSignal.any([signal, turn.signal]), redirect: "manual" });
     } catch (e) {
-      releaseHost(cur);
+      turn.release();
       // Node gives up connecting after 10 s; no request reached the server, so a fresh connection is tried again.
       if ((e as { cause?: { code?: string } })?.cause?.code === "UND_ERR_CONNECT_TIMEOUT" && onConnectTimeout?.()) { hop--; continue; }
       throw e;
     }
-    releaseHost(cur);
+    turn.release();
     try { noteResponse(cur, res.status, res.headers.get("retry-after")); }
     catch (err) { await res.body?.cancel().catch(() => undefined); throw err; }
     const loc = res.headers.get("location");
@@ -460,7 +539,7 @@ export async function fetchWithDeadline(url: string, init: RequestInit = {}, tim
   const timer = setTimeout(() => ctrl.abort(new Error(`timed out after ${Math.round(timeoutMs / 1000)}s: ${url}`)), timeoutMs);
   (timer as { unref?: () => void }).unref?.();
   try {
-    return await hops(url, init, ctrl.signal, minDelayMs);
+    return await hops(url, init, ctrl.signal, minDelayMs, Math.min(timeoutMs, 3 * 60_000));
   } catch (err) {
     clearTimeout(timer);
     throw err;
@@ -484,7 +563,7 @@ export async function politeFetch(url: string, init: RequestInit = {}, opts: Res
     (bodyTimer as { unref?: () => void }).unref?.();
     let res: Response;
     try {
-      res = await hops(url, { ...init, headers }, ctrl.signal, minDelayMs, () => connectRetries++ < 2);
+      res = await hops(url, { ...init, headers }, ctrl.signal, minDelayMs, timeoutMs, () => connectRetries++ < 2);
     } catch (e) {
       clearTimeout(bodyTimer);
       throw e;

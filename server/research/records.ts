@@ -13,7 +13,7 @@
  * searched is reported as not searched, never as "nothing found".
  */
 import { politeFetch, rethrowIfBlocked } from "./http";
-import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordCategory, RecordSource } from "@shared/research-reports";
+import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordCategory, RecordSource, ResearchPreview } from "@shared/research-reports";
 import { nameClause, sodaRows, tokens } from "./licenses";
 import { BULK_LIMIT, searchBulk } from "./bulk";
 import { allBulkSourcesFor as bulkSourcesFor, hasStateCourtSearch, packComplaintSourcesFor, searchPackEnforcement } from "./registry";
@@ -266,21 +266,24 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
 }
 
 /** The free preview's counts: complaints and OSHA in full, federal cases from the first page's match count. */
-export async function previewCompanyRecords(name: string, states: string[]): Promise<{ complaints: number; courtCases: number; osha: number; enforcement: number; searched: string[] }> {
+export async function previewCompanyRecords(name: string, states: string[]): Promise<NonNullable<ResearchPreview["records"]>> {
   const searched: string[] = [];
+  const ran = { complaints: false, courtCases: false, osha: false, enforcement: false };
   let complaints = 0, courtCases = 0, osha = 0;
   for (const state of states) for (const src of complaintSourcesFor(state)) {
-    try { complaints += (await searchComplaints(src, name)).length; searched.push(src.source); } catch { /* a hint, not the report */ }
+    try { complaints += (await searchComplaints(src, name)).length; searched.push(src.source); ran.complaints = true; } catch { /* a hint, not the report */ }
   }
-  if (COURTLISTENER_ALLOWED) try { courtCases = (await searchCourtCases(name, 1)).total; searched.push("Federal court dockets"); } catch { /* ditto */ }
+  if (COURTLISTENER_ALLOWED) try { courtCases = (await searchCourtCases(name, 1)).total; searched.push("Federal court dockets"); ran.courtCases = true; } catch { /* ditto */ }
   if (process.env.DOL_API_KEY) {
-    try { osha = (await searchOsha(name)).length; searched.push("Federal OSHA inspections"); } catch { /* ditto */ }
+    try { osha = (await searchOsha(name)).length; searched.push("Federal OSHA inspections"); ran.osha = true; } catch { /* ditto */ }
   }
   let enforcement = 0;
   try {
     const e = await searchEnforcement(name, states);
     enforcement = e.hits.length;
-    searched.push(...e.sources.filter((x) => x.searched).map((x) => x.source));
+    const done = e.sources.filter((x) => x.searched);
+    searched.push(...done.map((x) => x.source));
+    ran.enforcement = done.length > 0;
   } catch { /* ditto */ }
-  return { complaints, courtCases, osha, enforcement, searched };
+  return { complaints, courtCases, osha, enforcement, searched, ran };
 }

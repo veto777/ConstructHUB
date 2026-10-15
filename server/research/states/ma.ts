@@ -24,7 +24,7 @@
 import { request as httpsRequest } from "node:https";
 import { rootCertificates } from "node:tls";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { USER_AGENT, guard, noteResponse, releaseHost, useRobotsFetcher } from "../http";
+import { USER_AGENT, guard, noteResponse, useRobotsFetcher } from "../http";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { tokens, wholeWordMatch } from "../licenses";
@@ -95,14 +95,15 @@ type HicQuery = { name?: string | null; firstName?: string | null; lastName?: st
  * robots.txt and the rate limit before it; a 401/403 or Retry-After recorded after it. It follows no redirects.
  */
 async function hicRequest(url: string, body: string | null): Promise<string> {
-  await guard(url, 1500);
+  // The request's own turn (round 4, finding 12): released once, and an expired turn aborts the request.
+  const turn = await guard(url, 1500, 120_000);
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = { "user-agent": USER_AGENT };
     if (body != null) Object.assign(headers, { "content-type": "application/x-www-form-urlencoded; charset=UTF-8", "content-length": String(Buffer.byteLength(body)), referer: HIC_PAGE });
     const req = httpsRequest(url, {
-      method: body != null ? "POST" : "GET", ca: HIC_CA, timeout: 90_000, headers,
+      method: body != null ? "POST" : "GET", ca: HIC_CA, timeout: 90_000, headers, signal: turn.signal,
     }, (res) => {
-      releaseHost(url);
+      turn.release();
       try { noteResponse(url, res.statusCode ?? 0, res.headers["retry-after"] as string | undefined); }
       catch (err) { res.resume(); reject(err); return; }
       const chunks: Buffer[] = [];
@@ -110,7 +111,7 @@ async function hicRequest(url: string, body: string | null): Promise<string> {
       res.on("end", () => (res.statusCode === 200 ? resolve(Buffer.concat(chunks).toString("utf8")) : reject(new Error(`Contractor Hub returned HTTP ${res.statusCode}`))));
     });
     req.on("timeout", () => req.destroy(new Error("Contractor Hub timed out")));
-    req.on("error", (err) => { releaseHost(url); reject(err); });
+    req.on("error", (err) => { turn.release(); reject(err); });
     const deadline = setTimeout(() => req.destroy(new Error("Contractor Hub response not finished in 120s")), 120_000);
     deadline.unref?.();
     req.on("close", () => clearTimeout(deadline));

@@ -9,7 +9,8 @@
  *   - No disciplinary text on a license: `discipline` (and anything a source still put there) is removed from every
  *     hit. For a business's license it becomes an enforcement record (companies only, FCRA); for an individual's it
  *     is dropped.
- *   - An individual's license status keeps only words of standing (round 3, decision 1; standingStatus below):
+ *   - An individual's license status, and every license status in a person's report (round 4, decision 2; reportHit),
+ *     keeps only words of standing (round 3, decision 1; standingStatus below):
  *     probation, "disciplined", citations, a pending case and the like come off the status and go to `discipline`,
  *     which an individual's record never shows.
  *   - The holder comes only from what the publisher says (round 3, decision 3; entityHolder below): a value on the
@@ -34,7 +35,7 @@ export function entityHolder(v: unknown, lists: { business: RegExp; individual: 
 }
 
 /** Words of standing a license status may keep for an individual, as published (round 3, decision 1). */
-const STANDING = "active|inactive|current|expired|delinquent|null and void|revoked|suspended|surrendered|valid|issued|licensed|lapsed|cancell?ed|retired|closed|deceased|void|renewed|(?:in )?good standing";
+const STANDING = "active|inactive|current|clear|expired|delinquent|null and void|revoked|suspended|surrendered|valid|issued|licensed|lapsed|cancell?ed|retired|closed|deceased|void|renewed|(?:in )?good standing";
 const STANDING_RE = new RegExp(`^(${STANDING})\\b(.*)$`, "i");
 /** Words that make a status piece disciplinary (or about a case) rather than standing. */
 const DISCIPLINARY = /probation|disciplin|citation|\bcited\b|pending|\bcase\b|complaint|reprimand|censure|\bfined?\b|consent|\border\b|restrict|condition|monitor|stipulat|sanction|violation|investigat|hearing|summary|emergency|warning|admonish|letter of concern|corrective|action/i;
@@ -85,9 +86,17 @@ export function privateHit<T extends LicenseHit>(h: T): T {
   return out;
 }
 
-/** The hit as a report shows it: private (above) and without disciplinary text (see disciplineRecord). */
-export function reportHit<T extends LicenseHit>(h: T): T {
-  const p = privateHit(h);
+/**
+ * The hit as a report shows it: private (above) and without disciplinary text (see disciplineRecord). The status
+ * follows the REPORT SUBJECT too (round 4, decision 2): in a person's report every license, own, related or matched by
+ * an identifier and whatever its holder, shows standing words only ("Probation, Active" → "Active").
+ */
+export function reportHit<T extends LicenseHit>(h: T, subject: "person" | "company"): T {
+  let p = privateHit(h);
+  if (subject === "person" && !isIndividual(p)) {
+    const st = standingStatus(p.status);
+    if (st.status !== (p.status ?? null)) p = { ...p, status: st.status };
+  }
   if (p.discipline === undefined) return p;
   const { discipline: _d, ...rest } = p;
   return rest as T;

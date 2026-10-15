@@ -136,8 +136,15 @@ export function wcInsurer(r: Record<string, unknown>): string | null {
   return clean(String(r.record_origin ?? "")) ? `Insurer: ${insurer}` : `Insurer: ${insurer} (self-insured, per DCBS's record-origin code)`;
 }
 
-/** entity_code 1 is "Individual" (the dataset's column description): a person's address and phone are not shown. */
-const WC_INDIVIDUAL = "1";
+/**
+ * entity_code, from the dataset's column description (checked 2026-10-15): 0 Other, 1 Individual, 2 Corporation,
+ * 3 Political Subd, 4 Husband/Wife Partnership, 5 Partnership, 6 Joint Venture, 7 Association, 8 Labor Union,
+ * 9 Limited Partner, A LLP, B LLC, C Trust, D Estate. Street address and phone are kept only for a documented business
+ * entity (round 4, decision 5); an individual, a husband/wife partnership, an estate, "Other", a blank or an unlisted
+ * code shows city, state and ZIP only.
+ */
+const WC_BUSINESS = new Set(["2", "3", "5", "6", "7", "8", "9", "A", "B", "C"]);
+export const wcBusinessEntity = (r: Record<string, unknown>): boolean => WC_BUSINESS.has((clean(String(r.entity_code ?? "")) ?? "").toUpperCase());
 
 export async function searchWorkersComp(name: string): Promise<EnforcementHit[]> {
   const rows = await sodaRows(WC_URL, `(${nameClause("legal_business_name", name)}) OR (${nameClause("dba_name", name)})`, 200, "Oregon workers' comp employers");
@@ -145,7 +152,7 @@ export async function searchWorkersComp(name: string): Promise<EnforcementHit[]>
   return withNote(rows.filter((r) => nameMatches(name, String(r.legal_business_name ?? ""), String(r.dba_name ?? ""))).map((r) => {
     const code = clean(String(r.insurer_status ?? "")) ?? "";
     const dba = clean(String(r.dba_name ?? ""));
-    const individual = clean(String(r.entity_code ?? "")) === WC_INDIVIDUAL;
+    const individual = !wcBusinessEntity(r);
     return {
       state: "OR", source: "Oregon DCBS workers' compensation coverage (active employers)", sourceUrl: WC_DATASET, category: "business_status" as const,
       name: [clean(String(r.legal_business_name ?? "")), dba].filter(Boolean).join(" / "), id: clean(String(r.employer_num ?? "")),

@@ -207,9 +207,10 @@ export function idKey(q: IdQuery): string | null {
  * One identifier across every finder. A finder that fails, or can't search it, is noted ("failed", "skipped"),
  * never counted as "nothing found"; a search that stopped at a cap says so ("capped").
  */
-export async function searchById(finders: LicenseFinder[], q: IdQuery, kind: "person" | "company"): Promise<{ licenses: LicenseHit[]; enforcement: EnforcementHit[]; searched: number; failed: string[]; skipped: string[]; capped: string[] }> {
+export async function searchById(finders: LicenseFinder[], q: IdQuery, kind: "person" | "company"): Promise<{ licenses: LicenseHit[]; enforcement: EnforcementHit[]; searched: number; licenseSearched: number; failed: string[]; skipped: string[]; capped: string[] }> {
   const licenses: LicenseHit[] = [], enforcement: EnforcementHit[] = [], failed: string[] = [], skipped: string[] = [], capped: string[] = [];
-  let searched = 0;
+  // licenseSearched: of those, license sources (round 4, finding 10): an enforcement file that answered is not a license search.
+  let searched = 0, licenseSearched = 0;
   for (const f of finders) {
     if (f.companiesOnly && kind === "person") continue;
     // A source with no identifier search at all is listed as not searched (round 2, decision 8).
@@ -218,6 +219,7 @@ export async function searchById(finders: LicenseFinder[], q: IdQuery, kind: "pe
       const r = await f.byId(q);
       if (r.searched === false) { skipped.push(`${f.label}${r.note ? ` (${r.note})` : ""}`); continue; }
       searched++;
+      if (!f.companiesOnly) licenseSearched++;
       if (r.note) capped.push(`${f.label}: ${r.note}`);
       licenses.push(...r.licenses.map((h) => ({ ...h, matchedOn: q.type })));
       enforcement.push(...r.enforcement);
@@ -225,7 +227,7 @@ export async function searchById(finders: LicenseFinder[], q: IdQuery, kind: "pe
       failed.push(`${f.label}: ${String(err?.message ?? err).slice(0, 120)}`);
     }
   }
-  return { licenses, enforcement, searched, failed, skipped, capped };
+  return { licenses, enforcement, searched, licenseSearched, failed, skipped, capped };
 }
 
 /** How a report says what an identifier search covered: "4 source(s) searched; not searched: …; could not search …". */
@@ -243,7 +245,7 @@ export type CustomerIdResult = {
   /** Records found only by the identifier (another name on them): related, "matched by the phone you gave". */
   matched: LicenseHit[];
   enforcement: EnforcementHit[];
-  searches: { query: string; found: number; note: string; sourcesSearched?: number }[]; searchedIds: Set<string>; used: number; notes: string[];
+  searches: { query: string; found: number; note: string; sourcesSearched?: number; licenseSourcesSearched?: number }[]; searchedIds: Set<string>; used: number; notes: string[];
 };
 
 /**
@@ -292,6 +294,7 @@ export async function searchCustomerIds(finders: LicenseFinder[], ids: IdQuery[]
       note: coverageNote(r),
       // 0 sources searched: the report says "Not searched", never "0 found" (round 2, decision 8).
       sourcesSearched: r.searched,
+      licenseSourcesSearched: r.licenseSearched,
     });
   }
   return out;
@@ -340,9 +343,14 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
   let idSearches = x.idSearchesUsed;
   const ownList = [...own.list];
 
+  /**
+   * A copy of one of the subject's own records merges into it (round 4, finding 8: a fetched copy may carry discipline
+   * the first one left out); true when it was one.
+   */
+  const mergeOwn = (h: LicenseHit): boolean => { if (!own.find(h)) return false; own.add(h); return true; };
   /** A record joins the related list unless it is one of the subject's own. */
   const addRelated = (h: LicenseHit, tie: RelatedTie, via: string) => {
-    if (own.find(h)) return;
+    if (mergeOwn(h)) return;
     const dup = related.find(h);
     if (dup) {
       // Keep the strongest tie; a second tie is worth saying.
@@ -375,7 +383,7 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
     for (const f of r.failed) notes.push(`Could not search ${describeId(c.q)} in ${f}`);
     if (r.skipped.length) notes.push(`${describeId(c.q)} was not searched in ${r.skipped.join(", ")}.`);
     for (const f of r.capped) notes.push(`${describeId(c.q)}: ${f}.`);
-    const fresh = r.licenses.filter((h) => !own.find(h));
+    const fresh = r.licenses.filter((h) => !mergeOwn(h));
     const ref = licenseRef(c.from);
     const spread = spreadOf(fresh, subject.kind === "company" ? r.enforcement : []);
     if (spread > MAX_BUSINESSES_PER_TIE) {
@@ -430,7 +438,7 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
         found.push(...r.hits.filter((h) => hop.kind === "person" ? samePerson(hop.name, h) : nameMatches(hop.name, hop.kind, h)));
       } catch (err: any) { notes.push(`Could not search "${hop.name}" in ${f.label}: ${String(err?.message ?? err).slice(0, 120)}`); }
     }
-    const fresh = found.filter((h) => !own.find(h));
+    const fresh = found.filter((h) => !mergeOwn(h));
     const ref = licenseRef(hop.from);
     if (hop.kind === "person" && distinctBusinesses(fresh) > MAX_BUSINESSES_PER_TIE) {
       notes.push(`"${hop.name}" (named on ${ref}) matches licenses of ${distinctBusinesses(fresh)} different businesses, too common a name to link them; they are left out.`);
