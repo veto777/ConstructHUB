@@ -254,6 +254,7 @@ function DashboardRouter() {
       <Route path="/domains" component={DomainsPage} />
       <Route path="/mail-alerts" component={MailAlertsPage} />
       <Route path="/gbp-content" component={GbpContentPage} />
+      <Route path="/gbp-photos" component={GbpContentPage} />
       <Route path="/listing-editor" component={ListingEditorPage} />
       <Route path="/listings"><Redirect to={"/directories" + window.location.search} /></Route>
       <Route path="/directories" component={DirectoriesPage} />
@@ -535,7 +536,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/call-assistant", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings", "/site-scan/history",
-  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/backlinks", "/admin/partnerships", "/admin/youtube",
+  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/backlinks", "/admin/partnerships", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];

@@ -3,7 +3,7 @@ import { AgencyWorkspace, useAgencyFilter } from "@/components/agency-workspace"
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest, apiErrorMessage } from '@/lib/queryClient';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,8 @@ import { GoogleSurface } from "@/components/google";
 
 type Photo={id:number;name:string;url:string};
 export default function GbpContentPage(){
+  const [path]=useLocation();
+  const mode:ContentMode=path.startsWith('/gbp-photos')?'photos':'posts';
   const f=useAgencyFilter();
   const {data:locations=[],error:locationsError,isLoading:locationsLoading}=useQuery<any[]>({queryKey:[`/api/locations?${f.params}`]});
   const [locationParam,setLocationParam]=useUrlParam('location');
@@ -21,21 +23,30 @@ export default function GbpContentPage(){
   // A ?location= value can name a deleted or unlinked location (old link, typo);
   // only open the editor for a location that is actually linked to Google.
   const chosen=location?locations.find(l=>String(l.id)===location):undefined;
-  return <GoogleSurface page><AppPage className="before:hidden" width="narrow"><PageHeader title="Posts & photos" description="Draft, approve and schedule updates for your Google profile." actions={!chosen?.gbpLocationName?<Button asChild><Link href="/locations?import=gbp">Link a location</Link></Button>:undefined}/>
+  return <GoogleSurface page><AppPage className="before:hidden" width="narrow"><PageHeader title={mode==='posts'?'Posts':'Photos'} description={mode==='posts'?'Write or AI-draft Google updates, schedule them and approve.':'Upload, caption and schedule photos onto your Google profile.'} actions={!chosen?.gbpLocationName?<Button asChild><Link href="/locations?import=gbp">Link a location</Link></Button>:undefined}/>
 {locationsError&&<p role="alert">Unable to load locations. Please reload the page.</p>}
     <Section title="Choose a profile"><label className="block text-sm">Location<select className="block border rounded p-2 w-full bg-background" aria-label="Location" value={chosen?.gbpLocationName?location:''} onChange={e=>setLocation(e.target.value)}><option value="">Choose a linked location</option>{linked.map(l=><option key={l.id} value={l.id}>{l.businessName}</option>)}</select></label></Section>
     {!locationsLoading&&!locationsError&&!linked.length&&<p className="text-sm text-muted-foreground" data-testid="text-no-linked-locations">No locations are linked to Google Business Profile yet. Connect your Google account, then use <strong>Link &amp; sync</strong> in <Link href="/locations" className="text-primary underline">Locations</Link> to link one.</p>}
     {!location?<GbpConnection context="content"/>
       :locationsLoading?<p role="status">Loading locations…</p>
       :locationsError?null
-      :chosen?.gbpLocationName?<Editor key={location} location={location}/>
+      :chosen?.gbpLocationName?<Editor key={location+mode} location={location} mode={mode}/>
       :<div role="alert" className="border rounded-lg p-4 space-y-2" data-testid="gbp-content-location-unavailable">
         <p className="font-medium">{chosen?`${chosen.businessName} isn't linked to Google Business Profile.`:'Location not found.'}</p>
         <p className="text-sm text-muted-foreground">{chosen?'Link it to the Google listing it belongs to before publishing posts or photos.':'It may have been deleted, or it belongs to another client workspace.'}</p>
         <div className="flex flex-wrap gap-2">{chosen&&<Button asChild size="sm"><Link href={`/locations?location=${chosen.id}`}>Link it in Locations</Link></Button>}<Button size="sm" variant="outline" onClick={()=>setLocation('')}>Choose another location</Button></div>
       </div>}<details className="text-sm"><summary className="cursor-pointer py-2 min-h-10">Agency bulk actions</summary><AgencyWorkspace compact/></details></AppPage></GoogleSurface>;
 }
-function Editor({location}:{location:string}){
+/** The whole Posts & Photos tool for one linked location: media library, AI drafts and style, compose, schedule,
+ * queue and history. Mounted by /gbp-content and by a location's Posts & Updates tab (owner 2026-10-15). */
+export type ContentMode='posts'|'photos';
+export function GbpContentEditor({location,mode}:{location:string;mode:ContentMode}){return <Editor location={location} mode={mode}/>;}
+/** Posts and photos were one tool because Google publishes both through the same queue and a post can carry photos
+ * (owner 2026-10-15: "why are posts entangled with photos?" — they are no longer shown together). `mode` picks the
+ * half: posts = compose, AI post drafts, style, schedule, the posts queue (photos only as attachments); photos =
+ * upload, captions, category, schedule, the photos queue. */
+function Editor({location,mode}:{location:string;mode:ContentMode}){
+  const posts=mode==='posts',photosMode=mode==='photos';
   const base=`/api/gbp/content/${location}`;
   const {data,refetch,error:queueError}=useQuery<any>({queryKey:[base],refetchInterval:15000});
   const {data:photos=[],refetch:refreshPhotos,error:photosError}=useQuery<Photo[]>({queryKey:[base+'/photos']});
@@ -94,13 +105,13 @@ function Editor({location}:{location:string}){
   };
   // Newest first, so a post just approved with a blank "First publish" shows at the top
   // instead of under items that were queued earlier for further-ahead dates.
-  const jobs=(data?.jobs||[]).slice().sort((a:any,b:any)=>String(b.created_at??'').localeCompare(String(a.created_at??''))||Number(b.id)-Number(a.id)),ordered=[...jobs].sort((a,b)=>a.due_at.localeCompare(b.due_at));
+  const jobs=(data?.jobs||[]).filter((j:any)=>posts?j.kind==='post':j.kind==='photo').slice().sort((a:any,b:any)=>String(b.created_at??'').localeCompare(String(a.created_at??''))||Number(b.id)-Number(a.id)),ordered=[...jobs].sort((a,b)=>a.due_at.localeCompare(b.due_at));
   return <div className="space-y-6">
     {data&&!data.workerEnabled&&<Notice tone="warning">Publishing worker is disabled. Queued content will wait until it is enabled.</Notice>}
     {(queueError||photosError)&&<p role="alert">Unable to load the queue or media library. Please reload the page.</p>}
     {error&&<p role="alert" className="text-destructive">{error}</p>}{message&&<p role="status">{message}</p>}
-    <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer py-2 min-h-10 font-medium">Photos and media library</summary><fieldset disabled={busy} className="space-y-3 text-sm">
-      <p>Choose up to 100 photos and review captions before publishing.</p><details><summary className="cursor-pointer py-2">Advanced photo settings</summary><p>Google strips EXIF on upload. Geotags do not promise ranking benefits; published captions cannot be edited through Google.</p>
+    <details open={photosMode} className="rounded-xl border bg-card p-4"><summary className="cursor-pointer py-2 min-h-10 font-medium">{posts?'Attach photos to the post (optional)':'Photos and media library'}</summary><fieldset disabled={busy} className="space-y-3 text-sm">
+      <p>{posts?'A post can carry up to 10 photos. Tick them here or upload new ones.':'Choose up to 100 photos and review captions before publishing.'}</p><details><summary className="cursor-pointer py-2">Advanced photo settings</summary><p>Google strips EXIF on upload. Geotags do not promise ranking benefits; published captions cannot be edited through Google.</p>
       <label className="block">SEO filename pattern<Input aria-label="SEO filename pattern" value={pattern} onChange={e=>setPattern(e.target.value)}/></label><p className="text-sm">Placeholders: {'{business}, {city}, {n}'}. Metadata changes create a library copy.</p>
       <div className="grid sm:grid-cols-3 gap-3"><label>EXIF title<Input value={title} onChange={e=>setTitle(e.target.value)}/></label><label>GPS latitude (optional)<Input value={lat} onChange={e=>setLat(e.target.value)} type="number" min="-90" max="90" step="any"/></label><label>GPS longitude (optional)<Input value={lon} onChange={e=>setLon(e.target.value)} type="number" min="-180" max="180" step="any"/></label></div>
       </details><label className="block">Upload photos (up to 100, 15 MB each)<Input aria-label="Upload photos" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e=>{const files=Array.from(e.target.files||[]);e.target.value='';void run(()=>uploadPhotos(files));}}/></label>
@@ -112,17 +123,17 @@ function Editor({location}:{location:string}){
     <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer py-2 min-h-10 font-medium">AI drafts and style</summary><fieldset disabled={busy} className="space-y-3 text-sm">
       <label className="block">Instructions<Textarea aria-label="Instructions" value={instructions} onChange={e=>setInstructions(e.target.value)} maxLength={4000}/></label>
       <label className="block">Example descriptions<Textarea value={examples} onChange={e=>setExamples(e.target.value)} maxLength={6000}/></label>
-      <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!selected.length} onClick={()=>void run(()=>draft('photo'))}>Generate caption drafts</Button><Button variant="outline" onClick={()=>void run(()=>draft('post'))}>Generate post draft</Button><Button variant="outline" onClick={()=>void run(async()=>{const r=await call('/learn',{});setStyle(r.summary);setMessage(`AI style draft based on ${r.postCount} past updates. Edit and save to use it.`);})}>Learn from past updates</Button></div>
+      <div className="flex flex-wrap gap-2">{photosMode&&<Button variant="outline" disabled={!selected.length} onClick={()=>void run(()=>draft('photo'))}>Generate caption drafts</Button>}{posts&&<Button variant="outline" onClick={()=>void run(()=>draft('post'))}>Generate post draft</Button>}<Button variant="outline" onClick={()=>void run(async()=>{const r=await call('/learn',{});setStyle(r.summary);setMessage(`AI style draft based on ${r.postCount} past updates. Edit and save to use it.`);})}>Learn from past updates</Button></div>
       <label className="block">Editable style guidance (AI draft until saved)<Textarea aria-label="Style guidance" value={style??data?.style?.summary??''} onChange={e=>setStyle(e.target.value)} maxLength={6000}/></label><Button variant="outline" onClick={()=>void run(async()=>{await call('/style',{summary:style??data?.style?.summary??''},'PATCH');await refetch();setMessage('Style guidance saved.');})}>Save style guidance</Button>
     </fieldset></details>
-    <Section title="Compose a Google update"><fieldset disabled={busy} className="space-y-3 text-sm">
+    {posts&&<Section title="Compose a Google update"><fieldset disabled={busy} className="space-y-3 text-sm">
       <label>Post type<select aria-label="Post type" className="min-h-10 max-w-full rounded-lg border p-2 bg-background" value={topicType} onChange={e=>setTopic(e.target.value)}>{['STANDARD','EVENT','OFFER'].map(t=><option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase().replaceAll('_',' ')}</option>)}</select></label>
       <Textarea aria-label="Post draft" value={summary} onChange={e=>setSummary(e.target.value)} maxLength={1500} placeholder="Write your update or generate a draft above"/><p>{summary.length}/1500 characters. The first 10 selected photos will be attached.</p>
       {topicType!=='OFFER'&&<div className="flex flex-col sm:flex-row gap-3"><label>Call to action<select aria-label="Call to action" className="min-h-10 max-w-full rounded-lg border p-2 bg-background" value={cta} onChange={e=>setCta(e.target.value)}><option value="">None</option>{['BOOK','ORDER','SHOP','LEARN_MORE','SIGN_UP','CALL'].map(t=><option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase().replaceAll('_',' ')}</option>)}</select></label><Input aria-label="Action URL" placeholder="https://…" value={url} onChange={e=>setUrl(e.target.value)}/></div>}
       {topicType!=='STANDARD'&&<div className="grid gap-2"><Input aria-label="Event title" placeholder="Event / offer title" value={eventTitle} onChange={e=>setEventTitle(e.target.value)}/><p>Event and offer times use the Google location’s local time.</p><label>Starts<Input type="datetime-local" value={eventStart} onChange={e=>setEventStart(e.target.value)}/></label><label>Ends<Input type="datetime-local" value={eventEnd} onChange={e=>setEventEnd(e.target.value)}/></label>{topicType==='OFFER'&&<Input aria-label="Coupon code" placeholder="Coupon code (optional)" value={coupon} onChange={e=>setCoupon(e.target.value)}/>}</div>}
       <Button variant="outline" disabled={!summary.trim()||postBatch.length>=100} onClick={()=>void run(async()=>{setPostBatch(old=>[...old,currentPost()]);setSummary('');setMessage('Post added to draft batch. Compose the next update or approve the batch.');})}>Add post to draft batch</Button>
       {postBatch.map((p,i)=><div key={i} className="border rounded p-2"><label>Draft {i+1}<Textarea aria-label={`Batch post ${i+1}`} value={p.summary} maxLength={1500} onChange={e=>setPostBatch(old=>old.map((post,n)=>n===i?{...post,summary:e.target.value}:post))}/></label><Button variant="ghost" onClick={()=>setPostBatch(old=>old.filter((_,n)=>n!==i))}>Remove draft {i+1}</Button></div>)}
-    </fieldset></Section>
+    </fieldset></Section>}
     <Section title="Schedule and approve"><fieldset disabled={busy} className="space-y-3 text-sm">
       <label>First publish (blank = now)<Input aria-label="First publish" type="datetime-local" value={start} onChange={e=>setStart(e.target.value)}/></label>
       <details><summary className="cursor-pointer py-2 min-h-10">Advanced schedule</summary><div className="flex flex-col sm:flex-row gap-3"><label>Items per period<Input aria-label="Items per period" type="number" min={1} max={100} step={1} value={countText} aria-invalid={!countValid} aria-describedby={countValid?undefined:'items-per-period-error'} onChange={e=>setCountText(e.target.value)}/></label><label>Cadence<select aria-label="Cadence" className="block border p-2 bg-background" value={cadence} onChange={e=>setCadence(e.target.value)}><option value="day">Per day</option><option value="week">Per week</option><option value="custom">Custom times</option></select></label></div>
@@ -131,10 +142,10 @@ function Editor({location}:{location:string}){
       {cadence==='custom'&&<Textarea aria-label="Custom times" placeholder="One ISO date/time per item, including timezone" value={custom} onChange={e=>setCustom(e.target.value)}/>}
       <label className="flex flex-wrap gap-2"><input type="checkbox" checked={hours} onChange={e=>setHours(e.target.checked)}/>Business hours only</label>
       {hours&&<div className="space-y-2"><p>Set the business's publishing hours explicitly; these are not inferred from Google.</p><Input aria-label="Timezone" value={zone} onChange={e=>setZone(e.target.value)}/><div className="flex flex-wrap gap-2"><label>Opening hour<Input type="number" value={open} onChange={e=>setOpen(Number(e.target.value))}/></label><label>Closing hour<Input type="number" value={close} onChange={e=>setClose(Number(e.target.value))}/></label></div>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d,i)=><label key={d} className="inline-flex gap-1 mr-3"><input type="checkbox" checked={days.includes(i)} onChange={e=>setDays(e.target.checked?[...days,i]:days.filter(n=>n!==i))}/>{d}</label>)}</div>}
-      </details><p>Approving authorizes Google publishing at the scheduled times. AI text remains a draft until you approve it. With a draft batch, approval queues only the posts in that batch. Unsaved drafts are lost on reload.</p><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!selected.length||!countValid} onClick={()=>void run(()=>queue('photo'))}>Approve &amp; queue photos</Button><Button className="w-full sm:w-auto" disabled={(!summary.trim()&&!postBatch.length)||!countValid} onClick={()=>void run(()=>queue('post'))}>Approve &amp; queue post</Button></div>
+      </details><p>Approving authorizes Google publishing at the scheduled times. AI text remains a draft until you approve it. With a draft batch, approval queues only the posts in that batch. Unsaved drafts are lost on reload.</p><div className="flex flex-wrap gap-2">{photosMode&&<Button className="w-full sm:w-auto" disabled={!selected.length||!countValid} onClick={()=>void run(()=>queue('photo'))}>Approve &amp; queue photos</Button>}{posts&&<Button className="w-full sm:w-auto" disabled={(!summary.trim()&&!postBatch.length)||!countValid} onClick={()=>void run(()=>queue('post'))}>Approve &amp; queue post</Button>}</div>
     </fieldset></Section>
     <Section title="Calendar, queue & history" contentClassName="space-y-3 text-sm"><div className="flex flex-wrap gap-2"><Button variant="outline" aria-pressed={view==='queue'} onClick={()=>setView('queue')}>Queue</Button><Button variant="outline" aria-pressed={view==='calendar'} onClick={()=>setView('calendar')}>Calendar</Button><Button variant="outline" disabled={busy} onClick={()=>void run(async()=>{await call('/refresh',{});await refetch();setMessage('Google statuses refreshed.');})}>Refresh Google status</Button></div>
-      {!jobs.length&&<p>No scheduled content yet.</p>}{(view==='calendar'?ordered:jobs).map((j:any,i:number,all:any[])=><div key={j.id}>
+      {!jobs.length&&<p>{posts?'No scheduled posts yet.':'No scheduled photos yet.'}</p>}{(view==='calendar'?ordered:jobs).map((j:any,i:number,all:any[])=><div key={j.id}>
         {view==='calendar'&&(i===0||new Date(all[i-1].due_at).toLocaleDateString()!==new Date(j.due_at).toLocaleDateString())&&<h3 className="font-semibold mt-4">{new Date(j.due_at).toLocaleDateString()}</h3>}
         <article className="border rounded p-3 space-y-2"><p>{j.kind} · {new Date(j.due_at).toLocaleString()} · <strong>{j.status}</strong>{j.google_status&&` · Google: ${j.google_status}`}</p><p>{j.payload.summary||j.payload.description||j.payload.locationAssociation?.category}</p>{j.google_name&&<p className="text-sm break-all">Google resource: {j.google_name}</p>}{j.error&&<p role="alert">{j.error}</p>}
           {['failed','uncertain'].includes(j.status)&&<Button disabled={busy} variant="outline" onClick={()=>{if(j.status==='uncertain'&&!window.confirm('Check Google first. Retrying may duplicate a successful publish. Have you verified it is missing?'))return;void run(async()=>{await call(`/jobs/${j.id}`,{action:'retry',checkedGoogle:j.status==='uncertain'},'PATCH');await refetch();});}}>Retry</Button>}

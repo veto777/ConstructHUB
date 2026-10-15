@@ -37,8 +37,10 @@ import {
   MapPin, Plus, Search, ArrowLeft, Settings, Image, Users, Link2, Globe,
   Phone, Mail, Lock, Loader2, Trash2, RefreshCw, ExternalLink, Check, X,
   ChevronDown, Building2, Tag, BarChart3, Star, TrendingUp, TrendingDown,
-  Eye, MousePointerClick, Smartphone, Monitor,
+  Eye, MousePointerClick, Smartphone, Monitor, Megaphone,
 } from "lucide-react";
+import { GbpContentEditor } from "@/pages/gbp-content";
+import { GbpLinkCell } from "@/components/gbp-connection";
 import {
   SiFacebook, SiInstagram, SiLinkedin, SiPinterest, SiTiktok, SiX, SiYoutube,
 } from "react-icons/si";
@@ -394,6 +396,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
     { value: "info", label: "Location Info", icon: Building2 },
     { value: "services", label: "Services", icon: Tag },
     { value: "photos", label: "Photos & Videos", icon: Image },
+    { value: "posts", label: "Posts & Updates", icon: Megaphone },
     { value: "social", label: "Social Profiles", icon: Link2 },
     { value: "settings", label: "Settings", icon: Settings },
     { value: "citations", label: "Citations", icon: Globe },
@@ -441,6 +444,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
             {activeTab === "info" && <LocationInfoTab location={location} />}
             {activeTab === "services" && <ServicesTab location={location} />}
             {activeTab === "photos" && <PhotosTab location={location} />}
+            {activeTab === "posts" && <PostsTab location={location} />}
             {activeTab === "social" && <SocialProfilesTab location={location} />}
             {activeTab === "settings" && <SettingsTab location={location} onDeleted={onDeleted} />}
             {activeTab === "citations" && <CitationsTab location={location} />}
@@ -703,6 +707,31 @@ function ServicesTab({ location }: { location: BusinessLocation }) {
   );
 }
 
+/** Posts & Updates: the Posts & Photos tool scoped to this location — write or AI-draft Google updates, upload photos,
+ * set the style the drafts follow, schedule a batch on a cadence, and watch the queue and history. */
+function PostsTab({ location }: { location: BusinessLocation }) {
+  if (!location.gbpLocationName) {
+    return (
+      <Card><CardContent className="p-4 space-y-3 text-sm text-muted-foreground">
+        <p>Link this location to your Google Business Profile first. Posts and photos publish to the linked listing.</p>
+        <GbpLinkCell locationId={location.id} />
+      </CardContent></Card>
+    );
+  }
+  return (
+    <div className="space-y-4" data-testid="tab-posts">
+      <div>
+        <div className="flex items-center gap-1">
+          <h3 className="text-base font-semibold">Posts &amp; Updates</h3>
+          <InfoTip k="location-posts" />
+        </div>
+        <p className="text-xs text-muted-foreground max-w-xl">Write an update or let the AI draft one in your style, pick when it goes out, and approve. Automation lives here too: a batch of drafts spaced out by day or week, business hours only, and the queue that publishes them to Google on time. Photos have their own tab.</p>
+      </div>
+      <GbpContentEditor key={location.id} location={String(location.id)} mode="posts" />
+    </div>
+  );
+}
+
 function PhotosTab({ location }: { location: BusinessLocation }) {
   const [source, setSource] = useState<"business" | "customer">("business");
   const [limit, setLimit] = useState(60);
@@ -776,9 +805,13 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
         </>
       )}
 
-      <Button variant="outline" className="w-full gap-2" onClick={() => (window.location.href = "/gbp-content")} data-testid="button-posts-photos">
-        <Image className="w-4 h-4" /> Add or schedule photos in Posts &amp; Photos
-      </Button>
+      {linked && (
+        <details className="rounded-xl border bg-card p-4" data-testid="photos-upload-schedule">
+          <summary className="cursor-pointer py-2 min-h-10 font-medium">Upload &amp; schedule photos</summary>
+          <p className="text-xs text-muted-foreground mb-3">Upload photos, let the AI caption them, pick a category and when they go onto the listing. Nothing publishes until you approve.</p>
+          <GbpContentEditor key={location.id} location={String(location.id)} mode="photos" />
+        </details>
+      )}
     </div>
   );
 }

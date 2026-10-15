@@ -23,6 +23,17 @@ export interface InfoEntry {
 export const INFO_CONTENT: Record<string, InfoEntry> = {
   /* ── Google Business ─────────────────────────────────────────────────── */
 
+  "location-posts": {
+    title: "Posts & Updates",
+    body: [
+      "Google lets a business post short updates on its own listing — a finished job, a seasonal offer, an event, a new service. Listings that post regularly look alive to Google and to customers, and they get more calls and direction requests than listings that sit still.",
+      "This tab is the whole posting tool for this one location. Compose a Google update: write it yourself or press the AI draft button and it writes one in your style; add up to ten photos; choose Standard, Event or Offer; add a button such as Call or Learn more.",
+      "Automation: add several drafts to a batch, then set a cadence — say three a week, business hours only — and approve once. The queue publishes each one to Google at its time, retries a failure, and keeps the history. Style guidance tells the AI how you talk, so every draft sounds like you.",
+      "Photos are separate: the Photos & Videos tab uploads, captions and schedules them. A post can still carry up to ten photos from your library as attachments.",
+      "Nothing goes out without your approval. AI text is a draft until you approve it, and a queued item can be cancelled right up to its publish time.",
+    ],
+  },
+
   "profile-watch": {
     title: "Profile Watch",
     body: [

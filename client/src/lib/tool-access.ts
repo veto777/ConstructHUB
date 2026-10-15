@@ -67,6 +67,7 @@ export const TOOL_RULES: Record<string, Rule> = {
   "/directories": { landing: "/features/gbp", has: (e) => count(e, "locations") },
   "/gmb-monitor": { landing: "/features/profile-guard", has: (e) => count(e, "locations") },
   "/gbp-content": { landing: "/features/gbp-content", has: (e) => count(e, "locations") || module(e, "autoPosts") },
+  "/gbp-photos": { landing: "/features/gbp-content", has: (e) => count(e, "locations") || module(e, "autoPosts") },
   "/photos": { landing: "/features/media", has: (e) => count(e, "locations") },
   "/media-library": { landing: "/features/media", has: (e) => count(e, "locations") },
   "/ranking-grid": { landing: "/features/ranking-grid", has: (e) => count(e, "gridCredits") },
