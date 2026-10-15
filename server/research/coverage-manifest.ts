@@ -118,7 +118,7 @@ export async function buildCoverageManifest(): Promise<CoverageManifest> {
 
     for (const src of registry.allBulkSourcesFor(state)) {
       sources.push({
-        label: src.label, kinds: [src.companiesOnly ? kindOfLabel(src.label) : "licenses"], ids: ["name"], mode: "file",
+        label: src.label, kinds: [src.companiesOnly ? (src.category ? KIND_OF_CATEGORY[src.category] : kindOfLabel(src.label)) : "licenses"], ids: ["name"], mode: "file",
         refreshHours: src.everyHours, fileId: src.id, local: localBulk.has(src) || undefined, companiesOnly: !!src.companiesOnly, url: src.pageUrl || null,
       });
     }
@@ -144,7 +144,7 @@ export async function buildCoverageManifest(): Promise<CoverageManifest> {
       sources.push({ label: src.source, kinds: [cat ? KIND_OF_CATEGORY[cat] : kindOfLabel(src.source)], ids: ["name"], mode: "live", companiesOnly: true, url: src.datasetUrl });
     }
     for (const src of pack?.liveEnforcement ?? []) {
-      sources.push({ label: src.source, kinds: [kindOfLabel(`${src.source} ${src.scope}`)], ids: ["name"], mode: "live", companiesOnly: true, url: null });
+      sources.push({ label: src.source, kinds: [src.category ? KIND_OF_CATEGORY[src.category] : kindOfLabel(`${src.source} ${src.scope}`)], ids: ["name"], mode: "live", companiesOnly: true, url: null });
     }
     // The original tables' live enforcement (TX Comptroller, TCEQ, TDLR orders, …): the report's own source list.
     const original = await searchStateEnforcement(PROBE_COMPANY, state, () => true).catch(() => ({ sources: [] as { source: string }[] }));

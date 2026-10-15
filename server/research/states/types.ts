@@ -10,7 +10,7 @@
  *   - Enforcement, complaints and court records are searched for companies only (FCRA).
  *   - No CAPTCHA, login wall or 403 is ever worked around; such a source is listed in `blocked` instead.
  */
-import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
+import type { EnforcementCategory, EnforcementHit, LicenseHit } from "@shared/research-reports";
 import type { LicenseSource } from "../licenses";
 import type { BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
@@ -32,6 +32,8 @@ export type LiveEnforcementSearch = {
   source: string;
   scope: string;
   search: (name: string) => Promise<EnforcementHit[]>;
+  /** What its records are (the category its hits carry). Optional; the coverage page guesses from the label without it. */
+  category?: EnforcementCategory;
 };
 
 export type StatePack = {

@@ -19,7 +19,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { pool } from "../db";
 import { USER_AGENT, rateLimitHost, sleep } from "../scrapers/polite-fetch";
-import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
+import type { EnforcementCategory, EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { tokens } from "./licenses";
 import { addressMatches, idWords, queryWords, type IdKeys, type IdQuery } from "./identifiers";
 
@@ -49,6 +49,8 @@ export type BulkSource = {
   utcHours?: number[];
   /** Searched for companies only (enforcement records are; FCRA). */
   companiesOnly?: boolean;
+  /** An enforcement file's kind of record (the category its hits carry). Optional; the coverage page guesses from the label without it. */
+  category?: EnforcementCategory;
 };
 
 const DDL = `
