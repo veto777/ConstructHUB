@@ -418,7 +418,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
         <Button variant="ghost" onClick={onBack} data-testid="button-back-to-list"><ArrowLeft className="mr-2 h-4 w-4"/>All locations</Button>
         <PageHeader title={<span data-testid="text-detail-name">{location.businessName}</span>} description={fullAddress(location)||'Manage this Google Business Profile.'} image={logo} actions={<LogoButton location={location} />}/>
         <div className="flex flex-col md:flex-row gap-6">
-          <div className="flex overflow-x-auto md:block md:w-48 shrink-0 gap-1 md:space-y-1">
+          <div className="flex overflow-x-auto scrollbar-none md:overflow-visible md:block md:w-48 shrink-0 gap-1 md:space-y-1">
             {tabItems.map(item => {
               const isLocked = item.value === "citations" && !isPremiumPlus;
               return (

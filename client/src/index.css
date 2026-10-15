@@ -5,6 +5,24 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  /* Scrollbars stay out of sight until the pointer is over the area that scrolls (owner 2026-10-15: "hide them
+   * unless they are needed … you shouldn't see them until you put a mouse over the top of them"). The page's own
+   * bar is a thin, quiet line; every inner scroller shows its thumb only while hovered. Standard properties, so
+   * Chrome 121+, Edge and Firefox draw thin bars with no arrow buttons; Safari already overlays its own. */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+  }
+  body * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  body *:hover {
+    scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
+  }
+}
+
 @layer utilities {
   .scrollbar-none {
     -ms-overflow-style: none;
