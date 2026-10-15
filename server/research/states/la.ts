@@ -70,7 +70,7 @@ const names = (want: string[], who: string | null) => { const have = new Set(tok
 async function lslbcQuery(body: URLSearchParams, referer: string, matchedOn: LicenseHit["matchedOn"], name: string | null, keep: (r: { name: string | null; qualifiers: string[] }) => boolean): Promise<LicenseHit[]> {
   const res = await politeFetch(`${ARLS}/Public/_DetailedSearch/`, {
     method: "POST", body: body.toString(),
-    headers: { "content-type": "application/x-www-form-urlencoded", referer, "x-requested-with": "XMLHttpRequest" },
+    headers: { "content-type": "application/x-www-form-urlencoded", referer }, // no X-Requested-With: the bot doesn't pose as the page's script (audit 2026-10-15)
   }, { minDelayMs: 1100 });
   if (!res.ok) throw new Error(`LSLBC search returned HTTP ${res.status}`);
   const html = await res.text();
@@ -81,7 +81,7 @@ async function lslbcQuery(body: URLSearchParams, referer: string, matchedOn: Lic
   const rows = parseLaResults(html).filter(keep);
   for (const row of rows.slice(0, MAX_DETAILS)) {
     const url = `${ARLS}/Public/_DisplayOnlineDetails/?key=${row.key}&Source=DetailedSearch`;
-    const d = await politeFetch(url, { headers: { referer, "x-requested-with": "XMLHttpRequest" } }, { minDelayMs: 1100 });
+    const d = await politeFetch(url, { headers: { referer } }, { minDelayMs: 1100 });
     if (!d.ok) throw new Error(`LSLBC detail returned HTTP ${d.status}`);
     const det = parseLaDetail(await d.text());
     const quals = Array.from(new Set(det.classes.map((c) => c.qualifier).filter((v): v is string => !!v)));
