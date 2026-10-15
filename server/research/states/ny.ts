@@ -29,7 +29,7 @@ import type { EnforcementHit } from "@shared/research-reports";
 import type { LicenseSource } from "../licenses";
 import type { SodaEnforcement } from "../state-records";
 import type { ComplaintSource } from "../records";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { decodeEntities } from "../bulk-sources";
 import { clean, usDate } from "../bulk";
 import type { LiveEnforcementSearch, StatePack } from "./types";

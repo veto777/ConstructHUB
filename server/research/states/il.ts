@@ -14,7 +14,7 @@
  * roofing contractors but no general contractor, and plumbers are licensed by IDPH.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { nameClause, sodaRows, wholeWordMatch, type LicenseSource } from "../licenses";
 import { addressKeys, addressMatches, normLicense, normPhone, type IdQuery } from "../identifiers";
 import { decodeEntities } from "../bulk-sources";

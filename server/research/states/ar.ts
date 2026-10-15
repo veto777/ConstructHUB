@@ -23,7 +23,7 @@
  * labor.arkansas.gov's robots.txt asks for a 10-second crawl delay; the loaders wait that long between pages.
  */
 import type { LicenseHit } from "@shared/research-reports";
-import { USER_AGENT, rateLimitHost } from "../../scrapers/polite-fetch";
+import { USER_AGENT, rateLimitHost } from "../http";
 import { clean, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { pdfText, textLines } from "./lib/a3-pdf";
 import type { StatePack } from "./types";

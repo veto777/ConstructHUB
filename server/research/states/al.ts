@@ -19,7 +19,7 @@
  *     is kept as Acme Electric. The "outstanding fines" lists name individuals and are left out.
  */
 import type { LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { normLicense, normPhone, type IdQuery } from "../identifiers";
 import { clean, download, usDate, type BulkHit } from "../bulk";

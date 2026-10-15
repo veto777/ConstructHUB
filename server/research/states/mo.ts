@@ -18,7 +18,7 @@ import type { LicenseHit } from "@shared/research-reports";
 import { wholeWordMatch, type LicenseSource } from "../licenses";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { fromFile, isoDay, joinAddr, unzipFirst } from "./lib/g6-common";
 

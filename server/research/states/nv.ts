@@ -14,7 +14,7 @@
  *     contract (NRS 338.017), with the suspension period. Companies only; the corporate officers it names are left out.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { tokens, wholeWordMatch } from "../licenses";
 import { clean } from "../bulk";
 import type { BulkHit, BulkSource } from "../bulk";

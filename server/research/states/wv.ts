@@ -15,7 +15,7 @@
  * None of these publish a street address or phone; electricians and plumbers/HVAC give city and state only.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch, sleep } from "../../scrapers/polite-fetch";
+import { politeFetch, sleep } from "../http";
 import { clean, type BulkHit, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
 import { normLicense } from "../identifiers";

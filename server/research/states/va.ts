@@ -20,7 +20,7 @@
  * from the regulant-list page. A code DPOR doesn't define there is shown as "code X".
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { LiveEnforcementSearch, StatePack } from "./types";
 import { fromFile, hasAllWords } from "./lib/g3-common";

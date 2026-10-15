@@ -1,7 +1,7 @@
 /**
  * Small helpers shared by the g8 state packs (OR, WA, MT, WY, AK, HI). No source data lives here.
  */
-import { politeFetch } from "../../../scrapers/polite-fetch";
+import { politeFetch } from "../../http";
 import { clean } from "../../bulk";
 import { tokens } from "../../licenses";
 

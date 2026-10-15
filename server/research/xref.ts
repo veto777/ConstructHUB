@@ -32,7 +32,11 @@ export const MAX_RELATED_BUSINESSES = 5;
  */
 export const MAX_BUSINESSES_PER_TIE = 12;
 
-export type FinderResult = { licenses: LicenseHit[]; enforcement: EnforcementHit[] };
+/**
+ * What one finder found for one identifier. `searched: false` means it could not search it (a file not loaded yet, a
+ * lookup that can't search by that kind of identifier): reported as "not searched" with `note`, never as 0 found.
+ */
+export type FinderResult = { licenses: LicenseHit[]; enforcement: EnforcementHit[]; searched?: boolean; note?: string };
 
 /** One searchable source in one state. */
 export type LicenseFinder = {

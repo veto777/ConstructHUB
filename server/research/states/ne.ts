@@ -17,7 +17,7 @@ import type { LicenseHit } from "@shared/research-reports";
 import { promises as fs } from "node:fs";
 import { clean, download, usDate, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { htmlText, joinAddr } from "./lib/g6-common";
 import { pdfTable } from "./lib/g6-pdf";

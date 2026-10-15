@@ -8,7 +8,7 @@
  *   TX  TCEQ administrative orders, civil judgments, notices of enforcement and violation, and complaints
  */
 import type { EnforcementHit, RecordSource } from "@shared/research-reports";
-import { politeFetch } from "../scrapers/polite-fetch";
+import { politeFetch } from "./http";
 import { nameClause, sodaRows } from "./licenses";
 import { decodeEntities } from "./bulk-sources";
 import { clean, usDate } from "./bulk";

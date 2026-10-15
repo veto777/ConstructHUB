@@ -35,6 +35,7 @@ import { refreshDueSources, searchBulk, searchBulkBy, type BulkSource, type Stor
 import type { LiveLicenseSearch } from "./states/types";
 import { crossReference, LicenseSet, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
 import { ALL_BULK_SOURCES, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
+import { noteOf } from "./notes";
 import { previewCompanyRecords, searchCompanyRecords, searchEnforcement } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
 
@@ -123,7 +124,10 @@ export function liveFinder(state: string, src: LiveLicenseSearch): LicenseFinder
   return {
     state, label: src.source,
     byName: async (name, kind) => { const hits = (await src.search(name, kind)).filter((h) => nameMatches(name, kind, h)); return { hits, searched: true, note: `${hits.length} match(es)` }; },
-    byId: src.searchBy ? async (q) => ({ licenses: await src.searchBy!(q), enforcement: [] }) : undefined,
+    byId: src.searchBy ? async (q) => {
+      const hits = await src.searchBy!(q);
+      return hits ? { licenses: hits, enforcement: [], note: noteOf(hits) ?? undefined } : { licenses: [], enforcement: [], searched: false, note: `this lookup can't search by ${q.type === "license" ? "license number" : q.type}` };
+    } : undefined,
   };
 }
 

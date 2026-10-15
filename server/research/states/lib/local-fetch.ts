@@ -3,7 +3,7 @@
  * resource endpoint, and an ArcGIS feature-service layer or table through its query API. One request at a time per
  * host (politeFetch), the rows in the publisher's own field names.
  */
-import { politeFetch, sleep } from "../../../scrapers/polite-fetch";
+import { politeFetch, sleep } from "../../http";
 import { clean } from "../../bulk";
 
 type Row = Record<string, unknown>;

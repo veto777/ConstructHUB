@@ -20,7 +20,7 @@
 import type { LicenseHit } from "@shared/research-reports";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { Session, fromFile, hiddenInputs, htmlText, isoDay, joinAddr, unzipFirst } from "./lib/g6-common";
 

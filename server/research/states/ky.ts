@@ -11,7 +11,7 @@
  *     licenses only.
  */
 import type { LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { normLicense, type IdQuery } from "../identifiers";
 import { usDate } from "../bulk";

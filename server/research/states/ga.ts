@@ -10,7 +10,7 @@
  * Cloudflare challenge, so no license source is searched here yet (see `blocked`).
  */
 import type { EnforcementHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { clean } from "../bulk";
 import { tokens } from "../licenses";
 import type { LiveEnforcementSearch, StatePack } from "./types";

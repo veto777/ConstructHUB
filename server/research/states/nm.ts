@@ -11,7 +11,7 @@
  * only searchable through PSI's portal, which requires a CAPTCHA: listed under `blocked`, never worked around.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { clean, usDate } from "../bulk";
 import { auraApex, type AuraSite } from "./lib/g7-aura";

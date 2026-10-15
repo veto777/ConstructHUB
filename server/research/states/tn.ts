@@ -21,7 +21,7 @@
  * report shows the code.
  */
 import type { EnforcementHit } from "@shared/research-reports";
-import { USER_AGENT, rateLimitHost } from "../../scrapers/polite-fetch";
+import { USER_AGENT, rateLimitHost } from "../http";
 import { clean, csvRecords, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";

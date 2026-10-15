@@ -6,7 +6,7 @@
  * The page's framework id (fwuid) and app version change with each Salesforce release, so they are read from the
  * public page itself and re-read once if the site answers that the client is out of date.
  */
-import { politeFetch } from "../../../scrapers/polite-fetch";
+import { politeFetch } from "../../http";
 
 export type AuraSite = { origin: string; /** A public page of the site, e.g. "/AZRoc/s/contractor-search". */ page: string };
 

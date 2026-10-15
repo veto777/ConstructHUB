@@ -26,7 +26,7 @@
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit } from "@shared/research-reports";
-import { USER_AGENT, politeFetch, rateLimitHost } from "../../scrapers/polite-fetch";
+import { USER_AGENT, politeFetch, rateLimitHost } from "../http";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
 import { excelDate, readXlsx } from "./lib/g1-xlsx";

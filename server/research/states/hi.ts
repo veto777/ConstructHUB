@@ -21,7 +21,7 @@ import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { clean, download } from "../bulk";
 import type { BulkHit, BulkSource } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import type { LiveEnforcementSearch, StatePack } from "./types";
 import { anyDay, businessParts, fetchJson, looksLikeBusiness, money, nameMatches, usd } from "./lib/g8-common";
 import { xlsxRows } from "./lib/g8-xlsx";

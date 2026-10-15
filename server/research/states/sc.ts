@@ -15,7 +15,7 @@
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { decodeEntities } from "../bulk-sources";
 import { clean, download, type BulkHit } from "../bulk";
 import { pdfText, textLines } from "./lib/a3-pdf";

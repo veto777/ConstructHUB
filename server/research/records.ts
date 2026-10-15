@@ -10,7 +10,7 @@
  * Every dataset here was checked live (CLAUDE.md: never fabricate government data). A source that could not be
  * searched is reported as not searched, never as "nothing found".
  */
-import { politeFetch } from "../scrapers/polite-fetch";
+import { politeFetch } from "./http";
 import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordSource } from "@shared/research-reports";
 import { nameClause, sodaRows, tokens } from "./licenses";
 import { searchBulk } from "./bulk";

@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { pool } from "../db";
-import { USER_AGENT, rateLimitHost, sleep } from "../scrapers/polite-fetch";
+import { USER_AGENT, rateLimitHost, sleep } from "./http";
 import type { EnforcementCategory, EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { tokens } from "./licenses";
 import { addressMatches, idWords, queryWords, type IdKeys, type IdQuery } from "./identifiers";

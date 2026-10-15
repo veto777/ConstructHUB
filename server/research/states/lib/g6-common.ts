@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { clean } from "../../bulk";
 import { decodeEntities } from "../../bulk-sources";
-import { USER_AGENT, rateLimitHost } from "../../../scrapers/polite-fetch";
+import { USER_AGENT, rateLimitHost } from "../../http";
 
 const run = promisify(execFile);
 

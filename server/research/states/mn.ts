@@ -19,7 +19,7 @@
 import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { promisify } from "node:util";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { decodeEntities } from "../bulk-sources";
 import { clean, csvRecords, download, usDate, type BulkHit } from "../bulk";
 import type { StatePack } from "./types";

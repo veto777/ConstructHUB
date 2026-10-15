@@ -4,7 +4,7 @@
  * hand (fetch drops the cookies a 302 sets), and a parser for the form fields a browser would post back.
  * Every request goes through politeFetch (honest user agent, one request at a time per host, at most ~1/s).
  */
-import { politeFetch } from "../../../scrapers/polite-fetch";
+import { politeFetch } from "../../http";
 import { decodeEntities } from "../../bulk-sources";
 import { clean } from "../../bulk";
 

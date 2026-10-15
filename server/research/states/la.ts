@@ -11,7 +11,7 @@
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { normLicense, type IdQuery } from "../identifiers";
 import { download, usDate, type BulkHit, type BulkSource } from "../bulk";

@@ -12,7 +12,7 @@
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { clean, usDate } from "../bulk";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
 import { htmlText, isoDay } from "./lib/g6-common";
 

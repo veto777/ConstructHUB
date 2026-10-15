@@ -3,7 +3,7 @@
  * by the person named on the license. Only datasets checked live are listed (CLAUDE.md: never fabricate government
  * data); a state without one is reported as "no published license data searched", never as "no license".
  */
-import { politeFetch } from "../scrapers/polite-fetch";
+import { politeFetch } from "./http";
 import type { LicenseHit } from "@shared/research-reports";
 import { addressKeys, addressMatches, idWords, normLicense, normPhone, type IdQuery } from "./identifiers";
 

@@ -10,7 +10,7 @@
  * exportable "Public License List Search". Nothing there is used; see `blocked`.
  */
 import type { EnforcementHit } from "@shared/research-reports";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { clean, usDate } from "../bulk";
 import type { LiveEnforcementSearch, StatePack } from "./types";

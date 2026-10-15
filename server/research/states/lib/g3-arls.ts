@@ -12,7 +12,7 @@
  * Field labels are the portal's own. A field a board doesn't show (the plumbing board shows no status) is null.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch, sleep } from "../../../scrapers/polite-fetch";
+import { politeFetch, sleep } from "../../http";
 import { usDate } from "../../bulk";
 import { tokens } from "../../licenses";
 import { addressMatches, normLicense, normPhone, type IdQuery } from "../../identifiers";

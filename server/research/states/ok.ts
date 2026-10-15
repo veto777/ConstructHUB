@@ -16,7 +16,7 @@
  */
 import type { LicenseHit } from "@shared/research-reports";
 import { inflateSync } from "node:zlib";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { clean, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { jsLayoutText, pdfText, textLines } from "./lib/a3-pdf";
 import type { StatePack } from "./types";

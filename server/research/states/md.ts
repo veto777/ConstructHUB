@@ -19,7 +19,7 @@
  *   Montgomery County Office of Consumer Protection investigations          ey5a-vyri
  */
 import type { EnforcementHit } from "@shared/research-reports";
-import { USER_AGENT, rateLimitHost } from "../../scrapers/polite-fetch";
+import { USER_AGENT, rateLimitHost } from "../http";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
 import type { LicenseSource } from "../licenses";

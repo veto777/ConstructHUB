@@ -11,7 +11,7 @@
  * electrical, HVAC) are NOT searchable here: see `blocked`.
  */
 import { promises as fs } from "node:fs";
-import { politeFetch } from "../../scrapers/polite-fetch";
+import { politeFetch } from "../http";
 import { decodeEntities } from "../bulk-sources";
 import { clean, download, type BulkHit } from "../bulk";
 import type { StatePack } from "./types";
