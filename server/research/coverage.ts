@@ -8,17 +8,19 @@ import {
   KIND_OF_CATEGORY, COVERAGE_ID_ORDER, COVERAGE_KIND_ORDER, type CoverageFacets, type CoverageId, type CoverageKind, type CoverageRuntime,
 } from "@shared/research-coverage";
 import { pool } from "../db";
-import { KEY_VERSION, bulkSchemaReady } from "./bulk";
+import { KEY_VERSION, bulkSchemaReady, sourceStatus } from "./bulk";
+import { SAM_SOURCE_ID } from "./sam";
 
 const sortIds = (ids: Iterable<CoverageId>) => COVERAGE_ID_ORDER.filter((i) => new Set(ids).has(i));
 const sortKinds = (kinds: Iterable<CoverageKind>) => COVERAGE_KIND_ORDER.filter((k) => new Set(kinds).has(k));
 
 /**
- * What this server can search beyond the build's manifest, from its own environment at run time (round 4): OSHA when
- * it holds the Labor Department key (the key itself is never sent).
+ * What this server can search beyond the build's manifest, decided at run time (round 4; A9): OSHA when it holds the
+ * Labor Department key (the key itself is never sent); SAM.gov exclusions when its file has a loaded generation.
  */
-export function coverageRuntime(): CoverageRuntime {
-  return { osha: !!process.env.DOL_API_KEY };
+export async function coverageRuntime(): Promise<CoverageRuntime> {
+  const sam = await sourceStatus(SAM_SOURCE_ID).catch(() => null);
+  return { osha: !!process.env.DOL_API_KEY, samExclusions: !!sam?.loaded };
 }
 
 // ── Run-time facets of the daily files ────────────────────────────────────────────────────────────────────────────

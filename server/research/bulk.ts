@@ -455,7 +455,32 @@ export const MAX_CSV_COLUMNS = 2000;
  */
 export async function* csvRows(path: string, delimiter = ","): AsyncIterable<string[]> {
   const head = await fs.open(path).then(async (fh) => { const b = Buffer.alloc(1 << 20); const { bytesRead } = await fh.read(b, 0, b.length, 0); await fh.close(); return b.subarray(0, bytesRead); });
-  const dec = decoderFor(head);
+  yield* parseCsv(createReadStream(path) as AsyncIterable<Buffer>, decoderFor(head), delimiter);
+}
+
+/**
+ * The same rows from a stream of bytes (a zip member read with `unzip -p`), so a large file is never written to disk.
+ * The encoding is decided from the first megabyte, as for a file.
+ */
+export async function* csvRowsFrom(chunks: AsyncIterable<Buffer>, delimiter = ","): AsyncIterable<string[]> {
+  const it = chunks[Symbol.asyncIterator]();
+  const first: Buffer[] = [];
+  let size = 0, done = false;
+  while (size < 1 << 20) {
+    const r = await it.next();
+    if (r.done) { done = true; break; }
+    first.push(r.value); size += r.value.length;
+  }
+  const head = Buffer.concat(first);
+  async function* rest(): AsyncIterable<Buffer> {
+    if (head.length) yield head;
+    if (done) return;
+    for (let r = await it.next(); !r.done; r = await it.next()) yield r.value;
+  }
+  yield* parseCsv(rest(), decoderFor(head.subarray(0, 1 << 20)), delimiter);
+}
+
+async function* parseCsv(chunks: AsyncIterable<Buffer>, dec: TextDecoder, delimiter: string): AsyncIterable<string[]> {
   let field = "", row: string[] = [], inQ = false, pendingQ = false, recordLen = 0;
   const add = (c: string) => {
     field += c;
@@ -466,8 +491,8 @@ export async function* csvRows(path: string, delimiter = ","): AsyncIterable<str
     row.push(field); field = "";
     if (row.length > MAX_CSV_COLUMNS) throw new Error(`malformed CSV: a record has more than ${MAX_CSV_COLUMNS} columns`);
   };
-  for await (const chunk of createReadStream(path)) {
-    const s = dec.decode(chunk as Buffer, { stream: true });
+  for await (const chunk of chunks) {
+    const s = dec.decode(chunk, { stream: true });
     for (let i = 0; i < s.length; i++) {
       const c = s[i];
       if (inQ) {
@@ -491,8 +516,17 @@ export async function* csvRows(path: string, delimiter = ","): AsyncIterable<str
 
 /** Rows as objects keyed by the header row. */
 export async function* csvRecords(path: string, delimiter = ","): AsyncIterable<Record<string, string>> {
+  yield* recordsOf(csvRows(path, delimiter));
+}
+
+/** Rows of a stream as objects keyed by the header row (csvRowsFrom). */
+export async function* csvRecordsFrom(chunks: AsyncIterable<Buffer>, delimiter = ","): AsyncIterable<Record<string, string>> {
+  yield* recordsOf(csvRowsFrom(chunks, delimiter));
+}
+
+async function* recordsOf(rows: AsyncIterable<string[]>): AsyncIterable<Record<string, string>> {
   let header: string[] | null = null;
-  for await (const r of csvRows(path, delimiter)) {
+  for await (const r of rows) {
     if (!header) { header = r.map((h) => h.trim().replace(/^﻿/, "")); continue; }
     if (r.length === 1 && r[0] === "") continue;
     const o: Record<string, string> = {};

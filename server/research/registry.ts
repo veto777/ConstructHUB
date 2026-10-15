@@ -9,6 +9,7 @@ import { licenseSourcesFor, type LicenseSource } from "./licenses";
 import { searchSodaEnforcement, type SodaEnforcement } from "./state-records";
 import type { ComplaintSource } from "./records";
 import { STATE_PACKS } from "./states";
+import { NATIONWIDE_BULK } from "./sam";
 import { noteOf } from "./notes";
 import { LOCAL_BULK, LOCAL_ENFORCEMENT, LOCAL_LICENSES, LOCAL_LIVE, LOCAL_LIVE_ENFORCEMENT } from "./states/local";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./states/types";
@@ -16,7 +17,9 @@ import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./stat
 const PACKS = new Map<string, StatePack>(STATE_PACKS.map((p) => [p.state, p]));
 const pack = (state: string): StatePack | undefined => PACKS.get(state);
 
-export const ALL_BULK_SOURCES: BulkSource[] = [...BULK_SOURCES, ...STATE_PACKS.flatMap((p) => p.bulk ?? []), ...LOCAL_BULK];
+export const ALL_BULK_SOURCES: BulkSource[] = [...BULK_SOURCES, ...STATE_PACKS.flatMap((p) => p.bulk ?? []), ...LOCAL_BULK, ...NATIONWIDE_BULK];
+/** Files searched in every state, once per report (state "US": SAM.gov exclusions). */
+export const nationwideBulkSources = (): BulkSource[] => NATIONWIDE_BULK;
 export const allBulkSourcesFor = (state: string): BulkSource[] => ALL_BULK_SOURCES.filter((s) => s.state === state);
 
 export const allLicenseSourcesFor = (state: string): LicenseSource[] => [...licenseSourcesFor(state), ...(pack(state)?.licenses ?? []), ...LOCAL_LICENSES.filter((s) => s.state === state)];

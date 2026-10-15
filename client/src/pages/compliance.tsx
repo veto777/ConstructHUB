@@ -20,7 +20,7 @@ import { US_STATES } from "@/lib/voice-studio";
 import { formatUsd } from "@shared/plan-copy";
 import { RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS } from "@shared/plans";
 import { RESEARCH_PATH } from "@shared/research-reports";
-import { RESEARCH_COVERAGE_PATH } from "@shared/research-coverage";
+import { RESEARCH_COVERAGE_PATH, type CoverageRuntime } from "@shared/research-coverage";
 import {
   STATE_COMPLIANCE, ROLE_LABELS, ELECTRICAL_ISSUER_LABELS, type ComplianceAgency, type StateCompliance,
 } from "@shared/compliance";
@@ -93,6 +93,8 @@ function StateSection({ s }: { s: StateCompliance }) {
 }
 
 export function ResearchOffer({ compact = false }: { compact?: boolean }) {
+  // SAM.gov exclusions are named only once the running server has loaded their file (A9).
+  const { data: runtime } = useQuery<CoverageRuntime>({ queryKey: ["/api/research-reports/coverage-runtime"], retry: false, staleTime: 600_000 });
   if (inNativeApp()) return null;
   return (
     <div className="rounded-xl border bg-card p-5 sm:p-6 flex flex-col sm:flex-row gap-5 sm:items-center justify-between" data-testid="card-research-offer">
@@ -104,7 +106,7 @@ export function ResearchOffer({ compact = false }: { compact?: boolean }) {
           name, owner, license number, phone or address and links related licenses: we search the state license records and
           every city and county permit portal we can reach there, follow the license numbers, phones, addresses and people we
           find to other licenses and businesses tied to them, and add consumer complaints, state discipline and enforcement
-          records, and OSHA inspections (federal) for companies. You get a sourced report.
+          records,{runtime?.samExclusions ? " federal exclusions and debarments (SAM.gov)," : ""} and OSHA inspections (federal) for companies. You get a sourced report.
           {" "}{formatUsd(RESEARCH_STANDARD_CENTS)} for one name in one state, {formatUsd(RESEARCH_EXTENDED_CENTS)} for up to five names in up to three states.
           Paid up front and non-refundable. Nothing is guaranteed.
         </p>

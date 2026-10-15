@@ -31,11 +31,13 @@ import {
 } from "@shared/research-reports";
 import { SITE_ORIGIN as SITE } from "@shared/seo";
 import { nameSearchable, searchLicenses, searchLicensesBy, type LicenseSource } from "./licenses";
-import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy, type BulkSource, type StoredHit } from "./bulk";
+import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy, sourceStatus, type BulkSource, type StoredHit } from "./bulk";
+import { SAM_SOURCE_ID } from "./sam";
+import { setKnowledgeFact } from "../hub/knowledge";
 import type { LiveLicenseSearch } from "./states/types";
 import { crossReference, enforcementKey, LicenseSet, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
 import { companyNamed, onePersonField, personMatches } from "./licenses";
-import { ALL_BULK_SOURCES, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
+import { ALL_BULK_SOURCES, nationwideBulkSources, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
 import { capNote, noteOf } from "./notes";
 import { disciplineRecord, privateHit, reportHit } from "./privacy";
 import { guard, guardBrowser, noteResponse, politeFetch, releaseHost, withRun, type Turn } from "./http";
@@ -69,7 +71,7 @@ export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | 
   let licenseMatches = 0, identifierMatches = 0;
   const licenseSourceStates = input.states.filter(hasLicenseSources);
   for (const s of input.subjects) {
-    const finders = input.states.flatMap((st) => findersFor(st));
+    const finders = [...input.states.flatMap((st) => findersFor(st)), ...nationwideFinders()];
     const found = new LicenseSet();
     for (const f of finders) {
       if (!f.byName || f.companiesOnly) continue;
@@ -160,6 +162,9 @@ export function liveFinder(state: string, src: LiveLicenseSearch): LicenseFinder
     } : undefined,
   };
 }
+
+/** The enforcement files that cover every state (SAM.gov exclusions), searched by identifier for a company. */
+export const nationwideFinders = (): LicenseFinder[] => nationwideBulkSources().map(bulkFinder);
 
 /** Every searchable source in one state, in the order the report lists them. */
 export function findersFor(state: string): LicenseFinder[] {
@@ -383,6 +388,8 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       if (noGc) licenseSources.push({ state, source: "Statewide general contractor license", searched: false, note: noGc });
       for (const f of list.filter((f) => !isBulk(f))) await searchByName(f);
     }
+    // Files that cover every state (SAM.gov exclusions, by UEI or CAGE as a license number), once per subject.
+    finders.push(...nationwideFinders());
     // The customer's license numbers, phones and addresses: the subject's own records, found another way.
     const ids = await searchCustomerIds(finders, subjectIds(subject), subject);
     for (const h of ids.licenses) own.add(h);
@@ -505,7 +512,15 @@ export async function drainResearchQueue(): Promise<void> {
   }
 }
 
+/** Tells Hub whether the SAM.gov exclusions file has loaded, so it names that source only then (A9). */
+async function noteResearchFacts(): Promise<void> {
+  const sam = await sourceStatus(SAM_SOURCE_ID);
+  setKnowledgeFact("samExclusions", sam.loaded);
+}
+
 export function startResearchWorker(): void {
+  setTimeout(() => void noteResearchFacts().catch(() => undefined), 30_000).unref?.();
+  setInterval(() => void noteResearchFacts().catch(() => undefined), 30 * 60_000).unref?.();
   if (process.env.RESEARCH_WORKER === "off") return;
   setTimeout(() => {
     requeueInterrupted()
