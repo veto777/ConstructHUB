@@ -7,7 +7,8 @@
  *       links the newest one, 2026-04-06 today): contractors by classification, electricians and plumbers, and
  *       engineers/architects/surveyors/landscape architects (EASLA). Current licenses only, as of the report date.
  *   Bulk (companies only):
- *     DCCA disciplinary actions (monthly OAH news releases on cca.hawaii.gov/oah, 2019 to today): board orders and
+ *     DCCA disciplinary actions (monthly OAH news releases on cca.hawaii.gov/oah, 2019 to today, read through the
+ *       site's WordPress REST API): board orders and
  *       settlements of the Contractors License Board, the Board of Electricians and Plumbers, the Elevator Mechanics
  *       Licensing Board and the engineers/architects board, with case number, sanction, effective date and RICO's
  *       allegation. Only business respondents are indexed.
@@ -33,9 +34,8 @@ const PVL_REPORTS: { match: RegExp; label: string; layout: "contractors" | "byTy
   { match: /PVL_Report_EASLA_Current_Licenses[^"']*\.xlsx/i, label: "Hawaii engineers, architects, surveyors and landscape architects licenses", layout: "byType" },
 ];
 
-async function text(url: string, minDelayMs = 1500): Promise<string> {
-  // cca.hawaii.gov answers 429 to a steady 1.5 s pace over many pages: the release pages are read slower.
-  const res = await politeFetch(url, {}, { minDelayMs, retries: 3 });
+async function text(url: string): Promise<string> {
+  const res = await politeFetch(url, {}, { minDelayMs: 1500, retries: 3 });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   return res.text();
 }
@@ -163,28 +163,33 @@ export function parseDisciplinaryRelease(html: string, url: string): Enforcement
   return out;
 }
 
+/**
+ * The releases are WordPress posts of the site's "oah" type: read through the site's REST API, 50 posts with their
+ * full text a request (a few requests a load; fetching each release page instead trips the site's rate limit).
+ */
 async function* disciplineLoader(): AsyncIterable<BulkHit> {
-  // The release list: the site's own search API (the OAH sub-site has no REST listing of its own).
-  const urls = new Set<string>();
-  for (let page = 1; page <= 10; page++) {
-    const res = await politeFetch(`https://cca.hawaii.gov/wp-json/wp/v2/search?search=${encodeURIComponent("disciplinary actions")}&per_page=100&page=${page}`, {}, { minDelayMs: 5000, retries: 3 });
-    if (res.status === 400) break; // past the last page
-    if (!res.ok) throw new Error(`DCCA search returned HTTP ${res.status}`);
-    const items = await res.json() as { url?: string }[];
-    if (!Array.isArray(items) || !items.length) break;
-    for (const it of items) if (typeof it.url === "string" && /^https:\/\/cca\.hawaii\.gov\/oah\/[^/]*disciplinary-actions[^/]*\/$/.test(it.url)) urls.add(it.url);
-    if (items.length < 100) break;
-  }
-  if (!urls.size) throw new Error("no DCCA disciplinary-action releases found");
   const seen = new Set<string>();
-  for (const url of urls) {
-    for (const hit of parseDisciplinaryRelease(await text(url, 5000), url)) {
-      const key = `${hit.id}|${hit.name}`;
-      if (seen.has(key)) continue; // a case repeated in a later release
-      seen.add(key);
-      yield { kind: "enforcement", hit, business: hit.name!.replace(/ \/ /g, " "), person: null };
+  let posts = 0;
+  for (let page = 1; page <= 20; page++) {
+    const q = new URLSearchParams({ search: "disciplinary actions", per_page: "50", page: String(page), _fields: "link,date,title,content" });
+    const res = await politeFetch(`https://cca.hawaii.gov/wp-json/wp/v2/oah?${q}`, { headers: { accept: "application/json" } }, { minDelayMs: 5000, retries: 3 });
+    if (res.status === 400) break; // past the last page
+    if (!res.ok) throw new Error(`DCCA releases returned HTTP ${res.status}`);
+    const items = await res.json() as { link?: string; title?: { rendered?: string }; content?: { rendered?: string } }[];
+    if (!Array.isArray(items) || !items.length) break;
+    for (const it of items) {
+      if (typeof it.link !== "string" || !/disciplinary actions/i.test(decodeEntities(it.title?.rendered ?? "")) || !it.content?.rendered) continue;
+      posts++;
+      for (const hit of parseDisciplinaryRelease(it.content.rendered, it.link)) {
+        const key = `${hit.id}|${hit.name}`;
+        if (seen.has(key)) continue; // a case repeated in a later release
+        seen.add(key);
+        yield { kind: "enforcement", hit, business: hit.name!.replace(/ \/ /g, " "), person: null };
+      }
     }
+    if (items.length < 50) break;
   }
+  if (!posts) throw new Error("no DCCA disciplinary-action releases found");
 }
 
 // ── RICO complaint history (live) ────────────────────────────────────────────────────────────────────────────
@@ -250,7 +255,7 @@ const bulk: BulkSource[] = [
   { id: "hi-pvl-licenses", state: "HI", label: "Hawaii PVL current licenses (contractors, electricians and plumbers, engineers and architects)", pageUrl: PVL_PAGE,
     everyHours: 24 * 7, minRows: 14_000, load: pvlLoader },
   { id: "hi-dcca-discipline", state: "HI", label: "Hawaii DCCA disciplinary actions (construction boards)", pageUrl: OAH_INDEX,
-    everyHours: 24 * 7, minRows: 150, load: disciplineLoader, companiesOnly: true },
+    everyHours: 24 * 7, minRows: 105, load: disciplineLoader, companiesOnly: true },
 ];
 
 export const pack: StatePack = {
