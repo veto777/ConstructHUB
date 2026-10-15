@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 vi.mock("./polite-fetch", async importOriginal => ({ ...await importOriginal<typeof import("./polite-fetch")>(), politeFetch: vi.fn() }));
-import adapter, { assertBsaPage, bsaTenant, bsaDate, parseBsaSearchForm, parseBsaSearchResults, parseBsaPermitGrid, parseBsaPermitDetail, bsaPermitGridUrl } from "./bsa";
+import adapter, { bsaRetry, isBsaTransientFault, assertBsaPage, bsaTenant, bsaDate, parseBsaSearchForm, parseBsaSearchResults, parseBsaPermitGrid, parseBsaPermitDetail, bsaPermitGridUrl } from "./bsa";
 import { politeFetch } from "./polite-fetch";
 import type { AdapterCtx } from "./types";
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/bsa/${name}`, import.meta.url), "utf8");
@@ -123,4 +123,35 @@ it("classifies a CAPTCHA or unavailable Building Department without masking the 
   expect(() => assertBsaPage("<main>Please complete the CAPTCHA</main>", base)).toThrow(PortalBlockedError);
   expect(() => assertBsaPage("<main>Building Department not available for this municipality</main>", base)).toThrow("not available for this municipality");
   expect(() => assertBsaPage(fixture("home.html"), base)).not.toThrow();
+});
+
+describe("BS&A server faults", () => {
+  // The text BS&A returned to the live server for 16 FL tenants on 2026-10-15 01:49-01:50 UTC.
+  const fault = "<html><body><div class=\"error\">An error has occurred: Object reference not set to an instance of an object. Check status page for more information</div></body></html>";
+  it("recognises only BS&A's own .NET fault as transient", () => {
+    expect(isBsaTransientFault("BS&A Online portal error: An error has occurred: Object reference not set to an instance of an object. Check status page")).toBe(true);
+    expect(isBsaTransientFault("BS&A Online portal error: An error has occurred: 'Advance Record Search' session has expired.")).toBe(false);
+    expect(isBsaTransientFault("BS&A Online requires login; only public records are supported")).toBe(false);
+  });
+  it("retries once with a fresh session and returns the real result", async () => {
+    bsaRetry.pauseMs = 0;
+    vi.mocked(politeFetch).mockResolvedValueOnce(new Response(fixture("home.html"), { headers: { "set-cookie": "ASP.NET_SessionId=faulted; path=/" } }));
+    for (const name of ["search-session.html", "search-form.html"]) vi.mocked(politeFetch).mockResolvedValueOnce(new Response(fixture(name)));
+    vi.mocked(politeFetch).mockResolvedValueOnce(new Response(fault));
+    for (const name of ["home.html", "search-session.html", "search-form.html", "no-results.html"]) vi.mocked(politeFetch).mockResolvedValueOnce(new Response(fixture(name)));
+    expect(await adapter.search(ctx, { type: "permit", value: "PB-2001-0945" })).toEqual([]);
+    expect(politeFetch).toHaveBeenCalledTimes(8);
+    // The retry starts a new session: its first request carries no cookie from the faulted one.
+    expect(new Headers(vi.mocked(politeFetch).mock.calls[3][1]?.headers).get("cookie")).toContain("ASP.NET_SessionId=faulted");
+    expect(new Headers(vi.mocked(politeFetch).mock.calls[4][1]?.headers).get("cookie") ?? "").not.toContain("faulted");
+  });
+  it("reports a fault that persists instead of returning zero permits", async () => {
+    bsaRetry.pauseMs = 0;
+    for (let i = 0; i < 2; i++) {
+      for (const name of ["home.html", "search-session.html", "search-form.html"]) vi.mocked(politeFetch).mockResolvedValueOnce(new Response(fixture(name)));
+      vi.mocked(politeFetch).mockResolvedValueOnce(new Response(fault));
+    }
+    await expect(adapter.search(ctx, { type: "permit", value: "PB-2001-0945" })).rejects.toThrow("Object reference not set");
+    expect(politeFetch).toHaveBeenCalledTimes(8);
+  });
 });

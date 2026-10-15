@@ -45,22 +45,38 @@ export type PoliteFetchOptions = {
   timeoutMs?: number;
 };
 
+const CONNECT_RETRIES = 2;
+export function isConnectTimeout(e: unknown): boolean {
+  const cause = (e as { cause?: { code?: string } } | null)?.cause;
+  return cause?.code === "UND_ERR_CONNECT_TIMEOUT";
+}
+
 /** fetch() with the honest UA, per-host rate limiting and back-off. Throws PortalBlockedError on 401/403/429 after retries. */
 export async function politeFetch(url: string, init: RequestInit = {}, opts: PoliteFetchOptions = {}): Promise<Response> {
   const minDelayMs = opts.minDelayMs ?? 1000;
   const retries = opts.retries ?? 2;
   const timeoutMs = opts.timeoutMs ?? 45000;
   let attempt = 0;
+  let connectRetries = 0;
   for (;;) {
     await rateLimitHost(url, minDelayMs);
     const headers = new Headers(init.headers ?? {});
     if (!headers.has("user-agent")) headers.set("user-agent", USER_AGENT);
     if (!headers.has("accept")) headers.set("accept", "text/html,application/json;q=0.9,*/*;q=0.8");
+    // A session's first request has an empty jar. An empty `Cookie:` header is malformed, and F5 ASM
+    // front ends (CentralSquare's aspgov.com Click2Gov/eTRAKiT hosts) answer it with an
+    // "Error Occurred ... support ID" page instead of the portal. Send no header at all instead.
+    if (headers.has("cookie") && !headers.get("cookie")!.trim()) headers.delete("cookie");
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     let res: Response;
     try {
       res = await fetch(url, { ...init, headers, signal: ctrl.signal, redirect: init.redirect ?? "follow" });
+    } catch (e) {
+      // Node gives up connecting after 10 s; some city servers (Addison, TX) intermittently take longer to accept
+      // a connection. No request reached the server, so a fresh connection is tried again (still rate limited).
+      if (isConnectTimeout(e) && connectRetries < CONNECT_RETRIES) { connectRetries += 1; continue; }
+      throw e;
     } finally {
       clearTimeout(timer);
     }

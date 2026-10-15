@@ -1,0 +1,1460 @@
+
+<link rel="shortcut icon" type="image/x-icon" href="im/favicon.ico" />
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head id="head1"><title>
+	eTRAKiT
+</title><meta http-equiv="X-UA-Compatible" content="IE=edge" /><meta http-equiv="PRAGMA" content="NO-CACHE" /><meta http-equiv="CACHE-CONTROL" content="NO-CACHE" /><meta http-equiv="EXPIRES" content="0" />
+    
+
+   <style type="text/css">
+        .preloader {
+            width: 300px;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: center;
+            filter: alpha(opacity=100);
+            opacity: 1;
+        }
+
+        .Overlay {
+            position: fixed;
+            top: 0px;
+            bottom: 0px;
+            left: 0px;
+            right: 0px;
+            overflow: hidden;
+            padding: 0;
+            margin: 0;
+            background-color: #000;
+            filter: alpha(opacity=50);
+            opacity: 0.5;
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #disablingDiv {
+            display: none;
+            z-index: 1002;
+            position: fixed;
+            top: 0px;
+            bottom: 0px;
+            left: 0px;
+            right: 0px;
+            overflow: hidden;
+            padding: 0;
+            margin: 0;
+            background-color: #000;
+            filter: alpha(opacity=50);
+            opacity: 0.5;
+        }
+        .hideme
+        {
+            display: none;
+        }
+         .copyright-logo{
+            display:inline-block;
+        }
+        .copyright{
+            display:block; 
+            text-align:left;
+        }
+        .logo-div{
+            display: inline-block;
+        }
+        .copyright-div{
+            display:block;
+            font-size:small;
+        }
+       h1:focus
+       {
+           outline: none;
+       }
+    </style>
+<script type="text/javascript" src="../js/JScript.js"></script><link href="../App_Themes/Custom/Grid.TRAKiT.css" type="text/css" rel="stylesheet" /><link href="../App_Themes/Custom/Input.TRAKiT.css" type="text/css" rel="stylesheet" /><link href="../App_Themes/Custom/screen.css" type="text/css" rel="stylesheet" /><link href="../App_Themes/Custom/TabStrip.TRAKiT.css" type="text/css" rel="stylesheet" /><link href="/etrakit/WebResource.axd?d=BWivyqZLghKQRLDeOpgAWEwo9YmPTSrjFnNZ3NgEHVp0YXMmCNzpLH-lcAxWQveqopUpVzkpVnnRFi2jbQ_YbnnT0JgcuAys30jHrw12fpPhhWxzSn2_G52kTIsgEimL-LUUQzgXHW40nYYxUUS8DA2&amp;t=638186322820000000" type="text/css" rel="stylesheet" class="Telerik_stylesheet" /><link href="/etrakit/WebResource.axd?d=kjcY-GbU16ZvsEzTLTEtJt5fF4GhHk052sUBvdKd2EEOF-XySU6Il_ggz0qSANV7tzTqVEnku8cef3PPsvtpTrw0oITtnV5sAsI5wnUcOC16d59RIeY2SWw6RL-w0DyadiT0074PFUXUCoacekPT820UZR2D6IOap2EVTOwgpzE1&amp;t=638186322820000000" type="text/css" rel="stylesheet" class="Telerik_stylesheet" /><link href="/etrakit/WebResource.axd?d=7N52IyGkbDgNU4Bg0ITwQnWi0dj0qnhFl2NYEBXRamIJxxF_ZtR6afZc9OVerkAe0ygL7wM2JfoAZ5K2UfBkNPcrCb7J__KKA60Ck3tJ0jq7-LSj_nYXR6_mwBckQ8mI_Ds1G6_QY-9GBcJCm-JFAg2&amp;t=638186322820000000" type="text/css" rel="stylesheet" class="Telerik_stylesheet" /><link href="/etrakit/WebResource.axd?d=7In9Zpq7JqeFDlvfOMjumL4-fjkwn029Kdd8GjRS6EZdOoD5IWmrlhms1_KHd1Hh5t3N5K4SifYgXyooRIQ0cSgy5I8uBjCZ4MO-59g_Rzs2LbCJStpSYhaZBDBn-mIEDXyYot45JO2IX_MitNu1pKbZEZoA5DQ-CJEruwufpOg1&amp;t=638186322820000000" type="text/css" rel="stylesheet" class="Telerik_stylesheet" /><link href="/etrakit/WebResource.axd?d=K4Vma_qkZG-T6CaKTyt5YBWCA9MyGulFwfV8yXoLe6g3sSUMq9m6q8utTmtGv9mQPnkjmAoqmNScK_r5jj0rsN8Rhpvs0gEdaCKCGcTuKUbkJzOxuA2duufqUvhrwlzCFPtYmltQmSLmhs5AME4Ryg2&amp;t=638186322820000000" type="text/css" rel="stylesheet" class="Telerik_stylesheet" /><link href="/etrakit/WebResource.axd?d=08LZkCmNZpAkTLjveQJgWxukAM_PwUX6R_k9-L_myfldzOsAUVvbkYuUA8tz_XvAp9R3iVy0lO85ireAOVurLA6e_v3VcXgPIHsd7lxaFp-4IREadx99DPxyehCEEp1CGXakU4lyePrgDRJKDgXfrw2&amp;t=638186322820000000" type="text/css" rel="stylesheet" class="Telerik_stylesheet" /><link href="/etrakit/WebResource.axd?d=LqOQk7ilVBj55QClMGUVRrw8X0Ll9mdfnVecCbtfJYdLE3Jfo3XtpwH44gkFgyzIqzS4rF1u9QABybrLN7nISiy4MtJNgQ1Wz5IpvkSTaFClzJwfij9Cv4-s0HHTWMKTxTcvNSG0Trp9ISnUDwkNqw2&amp;t=638186322820000000" type="text/css" rel="stylesheet" class="Telerik_stylesheet" /><link href="/etrakit/WebResource.axd?d=6b0MHjg6CHvR2VRm2-jLcjJZaeNqkRzf9Z4TpYrG4LGN5wyFWt5YsKVzF9O-_nFVmT6Q7FSngP094_M2dCJrbqDWDl6y-mFph_-RiGRrOA5x9XfS39fMaVIObWB2J5-WpGXCiAwDDr8LZeD7zCLiGg2&amp;t=638186322820000000" type="text/css" rel="stylesheet" class="Telerik_stylesheet" /></head>
+
+<body id="body1">
+    <form method="post" action="./permit.aspx" id="form1">
+<div class="aspNetHidden">
+<input type="hidden" name="RadScriptManager1_TSM" id="RadScriptManager1_TSM" value="" />
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__LASTFOCUS" id="__LASTFOCUS" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwUKMTMxMDUyNzE4Nw9kFgJmD2QWAgIED2QWAgIBD2QWDAIBDw8WBB4RY2VfT25SZXF1ZXN0U3RhcnQFDFJlcXVlc3RTdGFydB4QY2VfT25SZXNwb25zZUVuZAULUmVzcG9uc2VFbmRkZAIDD2QWBGYPFCsAAjwrAAQBAA8WCB4SUmVzb2x2ZWRSZW5kZXJNb2RlCylyVGVsZXJpay5XZWIuVUkuUmVuZGVyTW9kZSwgVGVsZXJpay5XZWIuVUksIFZlcnNpb249MjAyMC4yLjYxNy40MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj0xMjFmYWU3ODE2NWJhM2Q0AR4VRW5hYmxlRW1iZWRkZWRTY3JpcHRzZx4cRW5hYmxlRW1iZWRkZWRCYXNlU3R5bGVzaGVldGceF0VuYWJsZUFqYXhTa2luUmVuZGVyaW5naGRkZAIID2QWAgIBD2QWBGYPZBYQAgkPDxYCHgdWaXNpYmxlaGRkAg0PEGQPFgJmAgEWAhAFBlB1YmxpYwUGUHVibGljZxAFCkNvbnRyYWN0b3IFCkNvbnRyYWN0b3JnFgFmZAIRDxQrAAgPFgofBGceDUxhYmVsQ3NzQ2xhc3MFB3JpTGFiZWwfBWgfAgsrBAEfA2dkFggeCENzc0NsYXNzBSNyaVRleHRCb3ggcmlIb3ZlciBhcHB0eHRfODBfbGVzc3BhZB4FV2lkdGgbAAAAAAAAVEABAAAAHgpSZXNpemVNb2RlCylyVGVsZXJpay5XZWIuVUkuUmVzaXplTW9kZSwgVGVsZXJpay5XZWIuVUksIFZlcnNpb249MjAyMC4yLjYxNy40MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj0xMjFmYWU3ODE2NWJhM2Q0AB4EXyFTQgKCAhYIHwgFI3JpVGV4dEJveCByaUVycm9yIGFwcHR4dF84MF9sZXNzcGFkHwkbAAAAAAAAVEABAAAAHwoLKwUAHwsCggIWCB8IBSVyaVRleHRCb3ggcmlGb2N1c2VkIGFwcHR4dF84MF9sZXNzcGFkHwkbAAAAAAAAVEABAAAAHwoLKwUAHwsCggIWCB8KCysFAB8IBSVyaVRleHRCb3ggcmlFbmFibGVkIGFwcHR4dF84MF9sZXNzcGFkHwkbAAAAAAAAVEABAAAAHwsCggIWCB8IBSZyaVRleHRCb3ggcmlEaXNhYmxlZCBhcHB0eHRfODBfbGVzc3BhZB8JGwAAAAAAAFRAAQAAAB8KCysFAB8LAoICFggfCAUjcmlUZXh0Qm94IHJpRW1wdHkgYXBwdHh0XzgwX2xlc3NwYWQfCRsAAAAAAABUQAEAAAAfCgsrBQAfCwKCAhYIHwgFInJpVGV4dEJveCByaVJlYWQgYXBwdHh0XzgwX2xlc3NwYWQfCRsAAAAAAABUQAEAAAAfCgsrBQAfCwKCAmQCEw8QZGQWAGQCFw8UKwAIDxYKHwNnHwRnHwILKwQBHwVoHwcFB3JpTGFiZWxkFggfCAUjcmlUZXh0Qm94IHJpSG92ZXIgYXBwdHh0XzgwX2xlc3NwYWQfCRsAAAAAAABUQAEAAAAfCgsrBQAfCwKCAhYIHwgFI3JpVGV4dEJveCByaUVycm9yIGFwcHR4dF84MF9sZXNzcGFkHwkbAAAAAAAAVEABAAAAHwoLKwUAHwsCggIWCB8IBSVyaVRleHRCb3ggcmlGb2N1c2VkIGFwcHR4dF84MF9sZXNzcGFkHwkbAAAAAAAAVEABAAAAHwoLKwUAHwsCggIWCB8KCysFAB8IBSVyaVRleHRCb3ggcmlFbmFibGVkIGFwcHR4dF84MF9sZXNzcGFkHwkbAAAAAAAAVEABAAAAHwsCggIWCB8IBSZyaVRleHRCb3ggcmlEaXNhYmxlZCBhcHB0eHRfODBfbGVzc3BhZB8JGwAAAAAAAFRAAQAAAB8KCysFAB8LAoICFggfCAUjcmlUZXh0Qm94IHJpRW1wdHkgYXBwdHh0XzgwX2xlc3NwYWQfCRsAAAAAAABUQAEAAAAfCgsrBQAfCwKCAhYIHwgFInJpVGV4dEJveCByaVJlYWQgYXBwdHh0XzgwX2xlc3NwYWQfCRsAAAAAAABUQAEAAAAfCgsrBQAfCwKCAmQCGw8UKwAIDxYKHwcFB3JpTGFiZWwfBGcfA2cfBWgfAgsrBAFkFggfCAUjcmlUZXh0Qm94IHJpSG92ZXIgYXBwdHh0XzgwX2xlc3NwYWQfCRsAAAAAAABUQAEAAAAfCgsrBQAfCwKCAhYIHwgFI3JpVGV4dEJveCByaUVycm9yIGFwcHR4dF84MF9sZXNzcGFkHwkbAAAAAAAAVEABAAAAHwoLKwUAHwsCggIWCB8IBSVyaVRleHRCb3ggcmlGb2N1c2VkIGFwcHR4dF84MF9sZXNzcGFkHwkbAAAAAAAAVEABAAAAHwoLKwUAHwsCggIWCB8KCysFAB8IBSVyaVRleHRCb3ggcmlFbmFibGVkIGFwcHR4dF84MF9sZXNzcGFkHwkbAAAAAAAAVEABAAAAHwsCggIWCB8IBSZyaVRleHRCb3ggcmlEaXNhYmxlZCBhcHB0eHRfODBfbGVzc3BhZB8JGwAAAAAAAFRAAQAAAB8KCysFAB8LAoICFggfCAUjcmlUZXh0Qm94IHJpRW1wdHkgYXBwdHh0XzgwX2xlc3NwYWQfCRsAAAAAAABUQAEAAAAfCgsrBQAfCwKCAhYIHwgFInJpVGV4dEJveCByaVJlYWQgYXBwdHh0XzgwX2xlc3NwYWQfCRsAAAAAAABUQAEAAAAfCgsrBQAfCwKCAmQCIw8PFgIeC05hdmlnYXRlVXJsBSF+L3JldHJlaXZlQWNjb3VudEluZm9ybWF0aW9uLmFzcHhkZAIlDw8WAh8MBSd+L3JldHJlaXZlQWNjb3VudEluZm9ybWF0aW9uLmFzcHg/YWk9dW5kZAIBD2QWAgIGDw8WAh4EVGV4dAUJREFTSEJPQVJEZGQCBQ9kFlICAQ8WAh8GaGQCAw8WAh8GaGQCBQ9kFgICAQ8PFgIfDQUHUGVybWl0c2RkAgcPZBYCAgEPDxYEHw0FEkFwcGx5IC8gTmV3IFBlcm1pdB8MBSV+L1Blcm1pdEFwcGxpY2F0aW9uL2NvbmZpcm1hdGlvbi5hc3B4ZGQCCQ9kFgICAQ8PFgQfDQUNU2VhcmNoIFBlcm1pdB8MBRR+L1NlYXJjaC9wZXJtaXQuYXNweGRkAgsPZBYCAgEPDxYCHwwFHX4vc2hvcHBpbmdDYXJ0LmFzcHg/bHQ9ZWl0aGVyZGQCDQ8WAh8GaGQCDw8WAh8GaBYCAgEPDxYCHwwFKH4vTWFwMi9FdHJha2l0TWFwMi5hc3B4P2FjdGl2ZWdycD1wZXJtaXRkZAITD2QWAgIBDw8WAh8NBQhQcm9qZWN0c2RkAhUPZBYCAgEPDxYCHwwFJn4vUHJvamVjdEFwcGxpY2F0aW9uL2NvbmZpcm1hdGlvbi5hc3B4ZGQCGQ9kFgICAQ8PFgIfDAUdfi9zaG9wcGluZ0NhcnQuYXNweD9sdD1laXRoZXJkZAIbDxYCHwZoFgICAQ8PFgIfDAUZfi9mZWVlc3RpbWF0ZXN1bW1hcnkuYXNweGRkAh0PFgIfBmgWAgIBDw8WAh8MBSl+L01hcDIvRXRyYWtpdE1hcDIuYXNweD9hY3RpdmVncnA9cHJvamVjdGRkAh8PZBYCAgEPDxYCHw0FCkNvbnRyYWN0b3JkZAIhD2QWAgIBDw8WBB8NBRhSZWdpc3RlciBmb3IgbmV3IEFjY291bnQfDAUifi9BZWNBcHBsaWNhdGlvbi9jb25maXJtYXRpb24uYXNweGRkAiMPFgIfBmhkAiUPZBYCAgEPDxYEHw0FElNlYXJjaCBDb250cmFjdG9ycx8MBRF+L1NlYXJjaC9hZWMuYXNweGRkAicPZBYCAgEPDxYCHwZoZGQCKQ8WAh8GaGQCLQ8WAh8GaBYCAgEPDxYCHwwFHX4vc2hvcHBpbmdDYXJ0LmFzcHg/bHQ9ZWl0aGVyZGQCMw8WAh8GaBYCAgEPDxYCHwwFF34vTWFwMi9FdHJha2l0TWFwMi5hc3B4ZGQCNw9kFgICAQ8PFgIfDAUOZGFzaGJvYXJkLmFzcHhkZAI5DxYCHwZoFgICAQ8PFgIfDAUsfi9NYXAyL0V0cmFraXRNYXAyLmFzcHg/YWN0aXZlZ3JwPWluc3BlY3Rpb25kZAI7DxYCHwZoFgICAQ8PFgQeB0VuYWJsZWRoHwZoZGQCPw9kFgICAQ8PFgIfDQUHTGljZW5zZWRkAkEPFgIfBmgWAgIBDw8WAh8NBRZBcHBseSBmb3IgTmV3IExpY2Vuc2VzZGQCQw9kFgICAQ8PFgYeB1Rvb2xUaXAFHUNsaWNrIGhlcmUgdG8gU2VhcmNoIExpY2Vuc2VzHw0FD1NlYXJjaCBMaWNlbnNlcx8MBRZ+L1NlYXJjaC9saWNlbnNlMi5hc3B4ZGQCRQ9kFgICAQ8PFgIfDAUdfi9zaG9wcGluZ0NhcnQuYXNweD9sdD1wdWJsaWNkZAJHD2QWAgIBDw8WBB8PBTBHbyB0byBNeSBEYXNoYm9hcmQgdG8gUmVuZXcgbXkgQnVzaW5lc3MgTGljZW5zZSAfDAUOZGFzaGJvYXJkLmFzcHhkZAJJD2QWAgIBDw8WAh8NBQpWaW9sYXRpb25zZGQCSw9kFgICAQ8PFgIfDAUSfi9TZWFyY2gvY2FzZS5hc3B4ZGQCTQ8WAh8GaBYCAgEPDxYCHwwFHX4vc2hvcHBpbmdDYXJ0LmFzcHg/bHQ9ZWl0aGVyZGQCTw8WAh8GaBYCAgEPDxYCHwwFJn4vTWFwMi9FdHJha2l0TWFwMi5hc3B4P2FjdGl2ZWdycD1jYXNlZGQCUQ8WAh8GaBYCAgEPDxYCHw0FA0NSTWRkAlMPFgIfBmgWAgIBDw8WBB8PBRpDbGljayBoZXJlIHRvIFJlcG9ydCBJc3N1ZR8NBQxSZXBvcnQgSXNzdWVkZAJVDxYCHwZoFgICAQ8PFgQfDwUbQ2xpY2sgaGVyZSB0byBTZWFyY2ggSXNzdWVzHw0FDVNlYXJjaCBJc3N1ZXNkZAJXDxYCHwZoFgICAQ8PFgQfDwUiVmlldyBhbGwgQWN0aXZlIElzc3VlcyBvbiBGdWxsIE1hcB8MBSV+L01hcDIvRXRyYWtpdE1hcDIuYXNweD9hY3RpdmVncnA9Y3JtZGQCWQ8WAh8GaGQCWw8WAh8GaBYCAgEPDxYCHwwFF34vTWFwMi9FdHJha2l0TWFwMi5hc3B4ZGQCXQ8WAh8GaBYCAgEPDxYCHwwFI34vTWFwMi9FdHJha2l0TWFwMi5hc3B4P2xvY215YWRkcj0xZGQCZw9kFgICAQ8PFgQfDAUOfi9jb250YWN0LmFzcHgfD2VkZAIGD2QWEgIJD2QWBAIBD2QWDAIDDxAPFgYeDURhdGFUZXh0RmllbGQFB0NhcHRpb24eDkRhdGFWYWx1ZUZpZWxkBQVGaWVsZB4LXyFEYXRhQm91bmRnZBAVBglQRVJNSVRfTk8JU0lURV9BRERSClBFUk1JVFRZUEUNUEVSTUlUU1VCVFlQRQ9DT05UUkFDVE9SX05BTUUFRk9MSU8VBhVQZXJtaXRfTWFpbi5QRVJNSVRfTk8VUGVybWl0X01haW4uU0lURV9BRERSFlBlcm1pdF9NYWluLlBFUk1JVFRZUEUZUGVybWl0X01haW4uUEVSTUlUU1VCVFlQRRtQZXJtaXRfTWFpbi5DT05UUkFDVE9SX05BTUUUUGVybWl0X01haW4uU0lURV9BUE4UKwMGZ2dnZ2dnFgECBGQCBw8QZA8WBWYCAQICAgMCBBYFEAULQmVnaW5zIFdpdGgFC0JFR0lOUyBXSVRIZxAFCENvbnRhaW5zBQhDT05UQUlOU2cQBQZFcXVhbHMFBkVRVUFMU2cQBQhBdCBMZWFzdAUIQVQgTEVBU1RnEAUHQXQgTW9zdAUHQVQgTU9TVGdkZAINDw8WAh4RVXNlU3VibWl0QmVoYXZpb3JoZGQCDw9kFgJmD2QWAgIBDxYCHwZoZAIRDw8WAh8GaGQWDgIBDxBkZBYAZAIFD2QWBGYPPCsACABkAgIPPCsADQEADxYCBQ9SZW5kZXJJbnZpc2libGVnZGQCCw9kFgRmDzwrAAgAZAICDzwrAA0BAA8WAgUPUmVuZGVySW52aXNpYmxlZ2RkAhEPZBYEZg88KwAIAGQCAg88KwANAQAPFgIFD1JlbmRlckludmlzaWJsZWdkZAIXD2QWBGYPPCsACABkAgIPPCsADQEADxYCBQ9SZW5kZXJJbnZpc2libGVnZGQCHQ9kFgRmDzwrAAgAZAICDzwrAA0BAA8WAgUPUmVuZGVySW52aXNpYmxlZ2RkAiMPZBYEZg88KwAIAGQCAg88KwANAQAPFgIFD1JlbmRlckludmlzaWJsZWdkZAITD2QWAgIBD2QWAmYPZBYCAgEPDxYCHw0FKFlvdXIgc2VhcmNoIHJldHVybmVkIDI2IHRvdGFsIHJlY29yZChzKS5kZAIDDxYCHwZoZAILDw8WBh8IBRVhcHBidXR0b25fbm9wYWQgZmxlZnQfE2gfCwICZGQCDQ8PFgYfCAUbYXBwYnV0dG9uX25vcGFkIGZhZGVkIGZsZWZ0HxNoHwsCAmRkAg8PFgIfBmhkAhMPDxYGHwNnHwVoHwRnZGQCGw88KwAOAgAUKwACDxYUHwILKwQBHwRnHgtfIUl0ZW1Db3VudAIBHxJnHgZIZWlnaHQbAAAAAABwdkABAAAAHwsCgAMfCRsAAAAAAICGQAEAAAAfBWgfA2ceFWNzX3Njcm9sbF9BbGxvd1Njcm9sbGdkFwMFC0VkaXRJbmRleGVzFgAFD1NlbGVjdGVkSW5kZXhlcxYABRNTZWxlY3RlZENlbGxJbmRleGVzFgABFgIWC2QUKwAHFCsABRYQHgpIZWFkZXJUZXh0BQlQRVJNSVRfTk8eCURhdGFGaWVsZAUJUEVSTUlUX05PHgNfc2UFCVBFUk1JVF9OTx4IUmVhZE9ubHloHghEYXRhVHlwZRkrAh4Eb2luZAICHgdEaXNwbGF5Zx4NSGVhZGVyVG9vbHRpcAURU29ydCBieSBQRVJNSVRfTk9kZGQFCVBFUk1JVF9OTxQrAAUWEB8XBQtQZXJtaXQgVHlwZR8YBQpQZXJtaXRUeXBlHxkFClBlcm1pdFR5cGUfGmgfGxkrAh8cAgMfHWcfHgUTU29ydCBieSBQZXJtaXQgVHlwZWRkZAUKUGVybWl0VHlwZRQrAAUWEB8XBQ9QZXJtaXQgU3ViIFR5cGUfGAUNUGVybWl0U3ViVHlwZR8ZBQ1QZXJtaXRTdWJUeXBlHxpoHxsZKwIfHAIEHx1nHx4FF1NvcnQgYnkgUGVybWl0IFN1YiBUeXBlZGRkBQ1QZXJtaXRTdWJUeXBlFCsABRYQHxcFBUZPTElPHxgFCFNJVEVfQVBOHxkFCFNJVEVfQVBOHxpoHxsZKwIfHAIFHx1nHx4FDVNvcnQgYnkgRk9MSU9kZGQFCFNJVEVfQVBOFCsABRYQHxcFCVNJVEVfQUREUh8YBQlTSVRFX0FERFIfGQUJU0lURV9BRERSHxpoHxsZKwIfHAIGHx1nHx4FEVNvcnQgYnkgU0lURV9BRERSZGRkBQlTSVRFX0FERFIUKwAFFhAfFwUPQ09OVFJBQ1RPUl9OQU1FHxgFD0NPTlRSQUNUT1JfTkFNRR8ZBQ9DT05UUkFDVE9SX05BTUUfGmgfGxkrAh8cAgcfHWcfHgUXU29ydCBieSBDT05UUkFDVE9SX05BTUVkZGQFD0NPTlRSQUNUT1JfTkFNRRQrAAUWEB8XBQhSRUNPUkRJRB8YBQhSRUNPUkRJRB8ZBQhSRUNPUkRJRB8aaB8bGSsCHxwCCB8daB8eBRBTb3J0IGJ5IFJFQ09SRElEZGRkBQhSRUNPUkRJRGUUKwAACyl5VGVsZXJpay5XZWIuVUkuR3JpZENoaWxkTG9hZE1vZGUsIFRlbGVyaWsuV2ViLlVJLCBWZXJzaW9uPTIwMjAuMi42MTcuNDAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49MTIxZmFlNzgxNjViYTNkNAE8KwAHAAspdFRlbGVyaWsuV2ViLlVJLkdyaWRFZGl0TW9kZSwgVGVsZXJpay5XZWIuVUksIFZlcnNpb249MjAyMC4yLjYxNy40MCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj0xMjFmYWU3ODE2NWJhM2Q0ARYCHgRfZWZzZGQWEh8SZx4IRGF0YUtleXMWAB4EX2hsbQsrBgEfFAIFHgpEYXRhTWVtYmVyZR4USXNCb3VuZFRvRm9yd2FyZE9ubHloHgZfY2RrbnMVAQlQRVJNSVRfTk8eBV8hQ0lTFwAeBV9xZWx0GSlnU3lzdGVtLkRhdGEuRGF0YVJvd1ZpZXcsIFN5c3RlbS5EYXRhLCBWZXJzaW9uPTQuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49Yjc3YTVjNTYxOTM0ZTA4OWRmFgZmDxQrAAMPZBYCHgVzdHlsZQULd2lkdGg6MTAwJTtkZGQCAQ8WBRQrAAIPFhIfEmcfIBYAHyELKwYBHxQCBR8iZR8jaB8kFQEJUEVSTUlUX05PHyUXAB8mGSsIZBcFBQhQYWdlU2l6ZQIFBQhfIVBDb3VudAIGBRBDdXJyZW50UGFnZUluZGV4ZgUGXyFEU0lDAhoFC18hSXRlbUNvdW50AgUWAh8ZFgIeAl9jZhQrAAUUKwACFCsAAgUJcGVybWl0X25vBQlQRVJNSVRfTk8UKwACBQpCMjAxMS0xMzU3BQpCMjAxMS0xMzU3FCsAAhQrAAIFCXBlcm1pdF9ubwUJUEVSTUlUX05PFCsAAgUKQjIwMTEtMzA5OQUKQjIwMTEtMzA5ORQrAAIUKwACBQlwZXJtaXRfbm8FCVBFUk1JVF9OTxQrAAIFDEJMUjIwMTQtMTMyNgUMQkxSMjAxNC0xMzI2FCsAAhQrAAIFCXBlcm1pdF9ubwUJUEVSTUlUX05PFCsAAgUMQkxSMjAxNi0yNTA4BQxCTFIyMDE2LTI1MDgUKwACFCsAAgUJcGVybWl0X25vBQlQRVJNSVRfTk8UKwACBQxCTFIyMDE2LTMyMTgFDEJMUjIwMTYtMzIxOBYAFgJnZxYCZg9kFhhmD2QWBGYPDxYCHwZoZBYCZg8PFgIfDWVkZAIBD2QWEmYPDxYGHw0FBiZuYnNwOx8PBQhTb3J0IGJ5IB8GaGRkAgEPDxYGHw0FBiZuYnNwOx8PBQhTb3J0IGJ5IB8GaGRkAgIPDxYCHw8FEVNvcnQgYnkgUEVSTUlUX05PZGQCAw8PFgIfDwUTU29ydCBieSBQZXJtaXQgVHlwZWRkAgQPDxYCHw8FF1NvcnQgYnkgUGVybWl0IFN1YiBUeXBlZGQCBQ8PFgIfDwUNU29ydCBieSBGT0xJT2RkAgYPDxYCHw8FEVNvcnQgYnkgU0lURV9BRERSZGQCBw8PFgIfDwUXU29ydCBieSBDT05UUkFDVE9SX05BTUVkZAIIDw8WAh8PBRBTb3J0IGJ5IFJFQ09SRElEZGQCAQ9kFgRmD2QWEmYPDxYCHw0FBiZuYnNwO2RkAgEPDxYCHw0FBiZuYnNwO2RkAgIPDxYCHw0FBiZuYnNwO2RkAgMPDxYCHw0FBiZuYnNwO2RkAgQPDxYCHw0FBiZuYnNwO2RkAgUPDxYCHw0FBiZuYnNwO2RkAgYPDxYCHw0FBiZuYnNwO2RkAgcPDxYCHw0FBiZuYnNwO2RkAggPDxYCHw0FBiZuYnNwO2RkAgEPZBYCZg8PFgIfDWVkZAICDw8WAh4EX2lpaAUBMGQWEmYPDxYCHwZoZGQCAQ8PFgQfDQUGJm5ic3A7HwZoZGQCAg8PFgIfDQUKQjIwMTEtMTM1N2RkAgMPDxYCHw0FGTxzcGFuPkJVSUxESU5HLVJFUzwvc3Bhbj5kZAIEDw8WAh8NBQ08c3Bhbj48L3NwYW4+ZGQCBQ8PFgIfDQUaPHNwYW4+MzIyMDE1MDM5MDMyMDwvc3Bhbj5kZAIGDw8WAh8NBRs8c3Bhbj4xNjc0MSBOVyA3NyBQTDwvc3Bhbj5kZAIHDw8WAh8NBSo8c3Bhbj5BIEEgUkVMSUFCTEUgQ09OU1RSVUNUSU9OIElOQzwvc3Bhbj5kZAIIDw8WAh8NBSQ8c3Bhbj5DT05WOjEyMDUyOTEzMzY0NTE3MzE2MDwvc3Bhbj5kZAIDD2QWAmYPDxYCHwZoZGQCBA8PFgIfKQUBMWQWEmYPDxYCHwZoZGQCAQ8PFgQfDQUGJm5ic3A7HwZoZGQCAg8PFgIfDQUKQjIwMTEtMzA5OWRkAgMPDxYCHw0FFTxzcGFuPkJVSUxESU5HPC9zcGFuPmRkAgQPDxYCHw0FDTxzcGFuPjwvc3Bhbj5kZAIFDw8WAh8NBRo8c3Bhbj4zMjIwMjEwMTUwMTAwPC9zcGFuPmRkAgYPDxYCHw0FGzxzcGFuPjg3OTMgTlcgMTQyIExOPC9zcGFuPmRkAgcPDxYCHw0FKjxzcGFuPkEgQSBSRUxJQUJMRSBDT05TVFJVQ1RJT04gSU5DPC9zcGFuPmRkAggPDxYCHw0FJDxzcGFuPkNPTlY6MTIwNTI5MTMzNzAyMTc4ODQxPC9zcGFuPmRkAgUPZBYCZg8PFgIfBmhkZAIGDw8WAh8pBQEyZBYSZg8PFgIfBmhkZAIBDw8WBB8NBQYmbmJzcDsfBmhkZAICDw8WAh8NBQxCTFIyMDE0LTEzMjZkZAIDDw8WAh8NBRk8c3Bhbj5CVUlMRElORy1SRVM8L3NwYW4+ZGQCBA8PFgIfDQUZPHNwYW4+SU5URVJJT1IgQUxUPC9zcGFuPmRkAgUPDxYCHw0FGjxzcGFuPjMyMjAyMTAwMjA2ODA8L3NwYW4+ZGQCBg8PFgIfDQUbPHNwYW4+ODgyMCBOVyAxNTAgU1Q8L3NwYW4+ZGQCBw8PFgIfDQUqPHNwYW4+QSBBIFJFTElBQkxFIENPTlNUUlVDVElPTiBJTkM8L3NwYW4+ZGQCCA8PFgIfDQUgPHNwYW4+TEc6MTQwNTMwMTIxMjMxMDc1Mzwvc3Bhbj5kZAIHD2QWAmYPDxYCHwZoZGQCCA8PFgIfKQUBM2QWEmYPDxYCHwZoZGQCAQ8PFgQfDQUGJm5ic3A7HwZoZGQCAg8PFgIfDQUMQkxSMjAxNi0yNTA4ZGQCAw8PFgIfDQUZPHNwYW4+QlVJTERJTkctUkVTPC9zcGFuPmRkAgQPDxYCHw0FGzxzcGFuPlJFL1JQLURSSVZFV0FZPC9zcGFuPmRkAgUPDxYCHw0FGjxzcGFuPjMyMjAyMzAxMDE2NDA8L3NwYW4+ZGQCBg8PFgIfDQUePHNwYW4+NzMxMCBKQUNBUkFOREEgTE48L3NwYW4+ZGQCBw8PFgIfDQUqPHNwYW4+QSBBIFJFTElBQkxFIENPTlNUUlVDVElPTiBJTkM8L3NwYW4+ZGQCCA8PFgIfDQUhPHNwYW4+U05BUjoxNjEwMDMwOTIzMTg1NTg8L3NwYW4+ZGQCCQ9kFgJmDw8WAh8GaGRkAgoPDxYCHykFATRkFhJmDw8WAh8GaGRkAgEPDxYEHw0FBiZuYnNwOx8GaGRkAgIPDxYCHw0FDEJMUjIwMTYtMzIxOGRkAgMPDxYCHw0FGTxzcGFuPkJVSUxESU5HLVJFUzwvc3Bhbj5kZAIEDw8WAh8NBRs8c3Bhbj5SRS9SUC1EUklWRVdBWTwvc3Bhbj5kZAIFDw8WAh8NBRo8c3Bhbj4zMjIwMTYwMDIxMDUwPC9zcGFuPmRkAgYPDxYCHw0FGzxzcGFuPjE2MzU0IE5XIDg3IFBMPC9zcGFuPmRkAgcPDxYCHw0FKjxzcGFuPkEgQSBSRUxJQUJMRSBDT05TVFJVQ1RJT04gSU5DPC9zcGFuPmRkAggPDxYCHw0FITxzcGFuPlNOQVI6MTYxMjA1MTAwMjE5OTk5PC9zcGFuPmRkAgsPZBYCZg8PFgIfBmhkZAICDw9kFgIfJwUNZGlzcGxheTpub25lOxYCZg88KwANAQAPFgQFG1VzZUNvbHVtbkhlYWRlcnNBc1NlbGVjdG9yc2gFGFVzZVJvd0hlYWRlcnNBc1NlbGVjdG9yc2gPFgQeE0VuYWJsZUVtYmVkZGVkU2tpbnNoHhFFbmFibGVBcmlhU3VwcG9ydGhkZAIhDxQrAAIUKwACDxYIHwRnHwNnHwVoHwILKwQBZBAWCGYCAQICAgMCBAIFAgYCBxYIFCsAAg8WAh4SSW1wbGljaXRQYWdlVmlld0lEBRVSYWRQYWdlVmlld1Blcm1pdEluZm9kZBQrAAIPFgIfLAUTUmFkUGFnZVZpZXdTaXRlSW5mb2RkFCsAAg8WAh8sBRNSYWRQYWdlVmlld0NvbnRhY3RzZGQUKwACDxYCHywFD1JhZFBhZ2VWaWV3RmVlc2RkFCsAAg8WAh8sBRZSYWRQYWdlVmlld0luc3BlY3Rpb25zZGQUKwACDxYCHywFEVJhZFBhZ2VDaHJvbm9sb2d5ZGQUKwACDxYCHywFEVJhZFBhZ2VDb25kaXRpb25zZGQUKwACDxYCHywFElJhZFBhZ2VWaWV3UmV2aWV3c2RkDxYIZmZmZmZmZmYWAQVuVGVsZXJpay5XZWIuVUkuUmFkVGFiLCBUZWxlcmlrLldlYi5VSSwgVmVyc2lvbj0yMDIwLjIuNjE3LjQwLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPTEyMWZhZTc4MTY1YmEzZDRkFhBmDw8WAh8sBRVSYWRQYWdlVmlld1Blcm1pdEluZm9kZAIBDw8WAh8sBRNSYWRQYWdlVmlld1NpdGVJbmZvZGQCAg8PFgIfLAUTUmFkUGFnZVZpZXdDb250YWN0c2RkAgMPDxYCHywFD1JhZFBhZ2VWaWV3RmVlc2RkAgQPDxYCHywFFlJhZFBhZ2VWaWV3SW5zcGVjdGlvbnNkZAIFDw8WAh8sBRFSYWRQYWdlQ2hyb25vbG9neWRkAgYPDxYCHywFEVJhZFBhZ2VDb25kaXRpb25zZGQCBw8PFgIfLAUSUmFkUGFnZVZpZXdSZXZpZXdzZGQCIw8UKwACDxYMHwgFGWdyZXlncmFkaWVudCBtaW5IZWlnaHQzNjEfA2cfBGcfAgsrBAEfBWgfCwICZBUIFVJhZFBhZ2VWaWV3UGVybWl0SW5mbxNSYWRQYWdlVmlld1NpdGVJbmZvE1JhZFBhZ2VWaWV3Q29udGFjdHMPUmFkUGFnZVZpZXdGZWVzFlJhZFBhZ2VWaWV3SW5zcGVjdGlvbnMRUmFkUGFnZUNocm9ub2xvZ3kRUmFkUGFnZUNvbmRpdGlvbnMSUmFkUGFnZVZpZXdSZXZpZXdzZAInD2QWAmYPPCsABAEADxYIHwNnHwRnHwILKwQBHwVoZGQCBw8PFgIfDQXbBTxkaXYgc3R5bGU9InRleHQtYWxpZ246IGNlbnRlcjsiPjxpPjxzcGFuIHN0eWxlPSJmb250LXNpemU6MTIuMHB0Ij4qKiogVGhlIFRvd24gb2YgTWlhbWkgTGFrZXMsIEZsb3JpZGEgbWFrZXMgZXZlcnkNCmVmZm9ydCB0byBwcm9kdWNlIGFuZCBwdWJsaXNoIHRoZSBtb3N0IGN1cnJlbnQgYW5kIGFjY3VyYXRlIGluZm9ybWF0aW9uDQpwb3NzaWJsZS4gTm8gd2FycmFudGllcyBleHByZXNzIG9yIGltcGxpZWQsIGFyZSBwcm92aWRlZCBmb3IgdGhlIGRhdGEsIGNvbnRlbnQsDQpvciBzZXJ2aWNlcyBoZXJlaW4sIGl0cyB1c2UsIG9yIGl0cyBpbnRlcnByZXRhdGlvbi4gSW4gbm8gZXZlbnQgc2hhbGwgdGhlIFRvd24NCm9mIE1pYW1pIExha2VzLCBGbG9yaWRhIGJlIHJlc3BvbnNpYmxlIG9yIGxpYWJsZSwgZGlyZWN0bHkgb3IgaW5kaXJlY3RseSwgZm9yDQphbnkgZGFtYWdlIG9yIGxvc3MgY2F1c2VkIG9yIGFsbGVnZWQgdG8gYmUgY2F1c2VkIGJ5IG9yIGluIGNvbm5lY3Rpb24gd2l0aCB0aGUNCnVzZSBvZiBvciByZWxpYW5jZSBvbiBhbnkgc3VjaCBkYXRhLCBjb250ZW50LCBvciBzZXJ2aWNlcyBhdmFpbGFibGUgb24gb3IgdGhyb3VnaA0KYW55IHN1Y2ggd2Vic2l0ZSBvciByZXNvdXJjZS4gVXRpbGl6YXRpb24gb2YgdGhpcyB3ZWJzaXRlIGFuZCByZXNvdXJjZXMNCmNvbnN0aXR1dGVzIGFjY2VwdGFuY2Ugb2YgdGhpcyBzdGF0ZW1lbnQuPC9zcGFuPjwvaT48cD48L3A+PC9kaXY+ZGQCCA9kFgoCAQ8PFgIfBmhkZAIDD2QWAgIBDw8WAh8NBSg2NjAxIE1haW4gU3RyZWV0ICBNaWFtaSBMYWtlcywgRkwgIDMzMDE0ZGQCCQ8PFgIfBmhkZAILDxYCHwZoZAINDw8WAh8MBQ5+L2NvbnRhY3QuYXNweGRkGAIFHl9fQ29udHJvbHNSZXF1aXJlUG9zdEJhY2tLZXlfXxYGBRZjdGwwMCR1Y0xvZ2luJHJ3bUxvZ2luBR5jdGwwMCR1Y0xvZ2luJGNoa0JveFJlbWVtYmVyTWUFG2N0bDAwJGNwbE1haW4kcmdTZWFyY2hSc2x0cwUdY3RsMDAkY3BsTWFpbiR0Y1NlYXJjaERldGFpbHMFIGN0bDAwJGNwbE1haW4kUmFkTXVsdGlQYWdlU2VhcmNoBRBjdGwwMCRjcGxNYWluJHJ3BRVjdGwwMCR1Y0xvZ2luJG12TG9naW4PD2RmZHCtdJLjqiXNVzC1dn7jcrpKkqnFLaovN7ZNZee5ACGg" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['form1'];
+if (!theForm) {
+    theForm = document.form1;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/etrakit/WebResource.axd?d=KsGi5D_r2HL3m-vKKZkBn3KuQ5VBEzVFMVC0WaLUJjOTZDjufB4_DWDM36lD8_oujDOD5xd7WGDdLD6NlR2eyhpsDu91v-niR54tB1LxNN81&amp;t=639190689332169432" type="text/javascript"></script>
+
+
+<script src="/etrakit/Telerik.Web.UI.WebResource.axd?_TSM_HiddenField_=RadScriptManager1_TSM&amp;compress=1&amp;_TSM_CombinedScripts_=%3b%3bAjaxControlToolkit%2c+Version%3d4.1.60919.0%2c+Culture%3dneutral%2c+PublicKeyToken%3d28f01b0e84b6d53e%3aen-US%3aab75ae50-1505-49da-acca-8b96b908cb1a%3aea597d4b%3ab25378d2%3bTelerik.Web.UI%2c+Version%3d2020.2.617.40%2c+Culture%3dneutral%2c+PublicKeyToken%3d121fae78165ba3d4%3aen-US%3a052f2b1c-05b8-458e-9272-a1efb1307104%3a16e4e7cd%3aed16cbdc%3a874f8ea2%3af7645509%3a24ee1bba%3ab2e06756%3af46195d3%3a92fe8ea0%3afa31b949%3a33715776%3a4877f69a%3ac128760b%3a19620875%3a490a9d4e%3abd8f85e4%3ab7778d6c%3a88144a7a%3a58366029%3ae330518b%3a1e771326%3a8e6f0d33%3a1f3a7489%3a6a6d718d" type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+var PageMethods = function() {
+PageMethods.initializeBase(this);
+this._timeout = 0;
+this._userContext = null;
+this._succeeded = null;
+this._failed = null;
+}
+PageMethods.prototype = {
+_get_path:function() {
+ var p = this.get_path();
+ if (p) return p;
+ else return PageMethods._staticInstance.get_path();},
+GetSelectedInspection:function(succeededCallback, failedCallback, userContext) {
+return this._invoke(this._get_path(), 'GetSelectedInspection',false,{},succeededCallback,failedCallback,userContext); }}
+PageMethods.registerClass('PageMethods',Sys.Net.WebServiceProxy);
+PageMethods._staticInstance = new PageMethods();
+PageMethods.set_path = function(value) { PageMethods._staticInstance.set_path(value); }
+PageMethods.get_path = function() { return PageMethods._staticInstance.get_path(); }
+PageMethods.set_timeout = function(value) { PageMethods._staticInstance.set_timeout(value); }
+PageMethods.get_timeout = function() { return PageMethods._staticInstance.get_timeout(); }
+PageMethods.set_defaultUserContext = function(value) { PageMethods._staticInstance.set_defaultUserContext(value); }
+PageMethods.get_defaultUserContext = function() { return PageMethods._staticInstance.get_defaultUserContext(); }
+PageMethods.set_defaultSucceededCallback = function(value) { PageMethods._staticInstance.set_defaultSucceededCallback(value); }
+PageMethods.get_defaultSucceededCallback = function() { return PageMethods._staticInstance.get_defaultSucceededCallback(); }
+PageMethods.set_defaultFailedCallback = function(value) { PageMethods._staticInstance.set_defaultFailedCallback(value); }
+PageMethods.get_defaultFailedCallback = function() { return PageMethods._staticInstance.get_defaultFailedCallback(); }
+PageMethods.set_enableJsonp = function(value) { PageMethods._staticInstance.set_enableJsonp(value); }
+PageMethods.get_enableJsonp = function() { return PageMethods._staticInstance.get_enableJsonp(); }
+PageMethods.set_jsonpCallbackParameter = function(value) { PageMethods._staticInstance.set_jsonpCallbackParameter(value); }
+PageMethods.get_jsonpCallbackParameter = function() { return PageMethods._staticInstance.get_jsonpCallbackParameter(); }
+PageMethods.set_path("permit.aspx");
+PageMethods.GetSelectedInspection= function(onSuccess,onFailed,userContext) {PageMethods._staticInstance.GetSelectedInspection(onSuccess,onFailed,userContext); }
+//]]>
+</script>
+
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="2A136539" />
+</div>
+        <script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('ctl00$RadScriptManager1', 'form1', ['tctl00$cplMain$UpdatePanelreCAPTCHA','cplMain_UpdatePanelreCAPTCHA','tctl00$cplMain$UpdatePanel1','cplMain_UpdatePanel1','tctl00$cplMain$UpdatePanelDetail','cplMain_UpdatePanelDetail','tctl00$ctl00$cplMain$rgSearchRsltsPanel','','tctl00$ctl00$cplMain$tcSearchDetailsPanel','','tctl00$ctl00$cplMain$RadMultiPageSearchPanel','','tctl00$ctl00$cplMain$plHldrActionsPanel','','tctl00$ctl00$cplMain$lblNoSearchRsltsPanel','','tctl00$ctl00$cplMain$btnMapOnPanel','','tctl00$ctl00$cplMain$btnMapOffPanel','','tctl00$ctl00$cplMain$lblPermitNoPanel','','tctl00$ctl00$cplMain$MapFramePanel','','tctl00$RadAjaxManager1SU','RadAjaxManager1SU'], ['ctl00$cplMain$btnSearch','','ctl00$cplMain$rgSearchRslts','','ctl00$cplMain$hlSearchResults','','ctl00$cplMain$tcSearchDetails','','ctl00$cplMain$btnMapOn','','ctl00$cplMain$btnMapOff',''], [], 360, 'ctl00');
+//]]>
+</script>
+
+        <!-- 2020.2.617.40 --><div id="RadAjaxManager1SU">
+	<span id="ctl00_RadAjaxManager1" style="display:none;"></span>
+</div>
+        <div id="container">
+            <div id="content" class="cntn">
+                <div class="skipnav caps">
+                    <a id="Moduleskipnav" tabindex="-1" title="Skip to main content" href="#sidebar" href="javascript:__doPostBack(&#39;ctl00$Moduleskipnav&#39;,&#39;&#39;)">Skip to main content</a>
+                </div>
+                <div style="width: 100%; margin: 0 auto;">
+                    <div id="ctl00_ucLogin_rwmLogin" style="display:none;">
+	<div id="ctl00_ucLogin_rwmLogin_alerttemplate" style="display:none;">
+		<div class="rwDialogPopup radalert">			
+			<div class="rwDialogText">
+			{1}				
+			</div>
+			
+			<div>
+				<a  onclick="$find('{0}').close(true);"
+				class="rwPopupButton" href="javascript:void(0);">
+					<span class="rwOuterSpan">
+						<span class="rwInnerSpan">##LOC[OK]##</span>
+					</span>
+				</a>				
+			</div>
+		</div>
+		</div><div id="ctl00_ucLogin_rwmLogin_prompttemplate" style="display:none;">
+		 <div class="rwDialogPopup radprompt">			
+			    <div class="rwDialogText">
+			    {1}				
+			    </div>		
+			    <div>
+				    <script type="text/javascript">
+				    function RadWindowprompt_detectenter(id, ev, input)
+				    {							
+					    if (!ev) ev = window.event;                
+					    if (ev.keyCode == 13)
+					    {															        
+					        var but = input.parentNode.parentNode.getElementsByTagName("A")[0];					        
+					        if (but)
+						    {							
+							    if (but.click) but.click();
+							    else if (but.onclick)
+							    {
+							        but.focus(); var click = but.onclick; but.onclick = null; if (click) click.call(but);							 
+							    }
+						    }
+					       return false;
+					    } 
+					    else return true;
+				    }	 
+				    </script>
+				    <input title="Enter Value" onkeydown="return RadWindowprompt_detectenter('{0}', event, this);" type="text"  class="rwDialogInput" value="{2}" />
+			    </div>
+			    <div>
+				    <a onclick="$find('{0}').close(this.parentNode.parentNode.getElementsByTagName('input')[0].value);"				
+					    class="rwPopupButton" href="javascript:void(0);" ><span class="rwOuterSpan"><span class="rwInnerSpan">##LOC[OK]##</span></span></a>
+				    <a onclick="$find('{0}').close(null);" class="rwPopupButton"  href="javascript:void(0);"><span class="rwOuterSpan"><span class="rwInnerSpan">##LOC[Cancel]##</span></span></a>
+			    </div>
+		    </div>				       
+		</div><div id="ctl00_ucLogin_rwmLogin_confirmtemplate" style="display:none;">
+		<div class="rwDialogPopup radconfirm">			
+			<div class="rwDialogText">
+			{1}				
+			</div>						
+			<div>
+				<a onclick="$find('{0}').close(true);"  class="rwPopupButton" href="javascript:void(0);" ><span class="rwOuterSpan"><span class="rwInnerSpan">##LOC[OK]##</span></span></a>
+				<a onclick="$find('{0}').close(false);" class="rwPopupButton"  href="javascript:void(0);"><span class="rwOuterSpan"><span class="rwInnerSpan">##LOC[Cancel]##</span></span></a>
+			</div>
+		</div>		
+		</div><input id="ctl00_ucLogin_rwmLogin_ClientState" name="ctl00_ucLogin_rwmLogin_ClientState" type="hidden" />
+</div>
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+<style type="text/css">
+    .skipnav {
+        text-align: left;
+    }
+
+        .skipnav a {
+            position: absolute;
+            left: -10000px;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+        }
+
+            .skipnav a:focus, .skipnav a:active {
+                position: static;
+                left: 0;
+                width: auto;
+                height: auto;
+                overflow: visible;
+                text-decoration: underline;
+            }
+</style>
+<script type="text/javascript">
+    function OnFocus(sender, eventArgs) {
+        $get('PasswordMask').style.display = 'none';
+        $get('Password').style.display = 'inline';
+        $find('ctl00_ucLogin_txtPassword').focus();
+    }
+
+    function alertme() {
+        alert("hello");
+    }
+
+    function OnBlur(sender, eventArgs) {
+        if (sender.isEmpty()) {
+            $get('PasswordMask').style.display = 'inline';
+            $get('Password').style.display = 'none';
+        }
+    }
+
+    function DashboardNavigate() {
+        var psurl = document.getElementById("ucLogin_hfDashboardRedirect").value
+
+        if (psurl != null) {
+            window.location.replace(psurl);
+        }
+    }
+    function CartNavigate() {
+        var psurl = document.getElementById("ucLogin_hfCartRedirect").value
+
+        if (psurl != null) {
+            window.location.replace(psurl);
+        }
+    }
+
+
+    function ViewEditProfileNavigate() {
+        var psurl = document.getElementById("ucLogin_hfViewEditProfile").value
+
+        if (psurl != null) {
+            window.location.replace(psurl);
+        }
+    }
+
+    function HomeNavigate() {
+        var psurl = document.getElementById("ucLogin_hfHome").value
+
+        if (psurl != null) {
+            window.location.replace(psurl);
+        }
+    }
+
+    function setupanaccount() {
+        var poSelectedValue = document.getElementById("ucLogin_hfContractorCSLBVerification").value;
+
+        if (poSelectedValue == null) {
+            alert("object is null");
+        }
+        else {
+            if (poSelectedValue == "ENABLED") {
+                var psurl = document.getElementById("ucLogin_hfSetupAnAccountForContractor").value
+
+                if (psurl != null) {
+                    var res = window.location.pathname.split("/");
+                    if (res.length > 3)
+                    {
+                        window.location.href = "../RegistrationConfirmation.aspx";
+                    }
+                    else 
+                    {
+                        window.location.href = "RegistrationConfirmation.aspx";
+                    }
+                }
+            }
+            else {
+                var psurl = document.getElementById("ucLogin_hfSetupAnAccountForPublic").value
+
+                if (psurl != null) {
+                    window.location.replace(psurl);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    $(document).ready(function () {
+        var LoginValue = document.getElementById("ucLogin_ddlSelLogin").value;
+        let ddlLogic = document.getElementById("ucLogin_ddlSelLogin");
+        var message = LoginValue + " is selected";
+        ddlLogic.setAttribute("aria-label", message);
+        setTimeout(function () {
+            ddlLogic.removeAttribute("aria-label");
+        }, 1000);
+    });
+
+</script>
+
+<div>
+    <input type="hidden" name="ctl00$ucLogin$hfDashboardRedirect" id="ucLogin_hfDashboardRedirect" value="https://trakit.miamilakes-fl.gov/etrakit/dashboard.aspx" />
+    <input type="hidden" name="ctl00$ucLogin$hfCartRedirect" id="ucLogin_hfCartRedirect" value="https://trakit.miamilakes-fl.gov/etrakit/ShoppingCart.aspx?iscartview=true" />
+    <input type="hidden" name="ctl00$ucLogin$hfViewEditProfile" id="ucLogin_hfViewEditProfile" value="static value" />
+    <input type="hidden" name="ctl00$ucLogin$hfHome" id="ucLogin_hfHome" value="https://trakit.miamilakes-fl.gov/etrakit/default.aspx" />
+
+    <input type="hidden" name="ctl00$ucLogin$hfSetupAnAccountForPublic" id="ucLogin_hfSetupAnAccountForPublic" value="https://trakit.miamilakes-fl.gov/etrakit/publicUserAccount.aspx?action=npa" />
+    <input type="hidden" name="ctl00$ucLogin$hfSetupAnAccountForContractor" id="ucLogin_hfSetupAnAccountForContractor" value="https://trakit.miamilakes-fl.gov/etrakit/RegistrationConfirmation.aspx" />
+    <input type="hidden" name="ctl00$ucLogin$hfContractorCSLBVerification" id="ucLogin_hfContractorCSLBVerification" value="DISABLED" />
+
+</div>
+
+
+<div id="hdrutils" class="cntn bg-a brdr-a">
+    <div class="int" style="width: 110%; margin-left: auto; margin-right: auto;">
+        <div id="ucLogin_pnlLogin" onkeypress="javascript:return WebForm_FireDefaultButton(event, &#39;ucLogin_btnLogin&#39;)">
+	
+            
+                    <div class="login_bg" align="center" >
+                        <div class="skipnav caps">
+                            <a id="ucLogin_Moduleskipnav" title="Skip to main content" href="#modules" href="javascript:__doPostBack(&#39;ctl00$ucLogin$Moduleskipnav&#39;,&#39;&#39;)">Skip to main content</a>
+                        </div>
+                        <a id="ucLogin_lnkBtnHome1" title="Link to Home" class="appcolor_hyperlinkAlt" href="javascript:__doPostBack(&#39;ctl00$ucLogin$lnkBtnHome1&#39;,&#39;&#39;)">Home</a>
+                        <span id="ucLogin_pipe5" class="pipe">|</span>
+
+                        <a id="ucLogin_hlSetupAcct" title="Link to Setup an Account" class="appcolor_hyperlinkAlt" href="../publicUserAccount.aspx?action=npa">Setup an Account</a>
+                        
+
+
+                        <label for="ucLogin_ddlSelLogin" id="ucLogin_lblSelLogin" class="pipe">Log In</label>
+                        <select name="ctl00$ucLogin$ddlSelLogin" onchange="javascript:setTimeout(&#39;__doPostBack(\&#39;ctl00$ucLogin$ddlSelLogin\&#39;,\&#39;\&#39;)&#39;, 0)" id="ucLogin_ddlSelLogin" title="Dropdown to Select type of Login" class="appdd_nofloat">
+		<option selected="selected" value="Public">Public</option>
+		<option value="Contractor">Contractor</option>
+
+	</select>
+                        <label for="ctl00_ucLogin_txtLoginId" id="ucLogin_lblLoginId" class="pipe">User Name:</label>
+
+                        
+                        <span id="ctl00_ucLogin_txtLoginId_wrapper" class="riSingle RadInput RadInput_Default" style="width:80px;"><input id="ctl00_ucLogin_txtLoginId" name="ctl00$ucLogin$txtLoginId" size="20" class="riTextBox riEnabled apptxt_80_lesspad" title="Enter User Name" type="text" value="" /><input id="ctl00_ucLogin_txtLoginId_ClientState" name="ctl00_ucLogin_txtLoginId_ClientState" type="hidden" /></span>
+                        
+                        
+                        <label for="ctl00_ucLogin_RadTextBox2" id="ucLogin_lblPassword" class="pipe">Password:</label>
+                        <span id="PasswordMask">
+                            <span id="ctl00_ucLogin_RadTextBox2_wrapper" class="riSingle RadInput RadInput_Default" style="width:80px;"><input id="ctl00_ucLogin_RadTextBox2" name="ctl00$ucLogin$RadTextBox2" size="20" class="riTextBox riEnabled apptxt_80_lesspad" type="text" value="" /><input id="ctl00_ucLogin_RadTextBox2_ClientState" name="ctl00_ucLogin_RadTextBox2_ClientState" type="hidden" /></span>
+                        </span>
+                        <span style="display: none">
+                            <label for="ctl00_ucLogin_txtPassword" id="ucLogin_labelPassword" class="pipe">Password:</label>
+                        </span>
+                        <span id="Password" style="display: none;">
+                            <span id="ctl00_ucLogin_txtPassword_wrapper" class="riSingle RadInput RadInput_Default" style="width:80px;"><input id="ctl00_ucLogin_txtPassword" name="ctl00$ucLogin$txtPassword" size="20" class="riTextBox riEnabled apptxt_80_lesspad" title="Enter Password" type="password" /><input id="ctl00_ucLogin_txtPassword_ClientState" name="ctl00_ucLogin_txtPassword_ClientState" type="hidden" /></span>
+                        </span>
+                        <input type="button" name="ctl00$ucLogin$btnLogin" value="Login" onclick="javascript:__doPostBack(&#39;ctl00$ucLogin$btnLogin&#39;,&#39;&#39;)" id="ucLogin_btnLogin" class="appbutton_nomarralt" />
+                        <span class="chkbx">
+                            <span class="pipe"><input id="ucLogin_chkBoxRememberMe" type="checkbox" name="ctl00$ucLogin$chkBoxRememberMe" /></span></span>
+                        <label for="ucLogin_chkBoxRememberMe" id="ucLogin_lblchkbox" class="pipe">Remember Me</label>&nbsp;&nbsp;&nbsp;
+                                    <a id="ucLogin_hlForgotPassword" class="appcolor_hyperlinkAlt" href="../retreiveAccountInformation.aspx" style="font-weight:bold;">Forgot Password</a>
+                        <a id="ucLogin_hlForgotUsername" class="appcolor_hyperlinkAlt" href="../retreiveAccountInformation.aspx?ai=un" style="font-weight:bold;">/Forgot Username</a>
+                    </div>
+                
+        
+</div>
+    </div>
+</div>
+<script type="text/javascript" language="javascript">
+    function invalidLogin() {
+    }
+
+    function invalidContractorAcct() {
+    }
+</script>
+
+                </div>
+                <input type="hidden" name="ctl00$hfGoogleKey" id="hfGoogleKey" />
+                <script type="text/javascript">
+                    var varGoogleKey = document.getElementById("hfGoogleKey").value;
+                    var _gaq = _gaq || [];
+
+                    _gaq.push(['_setAccount', varGoogleKey]);
+                    _gaq.push(['_trackPageview']);
+                    (function () {
+                        if (varGoogleKey != "") {
+                            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+                            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+                            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+                        }
+                    }
+                    )();
+                    function startSpatialAdvisor2(ddlActivityTypes, ddlActivitySubTypes, grp, altID, actNo, apn) {
+                        var actSubType = "";
+                        actType = ddlActivityTypes.options[ddlActivityTypes.selectedIndex].value;
+                        if (ddlActivitySubTypes)
+                            actSubType = ddlActivitySubTypes.options[ddlActivitySubTypes.selectedIndex].value;
+
+                        saFireAway(actType, actSubType, grp, altID, apn, actNo, callbackFunc);
+                    }
+                    function saFireAway(activityType, activitySubType, grp, altID, apn, actNo, callbackFunc) {
+                        try {
+                            window.frames.frmSpatialAdvisor.getSpatialAdvisorData(activityType, activitySubType, grp, altID, apn, actNo, callbackFunc);
+                        }
+                        catch (e)
+                        {
+                            window.frames.frmSpatialAdvisor.contentWindow.getSpatialAdvisorData(activityType, activitySubType, grp, altID, apn, actNo, callbackFunc);
+                        }
+                    }
+                
+                    function callbackFunc(js, useEval) {
+                        if (typeof js === "string" && js.indexOf("ERROR") > -1) {
+                            alert(js);
+                            setSARules();
+                        }
+                        else if (!js || (typeof js === "string" && js.toUpperCase() === "FALSE")) {
+                            setSARules();
+                        }
+                        else {
+                            if (useEval) {
+                                eval(js);
+
+                            }
+                            else {
+                                setSARules(js);
+                            }
+                        }
+                    }
+                </script>
+                <div class="int">
+                    <div id="sidebar" class="ragged light">
+                        
+
+                        
+
+                        <ul>
+                            <li id="liPermitsHeader" class="title">
+                                <h3>
+                                    <span id="lblPermitsHeader">Permits</span></h3>
+                            </li>
+                            <li id="liApplyForPermit">
+                                <a id="hlPermitApplication" title="Apply for a new Permit" href="../PermitApplication/confirmation.aspx" style="text-decoration:none;">Apply / New Permit</a>
+                            </li>
+                            <li id="liSearchPermits">
+                                <a id="hlPermitSearch" title="Click here to Search Permits" href="permit.aspx" style="text-decoration:none;">Search Permit</a>
+                            </li>
+                            <li id="liPermitShoppingCart">
+                                <a id="hlPermitFees" title="Pay All Fees added to the Shopping Cart" href="../shoppingCart.aspx?lt=either" style="text-decoration:none;">Pay Fees</a>
+                            </li>
+                            
+                            
+                            
+                            <li id="liProjectsHeader" class="title">
+                                <h3>
+                                    <span id="lblProjectHeader">Projects</span></h3>
+                            </li>
+                            <li id="liApplyForProject">
+                                <a id="hlProjectApplication" title="Apply for a new Project" href="../ProjectApplication/confirmation.aspx" style="text-decoration:none;">Apply for New Project</a>
+                            </li>
+                            <li id="liSearchProjects">
+                                <a id="hlProjectSearch" title="Click here to Search Projects" href="project.aspx" style="text-decoration:none;">Search Projects</a>
+                            </li>
+                            <li id="liProjectShoppingCart">
+                                <a id="hlProjectFees" title="Pay All Fees added to the Shopping Cart" href="../shoppingCart.aspx?lt=either" style="text-decoration:none;">Pay Fees</a>
+                            </li>
+                            
+                            
+                            <li id="liContractorsHeader" class="title">
+                                <h3>
+                                    <span id="lblContractorsHeader">Contractor</span></h3>
+                            </li>
+                            <li id="liApplyForAEC">
+                                <a id="hlAECApplication" title="Apply for a new AEC" href="../AecApplication/confirmation.aspx" style="text-decoration:none;">Register for new Account</a>
+                            </li>
+                            
+                            <li id="liSearchContractors">
+                                <a id="hlSearchAEC" title="Click here to Search Contractors" href="aec.aspx" style="text-decoration:none;">Search Contractors</a>
+                            </li>
+                            
+                            
+                            
+                            
+                            <li id="liParcelsHeader" class="title">
+                                <h3>Properties</h3>
+                            </li>
+                            <li id="liSearchParcels">
+                                <a id="hlLandSearch" title="Search Properties and Parcels" href="parcel.aspx" style="text-decoration:none;">Search Property</a>
+                            </li>
+                            
+                            <li id="liInspectionsHeader" class="title">
+                                <h3>Inspections</h3>
+                            </li>
+                            <li id="liScheduleInspections">
+                                <a id="hlScheduleInspections" title="Go to My Dashboard to Schedule Inspections" href="../dashboard.aspx" style="text-decoration:none;">Schedule</a>
+                            </li>
+                            
+                            
+                            <li id="liScheduled">
+                                <a id="hlScheduled" title="Scheduled Inspections for today" href="../ExistingInspections.aspx" style="text-decoration:none;">Scheduled</a>
+                            </li>
+                            <li id="liLicensesHeader" class="title">
+                                <h3>
+                                    <span id="lblLicensesHeader">License</span></h3>
+                            </li>
+                            
+                            <li id="liSearchLicenses">
+                                <a id="hlLicenseSearch" title="Click here to Search Licenses" href="license2.aspx" style="text-decoration:none;">Search Licenses</a>
+                            </li>
+                            <li id="liLicenseShoppingCart">
+                                <a id="hlLicenseFees" title="Pay All Fees added to the Shopping Cart" href="../shoppingCart.aspx?lt=public" style="text-decoration:none;">Pay Fees</a>
+                            </li>
+                            <li id="liRenewLicense">
+                                <a id="hlRenewLicense" title="Go to My Dashboard to Renew my Business License " href="../dashboard.aspx" style="text-decoration:none;">Renew</a>
+                            </li>
+                            <li id="liViolationsHeader" class="title">
+                                <h3>
+                                    <span id="lblCasesHeader">Violations</span></h3>
+                            </li>
+                            <li id="liSearchViolations">
+                                <a id="hlSearchViolations" title="Search Violations" href="case.aspx" style="text-decoration:none;">Search</a>
+                            </li>
+                            
+                            
+                            
+                            
+                            
+                            
+                            
+                            
+                            
+                            <li id="liShoppingCartHeader" class="title">
+                                <h3>Shopping Cart</h3>
+                            </li>
+                            <li id="liShoppingCartPayFees">
+                                <a id="hlPayFees" title="Pay All Fees for logged in user" href="../ShoppingCart.aspx?AddAllFees=true" style="text-decoration:none;">Pay All Fees</a>
+                            </li>
+                            <li id="liPaidItems">
+                                <a id="hlPaidItems" title="Click here for Paid Items" href="../paymenthistory.aspx" style="text-decoration:none;">Paid Items</a>
+                            </li>
+                            <li id="liContactHeader" class="title">
+                                <h3>
+                                    <span id="lblContact">Contact</span></h3>
+                            </li>
+                            <li id="liContact">
+                                <a id="hlContact" href="../contact.aspx" style="text-decoration:none;">Contact us</a>
+                            </li>
+                        </ul>
+                        <div class="botExt">
+                            <img width="180" height="15" alt="" src="blank.gif" />
+                        </div>
+                        <div class="bot">
+                            <img width="180" height="15" alt="" src="blank.gif" />
+                        </div>
+                    </div>
+                    <div id="maincol">
+                        
+    <script type="text/javascript" src='https://www.google.com/recaptcha/api.js'></script>
+
+    <style>
+        .column {
+          float: left;
+          width: 50%;
+        }
+
+        /* Clear floats after the columns */
+        .row:after {
+          content: "";
+          display: table;
+          clear: both;
+        }
+    </style>
+    <input type="hidden" name="ctl00$cplMain$activeTab" id="cplMain_activeTab" />
+    <input type="hidden" name="ctl00$cplMain$hfActivityMode" id="cplMain_hfActivityMode" />
+
+    <div id="cplMain_PageUpdateProgress" style="display:none;">
+	
+            <div class="Overlay">
+                <br />
+                <br />
+                <br />
+                <br />
+                <br />
+                <br />
+                <br />
+                <br />
+                <br />
+                <table width="100%" border="0" class="preloader">
+                        <tr>
+                            <th style="display:none">PreLoader</th>
+                        </tr>
+                        <tr>
+                            <td style="text-align: center; width: 100%">
+                                <img id="cplMain_Image1" src="../im/Preloader.gif" alt="" style="height:100px;width:100px;" />
+                            </td>
+                        </tr>
+                </table>
+            </div>
+        
+</div>
+
+    <div class="div_spacer_10">
+    </div>
+
+    <div id="pagetitle" style="text-align: left" role="main">
+        <h1>
+            
+                <span id="cplMain_lblSearchType"></span> Permit Search</h1>
+    </div>
+    <div id="cplMain_pnlSearchFunctions" onkeypress="javascript:return WebForm_FireDefaultButton(event, &#39;ctl00_cplMain_btnSearch&#39;)">
+	
+        <div id="cplMain_divSearchFunctions" class="formline">
+            <div style="width:100%">
+                <div class="row">
+                    <span style="display:none">Search By</span>
+                </div>
+                <div class="row">
+                    <div class="column">
+                        <label for="cplMain_ddSearchBy" class="applabel_autowidth fright">
+                            Search By:</label>
+                    </div>
+                    <div class="column">
+                        <select name="ctl00$cplMain$ddSearchBy" onchange="javascript:setTimeout(&#39;__doPostBack(\&#39;ctl00$cplMain$ddSearchBy\&#39;,\&#39;\&#39;)&#39;, 0)" id="cplMain_ddSearchBy" title="Search Field" class="appdd fleft">
+		<option value="Permit_Main.PERMIT_NO">PERMIT_NO</option>
+		<option value="Permit_Main.SITE_ADDR">SITE_ADDR</option>
+		<option value="Permit_Main.PERMITTYPE">PERMITTYPE</option>
+		<option value="Permit_Main.PERMITSUBTYPE">PERMITSUBTYPE</option>
+		<option selected="selected" value="Permit_Main.CONTRACTOR_NAME">CONTRACTOR_NAME</option>
+		<option value="Permit_Main.SITE_APN">FOLIO</option>
+
+	</select>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="column">
+                        <label for="cplMain_ddSearchOper" class="applabel_autowidth fright">
+                            Search Operator:</label>
+                    </div>
+                    <div class="column">
+                        <select name="ctl00$cplMain$ddSearchOper" id="cplMain_ddSearchOper" title="Search Operator" class="appdd fleft">
+		<option value="BEGINS WITH">Begins With</option>
+		<option selected="selected" value="CONTAINS">Contains</option>
+		<option value="EQUALS">Equals</option>
+		<option value="AT LEAST">At Least</option>
+		<option value="AT MOST">At Most</option>
+
+	</select>
+                    </div> 
+                </div>
+                <div class="row">
+                    <div class="column">
+                        <label for="cplMain_txtSearchString" class="applabel_autowidth fright">
+                            Search Value:</label>
+                    </div>
+                    <div class="fleft column">
+                        <input name="ctl00$cplMain$txtSearchString" type="text" value="Able Construction" id="cplMain_txtSearchString" title="Search value" class="apptxt_140 fleft plain" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div>
+                        &nbsp;
+                    </div>
+                </div>
+                <div class="row" style="text-align:center; vertical-align:bottom">
+                    <div style="text-align: center">
+                        <input type="button" name="ctl00$cplMain$btnSearch" value="Search" onclick="javascript:__doPostBack(&#39;ctl00$cplMain$btnSearch&#39;,&#39;&#39;)" id="ctl00_cplMain_btnSearch" class="appbuttonalt marl5" />
+                    </div>
+                </div>
+            </div>
+            <br />
+
+            <div id="cplMain_UpdatePanelreCAPTCHA">
+		
+                    
+                
+	</div>
+
+            
+            <table>
+                <tr>
+                    <th style="display:none">Search More Results</th>
+                </tr>
+                <tr>
+                    <td id="cplMain_tdMoreResult" align="left">
+                        <br />
+                        <div style="position: relative; left: 20px; top: -15px; width: 120%;">
+                            <div id="cplMain_UpdatePanel1">
+		
+                                    <span id="cplMain_lblMoreResults" class="applabel_180_nomar_nofloat" role="alert" style="background-color:Transparent;">Your search returned 26 total record(s).</span>
+                                
+	</div>
+                        </div>
+                    </td>
+	
+                </tr>
+            </table>
+        </div>
+        
+    
+</div>
+    <div class="clear linespace">
+    </div>
+    <div id="maptoggle" style="position: relative; top: 0px;">
+        <span class="applabel_autowidth primary caps small">Map</span>
+        <span class="RadAjaxPanel" id="ctl00_ctl00_cplMain_btnMapOnPanel"><input type="button" name="ctl00$cplMain$btnMapOn" value="On" onclick="javascript:__doPostBack(&#39;ctl00$cplMain$btnMapOn&#39;,&#39;&#39;)" id="ctl00_cplMain_btnMapOn" class="appbutton_nopad fleft" /></span>
+        <span class="RadAjaxPanel" id="ctl00_ctl00_cplMain_btnMapOffPanel"><input type="button" name="ctl00$cplMain$btnMapOff" value="Off" id="ctl00_cplMain_btnMapOff" disabled="disabled" class="aspNetDisabled appbutton_nopad faded fleft" /></span>
+    </div>
+    <div class="clear linespace">
+    </div>
+    <div style="position: relative; left: -25px; top: 10px;">
+        <table cellpadding="0" cellspacing="0" border="0" width="110%">
+            <tr align="center">
+                <th colspan="2">
+                    <!-- MAP HERE -->
+                    <div style="visibility:hidden">Map Frame</div>
+                    <span class="RadAjaxPanel" id="ctl00_ctl00_cplMain_MapFramePanel"></span>
+                    <div class="clear linespace">
+                    </div>
+                </th>
+            </tr>
+            <tr>
+                <th colspan="2">
+                                        <div style="visibility:hidden">No results</div>
+                    <span class="RadAjaxPanel" id="ctl00_ctl00_cplMain_lblNoSearchRsltsPanel"></span>
+                </th>
+            </tr>
+            <tr>
+                <th valign="top" style="text-align: left">
+                  <div style="visibility:hidden">Search</div>
+                    <div id="cplMain_rlpSearch" style="display:none;background-color:White;height:680px;width:732px;text-align:center;position: absolute;">
+	
+                        <div class="divspacer">
+                            &nbsp;
+                        </div>
+                        <div class="divspacer">
+                            &nbsp;
+                        </div>
+                        <div class="divspacer">
+                            &nbsp;
+                        </div>
+                        <div class="divspacer">
+                            &nbsp;
+                        </div>
+                        <div class="divspacer">
+                            &nbsp;
+                        </div>
+                        <div class="divspacer">
+                            &nbsp;
+                        </div>
+                        <div class="divspacer">
+                            &nbsp;
+                        </div>
+                        <div class="divspacer">
+                            &nbsp;
+                        </div>
+                        <div class="divspacer">
+                            &nbsp;
+                        </div>
+                        <img id="cplMain_imgLoading" src="../im/Common/Loading.gif" alt="" />
+                        <span id="cplMain_lblLoading" class="LoadingImage" style="font-size:Large;">Loading...</span>
+                    
+</div>
+                    <div id="divSearchResults" style="display: none; position: relative; left: 10px; top: -40px;"
+                        class="marl5">
+                        <fieldset class="fieldsetwhite">
+                            <legend>
+                                <div class="pagesubtitle">
+                                      <span id="lbChangeRecord"><strong>Permits</strong></span>
+                                </div>
+                            </legend>
+                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <tr>
+                                    <th style="display:none">Buttons</th>
+                                </tr>
+                                <tr>
+                                    <th>
+                                        <div style="position: relative; left: 565px; top: -43px;text-align: justify;">
+                                            <input type="button" name="ctl00$cplMain$btnPrint" value="Print" onclick="fnLoadNewWindow(&#39;../PermitListPrint.aspx&#39;); return false;__doPostBack(&#39;ctl00$cplMain$btnPrint&#39;,&#39;&#39;)" id="cplMain_btnPrint" class="appbuttonalt marl5" />&nbsp;<input type="button" name="ctl00$cplMain$btnExportToExcel" value="Export To Excel" onclick="javascript:__doPostBack(&#39;ctl00$cplMain$btnExportToExcel&#39;,&#39;&#39;)" id="cplMain_btnExportToExcel" class="appbuttonalt marl5" />
+                                        </div>
+                                    </th>
+                                </tr>
+                                <tr>
+                                    <th class="applblfixedbox_463_grey">
+                                        <div style="display:none">Search Results</div>
+                                        <a id="ctl00_cplMain_hlSearchResults" title="Return to Search Results" href="javascript:__doPostBack(&#39;ctl00$cplMain$hlSearchResults&#39;,&#39;&#39;)">
+                            <span class="marl10" style="font-weight:bold; color:#DB0000;"><img src="../im/Search_Results.png" title="Return to Search Results" alt="Click here to Return to Search Results" border="0" />&nbsp;&nbsp;&nbsp;Search Results</span>
+                                        </a>
+                                    </th>
+                                </tr>
+                                <tr>
+                                    <th class="marb0">&nbsp;
+                                        <div style="display:none">Results below</div>
+                                    </th>
+                                </tr>
+                            </table>
+                            <div style="position: relative; left: 5px">
+                                <span class="RadAjaxPanel" id="ctl00_ctl00_cplMain_rgSearchRsltsPanel"><div id="ctl00_cplMain_rgSearchRslts" class="RadGrid RadGrid_TRAKiT_Grid greygradient padb30" style="border-style:None;height:359px;width:720px;">
+
+	<div id="ctl00_cplMain_rgSearchRslts_GridData" class="rgDataDiv" style="overflow-x:auto;overflow-y:auto;width:100%;height:300px;">
+
+<table class="rgMasterTable" cellspacing="1" cellpadding="2" align="Left" id="ctl00_cplMain_rgSearchRslts_ctl00" style="background-color:Transparent;font-size:12px;font-style:normal;text-decoration:none;width:100%;table-layout:auto;empty-cells:show;">
+	<colgroup>
+		<col  />
+		<col  />
+		<col  />
+		<col  />
+		<col  />
+		<col  />
+		<col style="display:none;" />
+	</colgroup>
+<thead>
+		<tr>
+			<th scope="col" title="Sort by PERMIT_NO" class="rgHeader appGridHeader" style="font-style:normal;text-decoration:none;white-space:nowrap;text-align:left;"><a onclick="Telerik.Web.UI.Grid.Sort($find(&#39;ctl00_cplMain_rgSearchRslts_ctl00&#39;), &#39;PERMIT_NO&#39;); return false;" title="Sort by PERMIT_NO" href="javascript:__doPostBack(&#39;ctl00$cplMain$rgSearchRslts$ctl00$ctl02$ctl01$ctl00&#39;,&#39;&#39;)">PERMIT_NO</a></th><th scope="col" title="Sort by Permit Type" class="rgHeader appGridHeader" style="font-style:normal;text-decoration:none;white-space:nowrap;text-align:left;"><a onclick="Telerik.Web.UI.Grid.Sort($find(&#39;ctl00_cplMain_rgSearchRslts_ctl00&#39;), &#39;PermitType&#39;); return false;" title="Sort by Permit Type" href="javascript:__doPostBack(&#39;ctl00$cplMain$rgSearchRslts$ctl00$ctl02$ctl01$ctl01&#39;,&#39;&#39;)">Permit Type</a></th><th scope="col" title="Sort by Permit Sub Type" class="rgHeader appGridHeader" style="font-style:normal;text-decoration:none;white-space:nowrap;text-align:left;"><a onclick="Telerik.Web.UI.Grid.Sort($find(&#39;ctl00_cplMain_rgSearchRslts_ctl00&#39;), &#39;PermitSubType&#39;); return false;" title="Sort by Permit Sub Type" href="javascript:__doPostBack(&#39;ctl00$cplMain$rgSearchRslts$ctl00$ctl02$ctl01$ctl02&#39;,&#39;&#39;)">Permit Sub Type</a></th><th scope="col" title="Sort by FOLIO" class="rgHeader appGridHeader" style="font-style:normal;text-decoration:none;white-space:nowrap;text-align:left;"><a onclick="Telerik.Web.UI.Grid.Sort($find(&#39;ctl00_cplMain_rgSearchRslts_ctl00&#39;), &#39;SITE_APN&#39;); return false;" title="Sort by FOLIO" href="javascript:__doPostBack(&#39;ctl00$cplMain$rgSearchRslts$ctl00$ctl02$ctl01$ctl03&#39;,&#39;&#39;)">FOLIO</a></th><th scope="col" title="Sort by SITE_ADDR" class="rgHeader appGridHeader" style="font-style:normal;text-decoration:none;white-space:nowrap;text-align:left;"><a onclick="Telerik.Web.UI.Grid.Sort($find(&#39;ctl00_cplMain_rgSearchRslts_ctl00&#39;), &#39;SITE_ADDR&#39;); return false;" title="Sort by SITE_ADDR" href="javascript:__doPostBack(&#39;ctl00$cplMain$rgSearchRslts$ctl00$ctl02$ctl01$ctl04&#39;,&#39;&#39;)">SITE_ADDR</a></th><th scope="col" title="Sort by CONTRACTOR_NAME" class="rgHeader appGridHeader" style="font-style:normal;text-decoration:none;white-space:nowrap;text-align:left;"><a onclick="Telerik.Web.UI.Grid.Sort($find(&#39;ctl00_cplMain_rgSearchRslts_ctl00&#39;), &#39;CONTRACTOR_NAME&#39;); return false;" title="Sort by CONTRACTOR_NAME" href="javascript:__doPostBack(&#39;ctl00$cplMain$rgSearchRslts$ctl00$ctl02$ctl01$ctl05&#39;,&#39;&#39;)">CONTRACTOR_NAME</a></th><th scope="col" title="Sort by RECORDID" class="rgHeader appGridHeader" style="font-style:normal;text-decoration:none;white-space:nowrap;display:none;text-align:left;"><a onclick="Telerik.Web.UI.Grid.Sort($find(&#39;ctl00_cplMain_rgSearchRslts_ctl00&#39;), &#39;RECORDID&#39;); return false;" title="Sort by RECORDID" href="javascript:__doPostBack(&#39;ctl00$cplMain$rgSearchRslts$ctl00$ctl02$ctl01$ctl06&#39;,&#39;&#39;)">RECORDID</a></th>
+		</tr>
+	</thead><tfoot>
+		<tr class="rgPager">
+			<td colspan="6">
+                                            <table border="0" cellpadding="0" width="148px"><tr><th style="Display:None">Buttons to move Next/Previous</th></tr><tr><td>&nbsp;</td></tr><tr><td>&nbsp;</td></tr><tr><td align="center"><input type="submit" name="ctl00$cplMain$rgSearchRslts$ctl00$ctl03$ctl01$btnPageFirst" value="" id="ctl00_cplMain_rgSearchRslts_ctl00_ctl03_ctl01_btnPageFirst" disabled="disabled" title="Click to go to first page" class="aspNetDisabled PagerButton FirstPage" />&nbsp;<input type="submit" name="ctl00$cplMain$rgSearchRslts$ctl00$ctl03$ctl01$btnPagePrev" value="" id="ctl00_cplMain_rgSearchRslts_ctl00_ctl03_ctl01_btnPagePrev" disabled="disabled" title="Click to go to previous page" class="aspNetDisabled PagerButton PrevPage" />&nbsp;<input type="submit" name="ctl00$cplMain$rgSearchRslts$ctl00$ctl03$ctl01$btnPageNext" value="" onclick="changePage(&#39;next&#39;); return false;" id="ctl00_cplMain_rgSearchRslts_ctl00_ctl03_ctl01_btnPageNext" title="Click to go to next page" class="PagerButton NextPage" />&nbsp;<input type="submit" name="ctl00$cplMain$rgSearchRslts$ctl00$ctl03$ctl01$btnPageLast" value="" onclick="changePage(&#39;last&#39;); return false;" id="ctl00_cplMain_rgSearchRslts_ctl00_ctl03_ctl01_btnPageLast" title="Click to go to last page" class="PagerButton LastPage" /></td></tr><tr><td>&nbsp;</td></tr><tr><td align="center"><span class="font12 italic">page 1 of 6</span></td></tr></table>
+                                        </td>
+		</tr>
+	</tfoot><tbody>
+	<tr class="rgRow" id="ctl00_cplMain_rgSearchRslts_ctl00__0" style="white-space:nowrap;text-align:left;">
+		<td>B2011-1357</td><td><span>BUILDING-RES</span></td><td><span></span></td><td><span>3220150390320</span></td><td><span>16741 NW 77 PL</span></td><td><span>A A RELIABLE CONSTRUCTION INC</span></td><td style="display:none;"><span>CONV:120529133645173160</span></td>
+	</tr><tr class="rgAltRow" id="ctl00_cplMain_rgSearchRslts_ctl00__1" style="white-space:nowrap;text-align:left;">
+		<td>B2011-3099</td><td><span>BUILDING</span></td><td><span></span></td><td><span>3220210150100</span></td><td><span>8793 NW 142 LN</span></td><td><span>A A RELIABLE CONSTRUCTION INC</span></td><td style="display:none;"><span>CONV:120529133702178841</span></td>
+	</tr><tr class="rgRow" id="ctl00_cplMain_rgSearchRslts_ctl00__2" style="white-space:nowrap;text-align:left;">
+		<td>BLR2014-1326</td><td><span>BUILDING-RES</span></td><td><span>INTERIOR ALT</span></td><td><span>3220210020680</span></td><td><span>8820 NW 150 ST</span></td><td><span>A A RELIABLE CONSTRUCTION INC</span></td><td style="display:none;"><span>LG:1405301212310753</span></td>
+	</tr><tr class="rgAltRow" id="ctl00_cplMain_rgSearchRslts_ctl00__3" style="white-space:nowrap;text-align:left;">
+		<td>BLR2016-2508</td><td><span>BUILDING-RES</span></td><td><span>RE/RP-DRIVEWAY</span></td><td><span>3220230101640</span></td><td><span>7310 JACARANDA LN</span></td><td><span>A A RELIABLE CONSTRUCTION INC</span></td><td style="display:none;"><span>SNAR:161003092318558</span></td>
+	</tr><tr class="rgRow" id="ctl00_cplMain_rgSearchRslts_ctl00__4" style="white-space:nowrap;text-align:left;">
+		<td>BLR2016-3218</td><td><span>BUILDING-RES</span></td><td><span>RE/RP-DRIVEWAY</span></td><td><span>3220160021050</span></td><td><span>16354 NW 87 PL</span></td><td><span>A A RELIABLE CONSTRUCTION INC</span></td><td style="display:none;"><span>SNAR:161205100219999</span></td>
+	</tr>
+	</tbody>
+
+</table>	</div>
+<div id="ctl00_cplMain_rgSearchRslts_SharedCalendarContainer" style="display:none;">
+
+</div><input id="ctl00_cplMain_rgSearchRslts_ClientState" name="ctl00_cplMain_rgSearchRslts_ClientState" type="hidden" />	</div>
+</span>
+                            </div>
+                        </fieldset>
+                    </div>
+                </th>
+                <th valign="top" style="text-align: left">
+                    <div style="display:none">Search Details</div>
+                    <div id="divSearchDetails" style="display: none; position: relative; left: 0px; top: -20px;"
+                        class="marb2">
+                        <fieldset class="fieldsetwhite">
+                            <legend>
+                                <div class="pagesubtitle">
+                                       <span id="lgdPermitTabs"><strong>Permit #<span class="RadAjaxPanel" id="ctl00_ctl00_cplMain_lblPermitNoPanel"><span id="cplMain_lblPermitNo"></span></span></strong></span>
+                                 </div>
+                            </legend>
+                            <div style="width:100%">
+                                <div class="row">
+                                    <div class="applblfixedbox_463_grey">
+                                        <span class="marl5" style="font-weight: bold;"></span>
+                                        <!-- actions -->
+                                        <img src="blank.gif" width="0px" alt="" height="20px" />
+                                        <span class="RadAjaxPanel" id="ctl00_ctl00_cplMain_plHldrActionsPanel"></span>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="marb0">&nbsp;
+                                    </div>
+                                </div>
+                            </div>
+
+                            <span class="RadAjaxPanel" id="ctl00_ctl00_cplMain_tcSearchDetailsPanel"><div id="ctl00_cplMain_tcSearchDetails" class="RadTabStrip RadTabStrip_TRAKiT_Grid RadTabStripTop_TRAKiT_Grid RadTabStripTop">
+	<div class="rtsLevel rtsLevel1">
+		<ul class="rtsUL"><li class="rtsLI rtsFirst"><a class="rtsLink" href="#"><span class="rtsOut"><span class="rtsIn"><span class="rtsTxt">Permit Info</span></span></span></a></li><li class="rtsLI"><a class="rtsLink rtsBefore" href="#"><span class="rtsOut"><span class="rtsIn"><span class="rtsTxt">Site Info</span></span></span></a></li><li class="rtsLI"><a class="rtsLink rtsSelected" href="#"><span class="rtsOut"><span class="rtsIn"><span class="rtsTxt">Contacts</span></span></span></a></li><li class="rtsLI"><a class="rtsLink rtsAfter" href="#"><span class="rtsOut"><span class="rtsIn"><span class="rtsTxt">Fees</span></span></span></a></li><li class="rtsLI"><a class="rtsLink" href="#"><span class="rtsOut"><span class="rtsIn"><span class="rtsTxt">Inspections</span></span></span></a></li><li class="rtsLI"><a class="rtsLink" href="#"><span class="rtsOut"><span class="rtsIn"><span class="rtsTxt">Chronology</span></span></span></a></li><li class="rtsLI"><a class="rtsLink" href="#"><span class="rtsOut"><span class="rtsIn"><span class="rtsTxt">Conditions</span></span></span></a></li><li class="rtsLI rtsLast"><a class="rtsLink" href="#"><span class="rtsOut"><span class="rtsIn"><span class="rtsTxt">Reviews</span></span></span></a></li></ul>
+	</div><input id="ctl00_cplMain_tcSearchDetails_ClientState" name="ctl00_cplMain_tcSearchDetails_ClientState" type="hidden" />
+</div></span>
+                            <hr />
+                            <span class="RadAjaxPanel" id="ctl00_ctl00_cplMain_RadMultiPageSearchPanel"><div id="ctl00_cplMain_RadMultiPageSearch" class="RadMultiPage RadMultiPage_Default greygradient minHeight361">
+	<div id="cplMain_RadPageViewPermitInfo" class="rmpView rmpHidden padb30">
+		
+                                    <div id="cplMain_UpdatePanelDetail">
+			
+                                            
+                                        
+		</div>
+                                
+	</div><div id="cplMain_RadPageViewSiteInfo" class="rmpView rmpHidden padb30">
+		
+                                    
+                                
+	</div><div id="cplMain_RadPageViewContacts" class="rmpView padb30">
+		
+                                    
+                                
+	</div><div id="cplMain_RadPageViewFees" class="rmpView rmpHidden padb30">
+		
+                                    
+                                
+	</div><div id="cplMain_RadPageViewInspections" class="rmpView rmpHidden padb30">
+		
+                                    
+                                
+	</div><div id="cplMain_RadPageChronology" class="rmpView rmpHidden padb30">
+		
+                                    
+                                
+	</div><div id="cplMain_RadPageConditions" class="rmpView rmpHidden padb30">
+		
+                                    
+                                
+	</div><div id="cplMain_RadPageViewReviews" class="rmpView rmpHidden padb30">
+		
+                                    
+                                
+	</div><input id="ctl00_cplMain_RadMultiPageSearch_ClientState" name="ctl00_cplMain_RadMultiPageSearch_ClientState" type="hidden" />
+</div></span>
+                        </fieldset>
+                    </div>
+
+                </th>
+            </tr>
+        </table>
+    </div>
+    <div id="divToolTip" tabindex="0" class="fright marl5" style="position: absolute; padding: 4px; color: #000; line-height: 1.2; background-color: #FFFFE1; border: 1px solid Black; width: 200px; top: 70px; left: 900px; visibility: hidden">
+        <button type="button" title="Close" onclick="ShowSearchToolTip()" class="appcolor fleft nounderline"
+            style="background-color: #FFFFE1; border-style: none; border-width: 1px; text-decoration: none; float: left">
+            X</button>
+        <p id="cplMain_pToolTipText">
+        </p>
+    </div>
+
+
+
+    
+        <script src="../js/JScript.js" type="text/javascript"></script>
+        <script type="text/javascript">
+            function buttonSwap(obj) {
+                imgURL = obj.src
+
+                if (imgURL.indexOf("_up.png") > 0) {
+                    imgURL = imgURL.replace("_up.png", "_over.png");
+                }
+
+                else {
+                    imgURL = imgURL.replace("_over.png", "_up.png");
+                }
+                obj.src = imgURL;
+            }
+
+            function insertrdpPrompt1aToday(sender) {
+                var today = new Date();
+                var cal = $find("ctl00_cplMain_rdpPrompt1a");
+
+                if (cal) {
+                    cal.set_selectedDate(today);
+                }
+            }
+            function insertrdpPrompt1bToday(sender) {
+                var today = new Date();
+                var cal = $find("ctl00_cplMain_rdpPrompt1b");
+
+                if (cal) {
+                    cal.set_selectedDate(today);
+                }
+            }
+            function insertrdpPrompt2aToday(sender) {
+                var today = new Date();
+                var cal = $find("ctl00_cplMain_rdpPrompt2a");
+
+                if (cal) {
+                    cal.set_selectedDate(today);
+                }
+            }
+            function insertrdpPrompt2bToday(sender) {
+                var today = new Date();
+                var cal = $find("ctl00_cplMain_rdpPrompt2b");
+
+                if (cal) {
+                    cal.set_selectedDate(today);
+                }
+            }
+            function insertrdpPrompt3aToday(sender) {
+                var today = new Date();
+                var cal = $find("ctl00_cplMain_rdpPrompt3a");
+
+                if (cal) {
+                    cal.set_selectedDate(today);
+                }
+            }
+            function insertrdpPrompt3bToday(sender) {
+                var today = new Date();
+                var cal = $find("ctl00_cplMain_rdpPrompt3b");
+
+                if (cal) {
+                    cal.set_selectedDate(today);
+                }
+            }
+            function ShowColumns() {
+                try {
+                    var rsltsGrid = $find("ctl00_cplMain_rgSearchRslts");
+                    var columnCount = rsltsGrid.get_masterTableView().get_columns().length - 1;
+                    for (i = 0; i <= columnCount; i++) {
+                        if (i != 0) {
+                            rsltsGrid.get_masterTableView().showColumn(i);
+                        }
+                    }
+                }
+                catch (err) {
+                }
+            }
+
+            function ShowSearchToolTip() {
+                var podivToolTip;
+
+                podivToolTip = document.getElementById("divToolTip");
+
+                if (podivToolTip.style.visibility == "hidden") {
+                    podivToolTip.style.visibility = "visible";
+                    podivToolTip.focus();
+                }
+                else {
+                    podivToolTip.style.visibility = "hidden";
+                }
+            }
+
+            function HideColumns() {
+                try {
+                    var rsltsGrid = $find("ctl00_cplMain_rgSearchRslts");
+                    var columnCount = rsltsGrid.get_masterTableView().get_columns().length - 1;
+
+                    for (i = 0; i <= columnCount; i++) {
+                        if (i != 0) {
+                            rsltsGrid.get_masterTableView().hideColumn(i);
+                        }
+                    }
+                }
+                catch (err) {
+                }
+            }
+
+            function OnTabSelectedHandler(sender, args) {
+                try {
+                    var activeTab = $get('cplMain_activeTab');
+
+                    activeTab.value = sender.get_selectedTab().get_value();
+                }
+                catch (err) {
+                    alert(err);
+                }
+            }
+
+            function RequestStart(sender, eventArgs) {
+                //var divSearchRslts = $find("ctl00_cplMain_rgSearchRslts").get_element().style;
+                //divSearchRslts.display = 'none';
+
+                //var divElementStyle = $find("cplMain_rlpSearch").get_element().style;
+                //divElementStyle.position = 'absolute';
+            }
+
+            function ResponseEnd(sender, eventArgs) {
+                //var divSearchRslts = $find("ctl00_cplMain_rgSearchRslts").get_element().style;
+                //divSearchRslts.display = 'none';
+
+                //                var divElementStyle = $find("cplMain_rlpSearch").get_element().style;
+                //                divElementStyle.position = 'absolute';
+
+                //                var bMapOn = document.getElementById('cplMain_btnMapOn');
+                //                if (bMapOn.disabled == true) { divElementStyle.top = '479px'; } else { divElementStyle.top = '159px'; }
+                //divSearchRslts.display = '';
+            }
+
+            function showTabs(bShow) {
+                var divSD = document.getElementById("divSearchDetails").style;
+                var lbCR = document.getElementById("lbChangeRecord")
+                if (bShow == true) {
+                    divSD.display = "";
+                    lbCR.innerHTML = "<strong>Search Results</strong>";
+                }
+                else {
+                    divSD.display = "none";
+                    lbCR.innerHTML = "<strong>Permits</strong>";
+                }
+            }
+
+            function resetTabs() {
+                var divSD = document.getElementById("divSearchDetails").style;
+                if (divSD.display == "none") divSD.display = "none"; else divSD.display = "";
+            }
+
+            function showMapButtons(bShow) {
+                var divMB = document.getElementById("maptoggle").style;
+                if (bShow == true) divMB.display = ""; else divMB.display = "none";
+            }
+
+            function showSearchResults(bShow) {
+                var divSR = document.getElementById("divSearchResults").style;
+                if (bShow == true) divSR.display = ""; else divSR.display = "none";
+            }
+
+            var tableView = null;
+            function pageLoad(sender, args) {
+                tableView = $find("ctl00_cplMain_rgSearchRslts").get_masterTableView();
+            }
+
+            function changePage(argument) {
+                tableView.page(argument);
+            }
+
+            function RadNumericTextBox1_ValueChanged(sender, args) {
+                tableView.page(sender.get_value());
+            }
+
+            var selected = {};
+            function rgSearchRslts_RowSelected(sender, args) {
+                var permitNo = args.getDataKeyValue("PERMIT_NO");
+                if (!selected[permitNo]) {
+                    selected[permitNo] = true;
+                }
+            }
+
+            function rgSearchRslts_RowDeselected(sender, args) {
+                var permitNo = args.getDataKeyValue("PERMIT_NO");
+                if (selected[permitNo]) {
+                    selected[permitNo] = null;
+                }
+            }
+
+            function rgSearchRslts_RowCreated(sender, args) {
+                var permitNo = args.getDataKeyValue("PERMIT_NO");
+                if (selected[permitNo]) {
+                    args.get_gridDataItem().set_selected(true);
+                }
+            }
+
+            function rgSearchRslts_DeselectAll() {
+                selected = {};
+            }
+
+        </script>
+        <div id="ctl00_cplMain_rw" style="display:none;">
+	<div id="ctl00_cplMain_rw_C" style="display:none;">
+
+	</div><input id="ctl00_cplMain_rw_ClientState" name="ctl00_cplMain_rw_ClientState" type="hidden" />
+</div>
+        <script language="javascript" type="text/javascript">
+
+            function ToggleDisplay(sender) {
+
+                var id = sender.id
+                var img = document.getElementById(id);
+                var trid = id.replace("btn", "table");
+                var elem = document.getElementById(trid);
+
+                if (elem) {
+                    if (elem.style.display == 'block' || elem.style.display == '') {
+                        elem.style.display = 'none';
+                        img.src = "../im/add_up.gif";
+                        img.title = "Expand";
+                    }
+                    else {
+                        elem.style.display = 'block';
+                        img.src = "../im/del_up.gif";
+                        img.title = "Expand";
+                    }
+                }
+            }
+
+            function openBingMap(url, width, height) {
+                var oWnd = $find("ctl00_cplMain_rw");
+                oWnd.show();
+                oWnd.setSize(width, height);
+                oWnd.center();
+                oWnd.set_modal(true);
+                oWnd.setUrl(url);
+            }
+
+            function openEditCustom(activityno, recordid, mode) {
+                var oWnd = $find("ctl00_cplMain_rw");
+
+                url = '../Agency/EditInspection.aspx?Group=PERMIT&ActivityNo=' + activityno + '&action=' + mode + '&subgroup=INSPECTION&RecordID=' + recordid
+                oWnd.setSize(950, 465);
+                oWnd.show();
+                oWnd.set_title("Custom Screen");
+                oWnd.center();
+                oWnd.set_modal(true);
+                oWnd.setUrl(url);
+            }
+
+            function openMoreInfo(mtype, group, actNo, recID, respond, hidenotes) {
+                url = "";
+                switch (mtype) {
+                    case "CHRONOLOGY":
+                        url = '../moreinfo/actionInfo.aspx?Group=' + group + '&ActivityNo=' + actNo + '&RecordID=' + recID;
+                        break;
+                    case "INSPECTION":
+                        url = '../moreinfo/inspectionInfo.aspx?Group=' + group + '&ActivityNo=' + actNo + '&RecordID=' + recID;
+                        break;
+                    case "REVIEW":
+                        url = '../moreinfo/reviewInfo.aspx?Group=' + group + '&ActivityNo=' + actNo + '&RecordID=' + recID + '&Respond=' + respond;
+                        break;
+                    case "CONDITION":
+                        url = '../moreinfo/conditionInfo.aspx?Group=' + group + '&ActivityNo=' + actNo + '&RecordID=' + recID + '&agency=false';
+                        break;
+                    case "VIOLATION":
+                        url = '../moreinfo/violationInfo.aspx?Group=' + group + '&ActivityNo=' + actNo + '&RecordID=' + recID;
+                        break;
+                }
+
+                var oWnd = $find("ctl00_cplMain_rw");
+
+                if (respond != null && respond != "null") {
+                    if (hidenotes != null && hidenotes == "TRUE") {
+                        oWnd.setSize(640, 300);
+                    }
+                    else {
+                        oWnd.setSize(640, 650);
+                    }
+                }
+                else {
+                    oWnd.setSize(500, 550);
+                }
+
+                oWnd.show();
+
+                oWnd.set_title(mtype + " More Info");
+                oWnd.center();
+                oWnd.set_modal(true);
+                oWnd.setUrl(url);
+            }
+
+            function closeMoreInfo() {
+                var oWnd = $find("ctl00_cplMain_rw");
+                oWnd.close();
+            }
+
+            function closeEditCustomScreen() {
+                var oWnd = $find("ctl00_cplMain_rw");
+                oWnd.close();
+            }
+
+            function closeMoreInfoandrefresh(oreviewrecordid) {
+                //var oWnd = $find("ctl00_cplMain_rw");
+                //oWnd.close();
+
+                //changerespondtext(oreviewrecordid);
+                return true;
+            }
+
+            function setWindowTitle(title) {
+                var oWnd = $find("ctl00_cplMain_rw");
+                oWnd.set_title(title);
+            }
+
+            function ShowMoreResult(note) {
+                var lblResult = document.getElementById('lblMoreResult');
+
+                if (lblResult != null) {
+                    lblResult.innerText = note;
+                }
+            }
+
+            function HideMoreResult() {
+                var lblResult = document.getElementById('lblMoreResult');
+
+                if (lblResult != null) {
+                    lblResult.innerText = '';
+                }
+            }
+            function fnLoadNewWindow(strUrl) {
+                window.open(strUrl, null, "width=900,scrollbars=1,stat us=no,toolbar=no,menubar=no,location=no");
+            }
+
+            function CloseRW() {
+                var oWnd = $find("ctl00_cplMain_rw");
+                oWnd.close();
+
+                __doPostBack("UPDATESINGLEACTIVITY", "");
+            }
+
+            function CloseAndRefreshInspections() {
+                CloseRW();
+            }
+
+            function openAttachment(asGroup, asActivityNo) {
+                var url = "../attachmentUpload.aspx?Group=" + asGroup + "&ActivityNo=" + asActivityNo + "&showCurrent=true&postbackid=nothing";
+
+                var oWnd = $find("ctl00_cplMain_rw");
+
+                oWnd.show();
+                oWnd.setSize(640, 500);
+                oWnd.set_title("Attachment");
+                oWnd.center();
+                oWnd.set_modal(true);
+                oWnd.setUrl(url);
+            }
+
+        </script>
+    
+
+                    </div>
+                    <div class="clear">
+                    </div>
+                </div>
+                <!-- COMMENTED OUT - fixes button and scroll bottom of page problems - MDP - 6/7/11
+            <div class="bgimg">
+                <img src="blank.gif" height="135" width="960" alt="" /></div>
+            -->
+            </div>
+            <div id="footer" class="cntn">
+                <div class="int">
+                    <div id="disclaimer">
+                        <p>
+                            <span id="lblDisclaimerFooter"><div style="text-align: center;"><i><span style="font-size:12.0pt">*** The Town of Miami Lakes, Florida makes every
+effort to produce and publish the most current and accurate information
+possible. No warranties express or implied, are provided for the data, content,
+or services herein, its use, or its interpretation. In no event shall the Town
+of Miami Lakes, Florida be responsible or liable, directly or indirectly, for
+any damage or loss caused or alleged to be caused by or in connection with the
+use of or reliance on any such data, content, or services available on or through
+any such website or resource. Utilization of this website and resources
+constitutes acceptance of this statement.</span></i><p></p></div></span>
+                        </p>
+                    </div>
+                    <div id="divfooter">
+                        <div id="ftrutils" class="bg-c">
+                              <div class="copyright-logo">
+                                <div class="logo-div">
+                                    <a class="crwbadge" href="https://centralsquare.com/">Powered by CentralSquare Technologies</a>
+                                </div>
+                                <div class="copyright-div">
+                                    <span class="copyright">©1990-<script type="text/javascript">document.write(new Date().getFullYear())</script> CentralSquare Technologies, LLC. All Rights Reserved.</span>
+                                </div>
+                            </div>
+                            <div class="ftrlinks">
+                                <span class="address">
+                                    
+                                    <div id="pnlFooter">
+	
+                                        <span id="lblFooter">6601 Main Street  Miami Lakes, FL  33014</span>
+                                    
+</div>
+                                </span>
+                                <a id="hlHomeFooter" href="../">HOME</a>
+                                <span id="pipe1" class="pipe">|</span>
+                                
+                                
+                                <a id="hlContactFooter" href="../contact.aspx">CONTACT</a>
+                            </div>
+                            <div class="clear">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+                 
+        <iframe src="https://trakit.miamilakes-fl.gov/etrakit/Map2/SpatialAdvisor/SpatialAdvisor.aspx" id="frmSpatialAdvisor" style="display:none"></iframe>
+    
+
+<script type="text/javascript">
+//<![CDATA[
+showSearchResults(true);showTabs(false);rgSearchRslts_DeselectAll();resetTabs();showMapButtons(false);window.__TsmHiddenField = $get('RadScriptManager1_TSM');Sys.Application.add_init(function() {
+    $create(Telerik.Web.UI.RadAjaxManager, {"_updatePanels":"cplMain_UpdatePanelDetail","ajaxSettings":[{InitControlID : "ctl00_cplMain_btnSearch",UpdatedControls : [{ControlID:"ctl00_cplMain_rgSearchRslts",PanelID:"cplMain_rlpSearch"}]},{InitControlID : "ctl00_cplMain_btnSearch",UpdatedControls : [{ControlID:"ctl00_cplMain_tcSearchDetails",PanelID:"cplMain_rlpSearch"}]},{InitControlID : "ctl00_cplMain_btnSearch",UpdatedControls : [{ControlID:"ctl00_cplMain_RadMultiPageSearch",PanelID:"cplMain_rlpSearch"}]},{InitControlID : "ctl00_cplMain_btnSearch",UpdatedControls : [{ControlID:"cplMain_plHldrActions",PanelID:""}]},{InitControlID : "ctl00_cplMain_btnSearch",UpdatedControls : [{ControlID:"cplMain_lblNoSearchRslts",PanelID:""}]},{InitControlID : "ctl00_cplMain_btnSearch",UpdatedControls : [{ControlID:"ctl00_cplMain_btnMapOn",PanelID:""}]},{InitControlID : "ctl00_cplMain_btnSearch",UpdatedControls : [{ControlID:"ctl00_cplMain_btnMapOff",PanelID:""}]},{InitControlID : "ctl00_cplMain_rgSearchRslts",UpdatedControls : [{ControlID:"ctl00_cplMain_tcSearchDetails",PanelID:"cplMain_rlpSearch"}]},{InitControlID : "ctl00_cplMain_rgSearchRslts",UpdatedControls : [{ControlID:"cplMain_lblPermitNo",PanelID:""}]},{InitControlID : "ctl00_cplMain_rgSearchRslts",UpdatedControls : [{ControlID:"ctl00_cplMain_RadMultiPageSearch",PanelID:"cplMain_rlpSearch"}]},{InitControlID : "ctl00_cplMain_hlSearchResults",UpdatedControls : [{ControlID:"ctl00_cplMain_rgSearchRslts",PanelID:""}]},{InitControlID : "ctl00_cplMain_hlSearchResults",UpdatedControls : [{ControlID:"ctl00_cplMain_tcSearchDetails",PanelID:""}]},{InitControlID : "ctl00_cplMain_hlSearchResults",UpdatedControls : [{ControlID:"ctl00_cplMain_RadMultiPageSearch",PanelID:""}]},{InitControlID : "ctl00_cplMain_rgSearchRslts",UpdatedControls : [{ControlID:"cplMain_plHldrActions",PanelID:""}]},{InitControlID : "ctl00_cplMain_rgSearchRslts",UpdatedControls : [{ControlID:"ctl00_cplMain_rgSearchRslts",PanelID:""}]},{InitControlID : "ctl00_cplMain_tcSearchDetails",UpdatedControls : [{ControlID:"ctl00_cplMain_rgSearchRslts",PanelID:""}]},{InitControlID : "ctl00_cplMain_tcSearchDetails",UpdatedControls : [{ControlID:"ctl00_cplMain_tcSearchDetails",PanelID:""}]},{InitControlID : "ctl00_cplMain_tcSearchDetails",UpdatedControls : [{ControlID:"ctl00_cplMain_RadMultiPageSearch",PanelID:""}]},{InitControlID : "ctl00_cplMain_RadMultiPageSearch",UpdatedControls : [{ControlID:"ctl00_cplMain_rgSearchRslts",PanelID:""}]},{InitControlID : "ctl00_cplMain_RadMultiPageSearch",UpdatedControls : [{ControlID:"ctl00_cplMain_tcSearchDetails",PanelID:""}]},{InitControlID : "ctl00_cplMain_btnMapOn",UpdatedControls : [{ControlID:"cplMain_MapFrame",PanelID:""}]},{InitControlID : "ctl00_cplMain_btnMapOn",UpdatedControls : [{ControlID:"ctl00_cplMain_btnMapOn",PanelID:""}]},{InitControlID : "ctl00_cplMain_btnMapOn",UpdatedControls : [{ControlID:"ctl00_cplMain_btnMapOff",PanelID:""}]},{InitControlID : "ctl00_cplMain_btnMapOff",UpdatedControls : [{ControlID:"cplMain_MapFrame",PanelID:""}]},{InitControlID : "ctl00_cplMain_btnMapOff",UpdatedControls : [{ControlID:"ctl00_cplMain_btnMapOff",PanelID:""}]},{InitControlID : "ctl00_cplMain_btnMapOff",UpdatedControls : [{ControlID:"ctl00_cplMain_btnMapOn",PanelID:""}]},{InitControlID : "ctl00_cplMain_btnSearch",UpdatedControls : [{ControlID:"cplMain_MapFrame",PanelID:""}]},{InitControlID : "ctl00_cplMain_rgSearchRslts",UpdatedControls : [{ControlID:"cplMain_MapFrame",PanelID:""}]}],"clientEvents":{OnRequestStart:"RequestStart",OnResponseEnd:"ResponseEnd"},"defaultLoadingPanelID":"","enableAJAX":true,"enableHistory":false,"links":[],"styles":[],"uniqueID":"ctl00$RadAjaxManager1","updatePanelsRenderMode":0}, null, null, $get("ctl00_RadAjaxManager1"));
+});
+Sys.Application.add_init(function() {
+    $create(Telerik.Web.UI.RadWindowManager, {"clientStateFieldID":"ctl00_ucLogin_rwmLogin_ClientState","enableAriaSupport":true,"enableShadow":true,"formID":"form1","iconUrl":"","minimizeIconUrl":"","name":"rwmLogin","shortcuts":"[[\u0027close\u0027,\u0027Esc\u0027]]","skin":"Default","windowControls":"[]"}, null, null, $get("ctl00_ucLogin_rwmLogin"));
+});
+Sys.Application.add_init(function() {
+    $create(Telerik.Web.UI.RadTextBox, {"_displayText":"","_focused":false,"_initialValueAsText":"","_postBackEventReferenceScript":"setTimeout(\"__doPostBack(\\\u0027ctl00$ucLogin$txtLoginId\\\u0027,\\\u0027\\\u0027)\", 0)","_skin":"Default","_validationText":"","clientStateFieldID":"ctl00_ucLogin_txtLoginId_ClientState","enabled":true,"styles":{HoveredStyle: ["width:80px;", "riTextBox riHover apptxt_80_lesspad"],InvalidStyle: ["width:80px;", "riTextBox riError apptxt_80_lesspad"],DisabledStyle: ["width:80px;", "riTextBox riDisabled apptxt_80_lesspad"],FocusedStyle: ["width:80px;", "riTextBox riFocused apptxt_80_lesspad"],EmptyMessageStyle: ["width:80px;", "riTextBox riEmpty apptxt_80_lesspad"],ReadOnlyStyle: ["width:80px;", "riTextBox riRead apptxt_80_lesspad"],EnabledStyle: ["width:80px;", "riTextBox riEnabled apptxt_80_lesspad"]}}, null, null, $get("ctl00_ucLogin_txtLoginId"));
+});
+Sys.Application.add_init(function() {
+    $create(Telerik.Web.UI.RadTextBox, {"_displayText":"","_focused":false,"_initialValueAsText":"","_postBackEventReferenceScript":"setTimeout(\"__doPostBack(\\\u0027ctl00$ucLogin$RadTextBox2\\\u0027,\\\u0027\\\u0027)\", 0)","_skin":"Default","_validationText":"","clientStateFieldID":"ctl00_ucLogin_RadTextBox2_ClientState","enabled":true,"styles":{HoveredStyle: ["width:80px;", "riTextBox riHover apptxt_80_lesspad"],InvalidStyle: ["width:80px;", "riTextBox riError apptxt_80_lesspad"],DisabledStyle: ["width:80px;", "riTextBox riDisabled apptxt_80_lesspad"],FocusedStyle: ["width:80px;", "riTextBox riFocused apptxt_80_lesspad"],EmptyMessageStyle: ["width:80px;", "riTextBox riEmpty apptxt_80_lesspad"],ReadOnlyStyle: ["width:80px;", "riTextBox riRead apptxt_80_lesspad"],EnabledStyle: ["width:80px;", "riTextBox riEnabled apptxt_80_lesspad"]}}, {"focus":OnFocus}, null, $get("ctl00_ucLogin_RadTextBox2"));
+});
+Sys.Application.add_init(function() {
+    $create(Telerik.Web.UI.RadTextBox, {"_focused":false,"_postBackEventReferenceScript":"setTimeout(\"__doPostBack(\\\u0027ctl00$ucLogin$txtPassword\\\u0027,\\\u0027\\\u0027)\", 0)","_skin":"Default","clientStateFieldID":"ctl00_ucLogin_txtPassword_ClientState","enabled":true,"styles":{HoveredStyle: ["width:80px;", "riTextBox riHover apptxt_80_lesspad"],InvalidStyle: ["width:80px;", "riTextBox riError apptxt_80_lesspad"],DisabledStyle: ["width:80px;", "riTextBox riDisabled apptxt_80_lesspad"],FocusedStyle: ["width:80px;", "riTextBox riFocused apptxt_80_lesspad"],EmptyMessageStyle: ["width:80px;", "riTextBox riEmpty apptxt_80_lesspad"],ReadOnlyStyle: ["width:80px;", "riTextBox riRead apptxt_80_lesspad"],EnabledStyle: ["width:80px;", "riTextBox riEnabled apptxt_80_lesspad"]}}, {"blur":OnBlur}, null, $get("ctl00_ucLogin_txtPassword"));
+});
+Sys.Application.add_init(function() {
+    $create(Sys.UI._UpdateProgress, {"associatedUpdatePanelId":null,"displayAfter":500,"dynamicLayout":true}, null, null, $get("cplMain_PageUpdateProgress"));
+});
+Sys.Application.add_init(function() {
+    $create(Telerik.Web.UI.RadAjaxLoadingPanel, {"initialDelayTime":100,"isSticky":true,"minDisplayTime":400,"skin":"","transparency":5,"uniqueID":"ctl00$cplMain$rlpSearch","zIndex":90000}, null, null, $get("cplMain_rlpSearch"));
+});
+Sys.Application.add_init(function() {
+    $create(Telerik.Web.UI.RadGrid, {"ClientID":"ctl00_cplMain_rgSearchRslts","ClientSettings":{"AllowAutoScrollOnDragDrop":true,"EnableRowHoverStyle":true,"AllowColumnHide":true,"EnablePostBackOnRowClick":true,"ShouldCreateRows":true,"DataBinding":{},"Selecting":{"CellSelectionMode":0,"AllowRowSelect":true,"EnableDragToSelectRows":true},"Scrolling":{"AllowScroll":true,"SaveScrollPosition":true,"ScrollHeight":"300px"},"Resizing":{},"ClientMessages":{},"KeyboardNavigationSettings":{"AllowActiveRowCycle":false,"EnableKeyboardShortcuts":true,"FocusKey":89,"InitInsertKey":73,"RebindKey":82,"ExitEditInsertModeKey":27,"UpdateInsertItemKey":13,"DeleteActiveRow":127,"ExpandDetailTableKey":39,"CollapseDetailTableKey":37,"MoveDownKey":40,"MoveUpKey":38,"SaveChangesKey":85,"CancelChangesKey":81},"Animation":{},"Virtualization":{}},"Skin":"TRAKiT_Grid","SortingSettings":{"SortToolTip":"Click here to sort","SortedAscToolTip":"Sorted asc","SortedDescToolTip":"Sorted desc","SortedBackColor":{"R":0,"G":0,"B":0,"A":0,"IsKnownColor":false,"IsEmpty":true,"IsNamedColor":false,"IsSystemColor":false,"Name":"0"},"EnableSkinSortStyles":true,"ViewState":{}},"UniqueID":"ctl00$cplMain$rgSearchRslts","_activeRowIndex":"","_clientKeyValues":{"0":{"PERMIT_NO":"B2011-1357"},"1":{"PERMIT_NO":"B2011-3099"},"2":{"PERMIT_NO":"BLR2014-1326"},"3":{"PERMIT_NO":"BLR2016-2508"},"4":{"PERMIT_NO":"BLR2016-3218"}},"_controlToFocus":"","_currentPageIndex":0,"_defaultDateTimeFormat":"M/d/yyyy h:mm:ss tt","_editIndexes":"[]","_embeddedSkin":false,"_freezeText":"Freeze","_gridTableViewsData":"[{\"ClientID\":\"ctl00_cplMain_rgSearchRslts_ctl00\",\"UniqueID\":\"ctl00$cplMain$rgSearchRslts$ctl00\",\"PageSize\":5,\"PageCount\":6,\"EditMode\":\"EditForms\",\"AllowPaging\":true,\"CurrentPageIndex\":0,\"VirtualItemCount\":0,\"AllowMultiColumnSorting\":false,\"AllowNaturalSort\":true,\"AllowFilteringByColumn\":false,\"PageButtonCount\":10,\"HasDetailTables\":false,\"HasMultiHeaders\":false,\"CheckListWebServicePath\":\"\",\"GroupLoadMode\":\"Server\",\"PagerAlwaysVisible\":false,\"IsItemInserted\":false,\"clientDataKeyNames\":[\"PERMIT_NO\"],\"hasDetailItemTemplate\":false,\"_dataBindTemplates\":false,\"_selectedItemStyle\":\"\",\"_selectedItemStyleClass\":\"rgSelectedRow\",\"_columnsData\":[{\"UniqueName\":\"PERMIT_NO\",\"Resizable\":true,\"Reorderable\":true,\"Selectable\":true,\"Groupable\":true,\"ColumnType\":\"GridBoundColumn\",\"ColumnGroupName\":\"\",\"Editable\":true,\"SortExpression\":\"PERMIT_NO\",\"DataTypeName\":\"System.String\",\"DataField\":\"PERMIT_NO\",\"Display\":true},{\"UniqueName\":\"PermitType\",\"Resizable\":true,\"Reorderable\":true,\"Selectable\":true,\"Groupable\":true,\"ColumnType\":\"GridBoundColumn\",\"ColumnGroupName\":\"\",\"Editable\":true,\"SortExpression\":\"PermitType\",\"DataTypeName\":\"System.String\",\"DataField\":\"PermitType\",\"Display\":true},{\"UniqueName\":\"PermitSubType\",\"Resizable\":true,\"Reorderable\":true,\"Selectable\":true,\"Groupable\":true,\"ColumnType\":\"GridBoundColumn\",\"ColumnGroupName\":\"\",\"Editable\":true,\"SortExpression\":\"PermitSubType\",\"DataTypeName\":\"System.String\",\"DataField\":\"PermitSubType\",\"Display\":true},{\"UniqueName\":\"SITE_APN\",\"Resizable\":true,\"Reorderable\":true,\"Selectable\":true,\"Groupable\":true,\"ColumnType\":\"GridBoundColumn\",\"ColumnGroupName\":\"\",\"Editable\":true,\"SortExpression\":\"SITE_APN\",\"DataTypeName\":\"System.String\",\"DataField\":\"SITE_APN\",\"Display\":true},{\"UniqueName\":\"SITE_ADDR\",\"Resizable\":true,\"Reorderable\":true,\"Selectable\":true,\"Groupable\":true,\"ColumnType\":\"GridBoundColumn\",\"ColumnGroupName\":\"\",\"Editable\":true,\"SortExpression\":\"SITE_ADDR\",\"DataTypeName\":\"System.String\",\"DataField\":\"SITE_ADDR\",\"Display\":true},{\"UniqueName\":\"CONTRACTOR_NAME\",\"Resizable\":true,\"Reorderable\":true,\"Selectable\":true,\"Groupable\":true,\"ColumnType\":\"GridBoundColumn\",\"ColumnGroupName\":\"\",\"Editable\":true,\"SortExpression\":\"CONTRACTOR_NAME\",\"DataTypeName\":\"System.String\",\"DataField\":\"CONTRACTOR_NAME\",\"Display\":true},{\"UniqueName\":\"RECORDID\",\"Resizable\":true,\"Reorderable\":true,\"Selectable\":true,\"Groupable\":true,\"ColumnType\":\"GridBoundColumn\",\"ColumnGroupName\":\"\",\"Editable\":true,\"SortExpression\":\"RECORDID\",\"DataTypeName\":\"System.String\",\"DataField\":\"RECORDID\",\"Display\":false}]}]","_masterClientID":"ctl00_cplMain_rgSearchRslts_ctl00","_shouldFocusOnPage":false,"_unfreezeText":"Unfreeze","allowMultiRowSelection":false,"clientStateFieldID":"ctl00_cplMain_rgSearchRslts_ClientState","expandItems":{},"renderMode":1}, {"rowCreated":rgSearchRslts_RowCreated,"rowDeselected":rgSearchRslts_RowDeselected,"rowSelected":rgSearchRslts_RowSelected}, null, $get("ctl00_cplMain_rgSearchRslts"));
+});
+Sys.Application.add_init(function() {
+    $create(Telerik.Web.UI.RadTabStrip, {"_perTabScrolling":true,"_scrollButtonsPosition":1,"_selectedIndex":2,"_skin":"TRAKiT_Grid","clientStateFieldID":"ctl00_cplMain_tcSearchDetails_ClientState","multiPageID":"ctl00_cplMain_RadMultiPageSearch","selectedIndexes":["2"],"tabData":[{"value":"0","_implPageViewID":"cplMain_RadPageViewPermitInfo"},{"value":"1","_implPageViewID":"cplMain_RadPageViewSiteInfo"},{"value":"2","_implPageViewID":"cplMain_RadPageViewContacts"},{"value":"3","_implPageViewID":"cplMain_RadPageViewFees"},{"value":"4","_implPageViewID":"cplMain_RadPageViewInspections"},{"value":"5","_implPageViewID":"cplMain_RadPageChronology"},{"value":"6","_implPageViewID":"cplMain_RadPageConditions"},{"value":"7","_implPageViewID":"cplMain_RadPageViewReviews"}]}, {"tabSelected":OnTabSelectedHandler}, null, $get("ctl00_cplMain_tcSearchDetails"));
+});
+Sys.Application.add_init(function() {
+    $create(Telerik.Web.UI.RadMultiPage, {"clientStateFieldID":"ctl00_cplMain_RadMultiPageSearch_ClientState","pageViewData":[{"id":"cplMain_RadPageViewPermitInfo"},{"id":"cplMain_RadPageViewSiteInfo"},{"id":"cplMain_RadPageViewContacts"},{"id":"cplMain_RadPageViewFees"},{"id":"cplMain_RadPageViewInspections"},{"id":"cplMain_RadPageChronology"},{"id":"cplMain_RadPageConditions"},{"id":"cplMain_RadPageViewReviews"}],"selectedIndex":2}, null, null, $get("ctl00_cplMain_RadMultiPageSearch"));
+});
+Sys.Application.add_init(function() {
+    $create(Telerik.Web.UI.RadWindow, {"_dockMode":false,"behaviors":4,"clientStateFieldID":"ctl00_cplMain_rw_ClientState","formID":"form1","iconUrl":"/etrakit/im/clear.gif","minimizeIconUrl":"/etrakit/im/clear.gif","name":"rw","skin":"Default","visibleStatusbar":false}, null, null, $get("ctl00_cplMain_rw"));
+});
+//]]>
+</script>
+</form>
+</body>
+</html>
+
+<script type="text/javascript" language="javascript">
+    function Toggle() {
+        objdashboard = document.getElementById("cplMain_uctrlDashboard_divDashboard");
+        objcustomdiv = document.getElementById("cplMain_uctrlDashboard_divCustomPage");
+
+        if (objdashboard != null) {
+            objdashboard.style.display = "none";
+        }
+
+        if (objcustomdiv != null) {
+            objcustomdiv.style.display = "block";
+        }
+
+        if (objdashboard == null && objcustomdiv == null) {
+            return true;
+        }
+        
+        return false;
+    }
+    var h1Reader = document.getElementsByTagName('h1');
+    if (h1Reader[0] != null) {
+        h1Reader[0].tabIndex = -1;
+        h1Reader[0].focus();
+    }
+</script>

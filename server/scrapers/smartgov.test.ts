@@ -59,3 +59,37 @@ describe('SmartGov recorded public responses',()=>{
     expect(body.get('__submitFormValidator__')).toMatch(/^[a-z]+\d+[a-z]$/);
   });
 });
+describe('SmartGov tenant form differences (recorded 2026-10-15)',()=>{
+  const bal:AdapterCtx={...ctx,databaseId:7,databaseName:'Bal Harbour',jurisdiction:'Bal Harbour, FL',searchUrl:'https://vlg-balharbour-fl.smartgovcommunity.com/Public/Home'};
+  it('searches a permitting-only tenant whose form has no Module selector',async()=>{
+    vi.mocked(politeFetch).mockResolvedValueOnce(response('Bal Harbour-advanced-form')).mockResolvedValueOnce(response('Bal Harbour-company-1'));
+    const rows=await adapter.search(bal,{type:'company',value:'RJ Electric'});
+    expect(rows).toHaveLength(6);
+    // Two-column result rows: no site address is published, so it stays unknown; the names are not mistaken for one.
+    expect(rows[0]).toMatchObject({permitNumber:'EO-19-10-019',permitType:'Electrical - Other',status:'Certificate of Completion',address:null});
+    expect(rows[0].raw?.listedNames).toEqual(['BAL HARBOUR SHOPS LLC','RJ ELECTRIC LLC']);
+    expect(rows.every(r=>(r.raw?.listedNames as string[]).some(n=>/RJ ELECTRIC/.test(n)))).toBe(true);
+    const body=vi.mocked(politeFetch).mock.calls[1][1]?.body?.toString()??'';
+    expect(body).toContain('PrimaryContractor.Contact.DisplayName=RJ+Electric');
+    expect(body).not.toContain('Module=');
+  });
+  it('says the tenant does not publish name search when its form hides contact fields',async()=>{
+    const tomball:AdapterCtx={...ctx,jurisdiction:'Tomball, TX',searchUrl:'https://ci-tomball-tx.smartgovcommunity.com/Public/Home'};
+    for(const type of ['company','name'] as const){
+      vi.mocked(politeFetch).mockResolvedValueOnce(response('Tomball-advanced-form'));
+      await expect(adapter.search(tomball,{type,value:'Joe Bland Construction'})).rejects.toThrow(/field unavailable: Primary(Contractor|Contact)\.Contact\.DisplayName \(this tenant does not publish name search\)/);
+    }
+    expect(politeFetch).toHaveBeenCalledTimes(2);
+  });
+  it('follows a stored bit.ly link only to the SmartGov tenant it redirects to (Sachse, TX)',async()=>{
+    const sachse:AdapterCtx={...ctx,jurisdiction:'Sachse, TX',searchUrl:'https://bit.ly/SachsePermits'};
+    vi.mocked(politeFetch)
+      .mockResolvedValueOnce(new Response(null,{status:301,headers:{location:'https://ci-sachse-tx.smartgovcommunity.com/Public/Home'}}))
+      .mockResolvedValueOnce(response('Tomball-advanced-form'))
+      .mockResolvedValueOnce(response('Tomball-advanced-form'));
+    await expect(adapter.search(sachse,{type:'company',value:'Joe Bland Construction'})).rejects.toThrow('does not publish name search');
+    expect(vi.mocked(politeFetch).mock.calls.map(c=>String(c[0]))).toEqual(['https://bit.ly/SachsePermits','https://ci-sachse-tx.smartgovcommunity.com/Public/Home','https://ci-sachse-tx.smartgovcommunity.com/ApplicationPublic/ApplicationSearch/AdvancedSearch']);
+    vi.mocked(politeFetch).mockReset().mockResolvedValueOnce(new Response(null,{status:301,headers:{location:'https://example.com/elsewhere'}})).mockResolvedValueOnce(new Response('<html></html>'));
+    await expect(adapter.search(sachse,{type:'company',value:'x'})).rejects.toThrow('Not a SmartGov community portal URL');
+  });
+});
