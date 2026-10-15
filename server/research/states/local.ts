@@ -8,6 +8,8 @@
  *   NY  New York City DCWP home-improvement contractor and construction-labor-provider licenses (bulk)
  *   MD  Montgomery County DPS licenses: building contractors (new-home builders), master and limited master
  *       electricians, limited electrical businesses, fire-system licensees (bulk)
+ *   OH  Cleveland Building & Housing contractor registrations (active; bulk)
+ *   TN  Nashville Metro Codes registered professional contractors and their licenses (bulk)
  *   PA  Philadelphia L&I trade licenses: contractors, electrical, plumbing, fire suppression, sheet metal, home
  *       improvement, demolition, excavation (bulk; the contractor's address joined from L&I permit contractors)
  *
@@ -258,10 +260,52 @@ const mocoSource = (m: MocoSet): BulkSource => {
   };
 };
 
+// ── Cleveland, Ohio ──────────────────────────────────────────────────────────────────────────────────────────────
+const CLE = "https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/Active_Contractor_Registrations/FeatureServer/0";
+const CLE_PAGE = "https://www.arcgis.com/home/item.html?id=92e169a99d7b42ae97f6c28a7f7e9a19";
+const cleveland: BulkSource = {
+  id: "oh-cleveland-contractors", state: "OH", label: "Cleveland contractor registrations", pageUrl: CLE_PAGE, everyHours: 24, minRows: 2_300,
+  load: async function* () {
+    for await (const r of arcgisAll(CLE)) {
+      const name = txt(r, "BUSINESS_NAME");
+      if (!name) continue;
+      const rrp = txt(r, "RRP_CERTIFICATION_NO");
+      const h = licenseHit({
+        state: "OH", source: "Cleveland contractor registrations", sourceUrl: CLE_PAGE,
+        businessName: name, licenseNumber: txt(r, "B1_ALT_ID"), licenseType: txt(r, "CONTRACTOR_LICENSE_TYPE"),
+        specialty: rrp ? `EPA lead-safe (RRP) certification ${rrp}` : null, status: txt(r, "STATUS"), principal: null, city: txt(r, "B1_CITY"), expires: null,
+        address: addressLine([txt(r, "B1_ADDRESS1"), txt(r, "B1_ADDRESS2")], txt(r, "B1_CITY"), txt(r, "B1_STATE"), txt(r, "B1_ZIP")),
+        phone: txt(r, "B1_PHONE1"), people: [],
+      });
+      if (h.keys) h.keys.licenses = [txt(r, "B1_ALT_ID"), rrp];
+      yield h;
+    }
+  },
+};
+
+// ── Nashville (Metro Codes) ──────────────────────────────────────────────────────────────────────────────────────
+const NASH = "https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Registered_Professional_Contractors_view_2/FeatureServer/0";
+const NASH_PAGE = "https://www.arcgis.com/home/item.html?id=ac877684ad8b45e8b539af65ce475fe2";
+const nashville: BulkSource = {
+  id: "tn-nashville-contractors", state: "TN", label: "Nashville registered professional contractors", pageUrl: NASH_PAGE, everyHours: 24, minRows: 4_900,
+  load: async function* () {
+    for await (const r of arcgisAll(NASH)) {
+      const name = txt(r, "Company_Name");
+      if (!name) continue;
+      yield licenseHit({
+        state: "TN", source: "Nashville registered professional contractors", sourceUrl: NASH_PAGE,
+        businessName: name, licenseNumber: null, licenseType: txt(r, "Prof__Type"), specialty: null, status: "Active (registered with Metro Codes)",
+        principal: null, city: txt(r, "City"), expires: null,
+        address: addressLine([txt(r, "Address")], txt(r, "City"), txt(r, "ST"), txt(r, "ZIP")), phone: null, people: [],
+      });
+    }
+  },
+};
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource)];
+export const LOCAL_BULK: BulkSource[] = [nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
