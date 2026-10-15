@@ -49,6 +49,10 @@ const CITY_WORDS: Record<string, string> = { SAINT: "ST", MOUNT: "MT", FORT: "FT
 export type AddressParts = {
   number: string; box: boolean; pre: string | null; name: string[]; type: string | null; post: string | null;
   city: string | null; state: string | null; zip: string | null;
+  /** The unit ("STE 4" → "4"), when one is given. */
+  unit: string | null;
+  /** The street's end is unknown (no suffix and no comma): `name` holds its first word only. */
+  partial: boolean;
 };
 
 /** Parses a free-form US street address; null when it has no house number (or PO box). */
@@ -58,7 +62,7 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
   const zips = Array.from(raw.matchAll(/\b(\d{5})(?:-\d{4})?\b/g)).map((z) => z[1]);
   const zip = zips.length && !raw.startsWith(zips[zips.length - 1] + " ") && raw !== zips[zips.length - 1] ? zips[zips.length - 1] : null;
   const box = raw.match(/\bP\.?\s?O\.?\s?BOX\s+(\d+)/) ?? raw.match(/\bBOX\s+(\d+)/);
-  if (box) return { number: box[1], box: true, pre: null, name: [], type: null, post: null, city: null, state: null, zip };
+  if (box) return { number: box[1], box: true, pre: null, name: [], type: null, post: null, city: null, state: null, zip, unit: null, partial: false };
   // Commas mark the street's end when present ("123 Main, Springfield").
   const segs = raw.split(",").map((x) => x.replace(/[.#]/g, (c) => (c === "#" ? " # " : " ")).replace(/\s+/g, " ").trim()).filter(Boolean);
   // A hyphenated number ("251-21", Queens; "2200-B") is one building: kept whole.
@@ -70,10 +74,11 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
   let pre: string | null = null;
   if (DIRECTIONS[words[0]] && words.length > 1) { pre = DIRECTIONS[words[0]]; i = 1; }
   const name: string[] = [];
-  let type: string | null = null, post: string | null = null, typeAt = -1;
+  let type: string | null = null, post: string | null = null, typeAt = -1, unit: string | null = null;
+  const unitOf = (v: string | undefined) => { const u = (v ?? "").replace(/^#/, ""); return /^[A-Z0-9-]+$/.test(u) && !STATES.has(u) ? u : null; };
   // The suffix is a suffix word after at least one name word ("Court St": COURT is the name, ST the suffix).
   for (let j = i; j < words.length; j++) {
-    if (UNIT.test(words[j])) break;
+    if (UNIT.test(words[j])) { unit = unitOf(words[j + 1]); break; }
     if (j > i && STREET_TYPES[words[j]]) { type = STREET_TYPES[words[j]]; typeAt = j; break; }
     name.push(words[j]);
   }
@@ -84,8 +89,8 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
     // "Highway 50", "Route 9": the number belongs to the street.
     if ((type === "HWY" || type === "RTE") && /^\d+[A-Z]?$/.test(words[k] ?? "")) name.push(words[k++]);
     if (DIRECTIONS[words[k]]) post = DIRECTIONS[words[k++]];
-    if (UNIT.test(words[k] ?? "")) k += 2;
-    else if (/^#?\d+[A-Z]?$/.test(words[k] ?? "") && segs.length === 1) k += 1; // "123 Main St 4"
+    if (UNIT.test(words[k] ?? "")) { unit = unitOf(words[k + 1]); k += 2; }
+    else if (/^#?\d+[A-Z]?$/.test(words[k] ?? "") && segs.length === 1) { unit = unitOf(words[k]); k += 1; } // "123 Main St 4"
     tail = words.slice(k);
   } else if (segs.length > 1) {
     const u = name.findIndex((w) => UNIT.test(w));
@@ -94,10 +99,11 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
     // No suffix and no comma: where the street ends is unknown, so only its first word is used.
     name.splice(1);
   }
+  const partial = typeAt < 0 && segs.length === 1;
   const cityWords: string[] = [];
   const all = [...tail, ...rest];
   for (let k = 0; k < all.length; k++) {
-    if (UNIT.test(all[k])) { k++; continue; } // "Ste 4": the unit and its number
+    if (UNIT.test(all[k])) { unit ??= unitOf(all[k + 1]); k++; continue; } // "Ste 4": the unit and its number
     if (/^\d{5}(?:-\d{4})?$/.test(all[k]) || (!cityWords.length && /^#?\d+[A-Z]?$/.test(all[k]))) continue;
     cityWords.push(all[k]);
   }
@@ -113,7 +119,7 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
     break;
   }
   const city = (typeAt >= 0 || segs.length > 1) && cityWords.length ? cityWords.map((w) => CITY_WORDS[w] ?? w).join(" ") : null;
-  return { number: m[1], box: false, pre, name, type, post, city, state: state && (typeAt >= 0 || segs.length > 1) ? state : null, zip };
+  return { number: m[1], box: false, pre, name, type, post, city, state: state && (typeAt >= 0 || segs.length > 1) ? state : null, zip, unit, partial };
 }
 
 /** The city, state and ZIP of an address without its street ("SEATTLE WA 98101"); null when none is readable. */
@@ -168,21 +174,35 @@ export function describeId(q: IdQuery): string {
 }
 
 /**
- * A record's address is the query's (audit 2026-10-15, decision 6): same house number and street name; the same
- * suffix ("St" is not "Ave") and direction ("N" is not "S") when both give one; the same ZIP when both give one, and
- * the same city when both give one. A street without a suffix on one side is compared on the words it has.
+ * How well a record's address agrees with the query's (audit 2026-10-15, decision 6; round 2, decision 5):
+ *
+ *   - null: not the same address. The house number differs; or a street name, suffix ("St" is not "Ave"),
+ *     direction ("N" is not "S"), state, unit, ZIP or city given on both sides differs; or a street without a
+ *     suffix on either side is not the whole other name ("123 Lake View" is not "123 Lake Forest Rd"). A PO box needs
+ *     the same ZIP or city on both sides.
+ *   - "confirmed": the whole street (name and suffix on both sides) and its ZIP or city agree.
+ *   - "possible": nothing disagrees, but one side leaves out what would confirm it (no suffix, no ZIP and no city).
+ *     A tie built on it is labeled "possible match (address)".
  */
-export function addressMatches(query: string, address: string | null | undefined): boolean {
+export function addressMatch(query: string, address: string | null | undefined): "confirmed" | "possible" | null {
   const q = parseAddress(query), a = parseAddress(address);
-  if (!q || !a || q.box !== a.box || q.number !== a.number) return false;
-  if (q.box) return !q.zip || !a.zip || q.zip === a.zip;
+  if (!q || !a || q.box !== a.box || q.number !== a.number) return null;
   const both = <T>(x: T | null, y: T | null) => x == null || y == null || x === y;
-  if (!both(q.type, a.type) || !both(q.zip, a.zip) || !both(q.city, a.city)) return false;
+  const place = (q.zip && a.zip && q.zip === a.zip) || (q.city && a.city && q.city === a.city);
+  if (!both(q.zip, a.zip) || !both(q.city, a.city) || !both(q.state, a.state)) return null;
+  if (q.box) return place ? "confirmed" : null;
+  if (!both(q.type, a.type) || !both(q.unit, a.unit)) return null;
   // A direction given on both sides must agree, wherever each puts it ("N Main St" = "Main St N").
-  const qd = q.pre ?? q.post, ad = a.pre ?? a.post;
-  if (!both(qd, ad)) return false;
-  // Full names when both have a suffix (the street's end is known); otherwise the words the shorter one has.
-  if (q.type && a.type) return q.name.join(" ") === a.name.join(" ");
-  const n = Math.min(q.name.length, a.name.length);
-  return q.name.slice(0, n).join(" ") === a.name.slice(0, n).join(" ");
+  if (!both(q.pre ?? q.post, a.pre ?? a.post)) return null;
+  const qn = q.name.join(" "), an = a.name.join(" ");
+  if (q.type && a.type) return qn === an ? (place ? "confirmed" : "possible") : null;
+  // A side whose street end is unknown holds the first word only: the other side's whole name must be that word,
+  // and the place must agree, since nothing else does.
+  if (q.partial || a.partial) return qn === an && place ? "possible" : null;
+  return qn === an ? "possible" : null;
+}
+
+/** The record's address is the query's: confirmed or possible (see addressMatch). */
+export function addressMatches(query: string, address: string | null | undefined): boolean {
+  return addressMatch(query, address) != null;
 }

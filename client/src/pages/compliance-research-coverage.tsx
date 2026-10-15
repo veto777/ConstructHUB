@@ -69,6 +69,7 @@ function SourceRow({ src }: { src: CoverageSource }) {
         {src.mode === "file" ? refreshText(src.refreshHours) : "Searched live on the agency's site when your report runs"}
         {src.local ? " · City or county records" : ""}
         {src.companiesOnly ? " · Companies only" : ""}
+        {src.sampled ? " · \"Found by\" read from a sample of the file until its next load" : ""}
       </p>
     </li>
   );

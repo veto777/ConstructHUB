@@ -61,6 +61,8 @@ export type CoverageSource = {
   companiesOnly: boolean;
   /** The official page a reader can open. */
   url: string | null;
+  /** Files: what it is found by was read from a sample of its first rows (a load made before full facets). */
+  sampled?: boolean;
 };
 
 export type CoverageState = {
@@ -82,7 +84,7 @@ export type CoverageManifest = {
 };
 
 /** Live facets of the daily files, from the loaded rows (what they're really indexed by). */
-export type CoverageFacets = Record<string, { rows: number; loadedAt: string | null; ids: CoverageId[]; kinds: CoverageKind[] }>;
+export type CoverageFacets = Record<string, { rows: number; loadedAt: string | null; ids: CoverageId[]; kinds: CoverageKind[]; sampled?: boolean }>;
 
 /** A source's identifiers and kinds, with a file's loaded facets applied when there are some. */
 export function withFacets(src: CoverageSource, facets: CoverageFacets | undefined): CoverageSource {
@@ -91,7 +93,7 @@ export function withFacets(src: CoverageSource, facets: CoverageFacets | undefin
   // An enforcement file is searched for companies only, so the people on it are not a way in.
   const ids = COVERAGE_ID_ORDER.filter((i) => (f.ids.includes(i) && !(i === "owner" && src.companiesOnly)) || (i === "name" && src.ids.includes("name")));
   const kinds = COVERAGE_KIND_ORDER.filter((k) => src.kinds.includes(k) || f.kinds.includes(k));
-  return { ...src, ids, kinds };
+  return { ...src, ids, kinds, ...(f.sampled ? { sampled: true } : {}) };
 }
 
 /**

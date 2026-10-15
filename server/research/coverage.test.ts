@@ -47,7 +47,7 @@ describe("probing a live lookup", () => {
   it("says a search runs when it reaches for the network, and skips when it returns at once", async () => {
     expect(await probe(async () => { await fetch("https://example.test/search?q=acme"); return []; })).toBe("runs");
     expect(await probe(async () => [])).toBe("skips");
-    expect(await probe(async () => { throw new Error("not configured"); })).toBe("runs");
+    expect(await probe(async () => { throw new Error("not configured"); })).toBe("skips"); // round 2, decision 13: a key we don't hold is not a search that runs
     expect(await probe(async () => { throw new Error("unsupported search type"); })).toBe("skips");
   });
 });

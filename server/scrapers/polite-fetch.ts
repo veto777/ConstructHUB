@@ -1,7 +1,8 @@
 /**
  * Polite HTTP for portal adapters: honest User-Agent, one request at a time per
- * host with a minimum delay, back-off on 403/429, and a typed error so callers
- * can record "blocked" instead of inventing an empty result.
+ * host with a minimum delay, back-off on 429/503, and a typed error so callers
+ * can record "blocked" instead of inventing an empty result. A 401 or 403 is an
+ * access denial and is never retried (audit round 2, decision 6).
  *
  * Rules (CLAUDE.md + fleet brief): public records only, <=1 request/second per
  * host, never bypass CAPTCHAs/anti-bot challenges, never log in, no proxies.
@@ -40,7 +41,7 @@ export async function rateLimitHost(url: string, minDelayMs: number): Promise<vo
 
 export type PoliteFetchOptions = {
   minDelayMs?: number;
-  /** Retries on 429/503 (and 403 once) with a growing delay. Default 2. */
+  /** Retries on 429/503 with a growing delay (never on 401/403). Default 2. */
   retries?: number;
   timeoutMs?: number;
 };
@@ -51,7 +52,16 @@ export function isConnectTimeout(e: unknown): boolean {
   return cause?.code === "UND_ERR_CONNECT_TIMEOUT";
 }
 
-/** fetch() with the honest UA, per-host rate limiting and back-off. Throws PortalBlockedError on 401/403/429 after retries. */
+/** Retry-After as milliseconds: delta-seconds or an HTTP date (RFC 9110 §10.2.3); null when absent or unreadable. */
+export function retryAfterMs(v: string | null | undefined, now = Date.now()): number | null {
+  const t = (v ?? "").trim();
+  if (!t) return null;
+  if (/^\d+$/.test(t)) return Number(t) * 1000;
+  const at = Date.parse(t);
+  return Number.isFinite(at) ? Math.max(0, at - now) : null;
+}
+
+/** fetch() with the honest UA, per-host rate limiting and back-off. Throws PortalBlockedError on 401/403 at once, on 429/503 after retries. */
 export async function politeFetch(url: string, init: RequestInit = {}, opts: PoliteFetchOptions = {}): Promise<Response> {
   const minDelayMs = opts.minDelayMs ?? 1000;
   const retries = opts.retries ?? 2;
@@ -82,9 +92,12 @@ export async function politeFetch(url: string, init: RequestInit = {}, opts: Pol
     }
     const blocked = res.status === 429 || res.status === 403 || res.status === 401 || res.status === 503;
     if (!blocked) return res;
-    if (attempt >= retries || res.status === 401) throw new PortalBlockedError(url, res.status);
-    const retryAfter = Number(res.headers.get("retry-after"));
-    const backoff = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : Math.min(60000, 5000 * 2 ** attempt);
+    if (attempt >= retries || res.status === 401 || res.status === 403) { await res.body?.cancel().catch(() => undefined); throw new PortalBlockedError(url, res.status); }
+    await res.body?.cancel().catch(() => undefined);
+    const asked = retryAfterMs(res.headers.get("retry-after"));
+    // A server asking for more than two minutes gets no further request from this search.
+    if (asked != null && asked > 120_000) throw new PortalBlockedError(url, res.status, `HTTP ${res.status}: the server asked to wait ${Math.ceil(asked / 60_000)} minute(s) (${url})`);
+    const backoff = asked ?? Math.min(60000, 5000 * 2 ** attempt);
     attempt += 1;
     await sleep(backoff);
   }

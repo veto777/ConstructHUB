@@ -33,10 +33,12 @@ import { SITE_ORIGIN as SITE } from "@shared/seo";
 import { searchLicenses, searchLicensesBy, type LicenseSource } from "./licenses";
 import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy, type BulkSource, type StoredHit } from "./bulk";
 import type { LiveLicenseSearch } from "./states/types";
-import { crossReference, LicenseSet, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
+import { crossReference, enforcementKey, LicenseSet, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
+import { companyNamed, personMatches } from "./licenses";
 import { ALL_BULK_SOURCES, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
 import { capNote, noteOf } from "./notes";
-import { privateHit } from "./privacy";
+import { disciplineRecord, privateHit, reportHit } from "./privacy";
+import { withRun } from "./http";
 import type { IdQuery } from "./identifiers";
 import { previewCompanyRecords, searchCompanyRecords, searchEnforcement } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
@@ -107,14 +109,17 @@ export function bulkFinder(src: BulkSource): LicenseFinder {
       const { hits, status } = await searchBulk(src, name, kind);
       if (!status.loaded) return { hits: [], searched: false, note: "Not loaded yet (the state's file is downloaded daily)" };
       const found = stored(hits).licenses.map((h) => privateHit({ ...h, matchedOn: kind === "company" ? "business" as const : "principal" as const })).filter((h) => nameMatches(name, kind, h));
-      return { hits: found, searched: true, note: matchNote(found.length, hits.length >= BULK_LIMIT ? capNote(BULK_LIMIT, null, "index matches") : null, ` in the file of ${status.loadedAt?.slice(0, 10)}`) };
+      const capped = hits.length >= BULK_LIMIT ? capNote(BULK_LIMIT, null, "index matches") : null;
+      return { hits: found, searched: true, capped, note: matchNote(found.length, capped, ` in the file of ${status.loadedAt?.slice(0, 10)}`) };
     },
     byId: async (q) => {
-      const { hits, status } = await searchBulkBy(src, q);
+      const { hits, status, note, stale } = await searchBulkBy(src, q);
       // Not loaded yet: not searched (decision 8), never "0 found".
       if (!status.loaded) return { licenses: [], enforcement: [], searched: false, note: "not loaded yet; the state's file is downloaded daily" };
+      // Loaded under the old key format: its phone and address keys may be an individual's (round 2, decision 2).
+      if (stale) return { licenses: [], enforcement: [], searched: false, note: `being re-indexed; not searched by ${idName(q)} until the next load` };
       const r = stored(hits);
-      return { ...r, licenses: r.licenses.map(privateHit), note: hits.length >= BULK_ID_LIMIT ? capNote(BULK_ID_LIMIT, null, "records") : undefined };
+      return { ...r, licenses: r.licenses.map(privateHit), note };
     },
   };
 }
@@ -123,7 +128,7 @@ export function bulkFinder(src: BulkSource): LicenseFinder {
 export function sodaFinder(src: LicenseSource): LicenseFinder {
   return {
     state: src.state, label: src.source,
-    byName: async (name, kind) => { const hits = await searchLicenses(src, name, kind); return { hits: hits.map(privateHit), searched: true, note: matchNote(hits.length, noteOf(hits)) }; },
+    byName: async (name, kind) => { const hits = await searchLicenses(src, name, kind); return { hits: hits.map(privateHit), searched: true, capped: noteOf(hits), note: matchNote(hits.length, noteOf(hits)) }; },
     byId: async (q) => {
       const hits = await searchLicensesBy(src, q);
       return hits ? { licenses: hits.map(privateHit), enforcement: [], note: noteOf(hits) ?? undefined } : { licenses: [], enforcement: [], searched: false, note: `this dataset has no ${idName(q)} field` };
@@ -136,9 +141,11 @@ export function liveFinder(state: string, src: LiveLicenseSearch): LicenseFinder
   return {
     state, label: src.source,
     byName: async (name, kind) => {
+      // A lookup that can't search this kind of name (an individual-only roster asked for a company) did not search.
+      if (src.kinds && !src.kinds.includes(kind)) return { hits: [], searched: false, note: `Not searched: this lookup has no ${kind === "company" ? "business" : "person"} name search` };
       const raw = await src.search(name, kind);
       const hits = raw.filter((h) => nameMatches(name, kind, h)).map(privateHit);
-      return { hits, searched: true, note: matchNote(hits.length, noteOf(raw)) };
+      return { hits, searched: true, capped: noteOf(raw), note: matchNote(hits.length, noteOf(raw)) };
     },
     byId: src.searchBy ? async (q) => {
       const hits = await src.searchBy!(q);
@@ -269,24 +276,18 @@ async function sweepPortals(userId: number, name: string, kind: "person" | "comp
 }
 
 /**
- * True when every word of the name is a whole word of ONE of the record's names (a portal's fuzzy match is not
- * proof). A contact's name and company are separate names; the result's HTML and the description are split into
- * their cells, lines and "Label: value" parts, so words of two people ("Applicant: Jane Smith; Owner: John Doe")
- * never make "John Smith" (audit 2026-10-15).
+ * True when one of the permit's NAME fields names the subject (audit round 2, decision 12): the contractor, applicant
+ * and owner, each contact's name and company, and the names a results list shows without a role (`listedNames`).
+ * Each is one name, checked like a license: a company's every word (single letters kept) in a business name, a
+ * person's full words in ONE person's name with middle initials agreeing. Descriptions and saved HTML are never
+ * read for names: words of two people in a sentence ("Jane Smith and John Doe") are not "John Smith".
  */
-export function namesMatch(name: string, row: any): boolean {
-  const tok = (v: string) => v.toLowerCase().split(/[^a-z0-9&']+/).filter((w) => w.length >= 2);
-  const want = tok(name);
-  if (!want.length) return false;
+export function namesMatch(name: string, row: any, kind: "person" | "company" = "person"): boolean {
   const contacts = Array.isArray(row.contacts) ? row.contacts.flatMap((c: any) => [c?.name, c?.company]) : [];
   const record = row.rawData?.record ?? {};
-  const listed = listedNamesOf(row);
-  const parts = (v: unknown): string[] => (typeof v === "string" ? v.split(/[;|\n\r\t]+|\s{2,}|\b[A-Za-z][A-Za-z ]{1,30}:/) : []);
-  // Rows saved before a parser learned a field still carry the result's own HTML; each of its cells counts on its own.
-  const html = typeof row.rawData?.raw?.html === "string" ? row.rawData.raw.html.replace(/&amp;/g, "&").split(/<[^>]*>/).flatMap(parts) : [];
-  const fields = [row.contractorName, row.applicantName, record.ownerName, record.applicantName, record.contractorName, ...contacts, ...listed, ...parts(row.description), ...html]
+  const fields = [row.contractorName, row.applicantName, record.ownerName, record.applicantName, record.contractorName, ...contacts, ...listedNamesOf(row)]
     .filter((v): v is string => typeof v === "string" && v.trim().length > 0);
-  return fields.some((f) => { const have = new Set(tok(f)); return want.every((w) => have.has(w)); });
+  return fields.some((f) => (kind === "company" ? companyNamed(name, f) : personMatches(name, f)));
 }
 
 /** Names a results list shows without saying their role (SmartGov's party column). */
@@ -346,7 +347,7 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
     const { coverage, rows } = await sweepPortals(order.user_id, subject.name, subject.kind, dbs, log);
     const dedup = new Map<string, PermitHit>();
     for (const row of rows) {
-      if (!namesMatch(subject.name, row)) continue;
+      if (!namesMatch(subject.name, row, subject.kind)) continue;
       const hit = toPermitHit(row, input.trades);
       const y = yearOf(hit.issuedDate);
       if (input.sinceYear && y && y < input.sinceYear) continue;
@@ -374,11 +375,19 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       if (!dup) rel.add(h);
       else if (h.relatedVia && !dup.relatedVia?.includes(h.relatedVia)) dup.relatedVia = `${dup.relatedVia}; also ${h.relatedVia}`;
     }
-    const relatedLicenses = rel.list;
+    // Disciplinary text on a license never shows on the license (round 2, decision 1): a business's becomes an
+    // enforcement record for a company subject; for a person it is dropped.
+    const enforcement = [...records.enforcement];
+    const seenEnf = new Set(enforcement.map(enforcementKey));
+    if (subject.kind === "company") {
+      for (const h of own.list) { const e = disciplineRecord(h); if (e && !seenEnf.has(enforcementKey(e))) { seenEnf.add(enforcementKey(e)); enforcement.push(e); } }
+      for (const h of rel.list) { const e = disciplineRecord(h); if (e && !seenEnf.has(enforcementKey(e))) { seenEnf.add(enforcementKey(e)); relatedEnforcement.push(e); } }
+    }
+    const relatedLicenses = rel.list.map(reportHit);
     log(`cross-reference for "${subject.name}": ${relatedLicenses.length} related license(s), ${relatedEnforcement.length} related enforcement record(s), ${xref.idSearches} identifier search(es)${xref.notes.length ? `; ${xref.notes.join(" | ")}` : ""}`);
     subjects.push({
-      name: subject.name, kind: subject.kind, licenses: own.list, permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)),
-      complaints: records.complaints, courtCases: records.courtCases, osha: records.osha, enforcement: records.enforcement, recordSources: records.sources,
+      name: subject.name, kind: subject.kind, licenses: own.list.map(reportHit), permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)),
+      complaints: records.complaints, courtCases: records.courtCases, osha: records.osha, enforcement, recordSources: records.sources,
       identifierSearches: ids.searches, relatedLicenses, relatedEnforcement, relatedNotes: [...ids.notes, ...xref.notes],
     });
   }
@@ -431,7 +440,8 @@ export async function drainResearchQueue(): Promise<void> {
   try {
     for (let order = await claimNext(); order; order = await claimNext()) {
       try {
-        const report = await runResearch(order);
+        // One run: a host that denies access during it gets no further request until it ends (round 2, decision 6).
+        const report = await withRun(() => runResearch(order));
         await finishOrder(order.id, report);
         console.log(`[research] order ${order.id}: complete (${report.totals.licenses} licenses, ${report.totals.permits} permits)`);
         await sendReportEmails(order, report);

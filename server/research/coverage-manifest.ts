@@ -25,6 +25,8 @@ import {
   type CoverageId, type CoverageKind, type CoverageManifest, type CoverageSource, type CoverageState,
 } from "@shared/research-coverage";
 
+import { resetHostState } from "./http";
+
 const require = createRequire(import.meta.url);
 
 // ── The network guard ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -57,14 +59,17 @@ export function installNetworkGuard(): void {
 type Probe = "runs" | "skips";
 /** Runs one search under the guard: "runs" when it tried the network (or found something), "skips" when it didn't. */
 export async function probe(fn: () => Promise<unknown>): Promise<Probe> {
+  // Every probe asks robots.txt afresh: a cached answer (a refusal under the guard above all) sends nothing, and
+  // a search that would have reached the network must count as running.
+  resetHostState();
   const before = attempts;
   let settled: "ok" | "err" | null = null, result: unknown, error: unknown;
   const p = fn().then((r) => { settled = "ok"; result = r; }, (e) => { settled = "err"; error = e; });
   await Promise.race([p, new Promise((r) => realSetTimeout(r, 4000))]);
   if (attempts > before) return "runs";
   if (settled === "ok") return Array.isArray(result) && result.length > 0 ? "runs" : "skips";
-  // A source that needs a key we don't hold at build time: it runs where the key is set.
-  if (settled === "err" && /not configured/i.test(String((error as Error)?.message ?? error))) return "runs";
+  // A source that needs a key we don't hold here doesn't run: it is not claimed (round 2, decision 13).
+  if (settled === "err" && /not configured/i.test(String((error as Error)?.message ?? error))) return "skips";
   return settled === null ? "runs" : "skips"; // still waiting on something: it is working, not declining
 }
 

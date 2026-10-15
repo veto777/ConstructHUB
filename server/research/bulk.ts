@@ -18,10 +18,11 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { pool } from "../db";
-import { USER_AGENT, checkRobots, rateLimitHost, sleep } from "./http";
+import { USER_AGENT, fetchWithDeadline, guard, noteResponse, sleep, withRun } from "./http";
 import type { EnforcementCategory, EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { tokens } from "./licenses";
 import { addressMatches, idWords, queryWords, type IdKeys, type IdQuery } from "./identifiers";
+import { capNote } from "./notes";
 import { isIndividual, privateHit, privateKeys } from "./privacy";
 
 /**
@@ -30,8 +31,13 @@ import { isIndividual, privateHit, privateKeys } from "./privacy";
  * addresses (./identifiers.ts), so a report can find it by those and cross-reference related records.
  */
 export type BulkHit =
-  | { kind: "license"; hit: LicenseHit; business: string | null; person: string | null; people?: (string | null)[]; keys?: IdKeys }
-  | { kind: "enforcement"; hit: EnforcementHit; business: string | null; person: string | null; people?: (string | null)[]; keys?: IdKeys };
+  | { kind: "license"; hit: LicenseHit; business: string | null; person: string | null; people?: (string | null)[]; keys?: IdKeys; component?: string }
+  | { kind: "enforcement"; hit: EnforcementHit; business: string | null; person: string | null; people?: (string | null)[]; keys?: IdKeys; component?: string };
+/*
+ * `component`: for a source built from several files (VA's boards, MI's and IN's license types, OH's rosters, …),
+ * which file the row came from. Each component's count is kept in facets, and the 70% rule applies to it alone
+ * (round 2, decision 10).
+ */
 
 export type BulkSource = {
   id: string;
@@ -72,7 +78,17 @@ CREATE TABLE IF NOT EXISTS research_bulk_rows (
 CREATE INDEX IF NOT EXISTS research_bulk_rows_words ON research_bulk_rows USING gin (words);
 CREATE INDEX IF NOT EXISTS research_bulk_rows_source ON research_bulk_rows (source, generation);
 ALTER TABLE research_bulk_sources ADD COLUMN IF NOT EXISTS facets jsonb;
+ALTER TABLE research_bulk_sources ADD COLUMN IF NOT EXISTS key_version integer NOT NULL DEFAULT 0;
 `;
+
+/**
+ * The format of a load's identifier keys. Version 2 (round 2, decision 2): phone and street keys only for a license
+ * a business holds. A source loaded under an older version is refreshed first, and until then its "a:"/"t:" keys are
+ * not searched (they may be an individual's home address or phone).
+ */
+export const KEY_VERSION = 2;
+/** A new load with fewer rows than this share of the previous one (or of one component's) is kept out as an error. */
+export const MIN_SHARE_OF_PREVIOUS = 0.7;
 
 let ready: Promise<void> | null = null;
 export function bulkSchemaReady(): Promise<void> {
@@ -102,7 +118,7 @@ const BATCH = 2000;
  * business) gets no phone or street keys, and its hit keeps city, state and ZIP only (decision 4).
  */
 export function rowKeys(h: BulkHit): { hit: LicenseHit | EnforcementHit; keys: IdKeys | undefined } {
-  const individual = h.kind === "license" ? isIndividual(h.hit) && !h.business : !h.business && !h.hit.name;
+  const individual = h.kind === "license" ? isIndividual(h.hit) : !h.business && !h.hit.name;
   const hit = h.kind === "license" && individual ? privateHit(h.hit) : h.hit;
   const own: IdKeys = {
     licenses: [...(h.keys?.licenses ?? []), h.hit.licenseNumber ?? null],
@@ -112,18 +128,36 @@ export function rowKeys(h: BulkHit): { hit: LicenseHit | EnforcementHit; keys: I
   return { hit, keys: privateKeys(own, individual) };
 }
 
+/**
+ * The 70% rule (round 2, decision 10): a load under MIN_SHARE_OF_PREVIOUS of the previous generation's rows, or a
+ * component under that share of its previous count (or missing), is not swapped in. Null when the load may stand.
+ */
+export function shortfall(n: number, components: Record<string, number>, prev: { rows: number; components?: Record<string, number> | null } | null): string | null {
+  if (!prev || prev.rows <= 0) return null;
+  if (n < prev.rows * MIN_SHARE_OF_PREVIOUS) return `${n} rows, previous ${prev.rows}`;
+  const short = Object.entries(prev.components ?? {}).filter(([c, m]) => m > 0 && (components[c] ?? 0) < m * MIN_SHARE_OF_PREVIOUS)
+    .map(([c, m]) => `${c}: ${components[c] ?? 0} rows, previous ${m}`);
+  return short.length ? short.join("; ") : null;
+}
+
 /** Download, parse and swap in one source. Returns the row count. */
 export async function loadSource(src: BulkSource): Promise<number> {
+  return withRun(() => loadSourceRun(src));
+}
+
+async function loadSourceRun(src: BulkSource): Promise<number> {
   await bulkSchemaReady();
   await pool.query(`INSERT INTO research_bulk_sources (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`, [src.id]);
   await pool.query(`UPDATE research_bulk_sources SET attempted_at = now() WHERE id = $1`, [src.id]);
-  const { rows: [cur] } = await pool.query(`SELECT generation FROM research_bulk_sources WHERE id = $1`, [src.id]);
+  const { rows: [cur] } = await pool.query(`SELECT generation, row_count, loaded_at, facets FROM research_bulk_sources WHERE id = $1`, [src.id]);
   const gen = Number(cur.generation) + 1;
+  const prev = cur.loaded_at ? { rows: Number(cur.row_count ?? 0), components: (cur.facets?.components ?? null) as Record<string, number> | null } : null;
   await pool.query(`DELETE FROM research_bulk_rows WHERE source = $1 AND generation = $2`, [src.id, gen]);
   let n = 0;
   let batch: { words: string[]; hit: unknown }[] = [];
   // What the whole load is indexed by ("b:", "p:", "l:", "t:", "a:") and the kinds of its records, for the coverage page.
   const prefixes = new Set<string>(), kinds = new Set<string>();
+  const components: Record<string, number> = {};
   const flush = async () => {
     if (!batch.length) return;
     await pool.query(
@@ -140,29 +174,33 @@ export async function loadSource(src: BulkSource): Promise<number> {
       if (!words.length) continue;
       for (const w of words) prefixes.add(w.slice(0, 2));
       kinds.add(h.kind === "license" ? "license" : (h.hit as EnforcementHit).category ?? "other");
+      if (h.component) components[h.component] = (components[h.component] ?? 0) + 1;
       batch.push({ words, hit: { k: h.kind, h: hit } });
       n++;
       if (batch.length >= BATCH) await flush();
     }
     await flush();
     if (n < src.minRows) throw new Error(`only ${n} rows (expected at least ${src.minRows}); kept the previous load`);
+    const short = shortfall(n, components, prev);
+    if (short) throw new Error(`${short}: under ${Math.round(MIN_SHARE_OF_PREVIOUS * 100)}% of the previous load; kept the previous load`);
   } catch (err: any) {
     await pool.query(`DELETE FROM research_bulk_rows WHERE source = $1 AND generation = $2`, [src.id, gen]);
     await pool.query(`UPDATE research_bulk_sources SET error = $2 WHERE id = $1`, [src.id, String(err?.message ?? err).slice(0, 500)]);
     throw err;
   }
-  await pool.query(`UPDATE research_bulk_sources SET generation = $2, row_count = $3, loaded_at = now(), error = NULL, facets = $4 WHERE id = $1`,
-    [src.id, gen, n, JSON.stringify({ prefixes: Array.from(prefixes).sort(), kinds: Array.from(kinds).sort() })]);
+  const facets = { prefixes: Array.from(prefixes).sort(), kinds: Array.from(kinds).sort(), ...(Object.keys(components).length ? { components } : {}) };
+  await pool.query(`UPDATE research_bulk_sources SET generation = $2, row_count = $3, loaded_at = now(), error = NULL, facets = $4, key_version = $5 WHERE id = $1`,
+    [src.id, gen, n, JSON.stringify(facets), KEY_VERSION]);
   await pool.query(`DELETE FROM research_bulk_rows WHERE source = $1 AND generation <> $2`, [src.id, gen]);
   return n;
 }
 
-export type BulkStatus = { loaded: boolean; rows: number; loadedAt: string | null; error: string | null };
+export type BulkStatus = { loaded: boolean; rows: number; loadedAt: string | null; error: string | null; keyVersion: number };
 
 export async function sourceStatus(id: string): Promise<BulkStatus> {
   await bulkSchemaReady();
-  const { rows: [r] } = await pool.query(`SELECT row_count, loaded_at, error FROM research_bulk_sources WHERE id = $1`, [id]);
-  return { loaded: !!r?.loaded_at, rows: Number(r?.row_count ?? 0), loadedAt: r?.loaded_at ? new Date(r.loaded_at).toISOString() : null, error: r?.error ?? null };
+  const { rows: [r] } = await pool.query(`SELECT row_count, loaded_at, error, key_version FROM research_bulk_sources WHERE id = $1`, [id]);
+  return { loaded: !!r?.loaded_at, rows: Number(r?.row_count ?? 0), loadedAt: r?.loaded_at ? new Date(r.loaded_at).toISOString() : null, error: r?.error ?? null, keyVersion: Number(r?.key_version ?? 0) };
 }
 
 export type StoredHit = { kind: "license"; hit: LicenseHit } | { kind: "enforcement"; hit: EnforcementHit };
@@ -186,51 +224,61 @@ export async function searchBulk(src: BulkSource, name: string, kind: "person" |
   return { hits: rows.map((r) => ({ kind: r.hit.k, hit: r.hit.h })), status };
 }
 
-/** Hits in one source that carry this license number, phone or street address. */
-export async function searchBulkBy(src: BulkSource, q: IdQuery, limit = BULK_ID_LIMIT): Promise<{ hits: StoredHit[]; status: BulkStatus }> {
+/** Index candidates an address search reads, at most, before the re-check (past it the note says so). */
+export const BULK_ADDRESS_CANDIDATES = 5000;
+
+/**
+ * Hits in one source that carry this license number, phone or street address. An address search re-checks every
+ * candidate (house number + first street word) against the whole address, and the limit applies after that re-check,
+ * so a page of candidates from another town can't hide the right one; when the candidates themselves run past
+ * BULK_ADDRESS_CANDIDATES the note says so. A load made under an older key format is not searched by phone or
+ * address (`stale`): its keys may be an individual's.
+ */
+export async function searchBulkBy(src: BulkSource, q: IdQuery, limit = BULK_ID_LIMIT): Promise<{ hits: StoredHit[]; status: BulkStatus; note?: string; stale?: boolean }> {
   const status = await sourceStatus(src.id);
   // An address is searched by house number and street word; the ZIP is checked on the hit (not every file has one).
   const want = queryWords(q).filter((w) => !w.startsWith("z:"));
   if (!status.loaded || !want.length) return { hits: [], status };
-  const { rows } = await pool.query(
-    `SELECT r.hit FROM research_bulk_rows r JOIN research_bulk_sources s ON s.id = r.source AND s.generation = r.generation
-     WHERE r.source = $1 AND r.words @> $2::text[] LIMIT $3`,
-    [src.id, want, limit],
-  );
-  const hits: StoredHit[] = rows.map((r) => ({ kind: r.hit.k, hit: r.hit.h }));
-  // An address search keeps only hits whose address is the query's (a hit without one can't be confirmed).
-  return { hits: q.type === "address" ? hits.filter((h) => addressMatches(q.value, h.hit.address)) : hits, status };
+  if (q.type !== "license" && status.keyVersion < KEY_VERSION) return { hits: [], status, stale: true };
+  const sql = `SELECT r.hit FROM research_bulk_rows r JOIN research_bulk_sources s ON s.id = r.source AND s.generation = r.generation
+     WHERE r.source = $1 AND r.words @> $2::text[] ORDER BY r.ctid LIMIT $3 OFFSET $4`;
+  if (q.type !== "address") {
+    const { rows } = await pool.query(sql, [src.id, want, limit, 0]);
+    return { hits: rows.map((r) => ({ kind: r.hit.k, hit: r.hit.h })), status, ...(rows.length >= limit ? { note: capNote(limit, null, "records") } : {}) };
+  }
+  const hits: StoredHit[] = [];
+  const PAGE = 1000;
+  for (let offset = 0; offset < BULK_ADDRESS_CANDIDATES; offset += PAGE) {
+    const { rows } = await pool.query(sql, [src.id, want, PAGE, offset]);
+    for (const r of rows) {
+      const h: StoredHit = { kind: r.hit.k, hit: r.hit.h };
+      if (addressMatches(q.value, h.hit.address)) hits.push(h);
+      if (hits.length >= limit) return { hits, status, note: capNote(limit, null, "records at this address") };
+    }
+    if (rows.length < PAGE) return { hits, status };
+  }
+  return { hits, status, note: `only the first ${BULK_ADDRESS_CANDIDATES} records with this house number and street word were checked; there are more` };
 }
 
 // ── Download + parse helpers ──────────────────────────────────────────────────────────────────────────────────
 
-/** Download a file to a temp path (large files: streamed, a generous timeout). The caller deletes it. */
+/** Download a file to a temp path (large files: streamed, a generous timeout; redirects followed hop by hop, each guarded). The caller deletes it. */
 export async function download(url: string, init: RequestInit = {}, timeoutMs = 20 * 60_000): Promise<string> {
-  await checkRobots(url);
-  await rateLimitHost(url, 2000);
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const headers = new Headers(init.headers ?? {});
-    if (!headers.has("user-agent")) headers.set("user-agent", USER_AGENT);
-    const res = await fetch(url, { ...init, headers, signal: ctrl.signal, redirect: "follow" });
-    if (!res.ok || !res.body) { await res.body?.cancel().catch(() => undefined); throw new Error(`HTTP ${res.status} for ${url}`); }
-    const path = join(tmpdir(), `ch-bulk-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    try { await pipeline(Readable.fromWeb(res.body as any), createWriteStream(path)); }
-    catch (err) { await fs.rm(path, { force: true }); throw err; }
-    return path;
-  } finally {
-    clearTimeout(timer);
-  }
+  const res = await fetchWithDeadline(url, init, timeoutMs, 2000);
+  if (!res.ok || !res.body) { await res.body?.cancel().catch(() => undefined); throw new Error(`HTTP ${res.status} for ${url}`); }
+  const path = join(tmpdir(), `ch-bulk-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  try { await pipeline(Readable.fromWeb(res.body as any), createWriteStream(path)); }
+  catch (err) { await fs.rm(path, { force: true }); throw err; }
+  return path;
 }
 
 /**
  * A plain HTTPS request with only the headers given (fetch() always adds browser-style Sec-Fetch headers, which some
  * agency firewalls reject on form posts). Follows no redirects; the caller reads the body.
  */
-export async function plainRequest(url: string, opts: { method?: string; headers?: Record<string, string>; body?: string; timeoutMs?: number; totalMs?: number } = {}): Promise<IncomingMessage> {
-  await checkRobots(url);
-  return new Promise((resolve, reject) => {
+export async function plainRequest(url: string, opts: { method?: string; headers?: Record<string, string>; body?: string; timeoutMs?: number; totalMs?: number; minDelayMs?: number } = {}): Promise<IncomingMessage> {
+  await guard(url, opts.minDelayMs ?? 1000);
+  const res = await new Promise<IncomingMessage>((resolve, reject) => {
     const body = opts.body ?? null;
     const totalMs = opts.totalMs ?? 30 * 60_000;
     const req = httpsRequest(url, {
@@ -249,6 +297,10 @@ export async function plainRequest(url: string, opts: { method?: string; headers
     if (body != null) req.write(body);
     req.end();
   });
+  // A 401/403 blocks the host for every caller; a Retry-After sets its cooldown.
+  try { noteResponse(url, res.statusCode ?? 0, res.headers["retry-after"] as string | undefined); }
+  catch (err) { res.resume(); throw err; }
+  return res;
 }
 
 export async function readText(res: IncomingMessage): Promise<string> {
@@ -277,12 +329,28 @@ function decoderFor(sample: Buffer): TextDecoder {
 
 /** The longest field a CSV row may hold: past it the file is malformed (an unclosed quote swallowing the rest). */
 export const MAX_CSV_FIELD = 1 << 20;
+/** The longest record (all its fields together) and the most columns a CSV row may hold (round 2, decision 11). */
+export const MAX_CSV_RECORD = 4 << 20;
+export const MAX_CSV_COLUMNS = 2000;
 
-/** RFC 4180 rows from a file (quoted fields may hold the delimiter, quotes and newlines). A quote left open at the end, or a field over MAX_CSV_FIELD, throws: the load keeps the previous data. */
+/**
+ * RFC 4180 rows from a file (quoted fields may hold the delimiter, quotes and newlines). A quote left open at the
+ * end, a field over MAX_CSV_FIELD, a record over MAX_CSV_RECORD characters or MAX_CSV_COLUMNS columns throws (every
+ * append is checked, escaped quotes included): the load keeps the previous data.
+ */
 export async function* csvRows(path: string, delimiter = ","): AsyncIterable<string[]> {
   const head = await fs.open(path).then(async (fh) => { const b = Buffer.alloc(1 << 20); const { bytesRead } = await fh.read(b, 0, b.length, 0); await fh.close(); return b.subarray(0, bytesRead); });
   const dec = decoderFor(head);
-  let field = "", row: string[] = [], inQ = false, pendingQ = false;
+  let field = "", row: string[] = [], inQ = false, pendingQ = false, recordLen = 0;
+  const add = (c: string) => {
+    field += c;
+    if (field.length > MAX_CSV_FIELD) throw new Error(`malformed CSV: a ${inQ ? "quoted " : ""}field runs past ${MAX_CSV_FIELD} characters`);
+    if (++recordLen > MAX_CSV_RECORD) throw new Error(`malformed CSV: a record runs past ${MAX_CSV_RECORD} characters`);
+  };
+  const endField = () => {
+    row.push(field); field = "";
+    if (row.length > MAX_CSV_COLUMNS) throw new Error(`malformed CSV: a record has more than ${MAX_CSV_COLUMNS} columns`);
+  };
   for await (const chunk of createReadStream(path)) {
     const s = dec.decode(chunk as Buffer, { stream: true });
     for (let i = 0; i < s.length; i++) {
@@ -290,16 +358,15 @@ export async function* csvRows(path: string, delimiter = ","): AsyncIterable<str
       if (inQ) {
         if (pendingQ) {
           pendingQ = false;
-          if (c === '"') { field += '"'; continue; }
+          if (c === '"') { add('"'); continue; }
           inQ = false; // closing quote; fall through to handle c unquoted
         } else if (c === '"') { pendingQ = true; continue; }
-        else { field += c; if (field.length > MAX_CSV_FIELD) throw new Error(`malformed CSV: a quoted field runs past ${MAX_CSV_FIELD} characters`); continue; }
+        else { add(c); continue; }
       }
       if (c === '"' && field === "") { inQ = true; continue; }
-      if (c === delimiter) { row.push(field); field = ""; continue; }
-      if (c === "\n") { row.push(field.endsWith("\r") ? field.slice(0, -1) : field); yield row; row = []; field = ""; continue; }
-      field += c;
-      if (field.length > MAX_CSV_FIELD) throw new Error(`malformed CSV: a field runs past ${MAX_CSV_FIELD} characters`);
+      if (c === delimiter) { endField(); recordLen++; continue; }
+      if (c === "\n") { if (field.endsWith("\r")) field = field.slice(0, -1); endField(); yield row; row = []; recordLen = 0; continue; }
+      add(c);
     }
   }
   if (pendingQ) inQ = false;
@@ -351,11 +418,16 @@ export async function refreshDueSources(sources: BulkSource[], log = (m: string)
   refreshing = true;
   try {
     await bulkSchemaReady();
-    for (const src of sources) {
-      const { rows: [r] } = await pool.query(`SELECT loaded_at, attempted_at FROM research_bulk_sources WHERE id = $1`, [src.id]);
+    const { rows: state } = await pool.query(`SELECT id, loaded_at, attempted_at, key_version FROM research_bulk_sources`);
+    const byId = new Map(state.map((r) => [r.id as string, r]));
+    // A load under an older key format is refreshed first, whatever its interval (round 2, decision 2).
+    const stale = (src: BulkSource) => { const r = byId.get(src.id); return !!r?.loaded_at && Number(r.key_version ?? 0) < KEY_VERSION; };
+    const ordered = [...sources.filter(stale), ...sources.filter((s) => !stale(s))];
+    for (const src of ordered) {
+      const r = byId.get(src.id);
       const due = (t: Date | null, hours: number) => !t || Date.now() - new Date(t).getTime() > hours * 3600_000;
-      // A failed source waits 6 hours before the next try; a loaded one waits its full interval.
-      if (!due(r?.loaded_at ?? null, src.everyHours) || !due(r?.attempted_at ?? null, src.utcHours ? 1 : 6)) continue;
+      // A failed source waits 6 hours before the next try; a loaded one waits its full interval (an old key format: due now).
+      if ((!stale(src) && !due(r?.loaded_at ?? null, src.everyHours)) || !due(r?.attempted_at ?? null, src.utcHours ? 1 : 6)) continue;
       if (src.utcHours && !src.utcHours.includes(new Date().getUTCHours())) continue;
       const t0 = Date.now();
       try {

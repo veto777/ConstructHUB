@@ -128,6 +128,19 @@ export type LicenseHit = {
   relatedTie?: RelatedTie;
   /** Found only by a license number, phone or address the customer gave; it names someone else (absent before 2026-10-15). */
   byYourIdentifier?: boolean;
+  /**
+   * Who holds the license, as the publisher says (license class, entity type, an individual credential such as a
+   * journeyman or qualifier card): "business", "individual", or null when the publisher doesn't say. Only a
+   * business's street address and phone are shown or indexed; an individual's or an unknown holder's record keeps
+   * city, state and ZIP only (audit round 2, decision 2). Absent on reports made before 2026-10-16.
+   */
+  holder?: "business" | "individual" | null;
+  /**
+   * Disciplinary text a source publishes on the license (discipline history, "previous disciplinary actions",
+   * complaint counts). Never shown on a license: the runner removes it from every hit, and for a business's
+   * license turns it into an enforcement record (companies only; audit round 2, decision 1).
+   */
+  discipline?: string | null;
 };
 
 /**
@@ -199,7 +212,7 @@ export type ResearchSubjectReport = {
   enforcement?: EnforcementHit[];
   recordSources?: RecordSource[];
   /** Searches by the license numbers, phones and addresses the customer gave (reports before 2026-10-15 have none). */
-  identifierSearches?: { query: string; found: number; note: string }[];
+  identifierSearches?: { query: string; found: number; note: string; sourcesSearched?: number }[];
   /**
    * The cross-reference pass: records of other licenses and businesses tied to the subject's own records (same
    * license number, phone or address, or a person named on both). Never the subject's own: each carries relatedVia.

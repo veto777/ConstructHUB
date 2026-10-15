@@ -35,6 +35,11 @@ export type LicenseSource = {
   personField: Field | string[] | { anyOf: string[] };
   /** False for a row whose holder is an individual: its name is then the principal, never the business name. */
   isBusiness?: (row: Record<string, unknown>) => boolean;
+  /**
+   * Who holds the license, from what the publisher says (entity type, license class): only a business keeps its
+   * street address and phone (round 2, decision 2). Absent: null, shown and indexed like an individual's.
+   */
+  holder?: (row: Record<string, unknown>) => "business" | "individual" | null;
   /** A second dataset listing every principal of a license, joined on licenseNumber. */
   principals?: { url: string; nameField: string; licenseField: string; businessField?: string };
   /** Optional identifier fields, so a report can search and cross-reference by them (./identifiers.ts): the street
@@ -71,6 +76,9 @@ const WA: LicenseSource = {
   personField: "primaryprincipalname",
   principals: { url: "https://data.wa.gov/resource/4xk5-x9j6.json", nameField: "principalname", licenseField: "contractorlicensenumber", businessField: "businessname" },
   address: ["address1", "address2", "city", "state"], zip: "zip", phone: "phonenumber",
+  // businesstypecodedesc, checked 2026-10-16: Individual (a sole proprietor), Corporation, Limited Liability Company,
+  // Partnership, Limited Liability Partnership, Joint Venture, Association, Trust, or blank.
+  holder: (r) => entityHolder(r.businesstypecodedesc, /^individual$/i),
   people: [{ field: "primaryprincipalname", role: "Primary principal" }],
   // Every principal (past ones carry an end date) and every authorized signer, checked 2026-10-15.
   peopleFrom: [
@@ -78,6 +86,12 @@ const WA: LicenseSource = {
     { url: "https://data.wa.gov/resource/s7ge-wicw.json", licenseField: "contractorlicensenumber", nameField: "authorizedsigner", role: "Authorized signer", roleField: "signerrole" },
   ],
 };
+
+/** A publisher's entity type as a holder: blank → null; one of the individual forms → "individual"; any other entity → "business". */
+export function entityHolder(v: unknown, individual: RegExp): "business" | "individual" | null {
+  const t = String(v ?? "").replace(/\s+/g, " ").trim();
+  return !t ? null : individual.test(t) ? "individual" : "business";
+}
 
 const soda = (domain: string, id: string) => ({ datasetUrl: `https://${domain}/d/${id}`, url: `https://${domain}/resource/${id}.json` });
 
@@ -87,6 +101,8 @@ const OTHERS: LicenseSource[] = [
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: "license_subtype", status: null, principal: "owner_name", city: "business_city_state_zip", expires: "license_expiration_date_mmddccyy" },
     personField: "owner_name",
     address: ["business_address_line1", "business_address_line2", "business_city_state_zip"], phone: ["business_telephone", "owner_telephone"],
+    // The contractor classes are a business's license; electricians, technicians, installers and drillers hold their own.
+    holder: (r) => (/contractor/i.test(String(r.license_type ?? "")) ? "business" : r.license_type ? "individual" : null),
     people: [{ field: "owner_name", role: "Owner" }],
     filter: "license_type in ('Electrical Contractor','Master Electrician','Journeyman Electrician','Residential Wireman','Apprentice Electrician','Journeyman Industrial Electrician','Maintenance Electrician','Journeyman Lineman Electrician','Electrical Sign Contractor','Master Sign Electrician','Journeyman Sign Electrician','A/C Contractor','A/C Technician','Appliance Installation Contractor','Appliance Installer','Elevator Contractor','Water Well Driller/Pump Installer')" },
   { state: "TX", source: "Austin right-of-way contractor licenses", ...soda("data.austintexas.gov", "8d92-wsiw"),
@@ -95,16 +111,23 @@ const OTHERS: LicenseSource[] = [
   { state: "CO", source: "Colorado DORA licenses (electrical, plumbing, water well)", ...soda("data.colorado.gov", "7s5z-vewr"),
     fields: { businessName: "entityname", licenseNumber: "licensenumber", licenseType: "licensetype", specialty: "subcategory", status: "licensestatusdescription", principal: null, city: "city", expires: "licenseexpirationdate" },
     personField: ["firstname", "middlename", "lastname"],
+    // EC (electrical contractor) and PC (plumbing contractor) and WC (water well contractor) are a business's; the rest are a person's own license.
+    holder: (r) => (/^(?:EC|PC|WC)$/.test(String(r.licensetype ?? "")) ? "business" : r.licensetype ? "individual" : null),
     people: [{ field: ["firstname", "middlename", "lastname", "suffix"], role: "Licensee" }],
     filter: "licensetype in ('EC','ME','JW','RW','APE','PC','MP','JP','RP','AP','WC','WI','WP')" },
   { state: "CT", source: "Connecticut DCP licenses and credentials (home improvement and trades)", ...soda("data.ct.gov", "ngch-56tr"),
     fields: { businessName: "businessname", licenseNumber: "fullcredentialcode", licenseType: "credential", specialty: "credentialsubcategory", status: "status", principal: "name", city: "city", expires: "expirationdate" },
     personField: "name",
     address: ["address", "city", "state"], zip: "zip", people: [{ field: "name", role: "Credential holder" }],
+    // `type`, checked 2026-10-16: INDIVIDUAL, EMPLOYEE ONLY and SOLE PROPRIETOR are a person; BUSINESS, CORPORATION,
+    // LIMITED LIABILITY COMPANY, PARTNERSHIP, … an entity.
+    holder: (r) => entityHolder(r.type, /^(?:individual|employee only|sole proprietor)$/i),
     filter: "credentialtype in ('HIC','NHC','MCO','ELC','PLM','HTG','SHM','MEC','FRP','ELV','STC','GLZ','DMCR')" },
   { state: "DE", source: "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)", ...soda("data.delaware.gov", "pjnv-eaih"),
     fields: { businessName: null, licenseNumber: "license_no", licenseType: "license_type", specialty: "profession_id", status: "license_status", principal: null, city: "city", expires: "expiration_date" },
     personField: ["first_name", "last_name"],
+    // A person's own license (first and last name only).
+    holder: () => "individual",
     people: [{ field: ["first_name", "last_name"], role: "Licensee" }],
     filter: "profession_id in ('Electrical Examiners','Plumbing/HVACR','Elevator Mechanics','Manufactured Home Installation')" },
   { state: "OR", source: "Oregon Construction Contractors Board (active licenses)", ...soda("data.oregon.gov", "g77e-6bhs"),
@@ -112,6 +135,8 @@ const OTHERS: LicenseSource[] = [
     // The licensee and its responsible managing individual are two names, never one person (audit 2026-10-15).
     personField: { anyOf: ["full_name", "rmi_name"] },
     address: ["address", "city", "state"], zip: "zip_code", phone: "phone_number",
+    // Every CCB license is a contractor's business license (license_type RGC, CGC1, RSC, …: classes of contractor).
+    holder: (r) => (r.license_type ? "business" : null),
     people: [{ field: "rmi_name", role: "Responsible managing individual" }] },
   { state: "OR", source: "Oregon Building Codes Division trade licenses", ...soda("data.oregon.gov", "vhbr-cuaq"),
     fields: { businessName: "full_name", licenseNumber: "licnbr", licenseType: "lictype", specialty: "profession", status: "lic_status", principal: "full_name", city: "city", expires: "expiration_date" },
@@ -121,23 +146,31 @@ const OTHERS: LicenseSource[] = [
     filter: "profession in ('Electrical','Plumbing','Boiler','Elevator','Combo License')",
     // Journeyman and other individual licenses (lictype "J-General Journeyman", "JP-Journeyman Plumber", …) name a
     // person; contractor and business licenses ("C-Electrical Contractor", "BB-Boiler Business") a business.
-    isBusiness: (r) => /contractor|business/i.test(String(r.lictype ?? "")) || looksLikeBusiness(String(r.full_name ?? "")) },
+    isBusiness: (r) => /contractor|business/i.test(String(r.lictype ?? "")) || looksLikeBusiness(String(r.full_name ?? "")),
+    // The license class decides who holds it, not how the name reads.
+    holder: (r) => (/contractor|business/i.test(String(r.lictype ?? "")) ? "business" : r.lictype ? "individual" : null) },
   { state: "VT", source: "Vermont Division of Fire Safety trade licenses", ...soda("data.vermont.gov", "cy8e-89cz"),
     fields: { businessName: null, licenseNumber: "license_number", licenseType: "type_desc", specialty: "level_desc", status: null, principal: null, city: "city", expires: "license_exp_date" },
     personField: ["first_name", "last_name"],
     address: ["street_address", "city", "state"], zip: "zip_code", people: [{ field: ["first_name", "last_name"], role: "Licensee" }],
+    // Electricians, plumbers and installers: a person's own license.
+    holder: () => "individual",
     filter: "type_desc in ('Electrician','Plumber','Gas Installer','Oil Installer','Elevator Tradesman','Sprinkler Designer')" },
   { state: "IL", source: "Illinois IDFPR roofing contractor licenses", ...soda("data.illinois.gov", "pzzh-kp68"),
     fields: { businessName: "business_name", licenseNumber: "license_number", licenseType: "license_type", specialty: "description", status: "license_status", principal: null, city: "city", expires: "expiration_date" },
     personField: ["first_name", "middle", "last_name"],
     people: [{ field: ["first_name", "middle", "last_name", "suffix"], role: "Licensee", roleField: "description" }],
+    // `business`, checked 2026-10-16: Y (a business's license) or N (an individual's).
+    holder: (r) => (r.business === "Y" ? "business" : r.business === "N" ? "individual" : null),
     filter: "license_type='ROOFING CONTRACTOR'" },
   { state: "NY", source: "New York DOL contractor registry (public work)", ...soda("data.ny.gov", "i4jv-zkey"),
     fields: { businessName: "business_name", licenseNumber: "certificate_number", licenseType: "business_type", specialty: null, status: "status", principal: "business_officers", city: "city", expires: "expiration_date" },
     personField: "business_officers",
     address: ["address", "address_2", "city", "state"], zip: "zip_code", phone: "phone",
     // One field listing several officers: each is a person of their own (the principal is the first one listed).
-    people: [{ field: "business_officers", role: "Business officer", split: "," }] },
+    people: [{ field: "business_officers", role: "Business officer", split: "," }],
+    // business_type, checked 2026-10-16: Corporation, LLC, LLP, Partnership, Association, Trust, Government, or Sole Proprietorship.
+    holder: (r) => entityHolder(r.business_type, /^sole proprietorship$/i) },
 ];
 
 export const LICENSE_SOURCES: Record<string, LicenseSource[]> = {};
@@ -248,6 +281,7 @@ function toHit(src: LicenseSource, row: Record<string, unknown>, matchedOn: Lice
     licenseType: str(row, src.fields.licenseType), specialty: str(row, src.fields.specialty),
     status: str(row, src.fields.status), principal: principal ?? personOf(src, row) ?? (business ? null : str(row, src.fields.businessName)),
     city: str(row, src.fields.city), expires: expires ? expires.slice(0, 10) : null, matchedOn,
+    holder: src.holder ? src.holder(row) : null,
     ...(src.address ? { address: addressOf(src, row) } : {}),
     ...(src.phone ? { phone: phonesOf(src, row)[0] ?? null } : {}),
     ...(people.length ? { people } : {}),

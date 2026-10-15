@@ -28,8 +28,10 @@ describe("adverse comes only from the outcome text (decision 2)", () => {
     expect(adverseFrom(null)).toBeNull();
     expect(adverseFrom("")).toBeNull();
     expect(adverseFrom("Hearing held")).toBeNull();
-    expect(adverseFrom("Dismissed, no penalty imposed")).toBe(false); // contains "penalty"
-    expect(adverseFrom("No civil penalty")).toBe(false);
+    // Round 2, decision 4: a negated sanction is not a clean answer.
+    expect(adverseFrom("Dismissed, no penalty imposed")).toBeNull();
+    expect(adverseFrom("No civil penalty")).toBeNull();
+    expect(adverseFrom("Dismissed")).toBe(false);
     expect(adverseFrom("Withdrawn by the department")).toBe(false);
     expect(adverseFrom("Vacated on appeal")).toBe(false);
     expect(adverseFrom("License revoked")).toBe(true);
@@ -84,14 +86,14 @@ describe("home addresses (decision 4)", () => {
     const h = privateHit(lic({ principal: "JANE DOE", address: "12 Elm St, Burlington VT 05401", phone: "802-555-0100", city: "BURLINGTON" }));
     expect(h.address).toBe("BURLINGTON VT 05401");
     expect(h.phone).toBeNull();
-    const biz = privateHit(lic({ businessName: "ACME ELECTRIC LLC", address: "12 Elm St, Burlington VT 05401", phone: "802-555-0100" }));
+    const biz = privateHit(lic({ businessName: "ACME ELECTRIC LLC", holder: "business", address: "12 Elm St, Burlington VT 05401", phone: "802-555-0100" }));
     expect(biz.address).toBe("12 Elm St, Burlington VT 05401");
   });
   it("an individual's bulk row is never indexed by home phone or street; a business row gets its own keys even without `keys`", () => {
     const person = rowKeys({ kind: "license", hit: lic({ principal: "JANE DOE", address: "12 Elm St 05401", phone: "8025550100" }), business: null, person: "JANE DOE", keys: { phones: ["8025550100"], addresses: ["12 Elm St"] } });
     expect(person.keys).toEqual({ licenses: ["EM-1234"] });
     expect(person.hit.phone).toBeNull();
-    const biz = rowKeys({ kind: "license", hit: lic({ businessName: "ACME LLC", licenseNumber: "CGC1512345", phone: "8135550101" }), business: "ACME LLC", person: null });
+    const biz = rowKeys({ kind: "license", hit: lic({ businessName: "ACME LLC", holder: "business", licenseNumber: "CGC1512345", phone: "8135550101" }), business: "ACME LLC", person: null });
     expect(biz.keys?.licenses).toContain("CGC1512345");
     expect(biz.keys?.phones).toContain("8135550101");
   });
@@ -198,7 +200,9 @@ describe("permit name match (kimi 16)", () => {
   it("never joins words of two people from a result's HTML or description", () => {
     const row = { rawData: { raw: { html: "<td>Applicant: Jane Smith</td><td>Owner: John Doe</td>" } }, description: "Applicant: Jane Smith; Owner: John Doe" };
     expect(namesMatch("John Smith", row)).toBe(false);
-    expect(namesMatch("John Doe", row)).toBe(true);
+    // Round 2, decision 12: names come from name fields only; HTML and descriptions are never read for them.
+    expect(namesMatch("John Doe", row)).toBe(false);
+    expect(namesMatch("John Doe", { ...row, applicantName: "John Doe" })).toBe(true);
   });
 });
 

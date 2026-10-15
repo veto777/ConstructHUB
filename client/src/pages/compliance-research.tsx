@@ -23,7 +23,7 @@ import {
   RESEARCH_TIERS, RESEARCH_TRADES, RESEARCH_TRADE_KEYS, RESEARCH_PATH, COMPLIANCE_PATH,
   RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA, researchTierFor,
   RESEARCH_MAX_LICENSE_NUMBERS, RESEARCH_MAX_PHONES, RESEARCH_MAX_ADDRESSES, RELATED_TIES, cleanLicenseNumber, formatPhone, cleanAddress,
-  type ResearchOrderView, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie,
+  type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie,
 } from "@shared/research-reports";
 import { RESEARCH_COVERAGE_PATH } from "@shared/research-coverage";
 import { ComplianceFrame } from "./compliance";
@@ -336,6 +336,18 @@ function SubjectEnforcement({ s }: { s: ResearchSubjectReport }) {
   );
 }
 
+/** True when at least one of the record sources matching `re` was searched. */
+const anySearched = (sources: { source: string; searched: boolean }[] | undefined, re: RegExp) => !!sources?.some((r) => re.test(r.source) && r.searched);
+/**
+ * "(3)" after a heading, or "(not searched)" when the count is 0 and no source behind it ran: 0 found from 0 sources
+ * searched is not "none found" (audit round 2, decision 8).
+ */
+const countOrNot = (n: number, searched: boolean) => (n === 0 && !searched ? "not searched" : String(n));
+const COURT_RE = /court/i, OSHA_RE = /OSHA/, COMPLAINT_RE = /consumer complaints|attorney general/i;
+/** ", 2 OSHA inspection(s)" for the summary line, or ", OSHA inspections not searched" when none of the report's sources for it ran. */
+const totalOrNot = (r: ResearchReport, re: RegExp, n: number | undefined, found: string, what: string) =>
+  !n && !r.subjects.some((x) => anySearched(x.recordSources, re)) ? `; ${what} not searched` : `, ${n ?? 0} ${found}`;
+
 /** Complaints, federal cases and OSHA inspections (companies only; reports made before these were added have none). */
 function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
   if (!s.recordSources) return null;
@@ -346,7 +358,7 @@ function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
   return (
     <>
       <div className="space-y-2">
-        <h3 className="font-semibold">Consumer complaints ({complaints.length})</h3>
+        <h3 className="font-semibold">Consumer complaints ({countOrNot(complaints.length, anySearched(s.recordSources, COMPLAINT_RE))})</h3>
         {s.recordSources.filter((r) => /consumer complaints|attorney general/i.test(r.source)).map((r, j) => (
           <p key={j} className="text-xs text-muted-foreground">{r.source} ({r.scope}): {r.note}</p>
         ))}
@@ -369,7 +381,7 @@ function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
       <SubjectEnforcement s={s} />
 
       <div className="space-y-2">
-        <h3 className="font-semibold">Federal court cases ({cases.length})</h3>
+        <h3 className="font-semibold">Federal court cases ({countOrNot(cases.length, anySearched(s.recordSources, COURT_RE))})</h3>
         <p className="text-xs text-muted-foreground">
           {s.recordSources.filter((r) => /court/i.test(r.source)).map((r) => `${r.source}: ${r.note}`).join(". ")}.
           {" "}A case filed is not a finding against anyone; open the docket for what happened.
@@ -388,7 +400,7 @@ function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
       </div>
 
       <div className="space-y-2">
-        <h3 className="font-semibold">OSHA inspections ({osha.length})</h3>
+        <h3 className="font-semibold">OSHA inspections ({countOrNot(osha.length, anySearched(s.recordSources, OSHA_RE))})</h3>
         {s.recordSources.filter((r) => /OSHA/.test(r.source)).map((r, j) => (
           <p key={j} className="text-xs text-muted-foreground">{r.source} ({r.scope}): {r.note}</p>
         ))}
@@ -541,7 +553,7 @@ function SubjectReport({ s, i }: { s: ResearchSubjectReport; i: number }) {
           <p key={j} className="text-xs text-muted-foreground">{src.state}: {src.source}: {src.note}</p>
         ))}
         {!!s.identifierSearches?.length && (
-          <p className="text-xs text-muted-foreground" data-testid="text-identifier-searches">Also searched by {s.identifierSearches.map((x) => `${x.query} (${x.found} found; ${x.note})`).join("; ")}.</p>
+          <p className="text-xs text-muted-foreground" data-testid="text-identifier-searches">Also searched by {s.identifierSearches.map((x) => `${x.query} (${x.sourcesSearched === 0 ? "not searched" : `${x.found} found`}; ${x.note})`).join("; ")}.</p>
         )}
         {s.licenses.length > 0 && <LicenseTable rows={s.licenses} testId={`table-licenses-${i}`} />}
       </div>
@@ -657,7 +669,7 @@ export function ResearchOrderStatusPage() {
           {o.status === "failed" && <p className="rounded-lg border border-destructive p-4 text-sm">Something went wrong while researching. Our team has been told and will rerun it; you don't need to do anything.</p>}
           {o.status === "complete" && o.report && (
             <div className="space-y-10">
-              <p className="text-sm">Found {o.report.totals.licenses} license record(s) and {o.report.totals.permits} permit(s){o.report.totals.complaints != null ? `, ${o.report.totals.complaints} consumer complaint(s)${o.report.totals.enforcement != null ? `, ${o.report.totals.enforcement} state enforcement or standing record(s)` : ""}, ${o.report.totals.courtCases ?? 0} federal court case(s) and ${o.report.totals.osha ?? 0} OSHA inspection(s)` : ""}. {o.report.totals.related ? `${o.report.totals.related} related record(s) of other licenses and businesses. ` : ""}{o.report.totals.portalsSearched} portal search(es) ran; {o.report.totals.portalsNotSearched} could not. Generated {new Date(o.report.generatedAt).toLocaleString()}.</p>
+              <p className="text-sm">Found {o.report.totals.licenses} license record(s) and {o.report.totals.permits} permit(s){o.report.totals.complaints != null ? `, ${o.report.totals.complaints} consumer complaint(s)${o.report.totals.enforcement != null ? `, ${o.report.totals.enforcement} state enforcement or standing record(s)` : ""}${totalOrNot(o.report, COURT_RE, o.report.totals.courtCases, "federal court case(s)", "federal court cases")}${totalOrNot(o.report, OSHA_RE, o.report.totals.osha, "OSHA inspection(s)", "OSHA inspections")}` : ""}. {o.report.totals.related ? `${o.report.totals.related} related record(s) of other licenses and businesses. ` : ""}{o.report.totals.portalsSearched} portal search(es) ran; {o.report.totals.portalsNotSearched} could not. Generated {new Date(o.report.generatedAt).toLocaleString()}.</p>
               {o.report.subjects.map((s, i) => <SubjectReport key={i} s={s} i={i} />)}
               <div className="border-t pt-4"><Terms /></div>
             </div>

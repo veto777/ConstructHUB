@@ -25,6 +25,11 @@ export type LiveLicenseSearch = {
   /** The hits; a search that stopped at a cap returns them through ../notes.ts withNote() so the report says so. */
   search: (name: string, kind: "person" | "company") => Promise<LicenseHit[]>;
   /**
+   * The kinds of name this lookup can search, when not both (an individual-only roster: ["person"]). A name of the
+   * other kind is reported as not searched, never as "0 found" (round 2, decision 8).
+   */
+  kinds?: ("person" | "company")[];
+  /**
    * Search by license number, phone or address, when the lookup offers it (the cross-reference pass uses it).
    * Returns null when this lookup can't search by that kind of identifier (or that value isn't one it can take):
    * the report then says "not searched", never "searched, 0 found" (audit 2026-10-15, decision 8).

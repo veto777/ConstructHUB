@@ -15,7 +15,7 @@
 import { politeFetch } from "./http";
 import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordSource } from "@shared/research-reports";
 import { nameClause, sodaRows, tokens } from "./licenses";
-import { searchBulk } from "./bulk";
+import { BULK_LIMIT, searchBulk } from "./bulk";
 import { allBulkSourcesFor as bulkSourcesFor, hasStateCourtSearch, packComplaintSourcesFor, searchPackEnforcement } from "./registry";
 import { searchStateEnforcement } from "./state-records";
 import { capNote, noteOf, withNote, type Noted } from "./notes";
@@ -201,7 +201,9 @@ export async function searchEnforcement(name: string, states: string[]): Promise
         if (!status.loaded) { sources.push({ source: src.label, scope: state, searched: false, note: "Not loaded yet (the state's file is downloaded daily)" }); continue; }
         const mine = found.filter((h): h is { kind: "enforcement"; hit: EnforcementHit } => h.kind === "enforcement").map((h) => h.hit).filter((h) => matches(h.name));
         hits.push(...mine);
-        sources.push({ source: src.label, scope: `${state}, file of ${status.loadedAt?.slice(0, 10)}`, searched: true, note: `${mine.length} record(s)` });
+        // The index read stops at BULK_LIMIT rows: a search that reached it says so (round 2, decision 9).
+        const capped = found.length >= BULK_LIMIT ? ` (${capNote(BULK_LIMIT, null, "index matches")})` : "";
+        sources.push({ source: src.label, scope: `${state}, file of ${status.loadedAt?.slice(0, 10)}`, searched: true, note: `${mine.length} record(s)${capped}` });
       } catch (err: any) {
         sources.push({ source: src.label, scope: state, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
       }
