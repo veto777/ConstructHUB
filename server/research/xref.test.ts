@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { researchOrderSchema, researchTierFor } from "@shared/research-reports";
-import { idWords, queryWords, type IdQuery } from "./identifiers";
+import { addressMatches, idWords, queryWords, type IdQuery } from "./identifiers";
 import { tokens } from "./licenses";
 import {
   businessCore, businessNamed, crossReference, LicenseSet, MAX_BUSINESSES_PER_TIE, MAX_ID_SEARCHES, nameMatches, personNamed, samePerson,
@@ -100,7 +100,8 @@ describe("cross-reference name checks (cases seen in the FL ECLB file)", () => {
     const who = (principal: string) => ({ principal, people: [] });
     expect(samePerson("DOUGLAS W SMITH", who("DOUGLAS W SMITH"))).toBe(true);
     expect(samePerson("DOUGLAS W SMITH", who("DOUGLAS WAYNE SMITH"))).toBe(true);
-    expect(samePerson("DOUGLAS W SMITH", who("DOUGLAS SMITH"))).toBe(false);
+    // Only one side gives an initial: still a candidate (decision 6: initials must agree when both give one).
+    expect(samePerson("DOUGLAS W SMITH", who("DOUGLAS SMITH"))).toBe(true);
     expect(samePerson("DOUGLAS W SMITH", who("DOUGLAS C SMITH"))).toBe(false);
     expect(samePerson("DOUGLAS W SMITH", who("JASON DOUGLAS SMITH"))).toBe(false);
     expect(samePerson("DOUGLAS SMITH", who("DOUGLAS LEE SMITH"))).toBe(true);
@@ -116,31 +117,60 @@ describe("cross-reference name checks (cases seen in the FL ECLB file)", () => {
 });
 
 describe("dedupe", () => {
-  it("merges one license from two sources by state + license number, keeping the first and filling gaps", () => {
+  it("merges two copies of one license from one board, keeping the first, filling gaps and keeping everyone named", () => {
     const set = new LicenseSet();
-    expect(set.add(lic({ licenseNumber: "EC-100", businessName: "ACME ELECTRIC LLC", source: "A" }))).toBe(true);
-    expect(set.add(lic({ licenseNumber: "ec100", businessName: "Acme Electric", source: "B", phone: "8135550101", people: [{ name: "Jane Doe", role: "Qualifier" }] }))).toBe(false);
+    expect(set.add(lic({ licenseNumber: "EC-100", businessName: "ACME ELECTRIC LLC", principal: "JOHN ROE" }))).toBe(true);
+    expect(set.add(lic({ licenseNumber: "ec100", businessName: "Acme Electric", phone: "8135550101", principal: "MARY POE", people: [{ name: "Jane Doe", role: "Qualifier" }] }))).toBe(false);
     expect(set.list).toHaveLength(1);
-    expect(set.list[0].source).toBe("A");
+    expect(set.list[0].principal).toBe("JOHN ROE");
     expect(set.list[0].phone).toBe("8135550101");
-    expect(set.list[0].people).toEqual([{ name: "Jane Doe", role: "Qualifier" }]);
+    // Both copies' people survive the merge (a CSLB license with several officers).
+    expect(set.list[0].people).toEqual([{ name: "Jane Doe", role: "Qualifier" }, { name: "MARY POE", role: null }]);
   });
-  it("keeps two boards' records apart when only the number is shared, and other states apart", () => {
+  it("keeps two boards' license 12345 apart even when both names share a word like LLC (audit: dedupe by source and type)", () => {
     const set = new LicenseSet();
-    set.add(lic({ licenseNumber: "12345", businessName: "ACME ELECTRIC" }));
-    set.add(lic({ licenseNumber: "12345", businessName: "ZEBRA PLUMBING" }));
+    set.add(lic({ licenseNumber: "12345", businessName: "ALPHA ELECTRIC LLC", source: "Electrical board", phone: "8135550101" }));
+    set.add(lic({ licenseNumber: "12345", businessName: "BETA PLUMBING LLC", source: "Plumbing board", phone: "8135550199" }));
+    set.add(lic({ licenseNumber: "12345", businessName: "ALPHA ELECTRIC LLC", source: "Electrical board", licenseType: "Journeyman" }));
     set.add(lic({ licenseNumber: "12345", businessName: "ACME ELECTRIC", state: "TX" }));
-    expect(set.list).toHaveLength(3);
+    expect(set.list).toHaveLength(4);
+    expect(set.list[0].phone).toBe("8135550101");
+    // Within one board, LLC alone is not a shared name.
+    const one = new LicenseSet();
+    one.add(lic({ licenseNumber: "12345", businessName: "ALPHA ELECTRIC LLC" }));
+    one.add(lic({ licenseNumber: "12345", businessName: "BETA PLUMBING LLC" }));
+    expect(one.list).toHaveLength(2);
+  });
+  it("keeps two unnumbered records of one board apart when their streets differ", () => {
+    const set = new LicenseSet();
+    set.add(lic({ licenseNumber: null, businessName: "ACME ELECTRIC", address: "12 Palm Ave Tampa FL" }));
+    set.add(lic({ licenseNumber: null, businessName: "ACME ELECTRIC", address: "40 Oak St Miami FL" }));
+    expect(set.list).toHaveLength(2);
   });
 });
 
 describe("identifier search and cross-reference (fake source)", () => {
-  it("finds the subject's own record by the customer's license number and phone", async () => {
+  it("finds the subject's own record by the customer's license number; another name found by a phone is only 'matched by the phone you gave'", async () => {
     const f = fakeFinder(ROWS);
-    const r = await searchCustomerIds([f], [{ type: "license", value: "ec 100" }, { type: "phone", value: "8135550444" }], "company");
-    expect(r.licenses.map((h) => [h.licenseNumber, h.matchedOn])).toEqual([["EC100", "license"], ["CGC400", "phone"]]);
+    const r = await searchCustomerIds([f], [{ type: "license", value: "ec 100" }, { type: "phone", value: "8135550444" }], { name: "Acme Electric", kind: "company" });
+    expect(r.licenses.map((h) => [h.licenseNumber, h.matchedOn])).toEqual([["EC100", "license"]]);
+    expect(r.matched.map((h) => [h.licenseNumber, h.matchedOn, h.relatedTie, h.byYourIdentifier])).toEqual([["CGC400", "phone", "phone", true]]);
+    expect(r.matched[0].relatedVia).toBe("matched by the phone you gave (8135550444)");
     expect(r.searches.map((s) => s.found)).toEqual([1, 1]);
     expect(r.used).toBe(2);
+  });
+
+  it("the common-tie limit applies to the customer's identifiers too", async () => {
+    const many = Array.from({ length: MAX_BUSINESSES_PER_TIE + 1 }, (_, i) => lic({ licenseNumber: `EC8${String(i).padStart(2, "0")}`, businessName: `SUITE ${String.fromCharCode(65 + i)} CO`, phone: "813 555 0777" }));
+    const r = await searchCustomerIds([fakeFinder(many)], [{ type: "phone", value: "8135550777" }], { name: "Acme Electric", kind: "company" });
+    expect(r.matched).toEqual([]);
+    expect(r.notes.join(" ")).toMatch(/shared by 13 businesses/);
+  });
+
+  it("a source that can't search an identifier is 'not searched', never 'searched, 0 found'", async () => {
+    const unloaded: LicenseFinder = { state: "FL", label: "Florida file", byId: async () => ({ licenses: [], enforcement: [], searched: false, note: "not loaded yet" }) };
+    const r = await searchCustomerIds([unloaded, fakeFinder(ROWS)], [{ type: "license", value: "EC100" }], { name: "Acme Electric", kind: "company" });
+    expect(r.searches[0].note).toBe("1 source(s) searched; not searched: Florida file (not loaded yet)");
   });
 
   it("a company: links its officer's other business, same-phone and same-address licenses, each with its tie", async () => {
@@ -173,18 +203,51 @@ describe("identifier search and cross-reference (fake source)", () => {
     expect(x.relatedEnforcement.every((e) => e.relatedVia)).toBe(true);
   });
 
-  it("a person: the businesses they're named on and those businesses' licenses; no enforcement by identifier", async () => {
+  it("a person: the businesses they're named on and those businesses' licenses; never any enforcement (FCRA), not even for a related business", async () => {
     const f = fakeFinder([...ROWS, lic({ licenseNumber: "EC201", businessName: "BRIGHT SOLAR INC", phone: "727 555 0199" })], [enf({ name: "BRIGHT SOLAR INC", id: "SWO-9", phone: "7275550199" })]);
     const own = new LicenseSet();
     for (const h of (await f.byName!("Jane Doe", "person")).hits) own.add(h);
     expect(own.list.map((h) => h.licenseNumber).sort()).toEqual(["EC100", "EC200"]);
-    const x = await crossReference({ subject: { name: "Jane Doe", kind: "person" }, own, finders: [f], searchedIds: new Set(), idSearchesUsed: 0, enforcementSearch: noEnforcement });
+    // An enforcement search that really returns records for these businesses: it must never be called for a person.
+    const searchedFor: string[] = [];
+    const realEnforcement = async (name: string) => { searchedFor.push(name); return { hits: [enf({ name: "BRIGHT SOLAR INC", id: "SWO-1" }), enf({ name: "ACME ELECTRIC LLC", id: "SWO-3" })], sources: [] }; };
+    const x = await crossReference({ subject: { name: "Jane Doe", kind: "person" }, own, finders: [f], searchedIds: new Set(), idSearchesUsed: 0, enforcementSearch: realEnforcement });
+    expect(searchedFor).toEqual([]);
     const ec201 = x.related.find((h) => h.licenseNumber === "EC201")!;
     expect(ec201.relatedTie).toBe("phone");
     expect(ec201.relatedVia).toContain("same phone as license EC200");
     expect(ec201.relatedVia).toContain("held by BRIGHT SOLAR INC, the business on license EC200, where Jane Doe is named");
     expect(x.relatedEnforcement).toEqual([]);
     expect(x.notes.join(" ")).toContain("searched for companies only");
+  });
+
+  it("the same company's enforcement search does run (the guard is for people only)", async () => {
+    const f = fakeFinder(ROWS);
+    const own = new LicenseSet();
+    own.add({ ...ROWS[0] });
+    const x = await crossReference({ subject: { name: "Acme Electric", kind: "company" }, own, finders: [f], searchedIds: new Set(), idSearchesUsed: 0,
+      enforcementSearch: async (name) => ({ hits: name.startsWith("BRIGHT SOLAR") ? [enf({ name: "BRIGHT SOLAR INC", id: "SWO-1" })] : [], sources: [{ source: "Fake court", scope: "FL", searched: false, note: "Could not search: HTTP 503" }] }) });
+    expect(x.relatedEnforcement.map((e) => e.id)).toContain("SWO-1");
+    // A source that failed during the hop is said, not dropped.
+    expect(x.notes.join(" ")).toContain("not searched: Fake court (Could not search: HTTP 503)");
+  });
+
+  it("a name hop in a file that isn't loaded is reported as not searched", async () => {
+    const f = fakeFinder(ROWS);
+    const unloaded: LicenseFinder = { state: "FL", label: "Florida file", byName: async () => ({ hits: [], searched: false, note: "Not loaded yet" }) };
+    const own = new LicenseSet();
+    own.add({ ...ROWS[0] });
+    const x = await crossReference({ subject: { name: "Acme Electric", kind: "company" }, own, finders: [unloaded, f], searchedIds: new Set(), idSearchesUsed: 0, enforcementSearch: noEnforcement });
+    expect(x.notes.join(" ")).toContain(`Not searched: "JANE DOE" in Florida file (Not loaded yet)`);
+  });
+
+  it("an address on another side of the street is no tie (123 N Main St is not 123 S Main Ave)", async () => {
+    const rows = [lic({ licenseNumber: "EC100", businessName: "ACME ELECTRIC LLC", address: "123 N Main St Tampa FL 33602" }), lic({ licenseNumber: "EC700", businessName: "OTHER ROOFING LLC", address: "123 S Main Ave Tampa FL 33602" })];
+    const own = new LicenseSet();
+    own.add({ ...rows[0] });
+    const keyed: LicenseFinder = { ...fakeFinder(rows), byId: async (q) => ({ licenses: q.type === "address" ? rows.filter((h) => addressMatches(q.value, h.address)) : [], enforcement: [] }) };
+    const x = await crossReference({ subject: { name: "Acme Electric", kind: "company" }, own, finders: [keyed], searchedIds: new Set(), idSearchesUsed: 0, enforcementSearch: noEnforcement });
+    expect(x.related.map((h) => h.licenseNumber)).toEqual([]);
   });
 
   it("drops a tie shared by too many businesses (a shared building), and says so", async () => {

@@ -18,10 +18,11 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { pool } from "../db";
-import { USER_AGENT, rateLimitHost, sleep } from "./http";
+import { USER_AGENT, checkRobots, rateLimitHost, sleep } from "./http";
 import type { EnforcementCategory, EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { tokens } from "./licenses";
 import { addressMatches, idWords, queryWords, type IdKeys, type IdQuery } from "./identifiers";
+import { isIndividual, privateHit, privateKeys } from "./privacy";
 
 /**
  * One record of a file. `business` and `person` are the names it is found by; `people` adds everyone else the
@@ -70,6 +71,7 @@ CREATE TABLE IF NOT EXISTS research_bulk_rows (
 );
 CREATE INDEX IF NOT EXISTS research_bulk_rows_words ON research_bulk_rows USING gin (words);
 CREATE INDEX IF NOT EXISTS research_bulk_rows_source ON research_bulk_rows (source, generation);
+ALTER TABLE research_bulk_sources ADD COLUMN IF NOT EXISTS facets jsonb;
 `;
 
 let ready: Promise<void> | null = null;
@@ -94,6 +96,22 @@ export function indexWords(business: string | null, person: string | null, peopl
 
 const BATCH = 2000;
 
+/**
+ * The keys a row is indexed by: the pack's own, plus the license number, phone and address the hit itself carries
+ * (a source that forgot `keys` is still found by its license number; audit 2026-10-15). An individual's row (no
+ * business) gets no phone or street keys, and its hit keeps city, state and ZIP only (decision 4).
+ */
+export function rowKeys(h: BulkHit): { hit: LicenseHit | EnforcementHit; keys: IdKeys | undefined } {
+  const individual = h.kind === "license" ? isIndividual(h.hit) && !h.business : !h.business && !h.hit.name;
+  const hit = h.kind === "license" && individual ? privateHit(h.hit) : h.hit;
+  const own: IdKeys = {
+    licenses: [...(h.keys?.licenses ?? []), h.hit.licenseNumber ?? null],
+    phones: [...(h.keys?.phones ?? []), h.hit.phone ?? null],
+    addresses: [...(h.keys?.addresses ?? []), h.hit.address ?? null],
+  };
+  return { hit, keys: privateKeys(own, individual) };
+}
+
 /** Download, parse and swap in one source. Returns the row count. */
 export async function loadSource(src: BulkSource): Promise<number> {
   await bulkSchemaReady();
@@ -104,6 +122,8 @@ export async function loadSource(src: BulkSource): Promise<number> {
   await pool.query(`DELETE FROM research_bulk_rows WHERE source = $1 AND generation = $2`, [src.id, gen]);
   let n = 0;
   let batch: { words: string[]; hit: unknown }[] = [];
+  // What the whole load is indexed by ("b:", "p:", "l:", "t:", "a:") and the kinds of its records, for the coverage page.
+  const prefixes = new Set<string>(), kinds = new Set<string>();
   const flush = async () => {
     if (!batch.length) return;
     await pool.query(
@@ -115,9 +135,12 @@ export async function loadSource(src: BulkSource): Promise<number> {
   };
   try {
     for await (const h of src.load()) {
-      const words = indexWords(h.business, h.person, h.people, h.keys);
+      const { hit, keys } = rowKeys(h);
+      const words = indexWords(h.business, h.person, h.people, keys);
       if (!words.length) continue;
-      batch.push({ words, hit: { k: h.kind, h: h.hit } });
+      for (const w of words) prefixes.add(w.slice(0, 2));
+      kinds.add(h.kind === "license" ? "license" : (h.hit as EnforcementHit).category ?? "other");
+      batch.push({ words, hit: { k: h.kind, h: hit } });
       n++;
       if (batch.length >= BATCH) await flush();
     }
@@ -128,7 +151,8 @@ export async function loadSource(src: BulkSource): Promise<number> {
     await pool.query(`UPDATE research_bulk_sources SET error = $2 WHERE id = $1`, [src.id, String(err?.message ?? err).slice(0, 500)]);
     throw err;
   }
-  await pool.query(`UPDATE research_bulk_sources SET generation = $2, row_count = $3, loaded_at = now(), error = NULL WHERE id = $1`, [src.id, gen, n]);
+  await pool.query(`UPDATE research_bulk_sources SET generation = $2, row_count = $3, loaded_at = now(), error = NULL, facets = $4 WHERE id = $1`,
+    [src.id, gen, n, JSON.stringify({ prefixes: Array.from(prefixes).sort(), kinds: Array.from(kinds).sort() })]);
   await pool.query(`DELETE FROM research_bulk_rows WHERE source = $1 AND generation <> $2`, [src.id, gen]);
   return n;
 }
@@ -143,8 +167,13 @@ export async function sourceStatus(id: string): Promise<BulkStatus> {
 
 export type StoredHit = { kind: "license"; hit: LicenseHit } | { kind: "enforcement"; hit: EnforcementHit };
 
+/** Rows a name search reads from one file (past this, the report says it is showing the first ones). */
+export const BULK_LIMIT = 500;
+/** Rows an identifier search reads from one file. */
+export const BULK_ID_LIMIT = 200;
+
 /** Hits in one source where every word of the name is a word of the business name (company) or the person (person). */
-export async function searchBulk(src: BulkSource, name: string, kind: "person" | "company", limit = 500): Promise<{ hits: StoredHit[]; status: BulkStatus }> {
+export async function searchBulk(src: BulkSource, name: string, kind: "person" | "company", limit = BULK_LIMIT): Promise<{ hits: StoredHit[]; status: BulkStatus }> {
   const status = await sourceStatus(src.id);
   if (!status.loaded) return { hits: [], status };
   const want = tokens(name).map((w) => `${kind === "company" ? "b" : "p"}:${w}`);
@@ -158,7 +187,7 @@ export async function searchBulk(src: BulkSource, name: string, kind: "person" |
 }
 
 /** Hits in one source that carry this license number, phone or street address. */
-export async function searchBulkBy(src: BulkSource, q: IdQuery, limit = 200): Promise<{ hits: StoredHit[]; status: BulkStatus }> {
+export async function searchBulkBy(src: BulkSource, q: IdQuery, limit = BULK_ID_LIMIT): Promise<{ hits: StoredHit[]; status: BulkStatus }> {
   const status = await sourceStatus(src.id);
   // An address is searched by house number and street word; the ZIP is checked on the hit (not every file has one).
   const want = queryWords(q).filter((w) => !w.startsWith("z:"));
@@ -169,13 +198,15 @@ export async function searchBulkBy(src: BulkSource, q: IdQuery, limit = 200): Pr
     [src.id, want, limit],
   );
   const hits: StoredHit[] = rows.map((r) => ({ kind: r.hit.k, hit: r.hit.h }));
-  return { hits: q.type === "address" ? hits.filter((h) => !h.hit.address || addressMatches(q.value, h.hit.address)) : hits, status };
+  // An address search keeps only hits whose address is the query's (a hit without one can't be confirmed).
+  return { hits: q.type === "address" ? hits.filter((h) => addressMatches(q.value, h.hit.address)) : hits, status };
 }
 
 // ── Download + parse helpers ──────────────────────────────────────────────────────────────────────────────────
 
 /** Download a file to a temp path (large files: streamed, a generous timeout). The caller deletes it. */
 export async function download(url: string, init: RequestInit = {}, timeoutMs = 20 * 60_000): Promise<string> {
+  await checkRobots(url);
   await rateLimitHost(url, 2000);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -183,7 +214,7 @@ export async function download(url: string, init: RequestInit = {}, timeoutMs = 
     const headers = new Headers(init.headers ?? {});
     if (!headers.has("user-agent")) headers.set("user-agent", USER_AGENT);
     const res = await fetch(url, { ...init, headers, signal: ctrl.signal, redirect: "follow" });
-    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status} for ${url}`);
+    if (!res.ok || !res.body) { await res.body?.cancel().catch(() => undefined); throw new Error(`HTTP ${res.status} for ${url}`); }
     const path = join(tmpdir(), `ch-bulk-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     try { await pipeline(Readable.fromWeb(res.body as any), createWriteStream(path)); }
     catch (err) { await fs.rm(path, { force: true }); throw err; }
@@ -197,14 +228,22 @@ export async function download(url: string, init: RequestInit = {}, timeoutMs = 
  * A plain HTTPS request with only the headers given (fetch() always adds browser-style Sec-Fetch headers, which some
  * agency firewalls reject on form posts). Follows no redirects; the caller reads the body.
  */
-export function plainRequest(url: string, opts: { method?: string; headers?: Record<string, string>; body?: string; timeoutMs?: number } = {}): Promise<IncomingMessage> {
+export async function plainRequest(url: string, opts: { method?: string; headers?: Record<string, string>; body?: string; timeoutMs?: number; totalMs?: number } = {}): Promise<IncomingMessage> {
+  await checkRobots(url);
   return new Promise((resolve, reject) => {
     const body = opts.body ?? null;
+    const totalMs = opts.totalMs ?? 30 * 60_000;
     const req = httpsRequest(url, {
       method: opts.method ?? "GET",
       headers: { "user-agent": USER_AGENT, ...(opts.headers ?? {}), ...(body != null ? { "content-length": String(Buffer.byteLength(body)) } : {}) },
       timeout: opts.timeoutMs ?? 60_000,
-    }, resolve);
+    }, (res) => {
+      // The socket timeout only catches silence; this deadline covers the whole response, body included.
+      const total = setTimeout(() => res.destroy(new Error(`response not finished in ${Math.round(totalMs / 1000)}s: ${url}`)), totalMs);
+      (total as { unref?: () => void }).unref?.();
+      res.once("close", () => clearTimeout(total));
+      resolve(res);
+    });
     req.on("timeout", () => req.destroy(new Error(`timed out: ${url}`)));
     req.on("error", reject);
     if (body != null) req.write(body);
@@ -236,7 +275,10 @@ function decoderFor(sample: Buffer): TextDecoder {
   catch { return new TextDecoder("windows-1252"); }
 }
 
-/** RFC 4180 rows from a file (quoted fields may hold the delimiter, quotes and newlines). */
+/** The longest field a CSV row may hold: past it the file is malformed (an unclosed quote swallowing the rest). */
+export const MAX_CSV_FIELD = 1 << 20;
+
+/** RFC 4180 rows from a file (quoted fields may hold the delimiter, quotes and newlines). A quote left open at the end, or a field over MAX_CSV_FIELD, throws: the load keeps the previous data. */
 export async function* csvRows(path: string, delimiter = ","): AsyncIterable<string[]> {
   const head = await fs.open(path).then(async (fh) => { const b = Buffer.alloc(1 << 20); const { bytesRead } = await fh.read(b, 0, b.length, 0); await fh.close(); return b.subarray(0, bytesRead); });
   const dec = decoderFor(head);
@@ -251,15 +293,17 @@ export async function* csvRows(path: string, delimiter = ","): AsyncIterable<str
           if (c === '"') { field += '"'; continue; }
           inQ = false; // closing quote; fall through to handle c unquoted
         } else if (c === '"') { pendingQ = true; continue; }
-        else { field += c; continue; }
+        else { field += c; if (field.length > MAX_CSV_FIELD) throw new Error(`malformed CSV: a quoted field runs past ${MAX_CSV_FIELD} characters`); continue; }
       }
       if (c === '"' && field === "") { inQ = true; continue; }
       if (c === delimiter) { row.push(field); field = ""; continue; }
       if (c === "\n") { row.push(field.endsWith("\r") ? field.slice(0, -1) : field); yield row; row = []; field = ""; continue; }
       field += c;
+      if (field.length > MAX_CSV_FIELD) throw new Error(`malformed CSV: a field runs past ${MAX_CSV_FIELD} characters`);
     }
   }
   if (pendingQ) inQ = false;
+  if (inQ) throw new Error("malformed CSV: the file ends inside a quoted field (cut off?)");
   if (field !== "" || row.length) { row.push(field.replace(/\r$/, "")); yield row; }
 }
 
@@ -290,6 +334,9 @@ export async function* lines(path: string, encoding: "latin1" | "utf8" = "latin1
 export function usDate(v: string | null | undefined): string | null {
   const m = v?.trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
   if (!m || m[3] === "0000" || Number(m[3]) < 1900) return null;
+  const [y, mo, d] = [Number(m[3]), Number(m[1]), Number(m[2])];
+  // A month or day out of range ("13/40/2018") is not a date: null, never a made-up one.
+  if (mo < 1 || mo > 12 || d < 1 || d > new Date(Date.UTC(y, mo, 0)).getUTCDate()) return null;
   return `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
 }
 

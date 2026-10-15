@@ -15,7 +15,7 @@ const FAMILY = /&\s*sons?\b|\band sons?\b|\bbros\b|\bbrothers\b/i;
 const DBA = /\bd\/?b\/?a\b|\bdoing business as\b|\ba\/k\/a\b|\bt\/a\b|\btrading as\b/i;
 /**
  * Trade and business words that are not common U.S. surnames. Words that are surnames as well (Power, Mason,
- * Carpenter, Painter, Stone, Wood, Glass, Homes, Turner, Crane, Fuller, Brick, Field, Hall, Bell, …) are left out
+ * Carpenter, Painter, Stone, Wood, Wells, Glass, Homes, Turner, Crane, Fuller, Brick, Field, Hall, Bell, …) are left out
  * on purpose: "David Power" and "Joe Mason" are people.
  */
 const TRADE = new Set(`
@@ -33,7 +33,7 @@ const TRADE = new Set(`
   renovation renovations repair repairs residential restoration roofing roofers sales sanitation security septic
   service services sheet siding signs solar solutions specialties specialty sprinkler sprinklers steel storage
   structures supply surfaces systems technical technologies technology telecom telecommunications tile tiling
-  towers tree trucking underground utilities utility ventilation waterproofing welding wells windows wiring works
+  towers tree trucking underground utilities utility ventilation waterproofing welding windows wiring works
 `.trim().split(/\s+/));
 const TRADE_STEMS = /^(?:hvac|hvacr|plumb|electr|construct|roof|remodel|excavat|landscap|renovat|insulat|irrigat|refrigerat|waterproof)/i;
 
@@ -43,7 +43,8 @@ export function looksLikeBusiness(name: string | null | undefined): boolean {
   if (!t) return false;
   if (SUFFIX.test(t) || FAMILY.test(t) || DBA.test(t)) return true;
   const words = t.toLowerCase().split(/[^a-z0-9&']+/).filter(Boolean);
-  if (words.some((w) => TRADE.has(w) || TRADE_STEMS.test(w) || /\d/.test(w))) return true;
+  // Digits are no sign of a business: names in rosters and PDFs often carry a case number or a date.
+  if (words.some((w) => TRADE.has(w) || TRADE_STEMS.test(w))) return true;
   // "LAST, FIRST" is a person; a single word with no comma is a trade name.
   return words.length === 1 && !t.includes(",");
 }

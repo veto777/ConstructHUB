@@ -9,6 +9,7 @@ import { licenseSourcesFor, type LicenseSource } from "./licenses";
 import { searchSodaEnforcement, type SodaEnforcement } from "./state-records";
 import type { ComplaintSource } from "./records";
 import { STATE_PACKS } from "./states";
+import { noteOf } from "./notes";
 import { LOCAL_BULK, LOCAL_ENFORCEMENT, LOCAL_LICENSES, LOCAL_LIVE, LOCAL_LIVE_ENFORCEMENT } from "./states/local";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./states/types";
 
@@ -35,9 +36,11 @@ export async function searchPackEnforcement(name: string, state: string, matches
   const p = pack(state);
   const run = async (source: string, scope: string, fn: () => Promise<EnforcementHit[]>) => {
     try {
-      const found = (await fn()).filter((h) => matches(h.name));
+      const raw = await fn();
+      const found = raw.filter((h) => matches(h.name));
       hits.push(...found);
-      sources.push({ source, scope, searched: true, note: `${found.length} record(s)` });
+      // A search that stopped at a cap says so ("showing the first 10 of 34 matches").
+      sources.push({ source, scope, searched: true, note: `${found.length} record(s)${noteOf(raw) ? ` (${noteOf(raw)})` : ""}` });
     } catch (err: any) {
       sources.push({ source, scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
     }
@@ -53,6 +56,17 @@ export async function searchPackEnforcement(name: string, state: string, matches
 export const hasLicenseSources = (state: string): boolean =>
   allLicenseSourcesFor(state).length > 0 || liveLicenseSearchesFor(state).length > 0 || allBulkSourcesFor(state).some((s) => !s.companiesOnly);
 
-/** A pack that searches the state's courts (a live search whose source names a court) replaces the "not searchable" note. */
+/** The category a pack's enforcement source declares (Socrata ones: what their toHit returns). */
+function categoryOf(s: LiveEnforcementSearch | SodaEnforcement): string | null {
+  if ("category" in s && s.category) return s.category;
+  if ("toHit" in s) { try { return s.toHit({}).category; } catch { return null; } }
+  return null;
+}
+
+/**
+ * A pack that searches the state's court cases (a source whose records are court_case) replaces the "not searched"
+ * note. Decided by the records' category, not by the word "court" in a label (WA's bond-recovery suits name a
+ * court but are not a search of the state's courts; audit 2026-10-15, decision 11).
+ */
 export const hasStateCourtSearch = (state: string): boolean =>
-  [...(pack(state)?.liveEnforcement ?? []), ...(pack(state)?.enforcement ?? [])].some((s) => /court/i.test(s.source));
+  [...(pack(state)?.liveEnforcement ?? []), ...(pack(state)?.enforcement ?? [])].some((s) => categoryOf(s) === "court_case");

@@ -30,8 +30,11 @@ if (!pack) { console.error(`no pack for ${state}`); process.exit(2); }
 if (withBulk && /constructhub-live|5433/.test(process.env.DATABASE_URL ?? "")) { console.error("refusing to load bulk files into a live-looking database"); process.exit(2); }
 
 let failed = 0;
-const show = (label: string, n: number, sample: unknown[]) => {
-  console.log(`  ${label}: ${n}`);
+const show = (label: string, n: number | undefined, sample: unknown[] | null) => {
+  // A searchBy that can't search this kind of identifier returns null: "not searched", not 0.
+  if (sample == null) { console.log(`  ${label}: not searched (this source can't search by it)`); return; }
+  const note = (sample as { note?: string }).note;
+  console.log(`  ${label}: ${n}${note ? ` (${note})` : ""}`);
   for (const h of sample.slice(0, 2)) console.log(`    ${JSON.stringify(h).slice(0, 400)}`);
 };
 const attempt = async (label: string, fn: () => Promise<void>) => {
@@ -47,12 +50,12 @@ async function main() {
   for (const src of pack!.licenses ?? []) {
     console.log(`license dataset: ${src.source} (${src.datasetUrl})`);
     for (const s of subjects) await attempt(`${s.kind} "${s.name}"`, async () => { const h = await searchLicenses(src, s.name, s.kind); show(`${s.kind} "${s.name}"`, h.length, h); });
-    for (const q of ids) await attempt(`${q.type} "${q.value}"`, async () => { const h = await searchLicensesBy(src, q); show(`${q.type} "${q.value}"`, h.length, h); });
+    for (const q of ids) await attempt(`${q.type} "${q.value}"`, async () => { const h = await searchLicensesBy(src, q); show(`${q.type} "${q.value}"`, h?.length, h); });
   }
   for (const src of pack!.liveLicenses ?? []) {
     console.log(`live license search: ${src.source} (${src.sourceUrl})`);
     for (const s of subjects) await attempt(`${s.kind} "${s.name}"`, async () => { const h = await src.search(s.name, s.kind); show(`${s.kind} "${s.name}"`, h.length, h); });
-    if (src.searchBy) for (const q of ids) await attempt(`${q.type} "${q.value}"`, async () => { const h = await src.searchBy!(q); show(`${q.type} "${q.value}"`, h.length, h); });
+    if (src.searchBy) for (const q of ids) await attempt(`${q.type} "${q.value}"`, async () => { const h = await src.searchBy!(q); show(`${q.type} "${q.value}"`, h?.length, h); });
   }
   if (company && (pack!.enforcement?.length || pack!.liveEnforcement?.length)) {
     console.log(`enforcement (company "${company}")`);
