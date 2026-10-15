@@ -19,7 +19,7 @@ All adapter requests use the provided ConstructHUB user-agent and polite-fetch h
 
 ## 2. Capabilities
 
-Search: address and exact permit number for all configured datasets; name, company, and license only when the selected dataset publishes the corresponding mapped fields. Unsupported field searches throw explicitly. Keyword searches use published address, description, and type fields. Text searches are case-insensitive substring searches; split addresses match all input tokens. User LIKE wildcards are rejected. Quotes are escaped. Chicago company searches require the source contact role to begin with CONTRACTOR; all published contractor contact names are retained, separated by semicolons.
+Search: address and exact permit number for all configured datasets; name, company, and license only when the selected dataset (or its verified contacts dataset, section 7) publishes the corresponding mapped fields. Unsupported field searches throw explicitly. Keyword searches use published address, description, and type fields. Text searches are case-insensitive substring searches; split addresses match all input tokens. User LIKE wildcards are rejected. Quotes are escaped. Chicago company searches require the source contact role to begin with CONTRACTOR; all published contractor contact names are retained, separated by semicolons.
 
 `listRecent = true`: native issue-date queries, except Fort Worth and Baltimore County, which list by application date. Calendar-day sources replay the entire since-day for hourly alerts; these sources cannot distinguish time within a day. The poller must deduplicate replays. Floating source timestamps retain their unzoned ISO representation; midnight-only floating dates become YYYY-MM-DD. No UTC offset is invented. Unknown fields, sentinels, invalid coordinates, and unpublished values become null; raw rows/features remain untouched.
 
@@ -28,11 +28,11 @@ Search: address and exact permit number for all configured datasets; name, compa
 | Jurisdiction | Kind | Native recent field | Precision | Additional searches |
 |---|---|---|---|---|
 | New York, NY | socrata | `issued_date` | calendar day | name |
-| Los Angeles, CA | socrata | `issue_date` | calendar day | none |
+| Los Angeles, CA | socrata | `issue_date` | calendar day | name, company (contacts: CofO, 2026-10-14) |
 | Chicago, IL | socrata | `issue_date` | calendar day | name, company |
 | Austin, TX | socrata | `issue_date` | calendar day | name, company |
 | Seattle, WA | socrata | `issueddate` | calendar day | name, company |
-| San Francisco, CA | socrata | `issued_date` | source timestamp | none |
+| San Francisco, CA | socrata | `issued_date` | source timestamp | name, company (contacts: 3pee-9qhc, 2026-10-14) |
 | Las Vegas, NV | arcgis | `ISSDTTM` | source timestamp | name |
 | Miami-Dade County, FL | arcgis | `PermitIssuedDate` | calendar day | name, company, license |
 | Columbus, OH | arcgis | `ISSUED_DT` | source timestamp | name |
@@ -61,11 +61,11 @@ Search: address and exact permit number for all configured datasets; name, compa
 | Baltimore, MD | arcgis | `IssuedDate` | source timestamp | none |
 | Louisville, KY | arcgis | `ISSUE_DATE` | source timestamp | name, company |
 | San Jose, CA | arcgis | `ISSUEDATEUTC` | source timestamp | name, company |
-| Harris County, TX | arcgis | `ISSUEDDATE` | source timestamp | none |
+| Harris County, TX | arcgis | `ISSUEDDATE` | source timestamp | name, company (contacts: Projects DBANAME, 2026-10-14) |
 | Charlotte, NC | arcgis | `issuedate` | source timestamp | name |
 | Kansas City, MO | socrata | `issueddate` | calendar day | name, company, license |
-| San Antonio, TX | ckan | `DATE ISSUED` | calendar day | none |
-| San Diego, CA | arcgis | `APPROVAL_ISSUE_DATE` | source timestamp | none |
+| San Antonio, TX | ckan | `DATE ISSUED` | calendar day | name, company (primary contact, 2026-10-14) |
+| San Diego, CA | arcgis | `APPROVAL_ISSUE_DATE` | source timestamp | name, company (permit holder, 2026-10-14) |
 | Denver, CO | arcgis | `DATE_ISSUED` | source timestamp | name, company |
 
 ## 3. Live tests and verified metadata
@@ -564,8 +564,8 @@ Recorded baseline: `fixtures/opendata/Seattle__WA.json`. Two source records:
 ### San Francisco, CA
 
 Dataset: **Building Permits**. ID: `i98e-djp9`.
-Metadata endpoint: https://data.sfgov.org/api/views/i98e-djp9.json
-Data endpoint: https://data.sfgov.org/resource/i98e-djp9.json
+Metadata endpoint: https://data.sf.gov/api/views/i98e-djp9.json (was https://data.sfgov.org/api/views/i98e-djp9.json; see section 7)
+Data endpoint: https://data.sf.gov/resource/i98e-djp9.json (was https://data.sfgov.org/resource/i98e-djp9.json, kept as an accepted alias)
 Adapter context URL: https://sanfranciscoca.portal.opengov.com/
 Recorded baseline: `fixtures/opendata/San_Francisco__CA.json`. Two source records:
 ```json
@@ -3694,3 +3694,50 @@ Only `Open data` is registered; aliases: none. The supplied targets include Acce
 - Follow up with metadata/schema freshness checks, official replacement feeds for stale datasets, additional NYC/Denver/Portland trade datasets, and year rollover for Washington. Update the verified URL allowlist if catalog URLs change; do not accept an arbitrary tenant on a shared host.
 
 Validation: `npx vitest run server/scrapers/opendata.test.ts --configLoader runner` passes 26 tests, offline, across all four dataset kinds, schema maps, native query escaping, date precision, tenant validation, blocked/error responses, and pagination. `npx tsc --noEmit -p .` passes. The unmodified requested Vitest command cannot start in this container because node_modules/.vite-temp is read-only (EROFS); the runner option uses the same repository config without that cache write. No repository configuration was changed for the workaround.
+
+## 7. Contractor and applicant names — verified 2026-10-14
+
+Paid research reports search permits by a contractor company or a person's name. On 2026-10-10 seven configured datasets had no name field mapped, so those searches were refused. Each was re-checked on 2026-10-14 against live publisher metadata (Socrata `/api/views/<id>.json` column `fieldName`s, ArcGIS `<layer>?f=json` `fields`, CKAN `datastore_search` with `limit=1` plus the publisher's data dictionary), and with native queries that returned rows. New metadata files are under `fixtures/opendata/metadata/*_contacts.json`; `provenance.json` indexes their field names under each jurisdiction's `contacts` key, and the test suite checks every configured contacts column against them.
+
+### Mechanisms
+
+- `companyFields`: a company search also matches the listed mapped fields (default: `contractorName` only). This is used only where the publisher's sole company/person column is an applicant-type field. The value is published as `applicantName`, never relabelled as a contractor.
+- `contacts`: a sibling dataset from the same publisher on the same host, keyed by permit number (or Harris County's project-number prefix). Company/name searches query the contacts first (company columns for both search types; person-name columns for name searches; optional role filter), then fetch the main permits by key in chunks of 100 (Socrata) or 40 (ArcGIS), with `IN (...)` or `LIKE '<key>-%'`. The matched names fill `contractorName` (plus `contractorLicense`) or `applicantName`. Raw rows are the untouched main-dataset rows. Address, permit, keyword, license and recent queries are unchanged and use only the main dataset. A server-side Socrata JOIN works on data.sf.gov but data.lacity.org answers `"joins are not supported"`, so the adapter uses the two-step lookup everywhere.
+- `aliasUrls`: former endpoints of the same dataset after a publisher domain move, still accepted by `datasetFor`.
+
+Cost: each contacts search costs one request per 1,000 contact rows plus one per key chunk, at ≥1 s per request. Very large builders are slow. For example, Harris County `DBANAME LIKE '%LENNAR HOMES%'` matches 48,912 projects (about 1,270 requests, more than 20 minutes). The aborted smoke run is not counted below.
+
+### Per dataset
+
+| Jurisdiction | Result | Fields |
+|---|---|---|
+| Los Angeles, CA | **Added contacts.** `pi9x-tg5x` publishes no name column; none of its siblings, `(N)` issued/submitted building, electrical or mechanical datasets, has one either (catalog search). The same publisher's **Building and Safety Certificate of Occupancy** (`3f9m-afei`, LADBS, rows updated 2026-10-12, max `cofo_issue_date` 2026-10-09) carries `contractors_business_name`, `license`, `principal_first_name`/`principal_last_name`, keyed by `pcis_permit` = `permit_nbr` (verified: `23047-10000-01366` exists in both). | key `pcis_permit`; company `contractors_business_name`; person `principal_first_name`+`principal_last_name`; license `license` → `contractorName`/`contractorLicense`. **Scope limit:** contractor names exist only for permits that reached a certificate of occupancy (mostly new buildings, ADUs, pools and major alterations), and only for those that are also in the 2020-present issued file. A miss is not proof that the contractor pulled no LA permits. Older LADBS permit dataset IDs probed (`yv23-pmwf`, `nbyu-2ha9`) return `authentication_required` and were not used. |
+| San Francisco, CA | **Added contacts.** **Building Permits Contacts** (`3pee-9qhc`, rows updated 2026-10-14, 1,036,998 rows; roles: contractor 586,255, authorized agent-others, architect, engineer, lessee, payor, …), keyed by `permit_number`. The publisher moved from data.sfgov.org to **data.sf.gov** (301). The old redirector intermittently answered HTTP 428 with an empty body during chunked lookups, so both datasets now use data.sf.gov. The old URLs are kept in `aliasUrls`. | key `permit_number`; role `role` ∈ {contractor}; company `firm_name`; person `first_name`+`last_name`; license `license1` → `contractorName`/`contractorLicense`. Name searches match only contractor-role contacts, not architects/agents/applicants. |
+| Harris County, TX | **Added contacts.** Layer 1 (Permits) has no name field. Layer 0 of the same `AiPermitsService` (**Projects**) publishes `DBANAME` and `PROJECTNUMBER`; permit numbers are `<PROJECTNUMBER>-<code>-<seq>` (verified: project `2610070060` → `2610070060-RESB-001`, `-RSW-001`, `-RDW-001`). `DBANAME` is the applicant's company (e.g. a septic consultant whose project names a different property owner), so it is published as **applicantName**, not as the contractor. `ePermits/FeatureServer/0` also has `PROPERTYOWNERNAME` but sits alongside phone/e-mail columns, so it was not added. | key `PROJECTNUMBER`, separator `-`; company `DBANAME` → `applicantName`. |
+| San Diego, CA | **Mapped existing column.** `APPROVAL_PERMIT_HOLDER` was already in the configured layer (361,485 of 419,280 `PMT-%` rows populated; max issue date 2026-10-09). It names whoever holds the permit: contractors (e.g. "IRONCORE CONSTRUCTION", "New Day Solar") and also owners and organisations. | `applicantName: APPROVAL_PERMIT_HOLDER`; `companyFields: [applicantName]`. |
+| San Antonio, TX | **Mapped existing column.** `PRIMARY CONTACT` is in the PERMITS ISSUED resource (data dictionary: "The primary contact on the application or permit record"; resource modified 2026-10-11). Values are people and/or companies (e.g. "COURTNEY CHAPPELL, LENNAR HOMES", "LENNAR HOMES"). | `applicantName: "PRIMARY CONTACT"`; `companyFields: [applicantName]`. |
+| Fort Worth, TX | **No change.** The layer's fields are listed in `fixtures/opendata/metadata/Fort_Worth_TX.json`; `Owner_Full_Name` is already mapped for name searches. The only other name-like column is `B1_SPECIAL_TEXT`: no alias, no description, an Accela free-text application name. It mixes contractors ("SUNRUN INSTALLATION SERVICES INC", "DR Horton"), third-party inspectors ("Bureau Veritas - Tavolo Park - Integrity"), project names ("Orchard Farms") and code-compliance labels ("METRO CODE"). It is not a contractor field and was not mapped. The CFW ArcGIS org publishes no other permit/contractor service. Company search stays refused. | none |
+| Los Angeles County, CA | **No change.** `EPIC-LA_Case_History_view` fields contain no contractor/applicant/owner name, and neither do the sibling county layers (`Rebuild_Permits_Issued`, `EPICLA_County_Recovery`, `LDU_Permit_VIEW`; Hub search for EPIC-LA). The only Hub result with contractor-style data is a third-party (shovelsai) extract, not an official source. | none |
+
+### Houston and Dallas (not added)
+
+- **Houston, TX:** data.houstontx.gov (CKAN, 9 permit results) has only aggregate monthly residential permit counts (`residential-building-permits`, modified 2026-05-01) and non-construction permits. The COH ArcGIS org (`cohgis_ago`) publishes sidewalk permits for 2020–2023 only. No current permit-level dataset with contractor or applicant names exists. Houston stays on the city-built adapter.
+- **Dallas, TX:** the Socrata **Building Permits** dataset `e7gq-4sah` (has `contractor`) was last updated 2020-08-30. The DallasGIS layers `T_BU_Permits_FY2023_24` (`CONTRACTOR_NAME`; data last edited 2024-10-18) and `NewPermit_2008_2024` (no names; 2024-12-10) are not current. The only current official name-bearing permit data is **ROW Permits – Points** (`bw6g-a3ur`, `allcontractorsname`/`applicantcompanynamestored`, max `issuedate` 2026-09-18). It covers right-of-way permits only. A `DATASETS["Dallas, TX"]` entry would route Dallas's whole permit database (Accela DallasNow) to the open-data adapter through `registerJurisdictionAdapter`, so it was not added. Doing so needs an explicit decision to give right-of-way permits a separate database row.
+
+### Live smoke searches (2026-10-14 local; adapter `search`, polite ≥1 s/host)
+
+| Jurisdiction | Type | Value | Rows | ms | First record |
+|---|---|---|---|---|---|
+| Los Angeles, CA | company | POOL ICONS | 28 | 1,118 | 20047-10000-01102, 4420 N PORTOLA AVE, POOL ICONS INC (479446) |
+| Los Angeles, CA | company | SHAPELL HOMES | 906 | 19,818 | 21010-20000-05182, 20114 W MARLOW LANE, SHAPELL HOMES INC |
+| Los Angeles, CA | name | DONALD NARVAEZ | 30 | 1,997 | 20047-10000-01102 (principal of POOL ICONS INC) |
+| San Francisco, CA | company | Terence Mcmahon Construction | 629 | 6,155 | 201601147100, 41 Mars St (license 797580) |
+| San Francisco, CA | name | Andrew George Byrne | 629 | 6,936 | same contractor-role contact |
+| Harris County, TX | company | G&B GROUP | 46 | 5,809 | 2208190147-RESB-001, 14254 Texarkana St. (applicant G&B GROUP LLC) |
+| Harris County, TX | company | PS LIGHTWAVE | 511 | 25,503 | 1509140086-UGC-001, 4000 Peek Rd, Katy |
+| San Diego, CA | company | IRONCORE CONSTRUCTION | 26 | 2,095 | PMT-3439414 |
+| San Diego, CA | company | New Day Solar | 170 | 1,859 | PMT-3036958, 11724 Alderidge Ln |
+| San Antonio, TX | company | LENNAR HOMES | 2,890 | 2,207 | RES-RBP-PMT25-36600004, 3734 ROCK MILL DAM |
+| San Antonio, TX | name | COURTNEY CHAPPELL | 943 | 999 | TRE-AFF-PMT25-39002089 |
+
+Row counts are source rows: SF returns one row per permit address, so 553 matched permit numbers gave 629 rows. San Francisco address and seven-day recent queries were re-run on data.sf.gov with `searchUrl` set to the new URL, the old data.sfgov.org alias and the OpenGov portal: 6 / 6 / 6 address rows and 213 recent rows. Validation: `npx tsc --noEmit -p .` passes, and `npx vitest run server/scrapers/opendata.test.ts server/scrapers/registry.test.ts` passes, with recorded contact and permit fixtures in `fixtures/opendata/*_contacts.json` and `*_contact_permits.json`.

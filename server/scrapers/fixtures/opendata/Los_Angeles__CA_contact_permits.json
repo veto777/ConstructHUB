@@ -1,0 +1,41 @@
+[
+    {
+        "permit_nbr": "23047-10000-01366",
+        "primary_address": "5945 N HILLVIEW PARK AVE",
+        "zip_code": "91401",
+        "cd": "2",
+        "pin_nbr": "177B157   947",
+        "apn": "2343020007",
+        "zone": "RE11-1",
+        "apc": "South Valley",
+        "cpa": "Van Nuys - North Sherman Oaks",
+        "cnc": "Greater Valley Glen",
+        "ct": "1236.02",
+        "permit_group": "Building",
+        "permit_type": "Swimming-Pool/Spa",
+        "permit_sub_type": "1 or 2 Family Dwelling",
+        "use_code": "20",
+        "use_desc": "Pool/Spa - Private",
+        "submitted_date": "2023-08-29T00:00:00.000",
+        "issue_date": "2023-10-30T00:00:00.000",
+        "cofo_date": "2024-10-08T00:00:00.000",
+        "status_desc": "CofO Issued",
+        "status_date": "2024-10-08T00:00:00.000",
+        "valuation": "40000",
+        "type_lat_lon": "ADDRESS",
+        "lat": "34.17842",
+        "lon": "-118.42795",
+        "work_desc": "NEW POOL AND SPA PER LA CITY STANDARD PLAN #268 AND POOL COVER VAULT DETAIL PER ENGINEER",
+        "ev": "N",
+        "solar": "N",
+        "business_unit": "Expanded Counter Plan Check",
+        "refresh_time": "2026-10-11T00:00:00.000",
+        "geolocation": {
+            "type": "Point",
+            "coordinates": [
+                -118.42795,
+                34.17842
+            ]
+        }
+    }
+]

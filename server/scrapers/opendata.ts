@@ -11,6 +11,8 @@ export interface Dataset {
   id: string;
   metadataUrl: string;
   portalUrls: string[];
+  /** Former endpoints of this same dataset (publisher domain moves) that callers may still hold. */
+  aliasUrls?: string[];
   fields: Partial<Record<MappedField, Field>> & { permitNumber: Field; address: Field };
   dateField: string;
   orderField: string;
@@ -21,6 +23,34 @@ export interface Dataset {
   geometryField?: string;
   scope?: string;
   contractorContacts?: { name: string; type: string }[];
+  /** Mapped fields that a company search also matches (default: contractorName only). */
+  companyFields?: ("applicantName" | "ownerName")[];
+  /** A sibling official dataset of names keyed by permit (or project) number; see contactSearch. */
+  contacts?: ContactsSource;
+}
+/**
+ * Two-step lookup for publishers that keep permit contacts in a separate dataset on the same host.
+ * Company/name searches query the contacts first, then fetch the main permits by key in chunks.
+ */
+export interface ContactsSource {
+  url: string;
+  title: string;
+  id: string;
+  metadataUrl: string;
+  /** Contact column that holds the main dataset's permit number (or its project-number prefix). */
+  key: string;
+  /** Main permit numbers are `${key}${keySeparator}…` (e.g. Harris County project → permits). */
+  keySeparator?: string;
+  orderField: string;
+  /** Only rows whose role column equals one of these values (case-insensitive). */
+  role?: { field: string; values: string[] };
+  /** Company-name columns; matched by company and name searches. */
+  company: string[];
+  /** Person-name column groups (joined with spaces); matched by name searches only. */
+  person?: string[][];
+  license?: string;
+  /** The PermitRecord field the matched names fill. */
+  assign: "contractorName" | "applicantName";
 }
 
 export const DATASETS: Record<string, Dataset> = /* DATASETS_START */ {
@@ -83,7 +113,26 @@ export const DATASETS: Record<string, Dataset> = /* DATASETS_START */ {
     },
     "dateField": "issue_date",
     "orderField": ":id",
-    "dateType": "date"
+    "dateType": "date",
+    "contacts": {
+      "url": "https://data.lacity.org/resource/3f9m-afei.json",
+      "title": "Building and Safety Certificate of Occupancy",
+      "id": "3f9m-afei",
+      "metadataUrl": "https://data.lacity.org/api/views/3f9m-afei.json",
+      "key": "pcis_permit",
+      "orderField": ":id",
+      "company": [
+        "contractors_business_name"
+      ],
+      "person": [
+        [
+          "principal_first_name",
+          "principal_last_name"
+        ]
+      ],
+      "license": "license",
+      "assign": "contractorName"
+    }
   },
   "Chicago, IL": {
     "kind": "socrata",
@@ -240,12 +289,16 @@ export const DATASETS: Record<string, Dataset> = /* DATASETS_START */ {
   },
   "San Francisco, CA": {
     "kind": "socrata",
-    "url": "https://data.sfgov.org/resource/i98e-djp9.json",
+    "url": "https://data.sf.gov/resource/i98e-djp9.json",
     "title": "Building Permits",
     "id": "i98e-djp9",
-    "metadataUrl": "https://data.sfgov.org/api/views/i98e-djp9.json",
+    "metadataUrl": "https://data.sf.gov/api/views/i98e-djp9.json",
     "portalUrls": [
       "https://sanfranciscoca.portal.opengov.com/"
+    ],
+    "aliasUrls": [
+      "https://data.sfgov.org/resource/i98e-djp9.json",
+      "https://data.sfgov.org/api/views/i98e-djp9.json"
     ],
     "fields": {
       "permitNumber": "permit_number",
@@ -263,7 +316,32 @@ export const DATASETS: Record<string, Dataset> = /* DATASETS_START */ {
     },
     "dateField": "issued_date",
     "orderField": ":id",
-    "geometryField": "location"
+    "geometryField": "location",
+    "contacts": {
+      "url": "https://data.sf.gov/resource/3pee-9qhc.json",
+      "title": "Building Permits Contacts",
+      "id": "3pee-9qhc",
+      "metadataUrl": "https://data.sf.gov/api/views/3pee-9qhc.json",
+      "key": "permit_number",
+      "orderField": ":id",
+      "role": {
+        "field": "role",
+        "values": [
+          "contractor"
+        ]
+      },
+      "company": [
+        "firm_name"
+      ],
+      "person": [
+        [
+          "first_name",
+          "last_name"
+        ]
+      ],
+      "license": "license1",
+      "assign": "contractorName"
+    }
   },
   "Las Vegas, NV": {
     "kind": "arcgis",
@@ -998,7 +1076,20 @@ export const DATASETS: Record<string, Dataset> = /* DATASETS_START */ {
       "description": "PROJECTNAME"
     },
     "dateField": "ISSUEDDATE",
-    "orderField": "OBJECTID"
+    "orderField": "OBJECTID",
+    "contacts": {
+      "url": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/AiPermitsService/FeatureServer/0",
+      "title": "Projects",
+      "id": "AiPermitsService/0",
+      "metadataUrl": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/AiPermitsService/FeatureServer/0?f=json",
+      "key": "PROJECTNUMBER",
+      "keySeparator": "-",
+      "orderField": "OBJECTID",
+      "company": [
+        "DBANAME"
+      ],
+      "assign": "applicantName"
+    }
   },
   "Charlotte, NC": {
     "kind": "arcgis",
@@ -1070,12 +1161,16 @@ export const DATASETS: Record<string, Dataset> = /* DATASETS_START */ {
       "appliedAt": "DATE SUBMITTED",
       "description": "PROJECT NAME",
       "valuation": "DECLARED VALUATION",
-      "workClass": "WORK TYPE"
+      "workClass": "WORK TYPE",
+      "applicantName": "PRIMARY CONTACT"
     },
     "dateField": "DATE ISSUED",
     "dateType": "date",
     "orderField": "_id",
-    "scope": "\"PERMIT TYPE\" != 'Garage Sale'"
+    "scope": "\"PERMIT TYPE\" != 'Garage Sale'",
+    "companyFields": [
+      "applicantName"
+    ]
   },
   "San Diego, CA": {
     "kind": "arcgis",
@@ -1098,11 +1193,15 @@ export const DATASETS: Record<string, Dataset> = /* DATASETS_START */ {
       "lat": "GIS_LATITUDE",
       "lng": "GIS_LONGITUDE",
       "parcel": "GIS_APN",
-      "sourceUrl": "APPROVAL_URL"
+      "sourceUrl": "APPROVAL_URL",
+      "applicantName": "APPROVAL_PERMIT_HOLDER"
     },
     "dateField": "APPROVAL_ISSUE_DATE",
     "orderField": "OBJECTID",
-    "scope": "APPROVAL_ID LIKE 'PMT-%'"
+    "scope": "APPROVAL_ID LIKE 'PMT-%'",
+    "companyFields": [
+      "applicantName"
+    ]
   },
   "Denver, CO": {
     "kind": "arcgis",
@@ -1136,7 +1235,7 @@ export function datasetFor(ctx: AdapterCtx): Dataset {
   const d = DATASETS[ctx.jurisdiction];
   if (!d) throw new Error(`No verified open-data dataset for ${ctx.jurisdiction}`);
   const input = canonical(ctx.searchUrl);
-  if (![d.url, d.metadataUrl, ...d.portalUrls].some(u => canonical(u) === input)) {
+  if (![d.url, d.metadataUrl, ...d.portalUrls, ...(d.aliasUrls ?? [])].some(u => canonical(u) === input)) {
     throw new Error(`URL is not a verified open-data source/catalog portal for ${ctx.jurisdiction}`);
   }
   return d;
@@ -1158,15 +1257,19 @@ function expression(field: Field, d: Dataset): string {
   if (d.kind === "socrata") return fs.map(f => `coalesce(${f}, '')`).join(" || ' ' || ");
   return fs.map(f => `COALESCE(CAST(${f} AS VARCHAR), '')`).join(" || ' ' || ");
 }
-export function searchWhere(d: Dataset, q: { type: PermitSearchType; value: string }): string {
+function searchValue(q: { type: PermitSearchType; value: string }): string {
   if (!["address", "permit", "name", "company", "license", "keyword"].includes(q.type)) throw new Error("Unsupported search type");
   const value = q.value.trim();
   if (!value || value.length > 300) throw new Error("Search value must contain 1–300 characters");
   // Do not let LIKE metacharacters turn an address search into a full-table scan.
   if (/[%_\\]/.test(value) && q.type !== "permit") throw new Error("Search wildcards are unsupported");
+  return value;
+}
+export function searchWhere(d: Dataset, q: { type: PermitSearchType; value: string }): string {
+  const value = searchValue(q);
   const fields: (Field | undefined)[] = q.type === "address" ? [d.fields.address]
     : q.type === "permit" ? [d.fields.permitNumber]
-    : q.type === "company" ? [d.fields.contractorName]
+    : q.type === "company" ? [d.fields.contractorName, ...(d.companyFields ?? []).map(f => d.fields[f])]
     : q.type === "name" ? [d.fields.applicantName, d.fields.ownerName, d.fields.contractorName]
     : q.type === "license" ? [d.fields.contractorLicense]
     : [d.fields.description, d.fields.permitType, d.fields.address];
@@ -1187,6 +1290,33 @@ export function searchWhere(d: Dataset, q: { type: PermitSearchType; value: stri
     ? `${expression(f, d)} = ${literal(value)}`
     : "(" + (q.type === "address" && Array.isArray(f) ? value.split(/\s+/) : [value]).map(v => contains(f, v)).join(" AND ") + ")").concat(contactClauses).join(" OR ") + ")";
 }
+/** The contacts dataset as a queryable Dataset (same publisher, same API kind). */
+export function contactsDataset(d: Dataset): Dataset {
+  const c = d.contacts;
+  if (!c) throw new Error(`${d.title} has no contacts dataset`);
+  return { kind: d.kind, url: c.url, title: c.title, id: c.id, metadataUrl: c.metadataUrl, portalUrls: [],
+    fields: { permitNumber: c.key, address: c.key }, dateField: c.key, orderField: c.orderField };
+}
+export function contactsWhere(d: Dataset, q: { type: PermitSearchType; value: string }): string {
+  const value = searchValue(q);
+  if (q.type !== "company" && q.type !== "name") throw new Error(`${q.type} search does not use the contacts dataset`);
+  const c = d.contacts!, cd = contactsDataset(d);
+  const like = literal(`%${value.toUpperCase()}%`);
+  const groups: Field[] = [...c.company, ...(q.type === "name" ? c.person ?? [] : [])];
+  // ArcGIS SQL has no portable concatenation: match each column of a person group separately.
+  const match = groups.flatMap(f => cd.kind === "arcgis" && Array.isArray(f) ? f : [f]).map(f => `upper(${expression(f, cd)}) LIKE ${like}`).join(" OR ");
+  const role = c.role ? `upper(${identifier(c.role.field, cd)}) IN (${c.role.values.map(v => literal(v.toUpperCase())).join(", ")})` : null;
+  return role ? `(${role}) AND (${match})` : `(${match})`;
+}
+/** Main-dataset predicate for permit keys found in the contacts dataset. */
+export function keyWhere(d: Dataset, keys: string[]): string {
+  const c = d.contacts!, field = identifier(parts(d.fields.permitNumber)[0], d);
+  if (!keys.length) throw new Error("No contact keys");
+  if (!c.keySeparator) return `${field} IN (${keys.map(literal).join(", ")})`;
+  if (keys.some(k => /[%_\\]/.test(k))) throw new Error("Contact key contains LIKE metacharacters; refusing an inexact prefix match");
+  return "(" + keys.map(k => `${field} LIKE ${literal(k + c.keySeparator + "%")}`).join(" OR ") + ")";
+}
+export const KEY_CHUNK = { socrata: 100, arcgis: 40, ckan: 100, carto: 100 } as const;
 export function recentWhere(d: Dataset, since: string): string {
   if (!/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(since) || !Number.isFinite(Date.parse(since))) throw new Error("Invalid ISO since date");
   const calendarDay = new Date(`${since.slice(0, 10)}T00:00:00Z`);
@@ -1285,7 +1415,10 @@ async function fetchPayload(ctx: AdapterCtx, url: string): Promise<unknown> {
   try { return JSON.parse(body); } catch { throw new Error("Open-data endpoint returned invalid JSON"); }
 }
 async function query(ctx: AdapterCtx, d: Dataset, where: string): Promise<PermitRecord[]> {
-  const records: PermitRecord[] = [];
+  return (await fetchRows(ctx, d, where)).map(row => parseRow(d, row, ctx));
+}
+async function fetchRows(ctx: AdapterCtx, d: Dataset, where: string): Promise<Record<string, unknown>[]> {
+  const records: Record<string, unknown>[] = [];
   let offset = 0;
   let previous: string | undefined;
   for (let page = 0; page < 1000; page++) {
@@ -1294,17 +1427,51 @@ async function query(ctx: AdapterCtx, d: Dataset, where: string): Promise<Permit
     const fingerprint = JSON.stringify(rows);
     if (rows.length && fingerprint === previous) throw new Error("Portal ignored pagination");
     previous = fingerprint;
-    records.push(...rows.map(row => parseRow(d, row, ctx)));
+    records.push(...rows);
     offset += rows.length;
     if (more === false || (more !== true && rows.length < PAGE_SIZE)) return records;
     if (!rows.length) throw new Error("Portal reports more records but returned no page");
   }
   throw new Error("Open-data pagination limit exceeded; narrow the query");
 }
+/** Company/name search through the publisher's contacts dataset, then the permits by key. */
+async function contactSearch(ctx: AdapterCtx, d: Dataset, q: { type: PermitSearchType; value: string }): Promise<PermitRecord[]> {
+  const c = d.contacts!, cd = contactsDataset(d);
+  let own: PermitRecord[] = [];
+  try { own = await query(ctx, d, searchWhere(d, q)); }
+  catch (e) { if (!/not published by this dataset/.test((e as Error).message)) throw e; }
+  const byKey = new Map<string, { names: Set<string>; licenses: Set<string> }>();
+  for (const raw of await fetchRows(ctx, cd, contactsWhere(d, q))) {
+    const row = (cd.kind === "arcgis" ? raw.attributes : raw) as Record<string, unknown>;
+    const key = textValue(row?.[c.key]);
+    if (!key) continue;
+    const entry = byKey.get(key) ?? { names: new Set<string>(), licenses: new Set<string>() };
+    for (const f of c.company) { const v = textValue(row[f]); if (v) entry.names.add(v); }
+    if (c.license) { const v = textValue(row[c.license]); if (v) entry.licenses.add(v); }
+    byKey.set(key, entry);
+  }
+  const keys = [...byKey.keys()], seen = new Set(own.map(r => r.permitNumber)), out = [...own];
+  for (let i = 0; i < keys.length; i += KEY_CHUNK[d.kind]) {
+    for (const record of await query(ctx, d, keyWhere(d, keys.slice(i, i + KEY_CHUNK[d.kind])))) {
+      if (seen.has(record.permitNumber)) continue;
+      const key = c.keySeparator ? record.permitNumber.slice(0, record.permitNumber.indexOf(c.keySeparator)) : record.permitNumber;
+      const entry = byKey.get(key);
+      if (!entry) continue; // a prefix match that is not exactly key + separator
+      record[c.assign] = [...new Set([...(record[c.assign]?.split("; ") ?? []), ...entry.names])].join("; ") || null;
+      if (c.assign === "contractorName" && entry.licenses.size) record.contractorLicense = [...entry.licenses].join("; ");
+      out.push(record);
+    }
+  }
+  return out;
+}
 const adapter: PortalAdapter = {
   platform: "Open data",
   capabilities: { search: ["address", "permit", "name", "company", "license", "keyword"], listRecent: true, detail: false },
-  async search(ctx, q) { const d = datasetFor(ctx); return query(ctx, d, searchWhere(d, q)); },
+  async search(ctx, q) {
+    const d = datasetFor(ctx);
+    if (d.contacts && (q.type === "company" || q.type === "name")) return contactSearch(ctx, d, q);
+    return query(ctx, d, searchWhere(d, q));
+  },
   async listRecent(ctx, since) { const d = datasetFor(ctx); return query(ctx, d, recentWhere(d, since)); },
 };
 export default adapter;

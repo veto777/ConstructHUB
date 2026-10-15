@@ -1,0 +1,5619 @@
+{
+    "id": "3f9m-afei",
+    "name": "Building and Safety Certificate of Occupancy",
+    "assetType": "dataset",
+    "attribution": "LADBS",
+    "averageRating": 0,
+    "category": "City Infrastructure & Service Requests",
+    "createdAt": 1397861892,
+    "description": "The Department of Building and Safety is required by the Los Angeles Municipal Code to issue a Certificate of Occupancy for every building or structure in the City of Los Angeles.  A Certificate of Occupancy is a document issued by the Department of Building and Safety certifying a building's compliance with applicable building codes and other laws, and indicating it to be in a condition suitable for occupancy.",
+    "diciBackend": false,
+    "displayType": "table",
+    "downloadCount": 102330,
+    "hideFromCatalog": false,
+    "hideFromDataJson": false,
+    "indexUpdatedAt": 1561383670,
+    "licenseId": "CC0_10",
+    "locked": false,
+    "newBackend": true,
+    "numberOfComments": 3,
+    "oid": 13227518,
+    "provenance": "official",
+    "publicationAppendEnabled": false,
+    "publicationDate": 1449520800,
+    "publicationGroup": 1550923,
+    "publicationStage": "published",
+    "rowClass": "",
+    "rowsUpdatedAt": 1791810330,
+    "rowsUpdatedBy": "tdwf-cih6",
+    "tableId": 4266670,
+    "totalTimesRated": 0,
+    "viewCount": 74472,
+    "viewLastModified": 1606756941,
+    "viewType": "tabular",
+    "approvals": [
+        {
+            "reviewedAt": 1449529661,
+            "reviewedAutomatically": false,
+            "state": "approved",
+            "submissionId": 882140,
+            "submissionObject": "public_audience_request",
+            "submissionOutcome": "change_audience",
+            "submittedAt": 1449529661,
+            "targetAudience": "public",
+            "workflowId": 2212,
+            "reviewer": {
+                "id": "tdwf-cih6",
+                "displayName": "Building and Safety OpenData"
+            },
+            "submissionDetails": {
+                "permissionType": "READ"
+            },
+            "submissionOutcomeApplication": {
+                "failureCount": 0,
+                "status": "success"
+            },
+            "submitter": {
+                "id": "tdwf-cih6",
+                "displayName": "Building and Safety OpenData"
+            }
+        }
+    ],
+    "clientContext": {
+        "clientContextVariables": [],
+        "inheritedVariables": {}
+    },
+    "columns": [
+        {
+            "id": 221180504,
+            "name": "CofO Number",
+            "dataTypeName": "number",
+            "description": "System-generated Certificate of Occupancy (CofO) number.",
+            "fieldName": "cofo_number",
+            "position": 1,
+            "renderTypeName": "number",
+            "tableColumnId": 19261981,
+            "width": 232,
+            "cachedContents": {
+                "largest": "303982",
+                "non_null": "151693",
+                "average": "129874.6540373976",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "201768",
+                        "count": "2"
+                    },
+                    {
+                        "item": "212644",
+                        "count": "2"
+                    },
+                    {
+                        "item": "149159",
+                        "count": "2"
+                    },
+                    {
+                        "item": "149162",
+                        "count": "2"
+                    },
+                    {
+                        "item": "148421",
+                        "count": "2"
+                    },
+                    {
+                        "item": "237550",
+                        "count": "2"
+                    },
+                    {
+                        "item": "149163",
+                        "count": "2"
+                    },
+                    {
+                        "item": "127290",
+                        "count": "2"
+                    },
+                    {
+                        "item": "149172",
+                        "count": "2"
+                    },
+                    {
+                        "item": "153273",
+                        "count": "2"
+                    },
+                    {
+                        "item": "149167",
+                        "count": "2"
+                    },
+                    {
+                        "item": "247505",
+                        "count": "2"
+                    },
+                    {
+                        "item": "206039",
+                        "count": "2"
+                    },
+                    {
+                        "item": "285562",
+                        "count": "2"
+                    },
+                    {
+                        "item": "216566",
+                        "count": "2"
+                    },
+                    {
+                        "item": "149161",
+                        "count": "2"
+                    },
+                    {
+                        "item": "189187",
+                        "count": "2"
+                    },
+                    {
+                        "item": "149168",
+                        "count": "2"
+                    },
+                    {
+                        "item": "282804",
+                        "count": "1"
+                    },
+                    {
+                        "item": "257820",
+                        "count": "1"
+                    }
+                ],
+                "smallest": "7",
+                "not_null": "63936",
+                "count": "151693",
+                "sum": "7417920740",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "standard",
+                "noCommas": "true",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180505,
+            "name": "CofO Issue Date                                                                                                                                                                                                                                                ",
+            "dataTypeName": "calendar_date",
+            "description": "The date when the CofO was issued.",
+            "fieldName": "cofo_issue_date",
+            "position": 2,
+            "renderTypeName": "calendar_date",
+            "tableColumnId": 19261982,
+            "width": 221,
+            "cachedContents": {
+                "largest": "2026-10-09T00:00:00.000",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "2025-06-03T00:00:00.000",
+                        "count": "167"
+                    },
+                    {
+                        "item": "2022-11-19T00:00:00.000",
+                        "count": "166"
+                    },
+                    {
+                        "item": "2022-12-17T00:00:00.000",
+                        "count": "165"
+                    },
+                    {
+                        "item": "2016-01-14T00:00:00.000",
+                        "count": "160"
+                    },
+                    {
+                        "item": "2023-03-04T00:00:00.000",
+                        "count": "154"
+                    },
+                    {
+                        "item": "2016-10-19T00:00:00.000",
+                        "count": "154"
+                    },
+                    {
+                        "item": "2024-09-17T00:00:00.000",
+                        "count": "150"
+                    },
+                    {
+                        "item": "2024-03-29T00:00:00.000",
+                        "count": "150"
+                    },
+                    {
+                        "item": "2021-05-08T00:00:00.000",
+                        "count": "145"
+                    },
+                    {
+                        "item": "2020-07-31T00:00:00.000",
+                        "count": "138"
+                    },
+                    {
+                        "item": "2025-04-22T00:00:00.000",
+                        "count": "132"
+                    },
+                    {
+                        "item": "2020-09-23T00:00:00.000",
+                        "count": "130"
+                    },
+                    {
+                        "item": "2026-05-28T00:00:00.000",
+                        "count": "129"
+                    },
+                    {
+                        "item": "2022-05-21T00:00:00.000",
+                        "count": "128"
+                    },
+                    {
+                        "item": "2023-03-15T00:00:00.000",
+                        "count": "122"
+                    },
+                    {
+                        "item": "2022-04-19T00:00:00.000",
+                        "count": "122"
+                    },
+                    {
+                        "item": "2025-08-30T00:00:00.000",
+                        "count": "120"
+                    },
+                    {
+                        "item": "2018-05-05T00:00:00.000",
+                        "count": "119"
+                    },
+                    {
+                        "item": "2024-12-17T00:00:00.000",
+                        "count": "117"
+                    },
+                    {
+                        "item": "2025-09-09T00:00:00.000",
+                        "count": "117"
+                    }
+                ],
+                "smallest": "2005-01-10T00:00:00.000",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "view": "date",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180506,
+            "name": "Status",
+            "dataTypeName": "text",
+            "description": "The latest status of the Certificate of Occupancy.",
+            "fieldName": "latest_status",
+            "position": 3,
+            "renderTypeName": "text",
+            "tableColumnId": 31091385,
+            "width": 100,
+            "cachedContents": {
+                "largest": "CofO Superseded",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "CofO Issued",
+                        "count": "149116"
+                    },
+                    {
+                        "item": "CofO Corrected",
+                        "count": "2553"
+                    },
+                    {
+                        "item": "CofO Superseded",
+                        "count": "17"
+                    },
+                    {
+                        "item": "CofO Reactivated",
+                        "count": "7"
+                    }
+                ],
+                "smallest": "CofO Corrected",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180507,
+            "name": "Status Date",
+            "dataTypeName": "calendar_date",
+            "description": "The date when the CofO status took effect.",
+            "fieldName": "status_date",
+            "position": 4,
+            "renderTypeName": "calendar_date",
+            "tableColumnId": 31091424,
+            "width": 100,
+            "cachedContents": {
+                "largest": "2026-10-09T00:00:00.000",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "2022-11-19T00:00:00.000",
+                        "count": "167"
+                    },
+                    {
+                        "item": "2025-06-03T00:00:00.000",
+                        "count": "166"
+                    },
+                    {
+                        "item": "2022-12-17T00:00:00.000",
+                        "count": "165"
+                    },
+                    {
+                        "item": "2023-03-04T00:00:00.000",
+                        "count": "153"
+                    },
+                    {
+                        "item": "2016-01-14T00:00:00.000",
+                        "count": "152"
+                    },
+                    {
+                        "item": "2024-03-29T00:00:00.000",
+                        "count": "151"
+                    },
+                    {
+                        "item": "2024-09-17T00:00:00.000",
+                        "count": "150"
+                    },
+                    {
+                        "item": "2021-05-08T00:00:00.000",
+                        "count": "141"
+                    },
+                    {
+                        "item": "2020-07-31T00:00:00.000",
+                        "count": "139"
+                    },
+                    {
+                        "item": "2017-05-08T00:00:00.000",
+                        "count": "134"
+                    },
+                    {
+                        "item": "2025-04-22T00:00:00.000",
+                        "count": "133"
+                    },
+                    {
+                        "item": "2026-05-28T00:00:00.000",
+                        "count": "129"
+                    },
+                    {
+                        "item": "2020-09-23T00:00:00.000",
+                        "count": "128"
+                    },
+                    {
+                        "item": "2022-05-21T00:00:00.000",
+                        "count": "126"
+                    },
+                    {
+                        "item": "2017-02-06T00:00:00.000",
+                        "count": "125"
+                    },
+                    {
+                        "item": "2023-03-15T00:00:00.000",
+                        "count": "124"
+                    },
+                    {
+                        "item": "2022-04-19T00:00:00.000",
+                        "count": "121"
+                    },
+                    {
+                        "item": "2025-08-30T00:00:00.000",
+                        "count": "120"
+                    },
+                    {
+                        "item": "2024-12-17T00:00:00.000",
+                        "count": "119"
+                    },
+                    {
+                        "item": "2018-05-05T00:00:00.000",
+                        "count": "119"
+                    }
+                ],
+                "smallest": "2013-01-02T00:00:00.000",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "view": "date_time",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180508,
+            "name": "Assessor Book",
+            "dataTypeName": "text",
+            "description": "\"Book\" portion of the Los Angeles County Tax Assessor \"Book-Page-Parcel\" number.",
+            "fieldName": "assessor_book",
+            "position": 5,
+            "renderTypeName": "text",
+            "tableColumnId": 19261928,
+            "width": 256,
+            "cachedContents": {
+                "largest": "7563",
+                "non_null": "151617",
+                "null": "76",
+                "top": [
+                    {
+                        "item": "2701",
+                        "count": "2428"
+                    },
+                    {
+                        "item": "5526",
+                        "count": "530"
+                    },
+                    {
+                        "item": "4211",
+                        "count": "526"
+                    },
+                    {
+                        "item": "4405",
+                        "count": "489"
+                    },
+                    {
+                        "item": "5511",
+                        "count": "458"
+                    },
+                    {
+                        "item": "7442",
+                        "count": "450"
+                    },
+                    {
+                        "item": "2263",
+                        "count": "445"
+                    },
+                    {
+                        "item": "4242",
+                        "count": "420"
+                    },
+                    {
+                        "item": "4423",
+                        "count": "406"
+                    },
+                    {
+                        "item": "4244",
+                        "count": "402"
+                    },
+                    {
+                        "item": "4318",
+                        "count": "400"
+                    },
+                    {
+                        "item": "5524",
+                        "count": "393"
+                    },
+                    {
+                        "item": "2153",
+                        "count": "386"
+                    },
+                    {
+                        "item": "5442",
+                        "count": "384"
+                    },
+                    {
+                        "item": "2368",
+                        "count": "372"
+                    },
+                    {
+                        "item": "4303",
+                        "count": "371"
+                    },
+                    {
+                        "item": "5510",
+                        "count": "361"
+                    },
+                    {
+                        "item": "2414",
+                        "count": "359"
+                    },
+                    {
+                        "item": "5514",
+                        "count": "357"
+                    },
+                    {
+                        "item": "2355",
+                        "count": "352"
+                    }
+                ],
+                "smallest": "2004",
+                "not_null": "63879",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180509,
+            "name": "Assessor Page",
+            "dataTypeName": "text",
+            "description": "\"Page\" portion of the Los Angeles County Tax Assessor \"Book-Page-Parcel\" number.",
+            "fieldName": "assessor_page",
+            "position": 6,
+            "renderTypeName": "text",
+            "tableColumnId": 19261929,
+            "width": 256,
+            "cachedContents": {
+                "largest": "BRK",
+                "non_null": "151617",
+                "null": "76",
+                "top": [
+                    {
+                        "item": "010",
+                        "count": "5558"
+                    },
+                    {
+                        "item": "004",
+                        "count": "5495"
+                    },
+                    {
+                        "item": "003",
+                        "count": "5483"
+                    },
+                    {
+                        "item": "014",
+                        "count": "5472"
+                    },
+                    {
+                        "item": "006",
+                        "count": "5439"
+                    },
+                    {
+                        "item": "008",
+                        "count": "5337"
+                    },
+                    {
+                        "item": "009",
+                        "count": "5315"
+                    },
+                    {
+                        "item": "007",
+                        "count": "5276"
+                    },
+                    {
+                        "item": "005",
+                        "count": "5275"
+                    },
+                    {
+                        "item": "011",
+                        "count": "5233"
+                    },
+                    {
+                        "item": "013",
+                        "count": "5228"
+                    },
+                    {
+                        "item": "002",
+                        "count": "5220"
+                    },
+                    {
+                        "item": "016",
+                        "count": "5183"
+                    },
+                    {
+                        "item": "015",
+                        "count": "5155"
+                    },
+                    {
+                        "item": "001",
+                        "count": "5131"
+                    },
+                    {
+                        "item": "012",
+                        "count": "5033"
+                    },
+                    {
+                        "item": "017",
+                        "count": "4907"
+                    },
+                    {
+                        "item": "019",
+                        "count": "4759"
+                    },
+                    {
+                        "item": "018",
+                        "count": "4704"
+                    },
+                    {
+                        "item": "020",
+                        "count": "4399"
+                    }
+                ],
+                "smallest": "***",
+                "not_null": "63879",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180510,
+            "name": "Assessor Parcel",
+            "dataTypeName": "text",
+            "description": "\"Parcel\" portion of the Los Angeles County Tax Assessor \"Book-Page-Parcel\" number.",
+            "fieldName": "assessor_parcel",
+            "position": 7,
+            "renderTypeName": "text",
+            "tableColumnId": 19261930,
+            "width": 280,
+            "cachedContents": {
+                "largest": "XXX",
+                "non_null": "151616",
+                "null": "77",
+                "top": [
+                    {
+                        "item": "005",
+                        "count": "5105"
+                    },
+                    {
+                        "item": "007",
+                        "count": "5073"
+                    },
+                    {
+                        "item": "004",
+                        "count": "5058"
+                    },
+                    {
+                        "item": "008",
+                        "count": "4987"
+                    },
+                    {
+                        "item": "009",
+                        "count": "4952"
+                    },
+                    {
+                        "item": "006",
+                        "count": "4910"
+                    },
+                    {
+                        "item": "003",
+                        "count": "4794"
+                    },
+                    {
+                        "item": "010",
+                        "count": "4747"
+                    },
+                    {
+                        "item": "001",
+                        "count": "4735"
+                    },
+                    {
+                        "item": "012",
+                        "count": "4696"
+                    },
+                    {
+                        "item": "013",
+                        "count": "4692"
+                    },
+                    {
+                        "item": "011",
+                        "count": "4640"
+                    },
+                    {
+                        "item": "002",
+                        "count": "4636"
+                    },
+                    {
+                        "item": "016",
+                        "count": "4537"
+                    },
+                    {
+                        "item": "015",
+                        "count": "4512"
+                    },
+                    {
+                        "item": "014",
+                        "count": "4478"
+                    },
+                    {
+                        "item": "018",
+                        "count": "4353"
+                    },
+                    {
+                        "item": "017",
+                        "count": "4331"
+                    },
+                    {
+                        "item": "019",
+                        "count": "4216"
+                    },
+                    {
+                        "item": "020",
+                        "count": "4136"
+                    }
+                ],
+                "smallest": "*",
+                "not_null": "63879",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180511,
+            "name": "TRACT",
+            "dataTypeName": "text",
+            "description": "\"Tract\" portion of a property's legal description as recorded with the Los Angeles County Recorder.",
+            "fieldName": "tract",
+            "position": 8,
+            "renderTypeName": "text",
+            "tableColumnId": 19261931,
+            "width": 160,
+            "cachedContents": {
+                "largest": "ZOBELEINS MAIN STREET TRACT",
+                "non_null": "151183",
+                "null": "510",
+                "top": [
+                    {
+                        "item": "TR 1000",
+                        "count": "1224"
+                    },
+                    {
+                        "item": "TR 9300",
+                        "count": "1025"
+                    },
+                    {
+                        "item": "TR 5609",
+                        "count": "840"
+                    },
+                    {
+                        "item": "THE MACLAY RANCHO",
+                        "count": "652"
+                    },
+                    {
+                        "item": "TR 6170",
+                        "count": "623"
+                    },
+                    {
+                        "item": "TR 7555",
+                        "count": "587"
+                    },
+                    {
+                        "item": "TR 2955",
+                        "count": "570"
+                    },
+                    {
+                        "item": "TR 50509-01",
+                        "count": "520"
+                    },
+                    {
+                        "item": "LANKERSHIM RANCH LAND AND WATER CO.",
+                        "count": "506"
+                    },
+                    {
+                        "item": "TR 50505",
+                        "count": "387"
+                    },
+                    {
+                        "item": "EX MISSION DE SAN FERNANDO",
+                        "count": "386"
+                    },
+                    {
+                        "item": "TR 6143",
+                        "count": "383"
+                    },
+                    {
+                        "item": "TR 5822",
+                        "count": "372"
+                    },
+                    {
+                        "item": "TR 1200",
+                        "count": "353"
+                    },
+                    {
+                        "item": "BRENTWOOD PARK",
+                        "count": "304"
+                    },
+                    {
+                        "item": "TR 6097",
+                        "count": "299"
+                    },
+                    {
+                        "item": "TR 50509",
+                        "count": "285"
+                    },
+                    {
+                        "item": "TR 2605",
+                        "count": "266"
+                    },
+                    {
+                        "item": "TR 7307",
+                        "count": "257"
+                    },
+                    {
+                        "item": "VERMONT AVENUE SQUARE",
+                        "count": "251"
+                    }
+                ],
+                "smallest": "1668",
+                "not_null": "63696",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180512,
+            "name": "BLOCK",
+            "dataTypeName": "text",
+            "description": "\"Block\" portion of a property's legal description as recorded with the Los Angeles County Recorder.",
+            "fieldName": "block",
+            "position": 9,
+            "renderTypeName": "text",
+            "tableColumnId": 19261932,
+            "width": 160,
+            "cachedContents": {
+                "largest": "Z",
+                "non_null": "27919",
+                "null": "123774",
+                "top": [
+                    {
+                        "item": "2",
+                        "count": "1347"
+                    },
+                    {
+                        "item": "1",
+                        "count": "1285"
+                    },
+                    {
+                        "item": "3",
+                        "count": "1246"
+                    },
+                    {
+                        "item": "4",
+                        "count": "1106"
+                    },
+                    {
+                        "item": "5",
+                        "count": "1094"
+                    },
+                    {
+                        "item": "6",
+                        "count": "964"
+                    },
+                    {
+                        "item": "B",
+                        "count": "936"
+                    },
+                    {
+                        "item": "7",
+                        "count": "875"
+                    },
+                    {
+                        "item": "C",
+                        "count": "842"
+                    },
+                    {
+                        "item": "A",
+                        "count": "795"
+                    },
+                    {
+                        "item": "8",
+                        "count": "678"
+                    },
+                    {
+                        "item": "D",
+                        "count": "628"
+                    },
+                    {
+                        "item": "9",
+                        "count": "565"
+                    },
+                    {
+                        "item": "10",
+                        "count": "550"
+                    },
+                    {
+                        "item": "E",
+                        "count": "500"
+                    },
+                    {
+                        "item": "11",
+                        "count": "471"
+                    },
+                    {
+                        "item": "F",
+                        "count": "447"
+                    },
+                    {
+                        "item": "H",
+                        "count": "432"
+                    },
+                    {
+                        "item": "14",
+                        "count": "428"
+                    },
+                    {
+                        "item": "13",
+                        "count": "403"
+                    }
+                ],
+                "smallest": "--",
+                "not_null": "12209",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180513,
+            "name": "LOT",
+            "dataTypeName": "text",
+            "description": "\"Lot\" portion of a property's legal description as recorded with the Los Angeles County Recorder.",
+            "fieldName": "lot",
+            "position": 10,
+            "renderTypeName": "text",
+            "tableColumnId": 19261933,
+            "width": 136,
+            "cachedContents": {
+                "largest": "Y",
+                "non_null": "150996",
+                "null": "697",
+                "top": [
+                    {
+                        "item": "1",
+                        "count": "5434"
+                    },
+                    {
+                        "item": "2",
+                        "count": "4108"
+                    },
+                    {
+                        "item": "3",
+                        "count": "3909"
+                    },
+                    {
+                        "item": "4",
+                        "count": "3859"
+                    },
+                    {
+                        "item": "5",
+                        "count": "3416"
+                    },
+                    {
+                        "item": "6",
+                        "count": "3409"
+                    },
+                    {
+                        "item": "7",
+                        "count": "3107"
+                    },
+                    {
+                        "item": "8",
+                        "count": "3067"
+                    },
+                    {
+                        "item": "10",
+                        "count": "2879"
+                    },
+                    {
+                        "item": "9",
+                        "count": "2873"
+                    },
+                    {
+                        "item": "12",
+                        "count": "2662"
+                    },
+                    {
+                        "item": "11",
+                        "count": "2567"
+                    },
+                    {
+                        "item": "13",
+                        "count": "2512"
+                    },
+                    {
+                        "item": "14",
+                        "count": "2378"
+                    },
+                    {
+                        "item": "15",
+                        "count": "2282"
+                    },
+                    {
+                        "item": "16",
+                        "count": "2168"
+                    },
+                    {
+                        "item": "17",
+                        "count": "2112"
+                    },
+                    {
+                        "item": "18",
+                        "count": "2088"
+                    },
+                    {
+                        "item": "19",
+                        "count": "2036"
+                    },
+                    {
+                        "item": "20",
+                        "count": "1979"
+                    }
+                ],
+                "smallest": "0",
+                "not_null": "63573",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180514,
+            "name": "Reference # (Old Permit #)",
+            "dataTypeName": "text",
+            "description": "A sequential reference number issued by the Cashiering System, and used to file and retrieve original paper copies.",
+            "fieldName": "reference_old_permit",
+            "position": 11,
+            "renderTypeName": "text",
+            "tableColumnId": 19261934,
+            "width": 412,
+            "cachedContents": {
+                "largest": "99WL63584",
+                "non_null": "151400",
+                "null": "293",
+                "top": [
+                    {
+                        "item": "23ON 0301",
+                        "count": "10"
+                    },
+                    {
+                        "item": "23ON 9974",
+                        "count": "10"
+                    },
+                    {
+                        "item": "23ON 0299",
+                        "count": "10"
+                    },
+                    {
+                        "item": "23ON 1360",
+                        "count": "10"
+                    },
+                    {
+                        "item": "23ON 9976",
+                        "count": "10"
+                    },
+                    {
+                        "item": "26ON 8615",
+                        "count": "10"
+                    },
+                    {
+                        "item": "20ON 2066",
+                        "count": "9"
+                    },
+                    {
+                        "item": "21ON 2923",
+                        "count": "9"
+                    },
+                    {
+                        "item": "22ON 8129",
+                        "count": "9"
+                    },
+                    {
+                        "item": "20ON 1324",
+                        "count": "9"
+                    },
+                    {
+                        "item": "20ON 1456",
+                        "count": "9"
+                    },
+                    {
+                        "item": "22ON 8891",
+                        "count": "9"
+                    },
+                    {
+                        "item": "22ON 7609",
+                        "count": "9"
+                    },
+                    {
+                        "item": "23ON 9978",
+                        "count": "9"
+                    },
+                    {
+                        "item": "23ON 0133",
+                        "count": "9"
+                    },
+                    {
+                        "item": "23ON 0302",
+                        "count": "9"
+                    },
+                    {
+                        "item": "20ON 2352",
+                        "count": "9"
+                    },
+                    {
+                        "item": "23ON 9975",
+                        "count": "9"
+                    },
+                    {
+                        "item": "23ON 1330",
+                        "count": "9"
+                    },
+                    {
+                        "item": "21ON 3305",
+                        "count": "9"
+                    }
+                ],
+                "smallest": "00LA00070",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180515,
+            "name": "PCIS Permit #",
+            "dataTypeName": "text",
+            "description": "This is the permit number assigned by the Plan Check and Inspection System as soon as an application for a permit has been filed. Before a permit is issued, the number is known as the Application Number. After the permit is issued, this same number becomes the Permit Number.",
+            "fieldName": "pcis_permit",
+            "position": 12,
+            "renderTypeName": "text",
+            "tableColumnId": 19261935,
+            "width": 256,
+            "cachedContents": {
+                "largest": "99047-30001-00281",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "16010-10000-01141",
+                        "count": "2"
+                    },
+                    {
+                        "item": "25010-10000-01601",
+                        "count": "2"
+                    },
+                    {
+                        "item": "20014-10000-04431",
+                        "count": "2"
+                    },
+                    {
+                        "item": "16010-10000-00774",
+                        "count": "2"
+                    },
+                    {
+                        "item": "14014-20000-01640",
+                        "count": "2"
+                    },
+                    {
+                        "item": "16014-20000-03592",
+                        "count": "2"
+                    },
+                    {
+                        "item": "19014-20000-05153",
+                        "count": "2"
+                    },
+                    {
+                        "item": "19014-20000-03645",
+                        "count": "2"
+                    },
+                    {
+                        "item": "16010-10000-00775",
+                        "count": "2"
+                    },
+                    {
+                        "item": "16010-10000-00777",
+                        "count": "2"
+                    },
+                    {
+                        "item": "22016-20000-04200",
+                        "count": "2"
+                    },
+                    {
+                        "item": "16010-10000-01144",
+                        "count": "2"
+                    },
+                    {
+                        "item": "16010-10000-01142",
+                        "count": "2"
+                    },
+                    {
+                        "item": "15010-20000-02182",
+                        "count": "2"
+                    },
+                    {
+                        "item": "18010-20000-04090",
+                        "count": "2"
+                    },
+                    {
+                        "item": "20016-20000-05137",
+                        "count": "2"
+                    },
+                    {
+                        "item": "20014-20000-02334",
+                        "count": "2"
+                    },
+                    {
+                        "item": "16010-10000-00776",
+                        "count": "2"
+                    },
+                    {
+                        "item": "15010-10000-02015",
+                        "count": "1"
+                    },
+                    {
+                        "item": "24047-20000-00619",
+                        "count": "1"
+                    }
+                ],
+                "smallest": "00010-10000-00632",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180516,
+            "name": "Permit Type",
+            "dataTypeName": "text",
+            "description": "Permit application type.",
+            "fieldName": "permit_type",
+            "position": 13,
+            "renderTypeName": "text",
+            "tableColumnId": 19261936,
+            "width": 232,
+            "cachedContents": {
+                "largest": "Swimming-Pool/Spa",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "Bldg-Addition",
+                        "count": "55956"
+                    },
+                    {
+                        "item": "Bldg-New",
+                        "count": "43275"
+                    },
+                    {
+                        "item": "Bldg-Alter/Repair",
+                        "count": "31596"
+                    },
+                    {
+                        "item": "Swimming-Pool/Spa",
+                        "count": "18480"
+                    },
+                    {
+                        "item": "Nonbldg-New",
+                        "count": "2042"
+                    },
+                    {
+                        "item": "Nonbldg-Alter/Repair",
+                        "count": "322"
+                    },
+                    {
+                        "item": "Bldg-Relocation",
+                        "count": "12"
+                    },
+                    {
+                        "item": "Nonbldg-Addition",
+                        "count": "9"
+                    },
+                    {
+                        "item": "Project",
+                        "count": "1"
+                    }
+                ],
+                "smallest": "Bldg-Addition",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180517,
+            "name": "Permit Sub-Type",
+            "dataTypeName": "text",
+            "description": "The permit sub-type determines whether the permit application is for a 1 or 2 family dwelling, a multi-family dwelling, or a commercial structure.",
+            "fieldName": "permit_sub_type",
+            "position": 14,
+            "renderTypeName": "text",
+            "tableColumnId": 19261937,
+            "width": 280,
+            "cachedContents": {
+                "largest": "Commercial",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "1 or 2 Family Dwelling",
+                        "count": "128799"
+                    },
+                    {
+                        "item": "Commercial",
+                        "count": "16517"
+                    },
+                    {
+                        "item": "Apartment",
+                        "count": "6377"
+                    }
+                ],
+                "smallest": "1 or 2 Family Dwelling",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180518,
+            "name": "Permit Category",
+            "dataTypeName": "text",
+            "description": "Permit category is used to determine how the permit application will be handled within the LADBS public counter and regular plan check business process.",
+            "fieldName": "permit_category",
+            "position": 15,
+            "renderTypeName": "text",
+            "tableColumnId": 19261938,
+            "width": 280,
+            "cachedContents": {
+                "largest": "Plan Check",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "Plan Check",
+                        "count": "151571"
+                    },
+                    {
+                        "item": "No Plan Check",
+                        "count": "122"
+                    }
+                ],
+                "smallest": "No Plan Check",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180519,
+            "name": "Project Number",
+            "dataTypeName": "number",
+            "description": "A number used to associate a permit application with a specific construction or a development project consisting of several permit applications.",
+            "fieldName": "project_number",
+            "position": 16,
+            "renderTypeName": "number",
+            "tableColumnId": 19261939,
+            "width": 268,
+            "cachedContents": {
+                "largest": "5",
+                "non_null": "286",
+                "average": "2.569620253164557",
+                "null": "151407",
+                "top": [
+                    {
+                        "item": "5",
+                        "count": "143"
+                    },
+                    {
+                        "item": "1",
+                        "count": "116"
+                    },
+                    {
+                        "item": "4",
+                        "count": "22"
+                    },
+                    {
+                        "item": "2",
+                        "count": "5"
+                    }
+                ],
+                "smallest": "1",
+                "not_null": "162",
+                "count": "151693",
+                "sum": "406",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "standard",
+                "noCommas": "true",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180520,
+            "name": "Event Code",
+            "dataTypeName": "text",
+            "description": "An event code, usually synonymous with a disaster code, represents permits issued related to repairing, demolishing, or rebuilding structures damaged from a disaster.",
+            "fieldName": "event_code",
+            "position": 17,
+            "renderTypeName": "text",
+            "tableColumnId": 19261940,
+            "width": 220,
+            "cachedContents": {
+                "non_null": "76",
+                "largest": "WF1-25",
+                "null": "151617",
+                "top": [
+                    {
+                        "item": "WF1-25",
+                        "count": "72"
+                    },
+                    {
+                        "item": "SD1-05",
+                        "count": "3"
+                    },
+                    {
+                        "item": "EQ1-94",
+                        "count": "1"
+                    }
+                ],
+                "not_null": "3",
+                "smallest": "EQ1-94",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180521,
+            "name": "Initiating Office",
+            "dataTypeName": "text",
+            "description": "Office location where the permit application is initiated, not necessarily issued.",
+            "fieldName": "initiating_office",
+            "position": 18,
+            "renderTypeName": "text",
+            "tableColumnId": 19261941,
+            "width": 304,
+            "cachedContents": {
+                "largest": "WILSHIRE",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "VAN NUYS",
+                        "count": "79028"
+                    },
+                    {
+                        "item": "METRO",
+                        "count": "49457"
+                    },
+                    {
+                        "item": "WEST LA",
+                        "count": "16022"
+                    },
+                    {
+                        "item": "SOUTH LA",
+                        "count": "5336"
+                    },
+                    {
+                        "item": "SANPEDRO",
+                        "count": "1848"
+                    },
+                    {
+                        "item": "WILSHIRE",
+                        "count": "2"
+                    }
+                ],
+                "smallest": "METRO",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180522,
+            "name": "Permit Issue Date",
+            "dataTypeName": "calendar_date",
+            "description": "The date when the permit was issued.",
+            "fieldName": "issue_date",
+            "position": 19,
+            "renderTypeName": "calendar_date",
+            "tableColumnId": 19261942,
+            "width": 220,
+            "cachedContents": {
+                "largest": "2026-10-09T00:00:00.000",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "2022-11-19T00:00:00.000",
+                        "count": "167"
+                    },
+                    {
+                        "item": "2025-06-03T00:00:00.000",
+                        "count": "166"
+                    },
+                    {
+                        "item": "2022-12-17T00:00:00.000",
+                        "count": "165"
+                    },
+                    {
+                        "item": "2016-01-14T00:00:00.000",
+                        "count": "157"
+                    },
+                    {
+                        "item": "2023-03-04T00:00:00.000",
+                        "count": "153"
+                    },
+                    {
+                        "item": "2016-10-19T00:00:00.000",
+                        "count": "153"
+                    },
+                    {
+                        "item": "2024-03-29T00:00:00.000",
+                        "count": "151"
+                    },
+                    {
+                        "item": "2024-09-17T00:00:00.000",
+                        "count": "150"
+                    },
+                    {
+                        "item": "2021-05-08T00:00:00.000",
+                        "count": "141"
+                    },
+                    {
+                        "item": "2020-07-31T00:00:00.000",
+                        "count": "139"
+                    },
+                    {
+                        "item": "2025-04-22T00:00:00.000",
+                        "count": "133"
+                    },
+                    {
+                        "item": "2026-05-28T00:00:00.000",
+                        "count": "129"
+                    },
+                    {
+                        "item": "2020-09-23T00:00:00.000",
+                        "count": "128"
+                    },
+                    {
+                        "item": "2022-05-21T00:00:00.000",
+                        "count": "126"
+                    },
+                    {
+                        "item": "2023-03-15T00:00:00.000",
+                        "count": "124"
+                    },
+                    {
+                        "item": "2022-04-19T00:00:00.000",
+                        "count": "121"
+                    },
+                    {
+                        "item": "2025-08-30T00:00:00.000",
+                        "count": "120"
+                    },
+                    {
+                        "item": "2024-12-17T00:00:00.000",
+                        "count": "119"
+                    },
+                    {
+                        "item": "2018-05-05T00:00:00.000",
+                        "count": "119"
+                    },
+                    {
+                        "item": "2025-09-09T00:00:00.000",
+                        "count": "117"
+                    }
+                ],
+                "smallest": "2013-01-02T00:00:00.000",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "view": "date",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180523,
+            "name": "Address Start",
+            "dataTypeName": "number",
+            "description": "Beginning house number of property address on permit application. Example 1: For \"200 - 200 N Main Ave\", Address Start is 200. Example 2: For \"202 1/4 - 204 1/2 N Main St SE\", Address Start is 202.",
+            "fieldName": "address_start",
+            "position": 20,
+            "renderTypeName": "number",
+            "tableColumnId": 19261984,
+            "width": 256,
+            "cachedContents": {
+                "largest": "69004",
+                "non_null": "151693",
+                "average": "6834.112227747041",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "783",
+                        "count": "142"
+                    },
+                    {
+                        "item": "1000",
+                        "count": "114"
+                    },
+                    {
+                        "item": "1771",
+                        "count": "108"
+                    },
+                    {
+                        "item": "900",
+                        "count": "84"
+                    },
+                    {
+                        "item": "333",
+                        "count": "82"
+                    },
+                    {
+                        "item": "100",
+                        "count": "81"
+                    },
+                    {
+                        "item": "200",
+                        "count": "79"
+                    },
+                    {
+                        "item": "1600",
+                        "count": "78"
+                    },
+                    {
+                        "item": "700",
+                        "count": "77"
+                    },
+                    {
+                        "item": "2700",
+                        "count": "77"
+                    },
+                    {
+                        "item": "400",
+                        "count": "76"
+                    },
+                    {
+                        "item": "1400",
+                        "count": "74"
+                    },
+                    {
+                        "item": "800",
+                        "count": "70"
+                    },
+                    {
+                        "item": "123",
+                        "count": "70"
+                    },
+                    {
+                        "item": "300",
+                        "count": "70"
+                    },
+                    {
+                        "item": "201",
+                        "count": "69"
+                    },
+                    {
+                        "item": "1616",
+                        "count": "69"
+                    },
+                    {
+                        "item": "1200",
+                        "count": "67"
+                    },
+                    {
+                        "item": "815",
+                        "count": "66"
+                    },
+                    {
+                        "item": "1118",
+                        "count": "65"
+                    }
+                ],
+                "smallest": "1",
+                "not_null": "63936",
+                "count": "151693",
+                "sum": "390337154",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "standard",
+                "noCommas": "true",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180524,
+            "name": "Address Fraction Start",
+            "dataTypeName": "text",
+            "description": "Beginning fraction of property address on permit application. Example 1: For \"200 - 200 N Main Ave\", Address Fraction Start is null. Example 2: For \"202 1/4 - 204 1/2 N Main St SE\", Address Fraction Start is 1/4.",
+            "fieldName": "address_fraction_start",
+            "position": 21,
+            "renderTypeName": "text",
+            "tableColumnId": 19261943,
+            "width": 364,
+            "cachedContents": {
+                "largest": "B",
+                "non_null": "4321",
+                "null": "147372",
+                "top": [
+                    {
+                        "item": "1/2",
+                        "count": "3626"
+                    },
+                    {
+                        "item": "1/4",
+                        "count": "383"
+                    },
+                    {
+                        "item": "3/4",
+                        "count": "222"
+                    },
+                    {
+                        "item": "1/8",
+                        "count": "16"
+                    },
+                    {
+                        "item": "-",
+                        "count": "15"
+                    },
+                    {
+                        "item": "1",
+                        "count": "15"
+                    },
+                    {
+                        "item": "1/3",
+                        "count": "8"
+                    },
+                    {
+                        "item": "1-3",
+                        "count": "4"
+                    },
+                    {
+                        "item": "1-2",
+                        "count": "4"
+                    },
+                    {
+                        "item": "2/3",
+                        "count": "4"
+                    },
+                    {
+                        "item": "5/8",
+                        "count": "3"
+                    },
+                    {
+                        "item": "3/8",
+                        "count": "3"
+                    },
+                    {
+                        "item": "1-4",
+                        "count": "2"
+                    },
+                    {
+                        "item": "7/8",
+                        "count": "2"
+                    },
+                    {
+                        "item": "&",
+                        "count": "2"
+                    },
+                    {
+                        "item": "1\\2",
+                        "count": "2"
+                    },
+                    {
+                        "item": "B",
+                        "count": "1"
+                    },
+                    {
+                        "item": "#1",
+                        "count": "1"
+                    },
+                    {
+                        "item": "1-5",
+                        "count": "1"
+                    },
+                    {
+                        "item": "1/6",
+                        "count": "1"
+                    }
+                ],
+                "smallest": "`",
+                "not_null": "781",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180525,
+            "name": "Address End",
+            "dataTypeName": "number",
+            "description": "Ending house number of property address on permit application. Example 1: For \"200 - 200 N Main Ave\", Address End is 200. Example 2: For \"202 1/4 - 204 1/2 N Main St SE\", Address End is 204.",
+            "fieldName": "address_end",
+            "position": 22,
+            "renderTypeName": "number",
+            "tableColumnId": 19261985,
+            "width": 232,
+            "cachedContents": {
+                "largest": "69004",
+                "non_null": "151693",
+                "average": "6834.486133482737",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "783",
+                        "count": "143"
+                    },
+                    {
+                        "item": "1831",
+                        "count": "118"
+                    },
+                    {
+                        "item": "1000",
+                        "count": "106"
+                    },
+                    {
+                        "item": "333",
+                        "count": "80"
+                    },
+                    {
+                        "item": "100",
+                        "count": "77"
+                    },
+                    {
+                        "item": "2700",
+                        "count": "77"
+                    },
+                    {
+                        "item": "900",
+                        "count": "77"
+                    },
+                    {
+                        "item": "400",
+                        "count": "77"
+                    },
+                    {
+                        "item": "1600",
+                        "count": "76"
+                    },
+                    {
+                        "item": "700",
+                        "count": "73"
+                    },
+                    {
+                        "item": "200",
+                        "count": "73"
+                    },
+                    {
+                        "item": "1400",
+                        "count": "71"
+                    },
+                    {
+                        "item": "1616",
+                        "count": "69"
+                    },
+                    {
+                        "item": "300",
+                        "count": "69"
+                    },
+                    {
+                        "item": "330",
+                        "count": "68"
+                    },
+                    {
+                        "item": "800",
+                        "count": "67"
+                    },
+                    {
+                        "item": "1118",
+                        "count": "65"
+                    },
+                    {
+                        "item": "1200",
+                        "count": "64"
+                    },
+                    {
+                        "item": "120",
+                        "count": "63"
+                    },
+                    {
+                        "item": "320",
+                        "count": "62"
+                    }
+                ],
+                "smallest": "1",
+                "not_null": "63936",
+                "count": "151693",
+                "sum": "390358510",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "standard",
+                "noCommas": "true",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180526,
+            "name": "Address Fraction End",
+            "dataTypeName": "text",
+            "description": "Ending house number fraction of property address on permit application. Example 1: For \"200 - 200 N Main Ave\", Address Fraction End is null. Example 2: For \"202 1/4 - 204 1/2 N Main St SE\", Address Fraction End is 1/2.",
+            "fieldName": "address_fraction_end",
+            "position": 23,
+            "renderTypeName": "text",
+            "tableColumnId": 19261944,
+            "width": 340,
+            "cachedContents": {
+                "largest": "n",
+                "non_null": "10670",
+                "null": "141023",
+                "top": [
+                    {
+                        "item": "1/2",
+                        "count": "9630"
+                    },
+                    {
+                        "item": "3/4",
+                        "count": "528"
+                    },
+                    {
+                        "item": "1/4",
+                        "count": "417"
+                    },
+                    {
+                        "item": "1/8",
+                        "count": "15"
+                    },
+                    {
+                        "item": "7/8",
+                        "count": "9"
+                    },
+                    {
+                        "item": "1/3",
+                        "count": "9"
+                    },
+                    {
+                        "item": "3/8",
+                        "count": "7"
+                    },
+                    {
+                        "item": "1-2",
+                        "count": "6"
+                    },
+                    {
+                        "item": "2/3",
+                        "count": "5"
+                    },
+                    {
+                        "item": "3",
+                        "count": "5"
+                    },
+                    {
+                        "item": "2",
+                        "count": "4"
+                    },
+                    {
+                        "item": "1-3",
+                        "count": "4"
+                    },
+                    {
+                        "item": "5/8",
+                        "count": "3"
+                    },
+                    {
+                        "item": "5",
+                        "count": "2"
+                    },
+                    {
+                        "item": "A",
+                        "count": "2"
+                    },
+                    {
+                        "item": "1\\2",
+                        "count": "2"
+                    },
+                    {
+                        "item": "1-4",
+                        "count": "2"
+                    },
+                    {
+                        "item": "5/6",
+                        "count": "1"
+                    },
+                    {
+                        "item": "B",
+                        "count": "1"
+                    },
+                    {
+                        "item": "`",
+                        "count": "1"
+                    }
+                ],
+                "smallest": "`",
+                "not_null": "1798",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180527,
+            "name": "Street Direction",
+            "dataTypeName": "text",
+            "description": "Street direction of property address for permit application. Example 1: For \"200 - 200 Main Ave\", Street Direction is null. Example 2: For \"202 1/4 - 204 1/2 N Main St SE\", Street Direction is N.",
+            "fieldName": "street_direction",
+            "position": 24,
+            "renderTypeName": "text",
+            "tableColumnId": 19261945,
+            "width": 292,
+            "cachedContents": {
+                "largest": "W",
+                "non_null": "151132",
+                "null": "561",
+                "top": [
+                    {
+                        "item": "W",
+                        "count": "59075"
+                    },
+                    {
+                        "item": "N",
+                        "count": "57024"
+                    },
+                    {
+                        "item": "S",
+                        "count": "26775"
+                    },
+                    {
+                        "item": "E",
+                        "count": "8258"
+                    }
+                ],
+                "smallest": "E",
+                "not_null": "63569",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180528,
+            "name": "Street Name",
+            "dataTypeName": "text",
+            "description": "Street name of property address for permit application.",
+            "fieldName": "street_name",
+            "position": 25,
+            "renderTypeName": "text",
+            "tableColumnId": 19261946,
+            "width": 232,
+            "cachedContents": {
+                "largest": "ZUNIGA",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "VENTURA",
+                        "count": "746"
+                    },
+                    {
+                        "item": "SUNSET",
+                        "count": "555"
+                    },
+                    {
+                        "item": "WESTERN",
+                        "count": "469"
+                    },
+                    {
+                        "item": "SEPULVEDA",
+                        "count": "445"
+                    },
+                    {
+                        "item": "3RD",
+                        "count": "439"
+                    },
+                    {
+                        "item": "SHERMAN",
+                        "count": "421"
+                    },
+                    {
+                        "item": "FIGUEROA",
+                        "count": "409"
+                    },
+                    {
+                        "item": "VICTORY",
+                        "count": "404"
+                    },
+                    {
+                        "item": "ROSCOE",
+                        "count": "385"
+                    },
+                    {
+                        "item": "VANOWEN",
+                        "count": "380"
+                    },
+                    {
+                        "item": "WILSHIRE",
+                        "count": "372"
+                    },
+                    {
+                        "item": "OTSEGO",
+                        "count": "370"
+                    },
+                    {
+                        "item": "SATICOY",
+                        "count": "348"
+                    },
+                    {
+                        "item": "GILMORE",
+                        "count": "313"
+                    },
+                    {
+                        "item": "6TH",
+                        "count": "311"
+                    },
+                    {
+                        "item": "84TH",
+                        "count": "307"
+                    },
+                    {
+                        "item": "SYCAMORE",
+                        "count": "304"
+                    },
+                    {
+                        "item": "VERMONT",
+                        "count": "303"
+                    },
+                    {
+                        "item": "CALIFA",
+                        "count": "302"
+                    },
+                    {
+                        "item": "ADDISON",
+                        "count": "297"
+                    }
+                ],
+                "smallest": "100TH",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180529,
+            "name": "Street Suffix",
+            "dataTypeName": "text",
+            "description": "Street suffix of property address for permit application. Example 1: For \"200 - 200 Main Ave\", Street Suffix is Ave. Example 2: For \"202 1/4 - 204 1/2 N Main St SE\", Street Suffix is St.",
+            "fieldName": "street_suffix",
+            "position": 26,
+            "renderTypeName": "text",
+            "tableColumnId": 19261947,
+            "width": 256,
+            "cachedContents": {
+                "largest": "WAY",
+                "non_null": "149852",
+                "null": "1841",
+                "top": [
+                    {
+                        "item": "AVE",
+                        "count": "58773"
+                    },
+                    {
+                        "item": "ST",
+                        "count": "44947"
+                    },
+                    {
+                        "item": "DR",
+                        "count": "13374"
+                    },
+                    {
+                        "item": "BLVD",
+                        "count": "13026"
+                    },
+                    {
+                        "item": "PL",
+                        "count": "5822"
+                    },
+                    {
+                        "item": "ROAD",
+                        "count": "4754"
+                    },
+                    {
+                        "item": "WAY",
+                        "count": "3439"
+                    },
+                    {
+                        "item": "LANE",
+                        "count": "2416"
+                    },
+                    {
+                        "item": "CT",
+                        "count": "1290"
+                    },
+                    {
+                        "item": "CIR",
+                        "count": "795"
+                    },
+                    {
+                        "item": "TER",
+                        "count": "557"
+                    },
+                    {
+                        "item": "HWY",
+                        "count": "197"
+                    },
+                    {
+                        "item": "LN",
+                        "count": "102"
+                    },
+                    {
+                        "item": "RD",
+                        "count": "83"
+                    },
+                    {
+                        "item": "WALK",
+                        "count": "50"
+                    },
+                    {
+                        "item": "CL",
+                        "count": "44"
+                    },
+                    {
+                        "item": "PARK",
+                        "count": "43"
+                    },
+                    {
+                        "item": "TERR",
+                        "count": "33"
+                    },
+                    {
+                        "item": "TR",
+                        "count": "30"
+                    },
+                    {
+                        "item": "PKWY",
+                        "count": "23"
+                    }
+                ],
+                "smallest": "AVE",
+                "not_null": "63094",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180530,
+            "name": "Suffix Direction",
+            "dataTypeName": "text",
+            "description": "Street suffix direction of property address for permit application. Example 1: For \"200 - 200 N Main Ave\", Suffix Direction is null. Example 2: For \"202 1/4 - 204 1/2 N Main St SE\", Suffix Direction is SE.",
+            "fieldName": "suffix_direction",
+            "position": 27,
+            "renderTypeName": "text",
+            "tableColumnId": 19261948,
+            "width": 292,
+            "cachedContents": {
+                "largest": "WEST",
+                "non_null": "277",
+                "null": "151416",
+                "top": [
+                    {
+                        "item": "NORTH",
+                        "count": "80"
+                    },
+                    {
+                        "item": "WEST",
+                        "count": "76"
+                    },
+                    {
+                        "item": "EAST",
+                        "count": "60"
+                    },
+                    {
+                        "item": "SOUTH",
+                        "count": "33"
+                    },
+                    {
+                        "item": "NORT",
+                        "count": "17"
+                    },
+                    {
+                        "item": "SOUT",
+                        "count": "7"
+                    },
+                    {
+                        "item": "W",
+                        "count": "2"
+                    },
+                    {
+                        "item": "S",
+                        "count": "1"
+                    },
+                    {
+                        "item": "NO",
+                        "count": "1"
+                    }
+                ],
+                "smallest": "EAST",
+                "not_null": "144",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180531,
+            "name": "Unit Range Start",
+            "dataTypeName": "text",
+            "description": "Beginning unit number of property address on permit application. Example 1: For \"200 - 200 N Main Ave, #1-#8\", Unit Range Start is #1. Example 2: For \"202 1/4 - 204 1/2 N Main St SE\", Unit Range Start is null.",
+            "fieldName": "unit_range_start",
+            "position": 28,
+            "renderTypeName": "text",
+            "tableColumnId": 19261949,
+            "width": 292,
+            "cachedContents": {
+                "largest": "# Z",
+                "non_null": "9568",
+                "null": "142125",
+                "top": [
+                    {
+                        "item": "1",
+                        "count": "1260"
+                    },
+                    {
+                        "item": "A",
+                        "count": "119"
+                    },
+                    {
+                        "item": "1-3",
+                        "count": "87"
+                    },
+                    {
+                        "item": "1-2",
+                        "count": "85"
+                    },
+                    {
+                        "item": "1-4",
+                        "count": "79"
+                    },
+                    {
+                        "item": "1-6",
+                        "count": "78"
+                    },
+                    {
+                        "item": "1-5",
+                        "count": "71"
+                    },
+                    {
+                        "item": "#1",
+                        "count": "70"
+                    },
+                    {
+                        "item": "101",
+                        "count": "63"
+                    },
+                    {
+                        "item": "1-8",
+                        "count": "61"
+                    },
+                    {
+                        "item": "#2",
+                        "count": "52"
+                    },
+                    {
+                        "item": "1-9",
+                        "count": "51"
+                    },
+                    {
+                        "item": "3",
+                        "count": "51"
+                    },
+                    {
+                        "item": "B",
+                        "count": "51"
+                    },
+                    {
+                        "item": "#3",
+                        "count": "50"
+                    },
+                    {
+                        "item": "1-10",
+                        "count": "49"
+                    },
+                    {
+                        "item": "#4",
+                        "count": "47"
+                    },
+                    {
+                        "item": "1-7",
+                        "count": "46"
+                    },
+                    {
+                        "item": "1-11",
+                        "count": "43"
+                    },
+                    {
+                        "item": "4",
+                        "count": "38"
+                    }
+                ],
+                "smallest": "-",
+                "not_null": "3952",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180532,
+            "name": "Unit Range End",
+            "dataTypeName": "text",
+            "description": "Ending unit number of property address on permit application. Example 1: For \"200 - 200 N Main Ave, #1-#8\", Unit Range End is #8. Example 2: For \"202 1/4 - 204 1/2 N Main St SE\", Unit Range End is null.",
+            "fieldName": "unit_range_end",
+            "position": 29,
+            "renderTypeName": "text",
+            "tableColumnId": 19261950,
+            "width": 268,
+            "cachedContents": {
+                "largest": "W-HOTEL",
+                "non_null": "2456",
+                "null": "149237",
+                "top": [
+                    {
+                        "item": "3",
+                        "count": "129"
+                    },
+                    {
+                        "item": "2",
+                        "count": "122"
+                    },
+                    {
+                        "item": "4",
+                        "count": "94"
+                    },
+                    {
+                        "item": "5",
+                        "count": "77"
+                    },
+                    {
+                        "item": "6",
+                        "count": "64"
+                    },
+                    {
+                        "item": "10",
+                        "count": "52"
+                    },
+                    {
+                        "item": "9",
+                        "count": "47"
+                    },
+                    {
+                        "item": "7",
+                        "count": "46"
+                    },
+                    {
+                        "item": "8",
+                        "count": "44"
+                    },
+                    {
+                        "item": "B",
+                        "count": "43"
+                    },
+                    {
+                        "item": "1-6",
+                        "count": "42"
+                    },
+                    {
+                        "item": "12",
+                        "count": "35"
+                    },
+                    {
+                        "item": "1-4",
+                        "count": "35"
+                    },
+                    {
+                        "item": "17",
+                        "count": "33"
+                    },
+                    {
+                        "item": "1-8",
+                        "count": "33"
+                    },
+                    {
+                        "item": "1-3",
+                        "count": "32"
+                    },
+                    {
+                        "item": "18",
+                        "count": "32"
+                    },
+                    {
+                        "item": "1-5",
+                        "count": "26"
+                    },
+                    {
+                        "item": "11",
+                        "count": "25"
+                    },
+                    {
+                        "item": "21",
+                        "count": "24"
+                    }
+                ],
+                "smallest": "-",
+                "not_null": "757",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180533,
+            "name": "Zip Code",
+            "dataTypeName": "number",
+            "description": "Zip code of property address for permit application.",
+            "fieldName": "zip_code",
+            "position": 30,
+            "renderTypeName": "number",
+            "tableColumnId": 19261983,
+            "width": 196,
+            "cachedContents": {
+                "largest": "91608",
+                "non_null": "151668",
+                "average": "90636.40756567426",
+                "null": "25",
+                "top": [
+                    {
+                        "item": "90049",
+                        "count": "3869"
+                    },
+                    {
+                        "item": "90066",
+                        "count": "3549"
+                    },
+                    {
+                        "item": "91335",
+                        "count": "3360"
+                    },
+                    {
+                        "item": "91326",
+                        "count": "3192"
+                    },
+                    {
+                        "item": "91331",
+                        "count": "3187"
+                    },
+                    {
+                        "item": "91342",
+                        "count": "3136"
+                    },
+                    {
+                        "item": "90045",
+                        "count": "2949"
+                    },
+                    {
+                        "item": "91604",
+                        "count": "2839"
+                    },
+                    {
+                        "item": "91344",
+                        "count": "2818"
+                    },
+                    {
+                        "item": "90272",
+                        "count": "2617"
+                    },
+                    {
+                        "item": "91367",
+                        "count": "2513"
+                    },
+                    {
+                        "item": "90064",
+                        "count": "2496"
+                    },
+                    {
+                        "item": "91406",
+                        "count": "2419"
+                    },
+                    {
+                        "item": "91423",
+                        "count": "2417"
+                    },
+                    {
+                        "item": "91605",
+                        "count": "2325"
+                    },
+                    {
+                        "item": "90019",
+                        "count": "2307"
+                    },
+                    {
+                        "item": "90026",
+                        "count": "2301"
+                    },
+                    {
+                        "item": "91401",
+                        "count": "2270"
+                    },
+                    {
+                        "item": "90291",
+                        "count": "2254"
+                    },
+                    {
+                        "item": "91606",
+                        "count": "2203"
+                    }
+                ],
+                "smallest": "0",
+                "not_null": "63919",
+                "count": "151693",
+                "sum": "5175338872",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "standard",
+                "noCommas": "true",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180534,
+            "name": "Work Description",
+            "dataTypeName": "text",
+            "description": "Describes the work to be performed under the permit application.",
+            "fieldName": "work_description",
+            "position": 31,
+            "renderTypeName": "text",
+            "tableColumnId": 19261951,
+            "width": 292,
+            "cachedContents": {
+                "largest": "ZONING ONLY CHECK TO ADD 66 BEDS TO THE EXISTING  196-BED SKILLED NURS",
+                "non_null": "151693",
+                "null": "0",
+                "top": [
+                    {
+                        "item": "\"Small lot subdivision pursuant to Tentative Tract No./Preliminary Par",
+                        "count": "184"
+                    },
+                    {
+                        "item": "(N) 2-STORY SFD W/ ATTACHED GARAGE (NFPA-13D FIRE SPRINKLERS THROUGHOU",
+                        "count": "122"
+                    },
+                    {
+                        "item": "TWO STORY SFD-CONDO WITH ATTACH 2 CAR GARAGE (STANDARD PLAN #647-PLAN",
+                        "count": "95"
+                    },
+                    {
+                        "item": "PROPOSE TWO STORY SFD WITH ATTACHED THREE CAR GARAGE_STANDARD PLAN#653",
+                        "count": "93"
+                    },
+                    {
+                        "item": "NEW 2-STORY DUPLEX WITH ATTACHED 3-CAR GARAGE",
+                        "count": "85"
+                    },
+                    {
+                        "item": "NEW THREE STORY SINGLE FAMILY DWELLING WITH ATTACHED TWO-CAR GARAGE (B",
+                        "count": "81"
+                    },
+                    {
+                        "item": "(TRACT 62464) PROPOSED TWO STORY SFD-CONDO W/ ATT GARAGE, TYPE VB CONS",
+                        "count": "80"
+                    },
+                    {
+                        "item": "(N) 3-STORY SFD W/ ATTACHED GARAGE (NFPA-13D FIRE SPRINKLERS THROUGHOU",
+                        "count": "76"
+                    },
+                    {
+                        "item": "Fully sprinklered 47' x 21' irreg. shaped 2 story SFD with attached 2",
+                        "count": "76"
+                    },
+                    {
+                        "item": "3-STORY, TYPE VB, SINGLE FAMILY DWELLING WITH 2-CAR ATTACHED GARAGE. S",
+                        "count": "75"
+                    },
+                    {
+                        "item": "(TR 71866-01 PVSP-SUBAREA 3) PROPOSE THREE STORY SFD WITH ATTACHED GAR",
+                        "count": "75"
+                    },
+                    {
+                        "item": "PROPOSE TWO STORY SFD WITH ATTACHED THREE CAR GARAGE_STANDARD PLAN#652",
+                        "count": "73"
+                    },
+                    {
+                        "item": "TWO STORY SFD-CONDO WITH ATTACH 2 CAR GARAGE (STANDARD PLAN # 646 _ PL",
+                        "count": "73"
+                    },
+                    {
+                        "item": "Small lot subdivision pursuant to Tentative Tract Map No./Preliminary",
+                        "count": "72"
+                    },
+                    {
+                        "item": "(N) 3 STORY SPRINKLERED SFD W/ ATTACHED GARAGE - PLAN C",
+                        "count": "72"
+                    },
+                    {
+                        "item": "(VTT-72726-SL) PROPOSE NEW TWO STORY SFD WITH ATTACHED TWO CAR GARAGE",
+                        "count": "68"
+                    },
+                    {
+                        "item": "NEW 2-STORY DUPLEX",
+                        "count": "64"
+                    },
+                    {
+                        "item": "Emergency Homeless Shelter per Government Code Section 8698.4 and LAMC",
+                        "count": "64"
+                    },
+                    {
+                        "item": "NEW 2 STORY DUPLEX WITH ATTACHED 3 CAR GARAGE",
+                        "count": "62"
+                    },
+                    {
+                        "item": "(TR 71866-01 PVSP-SUBAREA 2) PROPOSE TWO STORY SFD WITH ATTACHED GARAG",
+                        "count": "57"
+                    }
+                ],
+                "smallest": "0CONVERT (19'-10\" X 25'-1\") IRREGULAR SHAPED (E) GARAGE TO ACCESSORY D",
+                "not_null": "63936",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180535,
+            "name": "Valuation",
+            "dataTypeName": "number",
+            "description": "The property/structure valuation amount is used to calculate the building permit fee and all fees calculated as percentage of the building fee. For all building permit types, except for Grading, the valuation is measured in dollars. For Grading permit applications, the valuation is measured in cubic yards of soil removed or added.",
+            "fieldName": "valuation",
+            "position": 32,
+            "renderTypeName": "number",
+            "tableColumnId": 19261952,
+            "width": 208,
+            "cachedContents": {
+                "largest": "583800300",
+                "non_null": "151670",
+                "average": "331296.0489151373",
+                "null": "23",
+                "top": [
+                    {
+                        "item": "20000",
+                        "count": "8210"
+                    },
+                    {
+                        "item": "30000",
+                        "count": "6789"
+                    },
+                    {
+                        "item": "50000",
+                        "count": "6529"
+                    },
+                    {
+                        "item": "25000",
+                        "count": "5713"
+                    },
+                    {
+                        "item": "40000",
+                        "count": "4900"
+                    },
+                    {
+                        "item": "10000",
+                        "count": "4110"
+                    },
+                    {
+                        "item": "15000",
+                        "count": "3794"
+                    },
+                    {
+                        "item": "60000",
+                        "count": "3305"
+                    },
+                    {
+                        "item": "100000",
+                        "count": "3288"
+                    },
+                    {
+                        "item": "35000",
+                        "count": "3222"
+                    },
+                    {
+                        "item": "150000",
+                        "count": "2432"
+                    },
+                    {
+                        "item": "80000",
+                        "count": "2424"
+                    },
+                    {
+                        "item": "5000",
+                        "count": "2294"
+                    },
+                    {
+                        "item": "45000",
+                        "count": "2135"
+                    },
+                    {
+                        "item": "75000",
+                        "count": "1891"
+                    },
+                    {
+                        "item": "120000",
+                        "count": "1836"
+                    },
+                    {
+                        "item": "200000",
+                        "count": "1759"
+                    },
+                    {
+                        "item": "70000",
+                        "count": "1668"
+                    },
+                    {
+                        "item": "18000",
+                        "count": "1488"
+                    },
+                    {
+                        "item": "300000",
+                        "count": "1334"
+                    }
+                ],
+                "smallest": "0",
+                "not_null": "63922",
+                "count": "151693",
+                "sum": "18918329577.25",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "currency",
+                "humane": "false",
+                "currencyStyle": "USD",
+                "precision": "2",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180536,
+            "name": "Floor Area-L.A. Zoning Code Definition",
+            "dataTypeName": "number",
+            "description": "Floor area as defined in the Los Angeles Zoning Code.",
+            "fieldName": "floor_area_l_a_zoning_code_definition",
+            "position": 33,
+            "renderTypeName": "number",
+            "tableColumnId": 19261953,
+            "width": 556,
+            "cachedContents": {
+                "largest": "2071928",
+                "non_null": "126622",
+                "average": "3552.023208124416",
+                "null": "25071",
+                "top": [
+                    {
+                        "item": "0",
+                        "count": "16006"
+                    },
+                    {
+                        "item": "400",
+                        "count": "929"
+                    },
+                    {
+                        "item": "1200",
+                        "count": "909"
+                    },
+                    {
+                        "item": "360",
+                        "count": "887"
+                    },
+                    {
+                        "item": "200",
+                        "count": "408"
+                    },
+                    {
+                        "item": "499",
+                        "count": "398"
+                    },
+                    {
+                        "item": "480",
+                        "count": "292"
+                    },
+                    {
+                        "item": "324",
+                        "count": "290"
+                    },
+                    {
+                        "item": "800",
+                        "count": "290"
+                    },
+                    {
+                        "item": "498",
+                        "count": "289"
+                    },
+                    {
+                        "item": "380",
+                        "count": "280"
+                    },
+                    {
+                        "item": "361",
+                        "count": "258"
+                    },
+                    {
+                        "item": "323",
+                        "count": "255"
+                    },
+                    {
+                        "item": "495",
+                        "count": "243"
+                    },
+                    {
+                        "item": "420",
+                        "count": "238"
+                    },
+                    {
+                        "item": "440",
+                        "count": "220"
+                    },
+                    {
+                        "item": "300",
+                        "count": "217"
+                    },
+                    {
+                        "item": "600",
+                        "count": "216"
+                    },
+                    {
+                        "item": "1199",
+                        "count": "210"
+                    },
+                    {
+                        "item": "450",
+                        "count": "209"
+                    }
+                ],
+                "smallest": "-122400",
+                "not_null": "52811",
+                "count": "151693",
+                "sum": "167186628.36",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "standard",
+                "noCommas": "false",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180537,
+            "name": "# of Residential Dwelling Units",
+            "dataTypeName": "number",
+            "description": "Number of dwelling units for a residential building.",
+            "fieldName": "of_residential_dwelling_units",
+            "position": 34,
+            "renderTypeName": "number",
+            "tableColumnId": 19261954,
+            "width": 484,
+            "cachedContents": {
+                "largest": "915",
+                "non_null": "64016",
+                "average": "2.409553771007534",
+                "null": "87677",
+                "top": [
+                    {
+                        "item": "0",
+                        "count": "35091"
+                    },
+                    {
+                        "item": "1",
+                        "count": "20121"
+                    },
+                    {
+                        "item": "2",
+                        "count": "5416"
+                    },
+                    {
+                        "item": "-1",
+                        "count": "509"
+                    },
+                    {
+                        "item": "4",
+                        "count": "247"
+                    },
+                    {
+                        "item": "3",
+                        "count": "240"
+                    },
+                    {
+                        "item": "5",
+                        "count": "201"
+                    },
+                    {
+                        "item": "6",
+                        "count": "163"
+                    },
+                    {
+                        "item": "8",
+                        "count": "112"
+                    },
+                    {
+                        "item": "9",
+                        "count": "97"
+                    },
+                    {
+                        "item": "7",
+                        "count": "79"
+                    },
+                    {
+                        "item": "10",
+                        "count": "58"
+                    },
+                    {
+                        "item": "12",
+                        "count": "53"
+                    },
+                    {
+                        "item": "15",
+                        "count": "51"
+                    },
+                    {
+                        "item": "14",
+                        "count": "45"
+                    },
+                    {
+                        "item": "18",
+                        "count": "43"
+                    },
+                    {
+                        "item": "21",
+                        "count": "42"
+                    },
+                    {
+                        "item": "13",
+                        "count": "41"
+                    },
+                    {
+                        "item": "-2",
+                        "count": "38"
+                    },
+                    {
+                        "item": "17",
+                        "count": "36"
+                    }
+                ],
+                "smallest": "-147",
+                "not_null": "27082",
+                "count": "151693",
+                "sum": "58210",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "standard",
+                "noCommas": "false",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180538,
+            "name": "# of Stories",
+            "dataTypeName": "number",
+            "description": "Number of stories.",
+            "fieldName": "of_stories",
+            "position": 35,
+            "renderTypeName": "number",
+            "tableColumnId": 19261955,
+            "width": 256,
+            "cachedContents": {
+                "largest": "4654",
+                "non_null": "119923",
+                "average": "1.423748570916183",
+                "null": "31770",
+                "top": [
+                    {
+                        "item": "1",
+                        "count": "44449"
+                    },
+                    {
+                        "item": "0",
+                        "count": "32305"
+                    },
+                    {
+                        "item": "2",
+                        "count": "31914"
+                    },
+                    {
+                        "item": "3",
+                        "count": "8665"
+                    },
+                    {
+                        "item": "4",
+                        "count": "1534"
+                    },
+                    {
+                        "item": "5",
+                        "count": "436"
+                    },
+                    {
+                        "item": "6",
+                        "count": "245"
+                    },
+                    {
+                        "item": "7",
+                        "count": "154"
+                    },
+                    {
+                        "item": "8",
+                        "count": "55"
+                    },
+                    {
+                        "item": "9",
+                        "count": "15"
+                    },
+                    {
+                        "item": "12",
+                        "count": "12"
+                    },
+                    {
+                        "item": "13",
+                        "count": "11"
+                    },
+                    {
+                        "item": "14",
+                        "count": "11"
+                    },
+                    {
+                        "item": "10",
+                        "count": "10"
+                    },
+                    {
+                        "item": "16",
+                        "count": "9"
+                    },
+                    {
+                        "item": "11",
+                        "count": "8"
+                    },
+                    {
+                        "item": "22",
+                        "count": "8"
+                    },
+                    {
+                        "item": "34",
+                        "count": "6"
+                    },
+                    {
+                        "item": "35",
+                        "count": "6"
+                    },
+                    {
+                        "item": "15",
+                        "count": "4"
+                    }
+                ],
+                "smallest": "0",
+                "not_null": "49994",
+                "count": "151693",
+                "sum": "63512",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "standard",
+                "noCommas": "false",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180539,
+            "name": "Contractor's Business Name",
+            "dataTypeName": "text",
+            "description": "If applicable, the contractor's business name.",
+            "fieldName": "contractors_business_name",
+            "position": 36,
+            "renderTypeName": "text",
+            "tableColumnId": 19261956,
+            "width": 400,
+            "cachedContents": {
+                "largest": "ZWICK CONSTRUCTION COMPANY",
+                "non_null": "139921",
+                "null": "11772",
+                "top": [
+                    {
+                        "item": "OWNER-BUILDER",
+                        "count": "65070"
+                    },
+                    {
+                        "item": "SHAPELL HOMES INC",
+                        "count": "1432"
+                    },
+                    {
+                        "item": "K N CONSULTING INC",
+                        "count": "1111"
+                    },
+                    {
+                        "item": "PACIFIC COAST BUILDERS",
+                        "count": "549"
+                    },
+                    {
+                        "item": "T J C HOME BUILDERS LLC",
+                        "count": "468"
+                    },
+                    {
+                        "item": "AGAM POOL AND SPA INC",
+                        "count": "418"
+                    },
+                    {
+                        "item": "SHAPELL INDUSTRIES INC",
+                        "count": "388"
+                    },
+                    {
+                        "item": "AVANTI POOLS INC",
+                        "count": "377"
+                    },
+                    {
+                        "item": "D R HORTON AMERICA'S BUILDER",
+                        "count": "333"
+                    },
+                    {
+                        "item": "BAKSH CONSTRUCTION INC",
+                        "count": "328"
+                    },
+                    {
+                        "item": "CYPRUS KIP",
+                        "count": "320"
+                    },
+                    {
+                        "item": "MR CARLOS POOLS AND CONSTRUCTION INC",
+                        "count": "314"
+                    },
+                    {
+                        "item": "INTEX DESIGN AND CONSTRUCTION INC",
+                        "count": "309"
+                    },
+                    {
+                        "item": "LUNA CUSTOM POOLS INC",
+                        "count": "304"
+                    },
+                    {
+                        "item": "BAKSH CONSTRUCTION",
+                        "count": "300"
+                    },
+                    {
+                        "item": "WILLIAMS HOMES INC",
+                        "count": "293"
+                    },
+                    {
+                        "item": "F S Z BROS GENERAL CONTRACTORS INC",
+                        "count": "261"
+                    },
+                    {
+                        "item": "RICHMOND AMERICAN HOMES OF MARYLAND INC",
+                        "count": "245"
+                    },
+                    {
+                        "item": "NOGA POOL AND SPA INC",
+                        "count": "245"
+                    },
+                    {
+                        "item": "JR POOL & SPA SERVICES",
+                        "count": "241"
+                    }
+                ],
+                "smallest": "0 4 PAN CONSTRUCTION",
+                "not_null": "63886",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180540,
+            "name": "Contractor Address",
+            "dataTypeName": "text",
+            "description": "\"Street address\" portion of contractor's address.",
+            "fieldName": "contractor_address",
+            "position": 37,
+            "renderTypeName": "text",
+            "tableColumnId": 19261957,
+            "width": 316,
+            "cachedContents": {
+                "largest": "WILL VALLECIOS",
+                "non_null": "76686",
+                "null": "75007",
+                "top": [
+                    {
+                        "item": "P O BOX 410",
+                        "count": "1401"
+                    },
+                    {
+                        "item": "250 GIBRALTAR RD",
+                        "count": "925"
+                    },
+                    {
+                        "item": "4 HILLCREST MANOR",
+                        "count": "552"
+                    },
+                    {
+                        "item": "1140 VIRGINIA DR ATTN: TOLL",
+                        "count": "490"
+                    },
+                    {
+                        "item": "12524 HATTERAS STREET",
+                        "count": "393"
+                    },
+                    {
+                        "item": "8383 WILSHIRE BLVD SUITE 700",
+                        "count": "388"
+                    },
+                    {
+                        "item": "8138 ORION AVE",
+                        "count": "375"
+                    },
+                    {
+                        "item": "978 NORTH AMEILA AVE",
+                        "count": "313"
+                    },
+                    {
+                        "item": "2603 COLD CREEK AVENUE",
+                        "count": "304"
+                    },
+                    {
+                        "item": "9306 GALLATIN ROAD",
+                        "count": "288"
+                    },
+                    {
+                        "item": "9277OTTO ST",
+                        "count": "258"
+                    },
+                    {
+                        "item": "21080 CENTRE POINTE PARKWAY",
+                        "count": "254"
+                    },
+                    {
+                        "item": "P O BOX 5249",
+                        "count": "241"
+                    },
+                    {
+                        "item": "5171 CALIFORNIA AVENUE",
+                        "count": "230"
+                    },
+                    {
+                        "item": "501 WEST BROADWAY SUITE 1200",
+                        "count": "227"
+                    },
+                    {
+                        "item": "9018 BALBOA BLVD SUITE 353",
+                        "count": "219"
+                    },
+                    {
+                        "item": "5739 KANAN ROAD #639",
+                        "count": "218"
+                    },
+                    {
+                        "item": "8055 MATILIJA AVENUE",
+                        "count": "205"
+                    },
+                    {
+                        "item": "18729 CLARK DALE AVE #C",
+                        "count": "194"
+                    },
+                    {
+                        "item": "26880 ALISO VIEJO PKWY STE 100",
+                        "count": "193"
+                    }
+                ],
+                "smallest": "-",
+                "not_null": "36026",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180541,
+            "name": "Contractor City",
+            "dataTypeName": "text",
+            "description": "\"City\" portion of contractor's address.",
+            "fieldName": "contractor_city",
+            "position": 38,
+            "renderTypeName": "text",
+            "tableColumnId": 19261958,
+            "width": 280,
+            "cachedContents": {
+                "largest": "ZELIENOPLE",
+                "non_null": "74777",
+                "null": "76916",
+                "top": [
+                    {
+                        "item": "LOS ANGELES",
+                        "count": "12286"
+                    },
+                    {
+                        "item": "WOODLAND HILLS",
+                        "count": "2321"
+                    },
+                    {
+                        "item": "VAN NUYS",
+                        "count": "2208"
+                    },
+                    {
+                        "item": "SHERMAN OAKS",
+                        "count": "2132"
+                    },
+                    {
+                        "item": "TARZANA",
+                        "count": "1739"
+                    },
+                    {
+                        "item": "ENCINO",
+                        "count": "1629"
+                    },
+                    {
+                        "item": "NORTH HOLLYWOOD",
+                        "count": "1574"
+                    },
+                    {
+                        "item": "SUNSET BEACH",
+                        "count": "1388"
+                    },
+                    {
+                        "item": "BEVERLY HILLS",
+                        "count": "1360"
+                    },
+                    {
+                        "item": "NORTHRIDGE",
+                        "count": "1344"
+                    },
+                    {
+                        "item": "DOWNEY",
+                        "count": "1296"
+                    },
+                    {
+                        "item": "SANTA MONICA",
+                        "count": "1092"
+                    },
+                    {
+                        "item": "GLENDALE",
+                        "count": "1068"
+                    },
+                    {
+                        "item": "VALLEY VILLAGE",
+                        "count": "1046"
+                    },
+                    {
+                        "item": "RESEDA",
+                        "count": "976"
+                    },
+                    {
+                        "item": "IRVINE",
+                        "count": "961"
+                    },
+                    {
+                        "item": "WEST HILLS",
+                        "count": "911"
+                    },
+                    {
+                        "item": "SIMI VALLEY",
+                        "count": "873"
+                    },
+                    {
+                        "item": "HORSHAM",
+                        "count": "856"
+                    },
+                    {
+                        "item": "SYLMAR",
+                        "count": "845"
+                    }
+                ],
+                "smallest": "136 S ROBERTSON BLVD",
+                "not_null": "34673",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180542,
+            "name": "Contractor State",
+            "dataTypeName": "text",
+            "description": "\"State\" portion of contractor's address.",
+            "fieldName": "contractor_state",
+            "position": 39,
+            "renderTypeName": "text",
+            "tableColumnId": 19261959,
+            "width": 292,
+            "cachedContents": {
+                "largest": "WI",
+                "non_null": "74764",
+                "null": "76929",
+                "top": [
+                    {
+                        "item": "CA",
+                        "count": "72413"
+                    },
+                    {
+                        "item": "PA",
+                        "count": "1442"
+                    },
+                    {
+                        "item": "AZ",
+                        "count": "130"
+                    },
+                    {
+                        "item": "TX",
+                        "count": "120"
+                    },
+                    {
+                        "item": "CO",
+                        "count": "77"
+                    },
+                    {
+                        "item": "WA",
+                        "count": "59"
+                    },
+                    {
+                        "item": "GA",
+                        "count": "55"
+                    },
+                    {
+                        "item": "MA",
+                        "count": "54"
+                    },
+                    {
+                        "item": "NY",
+                        "count": "49"
+                    },
+                    {
+                        "item": "NV",
+                        "count": "42"
+                    },
+                    {
+                        "item": "FL",
+                        "count": "37"
+                    },
+                    {
+                        "item": "UT",
+                        "count": "37"
+                    },
+                    {
+                        "item": "IL",
+                        "count": "29"
+                    },
+                    {
+                        "item": "NM",
+                        "count": "26"
+                    },
+                    {
+                        "item": "MN",
+                        "count": "21"
+                    },
+                    {
+                        "item": "MO",
+                        "count": "21"
+                    },
+                    {
+                        "item": "WI",
+                        "count": "14"
+                    },
+                    {
+                        "item": "AR",
+                        "count": "14"
+                    },
+                    {
+                        "item": "MD",
+                        "count": "12"
+                    },
+                    {
+                        "item": "MI",
+                        "count": "12"
+                    }
+                ],
+                "smallest": "AC",
+                "not_null": "34666",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180543,
+            "name": "License Type",
+            "dataTypeName": "text",
+            "description": "Contractor's license type (class code).",
+            "fieldName": "license_type",
+            "position": 40,
+            "renderTypeName": "text",
+            "tableColumnId": 19261961,
+            "width": 244,
+            "cachedContents": {
+                "largest": "N/A",
+                "non_null": "151677",
+                "null": "16",
+                "top": [
+                    {
+                        "item": "B",
+                        "count": "68464"
+                    },
+                    {
+                        "item": "NA",
+                        "count": "65078"
+                    },
+                    {
+                        "item": "C53",
+                        "count": "9962"
+                    },
+                    {
+                        "item": "N/A",
+                        "count": "6717"
+                    },
+                    {
+                        "item": "A",
+                        "count": "439"
+                    },
+                    {
+                        "item": "C27",
+                        "count": "159"
+                    },
+                    {
+                        "item": "D03",
+                        "count": "152"
+                    },
+                    {
+                        "item": "C10",
+                        "count": "111"
+                    },
+                    {
+                        "item": "C45",
+                        "count": "87"
+                    },
+                    {
+                        "item": "C-8",
+                        "count": "59"
+                    },
+                    {
+                        "item": "C46",
+                        "count": "40"
+                    },
+                    {
+                        "item": "C36",
+                        "count": "38"
+                    },
+                    {
+                        "item": "C29",
+                        "count": "37"
+                    },
+                    {
+                        "item": "C35",
+                        "count": "33"
+                    },
+                    {
+                        "item": "C12",
+                        "count": "29"
+                    },
+                    {
+                        "item": "C21",
+                        "count": "20"
+                    },
+                    {
+                        "item": "D35",
+                        "count": "19"
+                    },
+                    {
+                        "item": "C-6",
+                        "count": "17"
+                    },
+                    {
+                        "item": "C39",
+                        "count": "16"
+                    },
+                    {
+                        "item": "C20",
+                        "count": "15"
+                    }
+                ],
+                "smallest": "0",
+                "not_null": "63928",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180544,
+            "name": "License #",
+            "dataTypeName": "number",
+            "description": "Contractor's license number.",
+            "fieldName": "license",
+            "position": 41,
+            "renderTypeName": "number",
+            "tableColumnId": 19261962,
+            "width": 208,
+            "cachedContents": {
+                "largest": "10478743",
+                "non_null": "151677",
+                "average": "416994.8667612243",
+                "null": "16",
+                "top": [
+                    {
+                        "item": "0",
+                        "count": "71794"
+                    },
+                    {
+                        "item": "1001034",
+                        "count": "1432"
+                    },
+                    {
+                        "item": "993102",
+                        "count": "1113"
+                    },
+                    {
+                        "item": "834794",
+                        "count": "555"
+                    },
+                    {
+                        "item": "1025507",
+                        "count": "491"
+                    },
+                    {
+                        "item": "765023",
+                        "count": "443"
+                    },
+                    {
+                        "item": "993464",
+                        "count": "433"
+                    },
+                    {
+                        "item": "315237",
+                        "count": "388"
+                    },
+                    {
+                        "item": "772516",
+                        "count": "377"
+                    },
+                    {
+                        "item": "385622",
+                        "count": "352"
+                    },
+                    {
+                        "item": "910533",
+                        "count": "338"
+                    },
+                    {
+                        "item": "693797",
+                        "count": "320"
+                    },
+                    {
+                        "item": "981718",
+                        "count": "309"
+                    },
+                    {
+                        "item": "979185",
+                        "count": "304"
+                    },
+                    {
+                        "item": "734097",
+                        "count": "304"
+                    },
+                    {
+                        "item": "831578",
+                        "count": "300"
+                    },
+                    {
+                        "item": "794097",
+                        "count": "265"
+                    },
+                    {
+                        "item": "185102",
+                        "count": "251"
+                    },
+                    {
+                        "item": "487535",
+                        "count": "245"
+                    },
+                    {
+                        "item": "946647",
+                        "count": "245"
+                    }
+                ],
+                "smallest": "0",
+                "not_null": "63928",
+                "count": "151693",
+                "sum": "23813742851",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "standard",
+                "noCommas": "true",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180545,
+            "name": "Principal First Name",
+            "dataTypeName": "text",
+            "description": "First name of the contractor or personnel currently associated with the license.",
+            "fieldName": "principal_first_name",
+            "position": 42,
+            "renderTypeName": "text",
+            "tableColumnId": 19261963,
+            "width": 340,
+            "cachedContents": {
+                "largest": "ZYGMUNT",
+                "non_null": "83130",
+                "null": "68563",
+                "top": [
+                    {
+                        "item": "ROBERT",
+                        "count": "2411"
+                    },
+                    {
+                        "item": "MICHAEL",
+                        "count": "2266"
+                    },
+                    {
+                        "item": "DAVID",
+                        "count": "1791"
+                    },
+                    {
+                        "item": "JOHN",
+                        "count": "1627"
+                    },
+                    {
+                        "item": "KIP",
+                        "count": "1415"
+                    },
+                    {
+                        "item": "JOSE",
+                        "count": "1255"
+                    },
+                    {
+                        "item": "DANIEL",
+                        "count": "1069"
+                    },
+                    {
+                        "item": "JAMES",
+                        "count": "1042"
+                    },
+                    {
+                        "item": "WILLIAM",
+                        "count": "965"
+                    },
+                    {
+                        "item": "MARK",
+                        "count": "871"
+                    },
+                    {
+                        "item": "CHRISTOPHER",
+                        "count": "838"
+                    },
+                    {
+                        "item": "PETER",
+                        "count": "818"
+                    },
+                    {
+                        "item": "JUAN",
+                        "count": "811"
+                    },
+                    {
+                        "item": "THOMAS",
+                        "count": "733"
+                    },
+                    {
+                        "item": "RICHARD",
+                        "count": "701"
+                    },
+                    {
+                        "item": "GARY",
+                        "count": "649"
+                    },
+                    {
+                        "item": "PAUL",
+                        "count": "634"
+                    },
+                    {
+                        "item": "STEPHEN",
+                        "count": "601"
+                    },
+                    {
+                        "item": "STEVEN",
+                        "count": "581"
+                    },
+                    {
+                        "item": "AJIM",
+                        "count": "570"
+                    }
+                ],
+                "smallest": "-",
+                "not_null": "36725",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180546,
+            "name": "Principal Middle Name",
+            "dataTypeName": "text",
+            "description": "Middle name of the contractor or personnel currently associated with the license.",
+            "fieldName": "principal_middle_name",
+            "position": 43,
+            "renderTypeName": "text",
+            "tableColumnId": 19261964,
+            "width": 352,
+            "cachedContents": {
+                "largest": "ZWI IZHAK",
+                "non_null": "55185",
+                "null": "96508",
+                "top": [
+                    {
+                        "item": "CHRISTOPHER",
+                        "count": "1828"
+                    },
+                    {
+                        "item": "ANTHONY",
+                        "count": "1223"
+                    },
+                    {
+                        "item": "DAVID",
+                        "count": "1125"
+                    },
+                    {
+                        "item": "DANIEL",
+                        "count": "1115"
+                    },
+                    {
+                        "item": "JAMES",
+                        "count": "1114"
+                    },
+                    {
+                        "item": "MICHAEL",
+                        "count": "1071"
+                    },
+                    {
+                        "item": "JOSEPH",
+                        "count": "940"
+                    },
+                    {
+                        "item": "PAUL",
+                        "count": "847"
+                    },
+                    {
+                        "item": "ROBERT",
+                        "count": "815"
+                    },
+                    {
+                        "item": "JOHN",
+                        "count": "780"
+                    },
+                    {
+                        "item": "LEE",
+                        "count": "773"
+                    },
+                    {
+                        "item": "EDWARD",
+                        "count": "768"
+                    },
+                    {
+                        "item": "ALAN",
+                        "count": "662"
+                    },
+                    {
+                        "item": "GARRET",
+                        "count": "568"
+                    },
+                    {
+                        "item": "ELEAZAR",
+                        "count": "566"
+                    },
+                    {
+                        "item": "ALLEN",
+                        "count": "558"
+                    },
+                    {
+                        "item": "CHARLES",
+                        "count": "528"
+                    },
+                    {
+                        "item": "SCOTT",
+                        "count": "516"
+                    },
+                    {
+                        "item": "WAYNE",
+                        "count": "471"
+                    },
+                    {
+                        "item": "WILLIAM",
+                        "count": "450"
+                    }
+                ],
+                "smallest": "`",
+                "not_null": "24880",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180547,
+            "name": "Principal Last Name",
+            "dataTypeName": "text",
+            "description": "Last name of the contractor or personnel currently associated with the license.",
+            "fieldName": "principal_last_name",
+            "position": 44,
+            "renderTypeName": "text",
+            "tableColumnId": 19261965,
+            "width": 328,
+            "cachedContents": {
+                "largest": "ZWICK",
+                "non_null": "82628",
+                "null": "69065",
+                "top": [
+                    {
+                        "item": "CYPRUS",
+                        "count": "1411"
+                    },
+                    {
+                        "item": "MOORE",
+                        "count": "1039"
+                    },
+                    {
+                        "item": "HERNANDEZ",
+                        "count": "914"
+                    },
+                    {
+                        "item": "BAKSH",
+                        "count": "638"
+                    },
+                    {
+                        "item": "HEMPHILL",
+                        "count": "595"
+                    },
+                    {
+                        "item": "COHEN",
+                        "count": "591"
+                    },
+                    {
+                        "item": "WILLIAMS",
+                        "count": "526"
+                    },
+                    {
+                        "item": "LEGASPI",
+                        "count": "461"
+                    },
+                    {
+                        "item": "GONZALEZ",
+                        "count": "460"
+                    },
+                    {
+                        "item": "LEE",
+                        "count": "429"
+                    },
+                    {
+                        "item": "MARTINEZ",
+                        "count": "396"
+                    },
+                    {
+                        "item": "NAJUM",
+                        "count": "385"
+                    },
+                    {
+                        "item": "ZIMRING",
+                        "count": "377"
+                    },
+                    {
+                        "item": "KIM",
+                        "count": "375"
+                    },
+                    {
+                        "item": "ROSSI",
+                        "count": "343"
+                    },
+                    {
+                        "item": "SATTERFIELD",
+                        "count": "307"
+                    },
+                    {
+                        "item": "BECK",
+                        "count": "295"
+                    },
+                    {
+                        "item": "SANTANA",
+                        "count": "288"
+                    },
+                    {
+                        "item": "ALMANY",
+                        "count": "270"
+                    },
+                    {
+                        "item": "SMITH",
+                        "count": "268"
+                    }
+                ],
+                "smallest": "-",
+                "not_null": "36290",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180548,
+            "name": "License Expiration Date",
+            "dataTypeName": "calendar_date",
+            "description": "Contractor license expiration date.",
+            "fieldName": "license_expiration_date",
+            "position": 45,
+            "renderTypeName": "calendar_date",
+            "tableColumnId": 19261966,
+            "width": 376,
+            "cachedContents": {
+                "largest": "2208-05-31T00:00:00.000",
+                "non_null": "94736",
+                "null": "56957",
+                "top": [
+                    {
+                        "item": "2000-01-01T00:00:00.000",
+                        "count": "16077"
+                    },
+                    {
+                        "item": "2023-02-28T00:00:00.000",
+                        "count": "852"
+                    },
+                    {
+                        "item": "2021-02-28T00:00:00.000",
+                        "count": "833"
+                    },
+                    {
+                        "item": "2020-05-31T00:00:00.000",
+                        "count": "801"
+                    },
+                    {
+                        "item": "2018-05-31T00:00:00.000",
+                        "count": "786"
+                    },
+                    {
+                        "item": "2019-02-28T00:00:00.000",
+                        "count": "770"
+                    },
+                    {
+                        "item": "2016-05-31T00:00:00.000",
+                        "count": "730"
+                    },
+                    {
+                        "item": "2018-03-31T00:00:00.000",
+                        "count": "690"
+                    },
+                    {
+                        "item": "2022-05-31T00:00:00.000",
+                        "count": "677"
+                    },
+                    {
+                        "item": "2018-12-31T00:00:00.000",
+                        "count": "672"
+                    },
+                    {
+                        "item": "2017-04-30T00:00:00.000",
+                        "count": "669"
+                    },
+                    {
+                        "item": "2022-10-31T00:00:00.000",
+                        "count": "661"
+                    },
+                    {
+                        "item": "2019-04-30T00:00:00.000",
+                        "count": "657"
+                    },
+                    {
+                        "item": "2022-01-01T00:00:00.000",
+                        "count": "654"
+                    },
+                    {
+                        "item": "2017-06-30T00:00:00.000",
+                        "count": "652"
+                    },
+                    {
+                        "item": "2021-04-30T00:00:00.000",
+                        "count": "651"
+                    },
+                    {
+                        "item": "2018-01-31T00:00:00.000",
+                        "count": "651"
+                    },
+                    {
+                        "item": "2020-10-31T00:00:00.000",
+                        "count": "639"
+                    },
+                    {
+                        "item": "2019-12-31T00:00:00.000",
+                        "count": "638"
+                    },
+                    {
+                        "item": "2021-03-31T00:00:00.000",
+                        "count": "629"
+                    }
+                ],
+                "smallest": "1997-07-31T00:00:00.000",
+                "not_null": "41687",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "view": "date",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180549,
+            "name": "Applicant First Name",
+            "dataTypeName": "text",
+            "description": "First name of the permit applicant.",
+            "fieldName": "applicant_first_name",
+            "position": 46,
+            "renderTypeName": "text",
+            "tableColumnId": 19261969,
+            "width": 340,
+            "cachedContents": {
+                "largest": "ZWEIYU",
+                "non_null": "145212",
+                "null": "6481",
+                "top": [
+                    {
+                        "item": "MICHAEL",
+                        "count": "2044"
+                    },
+                    {
+                        "item": "DAVID",
+                        "count": "1869"
+                    },
+                    {
+                        "item": "JOSE",
+                        "count": "1552"
+                    },
+                    {
+                        "item": "VANDA",
+                        "count": "1539"
+                    },
+                    {
+                        "item": "ERIC",
+                        "count": "1488"
+                    },
+                    {
+                        "item": "RUBEN",
+                        "count": "1346"
+                    },
+                    {
+                        "item": "DANIEL",
+                        "count": "1160"
+                    },
+                    {
+                        "item": "JOHN",
+                        "count": "1038"
+                    },
+                    {
+                        "item": "ROBERT",
+                        "count": "1016"
+                    },
+                    {
+                        "item": "RICARDO",
+                        "count": "1014"
+                    },
+                    {
+                        "item": "CHRIS",
+                        "count": "909"
+                    },
+                    {
+                        "item": "-",
+                        "count": "906"
+                    },
+                    {
+                        "item": "LUIS",
+                        "count": "833"
+                    },
+                    {
+                        "item": "JUAN",
+                        "count": "819"
+                    },
+                    {
+                        "item": "RICHARD",
+                        "count": "791"
+                    },
+                    {
+                        "item": "GAYLE",
+                        "count": "789"
+                    },
+                    {
+                        "item": "ALEX",
+                        "count": "783"
+                    },
+                    {
+                        "item": "OSCAR",
+                        "count": "780"
+                    },
+                    {
+                        "item": "KEN",
+                        "count": "725"
+                    },
+                    {
+                        "item": "GM MODERN",
+                        "count": "708"
+                    }
+                ],
+                "smallest": "-",
+                "not_null": "58604",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180550,
+            "name": "Applicant Last Name",
+            "dataTypeName": "text",
+            "description": "Last name of the permit applicant.",
+            "fieldName": "applicant_last_name",
+            "position": 47,
+            "renderTypeName": "text",
+            "tableColumnId": 19261970,
+            "width": 328,
+            "cachedContents": {
+                "largest": "Zychowski",
+                "non_null": "127458",
+                "null": "24235",
+                "top": [
+                    {
+                        "item": "GARCIA",
+                        "count": "1662"
+                    },
+                    {
+                        "item": "GROVE",
+                        "count": "1475"
+                    },
+                    {
+                        "item": "GUTIERREZ",
+                        "count": "1425"
+                    },
+                    {
+                        "item": "DESIGN",
+                        "count": "1382"
+                    },
+                    {
+                        "item": "LUNA",
+                        "count": "1082"
+                    },
+                    {
+                        "item": "MARTINEZ",
+                        "count": "797"
+                    },
+                    {
+                        "item": "BIBAWI",
+                        "count": "793"
+                    },
+                    {
+                        "item": "FLORES",
+                        "count": "587"
+                    },
+                    {
+                        "item": "RODRIGUEZ",
+                        "count": "566"
+                    },
+                    {
+                        "item": "KIM",
+                        "count": "566"
+                    },
+                    {
+                        "item": "HERNANDEZ",
+                        "count": "558"
+                    },
+                    {
+                        "item": "SANCHEZ",
+                        "count": "548"
+                    },
+                    {
+                        "item": "MILLER",
+                        "count": "514"
+                    },
+                    {
+                        "item": "DEMBSKY",
+                        "count": "513"
+                    },
+                    {
+                        "item": "MCKINNEY",
+                        "count": "508"
+                    },
+                    {
+                        "item": "STOCKTON",
+                        "count": "495"
+                    },
+                    {
+                        "item": "AGUILAR",
+                        "count": "480"
+                    },
+                    {
+                        "item": "LEE",
+                        "count": "421"
+                    },
+                    {
+                        "item": "WACHTEL",
+                        "count": "416"
+                    },
+                    {
+                        "item": "-",
+                        "count": "413"
+                    }
+                ],
+                "smallest": "=)",
+                "not_null": "49897",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180551,
+            "name": "Applicant Business Name",
+            "dataTypeName": "text",
+            "description": "If applicable, permit applicant's business name.",
+            "fieldName": "applicant_business_name",
+            "position": 48,
+            "renderTypeName": "text",
+            "tableColumnId": 19261971,
+            "width": 376,
+            "cachedContents": {
+                "largest": "ZT CONSTRUCTION CO.",
+                "non_null": "13534",
+                "null": "138159",
+                "top": [
+                    {
+                        "item": "OWNER-BUILDER",
+                        "count": "5396"
+                    },
+                    {
+                        "item": "OCEAN DEVELOPMENT",
+                        "count": "225"
+                    },
+                    {
+                        "item": "GM MODERN DESIGN",
+                        "count": "176"
+                    },
+                    {
+                        "item": "MID VALLEY PERMIT SERVICE",
+                        "count": "164"
+                    },
+                    {
+                        "item": "KB HOME",
+                        "count": "132"
+                    },
+                    {
+                        "item": "HARRIDGE DEVELOPMENT GROUP",
+                        "count": "100"
+                    },
+                    {
+                        "item": "STUDIO BY DESIGN",
+                        "count": "88"
+                    },
+                    {
+                        "item": "WARMINGTON RESIDENTIAL",
+                        "count": "85"
+                    },
+                    {
+                        "item": "MID VALLEY PERMIT SERVICES",
+                        "count": "72"
+                    },
+                    {
+                        "item": "KB HOMES",
+                        "count": "67"
+                    },
+                    {
+                        "item": "RICHMOND AMERICAN HOMES",
+                        "count": "60"
+                    },
+                    {
+                        "item": "DCC",
+                        "count": "59"
+                    },
+                    {
+                        "item": "BAKSH CONSTRUCTION",
+                        "count": "57"
+                    },
+                    {
+                        "item": "KIMBERLINA WHETTAM & ASSOC.",
+                        "count": "56"
+                    },
+                    {
+                        "item": "GA ENGINEERING",
+                        "count": "54"
+                    },
+                    {
+                        "item": "MODERN DESIGN",
+                        "count": "50"
+                    },
+                    {
+                        "item": "MID VALLEY PERMIT",
+                        "count": "49"
+                    },
+                    {
+                        "item": "HUNSAKER & ASSOC",
+                        "count": "48"
+                    },
+                    {
+                        "item": "DR HORTON",
+                        "count": "46"
+                    },
+                    {
+                        "item": "HUNSAKER & ASSOC.",
+                        "count": "44"
+                    }
+                ],
+                "smallest": "-",
+                "not_null": "9555",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180552,
+            "name": "Applicant Address 1",
+            "dataTypeName": "text",
+            "description": "The street address portion of the permit applicant's address.",
+            "fieldName": "applicant_address_1",
+            "position": 49,
+            "renderTypeName": "text",
+            "tableColumnId": 19261973,
+            "width": 328,
+            "cachedContents": {
+                "largest": "WOODMAN AVE",
+                "non_null": "107220",
+                "null": "44473",
+                "top": [
+                    {
+                        "item": "-",
+                        "count": "3499"
+                    },
+                    {
+                        "item": "SAME AS JOB",
+                        "count": "1262"
+                    },
+                    {
+                        "item": ".",
+                        "count": "1136"
+                    },
+                    {
+                        "item": "11280 CORBIN AV",
+                        "count": "1077"
+                    },
+                    {
+                        "item": "SAME",
+                        "count": "958"
+                    },
+                    {
+                        "item": "6277 VAN NUYS BL.",
+                        "count": "592"
+                    },
+                    {
+                        "item": "19841 LEXINGTON LN",
+                        "count": "548"
+                    },
+                    {
+                        "item": "SAME AS ARCH",
+                        "count": "536"
+                    },
+                    {
+                        "item": "SAME AS OWNER",
+                        "count": "531"
+                    },
+                    {
+                        "item": "19324 OXNARD ST",
+                        "count": "447"
+                    },
+                    {
+                        "item": "11280 CORBIN AVE",
+                        "count": "376"
+                    },
+                    {
+                        "item": "6277 VAN NUYS BL",
+                        "count": "370"
+                    },
+                    {
+                        "item": "26500 W AGOURA RD",
+                        "count": "362"
+                    },
+                    {
+                        "item": "SAME AS CONT",
+                        "count": "328"
+                    },
+                    {
+                        "item": "25152 SPRINGFIELD CT",
+                        "count": "325"
+                    },
+                    {
+                        "item": "2794 CARLMONT PL",
+                        "count": "270"
+                    },
+                    {
+                        "item": "19261 WELLS DR",
+                        "count": "247"
+                    },
+                    {
+                        "item": "11280 CORBIN",
+                        "count": "244"
+                    },
+                    {
+                        "item": "6277 VAN NUYS",
+                        "count": "241"
+                    },
+                    {
+                        "item": "6115 yolanda ave",
+                        "count": "236"
+                    }
+                ],
+                "smallest": "`",
+                "not_null": "47728",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180553,
+            "name": "Applicant Address 2",
+            "dataTypeName": "text",
+            "description": "The unit portion of the permit applicant's address.",
+            "fieldName": "applicant_address_2",
+            "position": 50,
+            "renderTypeName": "text",
+            "tableColumnId": 19261974,
+            "width": 328,
+            "cachedContents": {
+                "largest": "WOODLAND HILLS",
+                "non_null": "28227",
+                "null": "123466",
+                "top": [
+                    {
+                        "item": "-",
+                        "count": "3505"
+                    },
+                    {
+                        "item": ".",
+                        "count": "1039"
+                    },
+                    {
+                        "item": "#118",
+                        "count": "664"
+                    },
+                    {
+                        "item": "118",
+                        "count": "472"
+                    },
+                    {
+                        "item": "#100",
+                        "count": "352"
+                    },
+                    {
+                        "item": "#102",
+                        "count": "285"
+                    },
+                    {
+                        "item": "#1",
+                        "count": "246"
+                    },
+                    {
+                        "item": "#205",
+                        "count": "232"
+                    },
+                    {
+                        "item": "#106",
+                        "count": "228"
+                    },
+                    {
+                        "item": "#223",
+                        "count": "210"
+                    },
+                    {
+                        "item": "#201",
+                        "count": "198"
+                    },
+                    {
+                        "item": "#204",
+                        "count": "196"
+                    },
+                    {
+                        "item": "100",
+                        "count": "183"
+                    },
+                    {
+                        "item": "#202",
+                        "count": "166"
+                    },
+                    {
+                        "item": "201",
+                        "count": "156"
+                    },
+                    {
+                        "item": "102",
+                        "count": "156"
+                    },
+                    {
+                        "item": "106",
+                        "count": "155"
+                    },
+                    {
+                        "item": "#250",
+                        "count": "154"
+                    },
+                    {
+                        "item": "200",
+                        "count": "151"
+                    },
+                    {
+                        "item": "#3",
+                        "count": "147"
+                    }
+                ],
+                "smallest": "`",
+                "not_null": "12628",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180554,
+            "name": "Applicant Address 3",
+            "dataTypeName": "text",
+            "description": "The city and state of the permit applicant's address.",
+            "fieldName": "applicant_address_3",
+            "position": 51,
+            "renderTypeName": "text",
+            "tableColumnId": 19261975,
+            "width": 328,
+            "cachedContents": {
+                "largest": "YUCAIPA, CA",
+                "non_null": "104252",
+                "null": "47441",
+                "top": [
+                    {
+                        "item": "LOS ANGELES, CA",
+                        "count": "8701"
+                    },
+                    {
+                        "item": "-",
+                        "count": "3482"
+                    },
+                    {
+                        "item": "LA, CA",
+                        "count": "3308"
+                    },
+                    {
+                        "item": "Los Angeles",
+                        "count": "2307"
+                    },
+                    {
+                        "item": "VAN NUYS CA",
+                        "count": "1917"
+                    },
+                    {
+                        "item": "GLENDALE, CA",
+                        "count": "1604"
+                    },
+                    {
+                        "item": "WOODLAND HILLS, CA",
+                        "count": "1369"
+                    },
+                    {
+                        "item": "LOS ANGELES CA",
+                        "count": "1368"
+                    },
+                    {
+                        "item": "LOS ANGELES",
+                        "count": "1318"
+                    },
+                    {
+                        "item": "TARZANA, CA",
+                        "count": "1310"
+                    },
+                    {
+                        "item": "L A",
+                        "count": "1280"
+                    },
+                    {
+                        "item": "VAN NUYS, CA",
+                        "count": "1148"
+                    },
+                    {
+                        "item": ".",
+                        "count": "1125"
+                    },
+                    {
+                        "item": "PORTER RANCH, CA",
+                        "count": "1038"
+                    },
+                    {
+                        "item": "V N",
+                        "count": "1001"
+                    },
+                    {
+                        "item": "CALABASAS, CA",
+                        "count": "996"
+                    },
+                    {
+                        "item": "HUNTINGTON BEACH, CA",
+                        "count": "970"
+                    },
+                    {
+                        "item": "SHERMAN OAKS, CA",
+                        "count": "969"
+                    },
+                    {
+                        "item": "SANTA MONICA, CA",
+                        "count": "938"
+                    },
+                    {
+                        "item": "LA CA",
+                        "count": "923"
+                    }
+                ],
+                "smallest": "=",
+                "not_null": "46446",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180555,
+            "name": "ZONE",
+            "dataTypeName": "text",
+            "description": "The designated zone of the property or lot that determines the allowed use, maximum height, allowable area, required yards, and any other requirements specific to the property or lot.",
+            "fieldName": "zone",
+            "position": 52,
+            "renderTypeName": "text",
+            "tableColumnId": 19261976,
+            "width": 148,
+            "cachedContents": {
+                "largest": "(WC)UPTOWN-SN-RIO",
+                "non_null": "151596",
+                "null": "97",
+                "top": [
+                    {
+                        "item": "R1-1",
+                        "count": "40877"
+                    },
+                    {
+                        "item": "RS-1",
+                        "count": "8811"
+                    },
+                    {
+                        "item": "RA-1",
+                        "count": "6628"
+                    },
+                    {
+                        "item": "R1-1-RIO",
+                        "count": "5939"
+                    },
+                    {
+                        "item": "R2-1",
+                        "count": "5337"
+                    },
+                    {
+                        "item": "RE15-1-H",
+                        "count": "4235"
+                    },
+                    {
+                        "item": "RE11-1",
+                        "count": "4169"
+                    },
+                    {
+                        "item": "R1V2",
+                        "count": "3590"
+                    },
+                    {
+                        "item": "RD1.5-1",
+                        "count": "3450"
+                    },
+                    {
+                        "item": "R3-1",
+                        "count": "3182"
+                    },
+                    {
+                        "item": "R1-1-O",
+                        "count": "2993"
+                    },
+                    {
+                        "item": "RD2-1",
+                        "count": "2231"
+                    },
+                    {
+                        "item": "[T]RE-1",
+                        "count": "1846"
+                    },
+                    {
+                        "item": "R1-1-RFA",
+                        "count": "1711"
+                    },
+                    {
+                        "item": "R1-1-CUGU",
+                        "count": "1434"
+                    },
+                    {
+                        "item": "C2-1VL",
+                        "count": "1417"
+                    },
+                    {
+                        "item": "R1-1-HPOZ",
+                        "count": "1260"
+                    },
+                    {
+                        "item": "C2-1",
+                        "count": "1250"
+                    },
+                    {
+                        "item": "RD1.5-1XL",
+                        "count": "1122"
+                    },
+                    {
+                        "item": "RE9-1",
+                        "count": "960"
+                    }
+                ],
+                "smallest": "A1",
+                "not_null": "63888",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180556,
+            "name": "OCCUPANCY",
+            "dataTypeName": "text",
+            "description": "Occupancy is the approved use for the structure.",
+            "fieldName": "occupancy",
+            "position": 53,
+            "renderTypeName": "text",
+            "tableColumnId": 19261977,
+            "width": 208,
+            "cachedContents": {
+                "largest": "U Occ. Group",
+                "non_null": "25960",
+                "null": "125733",
+                "top": [
+                    {
+                        "item": "Misc. Occ. Group",
+                        "count": "18474"
+                    },
+                    {
+                        "item": "R3 Occ. Group",
+                        "count": "5162"
+                    },
+                    {
+                        "item": "U1 Occ. Group",
+                        "count": "701"
+                    },
+                    {
+                        "item": "U Occ. Group",
+                        "count": "525"
+                    },
+                    {
+                        "item": "B Occ. Group",
+                        "count": "356"
+                    },
+                    {
+                        "item": "R1 Occ. Group",
+                        "count": "231"
+                    },
+                    {
+                        "item": "M Occ. Group",
+                        "count": "122"
+                    },
+                    {
+                        "item": "A3 Occ. Group",
+                        "count": "106"
+                    },
+                    {
+                        "item": "S3 Occ. Group",
+                        "count": "52"
+                    },
+                    {
+                        "item": "S2 Occ. Group",
+                        "count": "38"
+                    },
+                    {
+                        "item": "A2 Occ. Group",
+                        "count": "32"
+                    },
+                    {
+                        "item": "S1 Occ. Group",
+                        "count": "27"
+                    },
+                    {
+                        "item": "U2 Occ. Group",
+                        "count": "18"
+                    },
+                    {
+                        "item": "R2 Occ. Group",
+                        "count": "15"
+                    },
+                    {
+                        "item": "A2.1 Occ. Group",
+                        "count": "14"
+                    },
+                    {
+                        "item": "F1 Occ. Group",
+                        "count": "13"
+                    },
+                    {
+                        "item": "R2.1 Occ. Group",
+                        "count": "11"
+                    },
+                    {
+                        "item": "H4 Occ. Group",
+                        "count": "9"
+                    },
+                    {
+                        "item": "E1 Occ. Group",
+                        "count": "9"
+                    },
+                    {
+                        "item": "E3 Occ. Group",
+                        "count": "6"
+                    }
+                ],
+                "smallest": "A1 Occ. Group",
+                "not_null": "12491",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "left"
+            }
+        },
+        {
+            "id": 221180557,
+            "name": "Floor Area-L.A. Building Code Definition",
+            "dataTypeName": "number",
+            "description": "Floor area as defined in the Los Angeles Building Code.",
+            "fieldName": "floor_area_l_a_building_code_definition",
+            "position": 54,
+            "renderTypeName": "number",
+            "tableColumnId": 19261978,
+            "width": 580,
+            "cachedContents": {
+                "largest": "2154706",
+                "non_null": "151525",
+                "average": "2943.594640258123",
+                "null": "168",
+                "top": [
+                    {
+                        "item": "0",
+                        "count": "49437"
+                    },
+                    {
+                        "item": "400",
+                        "count": "824"
+                    },
+                    {
+                        "item": "1200",
+                        "count": "704"
+                    },
+                    {
+                        "item": "324",
+                        "count": "642"
+                    },
+                    {
+                        "item": "200",
+                        "count": "442"
+                    },
+                    {
+                        "item": "499",
+                        "count": "430"
+                    },
+                    {
+                        "item": "360",
+                        "count": "400"
+                    },
+                    {
+                        "item": "498",
+                        "count": "316"
+                    },
+                    {
+                        "item": "380",
+                        "count": "288"
+                    },
+                    {
+                        "item": "180",
+                        "count": "282"
+                    },
+                    {
+                        "item": "240",
+                        "count": "278"
+                    },
+                    {
+                        "item": "495",
+                        "count": "269"
+                    },
+                    {
+                        "item": "480",
+                        "count": "259"
+                    },
+                    {
+                        "item": "198",
+                        "count": "257"
+                    },
+                    {
+                        "item": "300",
+                        "count": "251"
+                    },
+                    {
+                        "item": "800",
+                        "count": "230"
+                    },
+                    {
+                        "item": "361",
+                        "count": "217"
+                    },
+                    {
+                        "item": "120",
+                        "count": "208"
+                    },
+                    {
+                        "item": "199",
+                        "count": "200"
+                    },
+                    {
+                        "item": "280",
+                        "count": "196"
+                    }
+                ],
+                "smallest": "-826056",
+                "not_null": "63836",
+                "count": "151693",
+                "sum": "167864371.55",
+                "cardinality": "151693"
+            },
+            "format": {
+                "precisionStyle": "standard",
+                "noCommas": "false",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180558,
+            "name": "Census Tract",
+            "dataTypeName": "text",
+            "description": "A geographic area for population-related analysis.",
+            "fieldName": "census_tract",
+            "position": 55,
+            "renderTypeName": "text",
+            "tableColumnId": 19261979,
+            "width": 244,
+            "cachedContents": {
+                "largest": "9800.31",
+                "non_null": "151648",
+                "null": "45",
+                "top": [
+                    {
+                        "item": "1082.02",
+                        "count": "2320"
+                    },
+                    {
+                        "item": "1397.01",
+                        "count": "861"
+                    },
+                    {
+                        "item": "2621.00",
+                        "count": "824"
+                    },
+                    {
+                        "item": "2110.00",
+                        "count": "795"
+                    },
+                    {
+                        "item": "2640.00",
+                        "count": "709"
+                    },
+                    {
+                        "item": "2611.02",
+                        "count": "680"
+                    },
+                    {
+                        "item": "1397.02",
+                        "count": "665"
+                    },
+                    {
+                        "item": "1439.01",
+                        "count": "658"
+                    },
+                    {
+                        "item": "2623.03",
+                        "count": "647"
+                    },
+                    {
+                        "item": "1943.00",
+                        "count": "641"
+                    },
+                    {
+                        "item": "2770.00",
+                        "count": "623"
+                    },
+                    {
+                        "item": "2624.00",
+                        "count": "615"
+                    },
+                    {
+                        "item": "2622.00",
+                        "count": "601"
+                    },
+                    {
+                        "item": "2626.04",
+                        "count": "596"
+                    },
+                    {
+                        "item": "1393.01",
+                        "count": "594"
+                    },
+                    {
+                        "item": "2695.00",
+                        "count": "588"
+                    },
+                    {
+                        "item": "2760.00",
+                        "count": "587"
+                    },
+                    {
+                        "item": "1396.00",
+                        "count": "583"
+                    },
+                    {
+                        "item": "1435.00",
+                        "count": "562"
+                    },
+                    {
+                        "item": "2628.02",
+                        "count": "560"
+                    }
+                ],
+                "smallest": "1011.10",
+                "not_null": "63899",
+                "count": "151693",
+                "cardinality": "151693"
+            },
+            "format": {
+                "displayStyle": "plain",
+                "align": "right"
+            }
+        },
+        {
+            "id": 221180559,
+            "name": "Latitude/Longitude",
+            "dataTypeName": "location",
+            "description": "GPS location point.",
+            "fieldName": "latitude_longitude",
+            "position": 56,
+            "renderTypeName": "location",
+            "tableColumnId": 19298327,
+            "width": 100,
+            "format": {
+                "view": "address_coords",
+                "align": "left"
+            }
+        },
+        {
+            "id": 358755122,
+            "name": "Zip Codes",
+            "dataTypeName": "number",
+            "fieldName": ":@computed_region_qz3q_ghft",
+            "position": 61,
+            "renderTypeName": "number",
+            "tableColumnId": 64639069,
+            "computationStrategy": {
+                "source_columns": [
+                    "latitude_longitude"
+                ],
+                "type": "georegion_match_on_point",
+                "parameters": {
+                    "region": "_qz3q-ghft",
+                    "primary_key": "_feature_id"
+                }
+            },
+            "format": {}
+        },
+        {
+            "id": 358755123,
+            "name": "Census Tracts",
+            "dataTypeName": "number",
+            "fieldName": ":@computed_region_k96s_3jcv",
+            "position": 62,
+            "renderTypeName": "number",
+            "tableColumnId": 64639070,
+            "computationStrategy": {
+                "source_columns": [
+                    "latitude_longitude"
+                ],
+                "type": "georegion_match_on_point",
+                "parameters": {
+                    "region": "_k96s-3jcv",
+                    "primary_key": "_feature_id"
+                }
+            },
+            "format": {}
+        },
+        {
+            "id": 358755124,
+            "name": "Precinct Boundaries",
+            "dataTypeName": "number",
+            "fieldName": ":@computed_region_tatf_ua23",
+            "position": 63,
+            "renderTypeName": "number",
+            "tableColumnId": 64639071,
+            "computationStrategy": {
+                "source_columns": [
+                    "latitude_longitude"
+                ],
+                "type": "georegion_match_on_point",
+                "parameters": {
+                    "region": "_tatf-ua23",
+                    "primary_key": "_feature_id"
+                }
+            },
+            "format": {}
+        },
+        {
+            "id": 358755125,
+            "name": "LA Specific Plans",
+            "dataTypeName": "number",
+            "fieldName": ":@computed_region_ur2y_g4cx",
+            "position": 64,
+            "renderTypeName": "number",
+            "tableColumnId": 64639072,
+            "computationStrategy": {
+                "source_columns": [
+                    "latitude_longitude"
+                ],
+                "type": "georegion_match_on_point",
+                "parameters": {
+                    "region": "_ur2y-g4cx",
+                    "primary_key": "_feature_id"
+                }
+            },
+            "format": {}
+        },
+        {
+            "id": 358755126,
+            "name": "Council Districts",
+            "dataTypeName": "number",
+            "fieldName": ":@computed_region_kqwf_mjcx",
+            "position": 65,
+            "renderTypeName": "number",
+            "tableColumnId": 64639073,
+            "computationStrategy": {
+                "source_columns": [
+                    "latitude_longitude"
+                ],
+                "type": "georegion_match_on_point",
+                "parameters": {
+                    "region": "_kqwf-mjcx",
+                    "primary_key": "_feature_id"
+                }
+            },
+            "format": {}
+        },
+        {
+            "id": 358755127,
+            "name": "Neighborhood Councils (Certified)",
+            "dataTypeName": "number",
+            "fieldName": ":@computed_region_2dna_qi2s",
+            "position": 66,
+            "renderTypeName": "number",
+            "tableColumnId": 64639074,
+            "computationStrategy": {
+                "source_columns": [
+                    "latitude_longitude"
+                ],
+                "type": "georegion_match_on_point",
+                "parameters": {
+                    "region": "_2dna-qi2s",
+                    "primary_key": "_feature_id"
+                }
+            },
+            "format": {}
+        }
+    ],
+    "grants": [
+        {
+            "inherited": false,
+            "type": "viewer",
+            "flags": [
+                "public"
+            ]
+        }
+    ],
+    "license": {
+        "name": "Creative Commons 1.0 Universal (Public Domain Dedication)",
+        "logoUrl": "images/licenses/ccZero.png",
+        "termsLink": "http://creativecommons.org/publicdomain/zero/1.0/legalcode"
+    },
+    "metadata": {
+        "rdfSubject": "0",
+        "rdfClass": "",
+        "custom_fields": {
+            "Committed Update Frequency": {
+                "Refresh rate": "Weekly"
+            },
+            "Location Specified": {
+                "Does this data have a Location column? (Yes or No)": "Yes",
+                "What geographic unit is the data collected?": "Latitude/longitude"
+            },
+            "Data Owner": {
+                "Department": "Building and Safety"
+            }
+        },
+        "rowLabel": "Row",
+        "availableDisplayTypes": [
+            "table",
+            "fatrow",
+            "page"
+        ],
+        "renderTypeConfig": {
+            "visible": {
+                "table": true
+            }
+        }
+    },
+    "owner": {
+        "id": "tdwf-cih6",
+        "displayName": "Building and Safety OpenData",
+        "profileImageUrlLarge": "/api/users/tdwf-cih6/profile_images/LARGE",
+        "profileImageUrlMedium": "/api/users/tdwf-cih6/profile_images/THUMB",
+        "profileImageUrlSmall": "/api/users/tdwf-cih6/profile_images/TINY",
+        "screenName": "Building and Safety OpenData",
+        "type": "interactive",
+        "flags": [
+            "acceptedEula",
+            "mayBeStoriesCoOwner"
+        ]
+    },
+    "query": {},
+    "rights": [
+        "read"
+    ],
+    "tableAuthor": {
+        "id": "tdwf-cih6",
+        "displayName": "Building and Safety OpenData",
+        "profileImageUrlLarge": "/api/users/tdwf-cih6/profile_images/LARGE",
+        "profileImageUrlMedium": "/api/users/tdwf-cih6/profile_images/THUMB",
+        "profileImageUrlSmall": "/api/users/tdwf-cih6/profile_images/TINY",
+        "screenName": "Building and Safety OpenData",
+        "type": "interactive",
+        "flags": [
+            "acceptedEula",
+            "mayBeStoriesCoOwner"
+        ]
+    },
+    "tags": [
+        "ladbs",
+        "department of building and safety",
+        "building and safety",
+        "building",
+        "safety",
+        "construction services",
+        "construction",
+        "permit",
+        "permit number",
+        "permit type",
+        "certificate of occupancy",
+        "occupancy",
+        "cofo number",
+        "cofo",
+        "certificate",
+        "building permit"
+    ],
+    "flags": [
+        "default",
+        "ownerMayBeContacted",
+        "restorable",
+        "restorePossibleForType"
+    ]
+}

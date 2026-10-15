@@ -6,7 +6,7 @@ vi.mock("./polite-fetch", async (original) => {
     politeFetch: vi.fn(async (...args: unknown[]) => new Response(JSON.stringify(await json(...args)))) };
 });
 import { politeJson, politeFetch, PortalBlockedError } from "./polite-fetch";
-import adapter, { DATASETS, OPENDATA_JURISDICTIONS, buildQuery, datasetFor, isoDate, parseRow, responseRows, searchWhere, recentWhere, PAGE_SIZE } from "./opendata";
+import adapter, { DATASETS, OPENDATA_JURISDICTIONS, buildQuery, contactsWhere, datasetFor, isoDate, keyWhere, parseRow, responseRows, searchWhere, recentWhere, PAGE_SIZE } from "./opendata";
 import type { AdapterCtx } from "./types";
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/opendata/${name}.json`, import.meta.url), "utf8"));
 function ctx(jurisdiction = "Austin, TX"): AdapterCtx {
@@ -67,7 +67,17 @@ describe("verified metadata", () => {
     for (const [jurisdiction, d] of Object.entries(DATASETS)) {
       const names = provenance[jurisdiction].fieldNames;
       for (const field of [d.dateField, ...Object.values(d.fields).flat(), ...(d.contractorContacts ?? []).flatMap(c => [c.name, c.type])]) expect(names, `${jurisdiction}: ${field}`).toContain(field);
+      for (const f of d.companyFields ?? []) expect(d.fields[f], `${jurisdiction}: company field ${f}`).toBeTruthy();
+      if (!d.contacts) continue;
+      const c = d.contacts, contacts = provenance[jurisdiction].contacts;
+      expect(contacts.id).toBe(c.id); expect(contacts.metadataUrl).toBe(c.metadataUrl);
+      for (const field of [c.key, c.orderField, ...c.company, ...(c.person ?? []).flat(), ...(c.license ? [c.license] : []), ...(c.role ? [c.role.field] : [])]) {
+        if (field !== ":id") expect(contacts.fieldNames, `${jurisdiction} contacts: ${field}`).toContain(field);
+      }
     }
+  });
+  it("only the verified contacts datasets are configured", () => {
+    expect(Object.keys(DATASETS).filter(j => DATASETS[j].contacts)).toEqual(["Los Angeles, CA", "San Francisco, CA", "Harris County, TX"]);
   });
 });
 describe("native queries", () => {
@@ -89,6 +99,22 @@ describe("native queries", () => {
     expect(where).toContain("upper(contact_1_type) LIKE 'CONTRACTOR%'");
     expect(where).toContain("upper(contact_15_name)");
   });
+  it("company searches include the published permit holder / primary contact where that is the only name", () => {
+    expect(searchWhere(DATASETS["San Diego, CA"],{type:"company",value:"IRONCORE CONSTRUCTION"})).toBe("((upper(APPROVAL_PERMIT_HOLDER) LIKE '%IRONCORE CONSTRUCTION%'))");
+    expect(searchWhere(DATASETS["San Antonio, TX"],{type:"company",value:"Lennar Homes"})).toBe(`((upper("PRIMARY CONTACT") LIKE '%LENNAR HOMES%'))`);
+    expect(()=>searchWhere(DATASETS["Fort Worth, TX"],{type:"company",value:"ACME"})).toThrow(/not published/);
+  });
+  it("builds contacts-dataset predicates with role filters and permit keys", () => {
+    expect(contactsWhere(DATASETS["San Francisco, CA"],{type:"company",value:"O'Driscoll"})).toBe("(upper(role) IN ('CONTRACTOR')) AND (upper(firm_name) LIKE '%O''DRISCOLL%')");
+    expect(contactsWhere(DATASETS["San Francisco, CA"],{type:"name",value:"Andrew Byrne"})).toContain("upper(coalesce(first_name, '') || ' ' || coalesce(last_name, '')) LIKE '%ANDREW BYRNE%'");
+    expect(contactsWhere(DATASETS["Los Angeles, CA"],{type:"company",value:"Pool Icons"})).toBe("(upper(contractors_business_name) LIKE '%POOL ICONS%')");
+    expect(contactsWhere(DATASETS["Harris County, TX"],{type:"name",value:"Lennar"})).toBe("(upper(DBANAME) LIKE '%LENNAR%')");
+    expect(()=>contactsWhere(DATASETS["San Francisco, CA"],{type:"company",value:"%"})).toThrow(/wildcards/);
+    expect(()=>contactsWhere(DATASETS["San Francisco, CA"],{type:"address",value:"1 Main"})).toThrow();
+    expect(keyWhere(DATASETS["Los Angeles, CA"],["23047-10000-01366","x'y"])).toBe("permit_nbr IN ('23047-10000-01366', 'x''y')");
+    expect(keyWhere(DATASETS["Harris County, TX"],["2610070060"])).toBe("(PERMITNUMBER LIKE '2610070060-%')");
+    expect(()=>keyWhere(DATASETS["Harris County, TX"],["26_1"])).toThrow(/metacharacters/);
+  });
   it("queries split ArcGIS addresses without unsupported SQL concatenation", () => {
     const where=searchWhere(DATASETS["Las Vegas, NV"],{type:"address",value:"10101 BANBURRY CROSS DR"});
     expect(where).toContain("STNO = 10101"); expect(where).not.toContain("CAST");
@@ -100,7 +126,7 @@ describe("native queries", () => {
     expect(()=>recentWhere(d,"2026-02-31")).toThrow();
     expect(()=>searchWhere(d,{type:"address",value:" "})).toThrow();
     expect(()=>searchWhere(d,{type:"address",value:"%"})).toThrow();
-    expect(()=>searchWhere(DATASETS["Los Angeles, CA"],{type:"company",value:"ACME"})).toThrow(/not published/);
+    expect(()=>searchWhere(DATASETS["Los Angeles County, CA"],{type:"company",value:"ACME"})).toThrow(/not published/);
   });
   it("uses exact jurisdiction plus authorized URL, including shared-host tenant paths", () => {
     expect(datasetFor(ctx())).toBe(DATASETS["Austin, TX"]);
@@ -112,6 +138,49 @@ describe("native queries", () => {
     expect(OPENDATA_JURISDICTIONS).toEqual(Object.keys(DATASETS));
     expect(adapter.platform).toBe("Open data"); expect(adapter.aliases??[]).toEqual([]);
     expect(adapter.capabilities.listRecent).toBe(true);
+  });
+});
+describe("contacts-dataset searches (recorded responses)", () => {
+  it("San Francisco: contractor contacts, then permits by number", async () => {
+    vi.mocked(politeJson).mockResolvedValueOnce(fixture("San_Francisco__CA_contacts").filter((r: { role: string }) => r.role === "contractor"))
+      .mockResolvedValueOnce(fixture("San_Francisco__CA_contact_permits"));
+    const records = await adapter.search(ctx("San Francisco, CA"), {type:"company",value:"Terence Mcmahon"});
+    expect(records).toHaveLength(1);
+    expect(records[0].permitNumber).toBe("202610139351");
+    expect(records[0].contractorName).toBe("Terence Mcmahon Construction");
+    expect(records[0].contractorLicense).toBe("797580");
+    const [contactsUrl, permitsUrl] = vi.mocked(politeJson).mock.calls.map(c => new URL(c[0] as string));
+    expect(contactsUrl.pathname).toBe("/resource/3pee-9qhc.json");
+    expect(contactsUrl.searchParams.get("$where")).toContain("upper(role) IN ('CONTRACTOR')");
+    expect(permitsUrl.pathname).toBe("/resource/i98e-djp9.json");
+    expect(permitsUrl.searchParams.get("$where")).toContain("permit_number IN ('202610139351')");
+  });
+  it("Los Angeles: certificate-of-occupancy contractor, then the permit", async () => {
+    vi.mocked(politeJson).mockResolvedValueOnce(fixture("Los_Angeles__CA_contacts")).mockResolvedValueOnce(fixture("Los_Angeles__CA_contact_permits"));
+    const [record] = await adapter.search(ctx("Los Angeles, CA"), {type:"company",value:"POOL ICONS"});
+    expect(record.permitNumber).toBe("23047-10000-01366");
+    expect(record.address).toBe("5945 N HILLVIEW PARK AVE");
+    expect(record.contractorName).toBe("POOL ICONS INC");
+    expect(record.contractorLicense).toBe("479446");
+  });
+  it("Harris County: project applicant company, then every permit of the project", async () => {
+    vi.mocked(politeJson).mockResolvedValueOnce(fixture("Harris_County__TX_contacts")).mockResolvedValueOnce(fixture("Harris_County__TX_contact_permits"));
+    const records = await adapter.search(ctx("Harris County, TX"), {type:"company",value:"Lennar Homes"});
+    expect(records.map(r => r.permitNumber)).toEqual(["2610070060-RESB-001", "2610070060-RSW-001", "2610070060-RDW-001"]);
+    expect(records.every(r => r.applicantName === "Lennar Homes" && r.contractorName === null)).toBe(true);
+  });
+  it("returns [] without a permit query when no contact matches", async () => {
+    vi.mocked(politeJson).mockResolvedValueOnce([]);
+    expect(await adapter.search(ctx("San Francisco, CA"), {type:"company",value:"NO SUCH FIRM"})).toEqual([]);
+    expect(vi.mocked(politeJson)).toHaveBeenCalledTimes(1);
+  });
+  it("keeps address searches on the main dataset only", async () => {
+    vi.mocked(politeJson).mockResolvedValueOnce(fixture("San_Francisco__CA_contact_permits"));
+    expect(await adapter.search(ctx("San Francisco, CA"), {type:"address",value:"1 Main"})).toHaveLength(1);
+    expect(new URL(vi.mocked(politeJson).mock.calls[0][0] as string).pathname).toBe("/resource/i98e-djp9.json");
+  });
+  it("accepts the publisher's former San Francisco domain as an alias", () => {
+    expect(datasetFor({...ctx("San Francisco, CA"),searchUrl:"https://data.sfgov.org/resource/i98e-djp9.json"})).toBe(DATASETS["San Francisco, CA"]);
   });
 });
 describe("failure and pagination semantics", () => {

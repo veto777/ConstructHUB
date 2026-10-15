@@ -110,3 +110,12 @@ Address matching follows the vendor's substring location search, not geocoding o
 Recorded fixtures include entire HTML/JSON responses; only CSRF tokens are redacted. capture-manifest.json contains exact URLs/status/timestamps for the three end-to-end captures. Parkville's additional Main response is the first 25 parcel rows, with page=1/pages=5. It is a parcel fixture, not permit data. Capture reruns confirmed Parkville=2, Jefferson County=0, South Portland=3.
 
 Validation: `npx vitest run --configLoader runner server/scrapers/citizenserve.test.ts server/scrapers/civicgov.test.ts` — 27 tests passed across 2 files, entirely offline. `npx tsc --noEmit -p .` passed. The default Vitest config bundler fails with EROFS writing `node_modules/.vite-temp`; runner mode avoids that shared read-only directory. No app/server/database was started. No login, CAPTCHA submission, write form, proxy, or browser was used. All adapter traffic uses politeFetch, its honest ConstructHUB User-Agent, and a minimum delay of max(1000 ms, ctx.politeness.minDelayMs).
+
+## Name/company search check — 2026-10-14
+
+Rechecked live on Parkville, MO (anonymous, ≤1 request/s):
+- The public records page `index.php?r=publicRecordsSearch/index` has a single input labelled "Search by Location or Parcel Number". Its only routes are `publicRecordsSearch/search`, `publicRecordsSearch/parcelDetails` and `publicRecordsSearch/getPermits`.
+- Sending real applicant names from Parkville's own records, "KC Custom Signs" and "Sergio cervantes", through `publicRecordsSearch/search` returned 0 parcels. "405 Main" returned the two permits that list those applicants.
+- Applicant names do appear in permit rows (already parsed as `applicantName`), but only after a location or parcel search.
+
+No public name, company or contractor search exists, so none was added. The adapter remains address-only.
