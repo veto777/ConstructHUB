@@ -17,6 +17,7 @@ import { stripe as appStripe, stripeConfigured } from "./client";
 import { describeSubscription, agencyLocationsPriceSpec, resolvePriceId } from "./prices";
 import { LIVE_STATUSES, billingSchemaReady, withBillingLock, legacyAgencyBilling } from "./sync";
 import { recordFailure } from "../ops/issues";
+import { workerInterval } from "../workers";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FIRST_RUN_DELAY_MS = 5 * 60 * 1000;
@@ -140,6 +141,5 @@ export function startAgencyLocationSync(): void {
     catch (e: any) { console.error("[billing] Agency location sync failed:", e?.message || e); void recordFailure("job", "Agency location billing sync", e); }
     finally { running = false; }
   };
-  setTimeout(run, FIRST_RUN_DELAY_MS).unref();
-  setInterval(run, DAY_MS).unref();
+  workerInterval("Agency location billing sync", run, DAY_MS, { firstAfterMs: FIRST_RUN_DELAY_MS });
 }

@@ -78,8 +78,9 @@ function LandingDoorTab() {
     <CardHeader><CardTitle>Landing door</CardTitle></CardHeader>
     <CardContent className="space-y-3">
       {hits.error&&<p role="alert">{apiErrorMessage(hits.error)}</p>}
-      {hits.isLoading?<p>Loading…</p>:<div className="overflow-x-auto border rounded"><table className={appTable.table}>
-        <thead><tr className="border-b text-left">{columns.map(c=><th key={c} className="p-3">{c}</th>)}</tr></thead>
+      {/* Ten columns: on a phone the table scrolls inside its frame instead of squeezing every heading to one letter per line. */}
+      {hits.isLoading?<p>Loading…</p>:<div className="overflow-x-auto border rounded"><table className={appTable.table + " min-w-[760px]"}>
+        <thead><tr className="border-b text-left">{columns.map(c=><th key={c} className="p-3 whitespace-nowrap">{c}</th>)}</tr></thead>
         <tbody>{(hits.data?.items||[]).map((hit:any)=><tr key={hit.id} className="border-b">
           {[new Date(hit.at).toLocaleString(),hit.door,hit.action,hit.reason,hit.ip,hit.country,hit.campaign_key,hit.device,hit.network].map((value,i)=><td key={i} className="p-3">{value||'—'}</td>)}
           <td className="p-3">{hit.session_id?<Button variant="outline" size="sm" onClick={()=>setReplay(hit.session_id)}>Replay</Button>:'No recording'}</td>

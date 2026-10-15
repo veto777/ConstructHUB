@@ -16,7 +16,8 @@ import { EMAIL_RE, customerErrorMessage, duplicateMatches, type DuplicateMatch }
 import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ChevronRight, Download, Upload } from "lucide-react";
 import { SegmentedTabs, TabCount } from "@/components/tool";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable, crmTableCards } from "@/components/crm-ui";
-import { SampleClientsTable } from "@/components/crm-sample-previews";
+import { lazySample } from "@/components/sample-preview";
+const SampleClientsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleClientsTable");
 
 interface Client {
   id: string;

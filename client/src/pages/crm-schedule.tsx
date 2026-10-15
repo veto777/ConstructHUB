@@ -17,7 +17,8 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone,
 } from "@/components/crm-ui";
-import { SampleScheduleList } from "@/components/crm-sample-previews";
+import { lazySample } from "@/components/sample-preview";
+const SampleScheduleList = lazySample(() => import("@/components/crm-sample-previews"), "SampleScheduleList");
 import { cn } from "@/lib/utils";
 
 type View = "month" | "week" | "agenda";

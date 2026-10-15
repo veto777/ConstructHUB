@@ -99,7 +99,7 @@ export default function AgencyPage(){
   const otherWorkspaces=me?.workspaces?.filter((w:any)=>w.user_id!==me.actor)??[];
   const switcher=<div className="flex flex-wrap gap-3 items-center text-sm"><label>Workspace <select className={selectClass} aria-label="Workspace" value={me?.owner||''} onChange={async e=>{await run('/workspace',{owner:Number(e.target.value)},'POST','Workspace opened.');queryClient.clear();window.location.reload();}}><option value={me?.actor}>My workspace</option>{otherWorkspaces.map((w:any)=><option value={w.user_id} key={w.user_id}>{w.name}</option>)}</select></label><span className="g-text-2">Your role here: <b className="font-medium g-text">{me?.role}</b></span></div>;
   // Without the plan: say so, and still let a team member open an agency workspace they belong to.
-  if(me&&!entitled&&!teamEntitled)return <GoogleSurface page><AppPage><PageHeader title="Team" description="Manage the people on your platform team."/>
+  if(me&&!entitled&&!teamEntitled)return <GoogleSurface page><AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11"><PageHeader title="Team" description="Manage the people on your platform team."/>
     {otherWorkspaces.length>0&&<section className="space-y-2" aria-label="Workspaces you belong to"><p>You're a member of {otherWorkspaces.length===1?'an agency workspace':'agency workspaces'}. Open one to work on its clients.</p>{switcher}</section>}
     {message&&<p ref={messageRef} role={failed?'alert':'status'} className={failed?'text-destructive':undefined}>{message}</p>}
     <p>Team management is included with Team and above. <a className="text-primary underline" href="/pricing">Compare plans</a>.</p>
@@ -142,7 +142,7 @@ export default function AgencyPage(){
     meta={[ACTION_LABELS[j.action]??j.action,j.client_name||'Unassigned',`Queued ${relativeTime(j.created_at)}`,j.finished_at?`Finished ${relativeTime(j.finished_at)}`:j.status==='queued'&&j.attempts>0?`Retry ${j.attempts} pending`:null]}
     line={j.error?<span role="alert" className={j.status==='failed'?'g-closed':undefined}>{j.error}</span>:undefined}
     actions={sample?undefined:<GooglePill size="sm" icon={MapPin} label="Open location" href={`/locations?location=${j.location_id}`}/>}/>;
-  return <GoogleSurface page><AppPage><PageHeader title={head[0]} description={head[1]} helpKey={helpKey} actions={tab==='locations'?<Button asChild><a href="/locations?import=gbp">Add location</a></Button>:undefined}/>
+  return <GoogleSurface page><AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11"><PageHeader title={head[0]} description={head[1]} helpKey={helpKey} actions={tab==='locations'?<Button asChild><a href="/locations?import=gbp">Add location</a></Button>:undefined}/>
     {switcher}
     {!inShell&&<Tabs value={tab} onValueChange={t=>{setTabParam(t==='locations'?null:t);setOffset(0);say('');}}><AppTabsList>{tabs.map(t=><TabsTrigger key={t} value={t}>{t[0].toUpperCase()+t.slice(1)}</TabsTrigger>)}</AppTabsList></Tabs>}
     {message&&<p ref={messageRef} role={failed?'alert':'status'} className={failed?'text-destructive':undefined} data-testid="agency-message">{message}</p>}

@@ -45,6 +45,7 @@ import { researchTransport, type ResearchTransport } from "../scrapers/research-
 import type { IdQuery } from "./identifiers";
 import { previewCompanyRecords, searchCompanyRecords, searchEnforcement } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
+import { registerWorker, workerInterval } from "../workers";
 
 const MAX_PERMITS_PER_SUBJECT = 1000;
 const POLL_MS = 5_000;
@@ -529,26 +530,28 @@ async function noteResearchFacts(): Promise<void> {
  * RESEARCH_BULK say. Small page-range batches, no table copy; a database without the table only gets it created.
  */
 export function startLegacyKeyPurge(delayMs = 60_000): void {
-  setTimeout(() => void purgeLegacyKeys(ALL_BULK_SOURCES).then((r) => { if (r) console.log(`[research-bulk] legacy key purge: ${JSON.stringify(r)}`); })
-    .catch((err) => console.error("[research-bulk] legacy key purge:", err)), delayMs).unref?.();
+  const t = setTimeout(() => void purgeLegacyKeys(ALL_BULK_SOURCES).then((r) => { if (r) console.log(`[research-bulk] legacy key purge: ${JSON.stringify(r)}`); })
+    .catch((err) => console.error("[research-bulk] legacy key purge:", err)), delayMs);
+  t.unref?.();
+  registerWorker("research legacy key purge", () => clearTimeout(t));
 }
 
 export function startResearchWorker(): void {
   startLegacyKeyPurge();
-  setTimeout(() => void noteResearchFacts().catch(() => undefined), 30_000).unref?.();
-  setInterval(() => void noteResearchFacts().catch(() => undefined), 30 * 60_000).unref?.();
+  workerInterval("research facts", () => noteResearchFacts().catch(() => undefined), 30 * 60_000, { firstAfterMs: 30_000 });
   if (process.env.RESEARCH_WORKER === "off") return;
-  setTimeout(() => {
+  const boot = setTimeout(() => {
     requeueInterrupted()
       .then((n) => { if (n) console.log(`[research] re-queued ${n} interrupted order(s)`); })
       .then(() => drainResearchQueue())
       .catch((err) => console.error("[research] worker start failed:", err));
-  }, 20_000).unref?.();
-  setInterval(() => { void drainResearchQueue().catch((err) => console.error("[research] queue:", err)); }, 5 * 60_000).unref?.();
+  }, 20_000);
+  boot.unref?.();
+  registerWorker("research queue boot", () => clearTimeout(boot));
+  workerInterval("research queue", () => drainResearchQueue().catch((err) => console.error("[research] queue:", err)), 5 * 60_000);
   // The state bulk files (hundreds of MB a day): production only, unless a dev server asks with RESEARCH_BULK=on.
   if (process.env.RESEARCH_BULK === "on" || (process.env.NODE_ENV === "production" && process.env.RESEARCH_BULK !== "off")) {
-    const refresh = () => void refreshDueSources(ALL_BULK_SOURCES).catch((err) => console.error("[research-bulk] refresh:", err));
-    setTimeout(refresh, 3 * 60_000).unref?.();
-    setInterval(refresh, 60 * 60_000).unref?.();
+    const refresh = () => refreshDueSources(ALL_BULK_SOURCES).catch((err) => console.error("[research-bulk] refresh:", err));
+    workerInterval("research bulk refresh", refresh, 60 * 60_000, { firstAfterMs: 3 * 60_000 });
   }
 }

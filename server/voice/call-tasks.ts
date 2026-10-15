@@ -30,6 +30,7 @@ import { loadOrgVoiceContext, findVoiceNumber } from "./org-profile";
 import { deliverLead, deliverLeadNotification } from "./leads";
 import { raiseEscalation, isEscalationKind, kindLabel } from "./escalations";
 import { recordFailure } from "../ops/issues";
+import { workerInterval } from "../workers";
 
 export type CallTaskKind = "lead" | "escalation" | "notification";
 export type CallTaskState = "pending" | "done" | "failed";
@@ -331,9 +332,7 @@ export function startVoiceCallTaskWorker(): boolean {
       void recordFailure("job", "Call Assistant delivery worker", e);
     } finally { running = false; }
   };
-  worker = setInterval(run, TASK_WORKER_EVERY_MS);
-  worker.unref();
-  setTimeout(run, 20_000).unref();
+  worker = workerInterval("Call Assistant delivery worker", run, TASK_WORKER_EVERY_MS, { firstAfterMs: 20_000 }).timer;
   console.log("[voice] call delivery worker on (every 60 s)");
   return true;
 }

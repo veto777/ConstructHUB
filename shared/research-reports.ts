@@ -102,6 +102,8 @@ export const researchOrderSchema = z.object({
   /** Only permits on or after this year are kept (rows without a date are kept and marked). */
   sinceYear: z.number().int().min(1980).max(2100).nullable().default(null),
   purpose: text("Purpose", 1000).optional().default(""),
+  /** "Anything else we should know": saved with the order and shown to the team; it changes neither the price nor the search (orders before 2026-10-15 have none). */
+  notes: text("Notes", 500).transform((v) => v.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "")).optional().default(""),
   agreeNonRefundable: z.literal(true, { errorMap: () => ({ message: "Please accept that the report is non-refundable" }) }),
   agreeNoGuarantee: z.literal(true, { errorMap: () => ({ message: "Please accept that results are not guaranteed" }) }),
   agreeNotFcra: z.literal(true, { errorMap: () => ({ message: "Please confirm you won't use the report for an FCRA purpose" }) }),

@@ -201,7 +201,7 @@ export default function YelpPage() {
   const showSample = (status.data && !available) || (available && !businesses.isLoading && list.length === 0);
   return (
     <GoogleSurface page>
-      <AppPage testId="page-yelp">
+      <AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-yelp">
         <GoogleSectionHeader
           as="h1"
           title="Yelp"

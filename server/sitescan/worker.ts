@@ -18,6 +18,7 @@ import { safeFetch } from "./http";
 import { enrichFindings, fixesFor, reconcileFixes } from "./guidance";
 import { robotsRules } from "./robots";
 import { recordFailure } from "../ops/issues";
+import { workerInterval } from "../workers";
 export async function profileFor(user: number, id?: number) {
   const {
     rows: [p],
@@ -536,7 +537,7 @@ export async function runSchedules() {
 export function startSiteScanWorker() {
   if (process.env.SITESCAN_WORKER_DISABLED === "true") return;
   let busy = false;
-  const timer = setInterval(async () => {
+  return workerInterval("Site Scan worker", async () => {
     if (busy) return;
     busy = true;
     try {
@@ -548,7 +549,5 @@ export function startSiteScanWorker() {
     } finally {
       busy = false;
     }
-  }, 5000);
-  timer.unref();
-  return timer;
+  }, 5000).timer;
 }

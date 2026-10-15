@@ -25,6 +25,7 @@ import { gradeSource, readSite } from "./vet";
 import { findContacts } from "./contacts";
 import { expandSource } from "./expand";
 import { composePitch, outreachConfig, pickEmail, PITCHED_KINDS, sendApproved } from "./outreach";
+import { workerInterval } from "../workers";
 
 const num = (v: string | undefined, d: number) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : d; };
 export const workerConfig = (env: NodeJS.ProcessEnv = process.env) => ({
@@ -234,6 +235,5 @@ export async function runPass(): Promise<void> {
 let timer: NodeJS.Timeout | null = null;
 export function startBacklinkWorker(env: NodeJS.ProcessEnv = process.env) {
   if (!workerConfig(env).enabled || timer) return;
-  timer = setInterval(() => void runPass(), 60_000);
-  timer.unref();
+  timer = workerInterval("Backlinks worker", () => runPass(), 60_000).timer;
 }

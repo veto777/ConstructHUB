@@ -198,7 +198,7 @@ export function VpnSitePanel({ d, selected, onPick }: { d: VpnDomain; selected?:
           <Link href={`/ip-tracker?site=${d.id}`} className="tool-btn" data-testid={`link-vpn-ip-tracker-${d.id}`}>IP Tracker</Link>
         </div>
       </div>
-      <MetricStrip cols={[3, 3, 3]}>
+      <MetricStrip cols={[2, 3, 3]} className="[&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
         <StatCell label="Detections" value={(d.vpnStats?.totalBlocks ?? 0).toLocaleString()} note="All time, any action" testId={`metric-vpn-detections-${d.id}`} href={vpnHref("flagged", d.id)} onClick={onPick} ariaLabel={`Detections: ${d.vpnStats?.totalBlocks ?? 0} — open ${title}'s flagged visits`} />
         <StatCell label="Unique VPN IPs" value={(d.vpnStats?.uniqueVpnIps ?? 0).toLocaleString()} note="Distinct addresses" testId={`metric-vpn-unique-${d.id}`} href={vpnHref("flagged", d.id)} onClick={onPick} ariaLabel={`Unique VPN IPs: ${d.vpnStats?.uniqueVpnIps ?? 0} — open ${title}'s flagged visits`} />
         <StatCell label="Mode" value={MODE_WORDS[mode] ?? mode} note={saved ? "Saved in Settings" : "Nothing saved yet: Log only applies"} testId={`metric-vpn-mode-${d.id}`} href={vpnHref("settings", d.id)} onClick={onPick} ariaLabel={`Mode: ${MODE_WORDS[mode] ?? mode} — open ${title}'s settings`} />

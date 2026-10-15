@@ -63,7 +63,7 @@ export function LookupBox({ status, sites, onSite }: { status: SeoStatus | undef
         </label>
         <div className="flex flex-wrap gap-2">
           <Button type="submit" disabled={!text.trim()} data-testid="button-seo-lookup"><Search className="mr-1 h-4 w-4" aria-hidden /> Look it up</Button>
-          <button type="button" className="g-pill min-h-[44px]" disabled={!text.trim() || adder.pending} onClick={addSite} data-testid="button-seo-lookup-add">{adder.pending ? <Loader2 className="animate-spin" /> : <Plus />} Add to my sites</button>
+          <button type="button" className="g-pill min-h-[44px]" disabled={!text.trim() || adder.pending} aria-busy={adder.pending || undefined} onClick={addSite} data-testid="button-seo-lookup-add">{adder.pending ? <Loader2 className="animate-spin" /> : <Plus />} Add to my sites</button>
         </div>
       </form>
       {domain && domain !== text.trim() && <p className="mt-1 text-[12px]" data-testid="text-seo-lookup-cleaned">Read as <b className="g-text font-medium">{domain}</b>.</p>}

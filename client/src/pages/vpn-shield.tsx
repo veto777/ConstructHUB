@@ -26,7 +26,8 @@ import { VPN_SHIELD_VIEWS } from "@/components/traffic-tool/nav";
 import { countryName } from "@/components/ip-tracker/country-names";
 import { ALL_TIME, RangePicker, StepsCard, inRange, rangeBounds, type DateRange } from "@/components/traffic-tool/shared";
 import { DetectionsChart, FlaggedVisitRow, TopLists, VpnSitePanel, VpnSummaryStrip, sparklineDays, type VpnDomain, type VpnStats, type VpnVisit } from "@/components/traffic-tool/vpn-views";
-import { VpnSample } from "@/components/traffic-tool/samples";
+import { lazySample } from "@/components/sample-preview";
+const VpnSample = lazySample(() => import("@/components/traffic-tool/samples"), "VpnSample");
 import { Copy, Clock, Search, Code2 } from "lucide-react";
 
 /** Each section: its label, its line in the full-screen tool, and the help entry its "i" opens (shared/help/registry.ts). */

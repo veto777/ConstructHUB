@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 import pg from "pg";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import { randomUUID } from "node:crypto";
-const env = parseEnv(readFileSync(".env", "utf8"));
-const url = process.env.DATABASE_URL || env.DATABASE_URL;
+// Lane-aware: a worktree lane has no .env — DATABASE_URL / SESSION_SECRET come from the environment.
+const env = { ...(existsSync(".env") ? parseEnv(readFileSync(".env", "utf8")) : {}), ...process.env } as Record<string, string | undefined>;
+const url = (process.env.DATABASE_URL || env.DATABASE_URL)!;
 if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(url).pathname)) throw new Error("Wrong review test database");
 const pool = new pg.Pool({ connectionString: url });
 const tokens: string[] = [];

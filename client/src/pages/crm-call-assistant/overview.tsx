@@ -16,7 +16,9 @@ import { CallAssistantPausedBanner } from "./paused-banner";
 import { CallResults, type ResultsPick } from "./results";
 import { GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { fmtWhen, outcomeLabel, outcomeTone } from "./calls-shared";
-import { SampleCallsPreview, SampleNumbersPreview } from "./samples";
+import { lazySample } from "@/components/sample-preview";
+const SampleCallsPreview = lazySample(() => import("./samples"), "SampleCallsPreview");
+const SampleNumbersPreview = lazySample(() => import("./samples"), "SampleNumbersPreview");
 
 type NumberRow = { id?: string | number; phoneNumber?: string; label?: string | null; location?: string | null; status?: string; isTest?: boolean };
 type CallRow = { id: string | number; startedAt?: string; from?: string; fromNumber?: string; outcome?: string; summary?: string | null; durationSeconds?: number };

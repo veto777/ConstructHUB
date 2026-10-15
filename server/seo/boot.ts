@@ -8,7 +8,6 @@
  */
 import type { Express } from "express";
 import { recordFailure } from "../ops/issues";
-import { onShutdown } from "../shutdown";
 import { ensureSeoSchema, type SeoSchemaOutcome } from "./schema";
 
 export const SEO_UNAVAILABLE_MESSAGE = "The SEO tools are not available on this server right now. The team has been told; nothing was charged.";
@@ -28,7 +27,8 @@ export function seoUnavailableHandler(_req: unknown, res: { status: (n: number) 
 export async function bootSeoModule(app: Express, auth: (req: any, res: any) => any, deps: {
   ensureSchema?: () => Promise<SeoSchemaOutcome>;
   registerRoutes?: (app: Express, auth: (req: any, res: any) => any) => void;
-  startWorker?: () => NodeJS.Timeout | undefined;
+  /** Starts the SEO worker (server/seo/jobs.ts); it registers itself for shutdown in server/workers.ts. */
+  startWorker?: () => unknown;
   log?: (line: string) => void;
 } = {}): Promise<boolean> {
   const log = deps.log ?? ((line: string) => console.log(line));
@@ -49,7 +49,6 @@ export async function bootSeoModule(app: Express, auth: (req: any, res: any) => 
   const registerRoutes = deps.registerRoutes ?? (await import("./routes")).registerSeoRoutes;
   registerRoutes(app, auth);
   const startWorker = deps.startWorker ?? (await import("./jobs")).startSeoWorker;
-  const timer = startWorker();
-  if (timer) onShutdown("seo worker", () => clearInterval(timer));
+  startWorker();
   return true;
 }

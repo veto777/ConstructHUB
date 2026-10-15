@@ -728,7 +728,7 @@ export default function RankingGridPage() {
   }
 
   return (
-    <GoogleSurface page><AppPage className="before:hidden [&_button]:min-h-10">
+    <GoogleSurface page><AppPage className="before:hidden [&_button]:min-h-10 max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11">
       <PageHeader title={<span data-testid="text-page-title">GMB ranking grid</span>} description="See where your business ranks on Google Maps across your service area." actions={            <Button
               className="w-full"
               disabled={!selectedBusiness || !keyword.trim() || !gridSizeValid || !gridDistanceValid || startScanMutation.isPending}
@@ -900,12 +900,12 @@ export default function RankingGridPage() {
             </Section>
             <SamplePreview what="what a finished scan looks like in your history" testId="sample-scan">
               <Section flush>
-                <div className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3 min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 p-4">
+                  <div className="flex flex-1 items-center gap-3 min-w-0">
                     <Target className="h-5 w-5 text-emerald-500 shrink-0" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap"><p className="font-semibold text-sm truncate">Sample Roofing Co.</p><Badge variant="secondary" className="text-xs shrink-0">roofing contractor</Badge></div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5"><span>5×5 grid</span><span>·</span><span>1 mi spacing</span><span>·</span><span className="flex items-center gap-0.5"><TrendingUp className="h-3 w-3" />Avg rank: 4.6</span><span>·</span><Badge variant="default" className="text-[10px] px-1 py-0">72% Ranked</Badge></div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-0.5"><span className="whitespace-nowrap">5×5 grid</span><span>·</span><span className="whitespace-nowrap">1 mi spacing</span><span>·</span><span className="flex items-center gap-0.5 whitespace-nowrap"><TrendingUp className="h-3 w-3" />Avg rank: 4.6</span><span>·</span><Badge variant="default" className="text-[10px] px-1 py-0">72% Ranked</Badge></div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0"><Badge variant="default">completed</Badge><Button variant="outline" size="sm" className="h-7 text-xs gap-1 hidden sm:flex"><FileText className="h-3 w-3" />Report</Button><ChevronDown className="h-4 w-4" /></div>
@@ -1134,7 +1134,7 @@ function ReportView({ scanId, onBack }: { scanId: number; onBack: () => void }) 
   }
 
   return (
-    <GoogleSurface page><AppPage className="before:hidden [&_button]:min-h-10"><ScanReport scan={data.scan} results={data.results} onBack={onBack} /></AppPage></GoogleSurface>
+    <GoogleSurface page><AppPage className="before:hidden [&_button]:min-h-10 max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11"><ScanReport scan={data.scan} results={data.results} onBack={onBack} /></AppPage></GoogleSurface>
   );
 }
 

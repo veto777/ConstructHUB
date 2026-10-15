@@ -8,7 +8,7 @@ import { grantStatus } from '../gbp/grants';
 import { takeBudget, rateLimit } from '../growth-limits';
 import { logActivity } from '../account-events';
 import { guardRecentAuthOk } from '../gbp/guard-routes';
-import { accessFor, agencyPlan, agencyPlanRequired, clientAccess, dashboard, filters, listLocations, locationAccess, locationFilter, locationJoin, missing, positiveId, requireAdmin, requireAllClients, requireOwner, requireWrite, workspaceEntitled, teamEntitled, teamPlanRequired, type AgencyAccess } from './access';
+import { accessFor, agencyPlan, agencyPlanRequired, clientAccess, dashboard, filters, forbidden, listLocations, locationAccess, locationFilter, locationJoin, missing, positiveId, requireAdmin, requireAllClients, requireOwner, requireWrite, workspaceEntitled, teamEntitled, teamPlanRequired, type AgencyAccess } from './access';
 import { getEntitlements, inUse, plural, raiseHint, sendLimitReached } from '../entitlements';
 import { PLANS } from '@shared/plans';
 import { bulkInput, queueBulk } from './jobs';
@@ -40,9 +40,10 @@ const agencyFieldMessages:Record<string,string>={
   clientIds:'Client IDs must be numbers from your client list.',
   clientId:'Choose a client.',
   subject:'Choose a connected agency Google account. If none is listed, connect the agency Google account first.',
-  businessName:'Enter the exact business name on Google (up to 300 characters).',
-  address:'Address must be 500 characters or fewer.',
-  placeId:'Place ID must be 300 characters or fewer.',
+  businessName:'Enter the exact business name on Google (one line, up to 300 characters).',
+  address:'Address must be one line, 500 characters or fewer.',
+  placeId:'Place ID must be one line, 300 characters or fewer.',
+  destinations:'Choose up to 20 social destinations.',
   owner:'Choose a workspace.',
 };
 export function agencyInputMessage(e:z.ZodError):string {
@@ -51,7 +52,11 @@ export function agencyInputMessage(e:z.ZodError):string {
   if(issue.code==='custom'&&issue.message&&issue.message!=='Invalid input')return issue.message;
   return agencyFieldMessages[String(issue.path[0]??'')]??'Invalid input';
 }
+/** LIKE/ILIKE pattern for a search box: the typed text is matched literally (no `%`/`_` wildcards). */
+const like=(q:string)=>`%${q.replace(/[\\%_]/g,'\\$&')}%`;
 export const csvCell=(value:unknown)=>'"'+String(value??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')+'"';
+/** PUT /team answers 400 for an address with no account; this many such misses a day per workspace, then 429. */
+export const TEAM_DAILY_MISSES=20;
 export function registerAgencyRoutes(app:Express) {
   // Client-workspace routes need Agency access; team routes need platform team seats.
   // /me and /workspace let members find and open a team without a plan of their own.
@@ -90,7 +95,7 @@ export function registerAgencyRoutes(app:Express) {
   // Clients tab list: agency_clients of the workspace owner (?q name/email/folder/tags,
   // member client scoping, 50/page). agency.tsx.
   route('get','/clients',async(req,res,a)=>{
-    const f=filters.parse(req.query),q=`%${f.q.replace(/[\\%_]/g,'\\$&')}%`;
+    const f=filters.parse(req.query),q=like(f.q);
     const where=`c.user_id=$1 AND ($2::boolean OR EXISTS(SELECT 1 FROM agency_member_clients m WHERE m.user_id=c.user_id AND m.client_id=c.id AND m.member_id=$3)) AND concat_ws(' ',c.name,c.contact_email,c.folder,array_to_string(c.tags,' ')) ILIKE $4`;
     const p=[a.owner,a.allClients,a.actor,q];
     // Each client carries its own numbers for the card: locations assigned to it and onboarding requests still
@@ -133,10 +138,12 @@ export function registerAgencyRoutes(app:Express) {
     finally{c.release();}
     res.status(201).json(created);
   });
-  // Client form update: UPDATE agency_clients (write role + client access required).
+  // Client form update: UPDATE agency_clients (write role + client access required). The contact email is where the
+  // onboarding steps are mailed, so changing it takes the owner or an admin; a manager keeps name, notes, tags and folder.
   // agency.tsx Clients tab "Save client".
   route('put','/clients/:id',async(req,res,a)=>{
-    requireWrite(a);const id=positiveId.parse(req.params.id);await clientAccess(a,id);const b=clientInput.parse(req.body);
+    requireWrite(a);const id=positiveId.parse(req.params.id);const current=await clientAccess(a,id);const b=clientInput.parse(req.body);
+    if((b.contactEmail??null)!==(current.contact_email??null)&&!['owner','admin'].includes(a.role))throw forbidden('Only the workspace owner or an admin can change a client\'s contact email; the onboarding steps are emailed to it.');
     await pool.query('UPDATE agency_clients SET name=$3,contact_email=$4,notes=$5,tags=$6,folder=$7 WHERE user_id=$1 AND id=$2',[a.owner,id,b.name,b.contactEmail,b.notes,b.tags,b.folder]);res.json({ok:true});
   });
   // Team tab list (admin+): agency_members joined with users, each with its
@@ -144,9 +151,11 @@ export function registerAgencyRoutes(app:Express) {
   route('get','/team',async(req,res,a)=>{
     requireAdmin(a);const f=filters.parse(req.query);
     // Each member row names its clients (not only their ids) for the Team cards; the seat count is the plan's
-    // (owner + members + extra seats), the same figure PUT /team refuses on.
+    // (owner + members + extra seats), the same figure PUT /team refuses on. A scoped admin sees only the clients
+    // they can see on /clients in those arrays (the same visibility clause), never the whole customer list.
+    const visible='EXISTS(SELECT 1 FROM agency_member_clients v WHERE v.user_id=mc.user_id AND v.client_id=mc.client_id AND v.member_id=$5)';
     const [{rows},seats]=await Promise.all([
-      pool.query(`SELECT m.member_id,m.role,m.all_clients,u.email,u.display_name,ARRAY(SELECT client_id FROM agency_member_clients mc WHERE mc.user_id=m.user_id AND mc.member_id=m.member_id ORDER BY client_id) client_ids,ARRAY(SELECT c.name FROM agency_member_clients mc JOIN agency_clients c ON c.user_id=mc.user_id AND c.id=mc.client_id WHERE mc.user_id=m.user_id AND mc.member_id=m.member_id ORDER BY c.id) client_names,count(*) OVER()::int total FROM agency_members m JOIN users u ON u.id=m.member_id WHERE m.user_id=$1 AND u.email ILIKE $2 ORDER BY m.member_id LIMIT 50 OFFSET $3`,[a.owner,`%${f.q}%`,f.offset]),
+      pool.query(`SELECT m.member_id,m.role,m.all_clients,u.email,u.display_name,ARRAY(SELECT client_id FROM agency_member_clients mc WHERE mc.user_id=m.user_id AND mc.member_id=m.member_id AND ($4::boolean OR ${visible}) ORDER BY client_id) client_ids,ARRAY(SELECT c.name FROM agency_member_clients mc JOIN agency_clients c ON c.user_id=mc.user_id AND c.id=mc.client_id WHERE mc.user_id=m.user_id AND mc.member_id=m.member_id AND ($4::boolean OR ${visible}) ORDER BY c.id) client_names,count(*) OVER()::int total FROM agency_members m JOIN users u ON u.id=m.member_id WHERE m.user_id=$1 AND u.email ILIKE $2 ORDER BY m.member_id LIMIT 50 OFFSET $3`,[a.owner,like(f.q),f.offset,a.allClients,a.actor]),
       getOwnerSeatUsage(a.owner,{product:'platform'}),
     ]);
     res.json({items:rows,total:rows[0]?.total??0,seats:{used:seats.used,limit:seats.limit}});
@@ -161,7 +170,11 @@ export function registerAgencyRoutes(app:Express) {
       if(b.clientIds.length)return void agencyPlanRequired(res);
       b.allClients=true;
     }
-    const {rows:[u]}=await pool.query('SELECT id FROM users WHERE lower(email)=lower($1)',[b.email]);if(!u||u.id===a.owner)throw new GoogleError('invalid','Choose another registered ConstructHUB user',400);
+    const {rows:[u]}=await pool.query('SELECT id FROM users WHERE lower(email)=lower($1)',[b.email]);
+    // An unknown address answers 400, which says the address has no account: a day's worth of misses is enough for
+    // typos, not for walking an address list through the form.
+    if(!u&&!await takeBudget(`agency-team-miss:${a.owner}`,TEAM_DAILY_MISSES,1,86400000))throw new GoogleError('quota','Too many unrecognised email addresses today. Check the address with the person and try again tomorrow.',429);
+    if(!u||u.id===a.owner)throw new GoogleError('invalid','Choose another registered ConstructHUB user',400);
     const {rows:[n]}=await pool.query('SELECT count(*)::int n FROM agency_clients WHERE user_id=$1 AND id=ANY($2::int[])',[a.owner,[...new Set(b.clientIds)]]);
     if(n.n!==new Set(b.clientIds).size)throw missing();
     await pool.query('INSERT INTO agency_workspaces(user_id) VALUES($1) ON CONFLICT DO NOTHING',[a.owner]);
@@ -220,7 +233,7 @@ export function registerAgencyRoutes(app:Express) {
   });
   route('put','/clients/:id/social-destinations',async(req,res,a)=>{
     requireOwner(a);const id=positiveId.parse(req.params.id);await clientAccess(a,id);
-    const destinations=z.array(destinationSchema).max(20).parse(req.body.destinations);
+    const {destinations}=z.object({destinations:z.array(destinationSchema).max(20)}).strict().parse(req.body);
     await validateDestinations(a.owner,destinations);
     await pool.query('INSERT INTO agency_social_destinations(user_id,client_id,destinations) VALUES($1,$2,$3) ON CONFLICT(user_id,client_id) DO UPDATE SET destinations=$3',[a.owner,id,JSON.stringify(destinations)]);res.json({ok:true});
   });
@@ -264,17 +277,21 @@ export function registerAgencyRoutes(app:Express) {
   route('get','/onboarding',async(req,res,a)=>{
     const f=filters.parse(req.query);
     const where=`r.user_id=$1 AND ($2::boolean OR EXISTS(SELECT 1 FROM agency_member_clients m WHERE m.user_id=r.user_id AND m.member_id=$3 AND m.client_id=r.client_id)) AND ($4::int IS NULL OR r.client_id=$4) AND r.business_name ILIKE $5`;
-    const p=[a.owner,a.allClients,a.actor,f.clientId??null,`%${f.q}%`];
+    const p=[a.owner,a.allClients,a.actor,f.clientId??null,like(f.q)];
     // `counts`: every matching request by stage (not just this page) — waiting on the client (sent/opened), moving
     // on Google's side (invitation received/accepted), linked, expired.
     const [{rows},{rows:[counts]}]=await Promise.all([
-      pool.query(`SELECT r.*,c.name client_name,count(*) OVER()::int total FROM agency_onboarding r JOIN agency_clients c ON c.id=r.client_id AND c.user_id=r.user_id WHERE ${where} ORDER BY r.created_at DESC LIMIT 50 OFFSET $6`,[...p,f.offset]),
+      // Named columns: the token (hash and ciphertext), the agency Google account's subject and the Google invitation
+      // name never leave the server; the instructions link and the agency email go to roles that can send requests.
+      pool.query(`SELECT r.id,r.client_id,r.contact_email,r.agency_email,r.business_name,r.address,r.place_id,r.status,r.sent_at,r.opened_at,r.accepted_at,r.location_id,r.expires_at,r.reminder_at,r.reminders,r.error,r.created_at,r.token_enc,c.name client_name,count(*) OVER()::int total FROM agency_onboarding r JOIN agency_clients c ON c.id=r.client_id AND c.user_id=r.user_id WHERE ${where} ORDER BY r.created_at DESC LIMIT 50 OFFSET $6`,[...p,f.offset]),
       pool.query(`SELECT count(*) FILTER(WHERE r.status IN ('sent','opened'))::int waiting,count(*) FILTER(WHERE r.status IN ('invitation received','accepted'))::int accepting,count(*) FILTER(WHERE r.status='linked')::int linked,count(*) FILTER(WHERE r.status='expired')::int expired,count(*) FILTER(WHERE r.error IS NOT NULL)::int with_error FROM agency_onboarding r JOIN agency_clients c ON c.id=r.client_id AND c.user_id=r.user_id WHERE ${where}`,p),
     ]);
     // A row whose token cannot be decrypted any more (the token key changed) keeps the list up: its link is null and
-    // the page says to send a new request, instead of one row answering 500 for the whole list.
-    const link=(r:any)=>{try{return onboardingLink(r);}catch{return null;}};
-    res.json({items:rows.map(({token_hash,token_enc,total,...r})=>({...r,link:link({...r,token_enc})})),total:rows[0]?.total??0,counts:{waiting:counts.waiting,accepting:counts.accepting,linked:counts.linked,expired:counts.expired,withError:counts.with_error}});
+    // the page says to send a new request, instead of one row answering 500 for the whole list. A viewer can follow
+    // each request's progress but holds no live link (it is a capability: opening it marks the request opened).
+    const canSend=a.role!=='viewer';
+    const link=(r:any)=>{if(!canSend)return null;try{return onboardingLink(r);}catch{return null;}};
+    res.json({items:rows.map(({token_enc,total,...r})=>({...r,agency_email:canSend?r.agency_email:null,link:link({...r,token_enc})})),total:rows[0]?.total??0,counts:{waiting:counts.waiting,accepting:counts.accepting,linked:counts.linked,expired:counts.expired,withError:counts.with_error}});
   });
   // "Send reminder" on one onboarding request: rate-limited 1/day; nudges reminder_at so
   // the worker resends on its next tick. agency.tsx Onboarding tab.

@@ -18,7 +18,8 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle, statusTone,
 } from "@/components/crm-ui";
-import { SamplePaymentsList } from "@/components/crm-sample-previews";
+import { lazySample } from "@/components/sample-preview";
+const SamplePaymentsList = lazySample(() => import("@/components/crm-sample-previews"), "SamplePaymentsList");
 import { TakePaymentDialog } from "@/components/crm-take-payment";
 
 const money = (c?: number | null) =>

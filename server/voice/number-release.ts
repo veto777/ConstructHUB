@@ -72,6 +72,8 @@ import { mergeAddonRequest } from "../billing/order";
 // webhook that imports this module does not pull in the voice routes.
 import type { NumbersMock } from "./numbers";
 import { recordFailure } from "../ops/issues";
+import { maskPhoneNumber, scrubText } from "../ops/scrub";
+import { workerInterval } from "../workers";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
 
@@ -239,12 +241,12 @@ export async function scheduleOrgReleases(org: { id: string; name?: string }, de
     c.release();
   }
   for (const n of notices) {
-    console.log(`[voice-numbers] org ${org.id}: ${n.phone} scheduled for release (${decision.reason}), eligible ${n.at.toISOString()}`);
+    console.log(`[voice-numbers] org ${org.id}: ${maskPhoneNumber(n.phone)} scheduled for release (${decision.reason}), eligible ${n.at.toISOString()}`);
     recordActivity({ orgId: org.id, actorLabel: "ConstructHUB billing", action: "call.number_release_scheduled", entityType: "voice_number", meta: { phone: n.phone, reason: decision.reason, releaseAt: n.at.toISOString() } });
     await notifyOwners(org.id, n.title, n.body);
   }
   for (const phone of out.restored) {
-    console.log(`[voice-numbers] org ${org.id}: ${phone} kept (the subscription pays for it again)`);
+    console.log(`[voice-numbers] org ${org.id}: ${maskPhoneNumber(phone)} kept (the subscription pays for it again)`);
     recordActivity({ orgId: org.id, actorLabel: "ConstructHUB billing", action: "call.number_release_cancelled", entityType: "voice_number", meta: { phone } });
   }
   return out;
@@ -344,7 +346,7 @@ export async function releaseDueCallNumbers(opts: ReleaseDeps & { orgIds?: strin
         await c.query("UPDATE voice_numbers SET last_error = $2, updated_at = $3 WHERE id = $1", [row.id, `Release failed, will retry: ${msg}`, now]);
         await c.query("COMMIT");
         out.failed.push({ phone: row.phone_number, error: msg });
-        console.error(`[voice-numbers] release of ${row.phone_number} (org ${row.org_id}) failed, will retry: ${msg}`);
+        console.error(`[voice-numbers] release of number ${row.id} (${maskPhoneNumber(row.phone_number)}, org ${row.org_id}) failed, will retry: ${scrubText(msg, 300)}`);
         void recordFailure("job", "Call number release", e, { orgId: row.org_id, numberId: row.id }, "warning");
       }
     } catch (e) {
@@ -355,7 +357,7 @@ export async function releaseDueCallNumbers(opts: ReleaseDeps & { orgIds?: strin
     }
     if (notice) {
       const why = releaseReasonText(notice.reason);
-      console.log(`[voice-numbers] org ${notice.orgId}: released ${notice.phone} on the carrier (${notice.reason})`);
+      console.log(`[voice-numbers] org ${notice.orgId}: released ${maskPhoneNumber(notice.phone)} on the carrier (${notice.reason})`);
       recordActivity({ orgId: notice.orgId, actorLabel: "ConstructHUB billing", action: "call.number_released", entityType: "voice_number", meta: { phone: notice.phone, reason: notice.reason } });
       await notifyOwners(notice.orgId,
         `Your Call Assistant number ${notice.phone} was released because ${why}`,
@@ -465,7 +467,6 @@ export function startVoiceNumberReleaseWorker(): boolean {
       void recordFailure("job", "Call number sweep", e);
     } finally { running = false; }
   };
-  setTimeout(run, SWEEP_FIRST_DELAY_MS).unref();
-  setInterval(run, SWEEP_EVERY_MS).unref();
+  workerInterval("Call number sweep", run, SWEEP_EVERY_MS, { firstAfterMs: SWEEP_FIRST_DELAY_MS });
   return true;
 }

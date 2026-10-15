@@ -16,7 +16,8 @@ import {
 } from "@/components/crm-ui";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { InfoTip } from "@/components/info-tip";
-import { SampleDocsTable } from "@/components/crm-sample-previews";
+import { lazySample } from "@/components/sample-preview";
+const SampleDocsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleDocsTable");
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";

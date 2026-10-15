@@ -94,7 +94,7 @@ export default function LocationsPage() {
   },[gbpParam]);
   if(locationParam&&selectedLocation)return <GoogleSurface page><LocationDetail location={selectedLocation} onBack={()=>showLocation(null)} onDeleted={()=>{showLocation(null);queryClient.removeQueries({queryKey:["/api/locations",locationParam],exact:true});refreshLocationLists();}} isPremiumPlus={true}/></GoogleSurface>;
   // Google look (owner, 2026-10-06): the whole page sits on a GoogleSurface; the list is a local pack.
-  return <GoogleSurface page><AppPage className="before:hidden">
+  return <GoogleSurface page><AppPage className="before:hidden max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11">
     <PageHeader title={<span data-testid="text-locations-title">Business Profile Locations</span>} description="Manage your locations and their connection to Google." actions={<Button data-testid="button-add-location" onClick={()=>setAddDialogOpen(true)}>Add location</Button>}/>
     <Dialog open={addDialogOpen} onOpenChange={o=>{setAddDialogOpen(o);if(!o&&importParam)setImportParam(null);}}>
       <DialogContent><DialogHeader><DialogTitle>Add location</DialogTitle></DialogHeader><AddLocationDialog initialTab={importParam==="gbp"?"gbp":undefined} onCreated={()=>{setAddDialogOpen(false);setImportParam(null);refreshLocationLists();}}/></DialogContent>
@@ -418,7 +418,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
   const logo = location.logoUrl || profilePhoto?.thumbnail_url || profilePhoto?.google_url || null;
 
   return (
-    <AppPage className="before:hidden">
+    <AppPage className="before:hidden max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11">
         <Button variant="ghost" onClick={onBack} data-testid="button-back-to-list"><ArrowLeft className="mr-2 h-4 w-4"/>All locations</Button>
         <PageHeader title={<span data-testid="text-detail-name">{location.businessName}</span>} description={fullAddress(location)||'Manage this Google Business Profile.'} image={logo} helpKey={helpKey} actions={<LogoButton location={location} />}/>
         <div className="flex flex-col md:flex-row gap-6">
@@ -542,8 +542,8 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
               <table className="w-full text-sm">
                 <thead className={appTableCards.thead}><tr><th className="p-2 text-left">Date</th>{SAMPLE_PERF_METRICS.map((m) => <th className="p-2 whitespace-nowrap" key={m}>{PERF_LABELS[m]}</th>)}</tr></thead>
                 <tbody>
-                  <tr className={`${appTableCards.tr} border-b font-semibold bg-muted/40`}><td className={`${appTableCards.td} !text-foreground`}>Total</td>{SAMPLE_PERF_METRICS.map((m) => <td className={`${appTableCards.td} !text-foreground`} key={m}>{SAMPLE_PERF_ROWS.reduce((n, r) => n + r.values[m], 0).toLocaleString()}</td>)}</tr>
-                  {SAMPLE_PERF_ROWS.map((r) => <tr key={r.date} className={`${appTableCards.tr} border-b`}><td className={`${appTableCards.td} !text-foreground`}>{r.date}</td>{SAMPLE_PERF_METRICS.map((m) => <td className={`${appTableCards.td} !text-foreground`} key={m}>{r.values[m].toLocaleString()}</td>)}</tr>)}
+                  <tr className={`${appTableCards.tr} border-b font-semibold bg-muted/40`}><td className={`${appTableCards.td} !text-foreground`}>Total</td>{SAMPLE_PERF_METRICS.map((m) => <td className={`${appTableCards.td} !text-foreground`} key={m}><span className="sm:hidden text-muted-foreground mr-2">{PERF_LABELS[m]}:</span>{SAMPLE_PERF_ROWS.reduce((n, r) => n + r.values[m], 0).toLocaleString()}</td>)}</tr>
+                  {SAMPLE_PERF_ROWS.map((r) => <tr key={r.date} className={`${appTableCards.tr} border-b`}><td className={`${appTableCards.td} !text-foreground`}>{r.date}</td>{SAMPLE_PERF_METRICS.map((m) => <td className={`${appTableCards.td} !text-foreground`} key={m}><span className="sm:hidden text-muted-foreground mr-2">{PERF_LABELS[m]}:</span>{r.values[m].toLocaleString()}</td>)}</tr>)}
                 </tbody>
               </table>
             </div>
@@ -1318,15 +1318,15 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <div className="flex items-center gap-1">
             <h3 className="text-base font-semibold">Citation Campaigns</h3>
             <InfoTip k="citations" />
           </div>
           <p className="text-xs text-muted-foreground max-w-xl">A citation is a listing of your business on another site — Yelp, BBB, Angi, Apple Maps, Bing and about 25 more. Google trusts a business more when the same name, address and phone show up on all of them, and that moves you up in Maps. A campaign is a checklist of those sites for this location. Run the audit and ConstructHUB reads each site and records what it actually found; mark the rest by hand or import a spreadsheet; then fix anything wrong on the site itself. Press the ⓘ for the full walkthrough.</p>
         </div>
-        <Button size="sm" onClick={() => setShowNewCampaign(true)} data-testid="button-new-campaign">
+        <Button size="sm" className="self-start max-sm:min-h-11 sm:self-auto" onClick={() => setShowNewCampaign(true)} data-testid="button-new-campaign">
           <Plus className="w-4 h-4 mr-1" /> New Campaign
         </Button>
       </div>

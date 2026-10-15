@@ -50,6 +50,9 @@ export async function ensureGbpSchema() {
       created_at timestamptz NOT NULL DEFAULT now());
     CREATE INDEX IF NOT EXISTS gbp_review_events_location ON gbp_review_events(location_id, created_at DESC);
     CREATE UNIQUE INDEX IF NOT EXISTS gbp_review_identity ON google_profile_reviews(user_id, google_review_id) WHERE google_review_id LIKE 'accounts/%/locations/%/reviews/%';
+    -- Agency "unanswered" status filter + dashboard count (server/agency/access.ts statusSql.unanswered):
+    -- EXISTS per location; the identity index above cannot serve it (DB review w3-r8, 2026-10-15).
+    CREATE INDEX IF NOT EXISTS google_profile_reviews_unanswered_idx ON google_profile_reviews(location_id, user_id) WHERE NOT google_deleted AND reply_comment IS NULL;
     UPDATE google_profile_reviews SET reply_draft=COALESCE(reply_draft,reply_comment),reply_comment=NULL,reply_date=NULL WHERE reply_status='draft' AND reply_comment IS NOT NULL;
     CREATE TABLE IF NOT EXISTS gbp_sync_status (
       location_id integer REFERENCES business_locations(id) ON DELETE CASCADE,

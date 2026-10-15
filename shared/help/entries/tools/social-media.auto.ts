@@ -4,10 +4,10 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "social-media.auto", parent: "social-media", group: "Tools", route: "/social-media", title: "Social Media → Auto mode",
   whatItIs: "ConstructHUB writing posts for the business on a schedule, as drafts for your approval or straight to your accounts.",
-  whatItDoes: "Turns auto mode on or off and sets the publishing mode: an approval queue, where every generated post waits as a draft, or fully automatic, which publishes to the saved destinations without review. You set how many posts per day or week (1 to 7), the content mix (project photos, tips, review highlights, offers, recent Google updates), instructions and writing examples, a timezone, blackout hours, and a daily budget of 0 to 20 AI requests. Content sources hold offers you type and Google updates synced from the linked listing; auto mode draws on them for 30 days.",
+  whatItDoes: "It turns auto mode on or off and sets the publishing mode: an approval queue, where every generated post waits as a draft, or fully automatic, which publishes to the saved destinations without review. You set how many posts per day or week (1 to 7), the content mix (project photos, tips, review highlights, offers, recent Google updates), instructions and writing examples, a timezone, blackout hours, and a daily budget of 0 to 20 AI requests. Content sources hold offers you type and Google updates synced from the linked listing; auto mode draws on them for 30 days.",
   howToUse: [
     "Open Auto mode for the business and tick Enable auto mode.",
-    "Choose the publishing mode. Approval queue is the safe choice: generated posts wait under Posts \u2192 Drafts.",
+    "Choose the publishing mode; Approval queue is the safe choice, where generated posts wait under Posts → Drafts.",
     "Set the saved destinations with Use accounts selected in Compose, the posts per period, the content mix and your instructions.",
     "Set the timezone and blackout hours, then choose Save auto settings.",
     "Add an offer under Content sources or choose Sync recent GBP updates, and use Generate draft from saved settings to try it.",

@@ -43,10 +43,12 @@ export function maskEmailAddress(email: string): string {
   return `${email[0]}***${email.slice(at)}`;
 }
 
-function maskPhoneDigits(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
+/** A phone number as the journal may print it: its last two digits only. */
+export function maskPhoneNumber(raw: string): string {
+  const digits = String(raw ?? "").replace(/\D/g, "");
   return `[phone …${digits.slice(-2)}]`;
 }
+const maskPhoneDigits = maskPhoneNumber;
 
 /**
  * Patterns applied to every string, in order. Secrets first (a token can
@@ -57,8 +59,14 @@ const STRING_RULES: Array<[RegExp, string | ((m: string, ...g: string[]) => stri
   [/\b(Bearer|Basic|Token)\s+[A-Za-z0-9._~+/=-]{8,}/gi, (_m, scheme: string) => `${scheme} ${REDACTED}`],
   // Credentials inside URLs: scheme://user:pass@host → scheme://[redacted]@host
   [/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, (_m, scheme: string) => `${scheme}${REDACTED}@`],
+  // Secret-named JSON members inside a string ("password":"hunter2", also the
+  // \"escaped\" form a provider echoes back): the key stays, the value goes.
+  [/(\\?"(?:password|passwd|passphrase|pass|secret|token|api[_-]?key|apikey|authorization|client[_-]?secret|refresh[_-]?token|access[_-]?token|id[_-]?token|cookie|otp|private[_-]?key|signature)\\?"\s*:\s*)(?:\\"[^"\\]*\\"|"(?:[^"\\]|\\.)*"|[^,}\]\s]+)/gi, (_m, k: string) => `${k}"${REDACTED}"`],
   // Secret-looking query / form parameters.
   [/([?&;](?:access_token|refresh_token|id_token|token|key|api_key|apikey|secret|password|pass|sig|signature|code|state|auth|session|client_secret)=)[^&#\s"']+/gi, (_m, k: string) => `${k}${REDACTED}`],
+  // The same at the start of a form body (no leading ? or &), and after a space for the unambiguous names.
+  [/(^(?:access_token|refresh_token|id_token|token|key|api_key|apikey|secret|password|pass|sig|signature|code|state|auth|session|client_secret)=)[^&#\s"']+/i, (_m, k: string) => `${k}${REDACTED}`],
+  [/(\s(?:access_token|refresh_token|id_token|token|api_key|apikey|secret|password|passwd|pass|client_secret|authorization|otp)=)[^&#\s"']+/gi, (_m, k: string) => `${k}${REDACTED}`],
   // Known key formats.
   [/\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{8,}\b/g, REDACTED],
   [/\bwhsec_[A-Za-z0-9]{8,}\b/g, REDACTED],

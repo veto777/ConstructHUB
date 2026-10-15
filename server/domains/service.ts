@@ -20,6 +20,7 @@ import { websiteHealth, type Health } from "./health";
 import { getEntitlements } from "../entitlements";
 import { MODULE_NAMES, PLANS, planForModule } from "@shared/plans";
 import { recordFailure } from "../ops/issues";
+import { workerInterval } from "../workers";
 /** Queued domain work and daily monitoring run only while the owner's plan includes the module. */
 export const domainsAllowed = async (user: number) =>
   (await getEntitlements(user)).modules.domainsMailAlerts;
@@ -725,7 +726,7 @@ export async function scheduleMonitors(onlyUser?: number) {
 export function startDomainWorker() {
   if (process.env.DOMAINS_WORKER_ENABLED !== "true") return;
   let busy = false;
-  const timer = setInterval(async () => {
+  workerInterval("Domains worker", async () => {
     if (busy) return;
     busy = true;
     try {
@@ -738,5 +739,4 @@ export function startDomainWorker() {
       busy = false;
     }
   }, 1000);
-  timer.unref();
 }

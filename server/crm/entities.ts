@@ -849,7 +849,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         .where(and(eq(crmCustomers.orgId, orgId), eq(crmCustomers.id, c.id)));
     });
 
-    console.log(`[crm] owner ${ctx.member.id} deleted customer ${c.id} (${c.displayName}) in org ${orgId}` +
+    console.log(`[crm] owner ${ctx.member.id} deleted customer ${c.id} in org ${orgId}` +
       (force ? ` — force tree: ${estimates} estimates, ${invoices} invoices, ${projects} projects, ${appointments} visits` : ""));
     logActivity(ctx, "customer.deleted", {
       entityType: "customer", entityId: c.id, customerId: c.id,

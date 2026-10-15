@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 import pg from "pg";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import { createHmac, randomUUID } from "node:crypto";
-const env = parseEnv(readFileSync(".env", "utf8"));
-const databaseUrl = process.env.DATABASE_URL || env.DATABASE_URL;
+// Lane-aware: a worktree lane has no .env — DATABASE_URL / SESSION_SECRET come from the environment.
+const env = { ...(existsSync(".env") ? parseEnv(readFileSync(".env", "utf8")) : {}), ...process.env } as Record<string, string | undefined>;
+const databaseUrl = (process.env.DATABASE_URL || env.DATABASE_URL)!;
 if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(new URL(databaseUrl).pathname)) throw new Error("Wrong growth test database");
 const pool = new pg.Pool({ connectionString: databaseUrl });
 let userId: number, cookie: string, sid: string;
@@ -15,7 +16,7 @@ test.beforeAll(async () => {
   userId = user.id; sid = randomUUID();
   await pool.query("insert into subscriptions(user_id,plan,status) values($1,'gold','active')", [userId]);
   await pool.query("insert into session(sid,sess,expire) values($1,$2,now()+interval '1 hour')", [sid, JSON.stringify({ cookie: { maxAge: 3600000 }, passport: { user: userId } })]);
-  const sig = createHmac("sha256", env.SESSION_SECRET).update(sid).digest("base64").replace(/=+$/, "");
+  const sig = createHmac("sha256", env.SESSION_SECRET!).update(sid).digest("base64").replace(/=+$/, "");
   cookie = encodeURIComponent(`s:${sid}.${sig}`);
   const { rows: [q] } = await pool.query("insert into search_queries(user_id,search_type,search_value) values($1,'address','Owned browser fixture') returning id", [userId]); queryId=q.id;
 });

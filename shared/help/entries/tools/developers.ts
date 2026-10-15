@@ -3,7 +3,7 @@ import type { HelpDraft } from "../../types";
 /** Written from client/src/pages/developers.tsx and the OpenAPI document the server publishes at /api/v1/openapi.json. */
 const entry: HelpDraft = {
   key: "developers", group: "Tools", route: "/developers", title: "Developers (API reference)",
-  whatItIs: "The public reference for the ConstructHUB API: how to authenticate, what each call costs, and every endpoint with its parameters, schemas, examples and a curl line.",
+  whatItIs: "The public reference for the ConstructHUB API (the way software talks to ConstructHUB): how to sign requests, what each call costs, and every call with its parameters, schemas, examples and a curl line.",
   whatItDoes: "Authentication explains the bearer header and the two key types. Limits and units lists what a read and a write cost and each plan’s monthly units. Endpoints is generated from /api/v1/openapi.json: one card per resource, a search over method, path and summary, and for every operation its scope, cost, parameters, request and response schemas, an example body and response built from the schemas, and a curl command. A banner says what the API does not do: it never reaches the AI features.",
   howToUse: [
     "Create a key in Settings → API keys (Manage API keys at the top of the page goes there).",

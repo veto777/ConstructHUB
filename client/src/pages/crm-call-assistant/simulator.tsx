@@ -18,7 +18,8 @@ import {
 } from "@/lib/voice-studio";
 import { PROFILE_KEY } from "./studio/api";
 import { CallAssistantPlanRequired } from "./index";
-import { SampleConversationPreview } from "./samples";
+import { lazySample } from "@/components/sample-preview";
+const SampleConversationPreview = lazySample(() => import("./samples"), "SampleConversationPreview");
 
 type Message = { role: "caller" | "assistant" | "system"; text: string; decision?: SimulatorTurn };
 

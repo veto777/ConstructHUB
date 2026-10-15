@@ -11,6 +11,7 @@ import { locationCount } from '../entitlements';
 import { agencyPlanPaused, clientAccess, locationLimitRefusal, positiveId, requireWrite, workspaceEntitled, type AgencyAccess } from './access';
 import { refreshDiscovery, queueSync } from './jobs';
 import { recordFailure } from '../ops/issues';
+import { workerInterval } from "../workers";
 export const googleHelp='https://support.google.com/business/answer/3403100';
 export const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
 const normalize=(s:unknown)=>String(s||'').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu,'');
@@ -19,7 +20,16 @@ export function matchesRequest(r:any,t:any) {
   if(r.place_id&&t.placeId) return r.place_id===t.placeId;
   return !!normalize(r.address)&&normalize(r.business_name)===normalize(t.locationName)&&normalize(r.address)===normalize(t.address);
 }
-export const onboardingInput=z.object({clientId:positiveId,subject:z.string().min(1).max(255),businessName:z.string().trim().min(1).max(300),address:z.string().trim().max(500).optional(),placeId:z.string().trim().max(300).optional()}).strict().refine(v=>!!v.address||!!v.placeId,'Provide an address or Place ID');
+/** One line, no control characters: the business name and address are spliced into the email's subject and body. */
+export const oneLine=/^[^\u0000-\u001f\u007f]*$/;
+export const onboardingInput=z.object({clientId:positiveId,subject:z.string().min(1).max(255),businessName:z.string().trim().min(1).max(300).regex(oneLine),address:z.string().trim().max(500).regex(oneLine).optional(),placeId:z.string().trim().max(300).regex(oneLine).optional()}).strict().refine(v=>!!v.address||!!v.placeId,'Provide an address or Place ID');
+/** Emails a member causes (a new request, then every reminder the worker or "Send reminder" sends for it) count
+ * against that member's own daily budget, on top of the workspace's 100/day. The owner keeps the workspace budget alone. */
+export const MEMBER_DAILY_SENDS=20;
+export async function memberSendAllowed(owner:number,actor:number|null|undefined) {
+  if(!actor||actor===owner)return true;
+  return takeBudget(`agency-invite:${owner}:${actor}`,MEMBER_DAILY_SENDS,1,86400000);
+}
 export function instructions(email:string,business:string) {
   return `To give your agency manager access to ${business}:\n1. Sign in to Google with the account that owns this Business Profile.\n2. Open your Business Profile, then More → Business Profile settings → People and access.\n3. Select Add, paste this exact email: ${email}\n4. Choose Manager, then Invite. Keep ownership of your profile.\nConstructHUB will detect the matching invitation, accept it for the agency, and link the listing. You do not need to connect Google to ConstructHUB.\nGoogle's instructions: ${googleHelp}`;
 }
@@ -31,10 +41,11 @@ export async function createOnboarding(a:AgencyAccess,raw:unknown) {
   if(!client.contact_email) throw new GoogleError('invalid','Add the client contact email first',400);
   const {rows:[g]}=await pool.query('SELECT email FROM gbp_grants WHERE user_id=$1 AND google_subject=$2 AND NOT reconnect_required AND $3=ANY(scopes)',[a.owner,b.subject,GBP_SCOPE]);
   if(!g)throw new GoogleError('invalid','Connect the agency Google account first',409);
+  if(!await memberSendAllowed(a.owner,a.actor))throw new GoogleError('quota',`Your daily onboarding email limit is reached (${MEMBER_DAILY_SENDS} a day per member)`,429);
   if(!await takeBudget(`agency-invite:${a.owner}`,100,1,86400000))throw new GoogleError('quota','Daily onboarding email limit reached',429);
   const token=randomBytes(32).toString('hex'),id=randomUUID();
-  await pool.query(`INSERT INTO agency_onboarding(id,user_id,client_id,subject,agency_email,contact_email,business_name,address,place_id,token_hash,token_enc)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[id,a.owner,b.clientId,b.subject,g.email,client.contact_email,b.businessName,b.address??null,b.placeId??null,hash(token),encryptToken(token)]);
+  await pool.query(`INSERT INTO agency_onboarding(id,user_id,client_id,subject,agency_email,contact_email,business_name,address,place_id,token_hash,token_enc,actor_id)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,[id,a.owner,b.clientId,b.subject,g.email,client.contact_email,b.businessName,b.address??null,b.placeId??null,hash(token),encryptToken(token),a.actor]);
   await logActivity(null,a.owner,'agency.onboarding_created',{actorId:a.actor,requestId:id,clientId:b.clientId});
   return {id,queued:true};
 }
@@ -120,6 +131,9 @@ export async function runOnboardingWorker(make=clientFor,send=sendWithFallback,o
     const entitled=new Map<number,Promise<boolean>>(),allowed=(owner:number)=>{if(!entitled.has(owner))entitled.set(owner,workspaceEntitled(owner));return entitled.get(owner)!;};
     for(const r of mail){
       if(!await allowed(r.user_id)){await c.query('UPDATE agency_onboarding SET error=$2,reminder_at=now() WHERE id=$1',[r.id,agencyPlanPaused]);continue;}
+      // A reminder (the first send was paid for when the request was created) counts against the member who made the
+      // request; over budget, it waits for the next reminder window instead of going out.
+      if(r.sent_at&&!await memberSendAllowed(r.user_id,r.actor_id)){await c.query('UPDATE agency_onboarding SET reminder_at=now() WHERE id=$1',[r.id]);continue;}
       try{await sendOnboarding(r,send);}catch(e){await c.query("UPDATE agency_onboarding SET error='Email delivery failed; retry pending',reminder_at=now() WHERE id=$1",[r.id]);void recordFailure('job','Agency onboarding email',e,{onboardingId:r.id},'warning');}
     }
     await c.query(`INSERT INTO agency_poll_grants(user_id,subject) SELECT g.user_id,g.google_subject FROM gbp_grants g WHERE NOT g.reconnect_required AND ($1::int IS NULL OR g.user_id=$1) AND (EXISTS(SELECT 1 FROM agency_onboarding r WHERE r.user_id=g.user_id AND r.subject=g.google_subject AND r.status NOT IN ('linked','expired')) OR EXISTS(SELECT 1 FROM agency_workspaces w WHERE w.user_id=g.user_id AND w.auto_accept_all)) ON CONFLICT DO NOTHING`,only);
@@ -139,4 +153,4 @@ export async function runOnboardingWorker(make=clientFor,send=sendWithFallback,o
     }
   }finally{if(locked)await c.query('SELECT pg_advisory_unlock(7163,1)');c.release();}
 }
-export function startOnboardingWorker(){if(process.env.GBP_SYNC_DISABLED==='true')return;const t=setInterval(()=>void runOnboardingWorker().catch((e)=>{console.error('Agency onboarding tick failed');void recordFailure('job','Agency onboarding tick',e);}),60000);t.unref();return t;}
+export function startOnboardingWorker(){if(process.env.GBP_SYNC_DISABLED==='true')return;return workerInterval('Agency onboarding worker',()=>runOnboardingWorker().catch((e)=>{console.error('Agency onboarding tick failed');void recordFailure('job','Agency onboarding tick',e);}),60000).timer;}

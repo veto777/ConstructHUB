@@ -3,6 +3,7 @@ import { lsaManagerConnection, lsaManagerAccounts, lsaManagerLeads, lsaConnectio
 import { eq, desc, and, count } from "drizzle-orm";
 import { sendLsaChargedLeadAlert } from "./email";
 import { recordFailure } from "./ops/issues";
+import { workerInterval } from "./workers";
 
 export const GOOGLE_ADS_API_VERSION = process.env.GOOGLE_ADS_API_VERSION || "v17";
 const GOOGLE_ADS_BASE = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
@@ -694,8 +695,5 @@ export function startManagerLeadSync(intervalMs = 5 * 60 * 1000) {
     }
   };
 
-  managerLeadTimer = setInterval(tick, intervalMs);
-  if (typeof managerLeadTimer.unref === "function") managerLeadTimer.unref();
-  const initial = setTimeout(tick, 30_000);
-  if (typeof initial.unref === "function") initial.unref();
+  managerLeadTimer = workerInterval("LSA manager lead sync", tick, intervalMs, { firstAfterMs: 30_000 }).timer;
 }

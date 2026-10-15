@@ -286,7 +286,7 @@ export function SitesSummaryStrip({ domains, online }: { domains: DomainWithStat
   const onlineTotal = sum((d) => online[d.id]?.count ?? 0);
   const capped = domains.some((d) => d.stats.totalVisits >= VISIT_ROW_CAP);
   return (
-    <MetricStrip cols={[2, 3, 5]} boxed testId="ip-portfolio">
+    <MetricStrip cols={[2, 3, 5]} boxed testId="ip-portfolio" className="[&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
       <StatCell label="Sites" value={domains.length.toLocaleString()} testId="tile-sites" note="Tracked across IP Tracker, Click Guard and VPN Shield" />
       <StatCell label="Online now" value={onlineKnown ? onlineTotal.toLocaleString() : null} none="Still counting" testId="tile-online" note="Distinct IPs in the last 20 minutes, every site added up" />
       <StatCell label="Visits" value={countLabel(sum((d) => d.stats.totalVisits), capped)} testId="tile-visits" note={capped ? `A site at ${VISIT_ROW_CAP.toLocaleString()} shows its latest visits only` : "All time, every site added up"} />
@@ -317,7 +317,7 @@ export function SitePanel({ d, online, selected, onPick, onRemove }: { d: Domain
           {onRemove && <button type="button" className="tool-btn tool-btn--quiet" onClick={onRemove} data-testid={`button-remove-site-${d.id}`}>Remove</button>}
         </div>
       </div>
-      <MetricStrip cols={[2, 3, 5]}>
+      <MetricStrip cols={[2, 3, 5]} className="[&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
         <StatCell label="Online now" value={online.count == null ? null : online.count.toLocaleString()} none={online.note ?? "Still counting"} note="Last 20 minutes" testId={`metric-online-${d.id}`} href={ipHref("visitors", d.id)} onClick={onPick} ariaLabel={`Online now: ${online.count ?? "unknown"} — open ${title}'s visitors`} linkTestId={`link-online-${d.id}`} />
         <StatCell label="Visits" value={countLabel(d.stats.totalVisits, capped)} note={capped ? `Latest ${VISIT_ROW_CAP.toLocaleString()} loaded` : "All time"} testId={`metric-visits-${d.id}`} href={ipHref("", d.id)} onClick={onPick} ariaLabel={`Visits: ${countLabel(d.stats.totalVisits, capped)} — open ${title}'s dashboard`} />
         <StatCell label="Unique visitors" value={d.stats.uniqueVisitors.toLocaleString()} note={`${d.stats.avgVisitsPerUser} visits per visitor`} testId={`metric-unique-${d.id}`} href={ipHref("visitors", d.id)} onClick={onPick} ariaLabel={`Unique visitors: ${d.stats.uniqueVisitors} — open ${title}'s visitors`} />

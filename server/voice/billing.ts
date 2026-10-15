@@ -37,6 +37,7 @@ import { signalwireConfig } from "./numbers-signalwire";
 import { releaseIsFinal } from "./number-release";
 import { getVoiceUsageRow, listVoiceUsage, summarizeVoiceUsage, voiceMonthKey, voiceOverageBillingState } from "./billing-usage";
 import { externalReceptionist } from "./ingest";
+import { workerInterval } from "../workers";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -85,9 +86,7 @@ export function startEngineHealthWatch(intervalMs = 5 * 60_000): ReturnType<type
       if (rows.length) await probeEngine();
     } catch { /* the next tick tries again */ }
   };
-  const timer = setInterval(() => { void tick(); }, intervalMs);
-  timer.unref();
-  return timer;
+  return workerInterval("voice engine health watch", tick, intervalMs).timer;
 }
 
 export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): void {

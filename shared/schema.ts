@@ -155,6 +155,8 @@ export const scrapeSchedules = pgTable("scrape_schedules", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   databaseId: integer("database_id").notNull(),
   frequency: text("frequency").notNull().default("daily"),
+  /** "custom" frequency only: run every N hours (1-720). NULL on preset rows (server/scrape-schedule-input.ts). */
+  everyHours: integer("every_hours"),
   searchType: text("search_type").notNull(),
   searchValue: text("search_value").notNull(),
   isActive: boolean("is_active").notNull().default(true),

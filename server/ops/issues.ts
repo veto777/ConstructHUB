@@ -27,6 +27,7 @@ import {
 import { ensureOpsIssuesSchema, NOTIFY_SIG_SQL, type Queryable } from "./schema";
 import { failureKey, issueFingerprint } from "./fingerprint";
 import { errorFacts, scrubDetail, scrubText } from "./scrub";
+import { isShuttingDown } from "../shutdown";
 
 export type IssueInput = {
   source: IssueSource;
@@ -77,6 +78,12 @@ export type RecorderOptions = {
   maxWritesPerMinute?: number;
   now?: () => number;
   warn?: (line: string) => void;
+  /**
+   * True once the desk must stop writing: the process is shutting down and the pool is about to end (default
+   * `isShuttingDown`). A worker tick that dies on the ended pool is logged by its own catch, never recorded here —
+   * the record itself would be one more "Cannot use a pool after calling end on the pool" line (2026-10-15).
+   */
+  closed?: () => boolean;
 };
 
 const SEVERITY_ORDER = ISSUE_SEVERITIES as readonly string[];
@@ -122,6 +129,7 @@ export function createIssueRecorder(opts: RecorderOptions = {}): IssueRecorder {
   const cap = Math.max(1, opts.maxWritesPerMinute ?? 120);
   const clock = opts.now ?? Date.now;
   const warn = opts.warn ?? ((line: string) => console.warn(line));
+  const closed = opts.closed ?? isShuttingDown;
   const slots = new Map<string, Slot>();
   let windowStart = 0;
   let windowWrites = 0;
@@ -132,6 +140,7 @@ export function createIssueRecorder(opts: RecorderOptions = {}): IssueRecorder {
   const poolFor = async (): Promise<Queryable> => opts.pool ?? (await import("../db")).pool;
 
   async function write(rec: Prepared, count: number): Promise<void> {
+    if (closed()) return; // shutting down: the pool is ending; a deferred repeat is dropped too
     try {
       const q = await poolFor();
       schemaReady ??= ensureOpsIssuesSchema(q).catch((e) => { schemaReady = null; throw e; });
@@ -167,6 +176,7 @@ export function createIssueRecorder(opts: RecorderOptions = {}): IssueRecorder {
   }
 
   function record(input: IssueInput): Promise<void> {
+    if (closed()) return Promise.resolve(); // no-op once shutdown began (the pool ends moments later)
     try {
       const rec = prepare(input);
       const now = clock();

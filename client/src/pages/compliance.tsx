@@ -79,7 +79,7 @@ function AgencyRow({ a, i, unconfirmed }: { a: ComplianceAgency; i: number; unco
         {a.permitLookupUrl && <LinkPill href={a.permitLookupUrl} label="Look up a permit" icon={Search} unconfirmed={unconfirmed} testId={`link-permit-lookup-${i}`} />}
         {a.openDataUrl && <LinkPill href={a.openDataUrl} label="Open data" icon={Database} unconfirmed={unconfirmed} />}
         {a.website && <LinkPill href={a.website} label="Agency website" icon={Globe} unconfirmed={unconfirmed} />}
-        {a.phone && <GooglePill icon={Phone} label={a.phone} href={`tel:${a.phone.replace(/[^\d+]/g, "")}`} size="sm" title={`Call ${a.name}`} />}
+        {a.phone && <GooglePill icon={Phone} label={a.phone} href={`tel:${a.phone.replace(/[^\d+]/g, "")}`} size="sm" title={`Call ${a.name}`} className="max-w-full !whitespace-normal py-1 text-left" />}
       </>}
     />
   );

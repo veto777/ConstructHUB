@@ -2,6 +2,7 @@
  * lookups enrich the hit after the response when the 1.5 second budget expires. */
 import { BlockList, isIP } from "node:net";
 import { pool } from "./db";
+import { workerInterval } from "./workers";
 
 export type PrivacyIntel = { proxy: boolean; vpn: boolean; tor: boolean; hosting: boolean; asn?: number | null };
 export type RangeHit = "datacenter" | "vpn" | null;
@@ -135,6 +136,6 @@ export function startAdsIntel(): void {
   if (started) return;
   started = true;
   void refreshRanges(); void refreshBans();
-  setInterval(() => void refreshRanges(), 12 * 3600e3).unref();
-  setInterval(() => void refreshBans(), 10 * 60e3).unref();
+  workerInterval("ads landing IP ranges", refreshRanges, 12 * 3600e3);
+  workerInterval("ads landing bans", refreshBans, 10 * 60e3);
 }

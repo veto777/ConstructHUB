@@ -8,6 +8,7 @@
  */
 import { randomInt } from "crypto";
 import { pool } from "../db";
+import { workerInterval } from "../workers";
 
 export const newCustomerNumber = () => String(randomInt(10_000_000, 100_000_000));
 export const newCrmNumber = () => `CRM${randomInt(1_000_000, 10_000_000)}`;
@@ -68,7 +69,7 @@ export async function ensureSupportSchema(): Promise<void> {
   `);
   await backfillNumbers();
   await purgeOldCalls();
-  setInterval(() => { purgeOldCalls().catch((e) => console.error("[support] purge failed:", e?.message || e)); }, 24 * 3_600_000).unref();
+  workerInterval("support call purge", () => purgeOldCalls().catch((e) => console.error("[support] purge failed:", e?.message || e)), 24 * 3_600_000);
 }
 
 /** Support-call state (it holds the account's email/phones once identified) is kept 30 days (Kimi #8). */

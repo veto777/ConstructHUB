@@ -22,6 +22,7 @@ import { pickEmail, siteName } from "../backlinks/outreach";
 import { isSuppressed } from "../backlinks/store";
 import { fetchSince, mailboxConfig, mailboxConfigured, sendMail } from "./mailbox";
 import * as store from "./store";
+import { workerInterval } from "../workers";
 
 const num = (v: string | undefined, d: number) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : d; };
 export const mediaWorkerConfig = (env: NodeJS.ProcessEnv = process.env) => ({
@@ -415,7 +416,5 @@ let timer: NodeJS.Timeout | null = null;
 export function startMediaInboxWorker(env: NodeJS.ProcessEnv = process.env) {
   const cfg = mediaWorkerConfig(env);
   if (!cfg.enabled || timer) return;
-  setTimeout(() => void runMediaPass(), 60_000).unref();
-  timer = setInterval(() => void runMediaPass(), cfg.intervalMin * 60_000);
-  timer.unref();
+  timer = workerInterval("media inbox", () => runMediaPass(), cfg.intervalMin * 60_000, { firstAfterMs: 60_000 }).timer;
 }

@@ -65,6 +65,7 @@ import { storeGeneratedPdf, storeGeneratedFile } from "./attachments";
 import { oauthBaseUrl } from "../site-context";
 import { recordFailure } from "../ops/issues";
 import { providerFixture, type HoverFixture } from "../tutorials/fixtures";
+import { workerInterval } from "../workers";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -1261,13 +1262,11 @@ export async function runDueHoverSyncs(now: Date = new Date()): Promise<void> {
 export function startHoverScheduler(): void {
   if (hoverSchedulerStarted) return;
   hoverSchedulerStarted = true;
-  const timer = setInterval(() => {
+  workerInterval("HOVER sync scheduler", () =>
     runDueHoverSyncs().catch((e) => {
       console.error("[hover] scheduler tick failed:", e?.message || e);
       void recordFailure("job", "HOVER sync scheduler tick", e);
-    });
-  }, HOVER_TICK_MS);
-  timer.unref();
+    }), HOVER_TICK_MS);
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────────

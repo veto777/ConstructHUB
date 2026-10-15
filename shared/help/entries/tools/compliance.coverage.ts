@@ -10,6 +10,6 @@ const entry: HelpDraft = {
     "Choose a state from the grid (or the dropdown on a phone) to see its sources.",
     "Read the “Found by” chips on a source to see which identifiers work there, then order a report if it covers what you need.",
   ],
-  howItWorks: "The list is generated at build time from the research bot’s own source registry, so the page cannot promise a source the bot does not search; it changes when the bot does. For downloaded files, the “Found by” chips are read from the file’s loaded rows when the server can answer, otherwise from the build-time list. Complaints, enforcement and court records are searched for companies only, never for individual people.",
+  howItWorks: "The list is generated when the app is built, from the research bot’s own list of sources, so the page cannot promise a source the bot does not search; it changes when the bot does. For downloaded files, the “Found by” chips are read from the file’s loaded rows when the server can answer, otherwise from the built-in list. Complaints, enforcement and court records are searched for companies only, never for individual people.",
 };
 export default entry;

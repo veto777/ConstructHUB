@@ -8,7 +8,10 @@
  * On SIGTERM / SIGINT the process now
  *   1. stops accepting: the listener closes, idle keep-alive connections are closed, new responses carry
  *      `Connection: close`, and `isShuttingDown()` is true (health answers 503 so a balancer would move on);
- *   2. runs the registered hooks (`onShutdown`: stop a worker's timer, flush a queue) — each bounded;
+ *   2. stops every registered background worker (server/workers.ts: the 1 s queue tickers, the minute sweeps, the
+ *      daily jobs) and waits up to SHUTDOWN_WORKERS_MS (default 5 s) for the ticks in flight — BEFORE the pool ends,
+ *      so a deploy no longer fills the journal with "Cannot use a pool after calling end on the pool" (2026-10-15);
+ *      then runs the registered hooks (`onShutdown`: flush a queue) — each bounded;
  *   3. waits for in-flight requests (`trackRequests` counts them) and tracked background work (`trackWork`: a paid
  *      lookup kicked off outside a request) to finish, up to SHUTDOWN_DRAIN_MS (default 20 s);
  *   4. closes whatever connections remain, closes the database pool(s), logs what was left behind, and exits 0 —
@@ -21,6 +24,7 @@
  */
 import type { Server } from "node:http";
 import type { RequestHandler } from "express";
+import { stopWorkers, resetWorkersForTests } from "./workers";
 
 type Hook = { name: string; run: () => unknown };
 const hooks: Hook[] = [];
@@ -67,6 +71,8 @@ export type ShutdownOptions = {
   closePools: () => Promise<unknown>;
   /** Longest wait for in-flight requests and tracked work (SHUTDOWN_DRAIN_MS, default 20 000). */
   drainMs?: number;
+  /** Longest wait for the background workers' ticks in flight (SHUTDOWN_WORKERS_MS, default 5 000). */
+  workersMs?: number;
   log?: (line: string) => void;
   exit?: (code: number) => void;
   now?: () => number;
@@ -91,7 +97,9 @@ export async function shutdown(signal: string, opts: ShutdownOptions): Promise<v
 
   // 1. Stop accepting. close() also closes idle keep-alive connections (Node ≥ 19); active ones finish their request.
   const closed = new Promise<void>((resolve) => opts.server.close(() => resolve()));
-  // 2. Hooks (timers off, queues flushed), each bounded to 5 s.
+  // 2. Workers off first (server/workers.ts): every timer cleared, ticks in flight given a bounded moment — nothing
+  //    may start a query on a pool that is about to end. Then the hooks (queues flushed), each bounded to 5 s.
+  await stopWorkers({ log, waitMs: opts.workersMs ?? envMs("SHUTDOWN_WORKERS_MS", 5_000), now });
   for (const h of [...hooks]) {
     try { const r = await bounded(Promise.resolve().then(h.run), 5_000); if (r === "timeout") log(`[shutdown] hook "${h.name}" did not finish in 5s`); }
     catch (e: any) { log(`[shutdown] hook "${h.name}" failed: ${e?.message ?? e}`); }
@@ -121,4 +129,5 @@ export function installGracefulShutdown(opts: ShutdownOptions): void {
 /** Test seam: forget hooks, counters and the stopping flag. */
 export function resetShutdownStateForTests(): void {
   hooks.length = 0; shuttingDown = false; inflight = 0; work.clear();
+  resetWorkersForTests();
 }

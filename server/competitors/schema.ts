@@ -23,5 +23,9 @@ export async function ensureCompetitorWorkerSchema() {
     ALTER TABLE competitor_scans ADD COLUMN IF NOT EXISTS started_at timestamptz;
     ALTER TABLE competitor_scans ADD COLUMN IF NOT EXISTS finished_at timestamptz;
     CREATE INDEX IF NOT EXISTS competitor_scans_claim ON competitor_scans(status, run_at);
+    -- DB review w3-r8 (2026-10-15): listings are read and cleared by scan (only the pkey existed);
+    -- the cards list reads the owner's scans newest first. scripts/apply-schema-migration.ts runs these too.
+    CREATE INDEX IF NOT EXISTS competitor_listings_scan_idx ON competitor_listings(scan_id, user_id);
+    CREATE INDEX IF NOT EXISTS competitor_scans_user_idx ON competitor_scans(user_id, created_at DESC);
   `);
 }

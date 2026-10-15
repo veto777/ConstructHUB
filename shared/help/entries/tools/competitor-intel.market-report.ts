@@ -9,10 +9,10 @@ const entry: HelpDraft = {
     "Choose Open report on a scan card (or its title) to open it; Close report folds it back to its four key numbers.",
     "Read the strip and the leaders first: they say who is winning on rating and on review count.",
     "Use the two bars to see where your own rating and review count would sit in this market.",
-    "Scroll the list; More businesses shows the next eight. Review analysis on a business opens the breakdown of its sampled reviews.",
-    "Re-run starts the same scan again as a new scan; Delete removes the scan and its listings for good, after a confirmation.",
+    "Scroll the list; More businesses shows the next eight, and Review analysis on a business opens the breakdown of its sampled reviews.",
+    "Use Re-run to start the same scan again as a new scan, or Delete to remove the scan and its listings for good, after a confirmation.",
   ],
-  howItWorks: "The scan’s listings come from the server already ordered best-rated first and most-reviewed among equals (an unrated listing goes last); the page never re-sorts them. The numbers in the strip and the bars are added up from those listings in the browser. A leader is a rated listing whose review signals stay below the “More signals” band — a 5.0 with a suspicious review sample is not named a leader, and the overview’s footnote says so when that happened. Ratings and counts are as Google showed them on the day of the scan; the date is under the overview.",
+  howItWorks: "The scan’s listings come from the server already ordered best-rated first and most-reviewed among equals (an unrated listing goes last); the page never re-sorts them. The numbers in the strip and the bars are added up from those listings in the browser. A leader is a rated listing whose review signals stay below the “More signals” band: a 5.0 with a suspicious review sample is not named a leader, and the overview’s footnote says so when that happened. Ratings and counts are as Google showed them on the day of the scan; the date is under the overview.",
   needs: ["A completed scan. A scan that is still running shows partial results until it finishes."],
 };
 export default entry;

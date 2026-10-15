@@ -216,7 +216,7 @@ export default function AdminPartnershipsPage() {
           </Button>
         }>
           <Tabs value={partnerTab} onValueChange={(v) => setPartnerTab(v as typeof partnerTab)} className="mb-3">
-            <TabsList className="flex-wrap">
+            <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="all">All</TabsTrigger>
               {MEDIA_PARTNER_STATUSES.map((st) => <TabsTrigger key={st} value={st}>{MEDIA_PARTNER_STATUS_LABELS[st]} ({n(s.partners[st])})</TabsTrigger>)}
             </TabsList>
@@ -250,7 +250,7 @@ export default function AdminPartnershipsPage() {
 
         <Section title="Emails" icon={Mail}>
           <Tabs value={mailTab} onValueChange={(v) => { setMailTab(v as typeof mailTab); setPage(0); }} className="mb-3">
-            <TabsList className="flex-wrap">
+            <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="out" data-testid="tab-media-sent">Sent ({n(s.sent)})</TabsTrigger>
               <TabsTrigger value="in">Received ({n(received)})</TabsTrigger>

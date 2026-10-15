@@ -48,6 +48,7 @@ import { getCrmEntitlements } from "./entitlements";
 import { CRM_PLANS, CRM_PLAN_KEYS, type CrmPlanLimits } from "@shared/crm-plans";
 
 import { providerFixture, type SmsFixture } from "../tutorials/fixtures";
+import { maskPhoneNumber } from "../ops/scrub";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -447,7 +448,7 @@ export async function sendSms(
   if (orgId) {
     try {
       if (await isSmsOptedOut(orgId, to)) {
-        console.log(`[sms] suppressed — ${to} opted out (STOP) for org ${orgId}`);
+        console.log(`[sms] suppressed — ${maskPhoneNumber(to)} opted out (STOP) for org ${orgId}`);
         return {
           ok: false,
           provider: sender ? "signalwire" : "log",

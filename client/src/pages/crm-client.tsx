@@ -969,8 +969,9 @@ export default function CrmClientPage() {
             <div className="flex items-start gap-4 min-w-0">
               <InitialAvatar name={c.displayName} className="h-14 w-14 text-lg" />
               <div className="min-w-0">
-                <div className="flex items-center gap-1">
-                  <h1 className="text-2xl font-semibold tracking-tight">{c.displayName}</h1>
+                {/* Phone width: the "i" and Watch wrap under a long name instead of widening the page. */}
+                <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                  <h1 className="text-2xl font-semibold tracking-tight break-words">{c.displayName}</h1>
                   <InfoTip k="client-detail" />
                   {/* The client-page walkthrough (quick actions). Static key: this title is not a CrmPageHeader. */}
                   <HelpButton k="crm-client-quick-actions" videoOnly />
@@ -980,9 +981,9 @@ export default function CrmClientPage() {
                 )}
                 <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
                   {c.email && (
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex min-w-0 items-center gap-1.5">
                       <a href={`mailto:${c.email}`} title="Send an email"
-                        className="inline-flex items-center gap-1.5 hover:text-foreground hover:underline underline-offset-2 transition-colors"
+                        className="inline-flex min-w-0 items-center gap-1.5 break-all hover:text-foreground hover:underline underline-offset-2 transition-colors"
                         data-testid="link-client-email">
                         <Mail className="h-3.5 w-3.5" />{c.email}
                       </a>
@@ -1346,7 +1347,7 @@ export default function CrmClientPage() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <SectionTitle
             icon={FileText}
             title="Estimates"
@@ -1491,7 +1492,7 @@ export default function CrmClientPage() {
                     );
                   })()}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {/* Edit verbiage / add work scopes — opens the full editor.
                       Available on drafts AND sent estimates (the client link
                       reflects edits immediately); hidden once signed/approved. */}

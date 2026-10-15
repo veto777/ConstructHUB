@@ -110,19 +110,30 @@ export function inRange(r: DateRange, at: string, now = new Date()): boolean {
 export function RangePicker({ value, onChange, presets = PRESETS, testId = "range" }: { value: DateRange; onChange: (r: DateRange) => void; presets?: [RangePreset, string][]; testId?: string }) {
   const setDay = (k: "from" | "to", v: string) => onChange({ preset: "custom", from: k === "from" ? v : value.from, to: k === "to" ? v : value.to });
   const today = localDayKey(new Date());
+  // A typed pair the inputs' min/max could not stop (keyboard entry): said in words, and announced.
+  const error = rangeError(value, today);
+  const errorId = `${testId}-error`;
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Date range" data-testid={`${testId}-picker`}>
       {presets.map(([p, label]) => (
         <GooglePill key={p} size="sm" label={label} selected={value.preset === p} ariaPressed={value.preset === p} onClick={() => onChange({ preset: p, from: "", to: "" })} testId={`${testId}-${p}`} />
       ))}
       <label className="flex items-center gap-1 text-[13px] g-text-2">From
-        <input type="date" className="g-input !min-h-8 !w-auto !px-2 text-[13px]" value={value.from} max={value.to || today} onChange={(e) => setDay("from", e.target.value)} aria-label="Range start date" data-testid={`${testId}-from`} />
+        <input type="date" className="g-input !min-h-8 !w-auto !px-2 text-[13px]" value={value.from} max={value.to || today} onChange={(e) => setDay("from", e.target.value)} aria-label="Range start date" aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} data-testid={`${testId}-from`} />
       </label>
       <label className="flex items-center gap-1 text-[13px] g-text-2">To
-        <input type="date" className="g-input !min-h-8 !w-auto !px-2 text-[13px]" value={value.to} min={value.from || undefined} max={today} onChange={(e) => setDay("to", e.target.value)} aria-label="Range end date" data-testid={`${testId}-to`} />
+        <input type="date" className="g-input !min-h-8 !w-auto !px-2 text-[13px]" value={value.to} min={value.from || undefined} max={today} onChange={(e) => setDay("to", e.target.value)} aria-label="Range end date" aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} data-testid={`${testId}-to`} />
       </label>
+      {error && <p id={errorId} role="alert" className="basis-full text-[13px]" style={{ color: "var(--g-red)" }} data-testid={errorId}>{error}</p>}
     </div>
   );
+}
+
+/** Why a typed custom range cannot be used, in words — null when it can. */
+export function rangeError(value: DateRange, today = localDayKey(new Date())): string | null {
+  if (value.from && value.to && value.from > value.to) return "The start date is after the end date.";
+  if ((value.from && value.from > today) || (value.to && value.to > today)) return "The range cannot go past today.";
+  return null;
 }
 
 /* ── "Seen within": minutes presets + a typed number ────────────────────────── */
@@ -134,6 +145,9 @@ export function WindowPicker({ minutes, onChange, testId = "window" }: { minutes
   const [typed, setTyped] = useState("");
   const apply = (v: string) => { setTyped(v); const n = Number(v); if (v.trim() !== "" && Number.isFinite(n) && n > 0) onChange(Math.floor(n)); };
   const preset = WINDOWS.some(([m]) => m === minutes);
+  // Something typed that is not a number of minutes above 0 changes nothing — said so, and announced.
+  const error = windowError(typed);
+  const errorId = `${testId}-error`;
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Seen within" data-testid={`${testId}-picker`}>
       <span className="text-[13px] g-text-2">Seen within</span>
@@ -141,11 +155,19 @@ export function WindowPicker({ minutes, onChange, testId = "window" }: { minutes
         <GooglePill key={m} size="sm" label={label} selected={minutes === m} ariaPressed={minutes === m} onClick={() => { setTyped(""); onChange(m); }} testId={`${testId}-${m}`} />
       ))}
       <label className="flex items-center gap-1 text-[13px] g-text-2">
-        <input type="number" inputMode="numeric" min={1} step={1} placeholder="minutes" className="g-input !min-h-8 !w-24 !px-2 text-[13px]" value={preset ? typed : typed || String(minutes)} onChange={(e) => apply(e.target.value)} aria-label="Seen within this many minutes" data-testid={`${testId}-minutes`} />
+        <input type="number" inputMode="numeric" min={1} step={1} placeholder="minutes" className="g-input !min-h-8 !w-24 !px-2 text-[13px]" value={preset ? typed : typed || String(minutes)} onChange={(e) => apply(e.target.value)} aria-label="Seen within this many minutes" aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} data-testid={`${testId}-minutes`} />
         minutes
       </label>
+      {error && <p id={errorId} role="alert" className="basis-full text-[13px]" style={{ color: "var(--g-red)" }} data-testid={errorId}>{error}</p>}
     </div>
   );
+}
+
+/** Why a typed "seen within" value is not used, in words — null for an empty box or a whole number of minutes above 0. */
+export function windowError(typed: string): string | null {
+  if (typed.trim() === "") return null;
+  const n = Number(typed);
+  return Number.isFinite(n) && n > 0 ? null : "Enter a number of minutes above 0.";
 }
 
 /* ── "How this works" over a bare form (≤ 3 steps) ─────────────────────────── */

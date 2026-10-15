@@ -33,6 +33,7 @@ import {
   rewardAmountCents, validTier, type CountedInvoice, type Product, type RewardKind, type Tier,
 } from "./rules";
 import type { BillingInterval } from "@shared/plans";
+import { workerInterval } from "../workers";
 
 export const REF_COOKIE = "ch_ref";
 const REF_COOKIE_DAYS = 30;
@@ -390,9 +391,7 @@ export function registerReferralRoutes(app: Express, getDevUser: any) {
   billingEvents.on("invoice.paid", ({ userId, stripeInvoice }) => onReferredInvoicePaid(userId, stripeInvoice));
   // A referrer who just started a plan may have rewards waiting.
   billingEvents.on("subscription.started", () => scheduleSweep());
-  const hourly = setInterval(() => void runReferralSweep(), 60 * 60_000);
-  hourly.unref?.();
-  setTimeout(() => void runReferralSweep(), 60_000).unref?.();
+  workerInterval("referral sweep", () => runReferralSweep(), 60 * 60_000, { firstAfterMs: 60_000 });
 
   app.get("/api/referrals/me", async (req: any, res) => {
     const u = getDevUser(req, res); if (!u) return;

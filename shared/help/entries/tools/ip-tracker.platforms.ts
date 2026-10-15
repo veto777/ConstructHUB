@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "The browsers, operating systems, devices and screen sizes your visitors use.",
   whatItDoes: "Four lists, each with a count and share: browsers, operating systems, devices (mobile, desktop, tablet) and screen resolutions.",
   howToUse: [
-    "IP Tracker → Platforms, and pick the site.",
+    "Open IP Tracker → Platforms and pick the site.",
     "Choose a date range preset, or type a From and To date.",
     "Use the device and screen lists to check your site on what most visitors use.",
   ],

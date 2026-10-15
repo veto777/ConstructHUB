@@ -32,7 +32,7 @@
     },
     {
       "action": "click",
-      "selector": "label:text-is(\"Summit Roofing Co. \u00b7 linkedin\") input",
+      "selector": "label:text-is(\"Summit Roofing Co. \u00b7 LinkedIn\") input",
       "caption": "Choose the accounts",
       "narration": "Untick any to skip. This post skips LinkedIn."
     },

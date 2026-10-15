@@ -35,6 +35,7 @@ import { sendWithFallback } from "../email";
 import { prettyPhone, leadFactsFrom } from "./leads";
 import { loadOrgVoiceContext, type OrgVoiceContext } from "./org-profile";
 import { recordFailure } from "../ops/issues";
+import { workerInterval } from "../workers";
 
 export const KIND_LABELS: Record<EscalationKind, string> = {
   human: "Asked for a person",
@@ -701,9 +702,7 @@ export function startVoiceEscalationWorker(): boolean {
     console.error("[voice] escalation worker failed:", e?.message || e);
     void recordFailure("job", "Call escalation reminder worker", e);
   });
-  worker = setInterval(run, WORKER_INTERVAL_MS);
-  worker.unref();
-  setTimeout(run, 15_000).unref();
+  worker = workerInterval("Call escalation reminder worker", run, WORKER_INTERVAL_MS, { firstAfterMs: 15_000 }).timer;
   console.log("[voice] escalation reminder worker on (every 30 min)");
   return true;
 }

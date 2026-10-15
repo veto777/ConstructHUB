@@ -10,7 +10,7 @@ const entry: HelpDraft = {
     "Read the agencies and the checklist; each agency name links to its official site.",
     "Open the lessons of the Business Formation & Licensing module under the guide once the module is unlocked.",
   ],
-  howItWorks: "The 50 state guides are public and free to read; the module’s lessons are fetched only for an account that owns the module, the bundle or a plan that includes the course. Agency links were checked when the guides were written and are never guessed. The chosen state and tab stay in the page address, so a reload or a shared link returns to the same place.",
+  howItWorks: "The 50 state guides are public and free to read; the module’s lessons are loaded only for an account that owns the module, the bundle or a plan that includes the course. Agency links were checked when the guides were written and are never guessed. The chosen state and tab stay in the page address, so a reload or a shared link returns to the same place.",
   needs: ["The state guides are free. The module’s lessons need a Master Class purchase or a plan that includes the course."],
 };
 export default entry;

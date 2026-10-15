@@ -4,9 +4,9 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "account.billing", parent: "account", group: "Tools", route: "/settings", title: "Account settings → Billing",
   whatItIs: "Your subscription, add-ons, invoices, payment methods and one-off purchases, read from Stripe.",
-  whatItDoes: "Four tabs. Subscriptions shows the statement, the current plan, its usage this month and the add-ons with + and − to change them. Invoices lists past invoices. Payment methods shows the cards on file. Purchases lists one-off orders. Manage billing opens Stripe’s secure portal for cards, invoices and cancellation.",
+  whatItDoes: "Four tabs. Subscriptions shows the statement, the current plan, its usage this month and the add-ons with + and − to change them. Invoices lists past invoices, Payment methods shows the cards on file, and Purchases lists one-off orders. Manage billing opens Stripe’s secure portal for cards, invoices and cancellation.",
   howToUse: [
-    "Settings → Billing, or follow a Manage plan link from the dashboard.",
+    "Open Settings → Billing, or follow a Manage plan link from the dashboard.",
     "Read the Subscriptions tab for the current plan, its renewal date and add-ons.",
     "Use + and − on an add-on to change it; the change is prorated and invoiced.",
     "Open Invoices, Payment methods or Purchases for the records, or Manage billing for Stripe’s portal.",

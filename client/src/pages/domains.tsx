@@ -342,7 +342,7 @@ export default function DomainsPage() {
   if (planGate)
     return (
       <GoogleSurface page>
-        <AppPage width="wide" testId="page-domains">
+        <AppPage width="wide" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-domains">
           {header}
           <PlanRequired
             module="domainsMailAlerts"
@@ -354,7 +354,7 @@ export default function DomainsPage() {
     );
   return (
     <GoogleSurface page>
-    <AppPage width="wide" testId="page-domains">
+    <AppPage width="wide" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-domains">
       {header}
       {error && <Notice tone="danger">{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}

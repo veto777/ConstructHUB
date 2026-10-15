@@ -16,10 +16,13 @@ test("start, live progress, report, draft, PDF, share and revoke", async ({
   request,
 }) => {
   await page.goto("/site-scan");
+  // Inside the SEO tool shell the page title reads "New scan" (the shell's
+  // crumb carries "Site Scan").
   await expect(
-    page.getByRole("heading", { name: "Site Scan", exact: true }),
+    page.getByRole("heading", { name: "New scan", exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Website URL").fill("https://sitescan-browser.test");
+  // By test id: the monthly-rescan switch's label also says "website URL".
+  await page.getByTestId("input-scan-url").fill("https://sitescan-browser.test");
   await page.getByLabel("Pages to speed-test", { exact: true }).fill("0");
   await page.getByLabel("Pages to check", { exact: true }).fill("3");
   const started = page.waitForResponse(
@@ -100,10 +103,14 @@ test("start, live progress, report, draft, PDF, share and revoke", async ({
       await request.get("/api/sitescan/shared/" + href!.split("/").pop())
     ).status(),
   ).toBe(404);
-  await page.getByRole("button", { name: "Enable monthly rescan" }).click();
-  await expect(
-    page.getByRole("button", { name: "Disable monthly rescan" }),
-  ).toBeVisible();
+  // Monthly rescan is a Switch that shows its state for the URL above.
+  const rescan = page.getByRole("switch", {
+    name: /Rescan this site every month/,
+  });
+  await expect(rescan).not.toBeChecked();
+  await rescan.click();
+  await expect(rescan).toBeChecked();
+  await expect(rescan).toHaveAccessibleName(/On, next run/);
 });
 test("public lead magnet shows summary and email verification guidance", async ({
   page,

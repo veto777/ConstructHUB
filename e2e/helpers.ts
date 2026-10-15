@@ -27,6 +27,10 @@ const EXPECTED_4XX: RegExp[] = [
   /\/api\/public\/(estimates|invoices)\/[^/]+$/, // 401 requiresVerification IS the email gate doing its job
   /\/api\/client\/documents/, // 401 IS the signed-out state on the client portal
   /\/api\/admin\//, // 403 IS the designed state for a non-admin on /crm/admin
+  // The "i" panel plays the page's walkthrough inline. An e2e lane has no media
+  // store (no R2 credentials, no tmp/tutorials), so the poster/video/captions
+  // 404 here by design; live serves them from R2 (server/tutorials/media.ts).
+  /\/api\/tutorials\/media\//,
 ];
 
 /** Designed 503s: online payment without a Stripe account is a friendly

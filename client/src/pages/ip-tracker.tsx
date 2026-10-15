@@ -26,7 +26,8 @@ import { useToolView } from "@/hooks/use-tool-view";
 import { IP_TRACKER_VIEWS } from "@/components/traffic-tool/nav";
 import { ALL_TIME, RangePicker, StepsCard, WindowPicker, daysAgo, inRange, localDayKey, rangeBounds, rangeKey, rangeQuery, type DateRange } from "@/components/traffic-tool/shared";
 import { DailyVisitsChart, PagesTable, PlatformBreakdowns, GeoTable, SitePanel, SitesSummaryStrip, SourcesTable, StatTiles, VISIT_ROW_CAP, VisitorDetailPanel, VisitorRow, countLabel, type Analytics, type DomainWithStats, type GeoData, type OnlineFigure, type PageStat, type PlatformData, type Visitor, type VisitorDetail } from "@/components/traffic-tool/ip-views";
-import { IpSample } from "@/components/traffic-tool/samples";
+import { lazySample } from "@/components/sample-preview";
+const IpSample = lazySample(() => import("@/components/traffic-tool/samples"), "IpSample");
 import { Search, Plus, Copy, Trash2, MoreHorizontal, Code2 } from "lucide-react";
 
 // The icon pickers live with the shared pieces now; the UI tests import them from here.

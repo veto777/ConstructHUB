@@ -165,7 +165,7 @@ export default function GoogleAdsGuidePage() {
               <Lock aria-hidden="true" />
               <span>Master Class Students Only</span>
             </div>
-            <div className="flex items-start justify-center gap-2">
+            <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:items-start">
               <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-locked-title">
                 Google Ads for Contractors:
                 <br />
@@ -233,7 +233,7 @@ export default function GoogleAdsGuidePage() {
               <GraduationCap aria-hidden="true" />
               <span>Google Ads Master Class</span>
             </div>
-            <div className="flex items-start justify-center gap-2">
+            <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:items-start">
               <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-masterclass-title">
                 Google Ads for Contractors:
                 <br />

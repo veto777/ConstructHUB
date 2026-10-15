@@ -29,6 +29,7 @@ import { sendModuleRequired } from '../entitlements';
 import { takeBudget } from '../growth-limits';
 import { recordFailure } from '../ops/issues';
 import { fitChars } from '../ai-output';
+import { workerInterval } from "../workers";
 
 export async function ensureBulkPostsSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS gbp_bulk_posts (
@@ -357,9 +358,7 @@ export async function runBulkPostsWorker(ai: DraftAI = generateDraft, http: Fetc
 
 export function startBulkPostsWorker() {
   if (process.env.GBP_CONTENT_WORKER_ENABLED !== 'true') return;
-  const t = setInterval(() => void runBulkPostsWorker().catch((e) => { console.error('Bulk posts worker failed'); void recordFailure('job', 'Bulk posts tick', e); }), 10 * 60000);
-  t.unref();
-  return t;
+  return workerInterval('Bulk posts worker', () => runBulkPostsWorker().catch((e) => { console.error('Bulk posts worker failed'); void recordFailure('job', 'Bulk posts tick', e); }), 10 * 60000).timer;
 }
 
 export function registerBulkPostRoutes(app: Express, auth: (req: any, res: any) => any) {

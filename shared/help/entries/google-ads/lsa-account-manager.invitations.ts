@@ -9,7 +9,7 @@ const entry: HelpDraft = {
     "Open /lsa-account-manager → Invitations and choose New invitation.",
     "Type the client’s 10-digit customer ID (digits only), a name if you like, and choose Send invitation.",
     "Ask the client to accept the manager-link invitation in their own Google Ads account.",
-    "When they confirm, choose Mark accepted on the invitation; choose Cancel to withdraw one.",
+    "Choose Mark accepted on the invitation when they confirm, or Cancel to withdraw one.",
   ],
   howItWorks: "The invitation itself lives in Google Ads: the client sees it under their account’s managers and decides there. This page does not learn the answer by itself; an admin marks it accepted once the client confirms, and that mark is what links the account here. Every send and every status change is written to the Audit log.",
   needs: ["A ConstructHUB platform-admin account.", "A connected central manager (MCC)."],

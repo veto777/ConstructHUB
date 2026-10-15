@@ -17,7 +17,8 @@ import {
   Loader2, KanbanSquare, ArrowRight, ChevronDown, ChevronUp, Plus, Pencil,
 } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard } from "@/components/crm-ui";
-import { SamplePipelineBoard } from "@/components/crm-sample-previews";
+import { lazySample } from "@/components/sample-preview";
+const SamplePipelineBoard = lazySample(() => import("@/components/crm-sample-previews"), "SamplePipelineBoard");
 import { Button } from "@/components/ui/button";
 import { ClientSearchPicker, type PickOption } from "@/components/crm-search-picker";
 import { parseDollarInput, dollarInputError } from "@/lib/dollar-input";

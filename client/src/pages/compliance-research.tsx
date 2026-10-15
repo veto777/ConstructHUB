@@ -77,6 +77,7 @@ export default function ResearchOrderPage() {
   const [trades, setTrades] = useState<ResearchTrade[]>([]);
   const [sinceYear, setSinceYear] = useState("");
   const [purpose, setPurpose] = useState("");
+  const [notes, setNotes] = useState("");
   const [wantExtended, setWantExtended] = useState(false);
   const [agree, setAgree] = useState({ refund: false, guarantee: false, fcra: false });
 
@@ -89,7 +90,7 @@ export default function ResearchOrderPage() {
   const create = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/research-reports/orders", {
       subjects: named.map((s) => ({ name: s.name.trim(), kind: s.kind, ...subjectIds(s).ids })), states, trades,
-      sinceYear: /^\d{4}$/.test(sinceYear) ? Number(sinceYear) : null, purpose,
+      sinceYear: /^\d{4}$/.test(sinceYear) ? Number(sinceYear) : null, purpose, notes,
       agreeNonRefundable: agree.refund, agreeNoGuarantee: agree.guarantee, agreeNotFcra: agree.fcra,
     })).json() as Promise<ResearchOrderView>,
     onSuccess: (o) => navigate(`${RESEARCH_PATH}/orders/${o.id}`),
@@ -253,6 +254,12 @@ export default function ResearchOrderPage() {
             <Label htmlFor="purpose">What is this for? <span className="text-muted-foreground font-normal">(optional)</span></Label>
             <Textarea id="purpose" rows={2} maxLength={1000} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. checking a subcontractor's history before we hire them" className="mt-1.5" data-testid="textarea-purpose" />
           </div>
+        </div>
+
+        <div>
+          <Label htmlFor="notes">Anything else we should know? <span className="text-muted-foreground font-normal">(optional)</span></Label>
+          <Textarea id="notes" rows={2} maxLength={500} value={notes} onChange={(e) => setNotes(e.target.value.slice(0, 500))} placeholder="e.g. the company also goes by another name, or a trade that isn't in the list above" className="mt-1.5" data-testid="textarea-notes" />
+          <p className="text-xs text-muted-foreground mt-1" data-testid="text-notes-help">Saved with the order and shown on its page, and in the email our team gets when it is paid ({notes.length}/500). It does not change the price or what the bot searches.</p>
         </div>
 
         <fieldset className="space-y-3 rounded-lg border p-4">
@@ -649,6 +656,8 @@ export function ResearchOrderStatusPage() {
             {o.input.subjects.filter((s) => s.licenseNumbers?.length || s.phones?.length || s.addresses?.length).map((s, j) => (
               <p key={j} className="text-xs text-muted-foreground mt-2">{s.name}, also by: {[...(s.licenseNumbers ?? []).map((v) => `license ${v}`), ...(s.phones ?? []), ...(s.addresses ?? [])].join(" · ")}</p>
             ))}
+            {!!o.input.purpose && <p className="text-xs text-muted-foreground mt-2" data-testid="text-order-purpose">Purpose: {o.input.purpose}</p>}
+            {!!o.input.notes && <p className="text-sm mt-2 whitespace-pre-wrap" data-testid="text-order-notes"><span className="font-semibold">Note with the order:</span> {o.input.notes}</p>}
           </header>
 
           {o.status === "awaiting_payment" && (
