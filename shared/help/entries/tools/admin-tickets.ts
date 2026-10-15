@@ -11,7 +11,7 @@ const entry: HelpDraft = {
     "Write a note and choose Save note (internal) or Email the customer.",
     "Change the status as the ticket moves along.",
   ],
-  howItWorks: "A reply emailed from here goes to the account’s email on file and moves an open ticket to Waiting on customer. The API answers 403 to anyone who is not a platform admin; open and in-progress tickets are listed first.",
+  howItWorks: "A reply emailed from here goes to the contact email saved on the ticket (the one the caller gave, which can differ from the account's) and moves an open ticket to Waiting on customer. The API answers 403 to anyone who is not a platform admin; open and in-progress tickets are listed first.",
   needs: ["Platform admin access."],
 };
 export default entry;

@@ -10,7 +10,7 @@ const entry: HelpDraft = {
     "CRM → Settings.",
     "Start with Company profile: the name, address, phone and logo that print on estimates and invoices.",
     "Set Estimate & invoice defaults — the estimate and invoice footers, terms and conditions, warranty text, and the default deposit and sales tax percentages.",
-    "Turn on the notifications you want, connect Payments, and add your lead sources.",
+    "Turn on the notifications you want and connect Payments; the Lead sources card only shows the sources already on your clients.",
   ],
   howItWorks: "Settings belong to the company, not to you, so every team member who can manage settings sees the same values. Document defaults are pre-filled on every new estimate and invoice and can be changed on that document; a saved change applies to the next document you create.",
   needs: ["A ConstructHub CRM plan — the CRM is a separate product with its own plans.", "The “Manage company settings” permission — by default the owner and admins have it."],
