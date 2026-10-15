@@ -18,6 +18,8 @@
  *   MO  Kansas City business license holders, construction business types (bulk)
  *   VA  Norfolk business licenses, construction NAICS (bulk)
  *   FL  Miami-Dade County contractor licenses with their tradesmen (the county's layer, last updated 2024-10-25; bulk)
+ *   NV  City of Las Vegas business licenses of type "Contractor", with owners and their titles (bulk)
+ *   AZ  Tucson active business licenses, construction NAICS codes (23…) (bulk)
  *   IL  Chicago BACP home-repair licenses, with every owner and officer from the city's Business Owners dataset (bulk)
  *   MD  Montgomery County DPS licenses: building contractors (new-home builders), master and limited master
  *       electricians, limited electrical businesses, fire-system licensees (bulk)
@@ -657,10 +659,60 @@ const miamiDade: BulkSource = {
   },
 };
 
+// ── Las Vegas ────────────────────────────────────────────────────────────────────────────────────────────────────
+const LV = "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/Business_Licenses_OpenData/FeatureServer/0";
+const LV_PAGE = "https://www.arcgis.com/home/item.html?id=f6b923ee5eb9450baf6adebaf0f307ed";
+const lasVegas: BulkSource = {
+  id: "nv-las-vegas-contractors", state: "NV", label: "City of Las Vegas contractor business licenses", pageUrl: LV_PAGE, everyHours: 24, minRows: 7_000,
+  load: async function* () {
+    // One row per owner of a license: gather each license's owners ("Donald Terry - Manager").
+    const byLicense = new Map<string, { row: Row; people: { name: string; role: string | null }[] }>();
+    for await (const r of arcgisAll(LV, "Type_of_Business = 'Contractor'")) {
+      const no = txt(r, "License__") ?? `row ${txt(r, "ObjectId")}`;
+      const entry = byLicense.get(no) ?? { row: r, people: [] };
+      const owner = txt(r, "Owner_and_Owner_Title");
+      const m = owner?.match(/^(.*?)\s+-\s+([^-]+)$/);
+      const name = m ? m[1].trim() : owner;
+      if (name && !entry.people.some((p) => p.name === name)) entry.people.push({ name, role: m ? m[2].trim() : null });
+      byLicense.set(no, entry);
+    }
+    for (const { row: r, people } of Array.from(byLicense.values())) {
+      const name = txt(r, "Business_Name");
+      if (!name) continue;
+      const zip = txt(r, "Zip_Code");
+      yield licenseHit({
+        state: "NV", source: "City of Las Vegas business licenses", sourceUrl: LV_PAGE,
+        businessName: name, licenseNumber: txt(r, "License__"), licenseType: txt(r, "Type_of_Business"), specialty: null,
+        status: txt(r, "Status"), principal: people.find((p) => !ORG.test(p.name))?.name ?? null, city: null, expires: null,
+        address: addressLine([txt(r, "Address")], null, "NV", zip), phone: txt(r, "Phone"), people,
+      });
+    }
+  },
+};
+
+// ── Tucson ───────────────────────────────────────────────────────────────────────────────────────────────────────
+const TUCSON = "https://gis.tucsonaz.gov/arcgis/rest/services/PublicMaps/OpenData_EconomicDevelopment/MapServer/3";
+const TUCSON_PAGE = "https://www.arcgis.com/home/item.html?id=b0e8f873aaeb4375b481979be334fbf2";
+const tucson: BulkSource = {
+  id: "az-tucson-contractors", state: "AZ", label: "Tucson business licenses (construction)", pageUrl: TUCSON_PAGE, everyHours: 24 * 7, minRows: 4_900,
+  load: async function* () {
+    for await (const r of arcgisAll(TUCSON, "NAIC_CODE LIKE '23%'")) {
+      const name = txt(r, "ACC_NAME");
+      if (!name) continue;
+      yield licenseHit({
+        state: "AZ", source: "Tucson business licenses", sourceUrl: TUCSON_PAGE,
+        businessName: name, licenseNumber: txt(r, "ACC_NUM"), licenseType: "Business license", specialty: txt(r, "NAIC_DESC"),
+        status: txt(r, "LIC_STATUS"), principal: null, city: txt(r, "CITY"), expires: null,
+        address: addressLine([txt(r, "ADDRESS")], txt(r, "CITY"), txt(r, "STATE"), txt(r, "ZIP_CODE")), phone: null, people: [],
+      });
+    }
+  },
+};
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade];
+export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade, lasVegas, tucson];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
