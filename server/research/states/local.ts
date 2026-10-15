@@ -9,6 +9,7 @@
  *   DC  District of Columbia DLCP basic business licenses: contractor and construction services (general
  *       contractors / construction managers, home-improvement contractors), with owners and registered agents (bulk)
  *   CA  Los Angeles Office of Finance active business tax registrations, construction NAICS codes (23…) (bulk)
+ *   CA  San Francisco registered business locations, self-reported construction NAICS (23…), with the owner (bulk)
  *   WA  Seattle active business license tax certificates, construction NAICS codes (23…) (bulk)
  *   CA  Long Beach business licenses in the "Contracting" categories (bulk)
  *   CO  Boulder licensed contractors (bulk)
@@ -486,6 +487,31 @@ const losAngeles: BulkSource = {
   },
 };
 
+const SF_BUSINESSES = soda("data.sfgov.org", "g8m3-pdis");
+const sanFrancisco: BulkSource = {
+  id: "ca-sf-construction-businesses", state: "CA", label: "San Francisco registered businesses (construction)", pageUrl: SF_BUSINESSES.datasetUrl,
+  everyHours: 24, minRows: 8_700,
+  load: async function* () {
+    for await (const r of sodaAll(SF_BUSINESSES.url, "starts_with(self_reported_naics_code,'23')")) {
+      const owner = txt(r, "ownership_name"), dba = txt(r, "dba_name");
+      if (!owner && !dba) continue;
+      const ownerIsOrg = !!owner && ORG.test(owner);
+      const closed = isoDay(r.location_end_date);
+      const address = addressLine([txt(r, "full_business_address")], txt(r, "city"), txt(r, "state"), txt(r, "business_zip"));
+      const mailing = addressLine([txt(r, "mailing_address_1")], txt(r, "mail_city"), txt(r, "mail_state"), txt(r, "mail_zipcode"));
+      const h = licenseHit({
+        state: "CA", source: "San Francisco registered businesses", sourceUrl: SF_BUSINESSES.datasetUrl,
+        businessName: ownerIsOrg ? (dba && dba.toUpperCase() !== owner!.toUpperCase() ? `${owner} (d/b/a ${dba})` : owner) : dba,
+        licenseNumber: txt(r, "certificate_number"), licenseType: "Business registration certificate", specialty: "Construction (self-reported NAICS 23)",
+        status: closed ? `Location closed ${closed}` : "Location open", principal: ownerIsOrg ? null : owner, city: txt(r, "city"), expires: null,
+        address, phone: null, people: [{ name: ownerIsOrg ? null : owner, role: "Owner" }],
+      });
+      if (h.keys) { h.keys.licenses = [txt(r, "certificate_number"), txt(r, "ttxid")]; h.keys.addresses = [address, mailing]; }
+      yield h;
+    }
+  },
+};
+
 const SEA_BUSINESSES = soda("cos-data.seattle.gov", "wnbq-64tb");
 const seattle: BulkSource = {
   id: "wa-seattle-construction-businesses", state: "WA", label: "Seattle business license tax certificates (construction)", pageUrl: SEA_BUSINESSES.datasetUrl,
@@ -712,7 +738,7 @@ const tucson: BulkSource = {
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade, lasVegas, tucson];
+export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, sanFrancisco, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade, lasVegas, tucson];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
