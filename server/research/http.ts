@@ -281,13 +281,17 @@ export function normalizeRobotsPath(path: string): string {
   });
 }
 
-/** RFC 9309: the longest matching rule wins; Allow wins a tie; no matching rule allows. Paths are compared normalized. */
+/**
+ * RFC 9309: the longest matching rule wins; Allow wins a tie; no matching rule allows. Paths are compared normalized,
+ * and so is the length that decides (round 6, decision 6): "Allow: /%70%72%69" is "/pri", shorter than "/private".
+ */
 export function robotsAllows(rules: Rule[], pathAndQuery: string): boolean {
-  let best: Rule | null = null;
+  let best: { allow: boolean; length: number } | null = null;
   const want = normalizeRobotsPath(pathAndQuery);
   for (const r of rules) {
-    if (!ruleRe(normalizeRobotsPath(r.path)).test(want)) continue;
-    if (!best || r.path.length > best.path.length || (r.path.length === best.path.length && r.allow)) best = r;
+    const path = normalizeRobotsPath(r.path);
+    if (!ruleRe(path).test(want)) continue;
+    if (!best || path.length > best.length || (path.length === best.length && r.allow)) best = { allow: r.allow, length: path.length };
   }
   return best ? best.allow : true;
 }
@@ -330,7 +334,8 @@ async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status
         })]);
       } else {
         const r = await fetch(cur, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.any([AbortSignal.timeout(15_000), turn.signal]), redirect: "manual" });
-        const read = r.status >= 200 && r.status < 500 && !REDIRECTS.has(r.status);
+        // Every answer but a redirect is read: a 5xx can be a challenge page too (round 6, decision 5).
+        const read = !REDIRECTS.has(r.status);
         res = { status: r.status, location: r.headers.get("location"), retryAfter: r.headers.get("retry-after"), text: read ? (await r.text()).slice(0, 200_000) : (await r.body?.cancel().catch(() => undefined), "") };
       }
     } finally {
@@ -341,6 +346,9 @@ async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status
     // every unknown path that way. A 401/403 on a data request still blocks the host (noteResponse there).
     // A challenge page with that 401/403 is a refusal: it blocks the host that answered.
     if ((res.status !== 401 && res.status !== 403) || challengePage(res.text)) noteResponse(cur, res.status, res.retryAfter);
+    // A challenge in place of robots.txt, on any status, blocks the host that answered for the rest of the run (round
+    // 6, decision 5), not only for the hour robots.txt is cached as refused. A plain 4xx page is still "no rules".
+    if (robotsChallenge(res.status, res.text)) blockHost(cur, res.status, "a bot challenge page on robots.txt");
     if (!REDIRECTS.has(res.status) || !res.location) return res;
     if (hop + 1 >= ROBOTS_HOPS) throw new Error(`more than ${ROBOTS_HOPS} redirects for robots.txt`);
     const next = new URL(res.location, cur);
@@ -398,16 +406,31 @@ export function challengePage(text: string, down = false): boolean {
   return CHALLENGE_WORDS.test(seen) || (down && DOWN_WORDS.test(seen));
 }
 
+/** Words only a bot challenge says: on an error status, "access denied" alone is an ordinary 403/404 page. */
+const CHALLENGE_ONLY_WORDS = /just a moment|checking your browser|attention required|captcha|are you a robot|bot detection|verify you are (?:a )?human/i;
+
+/**
+ * An error page (4xx/5xx) that is a bot challenge (round 6, decision 5): a vendor marker, or words only a challenge
+ * says ("Checking your browser") in what a reader sees. A plain "Access denied" 404 is no challenge.
+ */
+export function errorChallenge(text: string): boolean {
+  const t = text.slice(0, 20_000);
+  if (CHALLENGE_MARKERS.test(t)) return true;
+  if (/^\s*(?:<\?xml[^>]*\?>\s*)?<Error>/i.test(t)) return false;
+  return CHALLENGE_ONLY_WORDS.test(/<[a-z!]/i.test(t) ? visibleText(t) : t);
+}
+
 /** An HTML (or XHTML) content type: the only bodies checked for a challenge. */
 export const isHtmlType = (contentType: string | null | undefined): boolean => /\b(?:text\/html|application\/xhtml\+xml)\b/i.test(contentType ?? "");
 
 /**
- * A 2xx HTML answer that is a bot challenge (A10, finding 6): the host that sent it is blocked for the run, like a
- * 401/403, and the request throws. Every transport calls it on a 2xx HTML body: fetch hops, the browser guard, the
- * bulk downloads and plain requests, and the scraper's own API requests in a research run.
+ * An HTML answer that is a bot challenge, whatever its status (A10, finding 6; round 6, decision 5: a "503 Checking
+ * your browser" too): the host that sent it is blocked for the run, like a 401/403, and the request throws, before
+ * any retry. Every transport calls it on an HTML body: fetch hops, the browser guard, the bulk downloads and plain
+ * requests, MA's Contractor Hub client, and the scraper's own API requests in a research run.
  */
 export function refuseChallengeBody(url: string, status: number, body: string): void {
-  if (status < 200 || status >= 300 || !challengePage(body)) return;
+  if (!(status >= 200 && status < 300 ? challengePage(body) : errorChallenge(body))) return;
   blockHost(url, status, "a bot challenge page");
   throw new PortalBlockedError(url, status, `${hostOf(url)} answered with a bot challenge page; no automated requests to it for this run`);
 }
@@ -416,11 +439,12 @@ export function refuseChallengeBody(url: string, status: number, body: string): 
 const CHALLENGE_PEEK_BYTES = 64 * 1024;
 
 /**
- * The response with the start of its HTML body checked (refuseChallengeBody). The body still streams: the bytes read
+ * The response with the start of its HTML body checked (refuseChallengeBody), on any status (round 6, decision 5:
+ * before politeFetch's retry of a 503). The body still streams: the bytes read
  * for the check are handed on first, then the rest as it arrives, so a large page or file is never held whole.
  */
 async function checkedResponse(url: string, res: Response): Promise<Response> {
-  if (res.status < 200 || res.status >= 300 || !isHtmlType(res.headers.get("content-type")) || !res.body) return res;
+  if (!isHtmlType(res.headers.get("content-type")) || !res.body) return res;
   const reader = res.body.getReader();
   const head: Uint8Array[] = [];
   let size = 0, done = false;
@@ -454,6 +478,13 @@ async function checkedResponse(url: string, res: Response): Promise<Response> {
   return out;
 }
 
+/** A robots.txt answer that is a bot challenge: an HTML page on a 2xx (a robots file may say "captcha" in a path), any challenge otherwise. */
+const robotsHtml = (text: string) => /^\s*</.test(text) || /<html[\s>]/i.test(text.slice(0, 2000));
+function robotsChallenge(status: number, text: string): boolean {
+  if (REDIRECTS.has(status) || !text) return false;
+  return status >= 200 && status < 300 ? robotsHtml(text) && challengePage(text) : challengePage(text);
+}
+
 export async function robotsFor(origin: string, chain: Set<string> = new Set()): Promise<{ rules: Rule[]; denied?: string }> {
   const hit = robotsCache.get(origin);
   if (hit && Date.now() - hit.at < hit.ttl) return hit;
@@ -465,7 +496,7 @@ export async function robotsFor(origin: string, chain: Set<string> = new Set()):
       const res = await fetchRobots(origin, new Set(chain).add(origin));
       const ok = res.status >= 200 && res.status < 300;
       if (ok) {
-        const html = /^\s*</.test(res.text) || /<html[\s>]/i.test(res.text.slice(0, 2000));
+        const html = robotsHtml(res.text);
         // An HTML page is a refusal only when it is a bot challenge or an error page. An app that answers every path
         // with its own page (OK CIB's verify site) has no robots file: no rules, as RFC 9309 reads unparseable content.
         entry = html && challengePage(res.text, true)
@@ -601,17 +632,35 @@ function follow(signal: AbortSignal | null | undefined, ctrl: AbortController) {
   else signal.addEventListener("abort", () => ctrl.abort(signal.reason), { once: true });
 }
 
+/**
+ * The Socrata portals our sources read (round 6, decision 10): the only hosts the app token is sent to. A source on a
+ * new Socrata host adds it here (the research tests check every Socrata URL in the code is listed); until then its
+ * requests go without the token, as before A9.
+ */
+export const SOCRATA_HOSTS: ReadonlySet<string> = new Set(`
+  cos-data.seattle.gov data.austintexas.gov data.brla.gov data.cincinnati-oh.gov data.cityofchicago.org
+  data.cityofnewyork.us data.colorado.gov data.ct.gov data.delaware.gov data.honolulu.gov data.illinois.gov data.kcmo.org
+  data.lacity.org data.mesaaz.gov data.mo.gov data.montgomerycountymd.gov data.nola.gov data.norfolk.gov data.ny.gov
+  data.oregon.gov data.pa.gov data.seattle.gov data.sf.gov data.sfgov.org data.texas.gov data.vermont.gov data.wa.gov
+`.trim().split(/\s+/));
+
 /** A Socrata (SODA) API path: /resource/abcd-1234(.json|.csv…), /api/views/abcd-1234/…, /api/id/…, /api/odata/…. */
 const SOCRATA_PATH = /^\/(?:resource\/[a-z0-9]{4}-[a-z0-9]{4}(?:\.[a-z]+)?$|api\/(?:views|id)\/[a-z0-9]{4}-[a-z0-9]{4}(?:[./]|$)|api\/odata\/)/i;
 
 /**
- * The app token to send with a request (A9): SOCRATA_APP_TOKEN, only when it is set and only to a Socrata API path.
+ * The app token to send with a request (A9): SOCRATA_APP_TOKEN, only when it is set, only over HTTPS to a host on
+ * SOCRATA_HOSTS, and only to a Socrata API path.
  * Unset, every request is exactly as before. The token is never logged.
  */
 export function socrataAppToken(url: string): string | null {
   const token = process.env.SOCRATA_APP_TOKEN?.trim();
   if (!token) return null;
-  try { return SOCRATA_PATH.test(new URL(url).pathname) ? token : null; } catch { return null; }
+  try {
+    const u = new URL(url);
+    // An approved Socrata host as well as an API path (round 6, decision 10), checked on every hop: a redirect to
+    // https://untrusted.example/resource/… gets no token.
+    return u.protocol === "https:" && SOCRATA_HOSTS.has(u.hostname.toLowerCase()) && SOCRATA_PATH.test(u.pathname) ? token : null;
+  } catch { return null; }
 }
 
 /**

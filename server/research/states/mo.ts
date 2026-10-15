@@ -22,6 +22,7 @@ import { politeFetch, rethrowIfBlocked } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { safeDecode, withNote } from "../notes";
 import { looksLikeBusiness } from "./lib/business-name";
+import { personText } from "../person-name";
 import { fromFile, isoDay, joinAddr, unzipFirst } from "./lib/g6-common";
 
 // ── MO PRO guest Apex actions ────────────────────────────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ function moRow(r: Record<string, string>, licenseName: string, label: string): B
   const isBusiness = BUSINESS_PROFESSION.test(licenseName) || (!personName && !!entity);
   const business = isBusiness ? entity : clean(r.employer_name);
   const dba = clean(r.prc_dba_name);
-  const who = isBusiness ? null : personName ?? entity;
+  const who = isBusiness ? null : personName ?? personText(r.prc_entity_name); // as published: a list stays a list
   if (!business && !who) return null;
   const address = joinAddr(r.ba_address, r.ba_2address, r.ba_city, r.ba_state, r.ba_zip);
   const status = [clean(r.lst_description), clean(r.les_description)].filter(Boolean).join(", ") || null;
@@ -141,7 +142,11 @@ export function parseMoDetail(sections: MoSection[]): { fields: Record<string, s
       const v = Object.fromEntries(rec.headingFieldValue.map((f) => [f.label, clean(f.value) ?? ""]));
       if (s.headingName === "License") Object.assign(fields, v);
       else if (s.headingName === "Address") address = joinAddr(v["Street"], v["City"], v["State"], v["PostalCode"]);
-      else if (v["Licensee Name"]) people.push({ name: v["Licensee Name"], role: clean(v["Role"]) });
+      else if (v["Licensee Name"]) {
+        // The name as published: a list stays a list (round 6, decision 3).
+        const who = personText(rec.headingFieldValue.find((f) => f.label === "Licensee Name")?.value) ?? v["Licensee Name"];
+        people.push({ name: who, role: clean(v["Role"]) });
+      }
     }
   }
   return { fields, address, people };
@@ -197,6 +202,7 @@ async function moSearch(criteria: string, value: string, kind: "person" | "compa
     for (const [i, r] of named.entries()) {
       const name = clean(r.licenseeName);
       const isBusiness = moIsBusiness(r.rat, name);
+      const who = isBusiness ? null : personText(r.licenseeName); // as published: a list stays a list
       let d: ReturnType<typeof parseMoDetail> = { fields: {}, address: null, people: [] };
       if (i < MO_DETAILS) {
         try { d = parseMoDetail(await moApex<MoSection[]>("MODPR_LicenseSearchController", "getApplicationData", { blId: r.businessLicenseId, status, directApplication: false })); }
@@ -206,10 +212,10 @@ async function moSearch(criteria: string, value: string, kind: "person" | "compa
       hits.push({
         state: "MO", source: "Missouri MO PRO licensee search", sourceUrl: MO_SEARCH,
         businessName: isBusiness ? name : null, licenseNumber: clean(d.fields["License Number"]), licenseType: clean(r.rat),
-        specialty: null, status: statusText, discipline, holder: moHolder(clean(r.rat), name), principal: isBusiness ? null : name,
+        specialty: null, status: statusText, discipline, holder: moHolder(clean(r.rat), name), principal: who,
         city: [clean(r.city), clean(r.state)].filter(Boolean).join(", ") || null, expires: usDate(d.fields["Expiration Date"]),
         matchedOn: kind === "license" ? "license" : isBusiness ? "business" : "principal", address: d.address,
-        people: [...(!isBusiness && name ? [{ name, role: clean(r.rat) }] : []), ...d.people],
+        people: [...(who ? [{ name: who, role: clean(r.rat) }] : []), ...d.people],
       });
     }
     const label = status === "Active" ? "active" : "non-active";

@@ -25,6 +25,7 @@ import { politeFetch } from "../http";
 import type { LiveEnforcementSearch, StatePack } from "./types";
 import { anyDay, businessParts, fetchJson, money, nameMatches, usd } from "./lib/g8-common";
 import { looksLikeBusiness } from "./lib/business-name";
+import { personText } from "../person-name";
 import { adverseFrom } from "../adverse";
 import { capNote, escapeRegExp, withNote } from "../notes";
 import { xlsxRows } from "./lib/g8-xlsx";
@@ -58,7 +59,7 @@ export function parsePvlReport(rows: string[][], label: string, layout: "contrac
     const iName = col("Licensee"), iNo = col("License: License Number"), iClass = col("Classification: Classification Name"), iTrade = col("Trade/Professional Name"),
       iStatus = col("Status"), iExp = col("Effective Expire Date"), iStreet = col("Business Street"), iCity = col("Business City"), iSt = col("Business State"), iZip = col("Business Zip Code");
     if ([iName, iNo, iClass, iStatus, iExp].some((i) => i < 0)) throw new Error(`${label}: unexpected columns`);
-    let cur: { name: string; no: string; trade: string | null; status: string | null; exp: string | null; city: string | null; address: string | null; locality: string | null; classes: string[] } | null = null;
+    let cur: { name: string; person: string | null; no: string; trade: string | null; status: string | null; exp: string | null; city: string | null; address: string | null; locality: string | null; classes: string[] } | null = null;
     const flush = () => {
       if (!cur) return;
       // A sole proprietor's license is under the person's name (./lib/business-name.ts decides; the report has no
@@ -74,20 +75,21 @@ export function parsePvlReport(rows: string[][], label: string, layout: "contrac
         kind: "license",
         hit: {
           state: "HI", source: label, sourceUrl: PVL_PAGE, businessName: business, licenseNumber: cur.no, licenseType: "Contractor license",
-          specialty: cur.classes.length ? `Classes: ${cur.classes.join(", ")}` : null, status: status(cur.status ?? ""), principal: isBiz ? null : cur.name,
+          specialty: cur.classes.length ? `Classes: ${cur.classes.join(", ")}` : null, status: status(cur.status ?? ""), principal: isBiz ? null : cur.person,
           city: cur.city, expires: anyDay(cur.exp), matchedOn: isBiz ? "business" : "principal", address,
           holder: isBiz ? null : "individual",
         },
         keys: { licenses: [cur.no] },
         component: label,
-        business: isBiz ? [cur.name, cur.trade].filter(Boolean).join(" ") : cur.trade, person: isBiz ? null : cur.name,
+        business: isBiz ? [cur.name, cur.trade].filter(Boolean).join(" ") : cur.trade, person: isBiz ? null : cur.person,
       });
       cur = null;
     };
     for (const r of rows.slice(head + 1)) {
       const name = clean(r[iName]), no = clean(r[iNo]), cls = clean(r[iClass]);
       if (name && /^(subtotal|total)$/i.test(name)) continue;
-      if (name && no) { flush(); cur = { name, no, trade: clean(r[iTrade]), status: clean(r[iStatus]), exp: clean(r[iExp]), city: clean(r[iCity]),
+      // The person as published (round 6, decision 3): a line break between two names stays a list.
+      if (name && no) { flush(); cur = { name, person: personText(r[iName]), no, trade: clean(r[iTrade]), status: clean(r[iStatus]), exp: clean(r[iExp]), city: clean(r[iCity]),
         address: [r[iStreet], r[iCity], r[iSt], r[iZip]].map((v) => clean(v)).filter(Boolean).join(" ") || null,
         locality: [r[iCity], r[iSt], r[iZip]].map((v) => clean(v)).filter(Boolean).join(" ") || null, classes: [] }; }
       if (cur && cls && !cur.classes.includes(cls)) cur.classes.push(cls);
@@ -104,14 +106,15 @@ export function parsePvlReport(rows: string[][], label: string, layout: "contrac
       const no = clean(r[iNo]), name = clean(r[iName]);
       if (!no || !name) continue;
       const isBiz = looksLikeBusiness(name);
+      const who = isBiz ? null : personText(r[iName]); // as published: a list stays a list
       out.push({
         kind: "license",
         hit: {
           state: "HI", source: label, sourceUrl: PVL_PAGE, businessName: isBiz ? name : null, licenseNumber: no, licenseType: type, specialty: null,
-          status: status(r[iStatus] ?? ""), principal: isBiz ? null : name, city: null, expires: anyDay(r[iExp]), matchedOn: isBiz ? "business" : "principal",
+          status: status(r[iStatus] ?? ""), principal: who, city: null, expires: anyDay(r[iExp]), matchedOn: isBiz ? "business" : "principal",
           holder: isBiz ? null : "individual", // no entity type published (round 3, decision 3)
         },
-        business: isBiz ? name : null, person: isBiz ? null : name, keys: { licenses: [no] }, component: label,
+        business: isBiz ? name : null, person: who, keys: { licenses: [no] }, component: label,
       });
     }
   }

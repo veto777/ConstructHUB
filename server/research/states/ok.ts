@@ -14,6 +14,7 @@
  *     the top of the same PDF) and expiration date. The lists publish no address, phone or city. The PDF links carry
  *     their date, so each load reads the current links from the page.
  */
+import { flipPerson } from "../person-name";
 import type { LicenseHit } from "@shared/research-reports";
 import { inflateSync } from "node:zlib";
 import { politeFetch } from "../http";
@@ -244,7 +245,8 @@ export function expandEndorsements(codes: string | null, legend: Map<string, str
   }).join("; ");
 }
 
-const flipName = (v: string) => { const m = v.match(/^([^,]+),\s*(.+)$/); return clean(m ? `${m[2]} ${m[1]}` : v) ?? v; };
+/** "LAST, FIRST" → "FIRST LAST" for one person; a published list stays a list (../person-name.ts). */
+const flipName = (v: string) => flipPerson(v) ?? v;
 
 function odolLoader(kind: OdolKind): () => AsyncIterable<BulkHit> {
   return async function* () {

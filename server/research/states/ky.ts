@@ -15,7 +15,7 @@ import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { normLicense, type IdQuery } from "../identifiers";
 import { usDate } from "../bulk";
-import { aspxFields, cookiesOf, flipName, isPersonName, text } from "./lib/g4-html";
+import { aspxFields, cookiesOf, flipName, htmlPerson, isPersonName, text } from "./lib/g4-html";
 import type { StatePack } from "./types";
 import { withNote } from "../notes";
 
@@ -25,7 +25,7 @@ const CAP = 50;
 // manufactured home/RV and certified installer, building code enforcement.
 const DIVISIONS = ["49", "52", "53", "55", "57", "58"];
 
-export type KyRow = { id: string | null; name: string | null; type: string | null; dba: string | null; number: string | null; status: string | null; issued: string | null; expires: string | null };
+export type KyRow = { id: string | null; name: string | null; person?: string | null; type: string | null; dba: string | null; number: string | null; status: string | null; issued: string | null; expires: string | null };
 
 /** The rows of the licensee grid (MainContent_grdData). */
 export function parseKyGrid(html: string): KyRow[] {
@@ -36,7 +36,8 @@ export function parseKyGrid(html: string): KyRow[] {
     if (cells.length < 7) continue;
     out.push({
       id: cells[0].match(/HBC_Lic_Details\.aspx\?id=(\d+)/)?.[1] ?? null,
-      name: text(cells[0]), type: text(cells[1]), dba: text(cells[2]), number: text(cells[3]), status: text(cells[4]),
+      // `person`: the name cell with a <br> kept as a list separator (round 6, decision 3).
+      name: text(cells[0]), person: htmlPerson(cells[0]), type: text(cells[1]), dba: text(cells[2]), number: text(cells[3]), status: text(cells[4]),
       issued: usDate(text(cells[5])), expires: usDate(text(cells[6])),
     });
   }
@@ -99,7 +100,7 @@ export function kyHolder(type: string | null): "business" | "individual" | null 
 }
 
 const toHit = (r: KyRow, matchedOn: LicenseHit["matchedOn"]): LicenseHit => {
-  const person = isPersonName(r.name) ? flipName(r.name) : null;
+  const person = isPersonName(r.name) ? flipName(r.person ?? r.name) : null;
   return {
     state: "KY", source: "Kentucky Department of Housing, Buildings and Construction", sourceUrl: r.id ? `https://dhbc.ky.gov/Search/HBC_Lic_Details.aspx?id=${r.id}` : PAGE,
     businessName: r.dba ?? (person ? null : r.name), licenseNumber: r.number, licenseType: r.type, specialty: null, status: r.status,

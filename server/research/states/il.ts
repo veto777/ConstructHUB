@@ -23,6 +23,7 @@ import type { StatePack } from "./types";
 import { ADVERSE, NOT_ADVERSE, adverseFrom, hasEnded } from "../adverse";
 import { noteOf, withNote } from "../notes";
 import { looksLikeBusiness } from "./lib/business-name";
+import { personText } from "../person-name";
 
 /** The license number as typed and with its punctuation stripped, quoted for SoQL ("062-012345" and "062012345"). */
 export const licenseForms = (v: string): string[] =>
@@ -55,7 +56,7 @@ const joinAddr = (street: unknown, city: unknown, st: unknown, zip: unknown) => 
 };
 
 export function asbContractorHit(r: Record<string, unknown>, matchedOn: LicenseHit["matchedOn"]): LicenseHit {
-  const contact = na(r.contact_person);
+  const contact = na(r.contact_person) ? personText(String(r.contact_person)) : null; // as published: a list stays a list
   return {
     state: "IL", source: ASB_CONTRACTORS, sourceUrl: IDPH_CONTRACTORS.datasetUrl, businessName: na(r.contractor_name),
     licenseNumber: na(r.contractor_id_numb), licenseType: "Asbestos abatement contractor", specialty: null, status: null, principal: contact,

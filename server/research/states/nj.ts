@@ -30,6 +30,7 @@ import { fetchWithDeadline, politeFetch, rateLimitHost } from "../http";
 import { adverseFrom, hasEnded } from "../adverse";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
+import { personText } from "../person-name";
 import { excelDate, readXlsx } from "./lib/g1-xlsx";
 import { publicPowerBiRows } from "./lib/g1-powerbi";
 import type { LiveEnforcementSearch, StatePack } from "./types";
@@ -127,7 +128,7 @@ export function njRosterHit(r: Record<string, string>, label: string, isBusiness
   if (!type || NOT_A_LICENSE.test(type)) return null;
   const full = clean(r.full_name);
   if (!full) return null;
-  const person = isBusiness ? null : clean([r.first_name, r.middle_name, r.last_name, r.name_suffix].map(clean).filter(Boolean).join(" ")) ?? full;
+  const person = isBusiness ? null : clean([r.first_name, r.middle_name, r.last_name, r.name_suffix].map(clean).filter(Boolean).join(" ")) ?? personText(r.full_name); // full_name as published: a list stays a list
   const business = isBusiness ? full : null;
   const zip = /^\d{9}$/.test(r.addr_zipcode ?? "") ? `${r.addr_zipcode.slice(0, 5)}-${r.addr_zipcode.slice(5)}` : r.addr_zipcode; // "078654204"
   // An individual licensee's roster address is a home address: city, state and ZIP only, never a key.

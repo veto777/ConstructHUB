@@ -22,7 +22,7 @@ export type ResearchTransport = {
   /** After it (or after it failed, status 0): ends that turn, then notes the answer's status and Retry-After. */
   after: (url: string, status: number, retryAfter?: string | null, turn?: unknown) => void;
   /**
-   * A 2xx HTML answer's body, checked for a bot challenge (A10, finding 6): throws, and blocks the host that answered,
+   * An HTML answer's body (any status), checked for a bot challenge (A10, finding 6): throws, and blocks the host that answered,
    * when it is one.
    */
   checkBody?: (url: string, status: number, body: string) => void;
@@ -71,7 +71,8 @@ export async function researchPost(request: APIRequestContext, url: string, opts
     const loc = res.headers()["location"];
     if (!REDIRECTS.has(res.status()) || !loc) {
       // A challenge page in place of the API's answer stops the search and blocks its host (A10, finding 6).
-      if (store.checkBody && res.status() >= 200 && res.status() < 300 && /\b(?:text\/html|application\/xhtml\+xml)\b/i.test(res.headers()["content-type"] ?? "")) {
+      // Any status (round 6, decision 5): a 5xx challenge page blocks its host too.
+      if (store.checkBody && /\b(?:text\/html|application\/xhtml\+xml)\b/i.test(res.headers()["content-type"] ?? "")) {
         try { store.checkBody(cur, res.status(), (await res.body()).subarray(0, 64 * 1024).toString("utf8")); }
         catch (err) { await res.dispose().catch(() => undefined); throw err; }
       }

@@ -23,7 +23,7 @@ import type { IdQuery } from "../identifiers";
 import { politeFetch, rethrowIfBlocked } from "../http";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { capNote, escapeRegExp, noteOf, withNote } from "../notes";
-import { Session, fromFile, hiddenInputs, htmlText, isoDay, joinAddr, unzipFirst } from "./lib/g6-common";
+import { Session, fromFile, hiddenInputs, htmlPerson, htmlText, isoDay, joinAddr, unzipFirst } from "./lib/g6-common";
 
 // ── Iowa Data Hub bulk files ─────────────────────────────────────────────────────────────────────────────────
 /** The Data Hub's own download route (what its "Download as CSV" button opens): a zip holding one CSV. */
@@ -153,9 +153,12 @@ export function parseIaElectricalRows(html: string): ElRow[] {
 
 /** The detail page: the contact named on the license and the business phone. */
 export function parseIaElectricalDetail(html: string): { contact: string | null; phone: string | null; status: string | null } {
-  const t = htmlText(html.replace(/<script[\s\S]*?<\/script>/g, "")) ?? "";
+  const page = html.replace(/<script[\s\S]*?<\/script>/g, "");
+  const t = htmlText(page) ?? "";
   return {
-    contact: clean(t.match(/Contact Full Name (.+?) (?:Business Phone Number|Address City|Licensee Information)/)?.[1]),
+    // The contact from the page's HTML with htmlPerson: a <br> between two names stays a list (round 6, decision 3).
+    contact: htmlPerson(page.match(/Contact Full Name([\s\S]*?)(?:Business Phone Number|Address City|Licensee Information)/)?.[1])
+      ?? clean(t.match(/Contact Full Name (.+?) (?:Business Phone Number|Address City|Licensee Information)/)?.[1]),
     phone: clean(t.match(/Business Phone Number (\(\d{3}\) \d{3}-\d{4})/)?.[1]),
     status: clean(t.match(/License Status (.+?) Disciplines/)?.[1]),
   };

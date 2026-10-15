@@ -7,7 +7,7 @@ const GRID = `<table class="Grid" id="MainContent_grdData"><tr><th scope="col">&
 
 describe("Kentucky HBC grid", () => {
   it("reads a licensee row", () => {
-    expect(parseKyGrid(GRID)).toEqual([{ id: "576689", name: "Smith, Louis C", type: "Master Plumber", dba: "L C Smith Plumbing & Heating Co Inc", number: "M5846", status: "Active", issued: "2011-03-23", expires: "2027-03-31" }]);
+    expect(parseKyGrid(GRID)).toEqual([{ id: "576689", name: "Smith, Louis C", person: "Smith, Louis C", type: "Master Plumber", dba: "L C Smith Plumbing & Heating Co Inc", number: "M5846", status: "Active", issued: "2011-03-23", expires: "2027-03-31" }]);
   });
 });
 

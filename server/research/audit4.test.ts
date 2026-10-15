@@ -45,12 +45,13 @@ describe("finding 2: status follows the report subject", () => {
     const subject = (kind: "person" | "company"): ResearchSubjectReport => ({
       name: "John Smith", kind, licenses: [lic({ holder: "business", status: "Probation, Active" })], permits: [], licenseSources: [], portals: [],
       relatedLicenses: [lic({ holder: "business", status: "Suspended - Citation Pending", relatedVia: "x", relatedTie: "person" })],
-      enforcement: [{ state: "AZ", source: "x", sourceUrl: "x", category: "discipline", name: "ACME", id: "1", date: null, endDate: null, status: null, city: null, detail: null, amount: null, adverse: null }],
+      enforcement: [{ state: "AZ", source: "x", sourceUrl: "x", category: "discipline", name: "ACME ROOFING LLC", id: "1", date: null, endDate: null, status: null, city: null, detail: null, amount: null, adverse: null }],
     });
     const r: ResearchReport = { snapshotVersion: 2, generatedAt: "2026-10-15", states: ["AZ"], trades: [], sinceYear: null, subjects: [subject("person"), subject("company")], totals: { licenses: 2, permits: 0, portalsSearched: 0, portalsNotSearched: 0 } };
     const shown = shownReport(r)!;
     expect(shown.subjects[0].licenses[0].status).toBe("Active");
-    expect(shown.subjects[0].relatedLicenses![0].status).toBe("Suspended");
+    // Round 6, decision 8: a standing with a condition or pending matter on it shows none ("Status not stated").
+    expect(shown.subjects[0].relatedLicenses![0].status).toBeNull();
     expect(shown.subjects[0].enforcement).toEqual([]);
     expect(shown.subjects[1].licenses[0].status).toBe("Probation, Active");
     expect(shown.subjects[1].enforcement).toHaveLength(1);

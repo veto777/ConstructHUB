@@ -8,7 +8,7 @@
  *
  * Checked live 2026-10-15. robots.txt on madpl.mylicense.com and madfs.mylicense.com: none (404).
  */
-import { FormSession, buttonValue, formFields, tableRows, textOf } from "./g2-aspnet";
+import { FormSession, buttonValue, formFields, htmlPerson, tableRows, textOf } from "./g2-aspnet";
 import { withNote, type Noted } from "../../notes";
 
 const actionOf = (html: string, base: string): string => {
@@ -57,7 +57,8 @@ export function* pipeRecords(text: string): Iterable<Record<string, string>> {
   }
 }
 
-export type MyLicenseRow = Record<string, string | null> & { name: string | null; detailUrl: string | null };
+/** `person`: the name cell read as a person's name, a <br> in it kept as a list (round 6, decision 3). */
+export type MyLicenseRow = Record<string, string | null> & { name: string | null; person: string | null; detailUrl: string | null };
 
 /** Parse one results page: each row keyed by the grid's own column headers. */
 export function parseMyLicenseResults(html: string, base: string): MyLicenseRow[] {
@@ -69,7 +70,7 @@ export function parseMyLicenseResults(html: string, base: string): MyLicenseRow[
   for (const r of rows.slice(headerAt + 1)) {
     if (r.length !== header.length) continue;
     const href = r[0].match(/href="(Details\.aspx[^"]*)"/)?.[1];
-    const row: MyLicenseRow = { name: textOf(r[0]), detailUrl: href ? new URL(href.replace(/&amp;/g, "&"), base).toString() : null };
+    const row: MyLicenseRow = { name: textOf(r[0]), person: htmlPerson(r[0]), detailUrl: href ? new URL(href.replace(/&amp;/g, "&"), base).toString() : null };
     header.forEach((h, i) => { if (i > 0) row[h] = textOf(r[i]); });
     out.push(row);
   }

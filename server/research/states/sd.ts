@@ -10,6 +10,7 @@
  * The lists are published as PDFs only ("Lists of Licensees", dlr.sd.gov/plumbing/consumer_info.aspx); they are
  * read with ./lib/g6-pdf.ts. South Dakota has no state general-contractor license.
  */
+import { flipPerson } from "../person-name";
 import type { LicenseHit } from "@shared/research-reports";
 import { promises as fs } from "node:fs";
 import { clean, download, usDate, type BulkHit, type BulkSource } from "../bulk";
@@ -25,7 +26,8 @@ async function pdfRows(url: string, header: string[]) {
 }
 
 /** "LARSON, TREVOR J" → "TREVOR J LARSON". */
-const flip = (v: string | null) => { const m = v?.match(/^([^,]+),\s*(.+)$/); return m ? clean(`${m[2]} ${m[1]}`) : clean(v); };
+/** "LAST, FIRST" → "FIRST LAST" for one person; a published list stays a list (../person-name.ts). */
+const flip = (v: string | null) => flipPerson(v);
 const titleCity = (v: string | null) => clean(v)?.toUpperCase() ?? null;
 
 /** Every list here licenses people (plumbers, specialty and septic installers): an employer on the row doesn't make the license the employer's (round 2, decision 2). */

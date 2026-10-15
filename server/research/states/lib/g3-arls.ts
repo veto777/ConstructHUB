@@ -17,7 +17,7 @@ import { capNote, withNote, type Noted } from "../../notes";
 import { usDate } from "../../bulk";
 import { tokens } from "../../licenses";
 import { addressMatches, normLicense, normPhone, type IdQuery } from "../../identifiers";
-import { hasAllWords, htmlText } from "./g3-common";
+import { hasAllWords, htmlPerson, htmlText } from "./g3-common";
 
 export type ArlsBoard = {
   state: string;
@@ -71,14 +71,20 @@ export type ArlsDetails = {
   classifications: string[];
   holders: string[];
   qualifierFor: { licensee: string | null; license: string | null; status: string | null }[];
+  /** The Name field read as a person's name: a <br> in it stays a list (round 6, decision 3). */
+  person?: string | null;
 };
 
 /** One account's details page: label/value pairs, active classifications, classification holders, "Qualifier for". */
 export function parseArlsDetails(html: string): ArlsDetails {
   const fields: Record<string, string | null> = {};
+  let person: string | null = null;
   for (const m of Array.from(html.matchAll(/<div class="display-label">([\s\S]*?)<\/div>\s*<div class="display-field"[^>]*>([\s\S]*?)<\/div>/g))) {
     const k = htmlText(m[1]);
-    if (k && !(k in fields)) fields[k] = k === "Address" ? m[2] : htmlText(m[2]);
+    if (k && !(k in fields)) {
+      fields[k] = k === "Address" ? m[2] : htmlText(m[2]);
+      if (k === "Name") person = htmlPerson(m[2]);
+    }
   }
   const legend = (name: string) => html.match(new RegExp(`<legend>${name}</legend>([\\s\\S]*?)</fieldset>`))?.[1] ?? "";
   const classes = legend("Active Classifications").match(/<div class="display-field"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
@@ -90,6 +96,7 @@ export function parseArlsDetails(html: string): ArlsDetails {
     classifications: classes.split(/<br\s*\/?>/i).map(htmlText).filter((v): v is string => !!v),
     holders: holders.split(/<br\s*\/?>/i).map(htmlText).filter((v): v is string => !!v),
     qualifierFor,
+    person,
   };
 }
 
@@ -107,7 +114,7 @@ export function qualifierRole(x: { number: string | null; status: string | null 
 export function parseArlsQualifiers(html: string): { name: string; number: string | null; status: string | null }[] {
   const out: { name: string; number: string | null; status: string | null }[] = [];
   for (const r of Array.from(html.matchAll(/<tr[^>]*>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<\/tr>/g))) {
-    const name = htmlText(r[1]);
+    const name = htmlPerson(r[1]); // a <br> between two names stays a list (round 6, decision 3)
     if (!name || /^name$/i.test(name)) continue;
     out.push({ name, number: htmlText(r[2]), status: htmlText(r[3]) });
   }
@@ -206,10 +213,10 @@ async function accountHit(board: ArlsBoard, row: ArlsRow, matchedOn: LicenseHit[
   const isQualifier = !!f["Qualifier #"];
   const people: { name: string; role: string | null }[] = [];
   const add = (name: string | null | undefined, role: string) => { if (name && !people.some((p) => p.name === name)) people.push({ name, role }); };
-  if (isQualifier) add(f.Name, "Qualifier");
+  if (isQualifier) add(d.person ?? f.Name, "Qualifier");
   else {
     for (const h of d.holders) add(h.replace(/:.*$/, "").trim(), `Classification holder${h.includes(":") ? ` (${h.replace(/^[^:]*:\s*/, "")})` : ""}`);
-    if (f.Company && f.Name) add(f.Name, "Contact");
+    if (f.Company && f.Name) add(d.person ?? f.Name, "Contact");
     if (!board.noQualifiers) {
       const q = parseArlsQualifiers(await arlsText(`${board.base}/Public/_ShowAccountQualifiers/?key=${row.key}`));
       for (const x of q) add(x.name, qualifierRole(x));

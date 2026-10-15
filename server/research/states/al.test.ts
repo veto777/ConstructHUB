@@ -9,7 +9,7 @@ const DETAIL = `<input type="text" readonly class="form-control-plaintext" id="A
 
 describe("Alabama license lists", () => {
   it("reads list rows and detail links", () => {
-    expect(parseAlList(LIST)).toEqual([{ cells: ["DUNN CONSTRUCTION CO INC", "8", "BIRMINGHAM", "AL", "BC: BUILDING CONSTRUCTION, MU: MUNICIPAL AND UTILITY", "(205) 592-3866", "Details"], detail: "/genconbd/Details/1" }]);
+    expect(parseAlList(LIST)).toEqual([{ cells: ["DUNN CONSTRUCTION CO INC", "8", "BIRMINGHAM", "AL", "BC: BUILDING CONSTRUCTION, MU: MUNICIPAL AND UTILITY", "(205) 592-3866", "Details"], person: "DUNN CONSTRUCTION CO INC", detail: "/genconbd/Details/1" }]);
   });
   it("reads detail fields", () => {
     expect(parseAlDetail(DETAIL)).toEqual({ Address: "P O BOX 11967", zip: "35202", bid: "U UNLIMITED", expire: "9/30/2027" });

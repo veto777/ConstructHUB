@@ -10,6 +10,7 @@
  * Wisconsin's main construction credentials (DSPS dwelling contractor, dwelling contractor qualifier, plumbing,
  * electrical, HVAC) are NOT searchable here: see `blocked`.
  */
+import { flipPerson, personText } from "../person-name";
 import { promises as fs } from "node:fs";
 import { politeFetch } from "../http";
 import { decodeEntities } from "../bulk-sources";
@@ -42,7 +43,8 @@ export function wiAddress(lines: (string | undefined)[], city?: string, st?: str
   const z = dash(zip)?.replace(/-$/, "");
   return street ? clean([street, dash(city), [dash(st), z && z.length === 9 && /^\d+$/.test(z) ? `${z.slice(0, 5)}-${z.slice(5)}` : z].filter(Boolean).join(" ")].filter(Boolean).join(", ")) : null;
 }
-const flip = (n: string) => { const m = n.match(/^([^,]+),\s*(.+)$/); return clean(m ? `${m[2]} ${m[1]}` : n); };
+/** "LAST, FIRST" → "FIRST LAST" for one person; a published list stays a list (../person-name.ts). */
+const flip = (n: string) => flipPerson(n);
 
 /** Links on an agency page to a given file name (the DNR adds a ?version query that changes with each update). */
 async function linkTo(page: string, file: string): Promise<string> {
@@ -66,6 +68,8 @@ export function dnrRows(rows: string[][], type: string): BulkHit[] {
     if (!no || !raw || seen.has(no)) continue;
     seen.add(no);
     const person = isPersonName(raw);
+    // The person from the cell as published, not the collapsed text: a list stays a list (round 6, decision 3).
+    const cell = r[2]?.replace(/^-$/, "") ?? raw;
     const city = dash(r[7]), st = dash(r[8]);
     out.push({
       kind: "license",
@@ -73,7 +77,7 @@ export function dnrRows(rows: string[][], type: string): BulkHit[] {
         state: "WI", source: "Wisconsin DNR licensed well drillers and pump installers", sourceUrl: DNR_PAGE,
         businessName: person ? null : raw, licenseNumber: no, licenseType: type,
         specialty: updated ? `Listed in the DNR directory (${clean(updated)})` : "Listed in the DNR directory", status: null,
-        principal: person ? flip(raw) : null, city: [city, st && st !== "WI" ? st : null].filter(Boolean).join(", ") || null, expires: null,
+        principal: person ? flip(cell) : null, city: [city, st && st !== "WI" ? st : null].filter(Boolean).join(", ") || null, expires: null,
         matchedOn: person ? "principal" : "business",
         // The DNR files publish no entity type: a person's name is an individual's license; any other name, an entity
         // form in it (Inc, LLC) included, leaves the holder unknown (round 3, decision 3: a name never makes a holder
@@ -81,9 +85,9 @@ export function dnrRows(rows: string[][], type: string): BulkHit[] {
         holder: person ? "individual" : null,
         // Without a business holder the mailing address and phones may be a home's: city only, never a key.
         address: null, phone: null,
-        ...(person ? { people: [{ name: flip(raw)!, role: type.replace(/ \(DNR directory\)$/, " license holder") }] } : {}),
+        ...(person ? { people: [{ name: flip(cell)!, role: type.replace(/ \(DNR directory\)$/, " license holder") }] } : {}),
       },
-      business: person ? null : raw, person: person ? raw : null,
+      business: person ? null : raw, person: person ? personText(cell) : null,
       // Each phone is its own key ("608-555-0101, 608-555-0102" joined would match neither).
       keys: { licenses: [no] },
     });

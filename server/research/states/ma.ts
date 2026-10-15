@@ -24,12 +24,13 @@
 import { request as httpsRequest } from "node:https";
 import { rootCertificates } from "node:tls";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { USER_AGENT, guard, noteResponse, useRobotsFetcher } from "../http";
+import { USER_AGENT, guard, isHtmlType, noteResponse, refuseChallengeBody, useRobotsFetcher } from "../http";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { tokens, wholeWordMatch } from "../licenses";
 import { myLicenseDownload, myLicenseSearch, pipeRecords } from "./lib/g2-mylicense";
 import { splitName } from "./lib/g2-aspnet";
+import { personText } from "../person-name";
 import { adverseFrom } from "../adverse";
 import { capNote, noteOf, safeDecode, withNote } from "../notes";
 import type { StatePack } from "./types";
@@ -108,7 +109,12 @@ async function hicRequest(url: string, body: string | null): Promise<string> {
       catch (err) { res.resume(); reject(err); return; }
       const chunks: Buffer[] = [];
       res.on("data", (c) => chunks.push(c as Buffer));
-      res.on("end", () => (res.statusCode === 200 ? resolve(Buffer.concat(chunks).toString("utf8")) : reject(new Error(`Contractor Hub returned HTTP ${res.statusCode}`))));
+      res.on("end", () => {
+        const text = Buffer.concat(chunks).toString("utf8");
+        // A challenge page, on any status, blocks the host for the run (round 6, decision 5).
+        if (isHtmlType(String(res.headers["content-type"] ?? ""))) { try { refuseChallengeBody(url, res.statusCode ?? 0, text); } catch (err) { reject(err); return; } }
+        if (res.statusCode === 200) resolve(text); else reject(new Error(`Contractor Hub returned HTTP ${res.statusCode}`));
+      });
     });
     req.on("timeout", () => req.destroy(new Error("Contractor Hub timed out")));
     req.on("error", (err) => { turn.release(); reject(err); });
@@ -172,7 +178,7 @@ export function parseHicResponse(text: string): HicAccount[] {
 }
 
 const hicAddress = (a: HicAccount) => clean([a.BillingStreet, a.BillingCity, a.BillingState, a.BillingPostalCode].filter(Boolean).join(", "));
-const hicPeople = (a: HicAccount) => Array.from(new Set((a.AccountContactRelations ?? []).map((c) => clean(c.Contact_Full_Name__c)).filter((n): n is string => !!n)));
+const hicPeople = (a: HicAccount) => Array.from(new Set((a.AccountContactRelations ?? []).map((c) => personText(c.Contact_Full_Name__c)).filter((n): n is string => !!n)));
 
 export function hicToHit(a: HicAccount, matchedOn: LicenseHit["matchedOn"]): LicenseHit {
   const people = hicPeople(a);
@@ -182,7 +188,7 @@ export function hicToHit(a: HicAccount, matchedOn: LicenseHit["matchedOn"]): Lic
   return {
     state: "MA", source: "Massachusetts Home Improvement Contractor registry (OCABR)", sourceUrl: HIC_PAGE,
     businessName: a.IsPersonAccount ? null : name, licenseNumber: clean(a.HIC_Number__c), licenseType: "Home Improvement Contractor registration",
-    specialty: null, status: clean(a.Current_Registration_Status__c), principal: a.IsPersonAccount ? name : people[0] ?? null,
+    specialty: null, status: clean(a.Current_Registration_Status__c), principal: a.IsPersonAccount ? personText(a.Name) : people[0] ?? null,
     city: clean(a.BillingCity), expires: clean(a.Registration_Expiration_Date__c)?.slice(0, 10) ?? null, matchedOn,
     address: individual ? clean([a.BillingCity, a.BillingState, a.BillingPostalCode].filter(Boolean).join(", ")) : hicAddress(a),
     phone: individual ? null : clean(a.Phone), people: people.map((p) => ({ name: p, role: "Contact" })),
@@ -284,7 +290,7 @@ async function* maOpsiLoader(): AsyncIterable<BulkHit> {
     }
     for (const [no, g] of byLicense) {
       const r = g.main ?? g.first;
-      const who = clean(r.full_name);
+      const who = personText(r.full_name); // as published: a list stays a list (round 6, decision 3)
       if (!who) continue;
       // These licenses are issued to individuals, so the address on file is a person's: city, state and ZIP only,
       // no street, and it is not a cross-reference key (audit 2026-10-15, decision 4).
@@ -309,8 +315,8 @@ function dfsHit(r: Record<string, string | null>, matchedOn: LicenseHit["matched
   return {
     state: "MA", source: "Massachusetts Department of Fire Services certificates (oil burner, fire suppression, blasting)", sourceUrl: DFS,
     businessName: null, licenseNumber: r["License #"] ?? null, licenseType: r["License Type"] ?? null, specialty: null,
-    status: r.Status ?? null, principal: r.name ?? null, city: [r.City, r.St].filter(Boolean).join(", ") || null,
-    expires: usDate(r["Expiration Date"]), matchedOn, people: r.name ? [{ name: r.name, role: null }] : [],
+    status: r.Status ?? null, principal: r.person ?? r.name ?? null, city: [r.City, r.St].filter(Boolean).join(", ") || null,
+    expires: usDate(r["Expiration Date"]), matchedOn, people: r.name ? [{ name: r.person ?? r.name, role: null }] : [],
     holder: "individual", // certificates of competency are a person's own
   };
 }

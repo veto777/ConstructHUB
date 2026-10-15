@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { clean } from "../../bulk";
 import { decodeEntities } from "../../bulk-sources";
+import { personText } from "../../person-name";
 import { fetchWithDeadline } from "../../http";
 
 const run = promisify(execFile);
@@ -55,6 +56,14 @@ export async function unzipFirst(zip: string, match?: RegExp): Promise<string> {
 /** HTML fragment → plain text. */
 export const htmlText = (v: string | null | undefined): string | null =>
   clean(decodeEntities((v ?? "").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ")));
+
+/**
+ * A person-name cell as text (round 6, decision 3): like the helper above, but a <br> between two names stays a list
+ * (written " / ", ../../person-name.ts), so "Jane Smith<br>John Doe" is never read as one person. Whitespace in the
+ * page source is not a separator; only the <br> is.
+ */
+export const htmlPerson = (v: string | null | undefined): string | null =>
+  v == null ? null : personText(decodeEntities(v.replace(/\s+/g, " ").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")));
 
 /** "2026-03-31T00:00:00" or "2026-03-31" → "2026-03-31". */
 export const isoDay = (v: unknown): string | null => {

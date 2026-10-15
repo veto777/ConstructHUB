@@ -6,9 +6,11 @@
 import { pool } from "../db";
 import { reportHit } from "./privacy";
 import { ALL_BULK_SOURCES } from "./registry";
+import { localityOf } from "./identifiers";
+import { looksLikeBusiness, personNameForm } from "./states/lib/business-name";
 import { REPORT_SNAPSHOT_VERSION } from "@shared/research-reports";
 import type {
-  LicenseHit, ResearchOrderInput, ResearchOrderView, ResearchPreview, ResearchReport, ResearchStatus, ResearchSubjectReport, ResearchTier,
+  ComplaintHit, EnforcementHit, LicenseHit, ResearchOrderInput, ResearchOrderView, ResearchPreview, ResearchReport, ResearchStatus, ResearchSubjectReport, ResearchTier,
 } from "@shared/research-reports";
 
 const DDL = `
@@ -66,6 +68,55 @@ export function legacyReportHolder(h: LicenseHit): LicenseHit {
   return { ...h, holder: recompute ? recompute(h) ?? null : null };
 }
 
+/** Bulk sources' current rule on who an enforcement record is about, by the source name a hit carries. */
+let legacySubjects: Map<string, NonNullable<(typeof ALL_BULK_SOURCES)[number]["legacyEnforcement"]>> | null = null;
+
+/** City, state and ZIP of a stored address, or null (an unverifiable street or phone is absent; round 6, decision 4). */
+const localityOnly = (address: string | null | undefined, city: string | null): string | null => {
+  const l = address ? localityOf(address) : null;
+  return l && l !== city ? l : null;
+};
+
+/**
+ * An enforcement record from a report saved before REPORT_SNAPSHOT_VERSION 3 (round 6, decision 4): its subject is
+ * checked again by today's rule (the bulk source's own, else: a name with a personal form, or with no business sign,
+ * is dropped), and its street and phone, which no rule of the time verified, are cut to the locality.
+ */
+export function legacyReportEnforcement(h: EnforcementHit): EnforcementHit | null {
+  legacySubjects ??= new Map(ALL_BULK_SOURCES.filter((s) => s.legacyEnforcement).map((s) => [s.label, s.legacyEnforcement!]));
+  const rule = legacySubjects.get(h.source);
+  const names = (h.name ?? "").split(/\s+\/\s+|;/).map((n) => n.trim()).filter(Boolean);
+  const kept = rule ? rule(h, 0) : names.some((n) => personNameForm(n) === null && looksLikeBusiness(n)) ? h : null;
+  if (!kept) return null;
+  return { ...kept, address: localityOnly(kept.address, kept.city), phone: null };
+}
+
+/** The same for an older report's consumer complaint: the business address it named is cut to the locality. */
+const legacyComplaint = (c: ComplaintHit): ComplaintHit => (c.address ? { ...c, address: localityOnly(c.address, c.city) } : c);
+
+/** A phone or address as compared in relationship prose: digits of a phone, letters and digits of an address. */
+const contactKey = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]+/g, "");
+
+/**
+ * Relationship prose as shown (round 6, decision 4). "same phone as license 123, (813) 555-0100" and "same address as
+ * license 123, 123 Main St, Tampa FL" name a phone or street of one of the subject's records: kept only when that value
+ * is one the report shows on the subject's own records (`shown`), else the value is left out ("same address as license
+ * 123"). For a person subject the value is always left out. What the customer gave ("matched by the phone you gave
+ * (…)") is the customer's own and stays.
+ */
+export function shownVia(via: string | null | undefined, shown: Set<string>, person: boolean): string | null | undefined {
+  if (!via) return via;
+  return via.split("; ").map((part) => {
+    const m = part.match(/^((?:possible match \(address\): )?same (?:phone|address) as (?:license \S+|the .+? record for .+?)), (.+)$/);
+    if (!m) return part;
+    return !person && shown.has(contactKey(m[2])) ? part : m[1];
+  }).join("; ");
+}
+
+/** A phone or street in the cross-reference's notes ("address 123 Main St (on license 1) is shared by…"), left out. */
+export const scrubNote = (n: string): string =>
+  n.replace(/\bphone \(\d{3}\) \d{3}-\d{4}/g, "a phone").replace(/\baddress .+?(?= \(on | is shared| was not searched|: | in )/g, "an address");
+
 /** Totals of a report, counted from its subjects as shown (A10, decision 9; the same counts the runner makes). */
 export function reportTotals(subjects: ResearchSubjectReport[]): ResearchReport["totals"] {
   const sum = (f: (s: ResearchSubjectReport) => number) => subjects.reduce((n, s) => n + f(s), 0);
@@ -87,24 +138,45 @@ export function reportTotals(subjects: ResearchSubjectReport[]): ResearchReport[
 const PERSON_RECORD_SOURCES: NonNullable<ResearchSubjectReport["recordSources"]> = [{ source: "Complaints, lawsuits, enforcement and OSHA records", scope: "", searched: false, note: "Searched for companies only, not for individual people" }];
 
 /**
- * A stored report as shown today (round 4, decision 2; A10, decisions 5 and 9): license statuses follow the report
- * subject and holder under the current rules; a report saved before REPORT_SNAPSHOT_VERSION has its unverifiable
- * business holders treated as unknown; a person's report carries no enforcement, complaint, court or OSHA records and
- * says those are searched for companies only; and the totals are counted again from what is shown.
+ * A stored report as shown today (round 4, decision 2; A10, decisions 5 and 9; round 6, decision 4): license statuses
+ * follow the report subject and holder under the current rules; a report saved before snapshot version 2 has its
+ * unverifiable business holders treated as unknown, and one saved before version 3 its enforcement records checked
+ * again (legacyReportEnforcement) and its consumer complaints' addresses cut to the locality; relationship prose names
+ * only a phone or street the report shows (never for a person); a person's report carries no enforcement, complaint,
+ * court or OSHA records and says those are searched for companies only; and the totals are counted again from what
+ * is shown.
  */
 export function shownReport(r: ResearchReport | null): ResearchReport | null {
   if (!r) return r;
-  const legacy = (r.snapshotVersion ?? 1) < REPORT_SNAPSHOT_VERSION;
-  const show = (h: LicenseHit, kind: "person" | "company") => reportHit(legacy ? legacyReportHolder(h) : h, kind);
-  const subjects = r.subjects.map((s): ResearchSubjectReport => ({
-    ...s,
-    licenses: s.licenses.map((h) => show(h, s.kind)),
-    ...(s.relatedLicenses ? { relatedLicenses: s.relatedLicenses.map((h) => show(h, s.kind)) } : {}),
-    ...(s.kind === "person" ? {
-      complaints: [], courtCases: [], osha: [], enforcement: [], ...(s.relatedEnforcement ? { relatedEnforcement: [] } : {}),
+  const version = r.snapshotVersion ?? 1;
+  // Before version 2 holders are recomputed (A10, decision 5); before version 3 enforcement subjects and contacts too
+  // (round 6, decision 4).
+  const legacyHolders = version < 2, legacyContacts = version < 3;
+  const show = (h: LicenseHit, kind: "person" | "company") => reportHit(legacyHolders ? legacyReportHolder(h) : h, kind);
+  const enforcement = (list: EnforcementHit[] | undefined) => list && (legacyContacts ? list.map(legacyReportEnforcement).filter((e): e is EnforcementHit => !!e) : list);
+  const subjects = r.subjects.map((s): ResearchSubjectReport => {
+    const person = s.kind === "person";
+    const licenses = s.licenses.map((h) => show(h, s.kind));
+    // The phones and streets the report shows on the subject's own records: the only ones relationship prose may name.
+    const shown = new Set(licenses.flatMap((h) => [h.phone, h.address]).filter((v): v is string => !!v).map(contactKey));
+    const via = <T extends { relatedVia?: string | null }>(h: T): T => (h.relatedVia ? { ...h, relatedVia: shownVia(h.relatedVia, shown, person) } : h);
+    const out: ResearchSubjectReport = {
+      ...s,
+      licenses: licenses.map(via),
+      ...(s.relatedLicenses ? { relatedLicenses: s.relatedLicenses.map((h) => via(show(h, s.kind))) } : {}),
+      ...(s.relatedNotes && (person || legacyContacts) ? { relatedNotes: s.relatedNotes.map(scrubNote) } : {}),
+    };
+    if (person) return {
+      ...out, complaints: [], courtCases: [], osha: [], enforcement: [], ...(s.relatedEnforcement ? { relatedEnforcement: [] } : {}),
       ...(s.recordSources ? { recordSources: PERSON_RECORD_SOURCES } : {}),
-    } : {}),
-  }));
+    };
+    return {
+      ...out,
+      ...(s.enforcement ? { enforcement: enforcement(s.enforcement)!.map(via) } : {}),
+      ...(s.relatedEnforcement ? { relatedEnforcement: enforcement(s.relatedEnforcement)!.map(via) } : {}),
+      ...(s.complaints && legacyContacts ? { complaints: s.complaints.map(legacyComplaint) } : {}),
+    };
+  });
   const t = reportTotals(subjects);
   // A total the stored report didn't carry (older reports) stays absent, so the page doesn't claim a search.
   const totals = Object.fromEntries(Object.entries(t).filter(([k]) => k in r.totals || ["licenses", "permits", "portalsSearched", "portalsNotSearched"].includes(k))) as ResearchReport["totals"];

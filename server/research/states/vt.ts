@@ -19,6 +19,7 @@ import { CHROMIUM_ARGS, USER_AGENT } from "../../scrapers/polite-fetch";
 import { guardBrowser } from "../http";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { xlsxRecords } from "./lib/g2-xlsx";
+import { personText } from "../person-name";
 import type { StatePack } from "./types";
 
 const OPR_LOOKUP = "https://secure.professionals.vermont.gov/prweb/PRServletCustom/V9csDxL3sXkkjMC_FR2HrA%5B%5B*/!STANDARD?UserIdentifier=LicenseLookupGuestUser";
@@ -79,7 +80,7 @@ export function vtRosterHit(x: Record<string, string>, r: { type: string; busine
   const locality = [x.City, x.State, x.ZipCode ?? x.Zip].map((v) => clean(v)).filter(Boolean);
   const street = [x["AddressLine 1"] ?? x.Address1, x["AddressLine 2"] ?? x.Address2].map((v) => clean(v)).filter(Boolean);
   const address = clean((business ? [...street, ...locality] : locality).join(", "));
-  const supervisor = clean(x.Supervisor);
+  const supervisor = personText(x.Supervisor); // as published: a list stays a list (round 6, decision 3)
   // "Disciplined" is OPR's roster status for a disciplined licensee: disciplinary information, not a license status
   // (round 2, decision 1). It moves to `discipline` (dropped for an individual; a business's becomes an enforcement record).
   const status = clean(x.Status);

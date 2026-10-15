@@ -27,8 +27,9 @@ describe("decision 1: an individual's status keeps standing words only", () => {
   it("probation, 'disciplined' and pending cases come off the status and go to discipline", () => {
     expect(standingStatus("Probation, Active")).toEqual({ status: "Active", moved: "Probation" });
     expect(standingStatus("Disciplined")).toEqual({ status: null, moved: "Disciplined" });
-    expect(standingStatus("Active - Pending Case")).toEqual({ status: "Active", moved: "Pending Case" });
-    expect(standingStatus("Active with Conditions")).toEqual({ status: "Active", moved: "with Conditions" });
+    // Round 6, decision 8: a conditioned standing has none ("Status not stated").
+    expect(standingStatus("Active - Pending Case")).toEqual({ status: null, moved: "Active - Pending Case" });
+    expect(standingStatus("Active with Conditions")).toEqual({ status: null, moved: "Active with Conditions" });
     // Round 5, decision 2: only the standing phrase (and a date) stays.
     expect(standingStatus("Inactive per Request")).toEqual({ status: "Inactive", moved: "per Request" });
     expect(standingStatus("Null and Void")).toEqual({ status: "Null and Void", moved: null });

@@ -17,6 +17,7 @@ import { tokens } from "../licenses";
 import { clean } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { FormSession, cellText } from "./lib/g7-aspnet";
+import { personText } from "../person-name";
 import { adverseFrom } from "../adverse";
 import { capNote, withNote } from "../notes";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
@@ -57,7 +58,8 @@ export function parseCbrDetails(html: string): { profession: string | null; type
   return {
     profession: val("Profession"), type: val("License Type", html.split(/Qualifier Information/i)[0]), number: val("License Number"),
     expires: us ? `${us[3]}-${us[1]}-${us[2]}` : null,
-    qualifier: q ? clean(cellText(q.match(/Name:\s*(?:<[^>]+>\s*)*([^<]+)/)?.[1] ?? "")) : null,
+    // The whole <i> value with personText: a line break between two names stays a list (round 6, decision 3).
+    qualifier: q ? personText(cellText((q.match(/Name:\s*<i>([\s\S]*?)<\/i>/)?.[1] ?? q.match(/Name:\s*(?:<[^>]+>\s*)*([^<]+)/)?.[1] ?? "").replace(/<\/br\s*>/gi, "<br>"))) : null,
     qualifierType: q ? clean(cellText(q.match(/License Type:\s*(?:<[^>]+>\s*)*([^<]+)/)?.[1] ?? "")) : null,
     phone: clean(cellText(html.match(/Phone:\s*<i>([\s\S]*?)<\/i>/)?.[1] ?? "")),
     address: clean(cellText(html.match(/Address:\s*<i>([^<]*)<\/i>/)?.[1] ?? "")),

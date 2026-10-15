@@ -2,6 +2,7 @@
  * Small HTML helpers shared by the g4 state packs (AL, MS, LA, AR, KY, OK), whose boards publish their records as
  * plain server-rendered HTML pages and tables rather than open data.
  */
+import { flipPerson, personText } from "../../person-name";
 import { decodeEntities } from "../../bulk-sources";
 import { clean } from "../../bulk";
 
@@ -9,16 +10,26 @@ import { clean } from "../../bulk";
 export const text = (v: string | null | undefined): string | null =>
   clean(decodeEntities((v ?? "").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ")));
 
+/**
+ * A person-name cell as text (round 6, decision 3): like the helper above, but a <br> between two names stays a list
+ * (written " / ", ../../person-name.ts), so "Jane Smith<br>John Doe" is never read as one person. Whitespace in the
+ * page source is not a separator; only the <br> is.
+ */
+export const htmlPerson = (v: string | null | undefined): string | null =>
+  v == null ? null : personText(decodeEntities(v.replace(/\s+/g, " ").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")));
+
 /** The cells of every <tr> in a fragment, as text (cells keep their order; empty cells are null). */
 export function tableRows(html: string): (string | null)[][] {
   return Array.from(html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)).map((m) => Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((c) => text(c[1])));
 }
 
+/** The cells of every <tr> as their HTML (the same rows and cells as tableRows), for a person cell read with htmlPerson. */
+export function htmlRows(html: string): string[][] {
+  return Array.from(html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)).map((m) => Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((c) => c[1]));
+}
+
 /** "LAST, FIRST M" → "FIRST M LAST" (anything else unchanged). */
-export const flipName = (v: string | null): string | null => {
-  const m = v?.match(/^([^,]+),\s*(.+)$/);
-  return m ? clean(`${m[2]} ${m[1]}`) : clean(v);
-};
+export const flipName = (v: string | null): string | null => flipPerson(v);
 
 /** Words that mark a name as a business rather than one person. */
 const BUSINESS = /\b(LLC|L\.L\.C|INC|CORP|CORPORATION|CO|COMPANY|LTD|LP|LLP|PLLC|ENTERPRISES?|CONSTRUCTION|CONTRACTORS?|CONTRACTING|SERVICES?|BUILDERS?|HOMES?|GROUP|ROOFING|ELECTRIC(AL)?|PLUMBING|MECHANICAL|HEATING|AIR|DEVELOPMENT|PROPERTIES|INDUSTRIES|SOLUTIONS|DBA|D\/B\/A)\b|&/i;

@@ -24,6 +24,7 @@ import { fetchWithDeadline, politeFetch, rateLimitHost } from "../http";
 import { hasEnded } from "../adverse";
 import { capNote, withNote } from "../notes";
 import { looksLikeBusiness } from "./lib/business-name";
+import { personText } from "../person-name";
 import { clean, csvRecords, download, usDate, type BulkHit } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
 import type { SodaEnforcement } from "../state-records";
@@ -57,7 +58,7 @@ async function* phillyLoader(): AsyncIterable<BulkHit> {
   try {
     for await (const r of csvRecords(path)) {
       if (!("licensetype" in r)) throw new Error("Philadelphia trade licenses: unexpected layout");
-      const company = clean(r.companyname), who = clean(r.contactname);
+      const company = clean(r.companyname), who = personText(r.contactname); // the contact as published: a list stays a list
       if (!company && !who) continue;
       yield {
         kind: "license",
@@ -97,16 +98,17 @@ export async function* pittsburghLoader(): AsyncIterable<BulkHit> {
         if (!("license_type_name" in r)) throw new Error(`${f.label}: unexpected layout`);
         const name = clean(r.business_name);
         if (!name) continue;
+        const who = f.people ? personText(r.business_name) : null; // the tradesperson as published: a list stays a list
         yield {
           kind: "license",
           hit: {
             state: "PA", source: f.label, sourceUrl: PGH_PAGE, businessName: f.people ? null : name, licenseNumber: clean(r.license_number),
-            licenseType: clean(r.license_type_name), specialty: null, status: clean(r.license_state), principal: f.people ? name : null,
+            licenseType: clean(r.license_type_name), specialty: null, status: clean(r.license_state), principal: who,
             city: "Pittsburgh", expires: iso(r.expiration_date), matchedOn: f.people ? "principal" : "business",
             holder: f.people ? "individual" : "business",
           },
           // A trade license name may be a person or a shop: both searches find it.
-          business: name, person: f.people ? name : null,
+          business: name, person: who,
         };
       }
       if (records.length < 5000) break;

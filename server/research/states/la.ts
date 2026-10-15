@@ -15,7 +15,7 @@ import { politeFetch } from "../http";
 import { tokens } from "../licenses";
 import { normLicense, type IdQuery } from "../identifiers";
 import { download, usDate, type BulkHit, type BulkSource } from "../bulk";
-import { firstAmount, tableRows, text } from "./lib/g4-html";
+import { firstAmount, htmlPerson, htmlRows, tableRows, text } from "./lib/g4-html";
 import { adverseFrom } from "../adverse";
 import { capNote, noteOf, withNote } from "../notes";
 import type { StatePack } from "./types";
@@ -35,7 +35,7 @@ export function parseLaResults(html: string): { key: string; name: string | null
     // ByQP rows show the qualifier first and the company second; ByName rows show the company alone.
     const company = links[links.length - 1];
     const cur = out.get(company[1]) ?? { name: text(company[2]), qualifiers: [] };
-    const qp = links.length > 1 ? text(links[0][2]) : null;
+    const qp = links.length > 1 ? htmlPerson(links[0][2]) : null; // a <br> between two names stays a list (round 6, decision 3)
     if (qp && !cur.qualifiers.includes(qp)) cur.qualifiers.push(qp);
     out.set(company[1], cur);
   }
@@ -59,7 +59,9 @@ export function parseLaDetail(html: string): LaDetail {
     number: field(b, "License"), type: field(b, "Type"), status: field(b, "Status"), expires: usDate(field(b, "Expiration Date")),
   }));
   const classTable = html.match(/<table id="ClassificationListing"[\s\S]*?<\/table>/)?.[0] ?? "";
-  const classes = tableRows(classTable).filter((r) => r.length >= 2 && r[0]).map((r) => ({ cls: r[0]!, qualifier: r[1] }));
+  // The qualifier is read with htmlPerson: a <br> between two names stays a list (round 6, decision 3).
+  const classHtml = htmlRows(classTable);
+  const classes = tableRows(classTable).map((r, i) => ({ r, h: classHtml[i] ?? [] })).filter(({ r }) => r.length >= 2 && r[0]).map(({ r, h }) => ({ cls: r[0]!, qualifier: htmlPerson(h[1]) ?? r[1] }));
   return { name: field(info, "Name"), city: cs ? `${cs[1].trim()}, ${cs[2]}` : null, address: lines.join(", ") || null, phone: field(info, "Phone Number"), licenses, classes };
 }
 

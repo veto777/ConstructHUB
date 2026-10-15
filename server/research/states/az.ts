@@ -16,6 +16,7 @@
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { onePersonField, tokens } from "../licenses";
+import { personText } from "../person-name";
 import { clean } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { auraApex, type AuraSite } from "./lib/g7-aura";
@@ -50,7 +51,8 @@ export function rocCity(address: string | null | undefined): string | null {
 const MAX_DETAILS = 15;
 
 /** "Douglas Guy Mack (President) " → "Douglas Guy Mack". */
-export const contactName = (v: string | null | undefined) => clean(v?.replace(/\([^)]*\)\s*$/, ""));
+/** The role suffix comes off; the rest is the field as published, a list kept a list (round 6, decision 3: "Jane Smith\nJohn Doe" is not one name). */
+export const contactName = (v: string | null | undefined) => personText(v?.replace(/\([^)]*\)\s*$/, ""));
 /** "Kenneth Eugene Mackey (Member;Qualifying Party) " → "Member; Qualifying Party". */
 const contactRole = (v: string | null | undefined) => clean(v?.match(/\(([^)]*)\)\s*$/)?.[1]?.replace(/;/g, "; ")) ?? null;
 const letters = (v: string | null | undefined) => (v ?? "").toUpperCase().split(/[^A-Z0-9']+/).filter(Boolean);
