@@ -165,7 +165,8 @@ describe("identifier search and cross-reference (fake source)", () => {
     expect(x.related.every((h) => h.relatedVia && h.licenseNumber !== "EC100")).toBe(true);
     // Strongest ties first; enforcement searched for the related businesses, marked with the tie.
     expect(x.related.map((h) => h.relatedTie)).toEqual(["phone", "person", "address"]);
-    expect(searchedFor).toEqual(["SUNNY POOL CO", "BRIGHT SOLAR INC", "GULF ROOFING CORP"]);
+    // Each business by its name and by its name without "Co"/"Inc"/"Corp" (agencies file under either).
+    expect(searchedFor).toEqual(["SUNNY POOL CO", "SUNNY POOL", "BRIGHT SOLAR INC", "BRIGHT SOLAR", "GULF ROOFING CORP", "GULF ROOFING"]);
     const swo = x.relatedEnforcement.map((e) => [e.id, e.relatedTie]);
     expect(swo).toContainEqual(["SWO-2", "phone"]); // found by the phone itself
     expect(swo).toContainEqual(["SWO-1", "person"]);

@@ -4,7 +4,7 @@
  * research bot (server/research/runner.ts) finishes, the report itself (printable).
  * Prices and limits come from shared/research-reports.ts, the same module the server charges from.
  */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, CheckCircle2, ChevronDown, FileSearch, Link2, Loader2, Plus, Printer, Trash2, XCircle } from "lucide-react";
@@ -417,15 +417,18 @@ function LicenseTable({ rows, testId, related }: { rows: LicenseHit[]; testId: s
     <>
       <div className="hidden md:block overflow-x-auto print:block" data-testid={testId}><table className="w-full text-sm border-collapse">
         <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 pr-3">Business</th><th className="pr-3">People on the license</th><th className="pr-3">License</th><th className="pr-3">Type</th><th className="pr-3">Status</th><th className="pr-3">Address and phone</th><th className="whitespace-nowrap">Source</th></tr></thead>
-        <tbody>{rows.map((l, j) => (
-          <tr key={j} className="border-b align-top">
-            <td className="py-2 pr-3">{l.businessName ?? "—"}{related && l.relatedVia ? <span className="block text-xs text-muted-foreground"><Link2 className="inline h-3 w-3 mr-0.5" aria-hidden="true" />Why it's here: {l.relatedVia}</span> : null}</td>
+        <tbody>{rows.map((l, j) => (<Fragment key={j}>
+          {related && l.relatedVia && (
+            <tr className="align-top"><td colSpan={7} className="pt-2 text-xs text-muted-foreground"><Link2 className="inline h-3 w-3 mr-0.5" aria-hidden="true" />Why it's here: {l.relatedVia}</td></tr>
+          )}
+          <tr className="border-b align-top">
+            <td className="py-2 pr-3">{l.businessName ?? "—"}</td>
             <td className="pr-3"><People l={l} /></td>
             <td className="pr-3 font-mono text-xs whitespace-nowrap">{l.licenseNumber ?? "—"}{!related && FOUND_BY[l.matchedOn] ? <span className="block font-sans text-muted-foreground">{FOUND_BY[l.matchedOn]}</span> : null}</td>
             <td className="pr-3">{[l.licenseType, l.specialty].filter(Boolean).join(" · ") || "—"}</td><td className="pr-3">{l.status ?? "—"}{l.expires ? ` (exp. ${l.expires})` : ""}</td>
-            <td className="pr-3">{l.address ?? l.city ?? "—"}{l.phone ? <span className="block whitespace-nowrap">{l.phone}</span> : null}</td>
+            <td className="pr-3">{l.address ?? l.city ?? "—"}{l.phone ? <span className="block whitespace-nowrap">{formatPhone(l.phone) ?? l.phone}</span> : null}</td>
             <td className="whitespace-nowrap"><a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">{l.state} data</a><span className="block text-xs text-muted-foreground max-w-[12rem] whitespace-normal">{l.source}</span></td>
-          </tr>))}</tbody>
+          </tr></Fragment>))}</tbody>
       </table></div>
       <ul className="md:hidden print:hidden space-y-2" data-testid={`${testId}-cards`}>
         {rows.map((l, j) => (
@@ -435,7 +438,7 @@ function LicenseTable({ rows, testId, related }: { rows: LicenseHit[]; testId: s
             <p><span className="font-mono text-xs">{l.licenseNumber ?? "No number"}</span> · {[l.licenseType, l.specialty].filter(Boolean).join(" · ") || "—"}</p>
             <p>{l.status ?? "Status not published"}{l.expires ? ` (exp. ${l.expires})` : ""}</p>
             {(l.people?.length || l.principal) && <div className="text-xs"><People l={l} /></div>}
-            {(l.address || l.city || l.phone) && <p className="text-xs text-muted-foreground">{[l.address ?? l.city, l.phone].filter(Boolean).join(" · ")}</p>}
+            {(l.address || l.city || l.phone) && <p className="text-xs text-muted-foreground">{[l.address ?? l.city, l.phone ? formatPhone(l.phone) ?? l.phone : null].filter(Boolean).join(" · ")}</p>}
             {!related && FOUND_BY[l.matchedOn] && <p className="text-xs text-muted-foreground">{FOUND_BY[l.matchedOn]}</p>}
             <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">{l.state}: {l.source}</a>
           </li>
