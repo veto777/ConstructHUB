@@ -1,14 +1,16 @@
 /**
  * Check one state pack (server/research/states/<st>.ts) live, the way a report would use it.
  *
- *   DATABASE_URL=<a scratch db> npx tsx script/research-state-check.ts OH --company "Acme Roofing" [--person "John Smith"] [--bulk] [--only <bulk id>]
+ *   DATABASE_URL=<a scratch db> npx tsx script/research-state-check.ts OH --company "Acme Roofing" [--person "John Smith"]
+ *     [--license "EC123"] [--phone "614 555 0100"] [--address "100 Main St 43215"] [--bulk] [--only <bulk id>]
  *
  * Runs every license, enforcement and complaint search of the pack for the names given and prints the counts and
  * the first hits. With --bulk it also downloads and loads each bulk file into DATABASE_URL (never the live
  * database) and searches it. Exit code 1 if any source failed or a bulk file came in under its row floor.
  */
-import { loadSource, searchBulk } from "../server/research/bulk";
-import { searchLicenses } from "../server/research/licenses";
+import { loadSource, searchBulk, searchBulkBy } from "../server/research/bulk";
+import type { IdQuery } from "../server/research/identifiers";
+import { searchLicenses, searchLicensesBy } from "../server/research/licenses";
 import { namedIn, searchComplaints } from "../server/research/records";
 import { searchPackEnforcement } from "../server/research/registry";
 import { STATE_PACKS } from "../server/research/states";
@@ -20,6 +22,7 @@ const opt = (k: string) => { const i = args.indexOf(k); return i >= 0 ? args[i +
 const company = opt("--company");
 const person = opt("--person");
 const only = opt("--only");
+const ids: IdQuery[] = (["license", "phone", "address"] as const).flatMap((t) => { const v = opt(`--${t}`); return v ? [{ type: t, value: v }] : []; });
 const withBulk = args.includes("--bulk") || !!only;
 
 const pack = STATE_PACKS.find((p) => p.state === state);
@@ -44,10 +47,12 @@ async function main() {
   for (const src of pack!.licenses ?? []) {
     console.log(`license dataset: ${src.source} (${src.datasetUrl})`);
     for (const s of subjects) await attempt(`${s.kind} "${s.name}"`, async () => { const h = await searchLicenses(src, s.name, s.kind); show(`${s.kind} "${s.name}"`, h.length, h); });
+    for (const q of ids) await attempt(`${q.type} "${q.value}"`, async () => { const h = await searchLicensesBy(src, q); show(`${q.type} "${q.value}"`, h.length, h); });
   }
   for (const src of pack!.liveLicenses ?? []) {
     console.log(`live license search: ${src.source} (${src.sourceUrl})`);
     for (const s of subjects) await attempt(`${s.kind} "${s.name}"`, async () => { const h = await src.search(s.name, s.kind); show(`${s.kind} "${s.name}"`, h.length, h); });
+    if (src.searchBy) for (const q of ids) await attempt(`${q.type} "${q.value}"`, async () => { const h = await src.searchBy!(q); show(`${q.type} "${q.value}"`, h.length, h); });
   }
   if (company && (pack!.enforcement?.length || pack!.liveEnforcement?.length)) {
     console.log(`enforcement (company "${company}")`);
@@ -71,6 +76,7 @@ async function main() {
           const { hits } = await searchBulk(src, s.name, s.kind, 50);
           show(`${s.kind} "${s.name}"`, hits.length, hits);
         }
+        for (const q of ids) { const { hits } = await searchBulkBy(src, q, 50); show(`${q.type} "${q.value}"`, hits.length, hits); }
       });
     }
   } else if (pack!.bulk?.length) {
