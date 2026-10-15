@@ -15,12 +15,14 @@ import { ToolShell } from "@/components/tool/shell";
 import { nextTabIndex } from "@/components/tool/tabs";
 import { inNativeApp } from "@/lib/app-shell";
 import { SHOW_GOOGLE_REVIEWS } from "@/lib/features";
+import { portalUrl } from "@/lib/site";
 import type { SeoSite, SeoStatus } from "@/pages/seo/shell";
 import { seoNav } from "./nav";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import "./seo-layout.css";
 
-type NavEntry = { title: string; url: string; icon?: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element };
+/** `crmPath`: the page lives on the CRM portal host (JobCam) — a plain link there, never a client-side route. */
+type NavEntry = { title: string; url: string; icon?: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; crmPath?: string };
 
 function Glyph({ item }: { item: NavEntry }) {
   if (item.logoComponent) return <item.logoComponent className="h-[18px] w-[18px] shrink-0" />;
@@ -32,11 +34,14 @@ function Glyph({ item }: { item: NavEntry }) {
 /** Every other ConstructHUB tool, as the sidebar lists them (its own lists: APP_NAV). Social Media`s shell uses it too. */
 export function AllTools({ close }: { close: () => void }) {
   const [location] = useLocation();
-  const item = (i: NavEntry, sub = false) => (
-    <Link key={i.url} href={i.url} onClick={close} className={`tool-all__item${sub ? " tool-all__sub" : ""}`} aria-current={location === i.url ? "page" : undefined} data-testid={`all-tools-${i.url.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "home"}`}>
-      {!sub && <Glyph item={i} />}<span>{i.title}</span>
-    </Link>
-  );
+  const item = (i: NavEntry, sub = false) => {
+    const className = `tool-all__item${sub ? " tool-all__sub" : ""}`;
+    const testId = `all-tools-${i.url.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "home"}`;
+    const body = <>{!sub && <Glyph item={i} />}<span>{i.title}</span></>;
+    return i.crmPath
+      ? <a key={i.url} href={portalUrl(i.crmPath)} className={className} data-testid={testId}>{body}</a>
+      : <Link key={i.url} href={i.url} onClick={close} className={className} aria-current={location === i.url ? "page" : undefined} data-testid={testId}>{body}</Link>;
+  };
   const group = (g: { label: string; icon: any; logo?: string; logoComponent?: NavEntry["logoComponent"]; children: NavEntry[] }) => (
     <div className="tool-all__group" key={g.label}>
       <div className="tool-all__item" style={{ fontWeight: 600 }}><Glyph item={{ title: g.label, url: "", icon: g.icon, logo: g.logo, logoComponent: g.logoComponent }} /><span>{g.label}</span></div>
