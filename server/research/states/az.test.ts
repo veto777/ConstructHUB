@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { contactName, rocComplaintHit, rocHolder, rocLicenseHits, samePersonName, type RocAccount } from "./az";
-import { reportHit } from "../privacy";
+import { contactName, rocComplaintHit, rocHolder, rocLicenseHits, samePersonName, withDetails, type RocAccount } from "./az";
+import { privateHit, reportHit } from "../privacy";
 
 // Trimmed from a live ROC getRecords answer, 2026-10-15.
 const ROWS: RocAccount[] = [
@@ -55,8 +55,8 @@ describe("Arizona ROC", () => {
 });
 
 describe("Arizona round-2 audit (2026-10-16)", () => {
-  it("a ROC license is the account's (a business), with its people listed apart (decision 2)", () => {
-    expect(rocLicenseHits(ROWS, "Sun Valley Remodeling", "company").every((h) => h.holder === "business")).toBe(true);
+  it("a ROC search row's holder is unknown until its license page says (A13); its people are listed apart (decision 2)", () => {
+    expect(rocLicenseHits(ROWS, "Sun Valley Remodeling", "company").every((h) => h.holder === null)).toBe(true);
   });
   it("a disciplined case: the outcome's clean answer; mixed or negated wording is unknown (decision 4)", async () => {
     const { disciplinedAdverse } = await import("./az");
@@ -94,14 +94,15 @@ describe("AZ account address (round 3)", () => {
   });
 });
 
+// Trimmed from a live getRecords answer for "Gregory Smith", 2026-10-15; getLicenseDetail gave entityType
+// "Sole Proprietorship" for ROC 213981. The phone is a 555 stand-in, not the published number (an individual's).
+const SOLE: RocAccount[] = [{
+  accountContactData: [{ contactName: "Gregory John Smith (Owner) " }, { contactName: "Gregory John Smith (Qualifying Party) " }],
+  accountId: "001t000000MKxWcAAL", accountName: "Gregory John Smith", address: "Cornville, AZ, 86325", phone: "520-555-0100",
+  licenseData: [{ licenseId: "a0ot0000000Ng4EAAS", licenseNo: "ROC 213981", qpName: "Gregory John Smith", status: "Suspended", subType: "B-2 General Small Commercial Contractor" }],
+}];
+
 describe("Arizona ROC person search and holders (2026-10-15)", () => {
-  // Trimmed from a live getRecords answer for "Gregory Smith", 2026-10-15; getLicenseDetail gave entityType
-  // "Sole Proprietorship" for ROC 213981. The phone is a 555 stand-in, not the published number (an individual's).
-  const SOLE: RocAccount[] = [{
-    accountContactData: [{ contactName: "Gregory John Smith (Owner) " }, { contactName: "Gregory John Smith (Qualifying Party) " }],
-    accountId: "001t000000MKxWcAAL", accountName: "Gregory John Smith", address: "Cornville, AZ, 86325", phone: "520-555-0100",
-    licenseData: [{ licenseId: "a0ot0000000Ng4EAAS", licenseNo: "ROC 213981", qpName: "Gregory John Smith", status: "Suspended", subType: "B-2 General Small Commercial Contractor" }],
-  }];
 
   it("the license page's entity types: the ROC's values only", () => {
     expect(rocHolder("Sole Proprietorship")).toBe("individual");
@@ -126,5 +127,26 @@ describe("Arizona ROC person search and holders (2026-10-15)", () => {
     expect(owned.holder).toBe("individual");
     expect(reportHit(owned, "person").phone ?? null).toBeNull();
     expect(reportHit({ ...h, holder: rocHolder("LLC") ?? h.holder }, "company").phone).toBe("520-555-0100");
+  });
+});
+
+describe("A13: the AZ holder comes only from a license page that was read", () => {
+  it("past the 15 page reads, a hit is unknown: city only, no phone; an unlisted entity type is unknown too", async () => {
+    const base = rocLicenseHits(SOLE, "Gregory Smith", "person")[0];
+    const hits = Array.from({ length: 20 }, (_, i) => ({ ...base, licenseId: `id${i}`, licenseNumber: `ROC ${i}` }));
+    const types: Record<string, string> = { id0: "LLC", id1: "Sole Proprietorship", id2: "Trust" };
+    const out = await withDetails(hits, async (id) => ({ entityType: types[id] ?? "Corporation" }));
+    expect(out[0].holder).toBe("business");
+    expect(out[1].holder).toBe("individual");
+    expect(out[2].holder).toBeNull();
+    expect(out.slice(15).every((h) => h.holder === null)).toBe(true);
+    expect(out.slice(15).every((h) => reportHit(privateHit(h), "company").phone == null)).toBe(true);
+    expect(reportHit(out[0], "company").phone).toBe("520-555-0100");
+  });
+  it("a license page that fails leaves the holder unknown", async () => {
+    const [h] = rocLicenseHits(SOLE, "Gregory Smith", "person");
+    const [out] = await withDetails([h], async () => null);
+    expect(out.holder).toBeNull();
+    expect(privateHit(out).phone ?? null).toBeNull();
   });
 });

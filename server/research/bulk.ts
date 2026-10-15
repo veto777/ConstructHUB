@@ -345,11 +345,14 @@ export async function purgeLegacyKeys(sources: BulkSource[], log = (m: string) =
 
 /**
  * Sources taken out of the registry whose stored rows production still held on 2026-10-15 (acceptance run): MO's two
- * DPR download files (replaced by the live MO PRO search) and Pittsburgh PLI (robots.txt disallows its API). No search
+ * DPR download files (replaced by the live MO PRO search) and Pittsburgh PLI (robots.txt disallows its API); and on
+ * the coordinator's terms decisions (A13): SC DES enforcement (des.sc.gov's terms bar republishing) and WV Purchasing
+ * debarments (purchasing.wv.gov disallows robots; the legacy host is a side door), and Wisconsin's DNR well-driller
+ * and DHS abatement files (noncommercial-use terms). No search
  * reads them (every read is by a registered source's id), so they are deleted. Named one by one, never "whatever isn't
  * registered", so a source switched off by configuration keeps its rows.
  */
-export const RETIRED_BULK_SOURCES: readonly string[] = ["mo-dpr-ae", "mo-dpr-electrical", "pa-pittsburgh"];
+export const RETIRED_BULK_SOURCES: readonly string[] = ["mo-dpr-ae", "mo-dpr-electrical", "pa-pittsburgh", "sc-des-enforcement", "wv-purchasing-debarred", "wi-dnr-wells", "wi-dhs-abatement"];
 
 /**
  * Deletes the stored rows and the load record of each retired source that is not registered, in batches of 5,000 rows
