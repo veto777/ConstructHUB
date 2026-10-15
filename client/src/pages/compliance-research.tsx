@@ -295,7 +295,7 @@ const ExtA = ({ href, children }: { href: string; children: React.ReactNode }) =
 
 const ENFORCEMENT_LABELS: Record<EnforcementCategory, string> = {
   discipline: "Licensing-board discipline", complaint: "Licensing-board complaints", stop_work: "Stop-work orders",
-  environmental: "Environmental enforcement", tax_lien: "Federal tax liens", debarment: "Debarments", business_status: "Business registration status",
+  environmental: "Environmental enforcement", tax_lien: "Tax liens and warrants", debarment: "Debarments", business_status: "Business registration status",
   wage: "Wage and labor violations", court_case: "State court cases",
 };
 const ENFORCEMENT_ORDER: EnforcementCategory[] = ["discipline", "stop_work", "debarment", "wage", "court_case", "tax_lien", "environmental", "complaint", "business_status"];
