@@ -38,29 +38,54 @@ export type OrgContext = {
  * company" before the CRM works.
  */
 export async function ensureOrgForUser(userId: number): Promise<OrgContext> {
+  const found = await findOrgForUser(db, userId);
+  if (found) return found;
+  // The app's first CRM visit fires several requests at once; without a lock each of them found no
+  // membership and created its own org (prod 2026-10-15: seven accounts had 2–4 identical empty
+  // "companies" in the switcher). Create under a per-user lock and look again once we hold it.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(7171, $1)", [userId]);
+    const tx = drizzle(client, { schema });
+    const again = await findOrgForUser(tx, userId);
+    if (again) { await client.query("COMMIT"); return again; }
+    const created = await createOrgForUser(tx, userId);
+    await client.query("COMMIT");
+    return created;
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+type Db = NodePgDatabase<typeof schema>;
+
+async function findOrgForUser(d: Db, userId: number): Promise<OrgContext | null> {
   // Without a pinned org the default must be STABLE: an unordered LIMIT 1 lets
   // Postgres hand back either membership, and the active org then flips
   // randomly between requests. Oldest membership wins.
-  const existing = await db
+  const existing = await d
     .select()
     .from(crmMembers)
     .where(and(eq(crmMembers.userId, userId), eq(crmMembers.status, "active")))
     .orderBy(asc(crmMembers.createdAt))
     .limit(1);
+  if (!existing.length) return null;
+  const member = existing[0];
+  const [org] = await d.select().from(crmOrgs).where(eq(crmOrgs.id, member.orgId)).limit(1);
+  // Membership pointing at a deleted org — the caller rebuilds.
+  if (!org) return null;
+  return { org, member, permissions: crmEffectivePermissions(member.role, member.permissions) };
+}
 
-  if (existing.length) {
-    const member = existing[0];
-    const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, member.orgId)).limit(1);
-    if (org) {
-      return { org, member, permissions: crmEffectivePermissions(member.role, member.permissions) };
-    }
-    // Membership pointing at a deleted org — fall through and rebuild.
-  }
-
-  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+async function createOrgForUser(d: Db, userId: number): Promise<OrgContext> {
+  const [user] = await d.select().from(users).where(eq(users.id, userId)).limit(1);
   const name = user?.companyName?.trim() || user?.displayName?.trim() || user?.email || "My Company";
 
-  const [org] = await db
+  const [org] = await d
     .insert(crmOrgs)
     .values({
       name,
@@ -70,7 +95,7 @@ export async function ensureOrgForUser(userId: number): Promise<OrgContext> {
     })
     .returning();
 
-  const [member] = await db
+  const [member] = await d
     .insert(crmMembers)
     .values({
       orgId: org.id,
