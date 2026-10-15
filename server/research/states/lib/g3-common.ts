@@ -5,7 +5,7 @@
 import { promises as fs } from "node:fs";
 import { clean } from "../../bulk";
 import { decodeEntities } from "../../bulk-sources";
-import { personText } from "../../person-name";
+import { personText, htmlLines } from "../../person-name";
 import { tokens } from "../../licenses";
 
 /** Yield from a downloaded temp file, then delete it. */
@@ -18,12 +18,13 @@ export const htmlText = (v: string | null | undefined): string | null =>
   v == null ? null : clean(decodeEntities(v.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ")));
 
 /**
- * A person-name cell as text (round 6, decision 3): like the helper above, but a <br> between two names stays a list
- * (written " / ", ../../person-name.ts), so "Jane Smith<br>John Doe" is never read as one person. Whitespace in the
- * page source is not a separator; only the <br> is.
+ * A person-name cell as text (round 6, decision 3; round 7, finding 1): like the helper above, but a <br> or a block
+ * boundary (div, p, li, tr, td…) between two names stays a list (written " / ", ../../person-name.ts), so
+ * "Jane Smith<br>John Doe" and "<div>Jane Smith</div><div>John Doe</div>" are never read as one person. Whitespace in
+ * the page source is not a separator.
  */
 export const htmlPerson = (v: string | null | undefined): string | null =>
-  v == null ? null : personText(decodeEntities(v.replace(/\s+/g, " ").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")));
+  v == null ? null : personText(decodeEntities(htmlLines(v)));
 
 /** Every word of the searched name is a whole word of one of the candidate names ("Smith" is not "Locksmith"). */
 export function hasAllWords(name: string, ...candidates: (string | null | undefined)[]): boolean {

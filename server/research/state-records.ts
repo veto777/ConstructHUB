@@ -17,7 +17,7 @@ import { nameClause, sodaRows } from "./licenses";
 import { decodeEntities } from "./bulk-sources";
 import { clean, usDate } from "./bulk";
 import { adverseFrom } from "./adverse";
-import { capNote, noteOf, withNote, type Noted } from "./notes";
+import { capNote, failureNote, noteOf, type Noted, withNote } from "./notes";
 
 type Row = Record<string, unknown>;
 const s = (v: unknown): string | null => clean(v == null ? null : String(v));
@@ -185,7 +185,7 @@ export async function searchStateEnforcement(name: string, state: string, matche
       hits.push(...found);
       sources.push({ source: src.source, scope: src.scope, searched: true, note: `${found.length} record(s)${noteOf(found) ? ` (${noteOf(found)})` : ""}` });
     } catch (err: any) {
-      sources.push({ source: src.source, scope: src.scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+      sources.push({ source: src.source, scope: src.scope, searched: false, note: failureNote(err) });
     }
   }
   if (state === "TX") {
@@ -194,7 +194,7 @@ export async function searchStateEnforcement(name: string, state: string, matche
       hits.push(...found);
       sources.push({ source: "Texas TDLR administrative orders", scope: "Electrical, A/C, elevator, water well and other TDLR trades", searched: true, note: `${found.length} order(s)` });
     } catch (err: any) {
-      sources.push({ source: "Texas TDLR administrative orders", scope: "TDLR trades", searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+      sources.push({ source: "Texas TDLR administrative orders", scope: "TDLR trades", searched: false, note: failureNote(err) });
     }
   }
   return { hits, sources };

@@ -34,9 +34,10 @@ describe("finding 1: a negation after the whole outcome word", () => {
 });
 
 describe("finding 2: status follows the report subject", () => {
-  it("in a person's report a business-held license shows standing words only", () => {
+  it("in a person's report a business-held license shows a recognized standing only", () => {
     const h = lic({ holder: "business", principal: "John Smith", status: "Probation, Active", discipline: "Board order" });
-    expect(reportHit(h, "person")).toMatchObject({ status: "Active" });
+    expect(reportHit(h, "person")).toMatchObject({ status: null }); // round 7, finding 3: qualified → not stated
+    expect(reportHit({ ...h, status: "Active" }, "person")).toMatchObject({ status: "Active" });
     expect(reportHit(h, "person").discipline).toBeUndefined();
     // A company's report keeps a business's status as published.
     expect(reportHit(h, "company").status).toBe("Probation, Active");
@@ -49,7 +50,7 @@ describe("finding 2: status follows the report subject", () => {
     });
     const r: ResearchReport = { snapshotVersion: 2, generatedAt: "2026-10-15", states: ["AZ"], trades: [], sinceYear: null, subjects: [subject("person"), subject("company")], totals: { licenses: 2, permits: 0, portalsSearched: 0, portalsNotSearched: 0 } };
     const shown = shownReport(r)!;
-    expect(shown.subjects[0].licenses[0].status).toBe("Active");
+    expect(shown.subjects[0].licenses[0].status).toBeNull(); // round 7, finding 3: "Probation, Active" is qualified
     // Round 6, decision 8: a standing with a condition or pending matter on it shows none ("Status not stated").
     expect(shown.subjects[0].relatedLicenses![0].status).toBeNull();
     expect(shown.subjects[0].enforcement).toEqual([]);

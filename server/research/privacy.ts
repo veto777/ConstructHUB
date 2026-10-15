@@ -10,9 +10,9 @@
  *     hit. For a business's license it becomes an enforcement record (companies only, FCRA); for an individual's it
  *     is dropped.
  *   - An individual's license status, and every license status in a person's report (round 4, decision 2; reportHit),
- *     keeps only words of standing (round 3, decision 1; standingStatus below):
- *     probation, "disciplined", citations, a pending case and the like come off the status and go to `discipline`,
- *     which an individual's record never shows.
+ *     is shown only when it is a complete recognized standing expression (round 7, finding 3; standingStatus below);
+ *     any other status (probation, "disciplined", citations, a pending case, a condition) is null and goes to
+ *     `discipline`, which an individual's record never shows.
  *   - The holder comes only from what the publisher says (round 3, decision 3; entityHolder below): a value on the
  *     source's documented business list or individual list, anything else unknown. A name that reads like a company
  *     never makes a holder a business, so it never unlocks a street address or phone.
@@ -35,46 +35,54 @@ export function entityHolder(v: unknown, lists: { business: RegExp; individual: 
 }
 
 /** Words of standing a license status may keep for an individual, as published (round 3, decision 1). */
-const STANDING = "active|inactive|current|clear|expired|delinquent|null and void|revoked|suspended|surrendered|valid|issued|licensed|lapsed|cancell?ed|retired|closed|deceased|void|renewed|(?:in )?good standing";
-const STANDING_RE = new RegExp(`^(${STANDING})\\b(.*)$`, "i");
+const STANDING = "active|inactive|current|clear|expired|delinquent|null and void|revoked|suspended|surrendered|valid|issued|licensed|registered|lapsed|cancell?ed|retired|closed|deceased|void|renewed|(?:in )?good standing";
 
 /** The one applicant wording a source writes for itself (FL DBPR applicants, bulk-sources.ts): kept as it is. */
 export const APPLICANT_STATUS = "Applicant: an application is on file with DBPR (not a license)";
-/** A date as publishers print one ("2026-10-15", "10/15/2026", "Oct 15, 2026"), optionally after "on", "as of", "since"… */
-const DATE_TAIL = /^(?:(?:on|as of|since|effective|eff\.?|through|thru|until|expires?|exp\.?)\s+)?(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|[a-z]{3,9}\.? \d{1,2},? \d{4})$/i;
+/** A date as publishers print one ("2026-10-15", "10/15/2026", "Oct 15, 2026"). */
+const DATE = String.raw`(?:\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|[a-z]{3,9}\.? \d{1,2},? \d{4})`;
+/** A supported date after a standing: on, as of, since, effective, through, until or an expiry, then the date. */
+const DATE_TAIL = String.raw`(?:(?:on|as of|since|effective|eff\.?|through|thru|until|expires?|exp\.?)\s+)?${DATE}`;
 
 /**
- * Words that condition or negate a standing (round 6, decision 8): pending, subject to, on condition, conditional,
- * provisional, restricted, limited, until, unless, a negation… Their status shows no standing at all.
+ * Complete standing expressions (round 7, finding 3): a standing word or phrase alone, "Listed as active/licensed",
+ * "Valid & In Good Standing" or a voluntary surrender, each optionally followed by a supported date; and the roster
+ * listings our packs write ("On the board's roster of 2026-07-10", "Listed in the … directory of 2026-08-17"). The whole piece must be one of these; a
+ * standing followed by anything else ("Active - contingent upon board approval", "Active with civil penalty") is not.
  */
-const CONDITIONAL = /\b(?:not|no|never|without|non|nor|pending|subject to|condition(?:s|al|ally|ed)?|provisional(?:ly)?|probationary|until|unless|if|except|restrict(?:ed|ion|ions)?|limited|limitations?|awaiting|yet|temporar(?:y|ily)|interim|under review|in process|incomplete|stay(?:ed)?)\b|n't\b/i;
+const STANDING_EXPR = new RegExp(String.raw`^(?:(?:${STANDING}|active in renewal|not expired|listed as (?:active|licensed)|valid (?:&|and) in good standing|voluntar(?:y|ily) (?:surrender(?:ed)?|termination|terminated))(?:\s+${DATE_TAIL})?|on the board's roster of ${DATE}|listed in the [^;]{1,100} directory of ${DATE})$`, "i");
 
 /**
- * A license status reduced to recognized standing phrases (round 3, decision 1; round 5, decision 2): each piece that
- * starts with a standing phrase keeps that phrase, and a published date right after it; everything else, trailing
- * text included, moves to `discipline`. "Probation, Active" → "Active" + "Probation"; "Active with civil penalty of
- * $500" → "Active" + "with civil penalty of $500"; "Active since 01/02/2020" stays; "Disciplined" → null; a
- * conditioned or negated standing ("Active pending review", "Active - not yet approved") → null.
+ * Pieces that say nothing about the license's standing and are left out: the source attributions our own packs write
+ * ("on the Secretary of State's list of active entities", "on DPOR's regulant list", "current-license report of
+ * 2026-04-06", "as of 2024-10-25", "the layer's last update") and a publisher's one-letter status code ("C - Current").
+ */
+const ATTRIBUTION = new RegExp(String.raw`^(?:on (?:the |DPOR's )[^;]*\blist\b[^;]*|current-license report of ${DATE}|as of ${DATE}|the layer's last update|[A-Z])$`);
+
+/**
+ * A license status as a standing (round 3, decision 1; round 7, finding 3): kept only when every piece of it is a
+ * complete recognized standing expression ("Active", "Expired 2024-05-01", "Current, Inactive") or an attribution
+ * (above), and shown as published apart from the attributions. Anything else (a qualification, a condition, a
+ * negation, discipline or wording we don't recognize: "Active - contingent upon board approval", "Probation, Active",
+ * "Active with civil penalty of $500") gives no standing at all: null, which reads "Status not stated", and the whole
+ * status moves to `discipline`, which a report never shows. Recognizing whole expressions replaces round 6's list of
+ * conditional words, which any new wording got past.
  */
 export function standingStatus(status: string | null | undefined): { status: string | null; moved: string | null } {
   const t = (status ?? "").replace(/\s+/g, " ").trim();
   if (!t) return { status: null, moved: null };
   if (t === APPLICANT_STATUS) return { status: t, moved: null };
-  // A status that conditions or negates its standing ("Active pending…", "Active subject to…", "Active - not yet
-  // approved") has no unconditional standing to show: null, which reads "Status not stated" (round 6, decision 8).
-  if (CONDITIONAL.test(t)) return { status: null, moved: t };
-  const keep: string[] = [], moved: string[] = [];
-  for (const raw of t.split(/\s*[;|]\s*|,\s*(?![^()]*\))|\s+-\s+|\s*\(\s*|\s*\)\s*/)) {
+  const keep: string[] = [];
+  const body = t.replace(/^license status:\s*/i, "");
+  for (const raw of body.split(/\s*[;|]\s*|,\s*(?![^()]*\))|\s+-\s+|\s*\(\s*|\s*\)\s*/)) {
     const piece = raw.trim();
-    if (!piece) continue;
-    const m = piece.match(STANDING_RE);
-    if (!m) { moved.push(piece); continue; }
-    const rest = m[2].trim();
-    if (!rest || DATE_TAIL.test(rest)) { keep.push(piece); continue; }
-    keep.push(m[1]);
-    moved.push(rest);
+    if (!piece || ATTRIBUTION.test(piece)) continue;
+    if (!STANDING_EXPR.test(piece)) return { status: null, moved: t };
+    keep.push(piece);
   }
-  return { status: keep.length ? Array.from(new Set(keep)).join(", ") : null, moved: moved.length ? moved.join("; ") : null };
+  if (!keep.length) return { status: null, moved: t };
+  const shown = Array.from(new Set(keep)).join(", ");
+  return { status: shown, moved: null };
 }
 
 /** True unless the publisher says a business holds the license (null, unknown, counts as an individual). */
@@ -82,7 +90,7 @@ export const isIndividual = (h: Pick<LicenseHit, "holder">): boolean => h.holder
 
 /**
  * The hit with an individual's or unknown holder's street and phone removed (city, state and ZIP kept), and its
- * status reduced to standing words, the rest moved to `discipline` (round 3, decision 1).
+ * status shown only as a recognized standing, else null with the status moved to `discipline` (standingStatus).
  */
 export function privateHit<T extends LicenseHit>(h: T): T {
   if (!isIndividual(h)) return h;
@@ -102,7 +110,7 @@ export function privateHit<T extends LicenseHit>(h: T): T {
 /**
  * The hit as a report shows it: private (above) and without disciplinary text (see disciplineRecord). The status
  * follows the REPORT SUBJECT too (round 4, decision 2): in a person's report every license, own, related or matched by
- * an identifier and whatever its holder, shows standing words only ("Probation, Active" → "Active").
+ * an identifier and whatever its holder, shows a recognized standing only ("Probation, Active" → null).
  */
 export function reportHit<T extends LicenseHit>(h: T, subject: "person" | "company"): T {
   let p = privateHit(h);

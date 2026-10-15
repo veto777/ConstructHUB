@@ -18,7 +18,7 @@ import { nameClause, sodaRows, tokens } from "./licenses";
 import { BULK_LIMIT, searchBulk } from "./bulk";
 import { allBulkSourcesFor as bulkSourcesFor, hasStateCourtSearch, nationwideBulkSources, packComplaintSourcesFor, searchPackEnforcement } from "./registry";
 import { searchStateEnforcement } from "./state-records";
-import { capNote, noteOf, withNote, type Noted } from "./notes";
+import { capNote, failureNote, noteOf, type Noted, withNote } from "./notes";
 
 const MAX_COMPLAINTS = 1000;
 const MAX_CASE_PAGES = 10; // 20 dockets a page
@@ -207,7 +207,7 @@ export async function searchEnforcement(name: string, states: string[]): Promise
         const capped = found.length >= BULK_LIMIT ? ` (${capNote(BULK_LIMIT, null, "index matches")})` : "";
         sources.push({ source: src.label, scope: `${state}, file of ${status.loadedAt?.slice(0, 10)}`, searched: true, note: `${mine.length} record(s)${capped}`, category });
       } catch (err: any) {
-        sources.push({ source: src.label, scope: state, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category });
+        sources.push({ source: src.label, scope: state, searched: false, note: failureNote(err), category });
       }
     }
   }
@@ -221,7 +221,7 @@ export async function searchEnforcement(name: string, states: string[]): Promise
       const capped = found.length >= BULK_LIMIT ? ` (${capNote(BULK_LIMIT, null, "index matches")})` : "";
       sources.push({ source: src.label, scope: `All states, file of ${status.loadedAt?.slice(0, 10)}`, searched: true, note: `${mine.length} record(s)${capped}`, category: "enforcement" });
     } catch (err: any) {
-      sources.push({ source: src.label, scope: "All states", searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category: "enforcement" });
+      sources.push({ source: src.label, scope: "All states", searched: false, note: failureNote(err), category: "enforcement" });
     }
   }
   // Licensing-board enforcement on the license itself (CSLB suspensions, bonds) rides in the license files.
@@ -249,7 +249,7 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
         complaints.push(...hits);
         sources.push({ source: src.source, scope: src.scope, searched: true, note: `${hits.length} complaint(s)${noteOf(hits) ? ` (${noteOf(hits)})` : ""}`, category: "complaints" });
       } catch (err: any) {
-        sources.push({ source: src.source, scope: src.scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category: "complaints" });
+        sources.push({ source: src.source, scope: src.scope, searched: false, note: failureNote(err), category: "complaints" });
       }
     }
   }
@@ -262,7 +262,7 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
     sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: true,
       note: r.total > MAX_CASE_PAGES * 20 ? `${courtCases.length} case(s): the newest ${MAX_CASE_PAGES * 20} of ${r.total} matches were checked` : `${courtCases.length} case(s)`, category: "federal_court" });
   } catch (err: any) {
-    sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category: "federal_court" });
+    sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: false, note: failureNote(err), category: "federal_court" });
   }
   let osha: OshaHit[] = [];
   try {
@@ -271,7 +271,7 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
   } catch (err: any) {
     const msg = String(err?.message ?? err);
     sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: false,
-      note: msg === "not configured" ? "Not searched yet" : `Could not search: ${msg.slice(0, 200)}`, category: "osha" });
+      note: msg === "not configured" ? "Not searched yet" : failureNote(err), category: "osha" });
   }
   const enforcement = await searchEnforcement(name, states);
   sources.push(...enforcement.sources);

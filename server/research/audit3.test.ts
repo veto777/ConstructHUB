@@ -25,23 +25,24 @@ afterEach(() => { vi.restoreAllMocks(); resetHostState(); });
 
 describe("decision 1: an individual's status keeps standing words only", () => {
   it("probation, 'disciplined' and pending cases come off the status and go to discipline", () => {
-    expect(standingStatus("Probation, Active")).toEqual({ status: "Active", moved: "Probation" });
+    // Round 7, finding 3: a qualified standing is no standing ("Status not stated").
+    expect(standingStatus("Probation, Active")).toEqual({ status: null, moved: "Probation, Active" });
     expect(standingStatus("Disciplined")).toEqual({ status: null, moved: "Disciplined" });
     // Round 6, decision 8: a conditioned standing has none ("Status not stated").
     expect(standingStatus("Active - Pending Case")).toEqual({ status: null, moved: "Active - Pending Case" });
     expect(standingStatus("Active with Conditions")).toEqual({ status: null, moved: "Active with Conditions" });
-    // Round 5, decision 2: only the standing phrase (and a date) stays.
-    expect(standingStatus("Inactive per Request")).toEqual({ status: "Inactive", moved: "per Request" });
+    // Round 7, finding 3: only a complete recognized expression (and a date) stays.
+    expect(standingStatus("Inactive per Request")).toEqual({ status: null, moved: "Inactive per Request" });
     expect(standingStatus("Null and Void")).toEqual({ status: "Null and Void", moved: null });
     expect(standingStatus("Revoked")).toEqual({ status: "Revoked", moved: null });
   });
-  it("FL's primary status P on a qualifier's license: the report shows Active and no discipline", () => {
+  it("FL's primary status P on a qualifier's license: the report shows no status (round 7, finding 3) and no discipline", () => {
     const h = privateHit(lic({ status: "Probation, Active", holder: "individual" }));
-    expect(h).toMatchObject({ status: "Active", discipline: "Probation" });
-    expect(reportHit(lic({ status: "Probation, Active", holder: "individual" }), "person")).toMatchObject({ status: "Active" });
+    expect(h).toMatchObject({ status: null, discipline: "Probation, Active" });
+    expect(reportHit(lic({ status: "Probation, Active", holder: "individual" }), "person")).toMatchObject({ status: null });
     expect(reportHit(lic({ status: "Probation, Active", holder: "individual" }), "person").discipline).toBeUndefined();
     // An unknown holder counts as an individual; a business's status stays as published.
-    expect(privateHit(lic({ status: "Probation, Active", holder: null })).status).toBe("Active");
+    expect(privateHit(lic({ status: "Probation, Active", holder: null })).status).toBeNull();
     expect(privateHit(lic({ status: "Probation, Active", holder: "business" })).status).toBe("Probation, Active");
   });
 });

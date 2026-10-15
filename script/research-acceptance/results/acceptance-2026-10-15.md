@@ -1,75 +1,68 @@
 # Research acceptance run, 2026-10-15
 
-Commit 64627525. Options: {"states":["VT"],"onlyFailed":false,"useLoaded":true,"portals":false}.
+Commit 6831e130. Options: {"states":"all","onlyFailed":true,"useLoaded":true,"portals":false}.
 
-**6 failure(s)**: missed 1, privacy 0, silent 0, error 5, slow 0.
+**All checks passed**: missed 0, privacy 0, silent 0, error 0, slow 0.
 
 ## Summary by state
 
 | State | Golden subjects | Found | Missed | Privacy | Silent | Source errors | Slow | Slowest report |
 |---|---|---|---|---|---|---|---|---|
-| AL | 1 (2 null) | 1/1 | 0 | 0 | 0 | 1 | 0 | 1s |
+| AL | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 16s |
 | AK | 0 (3 null) | 0/0 | 0 | 0 | 0 | 0 | 0 | 0s |
-| AZ | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 50s |
+| AZ | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 53s |
 | AR | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
 | CA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 0s |
-| CO | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 12s |
-| CT | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 7s |
-| DE | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 13s |
+| CO | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 27s |
+| CT | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 4s |
+| DE | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 10s |
 | DC | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 0s |
 | FL | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 0s |
-| GA | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 2s |
+| GA | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 4s |
 | HI | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 3s |
 | ID | 0 (3 null) | 0/0 | 0 | 0 | 0 | 0 | 0 | 0s |
 | IL | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 5s |
 | IN | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 0s |
 | IA | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 11s |
 | KS | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
-| KY | 2 (1 null) | 1/2 | 1 | 0 | 0 | 0 | 0 | 11s |
-| LA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 5s |
+| KY | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 11s |
+| LA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 6s |
 | ME | 0 (3 null) | 0/0 | 0 | 0 | 0 | 0 | 0 | 0s |
-| MD | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 4s |
-| MA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 11s |
+| MD | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 7s |
+| MA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 14s |
 | MI | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
 | MN | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 0s |
-| MS | 1 (2 null) | 1/1 | 0 | 0 | 0 | 2 | 0 | 2s |
-| MO | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 19s |
+| MS | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 2s |
+| MO | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 23s |
 | MT | 0 (3 null) | 0/0 | 0 | 0 | 0 | 0 | 0 | 0s |
-| NE | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 8s |
-| NV | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 126s |
+| NE | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 12s |
+| NV | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 127s |
 | NH | 0 (3 null) | 0/0 | 0 | 0 | 0 | 0 | 0 | 0s |
 | NJ | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 4s |
-| NM | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 1s |
-| NY | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 83s |
+| NM | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 4s |
+| NY | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 242s |
 | NC | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 290s |
-| ND | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 13s |
+| ND | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 16s |
 | OH | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
 | OK | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
-| OR | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 12s |
-| PA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 18s |
-| RI | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 30s |
+| OR | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 16s |
+| PA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 21s |
+| RI | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 31s |
 | SC | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 0s |
 | SD | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 0s |
 | TN | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
-| TX | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 24s |
+| TX | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 31s |
 | UT | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 5s |
-| VT | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 1s |
+| VT | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 2s |
 | VA | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
-| WA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 28s |
-| WV | 2 (1 null) | 2/2 | 0 | 0 | 0 | 2 | 0 | 4s |
+| WA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 37s |
+| WV | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 16s |
 | WI | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
 | WY | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 5s |
 
 ## Failures, ranked (missed record > privacy > silent failure > source error > slow)
 
-| # | Severity | State | Source | Subject | Detail |
-|---|---|---|---|---|---|
-| 1 | missed | KY | Kentucky Department of Housing, Buildings and Construction | person "Harrison E Durham-Smith" | license ME67081 (Kentucky Department of Housing, Buildings and Construction) not in the report |
-| 2 | error | AL | Alabama Licensing Board for General Contractors | enforcement "Home Pro Construction LLC" | Could not search: licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read |
-| 3 | error | MS | Mississippi State Board of Contractors | enforcement "QUIN-CO, INC." | Could not search: search.msboc.us answered with a bot challenge page; no automated requests to it for this run |
-| 4 | error | MS | Mississippi State Board of Contractors complaints and violations | enforcement "QUIN-CO, INC." | Could not search: search.msboc.us denied access earlier (a bot challenge page); no further requests for now |
-| 5 | error | WV | WV Division of Labor certified plumbers | person "JOHN SMITH JR" | Could not search: www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read |
-| 6 | error | WV | WV Division of Labor certified HVAC technicians | person "JOHN SMITH JR" | Could not search: www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read |
+None.
 
 ## Links from publisher data (host not named in the code: check they are the publisher's own)
 
@@ -92,14 +85,14 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### AL
 
-- **enforcement**: "Home Pro Construction LLC" (Alabama Electrical Contractors Board disciplinary actions, record ECB 2023-021, bulk file al-aecb-discipline, loaded 2026-10-15): found in enforcement: Alabama Electrical Contractors Board disciplinary actions, 1s. Summary: Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **enforcement**: "Home Pro Construction LLC" (Alabama Electrical Contractors Board disciplinary actions, record ECB 2023-021, bulk file al-aecb-discipline, loaded 2026-10-15): found in enforcement: Alabama Electrical Contractors Board disciplinary actions, 16s. Summary: Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **company**: none (No usable record of a business holding an active license found in: Alabama Licensing Board for General Contractors (search failed: licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read); Alabama Onsite Wastewater Board installers)
 - **person**: none (No usable record of an individual license holder found in: Alabama Licensing Board for General Contractors; Alabama Onsite Wastewater Board installers (search failed: licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read))
 
 | Source | enforcement |
 |---|---|
 | Alabama Electrical Contractors Board disciplinary actions | found 1 |
-| Alabama Licensing Board for General Contractors | failed (licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read) |
+| Alabama Licensing Board for General Contractors | not searched (Not searched: the site refused automated access) |
 | Alabama Onsite Wastewater Board installers | not searched (Not searched: this lookup has no business name search) |
 | SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 |
 
@@ -111,7 +104,7 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### AZ
 
-- **company**: "Construction Management Services, LLC" (Arizona Registrar of Contractors licenses, record ROC 333995, live lookup, search "Construction"): found in licenses: Arizona Registrar of Contractors licenses, 50s. Summary: Found 2 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "Construction Management Services, LLC" (Arizona Registrar of Contractors licenses, record ROC 333995, live lookup, search "Construction"): found in licenses: Arizona Registrar of Contractors licenses, 53s. Summary: Found 2 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: az-tucson-contractors (discipline); Arizona Registrar of Contractors complaints; AZ original enforcement)
 - **person**: none (No usable record of an individual license holder found in: Arizona Registrar of Contractors licenses; az-tucson-contractors)
 
@@ -157,7 +150,7 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### CO
 
-- **company**: "Ultimate Heating & Cooling, Inc" (Colorado DORA licenses (electrical, plumbing, water well), record 4792, Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 4792): found in licenses: Colorado DORA licenses (electrical, plumbing, water well), 12s. Summary: Found 2 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "Ultimate Heating & Cooling, Inc" (Colorado DORA licenses (electrical, plumbing, water well), record 4792, Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 4792): found in licenses: Colorado DORA licenses (electrical, plumbing, water well), 27s. Summary: Found 2 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "Rusty Colt Twilley" (Colorado DORA licenses (electrical, plumbing, water well), record 41650, Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 41650): found in licenses: Colorado DORA licenses (electrical, plumbing, water well), 3s. Summary: Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: co-boulder-contractors (discipline); Colorado Secretary of State business entities; CO original enforcement)
 
@@ -171,8 +164,8 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### CT
 
-- **company**: "SEAWOLF CONTRACTORS LLC" (Connecticut DCP licenses and credentials (home improvement and trades), record HIC.0669016, Socrata dataset https://data.ct.gov/d/ngch-56tr, row HIC.0669016): found in licenses: Connecticut DCP licenses and credentials (home improvement and trades), 7s. Summary: Found 3 license record(s) and 2 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **enforcement**: "SCD Services, LLC" (Connecticut Department of Labor debarment list, record -, bulk file ct-dol-debarment, loaded 2026-10-15): found in enforcement: Connecticut Department of Labor debarment list, 4s. Summary: Found 1 license record(s) and 3 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "SEAWOLF CONTRACTORS LLC" (Connecticut DCP licenses and credentials (home improvement and trades), record HIC.0669016, Socrata dataset https://data.ct.gov/d/ngch-56tr, row HIC.0669016): found in licenses: Connecticut DCP licenses and credentials (home improvement and trades), 4s. Summary: Found 3 license record(s) and 2 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **enforcement**: "SCD Services, LLC" (Connecticut Department of Labor debarment list, record -, bulk file ct-dol-debarment, loaded 2026-10-15): found in enforcement: Connecticut Department of Labor debarment list, 2s. Summary: Found 1 license record(s) and 3 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "ROBERT W SALTSMAN" (Connecticut DCP licenses and credentials (home improvement and trades), record FRP.0041183-F1, Socrata dataset https://data.ct.gov/d/ngch-56tr, row FRP.0041183-F1): found in licenses: Connecticut DCP licenses and credentials (home improvement and trades), 1s. Summary: Found 3 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
 | Source | company | enforcement | person |
@@ -187,7 +180,7 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 ### DE
 
 - **company**: "CAHILL CONTRACTING INC" (Delaware Division of Revenue contractor business licenses, record 1990029424, Socrata dataset https://data.delaware.gov/d/5zy2-grhr, row 1990029424 (the publisher lists no status: a list of current licenses)): found in licenses: Delaware Division of Revenue contractor business licenses, 9s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **person**: "SHAWN DEEL" (Delaware Division of Professional Regulation (electrical, plumbing/HVACR), record TH-0021461, Socrata dataset https://data.delaware.gov/d/pjnv-eaih, row TH-0021461): found in licenses: Delaware Division of Professional Regulation (electrical, plumbing/HVACR), 13s. Summary: Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **person**: "SHAWN DEEL" (Delaware Division of Professional Regulation (electrical, plumbing/HVACR), record TH-0021461, Socrata dataset https://data.delaware.gov/d/pjnv-eaih, row TH-0021461): found in licenses: Delaware Division of Professional Regulation (electrical, plumbing/HVACR), 10s. Summary: Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: DE original enforcement)
 
 | Source | company | person |
@@ -233,7 +226,7 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### GA
 
-- **enforcement**: "MRJ Construction, Inc" (Georgia EPD enforcement orders, record EPD-WP-9566, live search "Construction"): found in enforcement: Georgia EPD enforcement orders, 2s. Summary: Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **enforcement**: "MRJ Construction, Inc" (Georgia EPD enforcement orders, record EPD-WP-9566, live search "Construction"): found in enforcement: Georgia EPD enforcement orders, 4s. Summary: Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **company**: none (No registered source publishes a business holding an active license for GA)
 - **person**: none (No registered source publishes an individual license holder for GA)
 
@@ -321,18 +314,18 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 ### KY
 
 - **company**: "Stewart Richey Construction, Inc" (Kentucky Department of Housing, Buildings and Construction, record RL641462, live lookup, search "Construction"): found in licenses: Kentucky Department of Housing, Buildings and Construction, 11s. Summary: Found 3 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **person**: "Harrison E Durham-Smith" (Kentucky Department of Housing, Buildings and Construction, record ME67081, live lookup, search "Smith"): **not found**, 2s. Summary: Found 0 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **person**: "Harrison E Durham-Smith" (Kentucky Department of Housing, Buildings and Construction, record ME67081, live lookup, search "Smith"): found in licenses: Kentucky Department of Housing, Buildings and Construction, 7s. Summary: Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: ky-louisville-contractors (discipline); KY original enforcement)
 
 | Source | company | person |
 |---|---|---|
 | Louisville Metro contractor licenses (as of 2022-06-19) | searched, 0 | searched, 0 |
-| Kentucky Department of Housing, Buildings and Construction | found 3 | searched, 0 |
+| Kentucky Department of Housing, Buildings and Construction | found 3 | found 2 |
 | SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | - |
 
 ### LA
 
-- **company**: "09 Construction Services, LLC" (Louisiana State Licensing Board for Contractors, record CL.68755, live lookup, search "Construction"): found in licenses: Louisiana State Licensing Board for Contractors, 5s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "09 Construction Services, LLC" (Louisiana State Licensing Board for Contractors, record CL.68755, live lookup, search "Construction"): found in licenses: Louisiana State Licensing Board for Contractors, 6s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **enforcement**: "Griffith Electrical LLC" (Louisiana State Licensing Board for Contractors violations, record 2018-886, bulk file la-lslbc-violations, loaded 2026-10-15): found in enforcement: Louisiana State Licensing Board for Contractors violations, 1s. Summary: Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "JONATHAN SQUARE" (New Orleans occupational business licenses (contractors), record 102801113, bulk file la-new-orleans-contractors, loaded 2026-10-15): found in licenses: New Orleans occupational business licenses, 2s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
@@ -352,7 +345,7 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### MD
 
-- **company**: "VC Homes LLC" (Montgomery County building contractor licenses, record BC232328, Socrata dataset https://data.montgomerycountymd.gov/d/c7hs-c9qq, row BC232328 (the publisher lists no status: a list of current licenses)): found in licenses: Montgomery County building contractor licenses, 3s. Summary: Found 1 license record(s), 1 consumer complaint(s) and 0 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
+- **company**: "VC Homes LLC" (Montgomery County building contractor licenses, record BC232328, Socrata dataset https://data.montgomerycountymd.gov/d/c7hs-c9qq, row BC232328 (the publisher lists no status: a list of current licenses)): found in licenses: Montgomery County building contractor licenses, 7s. Summary: Found 1 license record(s), 1 consumer complaint(s) and 0 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
 - **enforcement**: "Val Construction Co., Inc." (Maryland Board of Public Works debarments, record -, bulk file md-bpw-debarments, loaded 2026-10-15): found in enforcement: Maryland Board of Public Works debarments, 2s. Summary: Found 0 license record(s), 0 consumer complaint(s) and 1 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
 - **person**: "INC. A. R. DESIGN GROUP" (Montgomery County building contractor licenses, record BC3760, Socrata dataset https://data.montgomerycountymd.gov/d/c7hs-c9qq, row BC3760): found in licenses: Montgomery County building contractor licenses, 4s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
@@ -371,8 +364,8 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### MA
 
-- **company**: "100 Percent Construction Inc" (Massachusetts Home Improvement Contractor registry (OCABR), record 215560, live lookup, search "Construction"): found in licenses: Massachusetts Home Improvement Contractor registry (OCABR), 11s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **enforcement**: "99 NORTH RENOVATIONS & CONSTRUCTION LLC." (Massachusetts HIC hearing decisions, Guaranty Fund claims and arbitration awards (OCABR), record 2017-209, live search "Construction"): found in enforcement: Massachusetts HIC hearing decisions (OCABR), 10s. Summary: Found 1 license record(s) and 2 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "100 Percent Construction Inc" (Massachusetts Home Improvement Contractor registry (OCABR), record 215560, live lookup, search "Construction"): found in licenses: Massachusetts Home Improvement Contractor registry (OCABR), 14s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **enforcement**: "99 NORTH RENOVATIONS & CONSTRUCTION LLC." (Massachusetts HIC hearing decisions, Guaranty Fund claims and arbitration awards (OCABR), record 2017-209, live search "Construction"): found in enforcement: Massachusetts HIC hearing decisions (OCABR), 9s. Summary: Found 1 license record(s) and 2 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "CRAIG R MANCHESTER" (Massachusetts OPSI licenses (construction supervisors, pipefitters, refrigeration, sprinkler, elevator, hoisting), record CS-101811, bulk file ma-opsi, loaded 2026-10-15): found in licenses: Massachusetts OPSI licenses (construction supervisors, pipefitters, refrigeration, sprinkler, elevator, hoisting), 7s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
 | Source | company | enforcement | person |
@@ -417,14 +410,14 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 | Source | enforcement |
 |---|---|
 | Mississippi State Board of Contractors revoked and suspended licenses | found 1 |
-| Mississippi State Board of Contractors | failed (search.msboc.us answered with a bot challenge page; no automated requests to it for this run) |
-| Mississippi State Board of Contractors complaints and violations | failed (search.msboc.us denied access earlier (a bot challenge page); no further requests for now) |
+| Mississippi State Board of Contractors | not searched (Not searched: the site refused automated access) |
+| Mississippi State Board of Contractors complaints and violations | not searched (Not searched: the site refused automated access) |
 | SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 |
 
 ### MO
 
-- **company**: "ACS ARCHITECTURAL CONSTRUCTION SERVICES, INC." (Missouri MO PRO licensee search, record 2024000314, live lookup, search "Construction"): found in licenses: Missouri MO PRO licensee search, 19s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **person**: "Mike Ulmer" (Missouri registered onsite wastewater treatment system installers, record 32867, Socrata dataset https://data.mo.gov/d/nfxa-cq5r, row 32867): found in licenses: Missouri registered onsite wastewater treatment system installers, 14s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **company**: "ACS ARCHITECTURAL CONSTRUCTION SERVICES, INC." (Missouri MO PRO licensee search, record 2024000314, live lookup, search "Construction"): found in licenses: Missouri MO PRO licensee search, 21s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **person**: "Mike Ulmer" (Missouri registered onsite wastewater treatment system installers, record 32867, Socrata dataset https://data.mo.gov/d/nfxa-cq5r, row 32867): found in licenses: Missouri registered onsite wastewater treatment system installers, 23s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: mo-kansas-city-contractors (discipline); MO original enforcement)
 
 | Source | company | person |
@@ -442,7 +435,7 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### NE
 
-- **company**: "C & C CONSTRUCTION, LLC" (Nebraska DOL contractor registrations, record 50237-26, live lookup, search "Construction"): found in licenses: Nebraska DOL contractor registrations, 8s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "C & C CONSTRUCTION, LLC" (Nebraska DOL contractor registrations, record 50237-26, live lookup, search "Construction"): found in licenses: Nebraska DOL contractor registrations, 12s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **enforcement**: "Nelson & Sons Construction LLC" (Nebraska DOL contractors with unpaid Employee Classification Act fines, record -, bulk file ne-eca-unpaid, loaded 2026-10-15): found in enforcement: Nebraska DOL contractors with unpaid Employee Classification Act fines, 2s. Summary: Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "MICHAEL JOHNSON" (Nebraska State Electrical Division licenses, record A 59041, live lookup, search "Michael Johnson"): found in licenses: Nebraska State Electrical Division licenses, 3s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
@@ -455,8 +448,8 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### NV
 
-- **company**: "CONSTRUCTION DEVELOPMENT SERVICES INC" (Nevada State Contractors Board licenses, record 0022791, live lookup, search "Construction"): found in licenses: Nevada State Contractors Board licenses, 126s. Summary: Found 3 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **enforcement**: "NEXTEK CONSTRUCTION INC" (Nevada State Contractors Board disciplinary and board actions (2001 to today), record -, bulk file nv-nscb-discipline, loaded 2026-10-15): found in enforcement: Nevada State Contractors Board disciplinary and board actions, 5s. Summary: Found 0 license record(s) and 3 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "CONSTRUCTION DEVELOPMENT SERVICES INC" (Nevada State Contractors Board licenses, record 0022791, live lookup, search "Construction"): found in licenses: Nevada State Contractors Board licenses, 127s. Summary: Found 3 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **enforcement**: "NEXTEK CONSTRUCTION INC" (Nevada State Contractors Board disciplinary and board actions (2001 to today), record -, bulk file nv-nscb-discipline, loaded 2026-10-15): found in enforcement: Nevada State Contractors Board disciplinary and board actions, 6s. Summary: Found 0 license record(s) and 3 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "JOHN DAVID FIELD" (City of Las Vegas contractor business licenses, record 3000004452, bulk file nv-las-vegas-contractors, loaded 2026-10-15): found in licenses: City of Las Vegas business licenses, 29s. Summary: Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
 | Source | company | enforcement | person |
@@ -492,7 +485,7 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### NM
 
-- **person**: "Joshua A. Reed-Smith" (New Mexico RLD home inspector and landscape architect licenses, record HI0136, live lookup, search "Smith"): found in licenses: New Mexico RLD home inspector and landscape architect licenses, 1s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **person**: "Joshua A. Reed-Smith" (New Mexico RLD home inspector and landscape architect licenses, record HI0136, live lookup, search "Smith"): found in licenses: New Mexico RLD home inspector and landscape architect licenses, 4s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **company**: none (No usable record of a business holding an active license found in: New Mexico RLD home inspector and landscape architect licenses)
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: New Mexico Secretary of State business entities; NM original enforcement)
 
@@ -503,48 +496,48 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### NY
 
-- **company**: "Pro Sitework Inc." (New York DOL contractor registry (public work), record 26-64O7O-CR, Socrata dataset https://data.ny.gov/d/i4jv-zkey, row 26-64O7O-CR): found in licenses: New York DOL contractor registry (public work), 83s. Summary: Found 1 license record(s), 0 consumer complaint(s) and 1 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
-- **enforcement**: "Jaid Construction, Inc." (New York State non-responsible entities (Executive Order 192), record -, Socrata dataset https://data.ny.gov/d/jhxt-dfv6, search "Construction"): found in enforcement: New York State non-responsible entities (Executive Order 192), 72s. Summary: Found 1 license record(s), 0 consumer complaint(s) and 2 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
-- **person**: "Ian Bednar" (New York DOL elevator mechanic and inspector licenses, record 25-6LCUY-SHEL, Socrata dataset https://data.ny.gov/d/cxfs-ya8e, row 25-6LCUY-SHEL): found in licenses: New York DOL elevator mechanic and inspector licenses, 5s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **company**: "Pro Sitework Inc." (New York DOL contractor registry (public work), record 26-64O7O-CR, Socrata dataset https://data.ny.gov/d/i4jv-zkey, row 26-64O7O-CR): found in licenses: New York DOL contractor registry (public work), 242s. Summary: Found 1 license record(s), 0 consumer complaint(s) and 1 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
+- **person**: "Ian Bednar" (New York DOL elevator mechanic and inspector licenses, record 25-6LCUY-SHEL, Socrata dataset https://data.ny.gov/d/cxfs-ya8e, row 25-6LCUY-SHEL): found in licenses: New York DOL elevator mechanic and inspector licenses, 9s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **enforcement**: "Jaid Construction, Inc." (New York State non-responsible entities (Executive Order 192), record -, Socrata dataset https://data.ny.gov/d/jhxt-dfv6, search "Construction"): found in enforcement: New York State non-responsible entities (Executive Order 192), 233s. Summary: Found 1 license record(s), 0 consumer complaint(s) and 2 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
 
-| Source | company | enforcement | person |
+| Source | company | person | enforcement |
 |---|---|---|---|
 | New York DOL contractor registry (public work) | found 1 | searched, 0 | searched, 0 |
-| New York DOL elevator contractor licenses | searched, 0 | searched, 0 | not searched (Not searched: this dataset has no person name field) |
-| New York DOL elevator mechanic and inspector licenses | not searched (Not searched: this dataset has no business name field) | not searched (Not searched: this dataset has no business name field) | found 1 |
-| New York DOL mold contractor licenses | searched, 0 | searched, 0 | not searched (Not searched: this dataset has no person name field) |
-| New York DOL mold individual licenses | not searched (Not searched: this dataset has no business name field) | not searched (Not searched: this dataset has no business name field) | searched, 0 |
-| New York DOL asbestos certificates | not searched (Not searched: this dataset has no business name field) | not searched (Not searched: this dataset has no business name field) | searched, 0 |
-| New York DOL crane operator certificates | not searched (Not searched: this dataset has no business name field) | not searched (Not searched: this dataset has no business name field) | searched, 0 |
-| New York DOL blaster certificates | not searched (Not searched: this dataset has no business name field) | not searched (Not searched: this dataset has no business name field) | searched, 0 |
+| New York DOL elevator contractor licenses | searched, 0 | not searched (Not searched: this dataset has no person name field) | searched, 0 |
+| New York DOL elevator mechanic and inspector licenses | not searched (Not searched: this dataset has no business name field) | found 1 | not searched (Not searched: this dataset has no business name field) |
+| New York DOL mold contractor licenses | searched, 0 | not searched (Not searched: this dataset has no person name field) | searched, 0 |
+| New York DOL mold individual licenses | not searched (Not searched: this dataset has no business name field) | searched, 0 | not searched (Not searched: this dataset has no business name field) |
+| New York DOL asbestos certificates | not searched (Not searched: this dataset has no business name field) | searched, 0 | not searched (Not searched: this dataset has no business name field) |
+| New York DOL crane operator certificates | not searched (Not searched: this dataset has no business name field) | searched, 0 | not searched (Not searched: this dataset has no business name field) |
+| New York DOL blaster certificates | not searched (Not searched: this dataset has no business name field) | searched, 0 | not searched (Not searched: this dataset has no business name field) |
 | New York DOS licensed home inspectors | searched, 0 | searched, 0 | searched, 0 |
-| New York City DOB licenses (contractors and trades) | searched, 0 | found 1 | searched, 0 |
-| New York City DCWP home improvement contractor licenses | searched, 0 | searched, 0 | not searched (Not searched: this dataset has no person name field) |
-| New York State non-responsible entities (Executive Order 192) | searched, 0 | found 1 | n/a (companies only) |
-| New York Department of State active corporations | found 1 | found 1 | n/a (companies only) |
-| New York City DOB disciplinary actions | searched, 0 | searched, 0 | n/a (companies only) |
-| New York City DCWP charges | searched, 0 | searched, 0 | n/a (companies only) |
-| New York DOL / Workers' Compensation Board public-work debarments | searched, 0 | searched, 0 | n/a (companies only) |
-| New York City DCWP consumer complaints | searched, 0 | searched, 0 | n/a (companies only) |
-| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | searched, 0 | - |
+| New York City DOB licenses (contractors and trades) | searched, 0 | searched, 0 | found 1 |
+| New York City DCWP home improvement contractor licenses | searched, 0 | not searched (Not searched: this dataset has no person name field) | searched, 0 |
+| New York State non-responsible entities (Executive Order 192) | searched, 0 | n/a (companies only) | found 1 |
+| New York Department of State active corporations | found 1 | n/a (companies only) | found 1 |
+| New York City DOB disciplinary actions | searched, 0 | n/a (companies only) | searched, 0 |
+| New York City DCWP charges | searched, 0 | n/a (companies only) | searched, 0 |
+| New York DOL / Workers' Compensation Board public-work debarments | searched, 0 | n/a (companies only) | searched, 0 |
+| New York City DCWP consumer complaints | searched, 0 | n/a (companies only) | searched, 0 |
+| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | - | searched, 0 |
 
 ### NC
 
-- **company**: "M.B. Haynes Corporation, T/A" (NC Licensing Board for General Contractors, record L.01245, live lookup, search "Construction"): found in licenses: NC Licensing Board for General Contractors, 179s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "John B. Smith" (NC Board of Examiners of Electrical Contractors, record I.08556, live lookup, search "John Smith"): found in licenses: NC Board of Examiners of Electrical Contractors, 290s. Summary: Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **company**: "M.B. Haynes Corporation, T/A" (NC Licensing Board for General Contractors, record L.01245, live lookup, search "Construction"): found in licenses: NC Licensing Board for General Contractors, 275s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: NC Licensing Board for General Contractors: disciplinary actions; NC original enforcement)
 
-| Source | company | person |
+| Source | person | company |
 |---|---|---|
-| NC Licensing Board for General Contractors | found 1 | searched, 0 |
-| NC Board of Examiners of Electrical Contractors | searched, 0 | found 1 |
-| NC Board of Examiners of Plumbing, Heating & Fire Sprinkler Contractors | searched, 0 | found 1 |
-| NC Licensing Board for General Contractors: disciplinary actions | searched, 0 | n/a (companies only) |
-| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | - |
+| NC Licensing Board for General Contractors | searched, 0 | found 1 |
+| NC Board of Examiners of Electrical Contractors | found 1 | searched, 0 |
+| NC Board of Examiners of Plumbing, Heating & Fire Sprinkler Contractors | found 1 | searched, 0 |
+| NC Licensing Board for General Contractors: disciplinary actions | n/a (companies only) | searched, 0 |
+| SAM.gov federal exclusions and debarments (Public V2 extract) | - | searched, 0 |
 
 ### ND
 
-- **company**: "2 NUTZ CONSTRUCTION" (North Dakota Secretary of State contractor licenses, record 35011, live lookup, search "Construction"): found in licenses: North Dakota Secretary of State contractor licenses, 13s. Summary: Found 1 license record(s) and 2 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "2 NUTZ CONSTRUCTION" (North Dakota Secretary of State contractor licenses, record 35011, live lookup, search "Construction"): found in licenses: North Dakota Secretary of State contractor licenses, 16s. Summary: Found 1 license record(s) and 2 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "AUSTIN SMITH" (North Dakota State Electrical Board, record A 16547, live lookup, search "Smith"): found in licenses: North Dakota State Electrical Board electricians, 5s. Summary: Found 3 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: North Dakota Secretary of State business entity status; ND original enforcement)
 
@@ -584,9 +577,9 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### OR
 
-- **company**: "GREEN GARDEN LLC" (Oregon Construction Contractors Board (active licenses), record 263475, Socrata dataset https://data.oregon.gov/d/g77e-6bhs, row 263475 (the publisher lists no status: a list of current licenses)): found in licenses: Oregon Construction Contractors Board (active licenses), 8s. Summary: Found 2 license record(s), 0 consumer complaint(s) and 11 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
-- **enforcement**: "Tovar Flooring, LLC" (Oregon BOLI prevailing wage: ineligible contractors and case closure letters, record 25-1344, bulk file or-boli-pwr, loaded 2026-10-15): found in enforcement: Oregon BOLI prevailing-wage case closure letters, 12s. Summary: Found 0 license record(s), 0 consumer complaint(s) and 1 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
-- **person**: "MICHAEL S WIGGINS" (Oregon Building Codes Division trade licenses, record 6130CL2, Socrata dataset https://data.oregon.gov/d/vhbr-cuaq, row 6130CL2): found in licenses: Oregon Building Codes Division trade licenses, 1s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **company**: "GREEN GARDEN LLC" (Oregon Construction Contractors Board (active licenses), record 263475, Socrata dataset https://data.oregon.gov/d/g77e-6bhs, row 263475 (the publisher lists no status: a list of current licenses)): found in licenses: Oregon Construction Contractors Board (active licenses), 16s. Summary: Found 2 license record(s), 0 consumer complaint(s) and 11 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
+- **enforcement**: "Tovar Flooring, LLC" (Oregon BOLI prevailing wage: ineligible contractors and case closure letters, record 25-1344, bulk file or-boli-pwr, loaded 2026-10-15): found in enforcement: Oregon BOLI prevailing-wage case closure letters, 5s. Summary: Found 0 license record(s), 0 consumer complaint(s) and 1 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
+- **person**: "MICHAEL S WIGGINS" (Oregon Building Codes Division trade licenses, record 6130CL2, Socrata dataset https://data.oregon.gov/d/vhbr-cuaq, row 6130CL2): found in licenses: Oregon Building Codes Division trade licenses, 2s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
 | Source | company | enforcement | person |
 |---|---|---|---|
@@ -600,24 +593,24 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### PA
 
-- **company**: "Design Professional" (Philadelphia L&I trade licenses, record 055740, bulk file pa-philadelphia, loaded 2026-10-15): found in licenses: Philadelphia L&I trade licenses, 18s. Summary: Found 5 license record(s) and 12 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **enforcement**: "ETC Contracting, LLC" (Pennsylvania L&I Prevailing Wage Act debarments, record -, bulk file pa-dli-debarments, loaded 2026-10-15): found in enforcement: Pennsylvania L&I Prevailing Wage Act debarments, 12s. Summary: Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "Design Professional" (Philadelphia L&I trade licenses, record 055740, bulk file pa-philadelphia, loaded 2026-10-15): found in licenses: Philadelphia L&I trade licenses, 19s. Summary: Found 5 license record(s) and 12 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "MICHAEL SCHEB" (Philadelphia L&I trade licenses, record 26036, bulk file pa-philadelphia, loaded 2026-10-15): found in licenses: Philadelphia L&I trade licenses, 0s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **enforcement**: "ETC Contracting, LLC" (Pennsylvania L&I Prevailing Wage Act debarments, record -, bulk file pa-dli-debarments, loaded 2026-10-15): found in enforcement: Pennsylvania L&I Prevailing Wage Act debarments, 21s. Summary: Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 
-| Source | company | enforcement | person |
+| Source | company | person | enforcement |
 |---|---|---|---|
-| Philadelphia L&I trade licenses | found 5 | searched, 0 | found 1 |
-| Pennsylvania L&I Prevailing Wage Act debarments | searched, 0 | found 1 | n/a (companies only) |
-| Philadelphia L&I trade and contractor licenses | searched, 0 | searched, 0 | found 1 |
-| Philadelphia L&I contractor violations | searched, 0 | searched, 0 | n/a (companies only) |
-| Pennsylvania Department of State active business registrations | found 12 | searched, 0 | n/a (companies only) |
-| Pennsylvania DGS debarment and suspension list | searched, 0 | searched, 0 | n/a (companies only) |
-| Pennsylvania UJS court cases (web portal) | searched, 0 | searched, 0 | n/a (companies only) |
-| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | searched, 0 | - |
+| Philadelphia L&I trade licenses | found 5 | found 1 | searched, 0 |
+| Pennsylvania L&I Prevailing Wage Act debarments | searched, 0 | n/a (companies only) | found 1 |
+| Philadelphia L&I trade and contractor licenses | searched, 0 | found 1 | searched, 0 |
+| Philadelphia L&I contractor violations | searched, 0 | n/a (companies only) | searched, 0 |
+| Pennsylvania Department of State active business registrations | found 12 | n/a (companies only) | searched, 0 |
+| Pennsylvania DGS debarment and suspension list | searched, 0 | n/a (companies only) | searched, 0 |
+| Pennsylvania UJS court cases (web portal) | searched, 0 | n/a (companies only) | searched, 0 |
+| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | - | searched, 0 |
 
 ### RI
 
-- **company**: "C THREE ARCHITECTURE AND DESIGN, P.C." (Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers), record ARC.0021083-COA, bulk file ri-dbr-rosters, loaded 2026-10-15): found in licenses: Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers), 29s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "C THREE ARCHITECTURE AND DESIGN, P.C." (Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers), record ARC.0021083-COA, bulk file ri-dbr-rosters, loaded 2026-10-15): found in licenses: Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers), 31s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **enforcement**: "PETRUCCI CONSTRUCTION CO INC" (Rhode Island DLT Professional Regulation violations, record 6586, live search "Construction"): found in enforcement: Rhode Island DLT Professional Regulation violations, 14s. Summary: Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "Michael Lawlor" (Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers), record PE.0012314, bulk file ri-dbr-rosters, loaded 2026-10-15): found in licenses: Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers), 30s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
@@ -666,9 +659,9 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### TX
 
-- **company**: "DFW HOME SERVICES LLC" (Texas State Board of Plumbing Examiners licensees, record 36161, bulk file tx-tsbpe, loaded 2026-10-15): found in licenses: Texas State Board of Plumbing Examiners licensees, 24s. Summary: Found 2 license record(s) and 6 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **enforcement**: "PLUS 1 CONSTRUCTION SERVICES LLC" (TCEQ administrative orders, record 2024-0788-MLM-E, live search "Construction"): found in enforcement: TCEQ administrative orders, 5s. Summary: Found 0 license record(s) and 2 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **person**: "GEARY D. WINEGEART" (Texas State Board of Plumbing Examiners licensees, record 44434, bulk file tx-tsbpe, loaded 2026-10-15): found in licenses: Texas State Board of Plumbing Examiners licensees, 7s. Summary: Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **company**: "DFW HOME SERVICES LLC" (Texas State Board of Plumbing Examiners licensees, record 36161, bulk file tx-tsbpe, loaded 2026-10-15): found in licenses: Texas State Board of Plumbing Examiners licensees, 31s. Summary: Found 2 license record(s) and 6 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **enforcement**: "PLUS 1 CONSTRUCTION SERVICES LLC" (TCEQ administrative orders, record 2024-0788-MLM-E, live search "Construction"): found in enforcement: TCEQ administrative orders, 3s. Summary: Found 0 license record(s) and 2 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **person**: "GEARY D. WINEGEART" (Texas State Board of Plumbing Examiners licensees, record 44434, bulk file tx-tsbpe, loaded 2026-10-15): found in licenses: Texas State Board of Plumbing Examiners licensees, 2s. Summary: Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
 | Source | company | enforcement | person |
 |---|---|---|---|
@@ -699,7 +692,7 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### VT
 
-- **company**: "LeBlanc Custom Homes LLC" (Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers), record 174.0000251, bulk file vt-opr-rosters, loaded 2026-10-15): found in licenses: Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers), 1s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "LeBlanc Custom Homes LLC" (Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers), record 174.0000251, bulk file vt-opr-rosters, loaded 2026-10-15): found in licenses: Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers), 2s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "Michael R Hall" (Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers), record 003.0002959, bulk file vt-opr-rosters, loaded 2026-10-15): found in licenses: Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers), 1s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: vt-opr-rosters (discipline); VT original enforcement)
 
@@ -725,9 +718,9 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### WA
 
-- **company**: "A-1 REGLAZING LLC" (Washington L&I contractor licenses, record A1REGRL774ON, Socrata dataset https://data.wa.gov/d/m8qx-ubtq, row A1REGRL774ON): found in licenses: Washington L&I contractor licenses, 28s. Summary: Found 1 license record(s), 0 consumer complaint(s) and 2 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
-- **enforcement**: "Tacoma Architectural Metals, LLC" (Washington L&I debarred contractors (public works), record TACOMAM944DG, bulk file wa-lni-debarred, loaded 2026-10-15): found in enforcement: Washington L&I debarred contractors (public works), 3s. Summary: Found 0 license record(s), 0 consumer complaint(s) and 4 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
-- **person**: "JEFFREY DAVID JEWETT" (Washington L&I contractor licenses, record 5THSTS*782MF, Socrata dataset https://data.wa.gov/d/m8qx-ubtq, row 5THSTS*782MF): found in licenses: Washington L&I contractor licenses, 6s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **company**: "A-1 REGLAZING LLC" (Washington L&I contractor licenses, record A1REGRL774ON, Socrata dataset https://data.wa.gov/d/m8qx-ubtq, row A1REGRL774ON): found in licenses: Washington L&I contractor licenses, 37s. Summary: Found 1 license record(s), 0 consumer complaint(s) and 2 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
+- **enforcement**: "Tacoma Architectural Metals, LLC" (Washington L&I debarred contractors (public works), record TACOMAM944DG, bulk file wa-lni-debarred, loaded 2026-10-15): found in enforcement: Washington L&I debarred contractors (public works), 8s. Summary: Found 0 license record(s), 0 consumer complaint(s) and 4 state enforcement or standing record(s). Not searched: permit portals, federal court cases and OSHA inspections.
+- **person**: "JEFFREY DAVID JEWETT" (Washington L&I contractor licenses, record 5THSTS*782MF, Socrata dataset https://data.wa.gov/d/m8qx-ubtq, row 5THSTS*782MF): found in licenses: Washington L&I contractor licenses, 10s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
 | Source | company | enforcement | person |
 |---|---|---|---|
@@ -743,15 +736,15 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 ### WV
 
 - **enforcement**: "J-WAMSLEY CONTRACTING INC" (WV Employer Violator System (workers' comp default), record -, bulk file wv-oic-evs, loaded 2026-10-15): found in enforcement: WV Insurance Commissioner Employer Violator System (workers' comp default), 0s. Summary: Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **person**: "JOHN SMITH JR" (WV State Fire Marshal electrician licenses, record LV4768JSRENC0725, live lookup, search "John Smith"): found in licenses: WV State Fire Marshal electrician licenses, 4s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **person**: "JOHN SMITH JR" (WV State Fire Marshal electrician licenses, record LV4768JSRENC0725, live lookup, search "John Smith"): found in licenses: WV State Fire Marshal electrician licenses, 16s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **company**: none (No usable record of a business holding an active license found in: WV State Fire Marshal electrician licenses; WV Division of Labor certified plumbers; WV Division of Labor certified HVAC technicians)
 
 | Source | enforcement | person |
 |---|---|---|
 | WV Employer Violator System (workers' comp default) | found 1 | n/a (companies only) |
 | WV State Fire Marshal electrician licenses | not searched (Not searched: this lookup has no business name search) | found 1 |
-| WV Division of Labor certified plumbers | not searched (Not searched: this lookup has no business name search) | failed (www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read) |
-| WV Division of Labor certified HVAC technicians | not searched (Not searched: this lookup has no business name search) | failed (www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read) |
+| WV Division of Labor certified plumbers | not searched (Not searched: this lookup has no business name search) | not searched (Not searched: the site refused automated access) |
+| WV Division of Labor certified HVAC technicians | not searched (Not searched: this lookup has no business name search) | not searched (Not searched: the site refused automated access) |
 | SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | - |
 
 ### WI
@@ -768,7 +761,7 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### WY
 
-- **company**: "4Square Construction LLC" (Wyoming Fire Prevention & Electrical Safety licenses, record C-10447, live lookup, search "Construction"): found in licenses: Wyoming Fire Prevention & Electrical Safety licenses, 4s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "4Square Construction LLC" (Wyoming Fire Prevention & Electrical Safety licenses, record C-10447, live lookup, search "Construction"): found in licenses: Wyoming Fire Prevention & Electrical Safety licenses, 5s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "Joshua Hauser-Smith" (Wyoming Fire Prevention & Electrical Safety licenses, record A-43593, live lookup, search "Smith"): found in licenses: Wyoming Fire Prevention & Electrical Safety licenses, 5s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: WY original enforcement)
 

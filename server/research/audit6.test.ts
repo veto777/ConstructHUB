@@ -116,7 +116,7 @@ describe("#4 stored reports: enforcement and relationship prose follow today's r
     expect(shownReport(report(biz, 3))!.subjects[0].relatedLicenses![0].relatedVia).toBe("same address as license 123, 123 Main St, Tampa FL 33602");
   });
   it("a person's report never names a phone or street in prose or notes; what the customer gave stays", () => {
-    const shown = new Set(["8135550100"]);
+    const shown = [{ ref: "license 123", shown: new Set(["8135550100"]) }, { ref: "license 5", shown: new Set<string>() }];
     expect(shownVia("same phone as license 123, (813) 555-0100; possible match (address): same address as license 5, 1 Elm St", shown, true))
       .toBe("same phone as license 123; possible match (address): same address as license 5");
     expect(shownVia("matched by the phone you gave (813-555-0100)", shown, true)).toBe("matched by the phone you gave (813-555-0100)");
@@ -216,7 +216,7 @@ describe("#8 a conditioned standing shows none", () => {
   it("unconditional standing stays", () => {
     expect(standingStatus("Active").status).toBe("Active");
     expect(standingStatus("Active since 01/02/2020").status).toBe("Active since 01/02/2020");
-    expect(standingStatus("Probation, Active").status).toBe("Active");
+    expect(standingStatus("Probation, Active").status).toBeNull(); // round 7, finding 3
   });
 });
 
