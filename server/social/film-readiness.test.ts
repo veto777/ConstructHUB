@@ -47,7 +47,10 @@ describe("film readiness", () => {
     // Post now / Schedule: every blocker, TikTok's rules included; Save draft: all but TikTok's (a draft isn't posted).
     expect(page.match(/disabled=\{!!postBlocker \|\| mutation.isPending\}/g)).toHaveLength(1);
     expect(page.match(/title=\{postBlocker \|\| undefined\}/g)).toHaveLength(1);
-    expect(page.match(/disabled=\{!!draftBlocker \|\| mutation.isPending\}/g)).toHaveLength(1);
+    // Save draft: all but TikTok's, plus one of its own — a Google Business Profile post has no draft here
+    // (2026-10-15: the GBP channel sends to the GBP queue, which knows only Post now / Schedule).
+    expect(page.match(/disabled=\{!!draftOnlyBlocker \|\| mutation.isPending\}/g)).toHaveLength(1);
+    expect(page).toContain("const draftOnlyBlocker = draftBlocker ||");
     expect(page).toContain("const postBlocker = draftBlocker || tiktokBlocker;");
     expect(page).toContain('aria-describedby={setupProblem ? "social-setup-reason" : undefined}');
     expect(page).toContain("{postBlocker && !setupProblem && (");

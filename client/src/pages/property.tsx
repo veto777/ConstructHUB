@@ -183,7 +183,7 @@ export default function PropertyPage() {
         as="h1"
         titleTestId="text-property-title"
         title="Property records"
-        description="Find the county assessor or appraiser office that holds a property's ownership, value and tax records, and open its official site."
+        description="Find the county assessor or appraiser office for a property. Their own sites hold ownership, values, construction history and tax records where published."
         flush
       />
 
