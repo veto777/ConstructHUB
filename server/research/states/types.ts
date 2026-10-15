@@ -13,6 +13,7 @@
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import type { LicenseSource } from "../licenses";
 import type { BulkSource } from "../bulk";
+import type { IdQuery } from "../identifiers";
 import type { SodaEnforcement } from "../state-records";
 import type { ComplaintSource } from "../records";
 
@@ -22,6 +23,8 @@ export type LiveLicenseSearch = {
   /** The official page a reader can open. */
   sourceUrl: string;
   search: (name: string, kind: "person" | "company") => Promise<LicenseHit[]>;
+  /** Search by license number, phone or address, when the lookup offers it (the cross-reference pass uses it). */
+  searchBy?: (q: IdQuery) => Promise<LicenseHit[]>;
 };
 
 /** An enforcement, standing or court search that isn't a Socrata dataset, run live per report (companies only). */

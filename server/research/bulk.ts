@@ -21,10 +21,16 @@ import { pool } from "../db";
 import { USER_AGENT, rateLimitHost, sleep } from "../scrapers/polite-fetch";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { tokens } from "./licenses";
+import { addressMatches, idWords, queryWords, type IdKeys, type IdQuery } from "./identifiers";
 
+/**
+ * One record of a file. `business` and `person` are the names it is found by; `people` adds everyone else the
+ * record names (officers, qualifiers), searched like `person`; `keys` are its license numbers, phones and street
+ * addresses (./identifiers.ts), so a report can find it by those and cross-reference related records.
+ */
 export type BulkHit =
-  | { kind: "license"; hit: LicenseHit; business: string | null; person: string | null }
-  | { kind: "enforcement"; hit: EnforcementHit; business: string | null; person: string | null };
+  | { kind: "license"; hit: LicenseHit; business: string | null; person: string | null; people?: (string | null)[]; keys?: IdKeys }
+  | { kind: "enforcement"; hit: EnforcementHit; business: string | null; person: string | null; people?: (string | null)[]; keys?: IdKeys };
 
 export type BulkSource = {
   id: string;
@@ -70,11 +76,17 @@ export function bulkSchemaReady(): Promise<void> {
   return ready;
 }
 
-/** Index words: "b:" for a business name, "p:" for a person, so a company search never matches an officer's surname. */
-export function indexWords(business: string | null, person: string | null): string[] {
+/**
+ * Index words: "b:" for a business name, "p:" for a person, so a company search never matches an officer's surname;
+ * plus the identifier keys of ./identifiers.ts ("l:", "t:", "a:", "z:"). A person search matches when every word of
+ * the name is a "p:" word of the record, so with several people on one record the words could come from two of them:
+ * the runner re-checks each hit against the person names it carries.
+ */
+export function indexWords(business: string | null, person: string | null, people?: (string | null)[], keys?: IdKeys): string[] {
   const out = new Set<string>();
   for (const w of tokens(business ?? "")) out.add(`b:${w}`);
-  for (const w of tokens(person ?? "")) out.add(`p:${w}`);
+  for (const p of [person, ...(people ?? [])]) for (const w of tokens(p ?? "")) out.add(`p:${w}`);
+  for (const k of idWords(keys)) out.add(k);
   return Array.from(out);
 }
 
@@ -101,7 +113,7 @@ export async function loadSource(src: BulkSource): Promise<number> {
   };
   try {
     for await (const h of src.load()) {
-      const words = indexWords(h.business, h.person);
+      const words = indexWords(h.business, h.person, h.people, h.keys);
       if (!words.length) continue;
       batch.push({ words, hit: { k: h.kind, h: h.hit } });
       n++;
@@ -141,6 +153,21 @@ export async function searchBulk(src: BulkSource, name: string, kind: "person" |
     [src.id, want, limit],
   );
   return { hits: rows.map((r) => ({ kind: r.hit.k, hit: r.hit.h })), status };
+}
+
+/** Hits in one source that carry this license number, phone or street address. */
+export async function searchBulkBy(src: BulkSource, q: IdQuery, limit = 200): Promise<{ hits: StoredHit[]; status: BulkStatus }> {
+  const status = await sourceStatus(src.id);
+  // An address is searched by house number and street word; the ZIP is checked on the hit (not every file has one).
+  const want = queryWords(q).filter((w) => !w.startsWith("z:"));
+  if (!status.loaded || !want.length) return { hits: [], status };
+  const { rows } = await pool.query(
+    `SELECT r.hit FROM research_bulk_rows r JOIN research_bulk_sources s ON s.id = r.source AND s.generation = r.generation
+     WHERE r.source = $1 AND r.words @> $2::text[] LIMIT $3`,
+    [src.id, want, limit],
+  );
+  const hits: StoredHit[] = rows.map((r) => ({ kind: r.hit.k, hit: r.hit.h }));
+  return { hits: q.type === "address" ? hits.filter((h) => !h.hit.address || addressMatches(q.value, h.hit.address)) : hits, status };
 }
 
 // ── Download + parse helpers ──────────────────────────────────────────────────────────────────────────────────

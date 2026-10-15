@@ -85,7 +85,15 @@ export type ResearchStatus = "awaiting_payment" | "paid" | "researching" | "comp
 export type LicenseHit = {
   state: string; source: string; sourceUrl: string; businessName: string | null; licenseNumber: string | null;
   licenseType: string | null; specialty: string | null; status: string | null; principal: string | null;
-  city: string | null; expires: string | null; matchedOn: "business" | "principal";
+  city: string | null; expires: string | null;
+  /** How the record was found: the subject's name (business or a person on the license) or one of its identifiers. */
+  matchedOn: "business" | "principal" | "license" | "phone" | "address";
+  /** Published by some sources only (absent on reports made before 2026-10-15). */
+  address?: string | null; phone?: string | null;
+  /** Everyone the source names on the license: owners, officers, qualifiers, responsible managing employees. */
+  people?: { name: string; role: string | null }[];
+  /** Set by the cross-reference pass: why a record found through another record belongs to the subject. */
+  relatedVia?: string | null;
 };
 
 export type PermitHit = {
@@ -126,6 +134,10 @@ export type EnforcementHit = {
   state: string; source: string; sourceUrl: string; category: EnforcementCategory;
   name: string | null; id: string | null; date: string | null; endDate: string | null; status: string | null;
   city: string | null; detail: string | null; amount: number | null; adverse: boolean | null;
+  /** Published by some sources only. */
+  address?: string | null; phone?: string | null; licenseNumber?: string | null;
+  /** Set by the cross-reference pass (a record of a business tied to the subject through a license, phone or address). */
+  relatedVia?: string | null;
 };
 
 export type RecordSource = { source: string; scope: string; searched: boolean; note: string };

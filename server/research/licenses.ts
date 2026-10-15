@@ -5,6 +5,7 @@
  */
 import { politeFetch } from "../scrapers/polite-fetch";
 import type { LicenseHit } from "@shared/research-reports";
+import { addressKeys, addressMatches, idWords, normLicense, normPhone, type IdQuery } from "./identifiers";
 
 type Field = string | null;
 
@@ -23,6 +24,8 @@ export type LicenseSource = {
   personField: Field | string[];
   /** A second dataset listing every principal of a license, joined on licenseNumber. */
   principals?: { url: string; nameField: string; licenseField: string; businessField?: string };
+  /** Optional identifier fields, so a report can search and cross-reference by them (./identifiers.ts). */
+  address?: string | string[]; phone?: string; zip?: string;
   /** Extra SoQL restricting rows to construction trades. */
   filter?: string;
 };
@@ -126,7 +129,40 @@ function toHit(src: LicenseSource, row: Record<string, unknown>, matchedOn: Lice
     licenseType: str(row, src.fields.licenseType), specialty: str(row, src.fields.specialty),
     status: str(row, src.fields.status), principal: principal ?? personOf(src, row),
     city: str(row, src.fields.city), expires: expires ? expires.slice(0, 10) : null, matchedOn,
+    ...(src.address ? { address: [...(Array.isArray(src.address) ? src.address : [src.address]), ...(src.zip ? [src.zip] : [])].map((f) => str(row, f)).filter(Boolean).join(" ") || null } : {}),
+    ...(src.phone ? { phone: str(row, src.phone) } : {}),
   };
+}
+
+/**
+ * Licenses in one dataset with this license number, phone or street address. Phones are matched on their digit
+ * groups ("%206%555%0142%", since datasets store them in any format) and re-checked digit for digit; addresses on
+ * the house number and first street word, re-checked through ./identifiers.ts.
+ */
+export async function searchLicensesBy(src: LicenseSource, q: IdQuery): Promise<LicenseHit[]> {
+  const extra = src.filter ? ` AND (${src.filter})` : "";
+  let where: string | null = null;
+  if (q.type === "license" && src.fields.licenseNumber) {
+    const n = normLicense(q.value);
+    if (n) where = `upper(${src.fields.licenseNumber}) in (${Array.from(new Set([q.value.trim().toUpperCase(), n])).map(quote).join(",")})`;
+  } else if (q.type === "phone" && src.phone) {
+    const n = normPhone(q.value);
+    if (n) where = `${src.phone} like ${quote(`%${n.slice(0, 3)}%${n.slice(3, 6)}%${n.slice(6)}%`)}`;
+  } else if (q.type === "address" && src.address) {
+    const key = addressKeys(q.value).find((k) => k.startsWith("a:"));
+    const field = Array.isArray(src.address) ? src.address[0] : src.address;
+    if (key && !key.startsWith("a:POBOX")) {
+      const [num, word] = key.slice(2).split(" ");
+      where = `upper(${field}) like ${quote(`${num} %${word}%`)}`;
+    }
+  }
+  if (!where) return [];
+  const matchedOn = q.type;
+  return (await sodaRows(src.url, where + extra, 200)).map((row) => toHit(src, row, matchedOn)).filter((h) => {
+    if (q.type === "license") return normLicense(h.licenseNumber) === normLicense(q.value);
+    if (q.type === "address") return addressMatches(q.value, h.address);
+    return idWords({ phones: [h.phone] }).includes(`t:${normPhone(q.value)}`);
+  });
 }
 
 export const tokens = (v: string) => v.toUpperCase().split(/[^A-Z0-9&']+/).filter((w) => w.length >= 2);
