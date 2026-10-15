@@ -32,7 +32,8 @@ export function SamplePreview({ children, what, cta, className, testId }: {
         </p>
         {cta && <div className="flex items-center gap-2">{cta}</div>}
       </div>
-      <div className="pointer-events-none select-none opacity-80" aria-hidden="true" inert="">
+      {/* Not interactive: a sample is to look at. (The `inert` attribute is not in React's typings yet.) */}
+      <div className="pointer-events-none select-none opacity-80" aria-hidden="true" {...({ inert: "" } as Record<string, string>)}>
         {children}
       </div>
     </section>
