@@ -6,6 +6,8 @@
  *   NY  New York City DOB licenses: general contractors, master plumbers, electrical contractors and firms,
  *       fire-suppression contractors, oil-burner installers, riggers, welders, site safety and other DOB trades (bulk)
  *   NY  New York City DCWP home-improvement contractor and construction-labor-provider licenses (bulk)
+ *   MD  Montgomery County DPS licenses: building contractors (new-home builders), master and limited master
+ *       electricians, limited electrical businesses, fire-system licensees (bulk)
  *   PA  Philadelphia L&I trade licenses: contractors, electrical, plumbing, fire suppression, sheet metal, home
  *       improvement, demolition, excavation (bulk; the contractor's address joined from L&I permit contractors)
  *
@@ -17,7 +19,7 @@
  */
 import type { LicenseHit } from "@shared/research-reports";
 import type { LicenseSource } from "../licenses";
-import type { BulkHit, BulkSource } from "../bulk";
+import { clean, type BulkHit, type BulkSource } from "../bulk";
 import type { SodaEnforcement } from "../state-records";
 import type { LiveEnforcementSearch, LiveLicenseSearch } from "./types";
 import { addressLine, arcgisAll, fullName, isoDay, sodaAll, txt } from "./lib/local-fetch";
@@ -214,10 +216,52 @@ const phlViolations: BulkSource = {
   },
 };
 
+// ── Montgomery County, Maryland (Department of Permitting Services) ─────────────────────────────────────────────
+type MocoSet = { id: string; slug: string; label: string; floor: number; f: { no: string; type: string; who: string; extra?: string; trade?: string; addr: string; addr2: string; zip: string; phone?: string; expires: string } };
+const MOCO_STD = { no: "licenseno", type: "licensetype", who: "applicant", addr: "addr1", addr2: "addr2", zip: "zip", expires: "expiredate" };
+const MOCO: MocoSet[] = [
+  { id: "c7hs-c9qq", slug: "builders", label: "Montgomery County (MD) building contractor licenses", floor: 1_700, f: { ...MOCO_STD, extra: "additionalapplicant", trade: "businessname", phone: "telephone" } },
+  { id: "v8mn-6i2r", slug: "master-electricians", label: "Montgomery County (MD) master electrician licenses", floor: 2_900, f: MOCO_STD },
+  { id: "f637-ajic", slug: "limited-master-electricians", label: "Montgomery County (MD) limited master electrician licenses", floor: 400, f: MOCO_STD },
+  { id: "rmjr-4zb9", slug: "limited-electrical-businesses", label: "Montgomery County (MD) limited electrical business licenses", floor: 290, f: MOCO_STD },
+  { id: "yjd7-guhd", slug: "fire-systems", label: "Montgomery County (MD) fire-system licenses", floor: 560,
+    f: { no: "license_number", type: "license_type", who: "applicant", addr: "address1", addr2: "address2", zip: "zip_code", expires: "expired_date" } },
+];
+
+const mocoSource = (m: MocoSet): BulkSource => {
+  const ds = soda("data.montgomerycountymd.gov", m.id);
+  return {
+    id: `md-moco-${m.slug}`, state: "MD", label: m.label, pageUrl: ds.datasetUrl, everyHours: 24 * 7, minRows: m.floor,
+    load: async function* () {
+      for await (const r of sodaAll(ds.url)) {
+        const raw = txt(r, m.f.who);
+        if (!raw || /^TEST ONLY/i.test(raw)) continue;
+        // A few names carry the county's own markers ("BAD - ", "EXPIRED - ", " - INACTIVE LIMITED MASTER"): searched
+        // without them, and shown as published in the specialty line.
+        const marked = /\b(BAD|EXPIRED)\s+-\s|\s-\s+INACTIVE\b/i.test(raw);
+        const applicant = clean(raw.replace(/^[_\s]+/, "").replace(/\b(BAD|EXPIRED)\s+-\s+/gi, " ").replace(/\s+-\s+INACTIVE\b.*$/i, ""));
+        if (!applicant) continue;
+        const trade = m.f.trade ? txt(r, m.f.trade) : null;
+        const extra = m.f.extra ? txt(r, m.f.extra) : null;
+        const isOrg = ORG.test(applicant) || !!trade || m.slug === "limited-electrical-businesses";
+        const business = isOrg ? (trade && trade.toUpperCase() !== applicant.toUpperCase() ? `${applicant} (${trade})` : applicant) : null;
+        yield licenseHit({
+          state: "MD", source: m.label, sourceUrl: ds.datasetUrl,
+          businessName: business, licenseNumber: txt(r, m.f.no), licenseType: txt(r, m.f.type), specialty: [txt(r, "scope_limitation"), marked ? `name as published: ${raw}` : null].filter(Boolean).join("; ") || null,
+          status: null, principal: isOrg ? extra : applicant, city: txt(r, "city"), expires: isoDay(r[m.f.expires]),
+          address: addressLine([txt(r, m.f.addr)], txt(r, "city"), txt(r, "state"), txt(r, m.f.zip)),
+          phone: m.f.phone ? txt(r, m.f.phone) : null,
+          people: [{ name: isOrg ? extra : applicant, role: isOrg ? "Additional applicant" : "Licensee" }],
+        });
+      }
+    },
+  };
+};
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [nycDob, nycDcwp, phlTrade, phlViolations];
+export const LOCAL_BULK: BulkSource[] = [nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource)];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
