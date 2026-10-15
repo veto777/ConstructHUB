@@ -148,6 +148,8 @@ export type ComplaintHit = {
   state: string; source: string; sourceUrl: string; id: string | null; opened: string | null; closed: string | null;
   status: string | null; business: string | null; city: string | null; category: string | null;
   description: string | null; resolution: string | null; savings: number | null;
+  /** The business address the complaint names, when the source publishes it. */
+  address?: string | null;
 };
 
 /** A federal court docket naming the company (CourtListener). A case filed is not a finding against anyone. */

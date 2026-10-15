@@ -6,6 +6,10 @@
  *   TX  TDLR administrative orders (penalties, revocations; licensed and unlicensed respondents), public search form
  *   TX  Comptroller franchise-tax status (right to transact business; forfeitures), data.texas.gov 9cir-efmm
  *   TX  TCEQ administrative orders, civil judgments, notices of enforcement and violation, and complaints
+ *
+ * Addresses (2026-10-15, from each dataset's /api/views metadata): the Comptroller's taxpayer mailing address, the
+ * TCEQ regulated entity's delivery address (notices of enforcement) and site address (notices of violation); the
+ * TDLR orders carry the license number. The other TCEQ datasets publish a county only.
  */
 import type { EnforcementHit, RecordSource } from "@shared/research-reports";
 import { politeFetch } from "../scrapers/polite-fetch";
@@ -17,6 +21,11 @@ type Row = Record<string, unknown>;
 const s = (v: unknown): string | null => clean(v == null ? null : String(v));
 const day = (v: unknown): string | null => { const t = s(v); return t ? (/^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : usDate(t)) : null; };
 const num = (v: unknown): number | null => { const n = Number(v); return v == null || v === "" || !Number.isFinite(n) ? null : n; };
+/** Street, city, state and ZIP fields joined (null when the row has no street). */
+const addr = (r: Row, street: string[], rest: string[]): string | null => {
+  const st = street.map((f) => s(r[f])).filter(Boolean).join(" ");
+  return st ? [st, ...rest.map((f) => s(r[f]))].filter(Boolean).join(" ") : null;
+};
 const usd = (n: number | null) => (n == null ? null : `$${n.toLocaleString("en-US")}`);
 
 export type SodaEnforcement = {
@@ -48,6 +57,7 @@ const SODA_SOURCES: SodaEnforcement[] = [
         status: `Right to transact business in Texas: ${TX_TRANSACT[code] ?? (code ? `code ${code}` : "ended")}`,
         detail: [sos ? `Secretary of State status: ${TX_SOS[sos] ?? `code ${sos}`}` : null, s(r.secretary_of_state_sos_or_coa_file_number) ? `SOS file ${s(r.secretary_of_state_sos_or_coa_file_number)}` : null].filter(Boolean).join(". ") || null,
         amount: null, adverse: null,
+        address: addr(r, ["taxpayer_address"], ["taxpayer_city", "taxpayer_state", "taxpayer_zip"]),
       };
     },
   },
@@ -80,6 +90,7 @@ const SODA_SOURCES: SodaEnforcement[] = [
       status: "Notice of enforcement", city: s(r.city_name),
       detail: [s(r.reg_ent_desc_txt), num(r.viol_cnt) != null ? `${num(r.viol_cnt)} violation(s)` : null, s(r.a_viol_citations) ? `citing ${s(r.a_viol_citations)}` : null, s(r.tnrcc_dkt_num_txt) ? `docket ${s(r.tnrcc_dkt_num_txt)}` : null].filter(Boolean).join(", ") || null,
       amount: null, adverse: null,
+      address: addr(r, ["deliv_txt"], ["city_name", "usps_state_cd", "zip_cd"]),
     }),
   },
   {
@@ -90,6 +101,7 @@ const SODA_SOURCES: SodaEnforcement[] = [
       status: "Notice of violation", city: s(r.phys_city),
       detail: [num(r.viol_cnt) != null ? `${num(r.viol_cnt)} violation(s)` : null, s(r.a_viol_citations) ? `citing ${s(r.a_viol_citations)}` : null].filter(Boolean).join(", ") || null,
       amount: null, adverse: null,
+      address: addr(r, ["phys_loc"], ["phys_city", "phys_state", "phys_zip"]),
     }),
   },
   {
@@ -142,6 +154,7 @@ export function parseTdlrOrders(html: string): EnforcementHit[] {
       city: [get("city")[0], get("county")[0] ? `${get("county")[0]} County` : null].filter(Boolean).join(", ") || null,
       detail: [order, text(cells[2]) ? `Basis: ${text(cells[2])}` : null].filter(Boolean).join(" ").slice(0, 800) || null,
       amount: amount ? Number(amount.replace(/,/g, "")) : null, adverse: true,
+      licenseNumber: license && !/not licensed/i.test(license) ? license : null,
     });
   }
   return out;

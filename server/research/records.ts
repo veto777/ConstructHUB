@@ -39,6 +39,12 @@ export type ComplaintSource = {
   toHit: (row: Record<string, unknown>) => Omit<ComplaintHit, "state" | "source" | "sourceUrl">;
 };
 
+/** The street lines plus city, state and ZIP (null when the row has no street; both datasets checked 2026-10-15). */
+const street = (r: Record<string, unknown>, lines: string[], rest: string[]): string | null => {
+  const st = lines.map((f) => s(r[f])).filter(Boolean).join(" ");
+  return st ? [st, ...rest.map((f) => s(r[f]))].filter(Boolean).join(" ") : null;
+};
+
 const COMPLAINT_SOURCES: ComplaintSource[] = [
   {
     state: "WA", source: "Washington Attorney General consumer complaints", scope: "2013 to today, updated daily",
@@ -47,6 +53,7 @@ const COMPLAINT_SOURCES: ComplaintSource[] = [
     toHit: (r) => ({
       id: s(r.id), opened: day(r.openeddate), closed: null, status: s(r.status), business: s(r.business), city: s(r.businesscity),
       category: s(r.businesscategory), description: null, resolution: null, savings: num(r.actualsavings),
+      address: street(r, ["businessstreetline1", "businessstreetline2"], ["businesscity", "businessstate", "businesszip"]),
     }),
   },
   {
@@ -56,6 +63,7 @@ const COMPLAINT_SOURCES: ComplaintSource[] = [
     toHit: (r) => ({
       id: s(r.reference_no_), opened: day(r.date_open), closed: day(r.date_closed), status: s(r.status), business: s(r.respondent), city: s(r.city),
       category: s(r.business_type), description: s(r.complaint_description), resolution: s(r.closing_description), savings: null,
+      address: street(r, ["address_1", "address_2"], ["city", "state", "zip"]),
     }),
   },
 ];
