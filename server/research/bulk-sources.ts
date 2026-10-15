@@ -19,7 +19,6 @@
  *   CA  DCA licensees: engineers/surveyors/geologists, architects, landscape architects, structural pest control
  *   CA  DIR certified electricians and electrician trainees
  *   CA  DIR Labor Commissioner public-works debarments
- *   WA  L&I contractors not allowed to bid on public works (debarments), and public-works strikes   (added 2026-10-15)
  *
  * Every license and enforcement row carries its identifier keys (license numbers, phones, street addresses;
  * ./identifiers.ts) where the file publishes them, and its people with the publisher's roles (re-checked 2026-10-15).
@@ -820,8 +819,9 @@ function pdfString(s: string): string {
  * Tj/TJ), as lines of positioned fragments: enough for the CSLB lists, not a general PDF reader.
  */
 export function pdfTextLines(pdf: Buffer): { page: number; y: number; parts: { x: number; text: string }[] }[] {
-  const out = new Map<string, { page: number; y: number; parts: { x: number; text: string }[] }>();
-  let page = 0;
+  // Content streams, in file order. A page's content may be split over several streams, even mid-operator, so they
+  // are joined and read as one; a new page starts where the text jumps back up to the top.
+  const streams: string[] = [];
   const seen = new Set<string>();
   for (let i = pdf.indexOf("stream"); i >= 0; i = pdf.indexOf("stream", i + 6)) {
     if (pdf.subarray(i - 3, i).toString("latin1") === "end") continue;
@@ -830,23 +830,34 @@ export function pdfTextLines(pdf: Buffer): { page: number; y: number; parts: { x
     if (end < 0) break;
     let content: string;
     try { content = inflateSync(pdf.subarray(start, end)).toString("latin1"); } catch { continue; }
-    if (!/\bBT\b/.test(content) || seen.has(content)) continue; // the same page content can be stored twice
+    if (!/\b(BT|ET|TJ|Tj)\b/.test(content) || /[\x00-\x08\x0e-\x1f]/.test(content.slice(0, 2000))) continue; // not page content
+    if (seen.has(content)) continue; // the same page content can be stored twice
     seen.add(content);
-    page++;
-    let x = 0, y = 0, lx = 0, ly = 0;
-    const re = /\[((?:\((?:\\.|[^\\)])*\)|[^\]])*)\]\s*TJ|\(((?:\\.|[^\\)])*)\)\s*Tj|(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+Tm|(-?[\d.]+)\s+(-?[\d.]+)\s+T[dD]|\bBT\b/g;
-    for (const m of Array.from(content.matchAll(re))) {
-      if (m[0] === "BT") { x = lx = 0; y = ly = 0; continue; }
-      if (m[7] !== undefined) { x = lx = Number(m[7]); y = ly = Number(m[8]); continue; }
-      if (m[9] !== undefined) { lx += Number(m[9]); ly += Number(m[10]); x = lx; y = ly; continue; }
-      const text = m[1] !== undefined ? Array.from(m[1].matchAll(/\(((?:\\.|[^\\)])*)\)/g)).map((t) => pdfString(t[1])).join("") : pdfString(m[2] ?? "");
-      if (!text) continue;
-      const key = `${page}:${Math.round(y)}`;
-      const line = out.get(key) ?? out.set(key, { page, y: Math.round(y), parts: [] }).get(key)!;
-      line.parts.push({ x, text });
-    }
+    streams.push(content);
   }
-  return Array.from(out.values()).sort((a, b) => a.page - b.page || b.y - a.y).map((l) => ({ ...l, parts: l.parts.sort((a, b) => a.x - b.x) }));
+  const out = new Map<string, { page: number; y: number; parts: { x: number; text: string }[] }>();
+  let page = 1, lastY = Infinity, x = 0, y = 0, lx = 0, ly = 0;
+  const re = /\[((?:\((?:\\.|[^\\)])*\)|[^\]])*)\]\s*TJ|\(((?:\\.|[^\\)])*)\)\s*Tj|(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+Tm|(-?[\d.]+)\s+(-?[\d.]+)\s+T[dD]|\bBT\b/g;
+  for (const m of Array.from(streams.join("\n").matchAll(re))) {
+    if (m[0] === "BT") { x = lx = 0; y = ly = 0; continue; }
+    if (m[7] !== undefined) { x = lx = Number(m[7]); y = ly = Number(m[8]); continue; }
+    if (m[9] !== undefined) { lx += Number(m[9]); ly += Number(m[10]); x = lx; y = ly; continue; }
+    const text = m[1] !== undefined ? Array.from(m[1].matchAll(/\(((?:\\.|[^\\)])*)\)/g)).map((t) => pdfString(t[1])).join("") : pdfString(m[2] ?? "");
+    if (!text) continue;
+    if (y > lastY + 50) page++;
+    lastY = y;
+    const key = `${page}:${Math.round(y)}`;
+    const line = out.get(key) ?? out.set(key, { page, y: Math.round(y), parts: [] }).get(key)!;
+    line.parts.push({ x, text });
+  }
+  // Fragments of one printed line can sit up to about 6 points apart vertically (rows are 15+ apart): merge them.
+  const merged: { page: number; y: number; parts: { x: number; text: string }[] }[] = [];
+  for (const l of Array.from(out.values()).sort((a, b) => a.page - b.page || b.y - a.y)) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.page === l.page && prev.y - l.y <= 7) prev.parts.push(...l.parts);
+    else merged.push({ ...l, parts: [...l.parts] });
+  }
+  return merged.map((l) => ({ ...l, parts: l.parts.sort((a, b) => a.x - b.x) }));
 }
 
 /** The rows of one monthly list: business name, license number, revoked date, split at the header's column positions. */
@@ -855,28 +866,40 @@ export function cslbRevokedRows(pdf: Buffer): { name: string; license: string; d
   const rows: { name: string; license: string; date: string }[] = [];
   let cols: { lic: number; date: number } | null = null;
   let declared: number | null = null;
+  /** The x of the fragment where `word` starts in the line. */
   const at = (parts: { x: number; text: string }[], word: string) => {
-    let text = "";
-    for (const p of parts) { const before = text.length; text += p.text; const k = text.indexOf(word); if (k >= 0 && k < text.length) return k >= before ? p.x : parts[Math.max(0, parts.indexOf(p) - 1)].x; }
+    const k = parts.map((p) => p.text).join("").indexOf(word);
+    if (k < 0) return null;
+    let offset = 0;
+    for (const p of parts) { if (k < offset + p.text.length) return p.x; offset += p.text.length; }
     return null;
   };
+  let last: { name: string; license: string; date: string } | null = null;
   for (const l of lines) {
     const text = l.parts.map((p) => p.text).join("");
-    if (/LICENSE NUMBER/.test(text) && /REVOKED DATE/.test(text)) {
-      const lic = at(l.parts, "LICENSE NUMBER"), date = at(l.parts, "REVOKED DATE");
-      cols = lic != null && date != null ? { lic: lic - 2, date: date - 2 } : null;
+    const total = text.match(/TOTAL REVOKED LICENSES:\s*(\d+)/)?.[1];
+    if (total) { declared = Number(total); last = null; continue; }
+    // The header; on some lists "REVOKED DATE" wraps onto a second line.
+    if (/LICENSE NUMBER/.test(text) && /REVOKED/.test(text)) {
+      const lic = at(l.parts, "LICENSE NUMBER"), date = at(l.parts, "REVOKED");
+      // Values can start a few points left of their heading.
+      cols = lic != null && date != null ? { lic: lic - 6, date: date - 6 } : null;
+      last = null;
       continue;
     }
     if (!cols) continue;
     const cell = (from: number, to: number) => clean(l.parts.filter((p) => p.x >= from && p.x < to).map((p) => p.text).join(""));
-    const name = cell(-Infinity, cols.lic), license = cell(cols.lic, cols.date), date = cell(cols.date, Infinity);
-    if (name && license && date && /^\d{2}\/\d{2}\/\d{4}$/.test(date)) rows.push({ name, license, date });
-    const total = text.match(/TOTAL REVOKED LICENSES:\s*(\d+)/)?.[1];
-    if (total) declared = Number(total);
+    const name = cell(-Infinity, cols.lic), license = cell(cols.lic, cols.date)?.replace(/^LIC\s+/i, "") ?? null, date = cell(cols.date, Infinity)?.replace(/\s+/g, "") ?? null;
+    if (name && license && date && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(date)) { last = { name, license, date }; rows.push(last); }
+    // A business name too long for its column wraps onto the next line(s), with nothing in the other columns.
+    else if (name && !license && !date && last && !/^(BUSINESS NAME|CONTRACTORS STATE|LICENSES REVOKED)/.test(name)) last.name = `${last.name} ${name}`;
+    else last = null;
   }
   // Some lists store each page's text twice; a row is one row however often it is drawn.
   const unique = Array.from(new Map(rows.map((r) => [`${r.name}|${r.license}|${r.date}`, r])).values());
-  if (declared != null && unique.length !== declared) throw new Error(`read ${unique.length} rows, the list says ${declared}`);
+  // CSLB's own total differs from its printed rows by one to three on some lists; far fewer rows means a layout this
+  // reader doesn't understand.
+  if (declared != null && unique.length < declared * 0.9) throw new Error(`read ${unique.length} rows, the list says ${declared}`);
   return unique;
 }
 
@@ -896,7 +919,9 @@ async function* caCslbRevokedLoader(): AsyncIterable<BulkHit> {
     const path = await download(url, { headers: { "user-agent": USER_AGENT } }, 5 * 60_000);
     let pdf: Buffer;
     try { pdf = await fs.readFile(path); } finally { await fs.rm(path, { force: true }); }
-    for (const r of cslbRevokedRows(pdf)) {
+    let rows: ReturnType<typeof cslbRevokedRows>;
+    try { rows = cslbRevokedRows(pdf); } catch (err: any) { throw new Error(`${url}: ${err?.message ?? err}`); }
+    for (const r of rows) {
       if (/^HIS\b/i.test(r.license)) continue; // a salesperson registration: an individual
       yield enf({
         state: "CA", source: "California CSLB revoked licenses (monthly lists)", sourceUrl: url, category: "discipline",
@@ -1015,91 +1040,6 @@ async function* caDebarmentsLoader(): AsyncIterable<BulkHit> {
   }
 }
 
-// ── Washington L&I public-works debarments and strikes ──────────────────────────────────────────────────────
-/**
- * L&I's "Contractors Not Allowed To Bid" list and its contractor strike list (secure.lni.wa.gov/debarandstrike,
- * checked 2026-10-15): the public search pages read JSON from their own page methods, which take blank filters for
- * the whole list. No CAPTCHA or login; robots.txt has no rule for these paths. The RCW chapters are the grounds the
- * "Contractors Not Allowed To Bid" page lists.
- */
-const LNI_DEBAR_PAGE = "https://secure.lni.wa.gov/debarandstrike/ContractorDebarList.aspx";
-const LNI_STRIKE_PAGE = "https://secure.lni.wa.gov/debarandstrike/ContractorStrikeList.aspx";
-const LNI_RCW: Record<string, string> = {
-  "39.12": "Prevailing wage law (Chapter 39.12 RCW)", "18.27": "Contractor registration law (Chapter 18.27 RCW)",
-  "18.106": "Plumber certification and licensing law (Chapter 18.106 RCW)", "19.28": "Electrical certification and licensing law (Chapter 19.28 RCW)",
-  "70.87": "Elevator licensing and permitting law (Chapter 70.87 RCW)", "51.48": "Industrial insurance law (Chapter 51.48 RCW)",
-};
-const rcwText = (code: string | null) => {
-  if (!code) return null;
-  const chapter = code.match(/^(\d+\.\d+)/)?.[1];
-  return `RCW ${code}${chapter && LNI_RCW[chapter] ? `: ${LNI_RCW[chapter]}` : ""}`;
-};
-
-/** "A  B, A  B, C" → "A B, C" (L&I repeats a principal once per role). */
-const uniqueList = (v: string) => Array.from(new Set(v.split(",").map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean))).join(", ");
-
-/** Every row of one list, 100 a page (the endpoint accepts 100; 500 is refused). */
-async function lniList(page: string, method: string, filters: Record<string, string>): Promise<Record<string, string>[]> {
-  const out: Record<string, string>[] = [];
-  for (let p = 1; p <= 400; p++) {
-    await rateLimitHost(page, 1500);
-    const res = await fetch(`${page}/${method}`, {
-      method: "POST", headers: { "user-agent": USER_AGENT, "content-type": "application/json; charset=utf-8", referer: page },
-      body: JSON.stringify({ Echo: 1, PageNumber: p, RowspPage: 100, OrderByColumn: 0, OrderType: "asc", co_name: "", ubi_num: "", license_id: "", principals: "", rcw_code: "", ...filters }),
-    });
-    if (!res.ok) throw new Error(`L&I ${method} returned HTTP ${res.status}`);
-    const body = JSON.parse(((await res.json()) as { d?: string }).d ?? "null") as { IsSuccess?: boolean; aaData?: Record<string, string>[]; Messages?: string[] } | null;
-    if (!body?.IsSuccess && !body?.aaData?.length) throw new Error(`L&I ${method}: ${body?.Messages?.join("; ") || "unexpected reply"}`);
-    const rows = body?.aaData ?? [];
-    out.push(...rows);
-    if (rows.length < 100) break;
-  }
-  return out;
-}
-
-export function lniDebarHit(r: Record<string, string>): BulkHit | null {
-  const name = clean(r.co_name);
-  if (!name) return null;
-  const license = clean(r.license_id), related = clean(r.related_business), principals = clean(r.principals);
-  const due = [r.penalty_due_flg === "Yes" ? "penalties due" : null, r.wage_due_flg === "Yes" ? "wages due" : null].filter(Boolean).join(" and ");
-  return enf({
-    state: "WA", source: "Washington L&I contractors not allowed to bid on public works (debarred)", sourceUrl: LNI_DEBAR_PAGE,
-    category: "debarment", name: [name, related].filter(Boolean).join(" / "), id: license, date: usDate(r.debar_begin_date), endDate: usDate(r.debar_end_date),
-    status: clean(r.status_desc), city: null,
-    detail: [rcwText(clean(r.rcw_code)), due ? `L&I lists ${due}` : null, clean(r.ubi_num) ? `UBI ${clean(r.ubi_num)}` : null,
-      related ? `Related business: ${related}` : null, principals ? `Principals listed by L&I: ${uniqueList(principals)}` : null].filter(Boolean).join(". ") || null,
-    amount: null, adverse: true, licenseNumber: license,
-  }, [name, related].filter(Boolean).join(" "), { licenses: [license] });
-}
-
-export function lniStrikeHit(r: Record<string, string>): BulkHit | null {
-  const name = clean(r.co_name);
-  if (!name) return null;
-  const license = clean(r.license_id), related = clean(r.related_business), principals = clean(r.principals), rcw = clean(r.rcw_code);
-  return enf({
-    state: "WA", source: "Washington L&I public-works strikes", sourceUrl: LNI_STRIKE_PAGE,
-    category: rcw?.startsWith("39.12") ? "wage" : "discipline", name: [name, related].filter(Boolean).join(" / "), id: license,
-    date: usDate(r.effective_date), endDate: null, status: "Strike issued", city: null,
-    detail: [rcwText(rcw), clean(r.ubi_num) ? `UBI ${clean(r.ubi_num)}` : null, related ? `Related business: ${related}` : null,
-      principals ? `Principals listed by L&I: ${uniqueList(principals)}` : null].filter(Boolean).join(". ") || null,
-    amount: null, adverse: true, licenseNumber: license,
-  }, [name, related].filter(Boolean).join(" "), { licenses: [license] });
-}
-
-async function* waDebarmentsLoader(): AsyncIterable<BulkHit> {
-  for (const r of await lniList(LNI_DEBAR_PAGE, "GetDebarList", { status_code: "", debar_begin_date: "", debar_end_date: "", penalty_due_flg: "", wage_due_flg: "" })) {
-    const h = lniDebarHit(r);
-    if (h) yield h;
-  }
-}
-
-async function* waStrikesLoader(): AsyncIterable<BulkHit> {
-  for (const r of await lniList(LNI_STRIKE_PAGE, "GetStrikeList", { effective_date_start: "", effective_date_end: "" })) {
-    const h = lniStrikeHit(r);
-    if (h) yield h;
-  }
-}
-
 // ── The list ─────────────────────────────────────────────────────────────────────────────────────────────────
 export const BULK_SOURCES: BulkSource[] = [
   { id: "fl-cilb", state: "FL", label: "Florida DBPR construction licenses (CILB)", pageUrl: FL_CILB_PAGE, everyHours: 24, minRows: 200_000,
@@ -1120,7 +1060,7 @@ export const BULK_SOURCES: BulkSource[] = [
   { id: "tx-tsbpe", state: "TX", label: "Texas State Board of Plumbing Examiners licensees", pageUrl: TSBPE_PAGE, everyHours: 24, minRows: 60_000,
     load: txPlumbingLoader },
   // CSLB streams slowly in the daytime and cuts downloads off at about 150 s: fetch it in the small hours, Pacific time.
-  { id: "ca-cslb", state: "CA", label: "California CSLB contractor licenses", pageUrl: CSLB, everyHours: 20, minRows: 400_000, utcHours: [9, 10, 11, 12, 13],
+  { id: "ca-cslb", state: "CA", label: "California CSLB contractor licenses", pageUrl: CSLB, everyHours: 20, minRows: 470_000, utcHours: [9, 10, 11, 12, 13],
     load: caCslbLoader },
   { id: "ca-cslb-revoked", state: "CA", label: "California CSLB revoked licenses (monthly lists)", pageUrl: CSLB_REVOKED_YEARS, everyHours: 24 * 7, minRows: 2_000,
     utcHours: [9, 10, 11, 12, 13], load: caCslbRevokedLoader, companiesOnly: true },
@@ -1130,11 +1070,6 @@ export const BULK_SOURCES: BulkSource[] = [
     load: caElectriciansLoader },
   { id: "ca-debarments", state: "CA", label: "California Labor Commissioner public-works debarments", pageUrl: DLSE_DEBAR, everyHours: 24, minRows: 20,
     load: caDebarmentsLoader, companiesOnly: true },
-  { id: "wa-lni-debarments", state: "WA", label: "Washington L&I contractors not allowed to bid on public works (debarred)", pageUrl: LNI_DEBAR_PAGE, everyHours: 24, minRows: 450,
-    load: waDebarmentsLoader, companiesOnly: true },
-  // About 19,500 strikes since 2000 (about 200 requests a load, 1.5 s apart): weekly.
-  { id: "wa-lni-strikes", state: "WA", label: "Washington L&I public-works strikes", pageUrl: LNI_STRIKE_PAGE, everyHours: 24 * 7, minRows: 13_500,
-    load: waStrikesLoader, companiesOnly: true },
 ];
 
 export const bulkSourcesFor = (state: string) => BULK_SOURCES.filter((s) => s.state === state);

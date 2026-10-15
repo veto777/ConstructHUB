@@ -9,7 +9,7 @@ import { join } from "node:path";
 import type { BulkHit } from "./bulk";
 import { indexWords } from "./bulk";
 import {
-  cslbRows, flApplicantRows, flComplaintRows, flDisciplineCases, flLicenseIndex, flLicenseRows, flQualifiers, lniDebarHit, sunbizCorporation,
+  cslbRows, flApplicantRows, flComplaintRows, flDisciplineCases, flLicenseIndex, flLicenseRows, flQualifiers, sunbizCorporation,
 } from "./bulk-sources";
 
 async function file(text: string): Promise<string> {
@@ -126,15 +126,5 @@ describe("California CSLB master + personnel", () => {
     expect(enf.hit).toMatchObject({ category: "discipline", status: "Work Comp Susp", licenseNumber: "141212", adverse: true });
     const bruns = rest[rest.length - 1];
     expect(words(bruns)).toEqual(expect.arrayContaining(["p:KETTERING", "p:LAVON", "p:BRUNS"]));
-  });
-});
-
-describe("Washington L&I debarments", () => {
-  it("reads the list row with its license, related businesses and principals", () => {
-    const h = lniDebarHit({ co_name: "Brian Keith Sprague", ubi_num: "", license_id: "", principals: "Brian Keith Sprague", status_desc: "Debarred Until Penalties Paid", rcw_code: "39.12.050", debar_begin_date: "09/16/2009", debar_end_date: "", penalty_due_flg: "Yes", wage_due_flg: "No", related_business: "Shorts Concrete, Inc,Concrete Solutions and Design, LLC" })!;
-    expect(h.hit).toMatchObject({ category: "debarment", date: "2009-09-16", endDate: null, status: "Debarred Until Penalties Paid", adverse: true, licenseNumber: null });
-    expect((h.hit as any).detail).toContain("RCW 39.12.050: Prevailing wage law (Chapter 39.12 RCW)");
-    expect((h.hit as any).detail).toContain("L&I lists penalties due");
-    expect(h.person).toBeNull();
   });
 });
