@@ -95,14 +95,35 @@ const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,24}/gi;
 /** Image-file and placeholder addresses scraped from markup that are not mailboxes. */
 const NOT_A_MAILBOX = /\.(png|jpe?g|gif|webp|svg)$|@(example|domain|email|sentry|wixpress)\.|^(name|your|you|user|email)@/i;
 
-/** Emails published on the page: mailto: links and plain text. Only addresses on the site's own domain or a mail provider are kept. */
+/** Cloudflare's email protection: hex, the first byte the XOR key of the rest. */
+export function decodeCfEmail(hex: string): string | null {
+  if (!/^[0-9a-f]{4,}$/i.test(hex) || hex.length % 2) return null;
+  const key = parseInt(hex.slice(0, 2), 16);
+  let out = "";
+  for (let i = 2; i < hex.length; i += 2) out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16) ^ key);
+  return /^[^@\s]+@[^@\s]+\.[a-z]{2,24}$/i.test(out) ? out : null;
+}
+/** "editor [at] site [dot] com", "news(at)site.com": the address a site wrote out to dodge scrapers. */
+const SPELLED = /([a-z0-9._%+-]+)\s*[[({]\s*at\s*[\])}]\s*([a-z0-9-]+(?:(?:\s*[[({]\s*dot\s*[\])}]\s*|\.)[a-z0-9-]+)+)/gi;
+export function spelledOutEmails(text: string): string[] {
+  return [...text.matchAll(SPELLED)].map((m) => `${m[1]}@${m[2].replace(/\s*[[({]\s*dot\s*[\])}]\s*/gi, ".")}`.toLowerCase());
+}
+
+/**
+ * Emails published on the page: mailto: links, plain text, Cloudflare-protected and spelled-out addresses. Only addresses on
+ * the site's own domain or a mail provider are kept.
+ */
 export function extractEmails($: cheerio.CheerioAPI, siteDomain: string): string[] {
   const found = new Set<string>();
   $("a[href^='mailto:' i]").each((_, a) => {
     const v = decodeURIComponent(String($(a).attr("href") ?? "").replace(/^mailto:/i, "").split("?")[0]).trim().toLowerCase();
     if (v) found.add(v);
   });
-  for (const m of $.root().text().match(EMAIL) ?? []) found.add(m.toLowerCase());
+  $("[data-cfemail]").each((_, e) => { const v = decodeCfEmail(String($(e).attr("data-cfemail") ?? "")); if (v) found.add(v.toLowerCase()); });
+  $("a[href*='/cdn-cgi/l/email-protection#']").each((_, a) => { const v = decodeCfEmail(String($(a).attr("href")).split("#")[1] ?? ""); if (v) found.add(v.toLowerCase()); });
+  const text = $.root().text();
+  for (const m of text.match(EMAIL) ?? []) found.add(m.toLowerCase());
+  for (const m of spelledOutEmails(text)) found.add(m);
   const base = siteDomain.split(".").slice(-2).join(".");
   return [...found].filter((e) => {
     if (NOT_A_MAILBOX.test(e) || e.length > 120) return false;

@@ -144,6 +144,25 @@ export async function saveVetting(job: VetJob, token: string, signals: BacklinkS
   return true;
 }
 
+/** Qualified sources that published no email, never searched for contacts (or not for 90 days). */
+export async function needingContacts(limit: number): Promise<{ id: number; domain: string; contactUrl: string | null }[]> {
+  const r = await db().query(
+    `SELECT id, domain, contact_url "contactUrl" FROM backlink_sources
+      WHERE status = 'qualified' AND cardinality(contact_emails) = 0
+        AND (contacts_checked_at IS NULL OR contacts_checked_at < now() - interval '90 days')
+      ORDER BY tier NULLS LAST, score DESC NULLS LAST, id LIMIT $1`, [limit]);
+  return r.rows;
+}
+
+/** What the contact finder read; the addresses it found join the source's own. */
+export async function saveContacts(id: number, emails: string[], contactUrl: string | null, pagesRead: number) {
+  await db().query(
+    `UPDATE backlink_sources SET contact_emails = CASE WHEN cardinality($2::text[]) > 0 THEN $2::text[] ELSE contact_emails END,
+            contact_url = COALESCE(contact_url, $3), contacts_checked_at = now(), updated_at = now() WHERE id = $1`,
+    [id, emails, contactUrl]);
+  await event(id, "contacts_searched", { found: emails.length, pagesRead });
+}
+
 /** A vetting try that failed: back in the queue, or rejected when it was the last try. */
 export async function failVetting(job: VetJob, token: string, error: string) {
   const last = job.attempts >= MAX_VET_ATTEMPTS;
