@@ -361,6 +361,9 @@ export function visibleText(html: string): string {
 export function challengePage(text: string, down = false): boolean {
   const t = text.slice(0, 20_000);
   if (CHALLENGE_MARKERS.test(t)) return true;
+  // A storage API's XML error ("<Error><Code>AccessDenied</Code>": S3, Azure blobs) is that service saying the object
+  // isn't there for us, not a bot challenge: RFC 9309 reads it as robots.txt unavailable (A9: falextracts.s3.amazonaws.com).
+  if (/^\s*(?:<\?xml[^>]*\?>\s*)?<Error>/i.test(t)) return false;
   const seen = /<[a-z!]/i.test(t) ? visibleText(t) : t;
   return CHALLENGE_WORDS.test(seen) || (down && DOWN_WORDS.test(seen));
 }
@@ -506,6 +509,19 @@ function follow(signal: AbortSignal | null | undefined, ctrl: AbortController) {
   else signal.addEventListener("abort", () => ctrl.abort(signal.reason), { once: true });
 }
 
+/** A Socrata (SODA) API path: /resource/abcd-1234(.json|.csv…), /api/views/abcd-1234/…, /api/id/…, /api/odata/…. */
+const SOCRATA_PATH = /^\/(?:resource\/[a-z0-9]{4}-[a-z0-9]{4}(?:\.[a-z]+)?$|api\/(?:views|id)\/[a-z0-9]{4}-[a-z0-9]{4}(?:[./]|$)|api\/odata\/)/i;
+
+/**
+ * The app token to send with a request (A9): SOCRATA_APP_TOKEN, only when it is set and only to a Socrata API path.
+ * Unset, every request is exactly as before. The token is never logged.
+ */
+export function socrataAppToken(url: string): string | null {
+  const token = process.env.SOCRATA_APP_TOKEN?.trim();
+  if (!token) return null;
+  try { return SOCRATA_PATH.test(new URL(url).pathname) ? token : null; } catch { return null; }
+}
+
 /**
  * One request, its redirects followed by hand: every hop passes guard() (block, robots.txt, cooldown, rate limit)
  * and noteResponse() (a 401/403 blocks the host and throws; Retry-After sets the cooldown). A caller that asks for
@@ -520,6 +536,9 @@ async function hops(url: string, init: RequestInit, signal: AbortSignal, minDela
     if (!headers.has("user-agent")) headers.set("user-agent", USER_AGENT);
     if (headers.has("cookie") && !headers.get("cookie")!.trim()) headers.delete("cookie");
     if (method === "GET" || method === "HEAD") { headers.delete("content-type"); headers.delete("content-length"); }
+    // The Socrata app token, when one is set, on Socrata (SODA) requests only, hop by hop: a redirect elsewhere never carries it.
+    const appToken = socrataAppToken(cur);
+    if (appToken) headers.set("x-app-token", appToken); else headers.delete("x-app-token");
     let res: Response;
     try {
       // The turn's signal aborts the request if it outlives its turn (round 4, finding 12).

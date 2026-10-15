@@ -16,7 +16,7 @@ import { politeFetch, rethrowIfBlocked } from "./http";
 import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordCategory, RecordSource, ResearchPreview } from "@shared/research-reports";
 import { nameClause, sodaRows, tokens } from "./licenses";
 import { BULK_LIMIT, searchBulk } from "./bulk";
-import { allBulkSourcesFor as bulkSourcesFor, hasStateCourtSearch, packComplaintSourcesFor, searchPackEnforcement } from "./registry";
+import { allBulkSourcesFor as bulkSourcesFor, hasStateCourtSearch, nationwideBulkSources, packComplaintSourcesFor, searchPackEnforcement } from "./registry";
 import { searchStateEnforcement } from "./state-records";
 import { capNote, noteOf, withNote, type Noted } from "./notes";
 
@@ -209,6 +209,19 @@ export async function searchEnforcement(name: string, states: string[]): Promise
       } catch (err: any) {
         sources.push({ source: src.label, scope: state, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category });
       }
+    }
+  }
+  // Files that cover every state (SAM.gov federal exclusions), once per report whatever the states.
+  for (const src of nationwideBulkSources()) {
+    try {
+      const { hits: found, status } = await searchBulk(src, name, "company");
+      if (!status.loaded) { sources.push({ source: src.label, scope: "All states", searched: false, note: "Not loaded yet (the file is downloaded daily)", category: "enforcement" }); continue; }
+      const mine = found.filter((h): h is { kind: "enforcement"; hit: EnforcementHit } => h.kind === "enforcement").map((h) => h.hit).filter((h) => matches(h.name));
+      hits.push(...mine);
+      const capped = found.length >= BULK_LIMIT ? ` (${capNote(BULK_LIMIT, null, "index matches")})` : "";
+      sources.push({ source: src.label, scope: `All states, file of ${status.loadedAt?.slice(0, 10)}`, searched: true, note: `${mine.length} record(s)${capped}`, category: "enforcement" });
+    } catch (err: any) {
+      sources.push({ source: src.label, scope: "All states", searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category: "enforcement" });
     }
   }
   // Licensing-board enforcement on the license itself (CSLB suspensions, bonds) rides in the license files.

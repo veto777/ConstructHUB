@@ -90,7 +90,7 @@ export type CoverageManifest = {
 
 /** Live facets of the daily files, from the loaded rows (what they're really indexed by). */
 /** What the running server can search beyond the build's manifest (decided from the server's own settings). */
-export type CoverageRuntime = { osha: boolean };
+export type CoverageRuntime = { osha: boolean; samExclusions?: boolean };
 
 /** The nationwide sources the running server really searches (a `needs` source only when the server has it). */
 export const nationwideNow = <T extends Pick<CoverageSource, "needs">>(list: T[], runtime: CoverageRuntime | undefined): T[] =>

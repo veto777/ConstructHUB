@@ -109,10 +109,11 @@ export function registerResearchRoutes(app: Express, deps: Deps) {
     }
   });
 
-  // What the running server searches beyond the build's manifest (OSHA when it holds the Labor Department key).
-  app.get("/api/research-reports/coverage-runtime", (_req, res) => {
+  // What the running server searches beyond the build's manifest (OSHA when it holds the Labor Department key, SAM.gov
+  // exclusions once their file has loaded).
+  app.get("/api/research-reports/coverage-runtime", async (_req, res) => {
     res.set("Cache-Control", "public, max-age=600");
-    res.json(coverageRuntime());
+    res.json(await coverageRuntime());
   });
 
   app.get("/api/research-reports/orders", async (req, res) => {

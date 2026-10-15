@@ -72,6 +72,8 @@ export function knowledgeTokens(): Record<string, string> {
     GBP_REINSTATEMENT_PRICE: formatUsd(GBP_REINSTATEMENT_CENTS),
     RESEARCH_STANDARD_PRICE: formatUsd(RESEARCH_STANDARD_CENTS),
     RESEARCH_EXTENDED_PRICE: formatUsd(RESEARCH_EXTENDED_CENTS),
+    // Named only once the running server has loaded the SAM.gov file (A9; setKnowledgeFact).
+    RESEARCH_SAM_EXCLUSIONS: runtimeFacts.samExclusions ? " It also checks federal exclusions and debarments (SAM.gov) for companies in any state." : "",
     ANNUAL_MONTHS: String(ANNUAL_MONTHS),
     ANNUAL_FREE_MONTHS: String(12 - ANNUAL_MONTHS),
     CALL_ASSISTANT_SEPARATE_LINE,
@@ -188,6 +190,17 @@ export function buildBook(pack: string): KnowledgeBook {
 }
 
 let cached: KnowledgeBook | null = null;
+
+/**
+ * Facts about what the running server has, set by the code that knows (the pack itself never reads the database):
+ * samExclusions once the SAM.gov exclusions file has loaded (A9). A change re-renders the pack.
+ */
+const runtimeFacts = { samExclusions: false };
+export function setKnowledgeFact(key: keyof typeof runtimeFacts, value: boolean): void {
+  if (runtimeFacts[key] === value) return;
+  runtimeFacts[key] = value;
+  cached = null;
+}
 /** The rendered pack, loaded once. */
 export function knowledgeBook(): KnowledgeBook {
   return cached ??= buildBook(renderPack(fs.readFileSync(packPath(), "utf8")));

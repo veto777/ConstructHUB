@@ -112,6 +112,7 @@ export async function buildCoverageManifest(): Promise<CoverageManifest> {
   const { searchStateEnforcement } = await import("./state-records");
   const { STATE_PACKS } = await import("./states");
   const local = await import("./states/local");
+  const { SAM_EXCLUSIONS, SAM_SOURCE_ID } = await import("./sam");
   const packs = new Map(STATE_PACKS.map((p) => [p.state, p]));
   const localLicense = new Set(local.LOCAL_LICENSES), localBulk = new Set(local.LOCAL_BULK);
   const localLive = new Set(Object.values(local.LOCAL_LIVE).flat());
@@ -174,11 +175,14 @@ export async function buildCoverageManifest(): Promise<CoverageManifest> {
   const all = await searchCompanyRecords(PROBE_COMPANY, []);
   // A source switched off ("Not searched by ConstructHUB": CourtListener, robots.txt) is not claimed. OSHA is listed
   // with `needs: "osha"` whether or not the BUILD holds the Labor Department key: the running server decides
-  // (coverage.ts coverageRuntime; round 4).
+  // (coverage.ts coverageRuntime; round 4). SAM.gov exclusions likewise, with `needs: "samExclusions"` (A9).
   const nationwide: CoverageSource[] = all.sources
     .filter((s) => /^all /i.test(s.scope) && !s.note.startsWith("Not searched by ConstructHUB"))
-    .map((s) => ({ label: s.source, kinds: [/OSHA/.test(s.source) ? "other" as const : kindOfLabel(s.source)], ids: ["name" as const], mode: "live" as const, companiesOnly: true, url: null,
-      ...(s.category === "osha" ? { needs: "osha" as const } : {}) }));
+    .map((s): CoverageSource => s.source === SAM_EXCLUSIONS.label
+      // SAM.gov exclusions: a daily file, claimed only once the running server has loaded it (A9).
+      ? { label: s.source, kinds: ["debarment"], ids: ["name", "license", "address"], mode: "file", refreshHours: SAM_EXCLUSIONS.everyHours, fileId: SAM_SOURCE_ID, companiesOnly: true, url: SAM_EXCLUSIONS.pageUrl, needs: "samExclusions" }
+      : { label: s.source, kinds: [/OSHA/.test(s.source) ? "other" as const : kindOfLabel(s.source)], ids: ["name" as const], mode: "live" as const, companiesOnly: true, url: null,
+        ...(s.category === "osha" ? { needs: "osha" as const } : {}) });
 
   return { generatedAt: new Date().toISOString(), states, nationwide };
 }
