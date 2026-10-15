@@ -773,6 +773,20 @@ const entries: Draft[] = [
     ],
     howItWorks: "The directory is a fixed list kept in ConstructHUB’s reference data: every agency was researched state by state and every link was opened and checked on the date shown beside the state name; a link that failed its check is left out rather than guessed. The page reads nothing from your account. It is information, not legal advice; confirm requirements with the agency before you bid or hire.",
   },
+  {
+    key: "press-releases", group: "Tools", route: "/press-releases", title: "Press Releases",
+    whatItIs: "Press releases on the national newswire, written for you from a few sentences about your news.",
+    whatItDoes: "You pick a package (one Wire release, one Premium release, or the 12-month program: pay for 12, get 14), tell the writer what happened and add photos. It drafts the release to the wire's editorial guidelines and checks it against them; you read it, change anything, and approve. The release goes to the wire's editors; when it is live you get the link by email, and the distribution report (where it ran, views, clicks) follows the same way.",
+    howToUse: [
+      "Sidebar → Press Releases → pick a package and pay (credits are good for 12 months).",
+      "Write a release: choose the kind of news, fill in the company, the facts, who is quoted and the media contact, and add photos.",
+      "Press Write it. Read the draft; use Rewrite with a note, or edit the text yourself.",
+      "Fix anything the guideline check flags in red, then Approve & send. One credit is used.",
+      "Watch the status under Your releases: In editorial review → Live → Report delivered. Each step is also emailed to the media contact.",
+    ],
+    howItWorks: "The writer uses only the facts you give; it never adds numbers, awards or claims. Before you can send, the text is checked against the wire's published content rules (no hype words, no exclamation marks, no direct address outside quotes, a named source and a contact email, restricted topics flagged) because the wire does not refund a release its editors refuse. If the editors ask for changes, the draft is revised for their notes and you approve it again at no extra credit. One release a month is the pace that works best; the 12-month program is built for it.",
+    needs: ["A paid package (no plan needed)."],
+  },
 
   /* ══ CRM (served by the CRM host) ═════════════════════════════════════════════════════════════ */
   {
