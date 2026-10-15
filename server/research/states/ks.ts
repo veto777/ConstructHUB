@@ -11,8 +11,8 @@
  *         the Elevator Safety Program page and read with ./lib/g6-pdf.ts. The directories carry no license numbers.
  *
  * Kansas does not license contractors statewide (cities and counties do); roofers register with the Attorney
- * General, whose directory refuses automated requests (see blocked). Elevator contractors and mechanics are the one
- * construction trade the state licenses.
+ * General, whose directory refuses automated requests (see blocked). The State Fire Marshal licenses elevator contractors
+ * and mechanics (above).
  */
 import type { LicenseHit } from "@shared/research-reports";
 import { promises as fs } from "node:fs";
@@ -153,7 +153,7 @@ export const pack: StatePack = {
   liveLicenses: [KS_KSBTP],
   bulk: [KS_ELEVATOR_CONTRACTORS, KS_ELEVATOR_MECHANICS],
   noStatewideGcLicense:
-    "Kansas does not license general contractors or trades statewide (cities and counties do); engineers, architects and surveyors are licensed by the Board of Technical Professions (searched above), and roofers register with the Attorney General",
+    "Kansas does not license general contractors statewide (cities and counties license contractors and most trades); engineers, architects and surveyors are licensed by the Board of Technical Professions and elevator contractors by the State Fire Marshal (both searched above), and roofers register with the Attorney General",
   blocked: [
     "Kansas Attorney General roofing contractor registration directory (ag.ks.gov): HTTP 403 (Akamai) to our declared crawler",
     "KDHE licensed asbestos abatement contractors and lead activity firms (kdhe.ks.gov DocumentCenter PDFs): HTTP 403 to our declared crawler",
