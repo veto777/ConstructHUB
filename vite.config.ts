@@ -1,7 +1,31 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { execFileSync } from "child_process";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+
+/**
+ * `virtual:research-coverage`: what the research bot searches in each state (/compliance/research/coverage), generated
+ * from the bot's own source registry by script/research-coverage.ts when the module is first loaded, so every build
+ * (and dev server) carries the sources it actually ships. Offline and database-free; a failure fails the build.
+ */
+function researchCoverage(): Plugin {
+  const id = "virtual:research-coverage";
+  let json: string | null = null;
+  return {
+    name: "research-coverage",
+    resolveId: (source) => (source === id ? `\0${id}` : undefined),
+    load(loaded) {
+      if (loaded !== `\0${id}`) return undefined;
+      json ??= execFileSync(process.execPath, ["--import", "tsx", "script/research-coverage.ts"], {
+        cwd: import.meta.dirname, encoding: "utf8", maxBuffer: 64 << 20, timeout: 5 * 60_000,
+        env: { ...process.env, DATABASE_URL: "" }, stdio: ["ignore", "pipe", "ignore"],
+      });
+      JSON.parse(json); // a cut-off or noisy output fails here, not in the browser
+      return `export default ${json};`;
+    },
+  };
+}
 
 export default defineConfig({
   // Worktrees share node_modules; dependency caches must stay lane-local.
@@ -9,6 +33,7 @@ export default defineConfig({
   cacheDir: process.env.VITE_CACHE_DIR ? path.resolve(process.env.VITE_CACHE_DIR) : path.resolve(import.meta.dirname, ".cache/vite"),
   plugins: [
     react(),
+    researchCoverage(),
     runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
