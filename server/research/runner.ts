@@ -364,8 +364,16 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
     });
     // A person never gets enforcement records, not even related ones (FCRA; checked again here after the cross-reference).
     const relatedEnforcement = subject.kind === "company" ? [...ids.enforcement, ...xref.relatedEnforcement] : [];
+    // A record the cross-reference ties through one of the subject's own records keeps that tie; one found only by
+    // the customer's identifier is listed as matched by it.
     const rel = new LicenseSet();
-    for (const h of [...ids.matched, ...xref.related]) if (!own.find(h)) rel.add(h);
+    for (const h of xref.related) rel.add(h);
+    for (const h of ids.matched) {
+      if (own.find(h)) continue;
+      const dup = rel.find(h);
+      if (!dup) rel.add(h);
+      else if (h.relatedVia && !dup.relatedVia?.includes(h.relatedVia)) dup.relatedVia = `${dup.relatedVia}; also ${h.relatedVia}`;
+    }
     const relatedLicenses = rel.list;
     log(`cross-reference for "${subject.name}": ${relatedLicenses.length} related license(s), ${relatedEnforcement.length} related enforcement record(s), ${xref.idSearches} identifier search(es)${xref.notes.length ? `; ${xref.notes.join(" | ")}` : ""}`);
     subjects.push({
