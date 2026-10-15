@@ -23,6 +23,7 @@ describe("Arizona ROC", () => {
     const person = rocLicenseHits(ROWS, "Douglas Mack", "person");
     expect(person).toHaveLength(1);
     expect(person[0]).toMatchObject({ licenseNumber: "ROC 128499", principal: "Douglas Guy Mack", status: "Active", matchedOn: "principal" });
+    expect(person[0].people).toEqual([{ name: "Douglas Guy Mack", role: "President; Qualifying Party" }]);
     expect(rocLicenseHits(ROWS, "Mack", "person")).toHaveLength(1); // "Mackey" is another word
     expect(rocLicenseHits(ROWS, "United Mechanical", "company")[0]).toMatchObject({ businessName: "United Mechanical Services LLC", city: "Surprise, AZ, 85379" });
   });
@@ -32,7 +33,7 @@ describe("Arizona ROC", () => {
       Allegations__c: "Failure to Comply with Directive;Violation of any ROC Rule - Poor Work", Complaint_Outcome_Multi__c: "Legal - Revoked",
       License_Number_Respondent__r: { Name: "ROC 341825", Primary_Licensee__r: { Name: "TOUGH TURTLE TURF LLC" } },
     }, null, "ROC 341825", "a0o8y000000RplBAAS");
-    expect(hit).toMatchObject({ category: "discipline", name: "TOUGH TURTLE TURF LLC", id: "2025-02504", endDate: "2025-07-29", adverse: true, status: "Closed (Disciplined)" });
+    expect(hit).toMatchObject({ category: "discipline", name: "TOUGH TURTLE TURF LLC", id: "2025-02504", endDate: "2025-07-29", adverse: true, status: "Closed (Disciplined)", licenseNumber: "ROC 341825" });
     expect(hit.detail).toContain("Outcome: Legal - Revoked");
     expect(JSON.stringify(hit)).not.toMatch(/Complainant/);
   });

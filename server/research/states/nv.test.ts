@@ -54,3 +54,24 @@ describe("Nevada sources", () => {
     expect(JSON.stringify(hits)).not.toContain("Hugo");
   });
 });
+
+const DETAILS = `<span id="ContentPlaceHolder1_lblLicNum">0091752</span><span id="ContentPlaceHolder1_lblMonetaryLimit1">Unlimited</span>
+<span id="ContentPlaceHolder1_lblMailStrt1">106 S 1250 W</span><span id="ContentPlaceHolder1_lblMailStrt2"></span>
+<span id="ContentPlaceHolder1_lblMailCityOne">CENTERVILLE</span>, <span id="ContentPlaceHolder1_lblMailStateOne">UT</span> <span id="ContentPlaceHolder1_lblMailZipOne">84014</span>
+<span id="ContentPlaceHolder1_lblMailPhoneOne">(801) 561-4911</span>
+<span id="ContentPlaceHolder1_lblStrt1">650 INNOVATION DR</span><span id="ContentPlaceHolder1_lblStrt2">STE A</span>
+<span id="ContentPlaceHolder1_lblCityOne">RENO</span>, <span id="ContentPlaceHolder1_lblStateOne">NV</span> <span id="ContentPlaceHolder1_lblZipOne">89511</span>
+<span id="ContentPlaceHolder1_lblPhoneOne">(775) 825-7856</span><span id="ContentPlaceHolder1_lblExpireDate">02/28/2028</span>
+<span id="ContentPlaceHolder1_dtgPrincipalBroker_lblPrincipalName_0"> RADMALL, BRANDON  VAL </span></td><td><span id="ContentPlaceHolder1_dtgPrincipalBroker_lblPrincipalRelation_0">President</span>
+<span id="ContentPlaceHolder1_dtgQualInd_lblQualIndName_1">BLASER, ERIC DANIEL</span></td><td><span id="ContentPlaceHolder1_dtgQualInd_lblQaulType_1">Trade</span>`;
+
+describe("NSCB license details", () => {
+  it("reads addresses, phones, expiry and people", async () => {
+    const { parseNscbDetails } = await import("./nv");
+    expect(parseNscbDetails(DETAILS)).toEqual({
+      address: "650 INNOVATION DR STE A, RENO, NV 89511", mailing: "106 S 1250 W, CENTERVILLE, UT 84014",
+      phone: "(775) 825-7856", mailPhone: "(801) 561-4911", expires: "2028-02-28", limit: "Unlimited",
+      people: [{ name: "BRANDON VAL RADMALL", role: "President" }, { name: "ERIC DANIEL BLASER", role: "Qualified individual (Trade)" }],
+    });
+  });
+});

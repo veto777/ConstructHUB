@@ -15,10 +15,10 @@ describe("Utah DOPL", () => {
   it("reads registry rows and details", () => {
     const rows = parseCbrRows(CBR_ROWS);
     expect(rows).toEqual([
-      { name: "Dennis Sheridan Johnson", dba: null, city: null, eid: "29700", pid: "4001" },
-      { name: "AMCO American Roofing Co.", dba: "WESLEY GREEN ROOFING AMCO ET AL / AMERICAN RAIN GUTTERS", city: "Salt Lake City UT", eid: "5000", pid: "4000" },
+      { name: "Dennis Sheridan Johnson", dba: null, city: null, phone: null, eid: "29700", pid: "4001" },
+      { name: "AMCO American Roofing Co.", dba: "WESLEY GREEN ROOFING AMCO ET AL / AMERICAN RAIN GUTTERS", city: "Salt Lake City UT", phone: "(801) 269-1276", eid: "5000", pid: "4000" },
     ]);
-    expect(parseCbrDetails(CBR_DETAILS)).toEqual({ profession: "Contractor", type: "Contractor", number: "11848910-5501", expires: "2027-11-30", qualifier: "Wilfrido Vazquez", qualifierType: "S280 - Roofing Qualifier" });
+    expect(parseCbrDetails(CBR_DETAILS)).toEqual({ profession: "Contractor", type: "Contractor", number: "11848910-5501", expires: "2027-11-30", qualifier: "Wilfrido Vazquez", qualifierType: "S280 - Roofing Qualifier", phone: "(801) 781-9600", address: "Ogden UT 84401" });
   });
   it("reads cases with their documents and citations with their amounts", () => {
     const hits = parseDoplEntity(ENTITY);
@@ -26,7 +26,7 @@ describe("Utah DOPL", () => {
     expect(hits[0]).toMatchObject({
       name: "Barrios Construction, LLC", id: "Case 2022-369", date: "2023-01-04", endDate: "2023-02-22",
       sourceUrl: "https://services.commerce.utah.gov/dopl-disciplinary-actions/2022-369_AA_2023-01-04.pdf",
-      detail: "License 12485881-5501 (Contractor, Revoked)",
+      detail: "License 12485881-5501 (Contractor, Revoked)", licenseNumber: "12485881-5501",
     });
     expect(hits[1]).toMatchObject({ id: "Citation 102633", date: "2023-05-03", status: "Citation: Collections", amount: 1000, adverse: true });
     expect(hits[1].detail).toContain("Violation: Insurance Cancellation");

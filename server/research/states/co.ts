@@ -9,7 +9,8 @@
  *     military-spouse versions of these and of the electrical/plumbing licenses. Prefixes and meanings are DORA's own
  *     (data.colorado.gov 349y-twqi, "Professional and Occupational License Types in Colorado").
  *   CO Secretary of State business entities: data.colorado.gov 4ykn-tg5h (every entity since 1864, updated daily),
- *     its status as published (Good Standing, Delinquent, Revoked, Administratively Dissolved, ...). Companies only.
+ *     its status as published (Good Standing, Delinquent, Revoked, Administratively Dissolved, ...) and principal
+ *     address. Companies only. (The DORA dataset publishes city, state and ZIP but no street or phone.)
  *
  * Colorado has no statewide general-contractor license: DORA's own consumer page says "Not all occupations are
  * licensed, such as roofers and general contractors" (dora.colorado.gov/consumer-protection-home-and-repair).
@@ -52,6 +53,7 @@ const enforcement: SodaEnforcement[] = [
         status: status ? `Secretary of State status: ${status}` : null,
         detail: [s(r.entitytype) ? `Entity type code ${s(r.entitytype)}` : null, s(r.jurisdictonofformation) ? `formed in ${s(r.jurisdictonofformation)}` : null].filter(Boolean).join(", ") || null,
         amount: null, adverse: status === "Revoked" ? true : null,
+        address: s(r.principaladdress1) ? [s(r.principaladdress1), s(r.principaladdress2), s(r.principalcity), [s(r.principalstate), s(r.principalzipcode)].filter(Boolean).join(" ")].filter(Boolean).join(", ") : null,
       };
     },
   },

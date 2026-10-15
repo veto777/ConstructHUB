@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { nmSosHit, rldLicenseHit } from "./nm";
 
 describe("New Mexico sources", () => {
-  it("reads an RLD license without the street address", () => {
+  it("reads an RLD license with its address of record", () => {
     // Trimmed from a live RLDLicenseSearchController.onSearch answer, 2026-10-15.
-    const hit = rldLicenseHit({ Name: "HI0136", Status: "Active", License_Holder_Name__c: "Joshua A. Reed-Smith", License_Holder_City__c: "Corrales", License_Holder_State__c: "NM", periodEnd__c: "2029-02-28", Regulatory_Authorization_Type_Name__c: "Home Inspector", Regulatory_Authority__c: "Board of Home Inspector", License_Holder_Street__c: "723 W Meadowlark Ln" } as any);
+    const hit = rldLicenseHit({ Name: "HI0136", Status: "Active", License_Holder_Name__c: "Joshua A. Reed-Smith", License_Holder_City__c: "Corrales", License_Holder_State__c: "NM", periodEnd__c: "2029-02-28", Regulatory_Authorization_Type_Name__c: "Home Inspector", Regulatory_Authority__c: "Board of Home Inspector", License_Holder_Street__c: "723 W Meadowlark Ln", License_Holder_Postal_Code__c: "87048" });
     expect(hit).toMatchObject({ licenseNumber: "HI0136", licenseType: "Home Inspector", status: "Active", principal: "Joshua A. Reed-Smith", city: "Corrales, NM", expires: "2029-02-28" });
-    expect(JSON.stringify(hit)).not.toContain("Meadowlark");
+    expect(hit.address).toBe("723 W Meadowlark Ln, Corrales, NM 87048");
   });
   it("reads a Secretary of State row; revoked is adverse", () => {
     const row = { RECORD_NUM: "4092813", TITLE: ["BRADBURY STAMM BUILDERS, INC.", ""], RegistrationDate: "10/10/2008", BusinessStatusId: "Revoked Final", BusinessRecordTypeId: "Domestic Profit Corporation", FormationLocale: "New Mexico" };

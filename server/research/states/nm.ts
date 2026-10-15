@@ -29,10 +29,11 @@ const hasAll = (name: string, v: string | null | undefined) => { const want = to
 
 export type RldLicense = {
   Name?: string | null; Status?: string | null; License_Holder_Name__c?: string | null; License_Holder_City__c?: string | null;
+  License_Holder_Street__c?: string | null; License_Holder_Postal_Code__c?: string | null;
   License_Holder_State__c?: string | null; periodEnd__c?: string | null; Regulatory_Authorization_Type_Name__c?: string | null; Regulatory_Authority__c?: string | null;
 };
 
-/** One license row; the holder's street address is never read into a report. */
+/** One license row, with the address of record RLD publishes for it. */
 export function rldLicenseHit(r: RldLicense): LicenseHit {
   return {
     state: "NM", source: "New Mexico RLD home inspector and landscape architect licenses", sourceUrl: RLD_SEARCH_PAGE,
@@ -40,6 +41,8 @@ export function rldLicenseHit(r: RldLicense): LicenseHit {
     specialty: clean(r.Regulatory_Authority__c), status: clean(r.Status), principal: clean(r.License_Holder_Name__c),
     city: [clean(r.License_Holder_City__c), clean(r.License_Holder_State__c)].filter(Boolean).join(", ") || null,
     expires: /^\d{4}-\d{2}-\d{2}$/.test(r.periodEnd__c ?? "") ? r.periodEnd__c! : null, matchedOn: "principal",
+    address: clean(r.License_Holder_Street__c) ? [clean(r.License_Holder_Street__c), clean(r.License_Holder_City__c), [clean(r.License_Holder_State__c), clean(r.License_Holder_Postal_Code__c)].filter(Boolean).join(" ")].filter(Boolean).join(", ") : null,
+    people: clean(r.License_Holder_Name__c) ? [{ name: clean(r.License_Holder_Name__c)!, role: clean(r.Regulatory_Authorization_Type_Name__c) }] : [],
   };
 }
 

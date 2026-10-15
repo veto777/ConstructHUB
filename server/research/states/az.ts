@@ -3,12 +3,13 @@
  *
  *   AZ ROC contractor licenses: the Registrar of Contractors' public Contractor Search (azroc.my.site.com), the
  *     same guest Apex calls its page makes. Every license the ROC lists (active, suspended, revoked, expired,
- *     cancelled), by company name or by a person named on the license (qualifying party, officers, members).
+ *     cancelled), by company name, by a person named on the license (qualifying party, officers, members) or by
+ *     license number, with the phone and everyone named (with their roles).
  *   AZ ROC complaints: the complaints the same search shows on each license (open cases, disciplined cases and
  *     cases resolved with a corrective work order; the ROC leaves out dismissed and cancelled ones). Companies only.
  *
  * The ROC search answers: accountName, licenseData[] (licenseNo, subType, status, qpName), accountContactData[]
- * (contactName "Name (Role) "), address ("City, ST, ZIP"); getLicenseDetail adds renewalThr (renewed through),
+ * (contactName "Name (Role) "), address ("City, ST, ZIP": no street, so no address key), phone; getLicenseDetail adds renewalThr (renewed through),
  * licenseDescription, issuedDate; getAllComplaintsDetail gives complaintDataList[] (Name = case number, Status__c,
  * Complaint_Type__c, Complaint_Outcome_Multi__c, Allegations__c, Closed_Date__c, Jobsite_City__c). The complainant
  * (a private person) is never read into a report.
@@ -16,6 +17,7 @@
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { tokens } from "../licenses";
 import { clean } from "../bulk";
+import { normLicense, type IdQuery } from "../identifiers";
 import { auraApex, type AuraSite } from "./lib/g7-aura";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
 
@@ -24,7 +26,7 @@ const ROC_SEARCH_PAGE = ROC.origin + ROC.page;
 const licensePage = (id: string) => `${ROC_SEARCH_PAGE}?licenseId=${encodeURIComponent(id)}`;
 
 type RocLicense = { licenseId: string; licenseNo: string | null; qpName: string | null; status: string | null; subType: string | null };
-export type RocAccount = { accountId: string; accountName: string | null; address: string | null; licenseData?: RocLicense[]; accountContactData?: { contactName: string | null }[] };
+export type RocAccount = { accountId: string; accountName: string | null; address: string | null; phone?: string | null; licenseData?: RocLicense[]; accountContactData?: { contactName: string | null }[] };
 type RocDetail = { licenseDescription?: string | null; renewalThr?: string | null; licenseStatus?: string | null };
 type RocComplaint = {
   Name?: string | null; Status__c?: string | null; Complaint_Type__c?: string | null; Complaint_Outcome_Multi__c?: string | null;
@@ -36,6 +38,8 @@ const MAX_DETAILS = 15;
 
 /** "Douglas Guy Mack (President) " → "Douglas Guy Mack". */
 export const contactName = (v: string | null | undefined) => clean(v?.replace(/\([^)]*\)\s*$/, ""));
+/** "Kenneth Eugene Mackey (Member;Qualifying Party) " → "Member; Qualifying Party". */
+const contactRole = (v: string | null | undefined) => clean(v?.match(/\(([^)]*)\)\s*$/)?.[1]?.replace(/;/g, "; ")) ?? null;
 const hasAll = (name: string, v: string | null) => { const have = new Set(tokens(v ?? "")); return tokens(name).every((w) => have.has(w)); };
 
 async function rocSearch(searchKey: string): Promise<RocAccount[]> {
@@ -54,29 +58,39 @@ async function accountsFor(name: string, kind: "person" | "company"): Promise<Ro
 }
 
 /** License hits from search rows, kept to rows that name the company (company) or a person on the license (person). */
-export function rocLicenseHits(rows: RocAccount[], name: string, kind: "person" | "company"): (LicenseHit & { licenseId: string })[] {
+export function rocLicenseHits(rows: RocAccount[], name: string, kind: "person" | "company" | "license"): (LicenseHit & { licenseId: string })[] {
   const out: (LicenseHit & { licenseId: string })[] = [];
   for (const a of rows) {
     const people = Array.from(new Set((a.accountContactData ?? []).map((c) => contactName(c.contactName)).filter((v): v is string => !!v)));
     const matchedPerson = kind === "person" ? people.find((p) => hasAll(name, p)) ?? null : null;
-    if (kind === "company" ? !hasAll(name, a.accountName ?? null) : !matchedPerson && !(a.licenseData ?? []).some((l) => hasAll(name, l.qpName))) continue;
+    if (kind === "company" ? !hasAll(name, a.accountName ?? null) : kind === "person" && !matchedPerson && !(a.licenseData ?? []).some((l) => hasAll(name, l.qpName))) continue;
+    const roles = new Map<string, string[]>();
+    for (const c of a.accountContactData ?? []) {
+      const n = contactName(c.contactName);
+      if (!n) continue;
+      const r = contactRole(c.contactName);
+      roles.set(n, [...(roles.get(n) ?? []), ...(r ? [r] : [])]);
+    }
     for (const l of a.licenseData ?? []) {
       const qp = clean(l.qpName);
+      const named = new Map(roles);
+      if (qp && !Array.from(named.keys()).some((k) => k === qp)) named.set(qp, ["Qualifying Party"]);
       out.push({
         licenseId: l.licenseId,
         state: "AZ", source: "Arizona Registrar of Contractors licenses", sourceUrl: licensePage(l.licenseId),
         businessName: clean(a.accountName), licenseNumber: clean(l.licenseNo), licenseType: clean(l.subType), specialty: null,
         status: clean(l.status),
         principal: kind === "person" ? (qp && hasAll(name, qp) ? qp : matchedPerson ?? qp) : qp ?? people[0] ?? null,
-        city: clean(a.address), expires: null, matchedOn: kind === "company" ? "business" : "principal",
+        city: clean(a.address), expires: null, matchedOn: kind === "company" ? "business" : kind === "license" ? "license" : "principal",
+        phone: clean(a.phone),
+        people: Array.from(named, ([n, r]) => ({ name: n, role: Array.from(new Set(r)).join("; ") || null })),
       });
     }
   }
   return out;
 }
 
-async function searchRocLicenses(name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
-  const hits = rocLicenseHits(await accountsFor(name, kind), name, kind);
+async function withDetails(hits: (LicenseHit & { licenseId: string })[]): Promise<LicenseHit[]> {
   // The license page adds the class description and the renewed-through date.
   for (const h of hits.slice(0, MAX_DETAILS)) {
     const d = await auraApex<RocDetail | null>(ROC, "apex://ARCP_ContractorSearch/ACTION$getLicenseDetail", { licenseId: h.licenseId }).catch(() => null);
@@ -86,6 +100,17 @@ async function searchRocLicenses(name: string, kind: "person" | "company"): Prom
     h.status = clean(d.licenseStatus) ?? h.status;
   }
   return hits.map(({ licenseId: _id, ...h }) => h);
+}
+
+const searchRocLicenses = async (name: string, kind: "person" | "company") => withDetails(rocLicenseHits(await accountsFor(name, kind), name, kind));
+
+/** The ROC search also takes a license number ("ROC 128499" or "128499"); it does not search phones or addresses. */
+async function searchRocBy(q: IdQuery): Promise<LicenseHit[]> {
+  if (q.type !== "license") return [];
+  const want = normLicense(q.value)?.replace(/^ROC/, "");
+  if (!want) return [];
+  const rows = await rocSearch(want);
+  return withDetails(rocLicenseHits(rows, "", "license").filter((h) => normLicense(h.licenseNumber)?.replace(/^ROC/, "") === want));
 }
 
 /** One complaint as the ROC lists it on a license (the complainant is left out). */
@@ -104,6 +129,7 @@ export function rocComplaintHit(c: RocComplaint, fallbackName: string | null, li
       clean(c.Allegations__c) ? `Allegations: ${clean(c.Allegations__c!.replace(/;/g, "; "))}` : null,
       outcome ? `Outcome: ${outcome}` : null].filter(Boolean).join(". ") || null,
     amount: null, adverse: type === "Disciplined" ? true : null,
+    licenseNumber: licenseNo ?? clean(c.License_Number_Respondent__r?.Name),
   };
 }
 
@@ -120,7 +146,7 @@ async function searchRocComplaints(name: string): Promise<EnforcementHit[]> {
 }
 
 const liveLicenses: LiveLicenseSearch[] = [
-  { source: "Arizona Registrar of Contractors licenses", sourceUrl: ROC_SEARCH_PAGE, search: searchRocLicenses },
+  { source: "Arizona Registrar of Contractors licenses", sourceUrl: ROC_SEARCH_PAGE, search: searchRocLicenses, searchBy: searchRocBy },
 ];
 
 const liveEnforcement: LiveEnforcementSearch[] = [
