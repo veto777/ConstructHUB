@@ -401,7 +401,7 @@ const dcContractors: BulkSource = {
 const LB = "https://services6.arcgis.com/yCArG7wGXGyWLqav/arcgis/rest/services/Business_Licenses_Public_View/FeatureServer/0";
 const LB_PAGE = "https://www.arcgis.com/home/item.html?id=54d45ca9c4554062a02df49ec1ea2b2a";
 const longBeach: BulkSource = {
-  id: "ca-long-beach-contractors", state: "CA", label: "Long Beach business licenses (contracting)", pageUrl: LB_PAGE, everyHours: 24, minRows: 20_000,
+  id: "ca-long-beach-contractors", state: "CA", label: "Long Beach business licenses (contracting)", pageUrl: LB_PAGE, everyHours: 24, minRows: 25_000,
   load: async function* () {
     const seen = new Set<string>();
     for await (const r of arcgisAll(LB, "LICCATDESC LIKE 'Contracting%'")) {
@@ -691,7 +691,7 @@ const miamiDade: BulkSource = {
 const LV = "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/Business_Licenses_OpenData/FeatureServer/0";
 const LV_PAGE = "https://www.arcgis.com/home/item.html?id=f6b923ee5eb9450baf6adebaf0f307ed";
 const lasVegas: BulkSource = {
-  id: "nv-las-vegas-contractors", state: "NV", label: "City of Las Vegas contractor business licenses", pageUrl: LV_PAGE, everyHours: 24, minRows: 7_000,
+  id: "nv-las-vegas-contractors", state: "NV", label: "City of Las Vegas contractor business licenses", pageUrl: LV_PAGE, everyHours: 24, minRows: 9_800,
   load: async function* () {
     // One row per owner of a license: gather each license's owners ("Donald Terry - Manager").
     const byLicense = new Map<string, { row: Row; people: { name: string; role: string | null }[] }>();
