@@ -30,7 +30,7 @@ const NCPHFS: ArlsBoard = {
 const live = (b: ArlsBoard): LiveLicenseSearch => ({ source: b.source, sourceUrl: `${b.base}/Public/Search`, search: (name, kind) => searchArlsLicenses(b, name, kind), searchBy: (q) => searchArlsBy(b, q) });
 
 const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [
-  { source: "NC Licensing Board for General Contractors: disciplinary actions", scope: "Disciplinary actions on general contractor licenses, 2022 to today", search: (name) => searchArlsMatters(NCLBGC, name) },
+  { source: "NC Licensing Board for General Contractors: disciplinary actions", scope: "Disciplinary actions on general contractor licenses, 2022 to today", category: "discipline", search: (name) => searchArlsMatters(NCLBGC, name) },
 ];
 
 export const pack: StatePack = {

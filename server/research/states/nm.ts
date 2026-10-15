@@ -94,7 +94,7 @@ const liveLicenses: LiveLicenseSearch[] = [
 ];
 
 const liveEnforcement: LiveEnforcementSearch[] = [
-  { source: "New Mexico Secretary of State business entities", scope: "Every business entity on the Secretary of State's register", search: searchNmSos },
+  { source: "New Mexico Secretary of State business entities", scope: "Every business entity on the Secretary of State's register", category: "business_status", search: searchNmSos },
 ];
 
 export const pack: StatePack = {

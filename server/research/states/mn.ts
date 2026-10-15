@@ -249,11 +249,11 @@ export const pack: StatePack = {
   bulk: [
     { id: "mn-dli", state: "MN", label: "Minnesota DLI licenses and registrations", pageUrl: DLI_LOOKUP, everyHours: 24, minRows: 170_000, load: dliLicenses },
     { id: "mn-dli-flagged", state: "MN", label: "Minnesota DLI licenses flagged with an enforcement action", pageUrl: DLI_LOOKUP, everyHours: 24, minRows: 1_900,
-      load: dliFlagged, companiesOnly: true },
+      load: dliFlagged, companiesOnly: true, category: "discipline" },
     { id: "mn-dli-orders", state: "MN", label: "Minnesota DLI enforcement actions (residential building, electrical, plumbing)", pageUrl: DLI_ORDERS_PAGE,
-      everyHours: 24 * 7, minRows: 480, load: dliOrders, companiesOnly: true },
+      everyHours: 24 * 7, minRows: 480, load: dliOrders, companiesOnly: true, category: "discipline" },
     { id: "mn-debarred", state: "MN", label: "Minnesota suspended and debarred vendors (Office of State Procurement)", pageUrl: MN_DEBAR,
-      everyHours: 24, minRows: 20, load: mnDebarred, companiesOnly: true, utcHours: [6, 7, 8, 9, 10, 11] },
+      everyHours: 24, minRows: 20, load: mnDebarred, companiesOnly: true, category: "debarment", utcHours: [6, 7, 8, 9, 10, 11] },
   ],
   blocked: [
     "DLI license lookup (ims.dli.mn.gov): not needed, the same data is the nightly export loaded above",

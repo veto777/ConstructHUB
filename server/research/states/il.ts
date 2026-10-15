@@ -201,9 +201,9 @@ export const pack: StatePack = {
   ],
   liveEnforcement: [
     { source: "Illinois IDFPR discipline (roofing contractors, design firms, home inspectors)", scope: "Business licenses IDFPR marks as disciplined, with case, action and reason",
-      search: searchIdfprDiscipline },
+      category: "discipline", search: searchIdfprDiscipline },
     { source: "Illinois Department of Labor public-works debarments (Prevailing Wage Act)", scope: "The contractors IDOL currently lists as debarred",
-      search: () => searchIdolDebarred() },
+      category: "debarment", search: () => searchIdolDebarred() },
   ],
   noStatewideGcLicense:
     "Illinois does not license general contractors statewide; roofing contractors are licensed by IDFPR and plumbers by IDPH, and general contractors are licensed, where at all, by their city or county",

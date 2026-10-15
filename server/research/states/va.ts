@@ -188,7 +188,7 @@ async function searchScc(name: string): Promise<EnforcementHit[]> {
 }
 
 const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [
-  { source: "Virginia SCC business entity status (open data)", scope: "Corporations (copy of 2024-11-14) and LLCs (copy of 2026-03-24, first 1,048,575 rows)", search: searchScc },
+  { source: "Virginia SCC business entity status (open data)", scope: "Corporations (copy of 2024-11-14) and LLCs (copy of 2026-03-24, first 1,048,575 rows)", category: "business_status", search: searchScc },
 ];
 
 export const pack: StatePack = {
