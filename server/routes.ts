@@ -2808,7 +2808,8 @@ export async function registerRoutes(
       // Best-rated first, most-reviewed among equals; a listing with no rating yet goes last (Postgres puts
       // NULL first on a plain DESC, which put an unrated 0-review business at the top of the pack).
       const listings = await db.select().from(competitorListings).where(and(eq(competitorListings.scanId, scanId), eq(competitorListings.userId, userId)))
-        .orderBy(sql`${competitorListings.rating} DESC NULLS LAST`, sql`${competitorListings.reviewCount} DESC NULLS LAST`, asc(competitorListings.id));
+        // rating is stored as text: compare it as a number (Kimi review 2026-10-15), never alphabetically.
+        .orderBy(sql`NULLIF(${competitorListings.rating}, '')::numeric DESC NULLS LAST`, sql`${competitorListings.reviewCount} DESC NULLS LAST`, asc(competitorListings.id));
       res.json({ scan, listings: listings.map(presentListing) });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
