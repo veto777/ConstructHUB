@@ -7,8 +7,18 @@
  *                   other specialty classes; PDF with expiration dates).
  *   sd-septic       SD Plumbing Commission small onsite wastewater (septic) installers (PDF; with employer).
  *
- * The lists are published as PDFs only ("Lists of Licensees", dlr.sd.gov/plumbing/consumer_info.aspx); they are
- * read with ./lib/g6-pdf.ts. South Dakota has no state general-contractor license.
+ *   sd-dor-tax-delinquent  SD Department of Revenue "Top 100 Delinquent Report" (dor.sd.gov/businesses/taxes,
+ *                   "Click Here" PDF; "SOUTH DAKOTA BUSINESS TAX DELINQUENT REPORT"). Columns Owner Name / DBA Name,
+ *                   Address, City, State, Tax Due, Interest Due, Penalty Due, Total Due. The report says: business tax
+ *                   includes sales, use, tourism, contractors' excise, municipal, municipal gross receipts, motor vehicle
+ *                   leasing and telecommunications gross receipts tax; "A lien has been filed against all taxpayers
+ *                   listed"; names are removed within 10 days of payment in full (SDCL 10-59-46 through 51). The page
+ *                   says it is updated weekly. Companies only (FCRA): a row whose owner is not a business name is
+ *                   left out. 200 entries on the report of 09/15/2026 (checked 2026-10-15), 139 of them businesses.
+ *                   dor.sd.gov robots.txt: "User-agent: * / Allow: /".
+ *
+ * The plumbing lists are published as PDFs only ("Lists of Licensees", dlr.sd.gov/plumbing/consumer_info.aspx);
+ * they are read with ./lib/g6-pdf.ts. South Dakota has no state general-contractor license.
  */
 import { flipPerson } from "../person-name";
 import type { LicenseHit } from "@shared/research-reports";
@@ -16,6 +26,10 @@ import { promises as fs } from "node:fs";
 import { clean, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { StatePack } from "./types";
 import { pdfTable } from "./lib/g6-pdf";
+import { pdfText, textLines } from "./lib/a3-pdf";
+import { looksLikeBusiness, usd } from "./lib/g8-common";
+import { decodeEntities, politeFetch, politeText } from "../http";
+import type { EnforcementHit } from "@shared/research-reports";
 
 const SD_PAGE = "https://dlr.sd.gov/plumbing/consumer_info.aspx";
 const SD_DOCS = "https://dlr.sd.gov/plumbing/documents";
@@ -117,14 +131,91 @@ const SD_SEPTIC: BulkSource = {
   },
 };
 
+export const DOR_PAGE = "https://dor.sd.gov/businesses/taxes/";
+const DOR_SOURCE = "South Dakota Department of Revenue business tax delinquent report";
+
+/** The report's PDF: the page's link titled "Top 100 Delinquent Report" (its media path changes with each report). */
+export function delinquentPdfUrl(html: string, base = DOR_PAGE): string | null {
+  for (const m of html.matchAll(/<a\b[^>]*>/gi)) {
+    const tag = m[0];
+    const href = tag.match(/href="([^"]+\.pdf)"/i)?.[1];
+    if (href && /title="Top 100 Delinquent Report"/i.test(tag)) return new URL(decodeEntities(href), base).href;
+  }
+  return null;
+}
+
+export type DelinquentRow = { owner: string; dba: string | null; address: string | null; city: string; st: string; tax: number | null; interest: number | null; penalty: number | null; total: number | null };
+
+const AMT = String.raw`\$([\d,]+\.\d{2})`;
+const OWNER_LINE = new RegExp(String.raw`^\s*(\S.*?)\s{2,}(?:(\S.*?)\s{2,})?(\S.*?)\s{2,}([A-Z]{2})\s+${AMT}\s+${AMT}\s+${AMT}\s+${AMT}\s*$`);
+const num = (v: string): number | null => { const n = Number(v.replace(/,/g, "")); return Number.isFinite(n) ? n : null; };
+
+/**
+ * The report's rows: an owner line (name, address, city, state and the four amounts), then the DBA name on the next
+ * text line. Headers, page footers and the grand-total line are skipped.
+ */
+export function parseDelinquent(text: string): { reportDate: string | null; rows: DelinquentRow[] } {
+  const reportDate = usDate(text.match(/REPORT DATE:\s*(\d{1,2}\/\d{1,2}\/\d{4})/)?.[1] ?? null);
+  const rows: DelinquentRow[] = [];
+  let open: DelinquentRow | null = null;
+  for (const line of textLines(text)) {
+    if (!line.trim()) continue;
+    const m = line.match(OWNER_LINE);
+    if (m) {
+      open = { owner: clean(m[1])!, dba: null, address: clean(m[2]), city: clean(m[3])!, st: m[4], tax: num(m[5]), interest: num(m[6]), penalty: num(m[7]), total: num(m[8]) };
+      rows.push(open);
+      continue;
+    }
+    if (/\$\d|^\s*(?:Owner Name|DBA Name|Page \d+ of \d+)/i.test(line)) { open = null; continue; }
+    if (open && !open.dba) { open.dba = clean(line); open = null; }
+  }
+  return { reportDate, rows };
+}
+
+/** A row as report hits, one per business name (owner, and a different DBA); none when the owner is not a business. */
+export function delinquentHits(r: DelinquentRow, reportDate: string | null): BulkHit[] {
+  if (!looksLikeBusiness(r.owner)) return []; // companies only (FCRA): a person's tax lien is not searched
+  const dba = r.dba && r.dba.toUpperCase() !== r.owner.toUpperCase() ? r.dba : null;
+  const day = reportDate ? `${reportDate.slice(5, 7)}/${reportDate.slice(8, 10)}/${reportDate.slice(0, 4)}` : null;
+  const parts = [r.tax != null ? `tax due ${usd(r.tax)}` : null, r.interest != null ? `interest due ${usd(r.interest)}` : null, r.penalty != null ? `penalty due ${usd(r.penalty)}` : null].filter(Boolean);
+  const hit: EnforcementHit = {
+    state: "SD", source: DOR_SOURCE, sourceUrl: DOR_PAGE, category: "tax_lien",
+    name: dba ? `${r.owner} dba ${dba}` : r.owner, id: null, date: reportDate, endDate: null,
+    status: `On the business tax delinquent report${day ? ` of ${day}` : ""}: a lien has been filed`,
+    city: `${r.city}, ${r.st}`,
+    detail: `Delinquent South Dakota business tax (sales, use, tourism, contractors' excise, municipal and other business taxes)${parts.length ? `: ${parts.join(", ")}` : ""}`,
+    amount: r.total, adverse: true,
+    address: r.address ? `${r.address}, ${r.city}, ${r.st}` : null,
+  };
+  return [r.owner, dba].filter((n): n is string => !!n).map((business) => ({ kind: "enforcement" as const, hit, business, person: null }));
+}
+
+const SD_DOR_DELINQUENT: BulkSource = {
+  id: "sd-dor-tax-delinquent", state: "SD", label: DOR_SOURCE, pageUrl: DOR_PAGE,
+  everyHours: 24 * 7, minRows: 133, // 190 on the report of 09/15/2026 (139 business owners of 200 entries, plus 51 distinct DBA names)
+  companiesOnly: true, category: "tax_lien",
+  load: async function* () {
+    const url = delinquentPdfUrl(await politeText(DOR_PAGE, {}, { minDelayMs: 1500 }));
+    if (!url) throw new Error("the Department of Revenue taxes page no longer links the Top 100 Delinquent Report");
+    const res = await politeFetch(url, {}, { minDelayMs: 1500, timeoutMs: 90_000 });
+    if (!res.ok) throw new Error(`Department of Revenue returned HTTP ${res.status} for the delinquent report`);
+    const { reportDate, rows } = parseDelinquent((await pdfText(new Uint8Array(await res.arrayBuffer()))).text);
+    if (rows.length < 140) throw new Error(`the delinquent report changed layout (${rows.length} rows read)`);
+    for (const r of rows) yield* delinquentHits(r, reportDate);
+  },
+};
+
 export const pack: StatePack = {
   state: "SD",
   checked: "2026-10-15",
-  bulk: [SD_PLUMBERS, SD_SPECIALTY, SD_SEPTIC],
+  bulk: [SD_PLUMBERS, SD_SPECIALTY, SD_SEPTIC, SD_DOR_DELINQUENT],
   noStatewideGcLicense:
     "South Dakota does not license general contractors statewide; plumbers and electricians are licensed by state commissions (the plumbing lists are searched above)",
   blocked: [
-    "South Dakota Electrical Commission license lookup (sdec.portalus.thentiacloud.net, Thentia): HTTP 403 from the load balancer to every request",
+    "South Dakota Electrical Commission license portal (sdec.portalus.thentiacloud.net, Thentia; electrical contractors and electricians): re-checked 2026-10-15, robots.txt 'User-agent: * / Disallow: /'. dlr.sd.gov/electrical publishes no licensee or contractor list",
+    "SD Plumbing Commission: no company list; its PLUMBING CONTRACTOR and SEWER AND WATER CONTRACTOR licenses are issued to people and are in the lists above (dlr.sd.gov/plumbing/consumer_info.aspx, re-checked 2026-10-15)",
+    "Department of Revenue contractor's excise tax licenses: no public list or lookup (dor.sd.gov/businesses/taxes/contractors-excise-tax; the tax license application at apps.sd.gov/rv23cedar is an account system)",
+    "Electrical and Plumbing commission discipline: only meeting documents on boardsandcommissions.sd.gov (BoardID=35, 77), no discipline list",
     "South Dakota Secretary of State business search (sosenterprise.sd.gov): reCAPTCHA",
     "SD Plumbing Commission lists carry no license numbers, addresses or phones, so they can't be searched by those",
   ],

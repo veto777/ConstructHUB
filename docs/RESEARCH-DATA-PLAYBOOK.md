@@ -159,7 +159,7 @@ Permit portals are left out unless `--portals` (a full sweep takes hours per sta
 
 <!-- GENERATED: script/research-acceptance.ts --playbook (do not edit by hand between these markers) -->
 
-Generated 2026-10-15 from the registry (201 state sources, 2 nationwide). robots.txt was read live on that date for each source's page and API URL (fails closed: an unreadable robots.txt counts as no). Bulk-file floors: a new load needs more than 70% of the last good load and at least the row floor; key format version 3.
+Generated 2026-10-15 from the registry (207 state sources, 2 nationwide). robots.txt was read live on that date for each source's page and API URL (fails closed: an unreadable robots.txt counts as no). Bulk-file floors: a new load needs more than 70% of the last good load and at least the row floor; key format version 3.
 
 ### Nationwide (every report)
 
@@ -191,15 +191,16 @@ Looked at and not used (from the pack's `blocked` notes):
 
 Checked live: 2026-10-15.
 
-| Source | Publisher | Access | Holds | Searched by | Refresh / floor | Keys | robots.txt (page; API) |
-|---|---|---|---|---|---|---|---|
-| Alaska DCCED business licenses | - | live search per report | other (companies only) | name | live | none | checked at run time (its URL lives in the search code, not the registry) |
+No source is searched for this state yet.
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- CBPL professional-license search and download files (www.commerce.alaska.gov/cbp), which hold construction contractor registrations and electrical/mechanical administrator licenses: DataDome CAPTCHA (HTTP 403) on every request
-- DOLWD Mechanical Inspection certificates of fitness (electricians, plumbers): no public lookup or list published
-- DOLWD Wage and Hour public-construction debarment list (dol.alaska.gov/lss/debarments.htm): live and readable, but empty today (no company listed), so nothing to search or verify
+- CBPL professional-license search, business-license search and download files (www.commerce.alaska.gov/cbp and commerce.alaska.gov), which hold construction contractor registrations, electrical/mechanical administrator licenses and business licenses: HTTP 403 with a DataDome CAPTCHA page (geo.captcha-delivery.com) on robots.txt and on every page (rechecked 2026-10-15)
+- DCCED map server business-license layer (maps.commerce.alaska.gov/server/rest/services/Economics_Related/Business_Licenses/MapServer/2), used until 2026-10-15: robots.txt now answers HTTP 403 with the DataDome CAPTCHA page, so the research code refuses the host; the same data's ArcGIS Online item (owner DCRAOpenData) points at that host
+- DOLWD Mechanical Inspection certificates of fitness (electricians, plumbers; labor.alaska.gov/lss/mihome.htm, plumbing_electrical.htm, mi-faq.html): no public lookup or list published (rechecked 2026-10-15)
+- DOLWD Wage and Hour public-construction debarment list (labor.alaska.gov/lss/debarments.htm, 'last updated: November 6, 2025'): live and readable, but its table lists no company today, so nothing to search or verify
+- DOT&PF 'Suspended Contractors' link (dot.alaska.gov/procurement/warrant_manual/): points to the federal EPLS (now SAM.gov), not a state list
+- ArcGIS Online 'The Alaska General Contractors 2023 Layer' (AKDOT, services.arcgis.com/r4A0V7UzH9fcLVvv): one polyline layer 'AGC_FIGURES Events', no description and no license fields; not a license register
 
 ### AZ
 
@@ -340,11 +341,15 @@ Checked live: 2026-10-15.
 
 | Source | Publisher | Access | Holds | Searched by | Refresh / floor | Keys | robots.txt (page; API) |
 |---|---|---|---|---|---|---|---|
+| Georgia EPD licensed asbestos abatement firms ([page](https://epd.georgia.gov/about-us/land-protection-branch/recovered-materials-and-abatement/asbestos/asbestos-contractors-and)) | epd.georgia.gov | bulk file `ga-epd-asbestos-firms` (official download, indexed) | licenses | name | every 168h, floor 120 | none | allowed |
+| Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications ([page](https://www.gaswcc.org/esc-search.php)) | www.gaswcc.org | the agency's own lookup (page or API), live per report | licenses | name, owner | live | none | allowed |
 | Georgia EPD enforcement orders | - | live search per report | environmental (companies only) | name | live | none | checked at run time (its URL lives in the search code, not the registry) |
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- Georgia Secretary of State licensing boards (verify.sos.ga.gov: residential and general contractors, electrical, plumbing, conditioned air, low voltage, engineers): Cloudflare challenge on every page, robots.txt included
+- Georgia Secretary of State licensing boards (verify.sos.ga.gov/verification/Search.aspx: Residential and General Contractors, Construction Industry Licensing Board electrical, plumbing, conditioned air, low voltage, utility; engineers) and their board orders and roster request pages (sos.ga.gov): HTTP 403 with cf-mitigated: challenge (Cloudflare) on every page, robots.txt included (verify.sos.ga.gov/robots.txt redirects to Search.aspx, which is challenged); rechecked 2026-10-15
+- Georgia Secretary of State license rosters (bulk): ordered with a paper Roster Request Form and payment by check or money order (sos.ga.gov/page/licensing-roster-requests, behind the Cloudflare challenge); the store link a 2023 records response gave (georgiasecretaryofstate.net/collections/license-roster) returns HTTP 404 on 2026-10-15; needs the owner
+- Georgia DPH certified septic tank installer companies (dph.georgia.gov/media/92731/download, EnvHealthInstallers.pdf dated 10/9/2026): free and robots-allowed, but only a company name and phone in three columns per county, no license number or city; 'Companies and individuals are certified', so the holder is unknown. Not loaded
 - Georgia Secretary of State corporations (ecorp.sos.ga.gov): Cloudflare challenge; bulk corporations data is sold ($1,000 one-time or $500/month)
 - Georgia Insurance and Safety Fire Commissioner licensed professionals (sprinkler, elevator, boiler; Citizenserve portal): "I am human" check before results
 - Georgia DOAS suspended and debarred suppliers (doas.ga.gov, purchasing law page): the current FY27 list (a .docx posted 2026-08) says NONE, as did FY23 and FY24; rechecked 2026-10-15
@@ -378,7 +383,10 @@ Checked live: 2026-10-15.
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- DOPL eDOPL license search and Public License List Search (edopl.idaho.gov): robots.txt disallows every path; this covers contractor registration, electrical, plumbing, HVAC and public works contractor licenses and their discipline
+- DOPL eDOPL license search and Public License List Search (edopl.idaho.gov/OnlineServices/?link=PubSearch): robots.txt is 'User-agent: *' / 'Disallow: /' (rechecked 2026-10-15); this covers contractor registration, electrical, plumbing, HVAC and public works contractor licenses and their discipline
+- DOPL website (dopl.idaho.gov; robots.txt 'Disallow:' empty): the Contractors (/con/), Electrical (/ele/), Plumbing (/plb/), HVAC (/hvac/) and Public Works (/pwc/) board pages link only to eDOPL; the site's only discipline pages are for other boards (Accountancy /boa/boa-discipline/, Shorthand Reporters /sre/sre-disciplinary-actions/) (checked 2026-10-15)
+- data.idaho.gov: a data-governance site (AI readiness, data literacy, policies), not a dataset catalog; an ArcGIS Online search for Idaho contractor/licensee/electrician/plumber items found no license register (checked 2026-10-15)
+- Idaho Attorney General consumer protection (ag.idaho.gov): contractor settlements (assurances of voluntary compliance) are announced as newsroom press releases only, with no list or dataset (checked 2026-10-15)
 
 ### IL
 
@@ -413,10 +421,12 @@ Checked live: 2026-10-15. No statewide GC license: Indiana does not license gene
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- Professional Licensing Agency Search and Verify (mylicense.in.gov/EVerification): reCAPTCHA; plumbers, home inspectors, asbestos and lead licensees not searchable
-- PLA licensee list download (in.gov/pla): sold per record through the IN.gov portal
+- Professional Licensing Agency Search and Verify (mylicense.in.gov/EVerification), re-checked 2026-10-15: robots.txt has content-signal comments only (no rules), the search form's Recaptcha1 field is an empty hidden input and a Plumbing Commission search answers (Plumbing Contractor, Journeyman Plumber, Plumbing Corporation with its related plumbing contractor, asbestos and lead contractors); not used because the site carries the IN.gov portal header and the IN.gov Terms of Use (in.gov/core/terms_of_use.html) say: "the viewing, printing, or downloading of any content ... from the Portal grants you only a limited, nonexclusive license for use solely by you for your own personal use, and not for republication, distribution, ... sale, preparation of derivative works or other use. No part of any content ... may be reproduced in any form or incorporated into any information retrieval system, electronic or mechanical, other than for your personal use (not for resale or redistribution)" and bar using the Portal to "exploit any information ... for advertising or commercial purposes"
+- PLA licensee list download (in.gov/pla/license/download-license-files), re-checked 2026-10-15: sold through the IN.gov portal, "$150 for the first record ... $10 for each additional 1,000 records"
+- PLA Discipline Search (in.gov/ai/appfiles/pla-litigation → in.gov/apps/pla/litigation/advancedsearch.aspx): "disciplinary actions taken against individual licensees", searched by first and last name or license number only (no business name), so no company search (FCRA: companies only); IN.gov Terms of Use as above
+- PLA Indiana Active Licenses Map (in.gov/pla/data/indiana-active-licenses-map): counts per county only, no names
 - Secretary of State INBiz bulk business data: paid ($9,500) and needs an INBiz account
-- Indiana Data Hub (hub.mph.in.gov): no license or enforcement dataset for construction
+- Indiana Data Hub (hub.mph.in.gov), re-checked 2026-10-15: its search finds no dataset for "plumbing" or "contractor" (robots.txt disallows /api/)
 
 ### IA
 
@@ -482,16 +492,20 @@ Looked at and not used (from the pack's `blocked` notes):
 
 ### ME
 
-Checked live: 2026-10-15. No statewide GC license: Maine does not license general contractors or trades such as roofing and framing (Maine Attorney General); electricians, plumbers and oil and solid fuel technicians are licensed by the Office of Professional and Occupational Regulation, whose license search could not be used
+Checked live: 2026-10-15. No statewide GC license: Maine does not license general contractors or trades such as roofing and framing (Maine Attorney General); electricians, plumbers and oil and solid fuel technicians are licensed by the Office of Professional and Occupational Regulation, whose license search could not be used. Maine DEP's asbestos abatement licenses and underground tank installer certifications are searched above
 
-No source is searched for this state yet.
+| Source | Publisher | Access | Holds | Searched by | Refresh / floor | Keys | robots.txt (page; API) |
+|---|---|---|---|---|---|---|---|
+| Maine DEP licensed asbestos abatement contractors and consultants ([page](https://www.maine.gov/dep/waste/asbestos/asbestoscontractors.html)) | www.maine.gov | the agency's own lookup (page or API), live per report | licenses | name, phone | live | none | allowed |
+| Maine DEP certified underground storage tank installers and inspectors ([page](https://www.maine.gov/dep/waste/busti/certifiedlist.html)) | www.maine.gov | the agency's own lookup (page or API), live per report | licenses | name, owner | live | none | allowed |
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- OPOR license search (www.pfr.maine.gov/ALMSOnline/ALMSQuery): robots.txt disallows SearchResults.aspx, the detail pages and the CSV export, so the search can't be used
-- www1.maine.gov/cgi-bin/online/licensing (InforME license lookups): robots.txt on www.maine.gov disallows /cgi-bin/
-- Secretary of State corporate search (icrs.informe.org): did not answer
-- The electricians', plumbers' and fuel boards' pages publish no licensee lists or disciplinary action lists
+- OPOR license search, licensee list download and licensee discipline search (www.pfr.maine.gov/ALMSOnline/ALMSQuery; the electricians', plumbers' and fuel boards' "Find a Licensee", "Download a List of Licensees" and "Search Licensee Discipline" links all open it): robots.txt (checked 2026-10-15) has "Disallow: /ALMSOnline/ALMSQuery/SearchResults.aspx", "Disallow: /ALMSOnline/ALMSQuery/ExportToCSV.aspx", "Disallow: /ALMSOnline/ALMSQuery/ShowDetail.aspx" and "Disallow: /ALMSOnline/ALMSQuery/ShowCaseDetail.aspx", so neither the search, the CSV export nor the case details can be used
+- www.maine.gov/cgi-bin/online/licensing (InforME license lookups): robots.txt on www.maine.gov has "Disallow: /cgi-bin/"
+- Secretary of State corporate search (icrs.informe.org): did not answer (no response within 25 s, 2026-10-15)
+- Electricians' Examining Board, Plumbers' Examining Board and Maine Fuel Board pages (www.maine.gov/pfr/professionallicensing/professions/…): publish no licensee lists or disciplinary action lists of their own; every list link goes to ALMSQuery (above)
+- data.maine.gov: redirects to www.socrata.com (HTTP 404); no Maine open-data catalog to search
 
 ### MD
 
@@ -602,15 +616,23 @@ Looked at and not used (from the pack's `blocked` notes):
 
 Checked live: 2026-10-15.
 
-No source is searched for this state yet.
+| Source | Publisher | Access | Holds | Searched by | Refresh / floor | Keys | robots.txt (page; API) |
+|---|---|---|---|---|---|---|---|
+| Montana DEQ asbestos accreditations ([page](https://svc.mt.gov/deq/asbestosaccred/)) | svc.mt.gov | bulk file `mt-deq-asbestos` (official download, indexed) | licenses | name | every 168h, floor 375 | none | allowed |
+| Montana DEQ licensed septic tank pumpers ([page](https://deq.mt.gov/twr/Programs/septic-tank)) | deq.mt.gov | bulk file `mt-deq-septic-pumpers` (official download, indexed) | licenses | name | every 168h, floor 105 | none | allowed |
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- DLI Employment Standards licensee lookup and licensee list download (ebizws.mt.gov/PUBLICPORTAL; construction contractor, electrical, plumbing and other trade licenses): the F5 firewall answers 'Request Rejected', even for robots.txt
-- DLI professional licensing on Accela (ebiz.mt.gov/pol → aca-prod.accela.com/pol): its license lookup redirects to the same rejected portal
+- DLI Employment Standards licensee lookup and licensee list download (ebizws.mt.gov/PUBLICPORTAL and ERD_PUBLICPORTAL; construction contractor, electrical, plumbing and other trade licenses, and the Electrical and Plumbers boards' 'Licensee Mailing Lists'): re-checked 2026-10-15, the F5 firewall answers 'Request Rejected' ('The requested URL was rejected. Please consult with your administrator.') to every request, robots.txt included
+- DLI construction contractor registration lookup (erdcontractors.mt.gov/ICCROnlineSearch/registrationlookup.jsp, linked from erd.dli.mt.gov): 2026-10-15 the server resets the connection after the request (robots.txt included)
+- DLI professional licensing and Building Codes on Accela (ebiz.mt.gov/pol and /bcb → aca-prod.accela.com): the license search links go to the rejected ebizws portal; Accela's own licensee lookup was not used, being a side door to the same refused data
+- DLI data dashboards (erd.dli.mt.gov/data-dashboards/professional-licensing, IndependentContractors; Tableau on tableau-ext.mt.gov): application and certificate counts, no licensee names
+- Montana Data Portal (data.mt.gov) 'License Information' (Tableau DS-LicenseInformation): descriptions of license types and requirements, not licensees
+- DEQ 'List of Montana Asbestos Companies' (deq.mt.gov/cleanupandrec/Programs/asbestos): a voluntary directory of companies that employ accredited people and asked to be listed, not a license; not used as one
+- Electrical and Plumbers boards (boards.bsd.dli.mt.gov): discipline only through the rejected licensee lookup; board meeting documents (boardmeetings.dli.mt.gov) are agendas and minutes, not a discipline list
 - Secretary of State business search (biz.sosmt.gov): Cloudflare security check (HTTP 403)
-- DLI prevailing-wage debarment list (erd.dli.mt.gov/labor-standards/public-contracts-prevailing-wage-law/debarment): live, but lists 'None' today
-- State Procurement debarred-vendor list: the link from DLI (spb.mt.gov/Agency-Resources/Debarred-Suspended-Vendors) is a 404
+- DLI prevailing-wage debarment list (erd.dli.mt.gov/labor-standards/public-contracts-prevailing-wage-law/debarment): live 2026-10-15, lists 'None'
+- State Procurement (doa.mt.gov/SPSD) debarred vendors: no state list today; the agency resources page points to SAM.gov and the DLI list above
 - DEQ enforcement: annual summary reports only, no case-level list
 
 ### NE
@@ -652,8 +674,9 @@ No source is searched for this state yet.
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- OPLC license lookup (www.oplc.nh.gov/license-lookup, forms.nh.gov/licenseverification): HTTP 403 'Access Denied' (Akamai) to our bot, robots.txt included
-- Every other nh.gov host tried (www.nh.gov, data.nh.gov, quickstart.sos.nh.gov business search, www.dol.nh.gov): HTTP 403 to our bot
+- OPLC license lookup and board pages (www.oplc.nh.gov/license-lookup, www.oplc.nh.gov/electricians-board, forms.nh.gov/licenseverification): HTTP 403 "Access Denied" (Akamai, "You don't have permission to access … on this server") to our bot on 2026-10-15, robots.txt included, so no lookup, roster or board disciplinary decisions can be read
+- NH open data (data.nh.gov): HTTP 403 to our bot on 2026-10-15; its datasets were not looked for through another host
+- Every other nh.gov host tried on 2026-10-15 (www.nh.gov, www.des.nh.gov, www.doj.nh.gov, www.courts.nh.gov, www.dol.nh.gov, www.nhes.nh.gov, www.revenue.nh.gov, www.sos.nh.gov, quickstart.sos.nh.gov business search): HTTP 403 to our bot; sos.nh.gov answered HTTP 503
 
 ### NJ
 
@@ -687,9 +710,12 @@ Checked live: 2026-10-15.
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- Construction Industries Division contractor / journeyman license search (public.psiexams.com/search.jsp, PSI): the search requires a CAPTCHA
-- Workforce Solutions public works contractor registry (dws.state.nm.us/pwaa): the site's firewall rejects automated requests ("Request Rejected")
-- CID disciplinary actions: RLD publishes enforcement pages for its boards but none for CID
+- Construction Industries Division contractor / journeyman license search (public.psiexams.com/search.jsp, PSI, linked from rld.nm.gov's Verify a License page): the search form requires a CAPTCHA ("Enter Captcha", simplecaptcha.jpg; re-checked 2026-10-15). The results pages it posts to are not called directly (that would get around the CAPTCHA)
+- Workforce Solutions public works contractor registry (dws.state.nm.us): the site's firewall answers every request, robots.txt included, with "Request Rejected" (re-checked 2026-10-15)
+- CID disciplinary actions: rld.nm.gov's Enforcement Actions page lists every board's actions but links CID only to its home page; CID's Investigation and Enforcement and Unlicensed Violations pages publish no list (only the Recycled Metals program has a Disciplinary Actions page). Checked 2026-10-15
+- CID/MHD permit portal (nmrld.my.site.com/MHD/s/public-permit-search, /public-violation-search "Search Notice"): permit and notice searches, not a license lookup; not used
+- NM General Services Department debarment and suspension notices (generalservices.state.nm.us/state-purchasing/debarment-notices): "THERE ARE NO SUSPENDED OR DEBARRED FIRMS AT THIS TIME" (2026-10-15)
+- NM state open-data portal: none found (data.nm.gov and opendata.nm.gov do not resolve, 2026-10-15)
 
 ### NY
 
@@ -857,10 +883,13 @@ Checked live: 2026-10-15.
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- SC LLR licensee lookup (verify.llronline.com: Contractors' Licensing Board, Residential Builders, Burglar/Fire/Sprinkler, Manufactured Housing): reCAPTCHA on every search
-- SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb, /OnlineVerificationBulk): robots.txt Disallow: /
-- SC LLR license rosters: sold by mailed request ($10 check per roster with a signed Family Privacy Protection Act statement, llr.sc.gov Statement_Compliance.pdf); needs the owner
-- SC Secretary of State business entities (businessfilings.sc.gov): reCAPTCHA after a few searches
+- SC LLR licensee lookup (verify.llronline.com/LicLookup/Contractors/Contractor.aspx?div=69 for the Contractor's Licensing Board's general and mechanical contractors, Resbu/Resbu.aspx?div=46 for the Residential Builders Commission, BurgFire for burglar/fire/sprinkler): a g-recaptcha widget on every search form, the Find button hidden until it is solved; rechecked 2026-10-15
+- SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 and 46, /OnlineVerificationBulk): eservice.llr.sc.gov/robots.txt is "User-agent: * / Disallow: /"; rechecked 2026-10-15
+- SC Contractor's Licensing Board meeting minutes (llr.sc.gov/clb/minutes, robots-allowed PDFs): disciplinary hearings are listed by case number only ("In accordance with Board confidentiality statutes, the hearing was closed"), no respondent named; checked the 2026-07-30 minutes
+- SC LLR license rosters: sold by mailed request ($10 check per roster with a signed Family Privacy Protection Act statement, llr.sc.gov/AboutUs/MediaCenter/pidocs/Statement_Compliance.pdf, linked as 'Licensee List Request' from llr.sc.gov/clb); needs the owner
+- SC DES Asbestos Contractors and Consultants Search (apps.des.sc.gov/AsbestosContractorsAndConsultants, with free CSV exports /CSV and /CSV/<type>: ~200 contractors, ~870 consultants and air samplers on 2026-10-15) and the UST Class I/II certified contractors PDF (des.sc.gov List_of_Certified_Contractors_August2026.pdf): not used, because des.sc.gov's Website Accessibility and Policies page says "You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing"
+- SCDOT prequalified prime contractors (apps.scdot.org/powerbiexport, a free CSV export refreshed daily, ~425 firms on 2026-10-15): not used, because scdot.org/disclaimer.html says "You may not modify, publish, transmit, display, participate in the transfer or sale, create derivative works or in any way exploit, any of the content, in whole or in part, without the express written permission of SCDOT"
+- SC Secretary of State business entities (businessfilings.sc.gov/BusinessFiling/Entity/Search): g-recaptcha on the search form; rechecked 2026-10-15
 - SC DES ArcGIS hub: private; the monthly enforcement report PDFs are loaded instead (sc-des-enforcement)
 - SC Workers' Compensation Commission and SC Materials Management Office: no published list of penalized employers or debarred vendors (decisions are single PDFs)
 
@@ -873,10 +902,14 @@ Checked live: 2026-10-15. No statewide GC license: South Dakota does not license
 | South Dakota Plumbing Commission licensed plumbers ([page](https://dlr.sd.gov/plumbing/consumer_info.aspx)) | dlr.sd.gov | bulk file `sd-plumbers` (official download, indexed) | licenses | name | every 168h, floor 1950 | none | allowed |
 | South Dakota Plumbing Commission specialty licensees ([page](https://dlr.sd.gov/plumbing/consumer_info.aspx)) | dlr.sd.gov | bulk file `sd-specialty` (official download, indexed) | licenses | name | every 168h, floor 640 | none | allowed |
 | South Dakota small onsite wastewater (septic) installers ([page](https://dlr.sd.gov/plumbing/consumer_info.aspx)) | dlr.sd.gov | bulk file `sd-septic` (official download, indexed) | licenses | name | every 168h, floor 390 | none | allowed |
+| South Dakota Department of Revenue business tax delinquent report ([page](https://dor.sd.gov/businesses/taxes/)) | dor.sd.gov | bulk file `sd-dor-tax-delinquent` (official download, indexed) | tax_lien (companies only) | name | every 168h, floor 133 | none | allowed |
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- South Dakota Electrical Commission license lookup (sdec.portalus.thentiacloud.net, Thentia): HTTP 403 from the load balancer to every request
+- South Dakota Electrical Commission license portal (sdec.portalus.thentiacloud.net, Thentia; electrical contractors and electricians): re-checked 2026-10-15, robots.txt 'User-agent: * / Disallow: /'. dlr.sd.gov/electrical publishes no licensee or contractor list
+- SD Plumbing Commission: no company list; its PLUMBING CONTRACTOR and SEWER AND WATER CONTRACTOR licenses are issued to people and are in the lists above (dlr.sd.gov/plumbing/consumer_info.aspx, re-checked 2026-10-15)
+- Department of Revenue contractor's excise tax licenses: no public list or lookup (dor.sd.gov/businesses/taxes/contractors-excise-tax; the tax license application at apps.sd.gov/rv23cedar is an account system)
+- Electrical and Plumbing commission discipline: only meeting documents on boardsandcommissions.sd.gov (BoardID=35, 77), no discipline list
 - South Dakota Secretary of State business search (sosenterprise.sd.gov): reCAPTCHA
 - SD Plumbing Commission lists carry no license numbers, addresses or phones, so they can't be searched by those
 
@@ -889,10 +922,11 @@ Checked live: 2026-10-15.
 | TDEC enforcement cases ([page](https://dataviewers.tdec.tn.gov/dataviewers/r/tdec_reports/tdec-enforcementdataviewer999001/home)) | dataviewers.tdec.tn.gov | bulk file `tn-tdec-enforcement` (official download, indexed) | environmental (companies only) | name | every 168h, floor 3700 | none | allowed |
 | TN Board for Licensing Contractors and Alarm Systems Contractors Board disciplinary actions ([page](https://www.tn.gov/commerce/dar/rb.html)) | www.tn.gov | bulk file `tn-blc-discipline` (official download, indexed) | discipline (companies only) | name | every 168h, floor 380 | none | allowed |
 | Nashville registered professional contractors (city/county) ([page](https://www.arcgis.com/home/item.html?id=ac877684ad8b45e8b539af65ce475fe2)) | www.arcgis.com | bulk file `tn-nashville-contractors` (official download, indexed) | licenses | name | every 24h, floor 4900 | none | allowed |
+| TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers) ([page](https://search.cloud.commerce.tn.gov/)) | search.cloud.commerce.tn.gov | the agency's own lookup (page or API), live per report | licenses | name, owner | live | none | allowed |
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- TN Department of Commerce & Insurance license search (search.cloud.commerce.tn.gov: contractors, home improvement, electricians, plumbers): the public search runs reCAPTCHA
+- TN Commerce & Insurance Verify (search.cloud.commerce.tn.gov), re-checked 2026-10-15: the search runs without a CAPTCHA (its search configuration's reCaptcha is null) and is used above; it publishes no qualifying agents or owners on an organization's license, and no disciplinary history
 - TN Secretary of State business search (tnbear.tn.gov): connection timed out from our server on 2026-10-15; retried 2026-10-15 06:56 and 06:58 UTC from tower1 and vb11: TCP connect still times out (robots.txt unreachable too)
 - TN Secretary of State business entity search (tncab.tnsos.gov, the newer TNCaB system): the search page runs reCAPTCHA and Cloudflare Turnstile
 - TDEC asbestos and lead-based paint accreditations (dataviewers app 35001): searchable only through form posts, no list download found
@@ -989,15 +1023,15 @@ Checked live: 2026-10-15.
 | Source | Publisher | Access | Holds | Searched by | Refresh / floor | Keys | robots.txt (page; API) |
 |---|---|---|---|---|---|---|---|
 | WV Employer Violator System (workers' comp default) ([page](https://www.wvinsurance.gov/EVS)) | www.wvinsurance.gov | bulk file `wv-oic-evs` (official download, indexed) | debarment (companies only) | name | every 168h, floor 1500, row_shape 1 | none | allowed |
+| WV Purchasing Division debarred vendors ([page](https://www.state.wv.us/admin/purchase/debar.html)) | www.state.wv.us | bulk file `wv-purchasing-debarred` (official download, indexed) | debarment (companies only) | name | every 168h, floor 9 | none | allowed |
 | WV State Fire Marshal electrician licenses ([page](https://sfm-permit-public.wvoasis.gov/publicdata/LicenseeSearch)) | sfm-permit-public.wvoasis.gov | the agency's own lookup (page or API), live per report | licenses | owner, license | live | none | allowed |
-| WV Division of Labor certified plumbers ([page](https://labor.wv.gov/database-search)) | labor.wv.gov | the agency's own lookup (page or API), live per report | licenses | owner, license | live | none | allowed |
-| WV Division of Labor certified HVAC technicians ([page](https://labor.wv.gov/database-search)) | labor.wv.gov | the agency's own lookup (page or API), live per report | licenses | owner, license | live | none | allowed |
 
 Looked at and not used (from the pack's `blocked` notes):
 
-- WV Contractor Licensing Board license search and board actions (wvclboard.wv.gov/verify, /about/actions.asp): robots.txt Disallow: /
+- WV Contractor Licensing Board license search and board actions (wvclboard.wv.gov/verify, linked as "Contractor License Search" from labor.wv.gov/database-search; /about/actions.asp): robots.txt "User-agent: * / Disallow: /" (re-checked 2026-10-15; http:// and www. redirect to the same file)
+- WV Division of Labor certified plumbers, HVAC technicians, manufactured-housing licensees, elevator and amusement-ride inspectors and registered service companies (www.wvlabor.com/new_searches/*.cfm, linked from labor.wv.gov/database-search): robots.txt answers HTTP 500 (2026-10-15), read as a refusal of the host (RFC 9309); https:// does not connect
+- WV Purchasing Division (purchasing.wv.gov): robots.txt "User-Agent: * / Disallow: /"; the debarred-vendor list used here is the one on the Division's www.state.wv.us/admin/purchase site, which robots.txt allows
 - WV Secretary of State business search (apps.sos.wv.gov/business/corporations): the form carries bot-trap fields, treated as an anti-bot measure; bulk data is a paid subscription
-- WV Division of Labor manufactured-housing search (mfghsgRESULTS.cfm): returns no records for any name tried
 
 ### WI
 

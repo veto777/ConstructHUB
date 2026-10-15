@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { contactName, rocComplaintHit, rocLicenseHits, samePersonName, type RocAccount } from "./az";
+import { contactName, rocComplaintHit, rocHolder, rocLicenseHits, samePersonName, type RocAccount } from "./az";
+import { reportHit } from "../privacy";
 
 // Trimmed from a live ROC getRecords answer, 2026-10-15.
 const ROWS: RocAccount[] = [
@@ -90,5 +91,40 @@ describe("AZ account address (round 3)", () => {
     expect(rocCity("EL MIRAGE, AZ, 85335")).toBe("EL MIRAGE, AZ, 85335");
     expect(rocCity("123 W Main St, Phoenix, AZ, 85001")).toBe("Phoenix, AZ, 85001");
     expect(rocCity(null)).toBeNull();
+  });
+});
+
+describe("Arizona ROC person search and holders (2026-10-15)", () => {
+  // Trimmed from a live getRecords answer for "Gregory Smith", 2026-10-15; getLicenseDetail gave entityType
+  // "Sole Proprietorship" for ROC 213981. The phone is a 555 stand-in, not the published number (an individual's).
+  const SOLE: RocAccount[] = [{
+    accountContactData: [{ contactName: "Gregory John Smith (Owner) " }, { contactName: "Gregory John Smith (Qualifying Party) " }],
+    accountId: "001t000000MKxWcAAL", accountName: "Gregory John Smith", address: "Cornville, AZ, 86325", phone: "520-555-0100",
+    licenseData: [{ licenseId: "a0ot0000000Ng4EAAS", licenseNo: "ROC 213981", qpName: "Gregory John Smith", status: "Suspended", subType: "B-2 General Small Commercial Contractor" }],
+  }];
+
+  it("the license page's entity types: the ROC's values only", () => {
+    expect(rocHolder("Sole Proprietorship")).toBe("individual");
+    expect(rocHolder("LLC")).toBe("business");
+    expect(rocHolder("Corporation")).toBe("business");
+    expect(rocHolder("Partnership")).toBe("business");
+    expect(rocHolder("Joint Venture")).toBeNull();
+    expect(rocHolder(null)).toBeNull();
+  });
+
+  it("finds a person as the qualifying party, with everyone named and their roles", () => {
+    const [h] = rocLicenseHits(ROWS, "Kenneth Mackey", "person");
+    expect(h).toMatchObject({ licenseNumber: "ROC 325034", principal: "Kenneth Eugene Mackey", matchedOn: "principal", businessName: "United Mechanical Services LLC" });
+    expect(h.people).toEqual([{ name: "Kenneth Eugene Mackey", role: "Qualifying Party" }]);
+    expect(rocLicenseHits(ROWS, "Kenneth R Mackey", "person")).toEqual([]);
+  });
+
+  it("a sole proprietorship's license, once its page says so, is the owner's: no phone in the report", () => {
+    const [h] = rocLicenseHits(SOLE, "Gregory Smith", "person");
+    expect(h.matchedOn).toBe("principal");
+    const owned = { ...h, holder: rocHolder("Sole Proprietorship") ?? h.holder };
+    expect(owned.holder).toBe("individual");
+    expect(reportHit(owned, "person").phone ?? null).toBeNull();
+    expect(reportHit({ ...h, holder: rocHolder("LLC") ?? h.holder }, "company").phone).toBe("520-555-0100");
   });
 });
