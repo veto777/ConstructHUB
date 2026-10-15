@@ -6,7 +6,7 @@
  *     the serial report queue or the daily file refresh. `timeoutMs` bounds the headers, `bodyTimeoutMs` the whole
  *     exchange (body included).
  *   - robots.txt is honored at run time (HARD RULE 2), and fails closed: a 2xx robots.txt is parsed, a 404 or 410
- *     allows, and a 401, 403, 429, 5xx, timeout or an HTML page served as robots.txt (a challenge) disallows the
+ *     allows, and a 401, 403, 429, 5xx, timeout or a challenge/error page served as robots.txt disallows the
  *     whole host for an hour, then it is fetched again.
  *   - Redirects are followed by hand (at most MAX_HOPS), and every hop is checked against robots.txt, the host's
  *     block and cooldown, and the per-host rate limit, like the first request.
@@ -288,6 +288,9 @@ async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status
  * is a challenge: denied); 404/410 → no rules; 401, 403, 429, 5xx, a timeout or a network failure → denied for an
  * hour, then fetched again. Other 4xx answers mean "no robots.txt" (RFC 9309 §2.3.1.3).
  */
+/** Words of a bot challenge, a block page or an error page (Cloudflare, Akamai, Imperva, F5, CAPTCHAs, server errors). */
+const ROBOTS_REFUSAL_PAGE = /just a moment|checking your browser|attention required|cf-chl|cf_chl|challenge-platform|captcha|access denied|request rejected|forbidden|incapsula|_incapsula_|perimeterx|px-captcha|akamai|reference #|are you a robot|unusual traffic|blocked|not authorized|unauthorized|error\s*(?:4|5)\d\d|server error|service unavailable|bad gateway/i;
+
 export async function robotsFor(origin: string, chain: Set<string> = new Set()): Promise<{ rules: Rule[]; denied?: string }> {
   const hit = robotsCache.get(origin);
   if (hit && Date.now() - hit.at < hit.ttl) return hit;
@@ -300,7 +303,11 @@ export async function robotsFor(origin: string, chain: Set<string> = new Set()):
       const ok = res.status >= 200 && res.status < 300;
       if (ok) {
         const html = /^\s*</.test(res.text) || /<html[\s>]/i.test(res.text.slice(0, 2000));
-        entry = html ? { rules: [], denied: "robots.txt answered with an HTML page (a challenge or an error page)" } : { rules: /user-agent\s*:/i.test(res.text) ? parseRobots(res.text) : [] };
+        // An HTML page is a refusal only when it is a bot challenge or an error page. An app that answers every path
+        // with its own page (OK CIB's verify site) has no robots file: no rules, as RFC 9309 reads unparseable content.
+        entry = html && ROBOTS_REFUSAL_PAGE.test(res.text.slice(0, 20_000))
+          ? { rules: [], denied: "robots.txt answered with a challenge or error page" }
+          : { rules: !html && /user-agent\s*:/i.test(res.text) ? parseRobots(res.text) : [] };
       } else if (res.status === 404 || res.status === 410) entry = { rules: [] };
       else if (res.status === 401 || res.status === 403 || res.status === 429 || res.status >= 500) entry = { rules: [], denied: `robots.txt answered HTTP ${res.status}` };
       else if (REDIRECTS.has(res.status)) entry = { rules: [], denied: "robots.txt redirected without a location" };
