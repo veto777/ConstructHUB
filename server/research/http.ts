@@ -325,7 +325,7 @@ async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status
     // robotsFor() decides from the answer. Many open-data API hosts (ArcGIS REST "Invalid URL", api.box.com) answer
     // every unknown path that way. A 401/403 on a data request still blocks the host (noteResponse there).
     // A challenge page with that 401/403 is a refusal: it blocks the host that answered.
-    if ((res.status !== 401 && res.status !== 403) || ROBOTS_CHALLENGE_PAGE.test(res.text.slice(0, 20_000))) noteResponse(cur, res.status, res.retryAfter);
+    if ((res.status !== 401 && res.status !== 403) || challengePage(res.text)) noteResponse(cur, res.status, res.retryAfter);
     if (!REDIRECTS.has(res.status) || !res.location) return res;
     if (hop + 1 >= ROBOTS_HOPS) throw new Error(`more than ${ROBOTS_HOPS} redirects for robots.txt`);
     const next = new URL(res.location, cur);
@@ -340,13 +340,30 @@ async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status
  * network failure → denied for an hour, then fetched again.
  */
 /**
- * Words of a bot challenge or a WAF block page (Cloudflare, Akamai, Imperva, F5, PerimeterX, CAPTCHAs). Such an answer
- * to robots.txt refuses the host for an hour, whatever its status code. A plain 401/403/404 page ("Invalid URL", an
- * empty 401, IIS's "Server Error … 404 - File or directory not found") is not one: it means there is no robots.txt.
+ * A bot challenge or a WAF block page (Cloudflare, Akamai, Imperva, F5, PerimeterX, CAPTCHAs). Such an answer to
+ * robots.txt refuses the host for an hour, whatever its status code. A plain 401/403/404 page ("Invalid URL", an empty
+ * 401, IIS's "Server Error … 404 - File or directory not found") is not one: it means there is no robots.txt.
+ *
+ * Vendor markers count anywhere in the page; the general words ("access denied", "captcha", "just a moment") only in
+ * what a reader sees, its title and text, never in scripts or attributes (round 4 sweep: an Accela app page logs
+ * "Storage access denied" from a script, a Revize 404 page sets form_captcha, My L&I loads reCAPTCHA for its sign-in).
  */
-const ROBOTS_CHALLENGE_PAGE = /just a moment|checking your browser|attention required|cf-chl|cf_chl|challenge-platform|captcha|access denied|request rejected|incapsula|perimeterx|px-captcha|are you a robot|unusual traffic|bot detection/i;
-/** A 2xx page instead of a robots file that is a challenge, or says the server is down: refused like a 5xx. */
-const ROBOTS_REFUSAL_PAGE = new RegExp(`${ROBOTS_CHALLENGE_PAGE.source}|server error|service unavailable|bad gateway`, "i");
+const CHALLENGE_MARKERS = /cf-chl|cf_chl|challenge-platform|_incapsula_|incapsula incident|perimeterx|px-captcha|captcha-delivery|ak_bmsc|bm-verify/i;
+const CHALLENGE_WORDS = /just a moment|checking your browser|attention required|captcha|access denied|request rejected|are you a robot|unusual traffic|bot detection/i;
+/** Down words: a 2xx page instead of a robots file that says the server is down is refused like a 5xx. */
+const DOWN_WORDS = /server error|service unavailable|bad gateway/i;
+
+/** The words a reader sees on an HTML page: scripts, styles and tags removed. */
+export function visibleText(html: string): string {
+  return html.replace(/<(script|style|noscript)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
+}
+
+export function challengePage(text: string, down = false): boolean {
+  const t = text.slice(0, 20_000);
+  if (CHALLENGE_MARKERS.test(t)) return true;
+  const seen = /<[a-z!]/i.test(t) ? visibleText(t) : t;
+  return CHALLENGE_WORDS.test(seen) || (down && DOWN_WORDS.test(seen));
+}
 
 export async function robotsFor(origin: string, chain: Set<string> = new Set()): Promise<{ rules: Rule[]; denied?: string }> {
   const hit = robotsCache.get(origin);
@@ -362,12 +379,12 @@ export async function robotsFor(origin: string, chain: Set<string> = new Set()):
         const html = /^\s*</.test(res.text) || /<html[\s>]/i.test(res.text.slice(0, 2000));
         // An HTML page is a refusal only when it is a bot challenge or an error page. An app that answers every path
         // with its own page (OK CIB's verify site) has no robots file: no rules, as RFC 9309 reads unparseable content.
-        entry = html && ROBOTS_REFUSAL_PAGE.test(res.text.slice(0, 20_000))
+        entry = html && challengePage(res.text, true)
           ? { rules: [], denied: "robots.txt answered with a challenge or error page" }
           : { rules: !html && /user-agent\s*:/i.test(res.text) ? parseRobots(res.text) : [] };
       } else if (res.status === 429 || res.status >= 500) entry = { rules: [], denied: `robots.txt answered HTTP ${res.status}` };
       // Any other 4xx (401, 403, 404, 410…) means no robots.txt (RFC 9309 §2.3.1.3), unless the page is a challenge.
-      else if (res.status >= 400 && res.status < 500) entry = ROBOTS_CHALLENGE_PAGE.test(res.text.slice(0, 20_000)) ? { rules: [], denied: `robots.txt answered HTTP ${res.status} with a challenge page` } : { rules: [] };
+      else if (res.status >= 400 && res.status < 500) entry = challengePage(res.text) ? { rules: [], denied: `robots.txt answered HTTP ${res.status} with a challenge page` } : { rules: [] };
       else if (REDIRECTS.has(res.status)) entry = { rules: [], denied: "robots.txt redirected without a location" };
       else entry = { rules: [] };
     } catch (err) {

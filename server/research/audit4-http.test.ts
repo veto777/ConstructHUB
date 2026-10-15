@@ -222,3 +222,20 @@ describe("robots.txt: an IIS 404 page is no robots file (live 2026-10-15)", () =
     expect((await robotsFor("https://cf.test")).denied).toBeTruthy();
   });
 });
+
+describe("robots.txt: challenge words count only where a reader sees them (round 4 sweep)", () => {
+  it("script text and form settings are not a challenge; a title, page text or vendor marker is", async () => {
+    const { challengePage } = await import("./http");
+    // Accela's app page logs this from a script; a Revize 404 page sets form_captcha; My L&I loads reCAPTCHA for its sign-in.
+    expect(challengePage('<html><head><title>Accela Citizen Access</title><script>console.warn("Storage access denied: " + e)</script></head><body><div id="app"></div></body></html>')).toBe(false);
+    expect(challengePage('<html><head><title>Page not found</title><script>var form_captcha = "yes";</script></head><body>404</body></html>')).toBe(false);
+    expect(challengePage('<html><head><title>My L&amp;I</title><script src="https://www.google.com/recaptcha/api.js"></script></head><body>Sign in</body></html>')).toBe(false);
+    expect(challengePage("<html><head><title>Just a moment...</title></head><body></body></html>")).toBe(true);
+    expect(challengePage("<html><head><title>Access Denied</title></head><body>Reference #18.abc</body></html>")).toBe(true);
+    expect(challengePage('<html><body><iframe src="/_Incapsula_Resource?x=1"></iframe></body></html>')).toBe(true);
+    expect(challengePage('<html><script src="/cdn-cgi/challenge-platform/h/b/orchestrate"></script></html>')).toBe(true);
+    // A 2xx page that says the server is down refuses; the same words in a script do not.
+    expect(challengePage("<html><title>Service Unavailable</title></html>", true)).toBe(true);
+    expect(challengePage('<html><script>log("server error")</script><body>Welcome</body></html>', true)).toBe(false);
+  });
+});
