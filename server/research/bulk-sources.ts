@@ -559,8 +559,10 @@ export function sunbizCorporation(l: string): { hit: LicenseHit; name: string; p
   const mail = [f(347, 42), f(389, 42)], mCity = f(431, 28), mSt = f(459, 2), mZip = f(461, 10);
   const filed = f(473, 8)?.replace(/^(\d{2})(\d{2})(\d{4})$/, "$1/$2/$3") ?? null;
   const people: Person[] = [];
+  // A registered agent that is a corporation (Registered Agent Type "C") is a filing service shared by thousands of
+  // unrelated businesses: it would tie them together, so only a person acting as agent is kept.
   const agent = f(545, 42);
-  if (agent) people.push({ name: agent, role: "Registered agent" });
+  if (agent && f(587, 1) === "P") people.push({ name: agent, role: "Registered agent" });
   for (let i = 0; i < 6; i++) {
     const base = 669 + 128 * i;
     const title = f(base, 4), who = f(base + 5, 42);
@@ -1049,7 +1051,7 @@ export const BULK_SOURCES: BulkSource[] = [
   { id: "fl-dbpr-applicants", state: "FL", label: "Florida DBPR license applicants (construction and electrical)", pageUrl: FL_CILB_PAGE, everyHours: 24 * 7, minRows: 80_000,
     load: flApplicantsLoader },
   // Quarterly file (January, April, July, October): checked monthly so a new quarter is picked up within weeks.
-  { id: "fl-sunbiz-officers", state: "FL", label: "Florida Division of Corporations (Sunbiz) filings of licensed contractors", pageUrl: SUNBIZ_QUARTERLY, everyHours: 24 * 30, minRows: 50_000,
+  { id: "fl-sunbiz-officers", state: "FL", label: "Florida Division of Corporations (Sunbiz) filings of licensed contractors", pageUrl: SUNBIZ_QUARTERLY, everyHours: 24 * 30, minRows: 105_000,
     load: flSunbizOfficersLoader },
   { id: "fl-dbpr-complaints", state: "FL", label: "Florida DBPR complaints and discipline (construction and electrical)", pageUrl: FL_COMPLAINTS_PAGE, everyHours: 24, minRows: 34_000,
     load: flComplaintsLoader, companiesOnly: true },
@@ -1062,7 +1064,7 @@ export const BULK_SOURCES: BulkSource[] = [
   // CSLB streams slowly in the daytime and cuts downloads off at about 150 s: fetch it in the small hours, Pacific time.
   { id: "ca-cslb", state: "CA", label: "California CSLB contractor licenses", pageUrl: CSLB, everyHours: 20, minRows: 470_000, utcHours: [9, 10, 11, 12, 13],
     load: caCslbLoader },
-  { id: "ca-cslb-revoked", state: "CA", label: "California CSLB revoked licenses (monthly lists)", pageUrl: CSLB_REVOKED_YEARS, everyHours: 24 * 7, minRows: 2_000,
+  { id: "ca-cslb-revoked", state: "CA", label: "California CSLB revoked licenses (monthly lists)", pageUrl: CSLB_REVOKED_YEARS, everyHours: 24 * 7, minRows: 2_250,
     utcHours: [9, 10, 11, 12, 13], load: caCslbRevokedLoader, companiesOnly: true },
   { id: "ca-dca", state: "CA", label: "California DCA licensees (engineers, architects, pest control)", pageUrl: DCA_PAGE, everyHours: 24 * 7, minRows: 100_000,
     load: caDcaLoader },
