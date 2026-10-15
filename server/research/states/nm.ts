@@ -7,8 +7,11 @@
  *   NM Secretary of State business entities: the Secretary of State's public business search
  *     (enterprise.sos.nm.gov, its JSON API), status as published (Active, Revoked Final, ...). Companies only.
  *
- * Construction Industries Division contractor and journeyman licenses (the core New Mexico construction licenses) are
- * only searchable through PSI's portal, which requires a CAPTCHA: listed under `blocked`, never worked around.
+ * Construction Industries Division contractor and journeyman licenses (GB-98, GB-2, electrical, mechanical/plumbing,
+ * LP gas classes; the core New Mexico construction licenses) are still only searchable through PSI's portal, which
+ * requires a CAPTCHA (re-checked 2026-10-15): listed under `blocked`, never worked around. rld.nm.gov's Verify a License
+ * page sends CID licenses to that PSI search, not to RLD's own lookup above, and no CID roster, download or
+ * disciplinary list is published on rld.nm.gov (checked 2026-10-15).
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { politeFetch } from "../http";
@@ -116,8 +119,11 @@ export const pack: StatePack = {
   liveLicenses,
   liveEnforcement,
   blocked: [
-    "Construction Industries Division contractor / journeyman license search (public.psiexams.com/search.jsp, PSI): the search requires a CAPTCHA",
-    "Workforce Solutions public works contractor registry (dws.state.nm.us/pwaa): the site's firewall rejects automated requests (\"Request Rejected\")",
-    "CID disciplinary actions: RLD publishes enforcement pages for its boards but none for CID",
+    "Construction Industries Division contractor / journeyman license search (public.psiexams.com/search.jsp, PSI, linked from rld.nm.gov's Verify a License page): the search form requires a CAPTCHA (\"Enter Captcha\", simplecaptcha.jpg; re-checked 2026-10-15). The results pages it posts to are not called directly (that would get around the CAPTCHA)",
+    "Workforce Solutions public works contractor registry (dws.state.nm.us): the site's firewall answers every request, robots.txt included, with \"Request Rejected\" (re-checked 2026-10-15)",
+    "CID disciplinary actions: rld.nm.gov's Enforcement Actions page lists every board's actions but links CID only to its home page; CID's Investigation and Enforcement and Unlicensed Violations pages publish no list (only the Recycled Metals program has a Disciplinary Actions page). Checked 2026-10-15",
+    "CID/MHD permit portal (nmrld.my.site.com/MHD/s/public-permit-search, /public-violation-search \"Search Notice\"): permit and notice searches, not a license lookup; not used",
+    "NM General Services Department debarment and suspension notices (generalservices.state.nm.us/state-purchasing/debarment-notices): \"THERE ARE NO SUSPENDED OR DEBARRED FIRMS AT THIS TIME\" (2026-10-15)",
+    "NM state open-data portal: none found (data.nm.gov and opendata.nm.gov do not resolve, 2026-10-15)",
   ],
 };

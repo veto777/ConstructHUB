@@ -1,12 +1,13 @@
 {
- "generatedAt": "2026-10-15T20:54:09.530Z",
- "commit": "64627525",
+ "generatedAt": "2026-10-15T22:14:31.134Z",
+ "commit": "6831e130",
  "options": {
   "states": [
-   "VT"
+   "ME",
+   "WV"
   ],
   "onlyFailed": false,
-  "useLoaded": true,
+  "useLoaded": false,
   "portals": false
  },
  "states": [
@@ -103,7 +104,7 @@
     },
     {
      "role": "enforcement",
-     "reason": "No usable record of a company with an enforcement or discipline record found in: Alaska DCCED business licenses (search failed: maps.commerce.alaska.gov: robots.txt answered HTTP 403; no automated requests until it can be read); AK original enforcement"
+     "reason": "No usable record of a company with an enforcement or discipline record found in: AK original enforcement"
     },
     {
      "role": "person",
@@ -137,7 +138,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 49750,
+     "ms": 49187,
      "found": true,
      "where": "licenses: Arizona Registrar of Contractors licenses",
      "cells": [
@@ -165,16 +166,58 @@
      "issues": [],
      "summary": "Found 2 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
+    },
+    {
+     "role": "person",
+     "name": "Craig Miles Smith",
+     "kind": "person",
+     "golden": {
+      "role": "person",
+      "name": "Craig Miles Smith",
+      "kind": "person",
+      "source": "Arizona Registrar of Contractors licenses",
+      "sourceId": "https://azroc.my.site.com/AZRoc/s/contractor-search",
+      "from": "live lookup, search \"Smith\"",
+      "recordId": "ROC 336057",
+      "expected": {
+       "kind": "license",
+       "source": "Arizona Registrar of Contractors licenses",
+       "licenseNumber": "ROC 336057",
+       "businessName": "Craig Miles Smith",
+       "person": "Craig Miles Smith",
+       "matchedOn": "principal"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 5097,
+     "found": true,
+     "where": "licenses: Arizona Registrar of Contractors licenses",
+     "cells": [
+      {
+       "source": "Tucson business licenses (construction)",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Arizona Registrar of Contractors licenses",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "Arizona Registrar of Contractors complaints",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
     }
    ],
    "nulls": [
     {
      "role": "enforcement",
      "reason": "No usable record of a company with an enforcement or discipline record found in: az-tucson-contractors (discipline); Arizona Registrar of Contractors complaints; AZ original enforcement"
-    },
-    {
-     "role": "person",
-     "reason": "No usable record of an individual license holder found in: Arizona Registrar of Contractors licenses; az-tucson-contractors"
     }
    ],
    "loads": [],
@@ -1376,6 +1419,56 @@
    "state": "GA",
    "subjects": [
     {
+     "role": "company",
+     "name": "Marion Environmental, Inc.",
+     "kind": "company",
+     "golden": {
+      "role": "company",
+      "name": "Marion Environmental, Inc.",
+      "kind": "company",
+      "source": "Georgia EPD licensed asbestos abatement firms",
+      "sourceId": "ga-epd-asbestos-firms",
+      "from": "bulk file ga-epd-asbestos-firms, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
+      "recordId": null,
+      "expected": {
+       "kind": "license",
+       "source": "Georgia EPD licensed asbestos abatement firms",
+       "licenseNumber": null,
+       "businessName": "Marion Environmental, Inc.",
+       "matchedOn": "business"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 439,
+     "found": true,
+     "where": "licenses: Georgia EPD licensed asbestos abatement firms",
+     "cells": [
+      {
+       "source": "Georgia EPD licensed asbestos abatement firms",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this lookup has no business name search)"
+      },
+      {
+       "source": "Georgia EPD enforcement orders",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
      "role": "enforcement",
      "name": "MRJ Construction, Inc",
      "kind": "company",
@@ -1396,10 +1489,20 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 2055,
+     "ms": 3622,
      "found": true,
      "where": "enforcement: Georgia EPD enforcement orders",
      "cells": [
+      {
+       "source": "Georgia EPD licensed asbestos abatement firms",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this lookup has no business name search)"
+      },
       {
        "source": "Georgia EPD enforcement orders",
        "section": "records",
@@ -1412,20 +1515,57 @@
       }
      ],
      "issues": [],
-     "summary": "Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "summary": "Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
-    }
-   ],
-   "nulls": [
-    {
-     "role": "company",
-     "reason": "No registered source publishes a business holding an active license for GA"
     },
     {
      "role": "person",
-     "reason": "No registered source publishes an individual license holder for GA"
+     "name": "John Smith",
+     "kind": "person",
+     "golden": {
+      "role": "person",
+      "name": "John Smith",
+      "kind": "person",
+      "source": "Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications",
+      "sourceId": "https://www.gaswcc.org/esc-search.php",
+      "from": "live lookup, search \"John Smith\"",
+      "recordId": "0000049311",
+      "expected": {
+       "kind": "license",
+       "source": "Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications",
+       "licenseNumber": "0000049311",
+       "businessName": null,
+       "person": "John Smith",
+       "matchedOn": "principal"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 50123,
+     "found": true,
+     "where": "licenses: Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications",
+     "cells": [
+      {
+       "source": "Georgia EPD licensed asbestos abatement firms",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications",
+       "section": "licenses",
+       "cell": "found 28"
+      },
+      {
+       "source": "Georgia EPD enforcement orders",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 28 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
     }
    ],
+   "nulls": [],
    "loads": [],
    "issues": []
   },
@@ -1837,33 +1977,33 @@
    "subjects": [
     {
      "role": "company",
-     "name": "YOUR GO TO GUYS, LLC",
+     "name": "CREATIVE SIGN RESOURCES",
      "kind": "company",
      "golden": {
       "role": "company",
-      "name": "YOUR GO TO GUYS, LLC",
+      "name": "CREATIVE SIGN RESOURCES",
       "kind": "company",
       "source": "Indianapolis contractor licenses (Business and Neighborhood Services)",
       "sourceId": "in-indy",
       "from": "bulk file in-indy, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
-      "recordId": "GA1800882",
+      "recordId": "C6558900",
       "expected": {
        "kind": "license",
        "source": "Indianapolis contractor licenses (Business and Neighborhood Services)",
-       "licenseNumber": "GA1800882",
-       "businessName": "YOUR GO TO GUYS, LLC",
+       "licenseNumber": "C6558900",
+       "businessName": "CREATIVE SIGN RESOURCES",
        "matchedOn": "business"
       },
       "picked": "2026-10-15"
      },
-     "ms": 16,
+     "ms": 15,
      "found": true,
      "where": "licenses: Indianapolis contractor licenses (Business and Neighborhood Services)",
      "cells": [
       {
        "source": "Indianapolis contractor licenses (Business and Neighborhood Services)",
        "section": "licenses",
-       "cell": "found 2"
+       "cell": "found 5"
       },
       {
        "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
@@ -1872,7 +2012,7 @@
       }
      ],
      "issues": [],
-     "summary": "Found 2 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "summary": "Found 5 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     }
    ],
@@ -2413,19 +2553,102 @@
   },
   {
    "state": "ME",
-   "subjects": [],
+   "subjects": [
+    {
+     "role": "person",
+     "name": "Scott Smith",
+     "kind": "person",
+     "golden": {
+      "role": "person",
+      "name": "Scott Smith",
+      "kind": "person",
+      "source": "Maine DEP certified underground storage tank installers and inspectors",
+      "sourceId": "https://www.maine.gov/dep/waste/busti/certifiedlist.html",
+      "from": "live lookup, search \"Smith\"",
+      "recordId": null,
+      "expected": {
+       "kind": "license",
+       "source": "Maine DEP certified underground storage tank installers and inspectors",
+       "licenseNumber": null,
+       "businessName": "Hall & Smith Energy LLC",
+       "person": "Scott Smith",
+       "matchedOn": "principal"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 963,
+     "found": true,
+     "where": "licenses: Maine DEP certified underground storage tank installers and inspectors",
+     "cells": [
+      {
+       "source": "Maine DEP licensed asbestos abatement contractors and consultants",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this lookup has no person name search)"
+      },
+      {
+       "source": "Maine DEP certified underground storage tank installers and inspectors",
+       "section": "licenses",
+       "cell": "found 1"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "company",
+     "name": "Acadia Contractors LLC",
+     "kind": "company",
+     "golden": {
+      "role": "company",
+      "name": "Acadia Contractors LLC",
+      "kind": "company",
+      "source": "Maine DEP licensed asbestos abatement contractors and consultants",
+      "sourceId": "https://www.maine.gov/dep/waste/asbestos/asbestoscontractors.html",
+      "from": "live lookup, search \"Contractors\" (the publisher lists no status: a list of current licenses)",
+      "recordId": null,
+      "expected": {
+       "kind": "license",
+       "source": "Maine DEP licensed asbestos abatement contractors and consultants",
+       "licenseNumber": null,
+       "businessName": "Acadia Contractors LLC",
+       "matchedOn": "business"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 8,
+     "found": true,
+     "where": "licenses: Maine DEP licensed asbestos abatement contractors and consultants",
+     "cells": [
+      {
+       "source": "Maine DEP licensed asbestos abatement contractors and consultants",
+       "section": "licenses",
+       "cell": "found 2"
+      },
+      {
+       "source": "Maine DEP certified underground storage tank installers and inspectors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 2 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    }
+   ],
    "nulls": [
     {
      "role": "company",
-     "reason": "No registered source publishes a business holding an active license for ME"
+     "reason": "No usable record of a business holding an active license found in: Maine DEP licensed asbestos abatement contractors and consultants; Maine DEP certified underground storage tank installers and inspectors"
     },
     {
      "role": "enforcement",
      "reason": "No usable record of a company with an enforcement or discipline record found in: ME original enforcement"
-    },
-    {
-     "role": "person",
-     "reason": "No registered source publishes an individual license holder for ME"
     }
    ],
    "loads": [],
@@ -3310,19 +3533,98 @@
   },
   {
    "state": "MT",
-   "subjects": [],
-   "nulls": [
+   "subjects": [
     {
      "role": "company",
-     "reason": "No registered source publishes a business holding an active license for MT"
-    },
-    {
-     "role": "enforcement",
-     "reason": "No usable record of a company with an enforcement or discipline record found in: MT original enforcement"
+     "name": "SILO ESPRESSO",
+     "kind": "company",
+     "golden": {
+      "role": "company",
+      "name": "SILO ESPRESSO",
+      "kind": "company",
+      "source": "Montana DEQ licensed septic tank pumpers",
+      "sourceId": "mt-deq-septic-pumpers",
+      "from": "bulk file mt-deq-septic-pumpers, loaded 2026-10-15",
+      "recordId": "S-1213",
+      "expected": {
+       "kind": "license",
+       "source": "Montana DEQ licensed septic tank pumpers",
+       "licenseNumber": "S-1213",
+       "businessName": "SILO ESPRESSO",
+       "matchedOn": "business"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 33,
+     "found": true,
+     "where": "licenses: Montana DEQ licensed septic tank pumpers",
+     "cells": [
+      {
+       "source": "Montana DEQ asbestos accreditations",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Montana DEQ licensed septic tank pumpers",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
     },
     {
      "role": "person",
-     "reason": "No registered source publishes an individual license holder for MT"
+     "name": "TRAVIS IVERSON",
+     "kind": "person",
+     "golden": {
+      "role": "person",
+      "name": "TRAVIS IVERSON",
+      "kind": "person",
+      "source": "Montana DEQ asbestos accreditations",
+      "sourceId": "mt-deq-asbestos",
+      "from": "bulk file mt-deq-asbestos, loaded 2026-10-15",
+      "recordId": "MTA-6837-CS",
+      "expected": {
+       "kind": "license",
+       "source": "Montana DEQ asbestos accreditations",
+       "licenseNumber": "MTA-6837-CS",
+       "businessName": null,
+       "person": "TRAVIS IVERSON",
+       "matchedOn": "principal"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 7,
+     "found": true,
+     "where": "licenses: Montana DEQ asbestos accreditations",
+     "cells": [
+      {
+       "source": "Montana DEQ asbestos accreditations",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "Montana DEQ licensed septic tank pumpers",
+       "section": "licenses",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    }
+   ],
+   "nulls": [
+    {
+     "role": "enforcement",
+     "reason": "No usable record of a company with an enforcement or discipline record found in: mt-deq-asbestos (discipline); mt-deq-septic-pumpers (discipline); MT original enforcement"
     }
    ],
    "loads": [],
@@ -3910,7 +4212,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 1251,
+     "ms": 1163,
      "found": true,
      "where": "licenses: New Mexico RLD home inspector and landscape architect licenses",
      "cells": [
@@ -5346,26 +5648,26 @@
    "subjects": [
     {
      "role": "enforcement",
-     "name": "Harris Tree Service and Landscaping, LLC",
+     "name": "Alchemy Real Estate, LLC",
      "kind": "company",
      "golden": {
       "role": "enforcement",
-      "name": "Harris Tree Service and Landscaping, LLC",
+      "name": "Alchemy Real Estate, LLC",
       "kind": "company",
       "source": "South Carolina DES environmental enforcement orders",
       "sourceId": "sc-des-enforcement",
       "from": "bulk file sc-des-enforcement, loaded 2026-10-15",
-      "recordId": "25-019-A",
+      "recordId": "AF-0001416",
       "expected": {
        "kind": "enforcement",
        "source": "South Carolina DES environmental enforcement orders",
-       "id": "25-019-A",
-       "name": "Harris Tree Service and Landscaping, LLC",
+       "id": "AF-0001416",
+       "name": "Alchemy Real Estate, LLC",
        "category": "environmental"
       },
       "picked": "2026-10-15"
      },
-     "ms": 11,
+     "ms": 9,
      "found": true,
      "where": "enforcement: South Carolina DES environmental enforcement orders",
      "cells": [
@@ -5402,12 +5704,67 @@
    "state": "SD",
    "subjects": [
     {
+     "role": "enforcement",
+     "name": "BLACK HILLS AUTOMOTIVE TECHNICIANS INC",
+     "kind": "company",
+     "golden": {
+      "role": "enforcement",
+      "name": "BLACK HILLS AUTOMOTIVE TECHNICIANS INC",
+      "kind": "company",
+      "source": "South Dakota Department of Revenue business tax delinquent report",
+      "sourceId": "sd-dor-tax-delinquent",
+      "from": "bulk file sd-dor-tax-delinquent, loaded 2026-10-15",
+      "recordId": null,
+      "expected": {
+       "kind": "enforcement",
+       "source": "South Dakota Department of Revenue business tax delinquent report",
+       "id": null,
+       "name": "BLACK HILLS AUTOMOTIVE TECHNICIANS INC",
+       "category": "tax_lien"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 20,
+     "found": true,
+     "where": "enforcement: South Dakota Department of Revenue business tax delinquent report",
+     "cells": [
+      {
+       "source": "South Dakota Plumbing Commission licensed plumbers",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "South Dakota Plumbing Commission specialty licensees",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "South Dakota small onsite wastewater (septic) installers",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "South Dakota Department of Revenue business tax delinquent report",
+       "section": "records",
+       "cell": "found 1"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
      "role": "person",
-     "name": "CRAIG A. LITTLE BEAR",
+     "name": "DAVID W WOODRING",
      "kind": "person",
      "golden": {
       "role": "person",
-      "name": "CRAIG A. LITTLE BEAR",
+      "name": "DAVID W WOODRING",
       "kind": "person",
       "source": "South Dakota Plumbing Commission licensed plumbers",
       "sourceId": "sd-plumbers",
@@ -5418,12 +5775,12 @@
        "source": "South Dakota Plumbing Commission licensed plumbers",
        "licenseNumber": null,
        "businessName": null,
-       "person": "CRAIG A. LITTLE BEAR",
+       "person": "DAVID W WOODRING",
        "matchedOn": "principal"
       },
       "picked": "2026-10-15"
      },
-     "ms": 3,
+     "ms": 4,
      "found": true,
      "where": "licenses: South Dakota Plumbing Commission licensed plumbers",
      "cells": [
@@ -5441,6 +5798,11 @@
        "source": "South Dakota small onsite wastewater (septic) installers",
        "section": "licenses",
        "cell": "searched, 0"
+      },
+      {
+       "source": "South Dakota Department of Revenue business tax delinquent report",
+       "section": "records",
+       "cell": "n/a (companies only)"
       }
      ],
      "issues": [],
@@ -5452,10 +5814,6 @@
     {
      "role": "company",
      "reason": "No usable record of a business holding an active license found in: sd-plumbers; sd-specialty; sd-septic"
-    },
-    {
-     "role": "enforcement",
-     "reason": "No usable record of a company with an enforcement or discipline record found in: sd-plumbers (discipline); sd-specialty (discipline); sd-septic (discipline); SD original enforcement"
     }
    ],
    "loads": [],
@@ -5466,33 +5824,33 @@
    "subjects": [
     {
      "role": "company",
-     "name": "WARNER CONSTRUCTION INC",
+     "name": "W & W CONSTRUCTION",
      "kind": "company",
      "golden": {
       "role": "company",
-      "name": "WARNER CONSTRUCTION INC",
+      "name": "W & W CONSTRUCTION",
       "kind": "company",
-      "source": "Nashville registered professional contractors",
-      "sourceId": "tn-nashville-contractors",
-      "from": "bulk file tn-nashville-contractors, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
-      "recordId": null,
+      "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+      "sourceId": "https://search.cloud.commerce.tn.gov/",
+      "from": "live lookup, search \"Construction\"",
+      "recordId": "40187",
       "expected": {
        "kind": "license",
-       "source": "Nashville registered professional contractors",
-       "licenseNumber": null,
-       "businessName": "WARNER CONSTRUCTION INC",
+       "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+       "licenseNumber": "40187",
+       "businessName": "W & W CONSTRUCTION",
        "matchedOn": "business"
       },
       "picked": "2026-10-15"
      },
-     "ms": 13,
+     "ms": 31435,
      "found": true,
-     "where": "licenses: Nashville registered professional contractors",
+     "where": "licenses: TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
      "cells": [
       {
        "source": "TDEC enforcement cases",
        "section": "records",
-       "cell": "searched, 0"
+       "cell": "found 3"
       },
       {
        "source": "TN Board for Licensing Contractors and Alarm Systems Contractors Board disciplinary actions",
@@ -5502,7 +5860,12 @@
       {
        "source": "Nashville registered professional contractors",
        "section": "licenses",
-       "cell": "found 15"
+       "cell": "found 3"
+      },
+      {
+       "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+       "section": "licenses",
+       "cell": "found 96"
       },
       {
        "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
@@ -5511,31 +5874,31 @@
       }
      ],
      "issues": [],
-     "summary": "Found 15 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "summary": "Found 99 license record(s) and 3 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     },
     {
      "role": "enforcement",
-     "name": "6805 Hwy 305 LLC",
+     "name": "Robert Lowe d/b/a Robert's Ice",
      "kind": "company",
      "golden": {
       "role": "enforcement",
-      "name": "6805 Hwy 305 LLC",
+      "name": "Robert Lowe d/b/a Robert's Ice",
       "kind": "company",
       "source": "TDEC enforcement cases",
       "sourceId": "tn-tdec-enforcement",
       "from": "bulk file tn-tdec-enforcement, loaded 2026-10-15",
-      "recordId": "UST23-0161",
+      "recordId": "APC08-0152",
       "expected": {
        "kind": "enforcement",
        "source": "TDEC enforcement cases (Department of Environment and Conservation)",
-       "id": "UST23-0161",
-       "name": "6805 Hwy 305 LLC",
+       "id": "APC08-0152",
+       "name": "Robert Lowe d/b/a Robert's Ice",
        "category": "environmental"
       },
       "picked": "2026-10-15"
      },
-     "ms": 4,
+     "ms": 1556,
      "found": true,
      "where": "enforcement: TDEC enforcement cases (Department of Environment and Conservation)",
      "cells": [
@@ -5555,6 +5918,11 @@
        "cell": "searched, 0"
       },
       {
+       "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
        "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
        "section": "records",
        "cell": "searched, 0"
@@ -5563,14 +5931,60 @@
      "issues": [],
      "summary": "Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
-    }
-   ],
-   "nulls": [
+    },
     {
      "role": "person",
-     "reason": "No usable record of an individual license holder found in: tn-nashville-contractors"
+     "name": "JOHN H SMITH JR",
+     "kind": "person",
+     "golden": {
+      "role": "person",
+      "name": "JOHN H SMITH JR",
+      "kind": "person",
+      "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+      "sourceId": "https://search.cloud.commerce.tn.gov/",
+      "from": "live lookup, search \"John Smith\"",
+      "recordId": "56358",
+      "expected": {
+       "kind": "license",
+       "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+       "licenseNumber": "56358",
+       "businessName": null,
+       "person": "JOHN H SMITH JR",
+       "matchedOn": "principal"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 3279,
+     "found": true,
+     "where": "licenses: TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+     "cells": [
+      {
+       "source": "TDEC enforcement cases",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      },
+      {
+       "source": "TN Board for Licensing Contractors and Alarm Systems Contractors Board disciplinary actions",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      },
+      {
+       "source": "Nashville registered professional contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+       "section": "licenses",
+       "cell": "found 2"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
     }
    ],
+   "nulls": [],
    "loads": [],
    "issues": []
   },
@@ -6424,11 +6838,11 @@
    "subjects": [
     {
      "role": "enforcement",
-     "name": "J-WAMSLEY CONTRACTING INC",
+     "name": "A 1 LTD LLC",
      "kind": "company",
      "golden": {
       "role": "enforcement",
-      "name": "J-WAMSLEY CONTRACTING INC",
+      "name": "A 1 LTD LLC",
       "kind": "company",
       "source": "WV Employer Violator System (workers' comp default)",
       "sourceId": "wv-oic-evs",
@@ -6438,12 +6852,12 @@
        "kind": "enforcement",
        "source": "WV Insurance Commissioner Employer Violator System (workers' comp default)",
        "id": null,
-       "name": "J-WAMSLEY CONTRACTING INC",
+       "name": "A 1 LTD LLC",
        "category": "debarment"
       },
       "picked": "2026-10-15"
      },
-     "ms": 3,
+     "ms": 67,
      "found": true,
      "where": "enforcement: WV Insurance Commissioner Employer Violator System (workers' comp default)",
      "cells": [
@@ -6453,17 +6867,12 @@
        "cell": "found 1"
       },
       {
+       "source": "WV Purchasing Division debarred vendors",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
        "source": "WV State Fire Marshal electrician licenses",
-       "section": "licenses",
-       "cell": "not searched (Not searched: this lookup has no business name search)"
-      },
-      {
-       "source": "WV Division of Labor certified plumbers",
-       "section": "licenses",
-       "cell": "not searched (Not searched: this lookup has no business name search)"
-      },
-      {
-       "source": "WV Division of Labor certified HVAC technicians",
        "section": "licenses",
        "cell": "not searched (Not searched: this lookup has no business name search)"
       },
@@ -6499,7 +6908,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 4192,
+     "ms": 4184,
      "found": true,
      "where": "licenses: WV State Fire Marshal electrician licenses",
      "cells": [
@@ -6509,64 +6918,79 @@
        "cell": "n/a (companies only)"
       },
       {
+       "source": "WV Purchasing Division debarred vendors",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      },
+      {
        "source": "WV State Fire Marshal electrician licenses",
        "section": "licenses",
        "cell": "found 1"
-      },
-      {
-       "source": "WV Division of Labor certified plumbers",
-       "section": "licenses",
-       "cell": "failed (www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read)"
-      },
-      {
-       "source": "WV Division of Labor certified HVAC technicians",
-       "section": "licenses",
-       "cell": "failed (www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read)"
       }
      ],
-     "issues": [
-      {
-       "severity": "error",
-       "state": "WV",
-       "source": "WV Division of Labor certified plumbers",
-       "subject": "person \"JOHN SMITH JR\"",
-       "detail": "Could not search: www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read"
-      },
-      {
-       "severity": "error",
-       "state": "WV",
-       "source": "WV Division of Labor certified HVAC technicians",
-       "subject": "person \"JOHN SMITH JR\"",
-       "detail": "Could not search: www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read"
-      }
-     ],
+     "issues": [],
      "summary": "Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "enforcement",
+     "name": "KGH Development Inc.",
+     "kind": "company",
+     "golden": {
+      "role": "enforcement",
+      "name": "KGH Development Inc.",
+      "kind": "company",
+      "source": "WV Purchasing Division debarred vendors",
+      "sourceId": "wv-purchasing-debarred",
+      "from": "bulk file wv-purchasing-debarred, loaded 2026-10-15",
+      "recordId": null,
+      "expected": {
+       "kind": "enforcement",
+       "source": "WV Purchasing Division debarred vendors",
+       "id": null,
+       "name": "KGH Development Inc.",
+       "category": "debarment"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 5,
+     "found": true,
+     "where": "enforcement: WV Purchasing Division debarred vendors",
+     "cells": [
+      {
+       "source": "WV Employer Violator System (workers' comp default)",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "WV Purchasing Division debarred vendors",
+       "section": "records",
+       "cell": "found 1"
+      },
+      {
+       "source": "WV State Fire Marshal electrician licenses",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this lookup has no business name search)"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "found 1"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 2 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     }
    ],
    "nulls": [
     {
      "role": "company",
-     "reason": "No usable record of a business holding an active license found in: WV State Fire Marshal electrician licenses; WV Division of Labor certified plumbers; WV Division of Labor certified HVAC technicians"
+     "reason": "No usable record of a business holding an active license found in: WV State Fire Marshal electrician licenses"
     }
    ],
    "loads": [],
-   "issues": [
-    {
-     "severity": "error",
-     "state": "WV",
-     "source": "WV Division of Labor certified plumbers",
-     "subject": "person \"JOHN SMITH JR\"",
-     "detail": "Could not search: www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read"
-    },
-    {
-     "severity": "error",
-     "state": "WV",
-     "source": "WV Division of Labor certified HVAC technicians",
-     "subject": "person \"JOHN SMITH JR\"",
-     "detail": "Could not search: www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read"
-    }
-   ]
+   "issues": []
   },
   {
    "state": "WI",
@@ -6785,20 +7209,6 @@
    "source": "Mississippi State Board of Contractors complaints and violations",
    "subject": "enforcement \"QUIN-CO, INC.\"",
    "detail": "Could not search: search.msboc.us denied access earlier (a bot challenge page); no further requests for now"
-  },
-  {
-   "severity": "error",
-   "state": "WV",
-   "source": "WV Division of Labor certified plumbers",
-   "subject": "person \"JOHN SMITH JR\"",
-   "detail": "Could not search: www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read"
-  },
-  {
-   "severity": "error",
-   "state": "WV",
-   "source": "WV Division of Labor certified HVAC technicians",
-   "subject": "person \"JOHN SMITH JR\"",
-   "detail": "Could not search: www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read"
   }
  ]
 }

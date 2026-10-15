@@ -186,11 +186,11 @@ async function fromSoda(src: LicenseSource, role: SubjectRole): Promise<Golden |
 /** Common words to search a live lookup with, in turn, until one gives a usable record (some need a full name). */
 const COMMON = { company: ["Construction", "Electric", "Plumbing"], person: ["Smith", "John Smith", "Michael Johnson"] } as const;
 
-async function fromLive(src: LiveLicenseSearch, role: SubjectRole): Promise<Golden | null> {
+async function fromLive(src: LiveLicenseSearch, role: SubjectRole, queries?: string[]): Promise<Golden | null> {
   if (role === "enforcement") return null;
   const kind = role === "company" ? "company" : "person";
   if (src.kinds && !src.kinds.includes(kind)) return null;
-  for (const q of COMMON[kind]) {
+  for (const q of queries ?? COMMON[kind]) {
     const hits = await src.search(q, kind);
     const statusless = hits.length > 0 && hits.every((h) => !h.status);
     for (const h of hits) {
@@ -202,15 +202,35 @@ async function fromLive(src: LiveLicenseSearch, role: SubjectRole): Promise<Gold
   return null;
 }
 
-async function fromSodaEnforcement(src: SodaEnforcement): Promise<Golden | null> {
-  const r = await searchSodaEnforcement(src, "Construction", () => true);
-  for (const e of r) { const g = enforcementOf(src.source, src.datasetUrl, `Socrata dataset ${src.datasetUrl}, search "Construction"`, e); if (g) return g; }
+async function fromSodaEnforcement(src: SodaEnforcement, q = "Construction"): Promise<Golden | null> {
+  const r = await searchSodaEnforcement(src, q, () => true);
+  for (const e of r) { const g = enforcementOf(src.source, src.datasetUrl, `Socrata dataset ${src.datasetUrl}, search "${q}"`, e); if (g) return g; }
   return null;
 }
-async function fromLiveEnforcement(src: LiveEnforcementSearch): Promise<Golden | null> {
-  const r = await src.search("Construction");
-  for (const e of r) { const g = enforcementOf(src.source, src.source, `live search "Construction"`, e); if (g) return g; }
+async function fromLiveEnforcement(src: LiveEnforcementSearch, q = "Construction"): Promise<Golden | null> {
+  const r = await src.search(q);
+  for (const e of r) { const g = enforcementOf(src.source, src.source, `live search "${q}"`, e); if (g) return g; }
   return null;
+}
+
+/**
+ * An extra golden subject from one named source (a bulk id or a source label), e.g. for a source just added: the
+ * state's three picks take the first usable source, so a new one may otherwise never be exercised. `query` is the
+ * word a live source is searched with (default: the common words above). Null when the source gives nothing usable.
+ */
+export async function pickFromSource(state: string, role: SubjectRole, source: string, query?: string): Promise<Golden | null> {
+  const pack = STATE_PACKS.find((p) => p.state === state);
+  const bulk = allBulkSourcesFor(state).find((b) => b.id === source || b.label === source);
+  if (bulk) return fromBulk(bulk, role);
+  const soda = allLicenseSourcesFor(state).find((x) => x.source === source);
+  if (soda) return fromSoda(soda, role);
+  const live = liveLicenseSearchesFor(state).find((x) => x.source === source);
+  if (live) return fromLive(live, role, query ? [query] : undefined);
+  const se = [...(pack?.enforcement ?? []), ...LOCAL_ENFORCEMENT].find((x) => x.state === state && x.source === source);
+  if (se) return fromSodaEnforcement(se, query);
+  const le = [...(pack?.liveEnforcement ?? []), ...(LOCAL_LIVE_ENFORCEMENT[state] ?? [])].find((x) => x.source === source);
+  if (le) return fromLiveEnforcement(le, query);
+  throw new Error(`${state}: no registered source "${source}"`);
 }
 
 // ── One state ─────────────────────────────────────────────────────────────────────────────────────────────────────

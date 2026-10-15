@@ -1,8 +1,8 @@
 # Research acceptance run, 2026-10-15
 
-Commit 64627525. Options: {"states":["VT"],"onlyFailed":false,"useLoaded":true,"portals":false}.
+Commit 6831e130. Options: {"states":["ME","WV"],"onlyFailed":false,"useLoaded":false,"portals":false}.
 
-**6 failure(s)**: missed 1, privacy 0, silent 0, error 5, slow 0.
+**4 failure(s)**: missed 1, privacy 0, silent 0, error 3, slow 0.
 
 ## Summary by state
 
@@ -10,7 +10,7 @@ Commit 64627525. Options: {"states":["VT"],"onlyFailed":false,"useLoaded":true,"
 |---|---|---|---|---|---|---|---|---|
 | AL | 1 (2 null) | 1/1 | 0 | 0 | 0 | 1 | 0 | 1s |
 | AK | 0 (3 null) | 0/0 | 0 | 0 | 0 | 0 | 0 | 0s |
-| AZ | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 50s |
+| AZ | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 49s |
 | AR | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
 | CA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 0s |
 | CO | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 12s |
@@ -18,7 +18,7 @@ Commit 64627525. Options: {"states":["VT"],"onlyFailed":false,"useLoaded":true,"
 | DE | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 13s |
 | DC | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 0s |
 | FL | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 0s |
-| GA | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 2s |
+| GA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 50s |
 | HI | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 3s |
 | ID | 0 (3 null) | 0/0 | 0 | 0 | 0 | 0 | 0 | 0s |
 | IL | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 5s |
@@ -27,14 +27,14 @@ Commit 64627525. Options: {"states":["VT"],"onlyFailed":false,"useLoaded":true,"
 | KS | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
 | KY | 2 (1 null) | 1/2 | 1 | 0 | 0 | 0 | 0 | 11s |
 | LA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 5s |
-| ME | 0 (3 null) | 0/0 | 0 | 0 | 0 | 0 | 0 | 0s |
+| ME | 2 (2 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 1s |
 | MD | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 4s |
 | MA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 11s |
 | MI | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
 | MN | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 0s |
 | MS | 1 (2 null) | 1/1 | 0 | 0 | 0 | 2 | 0 | 2s |
 | MO | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 19s |
-| MT | 0 (3 null) | 0/0 | 0 | 0 | 0 | 0 | 0 | 0s |
+| MT | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
 | NE | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 8s |
 | NV | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 126s |
 | NH | 0 (3 null) | 0/0 | 0 | 0 | 0 | 0 | 0 | 0s |
@@ -49,14 +49,14 @@ Commit 64627525. Options: {"states":["VT"],"onlyFailed":false,"useLoaded":true,"
 | PA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 18s |
 | RI | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 30s |
 | SC | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 0s |
-| SD | 1 (2 null) | 1/1 | 0 | 0 | 0 | 0 | 0 | 0s |
-| TN | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
+| SD | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
+| TN | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 31s |
 | TX | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 24s |
 | UT | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 5s |
 | VT | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 1s |
 | VA | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
 | WA | 3 (0 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 28s |
-| WV | 2 (1 null) | 2/2 | 0 | 0 | 0 | 2 | 0 | 4s |
+| WV | 3 (1 null) | 3/3 | 0 | 0 | 0 | 0 | 0 | 4s |
 | WI | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 0s |
 | WY | 2 (1 null) | 2/2 | 0 | 0 | 0 | 0 | 0 | 5s |
 
@@ -68,8 +68,6 @@ Commit 64627525. Options: {"states":["VT"],"onlyFailed":false,"useLoaded":true,"
 | 2 | error | AL | Alabama Licensing Board for General Contractors | enforcement "Home Pro Construction LLC" | Could not search: licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read |
 | 3 | error | MS | Mississippi State Board of Contractors | enforcement "QUIN-CO, INC." | Could not search: search.msboc.us answered with a bot challenge page; no automated requests to it for this run |
 | 4 | error | MS | Mississippi State Board of Contractors complaints and violations | enforcement "QUIN-CO, INC." | Could not search: search.msboc.us denied access earlier (a bot challenge page); no further requests for now |
-| 5 | error | WV | WV Division of Labor certified plumbers | person "JOHN SMITH JR" | Could not search: www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read |
-| 6 | error | WV | WV Division of Labor certified HVAC technicians | person "JOHN SMITH JR" | Could not search: www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read |
 
 ## Links from publisher data (host not named in the code: check they are the publisher's own)
 
@@ -106,21 +104,21 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 ### AK
 
 - **company**: none (No registered source publishes a business holding an active license for AK)
-- **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: Alaska DCCED business licenses (search failed: maps.commerce.alaska.gov: robots.txt answered HTTP 403; no automated requests until it can be read); AK original enforcement)
+- **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: AK original enforcement)
 - **person**: none (No registered source publishes an individual license holder for AK)
 
 ### AZ
 
-- **company**: "Construction Management Services, LLC" (Arizona Registrar of Contractors licenses, record ROC 333995, live lookup, search "Construction"): found in licenses: Arizona Registrar of Contractors licenses, 50s. Summary: Found 2 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "Construction Management Services, LLC" (Arizona Registrar of Contractors licenses, record ROC 333995, live lookup, search "Construction"): found in licenses: Arizona Registrar of Contractors licenses, 49s. Summary: Found 2 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **person**: "Craig Miles Smith" (Arizona Registrar of Contractors licenses, record ROC 336057, live lookup, search "Smith"): found in licenses: Arizona Registrar of Contractors licenses, 5s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: az-tucson-contractors (discipline); Arizona Registrar of Contractors complaints; AZ original enforcement)
-- **person**: none (No usable record of an individual license holder found in: Arizona Registrar of Contractors licenses; az-tucson-contractors)
 
-| Source | company |
-|---|---|
-| Tucson business licenses (construction) | searched, 0 |
-| Arizona Registrar of Contractors licenses | found 2 |
-| Arizona Registrar of Contractors complaints | searched, 0 |
-| SAM.gov federal exclusions and debarments (Public V2 extract) | found 1 |
+| Source | company | person |
+|---|---|---|
+| Tucson business licenses (construction) | searched, 0 | searched, 0 |
+| Arizona Registrar of Contractors licenses | found 2 | found 1 |
+| Arizona Registrar of Contractors complaints | searched, 0 | n/a (companies only) |
+| SAM.gov federal exclusions and debarments (Public V2 extract) | found 1 | - |
 
 ### AR
 
@@ -233,14 +231,16 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### GA
 
-- **enforcement**: "MRJ Construction, Inc" (Georgia EPD enforcement orders, record EPD-WP-9566, live search "Construction"): found in enforcement: Georgia EPD enforcement orders, 2s. Summary: Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **company**: none (No registered source publishes a business holding an active license for GA)
-- **person**: none (No registered source publishes an individual license holder for GA)
+- **company**: "Marion Environmental, Inc." (Georgia EPD licensed asbestos abatement firms, record -, bulk file ga-epd-asbestos-firms, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)): found in licenses: Georgia EPD licensed asbestos abatement firms, 0s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **enforcement**: "MRJ Construction, Inc" (Georgia EPD enforcement orders, record EPD-WP-9566, live search "Construction"): found in enforcement: Georgia EPD enforcement orders, 4s. Summary: Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **person**: "John Smith" (Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications, record 0000049311, live lookup, search "John Smith"): found in licenses: Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications, 50s. Summary: Found 28 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
-| Source | enforcement |
-|---|---|
-| Georgia EPD enforcement orders | found 1 |
-| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 |
+| Source | company | enforcement | person |
+|---|---|---|---|
+| Georgia EPD licensed asbestos abatement firms | found 1 | searched, 0 | searched, 0 |
+| Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications | not searched (Not searched: this lookup has no business name search) | not searched (Not searched: this lookup has no business name search) | found 28 |
+| Georgia EPD enforcement orders | searched, 0 | found 1 | n/a (companies only) |
+| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | searched, 0 | - |
 
 ### HI
 
@@ -281,13 +281,13 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### IN
 
-- **company**: "YOUR GO TO GUYS, LLC" (Indianapolis contractor licenses (Business and Neighborhood Services), record GA1800882, bulk file in-indy, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)): found in licenses: Indianapolis contractor licenses (Business and Neighborhood Services), 0s. Summary: Found 2 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: "CREATIVE SIGN RESOURCES" (Indianapolis contractor licenses (Business and Neighborhood Services), record C6558900, bulk file in-indy, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)): found in licenses: Indianapolis contractor licenses (Business and Neighborhood Services), 0s. Summary: Found 5 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: in-indy (discipline); IN original enforcement)
 - **person**: none (No usable record of an individual license holder found in: in-indy)
 
 | Source | company |
 |---|---|
-| Indianapolis contractor licenses (Business and Neighborhood Services) | found 2 |
+| Indianapolis contractor licenses (Business and Neighborhood Services) | found 5 |
 | SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 |
 
 ### IA
@@ -346,9 +346,16 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### ME
 
-- **company**: none (No registered source publishes a business holding an active license for ME)
+- **person**: "Scott Smith" (Maine DEP certified underground storage tank installers and inspectors, record -, live lookup, search "Smith"): found in licenses: Maine DEP certified underground storage tank installers and inspectors, 1s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **company**: "Acadia Contractors LLC" (Maine DEP licensed asbestos abatement contractors and consultants, record -, live lookup, search "Contractors" (the publisher lists no status: a list of current licenses)): found in licenses: Maine DEP licensed asbestos abatement contractors and consultants, 0s. Summary: Found 2 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: none (No usable record of a business holding an active license found in: Maine DEP licensed asbestos abatement contractors and consultants; Maine DEP certified underground storage tank installers and inspectors)
 - **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: ME original enforcement)
-- **person**: none (No registered source publishes an individual license holder for ME)
+
+| Source | person | company |
+|---|---|---|
+| Maine DEP licensed asbestos abatement contractors and consultants | not searched (Not searched: this lookup has no person name search) | found 2 |
+| Maine DEP certified underground storage tank installers and inspectors | found 1 | searched, 0 |
+| SAM.gov federal exclusions and debarments (Public V2 extract) | - | searched, 0 |
 
 ### MD
 
@@ -436,9 +443,15 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### MT
 
-- **company**: none (No registered source publishes a business holding an active license for MT)
-- **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: MT original enforcement)
-- **person**: none (No registered source publishes an individual license holder for MT)
+- **company**: "SILO ESPRESSO" (Montana DEQ licensed septic tank pumpers, record S-1213, bulk file mt-deq-septic-pumpers, loaded 2026-10-15): found in licenses: Montana DEQ licensed septic tank pumpers, 0s. Summary: Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **person**: "TRAVIS IVERSON" (Montana DEQ asbestos accreditations, record MTA-6837-CS, bulk file mt-deq-asbestos, loaded 2026-10-15): found in licenses: Montana DEQ asbestos accreditations, 0s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: mt-deq-asbestos (discipline); mt-deq-septic-pumpers (discipline); MT original enforcement)
+
+| Source | company | person |
+|---|---|---|
+| Montana DEQ asbestos accreditations | searched, 0 | found 1 |
+| Montana DEQ licensed septic tank pumpers | found 1 | searched, 0 |
+| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | - |
 
 ### NE
 
@@ -630,7 +643,7 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### SC
 
-- **enforcement**: "Harris Tree Service and Landscaping, LLC" (South Carolina DES environmental enforcement orders, record 25-019-A, bulk file sc-des-enforcement, loaded 2026-10-15): found in enforcement: South Carolina DES environmental enforcement orders, 0s. Summary: Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **enforcement**: "Alchemy Real Estate, LLC" (South Carolina DES environmental enforcement orders, record AF-0001416, bulk file sc-des-enforcement, loaded 2026-10-15): found in enforcement: South Carolina DES environmental enforcement orders, 0s. Summary: Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **company**: none (No registered source publishes a business holding an active license for SC)
 - **person**: none (No registered source publishes an individual license holder for SC)
 
@@ -641,28 +654,31 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### SD
 
-- **person**: "CRAIG A. LITTLE BEAR" (South Dakota Plumbing Commission licensed plumbers, record -, bulk file sd-plumbers, loaded 2026-10-15): found in licenses: South Dakota Plumbing Commission licensed plumbers, 0s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
+- **enforcement**: "BLACK HILLS AUTOMOTIVE TECHNICIANS INC" (South Dakota Department of Revenue business tax delinquent report, record -, bulk file sd-dor-tax-delinquent, loaded 2026-10-15): found in enforcement: South Dakota Department of Revenue business tax delinquent report, 0s. Summary: Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **person**: "DAVID W WOODRING" (South Dakota Plumbing Commission licensed plumbers, record -, bulk file sd-plumbers, loaded 2026-10-15): found in licenses: South Dakota Plumbing Commission licensed plumbers, 0s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 - **company**: none (No usable record of a business holding an active license found in: sd-plumbers; sd-specialty; sd-septic)
-- **enforcement**: none (No usable record of a company with an enforcement or discipline record found in: sd-plumbers (discipline); sd-specialty (discipline); sd-septic (discipline); SD original enforcement)
 
-| Source | person |
-|---|---|
-| South Dakota Plumbing Commission licensed plumbers | found 1 |
-| South Dakota Plumbing Commission specialty licensees | searched, 0 |
-| South Dakota small onsite wastewater (septic) installers | searched, 0 |
+| Source | enforcement | person |
+|---|---|---|
+| South Dakota Plumbing Commission licensed plumbers | searched, 0 | found 1 |
+| South Dakota Plumbing Commission specialty licensees | searched, 0 | searched, 0 |
+| South Dakota small onsite wastewater (septic) installers | searched, 0 | searched, 0 |
+| South Dakota Department of Revenue business tax delinquent report | found 1 | n/a (companies only) |
+| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | - |
 
 ### TN
 
-- **company**: "WARNER CONSTRUCTION INC" (Nashville registered professional contractors, record -, bulk file tn-nashville-contractors, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)): found in licenses: Nashville registered professional contractors, 0s. Summary: Found 15 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **enforcement**: "6805 Hwy 305 LLC" (TDEC enforcement cases, record UST23-0161, bulk file tn-tdec-enforcement, loaded 2026-10-15): found in enforcement: TDEC enforcement cases (Department of Environment and Conservation), 0s. Summary: Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
-- **person**: none (No usable record of an individual license holder found in: tn-nashville-contractors)
+- **company**: "W & W CONSTRUCTION" (TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers), record 40187, live lookup, search "Construction"): found in licenses: TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers), 31s. Summary: Found 99 license record(s) and 3 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **enforcement**: "Robert Lowe d/b/a Robert's Ice" (TDEC enforcement cases, record APC08-0152, bulk file tn-tdec-enforcement, loaded 2026-10-15): found in enforcement: TDEC enforcement cases (Department of Environment and Conservation), 2s. Summary: Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **person**: "JOHN H SMITH JR" (TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers), record 56358, live lookup, search "John Smith"): found in licenses: TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers), 3s. Summary: Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
 
-| Source | company | enforcement |
-|---|---|---|
-| TDEC enforcement cases | searched, 0 | found 1 |
-| TN Board for Licensing Contractors and Alarm Systems Contractors Board disciplinary actions | searched, 0 | searched, 0 |
-| Nashville registered professional contractors | found 15 | searched, 0 |
-| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | searched, 0 |
+| Source | company | enforcement | person |
+|---|---|---|---|
+| TDEC enforcement cases | found 3 | found 1 | n/a (companies only) |
+| TN Board for Licensing Contractors and Alarm Systems Contractors Board disciplinary actions | searched, 0 | searched, 0 | n/a (companies only) |
+| Nashville registered professional contractors | found 3 | searched, 0 | searched, 0 |
+| TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers) | found 96 | searched, 0 | found 2 |
+| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | searched, 0 | - |
 
 ### TX
 
@@ -742,17 +758,17 @@ Cells per golden subject: `found N`, `searched, 0`, `not searched (reason)`, `fa
 
 ### WV
 
-- **enforcement**: "J-WAMSLEY CONTRACTING INC" (WV Employer Violator System (workers' comp default), record -, bulk file wv-oic-evs, loaded 2026-10-15): found in enforcement: WV Insurance Commissioner Employer Violator System (workers' comp default), 0s. Summary: Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **enforcement**: "A 1 LTD LLC" (WV Employer Violator System (workers' comp default), record -, bulk file wv-oic-evs, loaded 2026-10-15): found in enforcement: WV Insurance Commissioner Employer Violator System (workers' comp default), 0s. Summary: Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
 - **person**: "JOHN SMITH JR" (WV State Fire Marshal electrician licenses, record LV4768JSRENC0725, live lookup, search "John Smith"): found in licenses: WV State Fire Marshal electrician licenses, 4s. Summary: Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.
-- **company**: none (No usable record of a business holding an active license found in: WV State Fire Marshal electrician licenses; WV Division of Labor certified plumbers; WV Division of Labor certified HVAC technicians)
+- **enforcement**: "KGH Development Inc." (WV Purchasing Division debarred vendors, record -, bulk file wv-purchasing-debarred, loaded 2026-10-15): found in enforcement: WV Purchasing Division debarred vendors, 0s. Summary: Found 2 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.
+- **company**: none (No usable record of a business holding an active license found in: WV State Fire Marshal electrician licenses)
 
-| Source | enforcement | person |
-|---|---|---|
-| WV Employer Violator System (workers' comp default) | found 1 | n/a (companies only) |
-| WV State Fire Marshal electrician licenses | not searched (Not searched: this lookup has no business name search) | found 1 |
-| WV Division of Labor certified plumbers | not searched (Not searched: this lookup has no business name search) | failed (www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read) |
-| WV Division of Labor certified HVAC technicians | not searched (Not searched: this lookup has no business name search) | failed (www.wvlabor.com: robots.txt answered HTTP 500; no automated requests until it can be read) |
-| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | - |
+| Source | enforcement | person | enforcement |
+|---|---|---|---|
+| WV Employer Violator System (workers' comp default) | found 1 | n/a (companies only) | searched, 0 |
+| WV Purchasing Division debarred vendors | searched, 0 | n/a (companies only) | found 1 |
+| WV State Fire Marshal electrician licenses | not searched (Not searched: this lookup has no business name search) | found 1 | not searched (Not searched: this lookup has no business name search) |
+| SAM.gov federal exclusions and debarments (Public V2 extract) | searched, 0 | - | found 1 |
 
 ### WI
 

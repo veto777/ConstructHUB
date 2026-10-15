@@ -4,7 +4,7 @@
  *
  *   . ~/research-briefs/allstates.env   # a scratch database, never the live one
  *   npx tsx script/research-acceptance.ts [--state OH,WA …] [--only-failed] [--use-loaded] [--portals] [--repick]
- *                                         [--concurrency 3]
+ *                                         [--concurrency 3] [--add-subject ST:role:<bulk id or source label>[:query]]
  *   npx tsx script/research-acceptance.ts --prod-health      # read-only checks of production over ssh vb11
  *   npx tsx script/research-acceptance.ts --playbook         # regenerates docs/RESEARCH-DATA-PLAYBOOK.md tables
  *
@@ -46,7 +46,7 @@ import { standingStatus } from "../server/research/privacy";
 import { personNamed } from "../server/research/xref";
 import { researchOrderSchema, reportSummary, STATE_CODES, type LicenseHit, type ResearchReport, type ResearchSubjectReport } from "@shared/research-reports";
 import type { CoverageManifest, CoverageSource } from "@shared/research-coverage";
-import { isGolden, pickState, type Golden, type GoldenSlot, type StateSubjects } from "./research-acceptance/pick";
+import { isGolden, pickFromSource, pickState, type Golden, type GoldenSlot, type StateSubjects } from "./research-acceptance/pick";
 
 const DIR = join(import.meta.dirname, "research-acceptance");
 const RESULTS = join(DIR, "results");
@@ -357,6 +357,17 @@ async function acceptance(): Promise<number> {
     log(`${st}: picking golden subjects`);
     all[st] = await pickState(st, (m) => log(m));
     writeSubjects(all);
+  }
+  // --add-subject ST:role:<bulk id or source label>[:query] adds an extra golden subject from that one source.
+  for (const spec of args.flatMap((a, i) => (args[i - 1] === "--add-subject" ? [a] : []))) {
+    const [st, role, source, query] = spec.split(":");
+    const g = await pickFromSource(st.toUpperCase(), role as Golden["role"], source, query);
+    if (!g) { log(`${st}: no usable ${role} record in "${source}"`); continue; }
+    const cur = all[st.toUpperCase()] ?? { state: st.toUpperCase(), picked: today(), subjects: [] };
+    cur.subjects = [...cur.subjects.filter((x) => !(isGolden(x) && x.source === g.source && x.role === g.role)), g];
+    all[st.toUpperCase()] = cur;
+    writeSubjects(all);
+    log(`${st} ${role}: added "${g.name}" from ${g.source}`);
   }
 
   const results: StateResult[] = [];

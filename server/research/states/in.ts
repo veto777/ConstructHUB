@@ -9,7 +9,8 @@
  *
  * Indiana licenses no general contractors statewide: the Professional Licensing Agency's boards (its Search and
  * Verify board list) include the Plumbing Commission but no contractor board; cities and counties such as
- * Indianapolis license contractors.
+ * Indianapolis license contractors. The PLA's statewide plumber lookup answers searches but sits under the IN.gov
+ * Terms of Use (personal use only, no retrieval systems), so it is not used: see `blocked` (re-checked 2026-10-15).
  */
 import { promises as fs } from "node:fs";
 import { clean, csvRecords, usDate, type BulkHit } from "../bulk";
@@ -73,9 +74,11 @@ export const pack: StatePack = {
   noStatewideGcLicense:
     "Indiana does not license general contractors statewide; the Plumbing Commission licenses plumbers, and cities and counties such as Indianapolis license contractors (Indianapolis is searched above)",
   blocked: [
-    "Professional Licensing Agency Search and Verify (mylicense.in.gov/EVerification): reCAPTCHA; plumbers, home inspectors, asbestos and lead licensees not searchable",
-    "PLA licensee list download (in.gov/pla): sold per record through the IN.gov portal",
+    "Professional Licensing Agency Search and Verify (mylicense.in.gov/EVerification), re-checked 2026-10-15: robots.txt has content-signal comments only (no rules), the search form's Recaptcha1 field is an empty hidden input and a Plumbing Commission search answers (Plumbing Contractor, Journeyman Plumber, Plumbing Corporation with its related plumbing contractor, asbestos and lead contractors); not used because the site carries the IN.gov portal header and the IN.gov Terms of Use (in.gov/core/terms_of_use.html) say: \"the viewing, printing, or downloading of any content ... from the Portal grants you only a limited, nonexclusive license for use solely by you for your own personal use, and not for republication, distribution, ... sale, preparation of derivative works or other use. No part of any content ... may be reproduced in any form or incorporated into any information retrieval system, electronic or mechanical, other than for your personal use (not for resale or redistribution)\" and bar using the Portal to \"exploit any information ... for advertising or commercial purposes\"",
+    "PLA licensee list download (in.gov/pla/license/download-license-files), re-checked 2026-10-15: sold through the IN.gov portal, \"$150 for the first record ... $10 for each additional 1,000 records\"",
+    "PLA Discipline Search (in.gov/ai/appfiles/pla-litigation → in.gov/apps/pla/litigation/advancedsearch.aspx): \"disciplinary actions taken against individual licensees\", searched by first and last name or license number only (no business name), so no company search (FCRA: companies only); IN.gov Terms of Use as above",
+    "PLA Indiana Active Licenses Map (in.gov/pla/data/indiana-active-licenses-map): counts per county only, no names",
     "Secretary of State INBiz bulk business data: paid ($9,500) and needs an INBiz account",
-    "Indiana Data Hub (hub.mph.in.gov): no license or enforcement dataset for construction",
+    "Indiana Data Hub (hub.mph.in.gov), re-checked 2026-10-15: its search finds no dataset for \"plumbing\" or \"contractor\" (robots.txt disallows /api/)",
   ],
 };
