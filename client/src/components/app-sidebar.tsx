@@ -1,3 +1,4 @@
+import { portalUrl } from "@/lib/site";
 import { useEffect, useState } from "react";
 import { FaYelp } from "react-icons/fa";
 import { BrandIcon } from "@/components/brand-icon";
@@ -266,7 +267,7 @@ const googleGroups: NavGroup[] = [
 const googleReviewsItem = { title: "Google Reviews", url: "/google-reviews", icon: Star, logoComponent: GoogleGIcon, badge: "best" as BadgeType };
 const yelpReviewsItem = { title: "Yelp", url: "/yelp", icon: Star, logoComponent: YelpIcon, badge: "new" as BadgeType };
 
-const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType }[] = [
+const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType; crmPath?: string }[] = [
   // The AI Call Assistant's dashboard is a platform page (/call-assistant signed in); the CRM is a standalone
   // service and never hosts it (owner, 2026-10-02). Signed out, /call-assistant is the feature page.
   { title: "Call Assistant", url: "/call-assistant", icon: Phone, logoComponent: CallAssistantIcon, badge: "new" },
@@ -279,6 +280,9 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "VPN Shield", url: "/vpn-shield", icon: ShieldOff, logo: vpnBlockerLogo, badge: "new" },
   ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, landingUrl: "/features/competitors" }] : []),
   { title: "Compliance Dept", url: "/compliance", icon: ClipboardCheck, badge: "new" },
+  // JobCam is a CRM page (portal host); the owner wants it reachable from here too (2026-10-15: "add jobcam
+  // here on the side since we want jobcam to be here and in CRM section"). crmPath → a plain link to the portal.
+  { title: "JobCam", url: "/crm/jobcam", crmPath: "/crm/jobcam", icon: Camera, landingUrl: "/features/jobcam", badge: "new" },
   { title: "Master Class", url: "/master-class", icon: GraduationCap, logo: masterclassLogo, landingUrl: "/features/master-class" },
 ];
 
@@ -294,7 +298,7 @@ const pricingGroup: NavGroup = {
     { title: "Add-ons", url: "/pricing#add-ons", icon: PlusCircle },
     // Every feature's intro page, for any signed-in account deciding what to add.
     { title: "All features", url: "/features", icon: LayoutGrid },
-    // JobCam lives in the CRM only (owner, 2026-10-07): the platform just says it exists, on its feature page.
+    // JobCam runs in the CRM (owner, 2026-10-07); since 2026-10-15 the Tools list above also links to it there.
     { title: "JobCam", url: "/features/jobcam", icon: Camera, badge: "new" as BadgeType, testId: "link-nav-pricing-jobcam" },
     { title: "Master Class", url: "/features/master-class", icon: BookOpen, testId: "link-nav-pricing-master-class" },
     // The done-for-you SEO packages section of the pricing page.
@@ -587,19 +591,26 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
                       data-active={location === item.url}
                       className="flex-1"
                     >
-                      <Link href={item.url} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`} className="flex items-center gap-2 w-full">
-                        {item.logoComponent ? (
-                          <item.logoComponent className="h-5 w-5 min-w-5 min-h-5 shrink-0" />
-                        ) : item.logo ? (
-                          <img src={item.logo} alt="" className="h-5 w-5 min-w-5 min-h-5 object-cover rounded-full shrink-0" />
-                        ) : (
-                          <item.icon className="h-5 w-5 min-w-5 min-h-5 shrink-0" />
-                        )}
-                        <span>{item.title}</span>
-                        {planBadgeFor(item.url)
-                          ? <PlanBadge plan={planBadgeFor(item.url)!} label={item.title} />
-                          : item.badge && <FeatureBadge type={item.badge} label={item.title} />}
-                      </Link>
+                      {/* A CRM page lives on the portal host: a plain link there, not a client-side route. */}
+                      {(() => {
+                        const inner = (<>
+                          {item.logoComponent ? (
+                            <item.logoComponent className="h-5 w-5 min-w-5 min-h-5 shrink-0" />
+                          ) : item.logo ? (
+                            <img src={item.logo} alt="" className="h-5 w-5 min-w-5 min-h-5 object-cover rounded-full shrink-0" />
+                          ) : (
+                            <item.icon className="h-5 w-5 min-w-5 min-h-5 shrink-0" />
+                          )}
+                          <span>{item.title}</span>
+                          {planBadgeFor(item.url)
+                            ? <PlanBadge plan={planBadgeFor(item.url)!} label={item.title} />
+                            : item.badge && <FeatureBadge type={item.badge} label={item.title} />}
+                        </>);
+                        const testId = `link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`;
+                        return item.crmPath
+                          ? <a href={portalUrl(item.crmPath)} data-testid={testId} className="flex items-center gap-2 w-full">{inner}</a>
+                          : <Link href={item.url} data-testid={testId} className="flex items-center gap-2 w-full">{inner}</Link>;
+                      })()}
                     </SidebarMenuButton>
                     {item.landingUrl && !inNativeApp() && (
                       <Link href={item.landingUrl} className="p-1.5 rounded-md hover:bg-sidebar-accent transition-colors mr-1" data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}-landing`}>
