@@ -75,7 +75,7 @@ export const pack: StatePack = {
   noStatewideGcLicense:
     "Oklahoma does not license general contractors statewide; the Construction Industries Board licenses electrical, plumbing and mechanical trades and registers roofing contractors",
   blocked: [
-    "CIB electrical, plumbing and mechanical license search (cibverify.ok.gov GL Suite licensee search): answered HTTP 503 with Retry-After 3600 all night on 2026-10-15, from tower1 and from vb11",
+    "CIB electrical, plumbing and mechanical license search (cibverify.ok.gov GL Suite licensee search): answered HTTP 503 with Retry-After 3600 for over an hour on 2026-10-15 on 2026-10-15, from tower1 and from vb11",
     "CIB disciplinary actions: the board's site (oklahoma.gov/cib) publishes no list or file of orders",
     "Department of Labor alarm, locksmith and fire sprinkler licensees (oklahoma.gov/labor compliance lists): PDF lists only, and the production server has no PDF text tool (pdftotext)",
     "data.ok.gov: no CIB, contractor, debarment or business-entity dataset newer than 2019",
