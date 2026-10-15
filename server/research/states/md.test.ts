@@ -1,0 +1,20 @@
+import { describe, expect, it } from "vitest";
+import { parseBpwDebarments } from "./md";
+
+// Saved 2026-10-15 from bpw.prod.maryland.gov/bpw-programs/procurement/debarments (first rows of both lists).
+const BPW = "<h2>Barred from doing business with a public body&nbsp;</h2><table><tbody><tr><th scope=\"col\">Person/Company</th><th scope=\"col\">Term</th></tr><tr><td rowspan=\"1\">AB Medical, L\u200bLC.</td><td rowspan=\"1\">Indefinitely\u200b</td></tr><tr><td>George F. Alinsod</td><td>Indefinitely</td></tr><tr><td>Joseph D. Cheek</td><td>Indefinitely</td></tr><tr><td>Polar Bear Heating and Air Condition\u200bing Co. Inc.</td><td>Indefinitely</td></tr><tr><td>David J. Clemons</td><td>Indefinitely</td></tr></tbody></table><h2>Barred from doing business with the State</h2><table><tbody><tr><th scope=\"col\">Person/Company</th><th scope=\"col\">Term</th></tr><tr><td>Adler Services Group, Inc.\u200b<br>&nbsp;</td><td>Indefinitely</td></tr><tr><td>Harvey Adler\u200b\u200b<br>&nbsp;</td><td>Indefinitely</td></tr><tr><td>Belford Associates, Inc.</td><td>Indefinitely</td></tr><tr><td>Mary Patricia Bromwell</td><td>Indefinitely</td></tr><tr><td>Thomas L. Bromwell, Sr</td><td>Indefinitely</td></tr></tbody></table><h2>Other Debarments</h2>";
+
+describe("Maryland BPW debarments", () => {
+  it("keeps companies and drops individuals and officers", () => {
+    const rows = parseBpwDebarments(BPW);
+    const names = rows.map((r) => r.name);
+    expect(names).toContain("AB Medical, LLC.");
+    expect(names).toContain("Polar Bear Heating and Air Conditioning Co. Inc.");
+    expect(names).toContain("Adler Services Group, Inc.");
+    expect(names).not.toContain("George F. Alinsod");
+    expect(names).not.toContain("Harvey Adler");
+    expect(names.some((n) => /President/.test(n))).toBe(false);
+    expect(rows.find((r) => r.name === "AB Medical, LLC.")).toMatchObject({ term: "Indefinitely" });
+    expect(rows.find((r) => r.name === "Adler Services Group, Inc.")!.list).toMatch(/with the State/);
+  });
+});
