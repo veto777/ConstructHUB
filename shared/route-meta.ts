@@ -58,7 +58,7 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
   "/compliance/research": {
     title: "Permit & License Research Reports | ConstructHUB",
     description:
-      "Find the permits, licenses, consumer complaints, federal lawsuits and OSHA inspections tied to a contractor. Our bot searches official records and sends a sourced report.",
+      "Find the permits, licenses, complaints, state discipline, federal lawsuits and OSHA inspections tied to a contractor. Our bot searches official records and sends a sourced report.",
   },
   "/reinstatement": {
     title: "Request GBP Reinstatement Help | ConstructHUB",

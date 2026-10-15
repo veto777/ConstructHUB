@@ -11,8 +11,11 @@
  * searched is reported as not searched, never as "nothing found".
  */
 import { politeFetch } from "../scrapers/polite-fetch";
-import type { ComplaintHit, CourtCaseHit, OshaHit, RecordSource } from "@shared/research-reports";
+import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordSource } from "@shared/research-reports";
 import { nameClause, sodaRows, tokens } from "./licenses";
+import { searchBulk } from "./bulk";
+import { bulkSourcesFor } from "./bulk-sources";
+import { searchStateEnforcement } from "./state-records";
 
 const MAX_COMPLAINTS = 1000;
 const MAX_CASE_PAGES = 10; // 20 dockets a page
@@ -156,7 +159,42 @@ export async function searchOsha(name: string): Promise<OshaHit[]> {
 }
 
 // ── All of it, for one company ──────────────────────────────────────────────────────────────────────────────────
-export type CompanyRecords = { complaints: ComplaintHit[]; courtCases: CourtCaseHit[]; osha: OshaHit[]; sources: RecordSource[] };
+export type CompanyRecords = { complaints: ComplaintHit[]; courtCases: CourtCaseHit[]; osha: OshaHit[]; enforcement: EnforcementHit[]; sources: RecordSource[] };
+
+/** State enforcement and standing records for a company: live searches plus the indexed bulk files. */
+export async function searchEnforcement(name: string, states: string[]): Promise<{ hits: EnforcementHit[]; sources: RecordSource[] }> {
+  const hits: EnforcementHit[] = [];
+  const sources: RecordSource[] = [];
+  const matches = (n: string | null) => namedIn(name, ...(n ?? "").split(" / "));
+  for (const state of states) {
+    const live = await searchStateEnforcement(name, state, matches);
+    hits.push(...live.hits);
+    sources.push(...live.sources);
+    for (const src of bulkSourcesFor(state)) {
+      if (!src.companiesOnly) continue; // the license files are searched with the licenses
+      try {
+        const { hits: found, status } = await searchBulk(src, name, "company");
+        if (!status.loaded) { sources.push({ source: src.label, scope: state, searched: false, note: "Not loaded yet (the state's file is downloaded daily)" }); continue; }
+        const mine = found.filter((h): h is { kind: "enforcement"; hit: EnforcementHit } => h.kind === "enforcement").map((h) => h.hit).filter((h) => matches(h.name));
+        hits.push(...mine);
+        sources.push({ source: src.label, scope: `${state}, file of ${status.loadedAt?.slice(0, 10)}`, searched: true, note: `${mine.length} record(s)` });
+      } catch (err: any) {
+        sources.push({ source: src.label, scope: state, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+      }
+    }
+  }
+  // Licensing-board enforcement on the license itself (CSLB suspensions, bonds) rides in the license files.
+  for (const state of states) for (const src of bulkSourcesFor(state)) {
+    if (src.companiesOnly) continue;
+    try {
+      const { hits: found, status } = await searchBulk(src, name, "company");
+      if (!status.loaded) continue;
+      hits.push(...found.filter((h): h is { kind: "enforcement"; hit: EnforcementHit } => h.kind === "enforcement").map((h) => h.hit).filter((h) => matches(h.name)));
+    } catch { /* reported with the licenses */ }
+  }
+  hits.sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")));
+  return { hits, sources };
+}
 
 export async function searchCompanyRecords(name: string, states: string[]): Promise<CompanyRecords> {
   const sources: RecordSource[] = [];
@@ -193,11 +231,13 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
     sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: false,
       note: msg === "not configured" ? "Not searched yet" : `Could not search: ${msg.slice(0, 200)}` });
   }
-  return { complaints, courtCases, osha, sources };
+  const enforcement = await searchEnforcement(name, states);
+  sources.push(...enforcement.sources);
+  return { complaints, courtCases, osha, enforcement: enforcement.hits, sources };
 }
 
 /** The free preview's counts: complaints and OSHA in full, federal cases from the first page's match count. */
-export async function previewCompanyRecords(name: string, states: string[]): Promise<{ complaints: number; courtCases: number; osha: number; searched: string[] }> {
+export async function previewCompanyRecords(name: string, states: string[]): Promise<{ complaints: number; courtCases: number; osha: number; enforcement: number; searched: string[] }> {
   const searched: string[] = [];
   let complaints = 0, courtCases = 0, osha = 0;
   for (const state of states) for (const src of complaintSourcesFor(state)) {
@@ -207,5 +247,11 @@ export async function previewCompanyRecords(name: string, states: string[]): Pro
   if (process.env.DOL_API_KEY) {
     try { osha = (await searchOsha(name)).length; searched.push("Federal OSHA inspections"); } catch { /* ditto */ }
   }
-  return { complaints, courtCases, osha, searched };
+  let enforcement = 0;
+  try {
+    const e = await searchEnforcement(name, states);
+    enforcement = e.hits.length;
+    searched.push(...e.sources.filter((x) => x.searched).map((x) => x.source));
+  } catch { /* ditto */ }
+  return { complaints, courtCases, osha, enforcement, searched };
 }

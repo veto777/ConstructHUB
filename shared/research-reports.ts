@@ -116,6 +116,18 @@ export type OshaHit = {
   penalty: number | null; url: string;
 };
 
+/**
+ * An official enforcement or standing record on the company: licensing-board discipline and complaints, stop-work
+ * orders, environmental orders, tax liens, debarments and business-registration status. `adverse` is the source's own
+ * outcome (a final order or suspension is adverse; a complaint closed with no violation found is not; null: unknown).
+ */
+export type EnforcementCategory = "discipline" | "complaint" | "stop_work" | "environmental" | "tax_lien" | "debarment" | "business_status";
+export type EnforcementHit = {
+  state: string; source: string; sourceUrl: string; category: EnforcementCategory;
+  name: string | null; id: string | null; date: string | null; endDate: string | null; status: string | null;
+  city: string | null; detail: string | null; amount: number | null; adverse: boolean | null;
+};
+
 export type RecordSource = { source: string; scope: string; searched: boolean; note: string };
 
 export type ResearchSubjectReport = {
@@ -125,6 +137,8 @@ export type ResearchSubjectReport = {
   portals: PortalCoverage[];
   /** Complaints, lawsuits and safety records: companies only (reports made before 2026-10-14 have none). */
   complaints?: ComplaintHit[]; courtCases?: CourtCaseHit[]; osha?: OshaHit[];
+  /** State enforcement and standing records (reports made before 2026-10-15 have none). */
+  enforcement?: EnforcementHit[];
   recordSources?: RecordSource[];
 };
 
@@ -132,7 +146,7 @@ export type ResearchReport = {
   generatedAt: string;
   states: string[]; trades: string[]; sinceYear: number | null;
   subjects: ResearchSubjectReport[];
-  totals: { licenses: number; permits: number; portalsSearched: number; portalsNotSearched: number; complaints?: number; courtCases?: number; osha?: number };
+  totals: { licenses: number; permits: number; portalsSearched: number; portalsNotSearched: number; complaints?: number; courtCases?: number; osha?: number; enforcement?: number };
 };
 
 /** The free look before paying: license matches now, and how many live portals the full report will sweep. */
@@ -141,7 +155,7 @@ export type ResearchPreview = {
   licenseSourceStates: string[];
   portalsByState: Record<string, number>;
   /** Companies only: complaint, federal case and OSHA inspection counts (absent on older previews). */
-  records?: { complaints: number; courtCases: number; osha: number; searched: string[] };
+  records?: { complaints: number; courtCases: number; osha: number; enforcement?: number; searched: string[] };
 };
 
 export type ResearchOrderView = {

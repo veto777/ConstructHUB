@@ -26,7 +26,9 @@ import {
   type ResearchPreview, type ResearchTrade, type LicenseHit,
 } from "@shared/research-reports";
 import { SITE_ORIGIN as SITE } from "@shared/seo";
-import { licenseSourcesFor, searchLicenses } from "./licenses";
+import { licenseSourcesFor, searchLicenses, wholeWordMatch } from "./licenses";
+import { refreshDueSources, searchBulk } from "./bulk";
+import { BULK_SOURCES, bulkSourcesFor } from "./bulk-sources";
 import { previewCompanyRecords, searchCompanyRecords } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
 
@@ -56,9 +58,12 @@ export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | 
   const licenseSourceStates: string[] = [];
   for (const state of input.states) {
     const sources = licenseSourcesFor(state);
-    if (sources.length) licenseSourceStates.push(state);
+    if (sources.length || bulkLicenseSources(state).length) licenseSourceStates.push(state);
     for (const src of sources) for (const s of input.subjects) {
       try { licenseMatches += (await searchLicenses(src, s.name, s.kind)).length; } catch { /* the preview is a hint, not the report */ }
+    }
+    for (const src of bulkLicenseSources(state)) for (const s of input.subjects) {
+      try { licenseMatches += (await searchBulkLicenses(src, s.name, s.kind)).hits.length; } catch { /* ditto */ }
     }
   }
   const portals = await portalsInStates(input.states);
@@ -66,11 +71,27 @@ export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | 
   for (const s of input.subjects.filter((x) => x.kind === "company")) {
     const r = await previewCompanyRecords(s.name, input.states);
     records = records
-      ? { complaints: records.complaints + r.complaints, courtCases: records.courtCases + r.courtCases, osha: records.osha + r.osha, searched: Array.from(new Set([...records.searched, ...r.searched])) }
+      ? { complaints: records.complaints + r.complaints, courtCases: records.courtCases + r.courtCases, osha: records.osha + r.osha, enforcement: (records.enforcement ?? 0) + r.enforcement, searched: Array.from(new Set([...records.searched, ...r.searched])) }
       : r;
   }
   return { licenseMatches, licenseSourceStates, portalsByState: Object.fromEntries(Array.from(portals, ([s, l]) => [s, l.length])), ...(records ? { records } : {}) };
 }
+
+const bulkLicenseSources = (state: string) => bulkSourcesFor(state).filter((s) => !s.companiesOnly);
+
+/** License hits from one indexed state file: business name for a company, the people on the license for a person. */
+async function searchBulkLicenses(src: ReturnType<typeof bulkSourcesFor>[number], name: string, kind: "person" | "company") {
+  const { hits, status } = await searchBulk(src, name, kind);
+  const found = hits.filter((h): h is { kind: "license"; hit: LicenseHit } => h.kind === "license")
+    .map((h) => ({ ...h.hit, matchedOn: kind === "company" ? "business" as const : "principal" as const }))
+    .filter((h) => wholeWordMatch(name, kind === "company" ? { businessName: h.businessName, principal: null } : { businessName: null, principal: h.principal }));
+  return { hits: found, status };
+}
+
+/** States with no statewide license for general contractors: said in the report instead of "no license found". */
+const NO_STATEWIDE_GC_LICENSE: Record<string, string> = {
+  TX: "Texas does not license general contractors statewide; trades (electrical, A/C, plumbing and others) are licensed separately and are searched above",
+};
 
 function tradesFor(text: string, trades: ResearchTrade[]): string[] {
   const t = ` ${text.toLowerCase()} `;
@@ -211,7 +232,18 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
     const licenseSources: ResearchSubjectReport["licenseSources"] = [];
     for (const state of input.states) {
       const sources = licenseSourcesFor(state);
-      if (!sources.length) licenseSources.push({ state, source: "State license records", searched: false, note: "We don't search this state's license records yet" });
+      if (!sources.length && !bulkLicenseSources(state).length) licenseSources.push({ state, source: "State license records", searched: false, note: "We don't search this state's license records yet" });
+      for (const src of bulkLicenseSources(state)) {
+        try {
+          const { hits, status } = await searchBulkLicenses(src, subject.name, subject.kind);
+          if (!status.loaded) { licenseSources.push({ state, source: src.label, searched: false, note: "Not loaded yet (the state's file is downloaded daily)" }); continue; }
+          licenses.push(...hits);
+          licenseSources.push({ state, source: src.label, searched: true, note: `${hits.length} match(es) in the file of ${status.loadedAt?.slice(0, 10)}` });
+        } catch (err: any) {
+          licenseSources.push({ state, source: src.label, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+        }
+      }
+      if (NO_STATEWIDE_GC_LICENSE[state]) licenseSources.push({ state, source: "Statewide general contractor license", searched: false, note: NO_STATEWIDE_GC_LICENSE[state] });
       for (const src of sources) {
         try {
           const hits = await searchLicenses(src, subject.name, subject.kind);
@@ -236,11 +268,11 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       (b.tradeMatch.length > 0 ? 1 : 0) - (a.tradeMatch.length > 0 ? 1 : 0) || String(b.issuedDate ?? "").localeCompare(String(a.issuedDate ?? "")));
     const records = subject.kind === "company"
       ? await searchCompanyRecords(subject.name, input.states)
-      : { complaints: [], courtCases: [], osha: [], sources: [{ source: "Complaints, lawsuits and OSHA records", scope: "", searched: false, note: "Searched for companies only, not for individual people" }] };
-    log(`records for "${subject.name}": ${records.complaints.length} complaint(s), ${records.courtCases.length} federal case(s), ${records.osha.length} OSHA inspection(s)`);
+      : { complaints: [], courtCases: [], osha: [], enforcement: [], sources: [{ source: "Complaints, lawsuits, enforcement and OSHA records", scope: "", searched: false, note: "Searched for companies only, not for individual people" }] };
+    log(`records for "${subject.name}": ${records.complaints.length} complaint(s), ${records.courtCases.length} federal case(s), ${records.osha.length} OSHA inspection(s), ${records.enforcement.length} enforcement record(s)`);
     subjects.push({
       name: subject.name, kind: subject.kind, licenses, permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)),
-      complaints: records.complaints, courtCases: records.courtCases, osha: records.osha, recordSources: records.sources,
+      complaints: records.complaints, courtCases: records.courtCases, osha: records.osha, enforcement: records.enforcement, recordSources: records.sources,
     });
   }
   const allCoverage = subjects.flatMap((s) => s.portals);
@@ -255,6 +287,7 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       complaints: subjects.reduce((n, s) => n + (s.complaints?.length ?? 0), 0),
       courtCases: subjects.reduce((n, s) => n + (s.courtCases?.length ?? 0), 0),
       osha: subjects.reduce((n, s) => n + (s.osha?.length ?? 0), 0),
+      enforcement: subjects.reduce((n, s) => n + (s.enforcement?.length ?? 0), 0),
     },
   };
 }
@@ -263,7 +296,7 @@ async function sendReportEmails(order: ResearchOrderRow, report: ResearchReport)
   const link = `${SITE}${RESEARCH_PATH}/orders/${order.id}`;
   const names = order.input.subjects.map((s) => s.name).join(", ");
   const t = report.totals;
-  const records = t.complaints || t.courtCases || t.osha ? `, ${t.complaints ?? 0} consumer complaint(s), ${t.courtCases ?? 0} federal court case(s) and ${t.osha ?? 0} OSHA inspection(s)` : "";
+  const records = t.complaints || t.courtCases || t.osha || t.enforcement ? `, ${t.complaints ?? 0} consumer complaint(s), ${t.enforcement ?? 0} state enforcement or standing record(s), ${t.courtCases ?? 0} federal court case(s) and ${t.osha ?? 0} OSHA inspection(s)` : "";
   const summary = `${t.licenses} license record(s) and ${t.permits} permit(s) across ${t.portalsSearched} searched portal(s)${records}`;
   await sendWithFallback({
     from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
@@ -317,4 +350,10 @@ export function startResearchWorker(): void {
       .catch((err) => console.error("[research] worker start failed:", err));
   }, 20_000).unref?.();
   setInterval(() => { void drainResearchQueue().catch((err) => console.error("[research] queue:", err)); }, 5 * 60_000).unref?.();
+  // The state bulk files (hundreds of MB a day): production only, unless a dev server asks with RESEARCH_BULK=on.
+  if (process.env.RESEARCH_BULK === "on" || (process.env.NODE_ENV === "production" && process.env.RESEARCH_BULK !== "off")) {
+    const refresh = () => void refreshDueSources(BULK_SOURCES).catch((err) => console.error("[research-bulk] refresh:", err));
+    setTimeout(refresh, 3 * 60_000).unref?.();
+    setInterval(refresh, 60 * 60_000).unref?.();
+  }
 }
