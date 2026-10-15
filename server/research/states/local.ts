@@ -13,6 +13,10 @@
  *   CA  Long Beach business licenses in the "Contracting" categories (bulk)
  *   CO  Boulder licensed contractors (bulk)
  *   TX  Arlington registered contractors (bulk)
+ *   LA  New Orleans occupational business licenses, construction business types (bulk)
+ *   LA  East Baton Rouge Parish business registrations, NAICS group "Construction" (bulk)
+ *   MO  Kansas City business license holders, construction business types (bulk)
+ *   VA  Norfolk business licenses, construction NAICS (bulk)
  *   IL  Chicago BACP home-repair licenses, with every owner and officer from the city's Business Owners dataset (bulk)
  *   MD  Montgomery County DPS licenses: building contractors (new-home builders), master and limited master
  *       electricians, limited electrical businesses, fire-system licensees (bulk)
@@ -505,10 +509,119 @@ const seattle: BulkSource = {
 /** "RASUL ABDURAKHMANOV" and "ABDURAKHMANOV RASUL" are one name. */
 const namesMatch = (a: string, b: string) => tokens(a).sort().join(" ") === tokens(b).sort().join(" ");
 
+// ── Business-license registries labeled with NAICS titles: kept to construction contractors ───────────────────────
+const CONSTRUCTION_TITLE = /\b(contractors?|construction|builders)\b/i;
+const NOT_CONSTRUCTION = /food service|apparel|cut and sew|wholesal|material|machinery|equipment rental|leasing|manufactur|dealers|retail|stores/i;
+const isConstruction = (title: string | null) => !!title && CONSTRUCTION_TITLE.test(title) && !NOT_CONSTRUCTION.test(title);
+const TITLE_WHERE = (f: string) => `${f} like '%Contractor%' OR ${f} like '%Construction%' OR ${f} like '%Builders%'`;
+
+const NOLA = soda("data.nola.gov", "hjcd-grvu");
+const newOrleans: BulkSource = {
+  id: "la-new-orleans-contractors", state: "LA", label: "New Orleans occupational business licenses (contractors)", pageUrl: NOLA.datasetUrl,
+  everyHours: 24, minRows: 1_000,
+  load: async function* () {
+    for await (const r of sodaAll(NOLA.url, TITLE_WHERE("businesstype"))) {
+      if (!isConstruction(txt(r, "businesstype"))) continue;
+      const biz = txt(r, "businessname"), owner = txt(r, "ownername");
+      const named = biz && biz !== "0" ? biz : null;
+      const ownerIsOrg = !!owner && ORG.test(owner);
+      const business = named ?? (ownerIsOrg ? owner : null);
+      const person = owner && !ownerIsOrg && owner !== business ? owner : null;
+      if (!business && !person) continue;
+      const address = addressLine([txt(r, "address")], txt(r, "city"), txt(r, "state"), txt(r, "zip"));
+      const mailing = addressLine([txt(r, "mailaddress"), txt(r, "mailsuite")], txt(r, "mailcity"), txt(r, "mailstate"), txt(r, "mailzip"));
+      const h = licenseHit({
+        state: "LA", source: "New Orleans occupational business licenses", sourceUrl: NOLA.datasetUrl,
+        businessName: business, licenseNumber: txt(r, "businesslicensenumber"), licenseType: "Occupational business license", specialty: txt(r, "businesstype"),
+        status: "Licensed", principal: person, city: txt(r, "city"), expires: null, address, phone: txt(r, "phonenumber"),
+        people: [{ name: person, role: "Owner" }],
+      });
+      if (h.keys) h.keys.addresses = [address, mailing];
+      yield h;
+    }
+  },
+};
+
+const EBR = soda("data.brla.gov", "xw6s-bcqm");
+// tstatus, from the column description: "O - Open or C - Closed".
+const EBR_STATUS: Record<string, string> = { O: "Open", C: "Closed" };
+const batonRouge: BulkSource = {
+  id: "la-ebr-construction-businesses", state: "LA", label: "East Baton Rouge Parish business registrations (construction)", pageUrl: EBR.datasetUrl,
+  everyHours: 24 * 7, minRows: 4_300,
+  load: async function* () {
+    for await (const r of sodaAll(EBR.url, "naicgroupname='Construction'")) {
+      const name = txt(r, "tname"), legal = txt(r, "tlegalname");
+      if (!name && !legal) continue;
+      const contact = txt(r, "tcontactperson");
+      const code = txt(r, "tstatus");
+      const address = addressLine([txt(r, "tphysicaladdress1"), txt(r, "tphysicaladdress2")], txt(r, "tphysicalcity"), txt(r, "tphysicalstate"), txt(r, "tphysicalzipcode5"));
+      const mailing = addressLine([txt(r, "tmailaddress1"), txt(r, "tmailaddress2")], txt(r, "tmailcity"), txt(r, "tmailstate"), txt(r, "tmailzipcode5"));
+      const h = licenseHit({
+        state: "LA", source: "East Baton Rouge Parish business registrations", sourceUrl: EBR.datasetUrl,
+        businessName: legal && name && legal.toUpperCase() !== name.toUpperCase() ? `${legal} (${name})` : legal ?? name,
+        licenseNumber: txt(r, "taccount"), licenseType: txt(r, "typename"), specialty: txt(r, "naicname"),
+        status: code ? EBR_STATUS[code] ?? `code ${code}` : null, principal: contact && !ORG.test(contact) ? contact : null,
+        city: txt(r, "tphysicalcity"), expires: null, address: address ?? mailing, phone: null,
+        people: [{ name: contact && !ORG.test(contact) ? contact : null, role: "Account contact" }],
+      });
+      if (h.keys) h.keys.addresses = [address, mailing];
+      yield h;
+    }
+  },
+};
+
+const KCMO = soda("data.kcmo.org", "pnm4-68wg");
+const kansasCity: BulkSource = {
+  id: "mo-kansas-city-contractors", state: "MO", label: "Kansas City business license holders (construction)", pageUrl: KCMO.datasetUrl,
+  everyHours: 24 * 7, minRows: 3_300,
+  load: async function* () {
+    for await (const r of sodaAll(KCMO.url, TITLE_WHERE("business_type"))) {
+      if (!isConstruction(txt(r, "business_type"))) continue;
+      const name = txt(r, "business_name"), dba = txt(r, "dba_name");
+      if (!name && !dba) continue;
+      const valid = txt(r, "valid_license_for");
+      yield licenseHit({
+        state: "MO", source: "Kansas City business license holders", sourceUrl: KCMO.datasetUrl,
+        businessName: name && dba && dba.toUpperCase() !== name.toUpperCase() ? `${name} (d/b/a ${dba})` : name ?? dba,
+        licenseNumber: null, licenseType: "Business license", specialty: txt(r, "business_type"), status: "Licensed", principal: null,
+        city: txt(r, "city"), expires: valid ? ymd(valid) : null,
+        address: addressLine([txt(r, "address")], txt(r, "city"), txt(r, "state"), txt(r, "zipcode")), phone: null, people: [],
+      });
+    }
+  },
+};
+
+const NORFOLK = soda("data.norfolk.gov", "dpi6-sct5");
+const norfolk: BulkSource = {
+  id: "va-norfolk-contractors", state: "VA", label: "Norfolk business licenses (construction)", pageUrl: NORFOLK.datasetUrl, everyHours: 24 * 7, minRows: 1_100,
+  load: async function* () {
+    for await (const r of sodaAll(NORFOLK.url, TITLE_WHERE("naics"))) {
+      if (!isConstruction(txt(r, "naics"))) continue;
+      const trade = txt(r, "trading_as_name"), owner = txt(r, "primary_owner");
+      if (!trade && !owner) continue;
+      const ownerIsOrg = !!owner && ORG.test(owner);
+      // "NO NORFOLK ADDRESS REQUIRED 99999": a business without a Norfolk location; its mailing address is its address.
+      const loc = txt(r, "location_address");
+      const location = loc && !/^NO NORFOLK ADDRESS/i.test(loc) ? loc.replace(/\s+(\d{5})$/, ", NORFOLK, VA $1") : null;
+      const mailing = txt(r, "mailing_address");
+      const h = licenseHit({
+        state: "VA", source: "Norfolk business licenses", sourceUrl: NORFOLK.datasetUrl,
+        businessName: ownerIsOrg && trade && owner!.toUpperCase() !== trade.toUpperCase() ? `${owner} (t/a ${trade})` : ownerIsOrg ? owner : trade,
+        licenseNumber: null, licenseType: "Business license", specialty: txt(r, "naics"), status: null,
+        principal: ownerIsOrg ? null : owner, city: null, expires: null,
+        address: location ?? mailing, phone: null,
+        people: [{ name: ownerIsOrg ? null : owner, role: "Primary owner" }],
+      });
+      if (h.keys) h.keys.addresses = [location, mailing];
+      yield h;
+    }
+  },
+};
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, seattle];
+export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, seattle, newOrleans, batonRouge, kansasCity, norfolk];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
