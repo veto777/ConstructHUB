@@ -1,0 +1,50 @@
+[
+    {
+        "permit_number": "202610139351",
+        "permit_type": "8",
+        "permit_type_definition": "otc alterations permit",
+        "permit_creation_date": "2026-10-13T00:00:00.000",
+        "block": "1388",
+        "lot": "035",
+        "street_number": "2715",
+        "street_name": "Lake",
+        "street_suffix": "St",
+        "description": "structural retrofit work within (e) building. no changes to the (e) architectural layout floor plan configuration, building use or occupancy.",
+        "status": "filed",
+        "status_date": "2026-10-13T12:16:17.000",
+        "filed_date": "2026-10-13T12:16:17.000",
+        "number_of_existing_stories": "2",
+        "number_of_proposed_stories": "2",
+        "estimated_cost": "55000.0",
+        "revised_cost": "0.0",
+        "existing_use": "1 family dwelling",
+        "existing_units": "1.0",
+        "proposed_use": "1 family dwelling",
+        "proposed_units": "1.0",
+        "plansets": "2",
+        "existing_occupancy": "R-3",
+        "proposed_occupancy": "R-3",
+        "existing_construction_type": "5",
+        "existing_construction_type_description": "wood frame (5)",
+        "proposed_construction_type": "5",
+        "proposed_construction_type_description": "wood frame (5)",
+        "last_permit_activity_date": "2026-10-13T12:18:46.000",
+        "application_submission_method": "in-house",
+        "adu": "N",
+        "primary_address_flag": "Y",
+        "supervisor_district": "1",
+        "neighborhoods_analysis_boundaries": "Seacliff",
+        "zipcode": "94121",
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                -122.488740162,
+                37.784952255
+            ]
+        },
+        "point_source": "eas_address_point",
+        "record_id": "175823598022",
+        "data_as_of": "2026-10-14T01:05:03.000",
+        "data_loaded_at": "2026-10-14T05:26:54.443"
+    }
+]

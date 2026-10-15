@@ -1,0 +1,99 @@
+{
+    "objectIdFieldName": "OBJECTID",
+    "globalIdFieldName": "",
+    "geometryType": "esriGeometryPoint",
+    "spatialReference": {
+        "wkid": 4326,
+        "latestWkid": 4326
+    },
+    "fields": [
+        {
+            "name": "OBJECTID",
+            "alias": "OBJECTID",
+            "type": "esriFieldTypeOID"
+        },
+        {
+            "name": "PROJECTNAME",
+            "alias": "PROJECTNAME",
+            "type": "esriFieldTypeString",
+            "length": 1000
+        },
+        {
+            "name": "FULLADDRESS",
+            "alias": "FULLADDRESS",
+            "type": "esriFieldTypeString",
+            "length": 200
+        },
+        {
+            "name": "PERMITNUMBER",
+            "alias": "PERMITNUMBER",
+            "type": "esriFieldTypeString",
+            "length": 20
+        },
+        {
+            "name": "PERMITNAME",
+            "alias": "PERMITNAME",
+            "type": "esriFieldTypeString",
+            "length": 1000
+        },
+        {
+            "name": "STATUS",
+            "alias": "STATUS",
+            "type": "esriFieldTypeString",
+            "length": 100
+        },
+        {
+            "name": "ISSUEDDATE",
+            "alias": "ISSUEDDATE",
+            "type": "esriFieldTypeDate",
+            "length": 8
+        }
+    ],
+    "features": [
+        {
+            "attributes": {
+                "OBJECTID": 110882,
+                "PROJECTNAME": "Residential Construction",
+                "FULLADDRESS": "31306 Piavola Lane Ln Huffman TX 77336",
+                "PERMITNUMBER": "2610070060-RESB-001",
+                "PERMITNAME": "Residential, New 1 Family (Standalone Structure)",
+                "STATUS": "Issued",
+                "ISSUEDDATE": 1791867600000
+            },
+            "geometry": {
+                "x": -95.11543897084378,
+                "y": 30.129349552511957
+            }
+        },
+        {
+            "attributes": {
+                "OBJECTID": 1315625,
+                "PROJECTNAME": "Residential Construction",
+                "FULLADDRESS": "31306 Piavola Lane Ln Huffman TX 77336",
+                "PERMITNUMBER": "2610070060-RSW-001",
+                "PERMITNAME": "Sidewalk Inspection",
+                "STATUS": "Issued",
+                "ISSUEDDATE": 1791781200000
+            },
+            "geometry": {
+                "x": -95.11543897084378,
+                "y": 30.129349552511957
+            }
+        },
+        {
+            "attributes": {
+                "OBJECTID": 609900,
+                "PROJECTNAME": "Residential Construction",
+                "FULLADDRESS": "31306 Piavola Lane Ln Huffman TX 77336",
+                "PERMITNUMBER": "2610070060-RDW-001",
+                "PERMITNAME": "Curb and Gutter Driveway",
+                "STATUS": "Issued",
+                "ISSUEDDATE": 1791867600000
+            },
+            "geometry": {
+                "x": -95.11543897084378,
+                "y": 30.129349552511957
+            }
+        }
+    ]
+}

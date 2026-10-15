@@ -1,0 +1,75 @@
+{
+    "objectIdFieldName": "OBJECTID",
+    "globalIdFieldName": "",
+    "geometryType": "esriGeometryPoint",
+    "spatialReference": {
+        "wkid": 102740,
+        "latestWkid": 2278
+    },
+    "fields": [
+        {
+            "name": "OBJECTID",
+            "alias": "OBJECTID",
+            "type": "esriFieldTypeOID"
+        },
+        {
+            "name": "ID",
+            "alias": "ID",
+            "type": "esriFieldTypeDouble"
+        },
+        {
+            "name": "PROJECTNUMBER",
+            "alias": "PROJECTNUMBER",
+            "type": "esriFieldTypeString",
+            "length": 50
+        },
+        {
+            "name": "PROJECTNAME",
+            "alias": "PROJECTNAME",
+            "type": "esriFieldTypeString",
+            "length": 1000
+        },
+        {
+            "name": "FULLADDRESS",
+            "alias": "FULLADDRESS",
+            "type": "esriFieldTypeString",
+            "length": 200
+        },
+        {
+            "name": "APPTYPE",
+            "alias": "APPTYPE",
+            "type": "esriFieldTypeString",
+            "length": 1000
+        },
+        {
+            "name": "STATUS",
+            "alias": "STATUS",
+            "type": "esriFieldTypeString",
+            "length": 100
+        },
+        {
+            "name": "DBANAME",
+            "alias": "DBANAME",
+            "type": "esriFieldTypeString",
+            "length": 200
+        }
+    ],
+    "features": [
+        {
+            "attributes": {
+                "OBJECTID": 1115147,
+                "ID": 1544154.0,
+                "PROJECTNUMBER": "2610070060",
+                "PROJECTNAME": "Residential Construction",
+                "FULLADDRESS": "31306 Piavola Lane Ln Huffman TX 77336",
+                "APPTYPE": "Tract Home Builders",
+                "STATUS": "Issued",
+                "DBANAME": "Lennar Homes"
+            },
+            "geometry": {
+                "x": 3196307.236830637,
+                "y": 13978588.389121056
+            }
+        }
+    ]
+}
