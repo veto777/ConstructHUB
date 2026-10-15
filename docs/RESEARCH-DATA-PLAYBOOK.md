@@ -259,6 +259,7 @@ Checked live: 2026-10-15. No statewide GC license: Colorado does not license gen
 | Boulder licensed contractors (city/county) ([page](https://www.arcgis.com/home/item.html?id=ef02bbe733464632aa0d2628177d6c9e)) | www.arcgis.com | bulk file `co-boulder-contractors` (official download, indexed) | licenses | name | every 24h, floor 2100 | none | allowed |
 | Colorado DORA licenses (electrical, plumbing, water well) ([page](https://data.colorado.gov/d/7s5z-vewr)) | data.colorado.gov | Socrata SODA API, live per report | licenses | name, owner, license | live | SOCRATA_APP_TOKEN (optional) | allowed; allowed |
 | Colorado DORA licenses (architects, engineers, surveyors, landscape architects, radon; trade work permits) ([page](https://data.colorado.gov/d/7s5z-vewr)) | data.colorado.gov | Socrata SODA API, live per report | licenses | name, owner, license | live | SOCRATA_APP_TOKEN (optional) | allowed; allowed |
+| Colorado DORA discipline of electrical, plumbing and water well contractors ([page](https://data.colorado.gov/d/7s5z-vewr)) | data.colorado.gov | Socrata SODA API, live per report | discipline (companies only) | name | live | SOCRATA_APP_TOKEN (optional) | allowed; allowed |
 | Colorado Secretary of State business entities ([page](https://data.colorado.gov/d/4ykn-tg5h)) | data.colorado.gov | Socrata SODA API, live per report | business_status (companies only) | name | live | SOCRATA_APP_TOKEN (optional) | allowed; allowed |
 
 Looked at and not used (from the pack's `blocked` notes):
@@ -289,6 +290,8 @@ Checked live: 2026-10-15. No statewide GC license: Delaware does not license gen
 
 | Source | Publisher | Access | Holds | Searched by | Refresh / floor | Keys | robots.txt (page; API) |
 |---|---|---|---|---|---|---|---|
+| Delaware Department of Labor Workplace Fraud Act violators ([page](https://industrialaffairs.delaware.gov/construction-enforcement)) | industrialaffairs.delaware.gov | bulk file `de-dol-wpfa-violators` (official download, indexed) | wage (companies only) | name | every 168h, floor 20 | none | allowed |
+| Delaware Department of Labor prevailing wage debarment list ([page](https://industrialaffairs.delaware.gov/construction-enforcement)) | industrialaffairs.delaware.gov | bulk file `de-dol-pw-debarment` (official download, indexed) | debarment (companies only) | name | every 168h, floor 4 | none | allowed |
 | Delaware Division of Professional Regulation (electrical, plumbing/HVACR) ([page](https://data.delaware.gov/d/pjnv-eaih)) | data.delaware.gov | Socrata SODA API, live per report | licenses | owner, license | live | SOCRATA_APP_TOKEN (optional) | allowed; allowed |
 | Delaware Division of Revenue contractor business licenses ([page](https://data.delaware.gov/d/5zy2-grhr)) | data.delaware.gov | Socrata SODA API, live per report | licenses | name, license, address | live | SOCRATA_APP_TOKEN (optional) | allowed; allowed |
 | Delaware Division of Professional Regulation (architects, surveyors, geologists, home inspectors) ([page](https://data.delaware.gov/d/pjnv-eaih)) | data.delaware.gov | Socrata SODA API, live per report | licenses | owner, license | live | SOCRATA_APP_TOKEN (optional) | allowed; allowed |
@@ -300,7 +303,6 @@ Looked at and not used (from the pack's `blocked` notes):
 
 - Delaware Division of Corporations entity search (icis.corp.delaware.gov): CAPTCHA on the search
 - Delaware DPR disciplinary actions (data.delaware.gov dz6p-akeq): names individual licensees only (no business), so it can't be searched for companies
-- Delaware DOL prevailing-wage debarment list: printed only inside each project's bid PDFs (bidcondocs.delaware.gov), no standing list or dataset
 - Delaware court records: no court dataset on data.delaware.gov
 
 ### DC
@@ -761,6 +763,7 @@ Checked live: 2026-10-15.
 
 Looked at and not used (from the pack's `blocked` notes):
 
+- NC Division of Purchase and Contract debarred vendors (ncadmin.nc.gov/government-agencies/procurement/contracts/debarred-vendors, CSV and PDF, revised 6/1/2021): not used, because the page's terms (www.nc.gov/disclaimer-terms-use, read 2026-10-15) grant "permission to copy and distribute non-image files, documents, and information for non-commercial use" only (coordinator's decision, 2026-10-15)
 - nclbgc.org (the board's main site, including its disciplinary news): Cloudflare challenge on every page; the portal.nclbgc.org search is used instead
 - NCBEEC public matters (/Public/_ShowAccountPublicMatters/): endpoint exists but no populated example was found to verify its layout, so it isn't searched
 - NC Secretary of State business registration: bulk data is a paid subscription and the SOS bars automated searching of its online tools
@@ -792,6 +795,7 @@ Checked live: 2026-10-15. No statewide GC license: Ohio does not license general
 | Ohio Construction Industry Licensing Board contractor licenses ([page](https://elicense4.com.ohio.gov/Lookup/LicenseLookup.aspx)) | elicense4.com.ohio.gov | bulk file `oh-ocilb` (official download, indexed) | licenses | name | every 24h, floor 8600 | none | allowed |
 | Ohio State Fire Marshal fire protection and UST licenses ([page](https://elicense7.com.ohio.gov/Lookup/LicenseLookup.aspx)) | elicense7.com.ohio.gov | bulk file `oh-sfm` (official download, indexed) | licenses | name | every 168h, floor 16000 | none | allowed |
 | Cleveland contractor registrations (city/county) ([page](https://www.arcgis.com/home/item.html?id=92e169a99d7b42ae97f6c28a7f7e9a19)) | www.arcgis.com | bulk file `oh-cleveland-contractors` (official download, indexed) | licenses | name | every 24h, floor 2300 | none | allowed |
+| Ohio Attorney General Public Inspection File (consumer-law court rulings) | - | live search per report | courts (companies only) | name | live | none | checked at run time (its URL lives in the search code, not the registry) |
 
 Looked at and not used (from the pack's `blocked` notes):
 
@@ -877,12 +881,11 @@ Looked at and not used (from the pack's `blocked` notes):
 
 Checked live: 2026-10-15.
 
-| Source | Publisher | Access | Holds | Searched by | Refresh / floor | Keys | robots.txt (page; API) |
-|---|---|---|---|---|---|---|---|
-| South Carolina DES environmental enforcement orders ([page](https://des.sc.gov/about-scdes/programs-divisions/environmental-enforcement-actions)) | des.sc.gov | bulk file `sc-des-enforcement` (official download, indexed) | environmental (companies only) | name | every 168h, floor 600 | none | allowed |
+No source is searched for this state yet.
 
 Looked at and not used (from the pack's `blocked` notes):
 
+- SC DES environmental enforcement action reports (the monthly PDFs linked from des.sc.gov "Environmental Enforcement Actions"; was sc-des-enforcement): not used, because des.sc.gov's Website Accessibility and Policies page says "You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing" (coordinator's decision, 2026-10-15)
 - SC LLR licensee lookup (verify.llronline.com/LicLookup/Contractors/Contractor.aspx?div=69 for the Contractor's Licensing Board's general and mechanical contractors, Resbu/Resbu.aspx?div=46 for the Residential Builders Commission, BurgFire for burglar/fire/sprinkler): a g-recaptcha widget on every search form, the Find button hidden until it is solved; rechecked 2026-10-15
 - SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 and 46, /OnlineVerificationBulk): eservice.llr.sc.gov/robots.txt is "User-agent: * / Disallow: /"; rechecked 2026-10-15
 - SC Contractor's Licensing Board meeting minutes (llr.sc.gov/clb/minutes, robots-allowed PDFs): disciplinary hearings are listed by case number only ("In accordance with Board confidentiality statutes, the hearing was closed"), no respondent named; checked the 2026-07-30 minutes
@@ -890,7 +893,7 @@ Looked at and not used (from the pack's `blocked` notes):
 - SC DES Asbestos Contractors and Consultants Search (apps.des.sc.gov/AsbestosContractorsAndConsultants, with free CSV exports /CSV and /CSV/<type>: ~200 contractors, ~870 consultants and air samplers on 2026-10-15) and the UST Class I/II certified contractors PDF (des.sc.gov List_of_Certified_Contractors_August2026.pdf): not used, because des.sc.gov's Website Accessibility and Policies page says "You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing"
 - SCDOT prequalified prime contractors (apps.scdot.org/powerbiexport, a free CSV export refreshed daily, ~425 firms on 2026-10-15): not used, because scdot.org/disclaimer.html says "You may not modify, publish, transmit, display, participate in the transfer or sale, create derivative works or in any way exploit, any of the content, in whole or in part, without the express written permission of SCDOT"
 - SC Secretary of State business entities (businessfilings.sc.gov/BusinessFiling/Entity/Search): g-recaptcha on the search form; rechecked 2026-10-15
-- SC DES ArcGIS hub: private; the monthly enforcement report PDFs are loaded instead (sc-des-enforcement)
+- SC DES ArcGIS hub: private (and on a des.sc.gov service, under the same terms)
 - SC Workers' Compensation Commission and SC Materials Management Office: no published list of penalized employers or debarred vendors (decisions are single PDFs)
 
 ### SD
@@ -1023,27 +1026,26 @@ Checked live: 2026-10-15.
 | Source | Publisher | Access | Holds | Searched by | Refresh / floor | Keys | robots.txt (page; API) |
 |---|---|---|---|---|---|---|---|
 | WV Employer Violator System (workers' comp default) ([page](https://www.wvinsurance.gov/EVS)) | www.wvinsurance.gov | bulk file `wv-oic-evs` (official download, indexed) | debarment (companies only) | name | every 168h, floor 1500, row_shape 1 | none | allowed |
-| WV Purchasing Division debarred vendors ([page](https://www.state.wv.us/admin/purchase/debar.html)) | www.state.wv.us | bulk file `wv-purchasing-debarred` (official download, indexed) | debarment (companies only) | name | every 168h, floor 9 | none | allowed |
 | WV State Fire Marshal electrician licenses ([page](https://sfm-permit-public.wvoasis.gov/publicdata/LicenseeSearch)) | sfm-permit-public.wvoasis.gov | the agency's own lookup (page or API), live per report | licenses | owner, license | live | none | allowed |
 
 Looked at and not used (from the pack's `blocked` notes):
 
 - WV Contractor Licensing Board license search and board actions (wvclboard.wv.gov/verify, linked as "Contractor License Search" from labor.wv.gov/database-search; /about/actions.asp): robots.txt "User-agent: * / Disallow: /" (re-checked 2026-10-15; http:// and www. redirect to the same file)
 - WV Division of Labor certified plumbers, HVAC technicians, manufactured-housing licensees, elevator and amusement-ride inspectors and registered service companies (www.wvlabor.com/new_searches/*.cfm, linked from labor.wv.gov/database-search): robots.txt answers HTTP 500 (2026-10-15), read as a refusal of the host (RFC 9309); https:// does not connect
-- WV Purchasing Division (purchasing.wv.gov): robots.txt "User-Agent: * / Disallow: /"; the debarred-vendor list used here is the one on the Division's www.state.wv.us/admin/purchase site, which robots.txt allows
+- WV Purchasing Division debarred vendors (purchasing.wv.gov, and the same list on the Division's legacy host www.state.wv.us/admin/purchase/debar.html; was wv-purchasing-debarred): purchasing.wv.gov's robots.txt is "User-Agent: * / Disallow: /", and reading the same list from the legacy host would be a side door around that refusal (coordinator's decision, 2026-10-15)
 - WV Secretary of State business search (apps.sos.wv.gov/business/corporations): the form carries bot-trap fields, treated as an anti-bot measure; bulk data is a paid subscription
 
 ### WI
 
 Checked live: 2026-10-15.
 
-| Source | Publisher | Access | Holds | Searched by | Refresh / floor | Keys | robots.txt (page; API) |
-|---|---|---|---|---|---|---|---|
-| Wisconsin DNR licensed well drillers and pump installers ([page](https://dnr.wisconsin.gov/topic/Wells/Contacts.html)) | dnr.wisconsin.gov | bulk file `wi-dnr-wells` (official download, indexed) | licenses | name | every 168h, floor 1350 | none | allowed |
-| Wisconsin DHS certified lead and asbestos companies ([page](https://www.dhs.wisconsin.gov/lead/hire-a-contractor.htm)) | www.dhs.wisconsin.gov | bulk file `wi-dhs-abatement` (official download, indexed) | licenses | name | every 168h, floor 1750 | none | allowed |
+No source is searched for this state yet.
 
 Looked at and not used (from the pack's `blocked` notes):
 
+- Wisconsin DNR drilling and pump-installing service directories (dnr.wisconsin.gov/topic/Wells/Contacts.html, .xlsx; was wi-dnr-wells): not used, because DNR's Acceptable Use Policy (dnr.wisconsin.gov/legal/acceptableuse, read 2026-10-15) says "The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Department of Natural Resources webpages and linked agency webpages. ... For copy or use of information on the department website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page"
+- Wisconsin DHS certified lead and asbestos companies (www.dhs.wisconsin.gov/lead/hire-a-contractor.htm and /asbestos/contractors.htm, .xlsx; was wi-dhs-abatement): not used, because those pages' Policies link is the Wisconsin.gov Legal/Acceptable Use page (www.wisconsin.gov/Pages/Policies.aspx, read 2026-10-15), which says "The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Wisconsin.gov and linked agency Webpages. ... For copy or use of information on the State of Wisconsin website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page"
+- WisDOT debarred, suspended and ineligible contractors (wisconsindot.gov/hccidocs/debar.pdf) and the WI DOA debarment list: not used, because WisDOT's Acceptable Use Policy (wisconsindot.gov/Pages/global-footer/Acceptable-use-policy.aspx, read 2026-10-15) says "This website, and the pages and material available on it, are for the noncommercial use of the general public", and DOA's pages carry the Wisconsin.gov terms quoted above
 - DSPS credential lookup (license.wi.gov, the LicensE platform): Cloudflare blocks our bot ("Sorry, you have been blocked"); dwelling contractors, qualifiers, plumbers, electricians and HVAC are not searchable
 - DSPS old lookup and Reports of Decisions (online.drl.wi.gov): 403 with a CAPTCHA page
 - DSPS Credential/License List Purchasing (dspslicenselist.wi.gov): a paid list service, and the host does not resolve from here

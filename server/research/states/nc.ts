@@ -39,6 +39,7 @@ export const pack: StatePack = {
   liveLicenses: [live(NCLBGC), live(NCBEEC), live(NCPHFS)],
   liveEnforcement: LIVE_ENFORCEMENT,
   blocked: [
+    "NC Division of Purchase and Contract debarred vendors (ncadmin.nc.gov/government-agencies/procurement/contracts/debarred-vendors, CSV and PDF, revised 6/1/2021): not used, because the page's terms (www.nc.gov/disclaimer-terms-use, read 2026-10-15) grant \"permission to copy and distribute non-image files, documents, and information for non-commercial use\" only (coordinator's decision, 2026-10-15)",
     "nclbgc.org (the board's main site, including its disciplinary news): Cloudflare challenge on every page; the portal.nclbgc.org search is used instead",
     "NCBEEC public matters (/Public/_ShowAccountPublicMatters/): endpoint exists but no populated example was found to verify its layout, so it isn't searched",
     "NC Secretary of State business registration: bulk data is a paid subscription and the SOS bars automated searching of its online tools",

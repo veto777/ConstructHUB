@@ -260,44 +260,53 @@
    "subjects": [
     {
      "role": "company",
-     "name": "Ultimate Heating & Cooling, Inc",
+     "name": "A American Electric, L.L.C.",
      "kind": "company",
      "source": "Colorado DORA licenses (electrical, plumbing, water well)",
      "sourceId": "https://data.colorado.gov/d/7s5z-vewr",
-     "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 4792",
-     "recordId": "4792",
+     "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 5502",
+     "recordId": "5502",
      "expected": {
       "kind": "license",
       "source": "Colorado DORA licenses (electrical, plumbing, water well)",
-      "licenseNumber": "4792",
-      "businessName": "Ultimate Heating & Cooling, Inc",
+      "licenseNumber": "5502",
+      "businessName": "A American Electric, L.L.C.",
       "matchedOn": "business"
      },
      "picked": "2026-10-15"
     },
     {
-     "role": "enforcement",
-     "null": true,
-     "reason": "No usable record of a company with an enforcement or discipline record found in: co-boulder-contractors (discipline); Colorado Secretary of State business entities; CO original enforcement",
-     "blocked": [
-      "DORA license lookup with discipline (apps2.colorado.gov/dora/licensing/Lookup): the search form requires a CAPTCHA"
-     ]
-    },
-    {
      "role": "person",
-     "name": "Rusty Colt Twilley",
+     "name": "Wyatt Austin Kriplin",
      "kind": "person",
      "source": "Colorado DORA licenses (electrical, plumbing, water well)",
      "sourceId": "https://data.colorado.gov/d/7s5z-vewr",
-     "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 41650",
-     "recordId": "41650",
+     "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 9974116",
+     "recordId": "9974116",
      "expected": {
       "kind": "license",
       "source": "Colorado DORA licenses (electrical, plumbing, water well)",
-      "licenseNumber": "41650",
+      "licenseNumber": "9974116",
       "businessName": null,
-      "person": "Rusty Colt Twilley",
+      "person": "Wyatt Austin Kriplin",
       "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Eagle Electric Co.",
+     "kind": "company",
+     "source": "Colorado DORA discipline of electrical, plumbing and water well contractors",
+     "sourceId": "https://data.colorado.gov/d/7s5z-vewr",
+     "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, search \"Electric\"",
+     "recordId": "1999-3999000360",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Colorado DORA discipline of electrical, plumbing and water well contractors",
+      "id": "1999-3999000360",
+      "name": "Eagle Electric Co.",
+      "category": "discipline"
      },
      "picked": "2026-10-15"
     }
@@ -367,17 +376,17 @@
    "subjects": [
     {
      "role": "company",
-     "name": "CAHILL CONTRACTING INC",
+     "name": "DURHAM PLUMBING SERVICE, LLC",
      "kind": "company",
      "source": "Delaware Division of Revenue contractor business licenses",
      "sourceId": "https://data.delaware.gov/d/5zy2-grhr",
-     "from": "Socrata dataset https://data.delaware.gov/d/5zy2-grhr, row 1990029424 (the publisher lists no status: a list of current licenses)",
-     "recordId": "1990029424",
+     "from": "Socrata dataset https://data.delaware.gov/d/5zy2-grhr, row 2017600660 (the publisher lists no status: a list of current licenses)",
+     "recordId": "2017600660",
      "expected": {
       "kind": "license",
       "source": "Delaware Division of Revenue contractor business licenses",
-      "licenseNumber": "1990029424",
-      "businessName": "CAHILL CONTRACTING INC",
+      "licenseNumber": "2017600660",
+      "businessName": "DURHAM PLUMBING SERVICE, LLC",
       "matchedOn": "business"
      },
      "picked": "2026-10-15"
@@ -385,29 +394,62 @@
     {
      "role": "enforcement",
      "null": true,
-     "reason": "No usable record of a company with an enforcement or discipline record found in: DE original enforcement",
+     "reason": "No usable record of a company with an enforcement or discipline record found in: de-dol-wpfa-violators; de-dol-pw-debarment; DE original enforcement",
      "blocked": [
       "Delaware Division of Corporations entity search (icis.corp.delaware.gov): CAPTCHA on the search",
       "Delaware DPR disciplinary actions (data.delaware.gov dz6p-akeq): names individual licensees only (no business), so it can't be searched for companies",
-      "Delaware DOL prevailing-wage debarment list: printed only inside each project's bid PDFs (bidcondocs.delaware.gov), no standing list or dataset",
       "Delaware court records: no court dataset on data.delaware.gov"
      ]
     },
     {
      "role": "person",
-     "name": "SHAWN DEEL",
+     "name": "IRENE LIBERTA",
      "kind": "person",
      "source": "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
      "sourceId": "https://data.delaware.gov/d/pjnv-eaih",
-     "from": "Socrata dataset https://data.delaware.gov/d/pjnv-eaih, row TH-0021461",
-     "recordId": "TH-0021461",
+     "from": "Socrata dataset https://data.delaware.gov/d/pjnv-eaih, row TH-0020989",
+     "recordId": "TH-0020989",
      "expected": {
       "kind": "license",
       "source": "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
-      "licenseNumber": "TH-0021461",
+      "licenseNumber": "TH-0020989",
       "businessName": null,
-      "person": "SHAWN DEEL",
+      "person": "IRENE LIBERTA",
       "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "El Salvador Painting LLC",
+     "kind": "company",
+     "source": "Delaware Department of Labor Workplace Fraud Act violators",
+     "sourceId": "de-dol-wpfa-violators",
+     "from": "bulk file de-dol-wpfa-violators, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "Delaware Department of Labor Workplace Fraud Act violators",
+      "id": null,
+      "name": "El Salvador Painting LLC",
+      "category": "wage"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "ACH 1, INC.",
+     "kind": "company",
+     "source": "Delaware Department of Labor prevailing wage debarment list",
+     "sourceId": "de-dol-pw-debarment",
+     "from": "bulk file de-dol-pw-debarment, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "Delaware Department of Labor prevailing wage debarment list",
+      "id": null,
+      "name": "ACH 1, INC.",
+      "category": "debarment"
      },
      "picked": "2026-10-15"
     }
@@ -1867,47 +1909,53 @@
    "subjects": [
     {
      "role": "company",
-     "name": "AIRFAST HEATING & COOLING",
+     "name": "M C SERVICES INC",
      "kind": "company",
      "source": "Ohio Construction Industry Licensing Board contractor licenses",
      "sourceId": "oh-ocilb",
      "from": "bulk file oh-ocilb, loaded 2026-10-15",
-     "recordId": "RE.10708",
+     "recordId": "EL.19185",
      "expected": {
       "kind": "license",
       "source": "Ohio Construction Industry Licensing Board contractor licenses",
-      "licenseNumber": "RE.10708",
-      "businessName": "AIRFAST HEATING & COOLING",
+      "licenseNumber": "EL.19185",
+      "businessName": "M C SERVICES INC",
       "matchedOn": "business"
      },
      "picked": "2026-10-15"
     },
     {
-     "role": "enforcement",
-     "null": true,
-     "reason": "No usable record of a company with an enforcement or discipline record found in: oh-ocilb (discipline); oh-sfm (discipline); oh-cleveland-contractors (discipline); OH original enforcement",
-     "blocked": [
-      "elicense.ohio.gov (Salesforce license lookup for the other Commerce boards and OCILB board actions): the page carries a CAPTCHA",
-      "Ohio Secretary of State business reports (ohiosos.gov): HTTP 403 with a \"Website Maintenance\" page on 2026-10-15, and again on the retry at 06:52 UTC from tower1 and vb11 (robots.txt and businesssearch.ohiosos.gov too); recheck later",
-      "OCILB disciplinary actions: no published list or download found on com.ohio.gov",
-      "Ohio Facilities Construction Commission debarment list (R.C. 153.02): no published list found"
-     ]
-    },
-    {
      "role": "person",
-     "name": "JOSEPH GIANGIULI",
+     "name": "ANTHONY PATRICK",
      "kind": "person",
      "source": "Ohio Construction Industry Licensing Board contractor licenses",
      "sourceId": "oh-ocilb",
      "from": "bulk file oh-ocilb, loaded 2026-10-15",
-     "recordId": "HV.10823",
+     "recordId": "EL.35300",
      "expected": {
       "kind": "license",
       "source": "Ohio Construction Industry Licensing Board contractor licenses",
-      "licenseNumber": "HV.10823",
-      "businessName": "D & G MECHANICAL INC",
-      "person": "JOSEPH GIANGIULI",
+      "licenseNumber": "EL.35300",
+      "businessName": "TNT ELECTRIC",
+      "person": "ANTHONY PATRICK",
       "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Pave-Way Construction Company",
+     "kind": "company",
+     "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+     "sourceId": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+     "from": "live search \"Construction\"",
+     "recordId": "10000082",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+      "id": "10000082",
+      "name": "Pave-Way Construction Company",
+      "category": "court_case"
      },
      "picked": "2026-10-15"
     }
@@ -2147,6 +2195,7 @@
      "null": true,
      "reason": "No registered source publishes a business holding an active license for SC",
      "blocked": [
+      "SC DES environmental enforcement action reports (the monthly PDFs linked from des.sc.gov \"Environmental Enforcement Actions\"; was sc-des-enforcement): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\" (coordinator's decision, 2026-10-15)",
       "SC LLR licensee lookup (verify.llronline.com/LicLookup/Contractors/Contractor.aspx?div=69 for the Contractor's Licensing Board's general and mechanical contractors, Resbu/Resbu.aspx?div=46 for the Residential Builders Commission, BurgFire for burglar/fire/sprinkler): a g-recaptcha widget on every search form, the Find button hidden until it is solved; rechecked 2026-10-15",
       "SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 and 46, /OnlineVerificationBulk): eservice.llr.sc.gov/robots.txt is \"User-agent: * / Disallow: /\"; rechecked 2026-10-15",
       "SC Contractor's Licensing Board meeting minutes (llr.sc.gov/clb/minutes, robots-allowed PDFs): disciplinary hearings are listed by case number only (\"In accordance with Board confidentiality statutes, the hearing was closed\"), no respondent named; checked the 2026-07-30 minutes",
@@ -2154,32 +2203,33 @@
       "SC DES Asbestos Contractors and Consultants Search (apps.des.sc.gov/AsbestosContractorsAndConsultants, with free CSV exports /CSV and /CSV/<type>: ~200 contractors, ~870 consultants and air samplers on 2026-10-15) and the UST Class I/II certified contractors PDF (des.sc.gov List_of_Certified_Contractors_August2026.pdf): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\"",
       "SCDOT prequalified prime contractors (apps.scdot.org/powerbiexport, a free CSV export refreshed daily, ~425 firms on 2026-10-15): not used, because scdot.org/disclaimer.html says \"You may not modify, publish, transmit, display, participate in the transfer or sale, create derivative works or in any way exploit, any of the content, in whole or in part, without the express written permission of SCDOT\"",
       "SC Secretary of State business entities (businessfilings.sc.gov/BusinessFiling/Entity/Search): g-recaptcha on the search form; rechecked 2026-10-15",
-      "SC DES ArcGIS hub: private; the monthly enforcement report PDFs are loaded instead (sc-des-enforcement)",
+      "SC DES ArcGIS hub: private (and on a des.sc.gov service, under the same terms)",
       "SC Workers' Compensation Commission and SC Materials Management Office: no published list of penalized employers or debarred vendors (decisions are single PDFs)"
      ]
     },
     {
      "role": "enforcement",
-     "name": "Alchemy Real Estate, LLC",
-     "kind": "company",
-     "source": "South Carolina DES environmental enforcement orders",
-     "sourceId": "sc-des-enforcement",
-     "from": "bulk file sc-des-enforcement, loaded 2026-10-15",
-     "recordId": "AF-0001416",
-     "expected": {
-      "kind": "enforcement",
-      "source": "South Carolina DES environmental enforcement orders",
-      "id": "AF-0001416",
-      "name": "Alchemy Real Estate, LLC",
-      "category": "environmental"
-     },
-     "picked": "2026-10-15"
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: SC original enforcement",
+     "blocked": [
+      "SC DES environmental enforcement action reports (the monthly PDFs linked from des.sc.gov \"Environmental Enforcement Actions\"; was sc-des-enforcement): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\" (coordinator's decision, 2026-10-15)",
+      "SC LLR licensee lookup (verify.llronline.com/LicLookup/Contractors/Contractor.aspx?div=69 for the Contractor's Licensing Board's general and mechanical contractors, Resbu/Resbu.aspx?div=46 for the Residential Builders Commission, BurgFire for burglar/fire/sprinkler): a g-recaptcha widget on every search form, the Find button hidden until it is solved; rechecked 2026-10-15",
+      "SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 and 46, /OnlineVerificationBulk): eservice.llr.sc.gov/robots.txt is \"User-agent: * / Disallow: /\"; rechecked 2026-10-15",
+      "SC Contractor's Licensing Board meeting minutes (llr.sc.gov/clb/minutes, robots-allowed PDFs): disciplinary hearings are listed by case number only (\"In accordance with Board confidentiality statutes, the hearing was closed\"), no respondent named; checked the 2026-07-30 minutes",
+      "SC LLR license rosters: sold by mailed request ($10 check per roster with a signed Family Privacy Protection Act statement, llr.sc.gov/AboutUs/MediaCenter/pidocs/Statement_Compliance.pdf, linked as 'Licensee List Request' from llr.sc.gov/clb); needs the owner",
+      "SC DES Asbestos Contractors and Consultants Search (apps.des.sc.gov/AsbestosContractorsAndConsultants, with free CSV exports /CSV and /CSV/<type>: ~200 contractors, ~870 consultants and air samplers on 2026-10-15) and the UST Class I/II certified contractors PDF (des.sc.gov List_of_Certified_Contractors_August2026.pdf): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\"",
+      "SCDOT prequalified prime contractors (apps.scdot.org/powerbiexport, a free CSV export refreshed daily, ~425 firms on 2026-10-15): not used, because scdot.org/disclaimer.html says \"You may not modify, publish, transmit, display, participate in the transfer or sale, create derivative works or in any way exploit, any of the content, in whole or in part, without the express written permission of SCDOT\"",
+      "SC Secretary of State business entities (businessfilings.sc.gov/BusinessFiling/Entity/Search): g-recaptcha on the search form; rechecked 2026-10-15",
+      "SC DES ArcGIS hub: private (and on a des.sc.gov service, under the same terms)",
+      "SC Workers' Compensation Commission and SC Materials Management Office: no published list of penalized employers or debarred vendors (decisions are single PDFs)"
+     ]
     },
     {
      "role": "person",
      "null": true,
      "reason": "No registered source publishes an individual license holder for SC",
      "blocked": [
+      "SC DES environmental enforcement action reports (the monthly PDFs linked from des.sc.gov \"Environmental Enforcement Actions\"; was sc-des-enforcement): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\" (coordinator's decision, 2026-10-15)",
       "SC LLR licensee lookup (verify.llronline.com/LicLookup/Contractors/Contractor.aspx?div=69 for the Contractor's Licensing Board's general and mechanical contractors, Resbu/Resbu.aspx?div=46 for the Residential Builders Commission, BurgFire for burglar/fire/sprinkler): a g-recaptcha widget on every search form, the Find button hidden until it is solved; rechecked 2026-10-15",
       "SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 and 46, /OnlineVerificationBulk): eservice.llr.sc.gov/robots.txt is \"User-agent: * / Disallow: /\"; rechecked 2026-10-15",
       "SC Contractor's Licensing Board meeting minutes (llr.sc.gov/clb/minutes, robots-allowed PDFs): disciplinary hearings are listed by case number only (\"In accordance with Board confidentiality statutes, the hearing was closed\"), no respondent named; checked the 2026-07-30 minutes",
@@ -2187,7 +2237,7 @@
       "SC DES Asbestos Contractors and Consultants Search (apps.des.sc.gov/AsbestosContractorsAndConsultants, with free CSV exports /CSV and /CSV/<type>: ~200 contractors, ~870 consultants and air samplers on 2026-10-15) and the UST Class I/II certified contractors PDF (des.sc.gov List_of_Certified_Contractors_August2026.pdf): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\"",
       "SCDOT prequalified prime contractors (apps.scdot.org/powerbiexport, a free CSV export refreshed daily, ~425 firms on 2026-10-15): not used, because scdot.org/disclaimer.html says \"You may not modify, publish, transmit, display, participate in the transfer or sale, create derivative works or in any way exploit, any of the content, in whole or in part, without the express written permission of SCDOT\"",
       "SC Secretary of State business entities (businessfilings.sc.gov/BusinessFiling/Entity/Search): g-recaptcha on the search form; rechecked 2026-10-15",
-      "SC DES ArcGIS hub: private; the monthly enforcement report PDFs are loaded instead (sc-des-enforcement)",
+      "SC DES ArcGIS hub: private (and on a des.sc.gov service, under the same terms)",
       "SC Workers' Compensation Commission and SC Materials Management Office: no published list of penalized employers or debarred vendors (decisions are single PDFs)"
      ]
     }
@@ -2594,13 +2644,13 @@
      "blocked": [
       "WV Contractor Licensing Board license search and board actions (wvclboard.wv.gov/verify, linked as \"Contractor License Search\" from labor.wv.gov/database-search; /about/actions.asp): robots.txt \"User-agent: * / Disallow: /\" (re-checked 2026-10-15; http:// and www. redirect to the same file)",
       "WV Division of Labor certified plumbers, HVAC technicians, manufactured-housing licensees, elevator and amusement-ride inspectors and registered service companies (www.wvlabor.com/new_searches/*.cfm, linked from labor.wv.gov/database-search): robots.txt answers HTTP 500 (2026-10-15), read as a refusal of the host (RFC 9309); https:// does not connect",
-      "WV Purchasing Division (purchasing.wv.gov): robots.txt \"User-Agent: * / Disallow: /\"; the debarred-vendor list used here is the one on the Division's www.state.wv.us/admin/purchase site, which robots.txt allows",
+      "WV Purchasing Division debarred vendors (purchasing.wv.gov, and the same list on the Division's legacy host www.state.wv.us/admin/purchase/debar.html; was wv-purchasing-debarred): purchasing.wv.gov's robots.txt is \"User-Agent: * / Disallow: /\", and reading the same list from the legacy host would be a side door around that refusal (coordinator's decision, 2026-10-15)",
       "WV Secretary of State business search (apps.sos.wv.gov/business/corporations): the form carries bot-trap fields, treated as an anti-bot measure; bulk data is a paid subscription"
      ]
     },
     {
      "role": "enforcement",
-     "name": "A 1 LTD LLC",
+     "name": "PRO MED ANALYSIS LLC",
      "kind": "company",
      "source": "WV Employer Violator System (workers' comp default)",
      "sourceId": "wv-oic-evs",
@@ -2610,7 +2660,7 @@
       "kind": "enforcement",
       "source": "WV Insurance Commissioner Employer Violator System (workers' comp default)",
       "id": null,
-      "name": "A 1 LTD LLC",
+      "name": "PRO MED ANALYSIS LLC",
       "category": "debarment"
      },
      "picked": "2026-10-15"
@@ -2632,23 +2682,6 @@
       "matchedOn": "principal"
      },
      "picked": "2026-10-15"
-    },
-    {
-     "role": "enforcement",
-     "name": "KGH Development Inc.",
-     "kind": "company",
-     "source": "WV Purchasing Division debarred vendors",
-     "sourceId": "wv-purchasing-debarred",
-     "from": "bulk file wv-purchasing-debarred, loaded 2026-10-15",
-     "recordId": null,
-     "expected": {
-      "kind": "enforcement",
-      "source": "WV Purchasing Division debarred vendors",
-      "id": null,
-      "name": "KGH Development Inc.",
-      "category": "debarment"
-     },
-     "picked": "2026-10-15"
     }
    ]
   },
@@ -2658,26 +2691,27 @@
    "subjects": [
     {
      "role": "company",
-     "name": "NEHLS & WEBSTER WD INC /NOKOMIS DIV",
-     "kind": "company",
-     "source": "Wisconsin DNR licensed well drillers and pump installers",
-     "sourceId": "wi-dnr-wells",
-     "from": "bulk file wi-dnr-wells, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
-     "recordId": "5842",
-     "expected": {
-      "kind": "license",
-      "source": "Wisconsin DNR licensed well drillers and pump installers",
-      "licenseNumber": "5842",
-      "businessName": "NEHLS & WEBSTER WD INC /NOKOMIS DIV",
-      "matchedOn": "business"
-     },
-     "picked": "2026-10-15"
+     "null": true,
+     "reason": "No registered source publishes a business holding an active license for WI",
+     "blocked": [
+      "Wisconsin DNR drilling and pump-installing service directories (dnr.wisconsin.gov/topic/Wells/Contacts.html, .xlsx; was wi-dnr-wells): not used, because DNR's Acceptable Use Policy (dnr.wisconsin.gov/legal/acceptableuse, read 2026-10-15) says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Department of Natural Resources webpages and linked agency webpages. ... For copy or use of information on the department website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "Wisconsin DHS certified lead and asbestos companies (www.dhs.wisconsin.gov/lead/hire-a-contractor.htm and /asbestos/contractors.htm, .xlsx; was wi-dhs-abatement): not used, because those pages' Policies link is the Wisconsin.gov Legal/Acceptable Use page (www.wisconsin.gov/Pages/Policies.aspx, read 2026-10-15), which says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Wisconsin.gov and linked agency Webpages. ... For copy or use of information on the State of Wisconsin website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "WisDOT debarred, suspended and ineligible contractors (wisconsindot.gov/hccidocs/debar.pdf) and the WI DOA debarment list: not used, because WisDOT's Acceptable Use Policy (wisconsindot.gov/Pages/global-footer/Acceptable-use-policy.aspx, read 2026-10-15) says \"This website, and the pages and material available on it, are for the noncommercial use of the general public\", and DOA's pages carry the Wisconsin.gov terms quoted above",
+      "DSPS credential lookup (license.wi.gov, the LicensE platform): Cloudflare blocks our bot (\"Sorry, you have been blocked\"); dwelling contractors, qualifiers, plumbers, electricians and HVAC are not searchable",
+      "DSPS old lookup and Reports of Decisions (online.drl.wi.gov): 403 with a CAPTCHA page",
+      "DSPS Credential/License List Purchasing (dspslicenselist.wi.gov): a paid list service, and the host does not resolve from here",
+      "Department of Revenue delinquent taxpayer list: its data service (ww2.revenue.wi.gov) has robots.txt Disallow: /",
+      "DWD worker-misclassification stop-work orders: no published list found"
+     ]
     },
     {
      "role": "enforcement",
      "null": true,
-     "reason": "No usable record of a company with an enforcement or discipline record found in: wi-dnr-wells (discipline); wi-dhs-abatement (discipline); WI original enforcement",
+     "reason": "No usable record of a company with an enforcement or discipline record found in: WI original enforcement",
      "blocked": [
+      "Wisconsin DNR drilling and pump-installing service directories (dnr.wisconsin.gov/topic/Wells/Contacts.html, .xlsx; was wi-dnr-wells): not used, because DNR's Acceptable Use Policy (dnr.wisconsin.gov/legal/acceptableuse, read 2026-10-15) says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Department of Natural Resources webpages and linked agency webpages. ... For copy or use of information on the department website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "Wisconsin DHS certified lead and asbestos companies (www.dhs.wisconsin.gov/lead/hire-a-contractor.htm and /asbestos/contractors.htm, .xlsx; was wi-dhs-abatement): not used, because those pages' Policies link is the Wisconsin.gov Legal/Acceptable Use page (www.wisconsin.gov/Pages/Policies.aspx, read 2026-10-15), which says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Wisconsin.gov and linked agency Webpages. ... For copy or use of information on the State of Wisconsin website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "WisDOT debarred, suspended and ineligible contractors (wisconsindot.gov/hccidocs/debar.pdf) and the WI DOA debarment list: not used, because WisDOT's Acceptable Use Policy (wisconsindot.gov/Pages/global-footer/Acceptable-use-policy.aspx, read 2026-10-15) says \"This website, and the pages and material available on it, are for the noncommercial use of the general public\", and DOA's pages carry the Wisconsin.gov terms quoted above",
       "DSPS credential lookup (license.wi.gov, the LicensE platform): Cloudflare blocks our bot (\"Sorry, you have been blocked\"); dwelling contractors, qualifiers, plumbers, electricians and HVAC are not searchable",
       "DSPS old lookup and Reports of Decisions (online.drl.wi.gov): 403 with a CAPTCHA page",
       "DSPS Credential/License List Purchasing (dspslicenselist.wi.gov): a paid list service, and the host does not resolve from here",
@@ -2687,21 +2721,18 @@
     },
     {
      "role": "person",
-     "name": "BRANDON D MACOMBER",
-     "kind": "person",
-     "source": "Wisconsin DNR licensed well drillers and pump installers",
-     "sourceId": "wi-dnr-wells",
-     "from": "bulk file wi-dnr-wells, loaded 2026-10-15",
-     "recordId": "8739",
-     "expected": {
-      "kind": "license",
-      "source": "Wisconsin DNR licensed well drillers and pump installers",
-      "licenseNumber": "8739",
-      "businessName": null,
-      "person": "BRANDON D MACOMBER",
-      "matchedOn": "principal"
-     },
-     "picked": "2026-10-15"
+     "null": true,
+     "reason": "No registered source publishes an individual license holder for WI",
+     "blocked": [
+      "Wisconsin DNR drilling and pump-installing service directories (dnr.wisconsin.gov/topic/Wells/Contacts.html, .xlsx; was wi-dnr-wells): not used, because DNR's Acceptable Use Policy (dnr.wisconsin.gov/legal/acceptableuse, read 2026-10-15) says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Department of Natural Resources webpages and linked agency webpages. ... For copy or use of information on the department website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "Wisconsin DHS certified lead and asbestos companies (www.dhs.wisconsin.gov/lead/hire-a-contractor.htm and /asbestos/contractors.htm, .xlsx; was wi-dhs-abatement): not used, because those pages' Policies link is the Wisconsin.gov Legal/Acceptable Use page (www.wisconsin.gov/Pages/Policies.aspx, read 2026-10-15), which says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Wisconsin.gov and linked agency Webpages. ... For copy or use of information on the State of Wisconsin website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "WisDOT debarred, suspended and ineligible contractors (wisconsindot.gov/hccidocs/debar.pdf) and the WI DOA debarment list: not used, because WisDOT's Acceptable Use Policy (wisconsindot.gov/Pages/global-footer/Acceptable-use-policy.aspx, read 2026-10-15) says \"This website, and the pages and material available on it, are for the noncommercial use of the general public\", and DOA's pages carry the Wisconsin.gov terms quoted above",
+      "DSPS credential lookup (license.wi.gov, the LicensE platform): Cloudflare blocks our bot (\"Sorry, you have been blocked\"); dwelling contractors, qualifiers, plumbers, electricians and HVAC are not searchable",
+      "DSPS old lookup and Reports of Decisions (online.drl.wi.gov): 403 with a CAPTCHA page",
+      "DSPS Credential/License List Purchasing (dspslicenselist.wi.gov): a paid list service, and the host does not resolve from here",
+      "Department of Revenue delinquent taxpayer list: its data service (ww2.revenue.wi.gov) has robots.txt Disallow: /",
+      "DWD worker-misclassification stop-work orders: no published list found"
+     ]
     }
    ]
   },

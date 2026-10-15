@@ -11,7 +11,8 @@
  *     wv-oic-evs  WV Offices of the Insurance Commissioner Employer Violator System: employers in default on workers'
  *                 compensation money owed (barred from state licenses and permits until paid), every business by
  *                 first letter (www.wvinsurance.gov/EVS; robots.txt absent). Companies only; owner names are not kept.
- *     wv-purchasing-debarred  WV Purchasing Division debarred vendors: "vendors who are currently debarred from doing
+ *     wv-purchasing-debarred  NOT REGISTERED since 2026-10-15 (see `blocked`: the Division's current host disallows
+ *                 every robot, and the legacy host would be a side door). Was: WV Purchasing Division debarred vendors: "vendors who are currently debarred from doing
  *                 business with the State of West Virginia" under W. Va. Code §5A-3-33c and 33d (one HTML table:
  *                 Vendor Name, Vendor Address, Debarment Date, Debarment Period, Debarment Scope), linked from the
  *                 Purchasing Division's site www.state.wv.us/admin/purchase (robots.txt there disallows only /scripts,
@@ -202,10 +203,11 @@ const BULK: BulkSource[] = [
   { id: "wv-oic-evs", state: "WV", label: "WV Employer Violator System (workers' comp default)", pageUrl: EVS, everyHours: 24 * 7, minRows: 1_500, load: evsLoader, companiesOnly: true, category: "debarment",
     // Row shape 1: individuals are left out since 2026-10-15 (2,646 → 1,721 rows), so a shape-0 load is not a baseline.
     rowShape: 1 },
-  // 30 rows on 2026-10-15, 13 of them businesses (the rest are people, left out).
-  { id: "wv-purchasing-debarred", state: "WV", label: "WV Purchasing Division debarred vendors", pageUrl: DEBAR, everyHours: 24 * 7, minRows: 9,
-    load: wvDebarLoader, companiesOnly: true, category: "debarment" },
+  // wv-purchasing-debarred is not registered (coordinator, 2026-10-15; see `blocked`). wvDebarLoader is kept, unused;
+  // its stored rows are deleted at boot (bulk.ts RETIRED_BULK_SOURCES).
 ];
+/** Kept for its tests and a possible return (not registered): the Division's debarred-vendor list as bulk rows. */
+export const wvDebarredLoader = wvDebarLoader;
 
 export const pack: StatePack = {
   state: "WV",
@@ -215,7 +217,7 @@ export const pack: StatePack = {
   blocked: [
     "WV Contractor Licensing Board license search and board actions (wvclboard.wv.gov/verify, linked as \"Contractor License Search\" from labor.wv.gov/database-search; /about/actions.asp): robots.txt \"User-agent: * / Disallow: /\" (re-checked 2026-10-15; http:// and www. redirect to the same file)",
     "WV Division of Labor certified plumbers, HVAC technicians, manufactured-housing licensees, elevator and amusement-ride inspectors and registered service companies (www.wvlabor.com/new_searches/*.cfm, linked from labor.wv.gov/database-search): robots.txt answers HTTP 500 (2026-10-15), read as a refusal of the host (RFC 9309); https:// does not connect",
-    "WV Purchasing Division (purchasing.wv.gov): robots.txt \"User-Agent: * / Disallow: /\"; the debarred-vendor list used here is the one on the Division's www.state.wv.us/admin/purchase site, which robots.txt allows",
+    "WV Purchasing Division debarred vendors (purchasing.wv.gov, and the same list on the Division's legacy host www.state.wv.us/admin/purchase/debar.html; was wv-purchasing-debarred): purchasing.wv.gov's robots.txt is \"User-Agent: * / Disallow: /\", and reading the same list from the legacy host would be a side door around that refusal (coordinator's decision, 2026-10-15)",
     "WV Secretary of State business search (apps.sos.wv.gov/business/corporations): the form carries bot-trap fields, treated as an anti-bot measure; bulk data is a paid subscription",
   ],
 };

@@ -15,9 +15,10 @@
  *
  * No license source: rechecked live 2026-10-15, every free South Carolina contractor license list is behind a
  * reCAPTCHA or a robots.txt Disallow, or on a site whose terms forbid reuse (see `blocked`).
- * NOTE for the owner: des.sc.gov's "Website Accessibility and Policies" page (read 2026-10-15) says "You may not:
- * (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part
- * of this site except as specifically permitted by SCDES in writing". sc-des-enforcement reads that site.
+ * Removed 2026-10-15 (coordinator's decision): des.sc.gov's "Website Accessibility and Policies" page says "You may
+ * not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any
+ * part of this site except as specifically permitted by SCDES in writing", so sc-des-enforcement is no longer
+ * registered (the code below is kept, unused) and South Carolina has no searchable source.
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit } from "@shared/research-reports";
@@ -224,11 +225,11 @@ async function* desOrders(): AsyncIterable<BulkHit> {
 export const pack: StatePack = {
   state: "SC",
   checked: "2026-10-15",
-  bulk: [
-    { id: "sc-des-enforcement", state: "SC", label: "South Carolina DES environmental enforcement orders", pageUrl: DES_PAGE,
-      everyHours: 24 * 7, minRows: 600, load: desOrders, companiesOnly: true, category: "environmental" },
-  ],
+  // sc-des-enforcement is not registered (coordinator, 2026-10-15): des.sc.gov's terms bar republishing (see `blocked`).
+  // Its parser and loader (desOrders) are kept; its stored rows are deleted at boot (bulk.ts RETIRED_BULK_SOURCES).
+  bulk: [],
   blocked: [
+    "SC DES environmental enforcement action reports (the monthly PDFs linked from des.sc.gov \"Environmental Enforcement Actions\"; was sc-des-enforcement): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\" (coordinator's decision, 2026-10-15)",
     "SC LLR licensee lookup (verify.llronline.com/LicLookup/Contractors/Contractor.aspx?div=69 for the Contractor's Licensing Board's general and mechanical contractors, Resbu/Resbu.aspx?div=46 for the Residential Builders Commission, BurgFire for burglar/fire/sprinkler): a g-recaptcha widget on every search form, the Find button hidden until it is solved; rechecked 2026-10-15",
     "SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 and 46, /OnlineVerificationBulk): eservice.llr.sc.gov/robots.txt is \"User-agent: * / Disallow: /\"; rechecked 2026-10-15",
     "SC Contractor's Licensing Board meeting minutes (llr.sc.gov/clb/minutes, robots-allowed PDFs): disciplinary hearings are listed by case number only (\"In accordance with Board confidentiality statutes, the hearing was closed\"), no respondent named; checked the 2026-07-30 minutes",
@@ -236,7 +237,7 @@ export const pack: StatePack = {
     "SC DES Asbestos Contractors and Consultants Search (apps.des.sc.gov/AsbestosContractorsAndConsultants, with free CSV exports /CSV and /CSV/<type>: ~200 contractors, ~870 consultants and air samplers on 2026-10-15) and the UST Class I/II certified contractors PDF (des.sc.gov List_of_Certified_Contractors_August2026.pdf): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\"",
     "SCDOT prequalified prime contractors (apps.scdot.org/powerbiexport, a free CSV export refreshed daily, ~425 firms on 2026-10-15): not used, because scdot.org/disclaimer.html says \"You may not modify, publish, transmit, display, participate in the transfer or sale, create derivative works or in any way exploit, any of the content, in whole or in part, without the express written permission of SCDOT\"",
     "SC Secretary of State business entities (businessfilings.sc.gov/BusinessFiling/Entity/Search): g-recaptcha on the search form; rechecked 2026-10-15",
-    "SC DES ArcGIS hub: private; the monthly enforcement report PDFs are loaded instead (sc-des-enforcement)",
+    "SC DES ArcGIS hub: private (and on a des.sc.gov service, under the same terms)",
     "SC Workers' Compensation Commission and SC Materials Management Office: no published list of penalized employers or debarred vendors (decisions are single PDFs)",
   ],
 };

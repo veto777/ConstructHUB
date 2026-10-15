@@ -55,8 +55,8 @@ const MAX_DETAILS = 15;
 
 /**
  * The license page's entityType as the holder: the values the ROC answered on 2026-10-15 ("LLC", "Corporation",
- * "Partnership" → the business; "Sole Proprietorship" → the individual who owns it). Any other value is null, and the
- * license keeps the register's own holder (the account, a business).
+ * "Partnership" → the business; "Sole Proprietorship" → the individual who owns it). Any other value, or no page read,
+ * is null: the holder is unknown, shown like an individual's (city only, no phone).
  */
 export const rocHolder = (entityType: string | null | undefined) =>
   entityHolder(entityType, { business: /^(LLC|Corporation|Partnership)$/, individual: /^Sole Proprietorship$/ });
@@ -125,32 +125,34 @@ export function rocLicenseHits(rows: RocAccount[], name: string, kind: "person" 
         city: rocCity(a.address), expires: null, matchedOn: kind === "company" ? "business" : kind === "license" ? "license" : "principal",
         phone: clean(a.phone),
         people: Array.from(named, ([n, r]) => ({ name: n, role: Array.from(new Set(r)).join("; ") || null })),
-        // A ROC license is a contractor's license held by the account: the ROC's register is of licensed contracting
-        // businesses (the account), with its qualifying party and officers listed apart (publisher's definition; kept
-        // as "business" in round 3, decision 3). The license page's entityType refines it (withDetails, rocHolder): a
-        // sole proprietorship's license is its owner's. The account address is city, state and ZIP only (rocCity).
-        holder: "business",
+        // Who holds the license comes only from the license page's entityType (withDetails, rocHolder): LLC,
+        // Corporation or Partnership → the business; Sole Proprietorship → its owner. Until that page is read, and for
+        // hits past the MAX_DETAILS page reads, the holder is unknown (A13): a sole proprietor's phone is never shown
+        // because its page wasn't read. The account address is city, state and ZIP only (rocCity).
+        holder: null,
       });
     }
   }
   return out;
 }
 
-async function withDetails(hits: (LicenseHit & { licenseId: string })[]): Promise<LicenseHit[]> {
-  // The license page adds the class description and the renewed-through date.
+const rocDetail = (licenseId: string) => auraApex<RocDetail | null>(ROC, "apex://ARCP_ContractorSearch/ACTION$getLicenseDetail", { licenseId });
+
+export async function withDetails(hits: (LicenseHit & { licenseId: string })[], detail = rocDetail): Promise<LicenseHit[]> {
+  // The license page adds the class description, the renewed-through date and the holder.
   let failed = 0;
   for (const h of hits.slice(0, MAX_DETAILS)) {
     // One license page that fails is noted; an access denial stops the search (round 2, decision 6).
-    const d = await auraApex<RocDetail | null>(ROC, "apex://ARCP_ContractorSearch/ACTION$getLicenseDetail", { licenseId: h.licenseId }).catch((err) => { rethrowIfBlocked(err); return null; });
+    const d = await detail(h.licenseId).catch((err) => { rethrowIfBlocked(err); return null; });
     if (!d) { failed++; continue; }
     h.licenseType = clean(d.licenseDescription) ?? h.licenseType;
     h.expires = /^\d{4}-\d{2}-\d{2}$/.test(d.renewalThr ?? "") ? d.renewalThr! : null;
     h.status = clean(d.licenseStatus) ?? h.status;
-    h.holder = rocHolder(d.entityType) ?? h.holder;
+    h.holder = rocHolder(d.entityType); // an entity type not on either list leaves it unknown
   }
   const out = hits.map(({ licenseId: _id, ...h }) => h);
   return withNote(out, [
-    hits.length > MAX_DETAILS ? `class description and renewal date read for the first ${MAX_DETAILS} of ${hits.length} licenses` : null,
+    hits.length > MAX_DETAILS ? `class description, renewal date and holder read for the first ${MAX_DETAILS} of ${hits.length} licenses (the rest show city only)` : null,
     failed ? `the license page could not be read for ${failed} license(s), shown as the search lists them` : null,
   ].filter(Boolean).join("; "));
 }

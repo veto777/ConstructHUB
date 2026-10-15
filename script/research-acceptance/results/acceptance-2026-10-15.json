@@ -1,13 +1,12 @@
 {
- "generatedAt": "2026-10-15T22:14:31.134Z",
- "commit": "6831e130",
+ "generatedAt": "2026-10-15T23:36:00.080Z",
+ "commit": "f5e916f8",
  "options": {
   "states": [
-   "ME",
-   "WV"
+   "OH"
   ],
   "onlyFailed": false,
-  "useLoaded": false,
+  "useLoaded": true,
   "portals": false
  },
  "states": [
@@ -35,7 +34,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 1062,
+     "ms": 16126,
      "found": true,
      "where": "enforcement: Alabama Electrical Contractors Board disciplinary actions",
      "cells": [
@@ -47,7 +46,7 @@
       {
        "source": "Alabama Licensing Board for General Contractors",
        "section": "licenses",
-       "cell": "failed (licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read)"
+       "cell": "not searched (Not searched: the site refused automated access)"
       },
       {
        "source": "Alabama Onsite Wastewater Board installers",
@@ -60,15 +59,7 @@
        "cell": "searched, 0"
       }
      ],
-     "issues": [
-      {
-       "severity": "error",
-       "state": "AL",
-       "source": "Alabama Licensing Board for General Contractors",
-       "subject": "enforcement \"Home Pro Construction LLC\"",
-       "detail": "Could not search: licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read"
-      }
-     ],
+     "issues": [],
      "summary": "Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     }
@@ -84,15 +75,7 @@
     }
    ],
    "loads": [],
-   "issues": [
-    {
-     "severity": "error",
-     "state": "AL",
-     "source": "Alabama Licensing Board for General Contractors",
-     "subject": "enforcement \"Home Pro Construction LLC\"",
-     "detail": "Could not search: licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read"
-    }
-   ]
+   "issues": []
   },
   {
    "state": "AK",
@@ -138,7 +121,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 49187,
+     "ms": 51744,
      "found": true,
      "where": "licenses: Arizona Registrar of Contractors licenses",
      "cells": [
@@ -189,7 +172,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 5097,
+     "ms": 5369,
      "found": true,
      "where": "licenses: Arizona Registrar of Contractors licenses",
      "cells": [
@@ -247,7 +230,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 98,
+     "ms": 126,
      "found": true,
      "where": "licenses: Arkansas Fire Protection Licensing Board: licensed sprinkler companies",
      "cells": [
@@ -303,7 +286,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 15,
+     "ms": 19,
      "found": true,
      "where": "licenses: Arkansas Board of Electrical Examiners roster",
      "cells": [
@@ -366,7 +349,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 41,
+     "ms": 64,
      "found": true,
      "where": "licenses: California CSLB contractor licenses",
      "cells": [
@@ -446,7 +429,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 26,
+     "ms": 52,
      "found": true,
      "where": "enforcement: California CSLB revoked licenses (monthly lists)",
      "cells": [
@@ -527,7 +510,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 30,
+     "ms": 37,
      "found": true,
      "where": "licenses: California CSLB contractor licenses",
      "cells": [
@@ -591,26 +574,26 @@
    "subjects": [
     {
      "role": "company",
-     "name": "Ultimate Heating & Cooling, Inc",
+     "name": "A American Electric, L.L.C.",
      "kind": "company",
      "golden": {
       "role": "company",
-      "name": "Ultimate Heating & Cooling, Inc",
+      "name": "A American Electric, L.L.C.",
       "kind": "company",
       "source": "Colorado DORA licenses (electrical, plumbing, water well)",
       "sourceId": "https://data.colorado.gov/d/7s5z-vewr",
-      "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 4792",
-      "recordId": "4792",
+      "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 5502",
+      "recordId": "5502",
       "expected": {
        "kind": "license",
        "source": "Colorado DORA licenses (electrical, plumbing, water well)",
-       "licenseNumber": "4792",
-       "businessName": "Ultimate Heating & Cooling, Inc",
+       "licenseNumber": "5502",
+       "businessName": "A American Electric, L.L.C.",
        "matchedOn": "business"
       },
       "picked": "2026-10-15"
      },
-     "ms": 12213,
+     "ms": 11013,
      "found": true,
      "where": "licenses: Colorado DORA licenses (electrical, plumbing, water well)",
      "cells": [
@@ -622,7 +605,7 @@
       {
        "source": "Colorado DORA licenses (electrical, plumbing, water well)",
        "section": "licenses",
-       "cell": "found 3"
+       "cell": "found 1"
       },
       {
        "source": "Colorado DORA licenses (architects, engineers, surveyors, landscape architects, radon; trade work permits)",
@@ -630,9 +613,14 @@
        "cell": "searched, 0"
       },
       {
+       "source": "Colorado DORA discipline of electrical, plumbing and water well contractors",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
        "source": "Colorado Secretary of State business entities",
        "section": "records",
-       "cell": "found 1"
+       "cell": "searched, 0"
       },
       {
        "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
@@ -641,34 +629,89 @@
       }
      ],
      "issues": [],
-     "summary": "Found 2 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "summary": "Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     },
     {
      "role": "person",
-     "name": "Rusty Colt Twilley",
+     "name": "Wyatt Austin Kriplin",
      "kind": "person",
      "golden": {
       "role": "person",
-      "name": "Rusty Colt Twilley",
+      "name": "Wyatt Austin Kriplin",
       "kind": "person",
       "source": "Colorado DORA licenses (electrical, plumbing, water well)",
       "sourceId": "https://data.colorado.gov/d/7s5z-vewr",
-      "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 41650",
-      "recordId": "41650",
+      "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 9974116",
+      "recordId": "9974116",
       "expected": {
        "kind": "license",
        "source": "Colorado DORA licenses (electrical, plumbing, water well)",
-       "licenseNumber": "41650",
+       "licenseNumber": "9974116",
        "businessName": null,
-       "person": "Rusty Colt Twilley",
+       "person": "Wyatt Austin Kriplin",
        "matchedOn": "principal"
       },
       "picked": "2026-10-15"
      },
-     "ms": 3421,
+     "ms": 1296,
      "found": true,
      "where": "licenses: Colorado DORA licenses (electrical, plumbing, water well)",
+     "cells": [
+      {
+       "source": "Boulder licensed contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Colorado DORA licenses (electrical, plumbing, water well)",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "Colorado DORA licenses (architects, engineers, surveyors, landscape architects, radon; trade work permits)",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Colorado DORA discipline of electrical, plumbing and water well contractors",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      },
+      {
+       "source": "Colorado Secretary of State business entities",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "enforcement",
+     "name": "Eagle Electric Co.",
+     "kind": "company",
+     "golden": {
+      "role": "enforcement",
+      "name": "Eagle Electric Co.",
+      "kind": "company",
+      "source": "Colorado DORA discipline of electrical, plumbing and water well contractors",
+      "sourceId": "https://data.colorado.gov/d/7s5z-vewr",
+      "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, search \"Electric\"",
+      "recordId": "1999-3999000360",
+      "expected": {
+       "kind": "enforcement",
+       "source": "Colorado DORA discipline of electrical, plumbing and water well contractors",
+       "id": "1999-3999000360",
+       "name": "Eagle Electric Co.",
+       "category": "discipline"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 7002,
+     "found": true,
+     "where": "enforcement: Colorado DORA discipline of electrical, plumbing and water well contractors",
      "cells": [
       {
        "source": "Boulder licensed contractors",
@@ -686,22 +729,27 @@
        "cell": "searched, 0"
       },
       {
+       "source": "Colorado DORA discipline of electrical, plumbing and water well contractors",
+       "section": "records",
+       "cell": "found 2"
+      },
+      {
        "source": "Colorado Secretary of State business entities",
        "section": "records",
-       "cell": "n/a (companies only)"
+       "cell": "found 1"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
       }
      ],
      "issues": [],
-     "summary": "Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "summary": "Found 1 license record(s) and 3 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     }
    ],
-   "nulls": [
-    {
-     "role": "enforcement",
-     "reason": "No usable record of a company with an enforcement or discipline record found in: co-boulder-contractors (discipline); Colorado Secretary of State business entities; CO original enforcement"
-    }
-   ],
+   "nulls": [],
    "loads": [],
    "issues": []
   },
@@ -729,7 +777,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 7066,
+     "ms": 3116,
      "found": true,
      "where": "licenses: Connecticut DCP licenses and credentials (home improvement and trades)",
      "cells": [
@@ -789,7 +837,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 3801,
+     "ms": 2038,
      "found": true,
      "where": "enforcement: Connecticut Department of Labor debarment list",
      "cells": [
@@ -850,7 +898,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 1325,
+     "ms": 1134,
      "found": true,
      "where": "licenses: Connecticut DCP licenses and credentials (home improvement and trades)",
      "cells": [
@@ -894,29 +942,39 @@
    "subjects": [
     {
      "role": "company",
-     "name": "CAHILL CONTRACTING INC",
+     "name": "DURHAM PLUMBING SERVICE, LLC",
      "kind": "company",
      "golden": {
       "role": "company",
-      "name": "CAHILL CONTRACTING INC",
+      "name": "DURHAM PLUMBING SERVICE, LLC",
       "kind": "company",
       "source": "Delaware Division of Revenue contractor business licenses",
       "sourceId": "https://data.delaware.gov/d/5zy2-grhr",
-      "from": "Socrata dataset https://data.delaware.gov/d/5zy2-grhr, row 1990029424 (the publisher lists no status: a list of current licenses)",
-      "recordId": "1990029424",
+      "from": "Socrata dataset https://data.delaware.gov/d/5zy2-grhr, row 2017600660 (the publisher lists no status: a list of current licenses)",
+      "recordId": "2017600660",
       "expected": {
        "kind": "license",
        "source": "Delaware Division of Revenue contractor business licenses",
-       "licenseNumber": "1990029424",
-       "businessName": "CAHILL CONTRACTING INC",
+       "licenseNumber": "2017600660",
+       "businessName": "DURHAM PLUMBING SERVICE, LLC",
        "matchedOn": "business"
       },
       "picked": "2026-10-15"
      },
-     "ms": 8619,
+     "ms": 4411,
      "found": true,
      "where": "licenses: Delaware Division of Revenue contractor business licenses",
      "cells": [
+      {
+       "source": "Delaware Department of Labor Workplace Fraud Act violators",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Delaware Department of Labor prevailing wage debarment list",
+       "section": "records",
+       "cell": "searched, 0"
+      },
       {
        "source": "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
        "section": "licenses",
@@ -925,7 +983,7 @@
       {
        "source": "Delaware Division of Revenue contractor business licenses",
        "section": "licenses",
-       "cell": "found 3"
+       "cell": "found 1"
       },
       {
        "source": "Delaware Division of Professional Regulation (architects, surveyors, geologists, home inspectors)",
@@ -959,34 +1017,44 @@
     },
     {
      "role": "person",
-     "name": "SHAWN DEEL",
+     "name": "IRENE LIBERTA",
      "kind": "person",
      "golden": {
       "role": "person",
-      "name": "SHAWN DEEL",
+      "name": "IRENE LIBERTA",
       "kind": "person",
       "source": "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
       "sourceId": "https://data.delaware.gov/d/pjnv-eaih",
-      "from": "Socrata dataset https://data.delaware.gov/d/pjnv-eaih, row TH-0021461",
-      "recordId": "TH-0021461",
+      "from": "Socrata dataset https://data.delaware.gov/d/pjnv-eaih, row TH-0020989",
+      "recordId": "TH-0020989",
       "expected": {
        "kind": "license",
        "source": "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
-       "licenseNumber": "TH-0021461",
+       "licenseNumber": "TH-0020989",
        "businessName": null,
-       "person": "SHAWN DEEL",
+       "person": "IRENE LIBERTA",
        "matchedOn": "principal"
       },
       "picked": "2026-10-15"
      },
-     "ms": 12825,
+     "ms": 2603,
      "found": true,
      "where": "licenses: Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
      "cells": [
       {
+       "source": "Delaware Department of Labor Workplace Fraud Act violators",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      },
+      {
+       "source": "Delaware Department of Labor prevailing wage debarment list",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      },
+      {
        "source": "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
        "section": "licenses",
-       "cell": "found 2"
+       "cell": "found 1"
       },
       {
        "source": "Delaware Division of Revenue contractor business licenses",
@@ -1015,14 +1083,164 @@
       }
      ],
      "issues": [],
-     "summary": "Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "summary": "Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "enforcement",
+     "name": "El Salvador Painting LLC",
+     "kind": "company",
+     "golden": {
+      "role": "enforcement",
+      "name": "El Salvador Painting LLC",
+      "kind": "company",
+      "source": "Delaware Department of Labor Workplace Fraud Act violators",
+      "sourceId": "de-dol-wpfa-violators",
+      "from": "bulk file de-dol-wpfa-violators, loaded 2026-10-15",
+      "recordId": null,
+      "expected": {
+       "kind": "enforcement",
+       "source": "Delaware Department of Labor Workplace Fraud Act violators",
+       "id": null,
+       "name": "El Salvador Painting LLC",
+       "category": "wage"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 4212,
+     "found": true,
+     "where": "enforcement: Delaware Department of Labor Workplace Fraud Act violators",
+     "cells": [
+      {
+       "source": "Delaware Department of Labor Workplace Fraud Act violators",
+       "section": "records",
+       "cell": "found 1"
+      },
+      {
+       "source": "Delaware Department of Labor prevailing wage debarment list",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this dataset has no business name field)"
+      },
+      {
+       "source": "Delaware Division of Revenue contractor business licenses",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "Delaware Division of Professional Regulation (architects, surveyors, geologists, home inspectors)",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this dataset has no business name field)"
+      },
+      {
+       "source": "Delaware DNREC water well and pump installer contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Delaware DNREC on-site wastewater system licensees",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Delaware DNREC certified asbestos firms",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 1 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "enforcement",
+     "name": "ACH 1, INC.",
+     "kind": "company",
+     "golden": {
+      "role": "enforcement",
+      "name": "ACH 1, INC.",
+      "kind": "company",
+      "source": "Delaware Department of Labor prevailing wage debarment list",
+      "sourceId": "de-dol-pw-debarment",
+      "from": "bulk file de-dol-pw-debarment, loaded 2026-10-15",
+      "recordId": null,
+      "expected": {
+       "kind": "enforcement",
+       "source": "Delaware Department of Labor prevailing wage debarment list",
+       "id": null,
+       "name": "ACH 1, INC.",
+       "category": "debarment"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 1195,
+     "found": true,
+     "where": "enforcement: Delaware Department of Labor prevailing wage debarment list",
+     "cells": [
+      {
+       "source": "Delaware Department of Labor Workplace Fraud Act violators",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Delaware Department of Labor prevailing wage debarment list",
+       "section": "records",
+       "cell": "found 1"
+      },
+      {
+       "source": "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this dataset has no business name field)"
+      },
+      {
+       "source": "Delaware Division of Revenue contractor business licenses",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Delaware Division of Professional Regulation (architects, surveyors, geologists, home inspectors)",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this dataset has no business name field)"
+      },
+      {
+       "source": "Delaware DNREC water well and pump installer contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Delaware DNREC on-site wastewater system licensees",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Delaware DNREC certified asbestos firms",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     }
    ],
    "nulls": [
     {
      "role": "enforcement",
-     "reason": "No usable record of a company with an enforcement or discipline record found in: DE original enforcement"
+     "reason": "No usable record of a company with an enforcement or discipline record found in: de-dol-wpfa-violators; de-dol-pw-debarment; DE original enforcement"
     }
    ],
    "loads": [],
@@ -1052,7 +1270,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 73,
+     "ms": 201,
      "found": true,
      "where": "licenses: DC DLCP basic business licenses (construction)",
      "cells": [
@@ -1102,7 +1320,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 20,
+     "ms": 35,
      "found": true,
      "where": "enforcement: DC OCP excluded parties list",
      "cells": [
@@ -1153,7 +1371,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 13,
+     "ms": 20,
      "found": true,
      "where": "licenses: DC DLCP basic business licenses (construction)",
      "cells": [
@@ -1206,7 +1424,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 244,
+     "ms": 494,
      "found": true,
      "where": "licenses: Florida DBPR construction licenses (CILB)",
      "cells": [
@@ -1283,7 +1501,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 5,
+     "ms": 30,
      "found": true,
      "where": "enforcement: Florida DBPR complaints and discipline (construction and electrical)",
      "cells": [
@@ -1359,7 +1577,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 76,
+     "ms": 138,
      "found": true,
      "where": "licenses: Florida DBPR construction licenses (CILB)",
      "cells": [
@@ -1439,7 +1657,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 439,
+     "ms": 2331,
      "found": true,
      "where": "licenses: Georgia EPD licensed asbestos abatement firms",
      "cells": [
@@ -1489,7 +1707,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 3622,
+     "ms": 3734,
      "found": true,
      "where": "enforcement: Georgia EPD enforcement orders",
      "cells": [
@@ -1540,7 +1758,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 50123,
+     "ms": 52134,
      "found": true,
      "where": "licenses: Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications",
      "cells": [
@@ -1593,7 +1811,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 2673,
+     "ms": 2918,
      "found": true,
      "where": "licenses: Hawaii Contractors License Board licenses",
      "cells": [
@@ -1643,7 +1861,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 969,
+     "ms": 704,
      "found": true,
      "where": "enforcement: Hawaii DCCA disciplinary actions (construction boards)",
      "cells": [
@@ -1694,7 +1912,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 5,
+     "ms": 9,
      "found": true,
      "where": "licenses: Hawaii Contractors License Board licenses",
      "cells": [
@@ -1767,7 +1985,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 5181,
+     "ms": 4968,
      "found": true,
      "where": "licenses: Illinois IDFPR roofing contractor licenses",
      "cells": [
@@ -1842,7 +2060,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 2981,
+     "ms": 3015,
      "found": true,
      "where": "enforcement: Illinois IDFPR discipline (roofing contractors, design firms, home inspectors)",
      "cells": [
@@ -1918,7 +2136,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 4490,
+     "ms": 4533,
      "found": true,
      "where": "licenses: Illinois IDFPR roofing contractor licenses",
      "cells": [
@@ -1996,7 +2214,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 15,
+     "ms": 29,
      "found": true,
      "where": "licenses: Indianapolis contractor licenses (Business and Neighborhood Services)",
      "cells": [
@@ -2053,7 +2271,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 10959,
+     "ms": 10964,
      "found": true,
      "where": "licenses: Iowa DIAL construction contractor registrations",
      "cells": [
@@ -2119,7 +2337,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 10806,
+     "ms": 10516,
      "found": true,
      "where": "licenses: Iowa DIAL construction contractor registrations",
      "cells": [
@@ -2192,7 +2410,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 14,
+     "ms": 34,
      "found": true,
      "where": "licenses: Kansas State Fire Marshal licensed elevator contractors",
      "cells": [
@@ -2238,7 +2456,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 6,
+     "ms": 12,
      "found": true,
      "where": "licenses: Kansas State Fire Marshal licensed elevator contractors",
      "cells": [
@@ -2291,7 +2509,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 10650,
+     "ms": 11279,
      "found": true,
      "where": "licenses: Kentucky Department of Housing, Buildings and Construction",
      "cells": [
@@ -2337,9 +2555,9 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 2461,
-     "found": false,
-     "where": null,
+     "ms": 6438,
+     "found": true,
+     "where": "licenses: Kentucky Department of Housing, Buildings and Construction",
      "cells": [
       {
        "source": "Louisville Metro contractor licenses (as of 2022-06-19)",
@@ -2349,19 +2567,11 @@
       {
        "source": "Kentucky Department of Housing, Buildings and Construction",
        "section": "licenses",
-       "cell": "searched, 0"
+       "cell": "found 2"
       }
      ],
-     "issues": [
-      {
-       "severity": "missed",
-       "state": "KY",
-       "source": "Kentucky Department of Housing, Buildings and Construction",
-       "subject": "person \"Harrison E Durham-Smith\"",
-       "detail": "license ME67081 (Kentucky Department of Housing, Buildings and Construction) not in the report"
-      }
-     ],
-     "summary": "Found 0 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "issues": [],
+     "summary": "Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
      "publisherLinks": []
     }
    ],
@@ -2372,15 +2582,7 @@
     }
    ],
    "loads": [],
-   "issues": [
-    {
-     "severity": "missed",
-     "state": "KY",
-     "source": "Kentucky Department of Housing, Buildings and Construction",
-     "subject": "person \"Harrison E Durham-Smith\"",
-     "detail": "license ME67081 (Kentucky Department of Housing, Buildings and Construction) not in the report"
-    }
-   ]
+   "issues": []
   },
   {
    "state": "LA",
@@ -2406,7 +2608,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 4509,
+     "ms": 5613,
      "found": true,
      "where": "licenses: Louisiana State Licensing Board for Contractors",
      "cells": [
@@ -2461,7 +2663,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 1168,
+     "ms": 1171,
      "found": true,
      "where": "enforcement: Louisiana State Licensing Board for Contractors violations",
      "cells": [
@@ -2517,7 +2719,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 2093,
+     "ms": 2086,
      "found": true,
      "where": "licenses: New Orleans occupational business licenses",
      "cells": [
@@ -2576,7 +2778,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 963,
+     "ms": 17354,
      "found": true,
      "where": "licenses: Maine DEP certified underground storage tank installers and inspectors",
      "cells": [
@@ -2616,7 +2818,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 8,
+     "ms": 13,
      "found": true,
      "where": "licenses: Maine DEP licensed asbestos abatement contractors and consultants",
      "cells": [
@@ -2678,7 +2880,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 3492,
+     "ms": 3811,
      "found": true,
      "where": "licenses: Montgomery County building contractor licenses",
      "cells": [
@@ -2758,7 +2960,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 1595,
+     "ms": 1504,
      "found": true,
      "where": "enforcement: Maryland Board of Public Works debarments",
      "cells": [
@@ -2839,7 +3041,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 3513,
+     "ms": 3600,
      "found": true,
      "where": "licenses: Montgomery County building contractor licenses",
      "cells": [
@@ -2922,7 +3124,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 10546,
+     "ms": 13546,
      "found": true,
      "where": "licenses: Massachusetts Home Improvement Contractor registry (OCABR)",
      "cells": [
@@ -2977,7 +3179,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 9789,
+     "ms": 9304,
      "found": true,
      "where": "enforcement: Massachusetts HIC hearing decisions (OCABR)",
      "cells": [
@@ -3033,7 +3235,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 7179,
+     "ms": 7178,
      "found": true,
      "where": "licenses: Massachusetts OPSI licenses (construction supervisors, pipefitters, refrigeration, sprinkler, elevator, hoisting)",
      "cells": [
@@ -3091,7 +3293,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 12,
+     "ms": 20,
      "found": true,
      "where": "licenses: Michigan LARA licenses (builders and trades)",
      "cells": [
@@ -3132,7 +3334,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 8,
+     "ms": 11,
      "found": true,
      "where": "licenses: Michigan LARA licenses (builders and trades)",
      "cells": [
@@ -3180,7 +3382,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 10,
+     "ms": 23,
      "found": true,
      "where": "licenses: Minnesota DLI licenses and registrations",
      "cells": [
@@ -3235,7 +3437,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 27,
+     "ms": 58,
      "found": true,
      "where": "enforcement: Minnesota DLI licenses flagged with an enforcement action",
      "cells": [
@@ -3291,7 +3493,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 13,
+     "ms": 19,
      "found": true,
      "where": "licenses: Minnesota DLI licenses and registrations",
      "cells": [
@@ -3349,7 +3551,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 2303,
+     "ms": 2278,
      "found": true,
      "where": "enforcement: Mississippi State Board of Contractors revoked and suspended licenses",
      "cells": [
@@ -3361,12 +3563,12 @@
       {
        "source": "Mississippi State Board of Contractors",
        "section": "licenses",
-       "cell": "failed (search.msboc.us answered with a bot challenge page; no automated requests to it for this run)"
+       "cell": "not searched (Not searched: the site refused automated access)"
       },
       {
        "source": "Mississippi State Board of Contractors complaints and violations",
        "section": "records",
-       "cell": "failed (search.msboc.us denied access earlier (a bot challenge page); no further requests for now)"
+       "cell": "not searched (Not searched: the site refused automated access)"
       },
       {
        "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
@@ -3374,22 +3576,7 @@
        "cell": "searched, 0"
       }
      ],
-     "issues": [
-      {
-       "severity": "error",
-       "state": "MS",
-       "source": "Mississippi State Board of Contractors",
-       "subject": "enforcement \"QUIN-CO, INC.\"",
-       "detail": "Could not search: search.msboc.us answered with a bot challenge page; no automated requests to it for this run"
-      },
-      {
-       "severity": "error",
-       "state": "MS",
-       "source": "Mississippi State Board of Contractors complaints and violations",
-       "subject": "enforcement \"QUIN-CO, INC.\"",
-       "detail": "Could not search: search.msboc.us denied access earlier (a bot challenge page); no further requests for now"
-      }
-     ],
+     "issues": [],
      "summary": "Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     }
@@ -3405,22 +3592,7 @@
     }
    ],
    "loads": [],
-   "issues": [
-    {
-     "severity": "error",
-     "state": "MS",
-     "source": "Mississippi State Board of Contractors",
-     "subject": "enforcement \"QUIN-CO, INC.\"",
-     "detail": "Could not search: search.msboc.us answered with a bot challenge page; no automated requests to it for this run"
-    },
-    {
-     "severity": "error",
-     "state": "MS",
-     "source": "Mississippi State Board of Contractors complaints and violations",
-     "subject": "enforcement \"QUIN-CO, INC.\"",
-     "detail": "Could not search: search.msboc.us denied access earlier (a bot challenge page); no further requests for now"
-    }
-   ]
+   "issues": []
   },
   {
    "state": "MO",
@@ -3446,7 +3618,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 18848,
+     "ms": 27056,
      "found": true,
      "where": "licenses: Missouri MO PRO licensee search",
      "cells": [
@@ -3497,7 +3669,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 13771,
+     "ms": 13121,
      "found": true,
      "where": "licenses: Missouri registered onsite wastewater treatment system installers",
      "cells": [
@@ -3555,7 +3727,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 33,
+     "ms": 9,
      "found": true,
      "where": "licenses: Montana DEQ licensed septic tank pumpers",
      "cells": [
@@ -3601,7 +3773,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 7,
+     "ms": 6,
      "found": true,
      "where": "licenses: Montana DEQ asbestos accreditations",
      "cells": [
@@ -3654,7 +3826,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 7775,
+     "ms": 11523,
      "found": true,
      "where": "licenses: Nebraska DOL contractor registrations",
      "cells": [
@@ -3704,7 +3876,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 2429,
+     "ms": 2010,
      "found": true,
      "where": "enforcement: Nebraska DOL contractors with unpaid Employee Classification Act fines",
      "cells": [
@@ -3755,7 +3927,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 2732,
+     "ms": 2779,
      "found": true,
      "where": "licenses: Nebraska State Electrical Division licenses",
      "cells": [
@@ -3808,7 +3980,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 126051,
+     "ms": 126573,
      "found": true,
      "where": "licenses: Nevada State Contractors Board licenses",
      "cells": [
@@ -3863,7 +4035,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 5317,
+     "ms": 5476,
      "found": true,
      "where": "enforcement: Nevada State Contractors Board disciplinary and board actions",
      "cells": [
@@ -3919,7 +4091,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 28936,
+     "ms": 28814,
      "found": true,
      "where": "licenses: City of Las Vegas business licenses",
      "cells": [
@@ -3997,7 +4169,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 4333,
+     "ms": 4257,
      "found": true,
      "where": "licenses: New Jersey home improvement contractor registrations",
      "cells": [
@@ -4067,7 +4239,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 2788,
+     "ms": 5321,
      "found": true,
      "where": "enforcement: New Jersey DOL prevailing-wage debarments",
      "cells": [
@@ -4138,7 +4310,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 18,
+     "ms": 21,
      "found": true,
      "where": "licenses: New Jersey electrical, plumbing, HVACR and elevator licenses",
      "cells": [
@@ -4212,7 +4384,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 1163,
+     "ms": 4314,
      "found": true,
      "where": "licenses: New Mexico RLD home inspector and landscape architect licenses",
      "cells": [
@@ -4269,7 +4441,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 83417,
+     "ms": 76266,
      "found": true,
      "where": "licenses: New York DOL contractor registry (public work)",
      "cells": [
@@ -4389,7 +4561,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 71918,
+     "ms": 47156,
      "found": true,
      "where": "enforcement: New York State non-responsible entities (Executive Order 192)",
      "cells": [
@@ -4510,7 +4682,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 5466,
+     "ms": 5345,
      "found": true,
      "where": "licenses: New York DOL elevator mechanic and inspector licenses",
      "cells": [
@@ -4633,7 +4805,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 179335,
+     "ms": 142726,
      "found": true,
      "where": "licenses: NC Licensing Board for General Contractors",
      "cells": [
@@ -4689,7 +4861,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 289535,
+     "ms": 289594,
      "found": true,
      "where": "licenses: NC Board of Examiners of Electrical Contractors",
      "cells": [
@@ -4752,7 +4924,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 12727,
+     "ms": 14549,
      "found": true,
      "where": "licenses: North Dakota Secretary of State contractor licenses",
      "cells": [
@@ -4808,7 +4980,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 5403,
+     "ms": 5399,
      "found": true,
      "where": "licenses: North Dakota State Electrical Board electricians",
      "cells": [
@@ -4852,33 +5024,33 @@
    "subjects": [
     {
      "role": "company",
-     "name": "AIRFAST HEATING & COOLING",
+     "name": "M C SERVICES INC",
      "kind": "company",
      "golden": {
       "role": "company",
-      "name": "AIRFAST HEATING & COOLING",
+      "name": "M C SERVICES INC",
       "kind": "company",
       "source": "Ohio Construction Industry Licensing Board contractor licenses",
       "sourceId": "oh-ocilb",
       "from": "bulk file oh-ocilb, loaded 2026-10-15",
-      "recordId": "RE.10708",
+      "recordId": "EL.19185",
       "expected": {
        "kind": "license",
        "source": "Ohio Construction Industry Licensing Board contractor licenses",
-       "licenseNumber": "RE.10708",
-       "businessName": "AIRFAST HEATING & COOLING",
+       "licenseNumber": "EL.19185",
+       "businessName": "M C SERVICES INC",
        "matchedOn": "business"
       },
       "picked": "2026-10-15"
      },
-     "ms": 9,
+     "ms": 6247,
      "found": true,
      "where": "licenses: Ohio Construction Industry Licensing Board contractor licenses",
      "cells": [
       {
        "source": "Ohio Construction Industry Licensing Board contractor licenses",
        "section": "licenses",
-       "cell": "found 2"
+       "cell": "found 3"
       },
       {
        "source": "Ohio State Fire Marshal fire protection and UST licenses",
@@ -4888,6 +5060,11 @@
       {
        "source": "Cleveland contractor registrations",
        "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+       "section": "records",
        "cell": "searched, 0"
       },
       {
@@ -4897,39 +5074,89 @@
       }
      ],
      "issues": [],
-     "summary": "Found 2 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "summary": "Found 3 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     },
     {
      "role": "person",
-     "name": "JOSEPH GIANGIULI",
+     "name": "ANTHONY PATRICK",
      "kind": "person",
      "golden": {
       "role": "person",
-      "name": "JOSEPH GIANGIULI",
+      "name": "ANTHONY PATRICK",
       "kind": "person",
       "source": "Ohio Construction Industry Licensing Board contractor licenses",
       "sourceId": "oh-ocilb",
       "from": "bulk file oh-ocilb, loaded 2026-10-15",
-      "recordId": "HV.10823",
+      "recordId": "EL.35300",
       "expected": {
        "kind": "license",
        "source": "Ohio Construction Industry Licensing Board contractor licenses",
-       "licenseNumber": "HV.10823",
-       "businessName": "D & G MECHANICAL INC",
-       "person": "JOSEPH GIANGIULI",
+       "licenseNumber": "EL.35300",
+       "businessName": "TNT ELECTRIC",
+       "person": "ANTHONY PATRICK",
        "matchedOn": "principal"
       },
       "picked": "2026-10-15"
      },
-     "ms": 29,
+     "ms": 22,
      "found": true,
      "where": "licenses: Ohio Construction Industry Licensing Board contractor licenses",
      "cells": [
       {
        "source": "Ohio Construction Industry Licensing Board contractor licenses",
        "section": "licenses",
-       "cell": "found 2"
+       "cell": "found 1"
+      },
+      {
+       "source": "Ohio State Fire Marshal fire protection and UST licenses",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "Cleveland contractor registrations",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "enforcement",
+     "name": "Pave-Way Construction Company",
+     "kind": "company",
+     "golden": {
+      "role": "enforcement",
+      "name": "Pave-Way Construction Company",
+      "kind": "company",
+      "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+      "sourceId": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+      "from": "live search \"Construction\"",
+      "recordId": "10000082",
+      "expected": {
+       "kind": "enforcement",
+       "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+       "id": "10000082",
+       "name": "Pave-Way Construction Company",
+       "category": "court_case"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 8233,
+     "found": true,
+     "where": "enforcement: Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+     "cells": [
+      {
+       "source": "Ohio Construction Industry Licensing Board contractor licenses",
+       "section": "licenses",
+       "cell": "searched, 0"
       },
       {
        "source": "Ohio State Fire Marshal fire protection and UST licenses",
@@ -4940,19 +5167,24 @@
        "source": "Cleveland contractor registrations",
        "section": "licenses",
        "cell": "searched, 0"
+      },
+      {
+       "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+       "section": "records",
+       "cell": "found 1"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
       }
      ],
      "issues": [],
-     "summary": "Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "summary": "Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     }
    ],
-   "nulls": [
-    {
-     "role": "enforcement",
-     "reason": "No usable record of a company with an enforcement or discipline record found in: oh-ocilb (discipline); oh-sfm (discipline); oh-cleveland-contractors (discipline); OH original enforcement"
-    }
-   ],
+   "nulls": [],
    "loads": [],
    "issues": []
   },
@@ -4980,7 +5212,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 18,
+     "ms": 27,
      "found": true,
      "where": "licenses: Oklahoma Construction Industries Board roofing contractor registrations",
      "cells": [
@@ -5031,7 +5263,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 7,
+     "ms": 14,
      "found": true,
      "where": "licenses: Oklahoma Construction Industries Board roofing contractor registrations",
      "cells": [
@@ -5089,7 +5321,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 7861,
+     "ms": 7040,
      "found": true,
      "where": "licenses: Oregon Construction Contractors Board (active licenses)",
      "cells": [
@@ -5165,7 +5397,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 12050,
+     "ms": 1648,
      "found": true,
      "where": "enforcement: Oregon BOLI prevailing-wage case closure letters",
      "cells": [
@@ -5299,7 +5531,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 18112,
+     "ms": 10571,
      "found": true,
      "where": "licenses: Philadelphia L&I trade licenses",
      "cells": [
@@ -5369,7 +5601,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 11787,
+     "ms": 9820,
      "found": true,
      "where": "enforcement: Pennsylvania L&I Prevailing Wage Act debarments",
      "cells": [
@@ -5440,7 +5672,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 8,
+     "ms": 22,
      "found": true,
      "where": "licenses: Philadelphia L&I trade licenses",
      "cells": [
@@ -5513,7 +5745,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 28886,
+     "ms": 31444,
      "found": true,
      "where": "licenses: Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",
      "cells": [
@@ -5563,7 +5795,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 14444,
+     "ms": 14449,
      "found": true,
      "where": "enforcement: Rhode Island DLT Professional Regulation violations",
      "cells": [
@@ -5614,7 +5846,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 30165,
+     "ms": 29987,
      "found": true,
      "where": "licenses: Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",
      "cells": [
@@ -5645,52 +5877,15 @@
   },
   {
    "state": "SC",
-   "subjects": [
-    {
-     "role": "enforcement",
-     "name": "Alchemy Real Estate, LLC",
-     "kind": "company",
-     "golden": {
-      "role": "enforcement",
-      "name": "Alchemy Real Estate, LLC",
-      "kind": "company",
-      "source": "South Carolina DES environmental enforcement orders",
-      "sourceId": "sc-des-enforcement",
-      "from": "bulk file sc-des-enforcement, loaded 2026-10-15",
-      "recordId": "AF-0001416",
-      "expected": {
-       "kind": "enforcement",
-       "source": "South Carolina DES environmental enforcement orders",
-       "id": "AF-0001416",
-       "name": "Alchemy Real Estate, LLC",
-       "category": "environmental"
-      },
-      "picked": "2026-10-15"
-     },
-     "ms": 9,
-     "found": true,
-     "where": "enforcement: South Carolina DES environmental enforcement orders",
-     "cells": [
-      {
-       "source": "South Carolina DES environmental enforcement orders",
-       "section": "records",
-       "cell": "found 1"
-      },
-      {
-       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
-       "section": "records",
-       "cell": "searched, 0"
-      }
-     ],
-     "issues": [],
-     "summary": "Found 1 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.",
-     "publisherLinks": []
-    }
-   ],
+   "subjects": [],
    "nulls": [
     {
      "role": "company",
      "reason": "No registered source publishes a business holding an active license for SC"
+    },
+    {
+     "role": "enforcement",
+     "reason": "No usable record of a company with an enforcement or discipline record found in: SC original enforcement"
     },
     {
      "role": "person",
@@ -5724,7 +5919,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 20,
+     "ms": 24,
      "found": true,
      "where": "enforcement: South Dakota Department of Revenue business tax delinquent report",
      "cells": [
@@ -5780,7 +5975,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 4,
+     "ms": 6,
      "found": true,
      "where": "licenses: South Dakota Plumbing Commission licensed plumbers",
      "cells": [
@@ -5843,7 +6038,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 31435,
+     "ms": 32641,
      "found": true,
      "where": "licenses: TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
      "cells": [
@@ -5898,7 +6093,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 1556,
+     "ms": 1537,
      "found": true,
      "where": "enforcement: TDEC enforcement cases (Department of Environment and Conservation)",
      "cells": [
@@ -5954,7 +6149,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 3279,
+     "ms": 3294,
      "found": true,
      "where": "licenses: TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
      "cells": [
@@ -6012,7 +6207,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 23907,
+     "ms": 18650,
      "found": true,
      "where": "licenses: Texas State Board of Plumbing Examiners licensees",
      "cells": [
@@ -6102,7 +6297,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 4712,
+     "ms": 3448,
      "found": true,
      "where": "enforcement: TCEQ administrative orders",
      "cells": [
@@ -6193,7 +6388,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 7215,
+     "ms": 1092,
      "found": true,
      "where": "licenses: Texas State Board of Plumbing Examiners licensees",
      "cells": [
@@ -6286,7 +6481,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 4521,
+     "ms": 5518,
      "found": true,
      "where": "licenses: Utah DOPL Construction Business Registry (active, opted-in licensees only)",
      "cells": [
@@ -6331,7 +6526,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 1587,
+     "ms": 2092,
      "found": true,
      "where": "enforcement: Utah DOPL agency and disciplinary actions",
      "cells": [
@@ -6377,7 +6572,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 4275,
+     "ms": 3897,
      "found": true,
      "where": "licenses: Utah DOPL Construction Business Registry (active, opted-in licensees only)",
      "cells": [
@@ -6425,7 +6620,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 989,
+     "ms": 1564,
      "found": true,
      "where": "licenses: Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
      "cells": [
@@ -6471,7 +6666,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 563,
+     "ms": 517,
      "found": true,
      "where": "licenses: Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
      "cells": [
@@ -6524,7 +6719,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 11,
+     "ms": 14,
      "found": true,
      "where": "licenses: Virginia DPOR Board for Contractors licenses (contractors and tradesmen)",
      "cells": [
@@ -6580,7 +6775,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 7,
+     "ms": 10,
      "found": true,
      "where": "licenses: Virginia DPOR Board for Contractors licenses (contractors and tradesmen)",
      "cells": [
@@ -6643,7 +6838,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 27615,
+     "ms": 19925,
      "found": true,
      "where": "licenses: Washington L&I contractor licenses",
      "cells": [
@@ -6713,7 +6908,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 3366,
+     "ms": 3278,
      "found": true,
      "where": "enforcement: Washington L&I debarred contractors (public works)",
      "cells": [
@@ -6784,7 +6979,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 5559,
+     "ms": 7033,
      "found": true,
      "where": "licenses: Washington L&I contractor licenses",
      "cells": [
@@ -6838,11 +7033,11 @@
    "subjects": [
     {
      "role": "enforcement",
-     "name": "A 1 LTD LLC",
+     "name": "PRO MED ANALYSIS LLC",
      "kind": "company",
      "golden": {
       "role": "enforcement",
-      "name": "A 1 LTD LLC",
+      "name": "PRO MED ANALYSIS LLC",
       "kind": "company",
       "source": "WV Employer Violator System (workers' comp default)",
       "sourceId": "wv-oic-evs",
@@ -6852,12 +7047,12 @@
        "kind": "enforcement",
        "source": "WV Insurance Commissioner Employer Violator System (workers' comp default)",
        "id": null,
-       "name": "A 1 LTD LLC",
+       "name": "PRO MED ANALYSIS LLC",
        "category": "debarment"
       },
       "picked": "2026-10-15"
      },
-     "ms": 67,
+     "ms": 6,
      "found": true,
      "where": "enforcement: WV Insurance Commissioner Employer Violator System (workers' comp default)",
      "cells": [
@@ -6865,11 +7060,6 @@
        "source": "WV Employer Violator System (workers' comp default)",
        "section": "records",
        "cell": "found 1"
-      },
-      {
-       "source": "WV Purchasing Division debarred vendors",
-       "section": "records",
-       "cell": "searched, 0"
       },
       {
        "source": "WV State Fire Marshal electrician licenses",
@@ -6908,17 +7098,12 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 4184,
+     "ms": 4402,
      "found": true,
      "where": "licenses: WV State Fire Marshal electrician licenses",
      "cells": [
       {
        "source": "WV Employer Violator System (workers' comp default)",
-       "section": "records",
-       "cell": "n/a (companies only)"
-      },
-      {
-       "source": "WV Purchasing Division debarred vendors",
        "section": "records",
        "cell": "n/a (companies only)"
       },
@@ -6930,56 +7115,6 @@
      ],
      "issues": [],
      "summary": "Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
-     "publisherLinks": []
-    },
-    {
-     "role": "enforcement",
-     "name": "KGH Development Inc.",
-     "kind": "company",
-     "golden": {
-      "role": "enforcement",
-      "name": "KGH Development Inc.",
-      "kind": "company",
-      "source": "WV Purchasing Division debarred vendors",
-      "sourceId": "wv-purchasing-debarred",
-      "from": "bulk file wv-purchasing-debarred, loaded 2026-10-15",
-      "recordId": null,
-      "expected": {
-       "kind": "enforcement",
-       "source": "WV Purchasing Division debarred vendors",
-       "id": null,
-       "name": "KGH Development Inc.",
-       "category": "debarment"
-      },
-      "picked": "2026-10-15"
-     },
-     "ms": 5,
-     "found": true,
-     "where": "enforcement: WV Purchasing Division debarred vendors",
-     "cells": [
-      {
-       "source": "WV Employer Violator System (workers' comp default)",
-       "section": "records",
-       "cell": "searched, 0"
-      },
-      {
-       "source": "WV Purchasing Division debarred vendors",
-       "section": "records",
-       "cell": "found 1"
-      },
-      {
-       "source": "WV State Fire Marshal electrician licenses",
-       "section": "licenses",
-       "cell": "not searched (Not searched: this lookup has no business name search)"
-      },
-      {
-       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
-       "section": "records",
-       "cell": "found 1"
-      }
-     ],
-     "issues": [],
-     "summary": "Found 2 state enforcement or standing record(s). Not searched: license records, permit portals, consumer complaints, federal court cases and OSHA inspections.",
      "publisherLinks": []
     }
    ],
@@ -6994,98 +7129,19 @@
   },
   {
    "state": "WI",
-   "subjects": [
+   "subjects": [],
+   "nulls": [
     {
      "role": "company",
-     "name": "NEHLS & WEBSTER WD INC /NOKOMIS DIV",
-     "kind": "company",
-     "golden": {
-      "role": "company",
-      "name": "NEHLS & WEBSTER WD INC /NOKOMIS DIV",
-      "kind": "company",
-      "source": "Wisconsin DNR licensed well drillers and pump installers",
-      "sourceId": "wi-dnr-wells",
-      "from": "bulk file wi-dnr-wells, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
-      "recordId": "5842",
-      "expected": {
-       "kind": "license",
-       "source": "Wisconsin DNR licensed well drillers and pump installers",
-       "licenseNumber": "5842",
-       "businessName": "NEHLS & WEBSTER WD INC /NOKOMIS DIV",
-       "matchedOn": "business"
-      },
-      "picked": "2026-10-15"
-     },
-     "ms": 7,
-     "found": true,
-     "where": "licenses: Wisconsin DNR licensed well drillers and pump installers",
-     "cells": [
-      {
-       "source": "Wisconsin DNR licensed well drillers and pump installers",
-       "section": "licenses",
-       "cell": "found 2"
-      },
-      {
-       "source": "Wisconsin DHS certified lead and asbestos companies",
-       "section": "licenses",
-       "cell": "searched, 0"
-      },
-      {
-       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
-       "section": "records",
-       "cell": "searched, 0"
-      }
-     ],
-     "issues": [],
-     "summary": "Found 2 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
-     "publisherLinks": []
+     "reason": "No registered source publishes a business holding an active license for WI"
+    },
+    {
+     "role": "enforcement",
+     "reason": "No usable record of a company with an enforcement or discipline record found in: WI original enforcement"
     },
     {
      "role": "person",
-     "name": "BRANDON D MACOMBER",
-     "kind": "person",
-     "golden": {
-      "role": "person",
-      "name": "BRANDON D MACOMBER",
-      "kind": "person",
-      "source": "Wisconsin DNR licensed well drillers and pump installers",
-      "sourceId": "wi-dnr-wells",
-      "from": "bulk file wi-dnr-wells, loaded 2026-10-15",
-      "recordId": "8739",
-      "expected": {
-       "kind": "license",
-       "source": "Wisconsin DNR licensed well drillers and pump installers",
-       "licenseNumber": "8739",
-       "businessName": null,
-       "person": "BRANDON D MACOMBER",
-       "matchedOn": "principal"
-      },
-      "picked": "2026-10-15"
-     },
-     "ms": 4,
-     "found": true,
-     "where": "licenses: Wisconsin DNR licensed well drillers and pump installers",
-     "cells": [
-      {
-       "source": "Wisconsin DNR licensed well drillers and pump installers",
-       "section": "licenses",
-       "cell": "found 1"
-      },
-      {
-       "source": "Wisconsin DHS certified lead and asbestos companies",
-       "section": "licenses",
-       "cell": "searched, 0"
-      }
-     ],
-     "issues": [],
-     "summary": "Found 1 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
-     "publisherLinks": []
-    }
-   ],
-   "nulls": [
-    {
-     "role": "enforcement",
-     "reason": "No usable record of a company with an enforcement or discipline record found in: wi-dnr-wells (discipline); wi-dhs-abatement (discipline); WI original enforcement"
+     "reason": "No registered source publishes an individual license holder for WI"
     }
    ],
    "loads": [],
@@ -7115,7 +7171,7 @@
       },
       "picked": "2026-10-15"
      },
-     "ms": 4290,
+     "ms": 5294,
      "found": true,
      "where": "licenses: Wyoming Fire Prevention & Electrical Safety licenses",
      "cells": [
@@ -7181,34 +7237,5 @@
    "issues": []
   }
  ],
- "issues": [
-  {
-   "severity": "missed",
-   "state": "KY",
-   "source": "Kentucky Department of Housing, Buildings and Construction",
-   "subject": "person \"Harrison E Durham-Smith\"",
-   "detail": "license ME67081 (Kentucky Department of Housing, Buildings and Construction) not in the report"
-  },
-  {
-   "severity": "error",
-   "state": "AL",
-   "source": "Alabama Licensing Board for General Contractors",
-   "subject": "enforcement \"Home Pro Construction LLC\"",
-   "detail": "Could not search: licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read"
-  },
-  {
-   "severity": "error",
-   "state": "MS",
-   "source": "Mississippi State Board of Contractors",
-   "subject": "enforcement \"QUIN-CO, INC.\"",
-   "detail": "Could not search: search.msboc.us answered with a bot challenge page; no automated requests to it for this run"
-  },
-  {
-   "severity": "error",
-   "state": "MS",
-   "source": "Mississippi State Board of Contractors complaints and violations",
-   "subject": "enforcement \"QUIN-CO, INC.\"",
-   "detail": "Could not search: search.msboc.us denied access earlier (a bot challenge page); no further requests for now"
-  }
- ]
+ "issues": []
 }

@@ -48,5 +48,8 @@ export function failureReason(err: unknown): { refused: boolean; reason: string 
 /** A source line's note for a search that threw: "Not searched: the site refused automated access", or "Could not search: …". */
 export function failureNote(err: unknown): string {
   const f = failureReason(err);
+  // The customer reads the plain reason; the server log keeps the technical one (a challenge, a robots.txt that timed
+  // out three times, a 403…), so a refusal can be told apart afterwards.
+  if (f.refused) console.warn(`[research] not searched (${f.reason}): ${String((err as { message?: unknown } | null)?.message ?? err).slice(0, 300)}`);
   return f.refused ? `Not searched: ${f.reason}` : `Could not search: ${f.reason}`;
 }

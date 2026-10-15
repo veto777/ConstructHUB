@@ -13,13 +13,26 @@
  * electrical, HVAC, plumbing, hydronics and refrigeration contractors and that local building departments regulate
  * residential contractors.
  *
+ *   live      Ohio Attorney General Online Public Inspection File (opif.ohioattorneygeneral.gov; robots.txt answers 404,
+ *             no rules): court decisions in consumer-law cases (mostly rulings that a supplier violated the Consumer
+ *             Sales Practices Act; some for the supplier), searched by supplier name within the Furnaces, Home Buildings and Home Improvements subjects. The
+ *             site states no terms of use beyond a copyright line; the file exists so the public can inspect these
+ *             rulings (R.C. 1345.05). Companies only.
+ *
  * Not usable (see `blocked`): elicense.ohio.gov (the Salesforce lookup for other boards) has a CAPTCHA; the
  * Secretary of State's site answers 403; no published OCILB discipline list or debarment list was found.
  */
 import { promises as fs } from "node:fs";
 import { clean, csvRecords, usDate, type BulkHit } from "../bulk";
 import { personText } from "../person-name";
-import type { StatePack } from "./types";
+import type { LiveEnforcementSearch, StatePack } from "./types";
+import type { EnforcementHit } from "@shared/research-reports";
+import { politeFetch } from "../http";
+import { decodeEntities } from "../bulk-sources";
+import { companyNamed } from "../licenses";
+import { withNote } from "../notes";
+import { adverseFrom } from "../adverse";
+import { looksLikeBusiness, personNameForm } from "./lib/business-name";
 import { rosterGroups, tylerRosters } from "./lib/g5-aspnet";
 
 const OCILB = "https://elicense4.com.ohio.gov";
@@ -153,6 +166,133 @@ async function* sfmLoader(): AsyncIterable<BulkHit> {
   }
 }
 
+// ── Ohio Attorney General Online Public Inspection File (consumer-law court rulings) ─────────────────────────────
+
+const OPIF = "https://opif.ohioattorneygeneral.gov";
+const OPIF_SEARCH = `${OPIF}/Search/Pifs`;
+const OPIF_SOURCE = "Ohio Attorney General Public Inspection File (consumer-law court rulings)";
+/** The form's own Subject Matter values for construction work: Furnaces (12), Home Buildings (15), Home Improvements (17). */
+const OPIF_SUBJECTS = ["12", "15", "17"];
+/** Result pages (15 rows each) and case pages read per search. */
+const OPIF_PAGES = 3;
+const OPIF_DETAILS = 10;
+
+export type OpifRow = { issueId: string; pif: string; caseName: string | null; supplier: string | null; caseNumber: string | null };
+
+const cell = (v: string | undefined) => clean(decodeEntities((v ?? "").replace(/<[^>]+>/g, " ")));
+
+/** The results table (PIF Number, Case Name, Supplier, Case Number) and the "N record(s) match" count. */
+export function parseOpifResults(html: string): { rows: OpifRow[]; total: number | null } {
+  const rows: OpifRow[] = [];
+  for (const m of Array.from(html.matchAll(/<tr>([\s\S]*?)<\/tr>/g))) {
+    const cells = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c) => c[1]);
+    const link = cells[1]?.match(/href="\/Case\/Detail\/(\d+)"[^>]*>\s*(\d+)\s*</);
+    if (!link || cells.length < 5) continue;
+    rows.push({ issueId: link[1], pif: link[2], caseName: cell(cells[2]), supplier: cell(cells[3]), caseNumber: cell(cells[4]) });
+  }
+  const total = html.match(/(\d[\d,]*)\s+record\(s\) match/)?.[1];
+  return { rows, total: total ? Number(total.replace(/,/g, "")) : null };
+}
+
+/** A case page's labeled fields (<span class="form-label-display">Court:</span><div>…</div>: "Date in Pif", "Court", "County", "Subject Matter", "Issue Summary"…). */
+export function parseOpifDetail(html: string): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  for (const m of Array.from(html.matchAll(/<span class="form-label-display[^"]*">\s*([^<:]{2,40}):\s*<\/span>\s*<div[^>]*>([\s\S]*?)<\/div>/g))) out[m[1].trim()] = cell(m[2]);
+  return out;
+}
+
+/** "1/24/1990" → "1990-01-24". */
+const mdyDay = (v: string | null | undefined) => { const m = v?.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : null; };
+
+/**
+ * One business named as the supplier, as an enforcement record. The file's About page describes its cases as ones
+ * "where the courts have ruled a specific act or practice violates" the Consumer Sales Practices Act, but it also holds
+ * decisions for the supplier (PIF 10001192: "judgment for supplier ... No violation of CSPA"), so adverse comes only
+ * from the court's own summary (adverseFrom), and is unknown when the case page wasn't read. The case name is not
+ * shown (it names individual defendants); the supplier, court, county, subject and the court's summary are.
+ */
+export function opifHit(row: OpifRow, supplier: string, d: Record<string, string | null> | null): EnforcementHit {
+  const summary = d?.["Issue Summary"] ?? null;
+  return {
+    state: "OH", source: OPIF_SOURCE, sourceUrl: `${OPIF}/Case/Detail/${row.issueId}`, category: "court_case",
+    name: supplier, id: row.pif, date: mdyDay(d?.["Date in Pif"]), endDate: null,
+    status: "Consumer-law court decision in the Ohio Attorney General's Public Inspection File",
+    city: d?.County ? `${d.County} County, OH` : null,
+    detail: [row.caseNumber ? `Case ${row.caseNumber}` : null, d?.Court ? `court: ${d.Court}` : null, d?.["Subject Matter"] ? `subject: ${d["Subject Matter"]}` : null,
+      d?.Keywords ? `issues: ${d.Keywords}` : null, summary ? `summary: ${summary}` : null].filter(Boolean).join("; ").slice(0, 1000) || null,
+    amount: null, adverse: summary ? adverseFrom(summary) : null,
+  };
+}
+
+/** The supplier cell's business names ("Jones Paving; Jones Construction"); a person's name is left out (companies only). */
+export const opifSuppliers = (supplier: string | null): string[] =>
+  (supplier ?? "").split(/\s*;\s*/).map((n) => n.replace(/,?\s+et al\.?$/i, "").trim()).filter((n) => n && personNameForm(n) === null && looksLikeBusiness(n));
+
+const cookiesFrom = (res: Response, jar: Map<string, string>) => { for (const c of res.headers.getSetCookie?.() ?? []) { const [kv] = c.split(";"); const i = kv.indexOf("="); if (i > 0) jar.set(kv.slice(0, i).trim(), kv.slice(i + 1)); } };
+const cookieHeader = (jar: Map<string, string>) => Array.from(jar, ([k, v]) => `${k}=${v}`).join("; ");
+
+/**
+ * The file's own search form: Case Name/Supplier = the business name, Subject Matter = the construction subjects. The
+ * form posts with its anti-forgery token and session cookie and answers with a redirect to /Search/Results; the result
+ * pages and the matching case pages are then read (OPIF_PAGES, OPIF_DETAILS; past them the note says so). The host
+ * runs an F5 firewall, so every request waits its turn (2 s).
+ */
+export async function searchOpif(name: string): Promise<EnforcementHit[]> {
+  const q = name.replace(/[^A-Za-z0-9&' .,-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+  if (q.length < 2) return [];
+  const jar = new Map<string, string>();
+  const form = await politeFetch(OPIF_SEARCH, {}, { minDelayMs: 2000 });
+  if (!form.ok) throw new Error(`OPIF search page returned HTTP ${form.status}`);
+  cookiesFrom(form, jar);
+  const token = (await form.text()).match(/name="__RequestVerificationToken" type="hidden" value="([^"]+)"/)?.[1];
+  if (!token) throw new Error("OPIF search page changed (no form token)");
+  const body = new URLSearchParams({ __RequestVerificationToken: token, PifNumber: "", CaseName: q, CourtId: "", CountyId: "", DateInPif: "", IssueSummary: "", Regulation: "", Statute: "" });
+  for (const v of OPIF_SUBJECTS) body.append("SubjectMatterList", v);
+  const post = await politeFetch(OPIF_SEARCH, { method: "POST", body: body.toString(), redirect: "manual", headers: { "content-type": "application/x-www-form-urlencoded", cookie: cookieHeader(jar), referer: OPIF_SEARCH } }, { minDelayMs: 2000 });
+  cookiesFrom(post, jar);
+  const where = post.headers.get("location");
+  if (post.status !== 302 || !where) throw new Error(`OPIF search returned HTTP ${post.status}`);
+  const rows: OpifRow[] = [];
+  let total: number | null = null;
+  for (let page = 0; page < OPIF_PAGES; page++) {
+    const url = new URL(page ? `/Search/Results?page=${page}` : where, OPIF).toString();
+    const res = await politeFetch(url, { headers: { cookie: cookieHeader(jar), referer: OPIF_SEARCH } }, { minDelayMs: 2000 });
+    if (!res.ok) throw new Error(`OPIF results returned HTTP ${res.status}`);
+    const html = await res.text();
+    if (!/record\(s\) match/.test(html)) throw new Error("OPIF returned an unexpected page");
+    const r = parseOpifResults(html);
+    total ??= r.total;
+    rows.push(...r.rows);
+    if (!r.rows.length || rows.length >= (total ?? 0)) break;
+  }
+  // One record per business named as supplier on a case (a case shows once per issue: kept once).
+  const picked: { row: OpifRow; supplier: string }[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) for (const supplier of opifSuppliers(row.supplier)) {
+    const k = `${row.pif}|${supplier.toUpperCase()}`;
+    if (!companyNamed(name, supplier) || seen.has(k)) continue;
+    seen.add(k);
+    picked.push({ row, supplier });
+  }
+  const out: EnforcementHit[] = [];
+  const pages = new Map<string, Record<string, string | null> | null>();
+  for (const [i, { row, supplier }] of picked.entries()) {
+    if (i < OPIF_DETAILS && !pages.has(row.issueId)) {
+      const res = await politeFetch(`${OPIF}/Case/Detail/${row.issueId}`, { headers: { cookie: cookieHeader(jar) } }, { minDelayMs: 2000 });
+      pages.set(row.issueId, res.ok ? parseOpifDetail(await res.text()) : null);
+    }
+    out.push(opifHit(row, supplier, pages.get(row.issueId) ?? null));
+  }
+  return withNote(out, [
+    total != null && rows.length < total ? `read the first ${rows.length} of ${total} cases matching the name` : null,
+    picked.length > OPIF_DETAILS ? `court, date and summary read for the first ${OPIF_DETAILS} of ${picked.length} rulings` : null,
+  ].filter(Boolean).join("; ") || null);
+}
+
+const OPIF_SEARCHES: LiveEnforcementSearch[] = [
+  { source: OPIF_SOURCE, scope: "Court decisions in Ohio consumer-law cases about furnaces, home building and home improvement (R.C. 1345.05)", search: searchOpif, category: "court_case" },
+];
+
 export const pack: StatePack = {
   state: "OH",
   checked: "2026-10-15",
@@ -161,6 +301,7 @@ export const pack: StatePack = {
       everyHours: 24, minRows: 8_600, load: ocilbLoader },
     { id: "oh-sfm", state: "OH", label: SFM_SOURCE, pageUrl: SFM_PAGE, everyHours: 24 * 7, minRows: 16_000, load: sfmLoader },
   ],
+  liveEnforcement: OPIF_SEARCHES,
   noStatewideGcLicense:
     "Ohio does not license general or residential contractors statewide; the Construction Industry Licensing Board licenses commercial electrical, HVAC, plumbing, hydronics and refrigeration contractors (searched above), and local building departments regulate residential contractors",
   blocked: [
