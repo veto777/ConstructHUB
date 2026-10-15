@@ -7,6 +7,7 @@
  *   GET  /api/research-reports/orders/:id       one order, with the report when complete (owner or admin)
  *   POST /api/research-reports/orders/:id/retry  admin: re-queue a failed order
  *   POST /api/research-reports/orders/:id/run    admin: run an unpaid order without checkout (no charge)
+ *   GET  /api/research-reports/coverage-facets   public: what each loaded state file is indexed by (the coverage page)
  * The webhook side is fulfilResearchCheckout, called from server/stripe.ts applyOneTimeCheckout.
  */
 import type { Express, Request, Response } from "express";
@@ -22,6 +23,7 @@ import {
   RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA,
 } from "@shared/research-reports";
 import { buildPreview, drainResearchQueue } from "./runner";
+import { coverageFacets } from "./coverage";
 import { createOrder, getOrder, listOrders, markPaid, orderView, retryOrder, setCheckoutSession } from "./store";
 
 export const RESEARCH_CHECKOUT_TYPE = "research_report";
@@ -92,6 +94,18 @@ export function registerResearchRoutes(app: Express, deps: Deps) {
       res.json({ url: session.url });
     } catch (err: any) {
       deps.sendStripeError(res, err);
+    }
+  });
+
+  // The coverage page's live detail for the daily files: identifiers and record kinds seen in the loaded rows, row
+  // counts and load dates. Public (it says what we search, never what we found); cached six hours in coverageFacets.
+  app.get("/api/research-reports/coverage-facets", async (_req, res) => {
+    try {
+      res.set("Cache-Control", "public, max-age=3600");
+      res.json(await coverageFacets());
+    } catch (err) {
+      console.error("[research] coverage facets failed:", err);
+      res.status(503).json({});
     }
   });
 

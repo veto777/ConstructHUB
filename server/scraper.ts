@@ -1219,7 +1219,21 @@ export function accelaSearchUrl(searchUrl: string, html: string): string {
   });
   const permitLink = candidates.find(c => /building|^permits$|development services/i.test(c.label));
   if (permitLink) return permitLink.url;
-  return new URL(`/${agency}/Cap/CapHome.aspx?module=Building&TabName=Home`, source).href;
+  // No labeled tab (Fort Lauderdale links its module only from "Pay Record Fees"; Lee County's tabs are images).
+  // Use the permit module the agency's own links name, before assuming "Building".
+  const modules = new Map<string, string>();
+  for (const c of candidates) {
+    const module = new URL(c.url).searchParams.get('module');
+    if (module && /^[\w-]+$/.test(module)) modules.set(module.toLowerCase(), module);
+  }
+  // Tabs rendered from the page's script config: ['URL','/LEECO/Cap/CapHome.aspx?module=Permitting&TabName=Permitting'].
+  const escaped = agency.replace(/[^\w-]/g, '');
+  for (const m of html.matchAll(new RegExp(`['"]/${escaped}/Cap/CapHome\\.aspx\\?module=([\\w-]+)`, 'gi'))) {
+    if (!modules.has(m[1].toLowerCase())) modules.set(m[1].toLowerCase(), m[1]);
+  }
+  const named = ['building', 'permits', 'permitting', 'buildingpermits', 'permit'].map(m => modules.get(m)).find(Boolean);
+  const module = named ?? 'Building';
+  return new URL(`/${agency}/Cap/CapHome.aspx?module=${encodeURIComponent(module)}&TabName=Home`, source).href;
 }
 
 export function parseAccelaResults(html: string): ScrapeResult[] {
@@ -1246,7 +1260,8 @@ export function parseAccelaResults(html: string): ScrapeResult[] {
         const i = headers.findIndex(h => pattern.test(h));
         return i >= 0 ? cells.eq(i).text().replace(/\s+/g, ' ').trim() || null : null;
       };
-      const permitNumber = value(/^(record|permit|application) (number|#)$/);
+      // Plantation, FL labels it "Record No.".
+      const permitNumber = value(/^(record|permit|application) (number|#|no\.?)$/);
       if (!permitNumber || !/\d/.test(permitNumber)) return;
       results.push(makeResult({
         permitNumber,

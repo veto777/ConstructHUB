@@ -80,6 +80,16 @@ describe('Accela module discovery', () => {
     const url = 'https://aca-prod.accela.com/COUNTY/Cap/CapHome.aspx?module=Permits';
     expect(accelaSearchUrl(url, '')).toBe(url);
   });
+  // Recorded 2026-10-15: both tenants answered module=Building with "login required or invalid module".
+  it('uses the permit module an unlabeled agency link names (Fort Lauderdale: only "Pay Record Fees")', () => {
+    expect(accelaSearchUrl('https://aca-prod.accela.com/FTL/Default.aspx', '<a href="/FTL/Cap/CapHome.aspx?module=Permits&payfees=true">Pay Record Fees</a>'))
+      .toBe('https://aca-prod.accela.com/FTL/Cap/CapHome.aspx?module=Permits&TabName=Home');
+  });
+  it('reads the module from the page\'s tab configuration (Lee County renders tabs from script)', () => {
+    const html = "nks',[[['Links',[[['Active','False'],['Label','Permitting'],['Key','Home_Search_Records'],['Title',],['URL','/LEECO/Cap/CapHome.aspx?module=Permitting&TabName=Home'],['Module',],['Order',0]],[['URL','/LEECO/Cap/CapHome.aspx?module=CodeEnforcement&TabName=Home']";
+    expect(accelaSearchUrl('https://aca-prod.accela.com/LEECO/Default.aspx', html)).toBe('https://aca-prod.accela.com/LEECO/Cap/CapHome.aspx?module=Permitting&TabName=Home');
+    expect(accelaSearchUrl('https://aca-prod.accela.com/LEECO/Default.aspx', "['URL','/OTHER/Cap/CapHome.aspx?module=Permitting']")).toContain('module=Building&TabName=Home');
+  });
 });
 
 describe('Accela grid parsing', () => {

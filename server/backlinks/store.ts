@@ -39,15 +39,33 @@ export type QueryRow = { id: number; kind: BacklinkKind; niche: string; query: s
 export async function dueQueries(limit: number, repeatDays = 60): Promise<QueryRow[]> {
   const r = await db().query(
     `SELECT id, kind, niche, query FROM backlink_queries
-      WHERE last_run_at IS NULL OR last_run_at < now() - make_interval(days => $2)
+      WHERE task_id IS NULL AND (last_run_at IS NULL OR last_run_at < now() - make_interval(days => $2))
       ORDER BY last_run_at NULLS FIRST, id LIMIT $1`, [limit, repeatDays]);
   return r.rows;
 }
 
 export async function recordQueryRun(id: number, found: number, newFound: number, costUsd: number) {
   await db().query(
-    `UPDATE backlink_queries SET runs = runs + 1, found = found + $2, new_found = new_found + $3, cost_usd = cost_usd + $4, last_run_at = now() WHERE id = $1`,
+    `UPDATE backlink_queries SET runs = runs + 1, found = found + $2, new_found = new_found + $3, cost_usd = cost_usd + $4, last_run_at = now(), task_id = NULL WHERE id = $1`,
     [id, found, newFound, costUsd]);
+}
+
+/** A search posted to the standard queue (worker.ts runQueuedDiscovery); what it cost is counted now. */
+export async function markPosted(id: number, taskId: string, costUsd: number) {
+  await db().query(`UPDATE backlink_queries SET task_id = $2, task_posted_at = now(), cost_usd = cost_usd + $3 WHERE id = $1`, [id, taskId, costUsd]);
+}
+/** Posted searches to collect: a minute old at least. One over a day old is given up (it is due again later). */
+export async function postedQueries(limit: number): Promise<(QueryRow & { taskId: string; stale: boolean })[]> {
+  const r = await db().query(
+    `SELECT id, kind, niche, query, task_id "taskId", task_posted_at < now() - interval '1 day' stale FROM backlink_queries
+      WHERE task_id IS NOT NULL AND task_posted_at < now() - interval '1 minute' ORDER BY task_posted_at LIMIT $1`, [limit]);
+  return r.rows;
+}
+export async function dropTask(id: number) { await db().query(`UPDATE backlink_queries SET task_id = NULL WHERE id = $1`, [id]); }
+/** Searches started today: run live, or posted to the queue. */
+export async function searchesToday(): Promise<number> {
+  const r = await db().query(`SELECT count(*)::int n FROM backlink_queries WHERE greatest(last_run_at, task_posted_at) >= date_trunc('day', now())`);
+  return Number(r.rows[0]?.n ?? 0);
 }
 
 // ── Spend ───────────────────────────────────────────────────────────────────
@@ -142,6 +160,42 @@ export async function saveVetting(job: VetJob, token: string, signals: BacklinkS
   if (!r.rowCount) return false;
   await event(job.id, "vetted", { tier: g.tier, score: g.score, kind: g.kind });
   return true;
+}
+
+/**
+ * Sources that published no email, never searched for contacts (or not for 90 days): qualified ones, and rejected ones the
+ * media inbox sorted as a directory, association, chamber or newspaper (server/media-inbox/store.ts needingClass).
+ */
+export async function needingContacts(limit: number): Promise<{ id: number; domain: string; contactUrl: string | null }[]> {
+  const r = await db().query(
+    `SELECT id, domain, contact_url "contactUrl" FROM backlink_sources
+      WHERE cardinality(contact_emails) = 0
+        AND (status = 'qualified' OR (status = 'rejected' AND partner_class IN ('listing_directory', 'trade_association', 'chamber', 'news')))
+        AND (contacts_checked_at IS NULL OR contacts_checked_at < now() - interval '90 days')
+      ORDER BY status = 'qualified' DESC, tier NULLS LAST, score DESC NULLS LAST, id LIMIT $1`, [limit]);
+  return r.rows;
+}
+
+/** Sources sorted as a chamber, trade association, listing directory or newspaper whose links were never followed (./expand.ts). */
+export async function needingExpansion(limit: number): Promise<{ id: number; domain: string; discoveredUrl: string | null }[]> {
+  const r = await db().query(
+    `SELECT id, domain, discovered_url "discoveredUrl" FROM backlink_sources
+      WHERE expanded_at IS NULL AND partner_class IN ('chamber', 'trade_association', 'listing_directory', 'news')
+      ORDER BY status = 'qualified' DESC, tier NULLS LAST, id LIMIT $1`, [limit]);
+  return r.rows;
+}
+export async function markExpanded(id: number, found: number, added: number) {
+  await db().query(`UPDATE backlink_sources SET expanded_at = now() WHERE id = $1`, [id]);
+  await event(id, "expanded", { found, added });
+}
+
+/** What the contact finder read; the addresses it found join the source's own. */
+export async function saveContacts(id: number, emails: string[], contactUrl: string | null, pagesRead: number) {
+  await db().query(
+    `UPDATE backlink_sources SET contact_emails = CASE WHEN cardinality($2::text[]) > 0 THEN $2::text[] ELSE contact_emails END,
+            contact_url = COALESCE(contact_url, $3), contacts_checked_at = now(), updated_at = now() WHERE id = $1`,
+    [id, emails, contactUrl]);
+  await event(id, "contacts_searched", { found: emails.length, pagesRead });
 }
 
 /** A vetting try that failed: back in the queue, or rejected when it was the last try. */

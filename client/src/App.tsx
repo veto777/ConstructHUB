@@ -83,6 +83,7 @@ const MasterClassPage = lazyPage(() => import("@/pages/master-class"));
 const ReinstatementPage = lazyPage(() => import("@/pages/reinstatement"));
 const CompliancePage = lazyPage(() => import("@/pages/compliance"));
 const ResearchOrderPage = lazyPage(() => import("@/pages/compliance-research"));
+const ResearchCoveragePage = lazyPage(() => import("@/pages/compliance-research-coverage"));
 const ResearchOrderStatusPage = lazyPage(() => import("@/pages/compliance-research").then((m) => ({ default: m.ResearchOrderStatusPage })));
 const GoogleBusinessPage = lazyPage(() => import("@/pages/google-business"));
 const AdsManagerPage = lazyPage(() => import("@/pages/ads-manager"));
@@ -299,6 +300,7 @@ function DashboardRouter() {
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/compliance" component={CompliancePage} />
+      <Route path="/compliance/research/coverage" component={ResearchCoveragePage} />
       <Route path="/compliance/research" component={ResearchOrderPage} />
       <Route path="/compliance/research/orders/:id" component={ResearchOrderStatusPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
@@ -462,6 +464,7 @@ function PublicRouter() {
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/compliance" component={CompliancePage} />
+      <Route path="/compliance/research/coverage" component={ResearchCoveragePage} />
       <Route path="/compliance/research" component={ResearchOrderPage} />
       <Route path="/compliance/research/orders/:id" component={ResearchOrderStatusPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />

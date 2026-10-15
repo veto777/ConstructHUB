@@ -20,6 +20,7 @@ import { US_STATES } from "@/lib/voice-studio";
 import { formatUsd } from "@shared/plan-copy";
 import { RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS } from "@shared/plans";
 import { RESEARCH_PATH } from "@shared/research-reports";
+import { RESEARCH_COVERAGE_PATH } from "@shared/research-coverage";
 import {
   STATE_COMPLIANCE, ROLE_LABELS, ELECTRICAL_ISSUER_LABELS, type ComplianceAgency, type StateCompliance,
 } from "@shared/compliance";
@@ -99,12 +100,15 @@ export function ResearchOffer({ compact = false }: { compact?: boolean }) {
         <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary"><FileSearch className="h-4 w-4" aria-hidden="true" /> Permit &amp; License Research Report</p>
         <p className={compact ? "font-semibold" : "text-lg font-semibold"}>Let our research bot search every permit portal in a state for you.</p>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Give us names of people or companies, the states and the trades you care about. We search the state license
-          records and every city and county permit portal we can reach there, plus consumer complaints, state discipline and
-          enforcement records, federal lawsuits and OSHA inspections for companies, and send you a sourced report.
+          Give us names of people or companies, the states and the trades you care about. The report finds contractors by
+          name, owner, license number, phone or address and links related licenses: we search the state license records and
+          every city and county permit portal we can reach there, follow the license numbers, phones, addresses and people we
+          find to other licenses and businesses tied to them, and add consumer complaints, state discipline and enforcement
+          records, federal lawsuits and OSHA inspections for companies. You get a sourced report.
           {" "}{formatUsd(RESEARCH_STANDARD_CENTS)} for one name in one state, {formatUsd(RESEARCH_EXTENDED_CENTS)} for up to five names in up to three states.
           Paid up front and non-refundable. Nothing is guaranteed.
         </p>
+        <Link href={RESEARCH_COVERAGE_PATH} className="text-sm font-medium text-primary hover:underline" data-testid="link-compliance-coverage">See what a report searches in each state</Link>
       </div>
       <Button asChild className="shrink-0" data-testid="link-order-research">
         <Link href={RESEARCH_PATH}>Order a report <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden="true" /></Link>

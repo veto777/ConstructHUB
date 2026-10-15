@@ -144,16 +144,20 @@ export async function searchLicensesBy(src: LicenseSource, q: IdQuery): Promise<
   let where: string | null = null;
   if (q.type === "license" && src.fields.licenseNumber) {
     const n = normLicense(q.value);
-    if (n) where = `upper(${src.fields.licenseNumber}) in (${Array.from(new Set([q.value.trim().toUpperCase(), n])).map(quote).join(",")})`;
+    if (n) where = `upper(${src.fields.licenseNumber}::text) in (${Array.from(new Set([q.value.trim().toUpperCase(), n])).map(quote).join(",")})`;
   } else if (q.type === "phone" && src.phone) {
     const n = normPhone(q.value);
-    if (n) where = `${src.phone} like ${quote(`%${n.slice(0, 3)}%${n.slice(3, 6)}%${n.slice(6)}%`)}`;
+    if (n) where = `${src.phone}::text like ${quote(`%${n.slice(0, 3)}%${n.slice(3, 6)}%${n.slice(6)}%`)}`;
   } else if (q.type === "address" && src.address) {
     const key = addressKeys(q.value).find((k) => k.startsWith("a:"));
-    const field = Array.isArray(src.address) ? src.address[0] : src.address;
+    const fields = Array.isArray(src.address) ? src.address : [src.address];
     if (key && !key.startsWith("a:POBOX")) {
       const [num, word] = key.slice(2).split(" ");
-      where = `upper(${field}) like ${quote(`${num} %${word}%`)}`;
+      // One street field, or the house number and the street in two ("400" + "RELLA BLVD"): try both shapes.
+      const like = quote(`${num} %${word}%`);
+      where = fields.length > 1
+        ? `(upper(${fields[0]}::text) like ${like} OR upper(${fields[0]}::text || ' ' || ${fields[1]}::text) like ${like})`
+        : `upper(${fields[0]}::text) like ${like}`;
     }
   }
   if (!where) return [];

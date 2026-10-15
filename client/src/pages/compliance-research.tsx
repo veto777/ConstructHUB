@@ -4,10 +4,10 @@
  * research bot (server/research/runner.ts) finishes, the report itself (printable).
  * Prices and limits come from shared/research-reports.ts, the same module the server charges from.
  */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, CheckCircle2, FileSearch, Loader2, Plus, Printer, Trash2, XCircle } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, ChevronDown, FileSearch, Link2, Loader2, Plus, Printer, Trash2, XCircle } from "lucide-react";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,11 +22,33 @@ import { formatUsd } from "@shared/plan-copy";
 import {
   RESEARCH_TIERS, RESEARCH_TRADES, RESEARCH_TRADE_KEYS, RESEARCH_PATH, COMPLIANCE_PATH,
   RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA, researchTierFor,
-  type ResearchOrderView, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory,
+  RESEARCH_MAX_LICENSE_NUMBERS, RESEARCH_MAX_PHONES, RESEARCH_MAX_ADDRESSES, RELATED_TIES, cleanLicenseNumber, formatPhone, cleanAddress,
+  type ResearchOrderView, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie,
 } from "@shared/research-reports";
+import { RESEARCH_COVERAGE_PATH } from "@shared/research-coverage";
 import { ComplianceFrame } from "./compliance";
 
-type Subject = { name: string; kind: "person" | "company" };
+/** One name on the form; the identifiers are typed as text (license numbers and phones comma-separated, addresses one per line). */
+type Subject = { name: string; kind: "person" | "company"; licenses: string; phones: string; addresses: string; showIds: boolean };
+const blankSubject = (kind: Subject["kind"]): Subject => ({ name: "", kind, licenses: "", phones: "", addresses: "", showIds: false });
+const splitList = (v: string, sep: RegExp) => v.split(sep).map((x) => x.trim()).filter(Boolean);
+/** The identifiers as the API takes them, plus the entries the shared rules reject (shown under the field). */
+function subjectIds(s: Subject) {
+  const lists = {
+    licenseNumbers: { values: splitList(s.licenses, /[,;\n]/), check: cleanLicenseNumber, max: RESEARCH_MAX_LICENSE_NUMBERS },
+    phones: { values: splitList(s.phones, /[,;\n]/), check: formatPhone, max: RESEARCH_MAX_PHONES },
+    addresses: { values: splitList(s.addresses, /\n/), check: cleanAddress, max: RESEARCH_MAX_ADDRESSES },
+  };
+  const out: { licenseNumbers?: string[]; phones?: string[]; addresses?: string[] } = {};
+  const problems: Partial<Record<keyof typeof lists, string>> = {};
+  for (const [k, l] of Object.entries(lists) as [keyof typeof lists, (typeof lists)[keyof typeof lists]][]) {
+    const bad = l.values.filter((v) => !l.check(v));
+    if (bad.length) problems[k] = `Not recognized: ${bad.join(", ")}`;
+    else if (l.values.length > l.max) problems[k] = `Up to ${l.max}`;
+    if (l.values.length) out[k] = l.values;
+  }
+  return { ids: out, problems, count: Object.values(out).reduce((n, l) => n + (l?.length ?? 0), 0) };
+}
 const MAX_NAMES = RESEARCH_TIERS.extended.maxNames;
 const MAX_STATES = RESEARCH_TIERS.extended.maxStates;
 
@@ -45,7 +67,7 @@ export default function ResearchOrderPage() {
   const [, navigate] = useLocation();
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const { data: orders } = useQuery<ResearchOrderView[]>({ queryKey: ["/api/research-reports/orders"], enabled: !!user });
-  const [subjects, setSubjects] = useState<Subject[]>([{ name: "", kind: "company" }]);
+  const [subjects, setSubjects] = useState<Subject[]>([blankSubject("company")]);
   const [states, setStates] = useState<string[]>([]);
   const [trades, setTrades] = useState<ResearchTrade[]>([]);
   const [sinceYear, setSinceYear] = useState("");
@@ -55,11 +77,13 @@ export default function ResearchOrderPage() {
 
   const named = subjects.filter((s) => s.name.trim().length >= 2);
   const tier = researchTierFor(named.length, states.length);
-  const ready = !!tier && agree.refund && agree.guarantee && agree.fcra;
+  const idsOk = named.every((s) => !Object.keys(subjectIds(s).problems).length);
+  const ready = !!tier && idsOk && agree.refund && agree.guarantee && agree.fcra;
+  const setSubject = (i: number, patch: Partial<Subject>) => setSubjects((p) => p.map((x, j) => j === i ? { ...x, ...patch } : x));
 
   const create = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/research-reports/orders", {
-      subjects: named.map((s) => ({ name: s.name.trim(), kind: s.kind })), states, trades,
+      subjects: named.map((s) => ({ name: s.name.trim(), kind: s.kind, ...subjectIds(s).ids })), states, trades,
       sinceYear: /^\d{4}$/.test(sinceYear) ? Number(sinceYear) : null, purpose,
       agreeNonRefundable: agree.refund, agreeNoGuarantee: agree.guarantee, agreeNotFcra: agree.fcra,
     })).json() as Promise<ResearchOrderView>,
@@ -77,7 +101,7 @@ export default function ResearchOrderPage() {
       setSubjects((p) => [p.find((x) => x.name.trim()) ?? p[0]]);
       setStates((p) => p.slice(0, 1));
     } else if (subjects.length < 2) {
-      setSubjects((p) => [...p, { name: "", kind: "person" }]);
+      setSubjects((p) => [...p, blankSubject("person")]);
       requestAnimationFrame(() => (document.querySelector('[data-testid="input-subject-1"]') as HTMLInputElement | null)?.focus());
     }
   };
@@ -90,13 +114,27 @@ export default function ResearchOrderPage() {
         <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary"><FileSearch className="h-4 w-4" aria-hidden="true" /> Permit &amp; License Research Report</p>
         <h1 className="text-3xl font-semibold tracking-tight" data-testid="text-research-title">Find every permit and license tied to a name</h1>
         <p className="text-muted-foreground max-w-3xl leading-relaxed">
-          Tell us who to look for and where. Our research bot searches the state contractor-license records and every city and
-          county permit portal we can reach in those states, by name. For a company it also pulls consumer complaints, state
+          Tell us who to look for and where. Our research bot finds contractors by name, owner, license number, phone or address
+          and links related licenses: it searches the state contractor-license records and every city and county permit portal
+          we can reach in those states, then follows the license numbers, phones, addresses and people on what it finds to other
+          licenses and businesses tied to them. For a company it also pulls consumer complaints, state
           enforcement records (licensing-board discipline, stop-work orders, tax liens, debarments, environmental orders),
           federal court cases and OSHA safety inspections. Every finding links to its official
           source. Reports are usually ready the same day.
         </p>
       </header>
+
+      <section className="max-w-3xl rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2" data-testid="section-research-what">
+        <h2 className="font-semibold">What a report does</h2>
+        <ul className="space-y-1.5 text-sm list-disc pl-5">
+          <li>Finds a contractor by name, owner, license number, phone or address, in all 50 states and DC.</li>
+          <li>Cross-references what it finds. Other licenses and businesses that share a license number, phone, address or person show up too, and each one says what ties it.</li>
+          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens), federal court cases and OSHA inspections for companies.</li>
+        </ul>
+        <Link href={RESEARCH_COVERAGE_PATH} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline" data-testid="link-research-coverage">
+          See exactly what we search in your state <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
+      </section>
 
       {/* Picking a card shapes the form; the price always follows what's entered (one name in one state is Standard). */}
       <div className="grid gap-3 sm:grid-cols-2 max-w-3xl" role="group" aria-label="Report size">
@@ -121,28 +159,58 @@ export default function ResearchOrderPage() {
       <form className="space-y-6 max-w-3xl" onSubmit={(e) => { e.preventDefault(); if (!user) { navigate(`/auth?next=${encodeURIComponent(RESEARCH_PATH)}`); return; } if (ready) create.mutate(); }} data-testid="form-research">
         <fieldset className="space-y-3">
           <legend className="font-semibold">Who should we look for?</legend>
-          {subjects.map((s, i) => (
-            <div key={i} className="flex flex-col sm:flex-row gap-2">
-              <Input value={s.name} onChange={(e) => setSubjects((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
-                placeholder={s.kind === "company" ? "Company name, e.g. Safe Consulting LLC" : "Person's name, e.g. Aaron Johnson"} maxLength={120}
-                aria-label={`Name ${i + 1}`} data-testid={`input-subject-${i}`} className="sm:flex-1" />
-              <div className="flex gap-2">
-                {(["company", "person"] as const).map((k) => (
-                  <Button key={k} type="button" variant={s.kind === k ? "default" : "outline"} size="sm" className="h-10"
-                    onClick={() => setSubjects((p) => p.map((x, j) => j === i ? { ...x, kind: k } : x))} data-testid={`button-kind-${k}-${i}`}>
-                    {k === "company" ? "Company" : "Person"}
-                  </Button>
-                ))}
-                {subjects.length > 1 && (
-                  <Button type="button" variant="ghost" size="icon" className="h-10 w-10" aria-label="Remove name" onClick={() => setSubjects((p) => p.filter((_, j) => j !== i))}>
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                )}
+          <p className="text-sm text-muted-foreground">Pick <strong>Person</strong> for an owner, officer or qualifier: we match the people named on licenses.</p>
+          {subjects.map((s, i) => {
+            const { problems, count } = subjectIds(s);
+            return (
+            <div key={i} className="space-y-2 rounded-lg border p-3" data-testid={`subject-${i}`}>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input value={s.name} onChange={(e) => setSubject(i, { name: e.target.value })}
+                  placeholder={s.kind === "company" ? "Company name, e.g. Safe Consulting LLC" : "Person's name, e.g. Aaron Johnson"} maxLength={120}
+                  aria-label={`Name ${i + 1}`} data-testid={`input-subject-${i}`} className="sm:flex-1" />
+                <div className="flex gap-2">
+                  {(["company", "person"] as const).map((k) => (
+                    <Button key={k} type="button" variant={s.kind === k ? "default" : "outline"} size="sm" className="h-10"
+                      onClick={() => setSubject(i, { kind: k })} data-testid={`button-kind-${k}-${i}`}>
+                      {k === "company" ? "Company" : "Person"}
+                    </Button>
+                  ))}
+                  {subjects.length > 1 && (
+                    <Button type="button" variant="ghost" size="icon" className="h-10 w-10" aria-label="Remove name" onClick={() => setSubjects((p) => p.filter((_, j) => j !== i))}>
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  )}
+                </div>
               </div>
+              <button type="button" className="inline-flex items-center gap-1 text-sm text-primary hover:underline" aria-expanded={s.showIds}
+                onClick={() => setSubject(i, { showIds: !s.showIds })} data-testid={`button-ids-${i}`}>
+                <ChevronDown className={`h-4 w-4 transition-transform ${s.showIds ? "rotate-180" : ""}`} aria-hidden="true" />
+                Also search by license number, phone or address{count ? ` (${count})` : ""} <span className="text-muted-foreground">(optional, no extra charge)</span>
+              </button>
+              {s.showIds && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor={`lic-${i}`}>License numbers <span className="font-normal text-muted-foreground">(up to {RESEARCH_MAX_LICENSE_NUMBERS}, comma-separated)</span></Label>
+                    <Input id={`lic-${i}`} value={s.licenses} onChange={(e) => setSubject(i, { licenses: e.target.value })} placeholder="e.g. CGC1512345, EC13008123" maxLength={260} className="mt-1.5" data-testid={`input-licenses-${i}`} aria-invalid={!!problems.licenseNumbers} />
+                    {problems.licenseNumbers && <p className="mt-1 text-xs text-destructive">{problems.licenseNumbers}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor={`tel-${i}`}>Phone numbers <span className="font-normal text-muted-foreground">(up to {RESEARCH_MAX_PHONES}, comma-separated)</span></Label>
+                    <Input id={`tel-${i}`} type="tel" value={s.phones} onChange={(e) => setSubject(i, { phones: e.target.value })} placeholder="e.g. (813) 555-0142" maxLength={100} className="mt-1.5" data-testid={`input-phones-${i}`} aria-invalid={!!problems.phones} />
+                    {problems.phones && <p className="mt-1 text-xs text-destructive">{problems.phones}</p>}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label htmlFor={`addr-${i}`}>Street addresses <span className="font-normal text-muted-foreground">(up to {RESEARCH_MAX_ADDRESSES}, one per line)</span></Label>
+                    <Textarea id={`addr-${i}`} rows={2} value={s.addresses} onChange={(e) => setSubject(i, { addresses: e.target.value })} placeholder="e.g. 123 Main St, Tampa FL 33602" maxLength={620} className="mt-1.5" data-testid={`input-addresses-${i}`} aria-invalid={!!problems.addresses} />
+                    {problems.addresses && <p className="mt-1 text-xs text-destructive">{problems.addresses}. An address needs a house number and street.</p>}
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
           {subjects.length < MAX_NAMES && (
-            <Button type="button" variant="outline" size="sm" onClick={() => setSubjects((p) => [...p, { name: "", kind: "person" }])} data-testid="button-add-subject">
+            <Button type="button" variant="outline" size="sm" onClick={() => setSubjects((p) => [...p, blankSubject("person")])} data-testid="button-add-subject">
               <Plus className="mr-1 h-4 w-4" aria-hidden="true" /> Add another name
             </Button>
           )}
@@ -194,7 +262,7 @@ export default function ResearchOrderPage() {
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={(!!user && !ready) || create.isPending} data-testid="button-research-continue">
             {create.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-            {!user ? "Sign in to continue" : tier ? `Continue: ${RESEARCH_TIERS[tier].label}, ${formatUsd(RESEARCH_TIERS[tier].cents)}` : "Add a name and a state"}
+            {!user ? "Sign in to continue" : tier && !idsOk ? "Fix the highlighted entries" : tier ? `Continue: ${RESEARCH_TIERS[tier].label}, ${formatUsd(RESEARCH_TIERS[tier].cents)}` : "Add a name and a state"}
           </Button>
           <span className="text-xs text-muted-foreground">You'll see a free preview before you pay.</span>
         </div>
@@ -227,7 +295,7 @@ const ExtA = ({ href, children }: { href: string; children: React.ReactNode }) =
 
 const ENFORCEMENT_LABELS: Record<EnforcementCategory, string> = {
   discipline: "Licensing-board discipline", complaint: "Licensing-board complaints", stop_work: "Stop-work orders",
-  environmental: "Environmental enforcement", tax_lien: "Federal tax liens", debarment: "Debarments", business_status: "Business registration status",
+  environmental: "Environmental enforcement", tax_lien: "Tax liens and warrants", debarment: "Debarments", business_status: "Business registration status",
   wage: "Wage and labor violations", court_case: "State court cases",
 };
 const ENFORCEMENT_ORDER: EnforcementCategory[] = ["discipline", "stop_work", "debarment", "wage", "court_case", "tax_lien", "environmental", "complaint", "business_status"];
@@ -347,6 +415,105 @@ function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
   );
 }
 
+const FOUND_BY: Partial<Record<LicenseHit["matchedOn"], string>> = { license: "Found by license number", phone: "Found by phone", address: "Found by address" };
+
+/** Everyone named on a license, with their role ("Jane Doe, qualifier"). */
+function People({ l }: { l: LicenseHit }) {
+  const people = l.people?.length ? l.people : l.principal ? [{ name: l.principal, role: null }] : [];
+  if (!people.length) return <>—</>;
+  return <>{people.map((p, k) => <span key={k} className="block">{p.name}{p.role ? <span className="text-xs text-muted-foreground">, {p.role.toLowerCase()}</span> : null}</span>)}</>;
+}
+
+/** Licenses as a table on wide screens and as stacked cards on a phone. */
+function LicenseTable({ rows, testId, related }: { rows: LicenseHit[]; testId: string; related?: boolean }) {
+  return (
+    <>
+      <div className="hidden md:block overflow-x-auto print:block" data-testid={testId}><table className="w-full text-sm border-collapse">
+        <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 pr-3">Business</th><th className="pr-3">People on the license</th><th className="pr-3">License</th><th className="pr-3">Type</th><th className="pr-3">Status</th><th className="pr-3">Address and phone</th><th className="whitespace-nowrap">Source</th></tr></thead>
+        <tbody>{rows.map((l, j) => (<Fragment key={j}>
+          {related && l.relatedVia && (
+            <tr className="align-top"><td colSpan={7} className="pt-2 text-xs text-muted-foreground"><Link2 className="inline h-3 w-3 mr-0.5" aria-hidden="true" />Why it's here: {l.relatedVia}</td></tr>
+          )}
+          <tr className="border-b align-top">
+            <td className="py-2 pr-3">{l.businessName ?? "—"}</td>
+            <td className="pr-3"><People l={l} /></td>
+            <td className="pr-3 font-mono text-xs whitespace-nowrap">{l.licenseNumber ?? "—"}{!related && FOUND_BY[l.matchedOn] ? <span className="block font-sans text-muted-foreground">{FOUND_BY[l.matchedOn]}</span> : null}</td>
+            <td className="pr-3">{[l.licenseType, l.specialty].filter(Boolean).join(" · ") || "—"}</td><td className="pr-3">{l.status ?? "—"}{l.expires ? ` (exp. ${l.expires})` : ""}</td>
+            <td className="pr-3">{l.address ?? l.city ?? "—"}{l.phone ? <span className="block whitespace-nowrap">{formatPhone(l.phone) ?? l.phone}</span> : null}</td>
+            <td className="whitespace-nowrap"><a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">{l.state} data</a><span className="block text-xs text-muted-foreground max-w-[12rem] whitespace-normal">{l.source}</span></td>
+          </tr></Fragment>))}</tbody>
+      </table></div>
+      <ul className="md:hidden print:hidden space-y-2" data-testid={`${testId}-cards`}>
+        {rows.map((l, j) => (
+          <li key={j} className="rounded-lg border p-3 text-sm space-y-1">
+            <p className="font-medium">{l.businessName ?? l.principal ?? "—"}</p>
+            {related && l.relatedVia && <p className="text-xs text-muted-foreground"><Link2 className="inline h-3 w-3 mr-0.5" aria-hidden="true" />Why it's here: {l.relatedVia}</p>}
+            <p><span className="font-mono text-xs">{l.licenseNumber ?? "No number"}</span> · {[l.licenseType, l.specialty].filter(Boolean).join(" · ") || "—"}</p>
+            <p>{l.status ?? "Status not published"}{l.expires ? ` (exp. ${l.expires})` : ""}</p>
+            {(l.people?.length || l.principal) && <div className="text-xs"><People l={l} /></div>}
+            {(l.address || l.city || l.phone) && <p className="text-xs text-muted-foreground">{[l.address ?? l.city, l.phone ? formatPhone(l.phone) ?? l.phone : null].filter(Boolean).join(" · ")}</p>}
+            {!related && FOUND_BY[l.matchedOn] && <p className="text-xs text-muted-foreground">{FOUND_BY[l.matchedOn]}</p>}
+            <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">{l.state}: {l.source}</a>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+const TIE_LABELS: Record<RelatedTie, { title: string; caveat?: string }> = {
+  license: { title: "Same license number" },
+  phone: { title: "Same phone number", caveat: "A phone can be shared, for example by an office or an answering service." },
+  person: { title: "A person named on both", caveat: "Linked by a person's name only. It may be a different person with the same name." },
+  business: { title: "The same business" },
+  address: { title: "Same street address", caveat: "Businesses can share an address, for example an office building or a registered agent." },
+};
+
+/** Related licenses and businesses, grouped by the tie. None of them is the subject's own record. */
+function RelatedRecords({ s, i }: { s: ResearchSubjectReport; i: number }) {
+  if (!s.relatedLicenses && !s.relatedEnforcement) return null; // reports made before 2026-10-15
+  const lic = s.relatedLicenses ?? [], enf = s.relatedEnforcement ?? [];
+  const groups = RELATED_TIES.map((t) => ({ t, lic: lic.filter((h) => (h.relatedTie ?? "address") === t), enf: enf.filter((h) => (h.relatedTie ?? "address") === t) })).filter((g) => g.lic.length || g.enf.length);
+  return (
+    <div className="space-y-3" data-testid={`section-related-${i}`}>
+      <h3 className="font-semibold">Related licenses and businesses ({lic.length + enf.length})</h3>
+      <p className="text-sm text-muted-foreground">
+        These are not {s.name}'s own records. Each one shares a license number, phone, address or person with a record above,
+        and says which. Check the link before you rely on it.
+      </p>
+      {groups.length === 0 && <p className="text-sm text-muted-foreground">We found no other licenses or businesses tied to these records.</p>}
+      {groups.map((g) => (
+        <div key={g.t} className="space-y-1.5" data-testid={`related-${g.t}-${i}`}>
+          <h4 className="text-sm font-medium">{TIE_LABELS[g.t].title} ({g.lic.length + g.enf.length})</h4>
+          {TIE_LABELS[g.t].caveat && <p className="text-xs text-muted-foreground">{TIE_LABELS[g.t].caveat}</p>}
+          {g.lic.length > 0 && <LicenseTable rows={g.lic} related testId={`table-related-${g.t}-${i}`} />}
+          {g.enf.length > 0 && <RelatedEnforcement rows={g.enf} />}
+        </div>
+      ))}
+      {!!s.relatedNotes?.length && (
+        <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-0.5">{s.relatedNotes.map((n, j) => <li key={j}>{n}</li>)}</ul>
+      )}
+    </div>
+  );
+}
+
+function RelatedEnforcement({ rows }: { rows: EnforcementHit[] }) {
+  return (
+    <ul className="space-y-2">
+      {rows.map((h, j) => (
+        <li key={j} className="rounded-lg border p-3 text-sm space-y-1">
+          <p><span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{ENFORCEMENT_LABELS[h.category]}</span>{h.date ? <span className="text-xs text-muted-foreground"> · {h.date}{h.endDate ? ` to ${h.endDate}` : ""}</span> : null}</p>
+          <p className="font-medium">{h.name ?? "—"}{h.city ? <span className="font-normal text-muted-foreground">, {h.city}</span> : null}</p>
+          <p>{h.adverse ? <span className="text-destructive">{h.status ?? "—"}</span> : (h.status ?? "—")}{h.amount != null ? ` · ${money(h.amount)}` : ""}</p>
+          {h.detail && <p className="text-xs text-muted-foreground">{h.detail}</p>}
+          {h.relatedVia && <p className="text-xs text-muted-foreground"><Link2 className="inline h-3 w-3 mr-0.5" aria-hidden="true" />Why it's here: {h.relatedVia}</p>}
+          <ExtA href={h.sourceUrl}>{h.state}{h.id ? ` #${h.id}` : ""}: {h.source}</ExtA>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function SubjectReport({ s, i }: { s: ResearchSubjectReport; i: number }) {
   const searched = s.portals.filter((p) => p.outcome === "searched");
   const missed = s.portals.filter((p) => p.outcome !== "searched");
@@ -357,20 +524,15 @@ function SubjectReport({ s, i }: { s: ResearchSubjectReport; i: number }) {
       <div className="space-y-2">
         <h3 className="font-semibold">License records ({s.licenses.length})</h3>
         {s.licenseSources.map((src, j) => (
-          <p key={j} className="text-xs text-muted-foreground">{src.state}: {src.source}: {src.searched ? src.note : src.note}</p>
+          <p key={j} className="text-xs text-muted-foreground">{src.state}: {src.source}: {src.note}</p>
         ))}
-        {s.licenses.length > 0 && (
-          <div className="overflow-x-auto"><table className="w-full text-sm border-collapse">
-            <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 pr-3">Business</th><th className="pr-3">Person</th><th className="pr-3">License</th><th className="pr-3">Type</th><th className="pr-3">Status</th><th className="pr-3">City</th><th className="whitespace-nowrap">Source</th></tr></thead>
-            <tbody>{s.licenses.map((l, j) => (
-              <tr key={j} className="border-b align-top">
-                <td className="py-2 pr-3">{l.businessName ?? "—"}</td><td className="pr-3">{l.principal ?? "—"}</td><td className="pr-3 font-mono text-xs whitespace-nowrap">{l.licenseNumber ?? "—"}</td>
-                <td className="pr-3">{[l.licenseType, l.specialty].filter(Boolean).join(" · ") || "—"}</td><td className="pr-3">{l.status ?? "—"}{l.expires ? ` (exp. ${l.expires})` : ""}</td>
-                <td className="pr-3">{l.city ?? "—"}</td><td className="whitespace-nowrap"><a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">{l.state} data</a></td>
-              </tr>))}</tbody>
-          </table></div>
+        {!!s.identifierSearches?.length && (
+          <p className="text-xs text-muted-foreground" data-testid="text-identifier-searches">Also searched by {s.identifierSearches.map((x) => `${x.query} (${x.found} found; ${x.note})`).join("; ")}.</p>
         )}
+        {s.licenses.length > 0 && <LicenseTable rows={s.licenses} testId={`table-licenses-${i}`} />}
       </div>
+
+      <RelatedRecords s={s} i={i} />
 
       <div className="space-y-2">
         <h3 className="font-semibold">Permits ({s.permits.length})</h3>
@@ -438,6 +600,9 @@ export function ResearchOrderStatusPage() {
               <h1 className="text-2xl font-semibold" data-testid="text-order-title">Research report #{o.id}</h1>
               <p className="text-sm text-muted-foreground mt-1">{o.input.subjects.map((s) => s.name).join(", ")} · {o.input.states.map(stateName).join(", ")}
                 {o.input.trades.length ? ` · ${o.input.trades.map((t) => RESEARCH_TRADES[t].label).join(", ")}` : ""}{o.input.sinceYear ? ` · since ${o.input.sinceYear}` : ""}</p>
+              {o.input.subjects.filter((s) => s.licenseNumbers?.length || s.phones?.length || s.addresses?.length).map((s, j) => (
+                <p key={j} className="text-xs text-muted-foreground mt-0.5">{s.name}, also by: {[...(s.licenseNumbers ?? []).map((v) => `license ${v}`), ...(s.phones ?? []), ...(s.addresses ?? [])].join(" · ")}</p>
+              ))}
             </div>
             <div className="flex items-center gap-2"><StatusBadge status={o.status} />
               {o.status === "complete" && <Button variant="outline" size="sm" className="print:hidden" onClick={() => window.print()} data-testid="button-print"><Printer className="mr-1.5 h-4 w-4" aria-hidden="true" /> Print / save PDF</Button>}</div>
@@ -449,13 +614,13 @@ export function ResearchOrderStatusPage() {
                 <div className="rounded-lg border p-4 space-y-1 text-sm" data-testid="card-preview">
                   <p className="font-semibold">Free preview</p>
                   {o.preview.licenseSourceStates.length > 0
-                    ? <p>{o.preview.licenseMatches} license record(s) match in {o.preview.licenseSourceStates.join(", ")} state license data.</p>
+                    ? <p>{o.preview.licenseMatches} license record(s) match in {o.preview.licenseSourceStates.join(", ")} state license data{o.preview.identifierMatches ? `, ${o.preview.identifierMatches} of them found by a license number, phone or address you gave` : ""}.</p>
                     : <p>We don't search state license records for {o.input.states.join(", ")} yet. The report covers permit portals only there.</p>}
                   {Object.entries(o.preview.portalsByState).map(([st, n]) => <p key={st}>The report will search {n} live permit portal(s) in {stateName(st)} by name.</p>)}
                   {o.preview.records && (o.preview.records.complaints > 0 || o.preview.records.courtCases > 0 || o.preview.records.osha > 0 || (o.preview.records.enforcement ?? 0) > 0) && (
                     <p data-testid="text-preview-records">Records on file: {o.preview.records.complaints} consumer complaint(s){o.preview.records.enforcement ? `, ${o.preview.records.enforcement} state enforcement or standing record(s)` : ""}, about {o.preview.records.courtCases} federal court docket(s){o.preview.records.osha ? ` and ${o.preview.records.osha} OSHA inspection(s)` : ""}.</p>
                   )}
-                  <p className="text-muted-foreground">Details, permit matches and sources come with the full report.</p>
+                  <p className="text-muted-foreground">Details, permit matches, related licenses and businesses, and sources come with the full report.</p>
                 </div>
               )}
               <Terms />
@@ -478,7 +643,7 @@ export function ResearchOrderStatusPage() {
           {o.status === "failed" && <p className="rounded-lg border border-destructive p-4 text-sm">Something went wrong while researching. Our team has been told and will rerun it; you don't need to do anything.</p>}
           {o.status === "complete" && o.report && (
             <div className="space-y-10">
-              <p className="text-sm">Found {o.report.totals.licenses} license record(s) and {o.report.totals.permits} permit(s){o.report.totals.complaints != null ? `, ${o.report.totals.complaints} consumer complaint(s)${o.report.totals.enforcement != null ? `, ${o.report.totals.enforcement} state enforcement or standing record(s)` : ""}, ${o.report.totals.courtCases ?? 0} federal court case(s) and ${o.report.totals.osha ?? 0} OSHA inspection(s)` : ""}. {o.report.totals.portalsSearched} portal search(es) ran; {o.report.totals.portalsNotSearched} could not. Generated {new Date(o.report.generatedAt).toLocaleString()}.</p>
+              <p className="text-sm">Found {o.report.totals.licenses} license record(s) and {o.report.totals.permits} permit(s){o.report.totals.complaints != null ? `, ${o.report.totals.complaints} consumer complaint(s)${o.report.totals.enforcement != null ? `, ${o.report.totals.enforcement} state enforcement or standing record(s)` : ""}, ${o.report.totals.courtCases ?? 0} federal court case(s) and ${o.report.totals.osha ?? 0} OSHA inspection(s)` : ""}. {o.report.totals.related ? `${o.report.totals.related} related record(s) of other licenses and businesses. ` : ""}{o.report.totals.portalsSearched} portal search(es) ran; {o.report.totals.portalsNotSearched} could not. Generated {new Date(o.report.generatedAt).toLocaleString()}.</p>
               {o.report.subjects.map((s, i) => <SubjectReport key={i} s={s} i={i} />)}
               <div className="border-t pt-4"><Terms /></div>
             </div>

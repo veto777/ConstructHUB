@@ -143,13 +143,25 @@ class Session {
   async open(): Promise<Document> {
     let doc = await this.request(this.portal);
     // Do not turn a random ASP.NET page into an assumed Accela tenant.
-    if (!/Accela|appAca|ACA_CS_FIELD/i.test(doc.html) && !new URL(this.portal).hostname.endsWith(".accela.com")) throw new Error("URL did not return an Accela portal");
+    // A city-branded landing page (Plantation, FL) may carry no Accela marker but link to its own Cap/CapHome search;
+    // that search page must still prove it is Accela below.
+    const agencyPath = new URL(this.portal).pathname.split("/")[1]?.toLowerCase();
+    const $landing = cheerio.load(doc.html);
+    const linksOwnSearch = $landing("a[href]").toArray().some((a) => {
+      try {
+        const u = new URL($landing(a).attr("href")!, doc.url);
+        return u.origin === new URL(this.portal).origin && u.pathname.split("/")[1]?.toLowerCase() === agencyPath && /\/Cap\/CapHome\.aspx$/i.test(u.pathname);
+      } catch { return false; }
+    });
+    if (!/Accela|appAca|ACA_CS_FIELD/i.test(doc.html) && !new URL(this.portal).hostname.endsWith(".accela.com") && !linksOwnSearch) throw new Error("URL did not return an Accela portal");
     this.agencyCode = accelaAgencyCode(this.portal, doc.html);
     const target = new URL(accelaSearchUrl(this.portal, doc.html));
     target.searchParams.delete("IsToShowInspection");
     target.searchParams.delete("globalsearch");
     if (target.href !== doc.url) doc = await this.request(target.href);
     if (!/appAca|ACA_CS_FIELD/.test(doc.html) || !cheerio.load(doc.html)("a[id*='btnNewSearch']").length) throw new Error("Accela public search unavailable (login required or invalid module)");
+    // A custom landing page declares no agency; the Accela search page itself does.
+    this.agencyCode ??= accelaAgencyCode(this.portal, doc.html);
     return doc;
   }
 }

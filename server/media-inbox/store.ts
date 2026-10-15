@@ -316,6 +316,56 @@ export async function queueVettedDirectories(pick: (emails: string[]) => string 
 const FREE_MAIL_ADDR = /@(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|aol|icloud|proton(mail)?)\./i;
 
 /**
+ * Sites the relationship emails can use, never classified: vetted directories, and sites the Backlinks grade rejected
+ * only because no page invites guest posts (a trade association or newspaper still is a relationship; 2026-10-15).
+ * Government sites never reach the AI.
+ */
+export const RESCUABLE_SQL = `status = 'rejected' AND signals IS NOT NULL
+  AND EXISTS (SELECT 1 FROM unnest(reasons) r WHERE r LIKE 'No page on the site invites%')
+  AND NOT EXISTS (SELECT 1 FROM unnest(reasons) r WHERE r NOT LIKE 'No page on the site invites%' AND r NOT LIKE '+%')`;
+export async function needingClass(limit: number): Promise<{ domain: string; title: string | null; homeTitle: string | null }[]> {
+  const r = await db().query(
+    `SELECT domain, signals->>'title' AS title, signals->>'homeTitle' AS "homeTitle" FROM backlink_sources
+      WHERE partner_class IS NULL
+        AND ((status = 'qualified' AND kind IN ('directory', 'citation')) OR (${RESCUABLE_SQL}))
+        AND domain !~ '\\.(gov|mil|edu)$' AND domain !~ '\\.(state|k12|co|ci|city|us)\\.[a-z]{2}\\.us$'
+      ORDER BY status = 'qualified' DESC, cardinality(contact_emails) > 0 DESC, tier, score DESC NULLS LAST LIMIT $1`, [limit]);
+  return r.rows;
+}
+export async function saveClasses(classes: Map<string, string>, names: Map<string, string> = new Map()) {
+  for (const [domain, cls] of classes)
+    await db().query(`UPDATE backlink_sources SET partner_class = $2, partner_name = $3, partner_class_at = now() WHERE domain = $1`, [domain, cls, names.get(domain) ?? null]);
+}
+
+/**
+ * Queue classified sites (2026-10-15): a listing directory gets the Directory Sync email, a trade association or
+ * chamber the member-resource email, a newspaper the news email. Government sites and webmail addresses (often a member's, not the organisation's)
+ * are never queued.
+ */
+/** Listing-management vendors and competitors: support@ already asked them for quotes (2026-10-13), never cold-emailed here. */
+export const NOT_A_RELATIONSHIP = /(^|\.)(yext|synup|uberall|brightlocal|whitespark|birdeye|podium|nicejob|gatherup|reputation|vendasta|semrush|moz|localeze|neustar|advice-local|loganix|ubersuggest|serviceagent)\.[a-z.]+$/i;
+export async function queueClassified(pick: (emails: string[]) => string | null, name: (domain: string, signals: any) => string): Promise<number> {
+  const r = await db().query(
+    `SELECT s.domain, s.partner_class, s.partner_name, s.contact_emails, s.signals FROM backlink_sources s
+      WHERE s.status IN ('qualified', 'rejected') AND s.partner_class IN ('listing_directory', 'trade_association', 'chamber', 'news') AND cardinality(s.contact_emails) > 0
+        AND NOT EXISTS (SELECT 1 FROM media_outreach_queue q WHERE q.domain = s.domain)
+        AND NOT EXISTS (SELECT 1 FROM media_partners p WHERE p.domain = s.domain)
+      ORDER BY s.tier, s.score DESC NULLS LAST`);
+  let added = 0;
+  for (const x of r.rows) {
+    if (/\.(gov|mil|edu)$/.test(x.domain) || NOT_A_RELATIONSHIP.test(x.domain)) continue;
+    const to = pick((x.contact_emails as string[]).filter((e) => !NOT_A_PARTNER_ADDRESS.test(e) && !FREE_MAIL_ADDR.test(e)));
+    if (!to) continue;
+    const ins = await db().query(
+      `INSERT INTO media_outreach_queue (domain, company, kind, to_email, source) VALUES ($1, $2, $3, $4, 'backlinks-classified') ON CONFLICT (domain) DO NOTHING RETURNING id`,
+      [x.domain, (x.partner_name ?? name(x.domain, x.signals)).slice(0, 120), ({ listing_directory: "directory", news: "news" } as Record<string, string>)[x.partner_class] ?? "association", to.toLowerCase()]);
+    if (ins.rows[0]) added++;
+  }
+  return added;
+}
+
+
+/**
  * Queue vetted article / guest-post sites and news outlets (Backlinks kinds guest_post, editorial, press_release; tier
  * A or B; at least 500 Google visits a month — below that it is a contractor's own blog or a link farm; publishes an
  * email; never contacted). Same exclusions as directories, plus free-mail addresses (on these

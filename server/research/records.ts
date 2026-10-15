@@ -23,8 +23,10 @@ const MAX_OSHA = 500;
 
 /** Every word of the searched name is a whole word of one of the fields ("Bella" is not "DaBella"). */
 export function namedIn(name: string, ...fields: (string | null | undefined)[]): boolean {
-  const want = tokens(name);
-  return want.length > 0 && fields.some((f) => { const have = new Set(tokens(f ?? "")); return want.every((w) => have.has(w)); });
+  // Single letters count here ("D & S Electric" is not every "… Electric"), though the search index drops them.
+  const words = (v: string) => v.toUpperCase().split(/[^A-Z0-9']+/).filter((w) => w.length >= 1);
+  const want = words(name);
+  return tokens(name).length > 0 && fields.some((f) => { const have = new Set(words(f ?? "")); return want.every((w) => have.has(w)); });
 }
 
 const s = (v: unknown): string | null => (v == null || String(v).trim() === "" ? null : String(v).trim());
