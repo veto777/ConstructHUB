@@ -3,7 +3,7 @@
  * resource endpoint, and an ArcGIS feature-service layer or table through its query API. One request at a time per
  * host (politeFetch), the rows in the publisher's own field names.
  */
-import { politeFetch } from "../../../scrapers/polite-fetch";
+import { politeFetch, sleep } from "../../../scrapers/polite-fetch";
 import { clean } from "../../bulk";
 
 type Row = Record<string, unknown>;
@@ -26,22 +26,27 @@ export async function* sodaAll(url: string, where?: string, pageSize = 50_000): 
 }
 
 /** Every feature of an ArcGIS layer (".../FeatureServer/0") matching `where`, in object-id order, attributes only. */
-export async function* arcgisAll(layerUrl: string, where = "1=1", pageSize = 1000): AsyncIterable<Row> {
+export async function* arcgisAll(layerUrl: string, where = "1=1", outFields = "*", pageSize = 2000): AsyncIterable<Row> {
   const meta = await (await politeFetch(`${layerUrl}?f=json`, { headers: { Accept: "application/json" } }, { minDelayMs: 1000 })).json();
   if (meta?.error) throw new Error(`ArcGIS layer error: ${JSON.stringify(meta.error).slice(0, 200)}`);
   const oid: string = meta?.objectIdField ?? meta?.fields?.find((f: any) => f.type === "esriFieldTypeOID")?.name ?? "OBJECTID";
   const size = Math.min(pageSize, Number(meta?.maxRecordCount) || pageSize);
   for (let offset = 0; ; offset += size) {
     const body = new URLSearchParams({
-      where, outFields: "*", returnGeometry: "false", orderByFields: `${oid} ASC`,
+      where, outFields, returnGeometry: "false", orderByFields: `${oid} ASC`,
       resultOffset: String(offset), resultRecordCount: String(size), f: "json",
     });
-    const res = await politeFetch(`${layerUrl}/query`, {
-      method: "POST", body: body.toString(), headers: { "content-type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    }, { minDelayMs: 1000, timeoutMs: 120_000 });
-    if (!res.ok) throw new Error(`HTTP ${res.status} for ${layerUrl}`);
-    const page = await res.json();
-    if (page?.error) throw new Error(`ArcGIS query error: ${JSON.stringify(page.error).slice(0, 200)}`);
+    // A hosted layer now and then answers one page with a transient 400 or 5xx: try that page again before giving up.
+    let page: any = null;
+    for (let attempt = 0; ; attempt++) {
+      const res = await politeFetch(`${layerUrl}/query`, {
+        method: "POST", body: body.toString(), headers: { "content-type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      }, { minDelayMs: 1000, timeoutMs: 120_000 });
+      page = res.ok ? await res.json().catch(() => null) : null;
+      if (page && !page.error) break;
+      if (attempt >= 3) throw new Error(res.ok ? `ArcGIS query error at offset ${offset}: ${JSON.stringify(page?.error ?? page).slice(0, 200)}` : `HTTP ${res.status} for ${layerUrl}`);
+      await sleep(5000 * (attempt + 1));
+    }
     const feats: { attributes: Row }[] = page?.features ?? [];
     for (const f of feats) yield f.attributes;
     if (!feats.length || (feats.length < size && !page.exceededTransferLimit)) return;

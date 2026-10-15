@@ -6,18 +6,21 @@
  *   NY  New York City DOB licenses: general contractors, master plumbers, electrical contractors and firms,
  *       fire-suppression contractors, oil-burner installers, riggers, welders, site safety and other DOB trades (bulk)
  *   NY  New York City DCWP home-improvement contractor and construction-labor-provider licenses (bulk)
+ *   PA  Philadelphia L&I trade licenses: contractors, electrical, plumbing, fire suppression, sheet metal, home
+ *       improvement, demolition, excavation (bulk; the contractor's address joined from L&I permit contractors)
  *
  * Enforcement (companies only; LOCAL_ENFORCEMENT, for ../registry.ts):
  *   NY  New York City DOB disciplinary actions against licensees (1998 to today)
  *   NY  New York City DOB / ECB (OATH) building-code violations, by respondent
  *   NY  New York City DCWP consumer complaints (Sept 2022 to today)
+ *   PA  Philadelphia L&I contractor violations (bulk, companies only)
  */
 import type { LicenseHit } from "@shared/research-reports";
 import type { LicenseSource } from "../licenses";
 import type { BulkHit, BulkSource } from "../bulk";
 import type { SodaEnforcement } from "../state-records";
 import type { LiveEnforcementSearch, LiveLicenseSearch } from "./types";
-import { addressLine, fullName, isoDay, sodaAll, txt } from "./lib/local-fetch";
+import { addressLine, arcgisAll, fullName, isoDay, sodaAll, txt } from "./lib/local-fetch";
 
 type Row = Record<string, unknown>;
 const soda = (domain: string, id: string) => ({ datasetUrl: `https://${domain}/d/${id}`, url: `https://${domain}/resource/${id}.json` });
@@ -32,6 +35,9 @@ function licenseHit(h: Omit<LicenseHit, "matchedOn" | "people"> & { people: { na
     keys: { licenses: [h.licenseNumber], phones: [h.phone], addresses: [h.address] },
   };
 }
+
+/** A name that is a company's ("ACME ROOFING LLC"), not a person's. */
+const ORG = /\b(INC|INCORPORATED|LLC|L\.L\.C|LLP|LP|CORP|CORPORATION|CO|COMPANY|LTD|GROUP|ENTERPRISES?|SERVICES?|CONSTRUCTION|CONTRACTORS?|CONTRACTING|ROOFING|ELECTRIC(AL)?|PLUMBING|HEATING|MECHANICAL|BUILDERS?|ASSOCIATES|SYSTEMS|PARTNERS|HOLDINGS|SOLUTIONS|INDUSTRIES|DEVELOPMENT|RESTORATION|RENOVATIONS?|REMODELING|HOME|HOMES|TRUST)\b/i;
 
 /** A status field that holds something else (a phone number in a few NYC DOB rows) is no status. */
 const statusOf = (v: string | null) => (v && /[A-Za-z]/.test(v) ? v : null);
@@ -134,10 +140,84 @@ function ymd(v: string | null): string | null {
   return m && m[1] !== "0000" ? `${m[1]}-${m[2]}-${m[3]}` : isoDay(v);
 }
 
+// ── Philadelphia ─────────────────────────────────────────────────────────────────────────────────────────────────
+const PHL = "https://services.arcgis.com/fLeGjb7u4uXqeF9q/arcgis/rest/services";
+const PHL_TRADE = `${PHL}/TRADE_LICENSES/FeatureServer/0`;
+const PHL_PERMIT_CONTRACTORS = `${PHL}/PERMIT_CONTRACTORS/FeatureServer/0`;
+const PHL_VIOLATIONS = `${PHL}/CONTRACTOR_VIOLATIONS/FeatureServer/0`;
+const PHL_PAGE = "https://opendataphilly.org/datasets/licenses-and-inspections-trade-licenses/";
+const PHL_VIOLATIONS_PAGE = "https://www.arcgis.com/home/item.html?id=dbc8c4b06d3c40aab87d48a5fcdafc58"; // published by maps.phl.data
+const PHL_TRADES = ["CONTRACTOR", "ELECTRICAL CONTRACTOR", "PLUMBER MASTER", "PLUMBER JOURNEYMAN", "PLUMBER APPRENTICE", "FIRE SUPPRESSION CONTRACTOR",
+  "FIRE SUPPRESSION WORKER", "FIRE SUPPRESSION WORKER-SPECIALTY", "FIRE SUPPRESSION WORKER-KITCHEN FIRE EXTINGUISHING SYSTEM", "FIRE SUPPRESSION APPRENTICE",
+  "SHEET METAL TECHNICIAN", "SHEET METAL APPRENTICE", "PA HOME IMPROVEMENT", "DEMOLITION", "EXCAVATION CONTRACTOR", "CURB SETTER"];
+
+/** "NAME\r\n1000 MAIN ST\r\nNORRISTOWN, PA  19401\r\nUSA" → "1000 MAIN ST, NORRISTOWN, PA 19401" (the first line is the name). */
+export function phlAddress(v: string | null): string | null {
+  const lines = (v ?? "").split(/\r?\n/).map((l) => l.replace(/\s+/g, " ").replace(/\s+,/g, ",").trim()).filter(Boolean);
+  const rest = lines.slice(1).filter((l) => !/^USA$/i.test(l));
+  return rest.length && /\d/.test(rest[0]) ? rest.join(", ") : null;
+}
+
+/** "JOHN WEITORT DBA: JW ELECTRICAL CONTRACTORS INC" → the licensee and the trade name. */
+const phlDba = (v: string | null) => { const m = v?.match(/^(.*?)\s+DBA:\s*(.*)$/i); return m ? { who: m[1].trim() || null, dba: m[2].trim() || null } : { who: v, dba: null }; };
+
+const phlTrade: BulkSource = {
+  id: "pa-phl-trade-licenses", state: "PA", label: "Philadelphia L&I trade and contractor licenses", pageUrl: PHL_PAGE,
+  everyHours: 24 * 7, minRows: 28_000,
+  load: async function* () {
+    // The latest address each contractor gave on a permit, by commercial activity license number.
+    const addr = new Map<string, string>();
+    for await (const r of arcgisAll(PHL_PERMIT_CONTRACTORS, "cal_number IS NOT NULL", "cal_number,contractor_address,objectid")) {
+      const a = phlAddress(r.contractor_address == null ? null : String(r.contractor_address));
+      if (a) addr.set(txt(r, "cal_number")!, a);
+    }
+    for await (const r of arcgisAll(PHL_TRADE, `licensetype IN (${PHL_TRADES.map((t) => `'${t}'`).join(",")})`)) {
+      const { who: holder, dba } = phlDba(txt(r, "contactname"));
+      // The licensee is a person or, on many contractor licenses, the company itself.
+      const holderIsOrg = !!holder && ORG.test(holder);
+      const company = txt(r, "companyname") ?? dba ?? (holderIsOrg ? holder : null);
+      const who = holderIsOrg ? null : holder;
+      if (!who && !company) continue;
+      const cal = txt(r, "commercialactivitylicense");
+      const h = licenseHit({
+        state: "PA", source: "Philadelphia L&I trade licenses", sourceUrl: PHL_PAGE,
+        businessName: company, licenseNumber: txt(r, "licensenumber"), licenseType: txt(r, "licensetype"), specialty: null,
+        status: txt(r, "licensestatus"), principal: who, city: "Philadelphia", expires: isoDay(r.expirationdate),
+        address: cal ? addr.get(cal) ?? null : null, phone: null,
+        people: [{ name: who, role: "Licensee" }],
+      });
+      if (h.keys) h.keys.licenses = [txt(r, "licensenumber"), cal];
+      yield h;
+    }
+  },
+};
+
+const phlViolations: BulkSource = {
+  id: "pa-phl-contractor-violations", state: "PA", label: "Philadelphia L&I contractor violations", pageUrl: PHL_VIOLATIONS_PAGE,
+  everyHours: 24 * 7, minRows: 16_000, companiesOnly: true,
+  load: async function* () {
+    for await (const r of arcgisAll(PHL_VIOLATIONS)) {
+      const name = txt(r, "responsibleparty");
+      if (!name) continue;
+      const lic = txt(r, "licensenumber");
+      yield {
+        kind: "enforcement", business: name, person: null, keys: { licenses: [lic] },
+        hit: {
+          state: "PA", source: "Philadelphia L&I contractor violations", sourceUrl: PHL_VIOLATIONS_PAGE, category: "discipline",
+          name, id: txt(r, "violationnumber"), date: isoDay(r.violationdate), endDate: null, status: "Violation issued", city: "Philadelphia",
+          detail: [txt(r, "violationcodetitle"), txt(r, "violationcode") ? `code ${txt(r, "violationcode")}` : null, txt(r, "casenumber") ? `case ${txt(r, "casenumber")}` : null,
+            txt(r, "licensetype") ? `${txt(r, "licensetype")} license${lic ? ` ${lic}` : ""}` : null].filter(Boolean).join(", ") || null,
+          amount: null, adverse: null, licenseNumber: lic,
+        },
+      };
+    }
+  },
+};
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [nycDob, nycDcwp];
+export const LOCAL_BULK: BulkSource[] = [nycDob, nycDcwp, phlTrade, phlViolations];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
