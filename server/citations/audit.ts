@@ -167,7 +167,7 @@ export async function runAudit(auditId: number, deps: FinderDeps = defaultDeps):
 
 /** Write one finding onto its checklist row (exported for tests). */
 export async function applyFinding(row: typeof citations.$inferSelect, found: Found): Promise<void> {
-  const evidence = { how: found.how, partial: found.partial, fields: found.fields, checked: found.evidence.checked, candidates: found.evidence.candidates, searchUrl: found.evidence.searchUrl, title: found.evidence.title };
+  const evidence = { how: found.how, partial: found.partial, fields: found.fields, checked: found.evidence.checked, candidates: found.evidence.candidates, searchUrl: found.evidence.searchUrl, title: found.evidence.title, loads: found.evidence.loads ?? [] };
   const set: Record<string, unknown> = { auditResult: found.result, auditReason: found.reason, auditEvidence: evidence, auditCheckedAt: new Date() };
   if (found.result === "match" || found.result === "mismatch") {
     set.isFound = true;

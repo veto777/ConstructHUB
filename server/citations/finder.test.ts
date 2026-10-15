@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CITATION_DIRECTORIES, directoryByName, directoryOfUrl, onDirectory } from "./directories";
-import { candidatesFromSearchPage, checkDirectory, filterWebResults, nameOverlap, parseBing, parseDuckDuckGo, type BusinessProfile, type FinderDeps } from "./finder";
+import { candidatesFromSearchPage, checkDirectory, coreName, filterWebResults, nameOverlap, parseBing, parseDuckDuckGo, type BusinessProfile, type FinderDeps } from "./finder";
 import { looksBlocked } from "./fetch";
 import type { Loaded } from "./fetch";
 
@@ -42,6 +42,21 @@ describe("citation directories", () => {
 });
 
 describe("finder: reading pages", () => {
+  it("a Google name with a tagline matches the directory's plain name, and vice versa", () => {
+    expect(coreName("Alpine Exteriors | Siding, Roofing & Windows")).toBe("Alpine Exteriors");
+    expect(coreName("Summit Roofing - Bellingham's Roofer")).toBe("Summit Roofing");
+    expect(coreName("A1")).toBe("A1");
+    expect(nameOverlap("Alpine Exteriors | Siding, Roofing & Windows", "Alpine Exteriors")).toBe(1);
+    expect(nameOverlap("Alpine Exteriors", "Alpine Exteriors Siding Roofing Windows")).toBe(1);
+  });
+  it("a listing that shows the plain name is a match, not 'wrong details'", async () => {
+    const url = "https://www.bbb.org/profile/plain-1";
+    const d = deps({ [url]: loaded(url, listingPage("Alpine Exteriors", "(360) 543-4799", "2119 Lincoln St")) });
+    const r = await checkDirectory(bbb, alpine, url, d);
+    expect(r.result).toBe("match");
+    expect(r.partial).toBe(false);
+    expect(r.evidence.loads?.[0]).toMatchObject({ url, status: 200, blocked: false });
+  });
   it("name overlap ignores punctuation, case and company suffixes", () => {
     expect(nameOverlap("Alpine Exteriors LLC", "ALPINE EXTERIORS, INC.")).toBe(1);
     expect(nameOverlap("Alpine Exteriors | Siding, Roofing & Windows", "Alpine Exteriors Siding Roofing and Windows - Bellingham")).toBe(1);

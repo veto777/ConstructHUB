@@ -31,7 +31,7 @@ export type Found = {
   fields: Record<string, FieldResult> | null;
   /** Address could not be read: listed and the phone matches, but the address is unverified. */
   partial: boolean;
-  evidence: { checked: string[]; candidates: string[]; searchUrl: string | null; title: string | null };
+  evidence: { checked: string[]; candidates: string[]; searchUrl: string | null; title: string | null; /** What each load answered. */ loads?: { url: string; status: number; mode: string; blocked: boolean }[] };
 };
 
 export type BusinessProfile = Omit<NapProfile, "city" | "state"> & { city: string; state: string; zip: string };
@@ -45,13 +45,21 @@ export type FinderDeps = {
 
 const MAX_CANDIDATES = 3;
 
-export const nameTokens = (name: string) => normalizeName(name).split(" ").filter((t) => t.length > 1);
-/** Share of the business's name tokens present in a text (1 = all). */
+const STOP = new Set(["and", "the", "of", "co", "company", "llc", "inc", "ltd", "corp"]);
+export const nameTokens = (name: string) => normalizeName(name).split(" ").filter((t) => t.length > 1 && !STOP.has(t));
+/**
+ * The name proper, without a tagline: Google profiles often read "Alpine Exteriors | Siding, Roofing & Windows" while
+ * every directory says "Alpine Exteriors". Everything before the first " | ", " - ", " – ", ":" or " — ".
+ */
+export function coreName(name: string): string {
+  const core = name.split(/\s*\|\s*|\s+[-–—]\s+|\s*:\s+|\s*—\s*/)[0]?.trim() ?? "";
+  return core.length >= 3 ? core : name.trim();
+}
+/** Share of the business's name tokens present in a text (1 = all): the full name, or the name without its tagline. */
 export function nameOverlap(name: string, text: string): number {
-  const want = nameTokens(name);
-  if (!want.length) return 0;
   const have = new Set(normalizeName(text).split(" "));
-  return want.filter((t) => have.has(t)).length / want.length;
+  const share = (n: string) => { const want = nameTokens(n); return want.length ? want.filter((t) => have.has(t)).length / want.length : 0; };
+  return Math.max(share(name), share(coreName(name)));
 }
 const hasPhone = (phone: string | null, text: string) => {
   const d = phone ? normalizePhone(phone) : "";
@@ -215,11 +223,25 @@ export async function defaultWebSearch(q: string, dir: CitationDirectory): Promi
 export const defaultDeps: FinderDeps = { load: loadPage, webSearch: defaultWebSearch, budgetMs: 90_000 };
 
 // ── the check ─────────────────────────────────────────────────────────────────────────────────────────────────────
+/** The page read against the full name, then against the name without its tagline; the reading that confirms wins. */
+function analyzeTolerant(page: Loaded, profile: BusinessProfile) {
+  const full = analyzeDirectoryProfile({ url: page.url, status: page.status, body: page.body }, profile);
+  const core = coreName(profile.name ?? "");
+  if (!core || core === profile.name) return full;
+  const ok = (r: ReturnType<typeof analyzeDirectoryProfile>) => r.evidence.confirmation === "confirmed" && r.nap?.fields.name.result === "match";
+  if (ok(full)) return full;
+  const short = analyzeDirectoryProfile({ url: page.url, status: page.status, body: page.body }, { ...profile, name: core });
+  if (ok(short)) return short;
+  return full.evidence.confirmation === "confirmed" ? full : short.evidence.confirmation === "confirmed" ? short : full;
+}
+
 function verdictFromPage(page: Loaded, profile: BusinessProfile, how: How): Found | null {
   if (page.blocked || page.status < 200 || page.status >= 300 || !page.body) return null;
-  const a = analyzeDirectoryProfile({ url: page.url, status: page.status, body: page.body }, profile);
+  const a = analyzeTolerant(page, profile);
   const base = { listingUrl: page.url, how, evidence: { checked: [], candidates: [], searchUrl: null, title: a.evidence.title } };
   if (a.evidence.confirmation === "confirmed" && a.nap) {
+    const nm = a.nap.fields.name;
+    if (nm?.result === "differs" && nm.observed && (nameOverlap(profile.name ?? "", nm.observed) >= 0.75 || nameOverlap(nm.observed, profile.name ?? "") >= 0.75)) nm.result = "match";
     const addressUnread = ["street_address", "city", "postal_code"].every((f) => a.nap!.fields[f]?.result === "missing") && profile.service_area_only !== true;
     const wrong = Object.values(a.nap.fields).some((f) => f.result === "differs" && f.required);
     if (wrong) {
@@ -239,7 +261,8 @@ function verdictFromPage(page: Loaded, profile: BusinessProfile, how: How): Foun
 }
 
 export async function checkDirectory(dir: CitationDirectory, profile: BusinessProfile, knownListingUrl: string | null, deps: FinderDeps = defaultDeps): Promise<Found> {
-  const evidence: Found["evidence"] = { checked: [], candidates: [], searchUrl: null, title: null };
+  const evidence: Found["evidence"] = { checked: [], candidates: [], searchUrl: null, title: null, loads: [] };
+  const load = async (url: string) => { const p = await deps.load(url, dir.mode); evidence.checked.push(url); evidence.loads!.push({ url: p.url, status: p.status, mode: p.mode, blocked: p.blocked }); return p; };
   const t0 = Date.now();
   const budget = deps.budgetMs ?? 90_000;
   const outOfTime = () => Date.now() - t0 > budget;
@@ -249,8 +272,7 @@ export async function checkDirectory(dir: CitationDirectory, profile: BusinessPr
   let best: Found | null = null;
   // A listing link the owner saved is the first thing read: confirmed there, the search is only a duplicate check.
   if (knownListingUrl && onDirectory(knownListingUrl, dir)) {
-    const page = await deps.load(knownListingUrl, dir.mode);
-    evidence.checked.push(knownListingUrl);
+    const page = await load(knownListingUrl);
     best = verdictFromPage(page, profile, "listing_url");
     if (best && best.result === "match" && !best.partial) return { ...best, evidence: { ...evidence, title: best.evidence.title } };
     if (!best) candidates.push({ url: knownListingUrl, from: "listing_url", score: 100 });
@@ -261,8 +283,7 @@ export async function checkDirectory(dir: CitationDirectory, profile: BusinessPr
   if (dir.search && q.name) {
     const url = dir.search(q);
     evidence.searchUrl = url;
-    const page = await deps.load(url, dir.mode);
-    evidence.checked.push(url);
+    const page = await load(url);
     if (page.blocked || page.status < 200 || page.status >= 300) searchBlocked = true;
     else {
       const found = candidatesFromSearchPage(page.body, page.url, dir, profile);
@@ -283,8 +304,7 @@ export async function checkDirectory(dir: CitationDirectory, profile: BusinessPr
   for (const c of candidates.slice(0, MAX_CANDIDATES + 1)) {
     if (outOfTime()) break;
     if (c.from === "listing_url" && evidence.checked.includes(c.url)) continue;   // read above
-    const page = await deps.load(c.url, dir.mode);
-    evidence.checked.push(c.url);
+    const page = await load(c.url);
     const v = verdictFromPage(page, profile, c.from);
     if (!v) continue;
     if (!best || (best.partial && !v.partial) || (best.result === "mismatch" && v.result === "match" && !v.partial)) best = v;
