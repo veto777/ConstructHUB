@@ -183,13 +183,23 @@ export function robotsAllows(rules: Rule[], pathAndQuery: string): boolean {
  * is a challenge: denied); 404/410 → no rules; 401, 403, 429, 5xx, a timeout or a network failure → denied for an
  * hour, then fetched again. Other 4xx answers mean "no robots.txt" (RFC 9309 §2.3.1.3).
  */
+/** A host a source reaches with its own client (MA's Contractor Hub, whose server leaves out its intermediate certificate). */
+type RobotsFetcher = (url: string) => Promise<{ status: number; text: string }>;
+const robotsFetchers = new Map<string, RobotsFetcher>();
+/** Reads `origin`'s robots.txt with the source's own client, so robots.txt is checked over the same connection. */
+export function useRobotsFetcher(origin: string, fn: RobotsFetcher): void { robotsFetchers.set(new URL(origin).origin, fn); }
+
 export async function robotsFor(origin: string): Promise<{ rules: Rule[]; denied?: string }> {
   const hit = robotsCache.get(origin);
   if (hit && Date.now() - hit.at < hit.ttl) return hit;
   let entry: { rules: Rule[]; denied?: string };
   try {
     await limitHost(origin, 1000);
-    const res = await fetch(`${origin}/robots.txt`, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
+    const own = robotsFetchers.get(origin);
+    const res = own
+      ? await Promise.race([own(`${origin}/robots.txt`).then((r) => ({ ok: r.status >= 200 && r.status < 300, status: r.status, text: async () => r.text, body: null })),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timed out")), 15_000))])
+      : await fetch(`${origin}/robots.txt`, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
     const text = res.ok ? await res.text() : (await res.body?.cancel().catch(() => undefined), "");
     if (res.ok) {
       const html = /^\s*</.test(text) || /<html[\s>]/i.test(text.slice(0, 2000));

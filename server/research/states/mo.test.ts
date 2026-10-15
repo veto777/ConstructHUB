@@ -31,6 +31,9 @@ describe("MO PRO discipline and holder (audit round 2, decisions 1 and 2)", () =
     expect(r.status).not.toMatch(/disciplin|probation/i);
     expect(r.discipline).toBe("current discipline: Probation; previous disciplinary actions: Yes");
     expect(moStatus("Active", { "Current Discipline Status": "None", "Previous Disciplinary Actions": "No" })).toEqual({ status: "Active", discipline: null });
+    // As the live page printed it for a Professional Engineer on 2026-10-16.
+    expect(moStatus("Active", { "Current Discipline Status": "None Current/Previous", "Previous Disciplinary Actions": "Yes" })).toEqual({ status: "Active", discipline: "previous disciplinary actions: Yes" });
+    expect(moStatus("Active", { "Current Discipline Status": "None Current/Previous", "Previous Disciplinary Actions": "No" })).toEqual({ status: "Active", discipline: null });
   });
   it("the holder comes from the license class", () => {
     expect(moHolder("Engineering Corporation", "Amptron Electric Company")).toBe("business");

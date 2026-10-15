@@ -24,7 +24,7 @@
 import { request as httpsRequest } from "node:https";
 import { rootCertificates } from "node:tls";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { USER_AGENT, guard, noteResponse } from "../http";
+import { USER_AGENT, guard, noteResponse, useRobotsFetcher } from "../http";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { tokens, wholeWordMatch } from "../licenses";
@@ -36,6 +36,7 @@ import type { StatePack } from "./types";
 
 // ── OCABR Home Improvement Contractor registry ───────────────────────────────────────────────────────────────
 const HIC_PAGE = "https://contractorhub.mass.gov/s/hic-contractor-search";
+const HIC_ORIGIN = "https://contractorhub.mass.gov";
 const HIC_AURA = "https://contractorhub.mass.gov/s/sfsites/aura?r=1&aura.ApexAction.execute=1";
 
 /**
@@ -115,6 +116,18 @@ async function hicRequest(url: string, body: string | null): Promise<string> {
     req.end(body ?? undefined);
   });
 }
+
+// robots.txt is read with the same CA list (fetch() can't verify this server's chain), then checked like any host's.
+useRobotsFetcher(HIC_ORIGIN, (url) => new Promise((resolve, reject) => {
+  const req = httpsRequest(url, { ca: HIC_CA, timeout: 15_000, headers: { "user-agent": USER_AGENT } }, (res) => {
+    const chunks: Buffer[] = [];
+    res.on("data", (c) => chunks.push(c as Buffer));
+    res.on("end", () => resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString("utf8") }));
+  });
+  req.on("timeout", () => req.destroy(new Error("timed out")));
+  req.on("error", reject);
+  req.end();
+}));
 
 let auraCache: { at: number; fwuid: string; app: string } | null = null;
 /** The search page's own Aura framework id and app version (they change with Salesforce releases), read from the page. */

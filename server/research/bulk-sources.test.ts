@@ -241,3 +241,11 @@ describe("round 2 (A6)", () => {
     expect(UNZIP_TIMEOUT_MS).toBeLessThanOrEqual(30 * 60_000);
   });
 });
+
+describe("FL complaint respondents: a placeholder DBA is no DBA (live 2026-10-16)", () => {
+  it("RUSH, JOHN / N/A is an individual; a real DBA still makes a business", () => {
+    expect(flRespondentIsBusiness("RUSH, JOHN", ["N/A"])).toBe(false);
+    expect(flRespondentIsBusiness("UNKNOWN, STEVEN", ["UNKNOWN"])).toBe(false);
+    expect(flRespondentIsBusiness("MUNCY, WILLIAM", ["MUNCY ROOFING, LLC"])).toBe(true);
+  });
+});

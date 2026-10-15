@@ -320,7 +320,9 @@ const ENTITY = /\b(?:inc|incorporated|llc|l\.l\.c|corp|corporation|co|company|lt
  * type being published) reads as one by the shared classifier. Anyone else is an individual: the row is left out, so
  * it is neither indexed as a business nor returned in company enforcement results (FCRA; round 2, decision 3).
  */
-export const flRespondentIsBusiness = (name: string, dbas: string[]) => dbas.length > 0 || ENTITY.test(name) || looksLikeBusiness(name);
+export const flRespondentIsBusiness = (name: string, dbas: string[]) => dbas.some((d) => !DBA_PLACEHOLDER.test(d)) || ENTITY.test(name) || looksLikeBusiness(name);
+/** What DBPR prints in a DBA slot when there is none ("RUSH, JOHN / N/A", "UNKNOWN, STEVEN / UNKNOWN", seen live 2026-10-16). */
+const DBA_PLACEHOLDER = /^\s*(?:n\/?a|none|unknown|same|-+|\.)\s*$/i;
 
 export async function* flComplaintRows(complaintPaths: string[], cases: Map<string, FlCase>, licenses: Map<string, string>): AsyncIterable<BulkHit> {
   const seen = new Set<string>();
@@ -1116,7 +1118,8 @@ export const BULK_SOURCES: BulkSource[] = [
   // Quarterly file (January, April, July, October): checked monthly so a new quarter is picked up within weeks.
   { id: "fl-sunbiz-officers", state: "FL", label: "Florida Division of Corporations (Sunbiz) filings of licensed contractors", pageUrl: SUNBIZ_QUARTERLY, everyHours: 24 * 30, minRows: 105_000,
     load: flSunbizOfficersLoader },
-  { id: "fl-dbpr-complaints", state: "FL", label: "Florida DBPR complaints and discipline (construction and electrical)", pageUrl: FL_COMPLAINTS_PAGE, everyHours: 24, minRows: 34_000,
+  // 26,001 rows loaded live 2026-10-16 once individual respondents were left out (49,360 with them); floor about 80%.
+  { id: "fl-dbpr-complaints", state: "FL", label: "Florida DBPR complaints and discipline (construction and electrical)", pageUrl: FL_COMPLAINTS_PAGE, everyHours: 24, minRows: 21_000,
     load: flComplaintsLoader, companiesOnly: true },
   { id: "fl-stop-work", state: "FL", label: "Florida stop-work orders (Division of Workers' Compensation)", pageUrl: FL_SWO, everyHours: 24, minRows: 40_000,
     load: flStopWorkLoader, companiesOnly: true },
