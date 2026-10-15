@@ -37,7 +37,7 @@ async function fsSearch(kind: "contractor" | "business", value: string): Promise
 }
 
 const detailMap = (d: FsDetail): Record<string, string> =>
-  Object.fromEntries((d.DRAWER_DETAIL_LIST ?? []).map((x) => [x.LABEL, clean(x.VALUE?.replace(/\n/g, " ")) ?? ""]));
+  Object.fromEntries((d.DRAWER_DETAIL_LIST ?? []).map((x) => [x.LABEL, clean(x.VALUE?.replace(/\s*\n\s*/g, ", ")) ?? ""]));
 
 async function fsDetail(kind: "contractor" | "business", id: number): Promise<Record<string, string>> {
   try { return detailMap(await fsJson<FsDetail>(`/api/FilingDetail/${kind}/${id}/false`)); } catch { return {}; }
@@ -55,7 +55,7 @@ export function ndContractorHit(r: FsRow, d: Record<string, string>, matchedOn: 
     businessName: clean(name), licenseNumber: clean(d["License Num"]) ?? clean(cls?.split(/\s+-\s+/)[1]),
     licenseType: klass ? `Contractor license, ${klass}` : "Contractor license", specialty: null,
     status: [clean(r.STATUS), clean(r.STANDING), ...standing].filter(Boolean).join("; ") || null, principal: null,
-    city: clean(d["Mailing Address"]?.match(/ ([A-Z .'-]+), [A-Z]{2} \d{5}/)?.[1]), expires: usDate(d["Renewal Date"]),
+    city: clean(d["Mailing Address"]?.match(/(?:^|,)\s*([^,]+),\s*[A-Z]{2}\s+\d{5}/)?.[1]), expires: usDate(d["Renewal Date"]),
     matchedOn, address: clean(d["Mailing Address"]), phone: clean(d["Business Phone"]), people: [],
   };
 }
