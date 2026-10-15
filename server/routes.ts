@@ -2912,7 +2912,28 @@ export async function registerRoutes(
         changes.socialProfiles = { ...kept, ...Object.fromEntries(Object.entries(socialProfiles).filter(([, v]) => v)) };
       }
       const [updated] = await db.update(businessLocations).set(changes).where(eq(businessLocations.id, id)).returning();
-      res.json(updated);
+      // A linked listing takes the seven social links from Google on every sync (server/gbp/client.ts), so a link
+      // saved only here would be wiped within six hours. Write the changed ones to the listing's url_* attributes
+      // (owner 2026-10-15: "give me all the links for google"). A Google refusal keeps the local save and is reported.
+      let google: { pushed: string[]; error?: string } | undefined;
+      if (socialProfiles && existing.gbpLocationName) {
+        const before = (existing.socialProfiles as Record<string, string>) || {};
+        const after = (changes.socialProfiles as Record<string, string>) || {};
+        const changed = (SOCIAL_PROFILE_KEYS as readonly string[]).filter((k) => (before[k] || "") !== (after[k] || ""));
+        if (changed.length) {
+          const attributeMask = changed.map((k) => `attributes/url_${k}`);
+          const attributes = changed.filter((k) => after[k]).map((k) => ({ name: `attributes/url_${k}`, valueType: "URL" as const, uriValues: [{ uri: after[k] }] }));
+          try {
+            const { writeAttributes } = await import("./gbp/listing-editor");
+            const r = await writeAttributes(user.id, id, { attributeMask, attributes }, undefined, req);
+            const unconfirmed = Object.entries(r.verdicts).filter(([, v]) => v !== "applied").map(([n]) => n.split("/").pop()!.replace(/^url_/, ""));
+            google = { pushed: changed, ...(unconfirmed.length ? { error: `Google did not confirm: ${unconfirmed.join(", ")}` } : {}) };
+          } catch (e: any) {
+            google = { pushed: [], error: typeof e?.message === "string" ? e.message : "Google refused the social links" };
+          }
+        }
+      }
+      res.json(google ? { ...updated, google } : updated);
     } catch (err: any) {
       console.error("Error updating location:", err);
       res.status(500).json({ message: "Could not save the location. Please try again." });

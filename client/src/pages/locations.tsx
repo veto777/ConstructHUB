@@ -792,9 +792,11 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
       const res = await apiRequest("PUT", `/api/locations/${location.id}`, { socialProfiles: trimmed });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (r: { google?: { pushed: string[]; error?: string } }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-      toast({ title: "Social profiles saved" });
+      if (r?.google?.error) toast({ title: "Saved here, but not on Google", description: r.google.error, variant: "destructive" });
+      else if (r?.google) toast({ title: "Social profiles saved to your Google Business Profile", description: "Google can take a few minutes to show them on the listing." });
+      else toast({ title: "Social profiles saved" });
     },
     onError: (err: Error) => {
       toast({ title: "Save failed", description: apiErrorMessage(err), variant: "destructive" });
@@ -805,7 +807,7 @@ function SocialProfilesTab({ location }: { location: BusinessLocation }) {
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Social Profiles</CardTitle>
-        <CardDescription>Add your social media URLs</CardDescription>
+        <CardDescription>{location.gbpLocationName ? "Add your social media URLs. They are written to your Google Business Profile as well, so the listing shows them." : "Add your social media URLs."}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {SOCIAL_PLATFORMS.map(platform => (
