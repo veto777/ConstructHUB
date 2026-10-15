@@ -6,6 +6,7 @@
  *   NY  New York City DOB licenses: general contractors, master plumbers, electrical contractors and firms,
  *       fire-suppression contractors, oil-burner installers, riggers, welders, site safety and other DOB trades (bulk)
  *   NY  New York City DCWP home-improvement contractor and construction-labor-provider licenses (bulk)
+ *   IL  Chicago BACP home-repair licenses, with every owner and officer from the city's Business Owners dataset (bulk)
  *   MD  Montgomery County DPS licenses: building contractors (new-home builders), master and limited master
  *       electricians, limited electrical businesses, fire-system licensees (bulk)
  *   OH  Cleveland Building & Housing contractor registrations (active; bulk)
@@ -302,10 +303,57 @@ const nashville: BulkSource = {
   },
 };
 
+// ── Chicago ──────────────────────────────────────────────────────────────────────────────────────────────────────
+const CHI_LICENSES = soda("data.cityofchicago.org", "r5kz-chrr");
+const CHI_OWNERS = soda("data.cityofchicago.org", "ezma-pppn");
+// license_status codes, from the dataset's own description.
+const CHI_STATUS: Record<string, string> = { AAI: "Issued", AAC: "Cancelled during its term", REV: "Revoked", REA: "Revocation appealed" };
+
+const chicagoHomeRepair: BulkSource = {
+  id: "il-chicago-home-repair", state: "IL", label: "Chicago home-repair business licenses", pageUrl: CHI_LICENSES.datasetUrl,
+  everyHours: 24, minRows: 7_500,
+  load: async function* () {
+    // One row per application (issue, renewals, moves): keep each license's latest term.
+    const latest = new Map<string, Row>();
+    for await (const r of sodaAll(CHI_LICENSES.url, "license_description='Home Repair'")) {
+      const no = txt(r, "license_number");
+      if (!no) continue;
+      const prev = latest.get(no);
+      if (!prev || String(r.expiration_date ?? "") >= String(prev.expiration_date ?? "")) latest.set(no, r);
+    }
+    const owners = new Map<string, { name: string; role: string | null }[]>();
+    const accounts = Array.from(new Set(Array.from(latest.values()).map((r) => txt(r, "account_number")).filter((a): a is string => !!a)));
+    for (let i = 0; i < accounts.length; i += 300) {
+      const batch = accounts.slice(i, i + 300).map((a) => `'${a.replace(/'/g, "''")}'`).join(",");
+      for await (const o of sodaAll(CHI_OWNERS.url, `account_number in (${batch})`)) {
+        const name = txt(o, "owner_name") ?? fullName(txt(o, "owner_first_name"), txt(o, "owner_middle_initial"), txt(o, "owner_last_name"));
+        const acct = txt(o, "account_number");
+        if (!name || !acct) continue;
+        const list = owners.get(acct) ?? [];
+        if (!list.some((p) => p.name === name)) list.push({ name, role: txt(o, "owner_title") });
+        owners.set(acct, list);
+      }
+    }
+    for (const r of Array.from(latest.values())) {
+      const legal = txt(r, "legal_name"), dba = txt(r, "doing_business_as_name");
+      if (!legal && !dba) continue;
+      const business = legal && dba && dba.toUpperCase() !== legal.toUpperCase() ? `${legal} (d/b/a ${dba})` : legal ?? dba;
+      const people = owners.get(txt(r, "account_number") ?? "") ?? [];
+      const code = txt(r, "license_status");
+      yield licenseHit({
+        state: "IL", source: "Chicago business licenses (home repair)", sourceUrl: CHI_LICENSES.datasetUrl,
+        businessName: business, licenseNumber: txt(r, "license_number"), licenseType: txt(r, "license_description"), specialty: null,
+        status: code ? CHI_STATUS[code] ?? `code ${code}` : null, principal: people[0]?.name ?? null, city: txt(r, "city"), expires: isoDay(r.expiration_date),
+        address: addressLine([txt(r, "address")], txt(r, "city"), txt(r, "state"), txt(r, "zip_code")), phone: null, people,
+      });
+    }
+  },
+};
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville];
+export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
