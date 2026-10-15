@@ -19,6 +19,7 @@
  *   MO  Kansas City business license holders, construction business types (bulk)
  *   VA  Norfolk business licenses, construction NAICS (bulk)
  *   FL  Miami-Dade County contractor licenses with their tradesmen (the county's layer, last updated 2024-10-25; bulk)
+ *   CA  Sacramento County (unincorporated) business licenses whose activity is construction work (bulk)
  *   NV  City of Las Vegas business licenses of type "Contractor", with owners and their titles (bulk)
  *   AZ  Tucson active business licenses, construction NAICS codes (23…) (bulk)
  *   IL  Chicago BACP home-repair licenses, with every owner and officer from the city's Business Owners dataset (bulk)
@@ -735,10 +736,39 @@ const tucson: BulkSource = {
   },
 };
 
+// ── Sacramento County ────────────────────────────────────────────────────────────────────────────────────────────
+// LicenseActivity is the applicant's own description ("General Contracting Services, Electrician Services"): kept
+// when it names construction work, and shown as written.
+const SAC = "https://services1.arcgis.com/5NARefyPVtAeuJPU/arcgis/rest/services/Business_Licenses/FeatureServer/0";
+const SAC_PAGE = "https://www.arcgis.com/home/item.html?id=31a6cfbc26b9434093bc59b01b454b87";
+const SAC_WORK = /contract|construct|electrician|electrical|plumb|roof|hvac|heating|air condition|carpent|drywall|concrete|mason|flooring|remodel|handyman|home repair|painting services|solar|framing|insulation|stucco|paving|excavat|demolition|fence|gutter|tile|cabinet install|window install|door install/i;
+const SAC_NOT = /face painting|art |artist|auto|vehicle|boat|rental|wholesal|manufactur|supply|supplies|dealers|architect|inspection|estimat|drafting|computer|stereo|food|janitorial only/i;
+const sacramentoCounty: BulkSource = {
+  id: "ca-sacramento-county-contractors", state: "CA", label: "Sacramento County business licenses (construction work)", pageUrl: SAC_PAGE,
+  everyHours: 24 * 7, minRows: 2_000,
+  load: async function* () {
+    for await (const r of arcgisAll(SAC)) {
+      const activity = txt(r, "LicenseActivity");
+      if (!activity || !SAC_WORK.test(activity) || SAC_NOT.test(activity)) continue;
+      const name = txt(r, "Business_Name");
+      if (!name) continue;
+      const [city, st] = (txt(r, "CityState") ?? "").split(",").map((x) => x.trim());
+      yield licenseHit({
+        state: "CA", source: "Sacramento County business licenses", sourceUrl: SAC_PAGE,
+        businessName: name, licenseNumber: txt(r, "Record_number"), licenseType: "Business license", specialty: activity,
+        status: null, principal: null, city: city || null, expires: isoDay(r.ExpirationDate),
+        // Home-based licenses are published without a street ("0") and with "Home Based Business" for the phone.
+        address: txt(r, "StName") && txt(r, "stNumber") !== "0" ? addressLine([txt(r, "stNumber"), txt(r, "StName"), txt(r, "Suite")], city || null, st || null, txt(r, "Zip")) : null,
+        phone: /\d{3}/.test(txt(r, "Business_Phone") ?? "") ? txt(r, "Business_Phone") : null, people: [],
+      });
+    }
+  },
+};
+
 /** Socrata datasets; `state` is the state the city or county is in. */
 export const LOCAL_LICENSES: LicenseSource[] = [];
 /** Bulk files; `state` is the state the city or county is in. */
-export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, sanFrancisco, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade, lasVegas, tucson];
+export const LOCAL_BULK: BulkSource[] = [chicagoHomeRepair, nycDob, nycDcwp, phlTrade, phlViolations, ...MOCO.map(mocoSource), cleveland, nashville, dcContractors, longBeach, boulder, arlington, losAngeles, sanFrancisco, seattle, newOrleans, batonRouge, kansasCity, norfolk, miamiDade, lasVegas, tucson, sacramentoCounty];
 /** Other live lookups, by state. */
 export const LOCAL_LIVE: Record<string, LiveLicenseSearch[]> = {};
 /** City and county enforcement datasets (companies only), searched like a state pack's `enforcement`. */
