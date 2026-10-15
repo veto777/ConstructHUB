@@ -1,3 +1,103 @@
+/**
+ * Vermont. The Division of Fire Safety trade licenses (data.vermont.gov cy8e-89cz: electricians, plumbers, gas and
+ * oil installers, elevator, sprinkler) are already searched from ../licenses.ts. This pack adds, checked live on
+ * 2026-10-15 (CLAUDE.md: never fabricate government data; column names and status words are the publisher's own):
+ *
+ *   VT  Office of Professional Regulation (Secretary of State) profession rosters, bulk: the OPR "Find a
+ *       Professional" guest page's "Profession Roster Download" (an .xlsx per profession type, statuses Active,
+ *       Inactive per Request, Expired and Disciplined), for residential contractors (businesses and individuals),
+ *       architects, professional engineers, land surveyors,
+ *       landscape architects, well drillers and wastewater/water system designers.
+ *       The page is a Pega application with no plain download URL, so the roster is fetched with the headless
+ *       browser the permit search already uses (playwright-core), one roster at a time.
+ */
+import { promises as fs } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { LicenseHit } from "@shared/research-reports";
+import { CHROMIUM_ARGS, USER_AGENT } from "../../scrapers/polite-fetch";
+import { clean, usDate, type BulkHit } from "../bulk";
+import { xlsxRecords } from "./lib/g2-xlsx";
 import type { StatePack } from "./types";
 
-export const pack: StatePack = { state: "VT", checked: "" };
+const OPR_LOOKUP = "https://secure.professionals.vermont.gov/prweb/PRServletCustom/V9csDxL3sXkkjMC_FR2HrA%5B%5B*/!STANDARD?UserIdentifier=LicenseLookupGuestUser";
+const OPR_PAGE = "https://sos.vermont.gov/opr/find-a-professional/";
+/** Profession and profession type, as the roster form's own option labels. */
+const ROSTERS: { profession: string; type: string; business?: boolean }[] = [
+  { profession: "Residential Contractors", type: "Residential Contractor - Business", business: true },
+  { profession: "Residential Contractors", type: "Residential Contractor - Individual" },
+  { profession: "Architects", type: "Architect" },
+  { profession: "Engineering", type: "Professional Engineer" },
+  { profession: "Land Surveyors", type: "Land Surveyor" },
+  { profession: "Landscape Architects", type: "Landscape Architect" },
+  { profession: "Well Drillers", type: "Well Driller" },
+  { profession: "Wastewater / Water System Designers", type: "Wastewater/Water System Designers" },
+];
+const STATUSES = ["Active", "Inactive per Request", "Expired", "Disciplined"];
+
+/** Download one roster through the guest page; returns the saved .xlsx path (the caller deletes it). */
+async function fetchRoster(page: any, r: { profession: string; type: string }): Promise<string> {
+  await page.goto(OPR_LOOKUP, { waitUntil: "networkidle", timeout: 120_000 });
+  await page.click("button:has-text('PROFESSION ROSTER DOWNLOAD')");
+  await page.waitForTimeout(3000);
+  const professions = await page.$$("select[name='$PpyDisplayHarness$pProductIds']");
+  if (!professions.length) throw new Error("roster form did not open");
+  await professions[professions.length - 1].selectOption({ label: r.profession });
+  await page.waitForTimeout(4000);
+  const type = await page.$("select[name='$PpyDisplayHarness$pSetProfessionType']");
+  if (!type) throw new Error(`no profession types for ${r.profession}`);
+  await type.selectOption({ label: r.type });
+  await page.waitForTimeout(3000);
+  for (const s of STATUSES) { await page.getByLabel(s, { exact: true }).check(); await page.waitForTimeout(1500); }
+  const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 180_000 }), page.click("button[name^='NGLPRosterDownload']")]);
+  const path = join(tmpdir(), `ch-vt-opr-${Date.now()}-${Math.random().toString(36).slice(2)}.xlsx`);
+  await dl.saveAs(path);
+  return path;
+}
+
+async function* vtOprLoader(): AsyncIterable<BulkHit> {
+  const { chromium } = await import("playwright-core");
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, headless: true, args: CHROMIUM_ARGS });
+  try {
+    const context = await browser.newContext({ userAgent: USER_AGENT, acceptDownloads: true });
+    const page = await context.newPage();
+    for (const r of ROSTERS) {
+      const path = await fetchRoster(page, r);
+      try {
+        for (const x of await xlsxRecords(path)) {
+          const no = clean(x.LicenseNumber);
+          if (!no) continue;
+          const business = r.business ? clean(x.BusinessName) : null;
+          const who = r.business ? null : clean([x["First Name"], x["Middle Name"], x["Last Name"]].filter(Boolean).join(" "));
+          if (!business && !who) continue;
+          const address = clean([x["AddressLine 1"] ?? x.Address1, x["AddressLine 2"] ?? x.Address2, x.City, x.State, x.ZipCode ?? x.Zip].map((v) => clean(v)).filter(Boolean).join(", "));
+          const supervisor = clean(x.Supervisor);
+          const hit: LicenseHit = {
+            state: "VT", source: "Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
+            sourceUrl: OPR_PAGE, businessName: business, licenseNumber: no, licenseType: r.type, specialty: clean(x.Specialty),
+            status: clean(x.Status), principal: who, city: clean(x.City), expires: usDate(x["License Expiration"]),
+            matchedOn: business ? "business" : "principal", address,
+            people: [...(who ? [{ name: who, role: null }] : []), ...(supervisor ? [{ name: supervisor, role: "Supervisor" }] : [])],
+          };
+          yield { kind: "license", hit, business, person: who, people: supervisor ? [supervisor] : undefined, keys: { licenses: [no], addresses: [address] } };
+        }
+      } finally {
+        await fs.rm(path, { force: true });
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+export const pack: StatePack = {
+  state: "VT",
+  checked: "2026-10-15",
+  bulk: [
+    { id: "vt-opr-rosters", state: "VT", label: "Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
+      pageUrl: OPR_PAGE, everyHours: 24 * 7, minRows: 14_000, load: vtOprLoader },
+  ],
+  blocked: [
+    "OPR conduct decisions (Zoho Creator search) and monthly discipline reports (PDF): almost all are against individual licensees, which reports don't search for enforcement (companies only)",
+  ],
+};
