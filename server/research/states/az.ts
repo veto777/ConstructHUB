@@ -10,12 +10,15 @@
  *
  * The ROC search answers: accountName, licenseData[] (licenseNo, subType, status, qpName), accountContactData[]
  * (contactName "Name (Role) "), address ("City, ST, ZIP": no street, so no address key), phone; getLicenseDetail adds renewalThr (renewed through),
- * licenseDescription, issuedDate; getAllComplaintsDetail gives complaintDataList[] (Name = case number, Status__c,
+ * licenseDescription, issuedDate and entityType (LLC, Corporation, Partnership, Sole Proprietorship: the holder; a sole
+ * proprietorship's license is the owner's, so it shows no phone). A person is searched by name: the ROC search
+ * matches the qualifying party and everyone named on the account (re-checked 2026-10-15: "Kenneth Mackey" finds
+ * ROC 325034 and ROC 338420, qualifying party Kenneth Eugene Mackey); getAllComplaintsDetail gives complaintDataList[] (Name = case number, Status__c,
  * Complaint_Type__c, Complaint_Outcome_Multi__c, Allegations__c, Closed_Date__c, Jobsite_City__c). The complainant
  * (a private person) is never read into a report.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { onePersonField, tokens } from "../licenses";
+import { entityHolder, onePersonField, tokens } from "../licenses";
 import { personText } from "../person-name";
 import { clean } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
@@ -31,7 +34,7 @@ const licensePage = (id: string) => `${ROC_SEARCH_PAGE}?licenseId=${encodeURICom
 
 type RocLicense = { licenseId: string; licenseNo: string | null; qpName: string | null; status: string | null; subType: string | null };
 export type RocAccount = { accountId: string; accountName: string | null; address: string | null; phone?: string | null; licenseData?: RocLicense[]; accountContactData?: { contactName: string | null }[] };
-type RocDetail = { licenseDescription?: string | null; renewalThr?: string | null; licenseStatus?: string | null };
+type RocDetail = { licenseDescription?: string | null; renewalThr?: string | null; licenseStatus?: string | null; entityType?: string | null };
 type RocComplaint = {
   Name?: string | null; Status__c?: string | null; Complaint_Type__c?: string | null; Complaint_Outcome_Multi__c?: string | null;
   Allegations__c?: string | null; Closed_Date__c?: string | null; Jobsite_City__c?: string | null; Case_Nature__c?: string | null;
@@ -49,6 +52,14 @@ export function rocCity(address: string | null | undefined): string | null {
 }
 
 const MAX_DETAILS = 15;
+
+/**
+ * The license page's entityType as the holder: the values the ROC answered on 2026-10-15 ("LLC", "Corporation",
+ * "Partnership" → the business; "Sole Proprietorship" → the individual who owns it). Any other value is null, and the
+ * license keeps the register's own holder (the account, a business).
+ */
+export const rocHolder = (entityType: string | null | undefined) =>
+  entityHolder(entityType, { business: /^(LLC|Corporation|Partnership)$/, individual: /^Sole Proprietorship$/ });
 
 /** "Douglas Guy Mack (President) " → "Douglas Guy Mack". */
 /** The role suffix comes off; the rest is the field as published, a list kept a list (round 6, decision 3: "Jane Smith\nJohn Doe" is not one name). */
@@ -116,7 +127,8 @@ export function rocLicenseHits(rows: RocAccount[], name: string, kind: "person" 
         people: Array.from(named, ([n, r]) => ({ name: n, role: Array.from(new Set(r)).join("; ") || null })),
         // A ROC license is a contractor's license held by the account: the ROC's register is of licensed contracting
         // businesses (the account), with its qualifying party and officers listed apart (publisher's definition; kept
-        // as "business" in round 3, decision 3). The account address is city, state and ZIP only (rocCity).
+        // as "business" in round 3, decision 3). The license page's entityType refines it (withDetails, rocHolder): a
+        // sole proprietorship's license is its owner's. The account address is city, state and ZIP only (rocCity).
         holder: "business",
       });
     }
@@ -134,6 +146,7 @@ async function withDetails(hits: (LicenseHit & { licenseId: string })[]): Promis
     h.licenseType = clean(d.licenseDescription) ?? h.licenseType;
     h.expires = /^\d{4}-\d{2}-\d{2}$/.test(d.renewalThr ?? "") ? d.renewalThr! : null;
     h.status = clean(d.licenseStatus) ?? h.status;
+    h.holder = rocHolder(d.entityType) ?? h.holder;
   }
   const out = hits.map(({ licenseId: _id, ...h }) => h);
   return withNote(out, [

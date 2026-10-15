@@ -2,7 +2,7 @@
  * Small HTML helpers shared by the g4 state packs (AL, MS, LA, AR, KY, OK), whose boards publish their records as
  * plain server-rendered HTML pages and tables rather than open data.
  */
-import { flipPerson, personText } from "../../person-name";
+import { flipPerson, personText, htmlLines } from "../../person-name";
 import { decodeEntities } from "../../bulk-sources";
 import { clean } from "../../bulk";
 
@@ -11,12 +11,13 @@ export const text = (v: string | null | undefined): string | null =>
   clean(decodeEntities((v ?? "").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ")));
 
 /**
- * A person-name cell as text (round 6, decision 3): like the helper above, but a <br> between two names stays a list
- * (written " / ", ../../person-name.ts), so "Jane Smith<br>John Doe" is never read as one person. Whitespace in the
- * page source is not a separator; only the <br> is.
+ * A person-name cell as text (round 6, decision 3; round 7, finding 1): like the helper above, but a <br> or a block
+ * boundary (div, p, li, tr, td…) between two names stays a list (written " / ", ../../person-name.ts), so
+ * "Jane Smith<br>John Doe" and "<div>Jane Smith</div><div>John Doe</div>" are never read as one person. Whitespace in
+ * the page source is not a separator.
  */
 export const htmlPerson = (v: string | null | undefined): string | null =>
-  v == null ? null : personText(decodeEntities(v.replace(/\s+/g, " ").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")));
+  v == null ? null : personText(decodeEntities(htmlLines(v)));
 
 /** The cells of every <tr> in a fragment, as text (cells keep their order; empty cells are null). */
 export function tableRows(html: string): (string | null)[][] {

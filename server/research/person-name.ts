@@ -45,3 +45,15 @@ export function flipPerson(raw: string | null | undefined): string | null {
   const m = t.match(/^([^,]+),\s*(.+)$/);
   return m ? `${m[2]} ${m[1]}`.replace(/\s+/g, " ").trim() : t;
 }
+
+/** Elements whose start or end the browser renders as a new line (or a new cell): a name on each side is a different value. */
+const BLOCK_TAG = /<\/?(?:br|hr|div|p|li|ul|ol|dl|dt|dd|tr|td|th|table|thead|tbody|tfoot|caption|h[1-6]|section|article|header|footer|address|blockquote|pre|center|fieldset|legend|form|nav|aside|main|figure|figcaption|option)\b[^>]*>/gi;
+
+/**
+ * An HTML fragment with every rendered line boundary as "\n" and other tags as a space (round 7, finding 1): a <br>,
+ * and the start or end of a block element, list item, row or cell. "<div>Jane Smith</div><div>John Doe</div>" is two
+ * lines, never "Jane Smith John Doe". Whitespace in the page source is not a boundary. Entities are left to the caller.
+ */
+export function htmlLines(html: string): string {
+  return html.replace(/\s+/g, " ").replace(BLOCK_TAG, "\n").replace(/<[^>]+>/g, " ");
+}

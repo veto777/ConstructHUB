@@ -95,7 +95,7 @@ export function hostBlocked(url: string): { status: number; why: string } | null
 
 /** For tests: forget every host's state and cached robots.txt. */
 export function resetHostState(): void {
-  hosts.clear(); robotsCache.clear(); robotsPending.clear();
+  hosts.clear(); robotsCache.clear(); robotsPending.clear(); robotsRetryMs = ROBOTS_RETRY_MS;
   for (const h of Array.from(holding.values())) h.end();
   holding.clear(); turns.clear(); expiredUnreleased.clear();
 }
@@ -485,33 +485,56 @@ function robotsChallenge(status: number, text: string): boolean {
   return status >= 200 && status < 300 ? robotsHtml(text) && challengePage(text) : challengePage(text);
 }
 
+/** Pauses before robots.txt is read again after a failure that may pass (tests set them to 0). */
+const ROBOTS_RETRY_MS = [3_000, 10_000];
+let robotsRetryMs: number[] = ROBOTS_RETRY_MS;
+export function setRobotsRetryMs(ms: number[]): void { robotsRetryMs = ms; }
+
+/** One reading of an origin's robots.txt as rules or a refusal; `transient` when the refusal may pass on a retry. */
+async function readRobots(origin: string, chain: Set<string>): Promise<{ rules: Rule[]; denied?: string; transient?: boolean }> {
+  try {
+    const res = await fetchRobots(origin, new Set(chain).add(origin));
+    const ok = res.status >= 200 && res.status < 300;
+    if (ok) {
+      const html = robotsHtml(res.text);
+      // An HTML page is a refusal only when it is a bot challenge or an error page. An app that answers every path
+      // with its own page (OK CIB's verify site) has no robots file: no rules, as RFC 9309 reads unparseable content.
+      return html && challengePage(res.text, true)
+        ? { rules: [], denied: "robots.txt answered with a challenge or error page", transient: !challengePage(res.text) } // a "server error" page may pass; a challenge doesn't
+        : { rules: !html && /user-agent\s*:/i.test(res.text) ? parseRobots(res.text) : [] };
+    }
+    if (res.status === 429 || res.status >= 500) return { rules: [], denied: `robots.txt answered HTTP ${res.status}`, transient: !robotsChallenge(res.status, res.text) };
+    // Any other 4xx (401, 403, 404, 410…) means no robots.txt (RFC 9309 §2.3.1.3), unless the page is a challenge.
+    if (res.status >= 400 && res.status < 500) return challengePage(res.text) ? { rules: [], denied: `robots.txt answered HTTP ${res.status} with a challenge page` } : { rules: [] };
+    if (REDIRECTS.has(res.status)) return { rules: [], denied: "robots.txt redirected without a location" };
+    return { rules: [] };
+  } catch (err) {
+    const e = err as { status?: number; message?: string };
+    const refused = err instanceof PortalBlockedError;
+    return {
+      rules: [], transient: !refused,
+      denied: refused && (e.status === 401 || e.status === 403) ? `robots.txt answered HTTP ${e.status}` : `robots.txt could not be read (${String(e?.message ?? err).slice(0, 120)})`,
+    };
+  }
+}
+
 export async function robotsFor(origin: string, chain: Set<string> = new Set()): Promise<{ rules: Rule[]; denied?: string }> {
   const hit = robotsCache.get(origin);
   if (hit && Date.now() - hit.at < hit.ttl) return hit;
   const pending = !chain.size ? robotsPending.get(origin) : undefined;
   if (pending) return pending;
   const work = (async () => {
-    let entry: { rules: Rule[]; denied?: string };
-    try {
-      const res = await fetchRobots(origin, new Set(chain).add(origin));
-      const ok = res.status >= 200 && res.status < 300;
-      if (ok) {
-        const html = robotsHtml(res.text);
-        // An HTML page is a refusal only when it is a bot challenge or an error page. An app that answers every path
-        // with its own page (OK CIB's verify site) has no robots file: no rules, as RFC 9309 reads unparseable content.
-        entry = html && challengePage(res.text, true)
-          ? { rules: [], denied: "robots.txt answered with a challenge or error page" }
-          : { rules: !html && /user-agent\s*:/i.test(res.text) ? parseRobots(res.text) : [] };
-      } else if (res.status === 429 || res.status >= 500) entry = { rules: [], denied: `robots.txt answered HTTP ${res.status}` };
-      // Any other 4xx (401, 403, 404, 410…) means no robots.txt (RFC 9309 §2.3.1.3), unless the page is a challenge.
-      else if (res.status >= 400 && res.status < 500) entry = challengePage(res.text) ? { rules: [], denied: `robots.txt answered HTTP ${res.status} with a challenge page` } : { rules: [] };
-      else if (REDIRECTS.has(res.status)) entry = { rules: [], denied: "robots.txt redirected without a location" };
-      else entry = { rules: [] };
-    } catch (err) {
-      const e = err as { status?: number; message?: string };
-      entry = { rules: [], denied: err instanceof PortalBlockedError && (e.status === 401 || e.status === 403)
-        ? `robots.txt answered HTTP ${e.status}` : `robots.txt could not be read (${String(e?.message ?? err).slice(0, 120)})` };
+    // A robots.txt that fails in a way that may pass (no answer, a timeout, a 429 or a 5xx) is read again, after a
+    // pause, before the host is refused for the run (acceptance run, 2026-10-15: data.mo.gov's robots.txt failed once
+    // and answered 200 a minute later). Still failing after the retries, it refuses, as RFC 9309 §2.3.1.4 asks. A
+    // challenge, a 401/403 refusal or a blocked host is not retried.
+    let entry = await readRobots(origin, chain);
+    for (const wait of robotsRetryMs) {
+      if (!entry.transient || hostBlocked(`${origin}/robots.txt`)) break;
+      await new Promise((r) => setTimeout(r, wait));
+      entry = await readRobots(origin, chain);
     }
+    delete entry.transient;
     robotsCache.set(origin, { ...entry, at: Date.now(), ttl: entry.denied ? BLOCK_MS : ROBOTS_TTL_MS });
     return entry;
   })();

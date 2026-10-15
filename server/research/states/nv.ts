@@ -22,7 +22,7 @@ import type { BulkHit, BulkSource } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
 import { FormSession, cellText, tableRows } from "./lib/g7-aspnet";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
-import { withNote } from "../notes";
+import { noteOf, withNote } from "../notes";
 import { hasEnded } from "../adverse";
 import { looksLikeBusiness } from "./lib/business-name";
 
@@ -121,18 +121,51 @@ async function nscbSearch(by: "1" | "2" | "12", fields: Record<string, string>, 
   const picked = by === "1" ? first : await s.postBack(NSCB_LICENSE_SEARCH, first.html, { __EVENTTARGET: `${P}DdlSearchBy`, [`${P}DdlSearchBy`]: by });
   const res = await s.postBack(NSCB_LICENSE_SEARCH, picked.html, { [`${P}DdlSearchBy`]: by, ...fields, [`${P}btnSearch`]: "Submit" });
   if (res.status !== 200) throw new Error(`NSCB returned HTTP ${res.status}`);
+  // No match: the search form again, saying "Your search did not return any results" (acceptance run, 2026-10-15).
+  if (/Your search did not return any results/i.test(res.html) && !/dtgResults/.test(res.html)) return [];
   if (!/LicenseSearchResults|dtgResults|No (records|results)/i.test(res.url + res.html)) throw new Error("NSCB returned an unexpected page");
   return withNscbDetails(s, res, parseNscbLicenses(res.html, kind).filter(keep));
 }
 
+/** "LEGAL NAME dba TRADE NAME" as its names; a name without "dba" (or "d/b/a", "aka") is itself. */
+export const nscbCompanyNames = (name: string): string[] =>
+  name.split(/\s+(?:dba|d\/b\/a|aka)\s+/i).map((n) => n.trim()).filter((n) => n.length >= 2);
+
+/**
+ * The person-search fields: first name and last name, as the board's form takes them. A middle name or initial and a
+ * generational suffix ("JR") are left out, so "Kimberly A Hill" is Kimberly / Hill and "John Smith Jr" John / Smith;
+ * results are still matched against the whole name.
+ */
+export function nscbPersonFields(name: string): { last: string; first: string } | null {
+  const words = name.replace(/[^A-Za-z0-9&' -]/g, " ").split(/\s+/).filter((w) => w && !/^(?:jr|sr|ii|iii|iv)$/i.test(w));
+  const full = words.filter((w) => w.length > 1);
+  if (!full.length) return null;
+  return { last: full[full.length - 1], first: full.length > 1 ? full[0] : "" };
+}
+
 async function searchNscbLicenses(name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
-  const words = name.replace(/[^A-Za-z0-9&' -]/g, " ").split(/\s+/).filter(Boolean);
-  if (!words.length || words.join(" ").length < 2) return [];
-  // Details are opened only for rows that really name the subject.
-  const fields: Record<string, string> = kind === "company"
-    ? { [`${P}inputCompany`]: words.join(" ").slice(0, 60) }
-    : { [`${P}inputLastName`]: words[words.length - 1], [`${P}inputFirstName`]: words.length > 1 ? words[0] : "", [`${P}inputPrincipalCompanyName`]: "" };
-  return nscbSearch(kind === "company" ? "2" : "12", fields, kind, (h) => wholeWordMatch(name, kind === "company" ? { businessName: h.businessName, principal: null } : { businessName: null, principal: h.principal }));
+  if (kind === "person") {
+    const p = nscbPersonFields(name);
+    if (!p || p.last.length < 2) return [];
+    // Details are opened only for rows that really name the subject.
+    return nscbSearch("12", { [`${P}inputLastName`]: p.last, [`${P}inputFirstName`]: p.first, [`${P}inputPrincipalCompanyName`]: "" }, kind,
+      (h) => wholeWordMatch(name, { businessName: null, principal: h.principal }));
+  }
+  // The board's company search finds nothing for "LEGAL NAME dba TRADE NAME" (acceptance run, 2026-10-15): each name is
+  // searched on its own, and a row is kept when it is that name.
+  let out: LicenseHit[] = [];
+  const seen = new Set<string>();
+  for (const part of nscbCompanyNames(name)) {
+    const q = part.replace(/[^A-Za-z0-9&' -]/g, " ").split(/\s+/).filter(Boolean).join(" ").slice(0, 60);
+    if (q.length < 2) continue;
+    const hits = await nscbSearch("2", { [`${P}inputCompany`]: q }, kind, (h) => wholeWordMatch(part, { businessName: h.businessName, principal: null }));
+    for (const h of hits) {
+      const k = `${h.licenseNumber}|${h.businessName}`;
+      if (!seen.has(k)) { seen.add(k); out.push(h); }
+    }
+    out = withNote(out, noteOf(hits));
+  }
+  return out;
 }
 
 /** The NSCB search also takes a license number (it has no phone or address search). */

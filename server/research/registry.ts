@@ -10,7 +10,7 @@ import { searchSodaEnforcement, type SodaEnforcement } from "./state-records";
 import type { ComplaintSource } from "./records";
 import { STATE_PACKS } from "./states";
 import { NATIONWIDE_BULK } from "./sam";
-import { noteOf } from "./notes";
+import { failureNote, noteOf } from "./notes";
 import { LOCAL_BULK, LOCAL_ENFORCEMENT, LOCAL_LICENSES, LOCAL_LIVE, LOCAL_LIVE_ENFORCEMENT } from "./states/local";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./states/types";
 
@@ -47,7 +47,7 @@ export async function searchPackEnforcement(name: string, state: string, matches
       // A search that stopped at a cap says so ("showing the first 10 of 34 matches").
       sources.push({ source, scope, searched: true, note: `${found.length} record(s)${noteOf(raw) ? ` (${noteOf(raw)})` : ""}`, category });
     } catch (err: any) {
-      sources.push({ source, scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category });
+      sources.push({ source, scope, searched: false, note: failureNote(err), category });
     }
   };
   for (const src of p?.enforcement ?? []) await run(src.source, src.scope, kindOf(src as SodaEnforcement), () => searchSodaEnforcement(src as SodaEnforcement, name, matches));

@@ -22,6 +22,7 @@
  * Every search goes through a LicenseFinder, so the logic here runs against fakes in tests (xref.test.ts) and against
  * the registry's real sources in the runner. Work is capped per subject; whatever a cap leaves out is said in the notes.
  */
+import { failureReason } from "./notes";
 import type { EnforcementHit, LicenseHit, RecordSource, RelatedTie, ResearchSubjectInput } from "@shared/research-reports";
 import { RELATED_TIES } from "@shared/research-reports";
 import { addressMatch, addressQueryKey, describeId, normLicense, normPhone, streetKey, type IdQuery } from "./identifiers";
@@ -224,7 +225,7 @@ export async function searchById(finders: LicenseFinder[], q: IdQuery, kind: "pe
       licenses.push(...r.licenses.map((h) => ({ ...h, matchedOn: q.type })));
       enforcement.push(...r.enforcement);
     } catch (err: any) {
-      failed.push(`${f.label}: ${String(err?.message ?? err).slice(0, 120)}`);
+      failed.push(`${f.label}: ${failureReason(err).reason.slice(0, 120)}`); // an access refusal in plain words
     }
   }
   return { licenses, enforcement, searched, licenseSearched, failed, skipped, capped };
@@ -436,7 +437,7 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
         // A search that stopped at a cap says so (round 2, decision 9).
         if (r.capped) notes.push(`"${hop.name}" in ${f.label}: ${r.capped}.`);
         found.push(...r.hits.filter((h) => hop.kind === "person" ? samePerson(hop.name, h) : nameMatches(hop.name, hop.kind, h)));
-      } catch (err: any) { notes.push(`Could not search "${hop.name}" in ${f.label}: ${String(err?.message ?? err).slice(0, 120)}`); }
+      } catch (err: any) { const why = failureReason(err); notes.push(why.refused ? `"${hop.name}" was not searched in ${f.label}: ${why.reason}` : `Could not search "${hop.name}" in ${f.label}: ${why.reason.slice(0, 120)}`); }
     }
     const fresh = found.filter((h) => !mergeOwn(h));
     const ref = licenseRef(hop.from);
@@ -494,7 +495,8 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
       for (const e of mine) addEnforcement(e, b.tie, `a record of ${b.name}, which is tied to this name: ${b.via}`);
       log(`xref enforcement "${b.name}": ${mine.length} record(s) naming exactly this business (of ${r.hits.length} word matches)`);
     } catch (err: any) {
-      notes.push(`Could not search enforcement records for ${b.name}: ${String(err?.message ?? err).slice(0, 120)}`);
+      const why = failureReason(err);
+      notes.push(why.refused ? `Enforcement records for ${b.name} were not searched: ${why.reason}` : `Could not search enforcement records for ${b.name}: ${why.reason.slice(0, 120)}`);
     }
   }
   if (ranked.length) notes.unshift(`Related businesses checked for state enforcement records: ${ranked.slice(0, MAX_RELATED_BUSINESSES).map((b) => b.name).join(", ")}.`);

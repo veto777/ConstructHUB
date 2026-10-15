@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { darBusiness, darHit, parseTnDar, tdecHit, tdecIsOrganization } from "./tn";
+import { darBusiness, darHit, parseTnDar, tdecHit, tdecIsOrganization, verifyHit, type VerifyCard } from "./tn";
+import { reportHit } from "../privacy";
 
 // Respondent rows of the TDEC Enforcement Dataviewer CSV (page 700) as downloaded on 2026-10-15.
 const VALMONT = { Division: "APC", "Order Number": "APC26-0132", Respondent: "Valmont Industries, Inc.", "Case Type": "Technical Secretary Order", "Case Status": "Final", Site: "Valmont Industries, Inc.", County: "Marion", "EFO Name": "Chattanooga", "Signed Date": "9/12/2026" };
@@ -83,5 +84,43 @@ describe("TN Board for Licensing Contractors disciplinary action reports", () =>
     expect(darBusiness("John Smith dba Smith Roofing")).toBe("Smith Roofing");
     expect(darBusiness("Nextroof, LLC")).toBe("Nextroof, LLC");
     expect(darBusiness("101 Contractor")).toBe("101 Contractor");
+  });
+});
+
+// Result cards of the Commerce & Insurance Verify search (portal/search) as answered on 2026-10-15, trimmed to the fields read.
+const ORG_CARD: VerifyCard = { id: "C34666", title: "PRO BUILDERS UNLIMITED, INC.", subtitle: "Organization", details: [
+  { label: "License Details", values: ["Contractor", "Contractor", "37304", "Active", "11/30/2026"] },
+  { label: "Primary Contact Information", values: ["", null, null, "OCOEE, Tennessee 37361", "Polk, United States", null, null, null, null, null] }] };
+const PERSON_CARD: VerifyCard = { id: "C983719", title: "SMITH JR, JOHN H", subtitle: "Individual", details: [
+  { label: "License Details", values: ["Contractors: Limited Licensed Electricians", "Limited Licensed Electrician", "56358", "Expired", "09/30/2016"] },
+  { label: "Primary Contact Information", values: ["", null, null, "JAMESTOWN, Tennessee 38556", "Fentress, United States", null, null, null, null, null] }] };
+const APPLICATION_CARD: VerifyCard = { id: "C2266847", title: "Smith, Johnny Ray", subtitle: "Individual", details: [
+  { label: "License Details", values: ["Contractors: Limited Licensed Electricians", null, null, "Application Expired"] },
+  { label: "Primary Contact Information", values: ["", null, null, "LIVINGSTON, Tennessee 38570", "Overton, United States", null, null, null, null, null] }] };
+
+describe("TN Commerce & Insurance Verify search", () => {
+  it("reads an organization's contractor license, held by the business", () => {
+    expect(verifyHit(ORG_CARD, "business")).toMatchObject({
+      businessName: "PRO BUILDERS UNLIMITED, INC.", licenseNumber: "37304", licenseType: "Contractor", status: "Active",
+      expires: "2026-11-30", city: "OCOEE, Tennessee 37361", holder: "business", principal: null, matchedOn: "business",
+      sourceUrl: "https://search.cloud.commerce.tn.gov/search/C34666/detail",
+    });
+  });
+
+  it("reads an individual's license as the person's, with no street or phone", () => {
+    const h = verifyHit(PERSON_CARD, "principal")!;
+    expect(h).toMatchObject({ businessName: null, principal: "JOHN H SMITH JR", holder: "individual", licenseType: "Limited Licensed Electrician", status: "Expired", expires: "2016-09-30", matchedOn: "principal" });
+    expect(h.people).toEqual([{ name: "JOHN H SMITH JR", role: null }]);
+    const shown = reportHit(h, "person");
+    expect(shown.address ?? null).toBeNull();
+    expect(shown.phone ?? null).toBeNull();
+  });
+
+  it("leaves out an application (no license number)", () => {
+    expect(verifyHit(APPLICATION_CARD, "principal")).toBeNull();
+  });
+
+  it("an unknown entity type is no holder (treated as an individual's)", () => {
+    expect(verifyHit({ ...ORG_CARD, subtitle: "Trust" }, "business")!.holder).toBeNull();
   });
 });
