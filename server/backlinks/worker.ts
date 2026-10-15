@@ -13,7 +13,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { pool } from "../db";
-import { isConfigured } from "../seo/dataforseo";
+import { DataForSeoError, isConfigured } from "../seo/dataforseo";
 import { recordFailure } from "../ops/issues";
 import * as store from "./store";
 import { discoveryEstimateUsd, searchOnce } from "./discover";
@@ -39,7 +39,17 @@ export async function runDiscovery(n: number, capUsd = workerConfig().capUsd): P
   const out = { queries: 0, found: 0, added: 0, costUsd: 0, stopped: null as string | null };
   for (const q of await store.dueQueries(n)) {
     if ((await budgetLeft(capUsd)) < discoveryEstimateUsd()) { out.stopped = "Monthly budget reached"; break; }
-    const { hits, costUsd } = await searchOnce(q.query);
+    let hits: Awaited<ReturnType<typeof searchOnce>>["hits"] = [], costUsd = 0;
+    try {
+      ({ hits, costUsd } = await searchOnce(q.query));
+    } catch (e: any) {
+      // Credentials or balance: stop discovery. Anything else ("Internal SE Server Error", partial results) is this one
+      // search: count what it billed and move on — it comes round again with the bank (2026-10-15: one failing query
+      // was retried every minute for 8 hours and stopped vetting with it).
+      if (!(e instanceof DataForSeoError) || e.code === "auth") throw e;
+      costUsd = e.costUsd;
+      console.warn(`[backlinks] search skipped ("${q.query}"): ${e.message}`);
+    }
     await store.addSpend(costUsd);
     const added = await store.addCandidates(hits, q.kind, q.query, q.niche === "general" ? null : q.niche);
     await store.recordQueryRun(q.id, hits.length, added, costUsd);
@@ -134,7 +144,9 @@ export async function runPass(): Promise<void> {
     try {
       const cfg = workerConfig();
       const ranToday = Number((await pool.query(`SELECT count(*)::int n FROM backlink_queries WHERE last_run_at >= date_trunc('day', now())`)).rows[0]?.n ?? 0);
-      if (ranToday < cfg.queriesPerDay) await runDiscovery(Math.min(QUERIES_PER_PASS, cfg.queriesPerDay - ranToday), cfg.capUsd);
+      // Discovery failing (credentials, balance) must not stop vetting, which is free.
+      if (ranToday < cfg.queriesPerDay) await runDiscovery(Math.min(QUERIES_PER_PASS, cfg.queriesPerDay - ranToday), cfg.capUsd)
+        .catch((e) => { void recordFailure("job", "Backlinks discovery", e); console.error(`[backlinks] discovery failed: ${e?.message ?? e}`); });
       await runVetting();
       await runMetrics(cfg.capUsd);
       await runDirectoryAuthority(cfg.capUsd);

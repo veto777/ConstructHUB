@@ -31,6 +31,8 @@ export const QUERY_TEMPLATES: Record<Exclude<BacklinkKind, "pbn">, { per: "niche
     { per: "niche", t: `{n} "guest post guidelines"` },
     { per: "niche", t: `{n} "become a contributor"` },
     { per: "niche", t: `{n} blog "accepting guest posts"` },
+    { per: "niche", t: `{n} blog "guest author"` },
+    { per: "niche", t: `{n} "contribute an article"` },
   ],
   press_release: [
     { per: "once", t: `"submit press release" free` },
@@ -42,11 +44,14 @@ export const QUERY_TEMPLATES: Record<Exclude<BacklinkKind, "pbn">, { per: "niche
     { per: "niche", t: `{n} contractors directory "add your business"` },
     { per: "niche", t: `{n} "list your business" directory` },
     { per: "niche", t: `{n} association "member directory"` },
+    { per: "niche", t: `find a {n} contractor "get listed"` },
   ],
   citation: [
     { per: "state", t: `{s} business directory "add your business"` },
     { per: "state", t: `{s} contractors association members` },
     { per: "state", t: `{s} chamber of commerce "member directory" contractors` },
+    { per: "state", t: `{s} home builders association "member directory"` },
+    { per: "state", t: `{s} remodelers association members` },
   ],
   resource_page: [
     { per: "niche", t: `{n} "helpful resources" homeowners` },
@@ -55,6 +60,7 @@ export const QUERY_TEMPLATES: Record<Exclude<BacklinkKind, "pbn">, { per: "niche
   editorial: [
     { per: "niche", t: `{n} magazine "submit a story"` },
     { per: "niche", t: `{n} news "contributors"` },
+    { per: "state", t: `{s} local news "submit a news tip"` },
     { per: "once", t: `"journalist requests" home improvement experts` },
   ],
 };
