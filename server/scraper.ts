@@ -11,6 +11,7 @@ function log(message: string, source = "scraper") {
 import { liveSearchOutcome, scrapeFailureReason } from "./live-search-outcome";
 import type { AdapterCtx, PermitRecord, PermitSearchType, PortalAdapter } from "./scrapers/types";
 import { USER_AGENT as ADAPTER_USER_AGENT } from "./scrapers/polite-fetch";
+import { afterResearchRequest, beforeResearchRequest, guardResearchContext } from "./scrapers/research-transport";
 
 // CHROMIUM_PATH wins. The Replit-era Nix build is used only where it exists;
 // anywhere else playwright-core launches its own managed headless build (the
@@ -74,6 +75,7 @@ async function createIsolatedPage(): Promise<{ page: Page; context: BrowserConte
   });
   context.setDefaultTimeout(60000);
   context.setDefaultNavigationTimeout(60000);
+  await guardResearchContext(context);
   const page = await context.newPage();
   page.setDefaultTimeout(30000);
   return { page, context };
@@ -964,7 +966,9 @@ export async function scrapeEnerGov(
     // Build the observed advanced request explicitly; the bootstrap keyword
     // response is not the user's address search and must never be saved.
     const template = enerGovSearchRequest(response.request().postDataJSON(), searchTerm, searchType);
+    await beforeResearchRequest(apiUrl);
     const first = await context.request.post(apiUrl, { headers, data: template, timeout: 20_000 });
+    afterResearchRequest(apiUrl, first.status(), first.headers()['retry-after']);
     if (!first.ok()) throw new Error(`EnerGov search returned HTTP ${first.status()}`);
     let data = await first.json();
     const seen = new Set<string>();
@@ -982,9 +986,11 @@ export async function scrapeEnerGov(
       if (!parsed.results.length) throw new Error('EnerGov pagination ended before the advertised last page');
       if (pg === 100) throw new Error('EnerGov search exceeds 100 pages; narrow the search');
       // BrowserContext.request carries the same cookies as the portal session.
+      await beforeResearchRequest(apiUrl);
       const next = await context.request.post(apiUrl, {
         headers, data: enerGovPageRequest(template, pg + 1), timeout: 20_000,
       });
+      afterResearchRequest(apiUrl, next.status(), next.headers()['retry-after']);
       if (!next.ok()) throw new Error(`EnerGov page ${pg + 1} returned HTTP ${next.status()}`);
       data = await next.json();
     }
@@ -2388,6 +2394,7 @@ async function boundedPermitDetail(work: (page: Page, context: BrowserContext) =
       if (expired) return null;
       context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
       if (expired) { await context.close(); return null; }
+      await guardResearchContext(context);
       context.setDefaultTimeout(15_000);
       context.setDefaultNavigationTimeout(25_000);
       const page = await context.newPage();
@@ -2582,6 +2589,7 @@ function buildAdapterCtx(args: { databaseId: number; databaseName: string; juris
       context.setDefaultTimeout(60000);
       context.setDefaultNavigationTimeout(60000);
       contexts.push(context);
+      await guardResearchContext(context);
       return context;
     },
     log: (m) => log(`${args.databaseName}: ${m}`, "adapter"),

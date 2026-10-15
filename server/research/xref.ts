@@ -24,7 +24,7 @@
  */
 import type { EnforcementHit, LicenseHit, RecordSource, RelatedTie, ResearchSubjectInput } from "@shared/research-reports";
 import { RELATED_TIES } from "@shared/research-reports";
-import { addressMatch, describeId, normLicense, normPhone, parseAddress, streetKey, type IdQuery } from "./identifiers";
+import { addressMatch, addressQueryKey, describeId, normLicense, normPhone, streetKey, type IdQuery } from "./identifiers";
 import { companyNamed, nameWords, personMatches, tokens, wholeWordMatch } from "./licenses";
 
 /** Identifier searches per subject: the customer's own and the cross-reference hop together. */
@@ -140,6 +140,29 @@ function merge(into: LicenseHit, other: LicenseHit): void {
   if (add.length) into.people = [...(into.people ?? []), ...add];
   if (into.principal == null && other.principal) into.principal = other.principal;
   if (into.businessName == null && other.businessName) into.businessName = other.businessName;
+  // Disciplinary text from either copy (round 3, decision 10): a later exact-license fetch may carry what a capped
+  // name search left out. Each text once; one from another source says where it came from.
+  const discipline = mergeDiscipline(into, other);
+  if (discipline) into.discipline = discipline;
+}
+
+/** Both copies' disciplinary text, each once (whitespace and case aside), the other copy's labeled with its source when it differs. */
+export function mergeDiscipline(a: Pick<LicenseHit, "discipline" | "source">, b: Pick<LicenseHit, "discipline" | "source">): string | null {
+  const norm = (t: string) => t.replace(/\s+/g, " ").trim().toLowerCase();
+  const parts: string[] = [];
+  const seen = new Set<string>();
+  const push = (t: string | null | undefined, label: string | null) => {
+    for (const piece of (t ?? "").split(/\s*\n\s*/)) {
+      const bare = piece.replace(/^\[[^\]]*\]\s*/, "");
+      const k = norm(bare);
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      parts.push(label && !/^\[/.test(piece) ? `[${label}] ${bare}` : piece.trim());
+    }
+  };
+  push(a.discipline, null);
+  push(b.discipline, b.source !== a.source ? b.source : null);
+  return parts.length ? parts.join("\n") : null;
 }
 
 /** A license list that drops copies of the same license from different sources (and the same source twice). */
@@ -173,12 +196,11 @@ export function subjectIds(s: Pick<ResearchSubjectInput, "licenseNumbers" | "pho
   ];
 }
 
-/** The key that says two queries are the same search. */
+/** The key that says two queries are the same search (an address: street with its unit, city, state and ZIP; round 3, decision 8). */
 export function idKey(q: IdQuery): string | null {
   if (q.type === "license") { const n = normLicense(q.value); return n ? `l:${n}` : null; }
   if (q.type === "phone") { const n = normPhone(q.value); return n ? `t:${n}` : null; }
-  const p = parseAddress(q.value);
-  return p ? `a:${streetKey(q.value)}|${p.city ?? ""}|${p.zip ?? ""}` : null;
+  return addressQueryKey(q.value);
 }
 
 /**
@@ -234,9 +256,18 @@ export type CustomerIdResult = {
 export async function searchCustomerIds(finders: LicenseFinder[], ids: IdQuery[], subject: { name: string; kind: "person" | "company" }): Promise<CustomerIdResult> {
   const { kind } = subject;
   const out: CustomerIdResult = { licenses: [], matched: [], enforcement: [], searches: [], searchedIds: new Set(), used: 0, notes: [] };
+  const firstOf = new Map<string, IdQuery>();
   for (const q of ids) {
     const key = idKey(q);
-    if (!key || out.searchedIds.has(key)) continue;
+    if (!key) continue;
+    // Two identifiers that are one search (the same address written two ways) are searched once, and the report says so.
+    const first = firstOf.get(key);
+    if (first) {
+      if (first.value !== q.value) out.notes.push(`${describeId(q)} is the same ${q.type === "license" ? "license number" : q.type} as ${describeId(first)}, so it was searched once.`);
+      continue;
+    }
+    firstOf.set(key, q);
+    if (out.searchedIds.has(key)) continue;
     if (out.used >= MAX_ID_SEARCHES) { out.notes.push(`${describeId(q)} was not searched (limit of ${MAX_ID_SEARCHES} identifier searches per name).`); continue; }
     out.searchedIds.add(key);
     out.used++;
@@ -294,6 +325,9 @@ export type XrefInput = {
 export type XrefResult = { related: LicenseHit[]; relatedEnforcement: EnforcementHit[]; notes: string[]; idSearches: number };
 
 type Candidate = { q: IdQuery; key: string; from: LicenseHit };
+
+/** A source note that says a search that ran is incomplete (a cap, a cut-off page, a lookup that failed). */
+export const INCOMPLETE = /showing the first|there are more|only the first|incomplete|could not|not all\b|left out/i;
 
 /** The one-hop cross-reference pass for one subject. */
 export async function crossReference(x: XrefInput): Promise<XrefResult> {
@@ -436,13 +470,18 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
       // Also without "Inc"/"LLC": agencies often file a record under the bare name. The exact-name check follows.
       const names = Array.from(new Set([b.name, businessCore(b.name)].filter((n) => tokens(n).length)));
       const r = { hits: [] as EnforcementHit[] };
-      const down = new Set<string>();
+      const down = new Set<string>(), partial = new Set<string>();
       for (const n of names) {
         const found = await x.enforcementSearch(n);
         r.hits.push(...found.hits);
-        for (const src of found.sources) if (!src.searched) down.add(`${src.source} (${src.note})`);
+        for (const src of found.sources) {
+          if (!src.searched) down.add(`${src.source} (${src.note})`);
+          // A search that ran but stopped at a cap, or left something out, says so too (round 3, decision 11).
+          else if (INCOMPLETE.test(src.note)) partial.add(`${src.source}: ${src.note}`);
+        }
       }
       if (down.size) notes.push(`For ${b.name}, not searched: ${Array.from(down).join("; ")}.`);
+      if (partial.size) notes.push(`For ${b.name}, incomplete: ${Array.from(partial).join("; ")}.`);
       const mine = r.hits.filter((e) => businessNamed(b.name, e.name));
       for (const e of mine) addEnforcement(e, b.tie, `a record of ${b.name}, which is tied to this name: ${b.via}`);
       log(`xref enforcement "${b.name}": ${mine.length} record(s) naming exactly this business (of ${r.hits.length} word matches)`);

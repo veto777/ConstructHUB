@@ -2,7 +2,7 @@
  * Every research source by state: the original tables (./licenses.ts, ./bulk-sources.ts, ./state-records.ts,
  * ./records.ts) plus the per-state packs in ./states. The runner and ./records read sources only through here.
  */
-import type { EnforcementHit, RecordSource } from "@shared/research-reports";
+import type { EnforcementHit, RecordCategory, RecordSource } from "@shared/research-reports";
 import type { BulkSource } from "./bulk";
 import { BULK_SOURCES } from "./bulk-sources";
 import { licenseSourcesFor, type LicenseSource } from "./licenses";
@@ -34,21 +34,23 @@ export async function searchPackEnforcement(name: string, state: string, matches
   const hits: EnforcementHit[] = [];
   const sources: RecordSource[] = [];
   const p = pack(state);
-  const run = async (source: string, scope: string, fn: () => Promise<EnforcementHit[]>) => {
+  // The report's category for the source (round 3, decision 9): a search of court cases is a state court source.
+  const kindOf = (src: LiveEnforcementSearch | SodaEnforcement): RecordCategory => (categoryOf(src) === "court_case" ? "state_court" : "enforcement");
+  const run = async (source: string, scope: string, category: RecordCategory, fn: () => Promise<EnforcementHit[]>) => {
     try {
       const raw = await fn();
       const found = raw.filter((h) => matches(h.name));
       hits.push(...found);
       // A search that stopped at a cap says so ("showing the first 10 of 34 matches").
-      sources.push({ source, scope, searched: true, note: `${found.length} record(s)${noteOf(raw) ? ` (${noteOf(raw)})` : ""}` });
+      sources.push({ source, scope, searched: true, note: `${found.length} record(s)${noteOf(raw) ? ` (${noteOf(raw)})` : ""}`, category });
     } catch (err: any) {
-      sources.push({ source, scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+      sources.push({ source, scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category });
     }
   };
-  for (const src of p?.enforcement ?? []) await run(src.source, src.scope, () => searchSodaEnforcement(src as SodaEnforcement, name, matches));
-  for (const src of p?.liveEnforcement ?? []) await run(src.source, src.scope, () => (src as LiveEnforcementSearch).search(name));
-  for (const src of LOCAL_ENFORCEMENT.filter((x) => x.state === state)) await run(src.source, src.scope, () => searchSodaEnforcement(src, name, matches));
-  for (const src of LOCAL_LIVE_ENFORCEMENT[state] ?? []) await run(src.source, src.scope, () => src.search(name));
+  for (const src of p?.enforcement ?? []) await run(src.source, src.scope, kindOf(src as SodaEnforcement), () => searchSodaEnforcement(src as SodaEnforcement, name, matches));
+  for (const src of p?.liveEnforcement ?? []) await run(src.source, src.scope, kindOf(src as LiveEnforcementSearch), () => (src as LiveEnforcementSearch).search(name));
+  for (const src of LOCAL_ENFORCEMENT.filter((x) => x.state === state)) await run(src.source, src.scope, kindOf(src), () => searchSodaEnforcement(src, name, matches));
+  for (const src of LOCAL_LIVE_ENFORCEMENT[state] ?? []) await run(src.source, src.scope, kindOf(src), () => src.search(name));
   return { hits, sources };
 }
 

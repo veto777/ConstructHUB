@@ -18,12 +18,13 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { pool } from "../db";
-import { USER_AGENT, fetchWithDeadline, guard, noteResponse, sleep, withRun } from "./http";
+import { USER_AGENT, fetchWithDeadline, guard, noteResponse, releaseHost, sleep, withRun } from "./http";
 import type { EnforcementCategory, EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { tokens } from "./licenses";
 import { addressMatches, idWords, queryWords, type IdKeys, type IdQuery } from "./identifiers";
 import { capNote } from "./notes";
 import { isIndividual, privateHit, privateKeys } from "./privacy";
+import { looksLikeBusiness } from "./states/lib/business-name";
 
 /**
  * One record of a file. `business` and `person` are the names it is found by; `people` adds everyone else the
@@ -58,6 +59,16 @@ export type BulkSource = {
   companiesOnly?: boolean;
   /** An enforcement file's kind of record (the category its hits carry). Optional; the coverage page guesses from the label without it. */
   category?: EnforcementCategory;
+  /**
+   * The day the source's row shape changed on purpose (CSLB: one row per license instead of one per person, from
+   * 2026-10-15). A previous load made on or before it is not compared under the 70% rule (round 3, decision 12).
+   */
+  rowShapeChangedAt?: string;
+  /**
+   * For an enforcement row stored before PAYLOAD_VERSION: the source's current rule on who a record is about, run on
+   * what was stored (null drops it). Without it, an older row is kept only when its name reads as a business.
+   */
+  legacyEnforcement?: (h: EnforcementHit) => EnforcementHit | null;
 };
 
 const DDL = `
@@ -86,8 +97,21 @@ ALTER TABLE research_bulk_sources ADD COLUMN IF NOT EXISTS key_version integer N
  * a business holds. A source loaded under an older version is refreshed first, and until then its "a:"/"t:" keys are
  * not searched (they may be an individual's home address or phone).
  */
-export const KEY_VERSION = 2;
-/** A new load with fewer rows than this share of the previous one (or of one component's) is kept out as an error. */
+export const KEY_VERSION = 3;
+/*
+ * Version 3 (round 3, decisions 2–4): holders only from the publisher's listed values, and a Florida complaint about
+ * an individual's DBA without an address key. Older loads' phone and address keys stay blocked until they reload.
+ */
+
+/**
+ * The rules a stored row was written under (round 3, decision 4). Every read runs the row sanitizers whatever the
+ * version (privacy, status words, discipline removal for individuals); a row from before this version also has its
+ * enforcement subject checked again (BulkSource.legacyEnforcement, or the business-name rule), since the rule that
+ * let it in has changed. Raise it when a classifier changes.
+ */
+export const PAYLOAD_VERSION = 3;
+
+/** A new load needs strictly more than this share of the baseline (overall and per component), or it is kept out. */
 export const MIN_SHARE_OF_PREVIOUS = 0.7;
 
 let ready: Promise<void> | null = null;
@@ -129,15 +153,38 @@ export function rowKeys(h: BulkHit): { hit: LicenseHit | EnforcementHit; keys: I
 }
 
 /**
- * The 70% rule (round 2, decision 10): a load under MIN_SHARE_OF_PREVIOUS of the previous generation's rows, or a
- * component under that share of its previous count (or missing), is not swapped in. Null when the load may stand.
+ * The 70% rule (round 2, decision 10; round 3, decision 12): a load with no more than MIN_SHARE_OF_PREVIOUS of the
+ * baseline's rows, or a component with no more than that share of its baseline count (or missing), is not swapped
+ * in. Null when the load may stand.
  */
-export function shortfall(n: number, components: Record<string, number>, prev: { rows: number; components?: Record<string, number> | null } | null): string | null {
-  if (!prev || prev.rows <= 0) return null;
-  if (n < prev.rows * MIN_SHARE_OF_PREVIOUS) return `${n} rows, previous ${prev.rows}`;
-  const short = Object.entries(prev.components ?? {}).filter(([c, m]) => m > 0 && (components[c] ?? 0) < m * MIN_SHARE_OF_PREVIOUS)
-    .map(([c, m]) => `${c}: ${components[c] ?? 0} rows, previous ${m}`);
+export function shortfall(n: number, components: Record<string, number>, base: Baseline | null): string | null {
+  if (!base || base.rows <= 0) return null;
+  if (n <= base.rows * MIN_SHARE_OF_PREVIOUS) return `${n} rows, baseline ${base.rows}`;
+  const short = Object.entries(base.components ?? {}).filter(([c, m]) => m > 0 && (components[c] ?? 0) <= m * MIN_SHARE_OF_PREVIOUS)
+    .map(([c, m]) => `${c}: ${components[c] ?? 0} rows, baseline ${m}`);
   return short.length ? short.join("; ") : null;
+}
+
+export type Baseline = { rows: number; components?: Record<string, number> | null };
+
+/**
+ * What the next load is measured against (round 3, decision 12): the last load that passed and was not reduced,
+ * kept in facets.baseline. A load that passes with fewer rows than the baseline (or a component with fewer) leaves
+ * that number as it was, so a run of small cuts can't walk the baseline down. A key-format change doesn't reset it;
+ * only the source's own rowShapeChangedAt does (the previous load made on or before that day isn't compared).
+ */
+export function baselineOf(prev: { rows: number; loadedAt: Date | string | null; facets: any } | null, rowShapeChangedAt?: string): Baseline | null {
+  if (!prev?.loadedAt) return null;
+  if (rowShapeChangedAt && new Date(prev.loadedAt).toISOString().slice(0, 10) <= rowShapeChangedAt) return null;
+  const b = prev.facets?.baseline as Baseline | undefined;
+  return b?.rows ? b : { rows: prev.rows, components: (prev.facets?.components ?? null) as Record<string, number> | null };
+}
+
+/** The baseline after a load that passed: each number the larger of the old baseline's and this load's. */
+export function nextBaseline(n: number, components: Record<string, number>, base: Baseline | null): Baseline {
+  const out: Record<string, number> = { ...(base?.components ?? {}) };
+  for (const [c, m] of Object.entries(components)) out[c] = Math.max(out[c] ?? 0, m);
+  return { rows: Math.max(base?.rows ?? 0, n), ...(Object.keys(out).length ? { components: out } : {}) };
 }
 
 /** Download, parse and swap in one source. Returns the row count. */
@@ -151,10 +198,8 @@ async function loadSourceRun(src: BulkSource): Promise<number> {
   await pool.query(`UPDATE research_bulk_sources SET attempted_at = now() WHERE id = $1`, [src.id]);
   const { rows: [cur] } = await pool.query(`SELECT generation, row_count, loaded_at, facets, key_version FROM research_bulk_sources WHERE id = $1`, [src.id]);
   const gen = Number(cur.generation) + 1;
-  // The previous load counts only when it was made under the same format: a format change (CSLB went from one row
-  // per person to one per license) is not a cut-off download.
-  const prev = cur.loaded_at && Number(cur.key_version ?? 0) >= KEY_VERSION
-    ? { rows: Number(cur.row_count ?? 0), components: (cur.facets?.components ?? null) as Record<string, number> | null } : null;
+  // Measured against the last load that passed, whatever key format it was made under (round 3, decision 12).
+  const base = baselineOf(cur.loaded_at ? { rows: Number(cur.row_count ?? 0), loadedAt: cur.loaded_at, facets: cur.facets } : null, src.rowShapeChangedAt);
   await pool.query(`DELETE FROM research_bulk_rows WHERE source = $1 AND generation = $2`, [src.id, gen]);
   let n = 0;
   let batch: { words: string[]; hit: unknown }[] = [];
@@ -178,20 +223,20 @@ async function loadSourceRun(src: BulkSource): Promise<number> {
       for (const w of words) prefixes.add(w.slice(0, 2));
       kinds.add(h.kind === "license" ? "license" : (h.hit as EnforcementHit).category ?? "other");
       if (h.component) components[h.component] = (components[h.component] ?? 0) + 1;
-      batch.push({ words, hit: { k: h.kind, h: hit } });
+      batch.push({ words, hit: { k: h.kind, h: hit, v: PAYLOAD_VERSION } });
       n++;
       if (batch.length >= BATCH) await flush();
     }
     await flush();
     if (n < src.minRows) throw new Error(`only ${n} rows (expected at least ${src.minRows}); kept the previous load`);
-    const short = shortfall(n, components, prev);
-    if (short) throw new Error(`${short}: under ${Math.round(MIN_SHARE_OF_PREVIOUS * 100)}% of the previous load; kept the previous load`);
+    const short = shortfall(n, components, base);
+    if (short) throw new Error(`${short}: not more than ${Math.round(MIN_SHARE_OF_PREVIOUS * 100)}% of the last full load; kept the previous load`);
   } catch (err: any) {
     await pool.query(`DELETE FROM research_bulk_rows WHERE source = $1 AND generation = $2`, [src.id, gen]);
     await pool.query(`UPDATE research_bulk_sources SET error = $2 WHERE id = $1`, [src.id, String(err?.message ?? err).slice(0, 500)]);
     throw err;
   }
-  const facets = { prefixes: Array.from(prefixes).sort(), kinds: Array.from(kinds).sort(), ...(Object.keys(components).length ? { components } : {}) };
+  const facets = { prefixes: Array.from(prefixes).sort(), kinds: Array.from(kinds).sort(), ...(Object.keys(components).length ? { components } : {}), baseline: nextBaseline(n, components, base) };
   await pool.query(`UPDATE research_bulk_sources SET generation = $2, row_count = $3, loaded_at = now(), error = NULL, facets = $4, key_version = $5 WHERE id = $1`,
     [src.id, gen, n, JSON.stringify(facets), KEY_VERSION]);
   await pool.query(`DELETE FROM research_bulk_rows WHERE source = $1 AND generation <> $2`, [src.id, gen]);
@@ -207,6 +252,27 @@ export async function sourceStatus(id: string): Promise<BulkStatus> {
 }
 
 export type StoredHit = { kind: "license"; hit: LicenseHit } | { kind: "enforcement"; hit: EnforcementHit };
+
+/**
+ * A stored row as a search may return it (round 3, decision 4), for every generation, whenever it was loaded: a
+ * license gets the privacy and status rules again (an individual's or unknown holder's street, phone and
+ * disciplinary words removed, its discipline dropped); an enforcement row stored under an older PAYLOAD_VERSION has
+ * its subject checked again by the source's current rule, or else dropped unless its name reads as a business.
+ */
+export function readRow(src: Pick<BulkSource, "legacyEnforcement">, row: { k: "license" | "enforcement"; h: any; v?: number }): StoredHit | null {
+  if (row.k === "license") {
+    const p = privateHit(row.h as LicenseHit);
+    if (!isIndividual(p) || p.discipline === undefined) return { kind: "license", hit: p };
+    const { discipline: _d, ...rest } = p;
+    return { kind: "license", hit: rest as LicenseHit };
+  }
+  const h = row.h as EnforcementHit;
+  if ((row.v ?? 0) >= PAYLOAD_VERSION) return { kind: "enforcement", hit: h };
+  const fixed = src.legacyEnforcement ? src.legacyEnforcement(h) : (h.name ?? "").split(/\s+\/\s+|;/).some((n) => looksLikeBusiness(n)) ? h : null;
+  return fixed ? { kind: "enforcement", hit: fixed } : null;
+}
+
+const readRows = (src: BulkSource, rows: { hit: any }[]): StoredHit[] => rows.map((r) => readRow(src, r.hit)).filter((h): h is StoredHit => !!h);
 
 /** Rows a name search reads from one file (past this, the report says it is showing the first ones). */
 export const BULK_LIMIT = 500;
@@ -224,7 +290,7 @@ export async function searchBulk(src: BulkSource, name: string, kind: "person" |
      WHERE r.source = $1 AND r.words @> $2::text[] LIMIT $3`,
     [src.id, want, limit],
   );
-  return { hits: rows.map((r) => ({ kind: r.hit.k, hit: r.hit.h })), status };
+  return { hits: readRows(src, rows), status };
 }
 
 /** Index candidates an address search reads, at most, before the re-check (past it the note says so). */
@@ -247,14 +313,13 @@ export async function searchBulkBy(src: BulkSource, q: IdQuery, limit = BULK_ID_
      WHERE r.source = $1 AND r.words @> $2::text[] ORDER BY r.ctid LIMIT $3 OFFSET $4`;
   if (q.type !== "address") {
     const { rows } = await pool.query(sql, [src.id, want, limit, 0]);
-    return { hits: rows.map((r) => ({ kind: r.hit.k, hit: r.hit.h })), status, ...(rows.length >= limit ? { note: capNote(limit, null, "records") } : {}) };
+    return { hits: readRows(src, rows), status, ...(rows.length >= limit ? { note: capNote(limit, null, "records") } : {}) };
   }
   const hits: StoredHit[] = [];
   const PAGE = 1000;
   for (let offset = 0; offset < BULK_ADDRESS_CANDIDATES; offset += PAGE) {
     const { rows } = await pool.query(sql, [src.id, want, PAGE, offset]);
-    for (const r of rows) {
-      const h: StoredHit = { kind: r.hit.k, hit: r.hit.h };
+    for (const h of readRows(src, rows)) {
       if (addressMatches(q.value, h.hit.address)) hits.push(h);
       if (hits.length >= limit) return { hits, status, note: capNote(limit, null, "records at this address") };
     }
@@ -282,6 +347,8 @@ export async function download(url: string, init: RequestInit = {}, timeoutMs = 
 export async function plainRequest(url: string, opts: { method?: string; headers?: Record<string, string>; body?: string; timeoutMs?: number; totalMs?: number; minDelayMs?: number } = {}): Promise<IncomingMessage> {
   await guard(url, opts.minDelayMs ?? 1000);
   const res = await new Promise<IncomingMessage>((resolve, reject) => {
+    const settle = <A extends unknown[]>(fn: (...a: A) => void) => (...a: A) => { releaseHost(url); fn(...a); };
+    resolve = settle(resolve); reject = settle(reject);
     const body = opts.body ?? null;
     const totalMs = opts.totalMs ?? 30 * 60_000;
     const req = httpsRequest(url, {

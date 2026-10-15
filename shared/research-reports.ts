@@ -199,7 +199,13 @@ export type EnforcementHit = {
   byYourIdentifier?: boolean;
 };
 
-export type RecordSource = { source: string; scope: string; searched: boolean; note: string };
+/**
+ * What a record source covers, so each count is backed by the sources of its own kind (round 3, decision 9):
+ * consumer complaints, federal court dockets, state court cases, OSHA inspections, or state enforcement records.
+ * Absent on reports made before 2026-10-16.
+ */
+export type RecordCategory = "complaints" | "federal_court" | "state_court" | "osha" | "enforcement";
+export type RecordSource = { source: string; scope: string; searched: boolean; note: string; category?: RecordCategory };
 
 export type ResearchSubjectReport = {
   name: string; kind: "person" | "company";
@@ -248,3 +254,42 @@ export type ResearchOrderView = {
   preview: ResearchPreview | null; report: ResearchReport | null; error: string | null;
   createdAt: string; paidAt: string | null; completedAt: string | null;
 };
+
+// ── Counts backed by what ran (round 3, decision 9) ─────────────────────────────────────────────────────────────
+
+export type SourceKind = RecordCategory | "none";
+/**
+ * What a record source covers: its own category, or for a report made before categories were recorded, its name.
+ * Each count is backed only by the sources of its own kind ("none": the single "searched for companies only" line).
+ */
+export const recordKindOf = (r: RecordSource): SourceKind =>
+  r.category ?? (/consumer complaints|attorney general/i.test(r.source) ? "complaints" : /courtlistener|federal court/i.test(r.source) ? "federal_court"
+    : /state court/i.test(r.source) ? "state_court" : /OSHA/.test(r.source) ? "osha" : /Complaints, lawsuits/i.test(r.source) ? "none" : "enforcement");
+/** The sources behind the state enforcement count (state court cases are shown among them). */
+export const ENFORCEMENT_KINDS: SourceKind[] = ["enforcement", "state_court"];
+
+/** True when at least one of the record sources of these kinds was searched. */
+export const anySearched = (sources: RecordSource[] | undefined, kinds: SourceKind[]) => !!sources?.some((r) => kinds.includes(recordKindOf(r)) && r.searched);
+
+/** True when a subject's license search ran against at least one source (by name or by an identifier). */
+export const subjectLicensesSearched = (s: ResearchSubjectReport) => s.licenseSources.some((x) => x.searched) || !!s.identifierSearches?.some((x) => x.sourcesSearched !== 0);
+
+/**
+ * A report's one-line summary: each count backed by a source of its own kind that ran, everything else named as
+ * not searched. "Found 3 license record(s), 12 permit(s) and 0 consumer complaint(s). Not searched: OSHA inspections."
+ */
+export function reportSummary(r: ResearchReport): string {
+  const t = r.totals, found: string[] = [], not: string[] = [];
+  const add = (ran: boolean, n: number | undefined, what: string, label: string) => (ran || n ? found.push(`${n ?? 0} ${what}`) : not.push(label));
+  add(r.subjects.some(subjectLicensesSearched), t.licenses, "license record(s)", "license records");
+  add(t.portalsSearched > 0, t.permits, "permit(s)", "permit portals");
+  if (t.complaints != null) {
+    const ran = (kinds: SourceKind[]) => r.subjects.some((x) => anySearched(x.recordSources, kinds));
+    add(ran(["complaints"]), t.complaints, "consumer complaint(s)", "consumer complaints");
+    if (t.enforcement != null) add(ran(ENFORCEMENT_KINDS), t.enforcement, "state enforcement or standing record(s)", "state enforcement records");
+    add(ran(["federal_court"]), t.courtCases, "federal court case(s)", "federal court cases");
+    add(ran(["osha"]), t.osha, "OSHA inspection(s)", "OSHA inspections");
+  }
+  const list = (l: string[]) => (l.length > 1 ? `${l.slice(0, -1).join(", ")} and ${l[l.length - 1]}` : l[0]);
+  return [found.length ? `Found ${list(found)}.` : "", not.length ? `Not searched: ${list(not)}.` : ""].filter(Boolean).join(" ");
+}

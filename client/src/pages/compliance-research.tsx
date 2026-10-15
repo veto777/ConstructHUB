@@ -23,7 +23,7 @@ import {
   RESEARCH_TIERS, RESEARCH_TRADES, RESEARCH_TRADE_KEYS, RESEARCH_PATH, COMPLIANCE_PATH,
   RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA, researchTierFor,
   RESEARCH_MAX_LICENSE_NUMBERS, RESEARCH_MAX_PHONES, RESEARCH_MAX_ADDRESSES, RELATED_TIES, cleanLicenseNumber, formatPhone, cleanAddress,
-  type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie,
+  type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie, ENFORCEMENT_KINDS, anySearched, recordKindOf as kindOf, reportSummary, subjectLicensesSearched,
 } from "@shared/research-reports";
 import { RESEARCH_COVERAGE_PATH } from "@shared/research-coverage";
 import { ComplianceFrame } from "./compliance";
@@ -299,18 +299,16 @@ const ENFORCEMENT_LABELS: Record<EnforcementCategory, string> = {
   wage: "Wage and labor violations", court_case: "State court cases",
 };
 const ENFORCEMENT_ORDER: EnforcementCategory[] = ["discipline", "stop_work", "debarment", "wage", "court_case", "tax_lien", "environmental", "complaint", "business_status"];
-/** Record sources shown in their own sections (complaints, courts, OSHA); the rest are state enforcement sources. */
-const OTHER_SECTION = /consumer complaints|attorney general|court|OSHA|Complaints, lawsuits/i;
 
 /** State enforcement and standing records: discipline, stop-work orders, debarments, liens, environmental orders, status. */
 function SubjectEnforcement({ s }: { s: ResearchSubjectReport }) {
   const hits = s.enforcement ?? [];
-  const sources = (s.recordSources ?? []).filter((r) => !OTHER_SECTION.test(r.source));
+  const sources = (s.recordSources ?? []).filter((r) => ENFORCEMENT_KINDS.includes(kindOf(r)));
   if (!s.enforcement && !sources.length) return null;
   const groups = ENFORCEMENT_ORDER.map((c) => [c, hits.filter((h) => h.category === c)] as const).filter(([, l]) => l.length);
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">State enforcement and standing records ({hits.length})</h3>
+      <h3 className="font-semibold">State enforcement and standing records ({countOrNot(hits.length, anySearched(s.recordSources, ENFORCEMENT_KINDS))})</h3>
       {sources.filter((r) => r.searched).length > 0 && (
         <p className="text-xs text-muted-foreground">Searched: {sources.filter((r) => r.searched).map((r) => `${r.source} (${r.note})`).join("; ")}.</p>
       )}
@@ -336,17 +334,11 @@ function SubjectEnforcement({ s }: { s: ResearchSubjectReport }) {
   );
 }
 
-/** True when at least one of the record sources matching `re` was searched. */
-const anySearched = (sources: { source: string; searched: boolean }[] | undefined, re: RegExp) => !!sources?.some((r) => re.test(r.source) && r.searched);
 /**
  * "(3)" after a heading, or "(not searched)" when the count is 0 and no source behind it ran: 0 found from 0 sources
  * searched is not "none found" (audit round 2, decision 8).
  */
 const countOrNot = (n: number, searched: boolean) => (n === 0 && !searched ? "not searched" : String(n));
-const COURT_RE = /court/i, OSHA_RE = /OSHA/, COMPLAINT_RE = /consumer complaints|attorney general/i;
-/** ", 2 OSHA inspection(s)" for the summary line, or ", OSHA inspections not searched" when none of the report's sources for it ran. */
-const totalOrNot = (r: ResearchReport, re: RegExp, n: number | undefined, found: string, what: string) =>
-  !n && !r.subjects.some((x) => anySearched(x.recordSources, re)) ? `; ${what} not searched` : `, ${n ?? 0} ${found}`;
 
 /** Complaints, federal cases and OSHA inspections (companies only; reports made before these were added have none). */
 function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
@@ -358,8 +350,8 @@ function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
   return (
     <>
       <div className="space-y-2">
-        <h3 className="font-semibold">Consumer complaints ({countOrNot(complaints.length, anySearched(s.recordSources, COMPLAINT_RE))})</h3>
-        {s.recordSources.filter((r) => /consumer complaints|attorney general/i.test(r.source)).map((r, j) => (
+        <h3 className="font-semibold">Consumer complaints ({countOrNot(complaints.length, anySearched(s.recordSources, ["complaints"]))})</h3>
+        {s.recordSources.filter((r) => kindOf(r) === "complaints").map((r, j) => (
           <p key={j} className="text-xs text-muted-foreground">{r.source} ({r.scope}): {r.note}</p>
         ))}
         {complaints.length > 0 && (<>
@@ -381,9 +373,9 @@ function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
       <SubjectEnforcement s={s} />
 
       <div className="space-y-2">
-        <h3 className="font-semibold">Federal court cases ({countOrNot(cases.length, anySearched(s.recordSources, COURT_RE))})</h3>
+        <h3 className="font-semibold">Federal court cases ({countOrNot(cases.length, anySearched(s.recordSources, ["federal_court"]))})</h3>
         <p className="text-xs text-muted-foreground">
-          {s.recordSources.filter((r) => /court/i.test(r.source)).map((r) => `${r.source}: ${r.note}`).join(". ")}.
+          {s.recordSources.filter((r) => kindOf(r) === "federal_court").map((r) => `${r.source}: ${r.note}`).join(". ")}.
           {" "}A case filed is not a finding against anyone; open the docket for what happened.
         </p>
         {cases.length > 0 && (
@@ -400,8 +392,8 @@ function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
       </div>
 
       <div className="space-y-2">
-        <h3 className="font-semibold">OSHA inspections ({countOrNot(osha.length, anySearched(s.recordSources, OSHA_RE))})</h3>
-        {s.recordSources.filter((r) => /OSHA/.test(r.source)).map((r, j) => (
+        <h3 className="font-semibold">OSHA inspections ({countOrNot(osha.length, anySearched(s.recordSources, ["osha"]))})</h3>
+        {s.recordSources.filter((r) => kindOf(r) === "osha").map((r, j) => (
           <p key={j} className="text-xs text-muted-foreground">{r.source} ({r.scope}): {r.note}</p>
         ))}
         {osha.length > 0 && (
@@ -548,7 +540,7 @@ function SubjectReport({ s, i }: { s: ResearchSubjectReport; i: number }) {
       <h2 className="text-xl font-semibold">{s.name} <span className="text-sm font-normal text-muted-foreground">({s.kind})</span></h2>
 
       <div className="space-y-2">
-        <h3 className="font-semibold">License records ({s.licenses.length})</h3>
+        <h3 className="font-semibold">License records ({countOrNot(s.licenses.length, subjectLicensesSearched(s))})</h3>
         {s.licenseSources.map((src, j) => (
           <p key={j} className="text-xs text-muted-foreground">{src.state}: {src.source}: {src.note}</p>
         ))}
@@ -561,7 +553,7 @@ function SubjectReport({ s, i }: { s: ResearchSubjectReport; i: number }) {
       <RelatedRecords s={s} i={i} />
 
       <div className="space-y-2">
-        <h3 className="font-semibold">Permits ({s.permits.length})</h3>
+        <h3 className="font-semibold">Permits ({countOrNot(s.permits.length, s.portals.some((p) => p.outcome === "searched"))})</h3>
         {s.permits.length === 0 ? <p className="text-sm text-muted-foreground">No permits found under this name in the portals we searched.</p> : (
           <div className="overflow-x-auto"><table className="w-full text-sm border-collapse">
             <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 pr-3">Where</th><th className="pr-3">Permit</th><th className="pr-3">Type</th><th className="pr-3">Issued</th><th className="pr-3">Address</th><th className="pr-3">Contractor / applicant</th><th className="whitespace-nowrap">Source</th></tr></thead>
@@ -669,7 +661,7 @@ export function ResearchOrderStatusPage() {
           {o.status === "failed" && <p className="rounded-lg border border-destructive p-4 text-sm">Something went wrong while researching. Our team has been told and will rerun it; you don't need to do anything.</p>}
           {o.status === "complete" && o.report && (
             <div className="space-y-10">
-              <p className="text-sm">Found {o.report.totals.licenses} license record(s) and {o.report.totals.permits} permit(s){o.report.totals.complaints != null ? `, ${o.report.totals.complaints} consumer complaint(s)${o.report.totals.enforcement != null ? `, ${o.report.totals.enforcement} state enforcement or standing record(s)` : ""}${totalOrNot(o.report, COURT_RE, o.report.totals.courtCases, "federal court case(s)", "federal court cases")}${totalOrNot(o.report, OSHA_RE, o.report.totals.osha, "OSHA inspection(s)", "OSHA inspections")}` : ""}. {o.report.totals.related ? `${o.report.totals.related} related record(s) of other licenses and businesses. ` : ""}{o.report.totals.portalsSearched} portal search(es) ran; {o.report.totals.portalsNotSearched} could not. Generated {new Date(o.report.generatedAt).toLocaleString()}.</p>
+              <p className="text-sm">{reportSummary(o.report)} {o.report.totals.related ? `${o.report.totals.related} related record(s) of other licenses and businesses. ` : ""}{o.report.totals.portalsSearched} portal search(es) ran; {o.report.totals.portalsNotSearched} could not. Generated {new Date(o.report.generatedAt).toLocaleString()}.</p>
               {o.report.subjects.map((s, i) => <SubjectReport key={i} s={s} i={i} />)}
               <div className="border-t pt-4"><Terms /></div>
             </div>

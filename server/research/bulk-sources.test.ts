@@ -68,13 +68,15 @@ describe("Florida DBPR licensees", () => {
     const hits = await all(flComplaintRows([complaints], await flDisciplineCases([disc]), await flLicenseIndex([lic])));
     await Promise.all([disc, lic, complaints].map((p) => fs.rm(p)));
     const [c, d] = hits.map((h) => h.hit) as any[];
-    expect(c).toMatchObject({ category: "complaint", name: "COSTELLO, VINCENT ELIJAH / RRR AFFORDABLE REPAIRS", address: "616 SW 8TH AVE., FORT LAUDERDALE FL 33315-1069", licenseNumber: null });
+    // An individual doing business under a DBA: the record is the DBA's, with city, state and ZIP only (round 3, decision 2).
+    expect(c).toMatchObject({ category: "complaint", name: "RRR AFFORDABLE REPAIRS", address: "FORT LAUDERDALE FL 33315-1069", licenseNumber: null });
     expect(d).toMatchObject({
-      category: "discipline", name: "ALLEN, JOHN DOUGLAS / GULF SHORE BUILDERS LLC", id: "2025069408", licenseNumber: "CBC1250703", status: "Citation filed", adverse: true,
-      address: "500 VERA CRUZ DR, DESTIN FL 32541", date: "2025-09-23", endDate: "2026-01-23",
+      category: "discipline", name: "GULF SHORE BUILDERS LLC", id: "2025069408", licenseNumber: "CBC1250703", status: "Citation filed", adverse: true,
+      address: "DESTIN FL 32541", date: "2025-09-23", endDate: "2026-01-23",
     });
     expect(d.detail).toContain("Citation on 2025-10-31");
-    expect(words(hits[1])).toEqual(expect.arrayContaining(["l:CBC1250703", "a:500 VERA", "b:ALLEN"]));
+    expect(words(hits[1])).toEqual(expect.arrayContaining(["l:CBC1250703", "b:GULF", "b:SHORE"]));
+    expect(words(hits[1]).some((w) => w.startsWith("a:") || w === "b:ALLEN" || w.startsWith("p:"))).toBe(false);
     expect(hits[1].person).toBeNull();
   });
 });
@@ -202,7 +204,7 @@ describe("round 2 (A6)", () => {
 `);
     const hits = await all(flComplaintRows([complaints], await flDisciplineCases([disc]), new Map()));
     await Promise.all([complaints, disc].map((p) => fs.rm(p)));
-    expect(hits.map((h) => (h.hit as any).name)).toEqual(["COSTELLO, VINCENT ELIJAH / RRR AFFORDABLE REPAIRS"]);
+    expect(hits.map((h) => (h.hit as any).name)).toEqual(["RRR AFFORDABLE REPAIRS"]);
     expect(hits[0].component).toBe("complaints");
   });
 

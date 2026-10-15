@@ -7,6 +7,8 @@
  * Rules (CLAUDE.md + fleet brief): public records only, <=1 request/second per
  * host, never bypass CAPTCHAs/anti-bot challenges, never log in, no proxies.
  */
+import { researchTransport } from "./research-transport";
+
 export const USER_AGENT =
   "Mozilla/5.0 (compatible; ConstructHUB-PermitBot/1.0; +https://constructhub.us/permits; contact: support@constructhub.us)";
 
@@ -63,6 +65,9 @@ export function retryAfterMs(v: string | null | undefined, now = Date.now()): nu
 
 /** fetch() with the honest UA, per-host rate limiting and back-off. Throws PortalBlockedError on 401/403 at once, on 429/503 after retries. */
 export async function politeFetch(url: string, init: RequestInit = {}, opts: PoliteFetchOptions = {}): Promise<Response> {
+  // A permit search started by the research runner goes through the research guard instead (see research-transport.ts).
+  const research = researchTransport.getStore();
+  if (research) return research.fetch(url, init, opts);
   const minDelayMs = opts.minDelayMs ?? 1000;
   const retries = opts.retries ?? 2;
   const timeoutMs = opts.timeoutMs ?? 45000;

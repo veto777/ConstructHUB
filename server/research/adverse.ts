@@ -3,9 +3,12 @@
  * (audit 2026-10-15, decision 2; round 2, decision 4):
  *
  *   - no outcome published, or one that says neither way → null (unknown is never turned into a fact);
- *   - a negated sanction ("not revoked", "no suspension", "without penalty") → null;
+ *   - a negated sanction or a negated clearance, on either side ("not revoked", "no suspension", "without penalty",
+ *     "fine not imposed", "case not dismissed") → null;
+ *   - a reversal or suspension of the outcome ("lifted", "rescinded", "reversed", "set aside", "stayed", "vacated",
+ *     "overturned") → null: what stands afterwards isn't stated (round 3, decision 6);
  *   - words of both kinds ("License revoked; hearing waived", "Dismissed, penalty paid") → null;
- *   - only not-adverse words (dismissed, vacated, withdrawn, reversed, not sustained, …) → false;
+ *   - only not-adverse words (dismissed, withdrawn, not sustained, unfounded, …) → false;
  *   - only sanction words (revoked, suspended, fined, penalty, debarred, reprimand, probation, …) → true, or false
  *     when the sanction has ended (a debarment whose period is over).
  *
@@ -13,10 +16,16 @@
  */
 
 /** Outcomes that are not findings against the business. */
-export const NOT_ADVERSE = /\bdismiss|\bvacat|\bwithdr[ae]wn?\b|\bwithdrawal\b|\brevers(?:ed|al)\b|\brescind|\bno (?:action|violations?\b|further action|probable cause|cause\b)|\bnot (?:sustained|substantiated|guilty)|\bunfounded|\bunsubstantiated|\binsufficient evidence|\bfound not\b|\bexonerat|\bacquit|\bclosed without (?:action|a finding)|\bwaived\b/i;
+export const NOT_ADVERSE = /\bdismiss|\bwithdr[ae]wn?\b|\bwithdrawal\b|\bno (?:action|violations?\b|further action|probable cause|cause\b)|\bnot (?:sustained|substantiated|guilty)|\bunfounded|\bunsubstantiated|\binsufficient evidence|\bfound not\b|\bexonerat|\bacquit|\bclosed without (?:action|a finding)|\bwaived\b/i;
 
 /** Outcomes that are findings or sanctions. */
 export const ADVERSE = /\brevo(?:ked|cation|ke)\b|\bsuspen(?:ded|sion|d)\b|\bfined?\b|\bfines\b|\bpenalt(?:y|ies)\b|\bdebar(?:red|ment)?\b|\bcensure|\breprimand|\bprobation|\bcease (?:and|&) desist|\bguilty\b|\bforfeit|\bsanction|\bsurrender|\bdisciplin|\brestitution|\bstop[- ]work order|\bjudgment against|\bfinal order\b|\bcivil (?:penalty|forfeiture)/i;
+
+/** Words that undo or hold an outcome: the record doesn't say what stands afterwards. */
+export const REVERSAL = /\blift(?:ed|ing)?\b|\brescind|\brevers(?:ed|al|ing)\b|\bset aside\b|\bstay(?:ed|s)?\b|\bvacat|\boverturn|\bannul/i;
+
+/** A negation right after a word: "fine not imposed", "dismissal was not granted", "penalty never assessed". */
+const NEGATED_AFTER = /^\s+(?:(?:was|were|is|has|have|had|been|be|being)\s+)*(?:not|never|no longer)\b/i;
 
 /**
  * A sanction word under a negation: "not revoked", "no suspension", "without a penalty", "no civil penalty",
@@ -39,15 +48,19 @@ const global = (re: RegExp) => new RegExp(re.source, re.flags.includes("g") ? re
 export function adverseFrom(outcome: string | null | undefined, opts: AdverseOptions = {}): boolean | null {
   const t = (outcome ?? "").replace(/\s+/g, " ").trim();
   if (!t) return null;
+  if (REVERSAL.test(t)) return null;
+  const negated = (a: number, b: number) => NEGATOR.test(t.slice(Math.max(0, a - 40), a)) || NEGATED_AFTER.test(t.slice(b, b + 40));
   // Spans of not-adverse wording: a sanction word inside one ("not guilty") is part of it, not a sanction.
   const spans = [NOT_ADVERSE, ...(opts.notAdverse ? [opts.notAdverse] : [])].flatMap((re) => Array.from(t.matchAll(global(re)), (m) => [m.index!, m.index! + m[0].length]));
+  // A negated clearance ("case not dismissed") is not a clean answer either way.
+  if (spans.some(([a, b]) => negated(a, b))) return null;
   const cleared = spans.length > 0;
   let sanction = false;
   for (const m of t.matchAll(global(opts.adverse ?? ADVERSE))) {
     const [a, b] = [m.index!, m.index! + m[0].length];
     if (spans.some(([x, y]) => a < y && b > x)) continue;
-    // A negated sanction is not a clean answer either way.
-    if (NEGATOR.test(t.slice(Math.max(0, a - 40), a))) return null;
+    // A negated sanction ("not revoked", "fine not imposed") is not a clean answer either way.
+    if (negated(a, b)) return null;
     sanction = true;
   }
   if (sanction && cleared) return null;

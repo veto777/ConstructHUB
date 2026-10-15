@@ -25,12 +25,12 @@ import { getAdapterFor, isLegacyAdapter } from "../scrapers/registry";
 import { sendWithFallback } from "../email";
 import { escapeHtml } from "../route-guards";
 import {
-  RESEARCH_TRADES, RESEARCH_PATH, RESEARCH_NO_GUARANTEE,
+  RESEARCH_TRADES, RESEARCH_PATH, RESEARCH_NO_GUARANTEE, reportSummary,
   type ResearchOrderInput, type ResearchReport, type ResearchSubjectReport, type PermitHit, type PortalCoverage,
   type ResearchPreview, type ResearchTrade, type LicenseHit, type EnforcementHit,
 } from "@shared/research-reports";
 import { SITE_ORIGIN as SITE } from "@shared/seo";
-import { searchLicenses, searchLicensesBy, type LicenseSource } from "./licenses";
+import { nameSearchable, searchLicenses, searchLicensesBy, type LicenseSource } from "./licenses";
 import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy, type BulkSource, type StoredHit } from "./bulk";
 import type { LiveLicenseSearch } from "./states/types";
 import { crossReference, enforcementKey, LicenseSet, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
@@ -38,7 +38,8 @@ import { companyNamed, personMatches } from "./licenses";
 import { ALL_BULK_SOURCES, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
 import { capNote, noteOf } from "./notes";
 import { disciplineRecord, privateHit, reportHit } from "./privacy";
-import { withRun } from "./http";
+import { guard, guardBrowser, noteResponse, politeFetch, releaseHost, withRun } from "./http";
+import { researchTransport, type ResearchTransport } from "../scrapers/research-transport";
 import type { IdQuery } from "./identifiers";
 import { previewCompanyRecords, searchCompanyRecords, searchEnforcement } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
@@ -128,7 +129,12 @@ export function bulkFinder(src: BulkSource): LicenseFinder {
 export function sodaFinder(src: LicenseSource): LicenseFinder {
   return {
     state: src.state, label: src.source,
-    byName: async (name, kind) => { const hits = await searchLicenses(src, name, kind); return { hits: hits.map(privateHit), searched: true, capped: noteOf(hits), note: matchNote(hits.length, noteOf(hits)) }; },
+    byName: async (name, kind) => {
+      // A dataset with no field for this kind of name is not searched (round 3, decision 9): no request, no "0 found".
+      if (!nameSearchable(src, kind)) return { hits: [], searched: false, note: `Not searched: this dataset has no ${kind === "company" ? "business" : "person"} name field` };
+      const hits = await searchLicenses(src, name, kind);
+      return { hits: hits.map(privateHit), searched: true, capped: noteOf(hits), note: matchNote(hits.length, noteOf(hits)) };
+    },
     byId: async (q) => {
       const hits = await searchLicensesBy(src, q);
       return hits ? { licenses: hits.map(privateHit), enforcement: [], note: noteOf(hits) ?? undefined } : { licenses: [], enforcement: [], searched: false, note: `this dataset has no ${idName(q)} field` };
@@ -203,15 +209,35 @@ export function lacksNameSearch(message: string): boolean {
   return /field unavailable|does not expose|requested search field|(?:company|name|keyword) search form unavailable|has no published public record dashboards/i.test(message);
 }
 
+/**
+ * The transport a research permit search runs under (round 3, decision 5): the adapters' politeFetch, their browser
+ * contexts and the scraper's own API requests all pass the research guard (robots.txt, the shared host block and
+ * cooldown, the per-host queue). The Search page and the permit sweeps are unchanged.
+ */
+const PERMIT_TRANSPORT: ResearchTransport = {
+  fetch: (url, init, opts) => politeFetch(url, init, opts),
+  guardContext: async (context) => { await guardBrowser(context as Parameters<typeof guardBrowser>[0]); },
+  before: (url) => guard(url),
+  after: (url, status, retryAfter) => { releaseHost(url); noteResponse(url, status, retryAfter); },
+};
+
+/** A portal refused by robots.txt or an access denial reads as that, not as a failed search. */
+export function deniedMessage(message: string | undefined): string | null {
+  if (!message) return null;
+  if (/robots\.txt/i.test(message)) return "Not searched: the portal's robots.txt does not allow automated searches";
+  if (/denied access earlier|ERR_BLOCKED_BY_CLIENT|HTTP 40[13]\b|asked us to wait/i.test(message)) return "Not searched: the portal refused automated access";
+  return null;
+}
+
 /** One live search of a set of portals with one search type, read back as coverage per portal. */
 async function runSweep(userId: number, name: string, type: string, group: Db[], log: (m: string) => void): Promise<Map<number, PortalCoverage>> {
   const [query] = await db.insert(searchQueries).values({ userId, searchType: type, searchValue: name, countyId: null }).returning();
   const searchId = `research-${query.id}-${Date.now()}`;
   log(`sweeping ${group.length} portal(s) by ${type} for "${name}"`);
-  await startLiveSearch(searchId, query.id, type, name, group.map((d) => ({
+  await researchTransport.run(PERMIT_TRANSPORT, () => startLiveSearch(searchId, query.id, type, name, group.map((d) => ({
     id: d.id, name: d.name, jurisdiction: d.jurisdiction, countyId: d.countyId, platform: d.platform,
     searchUrl: d.searchUrl, portalUrl: d.portalUrl, isActive: d.isActive,
-  })));
+  }))));
   const started = Date.now();
   let job = getLiveSearchJob(searchId);
   while (job && job.status === "running" && Date.now() - started < SWEEP_BUDGET_MS) {
@@ -221,7 +247,9 @@ async function runSweep(userId: number, name: string, type: string, group: Db[],
   const out = new Map<number, PortalCoverage>();
   for (const e of job?.databases ?? []) {
     const outcome = e.status === "completed" ? "searched" : e.status === "error" ? "error" : "not_searched";
-    out.set(e.id, { jurisdiction: e.jurisdiction ?? e.name, outcome, found: e.resultsFound, message: outcome === "not_searched" ? "Did not finish in time" : e.message });
+    const denied = outcome === "error" ? deniedMessage(e.message) : null;
+    out.set(e.id, denied ? { jurisdiction: e.jurisdiction ?? e.name, outcome: "not_searched", found: 0, message: denied }
+      : { jurisdiction: e.jurisdiction ?? e.name, outcome, found: e.resultsFound, message: outcome === "not_searched" ? "Did not finish in time" : e.message });
   }
   // startLiveSearch leaves out portals it cannot scrape; say so rather than drop them.
   for (const d of group) if (!out.has(d.id)) out.set(d.id, { jurisdiction: d.jurisdiction, outcome: "not_searched", message: "Portal unavailable for live search today", found: 0 });
@@ -235,7 +263,7 @@ const SWEEP_ROUNDS = 4;
  * its next search type (a SmartGov tenant without a contractor field still has keyword search). Coverage keeps the
  * last attempt for each portal; matches are read back for every type that ran.
  */
-async function sweepPortals(userId: number, name: string, kind: "person" | "company", dbs: Db[], log: (m: string) => void): Promise<{ coverage: PortalCoverage[]; rows: any[] }> {
+export async function sweepPortals(userId: number, name: string, kind: "person" | "company", dbs: Db[], log: (m: string) => void): Promise<{ coverage: PortalCoverage[]; rows: any[] }> {
   type Pending = { d: Db; types: string[]; i: number; retriedSame: boolean };
   const final = new Map<number, PortalCoverage>();
   const ran: { type: string; ids: number[] }[] = [];
@@ -287,7 +315,20 @@ export function namesMatch(name: string, row: any, kind: "person" | "company" = 
   const record = row.rawData?.record ?? {};
   const fields = [row.contractorName, row.applicantName, record.ownerName, record.applicantName, record.contractorName, ...contacts, ...listedNamesOf(row)]
     .filter((v): v is string => typeof v === "string" && v.trim().length > 0);
-  return fields.some((f) => (kind === "company" ? companyNamed(name, f) : personMatches(name, f)));
+  return kind === "company" ? fields.some((f) => companyNamed(name, f)) : fields.flatMap(personParts).some((f) => personMatches(name, f));
+}
+
+/**
+ * The separate people one permit name field holds (round 3, decision 7): split on " and ", "&", ";", "/" and line
+ * breaks ("Jane Smith and John Doe" → two names). A part that still reads as more than one name (more than four name
+ * words, or "LAST, FIRST, LAST, FIRST") is left out: it gives no person match rather than pooling two people's words.
+ */
+export function personParts(field: string): string[] {
+  return field.split(/\s+and\s+|&|;|\/|\r?\n/i).map((p) => p.replace(/\s+/g, " ").trim()).filter((p) => {
+    if (!p) return false;
+    const words = p.split(/[\s,.]+/).filter((w) => /[a-z]{2,}/i.test(w) && !/^(?:jr|sr|ii|iii|iv)$/i.test(w));
+    return words.length <= 4 && (p.match(/,/g) ?? []).length < 2;
+  });
 }
 
 /** Names a results list shows without saying their role (SmartGov's party column). */
@@ -413,14 +454,14 @@ async function sendReportEmails(order: ResearchOrderRow, report: ResearchReport)
   const link = `${SITE}${RESEARCH_PATH}/orders/${order.id}`;
   const names = order.input.subjects.map((s) => s.name).join(", ");
   const t = report.totals;
-  const records = t.complaints || t.courtCases || t.osha || t.enforcement ? `, ${t.complaints ?? 0} consumer complaint(s), ${t.enforcement ?? 0} state enforcement or standing record(s), ${t.courtCases ?? 0} federal court case(s) and ${t.osha ?? 0} OSHA inspection(s)` : "";
-  const related = t.related ? `, plus ${t.related} related record(s) of other licenses and businesses tied to the same license numbers, phones, addresses or people` : "";
-  const summary = `${t.licenses} license record(s) and ${t.permits} permit(s) across ${t.portalsSearched} searched portal(s)${records}${related}`;
+  // Each count backed by a source of its own kind that ran; the rest named as not searched (round 3, decision 9).
+  const related = t.related ? ` Also ${t.related} related record(s) of other licenses and businesses tied to the same license numbers, phones, addresses or people.` : "";
+  const summary = `${reportSummary(report)}${t.portalsSearched ? ` ${t.portalsSearched} permit portal search(es) ran.` : ""}${related}`;
   await sendWithFallback({
     from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
     to: order.email,
     subject: `Your ConstructHUB research report is ready (#${order.id})`,
-    html: `<p>Your research report for <strong>${escapeHtml(names)}</strong> is ready: ${escapeHtml(summary)}.</p>
+    html: `<p>Your research report for <strong>${escapeHtml(names)}</strong> is ready. ${escapeHtml(summary)}</p>
       <p><a href="${link}">Open your report</a> (sign in to ConstructHUB to view it; you can print it or save it as a PDF).</p>
       <p style="color:#666;font-size:12px">${escapeHtml(RESEARCH_NO_GUARANTEE)}</p>`,
   }).catch((err: unknown) => console.error(`[research] order ${order.id}: customer email failed`, err));
@@ -428,7 +469,7 @@ async function sendReportEmails(order: ResearchOrderRow, report: ResearchReport)
     from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
     to: process.env.SMTP_EMAIL,
     subject: `Research report delivered #${order.id} (${order.tier})`,
-    html: `<p>Delivered to ${escapeHtml(order.email)}: ${escapeHtml(names)} in ${escapeHtml(order.input.states.join(", "))}. ${escapeHtml(summary)}.</p><p><a href="${link}">View</a></p>`,
+    html: `<p>Delivered to ${escapeHtml(order.email)}: ${escapeHtml(names)} in ${escapeHtml(order.input.states.join(", "))}. ${escapeHtml(summary)}</p><p><a href="${link}">View</a></p>`,
   }).catch(() => undefined);
 }
 

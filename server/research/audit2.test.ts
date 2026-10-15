@@ -56,9 +56,12 @@ describe("decision 3: the business-name classifier", () => {
     expect(looksLikeBusiness("Jones Steel LLC")).toBe(true); // the suffix still says so
   });
   it("a publisher's entity type decides when there is one", () => {
-    expect(entityHolder("Individual", /^individual$/i)).toBe("individual");
-    expect(entityHolder("Limited Liability Company", /^individual$/i)).toBe("business");
-    expect(entityHolder("", /^individual$/i)).toBeNull();
+    // Round 3, decision 3: only the listed values decide; anything else is unknown.
+    const lists = { business: /^(?:corporation|limited liability company)$/i, individual: /^individual$/i };
+    expect(entityHolder("Individual", lists)).toBe("individual");
+    expect(entityHolder("Limited Liability Company", lists)).toBe("business");
+    expect(entityHolder("Joint Venture", lists)).toBeNull();
+    expect(entityHolder("", lists)).toBeNull();
   });
 });
 
@@ -236,9 +239,9 @@ describe("decision 9: notes survive", () => {
 describe("decision 10: bulk completeness", () => {
   it("a load under 70% of the previous, overall or per component, is kept out", () => {
     expect(shortfall(100, {}, null)).toBeNull();
-    expect(shortfall(69, {}, { rows: 100 })).toBe("69 rows, previous 100");
-    expect(shortfall(90, { a: 89, b: 1 }, { rows: 100, components: { a: 60, b: 40 } })).toBe("b: 1 rows, previous 40");
-    expect(shortfall(90, { a: 90 }, { rows: 100, components: { a: 60, b: 40 } })).toBe("b: 0 rows, previous 40");
+    expect(shortfall(69, {}, { rows: 100 })).toBe("69 rows, baseline 100");
+    expect(shortfall(90, { a: 89, b: 1 }, { rows: 100, components: { a: 60, b: 40 } })).toBe("b: 1 rows, baseline 40");
+    expect(shortfall(90, { a: 90 }, { rows: 100, components: { a: 60, b: 40 } })).toBe("b: 0 rows, baseline 40");
     expect(shortfall(95, { a: 60, b: 35 }, { rows: 100, components: { a: 60, b: 40 } })).toBeNull();
   });
 });

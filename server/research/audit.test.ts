@@ -33,7 +33,7 @@ describe("adverse comes only from the outcome text (decision 2)", () => {
     expect(adverseFrom("No civil penalty")).toBeNull();
     expect(adverseFrom("Dismissed")).toBe(false);
     expect(adverseFrom("Withdrawn by the department")).toBe(false);
-    expect(adverseFrom("Vacated on appeal")).toBe(false);
+    expect(adverseFrom("Vacated on appeal")).toBeNull(); // a reversal: round 3, decision 6
     expect(adverseFrom("License revoked")).toBe(true);
     expect(adverseFrom("Administrative penalty of $500")).toBe(true);
     expect(adverseFrom("Debarred", { ended: true })).toBe(false);
@@ -72,7 +72,7 @@ describe("matching keeps single letters and one person per name (decision 6)", (
     expect(addressMatches("123 Main St, Seattle", "123 MAIN ST TACOMA WA")).toBe(false);
     expect(addressMatches("123 Main Street 98101", "123 N MAIN ST SEATTLE WA 98101-2222")).toBe(true);
     expect(addressMatches("123 Main St", "123 MAIN STREET STE 200")).toBe(true);
-    expect(streetKey("123 N. Main St., Ste 4, Seattle WA 98101")).toBe("123 N MAIN ST");
+    expect(streetKey("123 N. Main St., Ste 4, Seattle WA 98101")).toBe("123 N MAIN ST #4");
     expect(localityOf("123 N. Main St., Ste 4, Seattle WA 98101")).toBe("SEATTLE WA 98101");
     // The index key stays house number + first street word (old rows keep working); addressMatches decides.
     expect(addressKeys("123 Lake View Road")).toEqual(["a:123 LAKE"]);
@@ -102,8 +102,9 @@ describe("home addresses (decision 4)", () => {
 describe("business or person (decision 5)", () => {
   it("a bare two- or three-word name is a person unless it has a suffix, a dba or a trade word that isn't a surname", async () => {
     const { looksLikeBusiness } = await import("./states/lib/business-name");
-    for (const p of ["David Power", "Joe Mason", "John Wells", "Mary Homes", "WELLS, JOHN", "Milton Bullock 2020-021", "Daryl Kitchen"]) expect([p, looksLikeBusiness(p)]).toEqual([p, false]);
-    for (const b of ["Power Electric LLC", "Smith & Sons", "John Doe dba Doe Roofing", "Bright Solar", "Acme", "D & S Electric", "SURE BET PAINTING", "PAUL DAVIS OF RENO LAKE TAHOE", "R & R BACKHOE"]) expect([b, looksLikeBusiness(b)]).toEqual([b, true]);
+    // A single word is not shown to be a business either: it may be a surname (round 3, decision 3).
+    for (const p of ["David Power", "Joe Mason", "John Wells", "Mary Homes", "WELLS, JOHN", "Milton Bullock 2020-021", "Daryl Kitchen", "Acme", "SMITH"]) expect([p, looksLikeBusiness(p)]).toEqual([p, false]);
+    for (const b of ["Power Electric LLC", "Smith & Sons", "John Doe dba Doe Roofing", "Bright Solar", "D & S Electric", "SURE BET PAINTING", "PAUL DAVIS OF RENO LAKE TAHOE", "R & R BACKHOE"]) expect([b, looksLikeBusiness(b)]).toEqual([b, true]);
   });
 });
 

@@ -13,7 +13,7 @@
  * searched is reported as not searched, never as "nothing found".
  */
 import { politeFetch, rethrowIfBlocked } from "./http";
-import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordSource } from "@shared/research-reports";
+import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordCategory, RecordSource } from "@shared/research-reports";
 import { nameClause, sodaRows, tokens } from "./licenses";
 import { BULK_LIMIT, searchBulk } from "./bulk";
 import { allBulkSourcesFor as bulkSourcesFor, hasStateCourtSearch, packComplaintSourcesFor, searchPackEnforcement } from "./registry";
@@ -192,20 +192,22 @@ export async function searchEnforcement(name: string, states: string[]): Promise
   for (const state of states) {
     for (const live of [await searchStateEnforcement(name, state, matches), await searchPackEnforcement(name, state, matches)]) {
       hits.push(...live.hits);
-      sources.push(...live.sources);
+      // Every source carries its category (round 3, decision 9); a live search that names none is an enforcement source.
+      sources.push(...live.sources.map((s) => ({ ...s, category: s.category ?? ("enforcement" as const) })));
     }
     for (const src of bulkSourcesFor(state)) {
       if (!src.companiesOnly) continue; // the license files are searched with the licenses
+      const category: RecordCategory = src.category === "court_case" ? "state_court" : "enforcement";
       try {
         const { hits: found, status } = await searchBulk(src, name, "company");
-        if (!status.loaded) { sources.push({ source: src.label, scope: state, searched: false, note: "Not loaded yet (the state's file is downloaded daily)" }); continue; }
+        if (!status.loaded) { sources.push({ source: src.label, scope: state, searched: false, note: "Not loaded yet (the state's file is downloaded daily)", category }); continue; }
         const mine = found.filter((h): h is { kind: "enforcement"; hit: EnforcementHit } => h.kind === "enforcement").map((h) => h.hit).filter((h) => matches(h.name));
         hits.push(...mine);
         // The index read stops at BULK_LIMIT rows: a search that reached it says so (round 2, decision 9).
         const capped = found.length >= BULK_LIMIT ? ` (${capNote(BULK_LIMIT, null, "index matches")})` : "";
-        sources.push({ source: src.label, scope: `${state}, file of ${status.loadedAt?.slice(0, 10)}`, searched: true, note: `${mine.length} record(s)${capped}` });
+        sources.push({ source: src.label, scope: `${state}, file of ${status.loadedAt?.slice(0, 10)}`, searched: true, note: `${mine.length} record(s)${capped}`, category });
       } catch (err: any) {
-        sources.push({ source: src.label, scope: state, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+        sources.push({ source: src.label, scope: state, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category });
       }
     }
   }
@@ -227,36 +229,36 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
   const complaints: ComplaintHit[] = [];
   for (const state of states) {
     const list = complaintSourcesFor(state);
-    if (!list.length) sources.push({ source: `${state} attorney general complaints`, scope: state, searched: false, note: "Not searched by ConstructHUB: we have no complaint source for this state" });
+    if (!list.length) sources.push({ source: `${state} attorney general complaints`, scope: state, searched: false, note: "Not searched by ConstructHUB: we have no complaint source for this state", category: "complaints" });
     for (const src of list) {
       try {
         const hits = await searchComplaints(src, name);
         complaints.push(...hits);
-        sources.push({ source: src.source, scope: src.scope, searched: true, note: `${hits.length} complaint(s)${noteOf(hits) ? ` (${noteOf(hits)})` : ""}` });
+        sources.push({ source: src.source, scope: src.scope, searched: true, note: `${hits.length} complaint(s)${noteOf(hits) ? ` (${noteOf(hits)})` : ""}`, category: "complaints" });
       } catch (err: any) {
-        sources.push({ source: src.source, scope: src.scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+        sources.push({ source: src.source, scope: src.scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category: "complaints" });
       }
     }
   }
-  for (const state of states) if (!hasStateCourtSearch(state)) sources.push({ source: `${state} state court cases`, scope: state, searched: false, note: "Not searched by ConstructHUB: we don't search this state's court records" });
+  for (const state of states) if (!hasStateCourtSearch(state)) sources.push({ source: `${state} state court cases`, scope: state, searched: false, note: "Not searched by ConstructHUB: we don't search this state's court records", category: "state_court" });
   let courtCases: CourtCaseHit[] = [];
-  if (!COURTLISTENER_ALLOWED) sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: false, note: COURTLISTENER_BLOCKED_NOTE });
+  if (!COURTLISTENER_ALLOWED) sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: false, note: COURTLISTENER_BLOCKED_NOTE, category: "federal_court" });
   else try {
     const r = await searchCourtCases(name);
     courtCases = r.cases;
     sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: true,
-      note: r.total > MAX_CASE_PAGES * 20 ? `${courtCases.length} case(s): the newest ${MAX_CASE_PAGES * 20} of ${r.total} matches were checked` : `${courtCases.length} case(s)` });
+      note: r.total > MAX_CASE_PAGES * 20 ? `${courtCases.length} case(s): the newest ${MAX_CASE_PAGES * 20} of ${r.total} matches were checked` : `${courtCases.length} case(s)`, category: "federal_court" });
   } catch (err: any) {
-    sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+    sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category: "federal_court" });
   }
   let osha: OshaHit[] = [];
   try {
     osha = await searchOsha(name);
-    sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: true, note: `${osha.length} inspection(s)${noteOf(osha) ? ` (${noteOf(osha)})` : ""}` });
+    sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: true, note: `${osha.length} inspection(s)${noteOf(osha) ? ` (${noteOf(osha)})` : ""}`, category: "osha" });
   } catch (err: any) {
     const msg = String(err?.message ?? err);
     sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: false,
-      note: msg === "not configured" ? "Not searched yet" : `Could not search: ${msg.slice(0, 200)}` });
+      note: msg === "not configured" ? "Not searched yet" : `Could not search: ${msg.slice(0, 200)}`, category: "osha" });
   }
   const enforcement = await searchEnforcement(name, states);
   sources.push(...enforcement.sources);

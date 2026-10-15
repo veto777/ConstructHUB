@@ -61,6 +61,7 @@ const hosts = new Map<string, HostState>();
 const activeRuns = new Set<number>();
 let runSeq = 0;
 const hostOf = (url: string) => new URL(url).host;
+const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 
 /**
  * One report or one file load. A host that denies access during it gets no request until every run that was going
@@ -93,30 +94,84 @@ export function hostBlocked(url: string): { status: number; why: string } | null
 }
 
 /** For tests: forget every host's state and cached robots.txt. */
-export function resetHostState(): void { hosts.clear(); robotsCache.clear(); }
-
-/**
- * Everything a request must pass before it is sent: the host's block, robots.txt, the host's cooldown (waited out,
- * or a failure when longer than MAX_WAIT_MS) and the per-host rate limit. Throws PortalBlockedError when refused.
- */
-export async function guard(url: string, minDelayMs = 1000): Promise<void> {
-  const b = hostBlocked(url);
-  if (b) throw new PortalBlockedError(url, b.status, `${hostOf(url)} denied access earlier (${b.why}); no further requests for now`);
-  await checkRobots(url);
-  const cool = (hosts.get(hostOf(url))?.coolUntil ?? 0) - Date.now();
-  if (cool > MAX_WAIT_MS) throw new PortalBlockedError(url, 429, `${hostOf(url)} asked us to wait ${Math.ceil(cool / 60_000)} minute(s) before the next request`);
-  if (cool > 0) await sleep(cool);
-  await limitHost(url, minDelayMs);
+export function resetHostState(): void {
+  hosts.clear(); robotsCache.clear(); robotsPending.clear();
+  for (const free of Array.from(holding.values())) free();
+  turns.clear();
 }
 
-/** The rate limit alone, plus the host's block and cooldown (for callers that check robots.txt themselves). */
-export async function rateLimitHost(url: string, minDelayMs: number): Promise<void> {
+/** The host's block as a thrown PortalBlockedError (nothing when it may be asked). */
+function refuseIfBlocked(url: string): void {
   const b = hostBlocked(url);
   if (b) throw new PortalBlockedError(url, b.status, `${hostOf(url)} denied access earlier (${b.why}); no further requests for now`);
-  const cool = (hosts.get(hostOf(url))?.coolUntil ?? 0) - Date.now();
-  if (cool > MAX_WAIT_MS) throw new PortalBlockedError(url, 429, `${hostOf(url)} asked us to wait ${Math.ceil(cool / 60_000)} minute(s) before the next request`);
-  if (cool > 0) await sleep(cool);
-  await limitHost(url, minDelayMs);
+}
+
+const coolLeft = (url: string) => (hosts.get(hostOf(url))?.coolUntil ?? 0) - Date.now();
+
+/**
+ * Waits out the host's cooldown and rate limit, then checks the block and cooldown again right before the request
+ * is sent (round 3, decision 5): a 403 or a Retry-After that arrived while this request waited stops it.
+ */
+async function waitTurn(url: string, minDelayMs: number): Promise<void> {
+  for (;;) {
+    refuseIfBlocked(url);
+    const cool = coolLeft(url);
+    if (cool > MAX_WAIT_MS) throw new PortalBlockedError(url, 429, `${hostOf(url)} asked us to wait ${Math.ceil(cool / 60_000)} minute(s) before the next request`);
+    if (cool > 0) { await sleep(cool); continue; }
+    await limitHost(url, minDelayMs);
+    refuseIfBlocked(url);
+    if (coolLeft(url) <= 0) return;
+  }
+}
+
+/**
+ * The per-host request queue: one guarded request per host is out at a time, so the answer to one (a 403, a
+ * Retry-After) is known before the next is sent. The turn ends when the caller calls releaseHost() (after the
+ * response headers, or after a failure), or after HOLD_MS at the latest.
+ */
+const HOLD_MS = 15_000;
+const turns = new Map<string, Promise<void>>();
+const holding = new Map<string, () => void>();
+
+async function takeTurn(url: string, minDelayMs: number): Promise<void> {
+  const host = hostOf(url);
+  const prev = turns.get(host) ?? Promise.resolve();
+  let done!: () => void;
+  const mine = new Promise<void>((r) => (done = r));
+  turns.set(host, prev.then(() => mine));
+  await prev;
+  try { await waitTurn(url, minDelayMs); } catch (err) { done(); throw err; }
+  let freed = false;
+  const free = () => {
+    if (freed) return;
+    freed = true;
+    clearTimeout(timer);
+    if (holding.get(host) === free) holding.delete(host);
+    done();
+  };
+  const timer = setTimeout(free, HOLD_MS);
+  (timer as { unref?: () => void }).unref?.();
+  holding.set(host, free);
+}
+
+/** Ends the host's current turn (see takeTurn): call it once the response headers are in, or the request failed. */
+export function releaseHost(url: string): void { holding.get(hostOf(url))?.(); }
+
+/**
+ * Everything a request must pass before it is sent: the host's block, robots.txt, then the host's turn in its queue
+ * (cooldown waited out, or a failure when longer than MAX_WAIT_MS; the rate limit; the block and cooldown checked
+ * again right before dispatch). Throws PortalBlockedError when refused. The caller sends the request, calls
+ * noteResponse() with the answer and releaseHost() once the headers are in (or the request failed).
+ */
+export async function guard(url: string, minDelayMs = 1000): Promise<void> {
+  refuseIfBlocked(url);
+  await checkRobots(url);
+  await takeTurn(url, minDelayMs);
+}
+
+/** The rate limit plus the host's block and cooldown, checked again after the wait (for callers that check robots.txt themselves). */
+export async function rateLimitHost(url: string, minDelayMs: number): Promise<void> {
+  await waitTurn(url, minDelayMs);
 }
 
 /**
@@ -178,40 +233,88 @@ export function robotsAllows(rules: Rule[], pathAndQuery: string): boolean {
   return best ? best.allow : true;
 }
 
+/** A host a source reaches with its own client (MA's Contractor Hub, whose server leaves out its intermediate certificate). */
+type RobotsFetcher = (url: string) => Promise<{ status: number; text: string; location?: string | null; retryAfter?: string | null }>;
+const robotsFetchers = new Map<string, RobotsFetcher>();
+/** Reads `origin`'s robots.txt with the source's own client, so robots.txt is checked over the same connection. */
+export function useRobotsFetcher(origin: string, fn: RobotsFetcher): void { robotsFetchers.set(new URL(origin).origin, fn); }
+
+/** Redirect hops followed for a robots.txt (RFC 9309 §2.3.1.2 asks for at least five). */
+const ROBOTS_HOPS = 5;
+const robotsPending = new Map<string, Promise<{ rules: Rule[]; denied?: string }>>();
+
+/**
+ * One robots.txt request through the guarded transport (round 3, decision 5): redirects followed by hand, every hop
+ * through the host block and its queue (rate limit, cooldown), a hop to another page also through that page's own
+ * robots.txt, and noteResponse() on every answer, recorded against the host that answered.
+ */
+async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status: number; text: string }> {
+  let cur = `${origin}/robots.txt`;
+  for (let hop = 0; ; hop++) {
+    const u = new URL(cur);
+    // A hop to a page on another host (not its robots.txt) needs that host's robots.txt to allow it. A hop on a host
+    // whose robots.txt is the one being read (mopro.mo.gov/robots.txt → /license/robots.txt) can't be checked against
+    // it; it is still guarded below, and its answer is the robots.txt (an HTML page is a refusal).
+    if (u.pathname !== "/robots.txt" && !chain.has(u.origin)) {
+      const r = await robotsFor(u.origin, chain);
+      if (r.denied || !robotsAllows(r.rules, u.pathname + u.search)) throw new PortalBlockedError(cur, 0, `robots.txt redirects to ${u.host}${u.pathname}, which robots.txt does not allow`);
+    }
+    refuseIfBlocked(cur);
+    await takeTurn(cur, 1000);
+    let res: { status: number; text: string; location?: string | null; retryAfter?: string | null };
+    try {
+      const own = robotsFetchers.get(u.origin);
+      if (own) {
+        res = await Promise.race([own(cur), new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timed out")), 15_000))]);
+      } else {
+        const r = await fetch(cur, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.timeout(15_000), redirect: "manual" });
+        const ok = r.status >= 200 && r.status < 300;
+        res = { status: r.status, location: r.headers.get("location"), retryAfter: r.headers.get("retry-after"), text: ok ? await r.text() : (await r.body?.cancel().catch(() => undefined), "") };
+      }
+    } finally {
+      releaseHost(cur);
+    }
+    noteResponse(cur, res.status, res.retryAfter);
+    if (!REDIRECTS.has(res.status) || !res.location) return res;
+    if (hop + 1 >= ROBOTS_HOPS) throw new Error(`more than ${ROBOTS_HOPS} redirects for robots.txt`);
+    const next = new URL(res.location, cur);
+    if (next.protocol !== "https:" && next.protocol !== "http:") throw new Error(`robots.txt redirect to ${next.protocol} refused`);
+    cur = next.toString();
+  }
+}
+
 /**
  * What robots.txt says for one origin (round 2, decision 6): 2xx → its rules (an HTML page instead of a robots file
  * is a challenge: denied); 404/410 → no rules; 401, 403, 429, 5xx, a timeout or a network failure → denied for an
  * hour, then fetched again. Other 4xx answers mean "no robots.txt" (RFC 9309 §2.3.1.3).
  */
-/** A host a source reaches with its own client (MA's Contractor Hub, whose server leaves out its intermediate certificate). */
-type RobotsFetcher = (url: string) => Promise<{ status: number; text: string }>;
-const robotsFetchers = new Map<string, RobotsFetcher>();
-/** Reads `origin`'s robots.txt with the source's own client, so robots.txt is checked over the same connection. */
-export function useRobotsFetcher(origin: string, fn: RobotsFetcher): void { robotsFetchers.set(new URL(origin).origin, fn); }
-
-export async function robotsFor(origin: string): Promise<{ rules: Rule[]; denied?: string }> {
+export async function robotsFor(origin: string, chain: Set<string> = new Set()): Promise<{ rules: Rule[]; denied?: string }> {
   const hit = robotsCache.get(origin);
   if (hit && Date.now() - hit.at < hit.ttl) return hit;
-  let entry: { rules: Rule[]; denied?: string };
-  try {
-    await limitHost(origin, 1000);
-    const own = robotsFetchers.get(origin);
-    const res = own
-      ? await Promise.race([own(`${origin}/robots.txt`).then((r) => ({ ok: r.status >= 200 && r.status < 300, status: r.status, text: async () => r.text, body: null })),
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timed out")), 15_000))])
-      : await fetch(`${origin}/robots.txt`, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
-    const text = res.ok ? await res.text() : (await res.body?.cancel().catch(() => undefined), "");
-    if (res.ok) {
-      const html = /^\s*</.test(text) || /<html[\s>]/i.test(text.slice(0, 2000));
-      entry = html ? { rules: [], denied: "robots.txt answered with an HTML page (a challenge or an error page)" } : { rules: /user-agent\s*:/i.test(text) ? parseRobots(text) : [] };
-    } else if (res.status === 404 || res.status === 410) entry = { rules: [] };
-    else if (res.status === 401 || res.status === 403 || res.status === 429 || res.status >= 500) entry = { rules: [], denied: `robots.txt answered HTTP ${res.status}` };
-    else entry = { rules: [] };
-  } catch (err) {
-    entry = { rules: [], denied: `robots.txt could not be read (${String((err as Error)?.message ?? err).slice(0, 80)})` };
-  }
-  robotsCache.set(origin, { ...entry, at: Date.now(), ttl: entry.denied ? BLOCK_MS : ROBOTS_TTL_MS });
-  return entry;
+  const pending = !chain.size ? robotsPending.get(origin) : undefined;
+  if (pending) return pending;
+  const work = (async () => {
+    let entry: { rules: Rule[]; denied?: string };
+    try {
+      const res = await fetchRobots(origin, new Set(chain).add(origin));
+      const ok = res.status >= 200 && res.status < 300;
+      if (ok) {
+        const html = /^\s*</.test(res.text) || /<html[\s>]/i.test(res.text.slice(0, 2000));
+        entry = html ? { rules: [], denied: "robots.txt answered with an HTML page (a challenge or an error page)" } : { rules: /user-agent\s*:/i.test(res.text) ? parseRobots(res.text) : [] };
+      } else if (res.status === 404 || res.status === 410) entry = { rules: [] };
+      else if (res.status === 401 || res.status === 403 || res.status === 429 || res.status >= 500) entry = { rules: [], denied: `robots.txt answered HTTP ${res.status}` };
+      else if (REDIRECTS.has(res.status)) entry = { rules: [], denied: "robots.txt redirected without a location" };
+      else entry = { rules: [] };
+    } catch (err) {
+      const e = err as { status?: number; message?: string };
+      entry = { rules: [], denied: err instanceof PortalBlockedError && (e.status === 401 || e.status === 403)
+        ? `robots.txt answered HTTP ${e.status}` : `robots.txt could not be read (${String(e?.message ?? err).slice(0, 120)})` };
+    }
+    robotsCache.set(origin, { ...entry, at: Date.now(), ttl: entry.denied ? BLOCK_MS : ROBOTS_TTL_MS });
+    return entry;
+  })();
+  if (!chain.size) { robotsPending.set(origin, work); work.finally(() => robotsPending.delete(origin)).catch(() => undefined); }
+  return work;
 }
 
 /** True when robots.txt lets us request the URL (an unreadable robots.txt does not). */
@@ -233,6 +336,56 @@ export async function checkRobots(url: string): Promise<void> {
   }
 }
 
+// ── Browser pages ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Resource types a page loads on its own (styles, scripts, images, fonts): checked, but not rate limited. */
+const PASSIVE = new Set(["stylesheet", "script", "image", "font", "media", "manifest", "texttrack", "ping"]);
+
+type Routable = { route: (pattern: string, handler: (route: any) => Promise<unknown>) => Promise<unknown>; on: (event: "response", fn: (res: any) => void) => unknown };
+
+/**
+ * Puts a browser page or context behind the guarded transport (round 3, decision 5). Every page load, XHR and fetch
+ * passes the full guard (block, robots.txt, the host's queue: cooldown, rate limit, the recheck before dispatch); it
+ * is sent with its redirects held back, so a redirect's target passes the guard too before the browser follows it.
+ * Its answer goes to noteResponse() against the host that answered. Styles, scripts, images and fonts are checked
+ * against the block, cooldown and robots.txt without the rate limit. Every other response is noted as well.
+ * The returned check throws the first access denial seen, so a load stops instead of moving on.
+ */
+export async function guardBrowser(target: Routable, minDelayMs = 1000): Promise<() => void> {
+  let denied: unknown = null;
+  const deny = (err: unknown) => { if (err instanceof PortalBlockedError) denied ??= err; };
+  await target.route("**/*", async (route: any) => {
+    const req = route.request();
+    const url: string = req.url();
+    if (!/^https?:/i.test(url)) return route.continue();
+    if (PASSIVE.has(req.resourceType())) {
+      const ok = !hostBlocked(url) && coolLeft(url) <= 0 && await robotsAllowed(url);
+      return ok ? route.continue() : route.abort("blockedbyclient");
+    }
+    let res: any;
+    try {
+      await guard(url, minDelayMs);
+      try { res = await route.fetch({ maxRedirects: 0 }); } finally { releaseHost(url); }
+      noteResponse(url, res.status(), res.headers()["retry-after"]);
+      const loc = res.headers()["location"];
+      if (REDIRECTS.has(res.status()) && loc) {
+        // The browser follows this redirect without asking the route again: its target passes the guard now.
+        const next = new URL(loc, url).toString();
+        await guard(next, minDelayMs);
+        releaseHost(next);
+      }
+    } catch (err) {
+      deny(err);
+      return route.abort(err instanceof PortalBlockedError ? "blockedbyclient" : "failed").catch(() => undefined);
+    }
+    return route.fulfill({ response: res });
+  });
+  target.on("response", (res: any) => {
+    try { noteResponse(res.url(), res.status(), res.headers()["retry-after"]); } catch (err) { deny(err); }
+  });
+  return () => { if (denied) throw denied; };
+}
+
 // ── Fetch ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** Abort `ctrl` when `signal` aborts (a caller's own signal still works). */
@@ -241,8 +394,6 @@ function follow(signal: AbortSignal | null | undefined, ctrl: AbortController) {
   if (signal.aborted) ctrl.abort(signal.reason);
   else signal.addEventListener("abort", () => ctrl.abort(signal.reason), { once: true });
 }
-
-const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 
 /**
  * One request, its redirects followed by hand: every hop passes guard() (block, robots.txt, cooldown, rate limit)
@@ -262,10 +413,12 @@ async function hops(url: string, init: RequestInit, signal: AbortSignal, minDela
     try {
       res = await fetch(cur, { ...init, method, body: method === "GET" || method === "HEAD" ? undefined : body, headers, signal, redirect: "manual" });
     } catch (e) {
+      releaseHost(cur);
       // Node gives up connecting after 10 s; no request reached the server, so a fresh connection is tried again.
       if ((e as { cause?: { code?: string } })?.cause?.code === "UND_ERR_CONNECT_TIMEOUT" && onConnectTimeout?.()) { hop--; continue; }
       throw e;
     }
+    releaseHost(cur);
     try { noteResponse(cur, res.status, res.headers.get("retry-after")); }
     catch (err) { await res.body?.cancel().catch(() => undefined); throw err; }
     const loc = res.headers.get("location");

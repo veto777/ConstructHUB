@@ -51,7 +51,7 @@ export type AddressParts = {
   city: string | null; state: string | null; zip: string | null;
   /** The unit ("STE 4" → "4"), when one is given. */
   unit: string | null;
-  /** The street's end is unknown (no suffix and no comma): `name` holds its first word only. */
+  /** The street's end is unknown (no suffix and no comma): `name` holds the street and maybe the city after it. */
   partial: boolean;
 };
 
@@ -96,8 +96,9 @@ export function parseAddress(v: string | null | undefined): AddressParts | null 
     const u = name.findIndex((w) => UNIT.test(w));
     if (u >= 0) name.splice(u);
   } else {
-    // No suffix and no comma: where the street ends is unknown, so only its first word is used.
-    name.splice(1);
+    // No suffix and no comma: where the street ends is unknown. Every word is kept (the street, then maybe the city);
+    // only a trailing ZIP or state is dropped. addressMatch compares such a name by its leading words.
+    while (name.length > 1 && (/^\d{5}(?:-\d{4})?$/.test(name[name.length - 1]) || STATES.has(name[name.length - 1]))) name.pop();
   }
   const partial = typeAt < 0 && segs.length === 1;
   const cityWords: string[] = [];
@@ -129,12 +130,25 @@ export function localityOf(v: string | null | undefined): string | null {
   return [p.city, p.state, p.zip].filter(Boolean).join(" ") || null;
 }
 
-/** One canonical form of the street line: "123 N MAIN ST" (direction and suffix as USPS abbreviations). */
+/**
+ * One canonical form of the street line, unit included: "123 N MAIN ST", "123 N MAIN ST #4" (direction and suffix as
+ * USPS abbreviations). Suite 1 and Suite 2 are two addresses (round 3, decision 8).
+ */
 export function streetKey(v: string | null | undefined): string | null {
   const p = parseAddress(v);
   if (!p) return null;
   if (p.box) return `POBOX ${p.number}`;
-  return [p.number, p.pre, ...p.name, p.type, p.post].filter(Boolean).join(" ");
+  return [p.number, p.pre, ...p.name, p.type, p.post, p.unit ? `#${p.unit}` : null].filter(Boolean).join(" ");
+}
+
+/**
+ * The identity of an address query (round 3, decision 8): street with its unit, city, state and ZIP. Two queries with
+ * one key are the same search; a different unit, or the same street and city in another state, is not.
+ */
+export function addressQueryKey(v: string | null | undefined): string | null {
+  const p = parseAddress(v);
+  if (!p) return null;
+  return `a:${streetKey(v)}|${p.city ?? ""}|${p.state ?? ""}|${p.zip ?? ""}`;
 }
 
 /**
@@ -196,9 +210,13 @@ export function addressMatch(query: string, address: string | null | undefined):
   if (!both(q.pre ?? q.post, a.pre ?? a.post)) return null;
   const qn = q.name.join(" "), an = a.name.join(" ");
   if (q.type && a.type) return qn === an ? (place ? "confirmed" : "possible") : null;
-  // A side whose street end is unknown holds the first word only: the other side's whole name must be that word,
-  // and the place must agree, since nothing else does.
-  if (q.partial || a.partial) return qn === an && place ? "possible" : null;
+  // A side whose street end is unknown holds the street and maybe the city: the other side's whole name must be its
+  // leading words (both unknown: the shorter leads the longer), and the place must agree, since nothing else does.
+  if (q.partial || a.partial) {
+    const lead = (x: string[], y: string[]) => x.length <= y.length && x.every((w, i) => y[i] === w);
+    const ok = q.partial && a.partial ? lead(q.name, a.name) || lead(a.name, q.name) : q.partial ? lead(a.name, q.name) : lead(q.name, a.name);
+    return ok && place ? "possible" : null;
+  }
   return qn === an ? "possible" : null;
 }
 

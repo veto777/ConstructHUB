@@ -34,7 +34,8 @@ import { USER_AGENT, fetchWithDeadline, rateLimitHost, rethrowIfBlocked } from "
 import { adverseFrom } from "./adverse";
 import { looksLikeBusiness } from "./states/lib/business-name";
 import { clean, csvRecords, csvRows, download, lines, plainRequest, saveResponse, usDate, type BulkHit, type BulkSource } from "./bulk";
-import type { IdKeys } from "./identifiers";
+import { localityOf, type IdKeys } from "./identifiers";
+import { tokens } from "./licenses";
 
 const run = promisify(execFile);
 
@@ -315,14 +316,43 @@ const caseAdverse = (disposition: string | null, discipline: string[]) =>
 
 /** A business entity form in the name itself (DBPR's complaint files publish no entity type). */
 const ENTITY = /\b(?:inc|incorporated|llc|l\.l\.c|corp|corporation|co|company|ltd|limited|lp|llp|pllc|pa|p\.a|pc|p\.c)\b\.?/i;
-/**
- * A complaint respondent is a business when the record names a DBA or the name carries an entity form, or (no entity
- * type being published) reads as one by the shared classifier. Anyone else is an individual: the row is left out, so
- * it is neither indexed as a business nor returned in company enforcement results (FCRA; round 2, decision 3).
- */
-export const flRespondentIsBusiness = (name: string, dbas: string[]) => dbas.some((d) => !DBA_PLACEHOLDER.test(d)) || ENTITY.test(name) || looksLikeBusiness(name);
 /** What DBPR prints in a DBA slot when there is none ("RUSH, JOHN / N/A", "UNKNOWN, STEVEN / UNKNOWN", seen live 2026-10-16). */
 const DBA_PLACEHOLDER = /^\s*(?:n\/?a|none|unknown|same|-+|\.)\s*$/i;
+const sameWords = (a: string, b: string) => { const x = tokens(a).sort().join(" "), y = tokens(b).sort().join(" "); return !!x && x === y; };
+
+/**
+ * Who a complaint is about (DBPR's complaint files publish no entity type; round 3, decision 2):
+ *   - a respondent whose name carries an entity form or reads as a business → that business (its record as published);
+ *   - an individual doing business under a DBA → the DBA, the business: the record names the DBA only (`person`
+ *     null), with city, state and ZIP but no street, phone or address key;
+ *   - an individual with no DBA (or a placeholder one, or one that is only their own name) → left out (FCRA).
+ */
+export function flRespondent(name: string, dbas: string[]): { name: string; business: string; dbaOnly: boolean } | null {
+  // "D/B/A LOYAL ROOFERS", "- HANDY SOLUTIONS USA": the DBA name without DBPR's prefix.
+  const real = dbas.map((d) => d.replace(/^[\s\-–]*(?:d\/?b\/?a\b[:.]?\s*)?/i, "").trim())
+    .filter((d) => d && !DBA_PLACEHOLDER.test(d) && !sameWords(d, name));
+  if (ENTITY.test(name) || looksLikeBusiness(name)) return { name: [name, ...real].join(" / "), business: [name, ...real].join(" "), dbaOnly: false };
+  return real.length ? { name: real.join(" / "), business: real.join(" "), dbaOnly: true } : null;
+}
+export const flRespondentIsBusiness = (name: string, dbas: string[]) => flRespondent(name, dbas) !== null;
+
+/** City, state and ZIP of an address ("123 Main St, Tampa FL 33602" → "Tampa FL 33602"). */
+const localityLine = (city: string | null, state: string | null, zip: string | null) => [city, state, zip5(zip)].map((v) => clean(v)).filter(Boolean).join(" ") || null;
+
+/**
+ * A complaint row loaded before round 3 (read time; round 3, decision 4): the same rule on what it stored. "NAME /
+ * DBA / …" is split back into the respondent and the DBA names; an individual's row with a DBA becomes the DBA's,
+ * without a street; one without a DBA is dropped.
+ */
+export function flLegacyComplaint(h: EnforcementHit): EnforcementHit | null {
+  const [first, ...rest] = (h.name ?? "").split(" / ").map((v) => v.trim()).filter(Boolean);
+  if (!first) return null;
+  const who = flRespondent(first, rest);
+  if (!who) return null;
+  if (!who.dbaOnly) return { ...h, name: who.name };
+  const locality = h.address ? localityOf(h.address) : null;
+  return { ...h, name: who.name, address: locality, phone: null };
+}
 
 export async function* flComplaintRows(complaintPaths: string[], cases: Map<string, FlCase>, licenses: Map<string, string>): AsyncIterable<BulkHit> {
   const seen = new Set<string>();
@@ -340,34 +370,37 @@ export async function* flComplaintRows(complaintPaths: string[], cases: Map<stri
     const id = clean(r[10]);
     const c = id ? cases.get(id) : undefined;
     if (id) seen.add(id);
-    if (!flRespondentIsBusiness(name, dbas)) continue;
+    const who = flRespondent(name, dbas);
+    if (!who) continue;
     const disposition = clean(r[13]);
     const discipline = clean(r[15]?.replace(/;$/, "").replace(/;/g, "; ").replace(/,/g, " on "));
     const licenseNumber = c ? fullLicense(licenses, c.licType, c.licNo) ?? c.licNo : null;
     const city = clean(r[6]), st = clean(r[7]), zip = clean(r[8]);
     yield enf({
       state: "FL", source: "Florida DBPR complaints and discipline (construction and electrical)", sourceUrl: FL_COMPLAINTS_PAGE,
-      category: "complaint", name: [name, ...dbas].join(" / "), id, date: usDate(r[12]), endDate: usDate(r[14]),
+      category: "complaint", name: who.name, id, date: usDate(r[12]), endDate: usDate(r[14]),
       status: disposition, city,
       detail: [clean(r[11]), clean(r[9]), discipline ? `Discipline: ${discipline}` : null, c?.licType && c.licNo ? `On ${c.licType} license ${licenseNumber}` : null].filter(Boolean).join(". ") || null,
       amount: null, adverse: flDispositionAdverse(disposition),
-      address: joinAddress(street, city, st, zip), licenseNumber,
-    }, [name, ...dbas].join(" "), { licenses: [licenseNumber], addresses: addressKeysOf(street, city, st, zip) }, "complaints");
+      // An individual's DBA: city, state and ZIP only, and no address key (their street may be their home).
+      address: who.dbaOnly ? localityLine(city, st, zip) : joinAddress(street, city, st, zip), licenseNumber,
+    }, who.business, { licenses: [licenseNumber], addresses: who.dbaOnly ? [] : addressKeysOf(street, city, st, zip) }, "complaints");
   }
   // Discipline cases the complaint extracts don't list.
   for (const c of Array.from(cases.values())) {
     if (seen.has(c.id)) continue;
-    if (!flRespondentIsBusiness(c.name, c.dbas)) continue;
+    const who = flRespondent(c.name, c.dbas);
+    if (!who) continue;
     const licenseNumber = fullLicense(licenses, c.licType, c.licNo) ?? c.licNo;
     yield enf({
       state: "FL", source: "Florida DBPR complaints and discipline (construction and electrical)", sourceUrl: FL_CILB_PAGE,
-      category: "discipline", name: [c.name, ...c.dbas].join(" / "), id: c.id, date: c.entered, endDate: c.dispDate, status: c.disposition,
+      category: "discipline", name: who.name, id: c.id, date: c.entered, endDate: c.dispDate, status: c.disposition,
       city: [c.city, c.county ? `${c.county} County` : null].filter(Boolean).join(", ") || null,
       detail: [c.classification, c.licType && c.licNo ? `On ${c.licType} license ${licenseNumber}` : c.licType,
         c.discipline.length ? `Discipline: ${c.discipline.join("; ")}` : null, c.violations.length ? `Violation code ${c.violations.join(", ")}` : null].filter(Boolean).join(". ") || null,
       amount: null, adverse: caseAdverse(c.disposition, c.discipline),
-      address: joinAddress(c.lines, c.city, c.state, c.zip), licenseNumber,
-    }, [c.name, ...c.dbas].join(" "), { licenses: [licenseNumber], addresses: addressKeysOf(c.lines, c.city, c.state, c.zip) });
+      address: who.dbaOnly ? localityLine(c.city, c.state, c.zip) : joinAddress(c.lines, c.city, c.state, c.zip), licenseNumber,
+    }, who.business, { licenses: [licenseNumber], addresses: who.dbaOnly ? [] : addressKeysOf(c.lines, c.city, c.state, c.zip) });
   }
 }
 
@@ -1081,10 +1114,14 @@ export function parseCaDebarments(html: string, today = new Date().toISOString()
     if (cells.length < 2) continue;
     const who = text(cells[0]), period = text(cells[1]);
     if (!who || !period || /name of contractor/i.test(who)) continue;
-    // Dates are written M/D/YYYY, and on some rows M/D/YY ("9/13/24 through 9/13/27"): a two-digit year is 20YY.
-    const dates = Array.from(period.matchAll(/\b(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\b/g)).map((d) => usDate(`${d[1]}/${d[2]}/${d[3].length === 2 ? `20${d[3]}` : d[3]}`));
-    if (!dates.some(Boolean)) continue;
+    // Dates are written M/D/YYYY, and on some rows M/D/YY ("9/13/24 through 9/13/27"). The page doesn't say which
+    // century a two-digit year is in, so that date is left empty (the period stays in the detail as published;
+    // round 3, decision 13).
+    const found = Array.from(period.matchAll(/\b(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\b/g));
+    if (!found.length) continue;
+    const dates = found.map((d) => (d[3].length === 4 ? usDate(`${d[1]}/${d[2]}/${d[3]}`) : null));
     const from = dates[0] ?? null, to = dates[1] ?? null;
+    const endUnknown = found.length > 1 && !to;
     const pdf = cells[1].match(/href="([^"]+\.pdf)"/i)?.[1];
     const stayed = /stay/i.test(period);
     // The page writes the CSLB number several ways: "CSLB License Number: 976339", "CSLB Number: #969048", "CSLB# 919516",
@@ -1099,10 +1136,10 @@ export function parseCaDebarments(html: string, today = new Date().toISOString()
       state: "CA", source: "California Labor Commissioner public-works debarments", sourceUrl: pdf ? new URL(pdf, DLSE_DEBAR).toString() : DLSE_DEBAR,
       category: "debarment", name: named, id: licenseNumber,
       date: from, endDate: to,
-      status: stayed ? "Stayed by a court (see decision)" : ended ? "Debarment period over" : "Debarred",
+      status: stayed ? "Stayed by a court (see decision)" : endUnknown ? "Debarment (period as published)" : ended ? "Debarment period over" : "Debarred",
       // From the status itself (audit 2026-10-15): a running debarment is adverse, one whose period is over is not,
-      // a stayed one is unknown.
-      city: null, detail: period, amount: null, adverse: stayed ? null : adverseFrom("Debarred", { ended }), licenseNumber,
+      // a stayed one, or one whose end date can't be read, is unknown.
+      city: null, detail: period, amount: null, adverse: stayed || endUnknown ? null : adverseFrom("Debarred", { ended }), licenseNumber,
     }, who, { licenses }));
   }
   return out;
@@ -1125,6 +1162,7 @@ export const BULK_SOURCES: BulkSource[] = [
     load: flSunbizOfficersLoader },
   // 26,001 rows loaded live 2026-10-16 once individual respondents were left out (49,360 with them); floor about 80%.
   { id: "fl-dbpr-complaints", state: "FL", label: "Florida DBPR complaints and discipline (construction and electrical)", pageUrl: FL_COMPLAINTS_PAGE, everyHours: 24, minRows: 21_000,
+    legacyEnforcement: flLegacyComplaint,
     load: flComplaintsLoader, companiesOnly: true },
   { id: "fl-stop-work", state: "FL", label: "Florida stop-work orders (Division of Workers' Compensation)", pageUrl: FL_SWO, everyHours: 24, minRows: 40_000,
     load: flStopWorkLoader, companiesOnly: true },
@@ -1134,6 +1172,7 @@ export const BULK_SOURCES: BulkSource[] = [
     load: txPlumbingLoader },
   // CSLB streams slowly in the daytime and cuts downloads off at about 150 s: fetch it in the small hours, Pacific time.
   { id: "ca-cslb", state: "CA", label: "California CSLB contractor licenses", pageUrl: CSLB, everyHours: 20, minRows: 185_000, // one hit per license since 2026-10-15: 264,352 rows on that day (was ~668k with a row per person)
+    rowShapeChangedAt: "2026-10-15",
     // Starts 09–11 UTC only: a load begun at 12:52 UTC on 2026-10-15 was cut off on every try.
     utcHours: CSLB_START_HOURS,
     load: caCslbLoader },
