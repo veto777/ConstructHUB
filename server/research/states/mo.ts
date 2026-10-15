@@ -102,13 +102,13 @@ function moBoardLoader(board: string, label: string): () => AsyncIterable<BulkHi
   };
 }
 
-const MO_ELECTRICAL: BulkSource = {
+export const MO_ELECTRICAL: BulkSource = {
   id: "mo-dpr-electrical", state: "MO", label: "Missouri statewide electrical contractor licenses (active)", pageUrl: MO_DOWNLOADS,
   everyHours: 24, minRows: 840, // 1,201 on 2026-10-15
   load: moBoardLoader("Electrical Contractors", "Missouri statewide electrical contractor licenses"),
 };
 
-const MO_AE: BulkSource = {
+export const MO_AE: BulkSource = {
   id: "mo-dpr-ae", state: "MO", label: "Missouri architects, engineers, land surveyors and landscape architects (active)", pageUrl: MO_DOWNLOADS,
   everyHours: 24 * 7, minRows: 21_000,
   load: moBoardLoader("Architects, Engineers, Land Surveyors, and Landscape Architects", "Missouri architects, engineers, land surveyors and landscape architects"),
@@ -214,12 +214,16 @@ export const pack: StatePack = {
   checked: "2026-10-15",
   licenses: [MO_OWTS],
   liveLicenses: [MO_LIVE],
-  bulk: [MO_ELECTRICAL, MO_AE],
+  // MO_ELECTRICAL and MO_AE are kept for the record but not registered: their files are served from
+  // modpr.file.force.com, whose robots.txt (Salesforce's) disallows every path for all agents but Googlebot
+  // (checked 2026-10-15). The live licensee search covers the same licenses.
+  bulk: [],
   noStatewideGcLicense:
     "Missouri does not license general contractors statewide; cities and counties license contractors and trades, and the optional statewide electrical contractor license is searched above",
   blocked: [
     "Missouri Division of Labor Standards contractor debarment list (labor.mo.gov/contractor-debarment-list): reads 'No contractors debarred at this time' on 2026-10-15, nothing to search",
     "Missouri Secretary of State business entities: no free bulk file or open API (the online search is per entity)",
+    "MO PRO downloadable listings (electrical contractors; architects, engineers, land surveyors, landscape architects): the files are served from modpr.file.force.com, whose robots.txt disallows all paths for every agent but Googlebot (checked 2026-10-15), so they are not downloaded; the live licensee search covers these licenses",
     "MO PRO downloadable listings hold active licenses only; non-active licenses and discipline status come from the live licensee search",
   ],
 };

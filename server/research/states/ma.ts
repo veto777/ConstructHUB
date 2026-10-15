@@ -297,7 +297,8 @@ async function dfsSearch(name: string, kind: "person" | "company"): Promise<Lice
   const parts = splitName(name);
   if (!parts) return [];
   const rows = await myLicenseSearch(DFS, { t_web_lookup__last_name: parts.last, t_web_lookup__first_name: parts.first });
-  return rows.filter((r) => DFS_TYPES.test(r["License Type"] ?? "")).map((r) => dfsHit(r, "principal")).filter((h) => wholeWordMatch(name, h));
+  // The MyLicense cap note ("showing the first N of M") rides on `rows`; keep it on the filtered list.
+  return withNote(rows.filter((r) => DFS_TYPES.test(r["License Type"] ?? "")).map((r) => dfsHit(r, "principal")).filter((h) => wholeWordMatch(name, h)), noteOf(rows));
 }
 
 async function dfsSearchBy(q: IdQuery): Promise<LicenseHit[] | null> {

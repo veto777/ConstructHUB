@@ -81,7 +81,9 @@ const statusOf = (v: string | null) => (v && /[A-Za-z]/.test(v) ? v : null);
 const nycEnforcement: SodaEnforcement[] = [
   {
     state: "NY", source: "New York City DOB / ECB building-code violations", scope: "Violations where the company is the respondent, 1980s to today",
-    ...soda("data.cityofnewyork.us", "6bgk-3dad"), nameFields: ["respondent_name"], order: "issue_date DESC",
+    // No server-side $order: sorting this dataset's word matches by date takes the server about 60 s (1.4 s without,
+    // checked 2026-10-15); the report sorts by date itself, and a full page says that more rows exist.
+    ...soda("data.cityofnewyork.us", "6bgk-3dad"), nameFields: ["respondent_name"],
     toHit: (r: Row) => {
       const hearing = txt(r, "hearing_status");
       const penalty = Number(r.penality_imposed);
