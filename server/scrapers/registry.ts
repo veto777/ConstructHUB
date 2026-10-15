@@ -163,6 +163,10 @@ registerAdapter(ftg);
 
 import myGovAdapter from "./mygov";
 registerAdapter(myGovAdapter);
+// MyGov's public lookup is address-only. Tenants that publish a verified public Excel permit report with named
+// contacts also get name/company search, registered by jurisdiction so the other tenants stay address-only.
+import { MYGOV_NAME_REPORTS, myGovReportAdapter } from "./mygov";
+for (const [tenant, { jurisdiction }] of Object.entries(MYGOV_NAME_REPORTS)) registerJurisdictionAdapter(jurisdiction, myGovReportAdapter(tenant));
 import mgoConnectAdapter from "./mgo-connect";
 registerAdapter(mgoConnectAdapter);
 

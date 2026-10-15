@@ -101,3 +101,27 @@ Tenant public-access settings and CAPTCHA policies prevent universal coverage. D
 The fixtures are untouched real response bodies fetched on 2026-10-10; `provenance.json` records URLs, query values, status and timestamps. The initial Downers Grove Main fixture contains 20 rows and Next; the Carrollton address fixtures contain all 49 rows across three pages. Offline tests cover real no-results, CAPTCHA, exact redirects, dates, pagination, repeated pages and registry aliases.
 
 Validation: `npx vitest run --configLoader runner server/scrapers/cityview.test.ts server/scrapers/govpilot.test.ts` passed 26 tests (15 CityView, 11 GovPilot). `npx tsc --noEmit -p .` passed. Plain `npx vitest run ...` failed before tests because the shared node_modules is read-only; --configLoader runner uses the same repository config without the forbidden temporary bundle write. No application server or database was started.
+
+## Name/company search check — 2026-10-14 (finding; not implemented yet)
+
+Contact-name search exists on some CityView tenants. It is configured per tenant, and the locator help text says whether it is on: "Begin typing an application number, address, Parcel Number or name/address of a contact on the permit". Checked live (anonymous, ≤1 request/s per host) with POST `<root>/Permit/PermitSearch` (autocomplete; form `term`, header `__RequestVerificationToken` from the Locator page) for "Smith" and "Construction":
+
+| Tenant | Help text mentions contacts | Autocomplete returns contacts |
+|---|---|---|
+| Naples, FL (cityview2.iharriscomputer.com/cityofnaplesflorida) | no help text | yes (e.g. "HEMMER CONSTRUCTION -CGC060648") |
+| Johnson City, TN | yes | yes ("Scott Smith Construction, Address:…") |
+| Billings, MT | yes | yes ("HIGHSMITH CONSTRUCTION, Address:3138 STILLWATER DR, …") |
+| South Jordan, UT | yes | yes ("LAYTON CONSTRUCTION, Address:9090 S SANDY PKWY") |
+| Carrollton, TX | yes (generic) | no — "[There are no matches]" even for "Smith"; addresses and permit numbers do match |
+| Fernandina Beach, FL | yes | no matches |
+| Downers Grove, IL | no (address/parcel/application only) | no matches |
+| Schertz, TX / Rogers, AR | — | PermitSearch returns an error or not-found page |
+
+On Billings, GET `Permit/LocatorResults?searchValue=HIGHSMITH CONSTRUCTION` (or the full suggestion text) returned about 100 permits. The detail page of the first one, BP-24-04468, lists "Contractor: HIGHSMITH CONSTRUCTION, Address:3138 STILLWATER DR…" and "Applicant: MT ANGEL PROPERTIES LLC". Result rows show only number, type, status and locations; contacts appear only on the Status detail page.
+
+Not implemented, because a correct version needs:
+- per-tenant enablement (jurisdiction registration, verified like MyGov's report tenants)
+- a parser for the detail page's role-labelled Contacts section
+- a detail fetch per hit to confirm the name, which is about 100 requests per busy contractor at 1 request/s, more than the 75 s live-search budget per portal
+
+Until then the adapter remains address/permit only.
