@@ -184,10 +184,12 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   citations: {
     title: "Citations",
     body: [
-      "A citation is any website that lists your business name, address and phone number — directories like Yelp, BBB, Angi, HomeAdvisor, Apple Maps and Bing Places.",
-      "Why it matters: Google checks other sites to confirm your business is real and where it is. Being listed on the important sites — with exactly the same name, address and phone everywhere — helps you rank higher in Google Maps. Mismatched details (an old phone number, a different spelling) do the opposite.",
-      "How to use this: create a campaign, click Build checklist, then for each site click Search. It looks for your business on that site through Google. Mark what you found — listed and correct, listed with wrong info, or not listed — and paste the link to your listing if you have it.",
-      "Then fix anything marked wrong on that site itself, and add your business to the sites where you're not listed. ConstructHUB never guesses: a site stays “Not checked” until you mark it. The Google row fills in automatically when this location is linked to your Google Business Profile.",
+      "A citation is simply your business listed on another website: Yelp, BBB, Angi, HomeAdvisor, Houzz, Facebook, Nextdoor, Apple Maps, Bing Places, Yellow Pages and so on. Each one is a line that says: this company exists, it is at this address, this is its phone number.",
+      "Why you care: Google does not take your word for where your business is. It checks what the rest of the internet says. When thirty sites all agree on the same name, address and phone, Google treats you as real and established and shows you higher in Maps. When they disagree — an old number on Yelp, a different spelling on BBB — Google hesitates, and a competitor with tidy listings takes the spot.",
+      "What a campaign is: a checklist of about 30 directories that matter for contractors, built for one location. ConstructHUB does not submit listings for you, and it never guesses — a site stays Not checked until you have looked.",
+      "How to run one, step by step: 1) Press New Campaign and pick the location. 2) Press Build checklist: every directory appears as a row. 3) On a row, press Search: it opens a Google search limited to that site for your business name and city, so you see in seconds whether you are listed. 4) Mark what you found — Listed and correct, Listed with wrong details, or Not listed — and paste the link to your listing if there is one. 5) The counts at the top keep score: how many sites have you, how many are opportunities.",
+      "Then the real work, on the sites themselves: fix every listing marked wrong so it matches your Google Business Profile exactly, and claim a free listing on each site where you are not listed. Do a few a week; come back and update the marks.",
+      "The Google row fills itself in when this location is linked to your Google Business Profile. Everything else is your own eyes and your own marks, which is why the result can be trusted.",
     ],
   },
 

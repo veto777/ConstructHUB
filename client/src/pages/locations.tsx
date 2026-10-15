@@ -1146,7 +1146,7 @@ function CitationsTab({ location }: { location: BusinessLocation }) {
             <h3 className="text-base font-semibold">Citation Campaigns</h3>
             <InfoTip k="citations" />
           </div>
-          <p className="text-xs text-muted-foreground max-w-xl">A citation is any website that lists your business name, address and phone number — Yelp, BBB, Angi, Apple Maps and so on. Being listed, with the same details everywhere, helps you show up in Google Maps.</p>
+          <p className="text-xs text-muted-foreground max-w-xl">A citation is a listing of your business on another site — Yelp, BBB, Angi, Apple Maps, Bing and about 25 more. Google trusts a business more when the same name, address and phone show up on all of them, and that moves you up in Maps. A campaign is a checklist of those sites for this location: ConstructHUB finds each listing with you, you mark what you found and fix anything wrong on the site itself. Press the ⓘ for the full walkthrough.</p>
         </div>
         <Button size="sm" onClick={() => setShowNewCampaign(true)} data-testid="button-new-campaign">
           <Plus className="w-4 h-4 mr-1" /> New Campaign

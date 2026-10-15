@@ -10,10 +10,15 @@
  *   - LinkedIn: the profile URL is the `creator.url` in the public JSON-LD of the account's own post
  *     (urn:li:ugcPost:7513788256031993858, creator "Construct HUB"). LinkedIn answers every signed-out
  *     profile request with its bot status 999, so the post is the proof, not the profile page.
+ * Checked 2026-10-15 (owner: "add social media links to the bottom, we are missing a few"):
+ *   - Facebook: the page id URL is the `public_url` prefix of the posts ConstructHUB itself published there
+ *     (social_posts, business 7); Facebook answers signed-out fetches with 400, so the posts are the proof.
+ *   - X: the owner's own link, https://x.com/Constructhubapp, answers 200.
+ *   - Pinterest: the owner's pin.it short link resolves to https://www.pinterest.com/chub0125/, which answers 200.
  * A new account is one more entry below (and, for a new platform, an icon in
  * client/src/components/social-links.tsx).
  */
-export type SocialKey = "youtube" | "instagram" | "tiktok" | "linkedin";
+export type SocialKey = "youtube" | "instagram" | "tiktok" | "linkedin" | "facebook" | "x" | "pinterest";
 
 export type SocialLink = {
   key: SocialKey;
@@ -33,6 +38,9 @@ export const SOCIAL_LINKS: readonly SocialLink[] = [
   { key: "instagram", name: "Instagram", url: "https://www.instagram.com/constructhubapp/", handle: "@constructhubapp", label: "ConstructHUB on Instagram", hosts: ["www.instagram.com"] },
   { key: "tiktok", name: "TikTok", url: "https://www.tiktok.com/@construct.hub", handle: "@construct.hub", label: "ConstructHUB on TikTok", hosts: ["www.tiktok.com"] },
   { key: "linkedin", name: "LinkedIn", url: "https://www.linkedin.com/in/construct-hub-796b59441", handle: "Construct HUB", label: "ConstructHUB on LinkedIn", hosts: ["www.linkedin.com"] },
+  { key: "facebook", name: "Facebook", url: "https://www.facebook.com/122103723477505177", handle: "Construct HUB", label: "ConstructHUB on Facebook", hosts: ["www.facebook.com"] },
+  { key: "x", name: "X", url: "https://x.com/Constructhubapp", handle: "@Constructhubapp", label: "ConstructHUB on X", hosts: ["x.com"] },
+  { key: "pinterest", name: "Pinterest", url: "https://www.pinterest.com/chub0125/", handle: "@chub0125", label: "ConstructHUB on Pinterest", hosts: ["www.pinterest.com"] },
 ];
 
 /** The YouTube channel (the walkthrough videos). */

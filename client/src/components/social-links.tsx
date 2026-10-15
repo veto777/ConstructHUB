@@ -8,7 +8,8 @@
  * Touch targets are 44 px on phones and 36 px from `sm` up.
  */
 import type { ComponentType, SVGProps } from "react";
-import { Instagram, Linkedin, Youtube } from "lucide-react";
+import { Instagram, Linkedin, Youtube, Facebook } from "lucide-react";
+import { SiPinterest, SiX } from "react-icons/si";
 import { SOCIAL_LINKS, type SocialKey } from "@shared/social-links";
 
 /** TikTok is not in lucide: a plain single-stroke note in the same 24 px outline style as the other icons. */
@@ -26,6 +27,10 @@ const ICONS: Record<SocialKey, ComponentType<SVGProps<SVGSVGElement>>> = {
   instagram: Instagram,
   tiktok: TikTokIcon,
   linkedin: Linkedin,
+  facebook: Facebook,
+  // Simple Icons' marks (react-icons): X and Pinterest have no lucide glyph.
+  x: SiX as unknown as ComponentType<SVGProps<SVGSVGElement>>,
+  pinterest: SiPinterest as unknown as ComponentType<SVGProps<SVGSVGElement>>,
 };
 
 /** Where the row sits: the navy marketing footers, the cream marketing paper, or the app's own surfaces. */

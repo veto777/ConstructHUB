@@ -18,6 +18,7 @@ describe("official social links", () => {
   it("every URL is https, on its platform's host, with a real path and nothing extra", () => {
     const platformHost: Record<string, string> = {
       youtube: "www.youtube.com", instagram: "www.instagram.com", tiktok: "www.tiktok.com", linkedin: "www.linkedin.com",
+      facebook: "www.facebook.com", x: "x.com", pinterest: "www.pinterest.com",
     };
     for (const link of SOCIAL_LINKS) {
       const u = new URL(link.url);
