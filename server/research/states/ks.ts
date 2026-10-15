@@ -6,15 +6,21 @@
  *         engineers, architects, land surveyors, landscape architects and geologists, individuals and firms
  *         ("facilities"), every status. The site notes K.S.A. 45-220(c) on downloaded lists, so it is searched
  *         per report and never downloaded in bulk.
+ *   ks-elevator-contractors / ks-elevator-mechanics  State Fire Marshal directories of licensed elevator
+ *         contractors (company, contact, phone) and elevator mechanics (name, phone, company), published as PDFs on
+ *         the Elevator Safety Program page and read with ./lib/g6-pdf.ts. The directories carry no license numbers.
  *
  * Kansas does not license contractors statewide (cities and counties do); roofers register with the Attorney
- * General, whose directory refuses automated requests (see blocked).
+ * General, whose directory refuses automated requests (see blocked). Elevator contractors and mechanics are the one
+ * construction trade the state licenses.
  */
 import type { LicenseHit } from "@shared/research-reports";
-import { clean, usDate } from "../bulk";
+import { promises as fs } from "node:fs";
+import { clean, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { Session, hiddenInputs, htmlText } from "./lib/g6-common";
+import { pdfLines, pdfTable, pdfTextRuns } from "./lib/g6-pdf";
 
 const KSBTP = "https://licensing.ks.gov/Verification_KBTP_213";
 const KSBTP_PERSON = `${KSBTP}/Search.aspx`;
@@ -80,10 +86,72 @@ const KS_KSBTP: LiveLicenseSearch = {
   },
 };
 
+// ── State Fire Marshal elevator directories (PDF) ────────────────────────────────────────────────────────────
+const KSFM_PAGE = "https://firemarshal.ks.gov/342/Elevator-Safety-Program";
+const KSFM_CONTRACTORS = "https://firemarshal.ks.gov/DocumentCenter/View/2371/Contractors-Phone-List";
+const KSFM_MECHANICS = "https://firemarshal.ks.gov/DocumentCenter/View/2370/Mechanics-Phone-List";
+const MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December";
+
+async function ksfmRows(url: string, header: string[]): Promise<{ asOf: string | null; rows: Record<string, string>[] }> {
+  const path = await download(url);
+  try {
+    const buf = await fs.readFile(path);
+    // The report's print date heads the first page ("Monday, August 17, 2026").
+    const first = pdfLines(pdfTextRuns(buf)).slice(0, 4).map((l) => l.map((r) => r.text).join(" ")).join(" ");
+    const d = first.match(new RegExp(`(${MONTHS}) (\\d{1,2}), (\\d{4})`));
+    const asOf = d ? `${d[3]}-${String(MONTHS.split("|").indexOf(d[1]) + 1).padStart(2, "0")}-${d[2].padStart(2, "0")}` : null;
+    const rows = pdfTable(buf, header).map((r) => r.cells)
+      // Skip the alphabet group letters, page footers and the repeated print date.
+      .filter((c) => !Object.values(c).some((v) => /^Page \d+ of \d+$/.test(v) || new RegExp(`(${MONTHS}) \\d{1,2}, \\d{4}`).test(v)))
+      .filter((c) => Object.values(c).filter(Boolean).length >= 2);
+    return { asOf, rows };
+  } finally { await fs.rm(path, { force: true }); }
+}
+
+
+const KS_ELEVATOR_CONTRACTORS: BulkSource = {
+  id: "ks-elevator-contractors", state: "KS", label: "Kansas State Fire Marshal licensed elevator contractors", pageUrl: KSFM_PAGE,
+  everyHours: 24 * 7, minRows: 23, // 33 on 2026-10-15
+  load: async function* () {
+    const { asOf, rows } = await ksfmRows(KSFM_CONTRACTORS, ["Company Name", "Name", "Phone"]);
+    for (const c of rows) {
+      const company = clean(c["company name"]), contact = clean(c.name), phone = clean(c.phone);
+      if (!company) continue;
+      const hit: LicenseHit = {
+        state: "KS", source: "Kansas State Fire Marshal licensed elevator contractors", sourceUrl: KSFM_PAGE,
+        businessName: company, licenseNumber: null, licenseType: "Elevator contractor", specialty: null,
+        status: asOf ? `Listed in the State Fire Marshal's licensed elevator contractor directory of ${asOf}` : "Listed in the State Fire Marshal's licensed elevator contractor directory",
+        principal: contact, city: null, expires: null, matchedOn: "business", phone, people: contact ? [{ name: contact, role: "Contact" }] : [],
+      };
+      yield { kind: "license", hit, business: company, person: contact, keys: { phones: [phone] } } satisfies BulkHit;
+    }
+  },
+};
+
+const KS_ELEVATOR_MECHANICS: BulkSource = {
+  id: "ks-elevator-mechanics", state: "KS", label: "Kansas State Fire Marshal licensed elevator mechanics", pageUrl: KSFM_PAGE,
+  everyHours: 24 * 7, minRows: 180, // 261 on 2026-10-15
+  load: async function* () {
+    const { asOf, rows } = await ksfmRows(KSFM_MECHANICS, ["Name", "Phone", "Company"]);
+    for (const c of rows) {
+      const who = clean(c.name), company = clean(c.company), phone = clean(c.phone);
+      if (!who) continue;
+      const hit: LicenseHit = {
+        state: "KS", source: "Kansas State Fire Marshal licensed elevator mechanics", sourceUrl: KSFM_PAGE,
+        businessName: company, licenseNumber: null, licenseType: "Elevator mechanic", specialty: null,
+        status: asOf ? `Listed in the State Fire Marshal's licensed elevator mechanic directory of ${asOf}` : "Listed in the State Fire Marshal's licensed elevator mechanic directory",
+        principal: who, city: null, expires: null, matchedOn: "principal", phone, people: [{ name: who, role: "Elevator mechanic" }],
+      };
+      yield { kind: "license", hit, business: company, person: who, keys: { phones: [phone] } } satisfies BulkHit;
+    }
+  },
+};
+
 export const pack: StatePack = {
   state: "KS",
   checked: "2026-10-15",
   liveLicenses: [KS_KSBTP],
+  bulk: [KS_ELEVATOR_CONTRACTORS, KS_ELEVATOR_MECHANICS],
   noStatewideGcLicense:
     "Kansas does not license general contractors or trades statewide (cities and counties do); engineers, architects and surveyors are licensed by the Board of Technical Professions (searched above), and roofers register with the Attorney General",
   blocked: [
