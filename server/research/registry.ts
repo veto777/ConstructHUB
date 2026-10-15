@@ -9,16 +9,17 @@ import { licenseSourcesFor, type LicenseSource } from "./licenses";
 import { searchSodaEnforcement, type SodaEnforcement } from "./state-records";
 import type { ComplaintSource } from "./records";
 import { STATE_PACKS } from "./states";
+import { LOCAL_BULK, LOCAL_LICENSES, LOCAL_LIVE } from "./states/local";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./states/types";
 
 const PACKS = new Map<string, StatePack>(STATE_PACKS.map((p) => [p.state, p]));
 const pack = (state: string): StatePack | undefined => PACKS.get(state);
 
-export const ALL_BULK_SOURCES: BulkSource[] = [...BULK_SOURCES, ...STATE_PACKS.flatMap((p) => p.bulk ?? [])];
+export const ALL_BULK_SOURCES: BulkSource[] = [...BULK_SOURCES, ...STATE_PACKS.flatMap((p) => p.bulk ?? []), ...LOCAL_BULK];
 export const allBulkSourcesFor = (state: string): BulkSource[] => ALL_BULK_SOURCES.filter((s) => s.state === state);
 
-export const allLicenseSourcesFor = (state: string): LicenseSource[] => [...licenseSourcesFor(state), ...(pack(state)?.licenses ?? [])];
-export const liveLicenseSearchesFor = (state: string): LiveLicenseSearch[] => pack(state)?.liveLicenses ?? [];
+export const allLicenseSourcesFor = (state: string): LicenseSource[] => [...licenseSourcesFor(state), ...(pack(state)?.licenses ?? []), ...LOCAL_LICENSES.filter((s) => s.state === state)];
+export const liveLicenseSearchesFor = (state: string): LiveLicenseSearch[] => [...(pack(state)?.liveLicenses ?? []), ...(LOCAL_LIVE[state] ?? [])];
 export const packComplaintSourcesFor = (state: string): ComplaintSource[] => pack(state)?.complaints ?? [];
 
 /** States with no statewide license for general contractors: said in the report instead of "no license found". */
