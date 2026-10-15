@@ -121,7 +121,7 @@ export type OshaHit = {
  * orders, environmental orders, tax liens, debarments and business-registration status. `adverse` is the source's own
  * outcome (a final order or suspension is adverse; a complaint closed with no violation found is not; null: unknown).
  */
-export type EnforcementCategory = "discipline" | "complaint" | "stop_work" | "environmental" | "tax_lien" | "debarment" | "business_status";
+export type EnforcementCategory = "discipline" | "complaint" | "stop_work" | "environmental" | "tax_lien" | "debarment" | "business_status" | "wage" | "court_case";
 export type EnforcementHit = {
   state: string; source: string; sourceUrl: string; category: EnforcementCategory;
   name: string | null; id: string | null; date: string | null; endDate: string | null; status: string | null;

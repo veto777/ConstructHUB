@@ -19,7 +19,7 @@ const day = (v: unknown): string | null => { const t = s(v); return t ? (/^\d{4}
 const num = (v: unknown): number | null => { const n = Number(v); return v == null || v === "" || !Number.isFinite(n) ? null : n; };
 const usd = (n: number | null) => (n == null ? null : `$${n.toLocaleString("en-US")}`);
 
-type SodaEnforcement = {
+export type SodaEnforcement = {
   state: string; source: string; scope: string; datasetUrl: string; url: string; nameFields: string[]; order?: string;
   toHit: (r: Row) => Omit<EnforcementHit, "state" | "source" | "sourceUrl">;
 };
@@ -150,13 +150,18 @@ export function parseTdlrOrders(html: string): EnforcementHit[] {
 // ── Per state ────────────────────────────────────────────────────────────────────────────────────────────────
 const MAX_ROWS = 500;
 
+/** One open-data enforcement dataset, searched by every word of the name, kept to rows that really name it. */
+export async function searchSodaEnforcement(src: SodaEnforcement, name: string, matches: (n: string | null) => boolean): Promise<EnforcementHit[]> {
+  const rows = await sodaRows(src.url, nameClause(src.nameFields, name), MAX_ROWS, src.source, src.order);
+  return rows.map((r) => ({ state: src.state, source: src.source, sourceUrl: src.datasetUrl, ...src.toHit(r) })).filter((h) => matches(h.name));
+}
+
 export async function searchStateEnforcement(name: string, state: string, matches: (n: string | null) => boolean): Promise<{ hits: EnforcementHit[]; sources: RecordSource[] }> {
   const hits: EnforcementHit[] = [];
   const sources: RecordSource[] = [];
   for (const src of SODA_SOURCES.filter((x) => x.state === state)) {
     try {
-      const rows = await sodaRows(src.url, nameClause(src.nameFields, name), MAX_ROWS, src.source, src.order);
-      const found = rows.map((r) => ({ state: src.state, source: src.source, sourceUrl: src.datasetUrl, ...src.toHit(r) })).filter((h) => matches(h.name));
+      const found = await searchSodaEnforcement(src, name, matches);
       hits.push(...found);
       sources.push({ source: src.source, scope: src.scope, searched: true, note: `${found.length} record(s)` });
     } catch (err: any) {

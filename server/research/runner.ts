@@ -26,9 +26,9 @@ import {
   type ResearchPreview, type ResearchTrade, type LicenseHit,
 } from "@shared/research-reports";
 import { SITE_ORIGIN as SITE } from "@shared/seo";
-import { licenseSourcesFor, searchLicenses, wholeWordMatch } from "./licenses";
+import { searchLicenses, wholeWordMatch } from "./licenses";
 import { refreshDueSources, searchBulk } from "./bulk";
-import { BULK_SOURCES, bulkSourcesFor } from "./bulk-sources";
+import { ALL_BULK_SOURCES, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
 import { previewCompanyRecords, searchCompanyRecords } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
 
@@ -58,9 +58,12 @@ export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | 
   const licenseSourceStates: string[] = [];
   for (const state of input.states) {
     const sources = licenseSourcesFor(state);
-    if (sources.length || bulkLicenseSources(state).length) licenseSourceStates.push(state);
+    if (hasLicenseSources(state)) licenseSourceStates.push(state);
     for (const src of sources) for (const s of input.subjects) {
       try { licenseMatches += (await searchLicenses(src, s.name, s.kind)).length; } catch { /* the preview is a hint, not the report */ }
+    }
+    for (const src of liveLicenseSearchesFor(state)) for (const s of input.subjects) {
+      try { licenseMatches += (await src.search(s.name, s.kind)).length; } catch { /* ditto */ }
     }
     for (const src of bulkLicenseSources(state)) for (const s of input.subjects) {
       try { licenseMatches += (await searchBulkLicenses(src, s.name, s.kind)).hits.length; } catch { /* ditto */ }
@@ -87,11 +90,6 @@ async function searchBulkLicenses(src: ReturnType<typeof bulkSourcesFor>[number]
     .filter((h) => wholeWordMatch(name, kind === "company" ? { businessName: h.businessName, principal: null } : { businessName: null, principal: h.principal }));
   return { hits: found, status };
 }
-
-/** States with no statewide license for general contractors: said in the report instead of "no license found". */
-const NO_STATEWIDE_GC_LICENSE: Record<string, string> = {
-  TX: "Texas does not license general contractors statewide; trades (electrical, A/C, plumbing and others) are licensed separately and are searched above",
-};
 
 function tradesFor(text: string, trades: ResearchTrade[]): string[] {
   const t = ` ${text.toLowerCase()} `;
@@ -232,7 +230,7 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
     const licenseSources: ResearchSubjectReport["licenseSources"] = [];
     for (const state of input.states) {
       const sources = licenseSourcesFor(state);
-      if (!sources.length && !bulkLicenseSources(state).length) licenseSources.push({ state, source: "State license records", searched: false, note: "We don't search this state's license records yet" });
+      if (!hasLicenseSources(state)) licenseSources.push({ state, source: "State license records", searched: false, note: "We don't search this state's license records yet" });
       for (const src of bulkLicenseSources(state)) {
         try {
           const { hits, status } = await searchBulkLicenses(src, subject.name, subject.kind);
@@ -243,10 +241,20 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
           licenseSources.push({ state, source: src.label, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
         }
       }
-      if (NO_STATEWIDE_GC_LICENSE[state]) licenseSources.push({ state, source: "Statewide general contractor license", searched: false, note: NO_STATEWIDE_GC_LICENSE[state] });
+      const noGc = noStatewideGcLicense(state);
+      if (noGc) licenseSources.push({ state, source: "Statewide general contractor license", searched: false, note: noGc });
       for (const src of sources) {
         try {
           const hits = await searchLicenses(src, subject.name, subject.kind);
+          licenses.push(...hits);
+          licenseSources.push({ state, source: src.source, searched: true, note: `${hits.length} match(es)` });
+        } catch (err: any) {
+          licenseSources.push({ state, source: src.source, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+        }
+      }
+      for (const src of liveLicenseSearchesFor(state)) {
+        try {
+          const hits = (await src.search(subject.name, subject.kind)).filter((h) => wholeWordMatch(subject.name, subject.kind === "company" ? { businessName: h.businessName, principal: null } : { businessName: null, principal: h.principal }));
           licenses.push(...hits);
           licenseSources.push({ state, source: src.source, searched: true, note: `${hits.length} match(es)` });
         } catch (err: any) {
@@ -352,7 +360,7 @@ export function startResearchWorker(): void {
   setInterval(() => { void drainResearchQueue().catch((err) => console.error("[research] queue:", err)); }, 5 * 60_000).unref?.();
   // The state bulk files (hundreds of MB a day): production only, unless a dev server asks with RESEARCH_BULK=on.
   if (process.env.RESEARCH_BULK === "on" || (process.env.NODE_ENV === "production" && process.env.RESEARCH_BULK !== "off")) {
-    const refresh = () => void refreshDueSources(BULK_SOURCES).catch((err) => console.error("[research-bulk] refresh:", err));
+    const refresh = () => void refreshDueSources(ALL_BULK_SOURCES).catch((err) => console.error("[research-bulk] refresh:", err));
     setTimeout(refresh, 3 * 60_000).unref?.();
     setInterval(refresh, 60 * 60_000).unref?.();
   }

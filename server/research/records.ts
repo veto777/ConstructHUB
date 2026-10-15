@@ -14,7 +14,7 @@ import { politeFetch } from "../scrapers/polite-fetch";
 import type { ComplaintHit, CourtCaseHit, EnforcementHit, OshaHit, RecordSource } from "@shared/research-reports";
 import { nameClause, sodaRows, tokens } from "./licenses";
 import { searchBulk } from "./bulk";
-import { bulkSourcesFor } from "./bulk-sources";
+import { allBulkSourcesFor as bulkSourcesFor, hasStateCourtSearch, packComplaintSourcesFor, searchPackEnforcement } from "./registry";
 import { searchStateEnforcement } from "./state-records";
 
 const MAX_COMPLAINTS = 1000;
@@ -32,7 +32,7 @@ const day = (v: unknown): string | null => s(v)?.slice(0, 10) ?? null;
 const num = (v: unknown): number | null => { const n = Number(v); return v == null || v === "" || !Number.isFinite(n) ? null : n; };
 
 // ── State AG consumer complaints (checked live 2026-10-14) ─────────────────────────────────────────────────────────
-type ComplaintSource = {
+export type ComplaintSource = {
   state: string; source: string; scope: string; datasetUrl: string; url: string; nameField: string; dateField: string;
   toHit: (row: Record<string, unknown>) => Omit<ComplaintHit, "state" | "source" | "sourceUrl">;
 };
@@ -59,7 +59,7 @@ const COMPLAINT_SOURCES: ComplaintSource[] = [
 ];
 
 export function complaintSourcesFor(state: string): ComplaintSource[] {
-  return COMPLAINT_SOURCES.filter((c) => c.state === state);
+  return [...COMPLAINT_SOURCES.filter((c) => c.state === state), ...packComplaintSourcesFor(state)];
 }
 
 export async function searchComplaints(src: ComplaintSource, name: string): Promise<ComplaintHit[]> {
@@ -167,9 +167,10 @@ export async function searchEnforcement(name: string, states: string[]): Promise
   const sources: RecordSource[] = [];
   const matches = (n: string | null) => namedIn(name, ...(n ?? "").split(" / "));
   for (const state of states) {
-    const live = await searchStateEnforcement(name, state, matches);
-    hits.push(...live.hits);
-    sources.push(...live.sources);
+    for (const live of [await searchStateEnforcement(name, state, matches), await searchPackEnforcement(name, state, matches)]) {
+      hits.push(...live.hits);
+      sources.push(...live.sources);
+    }
     for (const src of bulkSourcesFor(state)) {
       if (!src.companiesOnly) continue; // the license files are searched with the licenses
       try {
@@ -212,7 +213,7 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
       }
     }
   }
-  for (const state of states) sources.push({ source: `${state} state court cases`, scope: state, searched: false, note: "State courts don't publish searchable case data" });
+  for (const state of states) if (!hasStateCourtSearch(state)) sources.push({ source: `${state} state court cases`, scope: state, searched: false, note: "State courts don't publish searchable case data" });
   let courtCases: CourtCaseHit[] = [];
   try {
     const r = await searchCourtCases(name);
