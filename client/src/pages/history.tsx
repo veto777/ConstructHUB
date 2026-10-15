@@ -12,7 +12,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AppPage, EmptyState } from "@/components/app-ui";
-import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
 import {
   FileText,
@@ -75,6 +75,13 @@ export default function HistoryPage() {
   });
 
   const count = queries?.length ?? 0;
+  // The number strip, from the rows themselves: the list holds the latest 50 searches, newest first.
+  const typeLabel = (t: string) => t.replace(/_/g, " ");
+  const mostUsed = (() => {
+    const n = new Map<string, number>();
+    for (const q of queries ?? []) n.set(q.searchType, (n.get(q.searchType) ?? 0) + 1);
+    return [...n.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+  })();
 
   return (
     <AppPage width="narrow" testId="page-history">
@@ -84,7 +91,7 @@ export default function HistoryPage() {
         titleTestId="text-page-title"
         title="Search history"
         count={count > 0 ? count : null}
-        description="Rerun a recent permit search with one tap."
+        description="Every permit search you have run, ready to run again with one tap."
         flush
         actions={count > 0 ? (
           <GooglePill
@@ -104,7 +111,12 @@ export default function HistoryPage() {
             <div key={i} className="h-16 animate-pulse g-divider" />
           ))}
         </div>
-      ) : count > 0 ? (
+      ) : count > 0 ? (<>
+        <GoogleStatGrid cols={3}>
+          <GoogleStat label="Searches saved" value={count.toLocaleString()} hint={count >= 50 ? "The latest 50 are listed" : undefined} testId="stat-history-count" />
+          <GoogleStat label="Last search" value={new Date(queries![0].createdAt).toLocaleDateString()} hint={queries![0].searchValue} testId="stat-history-last" />
+          <GoogleStat label="Most used" value={<span className="capitalize">{mostUsed ? typeLabel(mostUsed[0]) : "—"}</span>} hint={mostUsed ? `${mostUsed[1]} of ${count} searches` : undefined} testId="stat-history-type" />
+        </GoogleStatGrid>
         <GoogleList testId="list-history">
           {queries!.map((query) => {
             const Icon = typeIcons[query.searchType] ?? Search;
@@ -142,13 +154,14 @@ export default function HistoryPage() {
             );
           })}
         </GoogleList>
-      ) : (
-        <EmptyState
-          icon={FileText}
-          title="No searches yet"
-          description="Run a permit search and it shows up here, ready to rerun."
-          action={<GooglePill icon={Search} variant="solid" label="Search permits" href="/search" testId="link-history-search" />}
-        />
+      </>) : (
+        /* Nothing saved yet: what will appear and where it comes from. No sample searches. */
+        <div className="g-callout" data-testid="empty-history">
+          <h3 className="inline-flex items-center gap-2"><FileText className="h-4 w-4" aria-hidden="true" /> No searches yet</h3>
+          <p>Each permit search you run will be listed here, newest first (the latest 50): what you searched for, whether it was an address, a name, a company, a license or a permit number, and when. “Search again” reopens it on Search permits with the same values filled in.</p>
+          <p className="mt-2">A search is saved the moment Search permits runs it live on the portals in your area. Nothing else writes here.</p>
+          <div className="mt-3"><GooglePill icon={Search} variant="solid" label="Search permits" href="/search" testId="link-history-search" /></div>
+        </div>
       )}
 
       <AlertDialog open={confirmClearAll} onOpenChange={setConfirmClearAll}>

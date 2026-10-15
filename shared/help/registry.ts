@@ -21,7 +21,7 @@ import { EXTERNAL_FEATURE_PAGES, FEATURE_PAGES } from "../feature-pages";
 import { INTRO_VIDEO_PREFIX, introVideoKey } from "../feature-pages/intro-video";
 
 export { HELP_GROUPS } from "./types";
-export type { HelpEntry, HelpGroup, HelpVideo } from "./types";
+export type { HelpEntry, HelpGroup, HelpVideo, HelpVideoSource } from "./types";
 
 const planOf = (module: ModuleKey) => PLANS[planForModule(module)].name;
 /** "The <plan> plan, which includes the “<module>” module." — both names read from the plan model. */
@@ -59,15 +59,15 @@ const entries: Draft[] = [
   },
   {
     key: "cloudflare.sites", parent: "cloudflare", group: "Tools", route: "/cloudflare", title: "Cloudflare → Sites",
-    whatItIs: "The list of websites (zones) found in your connected Cloudflare accounts.",
-    whatItDoes: "Shows each site’s status at Cloudflare (active or pending), how many of your Locations use that website, when it was last synced, and the last error if a job failed. Clicking a site’s name opens its daily traffic, firewall events, top paths, countries, bot share and flagged IP addresses.",
+    whatItIs: "The websites (zones) found in your connected Cloudflare accounts, one card each.",
+    whatItDoes: "A summary strip counts the sites that match your search and filter, how many are synced, how many are not, and how many of your Locations are linked to them. Under it, one card per site shows its status at Cloudflare (active or pending), its zone ID, when it was last synced, how many of your Locations use that website, and whether the last job failed, with its message. Open, or the site’s name, shows its daily traffic, firewall events, top paths, countries, bot share and flagged IP addresses. Until a site exists, two made-up sample cards show what the list will look like.",
     howToUse: [
-      "Search by name or filter by status to find a site.",
-      "Tick sites and choose “Sync selected”, or “Sync all matching sites” for everything the search and filter match. Each row also has its own Sync button.",
+      "Search by name or filter by status to find a site; the summary strip follows the search.",
+      "Tick sites and choose “Sync selected”, or “Sync all matching sites” for everything the search and filter match. Each card also has its own Sync button.",
       "Open Work queue to watch the sync finish.",
-      "Click a site’s name to read what came back.",
+      "Choose Open, or the site’s name, to read what came back.",
     ],
-    howItWorks: "Sync adds one job per site; a site that already has a sync waiting is not queued twice. The worker asks Cloudflare’s analytics for the last 24 hours: daily requests, page views, unique visitors and threats (counted in UTC days), the latest 100 firewall events, the top 20 paths, and bot scores when the Cloudflare plan provides them. Anything Cloudflare doesn’t return is shown as unavailable. A site is linked to a Location when its domain matches the Location’s website exactly. The list refreshes itself every 15 seconds.",
+    howItWorks: "Sync adds one job per site; a site that already has a sync waiting is not queued twice. The worker asks Cloudflare’s analytics for the last 24 hours: daily requests, page views, unique visitors and threats (counted in UTC days), the latest 100 firewall events, the top 20 paths, and bot scores when the Cloudflare plan provides them. Anything Cloudflare doesn’t return is shown as unavailable. A site is linked to a Location when its domain matches the Location’s website exactly. The summary counts come from the server over every site that matches, not only the page shown. The sample cards are fixed text, shown only while the list is empty and never saved. The list refreshes itself every 15 seconds.",
     needs: [EDGE, "At least one connection under Connections."],
   },
   {
@@ -85,7 +85,7 @@ const entries: Draft[] = [
     needs: [EDGE, "Rate-limit rules depend on your Cloudflare plan — the preview says so.", "Rules affect real visitors; only traffic that passes through Cloudflare is covered.", IDENTITY],
   },
   {
-    key: "cloudflare.connections", parent: "cloudflare", group: "Tools", route: "/cloudflare", title: "Cloudflare → Connections",
+    key: "cloudflare.connections", parent: "cloudflare", group: "Tools", route: "/cloudflare/connections", title: "Cloudflare → Connections",
     whatItIs: "Where you give ConstructHUB access to a Cloudflare account, see the accounts already connected, and remove them.",
     whatItDoes: "There are three ways in. Recommended: “Connect with Cloudflare” — you sign in at Cloudflare, tick the account with your websites, and choose Authorize; ConstructHUB gets full access to that account (zones, DNS, analytics, firewall, cache, SSL, hosting) that you can revoke in Cloudflare under Manage OAuth authorizations. Fallback: enter your Cloudflare login email and Global API Key (Cloudflare’s master key). ConstructHUB checks them with Cloudflare, lists your accounts and zones, and you tick the zones to share; “Create limited key” then has Cloudflare make a new key named “ConstructHUB (date)” that can do only three things on the zones you ticked: Zone Read, Analytics Read and Zone WAF Edit (WAF is Cloudflare’s firewall rules). Fallback: paste a limited token you created yourself in Cloudflare. Agency membership: a path for ConstructHUB’s own agency account only — on any other account the button answers that it is not configured.",
     howToUse: [
@@ -99,7 +99,7 @@ const entries: Draft[] = [
     needs: [EDGE, "A Cloudflare login (the sign-in button), or the Cloudflare login email and Global API Key, or a token with Zone Read, Analytics Read and Zone WAF Edit on the chosen zones.", IDENTITY],
   },
   {
-    key: "cloudflare.onboarding", parent: "cloudflare", group: "Tools", route: "/cloudflare", title: "Cloudflare → Onboarding",
+    key: "cloudflare.onboarding", parent: "cloudflare", group: "Tools", route: "/cloudflare/onboarding", title: "Cloudflare → Onboarding",
     whatItIs: "A way to email a client the steps for giving the agency’s Cloudflare login access to their account as a member.",
     whatItDoes: "You pick a connection, list clients one per line (email, location ID, Cloudflare account ID) and send. Each client is emailed the steps: in Cloudflare open Manage Account → Members and invite the agency email with the Domain Administrator role for their site. The email says plainly that this role gives full access to that domain, including DNS. The Invitations list shows each one as pending or accepted.",
     howToUse: [
@@ -113,7 +113,7 @@ const entries: Draft[] = [
     needs: [EDGE, "The agency membership connection, which only ConstructHUB’s operator can configure.", "A Location with a website for each client."],
   },
   {
-    key: "cloudflare.work-queue", parent: "cloudflare", group: "Tools", route: "/cloudflare", title: "Cloudflare → Work queue",
+    key: "cloudflare.work-queue", parent: "cloudflare", group: "Tools", route: "/cloudflare/work-queue", title: "Cloudflare → Work queue",
     whatItIs: "The list of background jobs for your Cloudflare connections — the “is it done yet?” screen.",
     whatItDoes: "Shows every job with its number, kind (discover, sync, apply, undo, memberships, invite), state (queued, running, done, failed or uncertain) and its error message, if any. You can search and filter by state.",
     howToUse: [
@@ -126,7 +126,7 @@ const entries: Draft[] = [
     needs: [EDGE],
   },
   {
-    key: "cloudflare.edge-audit", parent: "cloudflare", group: "Tools", route: "/cloudflare", title: "Cloudflare → Edge audit",
+    key: "cloudflare.edge-audit", parent: "cloudflare", group: "Tools", route: "/cloudflare/edge-audit", title: "Cloudflare → Edge audit",
     whatItIs: "The record of every protection change: each preview you made and what happened to it.",
     whatItDoes: "For each change it shows the zone, the rule pack, the state (preview, queued, applied, reverted or uncertain), the time, when the “before” and the latest snapshots were taken, and how many blocked requests were in the sampled recent firewall events before and now. Applied and uncertain changes have an “Undo ConstructHUB rules” button.",
     howToUse: [
@@ -139,7 +139,7 @@ const entries: Draft[] = [
     needs: [EDGE, IDENTITY],
   },
   {
-    key: "cloudflare.guide", parent: "cloudflare", group: "Tools", route: "/cloudflare", title: "Cloudflare → Guide",
+    key: "cloudflare.guide", parent: "cloudflare", group: "Tools", route: "/cloudflare/guide", title: "Cloudflare → Guide",
     whatItIs: "Written step-by-step instructions, inside the page.",
     whatItDoes: "Covers putting a client site behind Cloudflare (adding the domain, checking DNS records, changing nameservers at GoDaddy, Namecheap, Squarespace and Bluehost), the three ways to connect Cloudflare to ConstructHUB, what Disconnect does, the cautions about blocking rules, and connecting Google Search Console.",
     howToUse: [
@@ -168,25 +168,25 @@ const entries: Draft[] = [
   },
   {
     key: "search-console.sites", parent: "search-console", group: "Tools", route: "/search-console", title: "Search Console → Sites",
-    whatItIs: "The list of Search Console properties found in your connected Google accounts.",
-    whatItDoes: "Shows each property with your access level at Google (siteOwner, siteFullUser or siteRestrictedUser, or access_removed when Google no longer lists it), how many of your Locations use that website, when it was last synced and the last error if a job failed. Clicking a property’s name opens its search analytics, sitemaps and index checks.",
+    whatItIs: "The websites (Google calls them properties) found in your connected Google accounts, one card each.",
+    whatItDoes: "A summary strip counts the properties that match your search and filter, how many are synced, how many are not, and how many of your Locations are linked to them. Under it, one card per property shows your access level at Google (Owner, Full, Restricted, Unverified, or “Access removed” when Google no longer lists it), the property ID the bulk box asks for, when it was last synced, how many of your Locations use that website, and whether the last job failed, with its message. Open, or the property’s name, shows its search analytics, sitemaps and index checks. Until a property exists, two made-up sample cards show what the list will look like.",
     howToUse: [
-      "Search by name or filter by access level.",
-      "Tick properties and choose “Sync selected”, or “Sync all matching sites”. Each row also has its own Sync button.",
+      "Search by name or filter by access level; the summary strip follows the search.",
+      "Tick properties and choose “Sync selected”, or “Sync all matching sites”. Each card also has its own Sync button.",
       "Open Work queue to watch the downloads finish.",
-      "Click a property’s name to read the data.",
+      "Choose Open, or the property’s name, to read the data.",
     ],
-    howItWorks: "Properties are found automatically: once when you connect, then about every hour. One that disappears from Google’s list is marked access_removed instead of deleted. A property is linked to a Location when its domain matches the Location’s website. Sync adds one job per property, and a property that already has a sync waiting is not queued twice. The list refreshes itself every 15 seconds.",
+    howItWorks: "Properties are found automatically: once when you connect, then about every hour. One that disappears from Google’s list is marked “Access removed” instead of deleted. A property is linked to a Location when its domain matches the Location’s website. Sync adds one job per property, and a property that already has a sync waiting is not queued twice. The summary counts come from the server over every property that matches, not only the page shown. The sample cards are fixed text, shown only while the list is empty and never saved. The list refreshes itself every 15 seconds.",
     needs: [EDGE, "At least one Google account under Connections."],
   },
   {
     key: "search-console.sync-range", parent: "search-console", group: "Tools", route: "/search-console", title: "Search Console → Sync date range",
-    whatItIs: "The two date boxes above the Sync buttons: how far back to download search data.",
-    whatItDoes: "Sets the first and last day for the next Sync. The first day can be up to 16 months ago; the last day cannot be in the future. Leave both empty and Sync downloads the last 31 days up to three days ago.",
+    whatItIs: "The folded “Import date range” line above the list: how far back the next Sync downloads search data.",
+    whatItDoes: "The folded line says what the next Sync will download. Opened, it offers quick picks — the last 31 days (the default), 3, 6, 12 or 16 months — and two date boxes for any other range. The first day can be up to 16 months ago; the last day cannot be in the future. Leave both empty and Sync downloads the last 31 days up to three days ago.",
     howToUse: [
-      "Pick “Sync from” — any day within the last 16 months.",
-      "Optionally pick “Sync through”. It is only used when “Sync from” is set; empty means up to three days ago.",
-      "Choose Sync selected or Sync all matching sites.",
+      "Open “Import date range” above the list.",
+      "Choose a quick pick, or type “Sync from” (any day within the last 16 months) and, if you want, “Sync through”. A quick pick sets the first day only; the last day stays three days ago.",
+      "Choose Sync selected, Sync all matching sites, or a card’s own Sync.",
       "Watch Work queue: a long range becomes many small jobs.",
     ],
     howItWorks: "The server refuses a first day older than 16 months or later than the last day, and a last day in the future. The worker cuts the range into 28-day pieces and, for each piece, queues one download per breakdown (date, query, page, device, country). Each download asks Google for finalised web-search data, 25,000 rows at a time, and replaces what was stored for those days.",
@@ -219,7 +219,7 @@ const entries: Draft[] = [
     needs: [EDGE, "Owner or Full access in Search Console to submit sitemaps."],
   },
   {
-    key: "search-console.connections", parent: "search-console", group: "Tools", route: "/search-console", title: "Search Console → Connections",
+    key: "search-console.connections", parent: "search-console", group: "Tools", route: "/search-console/connections", title: "Search Console → Connections",
     whatItIs: "Where you connect a Google account for Search Console, see the connected accounts, and remove them.",
     whatItDoes: "“Connect Google Search Console” sends you to Google’s sign-in. Google asks for your email identity and the Search Console permission only — not Business Profile, Ads or Calendar. After you allow it the account appears in the list and its properties are imported for you.",
     howToUse: [
@@ -232,7 +232,7 @@ const entries: Draft[] = [
     needs: [EDGE, "A Google account with a verified email.", IDENTITY],
   },
   {
-    key: "search-console.onboarding", parent: "search-console", group: "Tools", route: "/search-console", title: "Search Console → Onboarding",
+    key: "search-console.onboarding", parent: "search-console", group: "Tools", route: "/search-console/onboarding", title: "Search Console → Onboarding",
     whatItIs: "A way to email a client the steps for adding your Google account as a user on their Search Console property.",
     whatItDoes: "You pick a connection, list clients one per line (email, location ID) and send. Each client is emailed the steps: in Search Console open Settings → Users and permissions → Add user, enter the connected Google email and choose Full. The Invitations list shows each one as pending or accepted.",
     howToUse: [
@@ -246,7 +246,7 @@ const entries: Draft[] = [
     needs: [EDGE, "A connected Google account, and a Location with a website for each client."],
   },
   {
-    key: "search-console.work-queue", parent: "search-console", group: "Tools", route: "/search-console", title: "Search Console → Work queue",
+    key: "search-console.work-queue", parent: "search-console", group: "Tools", route: "/search-console/work-queue", title: "Search Console → Work queue",
     whatItIs: "The list of background jobs for your Search Console connections.",
     whatItDoes: "Shows every job with its number, kind (discover, sync, analytics, inspect, sitemap, invite), state (queued, running, done, failed or uncertain) and its error message, if any. You can search and filter by state.",
     howToUse: [
@@ -259,7 +259,7 @@ const entries: Draft[] = [
     needs: [EDGE],
   },
   {
-    key: "search-console.guide", parent: "search-console", group: "Tools", route: "/search-console", title: "Search Console → Guide",
+    key: "search-console.guide", parent: "search-console", group: "Tools", route: "/search-console/guide", title: "Search Console → Guide",
     whatItIs: "Written step-by-step instructions, inside the page.",
     whatItDoes: "The “Connect Google Search Console” card walks through connecting the agency’s Google account, onboarding a client, syncing up to 16 months of history, and sitemaps and index checks. The cards above it cover Cloudflare.",
     howToUse: [
@@ -273,74 +273,78 @@ const entries: Draft[] = [
   /* ══ Permits & Databases ══════════════════════════════════════════════════════════════════════ */
   {
     key: "search-permits", group: "Permits & Databases", route: "/search", title: "Search Permits",
-    whatItIs: "A live search of building-permit records on the government portals that support it.",
-    whatItDoes: "Runs your search on each searchable portal in the area you pick, shows each portal’s progress, and lists the permits found. Results can be filtered by status, and each has a Property Lookup link.",
+    whatItIs: "Find building permits by typing an address, a name, a company, a license number or a permit number: ConstructHUB searches the real city and county permit portals in the area you pick.",
+    whatItDoes: "You choose what you are searching by, type the value, pick a state and (if you want) one county or city, and press Search. Any matches already saved from earlier searches in that area show at once; then every searchable portal in the area is searched live and the page shows each portal’s progress and adds what it finds. Each result is one permit as the portal lists it: the address, permit number, type, status, issue date and which portal it came from, plus contacts and details when the portal gives them. You can narrow results by status, date, county and jurisdiction, open a result’s details, and jump to the county’s property office with Property lookup. The search is saved to Search history.",
     howToUse: [
-      "Sidebar → Permits & Databases → Search Permits.",
-      "Pick a state, then a county or city (or all of them). The page shows how many searchable portals are in that area.",
-      "Choose a search type — Address, Keyword, Name, Company Name, License # or Permit # — and optionally a date range.",
-      "Click Search, then filter by status and click a result for details.",
+      "Open Search permits. The map and the count show the portals the live search can query; a dot on the map fills in that place as your search area.",
+      "Pick what you are searching by: Address, Keyword, Name, Company name, License # or Permit #.",
+      "Type the value, choose a state and optionally a county or city, and press Search.",
+      "Watch the portal list fill in: a tick means the portal was searched, a red mark means it could not be, and you can open the reason.",
+      "Narrow the results with the status, date and jurisdiction filters, open View details on a permit, or load older stored matches.",
     ],
-    howItWorks: "Coverage varies by portal: some cannot be searched live or need their own login. When a portal fails, the results say so and may be incomplete. ConstructHUB never invents permit data. Each search counts toward your plan’s monthly permit searches.",
-    needs: ["Any plan; searches are counted against the plan’s monthly allowance."],
+    howItWorks: "A portal can be searched live only when its official link has been checked and ConstructHUB has a search adapter for its platform; the counts and the map show exactly those. Each portal is searched for up to 75 seconds and a failure is named, so an empty list never means no permit exists. Only a live search counts toward your plan’s monthly permit searches; showing saved results is free, and when nothing in the area can be searched live and nothing is saved, nothing runs and nothing is counted. Every permit shown came from a portal; ConstructHUB never invents permit data.",
+    needs: ["Any plan; live searches count toward the plan’s monthly permit searches."],
   },
   {
     key: "database-directory", group: "Permits & Databases", route: "/databases", title: "Database Directory",
-    whatItIs: "A directory of county and city permit offices in all 50 states and DC.",
-    whatItDoes: "Lists each jurisdiction with its official permit portal link when one is on record and has been checked. Links that could not be confirmed are labelled, and where no portal is known you get a “Find permit portal” web search instead of a guessed link.",
+    whatItIs: "The list of every county and city in the US, with the official permit portal for each one where ConstructHUB has a checked link.",
+    whatItDoes: "Shows the number of jurisdictions, counties and cities on file and how many have a permit portal on record. Each row names the place, its county, and what is known about its portal: “Verified portal” (the link was opened and checked), “Official site · unconfirmed” (a source-listed link the automatic check could not confirm, with the date it was last tried), “Permits issued by <county>” (an official page says the county issues that town’s permits, with a link to that page) or “No portal on record”. Rows with a portal get Open portal and Search portal pills and list the fields the portal can search; rows without one get a “Find permit portal” web search instead of a guessed link. An “Alerts supported” badge marks portals that Permit alerts can watch, and Scrape runs a one-off live search of a portal that supports it.",
     howToUse: [
-      "Sidebar → Permits & Databases → Database Directory.",
-      "Find the county or city you need.",
-      "Open its official portal link, or use “Find permit portal” when there is none.",
+      "Open Database directory and choose All, Counties or Cities.",
+      "Type a city, county or state in the search box, or pick a state and then a county.",
+      "Open the row’s portal link, or use “Find permit portal” when there is none.",
+      "Use Property records on a row to open the county’s property office, or Scrape to run one live search on a supported portal.",
     ],
-    howItWorks: "Portal links are stored only after a liveness check, and dead ones are marked. Nothing in the directory is generated or guessed.",
+    howItWorks: "Portal links come from the permit-portal pipeline: a candidate link is stored only after it answered live and its page is about permits; the link checker marks links that die, and a link it cannot confirm stays listed as unconfirmed with its last check date. Where a town has no portal of its own, the county routing comes from an official page that says so. Nothing in the directory is generated or guessed; an unknown portal is shown as unknown.",
     needs: ["Free to browse."],
   },
   {
     key: "property-records", group: "Permits & Databases", route: "/property", title: "Property Records",
-    whatItIs: "A finder for the official county property appraiser or assessor office.",
-    whatItDoes: "Lists county offices, filtered by state and county, with a link to each office’s official site when one is on record and a web search when none is. Ownership, assessed values and tax records are looked up on the county’s own site.",
+    whatItIs: "A finder for the county assessor or property appraiser office that holds a property’s ownership, value and tax records.",
+    whatItDoes: "Shows a county map shaded by what is on record for each county, and a list of offices you can filter by state and county or search by name. Each office row shows its name, county and address when one is on record, and pills for what ConstructHUB can honestly offer: Open portal and Search records when the office’s official site is on record, “Open unconfirmed site” when the link is listed but could not be auto-checked, a “Find property records” web search when no usable link is on record, and Call when a phone number is. Clicking a county on the map shows that county’s office and can filter the list to it.",
     howToUse: [
-      "Sidebar → Permits & Databases → Property Records.",
-      "Filter by state and county, or search.",
-      "Open the county office’s site from its row and search there.",
+      "Open Property records (a county link from Search permits or the Database directory lands here already filtered).",
+      "Pick a state and a county, or type an office, county or state in the search box; or click a county on the map.",
+      "Open the office’s site from its row and look the property up there.",
     ],
-    howItWorks: "The office list is sourced from NETR Online. ConstructHUB links to the county; it does not copy or store the county’s property data.",
-    needs: ["Free to browse."],
+    howItWorks: "The office list comes from NETR Online’s directory of assessor and appraiser offices, kept in ConstructHUB’s reference data. Each office link is checked; a link that could not be confirmed is marked and the row offers a web search instead of pretending. A link that leads to a bot-check page is treated as unconfirmed. ConstructHUB links to the county’s own site; it does not copy or store the county’s property data.",
+    needs: [moduleNeed("propertyRecords")],
   },
   {
     key: "search-history", group: "Permits & Databases", route: "/history", title: "Search History",
-    whatItIs: "The list of permit searches you have run.",
-    whatItDoes: "Lists your recent searches so you can run one again with one tap, and delete one or all of them.",
+    whatItIs: "The list of permit searches you have run, so you can run one again without retyping it.",
+    whatItDoes: "Lists your latest 50 searches, newest first: what you searched for, the search type (address, name, company, license or permit number) and when you ran it. “Search again” opens Search permits with the same type, value and county filled in. The X on a row deletes that search; “Clear all” deletes your whole history after you confirm.",
     howToUse: [
-      "Sidebar → Permits & Databases → Search History.",
-      "Choose “Search again” on a row to open that search on the Search page.",
-      "Delete a search from its row, or delete them all.",
+      "Open Search history.",
+      "Choose “Search again” on a row to reopen that search on Search permits, then press Search there.",
+      "Delete a search with the X on its row, or use “Clear all” to delete every one.",
     ],
-    howItWorks: "“Search again” opens the Search page with the same values filled in; running it is a new search and counts toward your plan’s monthly permit searches.",
+    howItWorks: "A search is saved the moment Search permits runs it live. “Search again” only fills the form in; running it is a new live search and counts toward your plan’s monthly permit searches. Deleting a search also removes the results that were saved with it.",
   },
   {
     key: "scrape-schedules", group: "Permits & Databases", route: "/schedules", title: "Scrape Schedules",
-    whatItIs: "Automatic permit refreshes for portals that support live search. This page is for administrators only.",
-    whatItDoes: "Lists the shared schedules, and lets an administrator add one, pause or resume it, and delete it.",
+    whatItIs: "Repeating permit searches that keep the shared permit cache fresh on portals that support live search. For administrators only.",
+    whatItDoes: "Lists every schedule: the portal, whether it is active or paused, how often it runs (daily, weekly or monthly), what it searches for (an address, a name, a company, a license number or a permit number) and when it last ran. “Add schedule” creates one; the switch on a row pauses or resumes it; the bin deletes it after you confirm.",
     howToUse: [
-      "Open Scrape Schedules (administrators only).",
-      "Choose “Add schedule”, pick one of the live-searchable portals and enter the value to search for.",
-      "Pause, resume or delete a schedule from its row.",
+      "Open Scrape schedules (administrators only).",
+      "Choose “Add schedule”, pick one of the live-searchable portals, the search type, the frequency, and type the value to search for.",
+      "Pause or resume a schedule with its switch, or delete it with the bin.",
     ],
-    howItWorks: "A schedule can only be made for a portal that has a verified link and supports live search. Other accounts see a message that administrator access is required.",
+    howItWorks: "Every 15 minutes the server runs each active schedule that is due, searching its portal once and saving what it finds into the shared permit cache (the same stored matches Search permits shows first); “Last run” is written only after a search really ran. A schedule can only target a portal with a checked link and a search adapter for its platform, which is why the portal list is short. Accounts without administrator access see a message instead of the list.",
     needs: ["Administrator access."],
   },
   {
     key: "permit-alerts", group: "Permits & Databases", route: "/permit-alerts", title: "Permit Alerts",
-    whatItIs: "Watches that tell you when a new permit you care about is filed.",
-    whatItDoes: "Watch an address, a parcel, a contractor, or the trades you work in across the jurisdictions you pick. Watched portals are checked every hour and you get one digest per watch by email, text or Telegram.",
+    whatItIs: "Watches that tell you when a new permit you care about is filed: at an address, on a parcel, by a contractor, or for your trades in an area.",
+    whatItDoes: "A watch names what to look for and which cities or counties to check. “Trades in an area” takes the trades you pick (roofing, HVAC, electrical, plumbing, solar and more), extra keywords of your own, and an optional centre address with a radius in miles. Each watch row shows its jurisdictions, how many of them can be checked today, how you are notified, when it was last checked, the last match and how many permits have matched. Matches opens the list of permits that matched, each with its permit number, type, status, address, contractor, date and the portal link. Check now asks for an extra check, Pause stops a watch without losing its history, and Delete removes the watch and its matches.",
     howToUse: [
-      "Sidebar → Permits & Databases → Permit Alerts.",
-      "Choose what to watch — an address, a parcel, a contractor, or the trades in an area — and pick the jurisdictions.",
-      "Pick how to hear about hits (email, text or Telegram) and save the watch.",
+      "Open Permit alerts and choose New watch.",
+      "Pick what to watch: an address, a parcel, a contractor (name and optional license number), or trades in an area.",
+      "Search the directory for the cities or counties to check and add them; each one says whether alerts are supported there yet.",
+      "Tick how you want to hear about matches (email, text or Telegram) and save the watch.",
+      "Open Matches on a watch to see what it found, or Check now to ask for a check on the next run.",
     ],
-    howItWorks: "Alerts work on the portals that can list permits by date; the directory marks those Alerts supported. Each watched jurisdiction is polled hourly through the adapter registry, and only jurisdictions with an active watch are polled.",
+    howItWorks: "Alerts work on portals whose platform can list permits by date; the directory marks those “Alerts supported”, and a jurisdiction that is not supported yet stays on your watch and starts working the day it is. Every hour the server reads the new permits from each watched portal (only portals with an active watch are read) and matches them against your watches; a portal that cannot be reached is backed off and the row says so. Each match is kept and sent once by the channels you chose. Text alerts use your CRM texting allowance; Telegram needs the account linked on LSA Leads. Distance matching needs a geocoder on the server; without one an area watch covers its whole jurisdictions.",
     needs: [moduleNeed("permitAlerts")],
   },
 
@@ -358,15 +362,16 @@ const entries: Draft[] = [
   },
   {
     key: "directories", group: "Google Business", route: "/directories", title: "Directory Sync",
-    whatItIs: "One business profile for a location, and the directories that list it.",
-    whatItDoes: "Keeps your business name, address and phone the same everywhere you are listed. For each location it holds one business profile, tracks a directory profile per directory with its status, and logs every change. The directory catalogue lists the directories a contractor can be listed on, with filters by category, state, trade and more.",
+    whatItIs: "Keeps your business name, address and phone the same on every directory that lists you, and shows which ones got it wrong.",
+    whatItDoes: "For each location it holds one business profile (started from the linked Google listing, with your own edits kept), a card per directory page about your business with its check status, a stat row counting the profiles that are live, differ or are verified, and an activity list of every change and check. The directory catalogue below lists the directories a contractor can be listed on, with filters by category, state, trade and more.",
     howToUse: [
-      "Sidebar → Google Business → Directories, and choose a location (add one under Locations first).",
-      "Check the business profile: it starts from the linked Google Business Profile, and your own edits are kept.",
-      "Review the directory profiles and their status; open the activity log to see what changed and when.",
-      "Browse the directory catalogue below to find more directories for your trade and state.",
+      "Sidebar → Google Business → Directories. Your only location is chosen for you; with several, pick one.",
+      "Check the business profile and save it — every directory page is compared against it.",
+      "Add the address of an existing directory page about your business, then Re-check it and open the comparison to see what differs.",
+      "Fix the details on the directory itself, re-check, and watch the Verified count rise.",
+      "Browse the directory catalogue to find more directories for your trade and state.",
     ],
-    howItWorks: "A directory profile counts as Verified only when it is live, was checked, and its name, address and phone match your business profile.",
+    howItWorks: "A check loads the directory page and reads the business details it publishes. A card is Live when the page is confirmed to be your business and the required details match, Details differ when a detail does not, and Verified counts live cards with matching details. ConstructHUB does not create or edit directory listings.",
     needs: ["A business location in ConstructHUB."],
   },
   {
@@ -397,41 +402,42 @@ const entries: Draft[] = [
   },
   {
     key: "agency", group: "Google Business", route: "/agency", title: "Agency workspace",
-    whatItIs: "The workspace for agencies that manage many clients’ locations.",
-    whatItDoes: "Keeps client records, team members and roles, onboarding requests for Google manager access, bulk actions across locations, and a Jobs list with progress and failures.",
+    whatItIs: "The workspace for an agency that looks after many businesses’ Google listings: every client, location, team member and queued job in one place.",
+    whatItDoes: "Six tabs. Locations lists every location in the workspace with its client and Google state, with tick boxes for bulk actions (sync, link, unlink, assign to a client, Watch mode, AI replies, post batches, Site Scans) and a CSV export. Clients keeps one record per business. Team sets who may do what and which clients each person sees. Onboarding emails a client the steps to add your agency as a Google manager and follows the request until the listing is linked. Jobs shows every queued action and how it went. Settings (owner) holds the agency name, the agency Google account and the invitation rule. Each tab has its own “i”.",
     howToUse: [
-      "Sidebar → Google Business → Agency.",
-      "Under Clients, add client records and assign locations to them.",
-      "Under Team, add members who already have a ConstructHUB login and choose their role and client access.",
-      "Under Onboarding, choose the client and “Email manager instructions”; the client adds your agency email as a Manager on their Business Profile.",
-      "On Locations, select locations and run a bulk action; follow it under Jobs.",
+      "Sidebar → Google Business → Agency. The switcher at the top opens any workspace you belong to; your role there is shown beside it.",
+      "Under Clients, add a client with its contact email; under Team, add the people who already have a ConstructHUB login and choose their role and client access.",
+      "Under Onboarding, choose the client and “Email manager instructions”; the client adds your agency’s Google account as a Manager on their Business Profile and the listing links itself.",
+      "On Locations, tick locations and run a bulk action; follow it under Jobs, where a failed row says why.",
     ],
-    howItWorks: "The client keeps ownership of the listing and never signs in to ConstructHUB. ConstructHUB spots the manager invitation, accepts clear matches, links the listing to the client and starts the first sync. Requests expire after 30 days.",
+    howItWorks: "Everything belongs to the workspace owner’s account and plan: members need no plan of their own, and a member given specific clients sees only those clients’ locations. The client keeps ownership of the listing and never signs in to ConstructHUB; a background worker spots the manager invitation, accepts the one that matches a request, links the listing to the client and queues the first sync. Requests expire after 30 days. Bulk actions become one job per location, run by a worker within seconds. A role that tries something it may not do gets a plain refusal. Until a tab has real data it shows a clearly marked sample of what it will look like.",
     needs: [moduleNeed("agencyWorkspace")],
   },
   {
     key: "domains", group: "Google Business", route: "/domains", title: "Domains",
-    whatItIs: "A place to manage client domains’ DNS and nameservers while the registration stays with the registrar.",
-    whatItDoes: "Connects a registrar for automation (Porkbun or Name-dot-com) or tracks domains you add by hand, maps domains to the client location whose website matches, applies DNS changes through a preview-and-confirm flow, and alerts on expiry, auto-renew off, nameserver or DNS changes, the website failing over HTTPS and certificates about to expire.",
+    whatItIs: "One list of every client domain with its expiry date, DNS and website health, and a safe way to change DNS.",
+    whatItDoes: "Connects a Porkbun or Name.com registrar account and imports its domains, or tracks domains you type in. Each domain card shows its registrar, the client it belongs to, when it expires, whether auto-renew is on, its nameservers and whether the website answers. The stat row counts the domains watched and the ones that need attention; a daily check flags a domain expiring within 60 days, auto-renew off, a website that is down or an SSL certificate expiring within 30 days. DNS and nameserver changes go through a preview you confirm before anything reaches the registrar, and an applied change can be rolled back the same way.",
     howToUse: [
-      "Sidebar → Google Business → Domains.",
-      "Connect a registrar, or add domains by hand for monitoring.",
-      "Check each domain is mapped to the right location.",
-      "For a change, preview it, review before and after, confirm it’s you and apply. The same flow rolls a change back.",
+      "Sidebar → Google Business → Domains. While the list is empty, “How this works” and a sample show what you will get.",
+      "Connect a registrar (a Porkbun or Name.com API key) to import its domains, or type domains under “Add domains”, up to 100 at a time.",
+      "Map each domain to its client: select it, pick the client location and choose “Map selected to client” — mail alerts about that domain then name the client.",
+      "To change DNS, select domains, fill in the nameservers or the record, choose Preview, review the before and after under “Previews and change history”, confirm it’s you and apply.",
+      "Use the “Needs attention” filter to see only domains expiring soon, with auto-renew off, a website down or an SSL certificate about to expire.",
     ],
-    howItWorks: "A change is marked verified once public DNS agrees. There are no transfers, purchases, renewals or deletions here. Copy website and email records before switching nameservers — a mistake can interrupt email.",
+    howItWorks: "Imports, daily checks, previews and confirmed changes are jobs for a background worker on the server. When an administrator has not turned it on, the page says so and the jobs wait in the queue, while adding, mapping and reviewing keep working. A change counts as verified once public DNS shows it. There are no transfers, purchases, renewals or deletions here, and Cloudflare-hosted zones are changed in Cloudflare. Copy website and email records before switching nameservers — a mistake can interrupt email.",
     needs: [moduleNeed("domainsMailAlerts")],
   },
   {
     key: "mail-alerts", group: "Google Business", route: "/mail-alerts", title: "Mail alerts",
-    whatItIs: "One inbox for the important provider emails about client accounts.",
-    whatItDoes: "Collects emails from providers such as Google Business Profile, Search Console, Google Ads, Cloudflare and registrars that you forward to a private address, and matches them to clients.",
+    whatItIs: "One inbox for the important provider emails about your clients’ accounts, matched to the client.",
+    whatItDoes: "Collects the emails you forward from Google Business Profile, Search Console, Google Ads, Cloudflare and the registrars to a private address, keeps only the recognised alerts (verification, suspension, ownership, billing, expiry, transfer and the like), grades each one critical, warning or info, and matches it to the client whose domain or business name it mentions. The stat row counts the alerts kept, unread, critical and unmapped; chips and filters narrow the inbox, and a filter list also takes a value you type.",
     howToUse: [
       "Sidebar → Google Business → Mail alerts, and copy your private forwarding address.",
-      "In Gmail: Settings → See all settings → Forwarding and POP/IMAP → Add a forwarding address, and finish Google’s confirmation with the code shown in ConstructHUB.",
+      "In Gmail: Settings → See all settings → Forwarding and POP/IMAP → Add a forwarding address; finish Google’s confirmation with the code or link shown here.",
       "Create Gmail filters for the listed provider senders with “Forward it to” that address. Don’t forward your whole inbox.",
+      "Open an alert to read it (that marks it read); select alerts to mark them read or map them to a client.",
     ],
-    howItWorks: "Unmatched mail is dropped and matched messages expire within 30 days. Matching a sender is not proof an email is genuine, so open the provider’s dashboard directly before acting on a security or billing alert.",
+    howItWorks: "Mail from a sender or with a subject the matcher does not know is ignored; a kept alert expires after 30 days. Matching a sender is not proof an email is genuine, so open the provider’s own dashboard before acting on a security or billing alert. The private address needs an inbound mail domain on the server; without it the page says what the administrator must set, and alerts already stored still show.",
     needs: [moduleNeed("domainsMailAlerts")],
   },
   {
@@ -441,7 +447,7 @@ const entries: Draft[] = [
     howToUse: [
       "Sidebar → Google Business → Posts, and choose a linked location (or open the location's Posts & Updates tab).",
       "Compose the update, or generate a post draft and edit it; attach photos if you want them.",
-      "Set the schedule under “Schedule and approve”: first publish, cadence, business hours.",
+      "Set the schedule under “Schedule and approve”: a first-publish date and time you type (blank means now), and under Advanced a cadence, your own list of times, or business hours only.",
       "Click “Approve & queue post”. Approving is what authorises publishing.",
       "Follow each item under “Calendar, queue & history”.",
     ],
@@ -482,10 +488,10 @@ const entries: Draft[] = [
       "Sidebar → Google Business → GMB Ranking Grid → New Scan.",
       "Search your business by name, address or Google Maps link.",
       "Enter a keyword, for example “roofing contractor”.",
-      "Choose the grid size and the distance between points; the page shows the width covered and the credits the scan uses.",
+      "Under Advanced, pick the grid size and the distance between points from the lists, or type your own (an odd size from 3 to 15, a spacing up to 20 miles); the page shows the width covered and the credits the scan uses.",
       "Start the scan, then choose “View Full Report”.",
     ],
-    howItWorks: "A scan is a snapshot at that moment; rankings move and none is guaranteed. Scans use the plan’s monthly ranking-grid credits, which reset monthly.",
+    howItWorks: "A scan is a snapshot at that moment; rankings move and none is guaranteed. Scans use the plan’s monthly ranking-grid credits, which reset monthly. Until your first scan, the history shows a clearly labelled sample of what a finished scan looks like.",
     needs: ["Any plan; each scan uses ranking-grid credits."],
   },
   {
@@ -506,12 +512,12 @@ const entries: Draft[] = [
     whatItIs: "Your project photos, organised into folders.",
     whatItDoes: "Lets you upload, rename, select and delete photos by folder — for example one folder per job. The library feeds review requests, Posts & Photos and Social Media.",
     howToUse: [
-      "Sidebar → Google Business → Photo Optimizer → Media Library.",
+      "Sidebar → Google Business → Photos → Media library.",
       "Create a folder for the job and upload its photos.",
       "Give the folder the client’s address if you want GPS coordinates embedded in its photos.",
       "Pick photos from the library when you send a review request or build a post.",
     ],
-    howItWorks: "When a folder has an address, its GPS coordinates are embedded into that folder’s photos. Google strips that data from photos uploaded to a Business Profile.",
+    howItWorks: "When a folder has an address, its GPS coordinates are embedded into that folder’s photos. Google strips that data from photos uploaded to a Business Profile. The numbers above the list count your folders and how many have an address and coordinates; while the library is empty, a labelled sample shows what folders look like.",
   },
   {
     key: "reinstatement", group: "Google Business", route: "/reinstatement", title: "Reinstatement",
@@ -529,40 +535,40 @@ const entries: Draft[] = [
   {
     key: "ads-manager", group: "Google Ads", route: "/ads-manager", title: "Agency Ads & LSA",
     whatItIs: "A manager for agencies that run clients’ Google Ads from a Google Ads manager (MCC) account.",
-    whatItDoes: "Discovers your client accounts and marks which run Local Services Ads, sends client access requests, runs read-only health audits, and applies bulk protections such as presence-only location targeting, Click Guard IP exclusions, shared negative keywords, placement exclusions and ad schedules.",
+    whatItDoes: "Six sections, each its own address: Recommendations (tick client accounts, choose the playbook steps to preview), Client accounts (every account under the MCC, with Link account, the health-audit button and, under Advanced, the bulk protections and Click Guard mapping), Access invitations, Protection previews, Queue and Health audit. It discovers your client accounts and marks which run Local Services Ads, sends client access requests, runs read-only health audits, and applies bulk protections such as presence-only location targeting, Click Guard IP exclusions, shared negative keywords, placement exclusions and ad schedules.",
     howToUse: [
-      "Sidebar → Google Ads → Agency Ads & LSA → Connect MCC with Google.",
-      "Under “Request client account access”, paste one “customer ID,email” pair per line, review, and confirm.",
-      "Run the health audits and read the findings.",
-      "For a bulk protection, preview it per account and confirm; use “Preview reversal” to undo one.",
+      "Sidebar → Google Ads → Agency Ads & LSA → Connect MCC with Google, then Discover clients.",
+      "Under Access invitations, paste one “customer ID,email” pair per line, preview, and confirm.",
+      "Under Client accounts, tick accounts and choose Queue health audit; read the findings under Health audit.",
+      "Under Recommendations, tick accounts and the steps you want, choose Preview, then confirm each preview under Protection previews; use “Preview reversal” to undo one.",
     ],
-    howItWorks: "Nothing changes in Google until you confirm a preview, and previews expire after 24 hours. Results depend on Google accepting each change. If the page says setup is required, the connection is not available yet.",
+    howItWorks: "Nothing changes in Google until you confirm a preview, and previews expire after 24 hours. Every button adds a job that a background worker runs; Queue shows each one. Results depend on Google accepting each change. If the page says setup is required, the connection is not available yet.",
     needs: [moduleNeed("adsManager"), "A Google Ads manager (MCC) account."],
   },
   {
     key: "click-guard", group: "Google Ads", route: "/google-ads", title: "Click Guard",
-    whatItIs: "Click-fraud protection for Google Ads.",
-    whatItDoes: "A small tracking script on the pages your ads send people to records each visit and flags unusual traffic with fixed rules: bot-like browsers, too many visits from one IP address, and the same device showing up from different addresses. Repeat offenders are added to Blocked IPs, and a script in your own Google Ads account adds them as IP exclusions.",
+    whatItIs: "Click-fraud protection for Google Ads: it watches who lands on your pages and builds the list of addresses to keep out.",
+    whatItDoes: "A small tracking script on the pages your ads send people to records each visit and flags unusual traffic with fixed rules: bot-like browsers, too many visits from one IP address (more than 5 in an hour or 15 in a day), and the same device showing up from different addresses. An address flagged past 10 visits in an hour is blocked automatically; you can block one yourself. A script in your own Google Ads account then adds the blocked addresses as IP exclusions. The Dashboard shows visits, blocked IPs, unique visitors, the threat level and a trend for the dates you pick; Traffic sources and Traffic signals break the same visits down.",
     howToUse: [
       "Sidebar → Google Ads → Click Guard, and add your website domain.",
-      "Copy the tracking code and paste it on every page your ads point to.",
-      "Open the “Google Ads Script” tab and copy the IP exclusion script.",
+      "Copy the tracking code from Tools and paste it on every page your ads point to.",
+      "Open the “Google Ads script” section and copy the IP exclusion script.",
       "In Google Ads go to Tools → Bulk actions → Scripts, paste it, authorise it, run it once and check the logs.",
       "Schedule the script to run hourly.",
     ],
-    howItWorks: "ConstructHUB serves your exclusion list from a private address and the Google Ads script reads it on each run. The script only adds exclusions, never removes them, and Google allows 500 per campaign. The signals do not prove fraud and can flag real visitors; no savings are guaranteed.",
+    howItWorks: "ConstructHUB serves your exclusion list from a private address and the Google Ads script reads it on each run. The script only adds exclusions, never removes them, and Google allows 500 per campaign. The signals do not prove fraud and can flag real visitors; no savings are guaranteed. Until a domain has a visit, each section shows a clearly marked sample — nothing in it is real or stored.",
     needs: [PROTECTED, "Access to your website’s code and your Google Ads account."],
   },
   {
     key: "ad-fraud", group: "Google Ads", route: "/google-ad-fraud", title: "Ad Fraud",
-    whatItIs: "A free reading page about click quality in Google Ads.",
-    whatItDoes: "Shares ConstructHUB’s own observations and opinions from accounts it has worked on.",
+    whatItIs: "A free reading page about click quality in Google Ads: what ConstructHUB saw in contractor accounts, and its opinion of it.",
+    whatItDoes: "Nine sections you open one at a time — invalid clicks, bot traffic, VPN and proxy clicks, the 500-IP exclusion limit, click counts, disputes, who clicks contractor ads, Google’s own report and call-only ads — then a list of Google’s explanations against what the tracking showed, and six links to what you can do: Click Guard, the Google Ads script, device fingerprints, the data sections, a CSV export and the Ads guide.",
     howToUse: [
       "Sidebar → Google Ads → Ad Fraud.",
-      "Read the page.",
-      "For protection on your own ads, set up Click Guard.",
+      "Choose a section title to open it; choose it again to close it.",
+      "Under “What can you do about it?”, pick a link to set up Click Guard on your own ads.",
     ],
-    howItWorks: "The page itself says it is not an independent audit and that your traffic may differ, so its figures are not industry facts.",
+    howItWorks: "Nothing on the page is measured from your account: the figures are ConstructHUB’s observations in accounts it has worked on plus published research, and the page says so. It is not an independent audit and your traffic may differ.",
   },
   {
     key: "ads-guide", group: "Google Ads", route: "/google-ads-guide", title: "Ads Guide",
@@ -589,80 +595,82 @@ const entries: Draft[] = [
   },
   {
     key: "lsa-leads", group: "Google Ads", route: "/lsa-leads", title: "LSA Leads",
-    whatItIs: "Your Local Services Ads leads in one list.",
-    whatItDoes: "Pulls in your phone-call and message leads for every Google Ads account you can access, can send a Telegram message when a new lead arrives, and lets you report bad leads to Google with a reason.",
+    whatItIs: "Your Local Services Ads leads in one list, account by account, with a Good or Bad rating on each.",
+    whatItDoes: "After you connect your Google account it lists every Google Ads account you can reach, with its lead count and how many were charged. Open an account to read its leads (phone call, message or booking), filter them to All, Charged or Disputed, and rate each one: Good tells Google the lead was fine; Bad reports it with a reason (service I don’t offer, sales call, duplicate, outside my service area, customer wasn’t ready to book). Tick several and Report now, or Schedule for later to spread the reports across a date range. Sync now pulls the latest leads; Telegram notifications can send you a message when a new lead arrives.",
     howToUse: [
-      "Sidebar → Google Ads → LSA Leads, and connect your Google account.",
-      "Optionally connect Telegram for new-lead messages.",
-      "Read new leads in the list, and report a bad one with the reason that fits.",
+      "Sidebar → Google Ads → LSA Leads → Connect Google Ads, and allow access.",
+      "Choose Sync now, then open an account in the list.",
+      "Filter to Charged, open a lead’s details, and choose Good or Bad; for a bad lead pick the reason that fits.",
+      "To report several at once, tick them, check each reason, and choose Report now or Schedule for later.",
+      "Under Connection → Telegram notifications, choose Link Telegram if you want a message for each new lead.",
     ],
-    howItWorks: "Google decides whether to credit a reported lead. If the page says Google Ads is not configured, the connection is not available yet.",
+    howItWorks: "Reports go to Google one at a time, 30 to 60 seconds apart per account, and a lead can be reported once; a scheduled report runs at a random business-hour moment inside the range you chose. Google decides whether to credit a reported lead. Leads keep syncing in the background after the first sync. If the page says Google Ads setup is required, the connection is not available yet.",
     needs: ["A Google account with access to the Google Ads account that runs your Local Services Ads."],
   },
 
   /* ══ Reviews ══════════════════════════════════════════════════════════════════════════════════ */
   {
     key: "google-reviews", group: "Reviews", route: "/google-reviews", title: "Google Reviews",
-    whatItIs: "Two tools on one page: asking clients for reviews, and working with the reviews already on your Google profile.",
-    whatItDoes: "Review Requests emails a client a request with a button to leave a Google review, with optional reminders and tracking. Google Profile Reviews lists your synced reviews and lets you publish replies, save drafts, add private notes and prepare a report. AI can draft replies for approval.",
+    whatItIs: "Four views in one tool: ask clients for reviews, work with the reviews already on your Google profiles, keep your review links, and set how feedback and reminders behave.",
+    whatItDoes: "Review requests emails a client a request with a button to leave a Google review, now or on a day and time you pick, with reminders and tracking of what they did. Google reviews lists your synced reviews so you can publish replies, save drafts and keep private notes, with AI drafts for approval if you want them. Profiles & links holds one profile per Google listing with its review link and your pages on other review sites. Settings decides which scores come to you privately and when reminders go out.",
     howToUse: [
-      "Google Reviews → “GMB Profiles & Templates” → Add Profile, and paste your Google review link. Add your review pages on other sites (Yelp, BBB, Houzz, Angi, HomeAdvisor and more) to the same profile if you want clients to see them after Google.",
-      "Choose “New Review Request”, pick the profile, enter the client’s name and email, and send now or schedule it.",
-      "Under “Feedback routing”, set the score below which a client’s feedback comes to you privately (default 8; “10” means only a perfect score skips the private form), then watch each request’s tracking: opened, link clicked, feedback, caught privately.",
-      "On the Google Profile Reviews tab, filter reviews and publish replies to Google.",
-      "For AI drafts, open “AI reply settings and drafts queue”, choose a location and a mode, then approve drafts in the queue.",
+      "Profiles & links → Add profile: paste the listing’s Google review link (or pick a linked location) and add your Yelp, BBB, Houzz, Angi or HomeAdvisor pages if you want clients to see them after Google.",
+      "Review requests → New review request: pick the profile, enter the client’s name and email, and send now or schedule a date and time.",
+      "Settings → Feedback routing: set the score below which feedback comes to you privately (any number from 1 to 10; 10 means only a perfect score goes straight to Google). Follow-up reminders: how many, how far apart, in which hours.",
+      "Watch each request’s tracking in the list: opened, Google link clicked, feedback, caught privately.",
+      "Google reviews: connect Google, sync a linked location, then filter the reviews and publish replies.",
     ],
-    howItWorks: "Every client is asked to rate the job and every answer reaches you. A score below your feedback-routing threshold shows the private “What could we have done better?” form and alerts you at once (bell, email and Telegram when linked) with the name, score, job and their words; a score at or above it goes straight to the Google review step. The “Caught privately” tile and the “Private feedback” badge count those requests. Reminders stop when the client responds, unsubscribes or reaches the maximum you set. AI can get facts wrong, so check every reply.",
-    needs: ["Any plan.", "Google Profile Reviews needs a connected Google account and a linked location."],
+    howItWorks: "Every client is asked to rate the job from 1 to 10 and every answer reaches you. A score below your routing threshold shows the private “What could we have done better?” form and alerts you at once (bell, email and Telegram when linked) with the name, score, job and their words; a score at or above it goes straight to the Google review step. Reminders stop when the client responds, unsubscribes or reaches the maximum you set. Nothing offers a reward for a review. AI can get facts wrong, so check every reply before publishing it.",
+    needs: ["Any plan.", "The Google reviews view needs a connected Google account and a linked location."],
   },
 
   {
     key: "yelp", group: "Reviews", route: "/yelp", title: "Yelp",
-    whatItIs: "Your Yelp business page's rating and reviews, inside ConstructHUB.",
-    whatItDoes: "Shows each connected Yelp business's rating, review count, latest reviews and 30-day trend, and the nearby businesses in your category with how they compare. AI drafts a reply to a review for you to copy.",
+    whatItIs: "Your Yelp rating and newest reviews next to the competitors nearby, with AI-drafted replies you post on Yelp.",
+    whatItDoes: "Shows each connected Yelp business as a card with its rating, review count, 30-day change, categories, open status and the reviews Yelp returns; a stat row adds them up across your businesses. AI drafts a reply to a review for you to copy and post on Yelp. The competitors panel lists nearby businesses in your category and marks the ones rated ahead of you. Up to 50 businesses can be connected.",
     howToUse: [
-      "Sidebar → Yelp → connect a business: search by business name and city, address or ZIP, then pick yours from the results.",
-      "Use Refresh to pull the latest rating and reviews.",
-      "On a review, choose “Draft reply with AI”, edit the draft, copy it and post it on Yelp from the review's link.",
-      "Open the competitors panel to see nearby businesses in your category and whether they are ahead of you.",
+      "Sidebar → Yelp → “Connect a Yelp business”: search by business name and city, address or ZIP, and choose Connect on yours.",
+      "Use Refresh on a card to pull the latest rating and reviews now; otherwise they refresh when older than 12 hours.",
+      "On a review, choose “Draft reply with AI”, edit the draft, copy it and post it on Yelp from the review’s link.",
+      "Open “Competitors on Yelp” on the card to see who is ahead of you.",
     ],
-    howItWorks: "Yelp's own API is read-only and lists only a few recent reviews per business; it has no way to post a reply, so replies are drafted here and posted on Yelp by you. AI can get facts wrong, so check every draft.",
+    howItWorks: "Yelp’s own API is read-only and returns only a few recent reviews per business; it has no way to post a reply, so replies are drafted here and posted on Yelp by you. A rising review count sends you a notification. The page needs a Yelp API key on the server; until an administrator sets one it shows a sample instead. AI can get facts wrong, so check every draft.",
     needs: ["A ConstructHUB account.", "A business page on Yelp."],
   },
 
   /* ══ Tools ════════════════════════════════════════════════════════════════════════════════════ */
   {
     key: "call-assistant", group: "Tools", route: "/call-assistant", title: "AI Call Assistant",
-    whatItIs: "An AI receptionist for your own phone line.",
-    whatItDoes: "It answers calls, asks what the call is about, collects the details you chose, files a real lead as a client in the CRM, and texts or emails urgent calls to the teammate you picked. Every call is listed with its outcome, a summary, the transcript and the recording.",
+    whatItIs: "An AI receptionist that answers your business line around the clock, screens out spam, and files real callers as leads in your CRM.",
+    whatItDoes: "It answers every call forwarded to it, asks what the call is about, collects the details you chose (the address, a name, a good email, the best time to call) and files a real caller as a lead in the CRM. Emergencies, existing customers and callers who insist on a person are texted or emailed to the teammate you picked. Telemarketers and robocalls are flagged and never reach you. Every call is logged with its outcome, a summary, the transcript and the recording. Five pages: Overview, Calls, Numbers, Agent studio and Simulator, each with its own \u201ci\u201d.",
     howToUse: [
-      "Sidebar → Call Assistant → Numbers: pick a state (and optionally an area code or city) and choose a local number.",
-      "To keep your existing number, forward it to the new one from your phone carrier.",
-      "In Agent Studio, set your services, service area, the questions to ask, the voice and greeting, and who gets urgent calls.",
-      "Try it in the Simulator by typing, then publish.",
-      "Read the results under Calls. Pause stops it answering.",
+      "Agent studio: tell the assistant about your business (services, service area, policies), choose its voice and the questions it asks, and who gets urgent calls. Publish when the review looks right.",
+      "Simulator: type a test conversation against the published version or the draft and read each decision beside the reply.",
+      "Numbers: get a local number (pick a state, optionally an area code or city) and forward your existing line to it with the steps shown for your carrier.",
+      "Calls: read every call with its outcome, summary, transcript and recording; unblock a number under Spam blocked if the assistant got one wrong.",
+      "Overview: watch the status, minutes and results, and follow the Next step line. Pause in Agent studio stops the assistant answering until you resume.",
     ],
-    howItWorks: "It says it is a virtual assistant if asked, and can play a notice that calls may be recorded. It does not quote prices unless you allow price ranges, does not book appointments, and never gives out a teammate’s number. Publishing creates a version you can restore later.",
+    howItWorks: "It says it is a virtual assistant if asked, and can play a notice that calls may be recorded. It never invents a rating, a license or a price: it quotes prices only when you choose to read typed ranges, does not book appointments, and never gives out a teammate\u2019s number. A number caught twice as near-certain spam is blocked before its next call is answered, and a weekly email reports how many spam calls were stopped. Publishing creates a numbered version you can restore later.",
     needs: [CALL_ASSISTANT_SEPARATE_LINE, callAssistantAvailabilityLine()],
   },
   {
     key: "social-media", group: "Tools", route: "/social-media", title: "Social Media",
-    whatItIs: "A composer, scheduler and approval queue for social posts, per business, posted to the accounts ConstructHUB connects for you.",
-    whatItDoes: "Writes and schedules posts for the social accounts you connected through ConstructHUB, with a calendar and queue, an optional auto mode that drafts posts from your business details, and bulk tools for agencies.",
+    whatItIs: "One place to write, schedule and follow posts for your business's social accounts and its Google Business Profile.",
+    whatItDoes: "Each business gets its own workspace: Overview (this week and what is coming up), Calendar, New post, Posts (drafts, scheduled, published, failed), Analytics, Inbox for comments, Accounts, and Auto mode, where ConstructHUB writes posts on a schedule as drafts or straight to your accounts. A post is written once and sent to every account you tick, with its own tweak per network, and to your Google listing when the business is linked to one. Agencies can open all clients at once for the calendar and the posts.",
     howToUse: [
-      "In Social Media, select a business and open Accounts.",
-      "Choose Connect for a network and sign in to it; for Facebook and LinkedIn, tick the Pages you manage.",
-      "Open “Map accounts and pages to this business” and save the destinations.",
-      "Under Compose, write the post, add media, and choose Post now, Schedule post or Save draft.",
-      "Follow each destination under “Calendar & queue”.",
+      "Pick the business in the Business menu, then open Accounts and choose Connect on each network; for Facebook and LinkedIn tick the pages you manage.",
+      "Open Map accounts and pages to this business and save where new posts go by default.",
+      "Under New post, tick the accounts and Google Business Profile, write the text, add media, type a schedule date and time or leave it blank, then choose Post now, Schedule post or Save draft.",
+      "Follow each post under Posts or on the Calendar; read comments under Inbox and numbers under Analytics.",
+      "Turn on Auto mode when you want posts written for you, as drafts to approve or published automatically.",
     ],
-    howItWorks: "ConstructHUB connects your social accounts directly; your sign-ins are stored encrypted and never shown again. “Queued” or “submitted” is not the same as published; if a status is uncertain, check the account on the network before posting again. Disconnecting stops ConstructHUB’s queue but cannot recall posts a network already published.",
-    needs: ["A social account you can sign in to for each network you post to.", "At least one Location to post for."],
+    howItWorks: "ConstructHUB connects your social accounts through its own apps on each network; the sign-ins are stored encrypted and never shown again. Published means the network confirmed it; queued means the post is still in ConstructHUB; if a status is uncertain, check the account on the network before posting again. The Google Business Profile copy goes through the Google posts queue the Posts page uses, so its status is shown there. Disconnecting stops ConstructHUB's queue but cannot recall posts a network already published.",
+    needs: ["A social account you can sign in to for each network you post to, or a business linked to its Google Business Profile.", "At least one business under Locations to post for."],
   },
   {
     key: "social-youtube", group: "Tools", route: "/social-media", title: "Social Media → YouTube",
-    whatItIs: "A direct connection between your ConstructHUB account and your own YouTube channel, so you can publish videos to it from the Social Media page.",
-    whatItDoes: "Connects one YouTube channel per account, shows you which channel was connected, and uploads the video files you choose to it with the title, description, tags and privacy setting you enter. It cannot edit or delete videos, read comments or statistics, or reach anything else in your Google account.",
+    whatItIs: "Your own YouTube channel, connected to ConstructHUB so you can publish videos to it from the Social Media → Accounts page.",
+    whatItDoes: "Connects one YouTube channel for your whole account, shows which channel is connected, and uploads the video files you choose with the title, description, tags and privacy you enter. It cannot edit or delete videos, read comments or statistics, or reach anything else in your Google account.",
     howToUse: [
       "Open Social Media, find the YouTube section and choose “Connect YouTube”. Pick the Google account and channel, and allow the two permissions Google lists.",
       "Check the channel name shown is the one you meant. If it is not, choose “Connect a different channel”.",
@@ -675,93 +683,95 @@ const entries: Draft[] = [
   },
   {
     key: "site-scan", group: "Tools", route: "/site-scan", title: "Site Scan",
-    whatItIs: "A check-up of your website that tells you what to fix, in priority order.",
-    whatItDoes: "Checks technical and content issues (broken links, redirects, HTTPS, titles, headings, image text), Google PageSpeed measurements on sampled pages, how the site’s details compare with your Google Business Profile, and readiness for AI search. Each finding explains its impact and the fix steps.",
+    whatItIs: "A check-up of a website that tells you what to fix, in priority order.",
+    whatItDoes: "Reads the site’s pages and checks technical and content issues (broken links, redirects, HTTPS, titles, headings, image text), runs Google PageSpeed on the pages you choose, compares the site’s details with a Google Business Profile if you pick one, and checks readiness for AI search. Each finding explains why it matters and the fix steps. You can mark fixes done, export a PDF, download a sitemap built from the crawl, email the checklist to your web person, share a read-only link, and rescan to see what changed.",
     howToUse: [
-      "Sidebar → Site Scan. Choose a linked location (it fills in the website) or “No GBP comparison” and enter the address.",
-      "Set the page cap and the number of PageSpeed pages, then “Start scan”.",
-      "Read the findings. “Generate AI fix plan” writes drafts only — check them before using them.",
-      "Mark items done, then rescan to see what is fixed, still present or new.",
-      "Export a PDF, create a read-only share link, or enable a monthly rescan.",
+      "Sidebar → Site Scan. Enter the website’s address in “Website URL” — the home page is enough.",
+      "Set “Pages to check” (150 covers most sites; any number up to 500) and “Pages to speed-test” (0 to 5) with the quick picks or your own number. Optionally pick a Google Business Profile to compare with — it fills in the address for you.",
+      "Choose “Start scan”. You can run 5 scans, 20 PageSpeed tests and 3 AI fix plans a day; bigger scans take a few minutes.",
+      "Read the findings. “Generate AI fix plan” writes a draft only — check it before using it. Mark items done, then rescan to see what is fixed, still present or new.",
+      "Turn on “Rescan this site every month” to keep it checked. Agencies queue many client sites at once under “Bulk scan client sites”; every scan lands in Scan history.",
     ],
-    howItWorks: "The scanner reads the pages’ HTML and does not run JavaScript. It never changes your website or Google listing. Scores are diagnostic indicators, not ranking predictions. Share links expire after 30 days and can be revoked.",
+    howItWorks: "The scanner reads the pages’ HTML and does not run JavaScript. It never changes your website or Google listing. Each page you speed-test is measured on mobile and on desktop by Google PageSpeed. Scores are diagnostic indicators, not ranking predictions. Share links expire after 30 days and can be revoked.",
     needs: ["Any plan; scans are counted against the plan’s monthly Site Scans."],
   },
   {
     key: "seo", group: "Tools", route: "/seo", title: "SEO Suite",
-    whatItIs: "A rank tracker and research tools: where your site ranks on Google for the keywords you choose, checked every week.",
-    whatItDoes: "Five tabs. Rank tracker shows each keyword’s position on desktop and mobile with movement since the last check. Site explorer looks up any website’s search traffic, keywords, backlinks and competitors. Keywords returns up to 50 related searches with volume, cost per click and difficulty. Backlinks shows who links to your site. Competitors lists keywords a competitor ranks for and you do not.",
+    whatItIs: "Your websites' standing on Google in one place: a card per site with its link strength, backlinks, estimated search traffic and where its tracked keywords rank — and the door to every other SEO tool.",
+    whatItDoes: "The box at the top looks any website up — yours or a competitor's — in Site explorer, or adds it to your sites for free. Each card shows the site's authority, referring domains, estimated organic traffic and keywords with their trend, how many tracked keywords are in the top 3 and top 10, the health score from its last crawl and its open tasks; every figure is a link to the page that holds it. Cards can be starred, put in groups (a client, a region) and ordered or narrowed with the pickers. Opening the dashboard never spends SEO data: Analyse or Refresh on a card buys a new Site explorer report at the price shown, and Run first crawl uses one of your plan's monthly Site Scans.",
     howToUse: [
-      "Sidebar → SEO, and add the domain you want to track (choose desktop, mobile or both, and how deep to check).",
-      "Choose “Add keywords” and paste them, one per line.",
-      "Wait for the weekly check, or choose “Run check now”; results arrive over the next few minutes.",
-      "Use the other tabs to research keywords, backlinks and competitors, and track the ones worth going after.",
+      "Type a website in “Look up any website”. Look it up opens it in Site explorer; Add to my sites puts it on this dashboard and in the rank tracker, free.",
+      "Open a card's figures: rankings go to the rank tracker, the health score to Site audit, traffic and keywords to Site explorer.",
+      "Choose Analyse on a card for its first Site explorer report, or Run first crawl for its health score — each says its cost before it runs.",
+      "Star the sites you watch most, put sites in groups, and use Order and Group to arrange the list; the arrangement is in the address, so a link lands on the same list.",
+      "Use the rail for the other tools: Site explorer, Keywords, Content, Rank tracker, Local grid, Site audit, AI visibility, Action plan, Alerts, Reports and Usage — each has its own “i”.",
     ],
-    howItWorks: "Checks are queued and run in the background. Keywords, research searches and backlink refreshes are counted against your plan’s allowances, shown on the page. If the page says rank tracking is being switched on, checks cannot run yet. Connecting the property in Search Console adds clicks and impressions to the overview.",
+    howItWorks: "The cards are built from numbers already saved — the last Site explorer report, each keyword's newest check on one device, the newest finished crawl and the plan's open tasks — so the page is free to open. Lookups and checks are paid from the SEO data your plan includes each month, then from credit you buy; the bar at the top shows what is left, and every button that spends says its price first. Up to 50 sites can be tracked, and a site with no keywords is never checked. If the page says lookups are being switched on, saved results open as usual and new lookups wait.",
     needs: [SEO_NEED],
   },
   {
     key: "ip-tracker", group: "Tools", route: "/ip-tracker", title: "IP Tracker",
-    whatItIs: "Visitor tracking for your websites, using the same tracking code and site list as Click Guard.",
-    whatItDoes: "Shows visitors online now, total and daily visits, each IP address’s visits with pages, location and device details, traffic sources, landing pages, countries and cities, and browsers and devices.",
+    whatItIs: "A live list of who visits your website — which address, from where, on what device, and which pages — using the same tracking code and site list as Click Guard.",
+    whatItDoes: "The Dashboard shows who is on the site right now (distinct IP addresses in the last 20 minutes), visits today, yesterday, the last 7 days, this month and all time, a 14-day chart, and one panel per site with its visits, unique visitors, flagged visits and blocked IPs. Visitors lists each address with its visits, pages, city, device and browser and opens to its full record; Traffic shows the sites that sent each visit, Pages the pages people landed on, Geo the countries and cities, Platforms the browsers, systems, devices and screen sizes.",
     howToUse: [
-      "Sidebar → IP Tracker, and add your website.",
-      "Paste the tracking code in the head section or before the closing body tag of every page you want to track.",
-      "Open the Dashboard and Visitor List once visits start arriving.",
+      "Sidebar → Tools → IP Tracker, and add your website’s domain (step 1 on the page).",
+      "Copy the tracking code and paste it in the head section, or before the closing body tag, of every page you want to track.",
+      "Open your site once: the first visit replaces the sample within about 30 seconds, and the other sections fill in from the same visits.",
+      "Narrow a section with a date range — a preset or two typed dates; on Visitors, “Seen within” shows who was there in the last 20 minutes or any number of minutes you type.",
     ],
-    howItWorks: "Visits appear only after the code runs on your site. “Online now” counts distinct IP addresses in the last 20 minutes. One website counts once across Click Guard, IP Tracker and VPN Shield.",
+    howItWorks: "Each page load with the code on it sends one visit: IP address, browser, system, device, screen size, language, time zone, referrer and landing page; country and city come from Cloudflare on visits recorded since Sep 30, 2026. Until a site has a visit, each section shows a clearly marked sample so you can see what it will look like — nothing in it is real or stored. A section loads the newest 1,000 visits at most, so a busy site’s all-time counts carry a plus sign. One website counts once across Click Guard, IP Tracker and VPN Shield.",
     needs: [PROTECTED],
   },
   {
     key: "vpn-shield", group: "Tools", route: "/vpn-shield", title: "VPN Shield",
-    whatItIs: "A detector for visitors who show possible VPN or proxy signals.",
-    whatItDoes: "Flags and logs those visits and can optionally react in the browser: show an overlay, record only, or redirect to an address you choose. You can whitelist up to 500 IP addresses that should never be blocked.",
+    whatItIs: "A detector for visitors who arrive through a VPN or proxy, with a choice of what to do about them: log, block or redirect.",
+    whatItDoes: "Flags a visit when the address matches a known VPN provider or datacenter range, the browser leaks a different address over WebRTC, or a VPN extension shows itself, and records it with the provider, the method and the action taken. The Overview counts detections (all time, today, blocked, unique addresses), charts the last 30 days, lists the top providers and countries and shows every site with its mode. Flagged visits lists each detection; Install script gives the one tag per site; Settings sets the mode, a redirect link and a whitelist of up to 500 of your own addresses.",
     howToUse: [
-      "Add your site in IP Tracker or Click Guard first.",
-      "Open VPN Shield, select the site and paste its script tag on your pages.",
-      "In Settings choose what flagged browsers get: overlay, record only or redirect.",
-      "Whitelist your own addresses, such as an office VPN.",
+      "Add your site here or in IP Tracker — it is the same site list — and it starts in Log only.",
+      "Open Install script, copy the tag and paste it on every page.",
+      "Visit your site through a VPN once: the detection replaces the sample on the Overview within a minute.",
+      "Read a few flagged visits, then in Settings choose Block (an overlay) or Redirect (your link), whitelist your office and test addresses, and save.",
     ],
-    howItWorks: "Detection is a set of signals, not proof: VPN use is often legitimate and nothing here identifies a person. The overlay and redirect run after the page loads, only in browsers that run the script, and can be bypassed.",
-    needs: [PROTECTED, "A site already added in IP Tracker or Click Guard."],
+    howItWorks: "Detection is a set of signals, not proof: VPN use is often legitimate and nothing here identifies a person. Search-engine crawlers are skipped by user agent, which can be spoofed. The overlay and redirect run after the page loads, only in browsers that run the script, and can be bypassed. A site that never saved a mode logs and blocks nobody. Until a site has a detection, the Overview and Flagged visits show a clearly marked sample — nothing in it is real or stored.",
+    needs: [PROTECTED, "A site added here, in IP Tracker or in Click Guard."],
   },
   {
     key: "competitor-intel", group: "Tools", route: "/competitors", title: "Competitor Intel",
-    whatItIs: "A market scan of the businesses competing in your trade and area, from public Google business listings.",
-    whatItDoes: "Lists each competitor’s name, address, star rating, review count, phone and website, flags businesses that are new since earlier scans, and gives each a “BS Meter” — a rough score of review signals worth a closer look.",
+    whatItIs: "A market scan of the businesses competing in your trade around your town, built from Google’s public business listings.",
+    whatItDoes: "Each scan lists every competitor Google shows for a trade within a radius of a place — name, rating, review count, category, address, phone and website — and reads it back as a market report: the leaders, how ratings and review counts spread across the market, and every listing best-rated first with its review signals explained in one line. A strip at the top adds up every saved scan. Scans stay on your account until you delete them.",
     howToUse: [
-      "Sidebar → Competitor Intel → New Market Scan.",
-      "Choose the industry, enter a location such as “Tampa, FL” and pick a radius.",
-      "Choose “Scan Market”.",
-      "Open the scan to see every competitor and the review analysis.",
+      "Sidebar → Competitor Intel. Pick your trade from the list or type your own, enter a city, ZIP or address, and set the radius: a preset or any number of miles from 1 to 100.",
+      "Choose Scan market and wait for the card to say Completed (a scan uses one of the month’s allowance; cancelling gives it back).",
+      "Open the report: read the leaders and the two distribution bars, then the list — Call, Directions and Website on each business.",
+      "Choose Review analysis on a business to see what its sampled reviews show; Re-run repeats a scan, Delete removes it.",
     ],
-    howItWorks: "It uses public business listings only. BS Meter signals are not proof that a review is fake, and the scores are not probabilities. It does not show competitors’ ads, ad spend or private data.",
+    howItWorks: "The scanner reads public business listings only — no ads, ad spend or private data. The listings arrive from the server already ordered best-rated first, most-reviewed among equals. Review signals are counted from the few reviews Google returns per listing: a score from 0 to 100 with its reasons, shown as Few, Some or More signals. They are not proof that a review is fake and the scores are not probabilities; a high-rated listing in the More band is not named a leader.",
     needs: [`Included with the ${COMPETITOR_INTEL_PLANS} plans, with a monthly number of scans.`],
   },
   {
     key: "master-class", group: "Tools", route: "/master-class", title: "Master Class",
-    whatItIs: "A step-by-step course on starting and growing a construction business.",
-    whatItDoes: "Four modules — Business Formation & Licensing, GMB Setup & Optimization, Website & Online Presence, and SEO & Directory Domination — with state-by-state guides and checklists.",
+    whatItIs: "A step-by-step course on starting and growing a construction business, with a free guide for every state.",
+    whatItDoes: "Four modules — Business Formation & Licensing, Google Business, Website, and SEO & ads — plus bonus lessons on vetting contractors. The Overview is free and compares all 50 states: who issues licenses, whether a license, a bond, workers’ comp or sales tax on labor applies, and the filing office. Each module tab holds its lessons; the Enroll tab sells the modules and the bundle.",
     howToUse: [
-      "Sidebar → Master Class.",
-      "Read the overview, which is free.",
-      "Open a module you have purchased to read its full content.",
+      "Sidebar → Master Class. Read the Overview and choose your state to open its guide.",
+      "Open a module tab you own to read its lessons in order; a lock on a tab means it is not unlocked on this account.",
+      "Choose Enroll to add a module or the complete bundle to the cart.",
     ],
-    howItWorks: "Modules are sold separately or as a bundle and are not included in any plan. Any Master Class purchase also unlocks the full Google Ads Guide.",
-    needs: ["A Master Class purchase for the full modules."],
+    howItWorks: "The state guides are public. Lesson text is fetched only for an account that owns the module, the bundle or a plan that includes the course; the page checks that first and says when the check is loading or failed instead of calling it “not bought”. Prices come from the catalog the server serves. Any Master Class purchase also opens the vetting lessons and the full Google Ads guide. The open tab, state and lesson stay in the page address.",
+    needs: ["A Master Class purchase, or a plan that includes the course, for the lessons. The Overview and state guides are free."],
   },
 
   {
     key: "compliance", group: "Tools", route: "/compliance", title: "Compliance Dept",
-    whatItIs: "A state-by-state directory of who licenses contractors and trades and who issues electrical permits, plus paid Permit & License Research Reports.",
-    whatItDoes: "For each state it lists the licensing boards and permit agencies (the equivalents of Washington's Labor & Industries) with links to their official license and permit lookups. A research report searches state license records and every live permit portal we reach in the chosen states for the names you give, and returns a sourced report.",
+    whatItIs: "A state-by-state directory of who licenses contractors and trades and who issues electrical permits, with each agency’s official lookup links, plus paid Permit & License Research Reports.",
+    whatItDoes: "For every state it shows a short summary of how licensing is split, who issues electrical permits (the state, cities and counties, or both), and a card for each licensing board or permit agency with the roles it covers and its official links: look up a license, look up a permit, open data, the agency website and a phone number where one is on record. A link the agency’s site would not let us check automatically is marked “unconfirmed”. The search box narrows the page to a state or an agency, and the state pills jump to a state. The report card leads to the paid research reports.",
     howToUse: [
-      "Sidebar → Compliance Dept.",
-      "Find a state to see its agencies and lookup links.",
-      "To order a report: Order a report → add names, pick up to three states and any trades → accept the terms → see the free preview → pay.",
-      "When the report is ready you get an email; open it from Compliance Dept → Research reports and print it or save it as a PDF.",
+      "Open Compliance Dept.",
+      "Type a state or agency name in the search box, or click a state pill to jump to it.",
+      "Open the agency’s “Look up a license” or “Look up a permit” link to check a contractor on the agency’s own site.",
+      "To have the research bot do the searching for you, choose Order a report.",
     ],
-    howItWorks: "The research bot runs the same live permit searches as Search Permits and reads official state license data. Reports are paid up front and non-refundable, nothing is guaranteed, and a report is not an FCRA consumer report.",
+    howItWorks: "The directory is a fixed list kept in ConstructHUB’s reference data: every agency was researched state by state and every link was opened and checked on the date shown beside the state name; a link that failed its check is left out rather than guessed. The page reads nothing from your account. It is information, not legal advice; confirm requirements with the agency before you bid or hire.",
   },
 
   /* ══ CRM (served by the CRM host) ═════════════════════════════════════════════════════════════ */
@@ -923,7 +933,7 @@ const entries: Draft[] = [
   /* ══ Tools → Report an issue ══════════════════════════════════════════════════════════════════ */
   {
     key: "report-issue", group: "Tools", route: "/report-issue", title: "Report an issue",
-    whatItIs: "The page for telling us something on ConstructHUB is broken, confusing or missing. “Report an issue” at the bottom of every page opens it.",
+    whatItIs: "The page for telling us something on ConstructHUB is broken, confusing or missing. “Report an issue” at the bottom of every page opens it, signed in or out.",
     whatItDoes: "Sends your description to our issue desk as its own numbered report, together with a short list of technical details the page shows you before you send. Under “Your reports” you can follow each report: Received, Being looked at, Fix ready, then Fixed or Not a bug, with our reply when there is one.",
     howToUse: [
       "Choose “Report an issue” at the bottom of the page where the problem happened.",
@@ -932,7 +942,7 @@ const entries: Draft[] = [
       "Open “What we send with your report” to see the details that go with it, then choose Send report.",
       "Keep the report number, and come back to “Your reports” for its status and our reply.",
     ],
-    howItWorks: "Each report is stored separately and is never merged with someone else’s. The issue desk takes reports from people before the errors the site records by itself, and “I can’t use the site” before everything else; that choice also alerts our team straight away. Before a report is stored, email addresses and phone numbers in the text are masked and anything that looks like a password, key or card number is removed. Signed out, the page asks for an email address so we can write back; the list of your reports needs an account.",
+    howItWorks: "Each report is stored separately and is never merged with someone else’s. The issue desk takes reports from people before the errors the site records by itself, and “I can’t use the site” before everything else; that choice also alerts our team straight away. Before a report is stored, email addresses and phone numbers in the text are masked and anything that looks like a password, key or card number is removed; the server keeps the browser and OS rather than the whole user agent, and the page path without its query string. Signed out, the page asks for an email address so we can write back, and the report waits for a person to read it before it goes to the desk; the list of your reports needs an account.",
     needs: ["Nothing: it works on every plan, and signed out too."],
   },
 ];
@@ -948,8 +958,60 @@ const START_HERE_ORDER = ["brand-what-is-constructhub", "brand-tour-crm", "brand
 const lead = (key: string) => { const i = START_HERE_ORDER.indexOf(key); return i === -1 ? START_HERE_ORDER.length : i; };
 const collected = (Object.values(moreEntries) as unknown as Draft[]).slice().sort((a, b) => lead(a.key) - lead(b.key) || a.key.localeCompare(b.key));
 
+/**
+ * The feature whose intro film an entry's "i" plays while the entry has no walkthrough of its own (owner 2026-10-15:
+ * the "i" is where the tutorial is). Help key → feature page key (shared/feature-pages, whose film is
+ * `intro-<slug>`, ./videos/intro-<slug>.json). Explicit and reviewed: each pair names a page whose film is about
+ * the tool the entry describes — never a neighbour's. Sections inherit their feature's pair. The film is labelled
+ * "Overview film" in the panel; the Tutorials page still reads `video` alone, so "Video coming soon" keeps meaning
+ * that no walkthrough was recorded. server/help-registry.test.ts holds every key and value to the registry and the
+ * catalogue, and asks for a pair (or a NO_INTRO_FALLBACK reason) for each main-app feature at a feature page's route.
+ */
+export const INTRO_FALLBACKS: Readonly<Record<string, string>> = {
+  // Google Ads
+  "ads-manager": "adsManager", "click-guard": "clickGuard", "lsa-leads": "lsaLeads",
+  // Google Business
+  "google-business": "gbp", locations: "gbp", "profile-guard": "profileGuard", "posts-photos": "gbpContent", photos: "gbpContent",
+  "photo-optimizer": "media", "media-library": "media", "ranking-grid": "rankingGrid", agency: "agency",
+  reinstatement: "reinstatement", domains: "domains", "mail-alerts": "mailAlerts",
+  // Reviews
+  "google-reviews": "reviews",
+  // Permits & Databases
+  "search-permits": "permits", "database-directory": "permits", "search-history": "permits", "permit-alerts": "permits",
+  "property-records": "property",
+  // Tools
+  cloudflare: "cloudflare", "search-console": "searchConsole", seo: "seo", "site-scan": "siteScan", "ip-tracker": "ipTracker",
+  "vpn-shield": "vpnShield", "competitor-intel": "competitors", "master-class": "masterClass", "call-assistant": "callAssistant",
+  "social-media": "social", "social-youtube": "social", developers: "customerApi",
+  // CRM (its pages have their own walkthroughs; the pair is the fallback should one be re-recorded)
+  "crm-home": "crm", "crm-pipeline": "crmLeads", "crm-lead-new": "crmLeads", "crm-schedule": "crmSchedule", "crm-schedule-views": "crmSchedule",
+  "crm-sms-setup": "texting", jobcam: "jobcam", "crm-jobcam-share-link": "jobcam", "crm-jobcam-share": "jobcam", "crm-jobcam-tags": "jobcam",
+  "crm-jobcam-upload": "jobcam", "crm-jobcam-timeline": "jobcam", "crm-jobcam-project": "jobcam",
+};
+/**
+ * Main-app features that sit at a feature page's route on purpose without that page's film: the page is about a
+ * different tool. Key → why (the test prints it).
+ */
+export const NO_INTRO_FALLBACK: Readonly<Record<string, string>> = {
+  home: "the Gabe film is about the assistant, not the dashboard the home page shows",
+};
+
+/** The intro film's help key for an entry (its feature's pair in INTRO_FALLBACKS), or undefined when there is none. */
+export const introFallbackKey = (e: Pick<HelpDraft, "key" | "parent">): string | undefined => {
+  const page = INTRO_FALLBACKS[e.parent ?? e.key];
+  return page ? introVideoKey(page) : undefined;
+};
+
+/** `video` is the walkthrough of the entry's own manifest (./videos/<key>.json); `film` adds the intro fallback. */
+function withFilms(e: Draft): HelpEntry {
+  const video = helpVideoFor(e.key);
+  const fallback = introFallbackKey(e);
+  const intro = video || !fallback ? null : helpVideoFor(fallback);
+  return { ...e, video, film: video ?? intro, videoSource: video ? "walkthrough" : intro ? "intro" : null };
+}
+
 /** Every entry. `video` is the recorded walkthrough of its manifest file (./videos/<key>.json), else null. */
-export const HELP_ENTRIES: readonly HelpEntry[] = [...entries, ...collected].map((e) => ({ ...e, video: helpVideoFor(e.key) }));
+export const HELP_ENTRIES: readonly HelpEntry[] = [...entries, ...collected].map(withFilms);
 
 const BY_KEY = new Map(HELP_ENTRIES.map((e) => [e.key, e]));
 /**
@@ -973,7 +1035,7 @@ export const introHelpEntry = (key: string): HelpEntry | undefined => {
     const ext = EXTERNAL_FEATURE_PAGES.find((p) => introVideoKey(p.key) === key);
     if (!ext) return undefined;
     return { key, title: ext.title, route: ext.app.href, group: INTRO_GROUPS[ext.key] ?? "Tools", unlisted: true,
-      whatItIs: ext.lede, whatItDoes: ext.lede, howToUse: [], howItWorks: ext.lede, video: helpVideoFor(key) };
+      whatItIs: ext.lede, whatItDoes: ext.lede, howToUse: [], howItWorks: ext.lede, ...introFilm(key) };
   }
   return {
     key, title: page.title, route: page.app.href, group: INTRO_GROUPS[page.key] ?? "Tools", unlisted: true,
@@ -981,25 +1043,46 @@ export const introHelpEntry = (key: string): HelpEntry | undefined => {
     whatItDoes: page.cards.map((c) => `${c.title}: ${c.body}`).join(" "),
     howToUse: page.steps.map((st) => `${st.title}: ${st.body}`),
     howItWorks: page.inDepth?.paragraphs[0] ?? page.lede,
-    video: helpVideoFor(key),
+    ...introFilm(key),
   };
+};
+/** An intro entry's own recording is an intro film, and it is labelled as one. */
+const introFilm = (key: string): Pick<HelpEntry, "video" | "film" | "videoSource"> => {
+  const video = helpVideoFor(key);
+  return { video, film: video, videoSource: video ? "intro" : null };
 };
 export const helpEntry = (key: string): HelpEntry | undefined => BY_KEY.get(key) ?? introHelpEntry(key);
 
 /**
  * The entry for a page path, so a page title can carry its "i" without naming a key (owner 2026-10-15: every
  * page gets an "i" that says what it is for and how to use it, with the walkthrough inside). Exact route first,
- * then the longest route prefix; at the same route a feature beats its sections (they share the feature's route
- * unless a section declares a more specific one, e.g. "/cloudflare/connections"). Query and hash are ignored.
+ * then the longest route prefix (an entry's `route`, or one of its `alsoAt` routes); at the same route a feature
+ * beats its sections (they share the feature's route unless a section declares a more specific one, e.g.
+ * "/cloudflare/connections"), and among features the one named after the route's last segment wins ("/crm/settings"
+ * → "crm-settings" rather than any of the dozen entries that live on that page; "/crm/pipeline" → "crm-pipeline",
+ * not the shorter "crm-project"), then the shortest key, then alphabetical — deterministic, never file order.
+ * Query and hash are ignored.
  */
 export function helpKeyForRoute(pathname: string): string | undefined {
   const path = (pathname.replace(/[?#].*$/, "").replace(/\/+$/, "") || "/");
-  let best: HelpEntry | undefined, bestLen = -1;
+  const clean = (r: string) => r.replace(/[?#].*$/, "").replace(/\/+$/, "") || "/";
+  /** How well a feature's key names the route's last segment: exact ("crm-settings" / "settings"), then "-settings", then contains it. */
+  const named = (key: string, r: string) => {
+    const seg = r.slice(r.lastIndexOf("/") + 1);
+    return key === seg || key === `crm-${seg}` ? 3 : key.endsWith(`-${seg}`) ? 2 : key.includes(seg) ? 1 : 0;
+  };
+  let best: HelpEntry | undefined, bestLen = -1, bestRank = -1;
   for (const e of HELP_ENTRIES) {
     if (e.unlisted) continue;
-    const r = e.route.replace(/[?#].*$/, "").replace(/\/+$/, "") || "/";
-    if (r === "/" || !(path === r || path.startsWith(r + "/"))) continue;
-    if (r.length > bestLen || (r.length === bestLen && !e.parent && best?.parent)) { best = e; bestLen = r.length; }
+    for (const r of [e.route, ...(e.alsoAt ?? [])].map(clean)) {
+      if (r === "/" || !(path === r || path.startsWith(r + "/"))) continue;
+      // Sections lowest, then the "Start here" films (a tour of the CRM is not the home page's "i"), then features by name.
+      const rank = e.parent ? 0 : e.group === "Start here" ? 1 : 2 + named(e.key, r);
+      // Still tied: the shortest key, then alphabetical — never the order the entries happen to be listed in.
+      const wins = r.length > bestLen || (r.length === bestLen && (rank > bestRank ||
+        (rank === bestRank && !!best && (e.key.length < best.key.length || (e.key.length === best.key.length && e.key < best.key)))));
+      if (wins) { best = e; bestLen = r.length; bestRank = rank; }
+    }
   }
   return best?.key;
 }

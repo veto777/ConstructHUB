@@ -16,7 +16,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { AppPage, Toolbar, Notice } from "@/components/app-ui";
-import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { HelpButton } from "@/components/help-button";
+import { SamplePreview } from "@/components/sample-preview";
+import { PresetFilter } from "@/components/domains/preset-filter";
 import {
   PlanRequired,
   planRequiredFrom,
@@ -25,6 +28,19 @@ import { pollWithinBudget } from "@/components/domains/polling";
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass =
   "h-10 w-full rounded-full border bg-background px-4 text-sm sm:w-auto";
+
+/** The categories and severities the matcher assigns (server/mail-alerts/classify.ts); any other word can be typed and is matched as-is. */
+const CATEGORIES: readonly [string, string][] = [["gbp", "Google Business Profile"], ["gsc", "Search Console"], ["ads", "Google Ads"], ["cloudflare", "Cloudflare"], ["registrar", "Registrar"], ["forwarding", "Gmail forwarding"]];
+const SEVERITIES: readonly [string, string][] = [["critical", "Critical"], ["warning", "Warning"], ["info", "Info"]];
+const categoryLabel = (c: string) => CATEGORIES.find(([v]) => v === c)?.[1] ?? c;
+
+/** Obviously made-up alerts for the sample shown while the inbox is empty (never stored, never sent). */
+const sampleAgo = (hours: number) => new Date(Date.now() - hours * 3600000).toISOString();
+const SAMPLE_ALERTS = [
+  { id: -1, subject: "Action needed: verify your Business Profile for Sample Roofing Co.", category: "gbp", severity: "warning", sender: "businessprofile-noreply@google.com", received_at: sampleAgo(3), read_at: null, location_name: "Sample Roofing Co." },
+  { id: -2, subject: "Transfer request for example-plumbing.example", category: "registrar", severity: "critical", sender: "support@sample-registrar.example", received_at: sampleAgo(26), read_at: null, location_name: "Example Plumbing LLC" },
+  { id: -3, subject: "Your Google Ads account: policy update", category: "ads", severity: "warning", sender: "ads-noreply@google.com", received_at: sampleAgo(50), read_at: sampleAgo(40), location_name: null },
+];
 
 function ListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
@@ -155,12 +171,16 @@ export default function MailAlertsPage() {
   };
   const counts = messages?.counts;
   const configured = !!settings?.address;
+  // The stat row's first number whatever the filters say: every alert kept (30 days).
+  const { data: overview } = useQuery<any>({ queryKey: ["/api/mail-alerts?limit=1"], refetchInterval: pollWithinBudget(60_000) });
+  const totalAlerts: number | null = overview ? Number(overview.total || 0) : null;
+  const filtering = !!(q || category || severity || unread || mapped || filterClient);
   // Google's format (owner, 2026-10-07): a quiet page title, section headings with a hairline, alerts as rows.
   const header = (
     <GoogleSectionHeader
       as="h1"
       title="Mail alerts"
-      description="Known provider alerts for your client accounts. Matched messages expire within 30 days."
+      description="The important emails from Google, Cloudflare and your registrar about each client’s accounts, in one inbox and matched to the client."
       flush
       actions={
         <Link href="/domains" asChild>
@@ -220,9 +240,28 @@ export default function MailAlertsPage() {
     <AppPage testId="page-mail-alerts">
       {header}
       {error && <Notice tone="danger">{error}</Notice>}
+      {totalAlerts !== null && totalAlerts > 0 && (
+        <GoogleStatGrid cols={4}>
+          <GoogleStat label="Alerts kept" value={totalAlerts.toLocaleString()} hint="Recognised alerts from the last 30 days" testId="stat-alerts-total" />
+          <GoogleStat label="Unread" value={(counts?.unread ?? 0).toLocaleString()} hint="Opening an alert marks it read" testId="stat-alerts-unread" />
+          <GoogleStat label="Critical" value={(counts?.critical ?? 0).toLocaleString()} tone={counts?.critical ? "bad" : "default"} hint="Suspensions, ownership and transfer requests, manual actions" testId="stat-alerts-critical" />
+          <GoogleStat label="Unmapped" value={(counts?.unmapped ?? 0).toLocaleString()} hint="Not yet matched to a client" testId="stat-alerts-unmapped" />
+        </GoogleStatGrid>
+      )}
+      {totalAlerts === 0 && (
+        <div className="g-callout" data-testid="mail-alerts-how-it-works">
+          <h3>How this works</h3>
+          <ol className="mt-1 list-decimal space-y-1 pl-5">
+            <li>Copy your private forwarding address below.</li>
+            <li>In Gmail, forward mail from the provider senders (Google Business Profile, Search Console, Google Ads, Cloudflare, your registrar) to it.</li>
+            <li>Recognised alerts land here, graded critical, warning or info and matched to the client they mention; they are kept for 30 days.</li>
+          </ol>
+        </div>
+      )}
       <section data-testid="section-connection-status">
         <GoogleSectionHeader
           title="Connection"
+          titleAfter={<HelpButton k="mail-alerts.forwarding-setup" />}
           description="Where provider alert emails land and how they reach ConstructHUB."
         />
         {settings ? (
@@ -272,12 +311,10 @@ export default function MailAlertsPage() {
               </div>
             </div>
           ) : (
-            <Notice tone="warning" testId="notice-inbound-unconfigured">
-              Inbound mail is not configured. Your administrator must set the{" "}
-              <code className="text-xs">INBOUND_MAIL_DOMAIN</code> environment
-              variable before ConstructHUB can create your private forwarding
-              address. Alerts already stored below still show; forwarding and
-              the optional Gmail connection need that setting.
+            <Notice tone="info" title="No forwarding address yet on this server" testId="notice-inbound-unconfigured">
+              Your private forwarding address is made from the server’s inbound mail domain, which an
+              administrator sets with <code className="text-xs">INBOUND_MAIL_DOMAIN</code> in the server
+              environment. Until then there is nothing to forward to; alerts already stored still show below.
             </Notice>
           )
         ) : settingsError ? (
@@ -325,43 +362,34 @@ export default function MailAlertsPage() {
             }
             filters={
               <>
-                <select
-                  aria-label="Alert category"
-                  className={selectClass}
+                <PresetFilter
+                  label="Alert category"
+                  allLabel="All providers"
+                  presets={CATEGORIES}
+                  placeholder="Provider"
+                  selectClass={selectClass}
+                  testId="filter-category"
                   value={category}
-                  onChange={(e) => {
-                    setCategory(e.target.value);
+                  onChange={(v) => {
+                    setCategory(v);
                     setSelected([]);
                     setPage(1);
                   }}
-                >
-                  <option value="">All providers</option>
-                  {[
-                    "gbp",
-                    "gsc",
-                    "ads",
-                    "cloudflare",
-                    "registrar",
-                    "forwarding",
-                  ].map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-                <select
-                  aria-label="Alert severity"
-                  className={selectClass}
+                />
+                <PresetFilter
+                  label="Alert severity"
+                  allLabel="All severity levels"
+                  presets={SEVERITIES}
+                  placeholder="Severity"
+                  selectClass={selectClass}
+                  testId="filter-severity"
                   value={severity}
-                  onChange={(e) => {
-                    setSeverity(e.target.value);
+                  onChange={(v) => {
+                    setSeverity(v);
                     setSelected([]);
                     setPage(1);
                   }}
-                >
-                  <option value="">All severity levels</option>
-                  <option>critical</option>
-                  <option>warning</option>
-                  <option>info</option>
-                </select>
+                />
                 <select
                   aria-label="Filter by client"
                   className={selectClass}
@@ -390,6 +418,7 @@ export default function MailAlertsPage() {
               </>
             }
           />
+          {!!messages?.items?.length && (
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex h-10 items-center gap-2 text-sm g-text-2">
               <input
@@ -417,6 +446,7 @@ export default function MailAlertsPage() {
               </span>
             )}
           </div>
+          )}
           {selected.length > 0 && (
             <div
               className="flex flex-wrap items-center gap-2 rounded-xl border p-2"
@@ -547,11 +577,41 @@ export default function MailAlertsPage() {
               {apiErrorMessage(messagesError, "Could not load provider alerts.")}
             </Notice>
           ) : !messages?.items?.length ? (
-            <p className="py-4 text-sm g-text-2">
-              {q || category || severity || unread || mapped || filterClient
-                ? "No alerts match these filters."
-                : "No provider alerts yet. Forward provider mail here and recognised alerts appear in this inbox."}
-            </p>
+            filtering ? (
+              <p className="py-4 text-sm g-text-2" data-testid="alerts-empty-filtered">No alerts match these filters.</p>
+            ) : (
+              <SamplePreview
+                what="what the inbox shows once provider mail is forwarded here"
+                testId="sample-alerts"
+                cta={configured
+                  ? <GooglePill size="sm" icon={Copy} label="Copy forwarding address" onClick={async () => { try { await navigator.clipboard.writeText(settings.address); toast({ title: "Address copied" }); } catch { toast({ title: "Could not copy", description: "Select the address and copy it manually.", variant: "destructive" }); } }} testId="sample-alerts-cta" />
+                  : undefined}
+              >
+                <GoogleStatGrid cols={4} className="mb-3">
+                  <GoogleStat label="Alerts kept" value="3" hint="Recognised alerts from the last 30 days" />
+                  <GoogleStat label="Unread" value="2" hint="Opening an alert marks it read" />
+                  <GoogleStat label="Critical" value="1" tone="bad" hint="Suspensions, ownership and transfer requests, manual actions" />
+                  <GoogleStat label="Unmapped" value="1" hint="Not yet matched to a client" />
+                </GoogleStatGrid>
+                <GoogleList>
+                  {SAMPLE_ALERTS.map((m) => (
+                    <GoogleListRow
+                      key={m.id}
+                      size="md"
+                      title={<span className={m.read_at ? "g-text-2" : undefined}>{m.subject}</span>}
+                      badges={
+                        <>
+                          {m.severity === "critical" ? <span className="g-chip g-chip--sm g-closed">Critical</span> : <span className="g-chip g-chip--sm">Warning</span>}
+                          {m.location_name ? <span className="g-chip g-chip--sm g-accent">{m.location_name}</span> : <span className="g-chip g-chip--sm">Unmapped</span>}
+                        </>
+                      }
+                      meta={[categoryLabel(m.category), m.sender, new Date(m.received_at).toLocaleString(), m.read_at ? "Read" : "Unread"]}
+                      actions={<><GooglePill variant="quiet" size="sm" label="Mark read" /><GooglePill variant="quiet" size="sm" icon={UserPlus} label="Assign client" /></>}
+                    />
+                  ))}
+                </GoogleList>
+              </SamplePreview>
+            )
           ) : (
             <GoogleList testId="list-alerts">
               {messages.items.map((m: any) => (
@@ -594,7 +654,7 @@ export default function MailAlertsPage() {
                     </>
                   }
                   meta={[
-                    m.category,
+                    categoryLabel(m.category),
                     m.sender,
                     new Date(m.received_at).toLocaleString(),
                     m.read_at ? "Read" : "Unread",
@@ -652,6 +712,7 @@ export default function MailAlertsPage() {
               ))}
             </GoogleList>
           )}
+          {(page > 1 || (messages?.total || 0) > 25) && (
           <div className="flex flex-wrap items-center gap-2">
             <GooglePill
               size="sm"
@@ -675,6 +736,7 @@ export default function MailAlertsPage() {
               label="Next alerts"
             />
           </div>
+          )}
         </div>
       </section>
       {configured && (

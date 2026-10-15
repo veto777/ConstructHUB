@@ -531,6 +531,8 @@ export default function CrmAdminPage() {
         as="h1"
         title={<>Platform admin <InfoTip k="admin" /></>}
         description="Every account and organization on ConstructHub — read-only monitoring."
+        /* No help entry covers /crm/admin (staff-only); without this the route lookup mounts CRM Home's "i". */
+        helpKey={null}
         flush
       />
 

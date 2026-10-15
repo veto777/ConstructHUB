@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { SamplePreview } from "@/components/sample-preview";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { LoadingCard, formatDateTime } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -166,7 +167,17 @@ export function AuditLogSection(_props: SettingsSectionProps) {
             <p className="py-6 text-sm text-muted-foreground" data-testid="text-audit-no-match">No activity matches these filters.</p>
           )}
           {rows.length === 0 && !error && (
-            <p className="py-6 text-sm text-muted-foreground" data-testid="text-audit-empty">Sign-ins, security changes and tool activity will appear here.</p>
+            <div className="space-y-4">
+              <p className="py-6 text-sm text-muted-foreground" data-testid="text-audit-empty">Sign-ins, security changes and tool activity will appear here.</p>
+              {/* Nothing recorded yet: a badged, made-up sample of the rows, replaced by the real log at the first event. */}
+              <SamplePreview what="what the log looks like once there is activity" testId="sample-audit-log">
+                <GoogleList as="ul">
+                  <GoogleListRow as="li" size="md" title="Signed in" meta={["Security", "you@example.com", "Mon 9:12 AM"]} line={<>IP <span className="font-mono">203.0.113.7</span> · Chrome on Windows</>} />
+                  <GoogleListRow as="li" size="md" title="Two-factor turned on" meta={["Security", "you@example.com", "Mon 9:15 AM"]} line={<>IP <span className="font-mono">203.0.113.7</span> · Chrome on Windows</>} />
+                  <GoogleListRow as="li" size="md" title="Google Business Profile connected" meta={["Google", "you@example.com", "Tue 2:40 PM"]} line={<>IP <span className="font-mono">198.51.100.21</span> · Safari on iPhone</>} />
+                </GoogleList>
+              </SamplePreview>
+            </div>
           )}
           <GoogleList as="ul">
             {shown.map((r) => {

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { InfoTip } from "@/components/info-tip";
+import { HelpButton } from "@/components/help-button";
 
 /** Clipboard writes can be refused (no permission, insecure context, some browsers); report the outcome. */
 export async function copyToClipboard(text: string): Promise<boolean> {
@@ -15,11 +15,15 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-/** Title row above a section: name, one-line description, the ⓘ tip and optional actions. */
-export function SettingsSectionHeader({ title, description, infoKey, actions }: {
+/**
+ * Title row above a section: name, one-line description, the "i" (what the section is for and how to use
+ * it, from the help registry — owner 2026-10-15: every page and section gets one) and optional actions.
+ */
+export function SettingsSectionHeader({ title, description, helpKey, actions }: {
   title: string;
   description?: string;
-  infoKey?: string;
+  /** A help-registry key ("account.profile"); the sections registry passes it. */
+  helpKey?: string;
   actions?: ReactNode;
 }) {
   return (
@@ -27,7 +31,7 @@ export function SettingsSectionHeader({ title, description, infoKey, actions }: 
       <div className="min-w-0">
         <h2 className="g-header__title flex items-center gap-1" data-testid="text-settings-section-title">
           {title}
-          {infoKey && <InfoTip k={infoKey} />}
+          {helpKey && <HelpButton k={helpKey} />}
         </h2>
         {description && <p className="g-header__sub">{description}</p>}
       </div>

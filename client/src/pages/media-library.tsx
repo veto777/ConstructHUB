@@ -9,7 +9,8 @@ import {
   FolderPlus, ImagePlus, Navigation, CheckCircle2, Grid3X3, List,
 } from "lucide-react";
 import { AppPage, EmptyState } from "@/components/app-ui";
-import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { SamplePreview } from "@/components/sample-preview";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,13 @@ interface Photo {
   size: number | null;
   createdAt: string;
 }
+
+/** The sample folder rows shown while the library is empty: made-up jobs, never stored or sent anywhere. */
+const SAMPLE_FOLDERS = [
+  { name: "Sample Residence – Roof Replacement", date: "Jan 12, 2026", address: "123 Example St, Springfield", gps: true },
+  { name: "Sample Office Park – Siding", date: "Jan 5, 2026", address: "456 Example Ave, Springfield", gps: true },
+  { name: "Sample Duplex – Windows", date: "Dec 20, 2025", address: "789 Example Rd, Springfield", gps: false },
+];
 
 function formatFileSize(bytes: number | null) {
   if (!bytes) return "";
@@ -367,7 +375,7 @@ export default function MediaLibraryPage() {
           as="h1"
           titleTestId="heading-media-library"
           title="Media library"
-          description="Project photo folders with client addresses. Photos processed in the Photo Optimizer carry GPS coordinates in their file data; direct uploads are stored exactly as uploaded."
+          description="Your job photos in folders, one per job, ready for posts, review requests and social media."
           flush
           actions={
             <GooglePill
@@ -381,6 +389,13 @@ export default function MediaLibraryPage() {
         />
       )}
 
+      {!activeFolderId && folders.length > 0 && (
+        <GoogleStatGrid cols={3}>
+          <GoogleStat label="Folders" value={folders.length.toLocaleString()} testId="stat-folders" />
+          <GoogleStat label="With a client address" value={folders.filter((f) => f.clientAddress).length.toLocaleString()} hint="The job's location on file" testId="stat-folders-address" />
+          <GoogleStat label="With GPS" value={folders.filter((f) => f.lat).length.toLocaleString()} hint="Coordinates found for the address" testId="stat-folders-gps" />
+        </GoogleStatGrid>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="g-search flex-1 sm:max-w-md" role="search">
           <Search aria-hidden="true" />
@@ -605,7 +620,7 @@ export default function MediaLibraryPage() {
       ) : !activeFolderId ? (
         <>
           {filteredFolders.length === 0 && !searchQuery ? (
-            <div data-testid="text-empty-state">
+            <div data-testid="text-empty-state" className="space-y-4">
               <EmptyState
                 icon={FolderOpen}
                 title="No folders yet"
@@ -614,6 +629,16 @@ export default function MediaLibraryPage() {
                   <GooglePill icon={FolderPlus} onClick={() => setShowNewFolder(true)} label="Create your first folder" testId="button-empty-new-folder" />
                 }
               />
+              <SamplePreview what="what your folders look like once you add one" testId="sample-folders"
+                cta={<GooglePill size="sm" icon={FolderPlus} onClick={() => setShowNewFolder(true)} label="New folder" />}>
+                <GoogleList>
+                  {SAMPLE_FOLDERS.map((f) => (
+                    <GoogleListRow key={f.name} size="md" leading={<FolderOpen />} title={f.name}
+                      meta={[f.date, <span key="addr" className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />{f.address}</span>, f.gps ? <span key="gps" className="g-open">GPS</span> : null]}
+                      trailing={<ChevronRight className="h-4 w-4 g-text-2" aria-hidden="true" />} />
+                  ))}
+                </GoogleList>
+              </SamplePreview>
             </div>
           ) : filteredFolders.length === 0 ? (
             <EmptyState compact icon={Search} title={`No folders match "${searchQuery}"`} />

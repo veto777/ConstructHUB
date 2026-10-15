@@ -80,7 +80,7 @@ export default function SeoBatchPage() {
     </th>
   );
   return (
-    <SeoShell title="Batch analysis" description="The headline numbers for many websites at once — to size up a list of competitors or sites you might get a link from." site={site} onSite={onSite} sites={sites} status={status} picker={false} spends="lookups">
+    <SeoShell title="Batch analysis" description="The headline numbers for many websites at once — to size up a list of competitors or sites you might get a link from." site={site} onSite={onSite} sites={sites} status={status} picker={false} spends="lookups" helpKey="seo.batch">
       <form onSubmit={(e) => { e.preventDefault(); setAsked(draft.slice(0, MAX)); }} data-testid="form-batch">
         <label className="block text-[13px]"><span className="g-text-2">Websites — one per line, up to {MAX}. Full addresses are fine; only the site name is used.</span>
           <textarea className="g-input mt-1 min-h-[140px] w-full py-2" value={text} onChange={(e) => setText(e.target.value)} placeholder={"competitor-one.com\ncompetitor-two.com\nlocal-directory.org"} data-testid="textarea-batch" />

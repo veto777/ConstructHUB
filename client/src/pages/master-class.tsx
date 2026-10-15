@@ -89,6 +89,8 @@ export default function MasterClassPage() {
   const filteredStates = (guides ?? []).filter((g) => !searchQuery || g.stateName.toLowerCase().includes(searchQuery.toLowerCase()) || g.stateCode.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const lockIcon = (tab: MasterClassTab) => accessQ.isSuccess && !tabUnlocked(access, tab) && <Lock className="h-3 w-3 text-muted-foreground" aria-label="Locked" />;
+  // The "i" beside the title follows the open tab: the course itself on the Overview, else that tab's section (shared/help/registry.ts).
+  const helpKey = activeTab === "overview" ? "master-class" : activeTab === "state-guide" ? "master-class.state-guide" : activeTab === "pricing" ? "master-class.enroll" : "master-class.modules";
 
   return (
     <>
@@ -97,7 +99,8 @@ export default function MasterClassPage() {
     <div className="h-full overflow-y-auto">
       <AppPage width="narrow" className="[&_p]:leading-relaxed [&_button:not([role=checkbox])]:min-h-10 [&_input]:min-h-10">
         <PageHeader title={<span data-testid="text-master-class-title">Master Class</span>}
-          description={<span data-testid="text-master-class-subtitle">Build your construction business, one lesson at a time.</span>}
+          helpKey={helpKey}
+          description={<span data-testid="text-master-class-subtitle">A course on starting and growing a construction business: a free guide for every state, then four modules of lessons.</span>}
           meta={<>
             <Badge variant="outline" data-testid="badge-states-count">{guides ? `${guides.length} states` : "50 states"}</Badge>
             <Badge variant="outline" data-testid="badge-licensing-count">{statesWithLicensing !== null ? `${statesWithLicensing} require licensing` : "— require licensing"}</Badge>

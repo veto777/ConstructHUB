@@ -194,6 +194,11 @@ export default function ReinstatementPage() {
     <GoogleSectionHeader as="h1" titleTestId="text-reinstatement-title" title="Profile reinstatement" description="Request help with a suspended Google Business Profile." flush/>
     <div data-testid="reinstatement-facts"><div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-3"><GoogleStat label="Flat project rate" value={formatUsd(GBP_REINSTATEMENT_CENTS)} testId="card-reinstatement-pricing"/><GoogleStat label="Initial review" value="1–2 days" hint="Business days"/></div></div>
     <p className="text-xs text-muted-foreground" data-testid="text-reinstatement-terms">Non-refundable. Google alone decides whether a profile is reinstated, so nothing is guaranteed.</p>
+    <div className="g-card space-y-2" data-testid="reinstatement-how"><h2 className="g-card__title g-card__title--md">How this works</h2><ol className="list-decimal space-y-1 pl-5 text-sm">
+      <li>Fill in the form below with what happened to the profile and send it.</li>
+      <li>The team reviews the case within 1–2 business days and tells you whether they think they can help.</li>
+      <li>If they take it on, they guide the fixes and documents and write and submit the appeal to Google.</li>
+    </ol></div>
     <section id="request" data-testid="card-reinstatement-form">
       <GoogleSectionHeader titleTestId="text-form-title" title="Tell us about your suspension" description="We’ll review your case before taking it on."/>
       {requestForm}

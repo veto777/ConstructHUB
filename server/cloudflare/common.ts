@@ -107,10 +107,17 @@ export async function listAssets(
     search = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
   const where =
     "user_id=$1 AND provider=$2 AND name ILIKE $3 AND ($4='' OR status=$4)";
+  // The totals over everything the search and filter match (not just this page): the Sites view's summary row.
   const {
     rows: [count],
   } = await pool.query(
-    `SELECT count(*)::int total FROM edge_assets WHERE ${where}`,
+    `SELECT count(*)::int total,
+    count(*) FILTER (WHERE synced_at IS NOT NULL)::int synced,
+    count(*) FILTER (WHERE synced_at IS NULL)::int not_synced,
+    count(*) FILTER (WHERE error IS NOT NULL AND error<>'')::int with_error,
+    COALESCE((SELECT count(*)::int FROM edge_location_links l JOIN edge_assets a ON a.id=l.asset_id
+      WHERE l.user_id=$1 AND a.user_id=$1 AND a.provider=$2 AND a.name ILIKE $3 AND ($4='' OR a.status=$4)),0) AS linked_locations
+    FROM edge_assets WHERE ${where}`,
     [user, provider, search, status],
   );
   const { rows } = await pool.query(
@@ -119,7 +126,10 @@ export async function listAssets(
     FROM edge_assets WHERE ${where} ORDER BY id LIMIT $5 OFFSET $6`,
     [user, provider, search, status, limit, (page - 1) * limit],
   );
-  return { items: rows, total: count.total, page, limit };
+  return {
+    items: rows, total: count.total, page, limit,
+    summary: { synced: count.synced, notSynced: count.not_synced, withError: count.with_error, linkedLocations: count.linked_locations },
+  };
 }
 export async function mapLocations(
   user: number,

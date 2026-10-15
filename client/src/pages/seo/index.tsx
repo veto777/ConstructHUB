@@ -27,6 +27,7 @@ import { CompetitorPanel } from "./rank-competitors";
 import { countryLabel } from "@shared/seo-markets";
 import { unresolvedPlaceMessage } from "@shared/seo-place";
 import { seoLinks, type Movement } from "./links";
+import { SampleRankTable } from "./samples";
 import { effectiveDevice, hrefWith, keepsRow, moved, narrowingWords, PANEL_TARGET, pageParts, scopeOf, scrollToTestId, showsMapPack, slug, useRankParams, utcDay, withFeature, type RankTo } from "./rank-params";
 import { GradientSpark, MetricColumn, ORANGE, PALETTE } from "./viz";
 import { CARD, LINK, LINK_BLOCK, LinkedDistributionBar, PositionBadge, PositionSpark, SectionTitle, TABLE, TAP } from "./viz-rank";
@@ -138,7 +139,7 @@ export default function SeoOverviewPage() {
   }, [o, site, search]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <SeoShell
-      title="Rank tracker" description="Where your site was found in Google's results for the keywords you chose, as of each saved check — automatic checks run weekly by default." site={site} onSite={onSite} sites={sites} status={status} spends="tracking"
+      title="Rank tracker" description="Where your site was found in Google's results for the keywords you chose, as of each saved check — automatic checks run weekly by default." site={site} onSite={onSite} sites={sites} status={status} spends="tracking" helpKey="seo.rank-tracker"
       actions={site && (
         <Button className="w-full sm:w-auto" disabled={!configured || !o || !o.rows.length || runNow.isPending || running} onClick={() => runNow.mutate()} data-testid="button-run-rank-check" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
           {runNow.isPending || running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
@@ -146,7 +147,11 @@ export default function SeoOverviewPage() {
         </Button>
       )}
     >
-      {!site && sites.isSuccess && <Empty testId="seo-empty-sites"><h3>No sites yet</h3><p>Add the domain you want to track. Then add the keywords you care about, and the first check runs on the next weekly tick — or straight away with "Run check now".</p></Empty>}
+      {!site && sites.isSuccess && <>
+        <Empty testId="seo-empty-sites"><h3>No sites yet</h3><p>Add the domain you want to track. Then add the keywords you care about, and the first check runs on the next weekly tick — or straight away with "Run check now".</p></Empty>
+        {/* What the table looks like with keywords tracked — made-up rows, shown only while there is no site (samples.tsx). */}
+        <div className="mt-4"><SampleRankTable what="what the tracker shows once a site has keywords" cta={<Link href={seoLinks.dashboard()} className="g-pill g-pill--sm !min-h-11" data-testid="link-sample-add-site">Add your first site</Link>} /></div>
+      </>}
       {site && missing && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="text-site-missing">The address names site #{missing}, which is not one of yours (or was removed); showing {site.domain}.</p>}
       {site && overview.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your rankings…</p>}
       {site && overview.isError && <div className="g-callout" role="alert" data-testid="rank-overview-error"><h3>Couldn't load your rankings</h3><p>{apiErrorMessage(overview.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void overview.refetch()}>Try again</button></div>}
@@ -235,7 +240,10 @@ export default function SeoOverviewPage() {
             )}
           </div>
           {o.rows.length === 0 ? (
-            <Empty testId="seo-empty-keywords"><h3>No keywords tracked for {site.domain}</h3><p>Paste keywords above, or <Link href={seoLinks.keywords("")} className={LINK} data-testid="link-research-keywords">research keywords</Link> and track the ones with volume.</p></Empty>
+            <>
+              <Empty testId="seo-empty-keywords"><h3>No keywords tracked for {site.domain}</h3><p>Paste keywords above, or <Link href={seoLinks.keywords("")} className={LINK} data-testid="link-research-keywords">research keywords</Link> and track the ones with volume.</p></Empty>
+              <div className="mt-4"><SampleRankTable what={`what this table shows once ${site.domain} has keywords`} /></div>
+            </>
           ) : (
             <>
             {(() => {
@@ -359,6 +367,8 @@ function AddKeywords({ site, onAdded }: { site: SeoSite; onAdded: () => void }) 
 
 /** Per-site settings: the name on the Google Business Profile (to find the business in the map pack) and alerts. */
 const FREQUENCY = { weekly: "Every week", twice_weekly: "Twice a week", daily: "Every day" } as const;
+/** The usual alert thresholds; "Custom…" takes any the server accepts (siteSettingsInput alertDrop: 1–20). */
+const DROPS = [1, 2, 3, 5, 10], DROP_MIN = 1, DROP_MAX = 20;
 type Frequency = keyof typeof FREQUENCY;
 function TrackingSettings({ site, onSaved, perMonthCents, includedCents }: { site: SeoSite; onSaved: () => void; /** A month of automatic checks at each frequency, at today's keywords. */ perMonthCents?: Record<Frequency, number>; includedCents: number | null }) {
   const { toast } = useToast();
@@ -366,6 +376,7 @@ function TrackingSettings({ site, onSaved, perMonthCents, includedCents }: { sit
   const [name, setName] = useState(site.businessName ?? "");
   const [alerts, setAlerts] = useState(site.alertsEnabled !== false);
   const [drop, setDrop] = useState(site.alertDrop ?? 3);
+  const [dropCustom, setDropCustom] = useState(false);
   const [freq, setFreq] = useState<Frequency>(site.rankFrequency ?? "weekly");
   useEffect(() => { setName(site.businessName ?? ""); setAlerts(site.alertsEnabled !== false); setDrop(site.alertDrop ?? 3); setFreq(site.rankFrequency ?? "weekly"); }, [site.id, site.businessName, site.alertsEnabled, site.alertDrop, site.rankFrequency]);
   const m = useMutation({
@@ -383,7 +394,9 @@ function TrackingSettings({ site, onSaved, perMonthCents, includedCents }: { sit
         <p className="g-text-2 mt-1 text-[12px]">Businesses on Google's map often show no website, so we find yours by its name as well as by {site.domain}.</p>
         <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={alerts} onChange={(e) => setAlerts(e.target.checked)} data-testid="checkbox-alerts" /> <span className="g-text">Alert me when rankings or links change</span></label>
         <label className="mt-2 flex flex-wrap items-center gap-2"><span className="g-text-2">A ranking counts as moved when it changes by at least</span>
-          <select className="g-select" value={drop} onChange={(e) => setDrop(Number(e.target.value))} disabled={!alerts} data-testid="select-alert-drop">{[1, 2, 3, 5, 10].map((n) => <option key={n} value={n}>{n} position{n === 1 ? "" : "s"}</option>)}</select>
+          <select className="g-select" value={DROPS.includes(drop) ? drop : "custom"} onChange={(e) => { if (e.target.value === "custom") setDropCustom(true); else { setDropCustom(false); setDrop(Number(e.target.value)); } }} disabled={!alerts} data-testid="select-alert-drop">{DROPS.map((n) => <option key={n} value={n}>{n} position{n === 1 ? "" : "s"}</option>)}<option value="custom">Custom…</option></select>
+          {/* Any threshold the server takes (1–20 positions), not only the listed ones (owner's rule, 2026-10-15). */}
+          {(dropCustom || !DROPS.includes(drop)) && <input type="number" className="g-input !w-24" min={DROP_MIN} max={DROP_MAX} step={1} inputMode="numeric" aria-label={`Positions, ${DROP_MIN} to ${DROP_MAX}`} value={drop} disabled={!alerts} onChange={(e) => { const n = Math.round(Number(e.target.value)); if (Number.isFinite(n) && n >= DROP_MIN && n <= DROP_MAX) setDrop(n); }} data-testid="input-alert-drop-custom" />}
         </label>
         <label className="mt-3 flex flex-wrap items-center gap-2"><span className="g-text-2">Check rankings automatically</span>
           <select className="g-select" value={freq} onChange={(e) => setFreq(e.target.value as Frequency)} data-testid="select-rank-frequency">

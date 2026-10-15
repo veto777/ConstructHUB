@@ -213,6 +213,25 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     ],
   },
 
+  "estimate-detail": {
+    title: "One estimate's page",
+    body: [
+      "One estimate on its own page: the number, title and status up top, the client it is for, then the message, the line items and the totals.",
+      "The buttons do what they say. Preview opens the page your client sees. Edit opens every line, the tax, the deposit and your message, and Save puts the new version on the client's link straight away. Send emails the client their private link (Resend once it has gone out). Copy client link puts that same link on your clipboard for a text or a call. The owner can delete an estimate that has not been approved.",
+      "Once the client approves, the estimate is a signed contract: it goes read-only, and the page shows who signed and the signed total after any optional discounts they ticked.",
+      "Example: the client calls and asks you to take the gutter guards off. Open the estimate, Edit, delete that line, Save — they refresh the link they already have and see the new total.",
+    ],
+  },
+
+  project: {
+    title: "The project page",
+    body: [
+      "One page per job. The top shows the job's name, number and stage; when you can see costs, four figures follow — Revised contract (the contract value plus change orders), Budget, Committed and Actual cost — with gross profit and margin beside them.",
+      "The tabs below are the job's working lists: Costing, Change orders, Punch list, Daily logs, Selections, Permits and JobCam. Each one is empty until you add to it.",
+      "Example: a homeowner adds a skylight mid-job. You write the change order on this page, the revised contract goes up by its amount, and the margin figure tells you whether the job is still on track.",
+    ],
+  },
+
   "estimate-new": {
     title: "New estimate — the fast flow",
     body: [
@@ -228,12 +247,21 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     body: [
       "A citation is simply your business listed on another website: Yelp, BBB, Angi, HomeAdvisor, Houzz, Facebook, Nextdoor, Apple Maps, Bing Places, Yellow Pages and so on. Each one is a line that says: this company exists, it is at this address, this is its phone number.",
       "Why you care: Google does not take your word for where your business is. It checks what the rest of the internet says. When thirty sites all agree on the same name, address and phone, Google treats you as real and established and shows you higher in Maps. When they disagree — an old number on Yelp, a different spelling on BBB — Google hesitates, and a competitor with tidy listings takes the spot.",
-      "What a campaign is: a checklist of 30 directories that matter for contractors, built for one location. ConstructHUB does not submit listings for you, and it never guesses — a site stays Not checked until it has been read or you have looked.",
+      "What a campaign is: a checklist of 30 directories that matter for contractors, built for one location. The Google row fills itself in when this location is linked to your Google Business Profile. ConstructHUB does not submit listings for you, and it never guesses — a site stays Not checked until it has been read or you have looked; every automatic mark comes from a page the audit actually read, and your own marks are never overwritten by an automatic “not found”.",
       "Run audit does the looking for you. For each directory it loads the site's own search for your business name and city (opening a real browser for sites that refuse plain requests), finds the listing, reads the name, phone and address on it and compares them with your Google Business Profile. Each row then says: Listed ✓, Listed with wrong details (and which field differs, with the value the site shows), Not found (the site lists other businesses, not yours), or Check by hand when the site blocks programs or shows nothing a program can read — those rows keep the Search link so you can look yourself. The audit takes a few minutes and runs again whenever you press it, so you can re-check after fixing a listing.",
       "Import CSV takes a spreadsheet of listings you already have: download the Template, fill in the link and the status (Listed, Wrong, Missing) per site — in Excel, File → Save As → CSV — and import it. Export gives you the whole checklist with every audit finding as a CSV.",
-      "How to run one, step by step: 1) Press New Campaign and pick the location. 2) Press Run audit (it builds the checklist if there is none). 3) Read the Audit column; for a Check-by-hand row, press Search, look, and mark what you found. 4) Paste listing links where you have them. 5) The counts at the top keep score: how many sites have you, how many are opportunities.",
-      "Then the real work, on the sites themselves: fix every listing marked wrong so it matches your Google Business Profile exactly, and claim a free listing on each site where you are not listed. Do a few a week; run the audit again to see the fixes land.",
-      "The Google row fills itself in when this location is linked to your Google Business Profile. Nothing here is guessed: every automatic mark comes from a page the audit actually read, and your own marks are never overwritten by an automatic “not found”.",
+      "How to run one, step by step: 1) Press New Campaign and pick the location. 2) Press Run audit (it builds the checklist if there is none). 3) Read the Audit column; for a Check-by-hand row, press Search, look, and mark what you found. 4) Paste listing links where you have them. 5) The counts at the top keep score: how many sites have you, how many are opportunities. Then the real work, on the sites themselves: fix every listing marked wrong so it matches your Google Business Profile exactly, and claim a free listing on each site where you are not listed. Do a few a week; run the audit again to see the fixes land.",
+    ],
+  },
+
+  "location-reviews-removed": {
+    title: "Reviews Google no longer shows",
+    body: [
+      "A review lands here when it was on your Google listing at one sync and gone at the next. ConstructHUB keeps its full text, the reviewer’s name, the date and the stars, and notes when it was last seen, so a review never just vanishes without a record.",
+      "Google explains the usual reasons on its “About missing or delayed reviews” page: every review is checked against Google’s content policies and a review removed for breaking them is not restored; new reviews can take a few days to appear while they are checked; reviews from merged profiles can take a few days to show; and Google can temporarily hide reviews on some profiles or business categories. The same page says to contact support if reviews disappear after a profile is reinstated.",
+      "To ask Google about a missing review, use the “Report a missing review to Google” button. It opens Google’s Business Profile support form, which needs the Google sign-in that manages the listing; pick the topic about reviews there. ConstructHUB cannot file this for you — Google only talks to the profile’s owner or manager.",
+      "Send Google exactly what it needs: your business name, the link to the listing, the reviewer’s name, the date and star rating, the review’s full text, and how many reviews the listing shows now against how many are saved here, with when the drop happened. “Copy for Google” on each removed review assembles that text from what is saved here, so you can paste it straight into the form.",
+      "Google decides on its own whether a review comes back, and it does not say how long that takes. Nothing here changes a review on Google; it only keeps the record and helps you ask.",
     ],
   },
 

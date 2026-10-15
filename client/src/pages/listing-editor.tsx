@@ -61,6 +61,11 @@ export default function ListingEditorPage() {
     <AppPage width="wide" testId="page-listing-editor" className="pb-24 sm:pb-10">
       <PageHeader icon={PenLine} title="Listing editor" description="Edit what Google shows for a linked location and save it straight to your Business Profile." back={{ href: "/locations", label: "Locations" }} />
       {error && <Notice tone="danger" testId="notice-locations-error">Unable to load locations. Reload the page.</Notice>}
+      {!chosen && <Section title="How this works" contentClassName="text-sm" testId="listing-editor-how"><ol className="list-decimal space-y-1 pl-5">
+        <li>Choose a location that is linked to its Google Business Profile; the form loads the live listing from Google.</li>
+        <li>Edit the fields. Rules are checked as you type, and “What Google will see” shows the result beside the form.</li>
+        <li>Choose Save to Google. Only the changed fields are sent, and Google’s answer is shown beside each one.</li>
+      </ol></Section>}
       <Section title="Profile to edit" icon={Store} description="Only locations linked to a Google Business Profile listing can be edited here.">
         <label className="block text-sm">
           <span className="sr-only">Location</span>

@@ -10,7 +10,10 @@ describe("contentInput", () => {
     expect(contentInput.parse({ query: " fiber cement siding cost " })).toMatchObject({ query: "fiber cement siding cost", sort: "relevance", limit: 25, offset: 0, peek: false });
     expect(contentInput.safeParse({ query: "x" }).success).toBe(false);
     expect(contentInput.safeParse({ query: "50% off" }).success).toBe(false);
-    expect(contentInput.safeParse({ query: "siding", sinceDays: 45 }).success).toBe(false);
+    // Any whole number of days up to two years (the page offers presets plus "Custom…"); 0 and beyond two years are refused.
+    expect(contentInput.safeParse({ query: "siding", sinceDays: 45 }).success).toBe(true);
+    expect(contentInput.safeParse({ query: "siding", sinceDays: 0 }).success).toBe(false);
+    expect(contentInput.safeParse({ query: "siding", sinceDays: 731 }).success).toBe(false);
     expect(contentInput.safeParse({ query: "siding", minAuthority: 0 }).success).toBe(false);
     expect(contentInput.safeParse({ query: "siding", extra: 1 }).success).toBe(false);
     expect(contentInput.safeParse({ query: "siding", exclude: "not a site" }).success).toBe(false);

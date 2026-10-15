@@ -1,6 +1,7 @@
 import { Tabs } from "@/components/ui/tabs";
 import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
-import { GoogleSectionHeader, GooglePill } from "@/components/google";
+import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid, GoogleList, GoogleListRow } from "@/components/google";
+import { SamplePreview } from "@/components/sample-preview";
 import { ToolTabs } from "@/components/tool";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -103,6 +104,50 @@ type AuditEntry = {
 };
 
 type Tab = "manager" | "accounts" | "invitations" | "audit";
+// The "i" beside the title: each section mounts its own help entry (shared/help/entries/google-ads/lsa-account-manager*).
+const HELP_BY_TAB: Record<Tab, string> = { manager: "lsa-account-manager", accounts: "lsa-account-manager.accounts", invitations: "lsa-account-manager.invitations", audit: "lsa-account-manager.audit-log" };
+// One plain sentence under the title, per section.
+const DESCRIPTION: Record<Tab, string> = {
+  manager: "Connect ConstructHUB’s central Google Ads manager account and pull in the client accounts under it.",
+  accounts: "Every client account the central manager knows, with its leads, charges and spend; open one for its campaigns and leads.",
+  invitations: "Invite a client’s Google Ads account to link under the central manager, and record each answer.",
+  audit: "Every change an admin made here, with who, when, the account and the result.",
+};
+
+/** A plain three-step card above a bare form (owner 2026-10-15: explain every form in a busy contractor's words). */
+function HowThisWorks({ steps, testId }: { steps: string[]; testId?: string }) {
+  return (
+    <Section flush testId={testId}>
+      <CardHeader><CardTitle className="g-card__title g-card__title--md">How this works</CardTitle></CardHeader>
+      <CardContent><ol className="list-decimal space-y-1.5 pl-5 text-sm">{steps.map((st) => <li key={st}>{st}</li>)}</ol></CardContent>
+    </Section>
+  );
+}
+/** Obviously made-up rows, shown only while the real list is empty (components/sample-preview.tsx rules). */
+function SampleAccounts() {
+  return (
+    <>
+      <GoogleStatGrid cols={4} className="mb-3">
+        <GoogleStat label="Accounts" value="2" />
+        <GoogleStat label="Leads" value="31" />
+        <GoogleStat label="Charged" value="19" tone="bad" />
+        <GoogleStat label="Spend" value="$1,240.00" />
+      </GoogleStatGrid>
+      <GoogleList>
+        <GoogleListRow size="md" title="Sample Roofing Co." badges={<><span className="g-chip g-chip--sm g-open">LSA</span><span className="g-chip g-chip--sm">central</span><span className="g-chip g-chip--sm">active</span></>} meta={["123-456-7890", "owner@example.com", "22 leads", <span key="c" className="g-closed">14 charged</span>, "2 disputed", "$940.00 spend"]} actions={<><GooglePill size="sm" label="View" /><GooglePill size="sm" label="Campaigns" /><GooglePill size="sm" label="Leads" /></>} />
+        <GoogleListRow size="md" title="Sample Plumbing LLC" badges={<><span className="g-chip g-chip--sm">self</span><span className="g-chip g-chip--sm">active</span></>} meta={["123-456-7891", "9 leads", <span key="c" className="g-closed">5 charged</span>, "$300.00 spend"]} actions={<><GooglePill size="sm" label="View" /><GooglePill size="sm" label="Campaigns" /><GooglePill size="sm" label="Leads" /></>} />
+      </GoogleList>
+    </>
+  );
+}
+function SampleInvitations() {
+  return (
+    <GoogleList>
+      <GoogleListRow size="md" title="Sample Roofing Co." badges={<span className="g-chip g-chip--sm">pending</span>} meta={["Customer ID: 1234567890", "Invited today"]} line="Waiting for the client to accept in their Google Ads account" actions={<><GooglePill size="sm" label="Mark accepted" /><GooglePill size="sm" label="Cancel" /></>} />
+      <GoogleListRow size="md" title="Sample Plumbing LLC" badges={<span className="g-chip g-chip--sm g-open">accepted</span>} meta={["Customer ID: 1234567891", "Invited last week"]} />
+    </GoogleList>
+  );
+}
 
 export default function LsaAccountManagerPage() {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -163,7 +208,7 @@ export default function LsaAccountManagerPage() {
   }
 
   if (selectedAccountId) {
-    return <AppPage><GoogleSectionHeader as="h1" title="LSA account details" description="Review campaigns, budgets and leads for this account." flush actions={<GooglePill icon={RefreshCw} variant="solid" label="Refresh account" onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/accounts", selectedAccountId]})} />} /><AccountDetailView accountId={selectedAccountId} onBack={() => setSelectedAccountId(null)} /></AppPage>;
+    return <AppPage><GoogleSectionHeader as="h1" helpKey="lsa-account-manager.accounts" title="LSA account details" description="This account’s campaigns and leads, live from Google; every change here is recorded in the audit log." flush actions={<GooglePill icon={RefreshCw} variant="solid" label="Refresh account" onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/accounts", selectedAccountId]})} />} /><AccountDetailView accountId={selectedAccountId} onBack={() => setSelectedAccountId(null)} /></AppPage>;
   }
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
@@ -173,14 +218,16 @@ export default function LsaAccountManagerPage() {
     { id: "audit", label: "Audit log", icon: History },
   ];
 
+  const helpKey = HELP_BY_TAB[activeTab];
   return (
     <AppPage className="[&_button]:min-h-10">
       {/* Google's page format (owner, 2026-10-07): a quiet header, pill tabs and actions, hairline cards. */}
       <GoogleSectionHeader
         as="h1"
+        helpKey={helpKey}
         titleTestId="text-page-title"
-        title="LSA account manager"
-        description={<>Manage client accounts through your Google Ads manager connection. <span className="g-chip g-chip--sm ml-1 align-middle" data-testid="badge-admin-only">Admin only</span></>}
+        title={activeTab === "manager" ? "LSA account manager" : tabs.find((t) => t.id === activeTab)!.label}
+        description={<>{DESCRIPTION[activeTab]} <span className="g-chip g-chip--sm ml-1 align-middle" data-testid="badge-admin-only">Admin only</span></>}
         flush
         actions={activeTab === "audit" ? <GooglePill icon={RefreshCw} variant="solid" label="Refresh audit" onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/audit-log"]})} /> : undefined} />
         <ToolTabs as="tablist" label="LSA account manager sections">
@@ -361,6 +408,7 @@ function ManagerConnectionTab() {
           ) : (
             <div className="space-y-4">
               <Notice tone="warning"><span data-testid="text-manager-not-connected">Not connected</span> · Connect a Google Ads manager account.</Notice>
+              <HowThisWorks testId="how-manager-connection" steps={["Choose Connect manager and enter the MCC customer ID (digits only) and a refresh token from the manager account’s OAuth flow; it is checked with Google before anything is saved.", "Choose Sync accounts: every client account under the MCC appears under Accounts, marked when it runs Local Services Ads.", "Use Invitations to link more clients; each client accepts the invitation in their own Google Ads account."]} />
               <Button onClick={() => setShowConnect(true)} className="w-full sm:w-auto" data-testid="button-connect-manager">
                 <Link2 className="h-4 w-4 mr-2" /> Connect manager
               </Button>
@@ -471,6 +519,11 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
   const accounts = accountsData?.accounts || [];
   const totalAccounts = accountsData?.total || 0;
   const totalPages = Math.ceil(totalAccounts / pageSize);
+  // The summary row adds up the accounts on this page only, and says so.
+  const spendOf = (a: LsaAccount) => { const n = Number(String(a.totalSpend ?? "").replace(/[^0-9.-]/g, "")); return Number.isFinite(n) ? n : 0; };
+  const sums = accounts.reduce((n, a) => ({ leads: n.leads + (a.leadCount ?? 0), charged: n.charged + (a.chargedLeads ?? 0), disputed: n.disputed + (a.disputedLeads ?? 0), spend: n.spend + spendOf(a), lsa: n.lsa + (a.isLsaEnrolled ? 1 : 0) }), { leads: 0, charged: 0, disputed: 0, spend: 0, lsa: 0 });
+  const scope = totalPages > 1 ? `Accounts on this page (${accounts.length} of ${totalAccounts})` : undefined;
+  const linkChip = (t: string) => t === "central" ? "g-chip g-chip--sm" : t === "both" ? "g-chip g-chip--sm g-open" : "g-chip g-chip--sm";
 
   const addAccountMutation = useMutation({
     mutationFn: async () => {
@@ -533,86 +586,54 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
           <div className="animate-spin h-6 w-6 border-2 border-[#4285F4] border-t-transparent rounded-full" />
         </div>
       ) : accounts.length === 0 ? (
-        <Section flush>
-          <CardContent className="p-12 text-center">
-            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="font-medium" data-testid="text-no-accounts">No accounts yet</p>
-            <p className="text-sm text-muted-foreground mt-1">Add accounts manually or sync from the connected MCC.</p>
-          </CardContent>
-        </Section>
+        search ? (
+          <Section flush><CardContent className="p-8 text-center"><p className="font-medium" data-testid="text-no-accounts">No account matches “{search}”</p></CardContent></Section>
+        ) : (
+          <SamplePreview what="what you’ll see once accounts are synced or added" testId="sample-lsa-manager-accounts" cta={<GooglePill size="sm" variant="solid" icon={Plus} label="Add account" onClick={() => setShowAdd(true)} />}>
+            <p className="sr-only" data-testid="text-no-accounts">No accounts yet</p>
+            <SampleAccounts />
+          </SamplePreview>
+        )
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className={appTable.table} data-testid="table-accounts">
-            <thead className={appTableCards.thead}>
-              <tr className={appTableCards.tr + " bg-muted/50 border-b border-border"}>
-                <th className="text-left p-3 font-medium">Account</th>
-                <th className="text-left p-3 font-medium">Customer ID</th>
-                <th className="text-left p-3 font-medium">Owner</th>
-                <th className="text-left p-3 font-medium">Link type</th>
-                <th className="text-left p-3 font-medium">Status</th>
-                <th className="text-left p-3 font-medium">Leads</th>
-                <th className="text-left p-3 font-medium">Charged</th>
-                <th className="text-left p-3 font-medium">Disputed</th>
-                <th className="text-left p-3 font-medium">Spend</th>
-                <th className="text-left p-3 font-medium">LSA</th>
-                <th className="p-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map(account => (
-                <tr key={account.id} className={appTableCards.tr + " border-b border-border last:border-0 hover:bg-muted/30 transition-colors"} data-testid={`row-account-${account.id}`}>
-                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Account: </span>{account.accountName || "—"}</td>
-                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-customer-id-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Customer ID: </span>{account.customerId}</td>
-                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-owner-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Owner: </span>
-                    {account.ownerEmail ? (
-                      <span className="truncate max-w-[140px] block" title={account.ownerEmail}>{account.ownerEmail}</span>
-                    ) : <span className="text-muted-foreground/50">—</span>}
-                  </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Link Type: </span>
-                    <Badge className={
-                      account.linkType === "central" ? "bg-primary/10 text-muted-foreground border-[#4285F4]/20" :
-                      account.linkType === "both" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
-                      "bg-muted text-muted-foreground"
-                    }>
-                      {account.linkType}
-                    </Badge>
-                  </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Status: </span>
-                    <Badge className={account.linkStatus === "active" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"}>
-                      {account.linkStatus}
-                    </Badge>
-                  </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-lead-count-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Leads: </span>{account.leadCount}</td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Charged: </span>
-                    {(account.chargedLeads ?? 0) > 0 ? (
-                      <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-xs" data-testid={`text-charged-leads-${account.id}`}>{account.chargedLeads}</Badge>
-                    ) : <span className="text-muted-foreground text-xs">0</span>}
-                  </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Disputed: </span>
-                    {(account.disputedLeads ?? 0) > 0 ? (
-                      <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-xs" data-testid={`text-disputed-leads-${account.id}`}>{account.disputedLeads}</Badge>
-                    ) : <span className="text-muted-foreground text-xs">0</span>}
-                  </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-total-spend-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Spend: </span>
-                    {account.totalSpend ? account.totalSpend : <span className="opacity-40">—</span>}
-                  </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">LSA: </span>
-                    {account.isLsaEnrolled ? (
-                      <Badge className="bg-[#34A853]/10 text-[#34A853] border-[#34A853]/20 text-xs">LSA ✓</Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
-                  </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>
-                    <Button size="sm" variant="ghost" onClick={() => onSelectAccount(account.id)} data-testid={`button-view-account-${account.id}`}>
-                      <Eye className="h-3.5 w-3.5 mr-1" /> View
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* The SEO Suite look (owner 2026-10-15): a quiet summary row, then one card per account with its numbers and actions. */}
+          <GoogleStatGrid cols={4}>
+            <GoogleStat label="Accounts" value={totalAccounts.toLocaleString()} hint={sums.lsa ? `${sums.lsa} with Local Services Ads${scope ? " on this page" : ""}` : undefined} testId="stat-accounts" />
+            <GoogleStat label="Leads" value={sums.leads.toLocaleString()} hint={scope} testId="stat-leads-total" />
+            <GoogleStat label="Charged" value={sums.charged.toLocaleString()} tone={sums.charged > 0 ? "bad" : "default"} hint={sums.disputed ? `${sums.disputed} disputed` : scope} testId="stat-charged-total" />
+            <GoogleStat label="Spend" value={sums.spend ? `$${sums.spend.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"} hint={sums.spend ? (scope ?? "Across these accounts") : "No spend recorded"} testId="stat-spend-total" />
+          </GoogleStatGrid>
+          <GoogleList testId="table-accounts">
+            {accounts.map(account => (
+              <GoogleListRow
+                key={account.id}
+                size="md"
+                testId={`row-account-${account.id}`}
+                title={account.accountName || `Account ${account.customerId}`}
+                onOpen={() => onSelectAccount(account.id)}
+                badges={<>
+                  {account.isLsaEnrolled && <span className="g-chip g-chip--sm g-open">LSA</span>}
+                  <span className={linkChip(account.linkType)}>{account.linkType}</span>
+                  <span className={account.linkStatus === "active" ? "g-chip g-chip--sm g-open" : "g-chip g-chip--sm g-closed"}>{account.linkStatus}</span>
+                </>}
+                meta={[
+                  <span key="id" data-testid={`text-customer-id-${account.id}`}>{account.customerId}</span>,
+                  account.ownerEmail ? <span key="owner" data-testid={`text-owner-${account.id}`} title={account.ownerEmail}>{account.ownerEmail}</span> : null,
+                  <span key="leads" data-testid={`text-lead-count-${account.id}`}>{account.leadCount} leads</span>,
+                  (account.chargedLeads ?? 0) > 0 ? <span key="charged" className="g-closed" data-testid={`text-charged-leads-${account.id}`}>{account.chargedLeads} charged</span> : "0 charged",
+                  (account.disputedLeads ?? 0) > 0 ? <span key="disputed" data-testid={`text-disputed-leads-${account.id}`}>{account.disputedLeads} disputed</span> : null,
+                  <span key="spend" data-testid={`text-total-spend-${account.id}`}>{account.totalSpend ? `${account.totalSpend} spend` : "No spend recorded"}</span>,
+                ]}
+                line={`Added ${new Date(account.createdAt).toLocaleDateString()}`}
+                actions={<>
+                  <GooglePill size="sm" icon={Eye} label="View" onClick={() => onSelectAccount(account.id)} testId={`button-view-account-${account.id}`} />
+                  <GooglePill size="sm" icon={BarChart3} label="Campaigns" onClick={() => onSelectAccount(account.id)} />
+                  <GooglePill size="sm" icon={FileText} label="Leads" onClick={() => onSelectAccount(account.id)} />
+                </>}
+              />
+            ))}
+          </GoogleList>
+        </>
       )}
 
       {totalPages > 1 && (
@@ -697,6 +718,9 @@ function InvitationsTab() {
       </div>
 
       {showForm && (
+        <HowThisWorks testId="how-invitations" steps={["Type the client’s 10-digit Google Ads customer ID (digits only); a name and notes are for your own list.", "Choose Send invitation: Google creates a pending manager-link invitation from the central manager and it is recorded below.", "The client accepts it in their own Google Ads account; when they confirm, choose Mark accepted and the account joins the Accounts list."]} />
+      )}
+      {showForm && (
         <Section flush testId="card-invitation-form">
           <CardHeader>
             <CardTitle className="text-sm">Link a client account</CardTitle>
@@ -736,12 +760,10 @@ function InvitationsTab() {
           <div className="animate-spin h-6 w-6 border-2 border-[#4285F4] border-t-transparent rounded-full" />
         </div>
       ) : invitations.length === 0 ? (
-        <Section flush>
-          <CardContent className="p-12 text-center">
-            <Send className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="font-medium" data-testid="text-no-invitations">No invitations yet</p>
-          </CardContent>
-        </Section>
+        <SamplePreview what="what you’ll see once an invitation is sent" testId="sample-lsa-invitations" cta={<GooglePill size="sm" variant="solid" icon={Plus} label="New invitation" onClick={() => setShowForm(true)} />}>
+          <p className="sr-only" data-testid="text-no-invitations">No invitations yet</p>
+          <SampleInvitations />
+        </SamplePreview>
       ) : (
         <div className="space-y-3">
           {invitations.map(inv => (
@@ -1207,6 +1229,7 @@ function AuditLogTab() {
       manager_disconnect: "Disconnected Manager",
       manager_invite: "Sent Manager Invite",
       sync_accounts: "Synced Child Accounts",
+      sync_leads: "Synced Leads",
       budget_change: "Changed Budget",
       campaign_pause: "Paused Campaign",
       campaign_enable: "Enabled Campaign",

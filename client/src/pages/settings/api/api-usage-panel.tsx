@@ -1,10 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { SamplePreview } from "@/components/sample-preview";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { apiErrorMessage } from "@/lib/queryClient";
@@ -28,6 +30,56 @@ function dayLabel(date: string): string {
 /** External clients call the API while this panel is open: while it is on screen the numbers refresh themselves this often. */
 export const USAGE_REFRESH_MS = 60_000;
 
+/** The period presets; "custom" shows a number box (owner 2026-10-15: a preset-only filter also takes a typed value). */
+const DAY_PRESETS = [7, 30, 90] as const;
+/** The server's cap (server/account/api-key-routes.ts MAX_USAGE_DAYS): a larger number is clamped there, so the box stops at it. */
+const MAX_DAYS = 365;
+
+/**
+ * A SAMPLE of the panel for an account whose keys have made no call yet — static, obviously made up, badged by
+ * <SamplePreview>, shown only while the real series is empty and never mixed with real rows.
+ */
+const SAMPLE_KEYS = { sample_a: "Reporting script (ck_12ab…9xyz)", sample_b: "Zapier (ck_34cd…8uvw)" } as const;
+const SAMPLE_DAYS = [
+  { label: "Mon", requests: 14, units: 22, byKey: { sample_a: 16, sample_b: 6 } },
+  { label: "Tue", requests: 9, units: 11, byKey: { sample_a: 11, sample_b: 0 } },
+  { label: "Wed", requests: 21, units: 38, byKey: { sample_a: 18, sample_b: 20 } },
+  { label: "Thu", requests: 6, units: 8, byKey: { sample_a: 8, sample_b: 0 } },
+  { label: "Fri", requests: 17, units: 29, byKey: { sample_a: 19, sample_b: 10 } },
+];
+const SAMPLE_CONFIG: ChartConfig = { sample_a: { label: SAMPLE_KEYS.sample_a, color: COLORS[0] }, sample_b: { label: SAMPLE_KEYS.sample_b, color: COLORS[1] } };
+
+function SampleUsage() {
+  const totals = SAMPLE_DAYS.reduce((t, d) => ({ units: t.units + d.units, requests: t.requests + d.requests }), { units: 0, requests: 0 });
+  return (
+    <div className="space-y-4">
+      <dl className="grid grid-cols-3 gap-3">
+        <Stat label="Units" value={formatCount(totals.units)} testId="text-sample-usage-units" />
+        <Stat label="Requests" value={formatCount(totals.requests)} testId="text-sample-usage-requests" />
+        <Stat label="Keys used" value="2" testId="text-sample-usage-keys" />
+      </dl>
+      <ChartContainer config={SAMPLE_CONFIG} className="w-full h-40 aspect-auto">
+        <BarChart data={SAMPLE_DAYS.map((d) => ({ label: d.label, ...d.byKey }))} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+          <CartesianGrid vertical={false} />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} />
+          <YAxis width={40} tickLine={false} axisLine={false} allowDecimals={false} />
+          <ChartLegend content={<ChartLegendContent />} />
+          <Bar dataKey="sample_a" stackId="units" fill="var(--color-sample_a)" radius={0} isAnimationActive={false} />
+          <Bar dataKey="sample_b" stackId="units" fill="var(--color-sample_b)" radius={0} isAnimationActive={false} />
+        </BarChart>
+      </ChartContainer>
+      <ul className="divide-y text-sm">
+        {SAMPLE_DAYS.map((d) => (
+          <li key={d.label} className="flex items-baseline justify-between gap-3 py-1.5">
+            <span className="font-medium">{d.label}</span>
+            <span className="tabular-nums text-muted-foreground">{formatCount(d.units)} units · {formatCount(d.requests)} req</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /**
  * Settings → API usage: units and requests per day for the last 30 days,
  * stacked by key, with the same numbers in a table. Names come from the keys
@@ -35,8 +87,13 @@ export const USAGE_REFRESH_MS = 60_000;
  * when its numbers were last fetched, refreshes them every minute while it is
  * visible, and has a Refresh button for right now.
  */
-export function ApiUsagePanel({ days = 30 }: ApiUsagePanelProps = {}) {
+export function ApiUsagePanel({ days: initialDays = 30 }: ApiUsagePanelProps = {}) {
   const queryClient = useQueryClient();
+  // The period: a preset, or a typed number of days (1–365). The query only moves once the typed value is a whole number.
+  const [preset, setPreset] = useState<string>(() => (DAY_PRESETS as readonly number[]).includes(initialDays) ? String(initialDays) : "custom");
+  const [customDays, setCustomDays] = useState<string>(() => (DAY_PRESETS as readonly number[]).includes(initialDays) ? "" : String(initialDays));
+  const typed = Number.parseInt(customDays, 10);
+  const days = preset === "custom" ? (Number.isInteger(typed) && typed >= 1 ? Math.min(typed, MAX_DAYS) : initialDays) : Number(preset);
   const usage = useQuery<ApiUsageResponse>({
     queryKey: ["/api/account/api-usage", { days }],
     queryFn: () => getJson<ApiUsageResponse>(`/api/account/api-usage?days=${days}`),
@@ -81,7 +138,20 @@ export function ApiUsagePanel({ days = 30 }: ApiUsagePanelProps = {}) {
             <CardTitle className="text-base">API usage</CardTitle>
             <CardDescription>Units and requests over the last {days} days, by key. A read is 1 unit (+1 per 100 rows); a write is 5.</CardDescription>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Period</span>
+              <select aria-label="Usage period" value={preset} onChange={(e) => setPreset(e.target.value)} className="h-8 rounded-md border bg-background px-2 text-sm text-foreground" data-testid="select-api-usage-period">
+                {DAY_PRESETS.map((d) => <option key={d} value={String(d)}>Last {d} days</option>)}
+                <option value="custom">Custom…</option>
+              </select>
+            </label>
+            {preset === "custom" && (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Input type="number" inputMode="numeric" min={1} max={MAX_DAYS} value={customDays} onChange={(e) => setCustomDays(e.target.value)} placeholder="Days" className="h-8 w-24 text-sm" aria-label="Number of days" data-testid="input-api-usage-days" />
+                <span>days (up to {MAX_DAYS})</span>
+              </label>
+            )}
             <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid="text-api-usage-updated">
               {usage.dataUpdatedAt ? `Updated ${formatDateTime(new Date(usage.dataUpdatedAt).toISOString())}` : usage.isLoading ? "Loading…" : "Not loaded"}
             </span>
@@ -106,9 +176,15 @@ export function ApiUsagePanel({ days = 30 }: ApiUsagePanelProps = {}) {
                 <Stat label="Keys used" value={formatCount(activeKeys)} testId="text-usage-active-keys" />
               </dl>
               {rows.length === 0 || keyIds.length === 0 ? (
-                <p className="text-sm text-muted-foreground rounded-lg bg-muted/50 p-4" data-testid="text-api-usage-empty">
-                  No API calls in the last {days} days.
-                </p>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground rounded-lg bg-muted/50 p-4" data-testid="text-api-usage-empty">
+                    No API calls in the last {days} days.
+                  </p>
+                  {/* Nothing real to show yet: a badged sample of the chart and table, replaced by the real series the moment a key is used. */}
+                  <SamplePreview what="what this panel shows once a key has made calls" testId="sample-api-usage">
+                    <SampleUsage />
+                  </SamplePreview>
+                </div>
               ) : (
                 <>
                   <ChartContainer config={config} className="w-full h-56 aspect-auto" data-testid="chart-api-usage">

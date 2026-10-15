@@ -18,6 +18,7 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle, statusTone,
 } from "@/components/crm-ui";
+import { SamplePaymentsList } from "@/components/crm-sample-previews";
 import { TakePaymentDialog } from "@/components/crm-take-payment";
 
 const money = (c?: number | null) =>
@@ -405,12 +406,20 @@ export default function CrmPaymentsPage() {
               <AlertTriangle className="h-4 w-4" /> Couldn't load payments — refresh to try again.
             </p>
           ) : !payments?.length ? (
-            <EmptyState
-              compact
-              icon={CreditCard}
-              title="No payments yet"
-              description="Nothing yet. Payments appear here when a client pays online or you record one from a client's page."
-            />
+            <>
+              <EmptyState
+                compact
+                icon={CreditCard}
+                title="No payments yet"
+                description="Nothing yet. Payments appear here when a client pays online or you record one from a client's page."
+              />
+              {/* The list is the org's whole payment history: empty means none yet, so show a sample. */}
+              <SamplePaymentsList cta={
+                <Link href="/crm/clients">
+                  <Button size="sm" variant="outline" data-testid="button-record-payment-sample">Record one from a client's page</Button>
+                </Link>
+              } />
+            </>
           ) : null}
           {payments?.slice(0, 50).map((p: any) => {
             const doc = p.invoiceNumber ? `Invoice ${p.invoiceNumber}` : p.estimateNumber ? `Estimate ${p.estimateNumber}` : null;

@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AppPage, EmptyState, Notice } from "@/components/app-ui";
-import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
 import {
   Clock,
@@ -124,7 +124,7 @@ export default function SchedulesPage() {
         as="h1"
         titleTestId="text-page-title"
         title="Scrape schedules"
-        description="Automatic permit refreshes for live-searchable portals. Admins only."
+        description="Repeating permit searches that keep the shared permit cache fresh on portals that support live search; administrators only."
         flush
         actions={
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -149,6 +149,14 @@ export default function SchedulesPage() {
           </Dialog>
         }
       />
+
+      {schedules && (
+        <GoogleStatGrid cols={3}>
+          <GoogleStat label="Schedules" value={schedules.length.toLocaleString()} testId="stat-schedules-total" />
+          <GoogleStat label="Active" value={schedules.filter((s) => s.isActive).length.toLocaleString()} hint="Run when due, every 15 minutes" testId="stat-schedules-active" />
+          <GoogleStat label="Portals a schedule can target" value={databasesLoading ? "…" : databases.length.toLocaleString()} hint="One per portal address: a checked link plus a search adapter (places that share a portal count once)" testId="stat-schedules-portals" />
+        </GoogleStatGrid>
+      )}
 
       {isLoading ? (
         <div className="space-y-2" data-testid="schedules-loading">
@@ -196,12 +204,13 @@ export default function SchedulesPage() {
           ))}
         </GoogleList>
       ) : (
-        <EmptyState
-          icon={Clock}
-          title="No schedules yet"
-          description="Schedules run automatically on their frequency against portals that support live search."
-          action={<GooglePill icon={Plus} label="Add schedule" onClick={() => setDialogOpen(true)} testId="button-empty-add-schedule" />}
-        />
+        /* No schedule yet: what a row will show and where its data comes from. No sample schedules (CLAUDE.md). */
+        <div className="g-callout" data-testid="empty-schedules">
+          <h3 className="inline-flex items-center gap-2"><Clock className="h-4 w-4" aria-hidden="true" /> No schedules yet</h3>
+          <p>Each schedule will be listed here with its portal, whether it is active, how often it runs (daily, weekly or monthly), what it searches for and when it last ran, with a switch to pause it and a bin to delete it.</p>
+          <p className="mt-2">Every 15 minutes the server runs the schedules that are due and saves what each portal returns into the shared permit cache, the same stored matches Search permits shows first. A schedule can only target one of the {databasesLoading ? "" : `${databases.length.toLocaleString()} `}portal addresses the live search can query (a checked official link plus a search adapter for its platform; places that share one portal count once).</p>
+          <div className="mt-3"><GooglePill icon={Plus} variant="solid" label="Add schedule" onClick={() => setDialogOpen(true)} testId="button-empty-add-schedule" /></div>
+        </div>
       )}
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>

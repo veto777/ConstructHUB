@@ -258,7 +258,7 @@ export default function SeoKeywordsPage() {
   }
 
   return (
-    <SeoShell title="Keywords explorer" description="How often people search for something, how hard it is to rank for, who ranked for it when it was last looked up, and the keywords around it." site={site} onSite={onSite} sites={sites} status={status} spends="lookups">
+    <SeoShell title="Keywords explorer" description="How often people search for something, how hard it is to rank for, who ranked for it when it was last looked up, and the keywords around it." site={site} onSite={onSite} sites={sites} status={status} spends="lookups" helpKey="seo.keywords">
       <nav className="g-tabs" aria-label="Keywords explorer views">
         {([["one", "One keyword"], ["bulk", "Many keywords"], ["area", "Service × town"], ["lists", "My lists"]] as const).map(([m, label]) => <Link key={m} href={seoLinks.keywords(keyword ?? "", { tab: m === "one" ? undefined : m })} aria-current={mode === m ? "page" : undefined} data-testid={`tab-keywords-${m}`}>{label}</Link>)}
       </nav>

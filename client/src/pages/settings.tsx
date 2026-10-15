@@ -69,7 +69,7 @@ export default function SettingsPage() {
           as="h1"
           titleTestId="text-settings-title"
           title="Account settings"
-          description="Manage your account and workspace."
+          description="Who you are, how you sign in, what reaches you, your plan and limits, API keys and connected services."
           flush
           actions={
             <GooglePill
@@ -92,7 +92,7 @@ export default function SettingsPage() {
           <SettingsNav active={section} onSelect={(id) => go(id)} />
 
           <div className="flex-1 min-w-0" data-testid={`settings-section-${section}`}>
-            <SettingsSectionHeader title={def.label} description={def.description} infoKey={def.infoKey} />
+            <SettingsSectionHeader title={def.label} description={def.description} helpKey={def.helpKey} />
             <div className="mt-4">
               <Section user={user} section={section} view={view} go={go} />
             </div>

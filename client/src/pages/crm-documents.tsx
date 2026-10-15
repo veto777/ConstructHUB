@@ -16,6 +16,7 @@ import {
 } from "@/components/crm-ui";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { InfoTip } from "@/components/info-tip";
+import { SampleDocsTable } from "@/components/crm-sample-previews";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -497,6 +498,22 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
               </div>
             )}
           </CardContent>
+          {/* data.total is the org's count before any filter: a sample only while there are none at all. */}
+          {data.total === 0 && (
+            <CardContent className="p-4 pt-0">
+              <SampleDocsTable kind={kind} cta={
+                kind === "estimates" ? (
+                  <Link href="/crm/estimates/new">
+                    <Button size="sm" variant="outline" data-testid="button-new-estimate-sample">Create your first estimate</Button>
+                  </Link>
+                ) : (
+                  <Link href="/crm/clients">
+                    <Button size="sm" variant="outline" data-testid="button-invoice-from-client-sample">Invoice from a client's page</Button>
+                  </Link>
+                )
+              } />
+            </CardContent>
+          )}
         </Card>
       ) : (
         <div className={crmTable.wrapper}>

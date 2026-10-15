@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { inNativeApp } from "@/lib/app-shell";
 import { PublicPageHeader } from "@/components/public-page-chrome";
+import { HelpButton } from "@/components/help-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GooglePill } from "@/components/google";
 import {
@@ -215,11 +216,14 @@ export default function LsaGuidePage() {
               <BadgeCheck className="g-open" aria-hidden="true" />
               <span>Google Verified (Local Services Ads)</span>
             </div>
-            <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-lsa-title">
-              Local Services Ads:
-              <br />
-              The Complete LSA Setup & Optimization Playbook
-            </h1>
+            <div className="flex items-start justify-center gap-2">
+              <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-lsa-title">
+                Local Services Ads:
+                <br />
+                The Complete LSA Setup & Optimization Playbook
+              </h1>
+              <HelpButton k="lsa-guide" className="mt-1" />
+            </div>
             <p className="g-text-2 text-sm leading-relaxed max-w-2xl mx-auto">
               LSA puts your business at the very top of Google — above regular ads and organic results. You only pay when a real customer contacts you. No clicks, no impressions — just leads. This guide covers every trick to staying on top.
             </p>

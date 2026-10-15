@@ -18,6 +18,7 @@ import {
 } from "@/lib/voice-studio";
 import { PROFILE_KEY } from "./studio/api";
 import { CallAssistantPlanRequired } from "./index";
+import { SampleConversationPreview } from "./samples";
 
 type Message = { role: "caller" | "assistant" | "system"; text: string; decision?: SimulatorTurn };
 
@@ -120,6 +121,8 @@ export function SimulatorPanel() {
             </div>
             <p className="text-xs text-center text-muted-foreground">A known caller number lets the assistant greet an existing client by name, as it would on a real call.</p>
             {lastError && <p className="text-sm text-destructive text-center" data-testid="text-simulator-error">{lastError}</p>}
+            {/* Before the first test call: a clearly marked sample of the chat — what a reply and its decision badge look like. */}
+            <SampleConversationPreview />
           </CardContent>
         </Section>
       ) : (

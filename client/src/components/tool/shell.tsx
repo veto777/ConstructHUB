@@ -5,7 +5,7 @@
  *   │                row 2: the tool's global input (a slot the page fills: site switcher, add a site, balance)
  *   ├ icon rail ─ one icon + small label per tool (active: orange icon and indicator)
  *   ├ sub-navigation ─ the active tool's views: ungrouped first, then collapsible bold groups
- *   └ content ─ a slim line (hamburger + where you are), then the page
+ *   └ content ─ a slim line (hamburger + where you are, and a fallback "i" for pages whose own title has none), then the page
  *
  * Everything is driven by a config object (`ToolShellConfig`): a tool is a route, a sub-item is a real deep link
  * (route + query) — the shell never invents a view. The item whose parameters match the address is the current one,
@@ -20,6 +20,8 @@ import { createPortal } from "react-dom";
 import { Link, useLocation, useSearch } from "wouter";
 import { ChevronDown, LayoutGrid, PanelLeft } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { HelpButton } from "@/components/help-button";
+import { HelpMountContext, useHelpKeyForRoute, type HelpMountClaim } from "@/lib/use-help-entry";
 import { ToolTabs, TabCount } from "./tabs";
 
 export type ToolNavCtx = { path: string; params: URLSearchParams };
@@ -155,6 +157,18 @@ export function ToolShell({ config, brand, allToolsLabel = "All tools", allTools
   // The app's own sidebar (blue) on every screen when the page provides it; the list sheet is only a fallback (owner, 2026-10-12).
   const openAll = () => { if (onAllToolsPhone) onAllToolsPhone(); else setMenu(true); };
 
+  // Every page gets an "i" (owner, 2026-10-15). The page's headers mount one for the route's help entry; a page with
+  // a custom title has none, so the crumb row carries a fallback — shown only while NO help control is on the page:
+  // no <HelpButton> of any key (a tab's section "i" counts, so does a video-only one) and no <InfoTip>
+  // (lib/use-help-entry.ts HelpMountContext). A count, so controls can come and go with tabs and dialogs.
+  const [helpMounts, setHelpMounts] = useState(0);
+  const claim = useCallback<HelpMountClaim>(() => {
+    setHelpMounts((n) => n + 1);
+    return () => setHelpMounts((n) => n - 1);
+  }, []);
+  const helpKey = useHelpKeyForRoute(path);
+  const crumbHelp = !!helpKey && helpMounts === 0;
+
   const main = config.tools.filter((t) => !t.foot), foot = config.tools.filter((t) => t.foot);
   const railItem = (t: ToolDef) => (
     <Link key={t.key} href={t.to(ctx)} className="tool-rail__item" aria-current={t.key === tool.key ? "page" : undefined} title={t.label} data-testid={`tool-rail-${t.key}`}>
@@ -172,6 +186,7 @@ export function ToolShell({ config, brand, allToolsLabel = "All tools", allTools
 
   return (
     <SlotContext.Provider value={slot}>
+    <HelpMountContext.Provider value={claim}>
       <div className="tool-shell g-surface" data-tool={config.key} data-subnav-inline={wide && subOpen ? "true" : undefined} data-testid={testId}>
         <header className="tool-top" data-testid="tool-top">
           <div className="tool-top__row">
@@ -232,6 +247,7 @@ export function ToolShell({ config, brand, allToolsLabel = "All tools", allTools
               {hasSub && <button type="button" className="tool-btn tool-btn--icon tool-btn--quiet" onClick={toggleSub} aria-expanded={subOpen} aria-controls={`tool-subnav-${config.key}`} aria-label={subOpen ? `Hide the ${tool.label} menu` : `Show the ${tool.label} menu`} title={subOpen ? "Hide the menu" : "Show the menu"} data-testid="button-subnav-toggle"><PanelLeft aria-hidden="true" /></button>}
               <span>{config.label}</span><span className="tool-crumb__sep" aria-hidden="true">/</span>
               {current && hasSub ? <><Link href={tool.to(ctx)}>{tool.label}</Link><span className="tool-crumb__sep" aria-hidden="true">/</span><b>{current.label}</b></> : <b>{tool.label}</b>}
+              {crumbHelp && helpKey && <span className="ml-1 inline-flex items-center" data-testid="tool-crumb-help"><HelpButton k={helpKey} fallback /></span>}
             </div>
             <div className="tool-main__content">{children}</div>
             {footer}
@@ -247,6 +263,7 @@ export function ToolShell({ config, brand, allToolsLabel = "All tools", allTools
           </SheetContent>
         </Sheet>
       </div>
+    </HelpMountContext.Provider>
     </SlotContext.Provider>
   );
 }

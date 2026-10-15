@@ -11,6 +11,14 @@ import { PROFILE_KEY } from "./studio/api";
 import { SetupWizard } from "./studio/wizard";
 import { CallAssistantPlanRequired } from "./index";
 import { StudioEditor } from "./studio/editor";
+import { HowItWorks } from "./how-it-works";
+
+/** The three steps of the studio, in a contractor's words (the wizard and the editor both do exactly this). */
+const STUDIO_STEPS: ReadonlyArray<[string, string]> = [
+  ["Tell it about your business", "Company, services and don'ts, service area, policies: it knows only what you type here and never invents a price or a license."],
+  ["Pick a voice and the questions", "Choose a persona and name, and the questions it asks in order. Save draft keeps edits without changing the live assistant."],
+  ["Publish, then test it", "Publish makes a numbered version live on every number forwarded to it; try it in the Simulator, and restore any version later."],
+];
 
 /**
  * Agent Studio tab — the setup wizard on first run (nothing published, setup
@@ -51,5 +59,11 @@ export function StudioPanel({ canManage }: { canManage: boolean }) {
     }
   }
 
-  return <div data-testid="panel-call-assistant-studio">{body}</div>;
+  const showHow = !!profile.data && !profile.isError;
+  return (
+    <div data-testid="panel-call-assistant-studio">
+      {showHow && <HowItWorks className="mt-4" testId="how-studio-works" steps={STUDIO_STEPS} />}
+      {body}
+    </div>
+  );
 }

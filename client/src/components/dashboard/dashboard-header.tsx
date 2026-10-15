@@ -96,6 +96,8 @@ export function DashboardHeader({
   return (
     <PageHeader
       icon={null}
+      // The home route ("/") is never matched by route, so the dashboard names its help entry (owner 2026-10-15: every page gets an "i").
+      helpKey="home"
       title={<span data-testid="text-dashboard-greeting">{account.firstName ? greeting : "Welcome back"}</span>}
       description={
         <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 pt-1">

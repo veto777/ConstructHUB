@@ -16,6 +16,7 @@ import { CallAssistantPausedBanner } from "./paused-banner";
 import { CallResults, type ResultsPick } from "./results";
 import { GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { fmtWhen, outcomeLabel, outcomeTone } from "./calls-shared";
+import { SampleCallsPreview, SampleNumbersPreview } from "./samples";
 
 type NumberRow = { id?: string | number; phoneNumber?: string; label?: string | null; location?: string | null; status?: string; isTest?: boolean };
 type CallRow = { id: string | number; startedAt?: string; from?: string; fromNumber?: string; outcome?: string; summary?: string | null; durationSeconds?: number };
@@ -205,11 +206,15 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               <GooglePill icon={ArrowRight} size="sm" variant="quiet" href="/call-assistant/numbers" label="Manage" testId="link-overview-numbers" />
             </div>
             {numbers.length === 0 ? (
-              <p className="text-sm text-muted-foreground" data-testid="text-overview-no-numbers">
-                {inNativeApp()
-                  ? "No number yet. Get a local number in the Numbers tab, then forward your existing line to it."
-                  : "No number yet. Buy a local number in the Numbers tab, then forward your existing line to it."}
-              </p>
+              <>
+                <p className="text-sm text-muted-foreground" data-testid="text-overview-no-numbers">
+                  {inNativeApp()
+                    ? "No number yet. Get a local number in the Numbers tab, then forward your existing line to it."
+                    : "No number yet. Buy a local number in the Numbers tab, then forward your existing line to it."}
+                </p>
+                {/* An outside receptionist's lines are real numbers answered elsewhere: no sample beside them. */}
+                {!ext && <SampleNumbersPreview cta={!inNativeApp() ? <GooglePill size="sm" href="/call-assistant/numbers" label="Get a number" testId="link-sample-get-number" /> : undefined} />}
+              </>
             ) : (
               <GoogleList as="ul" testId="list-overview-numbers">
                 {numbers.map((n, i) => (
@@ -237,9 +242,13 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
             <GooglePill icon={ArrowRight} size="sm" variant="quiet" href="/call-assistant/calls" label="All calls" testId="link-overview-calls" />
           </div>
           {calls.isError || recent.length === 0 ? (
-            <p className="text-sm text-muted-foreground" data-testid="text-overview-no-calls">
-              {calls.isError ? "The call log isn't available yet." : "No calls yet. Once a forwarded line rings the assistant, every call shows here with its outcome and summary."}
-            </p>
+            <>
+              <p className="text-sm text-muted-foreground" data-testid="text-overview-no-calls">
+                {calls.isError ? "The call log isn't available yet." : "No calls yet. Once a forwarded line rings the assistant, every call shows here with its outcome and summary."}
+              </p>
+              {/* Only once the log answered and is really empty (not while it failed, and not while a receptionist's calls exist). */}
+              {calls.isSuccess && recent.length === 0 && (status.usage?.calls ?? 0) === 0 && !ext && <SampleCallsPreview compact />}
+            </>
           ) : (
             <GoogleList as="ul" testId="list-overview-calls">
               {recent.map((c, i) => (

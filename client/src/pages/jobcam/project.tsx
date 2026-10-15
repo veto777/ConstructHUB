@@ -12,6 +12,7 @@ import { GooglePill } from "@/components/google";
 import { JobcamFeed } from "@/components/jobcam/feed";
 import { ShareDialog } from "@/components/jobcam/share-dialog";
 import { bootJobcamQueue } from "@/lib/jobcam-queue";
+import { HelpButton } from "@/components/help-button";
 import { Loader2 } from "lucide-react";
 
 export default function JobcamProjectPage() {
@@ -42,10 +43,14 @@ export default function JobcamProjectPage() {
           <Button variant="ghost" size="sm" className="-ml-2"><ArrowLeft className="h-4 w-4 mr-1" /> {project.name}</Button>
         </Link>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2"><Camera className="h-6 w-6 text-primary" /> JobCam</h1>
+          <div className="flex items-center gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2"><Camera className="h-6 w-6 text-primary" /> JobCam</h1>
+            {/* Static key: this title is not a CrmPageHeader, and the route lookup would land on Home. */}
+            <HelpButton k="crm-jobcam-project" />
+          </div>
           <StatusPill tone={statusTone(project.status)}>{project.stageLabel ?? project.status}</StatusPill>
         </div>
-        <div className="text-sm text-muted-foreground">{[project.number, address].filter(Boolean).join(" · ")}</div>
+        <div className="text-sm text-muted-foreground">{[project.number, address].filter(Boolean).join(" · ")} — this job's photos and video, newest first.</div>
       </div>
       <JobcamFeed projectId={id} title={project.name} canManage={canManage} memberId={me?.member?.id ?? null}
         onShare={canManage ? (ids) => setShare({ open: true, mediaIds: ids }) : undefined}

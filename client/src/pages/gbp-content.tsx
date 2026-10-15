@@ -11,8 +11,11 @@ import { GbpConnection } from '@/components/gbp-connection';
 import { useUrlParam } from '@/hooks/use-url-param';
 import { GoogleSurface } from "@/components/google";
 import { BulkPosts } from '@/components/bulk-posts';
+import { SamplePreview } from '@/components/sample-preview';
 
 type Photo={id:number;name:string;url:string};
+/** Fixed, made-up times for the sample queue shown while nothing is scheduled; never stored or sent. */
+const SAMPLE_DUE_AT='2026-03-02T09:00:00Z',SAMPLE_DONE_AT='2026-02-23T09:00:00Z';
 export default function GbpContentPage(){
   const [path]=useLocation();
   const mode:ContentMode=path.startsWith('/gbp-photos')?'photos':'posts';
@@ -26,6 +29,10 @@ export default function GbpContentPage(){
   const chosen=location?locations.find(l=>String(l.id)===location):undefined;
   return <GoogleSurface page><AppPage className="before:hidden" width="narrow"><PageHeader title={mode==='posts'?'Posts':'Photos'} description={mode==='posts'?'Write or AI-draft Google updates, schedule them and approve.':'Upload, caption and schedule photos onto your Google profile.'} actions={!chosen?.gbpLocationName?<Button asChild><Link href="/locations?import=gbp">Link a location</Link></Button>:undefined}/>
 {locationsError&&<p role="alert">Unable to load locations. Please reload the page.</p>}
+    <Section title="How this works" contentClassName="text-sm" testId="gbp-content-how"><ol className="list-decimal space-y-1 pl-5">
+      {mode==='posts'?<><li>Choose the linked location, then write a Google update or generate a draft and edit it.</li><li>Pick when it goes out: now, a date and time you type, or a cadence under Advanced schedule.</li><li>Approve it. Only approved items are queued and published to Google at their time.</li></>
+      :<><li>Choose the linked location, then upload photos or tick ones already in your library.</li><li>Give each photo a caption (typed or AI-drafted) and a Google category.</li><li>Pick when they go out and approve them. Only approved photos are queued and published.</li></>}
+    </ol></Section>
     <Section title="Choose a profile"><label className="block text-sm">Location<select className="block border rounded p-2 w-full bg-background" aria-label="Location" value={chosen?.gbpLocationName?location:''} onChange={e=>setLocation(e.target.value)}><option value="">Choose a linked location</option>{linked.map(l=><option key={l.id} value={l.id}>{l.businessName}</option>)}</select></label></Section>
     {!locationsLoading&&!locationsError&&!linked.length&&<p className="text-sm text-muted-foreground" data-testid="text-no-linked-locations">No locations are linked to Google Business Profile yet. Connect your Google account, then use <strong>Link &amp; sync</strong> in <Link href="/locations" className="text-primary underline">Locations</Link> to link one.</p>}
     {!location?<GbpConnection context="content"/>
@@ -60,6 +67,7 @@ function Editor({location,mode}:{location:string;mode:ContentMode}){
   const [start,setStart]=useState(''),[cadence,setCadence]=useState('day'),[countText,setCountText]=useState('1'),[custom,setCustom]=useState(''),[hours,setHours]=useState(false);
   const [zone,setZone]=useState(Intl.DateTimeFormat().resolvedOptions().timeZone),[open,setOpen]=useState(9),[close,setClose]=useState(17),[days,setDays]=useState([1,2,3,4,5]);
   const [postBatch,setPostBatch]=useState<any[]>([]);
+  const [customPick,setCustomPick]=useState(''),customCount=custom.split('\n').filter(t=>t.trim()).length;
   // 0 or a blank field would schedule every item at the same instant (1440/0 = Infinity).
   const count=Number(countText),countValid=countText.trim()!==''&&Number.isInteger(count)&&count>=1&&count<=100;
   const [view,setView]=useState('queue'),[requestKey,setRequestKey]=useState(crypto.randomUUID());
@@ -141,13 +149,21 @@ function Editor({location,mode}:{location:string;mode:ContentMode}){
       <details><summary className="cursor-pointer py-2 min-h-10">Advanced schedule</summary><div className="flex flex-col sm:flex-row gap-3"><label>Items per period<Input aria-label="Items per period" type="number" min={1} max={100} step={1} value={countText} aria-invalid={!countValid} aria-describedby={countValid?undefined:'items-per-period-error'} onChange={e=>setCountText(e.target.value)}/></label><label>Cadence<select aria-label="Cadence" className="block border p-2 bg-background" value={cadence} onChange={e=>setCadence(e.target.value)}><option value="day">Per day</option><option value="week">Per week</option><option value="custom">Custom times</option></select></label></div>
       {!countValid&&<p id="items-per-period-error" role="alert" className="text-sm text-destructive">Items per period must be a whole number from 1 to 100.</p>}
       <p>Spacing applies to selected photos or distinct posts in your draft batch. Without a batch, only the current post is scheduled. Blank start publishes the first item now, then spaces the remaining items. Cadence sets elapsed spacing; closed hours can move items to later days.</p>
-      {cadence==='custom'&&<Textarea aria-label="Custom times" placeholder="One ISO date/time per item, including timezone" value={custom} onChange={e=>setCustom(e.target.value)}/>}
+      {cadence==='custom'&&<div className="space-y-2" data-testid="custom-times">
+        <div className="flex flex-wrap items-end gap-2"><label className="block">Add a date and time<Input aria-label="Custom date and time" type="datetime-local" value={customPick} onChange={e=>setCustomPick(e.target.value)}/></label><Button type="button" variant="outline" disabled={!customPick} onClick={()=>{const iso=new Date(customPick).toISOString();setCustom(old=>(old.trim()?old.trimEnd()+'\n':'')+iso);setCustomPick('');}}>Add time</Button></div>
+        <p>One time per item, in the order the items are queued ({customCount} added). You can also type or paste times below, one per line, including the timezone (for example 2026-03-01T09:00:00-08:00).</p>
+        <Textarea aria-label="Custom times" placeholder="One ISO date/time per item, including timezone" value={custom} onChange={e=>setCustom(e.target.value)}/>
+      </div>}
       <label className="flex flex-wrap gap-2"><input type="checkbox" checked={hours} onChange={e=>setHours(e.target.checked)}/>Business hours only</label>
       {hours&&<div className="space-y-2"><p>Set the business's publishing hours explicitly; these are not inferred from Google.</p><Input aria-label="Timezone" value={zone} onChange={e=>setZone(e.target.value)}/><div className="flex flex-wrap gap-2"><label>Opening hour<Input type="number" value={open} onChange={e=>setOpen(Number(e.target.value))}/></label><label>Closing hour<Input type="number" value={close} onChange={e=>setClose(Number(e.target.value))}/></label></div>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d,i)=><label key={d} className="inline-flex gap-1 mr-3"><input type="checkbox" checked={days.includes(i)} onChange={e=>setDays(e.target.checked?[...days,i]:days.filter(n=>n!==i))}/>{d}</label>)}</div>}
       </details><p>Approving authorizes Google publishing at the scheduled times. AI text remains a draft until you approve it. With a draft batch, approval queues only the posts in that batch. Unsaved drafts are lost on reload.</p><div className="flex flex-wrap gap-2">{photosMode&&<Button className="w-full sm:w-auto" disabled={!selected.length||!countValid} onClick={()=>void run(()=>queue('photo'))}>Approve &amp; queue photos</Button>}{posts&&<Button className="w-full sm:w-auto" disabled={(!summary.trim()&&!postBatch.length)||!countValid} onClick={()=>void run(()=>queue('post'))}>Approve &amp; queue post</Button>}</div>
     </fieldset></Section>
     <Section title="Calendar, queue & history" contentClassName="space-y-3 text-sm"><div className="flex flex-wrap gap-2"><Button variant="outline" aria-pressed={view==='queue'} onClick={()=>setView('queue')}>Queue</Button><Button variant="outline" aria-pressed={view==='calendar'} onClick={()=>setView('calendar')}>Calendar</Button><Button variant="outline" disabled={busy} onClick={()=>void run(async()=>{await call('/refresh',{});await refetch();setMessage('Google statuses refreshed.');})}>Refresh Google status</Button></div>
-      {!jobs.length&&<p>{posts?'No scheduled posts yet.':'No scheduled photos yet.'}</p>}{(view==='calendar'?ordered:jobs).map((j:any,i:number,all:any[])=><div key={j.id}>
+      {!jobs.length&&<div className="space-y-3"><p>{posts?'No scheduled posts yet.':'No scheduled photos yet.'}</p>
+        <SamplePreview what={posts?'what a queued post looks like here':'what a queued photo looks like here'} testId="sample-queue">
+          <article className="border rounded p-3 space-y-2"><p>{posts?'post':'photo'} · {new Date(SAMPLE_DUE_AT).toLocaleString()} · <strong>queued</strong></p><p>{posts?'Sample Roofing Co. finished a full roof replacement on Example St this week — call for a free estimate.':'Finished siding job on 123 Example St — Sample Roofing Co.'}</p></article>
+          <article className="border rounded p-3 space-y-2"><p>{posts?'post':'photo'} · {new Date(SAMPLE_DONE_AT).toLocaleString()} · <strong>published</strong> · Google: LIVE</p><p>{posts?'Sample Roofing Co. is open Saturdays this spring.':'Crew at work, 456 Example Ave — Sample Roofing Co.'}</p></article>
+        </SamplePreview></div>}{(view==='calendar'?ordered:jobs).map((j:any,i:number,all:any[])=><div key={j.id}>
         {view==='calendar'&&(i===0||new Date(all[i-1].due_at).toLocaleDateString()!==new Date(j.due_at).toLocaleDateString())&&<h3 className="font-semibold mt-4">{new Date(j.due_at).toLocaleDateString()}</h3>}
         <article className="border rounded p-3 space-y-2"><p>{j.kind} · {new Date(j.due_at).toLocaleString()} · <strong>{j.status}</strong>{j.google_status&&` · Google: ${j.google_status}`}</p><p>{j.payload.summary||j.payload.description||j.payload.locationAssociation?.category}</p>{j.google_name&&<p className="text-sm break-all">Google resource: {j.google_name}</p>}{j.error&&<p role="alert">{j.error}</p>}
           {['failed','uncertain'].includes(j.status)&&<Button disabled={busy} variant="outline" onClick={()=>{if(j.status==='uncertain'&&!window.confirm('Check Google first. Retrying may duplicate a successful publish. Have you verified it is missing?'))return;void run(async()=>{await call(`/jobs/${j.id}`,{action:'retry',checkedGoogle:j.status==='uncertain'},'PATCH');await refetch();});}}>Retry</Button>}

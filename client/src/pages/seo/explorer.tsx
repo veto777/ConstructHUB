@@ -38,6 +38,8 @@ import { OpportunitiesView } from "./opportunities";
 import { MarketPicker, useMarket } from "./market";
 import { findMarket, marketKey, marketLabel, SEO_MARKETS, type SeoMarket } from "@shared/seo-markets";
 import { AddToList } from "./keyword-lists";
+import { useAddSite } from "./lookup-box";
+import { SampleExplorerFigures } from "./samples";
 
 type GapKey = "contentGap" | "linkIntersect" | "opportunities" | "directories" | "mentions";
 type ViewKey = ReportKey | GapKey | "overview";
@@ -256,11 +258,9 @@ export default function SeoExplorerPage() {
     onSuccess: (r: { added: number }, v) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to the rank tracker`, description: tracksHere(v.siteId) ? undefined : `These numbers are for ${market.label}, not the country that site is tracked in, so they were not copied.` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const track = useMutation({
-    mutationFn: (d: string) => api("POST", "/api/seo/sites", { domain: d, devices: "both", serpDepth: 10 }),
-    onSuccess: (s: { id: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); onSite(s.id); toast({ title: "Added to the rank tracker", description: "Add the keywords you care about under Rank tracker." }); },
-    onError: (e) => toast({ title: "Couldn't add the site", description: apiErrorMessage(e), variant: "destructive" }),
-  });
+  // "Add to my sites": the one request every such button sends (lookup-box.tsx) — free; the dashboard and the rank
+  // tracker list the site from then on, and nothing is checked or charged until keywords are added.
+  const adder = useAddSite({ sites: sites.data, onSite });
 
   /** Another site, from the overview: its own address, as a new history entry so Back returns here (the view and filters of the last one do not carry over). */
   const open = (d: string, m: SeoMarket = market) => { setReport(null); setDomain(d); setInput(d); navigate(seoLinks.explorer(d, "overview", marketParams(m))); };
@@ -334,7 +334,7 @@ export default function SeoExplorerPage() {
   const linksFrom = (d: string) => (trackedSite ? seoLinks.backlinks(trackedSite.id, { domain: d }) : to("backlinks", { source: d }));
 
   return (
-    <SeoShell title="Site explorer" description="Any website's estimated search traffic, keywords, backlinks and competitors — yours or a competitor's." site={site} onSite={onSite} sites={sites} status={status} picker={false} spends="lookups">
+    <SeoShell title="Site explorer" description="Any website's estimated search traffic, keywords, backlinks and competitors — yours or a competitor's." site={site} onSite={onSite} sites={sites} status={status} picker={false} spends="lookups" helpKey="seo.explorer">
       {/* The domain box is this tool's global input: it lives in the tool bar's second row (components/tool/shell.tsx). */}
       <ToolBarSlot>
       <form className="seo-explorer-form mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(false); }} data-testid="form-explorer">
@@ -388,7 +388,9 @@ export default function SeoExplorerPage() {
       )}
       {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status" data-testid="text-explorer-loading"><Loader2 className="h-4 w-4 animate-spin" /> {analyse.isPending ? "Gathering search and backlink data — about ten seconds…" : "Opening the saved report…"}</p>}
       {savedFailed && <div className="g-callout" role="alert" data-testid="explorer-saved-error"><h3>Couldn't check for a saved report</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
-      {notFoundYet && <Empty testId="explorer-empty"><h3>No report for {domain} yet</h3><p>Press <b>Analyse</b> to build one.{standalone && <> The {MENU_LABEL[view]} report below is its own lookup: a page already run opens free, and nothing is bought until you press Run.</>}</p></Empty>}
+      {notFoundYet && <Empty testId="explorer-empty"><h3>No report for {domain} yet</h3><p>Press <b>Analyse</b> to build one.{standalone && <> The {MENU_LABEL[view]} report below is its own lookup: a page already run opens free, and nothing is bought until you press Run.</>}</p>
+        {!tracked && <p className="mt-2 flex flex-wrap items-center gap-2"><Button type="button" disabled={adder.pending} onClick={() => adder.add(shown)} data-testid="button-explorer-add-site">{adder.pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />} Add to my sites</Button><span className="g-text-2 text-[12px]">Free — puts {shown} on your dashboard and in the rank tracker; nothing is checked or charged until you add keywords.</span></p>}
+      </Empty>}
       {notFoundYet && domain && !standalone && (
         <section className="mt-5" data-testid="explorer-opportunities-only">
           <h2 className="g-text mb-1 text-[17px] font-medium">Or just the opportunities</h2>
@@ -397,7 +399,11 @@ export default function SeoExplorerPage() {
         </section>
       )}
       {!report && !busy && !domain && (recent.data?.items.length ?? 0) === 0 && (
-        <Empty testId="explorer-intro"><h3>Look up any website</h3><p>Enter a domain to see an estimate of how much search traffic it gets, which keywords and pages earn it, who links to it and who it competes with.</p></Empty>
+        <>
+          <Empty testId="explorer-intro"><h3>Look up any website</h3><p>Enter a domain to see an estimate of how much search traffic it gets, which keywords and pages earn it, who links to it and who it competes with.</p></Empty>
+          {/* What a report's headline looks like — a made-up site, shown only while nothing real has been looked up (samples.tsx). */}
+          <div className="mt-4"><SampleExplorerFigures what="what a report shows once you look a site up" /></div>
+        </>
       )}
 
       {(report || standalone) && (
@@ -410,7 +416,8 @@ export default function SeoExplorerPage() {
             </div>
             {report && (
               <div className="ml-auto flex flex-wrap gap-2">
-                {!tracked && <button type="button" className="g-pill min-h-[44px]" disabled={track.isPending} onClick={() => track.mutate(report.domain)} data-testid="button-explorer-track"><Plus /> Track rankings</button>}
+                {!tracked && <Button type="button" disabled={adder.pending} onClick={() => adder.add(report.domain)} title="Free — puts this site on your dashboard and in the rank tracker; nothing is checked or charged until you add keywords" data-testid="button-explorer-add-site">{adder.pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />} Add to my sites</Button>}
+                {tracked && <span className="g-text-2 inline-flex min-h-[44px] items-center text-[12px]" data-testid="text-explorer-tracked">One of your sites</span>}
                 <button type="button" className="g-pill min-h-[44px]" disabled={analyse.isPending || !configured} onClick={() => { setInput(report.domain); analyse.mutate({ domain: report.domain, refresh: true }); }} data-testid="button-explorer-refresh"><RefreshCw className={analyse.isPending ? "animate-spin" : ""} /> Refresh</button>
               </div>
             )}
@@ -438,7 +445,7 @@ export default function SeoExplorerPage() {
               <h3 className="g-text mb-3 text-[17px] font-medium" data-testid="text-report-title">{MENU_LABEL[view]}</h3>
               {view === "mentions" ? (
                 trackedSite ? <MentionsView key={trackedSite.id} siteId={trackedSite.id} domain={trackedSite.domain} status={status.data} />
-                  : <p className="g-text-2 text-[13px]" data-testid="mentions-untracked">Mentions are looked for on your own sites: press <b>Track rankings</b> above to add {shown}, then open this again.</p>
+                  : <p className="g-text-2 text-[13px]" data-testid="mentions-untracked">Mentions are looked for on your own sites: press <b>Add to my sites</b> above to add {shown}, then open this again.</p>
               ) : view === "directories" ? (
                 <DirectoriesView domain={shown} status={status.data} suggestions={(report?.competitors ?? []).map((c) => c.domain)} planSiteId={trackedSite?.id} market={market} />
               ) : view === "opportunities" ? (
@@ -451,7 +458,7 @@ export default function SeoExplorerPage() {
                 <ReportView key={`${reportTable}:${shown}:${marketKey(market)}`} linked market={market} table={reportTable} domain={shown} siteId={trackedSite?.id} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList market={market} rows={rows} onDone={clear} />}
                   onTrack={trackedSite ? (rows) => trackKeywords.mutateAsync({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
               </>)}
-              {(view === "keywords" || view === "paidKeywords") && !trackedSite && <p className="g-text-2 mt-2 text-[13px]">Press <b>Track rankings</b> above to follow this site's keywords every week.</p>}
+              {(view === "keywords" || view === "paidKeywords") && !trackedSite && <p className="g-text-2 mt-2 text-[13px]">Press <b>Add to my sites</b> above to follow this site's keywords every week.</p>}
             </>
           ) : report && (
           <>

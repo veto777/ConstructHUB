@@ -14,6 +14,7 @@ import {
   CrmPage, CrmPageHeader, EmptyState, ErrorCard, SectionTitle, StatusPill,
   crmTable, statusTone,
 } from "@/components/crm-ui";
+import { SampleReportsTable } from "@/components/crm-sample-previews";
 import { confirmAction } from "@/components/confirm-dialog";
 
 /**
@@ -342,10 +343,14 @@ export default function CrmReportsPage() {
         {isLoading ? (
           <div className="flex justify-center p-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : !reports?.length ? (
-          <Card>
-            <EmptyState compact icon={Ruler} title="No reports yet"
-              description="Upload a HOVER PDF or paste a report above — the parsed client lands on your Clients page." />
-          </Card>
+          <>
+            <Card>
+              <EmptyState compact icon={Ruler} title="No reports yet"
+                description="Upload a HOVER PDF or paste a report above — the parsed client lands on your Clients page." />
+            </Card>
+            {/* The list is every import the org has made: empty means none yet, so show a sample. */}
+            <SampleReportsTable />
+          </>
         ) : (
           <>
             {/* Phones get stacked cards; the table starts at sm. `m-` test ids

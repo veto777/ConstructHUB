@@ -191,7 +191,7 @@ export default function DatabasesPage() {
         titleTestId="text-page-title"
         title="Database directory"
         titleAfter={<HelpButton k="database-directory" />}
-        description="Browse US counties and cities for permit offices — official portals where they are on record."
+        description="Every US county and city, with its official permit portal wherever ConstructHUB has a checked link, and an honest web search where it does not."
         flush
       />
 
@@ -292,8 +292,8 @@ export default function DatabasesPage() {
       ) : databases.length === 0 ? (
         <EmptyState
           icon={Database}
-          title="No databases match your search"
-          description="Try a different city, county or state."
+          title="No jurisdictions match your search"
+          description="Try a different city, county or state. Only places in the directory match; nothing is guessed."
           action={
             <Button variant="outline" size="sm" onClick={resetAll} data-testid="button-clear-filters-empty">
               Clear filters

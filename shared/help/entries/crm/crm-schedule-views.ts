@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "crm-schedule-views", group: "CRM", route: "/crm/schedule", title: "Month, week and agenda",
   whatItIs: "Three ways to look at the Schedule: a month, one week, or a list of what is coming.",
-  whatItDoes: "Month and Week draw the visits on a calendar, with arrows to move back and forward and a Today button to come back. Agenda lists the coming visits day by day for the next 7, 14 or 30 days, each with its time, project and crew. The list beside the views chooses whose visits you see: yours, everyone’s, or one team member’s.",
+  whatItDoes: "Month and Week draw the visits on a calendar, with arrows to move back and forward and a Today button to come back. Agenda lists the coming visits day by day for the next 7, 14 or 30 days — or any number of days you type, up to 60 — each with its time, project and crew. The list beside the views chooses whose visits you see: yours, everyone’s, or one team member’s.",
   howToUse: [
     "CRM → Schedule. It opens on Month.",
     "Use the arrows to move a month or a week at a time, and Today to come back.",

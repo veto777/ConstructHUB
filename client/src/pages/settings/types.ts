@@ -60,6 +60,8 @@ export interface SettingsSectionDef {
   /** One line under the section title. */
   description: string;
   icon: LucideIcon;
-  /** The ⓘ entry in lib/info-content.ts shown next to the section title. */
+  /** The ⓘ entry in lib/info-content.ts (kept for the Hub and older links; the title now shows the help "i"). */
   infoKey: string;
+  /** The help-registry entry (shared/help/registry.ts) behind the "i" beside the section title: "account.<section>". */
+  helpKey: string;
 }

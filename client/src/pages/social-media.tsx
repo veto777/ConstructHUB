@@ -1,6 +1,7 @@
 import { BusinessSelector, MappingEditor, Pager, refreshSocial } from "@/components/social-agency";
 import { characterCount, latestPostsFirst, destinationLabel, loadComposerDraft, loadRowEdits, saveComposerDraft, saveRowEdits, type ComposerSubmission } from "@/components/social-drafts";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { AppPage, Notice, Toolbar } from "@/components/app-ui";
 import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { AlertTriangle, ExternalLink, Search } from "lucide-react";
+import { SamplePreview } from "@/components/sample-preview";
 import { useToast } from "@/hooks/use-toast";
 import {
   autoSchema,
@@ -38,6 +40,12 @@ import { TikTokDeclaration, TikTokPanel } from "@/components/social-tiktok";
 
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass = "h-10 w-full rounded-full border border-input bg-background px-4 text-sm";
+/** The sample posts shown while a business has none (SamplePreview rules: obviously made up, never stored or sent). */
+const SAMPLE_POSTS = [
+  { id: "s1", platform: "facebook", state: "Scheduled", when: "Mon 9:00 AM", text: "Sample Roofing Co. finished a full roof replacement on Example St this week — call for a free estimate." },
+  { id: "s2", platform: "gbp", state: "Scheduled", when: "Wed 10:00 AM", text: "Sample Roofing Co. is open Saturdays this spring. Book your inspection online." },
+  { id: "s3", platform: "instagram", state: "Published", when: "Last Fri 4:30 PM", text: "Before and after: new siding at 123 Example St." },
+] as const;
 /** What each account picks a destination from, when it isn't a page. */
 const PICK_NOUN: Record<string, string> = { pinterest: "boards", reddit: "subreddits", tumblr: "blogs" };
 
@@ -155,12 +163,16 @@ export default function SocialMediaPage() {
   // instead of a page that asks for a choice it cannot show (owner, 2026-10-13: "doesnt let you choose anything").
   const onlyId = businesses.data?.total === 1 && businesses.data?.items?.length === 1 ? String(businesses.data.items[0].id) : null;
   useEffect(() => { if (business === "all" && onlyId) setBusiness(onlyId, true); }, [business, onlyId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The "i" beside the title explains the view that is open (shared/help/entries/tools/social-media.<view>.ts);
+  // the overview and the guides carry the feature's own entry.
+  const helpKey = view === "overview" || view === "guides" ? "social-media" : `social-media.${view}`;
   return (
     <AppPage>
       {!planRequired && <ToolBarSlot><BusinessSwitch business={chosen ? business : null} items={businesses.data?.items ?? []} total={businesses.data?.total ?? 0} onChange={(v) => { if (v) { setBusiness(v, true); return; } const p = new URLSearchParams(window.location.search); p.delete("business"); p.set("pick", "1"); navigate(`${path}?${p}`); }} /></ToolBarSlot>}
       {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, pills, hairline rows. */}
       <GoogleSectionHeader
         as="h1"
+        helpKey={helpKey}
         title={VIEW_HEAD[view][0]}
         description={VIEW_HEAD[view][1]}
         flush
@@ -297,6 +309,17 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   useEffect(() => { if (restoredRef.current) return; setDestinations(withoutLegacyTikTok(data?.defaults || [])); }, [JSON.stringify(data?.defaults)]);
   // What each TikTok panel says still stops posting (components/social-tiktok.tsx), by account id.
   const [tiktokProblems, setTiktokProblems] = useState<Record<string, string>>({});
+  // Google Business Profile as a channel (owner, 2026-10-15: "make sure Google Posts is also in the social media posts
+  // area … next to Meta/TikTok"). It is not a social destination: a ticked Google channel sends the same post to the
+  // EXISTING Google posts queue the Posts page uses (POST /api/gbp/content/:location/queue, server/gbp/content.ts) —
+  // one post for this linked location, an optional Media Library photo, at the composer's schedule time. The queue has
+  // no draft state, so "Save draft" keeps the Google copy in this composer only. The request key is kept until the
+  // post is accepted, so a retry replays instead of queuing twice.
+  const gbpLinked = !!data?.business?.gbp_location_name;
+  const [gbpOn, setGbpOn] = useState(false), [gbpPhotoId, setGbpPhotoId] = useState("");
+  const [gbpRequestKey, setGbpRequestKey] = useState(() => crypto.randomUUID());
+  const gbpPhotos = useQuery<{ id: number; name: string; url: string }[]>({ queryKey: [`/api/gbp/content/${businessId}/photos`], enabled: !all && !!businessId && gbpLinked && gbpOn });
+  const gbpText = tweaks.gbp ?? text;
   const mutation = useMutation({
     mutationFn: async ({
       path,
@@ -353,12 +376,16 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
     : "";
   // Why Post now / Save draft are disabled, in the order the user can fix it.
   const setupProblem = data?.setupProblem as string | null | undefined;
-  const draftBlocker = error ? "Refresh Social Media to check whether posting is available." : setupProblem || (!data?.connected
-    ? "Connect your social accounts above to post."
-    : !liveDestinations.length
-      ? "Choose at least one account above."
-      : !text.trim()
-        ? "Write the post text."
+  // A post that goes to Google only needs no social connection: the provider's setup problem and "connect your
+  // accounts" apply when a social account is chosen.
+  const socialChosen = liveDestinations.length > 0;
+  const socialProblem = socialChosen || !gbpOn ? (setupProblem || (!data?.connected ? "Connect your social accounts above to post." : "")) : "";
+  const draftBlocker = error ? "Refresh Social Media to check whether posting is available." : socialProblem || (!socialChosen && !gbpOn
+    ? "Choose at least one account or Google Business Profile above."
+    : !text.trim()
+      ? "Write the post text."
+      : gbpOn && [...gbpText].length > 1500
+        ? "Google posts are limited to 1,500 characters: shorten the Google text tweak."
         : uploading
           ? "Wait for the upload to finish."
           : mediaProblem);
@@ -366,6 +393,8 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   const tiktokShown = destinations.filter((d) => d.platform === "tiktok" && accounts.some((a) => a.id === d.accountId));
   const tiktokBlocker = tiktokShown.map((d) => tiktokProblems[d.accountId] ?? "TikTok: loading your account details…").find(Boolean) ?? "";
   const postBlocker = draftBlocker || tiktokBlocker;
+  // The Google posts queue holds approved posts only: a draft needs a social account to live in.
+  const draftOnlyBlocker = draftBlocker || (!socialChosen ? "Google Business Profile has no drafts here — use Post now or Schedule post." : "");
   function choose(a: Account, checked: boolean) {
     restoredRef.current = true;
     setDestinations((ds) =>
@@ -395,26 +424,55 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
       ds.map((d) => (d.accountId === id ? { ...d, ...patch } : d)),
     );
   }
+  /** The Google copy of the post, as the Posts page queues it (server/gbp/content.ts enqueue): one standard post for
+   *  this location, the Media Library photo if one was picked, first publish at the schedule time or now. */
+  const gbpQueueBody = (scheduledTime?: string) => ({
+    requestKey: gbpRequestKey,
+    items: [{ kind: "post", photoIds: gbpPhotoId ? [Number(gbpPhotoId)] : [], summary: gbpText.trim(), topicType: "STANDARD" }],
+    schedule: { start: scheduledTime ?? new Date().toISOString(), everyMinutes: 1440, businessHours: false, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, openHour: 9, closeHour: 17, weekdays: [1, 2, 3, 4, 5] },
+  });
   async function submit(draft: boolean) {
-    if (submittingRef.current || accountId === null || setupProblem || error) return;
+    if (submittingRef.current || accountId === null || error) return;
+    const toSocial = liveDestinations.length > 0, toGoogle = gbpOn && gbpLinked && !draft && !!businessId;
+    if (toSocial && setupProblem) return;
+    if (!toSocial && !toGoogle) return;
     submittingRef.current = true;
     let dispatched = false;
     try {
-      const body: ComposerSubmission = submission ?? postSchema.parse({
+      const scheduledTime = schedule ? new Date(schedule).toISOString() : undefined;
+      // Google only: nothing goes through the social queue, so there is no submission to keep for a retry.
+      const body: ComposerSubmission | null = toSocial ? (submission ?? postSchema.parse({
         requestId: crypto.randomUUID(), text, tweaks, destinations: liveDestinations, mediaUrls: urls(),
-        ...(schedule ? { scheduledTime: new Date(schedule).toISOString() } : {}), draft,
-      });
+        ...(scheduledTime ? { scheduledTime } : {}), draft,
+      })) : null;
       // Persist synchronously BEFORE dispatch: even an immediate navigation must restore
       // the exact request, including its action, time and per-destination payload.
       restoredRef.current = true;
-      saveComposerDraft(accountId, businessKey, { text, tweaks, destinations, mediaText, schedule, submission: body });
-      setSubmission(body);
+      if (body) {
+        saveComposerDraft(accountId, businessKey, { text, tweaks, destinations, mediaText, schedule, submission: body });
+        setSubmission(body);
+      }
       dispatched = true;
-      const result = await mutation.mutateAsync({
+      const result = body ? await mutation.mutateAsync({
         path: "/posts",
         success: false,
         body,
-      });
+      }) : { posts: [] };
+      // The Google copy goes to the Google posts queue after the social queue accepted its part (the social request
+      // is idempotent by its id, the Google one by its key, so a failure here leaves a retry safe either way).
+      let gbpQueued = false;
+      if (toGoogle) {
+        try {
+          await (await apiRequest("POST", `/api/gbp/content/${businessId}/queue`, gbpQueueBody(scheduledTime))).json();
+          gbpQueued = true;
+        } catch (e) {
+          toast({ title: body ? "Posted to social, but not to Google" : "Could not queue the Google post", description: apiErrorMessage(e), variant: "destructive" });
+          if (!body) return;
+        }
+      }
+      setGbpRequestKey(crypto.randomUUID());
+      setGbpOn(false);
+      setGbpPhotoId("");
       // The composer starts the next post clean: text, tweaks, media and the schedule time all go.
       // Only the destinations stay, and they return to the business's saved mapping (not the last post's picks).
       saveComposerDraft(accountId, businessKey, { text: "", tweaks: {}, mediaText: "", schedule: "", destinations: [] });
@@ -425,11 +483,11 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
       setMediaText("");
       setSchedule("");
       setDestinations(withoutLegacyTikTok(data?.defaults || []));
-      const count = body.destinations.length;
-      const when = body.scheduledTime ? new Date(body.scheduledTime) : null;
+      const count = (body?.destinations.length ?? 0) + (gbpQueued ? 1 : 0);
+      const when = scheduledTime ? new Date(scheduledTime) : null;
       toast({
-        title: body.draft ? "Draft saved" : when ? "Post scheduled" : "Post queued for publishing",
-        description: `${count} destination${count === 1 ? "" : "s"}${when ? ` · ${when.toLocaleString()}` : ""}${body.mediaUrls.length ? ` · ${body.mediaUrls.length} media` : ""}. The composer is clear for the next post.`,
+        title: body?.draft ? "Draft saved" : when ? "Post scheduled" : "Post queued for publishing",
+        description: `${count} destination${count === 1 ? "" : "s"}${gbpQueued ? " (Google Business Profile included — its status is under Google Business → Posts)" : ""}${when ? ` · ${when.toLocaleString()}` : ""}${body?.mediaUrls.length ? ` · ${body.mediaUrls.length} media` : ""}. The composer is clear for the next post.`,
       });
       setLatestPosts(result.posts || []);
       setOffset(0);
@@ -560,7 +618,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
 
       {tab === "compose" && (
         <section>
-          {setupProblem && <Notice tone="danger" testId="alert-social-setup"><span id="social-setup-reason">{setupProblem} Posting and saving drafts are unavailable until this is fixed.</span></Notice>}
+          {setupProblem && <Notice tone="danger" testId="alert-social-setup"><span id="social-setup-reason">{setupProblem} Posting to social accounts and saving drafts are unavailable until this is fixed{gbpLinked ? "; a post to your Google Business Profile still goes out." : "."}</span></Notice>}
           <GoogleSectionHeader title="Compose" description={all ? undefined : "Write once — every chosen account gets its own version."} />
           {submission && <div role="status" className="mb-4 space-y-2 rounded-lg border p-3 text-sm">
             <p>Submission awaiting confirmation. Your original post is saved. Retry it to confirm the result without creating duplicate posts.</p>
@@ -572,16 +630,45 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
               <legend className="mb-2 text-sm font-medium">Post to</legend>
               {!data?.connected ? (
                 <p className="text-sm text-muted-foreground">
-                  Connect your social accounts above to choose accounts.
+                  Connect your social accounts under Accounts to choose them here.
                 </p>
               ) : (
                 !accounts.length && (
                   <p className="text-sm text-muted-foreground">
                     No social accounts are available for this business.
-                    Connect accounts through ConstructHUB above, then add them
+                    Connect accounts through ConstructHUB under Accounts, then add them
                     under Map accounts and pages to this business.
                   </p>
                 )
+              )}
+              {/* Google Business Profile: the same post to the linked Google listing, through the Google posts queue. */}
+              {!all && (
+                <div className="space-y-3 rounded-lg border p-3" data-testid="composer-gbp" data-linked={gbpLinked ? "true" : "false"}>
+                  {gbpLinked ? (
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={gbpOn} onChange={(e) => setGbpOn(e.target.checked)} data-testid="checkbox-gbp" />
+                      <NetworkIcon platform="gbp" />
+                      {data?.business?.business_name} · Google Business Profile
+                    </label>
+                  ) : (
+                    <p className="flex flex-wrap items-center gap-2 text-sm">
+                      <NetworkIcon platform="gbp" />
+                      <span>Google Business Profile — <Link className="g-link" href="/locations" data-testid="link-gbp-link-first">Link a Google Business Profile first</Link></span>
+                    </p>
+                  )}
+                  {gbpOn && (
+                    <div className="space-y-2 text-sm">
+                      <p className="g-text-2">Goes to your Google listing as a standard update at the schedule time below (now when blank), 1,500 characters at most. A draft stays here; Google posts are queued when you post or schedule. Track it under <Link className="g-link" href={`/gbp-content?location=${businessId}`}>Google Business → Posts</Link>.</p>
+                      <label className="block space-y-1.5 sm:max-w-md">
+                        <span className="text-sm font-medium">Photo on the Google post (optional, from your Media Library)</span>
+                        <select aria-label="Google post photo" className={selectClass} value={gbpPhotoId} onChange={(e) => setGbpPhotoId(e.target.value)} disabled={gbpPhotos.isLoading} data-testid="select-gbp-photo">
+                          <option value="">{gbpPhotos.isLoading ? "Loading your library…" : gbpPhotos.isError ? "Library unavailable — no photo" : gbpPhotos.data?.length ? "No photo" : "No photos in your Media Library yet"}</option>
+                          {(gbpPhotos.data ?? []).map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  )}
+                </div>
               )}
               {accounts.map((a) => {
                 const d = destinations.find((d) => d.accountId === a.id);
@@ -697,10 +784,10 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                 placeholder="Share an update from your business…"
               />
             </label>
-            {[...new Set(destinations.map((d) => d.platform))].map((p) => (
+            {[...new Set([...destinations.map((d) => d.platform), ...(gbpOn && gbpLinked ? ["gbp"] : [])])].map((p) => (
               <label className="block space-y-1" key={p}>
                 <span className="flex items-center gap-1.5 text-sm">
-                  <NetworkIcon platform={p} /> {networkName(p)} text tweak · {characterCount(p, tweaks[p] ?? text)}
+                  <NetworkIcon platform={p} /> {p === "gbp" ? "Google Business Profile" : networkName(p)} text tweak · {p === "gbp" ? `${[...(tweaks[p] ?? text)].length}/1500 characters` : characterCount(p, tweaks[p] ?? text)}
                 </span>
                 <Textarea
                   aria-label={`${networkName(p)} text tweak`}
@@ -806,8 +893,8 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                 label={schedule ? "Schedule post" : "Post now"}
               />
               <GooglePill
-                disabled={!!draftBlocker || mutation.isPending}
-                title={draftBlocker || undefined}
+                disabled={!!draftOnlyBlocker || mutation.isPending}
+                title={draftOnlyBlocker || undefined}
                 onClick={() => void submit(true)}
                 label="Save draft"
               />
@@ -857,6 +944,17 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                   ? "No posts match your search or filters."
                   : "No posts yet. Compose your first update or generate an AI draft."}
               </p>
+            )}
+            {!error && !isLoading && !queuePosts.length && !(postSearch || postState || postPlatform || calendarDate) && (
+              <SamplePreview what="what your posts list looks like" testId="sample-social-posts"
+                cta={!all && <GooglePill size="sm" variant="solid" href={socialHref("compose", String(businessId))} label="Write a post" />}>
+                <GoogleList>
+                  {SAMPLE_POSTS.map((p) => (
+                    <GoogleListRow key={p.id} size="md" title={<span className="inline-flex items-center gap-1.5"><NetworkIcon platform={p.platform} />{networkName(p.platform)} · <span className={p.state === "Published" ? "g-open" : "g-text-2"}>{p.state}</span></span>}
+                      meta={`${p.when} · ${p.text}`} />
+                  ))}
+                </GoogleList>
+              </SamplePreview>
             )}
             <p className="text-sm text-muted-foreground">{error ? "Post count unavailable" : `${data?.total ?? 0} matching posts`}</p>
             <div className="flex flex-wrap gap-2">
@@ -1491,7 +1589,18 @@ function SocialOverview({ business, businessId, accounts }: { business: string; 
               <span className="line-clamp-1 break-words">{p.payload?.post?.content?.text}</span>
             </li>))}
           </ul>
-        ) : <p className="text-sm g-text-2">Nothing scheduled. <a className="g-link" href={socialHref("compose", business)}>Write a post</a>.</p>}
+        ) : <>
+          <p className="text-sm g-text-2">Nothing scheduled. <a className="g-link" href={socialHref("compose", business)}>Write a post</a>.</p>
+          <SamplePreview what="what upcoming posts look like" className="mt-3" testId="sample-social-upcoming">
+            <ul className="space-y-2">{SAMPLE_POSTS.filter((p) => p.state === "Scheduled").map((p) => (
+              <li key={p.id} className="flex items-start gap-2 text-sm">
+                <NetworkIcon platform={p.platform} className="mt-0.5 h-4 w-4 shrink-0" />
+                <span className="shrink-0 tabular-nums g-text-2">{p.when}</span>
+                <span className="line-clamp-1 break-words">{p.text}</span>
+              </li>))}
+            </ul>
+          </SamplePreview>
+        </>}
       </section>
     </div>
   );

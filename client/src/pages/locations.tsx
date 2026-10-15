@@ -7,6 +7,7 @@ import { ProfileGuard, GuardStatus, GoogleReport, GOOGLE_REPORT_REVIEW_HELP } fr
 import { GbpConnection } from "@/components/gbp-connection";
 import { startGbpConnect } from "@/components/recent-auth";
 import { InfoTip } from "@/components/info-tip";
+import { SamplePreview } from "@/components/sample-preview";
 import { GoogleSurface } from "@/components/google";
 import { useEffect, useRef, useState } from "react";
 import { cleanSocialLink } from "@shared/social-profile-links";
@@ -390,21 +391,23 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
   const [tabParam, setTabParam] = useUrlParam("tab");
   const setActiveTab = (tab: string) => setTabParam(tab);
 
+  // Each tab names its own help entry (shared/help/registry.ts), so the "i" beside the title explains the open tab.
   const tabItems = [
-    { value: "insights", label: "Insights", icon: BarChart3 },
-    { value: "reviews", label: "Reviews", icon: Star },
-    { value: "guard", label: "Profile Watch", icon: Lock },
-    { value: "info", label: "Location Info", icon: Building2 },
-    { value: "services", label: "Services", icon: Tag },
-    { value: "photos", label: "Photos & Videos", icon: Image },
-    { value: "posts", label: "Posts & Updates", icon: Megaphone },
-    { value: "social", label: "Social Profiles", icon: Link2 },
-    { value: "settings", label: "Settings", icon: Settings },
-    { value: "citations", label: "Citations", icon: Globe },
+    { value: "insights", label: "Insights", icon: BarChart3, helpKey: "locations.google-performance-kept" },
+    { value: "reviews", label: "Reviews", icon: Star, helpKey: "locations.reviews" },
+    { value: "guard", label: "Profile Watch", icon: Lock, helpKey: "locations.profile-guard-built-in" },
+    { value: "info", label: "Location Info", icon: Building2, helpKey: "locations.profile-details-at-a-glance" },
+    { value: "services", label: "Services", icon: Tag, helpKey: "locations.services-and-categories" },
+    { value: "photos", label: "Photos & Videos", icon: Image, helpKey: "locations.photos-and-videos" },
+    { value: "posts", label: "Posts & Updates", icon: Megaphone, helpKey: "locations.posts-and-updates" },
+    { value: "social", label: "Social Profiles", icon: Link2, helpKey: "locations.social-profiles" },
+    { value: "settings", label: "Settings", icon: Settings, helpKey: "locations.settings" },
+    { value: "citations", label: "Citations", icon: Globe, helpKey: "locations.citation-checklist" },
   ];
   // An unknown (?tab=reviews) or locked tab falls back to Insights instead of an empty pane.
   const validTab = tabItems.some((t) => t.value === tabParam && !(t.value === "citations" && !isPremiumPlus));
   const activeTab = validTab ? tabParam! : "insights";
+  const helpKey = tabItems.find((t) => t.value === activeTab)?.helpKey;
   useEffect(() => { if (tabParam && !validTab) setTabParam(null); }, [tabParam, validTab]);
   // The header chip: the uploaded logo, else the listing's profile photo from the last Google sync, else the icon.
   const { data: headerMedia } = useQuery<{ items: { category?: string | null; thumbnail_url?: string | null; google_url?: string | null }[] }>({
@@ -417,7 +420,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
   return (
     <AppPage className="before:hidden">
         <Button variant="ghost" onClick={onBack} data-testid="button-back-to-list"><ArrowLeft className="mr-2 h-4 w-4"/>All locations</Button>
-        <PageHeader title={<span data-testid="text-detail-name">{location.businessName}</span>} description={fullAddress(location)||'Manage this Google Business Profile.'} image={logo} actions={<LogoButton location={location} />}/>
+        <PageHeader title={<span data-testid="text-detail-name">{location.businessName}</span>} description={fullAddress(location)||'Manage this Google Business Profile.'} image={logo} helpKey={helpKey} actions={<LogoButton location={location} />}/>
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex overflow-x-auto scrollbar-none md:overflow-visible md:block md:w-48 shrink-0 gap-1 md:space-y-1">
             {tabItems.map(item => {
@@ -478,6 +481,13 @@ const PERF_LABELS: Record<string, string> = {
 type PerfData = { available: boolean; metrics: string[]; rows: { date: string; metric: string; value: string; last_day: string }[];
   firstDate: string | null; lastDate: string | null; pendingAfter: string };
 
+/** The sample table shown while Google has sent no performance numbers yet: made-up figures, never stored or sent anywhere. */
+const SAMPLE_PERF_METRICS = ["BUSINESS_IMPRESSIONS_MOBILE_SEARCH", "BUSINESS_IMPRESSIONS_MOBILE_MAPS", "WEBSITE_CLICKS", "CALL_CLICKS", "BUSINESS_DIRECTION_REQUESTS"];
+const SAMPLE_PERF_ROWS: { date: string; values: Record<string, number> }[] = [
+  { date: "2026-01-03", values: { BUSINESS_IMPRESSIONS_MOBILE_SEARCH: 42, BUSINESS_IMPRESSIONS_MOBILE_MAPS: 31, WEBSITE_CLICKS: 4, CALL_CLICKS: 2, BUSINESS_DIRECTION_REQUESTS: 1 } },
+  { date: "2026-01-02", values: { BUSINESS_IMPRESSIONS_MOBILE_SEARCH: 38, BUSINESS_IMPRESSIONS_MOBILE_MAPS: 27, WEBSITE_CLICKS: 3, CALL_CLICKS: 1, BUSINESS_DIRECTION_REQUESTS: 2 } },
+  { date: "2026-01-01", values: { BUSINESS_IMPRESSIONS_MOBILE_SEARCH: 25, BUSINESS_IMPRESSIONS_MOBILE_MAPS: 19, WEBSITE_CLICKS: 2, CALL_CLICKS: 0, BUSINESS_DIRECTION_REQUESTS: 1 } },
+];
 const PERF_RANGES = ["30d", "90d", "6m", "12m", "18m", "all"];
 const PERF_GROUPS = ["day", "week", "month"] as const;
 function InsightsTab({ location }: { location: BusinessLocation }) {
@@ -523,9 +533,22 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
         </div>
       </div>
       {isLoading ? <p>Loading performance…</p> : error ? <p role="alert">Unable to load performance.</p> : !data?.available ? (
-        location.gbpLocationName
-          ? <p>No performance data yet. Metrics appear after the first successful Google sync.</p>
-          : <p>Performance unavailable. Link this location to Google and sync to retrieve real metrics.</p>
+        <div className="space-y-3">
+          {location.gbpLocationName
+            ? <p>No performance data yet. Metrics appear after the first successful Google sync.</p>
+            : <p>Performance unavailable. Link this location to Google and sync to retrieve real metrics.</p>}
+          <SamplePreview what="what this table shows once Google has sent performance numbers" cta={!location.gbpLocationName ? <GbpLinkCell locationId={location.id} /> : undefined} testId="sample-performance">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className={appTableCards.thead}><tr><th className="p-2 text-left">Date</th>{SAMPLE_PERF_METRICS.map((m) => <th className="p-2 whitespace-nowrap" key={m}>{PERF_LABELS[m]}</th>)}</tr></thead>
+                <tbody>
+                  <tr className={`${appTableCards.tr} border-b font-semibold bg-muted/40`}><td className={`${appTableCards.td} !text-foreground`}>Total</td>{SAMPLE_PERF_METRICS.map((m) => <td className={`${appTableCards.td} !text-foreground`} key={m}>{SAMPLE_PERF_ROWS.reduce((n, r) => n + r.values[m], 0).toLocaleString()}</td>)}</tr>
+                  {SAMPLE_PERF_ROWS.map((r) => <tr key={r.date} className={`${appTableCards.tr} border-b`}><td className={`${appTableCards.td} !text-foreground`}>{r.date}</td>{SAMPLE_PERF_METRICS.map((m) => <td className={`${appTableCards.td} !text-foreground`} key={m}>{r.values[m].toLocaleString()}</td>)}</tr>)}
+                </tbody>
+              </table>
+            </div>
+          </SamplePreview>
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="table-performance">
@@ -711,6 +734,9 @@ function ServicesTab({ location }: { location: BusinessLocation }) {
 
 type ReviewRow = { id: number; reviewer_name: string | null; reviewer_photo_url: string | null; rating: number | null; comment: string | null; review_date: string | null; reply_comment: string | null; reply_status: string | null; reply_date: string | null; google_deleted: boolean; deleted_at: string | null; edited_at: string | null; edit_count: number; previous: { reviewer_name?: string | null; rating?: number | null; comment?: string | null } | null };
 type ReviewEventRow = { id: number; review_id: number | null; kind: "added" | "edited" | "removed" | "restored"; before: { reviewer_name?: string | null; rating?: number | null; comment?: string | null; review_date?: string | null } | null; after: { reviewer_name?: string | null; rating?: number | null; comment?: string | null; review_date?: string | null } | null; created_at: string };
+/** Google's own pages about reviews that disappear (verified 2026-10-15; no tracking parameters). The support form needs the Google sign-in that manages the listing. */
+const GOOGLE_MISSING_REVIEWS_HELP = "https://support.google.com/business/answer/10313341";
+const GOOGLE_BUSINESS_SUPPORT_FORM = "https://support.google.com/business/gethelp";
 const fmtDay = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "");
 const fmtWhen = (d: string | null | undefined) => (d ? new Date(d).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
 function Stars({ n }: { n: number | null | undefined }) {
@@ -726,10 +752,27 @@ function ReviewsTab({ location }: { location: BusinessLocation }) {
   });
   const [view, setView] = useState<"changes" | "removed" | "all">("changes");
   const [copied, setCopied] = useState<number | null>(null);
+  const [copiedReport, setCopiedReport] = useState<number | null>(null);
   const copy = async (r: ReviewRow) => {
     const txt = `${r.rating ?? "?"}-star review by ${r.reviewer_name || "a reviewer"}${r.review_date ? ` on ${fmtDay(r.review_date)}` : ""}:
 ${r.comment || "(no text)"}`;
     try { await navigator.clipboard.writeText(txt); setCopied(r.id); setTimeout(() => setCopied(null), 2000); } catch { /* clipboard blocked: the text is on screen */ }
+  };
+  // What Google's support form asks for about a missing review, assembled from what is saved here — nothing guessed.
+  const listingLink = location.googleCid && /^https:\/\//i.test(location.googleCid) ? location.googleCid : location.placeId ? `https://www.google.com/maps/place/?q=place_id:${location.placeId}` : null;
+  const copyReport = async (r: ReviewRow, liveCount: number, removedCount: number) => {
+    const lines = [
+      `Business: ${location.businessName}`,
+      `Listing: ${listingLink ?? "(no Google link on file)"}`,
+      `Reviewer: ${r.reviewer_name || "(name not recorded)"}`,
+      `Review date: ${r.review_date ? fmtDay(r.review_date) : "(not recorded)"}`,
+      `Rating: ${r.rating ?? "?"} star(s)`,
+      `Review text: ${r.comment || "(no text)"}`,
+      r.reply_comment ? `Our reply: ${r.reply_comment}` : null,
+      `Last seen on Google: ${r.deleted_at ? `gone since ${fmtWhen(r.deleted_at)}` : "gone since an earlier sync"}`,
+      `Reviews the listing shows now: ${liveCount}. Reviews saved by us that Google no longer shows: ${removedCount}.`,
+    ].filter((l): l is string => !!l);
+    try { await navigator.clipboard.writeText(lines.join("\n")); setCopiedReport(r.id); setTimeout(() => setCopiedReport(null), 2000); } catch { /* clipboard blocked: the text is on screen */ }
   };
   if (!linked) return <Card><CardContent className="p-4 space-y-3 text-sm text-muted-foreground"><p>Link this location to its Google Business Profile and its reviews are saved here on every sync, with an alert the moment one disappears or changes.</p><GbpLinkCell locationId={location.id} /></CardContent></Card>;
   const kindLabel: Record<ReviewEventRow["kind"], string> = { added: "New review", edited: "Edited", removed: "Removed by Google", restored: "Back on Google" };
@@ -767,7 +810,12 @@ ${r.comment || "(no text)"}`;
 
       {data && view === "removed" && (
         <Card><CardContent className="p-0">
-          {!removed.length ? <p className="p-4 text-sm text-muted-foreground">Nothing has been removed. If Google ever drops one, its full text stays here and you are alerted.</p> : (
+          <div className="p-4 border-b space-y-2" data-testid="reviews-removed-intro">
+            <div className="flex items-center gap-1"><h4 className="text-sm font-semibold">Reviews Google no longer shows</h4><InfoTip k="location-reviews-removed" /></div>
+            <p className="text-xs text-muted-foreground max-w-xl">A review that was on the listing at one sync and gone at the next is kept here with its full text. Google checks every review against its policies and does not restore one removed for breaking them; it can also take a few days to show a new review, or hide reviews for a while. You can ask Google about a missing review through its Business Profile support form, signed in with the Google account that manages the listing. <a className="underline" href={GOOGLE_MISSING_REVIEWS_HELP} target="_blank" rel="noopener noreferrer" data-testid="link-google-missing-reviews-help">What Google says about missing reviews ↗</a></p>
+            <Button asChild size="sm" variant="outline"><a href={GOOGLE_BUSINESS_SUPPORT_FORM} target="_blank" rel="noopener noreferrer" data-testid="link-google-report-missing-review">Report a missing review to Google ↗</a></Button>
+          </div>
+          {!removed.length ? <p className="p-4 text-sm text-muted-foreground">Nothing has been removed. If Google ever drops one, its full text stays here, you are alerted, and “Copy for Google” on the review assembles what Google’s support form asks for.</p> : (
             <ul className="divide-y">{removed.map((r) => (
               <li key={r.id} className="p-3 text-sm space-y-1" data-testid={`review-removed-${r.id}`}>
                 <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{r.reviewer_name || "A reviewer"}</span><Stars n={r.rating} />{r.review_date && <span className="text-xs text-muted-foreground">reviewed {fmtDay(r.review_date)}</span>}<span className="text-xs text-destructive">gone since {fmtWhen(r.deleted_at) || "an earlier sync"}</span></div>
@@ -775,7 +823,8 @@ ${r.comment || "(no text)"}`;
                 {r.reply_comment && <p className="text-xs text-muted-foreground">Your reply: {r.reply_comment}</p>}
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Button size="sm" variant="outline" onClick={() => void copy(r)}>{copied === r.id ? "Copied" : "Copy the text"}</Button>
-                  <Button asChild size="sm" variant="outline"><a href="https://support.google.com/business/contact/review_removal_restoration" target="_blank" rel="noopener noreferrer">Ask Google to restore it ↗</a></Button>
+                  <Button size="sm" variant="outline" onClick={() => void copyReport(r, live.length, removed.length)} data-testid={`button-copy-report-${r.id}`}>{copiedReport === r.id ? "Copied" : "Copy for Google"}</Button>
+                  <Button asChild size="sm" variant="outline"><a href={GOOGLE_BUSINESS_SUPPORT_FORM} target="_blank" rel="noopener noreferrer">Report a missing review to Google ↗</a></Button>
                 </div>
               </li>))}</ul>
           )}

@@ -26,6 +26,7 @@ import {
   CrmPage, MetricCard, StatusPill, EmptyState, ErrorCard, statusTone,
 } from "@/components/crm-ui";
 import { InfoTip } from "@/components/info-tip";
+import { HelpButton } from "@/components/help-button";
 import { ClientSearchPicker } from "@/components/crm-search-picker";
 
 interface Step {
@@ -215,6 +216,8 @@ export default function CrmHomePage() {
             {me?.org?.name ? me.org.name : "Welcome"}
           </h1>
           <InfoTip k="dashboard" />
+          {/* The Home walkthrough (static key: the title here is not a CrmPageHeader). */}
+          <HelpButton k="crm-home" videoOnly />
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           {ob.requiredComplete

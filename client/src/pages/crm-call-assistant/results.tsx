@@ -11,11 +11,17 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart3, BellRing, ClipboardCheck, Info, Mic, PhoneMissed, ShieldBan, Timer, XCircle } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { accentClasses, type Accent } from "@/components/app-ui";
 
 export type ResultsRange = "7d" | "30d" | "month" | "all";
+/** What the summary route takes: a preset, or "<1..365>d" typed by the owner (server/voice/calls.ts parseCallResultsRange). */
+type RangeParam = ResultsRange | `${number}d`;
+const CUSTOM = "custom";
+const clampDays = (n: number) => Math.min(365, Math.max(1, Math.round(n)));
 export type ResultsPick = "lead_submitted" | "alerted" | "info" | "declined" | "hangup" | "voicemail" | "spam";
 
 type Summary = {
@@ -30,6 +36,7 @@ type Summary = {
 };
 
 const RANGE_LABELS: Record<ResultsRange, string> = { "7d": "Last 7 days", "30d": "Last 30 days", month: "This month", all: "All time" };
+const rangeLabel = (r: RangeParam): string => (r in RANGE_LABELS ? RANGE_LABELS[r as ResultsRange] : `Last ${r.slice(0, -1)} days`);
 
 /** The tiles, in the order an owner reads them: what made money first, spam last. */
 const TILES: { key: ResultsPick; label: string; hint: string; outcomes: string[]; icon: typeof BellRing; tone: Accent }[] = [
@@ -45,8 +52,12 @@ const TILES: { key: ResultsPick; label: string; hint: string; outcomes: string[]
 const sum = (o: Record<string, number>, keys: string[]) => keys.reduce((n, k) => n + (o[k] ?? 0), 0);
 
 export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick) => void; className?: string }) {
-  const [range, setRange] = useState<ResultsRange>("30d");
-  const q = useQuery<Summary>({ queryKey: [`/api/crm/voice/calls/summary?range=${range}`] });
+  const [range, setRange] = useState<ResultsRange | typeof CUSTOM>("30d");
+  // "Custom": a number of days the owner types (1–365); the query runs on the settled value.
+  const [days, setDays] = useState("14");
+  const customDays = clampDays(Number(days) || 14);
+  const param: RangeParam = range === CUSTOM ? `${customDays}d` : range;
+  const q = useQuery<Summary>({ queryKey: [`/api/crm/voice/calls/summary?range=${param}`] });
   // A reply without the summary's shape counts as an error, never a crash.
   const d = q.data && typeof q.data.total === "number" && q.data.outcomes && Array.isArray(q.data.lines) ? q.data : undefined;
   const spam = d ? sum(d.outcomes, ["spam", "blocked"]) : 0;
@@ -63,13 +74,25 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
             <h2 className="flex items-center gap-2 text-base font-semibold"><BarChart3 className="h-4 w-4" aria-hidden="true" /> Results</h2>
             <p className="text-sm text-muted-foreground">What your assistant did with every call.</p>
           </div>
-          <div className="w-40">
-            <Select value={range} onValueChange={(v) => setRange(v as ResultsRange)}>
-              <SelectTrigger aria-label="Period" data-testid="select-results-range"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {(Object.keys(RANGE_LABELS) as ResultsRange[]).map((r) => <SelectItem key={r} value={r}>{RANGE_LABELS[r]}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap items-center gap-2">
+            {range === CUSTOM && (
+              <div className="flex items-center gap-1.5 text-sm">
+                <Label htmlFor="results-days" className="sr-only">Number of days</Label>
+                <span className="text-muted-foreground">Last</span>
+                <Input id="results-days" type="number" inputMode="numeric" min={1} max={365} value={days} className="h-9 w-20 tabular-nums"
+                  onChange={(e) => setDays(e.target.value)} onBlur={() => setDays(String(customDays))} data-testid="input-results-days" />
+                <span className="text-muted-foreground">days</span>
+              </div>
+            )}
+            <div className="w-40">
+              <Select value={range} onValueChange={(v) => setRange(v as ResultsRange | typeof CUSTOM)}>
+                <SelectTrigger aria-label="Period" data-testid="select-results-range"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(RANGE_LABELS) as ResultsRange[]).map((r) => <SelectItem key={r} value={r}>{RANGE_LABELS[r]}</SelectItem>)}
+                  <SelectItem value={CUSTOM} data-testid="option-results-range-custom">Custom number of days…</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -79,7 +102,7 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
           <p className="text-sm text-muted-foreground" role="alert" data-testid="text-results-error">Couldn't load the results. <button type="button" className="underline" onClick={() => q.refetch()}>Try again</button></p>
         ) : d.total === 0 ? (
           <p className="text-sm text-muted-foreground" data-testid="text-results-empty">
-            No calls {range === "all" ? "yet" : `in the ${RANGE_LABELS[range].toLowerCase()}`}. Results appear here as soon as your assistant answers its first call.
+            No calls {range === "all" ? "yet" : `in the ${rangeLabel(param).toLowerCase()}`}. Results appear here as soon as your assistant answers its first call.
           </p>
         ) : (
           <>

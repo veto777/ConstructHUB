@@ -130,7 +130,16 @@ export async function outsideSpamSplitThisMonth(orgId: string, timezone: unknown
   return { spam: Number(row?.n ?? 0), blocked: Number(row?.blocked ?? 0) };
 }
 
-export type CallResultsRange = "7d" | "30d" | "month" | "all";
+export type CallResultsRange = "7d" | "30d" | "month" | "all" | `${number}d`;
+
+/** The Results panel's period: a preset, or "<1..365>d" for a number of days the owner typed (anything else → 30d). */
+export function parseCallResultsRange(raw: unknown): CallResultsRange {
+  const v = String(raw ?? "");
+  if (v === "7d" || v === "30d" || v === "month" || v === "all") return v;
+  const m = /^(\d{1,3})d$/.exec(v);
+  const n = m ? Number(m[1]) : NaN;
+  return Number.isInteger(n) && n >= 1 && n <= 365 ? (`${n}d` as CallResultsRange) : "30d";
+}
 
 /** Office callbacks count too, including a voicemail whose message reached a person. */
 export function sentToPersonCondition(id: SQL, outcome: SQL): SQL {
@@ -141,9 +150,9 @@ export function sentToPersonCondition(id: SQL, outcome: SQL): SQL {
 /** The Results panel's numbers for one org, counted from voice_calls (see the /calls/summary route). */
 export async function callResultsSummary(orgId: string, range: CallResultsRange, timezone: unknown) {
   const tz = summaryTimezone(timezone);
+  const days = range === "month" || range === "all" ? null : Number(/^(\d+)d$/.exec(range)?.[1]);
   const since =
-    range === "7d" ? sql`now() AT TIME ZONE 'UTC' - interval '7 days'`
-    : range === "30d" ? sql`now() AT TIME ZONE 'UTC' - interval '30 days'`
+    days != null && Number.isInteger(days) && days > 0 ? sql`now() AT TIME ZONE 'UTC' - make_interval(days => ${days})`
     : range === "month" ? sql`(date_trunc('month', now() AT TIME ZONE ${tz}) AT TIME ZONE ${tz}) AT TIME ZONE 'UTC'`
     : null;
   const where = since ? sql`c.org_id = ${orgId} AND c.started_at >= ${since}` : sql`c.org_id = ${orgId}`;
@@ -233,7 +242,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
   });
 
   /**
-   * GET ?range=7d|30d|month|all → the Results panel (owner, 2026-10-02: "The clients want to see this data when
+   * GET ?range=7d|30d|month|all|<1..365>d → the Results panel (owner, 2026-10-02: "The clients want to see this data when
    * using this service"): calls by outcome, by line, minutes talked and recordings, counted from the call log itself
    * (so calls another receptionist pushed in through ingest.ts count too, though they are never metered).
    * "month" is the calendar month in the org's timezone. Registered before /calls/:id so "summary" isn't an id.
@@ -241,7 +250,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
   app.get("/api/crm/voice/calls/summary", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser);
     if (!v) return;
-    const range = (["7d", "30d", "month", "all"] as const).find((r) => r === req.query.range) ?? "30d";
+    const range = parseCallResultsRange(req.query.range);
     try {
       sendUnlogged(res, await callResultsSummary(v.ctx.org.id, range, (v.ctx.org as any).timezone));
     } catch (e: any) {

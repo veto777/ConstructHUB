@@ -66,18 +66,11 @@ export function registerMailAlertRoutes(
   route("get", "", async (req, res, id) => {
     const p = pageInput
       .extend({
-        category: z
-          .enum([
-            "",
-            "gbp",
-            "gsc",
-            "ads",
-            "cloudflare",
-            "registrar",
-            "forwarding",
-          ])
-          .default(""),
-        severity: z.enum(["", "critical", "warning", "info"]).default(""),
+        // Any short text: the inbox filters offer the known categories (gbp, gsc, ads, cloudflare, registrar,
+        // forwarding) and severities (critical, warning, info) and also take a typed value — an equality
+        // match in the parameterised query below, so an unknown value simply matches nothing.
+        category: z.string().max(40).default(""),
+        severity: z.string().max(40).default(""),
         unread: z.enum(["", "1"]).default(""),
         mapped: z.enum(["", "mapped", "unmapped"]).default(""),
       })

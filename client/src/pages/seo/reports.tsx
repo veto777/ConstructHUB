@@ -163,7 +163,7 @@ export default function SeoReportsPage() {
 
   return (
     <SeoShell title="Reports" description="A plain-English report of where your site stands and what changed — to read, download, or have emailed to you or a client." site={site} onSite={changeSite} sites={sites} status={status}
-      actions={site && d && !d.empty && <a className="g-pill !min-h-11 w-full justify-center sm:w-auto" href={`${key}.pdf`} download data-testid="link-report-pdf"><Download /> Download PDF</a>}>
+      actions={site && d && !d.empty && <a className="g-pill !min-h-11 w-full justify-center sm:w-auto" href={`${key}.pdf`} download data-testid="link-report-pdf"><Download /> Download PDF</a>} helpKey="seo.reports">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="reports-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
       {/* Said also when the report is empty: the address still asks for a section, and the page says it is not there. */}
       {section && r && <ActiveFilter onClear={() => clearParams(["section"], false)} clearLabel="Whole report">{!target ? `No section called "${section}" in a report (rankings, fixes, work, visibility, grid)` : d?.empty ? `"${target.words}" is not in this report — the report has no numbers for ${site?.domain ?? "the site"} yet` : sectionHere ? `Jumped to: ${target!.words}` : `"${target.words}" is not in this report yet — it appears once that tool has numbers for ${site?.domain ?? "the site"}`}</ActiveFilter>}

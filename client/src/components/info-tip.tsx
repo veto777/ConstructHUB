@@ -3,6 +3,7 @@ import { Info } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { useClaimHelpMount } from "@/lib/use-help-entry";
 import { useInfoContent } from "@/lib/use-info-content";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,8 @@ import { cn } from "@/lib/utils";
 export function InfoTip({ k, className }: { k: string; className?: string }) {
   const [open, setOpen] = useState(false);
   const entry = useInfoContent(k);
+  // A ⓘ is a help control: while one is on the page the tool shell shows no crumb-row fallback "i".
+  useClaimHelpMount(entry ? k : undefined);
 
   useEffect(() => {
     if (!open) return;

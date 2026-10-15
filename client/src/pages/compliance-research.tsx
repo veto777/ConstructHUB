@@ -8,6 +8,8 @@ import { Fragment, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRight, ArrowUpRight, CheckCircle2, ChevronDown, FileSearch, Link2, Loader2, Plus, Printer, Trash2, XCircle } from "lucide-react";
+import { GoogleList, GoogleListRow, GooglePill, GoogleSectionHeader } from "@/components/google";
+import { HelpButton } from "@/components/help-button";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,31 +114,30 @@ export default function ResearchOrderPage() {
 
   return (
     <ComplianceFrame next={RESEARCH_PATH} testId="page-research">
-      <header className="space-y-3">
-        <Link href={COMPLIANCE_PATH} className="text-sm text-muted-foreground hover:underline">← Compliance Dept</Link>
-        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary"><FileSearch className="h-4 w-4" aria-hidden="true" /> Permit &amp; License Research Report</p>
-        <h1 className="text-3xl font-semibold tracking-tight" data-testid="text-research-title">Find every permit and license tied to a name</h1>
-        <p className="text-muted-foreground max-w-3xl leading-relaxed">
-          Tell us who to look for and where. Our research bot finds contractors by name, owner, license number, phone or address
-          and links related licenses: it searches the state contractor-license records and every city and county permit portal
-          we can reach in those states, then follows the license numbers, phones, addresses and people on what it finds to other
-          licenses and businesses tied to them. For a company it also pulls consumer complaints, state
-          enforcement records (licensing-board discipline, stop-work orders, tax liens, debarments, environmental orders)
-          {runtimeRecordsPhrase(runtime)}. Every finding links to its official
-          source. Reports are usually ready the same day.
-        </p>
-      </header>
+      <div>
+        <Link href={COMPLIANCE_PATH} className="text-sm g-text-2 hover:underline">← Compliance Dept</Link>
+        <GoogleSectionHeader
+          as="h1"
+          titleTestId="text-research-title"
+          title="Research reports"
+          titleAfter={<HelpButton k="compliance.research" />}
+          description="Give us a person's or company's name and the states to check; our research bot finds every permit, license and public record tied to it and links each finding to its official source."
+          flush
+          className="mt-2"
+        />
+      </div>
 
-      <section className="max-w-3xl rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2" data-testid="section-research-what">
-        <h2 className="font-semibold">What a report does</h2>
-        <ul className="space-y-1.5 text-sm list-disc pl-5">
-          <li>Searches every source we have in each state you pick, by name, owner, license number, phone or address. What we have differs by state: the link below lists it.</li>
-          <li>Cross-references what it finds. Other licenses and businesses that share a license number, phone, address or person show up too, and each one says what ties it.</li>
-          <li>Adds state enforcement records (board discipline, stop-work orders, debarments, liens){runtimeRecordsPhrase(runtime)} for companies.</li>
-        </ul>
-        <Link href={RESEARCH_COVERAGE_PATH} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline" data-testid="link-research-coverage">
-          See exactly what we search in your state <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </Link>
+      {/* How this works: three steps, in the order the form runs them. The long explanation is in the "i". */}
+      <section className="g-callout max-w-3xl" data-testid="section-research-what" aria-labelledby="research-how">
+        <h3 id="research-how">How this works</h3>
+        <ol className="mt-1 list-decimal space-y-1 pl-5">
+          <li>Add the names (Company or Person), pick up to {MAX_STATES} states and, if you like, the trades to list first. License numbers, phones and addresses you already know can be added at no extra charge.</li>
+          <li>Tick the three agreements and continue. You see a free preview of what will be searched before you pay.</li>
+          <li>Pay to start the research. The bot searches the state license records, every city and county permit portal we can reach in those states{runtimeRecordsPhrase(runtime) ? `, and for companies the complaint and enforcement records${runtimeRecordsPhrase(runtime)}` : ", and for companies the complaint and enforcement records"}; we email you when the report is ready.</li>
+        </ol>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <GooglePill size="sm" label="See exactly what we search in your state" href={RESEARCH_COVERAGE_PATH} testId="link-research-coverage" />
+        </div>
       </section>
 
       {/* Picking a card shapes the form; the price always follows what's entered (one name in one state is Standard). */}
@@ -271,15 +272,32 @@ export default function ResearchOrderPage() {
         </div>
       </form>
 
-      {!!orders?.length && (
-        <section className="space-y-2 max-w-3xl" data-testid="list-research-orders">
-          <h2 className="font-semibold">Your reports</h2>
-          {orders.map((o) => (
-            <Link key={o.id} href={`${RESEARCH_PATH}/orders/${o.id}`} className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm hover:bg-accent">
-              <span>#{o.id} · {o.input.subjects.map((s) => s.name).join(", ")} · {o.input.states.join(", ")}</span>
-              <StatusBadge status={o.status} />
-            </Link>
-          ))}
+      {!!user && orders && (
+        <section className="max-w-3xl" data-testid="list-research-orders">
+          <GoogleSectionHeader as="h2" title="Your reports" count={orders.length || null} flush />
+          {orders.length ? (
+            <GoogleList>
+              {orders.map((o) => (
+                <GoogleListRow
+                  key={o.id}
+                  size="md"
+                  testId={`row-research-order-${o.id}`}
+                  title={`Report #${o.id}`}
+                  href={`${RESEARCH_PATH}/orders/${o.id}`}
+                  badges={<StatusBadge status={o.status} />}
+                  meta={[o.input.subjects.map((s) => s.name).join(", "), o.input.states.map(stateName).join(", "), `ordered ${new Date(o.createdAt).toLocaleDateString()}`]}
+                />
+              ))}
+            </GoogleList>
+          ) : (
+            /* No order yet: what a report page will show and where it comes from. Never a sample report (CLAUDE.md). */
+            <div className="g-callout mt-3" data-testid="empty-research-orders">
+              <h3>No report ordered yet</h3>
+              <p>Each order you place is listed here with its names, states and status (Awaiting payment, Queued, Researching, Ready or Needs attention), and opens the report once it is done.</p>
+              <p className="mt-2">A finished report has, for every name: <b>License records</b>, <b>Related licenses and businesses</b> (and what ties each one), <b>Permits</b>, and for a company <b>Consumer complaints</b>, <b>State enforcement and standing records</b>, <b>Federal court cases</b> and <b>OSHA inspections</b>, then the list of every portal searched. Every row is the agency's or portal's own record with a link to it; a source that did not run says “not searched”, never zero.</p>
+              <p className="mt-2">Fill in the form above to order your first one.</p>
+            </div>
+          )}
         </section>
       )}
     </ComplianceFrame>
@@ -616,17 +634,21 @@ export function ResearchOrderStatusPage() {
         <p className="text-sm text-muted-foreground">{error ? apiErrorMessage(error) : "Order not found."}</p>
       ) : (
         <div className="space-y-6">
-          <header className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold" data-testid="text-order-title">Research report #{o.id}</h1>
-              <p className="text-sm text-muted-foreground mt-1">{o.input.subjects.map((s) => s.name).join(", ")} · {o.input.states.map(stateName).join(", ")}
-                {o.input.trades.length ? ` · ${o.input.trades.map((t) => RESEARCH_TRADES[t].label).join(", ")}` : ""}{o.input.sinceYear ? ` · since ${o.input.sinceYear}` : ""}</p>
-              {o.input.subjects.filter((s) => s.licenseNumbers?.length || s.phones?.length || s.addresses?.length).map((s, j) => (
-                <p key={j} className="text-xs text-muted-foreground mt-0.5">{s.name}, also by: {[...(s.licenseNumbers ?? []).map((v) => `license ${v}`), ...(s.phones ?? []), ...(s.addresses ?? [])].join(" · ")}</p>
-              ))}
-            </div>
-            <div className="flex items-center gap-2"><StatusBadge status={o.status} />
-              {o.status === "complete" && <Button variant="outline" size="sm" className="print:hidden" onClick={() => window.print()} data-testid="button-print"><Printer className="mr-1.5 h-4 w-4" aria-hidden="true" /> Print / save PDF</Button>}</div>
+          <header>
+            <GoogleSectionHeader
+              as="h1"
+              titleTestId="text-order-title"
+              title={`Research report #${o.id}`}
+              titleAfter={<HelpButton k="compliance.order" className="print:hidden" />}
+              description={<>{o.input.subjects.map((s) => s.name).join(", ")} · {o.input.states.map(stateName).join(", ")}
+                {o.input.trades.length ? ` · ${o.input.trades.map((t) => RESEARCH_TRADES[t].label).join(", ")}` : ""}{o.input.sinceYear ? ` · since ${o.input.sinceYear}` : ""}</>}
+              flush
+              actions={<><StatusBadge status={o.status} />
+                {o.status === "complete" && <Button variant="outline" size="sm" className="print:hidden" onClick={() => window.print()} data-testid="button-print"><Printer className="mr-1.5 h-4 w-4" aria-hidden="true" /> Print / save PDF</Button>}</>}
+            />
+            {o.input.subjects.filter((s) => s.licenseNumbers?.length || s.phones?.length || s.addresses?.length).map((s, j) => (
+              <p key={j} className="text-xs text-muted-foreground mt-2">{s.name}, also by: {[...(s.licenseNumbers ?? []).map((v) => `license ${v}`), ...(s.phones ?? []), ...(s.addresses ?? [])].join(" · ")}</p>
+            ))}
           </header>
 
           {o.status === "awaiting_payment" && (
@@ -656,8 +678,12 @@ export function ResearchOrderStatusPage() {
             </div>
           )}
           {(o.status === "paid" || o.status === "researching") && (
-            <p className="rounded-lg border p-4 text-sm inline-flex items-center gap-2" data-testid="text-researching"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              Paid. The research bot is {o.status === "paid" ? "about to start" : "searching now"}. Big states can take a few hours; we'll email you when the report is ready.</p>
+            <div className="g-callout max-w-3xl" data-testid="text-researching">
+              <h3 className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Paid. The research bot is {o.status === "paid" ? "about to start" : "searching now"}.</h3>
+              <p>Big states can take a few hours; we'll email you when the report is ready, and this page refreshes itself.</p>
+              {/* What will appear: the report's sections as the code renders them (SubjectReport). No sample content. */}
+              <p className="mt-2">What the report will show for each name: License records, Related licenses and businesses (with what ties each one), Permits{o.input.subjects.some((s) => s.kind === "company") ? ", and for the company Consumer complaints, State enforcement and standing records, Federal court cases and OSHA inspections" : ""}, then the list of every portal that was searched or could not be. Every row links to the agency's or portal's own record; a source that did not run is shown as “not searched”, never as zero found.</p>
+            </div>
           )}
           {o.status === "failed" && <p className="rounded-lg border border-destructive p-4 text-sm">Something went wrong while researching. Our team has been told and will rerun it; you don't need to do anything.</p>}
           {o.status === "complete" && o.report && (

@@ -1,165 +1,49 @@
-import { useState } from "react";
+/**
+ * /ip-tracker — visitor tracking for the sites added here (the one tracked-site list behind Click Guard, IP Tracker
+ * and VPN Shield). Sections: Dashboard · Visitors · Traffic · Pages · Geo · Platforms, each its own address.
+ *
+ * Owner's program (2026-10-15): an "i" on every section (the help key per tab, below), a sample preview wherever
+ * the real dataset is empty (components/traffic-tool/samples.tsx — never mixed with real rows), the SEO Suite's
+ * dashboard look (a summary strip and one panel per site), and a typed value on every preset filter.
+ */
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, type UseQueryResult } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useAppOrigin } from "@/lib/app-origin";
-import {
-  AppPage, Section, StatusPill, Notice,
-} from "@/components/app-ui";
-import { countryName, geoLabel, GEO_SOURCE_NOTE } from "@/components/ip-tracker/country-names";
-import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { AppPage, Section, StatusPill, Notice } from "@/components/app-ui";
+import { GEO_SOURCE_NOTE } from "@/components/ip-tracker/country-names";
+import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { ToolTabs } from "@/components/tool";
 import { ToolBarSlot } from "@/components/tool/shell";
 import { useInToolShell } from "@/components/tool/in-shell";
 import { useToolView } from "@/hooks/use-tool-view";
 import { IP_TRACKER_VIEWS } from "@/components/traffic-tool/nav";
-import {
-  Fingerprint, Globe, Eye, Users, Monitor, Smartphone, Tablet,
-  Search, ChevronRight, MapPin,
-  FileText, Plus, Copy, Trash2,
-  Clock, Activity, AlertTriangle,
-  Laptop, Chrome, Compass, MoreHorizontal,
-  type LucideIcon,
-} from "lucide-react";
+import { ALL_TIME, RangePicker, StepsCard, WindowPicker, daysAgo, inRange, localDayKey, rangeBounds, rangeKey, rangeQuery, type DateRange } from "@/components/traffic-tool/shared";
+import { DailyVisitsChart, PagesTable, PlatformBreakdowns, GeoTable, SitePanel, SitesSummaryStrip, SourcesTable, StatTiles, VISIT_ROW_CAP, VisitorDetailPanel, VisitorRow, countLabel, type Analytics, type DomainWithStats, type GeoData, type OnlineFigure, type PageStat, type PlatformData, type Visitor, type VisitorDetail } from "@/components/traffic-tool/ip-views";
+import { IpSample } from "@/components/traffic-tool/samples";
+import { Search, Plus, Copy, Trash2, MoreHorizontal, Code2 } from "lucide-react";
 
-type DomainWithStats = {
-  id: number;
-  userId: number;
-  domain: string;
-  trackingId: string;
-  name: string | null;
-  isActive: boolean;
-  createdAt: string;
-  stats: {
-    totalVisits: number;
-    uniqueVisitors: number;
-    blockedIps: number;
-    suspiciousVisits: number;
-    avgVisitsPerUser: number;
-  };
-};
+// The icon pickers live with the shared pieces now; the UI tests import them from here.
+export { browserIcon, osIcon, deviceIcon } from "@/components/traffic-tool/shared";
 
-type Visitor = {
-  ipAddress: string;
-  fingerprint: string | null;
-  visits: number;
-  pageViews: number;
-  firstVisit: string;
-  lastVisit: string;
-  lastDevice: string | null;
-  lastBrowser: string | null;
-  lastOs: string | null;
-  screenResolution: string | null;
-  language: string | null;
-  timezone: string | null;
-  country: string | null;
-  city: string | null;
-  isSuspicious: boolean;
-  isOnline: boolean;
-};
-
-type VisitorDetail = {
-  ipAddress: string;
-  fingerprint: string | null;
-  totalVisits: number;
-  firstVisit: string;
-  lastVisit: string;
-  isOnline: boolean;
-  isSuspicious: boolean;
-  suspicionReasons: string[];
-  systemSpecs: {
-    browser: string | null;
-    os: string | null;
-    deviceType: string | null;
-    screenResolution: string | null;
-    language: string | null;
-    timezone: string | null;
-    userAgent: string | null;
-  };
-  geo: {
-    country: string | null;
-    city: string | null;
-  };
-  recentActivity: {
-    id: number;
-    referrer: string | null;
-    landingPage: string | null;
-    visitedAt: string;
-    deviceType: string | null;
-    browser: string | null;
-    isSuspicious: boolean;
-  }[];
-};
-
-type TrafficSource = {
-  domain: string;
-  pageLoads: number;
-  visitors: number;
-  percentage: number;
-};
-
-type Analytics = {
-  totalVisits: number;
-  uniqueVisitors: number;
-  blockedIps: number;
-  suspiciousVisits: number;
-  avgVisitsPerUser: number;
-  threatLevel: string;
-  threatPercent: number;
-  deviceBreakdown: Record<string, number>;
-  countryBreakdown: Record<string, number>;
-  browserBreakdown: Record<string, number>;
-  osBreakdown: Record<string, number>;
-  hourlyVisits: Record<string, number>;
-  dailyVisits: Record<string, number>;
-  multiClickBreakdown: Record<string, number>;
-  trafficSources: TrafficSource[];
-};
-
-type PageStat = { url: string; hits: number; uniqueVisitors: number };
-type GeoData = {
-  countries: { name: string; count: number; visitors: number; percentage: string }[];
-  cities: { name: string; count: number; visitors: number; country: string; percentage: string }[];
-};
-type PlatformData = {
-  browsers: Record<string, number>;
-  oses: Record<string, number>;
-  devices: Record<string, number>;
-  resolutions: Record<string, number>;
-};
-
+/** Each section: its label, its line in the full-screen tool, and the help entry its "i" opens (shared/help/registry.ts). */
 const tabs = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "visitors", label: "Visitors" },
-  { id: "traffic", label: "Traffic" },
-  { id: "pages", label: "Pages" },
-  { id: "geo", label: "Geo" },
-  { id: "platforms", label: "Platforms" },
+  { id: "dashboard", label: "Dashboard", helpKey: "ip-tracker", line: "Visits, visitors and where they came from on the chosen site, updated live." },
+  { id: "visitors", label: "Visitors", helpKey: "ip-tracker.visitors", line: "Every visitor with their IP address, location, device and the pages they opened." },
+  { id: "traffic", label: "Traffic", helpKey: "ip-tracker.traffic", line: "Where visits come from: search, ads, social and other sites." },
+  { id: "pages", label: "Pages", helpKey: "ip-tracker.pages", line: "The pages people land on and open the most." },
+  { id: "geo", label: "Geo", helpKey: "ip-tracker.geo", line: "Where your visitors are, by country and city." },
+  { id: "platforms", label: "Platforms", helpKey: "ip-tracker.platforms", line: "Browsers, operating systems, devices and screen sizes." },
 ] as const;
-
 type TabId = typeof tabs[number]["id"];
 
-/** Each section's title and line in the full-screen tool. */
-const IP_HEAD: Record<TabId, [string, string]> = {
-  dashboard: ["Dashboard", "Visits, visitors and where they came from on the chosen site, updated live."],
-  visitors: ["Visitors", "Every visitor with their IP address, location, device and the pages they opened."],
-  traffic: ["Traffic", "Where visits come from: search, ads, social and other sites."],
-  pages: ["Pages", "The pages people land on and open the most."],
-  geo: ["Geo", "Where your visitors are, by country, region and city."],
-  platforms: ["Platforms", "Browsers, operating systems, devices and screen sizes."],
-};
-
-/** Tab and site live in the query string (?site=10&tab=platforms) so a reload or shared link keeps them. */
+/** Tab and site live in the query string (?site=10) so a reload or shared link keeps them. */
 function useUrlState() {
   const search = useSearch();
   const [path, navigate] = useLocation();
@@ -173,10 +57,6 @@ function useUrlState() {
   return { params: new URLSearchParams(search), set };
 }
 
-const pad2 = (n: number) => String(n).padStart(2, "0");
-const localDayKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-const daysAgo = (now: Date, n: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - n);
-
 /** Local midnight that covers both the 14-day chart and "This Month". */
 function dashboardSince(now = new Date()) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -185,9 +65,9 @@ function dashboardSince(now = new Date()) {
 }
 
 /**
- * The server buckets days in UTC; regroup its UTC hour buckets ("2026-09-29T23") by the
- * viewer's local day so "Today" rolls over at local midnight. Exact for whole-hour offsets;
- * half-hour zones can shift up to 30 minutes of visits across midnight.
+ * The server buckets days in UTC; regroup its UTC hour buckets ("2026-09-29T23") by the viewer's local day so
+ * "Today" rolls over at local midnight. Exact for whole-hour offsets; half-hour zones can shift up to 30 minutes
+ * of visits across midnight.
  */
 function localDailyVisits(hourly: Record<string, number> | undefined) {
   const daily: Record<string, number> = {};
@@ -200,101 +80,50 @@ function localDailyVisits(hourly: Record<string, number> | undefined) {
   return daily;
 }
 
-// The visit endpoints load at most this many visits, newest first (storage.getClickVisits),
-// so the all-time total and a busy site's date range stop at it. A count at the cap is a
-// lower bound, shown with "+", never as an exact number.
-const VISIT_ROW_CAP = 1000;
-const countLabel = (n: number, partial: boolean) => (partial ? `${n.toLocaleString()}+` : n.toLocaleString());
-
-function formatTimeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
-    hour: "numeric", minute: "2-digit",
-  });
-}
-
-function DeviceIcon({ type }: { type: string | null }) {
-  if (type === "mobile") return <Smartphone className="h-3.5 w-3.5" />;
-  if (type === "tablet") return <Tablet className="h-3.5 w-3.5" />;
-  return <Monitor className="h-3.5 w-3.5" />;
-}
-
-/** Chrome has its own icon; Safari gets the compass its logo is; every other browser a neutral globe. */
-export function browserIcon(name: string): LucideIcon {
-  const n = name.toLowerCase();
-  if (n.includes("chrome") || n.includes("chromium")) return Chrome;
-  if (n.includes("safari")) return Compass;
-  return Globe;
-}
-
-/** Phones for iOS/Android, a tablet for iPadOS, a laptop for desktop systems, a globe when unknown. */
-export function osIcon(name: string): LucideIcon {
-  const n = name.toLowerCase();
-  if (n.includes("ipad")) return Tablet;
-  if (n === "ios" || n.includes("iphone") || n.includes("android")) return Smartphone;
-  if (/windows|mac|linux|chrome ?os|ubuntu|fedora/.test(n)) return Laptop;
-  return Globe;
-}
-
-export function deviceIcon(name: string): LucideIcon {
-  const n = name.toLowerCase();
-  if (n === "mobile") return Smartphone;
-  if (n === "tablet") return Tablet;
-  if (n === "desktop") return Monitor;
-  return Globe;
-}
-
 /** The range line for views that load every recorded visit (no start date), capped at VISIT_ROW_CAP. */
-function allTimeRange(visits: number | undefined) {
+function allTimeRange(visits: number | undefined, range: DateRange) {
+  if (range.preset !== "all") return `Visits from ${rangeBounds(range).label.toLowerCase()}${(visits ?? 0) >= VISIT_ROW_CAP ? ` (latest ${VISIT_ROW_CAP.toLocaleString()} loaded)` : ""}.`;
   if (visits === undefined) return "All recorded visits.";
   return visits >= VISIT_ROW_CAP ? `Latest ${VISIT_ROW_CAP.toLocaleString()} recorded visits (all time).` : "All recorded visits (all time).";
 }
 
-const shortDay = (key: string) => new Date(`${key}T00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+// Visible activity panels re-check on this cadence so "Online now" and the visitor list stay live while the page
+// is open (queries otherwise never refresh on their own).
+const ONLINE_REFETCH_MS = 15000;
+const ANALYTICS_REFETCH_MS = 30000;
 
-function PercentBar({ value }: { value: number }) {
-  return (
-    <div className="w-full bg-muted rounded-full h-2">
-      <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${Math.min(value, 100)}%` }} />
-    </div>
-  );
+type StatusQuery = { isError: boolean; dataUpdatedAt: number };
+
+/**
+ * One "Updated …" line for everything a view shows. With several queries it names the oldest successful load
+ * (every figure is at least that fresh) and says so when any refresh failed.
+ */
+function MetricStatus({ queries, testId }: { queries: StatusQuery[]; testId?: string }) {
+  const loaded = queries.filter((q) => q.dataUpdatedAt);
+  const failed = queries.some((q) => q.isError);
+  const at = loaded.length ? Math.min(...loaded.map((q) => q.dataUpdatedAt)) : 0;
+  return <p className="text-xs text-muted-foreground" role="status" data-testid={testId}>
+    {at ? `${failed ? "Refresh failed — showing saved data from" : "Updated"} ${new Date(at).toLocaleString()}` : failed ? "Unavailable" : "Loading…"}
+  </p>;
 }
 
-function OnlineCell({ domainId }: { domainId: number }) {
-  const { data, isError, dataUpdatedAt } = useQuery<{ count: number }>({
-    queryKey: ["/api/click-guard/domains", domainId, "online"],
-    refetchInterval: ONLINE_REFETCH_MS,
-  });
-  return (
-    <td className="px-3 py-2.5 sm:px-4 sm:py-3 align-middle text-right tabular-nums" data-testid={`text-online-${domainId}`} title="Distinct IPs in the last 20 minutes">
-      <span className="sm:hidden text-muted-foreground">Online: </span>
-      {data ? data.count : isError ? "Unavailable" : "…"}
-      {data && isError && <span className="block text-xs text-muted-foreground">Refresh failed · saved {new Date(dataUpdatedAt).toLocaleString()}</span>}
-    </td>
-  );
+const Spinner = ({ py = "py-12" }: { py?: string }) => <div className={`flex justify-center ${py}`}><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>;
+
+/** The pill that stands in for real data in a sample: it opens the Dashboard, where the tracking code is. */
+function InstallCta({ onOpen }: { onOpen?: () => void }) {
+  if (!onOpen) return null;
+  return <GooglePill size="sm" variant="solid" icon={Code2} label="Get the tracking code" onClick={onOpen} testId="button-sample-install" />;
 }
 
 function InstallCard({ domain }: { domain: DomainWithStats }) {
   const appOrigin = useAppOrigin();
   const { toast } = useToast();
   const noVisits = domain.stats.totalVisits === 0;
-  // Open while waiting for the first visit; once visits arrive the panel steps aside
-  // on its own unless the viewer explicitly opened or closed it.
+  // Open while waiting for the first visit; once visits arrive the panel steps aside on its own unless the
+  // viewer explicitly opened or closed it.
   const [openOverride, setOpenOverride] = useState<boolean | null>(null);
   const open = openOverride ?? noVisits;
   const snippet = `<script src="${appOrigin}/api/click-guard/script/${domain.trackingId}" async></script>`;
-
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(snippet);
@@ -303,35 +132,28 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
       toast({ title: "Could not copy", description: "Select the code and copy it manually.", variant: "destructive" });
     }
   };
-
   return (
-    <div className="rounded-xl border bg-card text-card-foreground" data-testid="card-install-tracking">
+    <div className="rounded-xl border bg-card text-card-foreground" data-testid="card-install-tracking" id="install-tracking">
       <div className="space-y-3 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="g-card__title g-card__title--md">Tracking code for {domain.domain}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground" data-testid="text-install-status">
-              {noVisits
-                ? "No visits recorded yet. Visits appear here only after this code runs on your site."
-                : `${countLabel(domain.stats.totalVisits, domain.stats.totalVisits >= VISIT_ROW_CAP)} visit${domain.stats.totalVisits !== 1 ? "s" : ""} recorded so far.`}
+              {noVisits ? "No visits recorded yet. Visits appear here only after this code runs on your site." : `${countLabel(domain.stats.totalVisits, domain.stats.totalVisits >= VISIT_ROW_CAP)} visit${domain.stats.totalVisits !== 1 ? "s" : ""} recorded so far.`}
             </p>
           </div>
-          {!noVisits && (
-            <Button size="sm" variant="ghost" className="text-xs" onClick={() => setOpenOverride(o => !(o ?? noVisits))} data-testid="button-toggle-install">
-              {open ? "Hide code" : "Show code"}
-            </Button>
-          )}
+          {!noVisits && <Button size="sm" variant="ghost" className="text-xs" onClick={() => setOpenOverride((o) => !(o ?? noVisits))} data-testid="button-toggle-install">{open ? "Hide code" : "Show code"}</Button>}
         </div>
         {open && (
           <>
-            <p className="text-xs text-muted-foreground">
-              Add this tag to the <code className="rounded bg-muted px-1 py-0.5">&lt;head&gt;</code> or just before the closing <code className="rounded bg-muted px-1 py-0.5">&lt;/body&gt;</code> tag of every page you want to track.
-            </p>
+            {noVisits && <StepsCard testId="steps-install" steps={[
+              "Copy the tag below.",
+              <>Paste it into the <code className="rounded bg-muted px-1 py-0.5">&lt;head&gt;</code> (or before <code className="rounded bg-muted px-1 py-0.5">&lt;/body&gt;</code>) of every page you want to track.</>,
+              "Open your site once: the visit shows up here within about 30 seconds.",
+            ]} />}
             <div className="relative">
               <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-muted p-3 pr-12 font-mono text-xs" data-testid="text-tracking-snippet">{snippet}</pre>
-              <Button size="icon" variant="ghost" className="!absolute top-1.5 right-1.5" onClick={copy} aria-label="Copy tracking code" data-testid="button-copy-tracking-snippet">
-                <Copy className="h-4 w-4" />
-              </Button>
+              <Button size="icon" variant="ghost" className="!absolute top-1.5 right-1.5" onClick={copy} aria-label="Copy tracking code" data-testid="button-copy-tracking-snippet"><Copy className="h-4 w-4" /></Button>
             </div>
           </>
         )}
@@ -340,59 +162,46 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
   );
 }
 
-// Visible activity panels re-check on this cadence so "Online now" and the visitor
-// list stay live while the page is open (queries otherwise never refresh on their own).
-const ONLINE_REFETCH_MS = 15000;
-const ANALYTICS_REFETCH_MS = 30000;
-
-type StatusQuery = { isError: boolean; dataUpdatedAt: number };
-
-/**
- * One "Updated …" line for everything a view shows. With several queries it names the oldest
- * successful load (every figure is at least that fresh) and says so when any refresh failed.
- */
-function MetricStatus({ queries, testId }: { queries: StatusQuery[]; testId?: string }) {
-  const loaded = queries.filter(q => q.dataUpdatedAt);
-  const failed = queries.some(q => q.isError);
-  const at = loaded.length ? Math.min(...loaded.map(q => q.dataUpdatedAt)) : 0;
-  return <p className="text-xs text-muted-foreground" role="status" data-testid={testId}>
-    {at ? `${failed ? "Refresh failed — showing saved data from" : "Updated"} ${new Date(at).toLocaleString()}` : failed ? "Unavailable" : "Loading…"}
-  </p>;
+/** A site's panel on the dashboard, with its own live "online now" count (distinct IPs in the last 20 minutes). */
+function LiveSitePanel({ d, selected, onPick, onRemove, onOnline }: { d: DomainWithStats; selected: boolean; onPick: () => void; onRemove?: () => void; onOnline: (id: number, f: OnlineFigure) => void }) {
+  const q = useQuery<{ count: number }>({ queryKey: ["/api/click-guard/domains", d.id, "online"], refetchInterval: ONLINE_REFETCH_MS });
+  const figure: OnlineFigure = { count: q.data?.count ?? null, note: q.isError ? "Unavailable" : "Still counting" };
+  useEffect(() => { onOnline(d.id, figure); }, [d.id, figure.count, figure.note]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <SitePanel d={d} online={figure} selected={selected} onPick={onPick} onRemove={onRemove} />;
 }
 
-export function DashboardView({ domainId, analyticsQuery, domains, domainsQuery }: {
+export function DashboardView({ domainId, analyticsQuery, domains, domainsQuery, onPickSite, onRemoveSite }: {
   domainId: number | null;
   analyticsQuery: UseQueryResult<Analytics, Error>;
   domains: DomainWithStats[];
-  /** The site list behind the per-site table; its refresh state joins the one status line. */
+  /** The site list behind the per-site panels; its refresh state joins the one status line. */
   domainsQuery?: StatusQuery;
+  onPickSite?: (id: number) => void;
+  onRemoveSite?: (id: number) => void;
 }) {
   const analytics = analyticsQuery.data;
-  const online = useQuery<{ count: number; visitors: any[] }>({
-    queryKey: ["/api/click-guard/domains", domainId, "online"],
-    enabled: !!domainId,
-    refetchInterval: ONLINE_REFETCH_MS,
-  });
-  const domain = domains.find(d => d.id === domainId);
+  const online = useQuery<{ count: number; visitors: unknown[] }>({ queryKey: ["/api/click-guard/domains", domainId, "online"], enabled: !!domainId, refetchInterval: ONLINE_REFETCH_MS });
+  const domain = domains.find((d) => d.id === domainId);
+  const [onlineBySite, setOnlineBySite] = useState<Record<number, OnlineFigure>>({});
+  const noteOnline = (id: number, f: OnlineFigure) => setOnlineBySite((m) => (m[id]?.count === f.count && m[id]?.note === f.note ? m : { ...m, [id]: f }));
 
   const now = new Date();
   const daily = localDailyVisits(analytics?.hourlyVisits);
-  const chartDays = Array.from({ length: 14 }, (_, i) => {
-    const key = localDayKey(daysAgo(now, 13 - i));
-    return [key, daily[key] || 0] as const;
-  });
-  const maxDaily = Math.max(...chartDays.map(([, v]) => v), 1);
-
+  const chartDays = Array.from({ length: 14 }, (_, i) => { const key = localDayKey(daysAgo(now, 13 - i)); return [key, daily[key] || 0] as const; });
   const todayVisits = daily[localDayKey(now)] || 0;
   const yesterdayVisits = daily[localDayKey(daysAgo(now, 1))] || 0;
   const last7 = chartDays.slice(-7).reduce((s, [, v]) => s + v, 0);
   const monthPrefix = localDayKey(now).slice(0, 7);
   const thisMonth = Object.entries(daily).filter(([k]) => k.startsWith(monthPrefix)).reduce((s, [, v]) => s + v, 0);
-  // At the cap the oldest visits in the range were not loaded: the oldest loaded day is
-  // partial and earlier days are unknown, not zero.
+  // At the cap the oldest visits in the range were not loaded: the oldest loaded day is partial and earlier days
+  // are unknown, not zero.
   const oldestLoaded = (analytics?.totalVisits ?? 0) >= VISIT_ROW_CAP ? Object.keys(daily).sort()[0] : undefined;
   const partialFrom = (firstDay: string) => !!oldestLoaded && firstDay <= oldestLoaded;
   const totalVisits = domain?.stats.totalVisits ?? 0;
+  // "…" only while a figure is still loading; a failed load says so; a site with no visits yet gets the sample below.
+  const fig = (n: number, partial: boolean) => analytics ? countLabel(n, partial) : analyticsQuery.isError ? "Unavailable" : "…";
+  const noVisits = !!domain && totalVisits === 0 && !!analytics && analytics.totalVisits === 0;
+  const scrollToInstall = () => document.getElementById("install-tracking")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -401,22 +210,12 @@ export function DashboardView({ domainId, analyticsQuery, domains, domainsQuery 
       {domainId && (
         <div className="flex flex-wrap items-center justify-between gap-2" data-testid="strip-dashboard-status">
           <MetricStatus queries={[analyticsQuery, online, ...(domainsQuery ? [domainsQuery] : [])]} testId="text-dashboard-updated" />
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs"
-            disabled={online.isFetching || analyticsQuery.isFetching}
-            onClick={() => { void online.refetch(); void analyticsQuery.refetch(); }}
-            data-testid="button-refresh-dashboard"
-          >
-            Refresh
-          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={online.isFetching || analyticsQuery.isFetching} onClick={() => { void online.refetch(); void analyticsQuery.refetch(); }} data-testid="button-refresh-dashboard">Refresh</Button>
         </div>
       )}
 
       {analyticsQuery.isError && !analytics && (
-        <Notice tone="danger" title="Couldn't load dashboard data" testId="notice-dashboard-error"
-          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void analyticsQuery.refetch()} data-testid="button-retry-dashboard">Retry</Button>}>
+        <Notice tone="danger" title="Couldn't load dashboard data" testId="notice-dashboard-error" action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void analyticsQuery.refetch()} data-testid="button-retry-dashboard">Retry</Button>}>
           {apiErrorMessage(analyticsQuery.error, "The visit summary could not be loaded.")} Figures below would be zeros, not real data.
         </Notice>
       )}
@@ -424,20 +223,18 @@ export function DashboardView({ domainId, analyticsQuery, domains, domainsQuery 
       {!online.isError && online.data && online.data.count > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/30" data-testid="banner-online">
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-            {online.data.count} ongoing visit{online.data.count > 1 ? "s" : ""} right now
-          </span>
+          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{online.data.count} ongoing visit{online.data.count > 1 ? "s" : ""} right now</span>
         </div>
       )}
 
-      <GoogleStatGrid cols={3}>
-        <GoogleStat label="Online now" value={online.data?.count ?? (online.isError ? "Unavailable" : "…")} testId="card-stat-online-now" hint="Last 20 minutes" />
-        <GoogleStat label="Today" value={analytics ? countLabel(todayVisits, partialFrom(localDayKey(now))) : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-today" />
-        <GoogleStat label="Yesterday" value={analytics ? countLabel(yesterdayVisits, partialFrom(localDayKey(daysAgo(now, 1)))) : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-yesterday" />
-        <GoogleStat label="Last 7 days" value={analytics ? countLabel(last7, partialFrom(chartDays[7][0])) : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-last-7-days" />
-        <GoogleStat label="This month" value={analytics ? countLabel(thisMonth, partialFrom(`${monthPrefix}-01`)) : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-this-month" />
-        <GoogleStat label="Total" value={domain ? countLabel(totalVisits, totalVisits >= VISIT_ROW_CAP) : "…"} testId="card-stat-total" hint="All time" />
-      </GoogleStatGrid>
+      <StatTiles tiles={[
+        { label: "Online now", value: online.data?.count ?? (online.isError ? "Unavailable" : "…"), hint: "Last 20 minutes", testId: "card-stat-online-now" },
+        { label: "Today", value: fig(todayVisits, partialFrom(localDayKey(now))), testId: "card-stat-today" },
+        { label: "Yesterday", value: fig(yesterdayVisits, partialFrom(localDayKey(daysAgo(now, 1)))), testId: "card-stat-yesterday" },
+        { label: "Last 7 days", value: fig(last7, partialFrom(chartDays[7][0])), testId: "card-stat-last-7-days" },
+        { label: "This month", value: fig(thisMonth, partialFrom(`${monthPrefix}-01`)), testId: "card-stat-this-month" },
+        { label: "Total", value: domain ? countLabel(totalVisits, totalVisits >= VISIT_ROW_CAP) : "…", hint: "All time", testId: "card-stat-total" },
+      ]} />
 
       {oldestLoaded && (
         <p className="text-xs text-muted-foreground" data-testid="text-visits-capped">
@@ -445,329 +242,89 @@ export function DashboardView({ domainId, analyticsQuery, domains, domainsQuery 
         </p>
       )}
 
-      {chartDays.some(([, v]) => v > 0) && (
-        <Section title="Daily visits">
-          {/* The column each bar hangs from needs its own height: a percentage height
-              inside a content-sized column collapses to the bar's minimum, drawing every
-              bar the same. h-full + an absolute bar keeps the percentage meaningful.
-              The dashed line is the top of the scale, labelled with the busiest day's count;
-              each day shows its value on hover or keyboard focus. */}
-          <div className="flex items-center gap-2 text-[10px] text-muted-foreground" data-testid="text-daily-max">
-            <span className="tabular-nums">{maxDaily.toLocaleString()} visit{maxDaily === 1 ? "" : "s"}</span>
-            <span className="flex-1 border-t border-dashed" aria-hidden="true" />
-          </div>
-          <div className="flex items-stretch gap-1 h-32" role="list" aria-label="Visits per day, last 14 days">
-            {chartDays.map(([date, count], i) => {
-              const notLoaded = !!oldestLoaded && date < oldestLoaded;
-              const value = notLoaded ? "not loaded" : date === oldestLoaded ? `at least ${count.toLocaleString()} visits` : `${count.toLocaleString()} visit${count === 1 ? "" : "s"}`;
-              const label = `${shortDay(date)}: ${value}`;
-              const align = i < 2 ? "left-0" : i > chartDays.length - 3 ? "right-0" : "left-1/2 -translate-x-1/2";
-              return (
-                <div key={date} className="group flex-1 flex h-full flex-col items-center gap-1" role="listitem">
-                  <div
-                    className="relative w-full flex-1 rounded-t outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    tabIndex={0}
-                    aria-label={label}
-                    data-testid={`bar-${date}`}
-                  >
-                    <div
-                      className={`absolute bottom-0 left-0 right-0 rounded-t transition-colors ${notLoaded ? "bg-muted" : "bg-primary/80 group-hover:bg-primary group-focus-within:bg-primary"}`}
-                      style={{ height: `${(count / maxDaily) * 100}%` }}
-                    />
-                    <span
-                      className={`pointer-events-none absolute bottom-full z-10 mb-1 whitespace-nowrap rounded bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${align}`}
-                      aria-hidden="true"
-                      data-testid={`tip-${date}`}
-                    >
-                      {label}
-                    </span>
-                  </div>
-                  <span className="text-[8px] text-muted-foreground truncate w-full text-center" aria-hidden="true">
-                    {Number(date.slice(8, 10))}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </Section>
-      )}
+      {chartDays.some(([, v]) => v > 0) && <DailyVisitsChart days={chartDays} oldestLoaded={oldestLoaded} />}
+      {/* No visit yet on this site: the chart as it will look, clearly marked, until the first real visit replaces it. */}
+      {noVisits && <IpSample tab="dashboard" tiles={false} what="the daily chart you'll see once this site sends its first visit" cta={<InstallCta onOpen={scrollToInstall} />} />}
 
       {domains.length > 0 && (
-        <Section title="All sites" flush>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr className="hidden sm:table-row">
-                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Site</th>
-                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Online</th>
-                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Total</th>
-                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Unique</th>
-                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Blocked</th>
-                </tr>
-              </thead>
-              <tbody>
-                {domains.map(d => (
-                  <tr key={d.id} className="border-t transition-colors hover:bg-muted/40 flex flex-col gap-1.5 px-3.5 py-3 sm:table-row sm:px-0 sm:py-0" data-testid={`row-domain-${d.id}`}>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle">
-                      <div className="font-medium">{d.name || d.domain}</div>
-                      <div className="text-xs text-muted-foreground break-all">{d.domain}</div>
-                    </td>
-                    <OnlineCell domainId={d.id} />
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums sm:font-medium">
-                      <span className="sm:hidden text-muted-foreground">Total: </span>
-                      {countLabel(d.stats.totalVisits, d.stats.totalVisits >= VISIT_ROW_CAP)}
-                    </td>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
-                      <span className="sm:hidden text-muted-foreground">Unique: </span>
-                      {/* No "+" here: unlike totalVisits, the unique-visitor count has no
-                          known-cap flag of its own — showing one would invent a lower bound. */}
-                      {d.stats.uniqueVisitors.toLocaleString()}
-                    </td>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
-                      <span className="sm:hidden text-muted-foreground">Blocked: </span>
-                      {d.stats.blockedIps}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="space-y-4" data-testid="ip-sites">
+          <div className="g-header g-header--flush">
+            <h2 className="g-header__title">All sites<span className="g-header__count">{domains.length}</span></h2>
+            <p className="g-header__sub">Every site you track, with its live figures. Each figure opens its section.</p>
           </div>
-        </Section>
+          {domains.length > 1 && <SitesSummaryStrip domains={domains} online={onlineBySite} />}
+          {domains.map((d) => <LiveSitePanel key={d.id} d={d} selected={d.id === domainId} onPick={() => onPickSite?.(d.id)} onRemove={onRemoveSite ? () => onRemoveSite(d.id) : undefined} onOnline={noteOnline} />)}
+        </div>
       )}
     </div>
   );
 }
 
-function VisitorListView({ domainId }: { domainId: number | null }) {
+function VisitorListView({ domainId, onInstall }: { domainId: number | null; onInstall?: () => void }) {
   const [ipSearch, setIpSearch] = useState("");
+  const [range, setRange] = useState<DateRange>(ALL_TIME);
+  const [withinMin, setWithinMin] = useState(0);
   const [expandedIp, setExpandedIp] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const perPage = 20;
 
   const visitorsQuery = useQuery<Visitor[]>({
-    queryKey: ["/api/click-guard/domains", domainId, "visitors"],
+    queryKey: ["/api/click-guard/domains", domainId, "visitors", rangeKey(range)],
+    queryFn: async () => (await apiRequest("GET", `/api/click-guard/domains/${domainId}/visitors${rangeQuery(range)}`)).json(),
     enabled: !!domainId,
     refetchInterval: ONLINE_REFETCH_MS,
   });
   const visitors = visitorsQuery.data;
   const visitorsError = visitorsQuery.isError && !visitors;
+  const detailQuery = useQuery<VisitorDetail>({ queryKey: ["/api/click-guard/domains", domainId, "visitors", expandedIp], enabled: !!domainId && !!expandedIp });
 
-  const detailQuery = useQuery<VisitorDetail>({
-    queryKey: ["/api/click-guard/domains", domainId, "visitors", expandedIp],
-    enabled: !!domainId && !!expandedIp,
-  });
-  const visitorDetail = detailQuery.data;
-
-  const filtered = (visitors || []).filter(v => v.ipAddress.includes(ipSearch));
+  const now = Date.now();
+  const filtered = (visitors || []).filter((v) => v.ipAddress.includes(ipSearch) && (!withinMin || now - new Date(v.lastVisit).getTime() <= withinMin * 60_000));
   const totalPages = Math.ceil(filtered.length / perPage);
   // Results can shrink below the current page (visits deleted, search narrowed): stay on a real page.
   const safePage = Math.min(page, Math.max(totalPages, 1));
   const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage);
+  const narrowed = !!ipSearch || withinMin > 0 || range.preset !== "all";
+  const nothingYet = !!visitors && visitors.length === 0 && !narrowed;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="g-search min-w-0 flex-1 max-w-sm" role="search">
           <Search aria-hidden="true" />
-          <input
-            type="search"
-            placeholder="Search by IP address…"
-            aria-label="Search by IP address"
-            value={ipSearch}
-            onChange={e => { setIpSearch(e.target.value); setPage(1); }}
-            data-testid="input-ip-search"
-          />
+          <input type="search" placeholder="Search by IP address…" aria-label="Search by IP address" value={ipSearch} onChange={(e) => { setIpSearch(e.target.value); setPage(1); }} data-testid="input-ip-search" />
         </div>
-        <span className="text-sm tabular-nums text-muted-foreground" data-testid="badge-visitor-count">
-          {filtered.length} visitor{filtered.length !== 1 ? "s" : ""}
-        </span>
+        <span className="text-sm tabular-nums text-muted-foreground" data-testid="badge-visitor-count">{filtered.length} visitor{filtered.length !== 1 ? "s" : ""}{filtered.length ? ` · ${filtered.filter((v) => v.isOnline).length} online` : ""}</span>
       </div>
+      <RangePicker value={range} onChange={(r) => { setRange(r); setPage(1); }} testId="visitors-range" />
+      <WindowPicker minutes={withinMin} onChange={(m) => { setWithinMin(m); setPage(1); }} testId="visitors-window" />
 
-      {visitorsQuery.isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
-        </div>
-      ) : visitorsError ? (
-        <Notice tone="danger" title="Couldn't load visitors" testId="notice-visitors-error"
-          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void visitorsQuery.refetch()} data-testid="button-retry-visitors">Retry</Button>}>
+      {visitorsQuery.isLoading ? <Spinner /> : visitorsError ? (
+        <Notice tone="danger" title="Couldn't load visitors" testId="notice-visitors-error" action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void visitorsQuery.refetch()} data-testid="button-retry-visitors">Retry</Button>}>
           {apiErrorMessage(visitorsQuery.error, "The visitor list could not be loaded.")} This is a failed request, not an empty site.
         </Notice>
+      ) : nothingYet ? (
+        <IpSample tab="visitors" cta={<InstallCta onOpen={onInstall} />} />
       ) : paginated.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-14 text-center">
-          <Users className="h-5 w-5 text-muted-foreground" strokeWidth={1.6} />
-          <p className="mt-3 text-sm text-muted-foreground">No visitors found</p>
-        </div>
+        <div className="g-callout text-center" data-testid="text-no-visitors"><p>No visitors match this search and range.</p></div>
       ) : (
         <div className="space-y-2">
-          {paginated.map(v => (
-            <div
-              key={v.ipAddress}
-              className={`rounded-xl border bg-card transition-all ${expandedIp === v.ipAddress ? "ring-1 ring-primary/30" : ""}`}
-              data-testid={`card-visitor-${v.ipAddress}`}
-            >
-              <button
-                type="button"
-                className="w-full cursor-pointer p-4 text-left hover:bg-muted/30 transition-colors"
-                onClick={() => setExpandedIp(expandedIp === v.ipAddress ? null : v.ipAddress)}
-                aria-expanded={expandedIp === v.ipAddress}
-                aria-controls={`visitor-detail-${v.ipAddress}`}
-                data-testid={`button-expand-visitor-${v.ipAddress}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${v.isOnline ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"}`} />
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm font-medium break-all" data-testid={`text-ip-${v.ipAddress}`}>
-                          {v.ipAddress}
-                        </span>
-                        {v.isSuspicious && (
-                          <span className="inline-flex items-center gap-0.5 rounded-full border border-red-500/25 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400">
-                            <AlertTriangle className="h-2.5 w-2.5" /> Suspicious
-                          </span>
-                        )}
-                        {v.isOnline && (
-                          <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
-                            Online
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Eye className="h-3 w-3" /> {v.visits} visit{v.visits !== 1 ? "s" : ""}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" /> {v.pageViews} page{v.pageViews !== 1 ? "s" : ""}
-                        </span>
-                        {(v.city || v.country) && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> {[v.city, countryName(v.country)].filter(Boolean).join(", ")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-                    <span className="flex items-center gap-1.5">
-                      <DeviceIcon type={v.lastDevice} />
-                      <span>{v.lastBrowser || "Unknown"}</span>
-                    </span>
-                    <span>{formatTimeAgo(v.lastVisit)}</span>
-                  </div>
-                  <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${expandedIp === v.ipAddress ? "rotate-90" : ""}`} />
+          {paginated.map((v) => (
+            <VisitorRow key={v.ipAddress} v={v} expanded={expandedIp === v.ipAddress} onToggle={() => setExpandedIp(expandedIp === v.ipAddress ? null : v.ipAddress)}>
+              {detailQuery.isLoading ? <Spinner py="py-8" /> : detailQuery.isError || !detailQuery.data ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <span className="text-sm text-destructive" role="alert" data-testid={`text-visitor-detail-error-${v.ipAddress}`}>{apiErrorMessage(detailQuery.error, "Couldn't load this visitor's details.")}</span>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void detailQuery.refetch()} data-testid={`button-retry-visitor-${v.ipAddress}`}>Retry</Button>
                 </div>
-              </button>
-
-              {expandedIp === v.ipAddress && (
-                <div className="border-t bg-muted/20 p-4" id={`visitor-detail-${v.ipAddress}`}>
-                  {detailQuery.isLoading ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
-                    </div>
-                  ) : detailQuery.isError || !visitorDetail ? (
-                    <div className="flex flex-wrap items-center justify-between gap-2 py-2">
-                      <span className="text-sm text-destructive" role="alert" data-testid={`text-visitor-detail-error-${v.ipAddress}`}>
-                        {apiErrorMessage(detailQuery.error, "Couldn't load this visitor's details.")}
-                      </span>
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void detailQuery.refetch()} data-testid={`button-retry-visitor-${v.ipAddress}`}>
-                        Retry
-                      </Button>
-                    </div>
-                  ) : (
-                  <div className="space-y-4">
-                  {visitorDetail.isSuspicious && (
-                    <div className="rounded-lg border border-red-500/25 bg-red-500/5 p-3" data-testid={`suspicion-reasons-${v.ipAddress}`}>
-                      <h4 className="flex items-center gap-1.5 text-xs font-semibold text-red-700 dark:text-red-400">
-                        <AlertTriangle className="h-3.5 w-3.5" /> Why Click Guard flagged this visitor
-                      </h4>
-                      {visitorDetail.suspicionReasons.length > 0 ? (
-                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-                          {visitorDetail.suspicionReasons.map(reason => <li key={reason}>{reason}</li>)}
-                        </ul>
-                      ) : (
-                        <p className="mt-2 text-sm text-muted-foreground">Click Guard recorded no reason for this flag.</p>
-                      )}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <div>
-                      <h4 className="mb-3 text-xs font-semibold text-muted-foreground">System specs</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Browser</span><span className="font-medium">{visitorDetail.systemSpecs.browser || "Unknown"}</span></div>
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">OS</span><span className="font-medium">{visitorDetail.systemSpecs.os || "Unknown"}</span></div>
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Device</span><span className="font-medium">{visitorDetail.systemSpecs.deviceType || "Unknown"}</span></div>
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Resolution</span><span className="font-medium">{visitorDetail.systemSpecs.screenResolution || "Unknown"}</span></div>
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Language</span><span className="font-medium">{visitorDetail.systemSpecs.language || "Unknown"}</span></div>
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Timezone</span><span className="font-medium">{visitorDetail.systemSpecs.timezone || "Unknown"}</span></div>
-                      </div>
-
-                      <h4 className="mb-3 mt-6 text-xs font-semibold text-muted-foreground">Identity</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">IP address</span><span className="font-mono font-medium">{visitorDetail.ipAddress}</span></div>
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Computer ID</span><span className="max-w-[200px] truncate font-mono text-xs">{visitorDetail.fingerprint || "N/A"}</span></div>
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">First visit</span><span>{formatDate(visitorDetail.firstVisit)}</span></div>
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Last visit</span><span>{formatDate(visitorDetail.lastVisit)}</span></div>
-                        <div className="flex justify-between gap-4"><span className="text-muted-foreground">Total visits</span><span className="font-semibold">{visitorDetail.totalVisits}</span></div>
-                      </div>
-
-                      {visitorDetail.geo.country && (
-                        <>
-                          <h4 className="mb-3 mt-6 text-xs font-semibold text-muted-foreground">Geolocation</h4>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between gap-4"><span className="text-muted-foreground">City</span><span>{visitorDetail.geo.city || "Unknown"}</span></div>
-                            <div className="flex justify-between gap-4"><span className="text-muted-foreground">Country</span><span>{countryName(visitorDetail.geo.country) || "Unknown"}</span></div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    <div>
-                      <h4 className="mb-3 text-xs font-semibold text-muted-foreground">Recent activity</h4>
-                      <div className="max-h-64 space-y-2 overflow-y-auto">
-                        {visitorDetail.recentActivity.map(a => (
-                          <div key={a.id} className="rounded-lg border bg-card p-3 text-xs" data-testid={`activity-${a.id}`}>
-                            <div className="mb-1 flex items-center justify-between">
-                              <span className="text-muted-foreground">{formatDate(a.visitedAt)}</span>
-                              {a.isSuspicious && <span className="rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-0 text-[9px] font-medium text-red-700 dark:text-red-400">Suspicious</span>}
-                            </div>
-                            <div className="text-muted-foreground">
-                              <span className="font-medium">From:</span> {a.referrer || "NO REFERRER DATA"}
-                            </div>
-                            <div className="mt-0.5 text-muted-foreground">
-                              <span className="font-medium">Landed:</span>{" "}
-                              <span className="break-all text-primary">{a.landingPage || "Unknown"}</span>
-                            </div>
-                          </div>
-                        ))}
-                        {visitorDetail.recentActivity.length === 0 && (
-                          <p className="text-sm text-muted-foreground">No activity recorded</p>
-                        )}
-                      </div>
-
-                      {visitorDetail.systemSpecs.userAgent && (
-                        <>
-                          <h4 className="mb-2 mt-6 text-xs font-semibold text-muted-foreground">User agent</h4>
-                          <p className="rounded bg-muted p-2 font-mono text-[11px] text-muted-foreground break-all">
-                            {visitorDetail.systemSpecs.userAgent}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  </div>
-                  )}
-                </div>
-              )}
-            </div>
+              ) : <VisitorDetailPanel d={detailQuery.data} />}
+            </VisitorRow>
           ))}
         </div>
       )}
 
       {totalPages > 1 && (
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-          <span className="text-xs text-muted-foreground">
-            Showing {(safePage - 1) * perPage + 1}-{Math.min(safePage * perPage, filtered.length)} of {filtered.length}
-          </span>
+          <span className="text-xs text-muted-foreground">Showing {(safePage - 1) * perPage + 1}-{Math.min(safePage * perPage, filtered.length)} of {filtered.length}</span>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} data-testid="button-prev-page">Prev</Button>
             <span className="text-sm tabular-nums text-muted-foreground">Page {safePage} / {totalPages}</span>
@@ -779,297 +336,141 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
   );
 }
 
-export function TrafficSourcesView({ analyticsQuery, since }: { analyticsQuery: UseQueryResult<Analytics, Error>; since: Date }) {
+export function TrafficSourcesView({ analyticsQuery, since, picker, rangeLabel, onInstall }: {
+  analyticsQuery: UseQueryResult<Analytics, Error>;
+  since: Date;
+  /** The range control, when the page offers one (presets + typed dates). */
+  picker?: ReactNode;
+  rangeLabel?: string;
+  onInstall?: () => void;
+}) {
   const analytics = analyticsQuery.data;
   const sources = analytics?.trafficSources || [];
   const totalLoads = sources.reduce((s, t) => s + t.pageLoads, 0);
   const totalVisitors = sources.reduce((s, t) => s + t.visitors, 0);
-  const sinceHint = `Since ${since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-
+  const sinceHint = rangeLabel ?? `Since ${since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  const fig = (n: number) => analytics ? n.toLocaleString() : analyticsQuery.isError ? "Unavailable" : "…";
   return (
     <div className="space-y-4">
+      {picker}
       {analyticsQuery.isError && !analytics && (
-        <Notice tone="danger" title="Couldn't load traffic sources" testId="notice-traffic-error"
-          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void analyticsQuery.refetch()} data-testid="button-retry-traffic">Retry</Button>}>
+        <Notice tone="danger" title="Couldn't load traffic sources" testId="notice-traffic-error" action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void analyticsQuery.refetch()} data-testid="button-retry-traffic">Retry</Button>}>
           {apiErrorMessage(analyticsQuery.error, "The traffic summary could not be loaded.")}
         </Notice>
       )}
       <p className="text-xs text-muted-foreground" data-testid="text-traffic-range">
-        {(analytics?.totalVisits ?? 0) >= VISIT_ROW_CAP ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : "Visits"} since {since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
+        {(analytics?.totalVisits ?? 0) >= VISIT_ROW_CAP ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : "Visits"} {rangeLabel ? `— ${rangeLabel.toLowerCase()}` : `since ${since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}.
       </p>
-      <GoogleStatGrid cols={3}>
-        <GoogleStat label="Total sources" value={analytics ? sources.length : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-total-sources" hint={sinceHint} />
-        <GoogleStat label="Total page loads" value={analytics ? totalLoads.toLocaleString() : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-total-page-loads" hint={sinceHint} />
-        <GoogleStat label="Unique visitors" value={analytics ? totalVisitors.toLocaleString() : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-unique-visitors" hint={sinceHint} />
-      </GoogleStatGrid>
+      <StatTiles tiles={[
+        { label: "Total sources", value: fig(sources.length), hint: sinceHint, testId: "card-stat-total-sources" },
+        { label: "Total page loads", value: fig(totalLoads), hint: sinceHint, testId: "card-stat-total-page-loads" },
+        { label: "Unique visitors", value: fig(totalVisitors), hint: sinceHint, testId: "card-stat-unique-visitors" },
+      ]} />
       <MetricStatus queries={[analyticsQuery]} />
-
-      <Section flush title="Traffic sources by domain">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr className="hidden sm:table-row">
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Source</th>
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Page loads</th>
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Visitors</th>
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap w-48">Share</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sources.length === 0 ? (
-                <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No traffic source data available</td></tr>
-              ) : (
-                sources.map((s, i) => (
-                  <tr key={i} className="border-t transition-colors hover:bg-muted/40 flex flex-col gap-1.5 px-3.5 py-3 sm:table-row sm:px-0 sm:py-0" data-testid={`row-source-${i}`}>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle">
-                      <span className={`break-all ${s.domain === "NO REFERRER DATA" ? "italic text-muted-foreground" : "font-medium"}`}>
-                        {s.domain}
-                      </span>
-                      <span className="sm:hidden text-xs text-muted-foreground"> · {s.percentage.toFixed(1)}%</span>
-                    </td>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
-                      <span className="sm:hidden text-muted-foreground">Page loads: </span>
-                      {s.pageLoads.toLocaleString()}
-                    </td>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
-                      <span className="sm:hidden text-muted-foreground">Visitors: </span>
-                      {s.visitors.toLocaleString()}
-                    </td>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:w-48">
-                      <div className="flex items-center gap-2">
-                        <span className="w-14 shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">{s.percentage.toFixed(1)}%</span>
-                        <PercentBar value={s.percentage} />
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Section>
+      {analytics && sources.length === 0
+        ? <IpSample tab="traffic" tiles={false} cta={<InstallCta onOpen={onInstall} />} what={analytics.totalVisits === 0 ? "the sources table you'll see once this site sends its first visit" : "the sources table — no visit in this range yet"} />
+        : <SourcesTable sources={sources} />}
     </div>
   );
 }
 
-export function PagesView({ domainId }: { domainId: number | null }) {
+export function PagesView({ domainId, onInstall }: { domainId: number | null; onInstall?: () => void }) {
+  const [range, setRange] = useState<DateRange>(ALL_TIME);
   const pagesQuery = useQuery<PageStat[]>({
-    queryKey: ["/api/click-guard/domains", domainId, "pages"],
+    queryKey: ["/api/click-guard/domains", domainId, "pages", rangeKey(range)],
+    queryFn: async () => (await apiRequest("GET", `/api/click-guard/domains/${domainId}/pages${rangeQuery(range)}`)).json(),
     enabled: !!domainId,
     refetchInterval: ANALYTICS_REFETCH_MS,
   });
   const pages = pagesQuery.data;
   const hits = pages?.reduce((s, p) => s + p.hits, 0);
-  // GET …/pages is called without a start date: every recorded visit, up to the newest VISIT_ROW_CAP.
+  // Without a start date the request loads every recorded visit, up to the newest VISIT_ROW_CAP.
   const capped = (hits ?? 0) >= VISIT_ROW_CAP;
-
+  const hint = range.preset === "all" ? "All time" : rangeBounds(range).label;
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground" data-testid="text-pages-range">{allTimeRange(hits)}</p>
-      <GoogleStatGrid cols={2}>
-        <GoogleStat label="Total pages" value={pages?.length ?? (pagesQuery.isError ? "Unavailable" : "…")} testId="card-stat-total-pages" hint="All time" />
-        <GoogleStat label="Total hits" value={hits !== undefined ? countLabel(hits, capped) : (pagesQuery.isError ? "Unavailable" : "…")} testId="card-stat-total-hits" hint={capped ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : "All time"} />
-      </GoogleStatGrid>
+      <RangePicker value={range} onChange={setRange} testId="pages-range" />
+      <p className="text-xs text-muted-foreground" data-testid="text-pages-range">{allTimeRange(hits, range)}</p>
+      <StatTiles cols={2} tiles={[
+        { label: "Total pages", value: pages?.length ?? (pagesQuery.isError ? "Unavailable" : "…"), hint, testId: "card-stat-total-pages" },
+        { label: "Total hits", value: hits !== undefined ? countLabel(hits, capped) : pagesQuery.isError ? "Unavailable" : "…", hint: capped ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : hint, testId: "card-stat-total-hits" },
+      ]} />
       <MetricStatus queries={[pagesQuery]} />
-
       {pagesQuery.isError && !pages && (
-        <Notice tone="danger" title="Couldn't load pages" testId="notice-pages-error"
-          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void pagesQuery.refetch()} data-testid="button-retry-pages">Retry</Button>}>
+        <Notice tone="danger" title="Couldn't load pages" testId="notice-pages-error" action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void pagesQuery.refetch()} data-testid="button-retry-pages">Retry</Button>}>
           {apiErrorMessage(pagesQuery.error, "The page list could not be loaded.")}
         </Notice>
       )}
-
-      <Section flush title="Pages">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr className="hidden sm:table-row">
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Page URL</th>
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Hits</th>
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Unique visitors</th>
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap w-32">Share</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagesQuery.isLoading ? (
-                <tr><td colSpan={4} className="p-6 text-center"><div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto" /></td></tr>
-              ) : pagesQuery.isError ? null : pages!.length === 0 ? (
-                <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No page data available</td></tr>
-              ) : (
-                pages!.map((p, i) => {
-                  const totalHits = pages!.reduce((s, x) => s + x.hits, 0);
-                  const pct = totalHits ? (p.hits / totalHits) * 100 : 0;
-                  return (
-                    <tr key={i} className="border-t transition-colors hover:bg-muted/40 flex flex-col gap-1.5 px-3.5 py-3 sm:table-row sm:px-0 sm:py-0" data-testid={`row-page-${i}`}>
-                      <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:max-w-xs">
-                        <span className="break-all text-xs text-primary">{p.url}</span>
-                      </td>
-                      <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums sm:font-medium">
-                        <span className="sm:hidden text-muted-foreground">Hits: </span>
-                        {p.hits.toLocaleString()}
-                      </td>
-                      <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
-                        <span className="sm:hidden text-muted-foreground">Unique: </span>
-                        {p.uniqueVisitors.toLocaleString()}
-                      </td>
-                      <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:w-32">
-                        <PercentBar value={pct} />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Section>
+      {pages && pages.length === 0
+        ? <IpSample tab="pages" tiles={false} cta={<InstallCta onOpen={onInstall} />} what={range.preset === "all" ? "the pages table you'll see once this site sends its first visit" : "the pages table — no visit in this range yet"} />
+        : <PagesTable pages={pagesQuery.isError && !pages ? undefined : pages} loading={pagesQuery.isLoading} />}
     </div>
   );
 }
 
-function GeoView({ domainId }: { domainId: number | null }) {
+function GeoView({ domainId, onInstall }: { domainId: number | null; onInstall?: () => void }) {
   const [subTab, setSubTab] = useState<"countries" | "cities">("countries");
+  const [range, setRange] = useState<DateRange>(ALL_TIME);
+  const [place, setPlace] = useState("");
   const geoQuery = useQuery<GeoData>({
-    queryKey: ["/api/click-guard/domains", domainId, "geo"],
+    queryKey: ["/api/click-guard/domains", domainId, "geo", rangeKey(range)],
+    queryFn: async () => (await apiRequest("GET", `/api/click-guard/domains/${domainId}/geo${rangeQuery(range)}`)).json(),
     enabled: !!domainId,
     refetchInterval: ANALYTICS_REFETCH_MS,
   });
   const geo = geoQuery.data;
-
-  const items = subTab === "countries" ? geo?.countries || [] : geo?.cities || [];
-
+  const all = subTab === "countries" ? geo?.countries : geo?.cities;
+  const q = place.trim().toLowerCase();
+  const items = all?.filter((r) => !q || r.name.toLowerCase().includes(q));
+  const totalVisits = geo ? (geo.countries ?? []).reduce((n, c) => n + c.count, 0) : undefined;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant={subTab === "countries" ? "default" : "outline"} onClick={() => setSubTab("countries")} data-testid="button-geo-countries">Countries</Button>
         <Button size="sm" variant={subTab === "cities" ? "default" : "outline"} onClick={() => setSubTab("cities")} data-testid="button-geo-cities">Cities</Button>
+        <div className="g-search min-w-0 flex-1 max-w-xs" role="search">
+          <Search aria-hidden="true" />
+          <input type="search" placeholder={subTab === "countries" ? "Country code, e.g. US" : "City or country…"} aria-label="Filter places" value={place} onChange={(e) => setPlace(e.target.value)} data-testid="input-geo-filter" />
+        </div>
       </div>
+      <RangePicker value={range} onChange={setRange} testId="geo-range" />
       <p className="text-xs text-muted-foreground">
-        <span data-testid="text-geo-range">{allTimeRange(geo ? (geo.countries ?? []).reduce((n, c) => n + c.count, 0) : undefined)}</span>{" "}
+        <span data-testid="text-geo-range">{allTimeRange(totalVisits, range)}</span>{" "}
         <span data-testid="text-geo-source-note">{GEO_SOURCE_NOTE}</span>
       </p>
-
       {geoQuery.isError && !geo && (
-        <Notice tone="danger" title="Couldn't load geographic data" testId="notice-geo-error"
-          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void geoQuery.refetch()} data-testid="button-retry-geo">Retry</Button>}>
+        <Notice tone="danger" title="Couldn't load geographic data" testId="notice-geo-error" action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void geoQuery.refetch()} data-testid="button-retry-geo">Retry</Button>}>
           {apiErrorMessage(geoQuery.error, "The geographic breakdown could not be loaded.")}
         </Notice>
       )}
-
-      <Section flush title={subTab === "countries" ? "Countries" : "Cities"}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr className="hidden sm:table-row">
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Location</th>
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Visits</th>
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Visitors</th>
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap w-44">Share</th>
-              </tr>
-            </thead>
-            <tbody>
-              {geoQuery.isLoading ? (
-                <tr><td colSpan={4} className="p-6 text-center"><div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto" /></td></tr>
-              ) : geoQuery.isError ? null : items.length === 0 ? (
-                <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No geographic data available</td></tr>
-              ) : (
-                items.map((item: any, i: number) => (
-                  <tr key={i} className="border-t transition-colors hover:bg-muted/40 flex flex-col gap-1.5 px-3.5 py-3 sm:table-row sm:px-0 sm:py-0" data-testid={`row-geo-${i}`}>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:font-medium">
-                      <span className="flex items-center gap-2">
-                        <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                        {subTab === "countries" ? countryName(item.name) : geoLabel(item.name)}
-                      </span>
-                    </td>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums sm:font-medium">
-                      <span className="sm:hidden text-muted-foreground">Visits: </span>
-                      {item.count.toLocaleString()}
-                    </td>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
-                      <span className="sm:hidden text-muted-foreground">Visitors: </span>
-                      {item.visitors.toLocaleString()}
-                    </td>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:w-44">
-                      <div className="flex items-center gap-2">
-                        <PercentBar value={parseFloat(item.percentage)} />
-                        <span className="w-14 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground" data-testid={`text-geo-share-${i}`}>{item.percentage}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Section>
+      {geo && totalVisits === 0
+        ? <IpSample tab="geo" cta={<InstallCta onOpen={onInstall} />} what={range.preset === "all" ? "the countries and cities you'll see once this site sends its first visit" : "the countries and cities — no visit in this range yet"} />
+        : <GeoTable items={geoQuery.isError && !geo ? undefined : items} mode={subTab} loading={geoQuery.isLoading} emptyText={q ? "No place matches that filter" : "No geographic data available"} />}
     </div>
   );
 }
 
-function PlatformsView({ domainId }: { domainId: number | null }) {
+function PlatformsView({ domainId, onInstall }: { domainId: number | null; onInstall?: () => void }) {
+  const [range, setRange] = useState<DateRange>(ALL_TIME);
   const platformsQuery = useQuery<PlatformData>({
-    queryKey: ["/api/click-guard/domains", domainId, "platforms"],
+    queryKey: ["/api/click-guard/domains", domainId, "platforms", rangeKey(range)],
+    queryFn: async () => (await apiRequest("GET", `/api/click-guard/domains/${domainId}/platforms${rangeQuery(range)}`)).json(),
     enabled: !!domainId,
     refetchInterval: ANALYTICS_REFETCH_MS,
   });
   const platforms = platformsQuery.data;
-
-  const renderBreakdown = (title: string, iconFor: (name: string) => LucideIcon, data: Record<string, number> | undefined) => {
-    if (!data) return null;
-    const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
-    const total = entries.reduce((s, [, v]) => s + v, 0);
-    return (
-      <Section title={title}>
-        <div className="space-y-2">
-          {entries.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No data</p>
-          ) : (
-            entries.map(([name, count]) => {
-              const pct = total ? (count / total) * 100 : 0;
-              const Icon = iconFor(name);
-              return (
-                <div key={name} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2 min-w-0">
-                      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{name}</span>
-                    </span>
-                    <span className="shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">{count} ({pct.toFixed(1)}%)</span>
-                  </div>
-                  <PercentBar value={pct} />
-                </div>
-              );
-            })
-          )}
-        </div>
-      </Section>
-    );
-  };
-
-  if (platformsQuery.isLoading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>;
-  }
-
-  if (platformsQuery.isError && !platforms) {
-    return (
-      <Notice tone="danger" title="Couldn't load platform data" testId="notice-platforms-error"
-        action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void platformsQuery.refetch()} data-testid="button-retry-platforms">Retry</Button>}>
-        {apiErrorMessage(platformsQuery.error, "The browser and OS breakdown could not be loaded.")}
-      </Notice>
-    );
-  }
-
+  const total = platforms ? Object.values(platforms.devices).reduce((n, c) => n + c, 0) : undefined;
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground" data-testid="text-platforms-range">
-        {allTimeRange(platforms ? Object.values(platforms.devices).reduce((n, c) => n + c, 0) : undefined)}
-      </p>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 sm:gap-5">
-        {renderBreakdown("Browsers", browserIcon, platforms?.browsers)}
-        {renderBreakdown("Operating systems", osIcon, platforms?.oses)}
-        {renderBreakdown("Devices", deviceIcon, platforms?.devices)}
-        {renderBreakdown("Screen resolutions", () => Monitor, platforms?.resolutions)}
-      </div>
+      <RangePicker value={range} onChange={setRange} testId="platforms-range" />
+      <p className="text-xs text-muted-foreground" data-testid="text-platforms-range">{allTimeRange(total, range)}</p>
+      {platformsQuery.isLoading ? <Spinner /> : platformsQuery.isError && !platforms ? (
+        <Notice tone="danger" title="Couldn't load platform data" testId="notice-platforms-error" action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void platformsQuery.refetch()} data-testid="button-retry-platforms">Retry</Button>}>
+          {apiErrorMessage(platformsQuery.error, "The browser and OS breakdown could not be loaded.")}
+        </Notice>
+      ) : platforms && total === 0
+        ? <IpSample tab="platforms" cta={<InstallCta onOpen={onInstall} />} what={range.preset === "all" ? "the browser, system and device breakdown you'll see once this site sends its first visit" : "the breakdown — no visit in this range yet"} />
+        : platforms ? <PlatformBreakdowns platforms={platforms} /> : null}
     </div>
   );
 }
@@ -1082,10 +483,14 @@ export default function IpTrackerPage() {
   const selectedDomainId = Number(params.get("site")) || null;
   const setSelectedDomainId = (id: number | null) => setUrlParam("site", id ? String(id) : null);
   const [showAddDomain, setShowAddDomain] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
   const [newDomain, setNewDomain] = useState("");
   const [newDomainName, setNewDomainName] = useState("");
+  const [trafficRange, setTrafficRange] = useState<DateRange>({ preset: "30d", from: "", to: "" });
+  const domainInput = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const tab = tabs.find((t) => t.id === activeTab)!;
+  const helpKey = tab.helpKey;
 
   // Signed out (the public preview of this page): the site list answers 401 — a sign-in prompt, not a failure.
   const domainsQuery = useQuery<DomainWithStats[] | null>({
@@ -1099,8 +504,9 @@ export default function IpTrackerPage() {
   const domainsError = domainsQuery.isError && !domains;
 
   // A stale or removed ?site= falls back to the first site rather than an id that no longer exists.
-  const selectedDomain = (domains ?? []).find(d => d.id === selectedDomainId) ?? domains?.[0];
+  const selectedDomain = (domains ?? []).find((d) => d.id === selectedDomainId) ?? domains?.[0];
   const domainId = selectedDomain?.id ?? null;
+  const removing = (domains ?? []).find((d) => d.id === confirmRemove);
 
   const since = dashboardSince();
   const sinceIso = since.toISOString();
@@ -1110,22 +516,28 @@ export default function IpTrackerPage() {
     enabled: !!domainId,
     refetchInterval: ANALYTICS_REFETCH_MS,
   });
+  // The Traffic section has its own range. Without a start the summary covers the last 7 days, so "all time"
+  // sends the epoch; the visit cap (VISIT_ROW_CAP) still applies and the view says so.
+  const trafficBounds = rangeBounds(trafficRange);
+  const trafficStart = trafficBounds.start ?? new Date(0);
+  const trafficQuery = useQuery<Analytics>({
+    queryKey: ["/api/click-guard/domains", domainId, "analytics", "traffic", rangeKey(trafficRange)],
+    queryFn: async () => (await apiRequest("GET", `/api/click-guard/domains/${domainId}/analytics?start=${encodeURIComponent(trafficStart.toISOString())}${trafficBounds.end ? `&end=${encodeURIComponent(trafficBounds.end.toISOString())}` : ""}`)).json(),
+    enabled: !!domainId && activeTab === "traffic",
+    refetchInterval: ANALYTICS_REFETCH_MS,
+  });
 
   const addDomainMutation = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/click-guard/domains", { domain: newDomain.trim(), name: newDomainName.trim() || undefined })).json(),
     onSuccess: (created: DomainWithStats) => {
       queryClient.invalidateQueries({ queryKey: ["/api/click-guard/domains"], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/vpn-shield/domains"], exact: true });
-      setNewDomain("");
-      setNewDomainName("");
-      setShowAddDomain(false);
+      setNewDomain(""); setNewDomainName(""); setShowAddDomain(false);
       if (created?.id) setSelectedDomainId(created.id);
       setActiveTab("dashboard");
       toast({ title: "Site added", description: "Install the tracking code below to start collecting visits." });
     },
-    onError: (err: any) => {
-      toast({ title: "Could not add site", description: apiErrorMessage(err, "Failed to add site"), variant: "destructive" });
-    },
+    onError: (err: unknown) => toast({ title: "Could not add site", description: apiErrorMessage(err, "Failed to add site"), variant: "destructive" }),
   });
 
   const removeDomainMutation = useMutation({
@@ -1133,185 +545,121 @@ export default function IpTrackerPage() {
     onSuccess: (_res, id) => {
       setSelectedDomainId(null);
       // Drop the site now and refresh only the lists: the removed site's own queries would 404.
-      queryClient.setQueryData<DomainWithStats[]>(["/api/click-guard/domains"], old => old?.filter(d => d.id !== id));
+      queryClient.setQueryData<DomainWithStats[]>(["/api/click-guard/domains"], (old) => old?.filter((d) => d.id !== id));
       queryClient.removeQueries({ queryKey: ["/api/click-guard/domains", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/click-guard/domains"], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/vpn-shield/domains"], exact: true });
       toast({ title: "Site removed" });
     },
-    onError: (err: any) => {
-      toast({ title: "Could not remove site", description: apiErrorMessage(err, "Failed to remove site"), variant: "destructive" });
-    },
+    onError: (err: unknown) => toast({ title: "Could not remove site", description: apiErrorMessage(err, "Failed to remove site"), variant: "destructive" }),
   });
 
+  const noSites = !!domains && domains.length === 0;
+  const openAddSite = () => { setShowAddDomain(true); requestAnimationFrame(() => domainInput.current?.focus()); };
+  const goInstall = () => { setActiveTab("dashboard"); requestAnimationFrame(() => document.getElementById("install-tracking")?.scrollIntoView({ behavior: "smooth", block: "start" })); };
+  const addSiteCta = <GooglePill size="sm" variant="solid" icon={Plus} label="Add your first site" onClick={openAddSite} testId="button-add-first-domain" />;
+
   // In the full-screen tool the site picker sits in the tool bar, beside the menu (like Social Media's business).
-  const siteControls = (
-          (domains?.length ?? 0) > 0 ? (
-            <>
-              <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-52 sm:flex-none">
-                <span className="text-muted-foreground sm:hidden">Site</span>
-                <select
-                  className="h-10 w-full rounded-full border bg-background px-4 text-sm"
-                  value={domainId || ""}
-                  onChange={(e) => setSelectedDomainId(Number(e.target.value))}
-                  aria-label="Site"
-                  data-testid="select-domain"
-                >
-                  {(domains ?? []).map(d => (
-                    <option key={d.id} value={d.id}>{d.name || d.domain}</option>
-                  ))}
-                </select>
-              </label>
-              <div className="flex flex-1 gap-2 sm:flex-none">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="icon" variant="outline" aria-label="Site actions" data-testid="button-site-actions">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onSelect={() => setConfirmRemove(true)}
-                      data-testid="button-remove-domain"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" /> Remove site
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <GooglePill
-                  icon={Plus}
-                  variant="solid"
-                  label="Add site"
-                  className="flex-1 sm:flex-none"
-                  onClick={() => setShowAddDomain(o => !o)}
-                  testId="button-add-domain"
-                />
-              </div>
-            </>
-          ) : undefined
+  const siteControls = (domains?.length ?? 0) > 0 ? (
+    <>
+      <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-52 sm:flex-none">
+        <span className="text-muted-foreground sm:hidden">Site</span>
+        <select className="h-10 w-full rounded-full border bg-background px-4 text-sm" value={domainId || ""} onChange={(e) => setSelectedDomainId(Number(e.target.value))} aria-label="Site" data-testid="select-domain">
+          {(domains ?? []).map((d) => <option key={d.id} value={d.id}>{d.name || d.domain}</option>)}
+        </select>
+      </label>
+      <div className="flex flex-1 gap-2 sm:flex-none">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button size="icon" variant="outline" aria-label="Site actions" data-testid="button-site-actions"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setConfirmRemove(domainId)} data-testid="button-remove-domain"><Trash2 className="mr-2 h-4 w-4" /> Remove site</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <GooglePill icon={Plus} variant="solid" label="Add site" className="flex-1 sm:flex-none" onClick={() => setShowAddDomain((o) => !o)} testId="button-add-domain" />
+      </div>
+    </>
+  ) : undefined;
+
+  const addForm = (showAddDomain || noSites) && !signedOut && !domainsError && (
+    <div className="rounded-xl border bg-card text-card-foreground" data-testid="card-add-domain">
+      <div className="space-y-3 p-4 sm:p-5">
+        <h2 className="g-card__title g-card__title--md">{noSites ? "Step 1 — add the site you want to watch" : "Add a site"}</h2>
+        {noSites && <StepsCard testId="steps-add-site" steps={[
+          "Type the site's domain, like example.com, and choose Add.",
+          "Copy the tracking code that appears and paste it on every page of the site.",
+          "Open the site once: its first visit replaces the sample below within about 30 seconds.",
+        ]} />}
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Input ref={domainInput} placeholder="example.com" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newDomain.trim()) addDomainMutation.mutate(); }} aria-label="Site domain" data-testid="input-domain" />
+          <Input placeholder="Display name (optional)" value={newDomainName} onChange={(e) => setNewDomainName(e.target.value)} aria-label="Display name" data-testid="input-domain-name" />
+        </div>
+        <div className="flex gap-2">
+          <GooglePill variant="solid" label={addDomainMutation.isPending ? "Adding…" : "Add"} onClick={() => addDomainMutation.mutate()} disabled={!newDomain.trim() || addDomainMutation.isPending} testId="button-save-domain" />
+          {!noSites && <GooglePill variant="quiet" label="Cancel" onClick={() => setShowAddDomain(false)} testId="button-cancel-domain" />}
+          <span className="self-center text-xs text-muted-foreground">One site counts once across IP Tracker, Click Guard and VPN Shield.</span>
+        </div>
+      </div>
+    </div>
   );
+
   return (
     <AppPage width="wide" testId="page-ip-tracker">
       {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
       <GoogleSectionHeader
         as="h1"
         titleTestId="text-page-title"
-        title={inShell ? IP_HEAD[activeTab][0] : "IP Tracker"}
+        title={inShell ? tab.label : "IP Tracker"}
+        helpKey={helpKey}
         description={<>
-          <span data-testid="text-subtitle">{inShell ? IP_HEAD[activeTab][1] : "Real-time website visitor tracking. See who visits your site, where they come from, and what they do."}</span>
+          <span data-testid="text-subtitle">{inShell ? tab.line : "See who visits your sites, where they come from and what they open, as it happens."}</span>
           {selectedDomain && <>{" "}<StatusPill tone="neutral" data-testid="badge-ip-tracker">{selectedDomain.name || selectedDomain.domain}</StatusPill></>}
         </>}
         flush
         actions={inShell ? undefined : siteControls}
       />
 
-      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+      <AlertDialog open={confirmRemove != null} onOpenChange={(o) => { if (!o) setConfirmRemove(null); }}>
         <AlertDialogContent data-testid="dialog-remove-domain">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {selectedDomain?.name || selectedDomain?.domain || "this site"}?</AlertDialogTitle>
+            <AlertDialogTitle>Remove {removing?.name || removing?.domain || "this site"}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This stops tracking {selectedDomain?.domain ?? "this site"} in IP Tracker, Click Guard and VPN Shield, and permanently deletes its recorded visits and blocked IPs. Remove the tracking code from your site as well. This cannot be undone.
+              This stops tracking {removing?.domain ?? "this site"} in IP Tracker, Click Guard and VPN Shield, and permanently deletes its recorded visits and blocked IPs. Remove the tracking code from your site as well. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-remove-domain">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { if (domainId) removeDomainMutation.mutate(domainId); }}
-              data-testid="button-confirm-remove-domain"
-            >
-              Remove site
-            </AlertDialogAction>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => { if (confirmRemove) removeDomainMutation.mutate(confirmRemove); }} data-testid="button-confirm-remove-domain">Remove site</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {showAddDomain && (
-        <div className="rounded-xl border bg-card text-card-foreground" data-testid="card-add-domain">
-          <div className="space-y-3 p-4 sm:p-5">
-            <h2 className="g-card__title g-card__title--md">Add a site</h2>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Input
-                placeholder="example.com"
-                value={newDomain}
-                onChange={(e) => setNewDomain(e.target.value)}
-                data-testid="input-domain"
-              />
-              <Input
-                placeholder="Display name (optional)"
-                value={newDomainName}
-                onChange={(e) => setNewDomainName(e.target.value)}
-                data-testid="input-domain-name"
-              />
-            </div>
-            <div className="flex gap-2">
-              <GooglePill
-                variant="solid"
-                label={addDomainMutation.isPending ? "Adding…" : "Add"}
-                onClick={() => addDomainMutation.mutate()}
-                disabled={!newDomain.trim() || addDomainMutation.isPending}
-                testId="button-save-domain"
-              />
-              <GooglePill
-                variant="quiet"
-                label="Cancel"
-                onClick={() => setShowAddDomain(false)}
-                testId="button-cancel-domain"
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {addForm}
 
       {inShell && (domains?.length ?? 0) > 0 && <ToolBarSlot><div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm" data-testid="toolbar-ip-site"><span className="hidden g-text-2 sm:inline">Site</span>{siteControls}</div></ToolBarSlot>}
       {!inShell && <ToolTabs as="tablist" label="IP tracker sections">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            data-testid={`tab-${tab.id}`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {tabs.map((t) => <button key={t.id} type="button" onClick={() => setActiveTab(t.id)} role="tab" aria-selected={activeTab === t.id} data-testid={`tab-${t.id}`}>{t.label}</button>)}
       </ToolTabs>}
 
-      {domainsLoading ? (
-        <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>
-      ) : signedOut ? (
-        <Notice tone="info" title="Sign in to see your sites" testId="notice-domains-signed-out"
-          action={<Button asChild size="sm" variant="outline" className="h-7 text-xs"><a href={`/auth?next=${encodeURIComponent("/ip-tracker")}`} data-testid="link-ip-tracker-sign-in">Sign in</a></Button>}>
+      {domainsLoading ? <Spinner /> : signedOut ? (
+        <Notice tone="info" title="Sign in to see your sites" testId="notice-domains-signed-out" action={<Button asChild size="sm" variant="outline" className="h-7 text-xs"><a href={`/auth?next=${encodeURIComponent("/ip-tracker")}`} data-testid="link-ip-tracker-sign-in">Sign in</a></Button>}>
           This tool watches the websites you add to your ConstructHUB account.
         </Notice>
       ) : domainsError ? (
-        <Notice tone="danger" title="Couldn't load your sites" testId="notice-domains-error"
-          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void domainsQuery.refetch()} data-testid="button-retry-domains">Retry</Button>}>
+        <Notice tone="danger" title="Couldn't load your sites" testId="notice-domains-error" action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void domainsQuery.refetch()} data-testid="button-retry-domains">Retry</Button>}>
           {apiErrorMessage(domainsQuery.error, "The site list could not be loaded.")} This is a failed request, not an empty account.
         </Notice>
-      ) : !domainId && !showAddDomain ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-14 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <Fingerprint className="h-5 w-5" strokeWidth={1.6} />
-          </div>
-          <h2 className="mt-3 g-card__title g-card__title--md">No sites being tracked</h2>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            Add your first site to start tracking visitors in real time. You'll get a tracking code to embed on your site.
-          </p>
-          <GooglePill icon={Plus} variant="solid" className="mt-4" label="Add your first site" onClick={() => setShowAddDomain(true)} testId="button-add-first-domain" />
-        </div>
+      ) : noSites ? (
+        // No site yet: every section shows what it will look like, until the first real visit replaces it.
+        <IpSample tab={activeTab} cta={addSiteCta} what={`what ${tab.label} shows once your first site sends a visit`} />
       ) : (
         <>
           {/* Keyed by site: search text, expanded rows and pagination must not leak between sites. */}
-          {activeTab === "dashboard" && <DashboardView domainId={domainId} analyticsQuery={analyticsQuery} domains={domains ?? []} domainsQuery={domainsQuery} />}
-          {activeTab === "visitors" && <VisitorListView key={domainId ?? "none"} domainId={domainId} />}
-          {activeTab === "traffic" && <TrafficSourcesView analyticsQuery={analyticsQuery} since={since} />}
-          {activeTab === "pages" && <PagesView key={domainId ?? "none"} domainId={domainId} />}
-          {activeTab === "geo" && <GeoView key={domainId ?? "none"} domainId={domainId} />}
-          {activeTab === "platforms" && <PlatformsView key={domainId ?? "none"} domainId={domainId} />}
+          {activeTab === "dashboard" && <DashboardView domainId={domainId} analyticsQuery={analyticsQuery} domains={domains ?? []} domainsQuery={domainsQuery} onPickSite={setSelectedDomainId} onRemoveSite={setConfirmRemove} />}
+          {activeTab === "visitors" && <VisitorListView key={domainId ?? "none"} domainId={domainId} onInstall={goInstall} />}
+          {activeTab === "traffic" && <TrafficSourcesView analyticsQuery={trafficQuery} since={trafficStart} rangeLabel={trafficBounds.label} picker={<RangePicker value={trafficRange} onChange={setTrafficRange} testId="traffic-range" />} onInstall={goInstall} />}
+          {activeTab === "pages" && <PagesView key={domainId ?? "none"} domainId={domainId} onInstall={goInstall} />}
+          {activeTab === "geo" && <GeoView key={domainId ?? "none"} domainId={domainId} onInstall={goInstall} />}
+          {activeTab === "platforms" && <PlatformsView key={domainId ?? "none"} domainId={domainId} onInstall={goInstall} />}
         </>
       )}
     </AppPage>

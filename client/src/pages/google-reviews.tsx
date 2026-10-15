@@ -3,6 +3,7 @@ import { GoogleReport } from "@/components/profile-guard";
 import { AiReplySettings } from "@/components/ai-review-replies";
 import { GoogleSurface, GoogleAvatar, GoogleStarRow, GooglePill, GoogleAiOverview, relativeTime } from "@/components/google";
 import { GbpConnection } from "@/components/gbp-connection";
+import { SamplePreview } from "@/components/sample-preview";
 import { useEffect, useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
@@ -85,6 +86,17 @@ function looksLikeGoogleReviewLink(input: string): boolean {
   if (google) return !(u.pathname === "/" && !u.search);
   return /^(?:[a-z0-9-]+\.)*(?:goo\.gl|g\.page|share\.google)$/.test(host);
 }
+
+/** Obviously made-up rows for the sample previews (components/sample-preview.tsx): shown only while the real list is empty. */
+const SAMPLE_REQUESTS: { name: string; email: string; job: string; status: string; tone: "success" | "neutral" | "warning" | "info"; score?: number }[] = [
+  { name: "Sample Homeowner", email: "sample@example.com", job: "Roof replacement, 123 Example St", status: "Google link opened", tone: "success", score: 10 },
+  { name: "Example Client", email: "client@example.com", job: "Siding repair, 45 Placeholder Ave", status: "Pending", tone: "neutral" },
+  { name: "Demo Customer", email: "demo@example.com", job: "Gutter install, 9 Fixture Rd", status: "Feedback", tone: "info", score: 6 },
+];
+const SAMPLE_PROFILE_REVIEWS = [
+  { name: "Sample Reviewer", rating: 5, when: "2 weeks ago", text: "Sample review: the crew showed up on time and left the yard clean. This is placeholder text, not a real review." },
+  { name: "Example Neighbor", rating: 4, when: "a month ago", text: "Sample review: good work on the siding; scheduling took a little longer than expected. Placeholder text." },
+];
 
 const stepLabels: Record<string, string> = {
   rating: "Rating",
@@ -534,6 +546,8 @@ export default function GoogleReviewsPage() {
 
   const hasGoogleUrl = !!((user?.googleProfileUrl || templates.find((t: any) => String(t.id) === selectedTemplateId)?.googleProfileUrl));
   const canSend = !!(clientName && clientEmail && hasGoogleUrl);
+  // The "i" beside the title: the feature's own entry on the first view, each other view's section (shared/help/registry.ts).
+  const helpKey = view === "requests" ? "google-reviews" : `google-reviews.${view}`;
 
   // Google look (owner, 2026-10-06): the page sits on a GoogleSurface; profile reviews read like Google's.
   return (
@@ -541,6 +555,7 @@ export default function GoogleReviewsPage() {
       <PageHeader
         title={<span data-testid="text-reviews-title">{REVIEWS_VIEW_HEAD[view][0]}</span>}
         description={REVIEWS_VIEW_HEAD[view][1]}
+        helpKey={helpKey}
         actions={view === "requests" ? (
           <Button onClick={openSendDialog} data-testid="button-new-review-request">
             <Plus className="mr-2 h-4 w-4" aria-hidden="true" />New review request
@@ -587,12 +602,25 @@ export default function GoogleReviewsPage() {
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" aria-hidden="true" />
                 </div>
               ) : reviews.length === 0 ? (
-                <EmptyState
-                  icon={Star}
-                  title="No review requests yet"
-                  description="Send your first review request to start collecting Google reviews from your clients."
-                  action={<Button onClick={openSendDialog} data-testid="button-first-review-request">New review request</Button>}
-                />
+                <SamplePreview what="what your sent requests look like here" testId="sample-review-requests"
+                  cta={<Button size="sm" onClick={openSendDialog} data-testid="button-first-review-request">New review request</Button>}>
+                  <div className="space-y-3">
+                    {SAMPLE_REQUESTS.map((r) => (
+                      <div key={r.name} className="flex items-center gap-3 rounded-xl border bg-card p-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><User className="h-5 w-5" aria-hidden="true" /></div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-medium">{r.name}</p>
+                            <StatusPill tone={r.tone}>{r.status}</StatusPill>
+                            {r.score && <Badge variant="outline" className="text-xs"><Star className="mr-0.5 h-3 w-3 text-amber-500" aria-hidden="true" />{r.score}/10</Badge>}
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">{r.email} · {r.job}</p>
+                        </div>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      </div>
+                    ))}
+                  </div>
+                </SamplePreview>
               ) : filteredReviews.length === 0 ? (
                 <div className="py-8 text-center">
                   <p className="text-sm text-muted-foreground">No results for &ldquo;{searchQuery}&rdquo;</p>
@@ -919,12 +947,17 @@ export default function GoogleReviewsPage() {
               actions={<Button variant="outline" size="sm" onClick={openNewTemplate} disabled={atTemplateLimit} data-testid="button-new-template"><Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Add profile</Button>}
             >
               {templates.length === 0 ? (
-                <EmptyState
-                  icon={Building2}
-                  title="No profiles yet"
-                  description="Add a profile for each Google Business listing you manage, so review requests go to the right page."
-                  action={<Button variant="outline" size="sm" onClick={openNewTemplate} data-testid="button-create-first-template"><Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Add your first profile</Button>}
-                />
+                <SamplePreview what="what a saved profile looks like here" testId="sample-review-profiles"
+                  cta={<Button variant="outline" size="sm" onClick={openNewTemplate} data-testid="button-create-first-template"><Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Add your first profile</Button>}>
+                  <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Building2 className="h-4 w-4" aria-hidden="true" /></div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2"><p className="text-sm font-medium">Sample Roofing Co. — Sampletown</p><Badge className="text-[10px]">Default</Badge></div>
+                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Link className="h-3 w-3 shrink-0" aria-hidden="true" />https://g.page/r/example-sample-roofing/review</p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">Also on: Yelp, BBB, Houzz</p>
+                    </div>
+                  </div>
+                </SamplePreview>
               ) : (
                 <div className="space-y-2">
                   {templates.map((template: any) => (
@@ -1015,6 +1048,16 @@ export default function GoogleReviewsPage() {
             </Section>
             )}
 
+            {view === "settings" && (
+              <div className="g-callout" data-testid="card-settings-how">
+                <h3>How this works</h3>
+                <ol className="list-decimal space-y-1 pl-5">
+                  <li>Feedback routing: every client rates the job from 1 to 10. Pick the score below which their words come to you privately instead of the Google review step.</li>
+                  <li>Follow-up reminders: choose how many a client can get, how many hours apart, and the hours of the day they may arrive.</li>
+                  <li>Save each card. Requests you send from then on follow the new settings.</li>
+                </ol>
+              </div>
+            )}
             {view === "settings" && <FeedbackRoutingCard />}
 
             {view === "settings" && <ReminderSettingsCard />}
@@ -2223,11 +2266,28 @@ function GoogleProfileReviewsTab() {
             <div className="flex justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
             </div>
+          ) : reviews.length === 0 && !hasFilters ? (
+            <SamplePreview what="what your synced Google reviews look like here" testId="sample-profile-reviews"
+              cta={<a className="g-link text-sm" href="/locations">Link a location</a>}>
+              <div className="-mt-2">
+                {SAMPLE_PROFILE_REVIEWS.map((r) => (
+                  <article key={r.name} className="g-review">
+                    <div className="g-review__head">
+                      <GoogleAvatar initial={r.name.charAt(0)} alt="" />
+                      <div className="min-w-0 flex-1"><p className="g-review__name">{r.name}</p></div>
+                    </div>
+                    <div className="g-review__rating"><GoogleStarRow rating={r.rating} /><span>{r.when}</span></div>
+                    <p className="g-review__text">{r.text}</p>
+                  </article>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Reviews from your Google Business Profiles appear here once synced: connect your Google account, link a location, then choose Sync now.</p>
+            </SamplePreview>
           ) : reviews.length === 0 ? (
             <EmptyState
               icon={Star}
-              title="No Google profile reviews yet"
-              description="Reviews from your Google Business Profiles appear here once synced. Connect your Google account, import a location, then choose Sync now."
+              title="No review matches these filters"
+              description="Clear the filters or the search to see every synced review."
             />
           ) : (
             <div className="-mt-2">
@@ -2455,6 +2515,9 @@ function GoogleProfileReviewsTab() {
   );
 }
 
+const INTERVAL_PRESETS = [24, 48, 72, 96, 168];
+const MAX_PRESETS = [1, 2, 3, 5];
+
 function ReminderSettingsCard() {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
@@ -2464,6 +2527,9 @@ function ReminderSettingsCard() {
   });
 
   const [localSettings, setLocalSettings] = useState<any>(null);
+  // "Custom" in a list opens a typed value; the server takes 1–720 hours and 0–10 reminders (server/review-reminders.ts).
+  const [customInterval, setCustomInterval] = useState(false);
+  const [customMax, setCustomMax] = useState(false);
   const currentSettings = localSettings || settings || {
     enabled: true,
     maxReminders: 3,
@@ -2507,6 +2573,7 @@ function ReminderSettingsCard() {
   }
 
   const formatHour = (h: number) => {
+    if (h === 24) return "12:00 AM (midnight)";
     const ampm = h >= 12 ? "PM" : "AM";
     const hr = h > 12 ? h - 12 : h === 0 ? 12 : h;
     return `${hr}:00 ${ampm}`;
@@ -2552,8 +2619,8 @@ function ReminderSettingsCard() {
                     Interval between reminders
                   </Label>
                   <Select
-                    value={String(currentSettings.intervalHours)}
-                    onValueChange={v => updateField("intervalHours", parseInt(v))}
+                    value={customInterval || !INTERVAL_PRESETS.includes(Number(currentSettings.intervalHours)) ? "__custom__" : String(currentSettings.intervalHours)}
+                    onValueChange={v => { if (v === "__custom__") { setCustomInterval(true); return; } setCustomInterval(false); updateField("intervalHours", parseInt(v)); }}
                   >
                     <SelectTrigger data-testid="select-interval">
                       <SelectValue />
@@ -2564,8 +2631,14 @@ function ReminderSettingsCard() {
                       <SelectItem value="72">Every 72 hours</SelectItem>
                       <SelectItem value="96">Every 4 days</SelectItem>
                       <SelectItem value="168">Every 7 days</SelectItem>
+                      <SelectItem value="__custom__" data-testid="option-interval-custom">Custom — type the hours (1 to 720)</SelectItem>
                     </SelectContent>
                   </Select>
+                  {(customInterval || !INTERVAL_PRESETS.includes(Number(currentSettings.intervalHours))) && (
+                    <Input type="number" inputMode="numeric" min={1} max={720} step={1} value={currentSettings.intervalHours} aria-label="Custom hours between reminders (1 to 720)"
+                      onChange={e => { const n = parseInt(e.target.value, 10); if (Number.isInteger(n) && n >= 1 && n <= 720) updateField("intervalHours", n); }}
+                      data-testid="input-interval-custom" />
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -2574,8 +2647,8 @@ function ReminderSettingsCard() {
                     Max reminders per client
                   </Label>
                   <Select
-                    value={String(currentSettings.maxReminders)}
-                    onValueChange={v => updateField("maxReminders", parseInt(v))}
+                    value={customMax || !MAX_PRESETS.includes(Number(currentSettings.maxReminders)) ? "__custom__" : String(currentSettings.maxReminders)}
+                    onValueChange={v => { if (v === "__custom__") { setCustomMax(true); return; } setCustomMax(false); updateField("maxReminders", parseInt(v)); }}
                   >
                     <SelectTrigger data-testid="select-max-reminders">
                       <SelectValue />
@@ -2585,8 +2658,14 @@ function ReminderSettingsCard() {
                       <SelectItem value="2">2 reminders</SelectItem>
                       <SelectItem value="3">3 reminders</SelectItem>
                       <SelectItem value="5">5 reminders</SelectItem>
+                      <SelectItem value="__custom__" data-testid="option-max-reminders-custom">Custom — type a count (0 to 10)</SelectItem>
                     </SelectContent>
                   </Select>
+                  {(customMax || !MAX_PRESETS.includes(Number(currentSettings.maxReminders))) && (
+                    <Input type="number" inputMode="numeric" min={0} max={10} step={1} value={currentSettings.maxReminders} aria-label="Custom number of reminders (0 to 10)"
+                      onChange={e => { const n = parseInt(e.target.value, 10); if (Number.isInteger(n) && n >= 0 && n <= 10) updateField("maxReminders", n); }}
+                      data-testid="input-max-reminders-custom" />
+                  )}
                 </div>
               </div>
 
@@ -2613,7 +2692,7 @@ function ReminderSettingsCard() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: 15 }, (_, h) => h + 6).map(h => (
+                          {Array.from({ length: 24 }, (_, h) => h).map(h => (
                             <SelectItem key={h} value={String(h)}>{formatHour(h)}</SelectItem>
                           ))}
                         </SelectContent>
@@ -2627,7 +2706,7 @@ function ReminderSettingsCard() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: 15 }, (_, h) => h + 7).filter(h => h > window.start || h === window.end).map(h => (
+                          {Array.from({ length: 24 }, (_, h) => h + 1).filter(h => h > window.start || h === window.end).map(h => (
                             <SelectItem key={h} value={String(h)}>{formatHour(h)}</SelectItem>
                           ))}
                         </SelectContent>
@@ -2671,6 +2750,8 @@ function FeedbackRoutingCard() {
   });
   const saved = normalizeReviewEscalationThreshold(settings?.reviewEscalationThreshold);
   const [draft, setDraft] = useState<number | null>(null);
+  // "Custom" in the list opens a typed score: the server takes any whole number from 1 to 10 (shared/review-flow.ts).
+  const [customThreshold, setCustomThreshold] = useState(false);
   const threshold = draft ?? saved;
 
   const saveMutation = useMutation({
@@ -2700,7 +2781,7 @@ function FeedbackRoutingCard() {
               <MessageSquare className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               Private feedback below
             </Label>
-            <Select value={String(threshold)} onValueChange={(v) => setDraft(parseInt(v, 10))} disabled={isLoading}>
+            <Select value={customThreshold ? "__custom__" : String(threshold)} onValueChange={(v) => { if (v === "__custom__") { setCustomThreshold(true); return; } setCustomThreshold(false); setDraft(parseInt(v, 10)); }} disabled={isLoading}>
               <SelectTrigger data-testid="select-escalation-threshold"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {[...new Set<number>([...REVIEW_ESCALATION_THRESHOLD_CHOICES, threshold])].sort((a, b) => a - b).map((n) => (
@@ -2708,8 +2789,14 @@ function FeedbackRoutingCard() {
                     {n >= 10 ? "10 — only 10s go straight to Google" : `${n} — scores below ${n} come to you privately`}
                   </SelectItem>
                 ))}
+                <SelectItem value="__custom__" data-testid="option-escalation-threshold-custom">Custom — type a score from 1 to 10</SelectItem>
               </SelectContent>
             </Select>
+            {customThreshold && (
+              <Input type="number" inputMode="numeric" min={1} max={10} step={1} value={threshold} aria-label="Custom feedback-routing score (1 to 10)"
+                onChange={(e) => { const n = parseInt(e.target.value, 10); if (Number.isInteger(n) && n >= 1 && n <= 10) setDraft(n); }}
+                data-testid="input-escalation-threshold-custom" />
+            )}
           </div>
           <p className="text-sm leading-relaxed text-muted-foreground sm:pt-7" data-testid="text-escalation-summary">
             {describeReviewEscalationThreshold(threshold)}

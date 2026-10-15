@@ -30,15 +30,20 @@ import { PALETTE } from "./viz";
 type Row = { url: string; domain: string; title: string; snippet: string | null; authority: number | null; published: string | null; quality: number | null; author: string | null };
 type Page = { query: string; rows: Row[]; total: number | null; sourceRows: number; limit: number; offset: number; fetchedAt: string };
 type Sort = "relevance" | "authority" | "newest";
-type Filters = { sort: Sort; sinceDays?: 30 | 90 | 365 | 730; minAuthority?: number; kind?: string; excludeOwn: boolean };
+type Filters = { sort: Sort; sinceDays?: number; minAuthority?: number; kind?: string; excludeOwn: boolean };
 const KINDS: [string, string][] = [["", "Any kind of site"], ["blogs", "Blogs"], ["news", "News"], ["organization", "Company sites"], ["message-boards", "Forums"], ["ecommerce", "Shops"]];
 const SINCE: readonly number[] = [30, 90, 365, 730], AUTHORITY: readonly number[] = [10, 20, 30, 50, 70];
+/** What the server takes (server/seo/content.ts contentInput): any whole number of days up to two years, any authority 1–100 — the lists above are shortcuts, and "Custom…" takes the rest. */
+const SINCE_MAX = 730, AUTHORITY_MIN = 1, AUTHORITY_MAX = 100;
 const SINCE_WORDS: Record<number, string> = { 30: "the last 30 days", 90: "the last 3 months", 365: "the last year", 730: "the last 2 years" };
+const sinceWords = (days: number) => SINCE_WORDS[days] ?? `the last ${days} days`;
+const okSince = (n: number) => Number.isInteger(n) && n >= 1 && n <= SINCE_MAX;
+const okAuthority = (n: number) => Number.isInteger(n) && n >= AUTHORITY_MIN && n <= AUTHORITY_MAX;
 const LIMIT = 25, MAX_OFFSET = 950;
 /** The shortest "Published" window that holds a date ("YYYY-MM-DD"), counted in whole days up to today; null when none reaches back that far. */
 const sinceFor = (published: string): Filters["sinceDays"] | null => {
   const days = Math.floor((Date.now() - new Date(`${published.slice(0, 10)}T00:00:00Z`).getTime()) / 86_400_000);
-  return Number.isFinite(days) ? ((SINCE.find((n) => days <= n) ?? null) as Filters["sinceDays"] | null) : null;
+  return Number.isFinite(days) ? SINCE.find((n) => days <= n) ?? null : null;
 };
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 /** A 40 px select, the same as every other on these screens. */
@@ -58,7 +63,7 @@ export default function SeoContentPage() {
     const sort = p.get("sort"), since = Number(p.get("since")), authority = Number(p.get("authority")), kind = p.get("kind"), offset = Number(p.get("offset"));
     return {
       q: p.get("q"), sort: (sort === "authority" || sort === "newest" ? sort : "relevance") as Sort,
-      since: SINCE.includes(since) ? (since as Filters["sinceDays"]) : undefined, authority: AUTHORITY.includes(authority) ? authority : undefined,
+      since: okSince(since) ? since : undefined, authority: okAuthority(authority) ? authority : undefined,
       kind: kind && KINDS.some(([v]) => v && v === kind) ? kind : undefined,
       offset: Number.isInteger(offset) && offset > 0 && offset % LIMIT === 0 && offset <= MAX_OFFSET ? offset : 0,
     };
@@ -67,6 +72,9 @@ export default function SeoContentPage() {
   const [input, setInput] = useState(address.q ?? "");
   useEffect(() => { setInput(address.q ?? ""); }, [address.q]);
   const [excludeOwn, setExcludeOwn] = useState(true);
+  // "Custom…" picked on a preset filter: its number box stays open until a preset is picked again.
+  const [sinceCustom, setSinceCustom] = useState(false);
+  const [authorityCustom, setAuthorityCustom] = useState(false);
   const f: Filters = { sort: address.sort, sinceDays: address.since, minAuthority: address.authority, kind: address.kind, excludeOwn };
   const offset = address.offset, limit = LIMIT;
   /** The address for this search with some filters changed (the first page unless `offset` is given): what a control writes and a chip's clear removes. */
@@ -108,7 +116,7 @@ export default function SeoContentPage() {
   /** What narrows the search, in words, each with its clear. */
   const chips: { key: string; words: string; href: string }[] = [];
   if (address.sort !== "relevance") chips.push({ key: "sort", words: address.sort === "authority" ? "Strongest sites first" : "Newest first", href: addr({ sort: "relevance" }) });
-  if (address.since) chips.push({ key: "since", words: `Published in ${SINCE_WORDS[address.since]}`, href: addr({ since: undefined }) });
+  if (address.since) chips.push({ key: "since", words: `Published in ${sinceWords(address.since)}`, href: addr({ since: undefined }) });
   if (address.authority) chips.push({ key: "authority", words: `Site authority ${address.authority} or more`, href: addr({ authority: undefined }) });
   if (address.kind) chips.push({ key: "kind", words: `${KINDS.find(([v]) => v === address.kind)?.[1] ?? address.kind} only`, href: addr({ kind: undefined }) });
   /** The page of a result on its own site, for the Site explorer's page views (its query string kept); null when the address is not on that site. */
@@ -159,7 +167,7 @@ export default function SeoContentPage() {
   const noNext = !page || page.sourceRows < limit || (page.total != null && page.offset + page.sourceRows >= page.total) || offset + limit > MAX_OFFSET;
 
   return (
-    <SeoShell title="Content explorer" description="Search the web for pages about a topic — who is writing about what you sell, how strong their site is, and when." site={site} onSite={onSite} sites={sites} status={status} picker={false} spends="lookups">
+    <SeoShell title="Content explorer" description="Search the web for pages about a topic — who is writing about what you sell, how strong their site is, and when." site={site} onSite={onSite} sites={sites} status={status} picker={false} spends="lookups" helpKey="seo.content">
       <form className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(); }} data-testid="form-content">
         <label className="relative min-w-0 flex-1 sm:max-w-xl"><span className="sr-only">Topic</span>
           <Search className="g-text-2 pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
@@ -169,8 +177,15 @@ export default function SeoContentPage() {
       </form>
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]" data-testid="content-filters">
         <label className="flex items-center gap-2"><span className="g-text-2">Sort</span><select className={SELECT} value={f.sort} onChange={(e) => set({ sort: e.target.value as Sort })} data-testid="select-content-sort"><option value="relevance">Most relevant</option><option value="authority">Strongest sites first</option><option value="newest">Newest first</option></select></label>
-        <label className="flex items-center gap-2"><span className="g-text-2">Published</span><select className={SELECT} value={f.sinceDays ?? ""} onChange={(e) => set({ sinceDays: (Number(e.target.value) || undefined) as Filters["sinceDays"] })} data-testid="select-content-since"><option value="">Any time</option><option value="30">Last 30 days</option><option value="90">Last 3 months</option><option value="365">Last year</option><option value="730">Last 2 years</option></select></label>
-        <label className="flex items-center gap-2"><span className="g-text-2">Site authority at least</span><select className={SELECT} value={f.minAuthority ?? ""} onChange={(e) => set({ minAuthority: Number(e.target.value) || undefined })} data-testid="select-content-authority"><option value="">Any</option>{[10, 20, 30, 50, 70].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+        <label className="flex items-center gap-2"><span className="g-text-2">Published</span><select className={SELECT} value={f.sinceDays == null ? "" : SINCE.includes(f.sinceDays) && !sinceCustom ? f.sinceDays : "custom"} onChange={(e) => { if (e.target.value === "custom") setSinceCustom(true); else { setSinceCustom(false); set({ sinceDays: Number(e.target.value) || undefined }); } }} data-testid="select-content-since"><option value="">Any time</option>{SINCE.map((n) => <option key={n} value={n}>{SINCE_WORDS[n].replace(/^the last/, "Last")}</option>)}<option value="custom">Custom…</option></select>
+          {/* Any number of days up to two years, as the server takes it (owner's rule 2026-10-15: a preset list never shuts out a value the server accepts). The address carries it like a preset. */}
+          {(sinceCustom || (f.sinceDays != null && !SINCE.includes(f.sinceDays))) && <span className="flex items-center gap-1"><input type="number" className="g-input !w-24" min={1} max={SINCE_MAX} step={1} inputMode="numeric" aria-label={`Days, 1 to ${SINCE_MAX}`} defaultValue={f.sinceDays ?? ""} placeholder="days" data-testid="input-content-since-custom"
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const n = Math.round(Number((e.target as HTMLInputElement).value)); if (okSince(n)) set({ sinceDays: n }); } }} onBlur={(e) => { const n = Math.round(Number(e.target.value)); if (okSince(n) && n !== f.sinceDays) set({ sinceDays: n }); }} /><span className="g-text-2 text-[12px]">days</span></span>}
+        </label>
+        <label className="flex items-center gap-2"><span className="g-text-2">Site authority at least</span><select className={SELECT} value={f.minAuthority == null ? "" : AUTHORITY.includes(f.minAuthority) && !authorityCustom ? f.minAuthority : "custom"} onChange={(e) => { if (e.target.value === "custom") setAuthorityCustom(true); else { setAuthorityCustom(false); set({ minAuthority: Number(e.target.value) || undefined }); } }} data-testid="select-content-authority"><option value="">Any</option>{AUTHORITY.map((n) => <option key={n} value={n}>{n}</option>)}<option value="custom">Custom…</option></select>
+          {(authorityCustom || (f.minAuthority != null && !AUTHORITY.includes(f.minAuthority))) && <input type="number" className="g-input !w-20" min={AUTHORITY_MIN} max={AUTHORITY_MAX} step={1} inputMode="numeric" aria-label={`Authority, ${AUTHORITY_MIN} to ${AUTHORITY_MAX}`} defaultValue={f.minAuthority ?? ""} placeholder="1–100" data-testid="input-content-authority-custom"
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const n = Math.round(Number((e.target as HTMLInputElement).value)); if (okAuthority(n)) set({ minAuthority: n }); } }} onBlur={(e) => { const n = Math.round(Number(e.target.value)); if (okAuthority(n) && n !== f.minAuthority) set({ minAuthority: n }); }} />}
+        </label>
         <label className="flex items-center gap-2"><span className="sr-only">Kind of site</span><select className={SELECT} value={f.kind ?? ""} onChange={(e) => set({ kind: e.target.value || undefined })} data-testid="select-content-kind">{KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
         {site && <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={f.excludeOwn} onChange={(e) => set({ excludeOwn: e.target.checked })} /> <span className="g-text">Leave out {site.domain}</span></label>}
       </div>

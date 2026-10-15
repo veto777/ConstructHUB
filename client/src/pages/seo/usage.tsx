@@ -48,7 +48,7 @@ export default function SeoUsagePage() {
     URL.revokeObjectURL(a.href);
   };
   return (
-    <SeoShell title="Usage" description="Every SEO data lookup on your account: what it was, when, and what it cost." site={site} onSite={onSite} sites={sites} status={status} picker={false}>
+    <SeoShell title="Usage" description="Every SEO data lookup on your account: what it was, when, and what it cost." site={site} onSite={onSite} sites={sites} status={status} picker={false} helpKey="seo.usage">
       {month && <ActiveFilter onClear={() => clearParams(["month"], false)} clearLabel="Every month">{/^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? `Lookups in ${monthName(month)}` : `"${month}" — not a month (YYYY-MM)`}{d ? ` — ${fmtNum(rows.length)} of the latest ${fmtNum(d.rows.length)}` : ""}</ActiveFilter>}
       {q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your usage…</p>}
       {q.isError && <div className="g-callout" role="alert" data-testid="usage-error"><h3>Couldn't load your usage</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}

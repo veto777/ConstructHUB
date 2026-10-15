@@ -47,7 +47,7 @@ export default function SeoCompetitorsPage() {
   const configured = !!status.data?.configured;
   const r = gap.data;
   return (
-    <SeoShell title="Competitor gap" description="Keywords a competitor ranks for on Google that your site does not — the gap to close." site={site} onSite={onSite} sites={sites} status={status} spends="lookups">
+    <SeoShell title="Competitor gap" description="Keywords a competitor ranks for on Google that your site does not — the gap to close." site={site} onSite={onSite} sites={sites} status={status} spends="lookups" helpKey="seo.competitors">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="competitors-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
       {/* Clearing drops the competitor from the address, empties the box and takes its results off the screen: nothing narrowed is left without its chip. */}
       {wanted && <ActiveFilter onClear={() => { clearParams(["competitor"], false); setCompetitor(""); gap.reset(); }} clearLabel="Clear">Competitor: {wanted}{r?.competitor === clean(wanted) ? "" : " — press Find the gap to compare (nothing is bought until then)"}</ActiveFilter>}

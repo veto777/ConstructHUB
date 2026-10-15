@@ -20,8 +20,8 @@ test("start, live progress, report, draft, PDF, share and revoke", async ({
     page.getByRole("heading", { name: "Site Scan", exact: true }),
   ).toBeVisible();
   await page.getByLabel("Website URL").fill("https://sitescan-browser.test");
-  await page.getByLabel("PageSpeed pages").fill("0");
-  await page.getByLabel("Page cap").fill("3");
+  await page.getByLabel("Pages to speed-test", { exact: true }).fill("0");
+  await page.getByLabel("Pages to check", { exact: true }).fill("3");
   const started = page.waitForResponse(
     (r) => r.url().endsWith("/api/sitescan") && r.request().method() === "POST",
   );
@@ -350,8 +350,8 @@ test("agency search with 1,000 locations, bulk queue, factual checklist, done, r
     await page
       .getByRole("button", { name: "Select this page", exact: true })
       .click();
-    await page.getByLabel("PageSpeed pages").fill("0");
-    await page.getByLabel("Page cap", { exact: true }).fill("2");
+    await page.getByLabel("Pages to speed-test", { exact: true }).fill("0");
+    await page.getByLabel("Pages to check", { exact: true }).fill("2");
     const queued = page.waitForResponse(
       (r) =>
         r.url().endsWith("/api/sitescan/bulk") &&

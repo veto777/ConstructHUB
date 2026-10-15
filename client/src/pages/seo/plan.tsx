@@ -191,7 +191,7 @@ export default function SeoPlanPage() {
   const toggleEvidence = (id: number) => setEvidenceOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   return (
-    <SeoShell title="Action plan" description="What you have decided to do about what the SEO tools found — and what is done." site={site} onSite={changeSite} sites={sites} status={status}>
+    <SeoShell title="Action plan" description="What you have decided to do about what the SEO tools found — and what is done." site={site} onSite={changeSite} sites={sites} status={status} helpKey="seo.plan">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="plan-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
       {chip && site && <ActiveFilter onClear={() => clearParams(OWN_PARAMS, false)} clearLabel="All open tasks">{chip}</ActiveFilter>}
       {!site && sites.isSuccess && <Empty testId="plan-empty-sites"><h3>No sites yet</h3><p>Add your site above; findings you choose to act on are kept here for it.</p></Empty>}

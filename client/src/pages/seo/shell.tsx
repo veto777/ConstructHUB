@@ -16,6 +16,7 @@ import { Link, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, X } from "lucide-react";
 import { GoogleSurface } from "@/components/google";
+import { HelpButton } from "@/components/help-button";
 import { AppPage } from "@/components/app-ui";
 import { SegmentedTabs, useToolSlot } from "@/components/tool";
 import { Button } from "@/components/ui/button";
@@ -213,8 +214,14 @@ const PHONE_SIZES = [
   "max-sm:[&_input[type=checkbox]:focus-visible]:[outline-offset:-10px] max-sm:[&_input[type=checkbox]:disabled]:cursor-default max-sm:[&_input[type=checkbox]:disabled]:opacity-50",
 ].join(" ");
 
-export function SeoShell({ title, description, actions, children, site, onSite, sites, status, picker = true, spends }: {
+export function SeoShell({ title, description, actions, children, site, onSite, sites, status, picker = true, spends, helpKey }: {
   title: string; description: string; actions?: ReactNode; children: ReactNode;
+  /**
+   * The page's "i" (shared/help/registry.ts: what the page is for, how to use it, the walkthrough): the key of its help
+   * entry — "seo" for the dashboard, "seo.<page>" for every other SEO page (shared/help/entries/seo/). Every SEO page
+   * passes one; server/seo/help-ui.test.ts checks that each key exists and that every SEO route has one.
+   */
+  helpKey?: string;
   /** false on pages that are not about one tracked site (Site explorer takes any domain). */
   picker?: boolean;
   /**
@@ -236,7 +243,10 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
         {!gate && (slot ? createPortal(bar, slot) : <div className="mb-3 flex flex-wrap items-center gap-2">{bar}</div>)}
         <div className="tool-head">
           <div className="min-w-0">
-            <h1 className="tool-head__title" data-testid="text-page-title">{title}</h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="tool-head__title" data-testid="text-page-title">{title}</h1>
+              {helpKey && <HelpButton k={helpKey} />}
+            </div>
             <p className="tool-head__sub">{description}</p>
           </div>
           {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto">{actions}</div>}
@@ -402,6 +412,35 @@ const DEPTHS = [
   { depth: 50, label: "Top 50" },
   { depth: 100, label: "Top 100" },
 ];
+/** How deep a check reads, as the server accepts it (siteInput.serpDepth: 10 to 100 results). */
+export const DEPTH_MIN = 10, DEPTH_MAX = 100;
+export const DEVICE_OPTIONS: [SeoSite["devices"], string][] = [["both", "Desktop + mobile"], ["desktop", "Desktop only"], ["mobile", "Mobile only"]];
+
+/**
+ * "How deep to check": the usual depths, plus "Custom…" for any depth the server takes (10–100 results) — a preset
+ * list never shuts out a number the server would accept (owner's rule, 2026-10-15).
+ */
+export function DepthPicker({ value, onChange, disabled, testId = "select-site-depth" }: { value: number; onChange: (depth: number) => void; disabled?: boolean; testId?: string }) {
+  const preset = DEPTHS.some((d) => d.depth === value);
+  const [custom, setCustom] = useState(!preset);
+  const [draft, setDraft] = useState(String(value));
+  return (
+    <span className="flex items-center gap-2">
+      <select className="g-input g-select sm:w-auto" value={custom ? "custom" : value} disabled={disabled} aria-label="How deep to check" data-testid={testId}
+        onChange={(e) => { if (e.target.value === "custom") { setCustom(true); setDraft(String(value)); } else { setCustom(false); onChange(Number(e.target.value)); } }}>
+        {DEPTHS.map((d) => <option key={d.depth} value={d.depth}>{d.label}</option>)}
+        <option value="custom">Custom…</option>
+      </select>
+      {custom && (
+        <label className="flex items-center gap-1 text-[13px]"><span className="sr-only">Depth, {DEPTH_MIN} to {DEPTH_MAX} results</span>
+          <input type="number" className="g-input !w-24" min={DEPTH_MIN} max={DEPTH_MAX} step={1} value={draft} disabled={disabled} inputMode="numeric" data-testid={`${testId}-custom`}
+            onChange={(e) => { setDraft(e.target.value); const n = Math.round(Number(e.target.value)); if (Number.isFinite(n) && n >= DEPTH_MIN && n <= DEPTH_MAX) onChange(n); }} />
+          <span className="g-text-2">results ({DEPTH_MIN}–{DEPTH_MAX})</span>
+        </label>
+      )}
+    </span>
+  );
+}
 
 function AddSiteForm({ onDone }: { onDone: (id?: number) => void }) {
   const qc = useQueryClient();
@@ -417,12 +456,10 @@ function AddSiteForm({ onDone }: { onDone: (id?: number) => void }) {
   return (
     <form className="flex w-full flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); if (domain.trim()) m.mutate(); }} data-testid="form-add-site">
       <input className="g-input sm:max-w-[240px]" placeholder="example.com" value={domain} onChange={(e) => setDomain(e.target.value)} autoFocus data-testid="input-site-domain" />
-      <select className="g-input g-select sm:w-auto" value={devices} onChange={(e) => setDevices(e.target.value as any)} aria-label="Devices">
-        <option value="both">Desktop + mobile</option><option value="desktop">Desktop only</option><option value="mobile">Mobile only</option>
+      <select className="g-input g-select sm:w-auto" value={devices} onChange={(e) => setDevices(e.target.value as SeoSite["devices"])} aria-label="Devices">
+        {DEVICE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
-      <select className="g-input g-select sm:w-auto" value={serpDepth} onChange={(e) => setDepth(Number(e.target.value))} aria-label="How deep to check">
-        {DEPTHS.map((d) => <option key={d.depth} value={d.depth}>{d.label}</option>)}
-      </select>
+      <DepthPicker value={serpDepth} onChange={setDepth} />
       <div className="flex gap-2">
         <Button type="submit" disabled={m.isPending || !domain.trim()} data-testid="button-save-site">{m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}</Button>
         <button type="button" className="g-pill" onClick={() => onDone()}>Cancel</button>

@@ -14,8 +14,8 @@ export const CONTENT_KINDS = ["blogs", "news", "organization", "ecommerce", "mes
 export const contentInput = z.object({
   query: z.string().trim().min(2).max(120).regex(/^[^%_\\]+$/, "No % _ or \\ in the search text"),
   sort: z.enum(["relevance", "authority", "newest"]).default("relevance"),
-  /** Only pages published in the last N days. */
-  sinceDays: z.union([z.literal(30), z.literal(90), z.literal(365), z.literal(730)]).optional(),
+  /** Only pages published in the last N days (the page offers 30 / 90 / 365 / 730 and takes any number up to two years). */
+  sinceDays: z.number().int().min(1).max(730).optional(),
   /** Only sites with at least this authority (0–100). */
   minAuthority: z.number().int().min(1).max(100).optional(),
   kind: z.enum(CONTENT_KINDS).optional(),

@@ -9,7 +9,7 @@ import { inNativeApp } from "@/lib/app-shell";
 export default function AccountDeletePage() {
   return (
     <AppPage width="narrow">
-      <PageHeader title="Delete account" />
+      <PageHeader title="Delete account" description={inNativeApp() ? "Delete your ConstructHUB account and everything held for it." : "Deletion is done in the iPhone apps or by a request from your account's email address."} />
       {inNativeApp() ? <AccountDeletionCard /> : (
         <p className="text-sm text-muted-foreground" data-testid="text-account-delete-web">
           To delete your account, go to Settings → Account → Delete account and send the request to

@@ -24,6 +24,8 @@ import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
 import { confirmAction } from "@/components/confirm-dialog";
+import { InfoTip } from "@/components/info-tip";
+import { HelpButton } from "@/components/help-button";
 
 // Cents → "$1,250.50" / "-$200.00": currency style puts the sign before the $.
 const money = (c?: number | null) =>
@@ -237,10 +239,15 @@ export default function CrmProjectPage() {
           </Button>
         </Link>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+          <div className="flex items-center gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+            <InfoTip k="project" />
+            {/* Static key: this title is not a CrmPageHeader, so the route lookup does not reach it. */}
+            <HelpButton k="crm-project" videoOnly />
+          </div>
           <StatusPill tone={statusTone(project.status)}>{project.stageLabel}</StatusPill>
         </div>
-        <div className="text-sm text-muted-foreground">{project.number} · {project.stageGroup}</div>
+        <div className="text-sm text-muted-foreground">{project.number} · {project.stageGroup} — the job's money up top, its working lists in the tabs below.</div>
       </div>
 
       {seeCosts && t && (

@@ -7,9 +7,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, ArrowUpRight, FileSearch, MapPin } from "lucide-react";
+import { ArrowRight, ArrowUpRight, MapPin } from "lucide-react";
 import manifest from "virtual:research-coverage";
 import { Button } from "@/components/ui/button";
+import { GoogleSectionHeader, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { HelpButton } from "@/components/help-button";
 import { stateName } from "@/lib/voice-studio";
 import { COMPLIANCE_PATH, RESEARCH_PATH } from "@shared/research-reports";
 import {
@@ -118,18 +120,24 @@ export default function ResearchCoveragePage() {
 
   return (
     <ComplianceFrame next={RESEARCH_COVERAGE_PATH} testId="page-research-coverage">
-      <header className="space-y-3 max-w-3xl">
-        <p><Link href={RESEARCH_PATH} className="text-sm text-muted-foreground hover:underline">← Research reports</Link></p>
-        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary"><FileSearch className="h-4 w-4" aria-hidden="true" /> What we search</p>
-        <h1 className="text-3xl font-semibold tracking-tight" data-testid="text-coverage-title">What a research report searches, state by state</h1>
-        <p className="text-muted-foreground leading-relaxed">
-          Pick a state to see every official source a report checks there: license boards, discipline and complaint records,
-          stop-work orders, debarments and business filings, and whether each one can be searched by business name, owner,
-          license number, phone or address. This list is built from the same source list the reports use, so it changes when
-          they do. Right now that's {totals.sources} state and local sources, with license records in {totals.withLicenses} of
-          the 50 states and DC.
-        </p>
-      </header>
+      <div>
+        <Link href={RESEARCH_PATH} className="text-sm g-text-2 hover:underline">← Research reports</Link>
+        <GoogleSectionHeader
+          as="h1"
+          titleTestId="text-coverage-title"
+          title="What a report searches"
+          titleAfter={<HelpButton k="compliance.coverage" />}
+          description="Pick a state to see every official source a research report checks there, and what each one can be searched by."
+          flush
+          className="mt-2"
+        />
+      </div>
+      {/* Counted from the build-time manifest the reports themselves use, so the numbers change when the bot does. */}
+      <GoogleStatGrid cols={3}>
+        <GoogleStat label="State and local sources" value={totals.sources.toLocaleString()} hint="Across the 50 states and DC" testId="stat-coverage-sources" />
+        <GoogleStat label="States with license records" value={`${totals.withLicenses} of 51`} testId="stat-coverage-license-states" />
+        <GoogleStat label="Plus, everywhere" value="Permit portals" hint="Every city and county portal we can reach in the states you pick" testId="stat-coverage-portals" />
+      </GoogleStatGrid>
 
       <section className="space-y-3" aria-labelledby="pick-state">
         <h2 id="pick-state" className="font-semibold inline-flex items-center gap-2"><MapPin className="h-4 w-4" aria-hidden="true" /> Pick a state</h2>

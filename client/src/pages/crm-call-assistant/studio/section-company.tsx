@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,9 +30,7 @@ export function CompanySection({ value, onChange, disabled }: SectionProps<Compa
           testid="input-company-phone" placeholder="+13605551234" inputMode="tel" hint={'For "what is your number?" — the office line, never the assistant\'s own.'} />
         <TextField id="company-website" label="Website" value={value.website} onChange={(v) => set("website", v)} disabled={disabled}
           testid="input-company-website" placeholder="https://example.com" inputMode="url" maxLength={300} />
-        <SelectField id="company-timezone" label="Timezone" value={value.timezone} onChange={(v) => set("timezone", v)} disabled={disabled}
-          testid="select-company-timezone" options={US_TIMEZONES.map((t) => ({ value: t.id, label: t.label }))}
-          hint="Hours, reminders and 'call you back tomorrow' all use this clock." />
+        <TimezoneField value={value.timezone} onChange={(v) => set("timezone", v)} disabled={disabled} />
       </div>
       <TextAreaField id="company-about" label="About the company" value={value.about} onChange={(v) => set("about", v)} disabled={disabled}
         testid="textarea-company-about" rows={4} maxLength={2000}
@@ -42,6 +41,44 @@ export function CompanySection({ value, onChange, disabled }: SectionProps<Compa
         <HoursEditor value={value.hours} onChange={(v) => set("hours", v)} disabled={disabled} />
       </div>
     </SectionCard>
+  );
+}
+
+const OTHER_TZ = "__other";
+/** A browser-known IANA zone ("America/Boise"); the profile schema takes any non-empty string, the compiler feeds it to the clock. */
+function knownTimezone(id: string): boolean {
+  try { new Intl.DateTimeFormat("en-US", { timeZone: id }); return true; } catch { return false; }
+}
+
+/**
+ * Timezone: the seven US presets, or "Other" with the zone typed in (owner rule 6, 2026-10-15: a preset list never
+ * blocks a value the server accepts). A typed zone is checked against the browser's zone list as you type.
+ */
+function TimezoneField({ value, onChange, disabled }: SectionProps<string>) {
+  const preset = US_TIMEZONES.some((t) => t.id === value);
+  const [other, setOther] = useState(!preset);
+  const custom = other || !preset;
+  const valid = !custom || knownTimezone(value);
+  return (
+    <div className="space-y-2">
+      <SelectField id="company-timezone" label="Timezone" value={custom ? OTHER_TZ : value} disabled={disabled} testid="select-company-timezone"
+        onChange={(v) => { if (v === OTHER_TZ) { setOther(true); } else { setOther(false); onChange(v); } }}
+        options={[...US_TIMEZONES.map((t) => ({ value: t.id, label: t.label })), { value: OTHER_TZ, label: "Other — type a time zone…" }]}
+        hint="Hours, reminders and 'call you back tomorrow' all use this clock." />
+      {custom && (
+        <div className="space-y-1.5">
+          <Label htmlFor="company-timezone-other" className="sr-only">Time zone name</Label>
+          <Input id="company-timezone-other" value={value} disabled={disabled} placeholder="America/Boise" aria-invalid={!valid} data-testid="input-company-timezone-other"
+            onChange={(e) => onChange(e.target.value.trim())} list="company-timezone-zones" />
+          <datalist id="company-timezone-zones">
+            {(typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : []).map((z) => <option key={z} value={z} />)}
+          </datalist>
+          <p className={valid ? "text-xs text-muted-foreground" : "text-xs text-destructive"} data-testid="text-company-timezone-other-hint">
+            {valid ? "A zone name like America/Boise or Pacific/Guam." : "Not a time zone this browser knows — check the spelling (Region/City)."}
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 

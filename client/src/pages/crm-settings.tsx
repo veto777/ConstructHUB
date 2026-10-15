@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { InfoTip } from "@/components/info-tip";
+import { HelpButton } from "@/components/help-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -762,6 +763,9 @@ export default function CrmSettingsPage() {
         icon={Settings}
         title="Settings"
         infoKey="settings"
+        /* Explicit: the route lookup picks the first /crm/settings entry alphabetically (the brand-colour
+           walkthrough), which is not this page's own. crm-settings has no recording yet, so nothing shows. */
+        help={<HelpButton k="crm-settings" videoOnly />}
         subtitle="Company profile, document defaults, notifications and calendar."
       />
 

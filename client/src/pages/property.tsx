@@ -1,6 +1,6 @@
 import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
 import { planNamesWhere } from "@shared/plan-copy";
-import { propertyJurisdictionLabel, propertyOfficeForDisplay, resolvePropertyScope } from "./property-display";
+import { propertyJurisdictionLabel, propertyOfficeForDisplay, propertyOfficeLinks, resolvePropertyScope } from "./property-display";
 import { PropertyOfficeRow, type PropertyAppraiser } from "@/components/property-office-row";
 import { PropertyMap } from "@/components/property-map";
 import { useState, useMemo, useEffect } from "react";
@@ -15,8 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AppPage, Toolbar, EmptyState, Notice } from "@/components/app-ui";
-import { GoogleSectionHeader, GoogleList } from "@/components/google";
-import { Building, ChevronLeft, ChevronRight } from "lucide-react";
+import { GoogleSectionHeader, GoogleList, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { Building, ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 export default function PropertyPage() {
   const { data: rawAppraisers, isLoading, error, refetch } = useQuery<PropertyAppraiser[]>({
@@ -153,6 +153,19 @@ export default function PropertyPage() {
     setPage(1);
   };
 
+  // The number strip: counted from the office rows themselves with the same rule the row and the map use
+  // (propertyOfficeLinks), so a tile can never promise a link a row does not show.
+  const officeTotals = useMemo(() => {
+    const rows = appraisers ?? [];
+    const links = rows.map(propertyOfficeLinks);
+    return {
+      offices: rows.length,
+      states: new Set(rows.map((a) => a.county?.stateCode).filter(Boolean)).size,
+      site: links.filter((l) => l.showPortal || l.showSearch).length,
+      phoneOnly: links.filter((l) => !(l.showPortal || l.showSearch) && l.shade === "phone").length,
+    };
+  }, [appraisers]);
+
   const hasFilters = stateFilter !== "all" || countyFilter !== "all" || searchQuery.trim() !== "";
   const activeFilters = (stateFilter !== "all" ? 1 : 0) + (countyFilter !== "all" ? 1 : 0);
 
@@ -170,9 +183,17 @@ export default function PropertyPage() {
         as="h1"
         titleTestId="text-property-title"
         title="Property records"
-        description={`Find assessor and appraiser offices. Their own sites hold ownership, values, construction history and tax records where published. Included with ${planNamesWhere(p => p.modules.propertyRecords)}.`}
+        description="Find the county assessor or appraiser office that holds a property's ownership, value and tax records, and open its official site."
         flush
       />
+
+      {appraisers && appraisers.length > 0 && (
+        <GoogleStatGrid cols={3}>
+          <GoogleStat label="Offices on record" value={officeTotals.offices.toLocaleString()} hint={`${officeTotals.states} states · from NETR Online's directory`} testId="stat-property-offices" />
+          <GoogleStat label="Offices with a records site" value={officeTotals.site.toLocaleString()} hint="An official site on record that passed its check (the map counts counties)" testId="stat-property-sites" />
+          <GoogleStat label="Offices with phone only" value={officeTotals.phoneOnly.toLocaleString()} hint="No usable site link on record; a web search is offered instead" testId="stat-property-phone-only" />
+        </GoogleStatGrid>
+      )}
 
       {/* County map (owner, 2026-10-14): each county shaded by what the list holds for it; a click shows
           the same office row the list shows and can filter the list to that county. */}
@@ -226,17 +247,25 @@ export default function PropertyPage() {
             <div key={i} className="h-24 animate-pulse g-divider" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && appraisers && appraisers.length > 0 ? (
         <EmptyState
           icon={Building}
-          title={appraisers && appraisers.length > 0 ? "No offices match your filters" : "No offices on record yet"}
-          description={appraisers && appraisers.length > 0 ? "Try a different search or state." : "Appraiser portals appear here as they are verified."}
+          title="No offices match your filters"
+          description="Try a different search or state. Only offices on record match; nothing is guessed."
           action={hasFilters ? (
             <Button variant="outline" size="sm" onClick={clearFilters} data-testid="button-clear-empty">
               Clear filters
             </Button>
           ) : undefined}
         />
+      ) : filtered.length === 0 ? (
+        /* Nothing on record at all (a fresh database): say what will appear and where it comes from. No sample offices (CLAUDE.md). */
+        <div className="g-callout" data-testid="empty-property-offices">
+          <h3>No offices on record yet</h3>
+          <p>One row per county assessor or property appraiser office will appear here: its name, county and address, with Open portal and Search records when its official site is on record, “Find property records” (a web search) when it is not, and Call when a phone number is.</p>
+          <p className="mt-2">The list comes from NETR Online's directory of assessor and appraiser offices, loaded into ConstructHUB's reference data and checked link by link; it is filled when the server's reference data is seeded. Until then, search the web for the county's assessor.</p>
+          <div className="mt-3"><GooglePill icon={Search} label="Find a county assessor on the web" href="https://www.google.com/search?q=county+assessor+property+records" external testId="link-property-empty-search" /></div>
+        </div>
       ) : (
         <>
           <p className="g-text-2 text-sm tabular-nums" aria-live="polite" data-testid="text-result-count">

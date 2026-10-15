@@ -1,6 +1,8 @@
 import { Tabs, TabsTrigger } from "@/components/ui/tabs";
 import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
-import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid, GoogleList, GoogleListRow } from "@/components/google";
+import { HelpButton } from "@/components/help-button";
+import { SamplePreview } from "@/components/sample-preview";
 import { useAppOrigin } from "@/lib/app-origin";
 import { useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
@@ -104,6 +106,63 @@ const FRAUD_TABS = ["Blocked IPs", "Countries", "Multi-Clicks", "Devices", "Brow
 
 const PAGE_TABS = ["dashboard", "traffic", "fraud", "tools", "settings", "link-ads"] as const;
 type PageTab = typeof PAGE_TABS[number];
+// The "i" beside the title: each section mounts the help entry (and recorded walkthrough) that is about it (shared/help/registry.ts, entries/google-ads/click-guard.*).
+const HELP_BY_TAB: Record<PageTab, string> = { dashboard: "click-guard", traffic: "click-guard.traffic-at-a-glance", fraud: "click-guard.flags-with-a-reason", tools: "click-guard.tools", settings: "click-guard.your-exclusion-rules", "link-ads": "click-guard.a-script-for-your-ads-account" };
+// One plain sentence under the title, per section.
+const DESCRIPTION: Record<PageTab, string> = {
+  dashboard: "Visits to the pages your ads send people to, and how many of them looked like bad traffic.",
+  traffic: "Which sites sent each visit, with page loads and visitors per source.",
+  fraud: "The IPs Click Guard blocked and why, plus the visits broken down by country, device, browser and operating system.",
+  tools: "The tracking code to put on every page your ads point to.",
+  settings: "The IPs you always exclude, the ones you never block, and how long the exclusion list is.",
+  "link-ads": "The script that adds your blocked IPs as exclusions inside your own Google Ads account.",
+};
+/** The three presets of the date range, plus a typed From/To (owner 2026-10-15: every preset-only filter takes a custom value). */
+type CustomRange = { start: string; end: string };
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const daysAgoISO = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+function RangePicker({ dateRange, setDateRange, custom, setCustom, testPrefix }: { dateRange: string; setDateRange: (r: string) => void; custom: CustomRange; setCustom: (c: CustomRange) => void; testPrefix: string }) {
+  return (
+    <>
+      {["1d", "7d", "30d"].map(r => (
+        <GooglePill key={r} size="sm" selected={dateRange === r} ariaPressed={dateRange === r} label={r === "1d" ? "Daily" : r === "7d" ? "Last 7 days" : "Last 30 days"} onClick={() => setDateRange(r)} testId={`${testPrefix}-${r}`} />
+      ))}
+      <GooglePill size="sm" selected={dateRange === "custom"} ariaPressed={dateRange === "custom"} label="Custom dates" onClick={() => setDateRange("custom")} testId={`${testPrefix}-custom`} />
+      {dateRange === "custom" && (
+        <span className="flex flex-wrap items-center gap-2 text-sm">
+          <label className="flex items-center gap-1">From <input type="date" className="g-input !w-auto !py-1" value={custom.start} max={custom.end || todayISO()} onChange={e => setCustom({ ...custom, start: e.target.value })} data-testid={`${testPrefix}-start`} /></label>
+          <label className="flex items-center gap-1">To <input type="date" className="g-input !w-auto !py-1" value={custom.end} min={custom.start} max={todayISO()} onChange={e => setCustom({ ...custom, end: e.target.value })} data-testid={`${testPrefix}-end`} /></label>
+        </span>
+      )}
+    </>
+  );
+}
+/** A plain three-step card above a bare form (owner 2026-10-15: explain every form in a busy contractor's words). */
+function HowThisWorks({ steps, testId }: { steps: string[]; testId?: string }) {
+  return (
+    <Section flush testId={testId}>
+      <CardHeader><CardTitle className="g-card__title g-card__title--md">How this works</CardTitle></CardHeader>
+      <CardContent><ol className="list-decimal space-y-1.5 pl-5 text-sm">{steps.map((st) => <li key={st}>{st}</li>)}</ol></CardContent>
+    </Section>
+  );
+}
+/** Obviously made-up figures, shown only while no website is tracked (components/sample-preview.tsx rules). */
+function SampleDashboard() {
+  return (
+    <>
+      <GoogleStatGrid cols={4} className="mb-3">
+        <GoogleStat label="Visits" value="1,240" hint="Last 7 days" />
+        <GoogleStat label="Blocked IPs" value="12" tone="bad" />
+        <GoogleStat label="Unique visitors" value="980" />
+        <GoogleStat label="Visits per visitor" value="1.3" />
+      </GoogleStatGrid>
+      <GoogleList>
+        <GoogleListRow size="md" title="203.0.113.42" badges={<span className="g-chip g-chip--sm g-closed">Blocked · auto</span>} meta={["High frequency: 11 visits in an hour", "Sample Roofing Co. landing page", "Today 9:14 AM"]} actions={<GooglePill size="sm" label="Unblock" />} />
+        <GoogleListRow size="md" title="198.51.100.7" badges={<span className="g-chip g-chip--sm">Flagged</span>} meta={["Bot user agent detected", "Sample Roofing Co. landing page", "Yesterday 4:02 PM"]} actions={<GooglePill size="sm" label="Block" />} />
+      </GoogleList>
+    </>
+  );
+}
 
 // Clipboard writes can be refused (no permission, insecure context, some
 // browsers). Report what happened instead of announcing a copy that failed.
@@ -149,6 +208,7 @@ export default function ClickGuardPage() {
   const setSelectedDomainId = (id: number | null) => updateUrl({ domain: id });
   const [fraudTab, setFraudTab] = useState("Blocked IPs");
   const [dateRange, setDateRange] = useState("7d");
+  const [customRange, setCustomRange] = useState<CustomRange>(() => ({ start: daysAgoISO(14), end: todayISO() }));
   const [showAddDomain, setShowAddDomain] = useState(false);
   const [newDomain, setNewDomain] = useState("");
   const [newDomainName, setNewDomainName] = useState("");
@@ -162,17 +222,20 @@ export default function ClickGuardPage() {
   const selectedDomain = domains.find(d => d.id === selectedDomainId) || domains[0];
   const domainId = selectedDomain?.id;
 
-  const dateStart = new Date(Date.now() - (dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 1) * 24 * 60 * 60 * 1000).toISOString();
-  const dateEnd = new Date().toISOString();
+  // A typed From/To covers whole days (local time); a preset counts back from now.
+  const customOk = dateRange === "custom" && !!customRange.start && !!customRange.end && customRange.start <= customRange.end;
+  const dateStart = customOk ? new Date(`${customRange.start}T00:00:00`).toISOString() : new Date(Date.now() - (dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 1) * 24 * 60 * 60 * 1000).toISOString();
+  const dateEnd = customOk ? new Date(`${customRange.end}T23:59:59.999`).toISOString() : new Date().toISOString();
+  const rangeKey = customOk ? `custom:${customRange.start}:${customRange.end}` : dateRange === "custom" ? "1d" : dateRange;
 
   const { data: analytics } = useQuery<Analytics>({
-    queryKey: ["/api/click-guard/domains", domainId, "analytics", dateRange],
+    queryKey: ["/api/click-guard/domains", domainId, "analytics", rangeKey],
     queryFn: () => fetch(`/api/click-guard/domains/${domainId}/analytics?start=${dateStart}&end=${dateEnd}`).then(r => r.json()),
     enabled: !!domainId,
   });
 
   const { data: visits = [] } = useQuery<ClickVisit[]>({
-    queryKey: ["/api/click-guard/domains", domainId, "visits", dateRange],
+    queryKey: ["/api/click-guard/domains", domainId, "visits", rangeKey],
     queryFn: () => fetch(`/api/click-guard/domains/${domainId}/visits?start=${dateStart}&end=${dateEnd}`).then(r => r.json()),
     enabled: !!domainId,
   });
@@ -266,19 +329,24 @@ export default function ClickGuardPage() {
   const dailyEntries = analytics?.dailyVisits ? Object.entries(analytics.dailyVisits).sort((a, b) => a[0].localeCompare(b[0])) : [];
   const maxDailyVisits = Math.max(...dailyEntries.map(([, v]) => v), 1);
 
+  const helpKey = HELP_BY_TAB[activeTab];
   return (
     <AppPage className="[&_button]:min-h-10">
       {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
       <GoogleSectionHeader
         as="h1"
+        helpKey={helpKey}
         titleTestId="text-page-title"
         title={activeTab === "dashboard" ? "Click Guard" : CLICK_GUARD_TABS.find(([key]) => key === activeTab)![2]}
-        description={<><span data-testid="text-subtitle">Track website visits and review unusual traffic.</span> <span className="g-chip g-chip--sm ml-1 align-middle" data-testid="badge-click-guard">Google Click Guard</span></>}
+        description={<><span data-testid="text-subtitle">{DESCRIPTION[activeTab]}</span> <span className="g-chip g-chip--sm ml-1 align-middle" data-testid="badge-click-guard">Google Click Guard</span></>}
         flush
         actions={<GooglePill icon={Plus} variant={showAddDomain ? "outline" : "solid"} label="Add domain" onClick={() => setShowAddDomain(true)} testId="button-add-domain" />} />
       {/* The site every section is about: in the tool bar inside the Google Ads tool, here otherwise. */}
       {selectedDomain && <ToolBarSlot><label className="flex min-w-0 items-center gap-2 text-sm"><span className={inShell ? "shrink-0 opacity-80" : "sr-only"}>Website</span><select aria-label="Website domain" className="h-10 w-full sm:w-72 rounded-md border bg-card px-3 text-sm text-foreground" value={domainId || ""} onChange={e => setSelectedDomainId(Number(e.target.value))} data-testid="select-domain">{domains.map(d => <option key={d.id} value={d.id}>{d.name || d.domain}</option>)}</select></label></ToolBarSlot>}
       <details className="text-sm text-muted-foreground"><summary className="cursor-pointer py-2">How protection works</summary><p>Signals do not prove fraud. Apply IP exclusions using the separate Google Ads script.</p></details>
+          {showAddDomain && (
+            <HowThisWorks testId="how-add-domain" steps={["Type the website your ads send people to (example.com) and a name for your own list.", "Under Tools, copy the tracking code and put it in the <head> of every page on that site.", "Visits start counting on the Dashboard; flagged IPs collect under Traffic signals, and the Google Ads script excludes them in your campaigns."]} />
+          )}
           {showAddDomain && (
             <Section flush className="bg-card border-border mb-6" testId="card-add-domain">
               <CardContent className="p-4">
@@ -367,6 +435,7 @@ export default function ClickGuardPage() {
                   <div className="animate-spin h-8 w-8 border-2 border-border border-t-transparent rounded-full" />
                 </div>
               ) : !selectedDomain ? (
+                <>
                 <Section flush className="bg-card border-border">
                   <CardContent className="p-12 text-center">
                     <Shield className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
@@ -375,6 +444,10 @@ export default function ClickGuardPage() {
                     <GooglePill icon={Plus} label="Add your first domain" onClick={() => setShowAddDomain(true)} testId="button-add-first-domain" />
                   </CardContent>
                 </Section>
+                  <SamplePreview what={activeTab === "dashboard" ? "what the Dashboard shows once a website is tracked" : "what Click Guard shows once a website is tracked"} testId="sample-click-guard" className="mt-4" cta={<GooglePill size="sm" variant="solid" icon={Plus} label="Add your first domain" onClick={() => setShowAddDomain(true)} />}>
+                    <SampleDashboard />
+                  </SamplePreview>
+                </>
               ) : (
                 <>
                   {activeTab === "dashboard" && (
@@ -382,6 +455,8 @@ export default function ClickGuardPage() {
                       analytics={analytics}
                       dateRange={dateRange}
                       setDateRange={setDateRange}
+                      custom={customRange}
+                      setCustom={setCustomRange}
                       threatColor={threatColor}
                       threatBg={threatBg}
                       dailyEntries={dailyEntries}
@@ -395,6 +470,8 @@ export default function ClickGuardPage() {
                       analytics={analytics}
                       dateRange={dateRange}
                       setDateRange={setDateRange}
+                      custom={customRange}
+                      setCustom={setCustomRange}
                     />
                   )}
 
@@ -843,10 +920,12 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
 }
 
 
-function DashboardView({ analytics, dateRange, setDateRange, threatColor, threatBg, dailyEntries, maxDailyVisits, domain }: {
+function DashboardView({ analytics, dateRange, setDateRange, custom, setCustom, threatColor, threatBg, dailyEntries, maxDailyVisits, domain }: {
   analytics: Analytics | undefined;
   dateRange: string;
   setDateRange: (r: string) => void;
+  custom: CustomRange;
+  setCustom: (c: CustomRange) => void;
   threatColor: string;
   threatBg: string;
   dailyEntries: [string, number][];
@@ -862,19 +941,7 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
 
   return (
     <div className="space-y-6">
-      <Toolbar filters={<>
-        {["1d", "7d", "30d"].map(r => (
-          <GooglePill
-            key={r}
-            size="sm"
-            selected={dateRange === r}
-            ariaPressed={dateRange === r}
-            label={r === "1d" ? "Daily" : r === "7d" ? "Last 7 days" : "Last 30 days"}
-            onClick={() => setDateRange(r)}
-            testId={`button-range-${r}`}
-          />
-        ))}
-      </>} />
+      <Toolbar filters={<RangePicker dateRange={dateRange} setDateRange={setDateRange} custom={custom} setCustom={setCustom} testPrefix="button-range" />} />
 
       <GoogleStatGrid cols={4}>{stats.map(s => <GoogleStat key={s.label} label={s.label === "Unique Visitors" ? "Unique visitors" : s.label === "Avg Visits/User" ? "Visits per visitor" : s.label} value={typeof s.value === "number" ? s.value.toLocaleString() : s.value} testId={`card-stat-${s.label.toLowerCase().replace(/[\s\/]/g, "-")}`} />)}</GoogleStatGrid>
 
@@ -1021,10 +1088,12 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
   );
 }
 
-function TrafficSourcesView({ analytics, dateRange, setDateRange }: {
+function TrafficSourcesView({ analytics, dateRange, setDateRange, custom, setCustom }: {
   analytics: Analytics | undefined;
   dateRange: string;
   setDateRange: (r: string) => void;
+  custom: CustomRange;
+  setCustom: (c: CustomRange) => void;
 }) {
   const sources = analytics?.trafficSources ?? [];
   const totalPageLoads = sources.reduce((sum, s) => sum + s.pageLoads, 0);
@@ -1036,19 +1105,7 @@ function TrafficSourcesView({ analytics, dateRange, setDateRange }: {
         <h3 className="g-header__title flex items-center gap-2" data-testid="text-traffic-title">
           <Globe className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> Traffic sources by domain / vendor
         </h3>
-        <Toolbar filters={<>
-          {["1d", "7d", "30d"].map(r => (
-            <GooglePill
-              key={r}
-              size="sm"
-              selected={dateRange === r}
-              ariaPressed={dateRange === r}
-              label={r === "1d" ? "Daily" : r === "7d" ? "Last 7 days" : "Last 30 days"}
-              onClick={() => setDateRange(r)}
-              testId={`button-traffic-range-${r}`}
-            />
-          ))}
-        </>} />
+        <Toolbar filters={<RangePicker dateRange={dateRange} setDateRange={setDateRange} custom={custom} setCustom={setCustom} testPrefix="button-traffic-range" />} />
       </div>
 
       <GoogleStatGrid cols={3}>
@@ -1184,6 +1241,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                   >
                     <Ban className="h-3 w-3 mr-1" /> Block
                   </Button>
+                  <HelpButton k="click-guard.automatic-and-manual-blocks" />
                 </div>
                 {blockedIps.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -1487,7 +1545,7 @@ function ToolsView({ domain, scriptSnippet, copyScript }: {
       <Section flush className="bg-card border-border" testId="card-tracking-script">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-muted-foreground" /> Tracking script
+            <ShieldCheck className="h-5 w-5 text-muted-foreground" /> Tracking script <HelpButton k="click-guard.one-device-many-ips" />
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0">

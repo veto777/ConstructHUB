@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Hash, Loader2, Pencil, Plus, AlertTriangle } from "lucide-react";
 import { EmptyState } from "@/components/crm-ui";
+import { GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
@@ -21,6 +22,9 @@ import { CALL_ASSISTANT_NUMBER_RULES, formatUsd } from "@shared/plan-copy";
 import { BuyNumberWizard } from "./numbers-buy";
 import { ForwardingInstructions } from "./numbers-forwarding";
 import { NUMBERS_KEY, NumberStatusPill, formatDate, formatPhone, type NumbersResponse, type VoiceNumber } from "./numbers-shared";
+import { HowItWorks } from "./how-it-works";
+import { SampleNumbersPreview } from "./samples";
+import type { VoiceStatus } from "./index";
 
 /**
  * Numbers tab — buy-by-state wizard (state → area code / city → pick → label
@@ -36,6 +40,8 @@ const stalePending = (n: { status: string; createdAt: string | null }) =>
 export function NumbersPanel({ canManage }: { canManage: boolean }) {
   const { toast } = useToast();
   const q = useQuery<NumbersResponse>({ queryKey: [NUMBERS_KEY] });
+  // This month's calls, minutes and spam for the stat row: the page shell already holds /status (same cache key).
+  const status = useQuery<VoiceStatus>({ queryKey: ["/api/crm/voice/status"] });
   const [buying, setBuying] = useState(false);
   const [justBought, setJustBought] = useState<string | null>(null);
   const [editing, setEditing] = useState<VoiceNumber | null>(null);
@@ -73,24 +79,31 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
 
   return (
     <div data-testid="panel-call-assistant-numbers" className="space-y-4 pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-0.5">
-          <p className="text-sm font-medium" data-testid="text-voice-numbers-allowance">
-            {d.allowance.used} of {d.allowance.numbers} number{d.allowance.numbers === 1 ? "" : "s"} in use
-          </p>
-          {/* Extra-number pricing and "move to a bigger tier" are sales — not in the app (3.1.3(f)). */}
-          {!inNativeApp() && (
-          <p className="text-xs text-muted-foreground">
-            {d.allowance.includedNumbers} included with your tier; more are {formatUsd(d.allowance.extraNumberMonthlyCents)}/mo each ({ADDONS.call_number.name}), or move to a bigger tier.
-          </p>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {d.mock && <Badge variant="outline" data-testid="badge-voice-numbers-mock-list">Mock carrier — not real numbers</Badge>}
-          {manage && d.configured && !full && !showWizard && !inNativeApp() && (
-            <Button size="sm" onClick={() => setBuying(true)} data-testid="button-voice-number-add"><Plus className="h-4 w-4 mr-1.5" aria-hidden="true" />Add a number</Button>
-          )}
-        </div>
+      {/* The SEO Suite's dashboard look (owner, 2026-10-15): a stat row first, then one card per number with pill actions. */}
+      <GoogleStatGrid cols={4}>
+        <GoogleStat label="Numbers in use" testId="text-voice-numbers-allowance"
+          value={<><span data-testid="text-voice-numbers-used">{d.allowance.used}</span> of {d.allowance.numbers}</>}
+          hint={inNativeApp() ? `${d.allowance.includedNumbers} included on this account` : `${d.allowance.includedNumbers} included with your tier · more are ${formatUsd(d.allowance.extraNumberMonthlyCents)}/mo each (${ADDONS.call_number.name})`} />
+        <GoogleStat label="Calls this month" testId="metric-numbers-calls" href="/call-assistant/calls"
+          value={(status.data?.usage?.calls ?? 0).toLocaleString("en-US")} hint="Answered on these numbers" />
+        <GoogleStat label="Minutes this month" testId="metric-numbers-minutes" href="/call-assistant"
+          value={(status.data?.usage?.minutes ?? 0).toLocaleString("en-US")}
+          hint={status.data ? status.data.allowance.minutes < 0 ? "Unlimited minutes" : `of ${(status.data.allowance.minutes || status.data.pricing.includedMinutes).toLocaleString("en-US")} included` : undefined} />
+        <GoogleStat label="Spam stopped this month" testId="metric-numbers-spam" href="/call-assistant/calls?view=spam"
+          value={(status.data?.usage?.spamCallsThisMonth ?? 0).toLocaleString("en-US")} hint="Never reached you" />
+      </GoogleStatGrid>
+
+      <HowItWorks testId="how-numbers-work" steps={[
+        ["Get a local number", "Pick a state, and an area code or city if you like, then choose one of the numbers the carrier offers."],
+        ["Forward your existing line to it", "Dial the star code shown for your carrier, or copy the digits into your phone system. Your own number stays with your phone company."],
+        ["The assistant answers first", "Telemarketers and robocalls are flagged and never reach you; real callers become leads, and urgent calls reach the right person on your team."],
+      ]} />
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {d.mock && <Badge variant="outline" data-testid="badge-voice-numbers-mock-list">Mock carrier — not real numbers</Badge>}
+        {manage && d.configured && !full && !showWizard && !inNativeApp() && (
+          <GooglePill variant="solid" icon={Plus} onClick={() => setBuying(true)} label="Add a number" testId="button-voice-number-add" />
+        )}
       </div>
 
       <Section flush testId="card-voice-numbers-rules">
@@ -146,6 +159,13 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
         <EmptyState icon={Hash} title="No numbers yet" description="A manager sets numbers up on the full website; they show here once added." />
       )}
 
+      {/* No real number yet (and none being set up): a clearly marked sample of a number card. Gone the moment one exists. */}
+      {shown.length === 0 && (
+        <SampleNumbersPreview cta={manage && d.configured && !full && !inNativeApp() && !showWizard
+          ? <GooglePill size="sm" icon={Plus} onClick={() => setBuying(true)} label="Get a number" testId="button-sample-get-number" />
+          : undefined} />
+      )}
+
       {/* The iPhone apps sell nothing: the buy-a-number wizard (and its monthly price) stays off the app. */}
       {showWizard && !inNativeApp() && (
         <BuyNumberWizard
@@ -157,56 +177,46 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
       )}
 
       {shown.length > 0 && (
-        <div className="grid gap-3" data-testid="list-voice-numbers">
+        <GoogleList as="ul" testId="list-voice-numbers">
           {shown.map((n) => (
-            <Section flush key={n.id} testId={`card-voice-number-${n.id}`}>
-              <CardContent className="flex flex-wrap items-start justify-between gap-3 p-4">
-                <div className="min-w-0 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-base font-semibold tabular-nums" data-testid={`text-voice-number-phone-${n.id}`}>{formatPhone(n.phoneNumber)}</span>
-                    <NumberStatusPill status={n.status} testId={`status-voice-number-${n.id}`} />
-                    {n.isTest && <Badge variant="outline">Test number</Badge>}
-                    {n.provider === "mock" && <Badge variant="outline">Mock</Badge>}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {[n.label, n.location].filter(Boolean).join(" · ") || "No label"}
-                    {n.forwardingFrom ? ` · forwarded from ${formatPhone(n.forwardingFrom)}` : ""}
-                  </p>
-                  <p className="text-xs text-muted-foreground" data-testid={`text-voice-number-dates-${n.id}`}>
-                    {n.purchasedAt ? `Bought ${formatDate(n.purchasedAt)}` : "Not bought"}
-                    {n.status === "active" && n.releaseEligibleAt
-                      ? n.releasable ? " · can be released any time" : ` · can be released from ${formatDate(n.releaseEligibleAt)}`
-                      : ""}
-                    {` · ${n.monthlyCents > 0 ? (inNativeApp() ? "extra number" : `${formatUsd(n.monthlyCents)}/mo extra number`) : "included"}`}
-                  </p>
-                  {n.status === "releasing" && n.releaseReason && (
-                    <p className="text-xs text-amber-700 dark:text-amber-400" data-testid={`text-voice-number-releasing-${n.id}`}>
-                      Not answering calls: being released because {n.releaseReasonText ?? "the subscription ended"}
-                      {n.releaseEligibleAt && new Date(n.releaseEligibleAt).getTime() > Date.now() ? ` — it goes back to the carrier on ${formatDate(n.releaseEligibleAt)}` : ""}.
-                      Turn off forwarding to it.
-                    </p>
-                  )}
-                  {n.lastError && <p className="text-xs text-destructive" data-testid={`text-voice-number-error-${n.id}`}>{n.lastError}</p>}
-                </div>
-                {manage && (
-                  <div className="flex flex-wrap gap-2">
-                    {n.status === "active" && (
-                      <Button size="sm" variant="outline" onClick={() => setEditing(n)} data-testid={`button-voice-number-edit-${n.id}`}><Pencil className="h-4 w-4 mr-1.5" aria-hidden="true" />Edit</Button>
-                    )}
-                    {(n.status === "active" || n.status === "failed" || stalePending(n)) && (
-                      <Button size="sm" variant="ghost" className="text-destructive"
-                        disabled={n.status === "active" && !n.releasable}
-                        title={n.status === "active" && !n.releasable ? `The carrier keeps a number for ${d.minDays} days; release from ${formatDate(n.releaseEligibleAt)}.` : undefined}
-                        onClick={() => setReleasing(n)} data-testid={`button-voice-number-release-${n.id}`}>
-                        {n.status === "active" ? "Release" : "Dismiss"}
-                      </Button>
-                    )}
-                  </div>
+            <GoogleListRow as="li" key={n.id} testId={`card-voice-number-${n.id}`}
+              title={<span className="tabular-nums" data-testid={`text-voice-number-phone-${n.id}`}>{formatPhone(n.phoneNumber)}</span>}
+              badges={<>
+                <NumberStatusPill status={n.status} testId={`status-voice-number-${n.id}`} />
+                {n.isTest && <span className="g-chip g-chip--sm">Test number</span>}
+                {n.provider === "mock" && <span className="g-chip g-chip--sm">Mock</span>}
+              </>}
+              meta={[n.label || n.location ? null : "No label", n.label, n.location, n.forwardingFrom ? `forwarded from ${formatPhone(n.forwardingFrom)}` : null]}
+              line={<span data-testid={`text-voice-number-dates-${n.id}`}>
+                {n.purchasedAt ? `Bought ${formatDate(n.purchasedAt)}` : "Not bought"}
+                {n.status === "active" && n.releaseEligibleAt
+                  ? n.releasable ? " · can be released any time" : ` · can be released from ${formatDate(n.releaseEligibleAt)}`
+                  : ""}
+                {` · ${n.monthlyCents > 0 ? (inNativeApp() ? "extra number" : `${formatUsd(n.monthlyCents)}/mo extra number`) : "included"}`}
+              </span>}
+              actions={manage ? <>
+                {n.status === "active" && (
+                  <GooglePill size="sm" icon={Pencil} onClick={() => setEditing(n)} label="Edit" testId={`button-voice-number-edit-${n.id}`} />
                 )}
-              </CardContent>
-            </Section>
+                {(n.status === "active" || n.status === "failed" || stalePending(n)) && (
+                  <GooglePill size="sm" variant={n.status === "active" ? "danger" : "quiet"}
+                    disabled={n.status === "active" && !n.releasable}
+                    title={n.status === "active" && !n.releasable ? `The carrier keeps a number for ${d.minDays} days; release from ${formatDate(n.releaseEligibleAt)}.` : undefined}
+                    onClick={() => setReleasing(n)} label={n.status === "active" ? "Release" : "Dismiss"} testId={`button-voice-number-release-${n.id}`} />
+                )}
+              </> : undefined}
+            >
+              {n.status === "releasing" && n.releaseReason && (
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400" data-testid={`text-voice-number-releasing-${n.id}`}>
+                  Not answering calls: being released because {n.releaseReasonText ?? "the subscription ended"}
+                  {n.releaseEligibleAt && new Date(n.releaseEligibleAt).getTime() > Date.now() ? ` — it goes back to the carrier on ${formatDate(n.releaseEligibleAt)}` : ""}.
+                  Turn off forwarding to it.
+                </p>
+              )}
+              {n.lastError && <p className="mt-1 text-xs text-destructive" data-testid={`text-voice-number-error-${n.id}`}>{n.lastError}</p>}
+            </GoogleListRow>
           ))}
-        </div>
+        </GoogleList>
       )}
 
       {released.length > 0 && (

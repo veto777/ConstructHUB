@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
-import { HELP_ENTRIES, HELP_FEATURES, HELP_GROUPS, helpEntry, helpMatches, helpSections, helpSummary, isCrmRoute } from "@shared/help/registry";
+import { HELP_ENTRIES, HELP_FEATURES, HELP_GROUPS, INTRO_FALLBACKS, NO_INTRO_FALLBACK, helpEntry, helpKeyForRoute, helpMatches, helpSections, helpSummary, introFallbackKey, isCrmRoute } from "@shared/help/registry";
 import { parseTutorialScript, STEP_ACTIONS } from "@shared/help/step-script";
 import { TUTORIAL_FILE, VIDEO_MANIFEST, helpVideoFor, tutorialMediaUrl } from "@shared/help/videos";
 import { createHash } from "crypto";
@@ -110,7 +110,8 @@ describe("help registry", () => {
       expect(parent, `${e.key} parent`).toBeTruthy();
       expect(parent!.parent, `${e.key} is nested two deep`).toBeUndefined();
       expect(e.key.startsWith(`${parent!.key}.`), `${e.key} key prefix`).toBe(true);
-      expect(e.route).toBe(parent!.route);
+      // A section shares its feature's route, or declares one under it ("/call-assistant/calls") so the page title's "i" switches per view (helpKeyForRoute).
+      expect(e.route === parent!.route || e.route.startsWith(`${parent!.route}/`), `${e.key} route ${e.route} is under ${parent!.route}`).toBe(true);
       expect(e.group).toBe(parent!.group);
     }
     expect(helpSections("cloudflare").length).toBe(7);
@@ -204,8 +205,20 @@ describe("help registry", () => {
         // With no recording, the text must not point at one.
         const text = [e.title, e.whatItIs, e.whatItDoes, e.howItWorks, ...e.howToUse, ...(e.needs ?? [])].join(" ");
         expect(text, `${e.key} mentions a video it does not have`).not.toMatch(/walkthrough|tutorial video|watch the video/i);
+        // The panel's film is then the feature's intro film — only through the reviewed map, and labelled as an intro.
+        const fallback = introFallbackKey(e);
+        if (e.film) {
+          expect(e.videoSource, `${e.key} film source`).toBe("intro");
+          expect(fallback && INTRO_KEYS.has(fallback), `${e.key} plays a film that is not its feature's intro film`).toBe(true);
+          expect(e.film).toEqual(helpVideoFor(fallback!));
+        } else {
+          expect(e.videoSource, `${e.key} has no film`).toBeNull();
+          expect(fallback === undefined || helpVideoFor(fallback) === null, `${e.key}: its feature's intro film exists but is not the panel's film`).toBe(true);
+        }
         continue;
       }
+      expect(e.videoSource, `${e.key} film source`).toBe("walkthrough");
+      expect(e.film, `${e.key}: the panel plays the walkthrough itself`).toEqual(e.video);
       expectRealRecording(e.key, e.video);
     }
     // The feature pages' intro films: the same proof, under their own keys (none of them is a help entry).
@@ -213,14 +226,18 @@ describe("help registry", () => {
       // An intro film has no written entry: helpEntry() synthesizes an unlisted one from its feature page (no card, no "i").
       expect(HELP_ENTRIES.some((e) => e.key === key), `${key} must not be a written help entry`).toBe(false);
       expect(helpEntry(key)?.unlisted, `${key} resolves to a synthesized, unlisted entry`).toBe(true);
+      expect(helpEntry(key)?.videoSource, `${key} is an intro film`).toBe("intro");
       expectRealRecording(key, helpVideoFor(key)!);
     }
     // The intro frame never shows a play control without a video either.
     const intro = read("client/src/components/feature-landing/intro-video.tsx");
     expect(intro).toMatch(/const video = featureIntroVideo\(featureKey\);\s*if \(!video\) return null;/);
-    // The UI never shows a play control for a null video: both are gated on `entry.video`.
+    // The UI never shows a play control without a film: the play button, the dialog and the panel are gated on `entry.film`,
+    // and the label follows `videoSource` so an overview film is never called a walkthrough.
     const button = read("client/src/components/help-button.tsx");
-    expect(button).toMatch(/\{entry\.video && \(\s*<>\s*<button[^>]*aria-label=\{`Watch the walkthrough/);
+    expect(button).toMatch(/\{entry\.film && \(\s*<>\s*<button[^>]*aria-label=\{`Watch the \$\{filmNoun\(entry\)\}/);
+    expect(button).toMatch(/if \(!entry\.film\) return null;/);
+    expect(button).toContain('entry.videoSource === "intro" ? "overview film" : "walkthrough"');
     expect(button).toContain("Video walkthrough coming soon");
     const page = read("client/src/pages/tutorials.tsx");
     // The player also waits for "Watch" (owner, 2026-10-13); it never renders without a real video.
@@ -228,6 +245,69 @@ describe("help registry", () => {
     expect(page).toContain("Video coming soon");
     // No video file is checked in, and nothing in the client links one.
     expect(fs.existsSync(path.join(ROOT, "client/public/tutorials"))).toBe(false);
+  });
+
+  it("the intro-film fallback map is explicit and reviewed", () => {
+    const pages = new Set(FEATURE_CATALOGUE.map((p) => p.key));
+    const byKey = new Map(HELP_ENTRIES.map((e) => [e.key, e]));
+    for (const [key, page] of Object.entries(INTRO_FALLBACKS)) {
+      const e = byKey.get(key);
+      expect(e, `INTRO_FALLBACKS: ${key} is not a help entry`).toBeTruthy();
+      expect(e?.parent, `INTRO_FALLBACKS: ${key} is a section — map its feature, sections inherit`).toBeUndefined();
+      expect(pages.has(page), `INTRO_FALLBACKS: ${key} → ${page} is not a feature page`).toBe(true);
+      expect(NO_INTRO_FALLBACK[key], `${key} is both mapped and excused`).toBeUndefined();
+    }
+    for (const key of Object.keys(NO_INTRO_FALLBACK)) expect(byKey.get(key), `NO_INTRO_FALLBACK: ${key} is not a help entry`).toBeTruthy();
+    // Sections inherit: a section's fallback is its feature's.
+    for (const e of HELP_ENTRIES) if (e.parent) expect(introFallbackKey(e)).toBe(introFallbackKey(byKey.get(e.parent)!));
+    // A main-app feature at a feature page's own route plays that page's film, or says why not.
+    const hrefs = new Map(FEATURE_CATALOGUE.map((p) => [p.app.href, p.key]));
+    const missing = HELP_FEATURES
+      .filter((e) => e.group !== "Start here" && !isCrmRoute(e.route) && hrefs.has(e.route) && !INTRO_FALLBACKS[e.key] && !NO_INTRO_FALLBACK[e.key])
+      .map((e) => `${e.key} (at ${e.route}, the ${hrefs.get(e.route)} page's route): add it to INTRO_FALLBACKS or NO_INTRO_FALLBACK in shared/help/registry.ts`);
+    expect(missing).toEqual([]);
+    // The map is never a neighbour's film: a key maps to a page whose route is the entry's own, or an owner-reviewed pairing listed here.
+    const reviewedElsewhere: Record<string, string> = {
+      "google-business": "gbp", "profile-guard": "profileGuard", photos: "gbpContent", "media-library": "media",
+      "database-directory": "permits", "search-history": "permits", "permit-alerts": "permits", "social-youtube": "social",
+      "crm-lead-new": "crmLeads", "crm-schedule-views": "crmSchedule", "crm-sms-setup": "texting",
+      "crm-jobcam-share-link": "jobcam", "crm-jobcam-share": "jobcam", "crm-jobcam-tags": "jobcam", "crm-jobcam-upload": "jobcam",
+      "crm-jobcam-timeline": "jobcam", "crm-jobcam-project": "jobcam",
+    };
+    const pageHref = new Map(FEATURE_CATALOGUE.map((p) => [p.key, p.app.href]));
+    for (const [key, page] of Object.entries(INTRO_FALLBACKS)) {
+      const e = byKey.get(key)!;
+      expect(pageHref.get(page) === e.route || reviewedElsewhere[key] === page, `INTRO_FALLBACKS: ${key} (${e.route}) → ${page} (${pageHref.get(page)}) is not a reviewed pairing`).toBe(true);
+    }
+  });
+
+  it("a page route resolves to its own entry (helpKeyForRoute), never to an unlisted one", () => {
+    expect(helpKeyForRoute("/cloudflare")).toBe("cloudflare");
+    expect(helpKeyForRoute("/cloudflare?tab=sites#x")).toBe("cloudflare");
+    // A section on a deeper route than its feature is that page's entry; one on the feature's route is not.
+    const byKey = new Map(HELP_ENTRIES.map((e) => [e.key, e]));
+    for (const s of HELP_ENTRIES.filter((e) => e.parent && !e.unlisted)) {
+      expect(helpKeyForRoute(s.route), s.key).toBe(s.route === byKey.get(s.parent!)!.route ? s.parent : s.key);
+    }
+    // Several features share a page: the one named after the route wins, deterministically — not file order.
+    expect(helpKeyForRoute("/crm/settings")).toBe("crm-settings");
+    expect(helpKeyForRoute("/crm/pipeline")).toBe("crm-pipeline");
+    expect(helpKeyForRoute("/crm/integrations")).toBe("crm-integrations");
+    expect(helpKeyForRoute("/crm/clients")).toBe("crm-clients");
+    expect(helpKeyForRoute("/crm/jobcam")).toBe("jobcam");
+    expect(helpKeyForRoute("/crm")).toBe("crm-home");
+    expect(helpKeyForRoute("/locations")).toBe("locations");
+    // The same answer whatever order the entries are listed in.
+    const reversed = HELP_ENTRIES.slice().reverse();
+    const pick = (route: string) => { const r = route.replace(/[?#].*$/, ""); const c = reversed.filter((e) => !e.unlisted && (e.route === r || r.startsWith(e.route + "/"))); return c; };
+    for (const route of ["/crm/settings", "/crm/pipeline", "/crm/clients", "/crm/estimates", "/crm/payments", "/crm/team", "/crm/inbox"]) {
+      expect(pick(route).some((e) => e.key === helpKeyForRoute(route)), route).toBe(true);
+    }
+    expect(helpKeyForRoute("/crm/clients/12")).toBe("crm-clients");
+    expect(helpKeyForRoute("/no-such-page")).toBeUndefined();
+    // "/" is never a prefix match: the home film is not every page's entry.
+    expect(helpKeyForRoute("/settings")).not.toBe("brand-what-is-constructhub");
+    for (const e of HELP_ENTRIES) if (e.unlisted) expect(helpKeyForRoute(e.route)).not.toBe(e.key);
   });
 
   it("help entries that live one per file are collected, named after their key and filed under their group", () => {

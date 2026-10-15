@@ -10,6 +10,7 @@ import { ReviewReferralSettings } from "@/components/review-referral-settings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SamplePreview } from "@/components/sample-preview";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -1129,6 +1130,17 @@ function ReferralCard() {
         )}
         {data?.rewards.some((r) => r.status === "earned") && (
           <p className="text-xs text-muted-foreground">A waiting reward is applied as soon as you have a plan in that product (a yearly plan for the {data.rules.annualSharePct}% reward).</p>
+        )}
+        {/* No referral yet: a badged, made-up sample of the rewards list, gone the moment a real one exists (never mixed with real rows). */}
+        {data && data.signedUp === 0 && data.rewards.length === 0 && (
+          <SamplePreview what="what you'll see once someone signs up with your link" testId="sample-referrals"
+            cta={<Button size="sm" variant="outline" onClick={() => copy(data.link)} data-testid="button-copy-referral-sample"><Copy className="mr-1 h-4 w-4" />Copy link</Button>}>
+            <div className="flex flex-wrap gap-4 text-sm"><span><strong>2</strong> signed up</span><span><strong>1</strong> qualified</span><span><strong>1</strong> rewards applied</span></div>
+            <div className="mt-3 divide-y rounded border text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2"><span>Free month · ConstructHUB</span><span className="text-muted-foreground">$49.00 · Applied</span></div>
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2"><span>Free month · CRM</span><span className="text-muted-foreground">$29.00 · Waiting to apply</span></div>
+            </div>
+          </SamplePreview>
         )}
       </CardContent>
     </Card>

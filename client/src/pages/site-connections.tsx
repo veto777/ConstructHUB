@@ -34,17 +34,17 @@ import { useToast } from "@/hooks/use-toast";
 import { Link, useSearch } from "wouter";
 import { SiteConnectionGuide } from "./site-connection-guide";
 import { AppPage, Toolbar, Notice } from "@/components/app-ui";
-import { ToolTabs } from "@/components/tool";
+import { MetricStrip, StatCell, ToolTabs } from "@/components/tool";
+import { SamplePreview } from "@/components/sample-preview";
 import { useInToolShell } from "@/components/tool/in-shell";
 import { useToolView } from "@/hooks/use-tool-view";
 import { CLOUDFLARE_VIEWS, SEARCH_CONSOLE_VIEWS } from "@/components/website-tool/nav";
 import {
   GoogleSectionHeader,
   GoogleList,
-  GoogleListRow,
   GooglePill,
 } from "@/components/google";
-import { Search, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Search, CheckCircle2, ArrowLeft, ExternalLink } from "lucide-react";
 import { HelpButton } from "@/components/help-button";
 import {
   CloudflareConnectSteps,
@@ -100,6 +100,101 @@ function Field({
     </label>
   );
 }
+/** YYYY-MM-DD of the day `days` days ago (UTC), the shape the date fields and the server take. */
+const isoDaysAgo = (days: number) => new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+/** Quick picks for the Search Console import range: a first day; the last day stays empty (three days ago, Google's delay). */
+const RANGE_PRESETS: { label: string; days: number | null }[] = [
+  { label: "Last 31 days (default)", days: null },
+  { label: "Last 3 months", days: 91 },
+  { label: "Last 6 months", days: 182 },
+  { label: "Last 12 months", days: 365 },
+  { label: "Last 16 months", days: 486 },
+];
+/** What the next Sync downloads, in the range control's summary line (server default: 31 days up to three days ago). */
+const rangeWords = (start: string, end: string) =>
+  start && end ? `${start} to ${end}` : start ? `${start} through three days ago` : "the last 31 days (default)";
+/** A smaller figure for a metric cell whose value is words or a date, not a number. */
+const Words = ({ children, tone }: { children: ReactNode; tone?: "bad" }) => (
+  <span className="text-[15px] font-medium leading-6 [overflow-wrap:anywhere]" style={tone === "bad" ? { color: "var(--tool-down)" } : undefined}>{children}</span>
+);
+/**
+ * The totals over every site the search and filter match (listAssets's `summary`, server/cloudflare/common.ts), in
+ * the SEO Suite's strip (components/tool). Shown over the list and, on made-up numbers, in the sample preview.
+ */
+function SitesSummary({ cf, total, summary }: { cf: boolean; total: number; summary?: { synced: number; notSynced: number; withError: number; linkedLocations: number } }) {
+  if (!summary) return null;
+  return (
+    <MetricStrip cols={[2, 4, 4]} boxed testId={`sites-summary-${cf ? "cloudflare" : "gsc"}`}>
+      <StatCell label={cf ? "Sites (zones)" : "Properties"} value={formatNumber(total)} note="Matching the search and filter"
+        subs={summary.withError > 0 ? [{ key: "errors", label: "With a failed job", value: formatNumber(summary.withError) }] : undefined} />
+      <StatCell label="Synced" value={formatNumber(summary.synced)} note={cf ? "Have traffic and security data here" : "Have sitemaps and search data here"} />
+      <StatCell label="Not synced" value={formatNumber(summary.notSynced)} note={summary.notSynced ? "Tick them and choose Sync selected" : "Every site has been pulled at least once"} />
+      <StatCell label="Linked locations" value={formatNumber(summary.linkedLocations)} note="Your Locations whose website matches a site" />
+    </MetricStrip>
+  );
+}
+/**
+ * One site (a Search Console property or a Cloudflare zone) as a card: its name opens the detail, a chip says its
+ * state, Sync and Open are the actions, and the strip holds its key numbers. In the sample preview it is a picture.
+ */
+function SiteCard({ a, cf, checked, onToggle, onOpen, onSync, busy, queued }: {
+  a: any; cf: boolean; checked: boolean; onToggle: () => void; onOpen: () => void; onSync: () => void; busy: boolean; queued: boolean;
+}) {
+  const host: string = a.domain || a.name || "";
+  const state = cf ? a.status : accessLabel(a.status);
+  return (
+    <section className="tool-panel" data-testid={`card-site-${a.id}`}>
+      <div className="tool-panel__head">
+        <input type="checkbox" aria-label={`Select ${a.name}`} checked={checked} onChange={onToggle} className="h-4 w-4 shrink-0" />
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded text-[13px] font-semibold uppercase" style={{ color: "var(--tool-accent-ink)", background: "color-mix(in srgb, var(--tool-accent) 14%, transparent)" }} aria-hidden>{host.replace(/^www\./, "")[0] ?? "?"}</span>
+        <div className="min-w-0">
+          <h3 className="tool-panel__title">
+            <button type="button" className="tool-link text-left [overflow-wrap:anywhere]" onClick={onOpen}>{a.name}</button>
+          </h3>
+          <p className="tool-muted text-[12px] [overflow-wrap:anywhere]">
+            {cf ? "Zone" : "Property"} ID {a.id}{a.external_id && a.external_id !== a.name ? ` · ${a.external_id}` : ""}
+          </p>
+        </div>
+        <span className="tool-chip">{state}</span>
+        <div className="ml-auto flex flex-wrap gap-1.5">
+          {a.domain && <a href={`https://${a.domain}`} target="_blank" rel="noopener noreferrer" className="tool-btn tool-btn--icon tool-btn--quiet" aria-label={`Open ${a.domain} in a new tab`} title="Open the website"><ExternalLink aria-hidden /></a>}
+          <GooglePill size="sm" disabled={busy} onClick={onSync} label={queued ? "Sync requested · sync again" : "Sync"} />
+          <GooglePill size="sm" variant="solid" onClick={onOpen} label="Open" ariaLabel={`Open ${a.name}: its data`} />
+        </div>
+      </div>
+      <MetricStrip cols={[2, 4, 4]}>
+        <StatCell label="Last synced" value={a.synced_at ? <Words>{relativeTime(a.synced_at)}</Words> : null} none="Not synced yet"
+          note={a.synced_at ? new Date(a.synced_at).toLocaleString() : "Choose Sync to pull its data"} />
+        <StatCell label="Linked locations" value={formatNumber(a.locations)} note="Locations whose website matches" />
+        <StatCell label={cf ? "Status at Cloudflare" : "Your access"} value={<Words>{state}</Words>} />
+        <StatCell label="Last job" value={a.error ? <Words tone="bad">Failed</Words> : a.synced_at ? <Words>Done</Words> : null} none="Nothing run yet"
+          note={a.error ? <span role="alert" className="g-closed">{a.error}</span> : a.synced_at ? "The last sync finished" : undefined} />
+      </MetricStrip>
+    </section>
+  );
+}
+/** Made-up sites for the sample preview of an empty list: shown only while the account has no site at all; never stored or sent. */
+const sampleSites = (cf: boolean) => [
+  { id: 1, name: cf ? "sample-roofing.example" : "sc-domain:sample-roofing.example", domain: "sample-roofing.example", external_id: cf ? "sample-zone-1" : "sc-domain:sample-roofing.example", status: cf ? "active" : "siteOwner", synced_at: "2026-10-14T13:00:00Z", error: null, locations: 2 },
+  { id: 2, name: cf ? "sample-plumbing.example" : "https://sample-plumbing.example/", domain: "sample-plumbing.example", external_id: cf ? "sample-zone-2" : "https://sample-plumbing.example/", status: cf ? "pending" : "siteFullUser", synced_at: null, error: null, locations: 1 },
+];
+/** A bare form's "How this works" card: up to three steps, in the strip the SEO Suite uses. */
+function HowItWorks({ steps, testId }: { steps: [string, string][]; testId?: string }) {
+  return (
+    <section className="tool-panel" data-testid={testId}>
+      <div className="tool-panel__head"><h2 className="tool-panel__title">How this works</h2></div>
+      <MetricStrip cols={[1, 3, 3]}>
+        {steps.map(([title, text], i) => (
+          <div key={title} className="tool-stat">
+            <div className="tool-stat__label">Step {i + 1}</div>
+            <h3 className="text-[14px] font-semibold leading-5" style={{ color: "var(--tool-text)" }}>{title}</h3>
+            <p className="tool-stat__note">{text}</p>
+          </div>
+        ))}
+      </MetricStrip>
+    </section>
+  );
+}
 /**
  * The views as the shared tab bar (components/tool/tabs.tsx); it scrolls sideways, never wraps. Plain buttons:
  * e2e reaches tabs by role "button" (e.g. getByRole("button", { name: "Work queue" })).
@@ -144,7 +239,7 @@ const CLOUDFLARE_TABS = [
 /** Each view's line under its title in the full-screen tool (from the help registry's "what it is"). */
 const VIEW_LINE: Record<"cloudflare" | "gsc", Record<string, string>> = {
   cloudflare: {
-    Sites: "The websites (zones) in your connected Cloudflare accounts, with traffic and protection.",
+    Sites: "The websites (zones) in your connected Cloudflare accounts: one card each, with its traffic and protection data.",
     Connections: "Give ConstructHUB access to a Cloudflare account, see the accounts already connected, and remove them.",
     Onboarding: "Email a client the steps for giving your Cloudflare login access to their account.",
     "Work queue": "Background jobs for your Cloudflare connections: is it done yet?",
@@ -152,7 +247,7 @@ const VIEW_LINE: Record<"cloudflare" | "gsc", Record<string, string>> = {
     Guide: "Step-by-step instructions for Cloudflare.",
   },
   gsc: {
-    Sites: "The Search Console properties in your connected Google accounts: searches, pages, sitemaps and indexing.",
+    Sites: "The websites your connected Google accounts can see in Search Console: one card each, with its searches, sitemaps and indexing.",
     Connections: "Connect a Google account for Search Console, see the connected accounts, and remove them.",
     Onboarding: "Email a client the steps for adding your Google account to their Search Console property.",
     "Work queue": "Background jobs for your Search Console connections.",
@@ -684,8 +779,8 @@ export default function SiteConnections({
       }
       description={
         cf
-          ? "Connect client accounts, inspect traffic, and review changes before blocking at the edge."
-          : "Manage client properties, search performance, sitemaps, and indexing monitoring."
+          ? "Connect the Cloudflare accounts behind your websites, read their traffic, and block bad visitors after a preview."
+          : "See how each website shows up in Google Search: clicks, searches, sitemaps and indexing."
       }
       flush
     />
@@ -1101,26 +1196,34 @@ export default function SiteConnections({
       {tab === "Sites" && (
         <div className="space-y-4 sm:space-y-5">
           {!cf && (
-            <fieldset className="flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:flex-wrap sm:items-end">
-              <legend className="px-1 text-sm font-medium">
-                Import date range
-              </legend>
-              <span className="order-last self-start sm:self-end sm:pb-3">
-                <HelpButton k="search-console.sync-range" />
-              </span>
-              <Field
-                label="Sync from (up to 16 months)"
-                type="date"
-                value={start}
-                onChange={(e) => Start(e.target.value)}
-              />
-              <Field
-                label="Sync through"
-                type="date"
-                value={end}
-                onChange={(e) => End(e.target.value)}
-              />
-            </fieldset>
+            // The date range is a quiet secondary control (owner, 2026-10-15): folded, its summary says what the next
+            // Sync will download; opened, quick picks plus the two dates (a typed date always wins over a pick).
+            <details className="tool-about" data-testid="sync-range">
+              <summary>Import date range: {rangeWords(start, end)} · change</summary>
+              <div className="mt-2 flex max-w-none flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:flex-wrap sm:items-end" style={{ borderColor: "var(--tool-line)" }}>
+                <div className="flex flex-wrap gap-1 sm:pb-1">
+                  {RANGE_PRESETS.map((p) => {
+                    const on = p.days ? start === isoDaysAgo(p.days) && !end : !start && !end;
+                    return <GooglePill key={p.label} size="sm" label={p.label} selected={on} ariaPressed={on} onClick={() => { Start(p.days ? isoDaysAgo(p.days) : ""); End(""); }} />;
+                  })}
+                </div>
+                <Field
+                  label="Sync from (up to 16 months)"
+                  type="date"
+                  value={start}
+                  onChange={(e) => Start(e.target.value)}
+                />
+                <Field
+                  label="Sync through"
+                  type="date"
+                  value={end}
+                  onChange={(e) => End(e.target.value)}
+                />
+                <span className="self-start sm:self-end sm:pb-3">
+                  <HelpButton k="search-console.sync-range" />
+                </span>
+              </div>
+            </details>
           )}
 
           {assetId && detail.isLoading && <LoadingReport />}
@@ -1273,45 +1376,6 @@ export default function SiteConnections({
                   </select>
                 }
               />
-            </>
-          )}
-          <div className="flex flex-wrap items-end gap-3">
-            {!assetId && (
-              <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
-                <GooglePill
-                  variant="solid"
-                  disabled={busy || !selected.length}
-                  className="w-full sm:w-auto"
-                  onClick={() =>
-                    act(() =>
-                      post("/sync", {
-                        ids: selected,
-                        ...(!cf ? syncRange(start, end) : {}),
-                      }),
-                    )
-                  }
-                  label={`Sync selected (${formatNumber(selected.length)})`}
-                />
-                <GooglePill
-                  disabled={busy || !assets.data?.total}
-                  className="w-full sm:w-auto"
-                  onClick={() =>
-                    act(() =>
-                      post("/sync", {
-                        allMatching: true,
-                        q,
-                        status,
-                        ...(!cf ? syncRange(start, end) : {}),
-                      }),
-                    )
-                  }
-                  label="Sync all matching sites"
-                />
-              </div>
-            )}
-          </div>
-          {!assetId && (
-            <>
               {assets.isLoading ? (
                 <LoadingReport />
               ) : assets.error && !assets.data ? (
@@ -1327,94 +1391,93 @@ export default function SiteConnections({
                       retry={() => void assets.refetch()}
                     />
                   )}
-                  <p className="text-sm g-text-2">
-                    {formatNumber(assets.data?.total)} sites
-                  </p>
-                  <label className="flex gap-2 text-sm g-text-2">
-                    <input
-                      type="checkbox"
-                      aria-label="Select this page"
-                      checked={
-                        !!assets.data?.items.length &&
-                        assets.data.items.every((a: any) =>
-                          selected.includes(a.id),
-                        )
-                      }
-                      onChange={(e) =>
-                        Select(
-                          e.target.checked
-                            ? assets.data.items.map((a: any) => a.id)
-                            : [],
-                        )
-                      }
-                    />
-                    Select this page
-                  </label>
+                  {/* The SEO Suite's look (owner, 2026-10-15): a summary strip over everything the search matches, then one card per site. */}
+                  {assets.data?.total > 0 && <SitesSummary cf={cf} total={assets.data.total} summary={assets.data.summary} />}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="text-sm g-text-2">
+                      {formatNumber(assets.data?.total)} sites
+                    </p>
+                    <label className="flex items-center gap-2 text-sm g-text-2">
+                      <input
+                        type="checkbox"
+                        aria-label="Select this page"
+                        checked={
+                          !!assets.data?.items.length &&
+                          assets.data.items.every((a: any) =>
+                            selected.includes(a.id),
+                          )
+                        }
+                        onChange={(e) =>
+                          Select(
+                            e.target.checked
+                              ? assets.data.items.map((a: any) => a.id)
+                              : [],
+                          )
+                        }
+                      />
+                      Select this page
+                    </label>
+                    <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
+                      <GooglePill
+                        variant="solid"
+                        disabled={busy || !selected.length}
+                        className="w-full sm:w-auto"
+                        onClick={() =>
+                          act(() =>
+                            post("/sync", {
+                              ids: selected,
+                              ...(!cf ? syncRange(start, end) : {}),
+                            }),
+                          )
+                        }
+                        label={`Sync selected (${formatNumber(selected.length)})`}
+                      />
+                      <GooglePill
+                        disabled={busy || !assets.data?.total}
+                        className="w-full sm:w-auto"
+                        onClick={() =>
+                          act(() =>
+                            post("/sync", {
+                              allMatching: true,
+                              q,
+                              status,
+                              ...(!cf ? syncRange(start, end) : {}),
+                            }),
+                          )
+                        }
+                        label="Sync all matching sites"
+                      />
+                    </div>
+                  </div>
                   {assets.data?.items.length ? (
-                    <GoogleList testId={`list-sites-${provider}`}>
+                    <div className="space-y-3" data-testid={`list-sites-${provider}`}>
                       {assets.data.items.map((a: any) => (
-                        <GoogleListRow
+                        <SiteCard
                           key={a.id}
-                          size="md"
-                          title={
-                            <span className="inline-flex items-center gap-3">
-                              <input
-                                type="checkbox"
-                                aria-label={`Select ${a.name}`}
-                                checked={selected.includes(a.id)}
-                                onChange={() => toggle(a.id)}
-                              />
-                              <button
-                                className="rounded text-left text-primary underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-                                type="button"
-                                onClick={() => A(a)}
-                              >
-                                {a.name}
-                              </button>
-                            </span>
-                          }
-                          meta={[
-                            cf ? a.status : accessLabel(a.status),
-                            `${formatNumber(a.locations)} linked locations`,
-                            a.synced_at
-                              ? `${cf ? "Analytics" : "Sitemaps"} updated ${new Date(a.synced_at).toLocaleString()}`
-                              : "Not synced",
-                          ]}
-                          line={
-                            a.error ? (
-                              <span role="alert" className="g-closed">
-                                {a.error}
-                              </span>
-                            ) : undefined
-                          }
-                          trailing={
-                            <GooglePill
-                              size="sm"
-                              disabled={busy}
-                              onClick={async () => {
-                                const result = await act(
-                                  () =>
-                                    post("/sync", {
-                                      ids: [a.id],
-                                      ...(!cf ? syncRange(start, end) : {}),
-                                    }),
-                                  "Sync queued",
-                                );
-                                if (result)
-                                  setQueuedIds((ids) => [...ids, a.id]);
-                              }}
-                              label={
-                                queuedIds.includes(a.id)
-                                  ? "Sync requested · sync again"
-                                  : "Sync"
-                              }
-                            />
-                          }
+                          a={a}
+                          cf={cf}
+                          checked={selected.includes(a.id)}
+                          onToggle={() => toggle(a.id)}
+                          onOpen={() => A(a)}
+                          busy={busy}
+                          queued={queuedIds.includes(a.id)}
+                          onSync={async () => {
+                            const result = await act(
+                              () =>
+                                post("/sync", {
+                                  ids: [a.id],
+                                  ...(!cf ? syncRange(start, end) : {}),
+                                }),
+                              "Sync queued",
+                            );
+                            if (result)
+                              setQueuedIds((ids) => [...ids, a.id]);
+                          }}
                         />
                       ))}
-                    </GoogleList>
+                    </div>
                   ) : (
-                    <div className="py-6 space-y-3">
+                    <div className="space-y-4 py-2">
                       {config.data && config.data.total > 0 ? (
                         <>
                           {/* Connected, but the account owns nothing we can list (owner, 2026-10-13: support@ had no Search Console properties). */}
@@ -1451,6 +1514,19 @@ export default function SiteConnections({
                             testId="button-open-connect-steps"
                           />
                         </>
+                      )}
+                      {/* No site yet (nothing matches the search is a different case, said above): what the list looks like,
+                          on made-up sites, until the first real one replaces it. */}
+                      {!q && !status && (
+                        <SamplePreview what={`what you'll see once ${cf ? "a Cloudflare account" : "Search Console"} is connected`} testId={`sample-sites-${provider}`}
+                          cta={<GooglePill size="sm" label="Connect to replace this sample" onClick={() => T("Connections")} />}>
+                          <div className="space-y-3">
+                            <SitesSummary cf={cf} total={2} summary={{ synced: 1, notSynced: 1, withError: 0, linkedLocations: 3 }} />
+                            {sampleSites(cf).map((a) => (
+                              <SiteCard key={a.id} a={a} cf={cf} checked={false} onToggle={() => {}} onOpen={() => {}} onSync={() => {}} busy={false} queued={false} />
+                            ))}
+                          </div>
+                        </SamplePreview>
                       )}
                     </div>
                   )}
@@ -1608,12 +1684,11 @@ export default function SiteConnections({
       )}
       {tab === "Onboarding" && (
         <div className="space-y-5">
-          <p className="text-sm text-muted-foreground">
-            Select a connection under Connections, then enter one client per
-            line: email, location ID{cf ? ", Cloudflare account ID" : ""}. Email
-            goes to the client with steps to grant access. Active connection:{" "}
-            {connection ?? "None"}.
-          </p>
+          <HowItWorks testId="how-onboarding-works" steps={[
+            ["Pick the connection", `Under Connections, select the ${cf ? "Cloudflare" : "Google"} account the client should share with (the round button beside it). Active connection: ${connection ?? "none yet"}.`],
+            ["List the clients", `One per line: email, location ID${cf ? ", Cloudflare account ID" : ""}. The location ID is in the Locations list below; the location needs a website.`],
+            ["Send and watch", `Each client gets an email with the exact steps for ${cf ? "inviting your login to their Cloudflare account" : "adding your Google account to their property"}. Invitations below turn from pending to accepted on their own.`],
+          ]} />
           <DataList
             title="Locations"
             url={`${base}/locations`}

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { AppPage, Notice } from "@/components/app-ui";
-import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, relativeTime } from "@/components/google";
+import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid, relativeTime } from "@/components/google";
 import { PlanRequired, planRequiredFrom, pollUnlessPlanRequired } from "@/components/plan-required";
 import { WATCH_KINDS, WATCH_KIND_LABELS, MAX_RADIUS_MILES, type PermitWatchDto, type WatchKind } from "@shared/permit-alerts";
 
@@ -46,7 +46,7 @@ export default function PermitAlertsPage() {
     <GoogleSectionHeader
       as="h1"
       title="Permit alerts"
-      description="Watch an address, a contractor, or the trades you care about in an area. We check each jurisdiction's permit portal every hour and send you what's new."
+      description="Get told when a new permit is filed at an address, on a parcel, by a contractor, or for your trades in an area; each watched portal is checked every hour."
       flush
       actions={<GooglePill icon={Plus} label="New watch" variant="solid" onClick={() => { setEditing(null); setShowForm(true); }} disabled={busy || isLoading || !!listError} testId="button-new-watch" />}
     />
@@ -65,6 +65,13 @@ export default function PermitAlertsPage() {
   }
   const watches = data?.watches ?? [];
   const unsupported = watches.flatMap((w) => w.jurisdictions.filter((j) => !j.alertsSupported));
+  // The number strip, from the watch rows themselves.
+  const jurisdictionsOnWatches = watches.reduce((n, w) => n + w.jurisdictions.length, 0);
+  const totals = {
+    active: watches.filter((w) => w.active).length,
+    supported: jurisdictionsOnWatches - unsupported.length,
+    matched: watches.reduce((n, w) => n + w.hitCount, 0),
+  };
 
   return (
     <GoogleSurface page>
@@ -93,10 +100,23 @@ export default function PermitAlertsPage() {
           />}
           </DialogContent>
         </Dialog>
+        {watches.length > 0 && (
+          <GoogleStatGrid cols={3}>
+            <GoogleStat label="Watches" value={watches.length.toLocaleString()} hint={`${totals.active} active`} testId="stat-alerts-watches" />
+            <GoogleStat label="Jurisdictions checked hourly" value={`${totals.supported} of ${jurisdictionsOnWatches}`} hint={unsupported.length ? `${unsupported.length} not supported by its portal yet` : "Every jurisdiction on your watches is supported"} testId="stat-alerts-jurisdictions" />
+            <GoogleStat label="Permits matched" value={totals.matched.toLocaleString()} hint="Across all watches, since each was made" testId="stat-alerts-matched" />
+          </GoogleStatGrid>
+        )}
         <section>
           <GoogleSectionHeader title="Your watches" count={listError || isLoading ? undefined : watches.length} description={unsupported.length ? `${unsupported.length} jurisdiction${unsupported.length === 1 ? "" : "s"} on your watches can't be polled yet.` : undefined} />
           {isLoading ? <Skeleton className="h-32 w-full" /> : listError ? null : !watches.length ? (
-            <p className="text-sm g-text-2" data-testid="text-no-watches">No watches yet. Add one to start getting alerts.</p>
+            /* No watch yet: what a row and its matches will show, and where they come from. No sample permits (CLAUDE.md). */
+            <div className="g-callout" data-testid="text-no-watches">
+              <h3 className="inline-flex items-center gap-2"><Bell className="h-4 w-4" aria-hidden="true" /> No watches yet</h3>
+              <p>Each watch will be listed here with what it watches, the cities or counties it checks and how many of them are supported, how you are notified, when it was last checked, its last match and how many permits have matched. Matches opens the permits it found: each one's permit number, type, status, address, contractor, date and a link to the portal's record.</p>
+              <p className="mt-2">Matches come from the permits each watched portal lists by date, read every hour from the portals whose platform can list permits by date; the directory marks those jurisdictions “Alerts supported”. Nothing is shown that a portal did not list.</p>
+              <div className="mt-3"><GooglePill icon={Plus} variant="solid" label="New watch" onClick={() => { setEditing(null); setShowForm(true); }} disabled={busy} testId="button-empty-new-watch" /></div>
+            </div>
           ) : (
             <GoogleList testId="list-permit-watches">
               {watches.map((w) => (

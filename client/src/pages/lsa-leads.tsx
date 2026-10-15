@@ -1,5 +1,6 @@
 import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { SamplePreview } from "@/components/sample-preview";
 import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -118,6 +119,44 @@ function lsaTypeLabel(t?: string | null): string {
 function money(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+type LeadFilter = "all" | "charged" | "disputed";
+
+/** A plain three-step card above a bare form (owner 2026-10-15: explain every form in a busy contractor's words). */
+function HowThisWorks({ steps, testId }: { steps: string[]; testId?: string }) {
+  return (
+    <Section flush testId={testId}>
+      <CardHeader><CardTitle className="g-card__title g-card__title--md">How this works</CardTitle></CardHeader>
+      <CardContent><ol className="list-decimal space-y-1.5 pl-5 text-sm">{steps.map((st) => <li key={st}>{st}</li>)}</ol></CardContent>
+    </Section>
+  );
+}
+
+/** Obviously made-up accounts and leads, shown only while the real list is empty (components/sample-preview.tsx rules). */
+function SampleAccounts() {
+  return (
+    <>
+      <GoogleStatGrid cols={4} className="mb-3">
+        <GoogleStat label="Accounts" value="2" />
+        <GoogleStat label="Leads" value="31" />
+        <GoogleStat label="Charged" value="19" tone="bad" />
+        <GoogleStat label="Spend" value="$1,240.00" />
+      </GoogleStatGrid>
+      <GoogleList>
+        <GoogleListRow size="md" title="Sample Roofing Co." badges={<span className="g-chip g-chip--sm g-open">LSA</span>} meta={["123-456-7890", "22 leads", <span key="c" className="g-closed">14 charged</span>, "$940.00 spend"]} actions={<><GooglePill size="sm" label="Open leads" /><GooglePill size="sm" label="Charged leads" /></>} />
+        <GoogleListRow size="md" title="Sample Plumbing LLC" badges={<span className="g-chip g-chip--sm g-open">LSA</span>} meta={["123-456-7891", "9 leads", <span key="c" className="g-closed">5 charged</span>, "$300.00 spend"]} actions={<><GooglePill size="sm" label="Open leads" /><GooglePill size="sm" label="Charged leads" /></>} />
+      </GoogleList>
+    </>
+  );
+}
+function SampleLeads() {
+  return (
+    <GoogleList>
+      <GoogleListRow size="md" title="Sample caller · Phone call" badges={<span className="g-chip g-chip--sm g-closed">Charged · $38.00</span>} meta={["Roof repair", "(555) 010-0001", "Today 9:14 AM"]} actions={<><GooglePill size="sm" label="Good" /><GooglePill size="sm" label="Bad" /></>} />
+      <GoogleListRow size="md" title="Sample homeowner · Message" badges={<span className="g-chip g-chip--sm">Not charged</span>} meta={["Gutter cleaning", "sample@example.com", "Yesterday 4:02 PM"]} actions={<><GooglePill size="sm" label="Good" /><GooglePill size="sm" label="Bad" /></>} />
+    </GoogleList>
+  );
+}
+
 function isDisputable(lead: LsaLead): boolean {
   if (lead.feedbackSubmitted) return false;
   const s = lead.disputeStatus || "";
@@ -171,6 +210,7 @@ function ReasonSelect({ value, onChange, disabled, testid }: {
 export default function LsaLeadsPage() {
   const { toast } = useToast();
   const [selectedAccount, setSelectedAccount] = useState<LsaAccount | null>(null);
+  const [initialFilter, setInitialFilter] = useState<LeadFilter>("all");
 
   const { data: status } = useQuery<LsaStatus>({
     queryKey: ["/api/lsa/status"],
@@ -219,7 +259,7 @@ export default function LsaLeadsPage() {
   return (
     <AppPage testId="page-lsa-leads" className="[&_button]:min-h-10 [&_select]:min-h-10">
       {/* Google's page format (owner, 2026-10-07): a quiet header, hairline rows, pill actions, stat tiles. */}
-      <GoogleSectionHeader as="h1" title="LSA leads" description="Review your Local Services Ads leads and manage billing disputes." flush actions={<>
+      <GoogleSectionHeader as="h1" title="LSA leads" description="Read your Local Services Ads leads and report the bad ones to Google, account by account." flush actions={<>
               {status?.connected ? (
                 <>
                   <GooglePill
@@ -239,7 +279,13 @@ export default function LsaLeadsPage() {
                 <GooglePill icon={Link2} variant="solid" label="Connect Google Ads" onClick={connect} testId="button-connect" />
               ) : <GooglePill variant="solid" label="Connect Google Ads" disabled />}</>} />
       {!status?.configured && <Notice tone="warning">Google Ads setup is required before you can connect.</Notice>}
+      {status && !status.configured && (
+        <HowThisWorks testId="how-lsa-leads" steps={["Choose Connect Google Ads and allow access with the Google account that can see your Local Services Ads.", "Choose Sync now: every Google Ads account you can reach appears below with its leads.", "Open an account and rate each lead Good or Bad; a Bad rating is reported to Google with the reason you pick."]} />
+      )}
       {status?.configured && <Section title="Connection" contentClassName="space-y-3">
+          {status?.configured && !status.connected && (
+            <HowThisWorks testId="how-lsa-leads" steps={["Choose Connect Google Ads and allow access with the Google account that can see your Local Services Ads.", "Choose Sync now: every Google Ads account you can reach appears below with its leads.", "Open an account and rate each lead Good or Bad; a Bad rating is reported to Google with the reason you pick."]} />
+          )}
           {status?.configured && !status.connected && status.redirectUri && (
             <RedirectUriHelp redirectUri={status.redirectUri} />
           )}
@@ -260,11 +306,16 @@ export default function LsaLeadsPage() {
         )}
       </Section>}
 
+      {status && !status.connected && (
+        <SamplePreview what="what you’ll see once Google Ads is connected" testId="sample-lsa-accounts" cta={<GooglePill size="sm" variant="solid" icon={Link2} label="Connect Google Ads" onClick={connect} disabled={!status.configured} />}>
+          <SampleAccounts />
+        </SamplePreview>
+      )}
       {status?.connected && !selectedAccount && (
-        <AccountsOverview onOpen={setSelectedAccount} />
+        <AccountsOverview onOpen={(a, f) => { setInitialFilter(f ?? "all"); setSelectedAccount(a); }} onSync={() => syncMutation.mutate()} syncing={syncMutation.isPending} />
       )}
       {status?.connected && selectedAccount && (
-        <AccountDetail account={selectedAccount} onBack={() => setSelectedAccount(null)} />
+        <AccountDetail key={`${selectedAccount.customerId}-${initialFilter}`} account={selectedAccount} initialFilter={initialFilter} onBack={() => setSelectedAccount(null)} />
       )}
     </AppPage>
   );
@@ -369,7 +420,7 @@ function TelegramPanel({ status }: { status: LsaStatus }) {
 }
 
 // ── Accounts overview ────────────────────────────────────────────────────────────
-function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
+function AccountsOverview({ onOpen, onSync, syncing }: { onOpen: (a: LsaAccount, filter?: LeadFilter) => void; onSync: () => void; syncing: boolean }) {
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [page, setPage] = useState(1);
@@ -388,6 +439,9 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
   const accounts = data?.accounts || [];
   const total = data?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  // The summary row adds up the accounts on this page only, and says so.
+  const sums = accounts.reduce((n, a) => ({ leads: n.leads + (a.leadCount ?? 0), charged: n.charged + (a.chargedCount ?? 0), disputed: n.disputed + (a.disputedCount ?? 0), spend: n.spend + (a.costTotal != null ? Number(a.costTotal) : 0), lsa: n.lsa + (a.lsaEnrolled === true ? 1 : 0) }), { leads: 0, charged: 0, disputed: 0, spend: 0, lsa: 0 });
+  const scope = totalPages > 1 ? `Accounts on this page (${accounts.length} of ${total})` : undefined;
 
   if (error) return <Notice tone="warning">Accounts could not be loaded. Please try again.</Notice>;
 
@@ -408,11 +462,22 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
         {isLoading ? (
           <div className="py-10 text-center text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin inline" /> Loading accounts…</div>
         ) : accounts.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">
-            No accounts yet. Once your first sync finishes, every Google Ads account you can access will appear here.
-          </p>
+          debouncedQ ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">No account matches “{debouncedQ}”.</p>
+          ) : (
+            <SamplePreview what="what you’ll see once your first sync finishes" testId="sample-lsa-accounts" cta={<GooglePill size="sm" variant="solid" icon={RefreshCw} label={syncing ? "Syncing…" : "Sync now"} onClick={onSync} disabled={syncing} />}>
+              <SampleAccounts />
+            </SamplePreview>
+          )
         ) : (
           <>
+            {/* The SEO Suite look (owner 2026-10-15): a quiet summary row, then one card per account with its numbers and actions. */}
+            <GoogleStatGrid cols={4} className="mb-3">
+              <GoogleStat label="Accounts" value={total.toLocaleString()} hint={sums.lsa ? `${sums.lsa} with Local Services Ads${scope ? " on this page" : ""}` : undefined} testId="stat-accounts" />
+              <GoogleStat label="Leads" value={sums.leads.toLocaleString()} hint={scope} testId="stat-leads-total" />
+              <GoogleStat label="Charged" value={sums.charged.toLocaleString()} tone={sums.charged > 0 ? "bad" : "default"} hint={sums.disputed ? `${sums.disputed} disputed` : scope} testId="stat-charged-total" />
+              <GoogleStat label="Spend" value={`$${money(sums.spend)}`} hint={scope ?? "Across these accounts"} testId="stat-spend-total" />
+            </GoogleStatGrid>
             <GoogleList>
               {accounts.map((a) => (
                 <GoogleListRow
@@ -431,8 +496,12 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
                     a.customerId,
                     `${a.leadCount ?? 0} leads`,
                     <span key="charged" className={(a.chargedCount ?? 0) > 0 ? "g-closed" : undefined}>{a.chargedCount ?? 0} charged</span>,
+                    (a.disputedCount ?? 0) > 0 ? `${a.disputedCount} disputed` : null,
+                    a.costTotal != null ? `$${money(Number(a.costTotal))} spend` : null,
                   ]}
+                  line={a.lastError ? <span className="text-amber-700">Last sync issue: {a.lastError}</span> : a.lastSyncAt ? `Synced ${new Date(a.lastSyncAt).toLocaleString()}` : "Not synced yet"}
                   trailing={<ChevronRight className="w-4 h-4 text-muted-foreground" aria-hidden="true" />}
+                  actions={<div className="relative z-10 flex flex-wrap gap-2"><GooglePill size="sm" label="Open leads" onClick={(e) => { e.stopPropagation(); onOpen(a); }} testId={`button-open-leads-${a.customerId}`} />{(a.chargedCount ?? 0) > 0 && <GooglePill size="sm" label={`${a.chargedCount} charged`} onClick={(e) => { e.stopPropagation(); onOpen(a, "charged"); }} testId={`button-open-charged-${a.customerId}`} />}</div>}
                 />
               ))}
             </GoogleList>
@@ -453,9 +522,11 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
 }
 
 // ── Account detail (leads + disputes) ────────────────────────────────────────────
-function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () => void }) {
+function AccountDetail({ account, initialFilter = "all", onBack }: { account: LsaAccount; initialFilter?: LeadFilter; onBack: () => void }) {
   const { toast } = useToast();
-  const [filter, setFilter] = useState<"all" | "charged" | "disputed">("all");
+  const [filter, setFilter] = useState<LeadFilter>(initialFilter);
+  // A typed value beside the three preset filters: matches name, phone, email, service, lead type and any status word on this page.
+  const [find, setFind] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
@@ -469,7 +540,12 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
       return active ? 4000 : 30000;
     },
   });
-  const leads = useMemo(() => data?.leads || [], [data]);
+  const allLeads = useMemo(() => data?.leads || [], [data]);
+  const leads = useMemo(() => {
+    const needle = find.trim().toLowerCase();
+    if (!needle) return allLeads;
+    return allLeads.filter((l) => [l.contactName, l.contactPhone, l.contactEmail, l.serviceId, l.categoryId, lsaTypeLabel(l.leadType), l.leadStatus, l.disputeStatus, l.creditState, l.surveyAnswer, reasonLabel(l.disputeReason), l.leadCharged === true ? "charged" : l.leadCharged === false ? "not charged" : ""].some((v) => (v || "").toLowerCase().includes(needle)));
+  }, [allLeads, find]);
   const total = data?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -577,7 +653,9 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
         <Toolbar className="mb-4" filters={<>
           {([["all", "All"], ["charged", "Charged"], ["disputed", "Disputed"]] as const).map(([v, label]) => (
             <GooglePill key={v} size="sm" selected={filter === v} ariaPressed={filter === v} label={label} onClick={() => setFilter(v)} testId={`button-filter-${v}`} />
-          ))}</>} />
+          ))}
+          <div className="g-search w-full sm:w-64" role="search"><Search aria-hidden="true" /><input type="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Name, phone, service or status…" aria-label="Filter the leads on this page" data-testid="input-find-leads" /></div>
+        </>} />
 
         {/* Bulk dispute toolbar */}
         {eligibleOnPage.length > 0 && (
@@ -621,7 +699,15 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
         {isLoading ? (
           <div className="py-10 text-center text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin inline" /> Loading leads…</div>
         ) : leads.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">No leads {filter !== "all" ? `(${filter})` : ""} for this account yet.</p>
+          find.trim() ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">No lead on this page matches “{find.trim()}”.</p>
+          ) : filter !== "all" ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">No {filter} leads for this account yet.</p>
+          ) : (
+            <SamplePreview what="what a lead looks like once this account has synced one" testId="sample-lsa-leads">
+              <SampleLeads />
+            </SamplePreview>
+          )
         ) : (
           <div className="space-y-3">
             {leads.map((lead) => {

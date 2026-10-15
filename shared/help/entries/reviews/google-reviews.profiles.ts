@@ -1,0 +1,17 @@
+import type { HelpDraft } from "../../types";
+
+/** Written from client/src/pages/google-reviews.tsx (the Profiles & links view) and shared/review-links.ts as they run. */
+const entry: HelpDraft = {
+  key: "google-reviews.profiles", parent: "google-reviews", group: "Reviews", route: "/google-reviews", title: "Google Reviews → Profiles & links",
+  whatItIs: "One profile per Google Business listing you ask reviews for: its Google review link, a default project description, and your pages on other review sites.",
+  whatItDoes: "Add profile saves a name, the Google review link (pasted, or picked from a linked Google listing), an optional project description used as the default message, and up to a handful of other review pages — Yelp, BBB, Houzz, Angi, HomeAdvisor and more — with one of them as the primary destination if you prefer it to Google. One profile can be the default for new requests. The card under the list links to the business sign-in pages of the common review platforms.",
+  howToUse: [
+    "Choose Add profile. Name it after the listing and paste its Google review link, or pick the listing from your linked locations.",
+    "Add the other review sites you want clients to see after Google, each with its link, and choose which one is primary.",
+    "Tick “Default profile” on the one most requests should use, then Save.",
+    "Edit a profile from its pencil icon; Delete asks you to confirm first.",
+  ],
+  howItWorks: "A Google review link is accepted only when it points at Google (a google.* page other than the bare homepage, g.page, goo.gl or share.google); other sites are checked against the known review platforms. Each profile counts toward the plan’s saved-profile allowance, and the page says when the limit is reached. When a request is sent, the profile’s links decide which review buttons the client sees and which comes first.",
+  needs: ["Any plan; the number of saved profiles depends on the plan."],
+};
+export default entry;

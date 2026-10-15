@@ -11,11 +11,11 @@ export const CALL_ASSISTANT_VIEWS = ["overview", "calls", "numbers", "studio", "
 export type CallAssistantView = (typeof CALL_ASSISTANT_VIEWS)[number];
 
 export const CALL_ASSISTANT_VIEW_HEAD: Record<CallAssistantView, [string, string]> = {
-  overview: ["Overview", "Answer calls, capture leads and keep your team informed."],
-  calls: ["Calls", "Every call with its outcome, summary, transcript and recording."],
-  numbers: ["Numbers", "The phone numbers your assistant answers, and how calls reach it."],
-  studio: ["Agent studio", "Teach the assistant your business: services, area, policies, voice and questions."],
-  simulator: ["Simulator", "Try a test conversation before real callers hear it."],
+  overview: ["Overview", "Is your assistant answering, what it did with this month's calls, and what to do next."],
+  calls: ["Calls", "Every call it answered, with the outcome, a summary, the transcript and the recording."],
+  numbers: ["Numbers", "The numbers your assistant answers, and how to forward your existing line to one."],
+  studio: ["Agent studio", "Teach the assistant your business, choose its voice and questions, then publish."],
+  simulator: ["Simulator", "Type a test call and read every decision before real callers hear it."],
 };
 
 /** The address of a view (extra query parameters kept: ?call=, ?view=, ?outcome=). */

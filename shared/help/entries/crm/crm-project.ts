@@ -2,7 +2,7 @@ import type { HelpDraft } from "../../types";
 
 /** Written from client/src/pages/crm-project.tsx as it runs. */
 const entry: HelpDraft = {
-  key: "crm-project", group: "CRM", route: "/crm/pipeline", title: "Read a project page",
+  key: "crm-project", group: "CRM", route: "/crm/pipeline", alsoAt: ["/crm/projects"], title: "Read a project page",
   whatItIs: "One page per job, with its money at the top and its working lists in tabs.",
   whatItDoes: "The top of the page shows the project’s name, number and stage, then four figures: Revised contract (with the change orders in it), Budget, Committed and Actual cost. Gross profit is the revised contract minus the actual cost posted so far, with the margin beside it. The tabs below are Costing, Change orders, Punch list, Daily logs, Selections, Permits and JobCam.",
   howToUse: [

@@ -5,7 +5,8 @@ import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GoogleSurface } from "@/components/google";
+import { GoogleSurface, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { SamplePreview } from "@/components/sample-preview";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -592,7 +593,8 @@ function SummaryRow({ label, value, highlight }: { label: string; value: string;
 }
 
 // Each size's cost in ranking-grid credits, as the server charges it (gridCreditCost).
-const GRID_SIZES = [3, 5, 7, 9, 11, 13, 15].map((n) => ({
+const GRID_SIZE_VALUES = [3, 5, 7, 9, 11, 13, 15];
+const GRID_SIZES = GRID_SIZE_VALUES.map((n) => ({
   value: String(n),
   label: `${n}×${n} (${n * n} points) · ${creditsLabel(gridCreditCost(n))}`,
 }));
@@ -620,6 +622,11 @@ export default function RankingGridPage() {
   const [keyword, setKeyword] = useState("");
   const [gridSize, setGridSize] = useState("3");
   const [gridDistance, setGridDistance] = useState("1");
+  // Typed values are allowed beside the presets (owner 2026-10-15), within what the server accepts
+  // (server/routes.ts POST /api/ranking-grid/scans): a size from the list, a spacing over 0 and up to 20 miles.
+  const gridSizeValid = GRID_SIZE_VALUES.includes(Number(gridSize));
+  const gridDistanceValid = Number.isFinite(Number(gridDistance)) && Number(gridDistance) > 0 && Number(gridDistance) <= 20;
+  const spacingPreset = DISTANCE_OPTIONS.some((d) => d.value === gridDistance);
   const [expandedScan, setExpandedScan] = useState<number | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [viewingReport, setViewingReport] = useState<number | null>(null);
@@ -724,7 +731,7 @@ export default function RankingGridPage() {
     <GoogleSurface page><AppPage className="before:hidden [&_button]:min-h-10">
       <PageHeader title={<span data-testid="text-page-title">GMB ranking grid</span>} description="See where your business ranks on Google Maps across your service area." actions={            <Button
               className="w-full"
-              disabled={!selectedBusiness || !keyword.trim() || startScanMutation.isPending}
+              disabled={!selectedBusiness || !keyword.trim() || !gridSizeValid || !gridDistanceValid || startScanMutation.isPending}
               onClick={() => startScanMutation.mutate()}
               data-testid="button-start-scan"
             >
@@ -735,6 +742,13 @@ export default function RankingGridPage() {
               )}
               Start ranking scan
             </Button>} />
+        {scans.length > 0 && (
+          <GoogleStatGrid cols={3}>
+            <GoogleStat label="Scans run" value={scans.length.toLocaleString()} testId="stat-scans-run" />
+            <GoogleStat label="Running now" value={scans.filter((x) => x.status === "running").length.toLocaleString()} testId="stat-scans-running" />
+            <GoogleStat label="Credits this month" value={creditsUsage || "—"} hint="Ranking-grid credits reset monthly" testId="stat-scans-credits" />
+          </GoogleStatGrid>
+        )}
         <Section title="Scan details" contentClassName="space-y-4">
             <div className="space-y-2">
               <Label>Business</Label>
@@ -820,9 +834,9 @@ export default function RankingGridPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
               <div className="space-y-2">
                 <Label>Grid size</Label>
-                <Select value={gridSize} onValueChange={setGridSize}>
+                <Select value={gridSizeValid ? gridSize : ""} onValueChange={setGridSize}>
                   <SelectTrigger data-testid="select-grid-size">
-                    <SelectValue />
+                    <SelectValue placeholder="Choose a size" />
                   </SelectTrigger>
                   <SelectContent>
                     {GRID_SIZES.map(gs => (
@@ -830,25 +844,34 @@ export default function RankingGridPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Label htmlFor="input-grid-size" className="text-xs text-muted-foreground font-normal">Or type the points per side (an odd number from 3 to 15)</Label>
+                <Input id="input-grid-size" type="number" inputMode="numeric" min={3} max={15} step={2} value={gridSize} aria-invalid={!gridSizeValid}
+                  onChange={(e) => setGridSize(e.target.value)} data-testid="input-grid-size" />
+                {!gridSizeValid && <p role="alert" className="text-xs text-destructive">Use 3, 5, 7, 9, 11, 13 or 15 points per side.</p>}
               </div>
 
               <div className="space-y-2">
                 <Label>Point spacing</Label>
-                <Select value={gridDistance} onValueChange={setGridDistance}>
+                <Select value={spacingPreset ? gridDistance : (gridDistanceValid ? "custom" : "")} onValueChange={(v) => { if (v !== "custom") setGridDistance(v); }}>
                   <SelectTrigger data-testid="select-grid-distance">
-                    <SelectValue />
+                    <SelectValue placeholder="Choose a spacing" />
                   </SelectTrigger>
                   <SelectContent>
                     {DISTANCE_OPTIONS.map(d => (
                       <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                     ))}
+                    {!spacingPreset && gridDistanceValid && <SelectItem value="custom">{gridDistance} miles (typed)</SelectItem>}
                   </SelectContent>
                 </Select>
+                <Label htmlFor="input-grid-distance" className="text-xs text-muted-foreground font-normal">Or type the miles between points (over 0, up to 20)</Label>
+                <Input id="input-grid-distance" type="number" inputMode="decimal" min={0.1} max={20} step={0.1} value={gridDistance} aria-invalid={!gridDistanceValid}
+                  onChange={(e) => setGridDistance(e.target.value)} data-testid="input-grid-distance" />
+                {!gridDistanceValid && <p role="alert" className="text-xs text-destructive">Spacing must be more than 0 and at most 20 miles.</p>}
               </div>
             </div>
 
             </details>
-            <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
+            {gridSizeValid && gridDistanceValid && <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
               <p>
                 This scan will check <strong>{parseInt(gridSize) * parseInt(gridSize)} grid points</strong> in a {gridSize}×{gridSize} pattern,
                 with <strong>{gridDistance} mile spacing</strong> between each point.
@@ -858,7 +881,7 @@ export default function RankingGridPage() {
                 Uses <strong>{creditsLabel(gridCreditCost(parseInt(gridSize)))}</strong> of your monthly ranking-grid credits
                 {creditsUsage ? ` (${creditsUsage} this month)` : ""}.
               </p>
-            </div>
+            </div>}
 
 
         </Section>
@@ -868,12 +891,28 @@ export default function RankingGridPage() {
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : scans.length === 0 ? (
-          <Section flush>
-            <CardContent className="py-12 text-center">
-              <Grid3X3 className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-              <p className="text-muted-foreground">No scans yet. Start your first ranking scan above.</p>
-            </CardContent>
-          </Section>
+          <div className="space-y-4">
+            <Section flush>
+              <CardContent className="py-12 text-center">
+                <Grid3X3 className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+                <p className="text-muted-foreground">No scans yet. Start your first ranking scan above.</p>
+              </CardContent>
+            </Section>
+            <SamplePreview what="what a finished scan looks like in your history" testId="sample-scan">
+              <Section flush>
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Target className="h-5 w-5 text-emerald-500 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap"><p className="font-semibold text-sm truncate">Sample Roofing Co.</p><Badge variant="secondary" className="text-xs shrink-0">roofing contractor</Badge></div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5"><span>5×5 grid</span><span>·</span><span>1 mi spacing</span><span>·</span><span className="flex items-center gap-0.5"><TrendingUp className="h-3 w-3" />Avg rank: 4.6</span><span>·</span><Badge variant="default" className="text-[10px] px-1 py-0">72% Ranked</Badge></div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0"><Badge variant="default">completed</Badge><Button variant="outline" size="sm" className="h-7 text-xs gap-1 hidden sm:flex"><FileText className="h-3 w-3" />Report</Button><ChevronDown className="h-4 w-4" /></div>
+                </div>
+              </Section>
+            </SamplePreview>
+          </div>
         ) : (
           <div className="space-y-4">
             <h2 className="text-base font-semibold" data-testid="text-scan-history">Scan history</h2>

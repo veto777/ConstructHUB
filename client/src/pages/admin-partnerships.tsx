@@ -15,7 +15,7 @@ import {
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AppPage, Notice, Section, Stat, StatGrid } from "@/components/app-ui";
-import { GoogleSectionHeader } from "@/components/google";
+import { GoogleList, GoogleListRow, GoogleSectionHeader } from "@/components/google";
 import { StatusPill, type PillTone } from "@/components/crm-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -221,19 +221,31 @@ export default function AdminPartnershipsPage() {
               {MEDIA_PARTNER_STATUSES.map((st) => <TabsTrigger key={st} value={st}>{MEDIA_PARTNER_STATUS_LABELS[st]} ({n(s.partners[st])})</TabsTrigger>)}
             </TabsList>
           </Tabs>
-          <div className="divide-y rounded-lg border" data-testid="list-partners">
+          {/* Google's list format (owner 2026-10-15, the SEO Suite look): hairline rows with the key facts; the title opens the company. */}
+          <GoogleList as="ul" testId="list-partners">
             {(partners ?? []).map((p) => (
-              <button key={p.id} type="button" onClick={() => setOpenId(p.id)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/50" data-testid={`row-partner-${p.id}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{p.company}{p.domain && p.domain !== p.company ? <span className="font-normal text-muted-foreground"> · {p.domain}</span> : null}</div>
-                  <div className="truncate text-xs text-muted-foreground">{MEDIA_PARTNER_KIND_LABELS[p.kind]} · {p.messages} emails · last {ago(p.lastMessageAt)}{p.addedTo ? ` · in the ${p.addedTo.toLowerCase()}` : ""}</div>
-                  {(p.toFinalize || p.ownerQuestion) && <div className="truncate text-xs">{p.status === "agreed" && p.toFinalize ? `To finalize: ${p.toFinalize}` : p.ownerQuestion ? `Your call: ${p.ownerQuestion}` : ""}</div>}
-                </div>
-                <StatusPill tone={PARTNER_TONE[p.status]}>{MEDIA_PARTNER_STATUS_LABELS[p.status]}</StatusPill>
-              </button>
+              <GoogleListRow
+                as="li"
+                size="md"
+                key={p.id}
+                testId={`row-partner-${p.id}`}
+                title={p.company}
+                onOpen={() => setOpenId(p.id)}
+                badges={<StatusPill tone={PARTNER_TONE[p.status]}>{MEDIA_PARTNER_STATUS_LABELS[p.status]}</StatusPill>}
+                meta={[
+                  p.domain && p.domain !== p.company ? p.domain : null,
+                  MEDIA_PARTNER_KIND_LABELS[p.kind],
+                  `${p.messages} emails`,
+                  `last ${ago(p.lastMessageAt)}`,
+                  p.addedTo ? `in the ${p.addedTo.toLowerCase()}` : null,
+                ]}
+                line={p.status === "agreed" && p.toFinalize ? `To finalize: ${p.toFinalize}` : p.ownerQuestion ? `Your call: ${p.ownerQuestion}` : undefined}
+              />
             ))}
-            {partners && !partners.length && <p className="px-3 py-8 text-center text-sm text-muted-foreground">No companies yet. They appear here as emails come in or go out.</p>}
-          </div>
+          </GoogleList>
+          {partners && !partners.length && (
+            <div className="g-callout" data-testid="empty-partners"><h3>No companies yet</h3><p>They appear here as emails come in or go out of media@.</p></div>
+          )}
         </Section>
 
         <Section title="Emails" icon={Mail}>
@@ -247,7 +259,7 @@ export default function AdminPartnershipsPage() {
           </Tabs>
           <div className="space-y-2" data-testid="list-media-messages">
             {(msgs?.rows ?? []).map((m) => <MessageCard key={m.id} m={m} />)}
-            {msgs && !msgs.rows.length && <p className="py-8 text-center text-sm text-muted-foreground">No emails here yet.</p>}
+            {msgs && !msgs.rows.length && <div className="g-callout" data-testid="empty-media-messages"><h3>No emails here yet</h3><p>Sent and received mail shows up as the inbox is checked (every {s.intervalMin} minutes) or when you send one below.</p></div>}
           </div>
           {pages > 1 && (
             <div className="mt-3 flex items-center justify-between text-sm">

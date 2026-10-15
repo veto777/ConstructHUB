@@ -241,7 +241,7 @@ export default function SeoAuditPage() {
           {running ? "Crawling…" : a ? "Run new crawl" : "Run first crawl"}
         </Button>
       )}
-    >
+     helpKey="seo.audit">
       {!site && sites.isSuccess && <Empty testId="audit-empty-sites"><h3>No sites yet</h3><p>Add your site above, then run a crawl to see its health score and issues.</p></Empty>}
       {askedSite && (site ? q.isLoading : sites.isLoading) && asked.length > 0 && <ActiveFilter words={`${asked.map((k) => wordOf(k, current[k]!)).join(", ")} (reading the crawl…)`} clearHref={seoLinks.audit(askedSite, { tab: view === "issues" ? undefined : view, at: at ?? undefined, vs: vs ?? undefined })} />}
       {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading the audit…</p>}

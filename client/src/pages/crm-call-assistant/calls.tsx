@@ -19,6 +19,8 @@ import { CALL_ASSISTANT_SPAM } from "@shared/plan-copy";
 import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
 import { CallDetailSheet, EscalationRow } from "./calls-detail";
 import { CallResults } from "./results";
+import { SampleCallsPreview, SampleSpamPreview } from "./samples";
+import { GooglePill } from "@/components/google";
 import {
   OUTCOME_LABELS, outcomeLabel, outcomeTone, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, LIVE_REFRESH_MS, callFingerprint,
   type VoiceCallList, type VoiceCallListRow, type VoiceCallDetail, type VoiceEscalationList, type VoiceSpamEntry, type EscalationReminders,
@@ -212,13 +214,19 @@ export function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) 
       ) : list.isError && !list.data ? (
         <InlineError title="Couldn't load the call log" error={list.error} onRetry={() => list.refetch()} />
       ) : !list.data?.calls.length ? (
-        <EmptyState
-          icon={PhoneIncoming}
-          title={filtered ? "No calls match" : "No calls yet"}
-          description={filtered
-            ? "Try a different search or outcome."
-            : "Once your number is forwarded and the assistant is live, every call shows up here with its outcome, summary, transcript and recording."}
-        />
+        <>
+          <EmptyState
+            icon={PhoneIncoming}
+            title={filtered ? "No calls match" : "No calls yet"}
+            description={filtered
+              ? "Try a different search or outcome."
+              : "Once your number is forwarded and the assistant is live, every call shows up here with its outcome, summary, transcript and recording."}
+          />
+          {/* The log is really empty (no filter hid anything): a clearly marked sample of three calls, gone with the first real one. */}
+          {!filtered && list.data?.total === 0 && (
+            <SampleCallsPreview cta={<GooglePill size="sm" href="/call-assistant/numbers" label="Get a number" testId="link-sample-calls-numbers" />} />
+          )}
+        </>
       ) : (
         <>
           <CallsTable calls={list.data.calls} onOpen={onOpen} testId="table-calls" numberHint={CALL_NO_HINT_LOG} />
@@ -478,7 +486,10 @@ export function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (i
         {ledger.isLoading ? <TableSkeleton rows={3} /> : ledger.isError && !ledger.data ? (
           <InlineError title="Couldn't load the spam ledger" error={ledger.error} onRetry={() => ledger.refetch()} />
         ) : !ledger.data?.entries.length ? (
-          <EmptyState compact icon={ShieldAlert} title="No spam yet" description="Numbers the assistant screens out land here." />
+          <>
+            <EmptyState compact icon={ShieldAlert} title="No spam yet" description="Numbers the assistant screens out land here." />
+            <SampleSpamPreview />
+          </>
         ) : (
           <div className={crmTable.wrapper}>
             <table className={crmTable.table} data-testid="table-spam-ledger">

@@ -7,6 +7,7 @@
  * player or a link: `video` is only ever a real, uploaded file (docs/tutorials/VIDEO-PIPELINE.md).
  */
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, ChevronDown, PlayCircle, Search } from "lucide-react";
 import { AppPage } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill } from "@/components/google";
@@ -25,7 +26,11 @@ const HIDDEN_ROUTES = new Set<string>([
   // The iPhone apps sell nothing, so they have no Master Class, reinstatement service or Ads guide.
   ...(inNativeApp() ? ["/master-class", "/reinstatement", "/google-ads-guide"] : []),
 ]);
-const FEATURES = HELP_FEATURES.filter((f) => !HIDDEN_ROUTES.has(f.route));
+const VISIBLE = HELP_FEATURES.filter((f) => !HIDDEN_ROUTES.has(f.route));
+/** The owner-only admin pages ("/admin/…") keep their "i" on the page itself, but their cards show here only to a platform admin. */
+// Operator-only consoles: their pages keep their "i", but clients never see them listed here.
+const isAdminRoute = (route: string) => route === "/admin" || route.startsWith("/admin/") || route === "/lsa-account-manager" || route.startsWith("/lsa-account-manager/");
+const featuresFor = (isPlatformAdmin: boolean) => (isPlatformAdmin ? VISIBLE : VISIBLE.filter((f) => !isAdminRoute(f.route)));
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const openHref = (e: HelpEntry) => (isCrmRoute(e.route) ? portalUrl(e.route) : e.route);
@@ -111,6 +116,9 @@ function FeatureCard({ entry, open, onToggle }: { entry: HelpEntry; open: boolea
 
 export default function TutorialsPage() {
   const [q, setQ] = useState("");
+  // Admin cards appear only once /api/auth/me says this is a platform admin (never while it is still loading).
+  const me = useQuery<{ isPlatformAdmin?: boolean } | null>({ queryKey: ["/api/auth/me"] });
+  const FEATURES = useMemo(() => featuresFor(me.data?.isPlatformAdmin === true), [me.data?.isPlatformAdmin]);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const toggle = (key: string) => setOpen((prev) => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
 
@@ -121,23 +129,24 @@ export default function TutorialsPage() {
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (!id) return;
     const key = id.replace(/^help-/, "");
-    if (id.startsWith("help-") && FEATURES.some((f) => f.key === key)) setOpen(new Set([key]));
+    if (id.startsWith("help-") && VISIBLE.some((f) => f.key === key)) setOpen(new Set([key]));
     const t = window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: "start" }), 50);
     return () => window.clearTimeout(t);
   }, []);
 
   const groups = useMemo(
     () => HELP_GROUPS.map((group) => ({ group, items: FEATURES.filter((f) => f.group === group && helpMatches(f, q)) })).filter((g) => g.items.length > 0),
-    [q],
+    [q, FEATURES],
   );
   const shown = groups.reduce((n, g) => n + g.items.length, 0);
   const withVideo = FEATURES.filter((f) => f.video).length;
 
   return (
     <AppPage testId="page-tutorials">
+      {/* No "i" on this title: the page IS the help (helpKey={null}); every card below carries its own guide. */}
       <GoogleSectionHeader
-        as="h1" title="Tutorials" titleTestId="text-page-title" flush
-        description="Every feature: what it’s for, how to run it and how it works. Walkthrough videos appear here as they are added."
+        as="h1" title="Tutorials" titleTestId="text-page-title" flush helpKey={null}
+        description="Every ConstructHUB feature in one place, grouped the way the menu groups them: what each one is for, how to run it, how it works, and its walkthrough video once recorded. Open a feature from its card, or read its guide right here."
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="g-search sm:w-96" role="search">

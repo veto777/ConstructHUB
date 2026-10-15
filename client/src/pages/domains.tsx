@@ -6,6 +6,8 @@ import {
   Eye,
   Globe,
   Link2,
+  MapPin,
+  Pencil,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -42,7 +44,12 @@ import {
   GoogleList,
   GoogleListRow,
   GooglePill,
+  GoogleStat,
+  GoogleStatGrid,
 } from "@/components/google";
+import { HelpButton } from "@/components/help-button";
+import { SamplePreview } from "@/components/sample-preview";
+import { PresetFilter } from "@/components/domains/preset-filter";
 import {
   PlanRequired,
   planRequiredFrom,
@@ -67,6 +74,8 @@ import {
 import {
   badgeClass,
   domainBadges,
+  type DomainHealthLike,
+  type DomainStateLike,
 } from "@/components/domains/domain-badges";
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass =
@@ -86,6 +95,104 @@ function ListSkeleton({ rows = 5, tall }: { rows?: number; tall?: boolean }) {
     </div>
   );
 }
+
+/** The registrars the inventory filter offers; any other registrar name can be typed (the server matches it as-is). */
+const REGISTRARS: readonly [string, string][] = [
+  ["porkbun", "Porkbun"],
+  ["namecom", "Name.com"],
+  ["manual", "Added by hand"],
+  ["squarespace", "Squarespace"],
+  ["wix", "Wix"],
+  ["hover", "Hover"],
+];
+const daysUntil = (iso: string | null | undefined): number | null => {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? Math.ceil((t - Date.now()) / 86400000) : null;
+};
+const inDays = (n: number) => (n < 0 ? `${Math.abs(n)} day${Math.abs(n) === 1 ? "" : "s"} ago` : n === 0 ? "today" : `in ${n} day${n === 1 ? "" : "s"}`);
+
+/** One domain as the inventory shows it (the API row, or a sample built from static offsets). */
+type DomainRow = {
+  id: number;
+  domain: string;
+  registrar: string;
+  location_name: string | null;
+  state: (DomainStateLike & { nameservers?: string[] | null }) | null;
+  health: DomainHealthLike;
+  checked_at: string | null;
+};
+
+/**
+ * A domain card: the badges the daily check raises, the four numbers a contractor asks about (expiry,
+ * auto-renew, website, nameservers) and one pill per action. The checkbox keeps bulk selection working.
+ */
+function DomainCard({ d, selected, onToggle, busy, onCheck, onMap, onChange }: {
+  d: DomainRow;
+  selected: boolean;
+  onToggle: () => void;
+  busy: boolean;
+  onCheck: () => void;
+  onMap: () => void;
+  onChange: () => void;
+}) {
+  const exp = daysUntil(d.state?.expires);
+  const ssl = daysUntil(d.health?.sslExpires);
+  const figures: [string, string, boolean][] = [
+    ["Expires", d.state?.expires ? `${new Date(d.state.expires).toLocaleDateString()} · ${inDays(exp ?? 0)}` : "Not known yet", exp !== null && exp <= 30],
+    ["Auto-renew", d.state?.autoRenew === true ? "On" : d.state?.autoRenew === false ? "Off" : "Not known yet", d.state?.autoRenew === false],
+    ["Website", d.health?.up === true ? (ssl !== null && ssl <= 30 ? `Up · SSL ${inDays(ssl)}` : "Up, SSL OK") : d.health?.up === false ? "Not answering" : "Not checked yet", d.health?.up === false || (ssl !== null && ssl <= 30)],
+    ["Nameservers", d.state?.nameservers?.length ? d.state.nameservers.join(", ") : "Not checked yet", false],
+  ];
+  return (
+    <GoogleListRow
+      size="md"
+      testId={`row-domain-${d.id}`}
+      title={
+        <label className="inline-flex cursor-pointer items-center gap-3">
+          <input aria-label={`Select ${d.domain}`} type="checkbox" checked={selected} onChange={onToggle} />
+          <span>{d.domain}</span>
+        </label>
+      }
+      badges={domainBadges(d.state, d.health).map((b) => (
+        <span key={b.key} className={badgeClass(b.tone)}>{b.label}</span>
+      ))}
+      meta={[
+        REGISTRARS.find(([v]) => v === d.registrar)?.[1] ?? d.registrar,
+        d.location_name || "Not mapped to a client",
+        d.checked_at ? `Checked ${new Date(d.checked_at).toLocaleString()}` : "Not checked yet",
+      ]}
+      actions={
+        <>
+          <GooglePill size="sm" icon={ShieldCheck} disabled={busy} onClick={onCheck} label="Check now" testId={`pill-check-${d.id}`} />
+          <GooglePill size="sm" variant="quiet" icon={MapPin} disabled={busy} onClick={onMap} label={d.location_name ? "Change client" : "Map to client"} testId={`pill-map-${d.id}`} />
+          {d.registrar === "porkbun" || d.registrar === "namecom" ? (
+            <GooglePill size="sm" variant="quiet" icon={Pencil} disabled={busy} onClick={onChange} label="Change DNS" testId={`pill-dns-${d.id}`} />
+          ) : null}
+        </>
+      }
+    >
+      <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[13px] sm:grid-cols-4">
+        {figures.map(([k, v, bad]) => (
+          <div key={k} className="min-w-0">
+            <dt className="g-text-2 text-[12px]">{k}</dt>
+            <dd className={`[overflow-wrap:anywhere] ${bad ? "g-closed" : "g-text"}`}>{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </GoogleListRow>
+  );
+}
+
+/** Obviously made-up domains for the sample shown while the inventory is empty (never stored, never sent). */
+const sampleDate = (days: number) => new Date(Date.now() + days * 86400000).toISOString();
+const SAMPLE_DOMAINS: DomainRow[] = [
+  { id: -1, domain: "sample-roofing.example", registrar: "porkbun", location_name: "Sample Roofing Co.", state: { expires: sampleDate(42), autoRenew: true, nameservers: ["ns1.sample-dns.example", "ns2.sample-dns.example"] }, health: { up: true, sslExpires: sampleDate(70) }, checked_at: sampleDate(-1) },
+  { id: -2, domain: "example-plumbing.example", registrar: "namecom", location_name: "Example Plumbing LLC", state: { expires: sampleDate(9), autoRenew: false, nameservers: ["ns1.sample-dns.example", "ns2.sample-dns.example"] }, health: { up: true, sslExpires: sampleDate(200) }, checked_at: sampleDate(-1) },
+  { id: -3, domain: "demo-electric.example", registrar: "manual", location_name: null, state: { expires: sampleDate(300), autoRenew: null, nameservers: null }, health: { up: false, sslExpires: null }, checked_at: sampleDate(-2) },
+];
+
+const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
 export default function DomainsPage() {
   const { toast } = useToast();
@@ -141,6 +248,11 @@ export default function DomainsPage() {
   });
   // Background processing off: queued work waits rather than applying, and copy says so.
   const workerOff = guides?.workerEnabled === false;
+  // The stat row's two counts, whatever the filters say: every domain, and the ones the daily check flags.
+  const { data: overview } = useQuery<any>({ queryKey: ["/api/domains?limit=1"], refetchInterval: pollWithinBudget(60_000) });
+  const { data: attentionOverview } = useQuery<any>({ queryKey: ["/api/domains?attention=1&limit=1"], refetchInterval: pollWithinBudget(60_000) });
+  const totalDomains: number | null = overview ? Number(overview.total || 0) : null;
+  const filtering = !!(q || registrar || attention);
   const {
     data: connections,
     error: connectionsError,
@@ -217,7 +329,7 @@ export default function DomainsPage() {
     <GoogleSectionHeader
       as="h1"
       title="Domains"
-      description="Watch client domains, expiry and DNS — registration stays with your registrar."
+      description="Every client domain in one place: when it expires, whether its DNS and website are healthy, and DNS changes with a preview first."
       flush
       actions={
         <Link href="/mail-alerts" asChild>
@@ -247,15 +359,45 @@ export default function DomainsPage() {
       {error && <Notice tone="danger">{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
       {guides && !guides.workerEnabled && (
-        <Notice tone="warning">
-          Domain background processing is off. Your administrator must enable
-          it before queued previews, changes and monitoring can run.
+        <Notice tone="info" title="Background checks are paused on this server" testId="notice-domains-worker-off">
+          Registrar imports, the daily expiry and DNS checks, previews and confirmed changes wait in the queue
+          until an administrator sets <code className="text-xs">DOMAINS_WORKER_ENABLED=true</code> in the
+          server environment and restarts the app. Everything else works now: connecting a registrar, adding
+          domains, mapping them to clients, and reviewing the inventory and history.
         </Notice>
       )}
+      {totalDomains !== null && totalDomains > 0 && (
+        <GoogleStatGrid cols={4}>
+          <GoogleStat label="Domains watched" value={totalDomains.toLocaleString()} hint={`${(connections?.items || []).length} registrar connection${(connections?.items || []).length === 1 ? "" : "s"}`} testId="stat-domains-watched" />
+          <GoogleStat label="Need attention" value={attentionOverview ? Number(attentionOverview.total || 0).toLocaleString() : "…"} tone={attentionOverview && Number(attentionOverview.total) > 0 ? "bad" : "default"} hint="Expiring in 60 days, auto-renew off, website down or SSL expiring" testId="stat-domains-attention" />
+          <GoogleStat label="Previews ready" value={(jobs?.items || []).filter(canConfirmJob).length.toLocaleString()} hint="Waiting for your confirmation" testId="stat-domains-previews" />
+          <GoogleStat label="Background checks" value={guides ? (guides.workerEnabled ? "On" : "Paused") : "…"} tone={workerOff ? "bad" : "default"} hint={workerOff ? "Queued work waits for an administrator" : "Imports and daily checks run"} testId="stat-domains-worker" />
+        </GoogleStatGrid>
+      )}
+      {totalDomains === 0 && (
+        <div className="g-callout" data-testid="domains-how-it-works">
+          <h3>How this works</h3>
+          <ol className="mt-1 list-decimal space-y-1 pl-5">
+            <li>Connect a registrar (Porkbun or Name.com) or add domains by typing them in.</li>
+            <li>We check each domain’s expiry date, auto-renew, nameservers and website, and keep checking daily.</li>
+            <li>You get an alert when a domain is expiring, auto-renew is off or the website stops answering — and DNS changes get a preview before anything is applied.</li>
+          </ol>
+        </div>
+      )}
+      <details id="domains-setup" className="group" open={totalDomains === null || totalDomains === 0} data-testid="details-domains-setup">
+        <summary className="flex cursor-pointer list-none items-center gap-2 py-2 text-[16px] font-medium g-text [&::-webkit-details-marker]:hidden">
+          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+          Connect a registrar or add domains
+          {(connections?.items || []).length > 0 && (
+            <span className="g-text-2 text-[13px] font-normal">· {connections.items.length} connected</span>
+          )}
+        </summary>
+        <div className="space-y-5 pt-2">
       <section id="domains-connect-registrar">
         <GoogleSectionHeader
-          title="Connect registrar"
-          description="Use a Porkbun or Name.com API key to sync and change client DNS."
+          title="Connect a registrar"
+          titleAfter={<HelpButton k="domains.connect" />}
+          description="A Porkbun or Name.com API key imports that account’s domains and lets you change their DNS from here."
         />
         <form
           className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
@@ -402,7 +544,7 @@ export default function DomainsPage() {
       <section>
         <GoogleSectionHeader
           title="Add domains"
-          description="Track domains your registrar can't reach — comma-separated, up to 100 at a time."
+          description="Domains kept anywhere else: typed in, comma-separated, up to 100 at a time, for expiry and website checks only."
         />
         <form
           className="flex flex-col gap-3 sm:flex-row"
@@ -458,8 +600,10 @@ export default function DomainsPage() {
           </p>
         )}
       </section>
+        </div>
+      </details>
       <section data-testid="section-domain-inventory">
-        <GoogleSectionHeader title="Domain inventory" count={domains?.total || 0} />
+        <GoogleSectionHeader title="Domain inventory" count={domains?.total || 0} description="One card per domain: its expiry, auto-renew, website and nameservers, with the badges the daily check raises." />
         <div className="space-y-3">
           <Toolbar
             search={{
@@ -476,29 +620,21 @@ export default function DomainsPage() {
             activeFilters={(registrar ? 1 : 0) + (attention ? 1 : 0)}
             filters={
               <>
-                <select
-                  className={selectClass}
-                  aria-label="Filter registrar"
+                <PresetFilter
+                  label="Filter registrar"
+                  allLabel="All registrars"
+                  presets={REGISTRARS}
+                  placeholder="Registrar name"
+                  selectClass={selectClass}
+                  testId="filter-registrar"
                   value={registrar}
-                  onChange={(e) => {
-                    setRegistrar(e.target.value);
+                  onChange={(v) => {
+                    setRegistrar(v);
                     setPage(1);
                     setSelected([]);
                     clearPickedRecord();
                   }}
-                >
-                  <option value="">All registrars</option>
-                  {[
-                    "porkbun",
-                    "namecom",
-                    "manual",
-                    "squarespace",
-                    "wix",
-                    "hover",
-                  ].map((v) => (
-                    <option key={v}>{v}</option>
-                  ))}
-                </select>
+                />
                 <select
                   className={selectClass}
                   aria-label="Filter by attention needed"
@@ -516,6 +652,7 @@ export default function DomainsPage() {
               </>
             }
           />
+          {(!!domains?.items?.length || filtering) && (
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex h-10 items-center gap-2 text-sm g-text-2">
               <input
@@ -563,7 +700,7 @@ export default function DomainsPage() {
                 }}
                 label="Check selected domains"
               />
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div id="domains-mapping" className="flex scroll-mt-4 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                 <Input
                   aria-label="Find client location"
                   placeholder="Search client name or website"
@@ -627,6 +764,7 @@ export default function DomainsPage() {
               </div>
             </div>
           </div>
+          )}
           {locationsError && (
             <Notice
               tone="danger"
@@ -653,45 +791,62 @@ export default function DomainsPage() {
             <>
               {domains?.items?.length ? (
                 <GoogleList testId="list-domains">
-                  {domains.items.map((d: any) => (
-                    <GoogleListRow
+                  {domains.items.map((d: DomainRow) => (
+                    <DomainCard
                       key={d.id}
-                      size="md"
-                      testId={`row-domain-${d.id}`}
-                      title={
-                        <label className="inline-flex cursor-pointer items-center gap-3">
-                          <input
-                            aria-label={`Select ${d.domain}`}
-                            type="checkbox"
-                            checked={selected.includes(Number(d.id))}
-                            onChange={() => toggle(Number(d.id))}
-                          />
-                          <span>{d.domain}</span>
-                        </label>
-                      }
-                      badges={domainBadges(d.state, d.health).map((b) => (
-                        <span key={b.key} className={badgeClass(b.tone)}>
-                          {b.label}
-                        </span>
-                      ))}
-                      meta={[
-                        d.registrar,
-                        d.location_name || "Unmapped",
-                        d.checked_at
-                          ? `DNS checked ${new Date(d.checked_at).toLocaleString()}`
-                          : "DNS never checked",
-                      ]}
-                      line={d.state?.nameservers?.join(", ") || "Nameservers not yet checked"}
+                      d={d}
+                      selected={selected.includes(Number(d.id))}
+                      onToggle={() => toggle(Number(d.id))}
+                      busy={busy}
+                      onCheck={async () => {
+                        const r = await act("/monitor", { ids: [Number(d.id)] });
+                        if (r)
+                          toast({
+                            title: "Fresh check queued",
+                            description: workerOff
+                              ? `${d.domain} waits until background processing is turned back on.`
+                              : `${d.domain} will be checked as soon as the worker is free.`,
+                          });
+                      }}
+                      onMap={() => {
+                        setSelected([Number(d.id)]);
+                        clearPickedRecord();
+                        scrollTo("domains-mapping");
+                      }}
+                      onChange={() => {
+                        setSelected([Number(d.id)]);
+                        clearPickedRecord();
+                        scrollTo("domains-dns-change");
+                      }}
                     />
                   ))}
                 </GoogleList>
-              ) : (
-                <p className="py-6 text-sm g-text-2">
+              ) : filtering ? (
+                <p className="py-6 text-sm g-text-2" data-testid="domains-empty-filtered">
                   {attention
                     ? "No domains need attention right now — nothing expiring soon, auto-renew is on and the websites answer."
-                    : "No domains found. Connect a registrar or add domains above."}
+                    : "No domains match these filters."}
                 </p>
+              ) : (
+                <SamplePreview
+                  what="what each domain card shows once you connect a registrar or add a domain"
+                  testId="sample-domains"
+                  cta={<GooglePill size="sm" icon={Plus} label="Add your first domain" onClick={() => { const el = document.getElementById("domains-setup") as HTMLDetailsElement | null; if (el) el.open = true; scrollTo("domains-setup"); }} testId="sample-domains-cta" />}
+                >
+                  <GoogleStatGrid cols={4} className="mb-3">
+                    <GoogleStat label="Domains watched" value="3" hint="2 registrar connections" />
+                    <GoogleStat label="Need attention" value="2" tone="bad" hint="Expiring in 60 days, auto-renew off, website down or SSL expiring" />
+                    <GoogleStat label="Previews ready" value="1" hint="Waiting for your confirmation" />
+                    <GoogleStat label="Background checks" value="On" hint="Imports and daily checks run" />
+                  </GoogleStatGrid>
+                  <GoogleList>
+                    {SAMPLE_DOMAINS.map((d) => (
+                      <DomainCard key={d.id} d={d} selected={false} onToggle={() => {}} busy={false} onCheck={() => {}} onMap={() => {}} onChange={() => {}} />
+                    ))}
+                  </GoogleList>
+                </SamplePreview>
               )}
+              {(page > 1 || (domains?.total || 0) > 25) && (
               <div className="flex flex-wrap items-center gap-2">
                 <GooglePill
                   size="sm"
@@ -717,6 +872,7 @@ export default function DomainsPage() {
                   label="Next domains"
                 />
               </div>
+              )}
             </>
           )}
         </div>
@@ -771,7 +927,7 @@ export default function DomainsPage() {
             </div>
           </div>
         </section>
-        <section>
+        <section id="domains-dns-change" className="scroll-mt-4">
           <GoogleSectionHeader title="DNS record change" />
           <div className="space-y-3">
             <p className="text-sm g-text-2">
@@ -916,7 +1072,8 @@ export default function DomainsPage() {
       <section data-testid="section-domain-jobs">
         <GoogleSectionHeader
           title="Previews and change history"
-          description="Review the diff, confirm, and verify your identity. Applied changes stay pending until public DNS agrees."
+          titleAfter={<HelpButton k="domains.dns-changes" />}
+          description="Review the before and after, confirm it’s you, and apply. An applied change stays pending until public DNS agrees."
           flush
         />
         <div className="space-y-3">
@@ -1188,7 +1345,7 @@ export default function DomainsPage() {
         </DialogContent>
       </Dialog>
       <section>
-        <GoogleSectionHeader title="Registrar walkthroughs" flush />
+        <GoogleSectionHeader title="Registrar guides" description="Where to make an API key at each registrar, and the server address to allow-list." flush />
         <div className="space-y-3">
           <p className="pt-4 text-sm g-text-2">
             Server egress IP for allowlists:{" "}

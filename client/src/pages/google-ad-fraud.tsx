@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PublicPageHeader } from "@/components/public-page-chrome";
+import { HelpButton } from "@/components/help-button";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -313,11 +314,15 @@ export default function GoogleAdFraudPage() {
               <Skull aria-hidden="true" />
               <span>Industry Investigation</span>
             </div>
-            <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-fraud-title">
-              Google Click Fraud:
-              <br />
-              The Billion-Dollar Scam Nobody Talks About
-            </h1>
+            {/* The page's "i" (owner's program 2026-10-15): what this page is and how to use it, from the help registry. */}
+            <div className="mb-3 flex items-start justify-center gap-1.5">
+              <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px]" data-testid="text-fraud-title">
+                Google Click Fraud:
+                <br />
+                The Billion-Dollar Scam Nobody Talks About
+              </h1>
+              <HelpButton k="ad-fraud" className="mt-1.5" />
+            </div>
             <p className="g-text-2 text-sm leading-relaxed max-w-2xl mx-auto">
               In contractor Google Ads accounts we have worked on, we used IP tracking, device fingerprinting, and screen recording to review ad traffic. This page shares what we observed and our opinion of it — it is not an independent audit, and your results may differ.
             </p>

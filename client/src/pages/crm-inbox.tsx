@@ -13,6 +13,7 @@ import {
   MessageSquare, Send, ArrowLeft, Clock,
 } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar } from "@/components/crm-ui";
+import { SampleInboxList } from "@/components/crm-sample-previews";
 
 /* ── Shared bits ─────────────────────────────────────────────────────────── */
 
@@ -145,13 +146,17 @@ function MessagesPane({ selected }: { selected: string | null }) {
 
   if (!threads.length) {
     return (
-      <Card>
-        <EmptyState
-          icon={MessageSquare}
-          title="No messages yet"
-          description="When a client sends a message from their portal or asks a question on an estimate, the conversation starts here."
-        />
-      </Card>
+      <div className="space-y-4">
+        <Card>
+          <EmptyState
+            icon={MessageSquare}
+            title="No messages yet"
+            description="When a client sends a message from their portal or asks a question on an estimate, the conversation starts here."
+          />
+        </Card>
+        {/* Threads are every conversation the org has: none means the inbox is empty, so show a sample. */}
+        <SampleInboxList />
+      </div>
     );
   }
 

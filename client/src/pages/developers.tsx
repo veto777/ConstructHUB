@@ -27,6 +27,7 @@ import { joinNames } from "@shared/plan-copy";
 import { Check, KeyRound, Link as LinkIcon, Search, ShieldAlert } from "lucide-react";
 import { API_NO_AI_NOTICE } from "@/pages/settings/api/api-keys-panel";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
+import { HelpButton } from "@/components/help-button";
 import { BTN_PRIMARY, Kicker } from "@/components/feature-landing/primitives";
 import { copyToClipboard } from "@/pages/settings/billing/format";
 import { SITE_ORIGIN } from "@shared/seo";
@@ -304,7 +305,11 @@ export default function DevelopersPage() {
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-10 sm:pb-12 flex flex-wrap items-end justify-between gap-6">
           <div className="min-w-0 max-w-2xl">
             <Kicker n="">Developers</Kicker>
-            <h1 className="font-display mt-5 font-semibold text-[2.4rem] sm:text-[3.1rem] lg:text-[3.6rem] leading-[1.04] tracking-[-0.02em]" data-testid="text-developers-title">{doc?.info?.title || "ConstructHUB API"}</h1>
+            <h1 className="font-display mt-5 font-semibold text-[2.4rem] sm:text-[3.1rem] lg:text-[3.6rem] leading-[1.04] tracking-[-0.02em] flex flex-wrap items-center gap-2" data-testid="text-developers-title">
+              <span>{doc?.info?.title || "ConstructHUB API"}</span>
+              {/* The "i" (owner 2026-10-15): what the page is for and how to use it, from the help registry. */}
+              <HelpButton k="developers" className="mt-2 self-center" />
+            </h1>
             <p className="mt-4 text-base sm:text-lg text-mkt-ink-soft leading-relaxed">
               {doc?.info?.description?.split("\n")[0] || "Read your ConstructHUB data and update your records from your own tools."}
               {doc?.info?.version ? ` Version ${doc.info.version}.` : ""}
@@ -315,6 +320,31 @@ export default function DevelopersPage() {
         <div className="mkt-ruler" aria-hidden />
       </section>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12 space-y-8">
+
+        {/* How this works, in three steps (owner 2026-10-15: a bare reference page explains itself before the detail). */}
+        <Card className={CARD} data-testid="card-developers-how">
+          <CardHeader>
+            <CardTitle className={CARD_TITLE}>How this works</CardTitle>
+            <CardDescription>Three steps from nothing to your first call.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ol className="grid gap-4 sm:grid-cols-3 text-sm" data-testid="list-developers-how">
+              {[
+                ["Create a key", inNativeApp() ? "Under Settings → API keys. The full key is shown once; copy it then." : "In Settings → API keys. The full key is shown once; copy it then.", inNativeApp() ? null : "/settings/api", "Open API keys"],
+                ["Call the API", "Send the key as Authorization: Bearer <key> to the /api/v1 base. Every endpoint below has a curl line and an example body to copy.", "#section-developers-endpoints", "See the endpoints"],
+                ["Watch usage", "Settings → API usage shows units and requests per day, by key. A read is 1 unit (+1 per 100 rows); a write is 5.", inNativeApp() ? null : "/settings?tab=api-usage", "Open API usage"],
+              ].map(([title, body, href, label], i) => (
+                <li key={title as string} className="rounded-xl border border-mkt-rule bg-mkt-card p-4">
+                  <p className="font-display font-semibold text-[1.05rem]"><span className="text-mkt-orange-ink mr-2 tabular-nums">{i + 1}</span>{title}</p>
+                  <p className="mt-1 text-muted-foreground">{body}</p>
+                  {href && (href as string).startsWith("#")
+                    ? <a href={href as string} className="mt-2 inline-block underline underline-offset-4" onClick={(e) => { e.preventDefault(); document.querySelector('[data-testid="section-developers-endpoints"]')?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>{label}</a>
+                    : href ? <Link href={href as string} className="mt-2 inline-block underline underline-offset-4">{label}</Link> : null}
+                </li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
 
         <Alert className="rounded-2xl border-mkt-orange bg-mkt-card [&>svg]:text-mkt-orange-ink" data-testid="banner-developers-no-ai">
           <ShieldAlert className="h-4 w-4" aria-hidden="true" />

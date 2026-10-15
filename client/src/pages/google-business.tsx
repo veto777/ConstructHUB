@@ -1,5 +1,5 @@
 import { AppPage } from "@/components/app-ui";
-import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { PublicPageHeader } from "@/components/public-page-chrome";
@@ -104,10 +104,24 @@ export default function GoogleBusinessPage() {
   const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
+  // The summary row: only what is already saved here (no Google call, no credit spent). Each tile opens its page.
+  const { data: locations } = useQuery<{ id: number; gbpLocationName?: string | null; reviewCount?: number | null }[]>({ queryKey: ["/api/locations"], enabled: !!user });
+  const { data: monitored } = useQuery<{ id: number }[]>({ queryKey: ["/api/gmb/listings"], enabled: !!user });
+  const { data: scans } = useQuery<{ id: number }[]>({ queryKey: ["/api/ranking-grid/scans"], enabled: !!user });
+  const linked = locations?.filter((l) => l.gbpLocationName).length;
+  const reviews = locations?.reduce((n, l) => n + (l.reviewCount ?? 0), 0);
+  const count = (n: number | undefined) => (n === undefined ? "—" : n.toLocaleString());
 
   // Google's format (owner, 2026-10-07): quiet title, the tools as hairline rows, pill actions.
   if (user) return <GoogleSurface page><AppPage>
     <GoogleSectionHeader as="h1" titleTestId="text-hero-title" title="Google Business" description="Manage your profile, check changes and improve your local presence." flush actions={<Link href="/gmb-monitor" asChild><GooglePill variant="solid" icon={Eye} label="Start monitoring" href="/gmb-monitor" testId="link-hero-start"/></Link>}/>
+    <GoogleStatGrid cols={4} className="sm:grid-cols-5">
+      <GoogleStat label="Locations" value={count(locations?.length)} href="/locations" testId="stat-locations"/>
+      <GoogleStat label="Linked to Google" value={count(linked)} hint={locations && !linked ? "Connect your Google account" : "Syncing reviews and stats"} href="/locations" testId="stat-linked"/>
+      <GoogleStat label="Google reviews" value={count(reviews)} hint="Saved from your linked listings" href="/google-reviews" testId="stat-reviews"/>
+      <GoogleStat label="Monitored listings" value={count(monitored?.length)} hint="Edit Monitor" href="/gmb-monitor" testId="stat-monitored"/>
+      <GoogleStat label="Ranking scans" value={count(scans?.length)} hint="Ranking grid" href="/ranking-grid" testId="stat-scans"/>
+    </GoogleStatGrid>
     <section id="tools">
       <GoogleSectionHeader title="Your Google tools" flush actions={<a href="#tools" className="g-link text-sm" data-testid="link-hero-explore">Explore all tools</a>}/>
       <GoogleList testId="list-google-tools">{tools.map((tool,i)=><GoogleListRow key={tool.link} size="md" leading={<tool.icon/>} title={<Link href={tool.link} data-testid={`card-tool-${i}`}>{['Profile monitor','Ranking grid','Photo optimizer','Locations','Reinstatement'][i]}</Link>} meta={['Check listing changes and draft review replies.','See where you rank across your service area.','Prepare job photos for your business profiles.','Manage profiles, connections and performance.','Get help with a suspended profile.'][i]} trailing={<ArrowRight className="h-4 w-4 g-text-2" aria-hidden="true"/>}/>)}</GoogleList>

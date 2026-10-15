@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { GooglePill } from "@/components/google";
 import { useQuery } from "@tanstack/react-query";
 import { PublicPageHeader } from "@/components/public-page-chrome";
+import { HelpButton } from "@/components/help-button";
 import { Link } from "wouter";
 import {
   Shield, ShieldCheck, ShieldAlert, Search, BarChart3,
@@ -164,11 +165,14 @@ export default function GoogleAdsGuidePage() {
               <Lock aria-hidden="true" />
               <span>Master Class Students Only</span>
             </div>
-            <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-locked-title">
-              Google Ads for Contractors:
-              <br />
-              The Complete Campaign Setup Playbook
-            </h1>
+            <div className="flex items-start justify-center gap-2">
+              <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-locked-title">
+                Google Ads for Contractors:
+                <br />
+                The Complete Campaign Setup Playbook
+              </h1>
+              <HelpButton k="ads-guide" className="mt-1" />
+            </div>
             <p className="g-text-2 text-sm leading-relaxed mb-8">
               12 in-depth sections with real Google Ads screenshots showing you exactly how to set up campaigns that generate real leads — and every trap Google sets to drain your budget.
             </p>
@@ -229,11 +233,14 @@ export default function GoogleAdsGuidePage() {
               <GraduationCap aria-hidden="true" />
               <span>Google Ads Master Class</span>
             </div>
-            <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-masterclass-title">
-              Google Ads for Contractors:
-              <br />
-              The Complete Campaign Setup Playbook
-            </h1>
+            <div className="flex items-start justify-center gap-2">
+              <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-masterclass-title">
+                Google Ads for Contractors:
+                <br />
+                The Complete Campaign Setup Playbook
+              </h1>
+              <HelpButton k="ads-guide" className="mt-1" />
+            </div>
             <p className="g-text-2 text-sm leading-relaxed">
               12 detailed guide pages showing you exactly how to set up profitable Google Ads campaigns. Each page is a complete walkthrough with real screenshots, step-by-step instructions, and the strategies that actually generate leads.
             </p>

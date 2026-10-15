@@ -71,13 +71,13 @@ describe('Agency access and 5,000-location scale',()=>{
     expect((await locationAccess(a,loc)).id).toBe(loc);
   });
   it('enforces HTTP auth, admin and viewer permissions and strict input',async()=>{
-    expect((await call('post','/api/agency/clients',member,{name:'Forbidden'})).status).toBe(404);
+    expect((await call('post','/api/agency/clients',member,{name:'Forbidden'})).status).toBe(403);
     expect((await call('post','/api/agency/clients',owner,{name:'',userId:other})).status).toBe(400);
-    expect((await call('put','/api/agency/team',member,{email:'other@example.invalid',role:'admin',allClients:true})).status).toBe(404);
+    expect((await call('put','/api/agency/team',member,{email:'other@example.invalid',role:'admin',allClients:true})).status).toBe(403);
     // A non-member's stale workspace choice falls back to their own account, which has no Agency plan.
     const foreign=await call('get','/api/agency/locations',other);expect(foreign.status).toBe(402);expect(foreign.data.items).toBeUndefined();
     await pool.query("UPDATE agency_members SET role='viewer' WHERE user_id=$1 AND member_id=$2",[owner,member]);
-    expect((await call('post','/api/agency/bulk',member,{requestKey:crypto.randomUUID(),action:'sync',selection:{ids:[loc]}})).status).toBe(404);
+    expect((await call('post','/api/agency/bulk',member,{requestKey:crypto.randomUUID(),action:'sync',selection:{ids:[loc]}})).status).toBe(403);
     await pool.query("UPDATE agency_members SET role='manager' WHERE user_id=$1 AND member_id=$2",[owner,member]);
   });
   it('checks deep-linked legacy objects and denies unrecognized delegated routes',async()=>{

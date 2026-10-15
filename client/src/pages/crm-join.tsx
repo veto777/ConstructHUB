@@ -149,6 +149,15 @@ export default function CrmJoinPage() {
 
             {data && (
               <>
+                {/* The form is three fields and a button: say what happens, in order. */}
+                <div className="rounded-lg border bg-muted/30 p-4 text-sm" data-testid="join-how-it-works">
+                  <div className="font-medium mb-1.5">How this works</div>
+                  <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
+                    <li>Sign in, or create an account, with the email the invitation was sent to.</li>
+                    <li>Enter the phone number clients on your jobs can reach you at.</li>
+                    <li>Accept — you land in {data.orgName ? `${data.orgName}'s` : "the company's"} CRM with the role shown below.</li>
+                  </ol>
+                </div>
                 <div className="rounded-lg border bg-muted/30 p-4 text-sm space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-muted-foreground">Invitation for</span>

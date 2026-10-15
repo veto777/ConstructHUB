@@ -14,7 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppPage, Notice } from "@/components/app-ui";
 import { GoogleAiOverview, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
-import { Download, Search, Trash2 } from "lucide-react";
+import { MetricStrip, StatCell, StatusBadge, scoreTone } from "@/components/tool";
+import { SamplePreview } from "@/components/sample-preview";
+import { HelpButton } from "@/components/help-button";
+import { cn } from "@/lib/utils";
+import { ChevronRight, Download, ExternalLink, Search, Trash2 } from "lucide-react";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { useToolView } from "@/hooks/use-tool-view";
@@ -184,6 +188,101 @@ function Copy({ text, label = "Copy draft" }: { text: string; label?: string }) 
   );
 }
 const pageCount = (n: number) => `${n} ${n === 1 ? "page" : "pages"}`;
+/** A scan's state in the history, in plain words. */
+const SCAN_STATUS_WORDS: Record<string, string> = { queued: "Waiting to start", running: "Scanning", completed: "Done", failed: "Failed" };
+/** The scored categories as the history card lines them up (the report's own order). */
+const CATEGORY_CELLS: [string, string][] = [["technical", "Technical"], ["content", "Content"], ["local", "Local"], ["performance", "Performance"], ["ai-readiness", "AI readiness"]];
+/**
+ * Made-up scans for the sample preview of an empty history: the same site twice, so the card shows a score and its
+ * move. Shown only while the account has no scan at all; never stored or sent (components/sample-preview.tsx).
+ */
+const SAMPLE_SCANS = [
+  { id: "sample-2", url: "https://sample-roofing.example", status: "completed", created_at: "2026-10-01T15:00:00Z", pages: 42, page_cap: 150, client: "Sample Roofing Co.", scores: { overall: 78, categories: { technical: 84, content: 71, local: 69, performance: 80, "ai-readiness": 74 } } },
+  { id: "sample-1", url: "https://sample-roofing.example", status: "completed", created_at: "2026-09-01T15:00:00Z", pages: 40, page_cap: 150, client: "Sample Roofing Co.", scores: { overall: 71, categories: { technical: 76, content: 68, local: 62, performance: 75, "ai-readiness": 70 } } },
+];
+const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } };
+
+/**
+ * A number the scan needs, with the usual values as quick picks: the field itself takes any other value (owner's rule,
+ * 2026-10-15: a fixed list of choices always accepts a typed value too). The value stays a string while typing so
+ * clearing the field does not become 0.
+ */
+function NumberField({ id, label, value, onChange, min, max, presets, unit, hint, invalid, testId }: {
+  id: string; label: string; value: string; onChange: (v: string) => void; min: number; max: number;
+  presets: (number | { value: number; label: string })[]; unit: string; hint: string; invalid: boolean; testId?: string;
+}) {
+  return (
+    <div className="space-y-1.5 text-sm">
+      <label htmlFor={id} className="block g-text-2">{label}</label>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input id={id} type="number" inputMode="numeric" min={min} max={max} value={value} aria-invalid={invalid} onChange={(e) => onChange(e.target.value)} className="h-10 w-24 tabular-nums" data-testid={testId} />
+        <div className="flex flex-wrap gap-1">
+          {presets.map((p) => {
+            const v = typeof p === "number" ? p : p.value, word = typeof p === "number" ? String(p) : p.label;
+            return <GooglePill key={v} size="sm" selected={value === String(v)} ariaPressed={value === String(v)} label={word} ariaLabel={typeof p === "number" ? `${v} ${unit}` : `${word} (${v} ${unit})`} onClick={() => onChange(String(v))} />;
+          })}
+        </div>
+      </div>
+      <p className="text-xs g-text-2">{hint}</p>
+    </div>
+  );
+}
+
+/** One step of the "How this works" card. */
+function HowStep({ n, title, text }: { n: number; title: string; text: string }) {
+  return (
+    <div className="tool-stat">
+      <div className="tool-stat__label">Step {n}</div>
+      <h3 className="text-[14px] font-semibold leading-5" style={{ color: "var(--tool-text)" }}>{title}</h3>
+      <p className="tool-stat__note">{text}</p>
+    </div>
+  );
+}
+
+/**
+ * One scan in the history, in the SEO Suite's card language (components/tool): the site, when it ran and for whom,
+ * its state, then the overall score with its move since the scan before and each category's score. A scan that is
+ * still running or failed says so in place of the figures. Without `onOpen` the card is a picture (the sample).
+ */
+function ScanCard({ job, prior, selected, onOpen }: { job: any; prior: any | null; selected?: boolean; onOpen?: () => void }) {
+  const overall = typeof job.scores?.overall === "number" ? job.scores.overall : null;
+  const before = typeof prior?.scores?.overall === "number" ? prior.scores.overall : null;
+  const running = ["queued", "running"].includes(job.status);
+  const when = new Date(job.created_at).toLocaleDateString();
+  return (
+    <section className={cn("tool-panel", selected && "outline outline-2 outline-[color:var(--tool-accent)]")} aria-current={selected ? "true" : undefined} data-testid={`card-scan-${job.id}`}>
+      <div className="tool-panel__head">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded text-[13px] font-semibold uppercase" style={{ color: "var(--tool-accent-ink)", background: "color-mix(in srgb, var(--tool-accent) 14%, transparent)" }} aria-hidden>{hostOf(job.url)[0]}</span>
+        <div className="min-w-0">
+          <h3 className="tool-panel__title">
+            {onOpen ? <button type="button" className="tool-link text-left [overflow-wrap:anywhere]" onClick={onOpen} aria-label={`${job.url} — open this scan's report`}>{job.url}</button> : job.url}
+          </h3>
+          <p className="tool-muted text-[12px]">{when}{job.client ? ` · ${job.client}` : ""}{typeof job.pages === "number" ? ` · ${pageCount(job.pages)} checked${job.page_cap ? ` of up to ${job.page_cap}` : ""}` : ""}</p>
+        </div>
+        <span className="tool-chip">{SCAN_STATUS_WORDS[job.status] ?? job.status}</span>
+        <div className="ml-auto flex flex-wrap gap-1.5">
+          <a href={job.url} target="_blank" rel="noopener noreferrer" className="tool-btn tool-btn--icon tool-btn--quiet" aria-label={`Open ${hostOf(job.url)} in a new tab`} title="Open the website" tabIndex={onOpen ? undefined : -1}><ExternalLink aria-hidden /></a>
+          {onOpen && <button type="button" className="tool-btn" onClick={onOpen} aria-current={selected ? "true" : undefined}>{selected ? "Showing below" : "Open report"}</button>}
+        </div>
+      </div>
+      {job.status === "completed" && job.scores ? (
+        <MetricStrip cols={[2, 3, 6]}>
+          <StatCell label="Overall score" testId={`metric-overall-${job.id}`} value={overall === null ? null : <StatusBadge tone={scoreTone(overall)} size="lg">{overall}</StatusBadge>} none="Not scored"
+            delta={before === null || overall === null ? null : { value: overall - before, period: "since the scan before", format: (n) => String(n) }}
+            note={before === null ? "First scored scan of this site" : `Scan before: ${before}`} />
+          {CATEGORY_CELLS.map(([k, label]) => (
+            <StatCell key={k} label={label} value={typeof job.scores.categories?.[k] === "number" ? String(job.scores.categories[k]) : null}
+              none={k === "performance" ? "Not scored: PageSpeed was off or unavailable" : "Not scored"} />
+          ))}
+        </MetricStrip>
+      ) : (
+        <p className="tool-panel__body text-sm g-text-2" role={job.status === "failed" ? "alert" : undefined}>
+          {running ? "Scanning — the scores appear here when it finishes." : job.error || "The scan did not finish."}
+        </p>
+      )}
+    </section>
+  );
+}
 export function ScanReport({
   report,
   draft,
@@ -605,132 +704,98 @@ export default function SiteScanPage() {
         ...extra,
       });
     });
+  const canStart = !busy && !!url && !limitsError;
+  const startScan = () =>
+    action(async () => {
+      const r = await api("POST", "/api/sitescan", {
+        url,
+        locationId: locationId ? Number(locationId) : undefined,
+        pageCap: Number(cap),
+        psiPages: Number(psi),
+      });
+      setSelected(r.id);
+      setShare("");
+    });
   return (
     <AppPage testId="page-site-scan">
-      {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, Google's search box, hairline rows, pills. */}
+      {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, Google's search box, hairline rows, pills.
+          The "i" follows the address: /site-scan is the feature's entry, /site-scan/history its Scan history section. */}
       <GoogleSectionHeader
         as="h1"
         title={!inShell ? "Site Scan" : view === "history" ? "Scan history" : "New scan"}
-        description={!inShell ? "Find website issues, compare your Google Business Profile, and draft your next fixes." : view === "scan" ? "Find website issues, compare your Google Business Profile, and draft your next fixes." : "Every scan you ran, its score over time, and its report."}
+        description={!inShell || view === "scan" ? "Check a website for problems and get a fix list in priority order." : "Every scan you ran, with its score and how it moved since the scan before."}
         flush
         // The side menu already lists Scan history; from the history the one action is starting a scan.
         actions={inShell && view === "history" ? <GooglePill variant="solid" href="/site-scan" label="New scan" testId="link-site-scan-new" /> : undefined}
       />
       <AgencyWorkspace compact />
-      {showStart && <section>
+      {showStart && <section className="space-y-5" data-testid="section-start-scan">
         {!inShell && <GoogleSectionHeader
           title="Start a scan"
-          description="Up to 5 scans/day, 20 PageSpeed requests/day and 3 AI drafts/day. Larger scans take minutes."
+          description="Enter a website address and start; the report is ready in a few minutes."
         />}
-        {inShell && <p className="mb-3 text-xs g-text-2">Up to 5 scans/day, 20 PageSpeed requests/day and 3 AI drafts/day. Larger scans take minutes.</p>}
-        <div className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <div className="g-search min-w-0 flex-1 sm:max-w-xs" role="search">
-              <Search aria-hidden="true" />
-              <input
-                type="search"
-                aria-label="Search client locations"
-                placeholder="Search client locations"
-                value={locationQ}
-                onChange={(e) => {
-                  setLocationQ(e.target.value);
-                  setLocationOffset(0);
-                }}
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <GooglePill
-                size="sm"
-                disabled={!locationOffset}
-                onClick={() =>
-                  setLocationOffset(Math.max(0, locationOffset - PAGE_SIZE))
-                }
-                label="Previous locations"
-              />
-              <span className="text-sm tabular-nums g-text-2">
-                {data?.locationTotal
-                  ? `${locationOffset + 1}–${Math.min(locationOffset + PAGE_SIZE, data.locationTotal)} of ${data.locationTotal}`
-                  : "No Business Profile-linked locations"}
-              </span>
-              <GooglePill
-                size="sm"
-                disabled={
-                  locationOffset + PAGE_SIZE >= (data?.locationTotal || 0)
-                }
-                onClick={() => setLocationOffset(locationOffset + PAGE_SIZE)}
-                label="Next locations"
-              />
-            </div>
+        {/* The form leads (owner, 2026-10-15: the page "is confusing on what it's for"): the address, the two sizes,
+            the optional profile comparison, then Start. Everything an agency does in bulk sits under it, folded. */}
+        <form
+          className="tool-panel"
+          data-testid="form-new-scan"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canStart) void startScan();
+          }}
+        >
+          <div className="tool-panel__head">
+            <h2 className="tool-panel__title">Scan a website</h2>
+            <span className="tool-muted text-[12px]">Reads the pages, scores them, and lists the fixes in priority order</span>
           </div>
-          <details className="g-card border-t">
-            <summary className="cursor-pointer text-sm font-medium">
-              Bulk scan client sites ({checked.length} selected)
-            </summary>
-            <div className="space-y-3 pt-3">
-              <div className="flex flex-wrap gap-2">
-                <GooglePill
-                  size="sm"
-                  label="Select this page"
-                  onClick={() =>
-                    setChecked([
-                      ...new Set([
-                        ...checked,
-                        ...(data?.locations || [])
-                          .filter((l: any) => l.website)
-                          .map((l: any) => l.id),
-                      ]),
-                    ])
-                  }
-                />
-                <GooglePill
-                  variant="quiet"
-                  size="sm"
-                  onClick={() => setChecked([])}
-                  label="Clear selection"
-                />
-              </div>
-              {data?.locations.map((l: any) => (
-                <label key={l.id} className="block text-sm">
-                  <input
-                    type="checkbox"
-                    checked={checked.includes(l.id)}
-                    onChange={(e) =>
-                      setChecked(
-                        e.target.checked
-                          ? [...checked, l.id]
-                          : checked.filter((id) => id !== l.id),
-                      )
-                    }
-                  />{" "}
-                  {l.business_name} — {l.website || "No website"}
-                </label>
-              ))}
-              <GooglePill
-                label="Queue selected sites"
-                disabled={busy || !checked.length || !!limitsError}
-                onClick={() =>
-                  action(async () => {
-                    const r = await api("POST", "/api/sitescan/bulk", {
-                      locationIds: checked,
-                      pageCap: Number(cap),
-                      psiPages: Number(psi),
-                    });
-                    setChecked([]);
-                    setSelected(r.jobs[0].id);
-                  })
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                Up to 1,000 sites per day. Each selected location needs a
-                synced GBP website. Work runs in the background with shared
-                provider budgets.
-              </p>
-            </div>
-          </details>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="tool-panel__body space-y-4">
             <label className="block space-y-1.5 text-sm">
-              <span className="g-text-2">Linked GBP location</span>
+              <span className="font-medium g-text">Website URL</span>
+              <Input
+                type="url"
+                inputMode="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://your-website.com"
+                className="h-11 text-base"
+                data-testid="input-scan-url"
+              />
+              <span className="block text-xs g-text-2">The home page is enough — the scan follows the site's own links from there.</span>
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <NumberField
+                id="scan-page-cap"
+                label="Pages to check"
+                value={cap}
+                onChange={setCap}
+                min={1}
+                max={500}
+                presets={[25, 50, 100, 150]}
+                unit="pages"
+                invalid={!whole(cap, 1, 500)}
+                hint="150 covers most contractor sites. Type any number up to 500 for a bigger one."
+                testId="input-scan-page-cap"
+              />
+              <NumberField
+                id="scan-psi-pages"
+                label="Pages to speed-test"
+                value={psi}
+                onChange={setPsi}
+                min={0}
+                max={5}
+                presets={[{ value: 0, label: "Off" }, 1, 3, 5]}
+                unit="pages"
+                invalid={!whole(psi, 0, 5)}
+                hint="Each one is measured by Google PageSpeed on mobile and on desktop. Off skips the speed test."
+                testId="input-scan-psi-pages"
+              />
+            </div>
+            <div className="space-y-1.5 text-sm">
+              <label htmlFor="scan-location" className="block g-text-2">
+                Compare with a Google Business Profile <span className="g-text-2">(optional)</span>
+              </label>
               <select
+                id="scan-location"
                 className={`${selectClass} block`}
                 value={locationId}
                 onChange={(e) => {
@@ -740,271 +805,357 @@ export default function SiteScanPage() {
                   );
                   if (l?.website) setUrl(l.website);
                 }}
+                data-testid="select-scan-location"
               >
-                <option value="">No GBP comparison</option>
+                <option value="">No comparison</option>
                 {data?.locations.map((l: any) => (
                   <option key={l.id} value={l.id}>
                     {l.business_name}
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="block space-y-1.5 text-sm">
-              <span className="g-text-2">Website URL</span>
-              <Input
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://your-website.com"
+              <p className="text-xs g-text-2">
+                {data?.locationTotal
+                  ? "Checks the website's name, address, phone, services and service area against the profile, and fills in the address for you."
+                  : "Link a location to its Google Business Profile under Locations to compare the website with the profile."}
+              </p>
+              {/* More locations than one page of the list: a search and pager for the picker (the bulk block below uses the same page). */}
+              {(locationQ || (data?.locationTotal ?? 0) > PAGE_SIZE) && (
+                <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap sm:items-center">
+                  <div className="g-search min-w-0 flex-1 sm:max-w-xs" role="search">
+                    <Search aria-hidden="true" />
+                    <input
+                      type="search"
+                      aria-label="Search client locations"
+                      placeholder="Search client locations"
+                      value={locationQ}
+                      onChange={(e) => {
+                        setLocationQ(e.target.value);
+                        setLocationOffset(0);
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <GooglePill
+                      size="sm"
+                      disabled={!locationOffset}
+                      onClick={() =>
+                        setLocationOffset(Math.max(0, locationOffset - PAGE_SIZE))
+                      }
+                      label="Previous locations"
+                    />
+                    <span className="text-sm tabular-nums g-text-2">
+                      {data?.locationTotal
+                        ? `${locationOffset + 1}–${Math.min(locationOffset + PAGE_SIZE, data.locationTotal)} of ${data.locationTotal}`
+                        : "No matching locations"}
+                    </span>
+                    <GooglePill
+                      size="sm"
+                      disabled={
+                        locationOffset + PAGE_SIZE >= (data?.locationTotal || 0)
+                      }
+                      onClick={() => setLocationOffset(locationOffset + PAGE_SIZE)}
+                      label="Next locations"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            {limitsError && (
+              <p role="alert" className="text-sm g-closed">{limitsError}</p>
+            )}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <GooglePill
+                type="submit"
+                variant="solid"
+                icon={Search}
+                disabled={!canStart}
+                className="w-full sm:w-auto"
+                label={busy ? "Working…" : "Start scan"}
+                testId="button-start-scan"
               />
-            </label>
-            <label className="block space-y-1.5 text-sm">
-              <span className="g-text-2">Page cap</span>
-              <Input
-                type="number"
-                min={1}
-                max={500}
-                value={cap}
-                aria-invalid={!whole(cap, 1, 500)}
-                onChange={(e) => setCap(e.target.value)}
-              />
-            </label>
-            <label className="block space-y-1.5 text-sm">
-              <span className="g-text-2">
-                PageSpeed pages (mobile + desktop)
-              </span>
-              <Input
-                type="number"
-                min={0}
-                max={5}
-                value={psi}
-                aria-invalid={!whole(psi, 0, 5)}
-                onChange={(e) => setPsi(e.target.value)}
-              />
-            </label>
-          </div>
-          {limitsError && (
-            <p className="text-sm g-closed">{limitsError}</p>
-          )}
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <GooglePill
-              variant="solid"
-              icon={Search}
-              disabled={busy || !url || !!limitsError}
-              className="w-full sm:w-auto"
-              onClick={() =>
-                action(async () => {
-                  const r = await api("POST", "/api/sitescan", {
-                    url,
+              {/* The account's daily allowances, as the server counts them (server/sitescan/routes.ts, worker.ts). */}
+              <p className="text-xs g-text-2" data-testid="text-scan-limits">
+                You can run 5 scans, 20 PageSpeed tests and 3 AI fix plans a day. Bigger scans take a few minutes.
+              </p>
+            </div>
+            {/* A toggle that shows its state for the URL above, not a bare "Disable" action beside Start scan. */}
+            <div className="flex items-start gap-3 g-divider pt-4" data-testid="toggle-monthly-rescan">
+              <Switch
+                id="monthly-rescan"
+                checked={!!currentSchedule}
+                disabled={busy || !url || !!limitsError}
+                onCheckedChange={(on) =>
+                  scheduleFor(url, on, {
                     locationId: locationId ? Number(locationId) : undefined,
                     pageCap: Number(cap),
                     psiPages: Number(psi),
-                  });
-                  setSelected(r.id);
-                  setShare("");
-                })
-              }
-              label="Start scan"
-            />
+                  })
+                }
+              />
+              <label htmlFor="monthly-rescan" className="text-sm">
+                <span className="font-medium">Rescan this site every month</span>{" "}
+                <span className="g-text-2">
+                  {!url
+                    ? "· Enter a website URL first."
+                    : currentSchedule
+                      ? `· On, next run ${new Date(currentSchedule.next_at).toLocaleDateString()}`
+                      : "· Off for this site. Uses the sizes above and one of the day's scans each time."}
+                </span>
+              </label>
+            </div>
           </div>
-          {/* A toggle that shows its state for the URL above, not a bare "Disable" action beside Start scan. */}
-          <div className="flex items-start gap-3" data-testid="toggle-monthly-rescan">
-            <Switch
-              id="monthly-rescan"
-              checked={!!currentSchedule}
-              disabled={busy || !url || !!limitsError}
-              onCheckedChange={(on) =>
-                scheduleFor(url, on, {
-                  locationId: locationId ? Number(locationId) : undefined,
-                  pageCap: Number(cap),
-                  psiPages: Number(psi),
-                })
-              }
-            />
-            <label htmlFor="monthly-rescan" className="text-sm">
-              <span className="font-medium">Monthly rescan</span>{" "}
-              <span className="g-text-2">
-                {!url
-                  ? "· Enter a website URL to schedule it."
-                  : currentSchedule
-                    ? `· On, next run ${new Date(currentSchedule.next_at).toLocaleDateString()}`
-                    : "· Off for this site"}
-              </span>
-            </label>
+        </form>
+        <section className="tool-panel" aria-labelledby="how-site-scan-works" data-testid="how-site-scan-works">
+          <div className="tool-panel__head">
+            <h2 id="how-site-scan-works" className="tool-panel__title">How this works</h2>
           </div>
-          <div className="space-y-2 g-divider pt-4">
-            <h2 className="g-card__title g-card__title--md">
-              Monthly rescans ({data?.schedules?.length ?? 0} of 10)
-            </h2>
-            {!data?.schedules?.length ? (
-              <p className="text-sm g-text-2">
-                No monthly rescans. Enter a website URL above and turn on
-                Monthly rescan.
-              </p>
-            ) : (
-              <GoogleList as="ul" testId="list-scan-schedules">
-                {data.schedules.map((s: any) => (
-                  <GoogleListRow
-                    as="li"
-                    key={s.url}
-                    size="md"
-                    title={s.url}
-                    meta={[`Up to ${s.page_cap} pages`, `Next run ${new Date(s.next_at).toLocaleDateString()}`]}
-                    trailing={
-                      <GooglePill
-                        size="sm"
-                        ariaLabel={`Turn off monthly rescan for ${s.url}`}
-                        disabled={busy}
-                        // Agency members may only change a schedule through its business;
-                        // the owner disables by URL, which also covers a deleted business.
-                        onClick={() =>
-                          scheduleFor(
-                            s.url,
-                            false,
-                            delegated && s.location_id
-                              ? { locationId: s.location_id }
-                              : {},
-                          )
-                        }
-                        label="Turn off"
-                      />
-                    }
-                  />
-                ))}
-              </GoogleList>
+          <MetricStrip cols={[1, 3, 3]}>
+            <HowStep n={1} title="Enter the address and start" text="Put in the website's home page. Pick a Google Business Profile too if you want the site checked against what the profile says." />
+            <HowStep n={2} title="We read the pages" text="The scanner reads the site's own HTML page by page, up to the number you set, and runs Google PageSpeed on the pages you chose. It never changes the website." />
+            <HowStep n={3} title="Fix what matters first" text="Findings come back in priority order with the fix steps. Mark items done, export a PDF, send the checklist to your web person, and rescan to see what changed." />
+          </MetricStrip>
+        </section>
+        <details className="tool-panel group" data-testid="agency-bulk-scan">
+          <summary className="tool-panel__head cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
+            <span className="tool-panel__title">Bulk scan client sites — for agencies ({checked.length} selected)</span>
+            <span className="tool-muted text-[12px] sm:ml-auto">Queues one scan per location, with the sizes above</span>
+          </summary>
+          <div className="tool-panel__body space-y-3">
+            <p className="flex items-center gap-1.5 text-sm g-text-2">
+              Tick the locations to scan. Each one needs a website on its Google Business Profile.
+              <HelpButton k="site-scan.agency-bulk" />
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <GooglePill
+                size="sm"
+                label="Select this page"
+                onClick={() =>
+                  setChecked([
+                    ...new Set([
+                      ...checked,
+                      ...(data?.locations || [])
+                        .filter((l: any) => l.website)
+                        .map((l: any) => l.id),
+                    ]),
+                  ])
+                }
+              />
+              <GooglePill
+                variant="quiet"
+                size="sm"
+                onClick={() => setChecked([])}
+                label="Clear selection"
+              />
+            </div>
+            {!data?.locations?.length && (
+              <p className="text-sm g-text-2">No Business Profile-linked locations{locationQ ? " match the search" : ""} yet.</p>
             )}
+            {data?.locations.map((l: any) => (
+              <label key={l.id} className="block text-sm">
+                <input
+                  type="checkbox"
+                  checked={checked.includes(l.id)}
+                  onChange={(e) =>
+                    setChecked(
+                      e.target.checked
+                        ? [...checked, l.id]
+                        : checked.filter((id) => id !== l.id),
+                    )
+                  }
+                />{" "}
+                {l.business_name} — {l.website || "No website"}
+              </label>
+            ))}
+            {(data?.locationTotal ?? 0) > PAGE_SIZE && (
+              <p className="text-xs g-text-2">
+                Showing {locationOffset + 1}–{Math.min(locationOffset + PAGE_SIZE, data.locationTotal)} of {data.locationTotal}. Use the location search above to page through the rest.
+              </p>
+            )}
+            <GooglePill
+              label="Queue selected sites"
+              disabled={busy || !checked.length || !!limitsError}
+              onClick={() =>
+                action(async () => {
+                  const r = await api("POST", "/api/sitescan/bulk", {
+                    locationIds: checked,
+                    pageCap: Number(cap),
+                    psiPages: Number(psi),
+                  });
+                  setChecked([]);
+                  setSelected(r.jobs[0].id);
+                })
+              }
+            />
+            <p className="text-xs g-text-2">
+              Up to 1,000 sites a day. The scans run in the background, one after another, and show up in Scan history.
+            </p>
           </div>
+        </details>
+        <div className="space-y-2" data-testid="section-monthly-rescans">
+          <h2 className="flex items-center gap-1.5 g-card__title g-card__title--md">
+            Monthly rescans ({data?.schedules?.length ?? 0} of 10)
+            <HelpButton k="site-scan.monthly-rescan" />
+          </h2>
+          {!data?.schedules?.length ? (
+            <p className="text-sm g-text-2">
+              None yet. Enter a website URL above and turn on “Rescan this site every month”.
+            </p>
+          ) : (
+            <GoogleList as="ul" testId="list-scan-schedules">
+              {data.schedules.map((s: any) => (
+                <GoogleListRow
+                  as="li"
+                  key={s.url}
+                  size="md"
+                  title={s.url}
+                  meta={[`Up to ${s.page_cap} pages`, `Next run ${new Date(s.next_at).toLocaleDateString()}`]}
+                  trailing={
+                    <GooglePill
+                      size="sm"
+                      ariaLabel={`Turn off monthly rescan for ${s.url}`}
+                      disabled={busy}
+                      // Agency members may only change a schedule through its business;
+                      // the owner disables by URL, which also covers a deleted business.
+                      onClick={() =>
+                        scheduleFor(
+                          s.url,
+                          false,
+                          delegated && s.location_id
+                            ? { locationId: s.location_id }
+                            : {},
+                        )
+                      }
+                      label="Turn off"
+                    />
+                  }
+                />
+              ))}
+            </GoogleList>
+          )}
         </div>
       </section>}
       {error && <Notice tone="danger">{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
-      {showHistory && <section data-testid="section-scan-history">
-        {!inShell && <GoogleSectionHeader title="History & score trend" />}
-        <div className="space-y-3">
-          {listError && (
-            <Notice tone="danger">
-              Could not load scan history:{" "}
-              {apiErrorMessage(listError, "please refresh and try again.")}
-            </Notice>
-          )}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="g-search w-full sm:w-72" role="search">
-              <Search aria-hidden="true" />
-              <input
-                type="search"
-                aria-label="Search history"
-                placeholder="Search history"
-                value={historyQ}
-                onChange={(e) => {
-                  setHistoryQ(e.target.value);
-                  setHistoryOffset(0);
+      {showHistory && <section className="space-y-3" data-testid="section-scan-history">
+        {!inShell && <GoogleSectionHeader title="Scan history" titleAfter={<HelpButton k="site-scan.history" />} description="Every scan you ran, with its score and how it moved since the scan before." />}
+        {listError && (
+          <Notice tone="danger">
+            Could not load scan history:{" "}
+            {apiErrorMessage(listError, "please refresh and try again.")}
+          </Notice>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="g-search w-full sm:w-72" role="search">
+            <Search aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Search history"
+              placeholder="Search history"
+              value={historyQ}
+              onChange={(e) => {
+                setHistoryQ(e.target.value);
+                setHistoryOffset(0);
+              }}
+            />
+          </div>
+          <select
+            aria-label="Status"
+            className={selectClass}
+            value={historyStatus}
+            onChange={(e) => {
+              setHistoryStatus(e.target.value);
+              setHistoryOffset(0);
+            }}
+          >
+            <option value="">All statuses</option>
+            {(["queued", "running", "completed", "failed"] as const).map((v) => (
+              <option key={v} value={v}>
+                {SCAN_STATUS_WORDS[v]}
+              </option>
+            ))}
+          </select>
+          {/* Each button is disabled when it would not change the list, so neither looks dead. */}
+          <GooglePill
+            size="sm"
+            disabled={!locationId || clientFilter === locationId}
+            onClick={() => {
+              setClientFilter(locationId);
+              setHistoryOffset(0);
+            }}
+            label="History for selected client"
+          />
+          <GooglePill
+            size="sm"
+            disabled={!clientFilter}
+            onClick={() => {
+              setClientFilter("");
+              setHistoryOffset(0);
+            }}
+            label="All clients"
+          />
+        </div>
+        <p className="text-sm g-text-2" aria-live="polite">
+          {clientFilter
+            ? `Showing scans for ${
+                data?.locations?.find(
+                  (l: any) => String(l.id) === clientFilter,
+                )?.business_name ?? "the selected client"
+              }.`
+            : locationId
+              ? "Showing scans for all clients."
+              : data?.locationTotal
+                ? "Showing scans for all clients. Choose a Google Business Profile in the scan form to see one client's history."
+                : "Showing scans for all clients. Per-client history is available for Business Profile-linked locations."}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <GooglePill
+            size="sm"
+            disabled={!historyOffset}
+            onClick={() =>
+              setHistoryOffset(Math.max(0, historyOffset - PAGE_SIZE))
+            }
+            label="Previous scans"
+          />
+          <span className="text-sm tabular-nums g-text-2">
+            {data?.total || 0} scans
+          </span>
+          <GooglePill
+            size="sm"
+            disabled={historyOffset + PAGE_SIZE >= (data?.total || 0)}
+            onClick={() => setHistoryOffset(historyOffset + PAGE_SIZE)}
+            label="Next scans"
+          />
+        </div>
+        {data?.jobs.length > 0 && (
+          <div className="space-y-3" data-testid="list-scan-history">
+            {data.jobs.map((j: any, index: number) => (
+              <ScanCard
+                key={j.id}
+                job={j}
+                // The score moved against the newest earlier scan of the same site that has one.
+                prior={data.jobs.slice(index + 1).find((p: any) => p.url === j.url && typeof p.scores?.overall === "number") ?? null}
+                selected={selected === j.id}
+                onOpen={() => {
+                  setSelected(j.id);
+                  setShare("");
                 }}
               />
+            ))}
+          </div>
+        )}
+        {data?.jobs.length === 0 && (historyQ || historyStatus || clientFilter ? (
+          <p className="text-sm g-text-2" data-testid="text-history-no-match">No scans match these filters.</p>
+        ) : (
+          // Nothing scanned yet: what the history looks like, on made-up numbers, until the first real scan replaces it.
+          <SamplePreview what="what your scan history looks like after a scan" testId="sample-scan-history"
+            cta={<GooglePill size="sm" variant="solid" href="/site-scan" label="Start your first scan" testId="link-sample-start-scan" />}>
+            <div className="space-y-3">
+              {SAMPLE_SCANS.map((j, i) => <ScanCard key={j.id} job={j} prior={SAMPLE_SCANS[i + 1] ?? null} />)}
             </div>
-            <select
-              aria-label="Status"
-              className={selectClass}
-              value={historyStatus}
-              onChange={(e) => {
-                setHistoryStatus(e.target.value);
-                setHistoryOffset(0);
-              }}
-            >
-              {["", "queued", "running", "completed", "failed"].map((v) => (
-                <option key={v} value={v}>
-                  {v || "All statuses"}
-                </option>
-              ))}
-            </select>
-            {/* Each button is disabled when it would not change the list, so neither looks dead. */}
-            <GooglePill
-              size="sm"
-              disabled={!locationId || clientFilter === locationId}
-              onClick={() => {
-                setClientFilter(locationId);
-                setHistoryOffset(0);
-              }}
-              label="History for selected client"
-            />
-            <GooglePill
-              size="sm"
-              disabled={!clientFilter}
-              onClick={() => {
-                setClientFilter("");
-                setHistoryOffset(0);
-              }}
-              label="All clients"
-            />
-          </div>
-          <p className="text-sm g-text-2" aria-live="polite">
-            {clientFilter
-              ? `Showing scans for ${
-                  data?.locations?.find(
-                    (l: any) => String(l.id) === clientFilter,
-                  )?.business_name ?? "the selected client"
-                }.`
-              : locationId
-                ? "Showing scans for all clients."
-                : data?.locationTotal
-                  ? "Showing scans for all clients. Choose a Linked GBP location above to see one client's history."
-                  : "Showing scans for all clients. Per-client history is available for Business Profile-linked locations."}
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <GooglePill
-              size="sm"
-              disabled={!historyOffset}
-              onClick={() =>
-                setHistoryOffset(Math.max(0, historyOffset - PAGE_SIZE))
-              }
-              label="Previous scans"
-            />
-            <span className="text-sm tabular-nums g-text-2">
-              {data?.total || 0} scans
-            </span>
-            <GooglePill
-              size="sm"
-              disabled={historyOffset + PAGE_SIZE >= (data?.total || 0)}
-              onClick={() => setHistoryOffset(historyOffset + PAGE_SIZE)}
-              label="Next scans"
-            />
-          </div>
-          {data?.jobs.length > 0 && (
-            <GoogleList testId="list-scan-history">
-              {data.jobs.map((j: any, index: number) => {
-                const old = data.jobs
-                  .slice(index + 1)
-                  .find(
-                    (p: any) =>
-                      p.url === j.url && typeof p.scores?.overall === "number",
-                  );
-                const delta =
-                  old && typeof j.scores?.overall === "number"
-                    ? j.scores.overall - old.scores.overall
-                    : null;
-                return (
-                  <GoogleListRow
-                    key={j.id}
-                    size="md"
-                    className={selected === j.id ? "bg-[color:var(--g-hover)] -mx-4 px-4 sm:mx-0 sm:px-0" : undefined}
-                    aria-current={selected === j.id ? "true" : undefined}
-                    title={j.url}
-                    onOpen={() => {
-                      setSelected(j.id);
-                      setShare("");
-                    }}
-                    meta={[
-                      new Date(j.created_at).toLocaleDateString(),
-                      typeof j.scores?.overall === "number" ? <span key="score" className="g-text">Overall {j.scores.overall}</span> : j.status,
-                      delta === null ? null : <span key="delta" className={delta > 0 ? "g-open" : delta < 0 ? "g-closed" : undefined}>{delta > 0 ? "+" : ""}{delta} since prior scan</span>,
-                    ]}
-                  />
-                );
-              })}
-            </GoogleList>
-          )}
-          {data?.jobs.length === 0 && (
-            <p className="text-sm g-text-2">No scans yet.</p>
-          )}
-        </div>
+          </SamplePreview>
+        ))}
       </section>}
       {selected && jobError && (
         <Notice tone="danger">

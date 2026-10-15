@@ -211,7 +211,7 @@ export default function SeoLocalGridPage() {
   ].filter(Boolean).join(" · ");
 
   return (
-    <SeoShell title="Local grid" description="Where your business shows up in Google's local results across your service area — looked up for point after point, for the searches your customers make." site={site} onSite={changeSite} sites={sites} status={status} spends="lookups">
+    <SeoShell title="Local grid" description="Where your business shows up in Google's local results across your service area — looked up for point after point, for the searches your customers make." site={site} onSite={changeSite} sites={sites} status={status} spends="lookups" helpKey="seo.local-grid">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="grid-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
       {chip && <ActiveFilter onClear={() => clearParams(OWN_PARAMS, false)} clearLabel="Close the scan">{chip}</ActiveFilter>}
       {!site && sites.isSuccess && <Empty testId="grid-empty-sites"><h3>No sites yet</h3><p>Add your site above; then find your business on Google Maps and scan the area around it.</p></Empty>}

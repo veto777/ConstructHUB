@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { copyrightNotice } from "@/lib/marketing";
 import { LegalPage } from "@/components/legal-page";
+import { HelpButton } from "@/components/help-button";
 
 /**
  * /data-deletion — public, no sign-in. How to delete what ConstructHUB holds from connected social accounts, and
@@ -41,6 +42,11 @@ export default function DataDeletionPage() {
       dateTestId="text-data-deletion-date"
       footer={copyrightNotice()}
     >
+      {/* The "i" (owner 2026-10-15): LegalPage draws the title, so it sits on the first line of the text. */}
+      <p className="mb-4 flex items-center gap-1 text-sm" data-testid="text-data-deletion-help">
+        <span>What this page is for and how to use it</span>
+        <HelpButton k="data-deletion" />
+      </p>
       {code && (
         <section className="mb-8 rounded-lg border p-4" data-testid="section-deletion-status">
           <h2 className="text-lg font-semibold mb-2">Deletion request {code}</h2>

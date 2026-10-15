@@ -201,7 +201,7 @@ export default function SeoAlertsPage() {
   const allHref = (id: number) => here({ all: allIds.has(id) ? [...allIds].filter((x) => x !== id) : [...allIds, id] });
 
   return (
-    <SeoShell title="Alerts" description="What changed since the last check — rankings, the Google map pack and the sites that link to you." site={site} onSite={onSite} sites={sites} status={status} spends="lookups">
+    <SeoShell title="Alerts" description="What changed since the last check — rankings, the Google map pack and the sites that link to you." site={site} onSite={onSite} sites={sites} status={status} spends="lookups" helpKey="seo.alerts">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="alerts-site-missing">The site this link is for isn't one of yours (or was removed). Showing every site.</p>}
       {chip && <ActiveFilter onClear={() => clearParams(["kind", "site", "alert", "undelivered", "more", "all"], false)} clearLabel="All alerts">{chip}</ActiveFilter>}
       <div className="mb-3 flex flex-wrap items-center gap-2">

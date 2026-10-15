@@ -1,5 +1,6 @@
 import { AppPage, PageHeader, Section } from "@/components/app-ui";
-import { GoogleSurface } from "@/components/google";
+import { GoogleSurface, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { SamplePreview } from "@/components/sample-preview";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
@@ -547,6 +548,8 @@ export default function GmbMonitorPage() {
   });
 
   const monitoredCount = listings?.filter(l => l.isMonitoring).length ?? 0;
+  const checkedCount = listings?.filter(l => l.lastCheckedAt).length ?? 0;
+  const lastChecked = listings?.map(l => l.lastCheckedAt).filter((d): d is NonNullable<typeof d> => !!d).sort().pop();
 
   return (
     <GoogleSurface page><AppPage className="before:hidden" width="narrow">
@@ -555,6 +558,14 @@ export default function GmbMonitorPage() {
         {monitoredCount>0&&<Button variant="outline" onClick={()=>checkAllMutation.mutate()} disabled={checkAllMutation.isPending} data-testid="button-check-all">{checkAllMutation.isPending?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:null}Check all ({monitoredCount})</Button>}
       </>}/>
       <p className="text-sm text-muted-foreground">Checks run on demand; this tool does not send automatic alerts.</p>
+      {!!listings?.length && (
+        <GoogleStatGrid cols={4}>
+          <GoogleStat label="Listings tracked" value={listings.length.toLocaleString()} testId="stat-listings" />
+          <GoogleStat label="In Check All" value={monitoredCount.toLocaleString()} testId="stat-monitored" />
+          <GoogleStat label="Baseline captured" value={`${checkedCount} / ${listings.length}`} hint="Checked at least once" testId="stat-checked" />
+          <GoogleStat label="Last check" value={lastChecked ? new Date(lastChecked).toLocaleDateString() : "—"} testId="stat-last-check" />
+        </GoogleStatGrid>
+      )}
         {showAddForm && (
           <Card className="p-4 rounded-xl">
             <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -635,6 +646,33 @@ export default function GmbMonitorPage() {
               <Plus className="h-4 w-4 mr-2" /> Add your first business
             </Button>
           </Card>
+        )}
+        {!isLoading && !listings?.length && (
+          <SamplePreview what="what a tracked listing looks like here" testId="sample-listing">
+            <Card className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5"><Building2 className="h-5 w-5 text-primary" /></div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-sm truncate">Sample Roofing Co.</h3>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5"><MapPin className="h-3 w-3 shrink-0" /> <span className="truncate">123 Example St, Springfield</span></p>
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> (555) 010-0000</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Star className="h-3 w-3 text-yellow-400" /> 4.8 (57)</span>
+                      <Badge variant="outline" className="text-[10px] py-0">Roofing contractor</Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0"><Label className="text-[10px] leading-tight text-right text-muted-foreground">Include in Check All</Label><Switch checked aria-label="Included in Check All" /></div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-border/40">
+                <Button size="sm" variant="outline" className="min-h-10 text-xs gap-1.5"><RefreshCw className="h-3 w-3" /> Check now</Button>
+                <Button size="sm" variant="ghost" className="min-h-10 text-xs gap-1.5"><History className="h-3 w-3" /> Edit History <ChevronDown className="h-3 w-3" /></Button>
+                <div className="flex-1" />
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">Last checked: Jan 12, 2026 · 2 changes found</span>
+              </div>
+            </Card>
+          </SamplePreview>
         )}
       <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer min-h-10 py-2 font-medium">Draft a review response</summary><ReviewResponseTool /></details>
     </AppPage></GoogleSurface>

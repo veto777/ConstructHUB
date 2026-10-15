@@ -31,16 +31,16 @@ export const SETTINGS_GROUPS: readonly { id: SettingsGroupId; label: string }[] 
 ];
 
 export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
-  { id: "account", group: "me", label: "My account", description: "Your name, photo, company details and account information.", icon: User, infoKey: "account-profile" },
-  { id: "security", group: "me", label: "Password & security", description: "Password, two-factor sign-in, remembered devices and recent security activity.", icon: Lock, infoKey: "account-security" },
-  { id: "notifications", group: "me", label: "Notifications", description: "Which alerts reach you in the app and by email.", icon: Bell, infoKey: "account-notifications" },
-  { id: "phone-bar", group: "me", label: "Phone tab bar", description: "Pick the four tabs at the bottom of the screen on your phone and in the app.", icon: Smartphone, infoKey: "account-phone-bar" },
-  { id: "billing", group: "workspace", label: "Billing", description: "Your subscription, add-ons, invoices and payment methods.", icon: CreditCard, infoKey: "account-billing" },
-  { id: "limits", group: "workspace", label: "Limits & usage", description: "Everything your plan includes and how much of it you've used this month.", icon: Gauge, infoKey: "account-limits" },
-  { id: "api-keys", group: "workspace", label: "API keys", description: "Keys for reading and writing your own data from your own tools.", icon: KeyRound, infoKey: "account-api-keys" },
-  { id: "api-usage", group: "workspace", label: "API usage", description: "Units and requests your API keys have used.", icon: Activity, infoKey: "account-api-usage" },
-  { id: "audit-log", group: "workspace", label: "Audit log", description: "Sign-ins, security changes and tool activity on this account.", icon: ScrollText, infoKey: "account-audit-log" },
-  { id: "integrations", group: "workspace", label: "Integrations", description: "Every connected service and where each one is managed.", icon: Plug, infoKey: "account-integrations" },
+  { id: "account", group: "me", label: "My account", description: "Your name, photo, company details and account information.", icon: User, infoKey: "account-profile", helpKey: "account.profile" },
+  { id: "security", group: "me", label: "Password & security", description: "Password, two-factor sign-in, remembered devices and recent security activity.", icon: Lock, infoKey: "account-security", helpKey: "account.security" },
+  { id: "notifications", group: "me", label: "Notifications", description: "Which alerts reach you in the app and by email.", icon: Bell, infoKey: "account-notifications", helpKey: "account.notifications" },
+  { id: "phone-bar", group: "me", label: "Phone tab bar", description: "Pick the four tabs at the bottom of the screen on your phone and in the app.", icon: Smartphone, infoKey: "account-phone-bar", helpKey: "account.phone-bar" },
+  { id: "billing", group: "workspace", label: "Billing", description: "Your subscription, add-ons, invoices and payment methods.", icon: CreditCard, infoKey: "account-billing", helpKey: "account.billing" },
+  { id: "limits", group: "workspace", label: "Limits & usage", description: "Everything your plan includes and how much of it you've used this month.", icon: Gauge, infoKey: "account-limits", helpKey: "account.limits" },
+  { id: "api-keys", group: "workspace", label: "API keys", description: "Keys for reading and writing your own data from your own tools.", icon: KeyRound, infoKey: "account-api-keys", helpKey: "account.api-keys" },
+  { id: "api-usage", group: "workspace", label: "API usage", description: "Units and requests your API keys have used.", icon: Activity, infoKey: "account-api-usage", helpKey: "account.api-usage" },
+  { id: "audit-log", group: "workspace", label: "Audit log", description: "Sign-ins, security changes and tool activity on this account.", icon: ScrollText, infoKey: "account-audit-log", helpKey: "account.audit-log" },
+  { id: "integrations", group: "workspace", label: "Integrations", description: "Every connected service and where each one is managed.", icon: Plug, infoKey: "account-integrations", helpKey: "account.integrations" },
 ];
 
 const DEFAULT_COMPONENTS: Record<SettingsSectionId, ComponentType<SettingsSectionProps>> = {

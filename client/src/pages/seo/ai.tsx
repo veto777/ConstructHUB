@@ -269,7 +269,7 @@ export default function SeoAiPage() {
   useScrollTo(hash === "ai-prompts" || hash === "ai-tracked" || hash === "ai-mentions" ? hash : null, !!d);
 
   return (
-    <SeoShell title="AI visibility" description="When a customer asks ChatGPT, Gemini or Perplexity for what you do — are you named, and is your website one of their sources?" site={site} onSite={changeSite} sites={sites} status={status} spends="lookups">
+    <SeoShell title="AI visibility" description="When a customer asks ChatGPT, Gemini or Perplexity for what you do — are you named, and is your website one of their sources?" site={site} onSite={changeSite} sites={sites} status={status} spends="lookups" helpKey="seo.ai">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="ai-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
       {!site && sites.isSuccess && <Empty testId="ai-empty-sites"><h3>No sites yet</h3><p>Add your site above; then ask the assistants the question your customers ask.</p></Empty>}
       {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>}

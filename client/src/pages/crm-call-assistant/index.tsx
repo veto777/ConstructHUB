@@ -161,6 +161,11 @@ export default function CrmCallAssistantPage() {
   const enabled = status.data?.enabled === true;
   const paused = !enabled && status.data?.paused === true;
   const canManage = me?.permissions?.manageSettings === true;
+  // The title's "i" follows the route (GoogleSectionHeader as="h1"): each view's own help section
+  // (shared/help/entries/tools/call-assistant.<view>.ts, routes /call-assistant/<view>) and, on the Overview, the
+  // feature entry itself — the whole tool's what-for and how-to, which is what its home page should say. The
+  // ".overview" section is listed under the feature on /tutorials. Naming a different key here would leave the
+  // tool shell's breadcrumb fallback "i" unclaimed and put two "i"s on the page.
 
   return (
     <AppPage testId="page-call-assistant">

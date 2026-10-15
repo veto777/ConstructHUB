@@ -1262,6 +1262,12 @@ export default function PhotosPage() {
         </Notice>
       )}
 
+      <Section title="How this works" contentClassName="text-sm" testId="photos-how"><ol className="list-decimal space-y-1 pl-5">
+        <li>Fill in Business info and the category and keywords once; save them as a template to reuse on the next batch.</li>
+        <li>Add your job photos (JPG or PNG) and pick the options you want: watermark, filenames, descriptions, geotag.</li>
+        <li>Process the batch, then download the photos or save them to the Media Library.</li>
+      </ol></Section>
+
       <Section
         title="Templates"
         actions={

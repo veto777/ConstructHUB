@@ -64,8 +64,13 @@ export async function accessFor(actor: number, owner = actor): Promise<AgencyAcc
   if (!m) throw missing();
   return {owner,actor,role:m.role,allClients:m.all_clients};
 }
-export function requireWrite(a: AgencyAccess) { if(a.role==='viewer') throw missing(); }
-export function requireAdmin(a: AgencyAccess) { if(!['owner','admin'].includes(a.role)) throw missing(); }
+/** A role refusal is said in plain words (403): the actor's own role is nothing to hide, unlike a record (404). */
+export const forbidden = (what: string) => new GoogleError('permission',what,403);
+export function requireWrite(a: AgencyAccess) { if(a.role==='viewer') throw forbidden('Viewers can look but not change anything. Ask the workspace owner for a manager or admin role.'); }
+export function requireAdmin(a: AgencyAccess) { if(!['owner','admin'].includes(a.role)) throw forbidden('Only the workspace owner or an admin can do this.'); }
+export function requireOwner(a: AgencyAccess) { if(a.role!=='owner') throw forbidden('Only the workspace owner can do this.'); }
+/** Work that spans every client (adding clients, refreshing Google listings) needs all-client access. */
+export function requireAllClients(a: AgencyAccess) { if(!a.allClients) throw forbidden('This needs access to all clients. Ask the workspace owner to widen your client access.'); }
 /** Always used again for objects and jobs, independently of any list/filter supplied by the browser. */
 export function visibility(a: AgencyAccess, alias='l', start=1) {
   return { sql:`${alias}.user_id=$${start} AND ($${start+1}::boolean OR EXISTS(SELECT 1 FROM agency_member_clients amc WHERE amc.user_id=${alias}.user_id AND amc.member_id=$${start+2} AND amc.client_id=${alias}.agency_client_id))`, values:[a.owner,a.allClients,a.actor] as unknown[] };

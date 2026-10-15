@@ -27,6 +27,9 @@ import { seoLinks, setParam } from "./links";
 import { compact, FigureLink, FOCUS, LINK_CUE, PALETTE, TAP } from "./viz";
 import { MetricStrip, StatusBadge, scoreTone } from "@/components/tool";
 import { PortfolioCell, ProjectRow, type SiteCard } from "@/components/seo-tool/project-row";
+import { SamplePreview } from "@/components/sample-preview";
+import { LookupBox } from "./lookup-box";
+import { SAMPLE_SITE_CARD } from "./samples";
 
 type SortKey = "added" | "name" | "traffic" | "authority" | "keywords" | "top10" | "tasks" | "health";
 const SORTS: [SortKey, string][] = [["added", "As added"], ["name", "Name"], ["traffic", "Most search traffic"], ["authority", "Highest authority"], ["keywords", "Most tracked keywords"], ["top10", "Most keywords in the top 10"], ["tasks", "Most open tasks"], ["health", "Lowest site health first"]];
@@ -149,15 +152,24 @@ export default function SeoDashboardPage() {
   useEffect(() => { if (dash.isSuccess && hash === "sites") scrollToSites(); }, [dash.isSuccess, hash]);
 
   return (
-    <SeoShell title="SEO Suite" description="Your sites at a glance: authority, backlinks, estimated search traffic and rankings." site={site} onSite={onSite} sites={sites} status={status} spends="lookups">
+    <SeoShell title="SEO Suite" description="Your sites at a glance: authority, backlinks, estimated search traffic and rankings." site={site} onSite={onSite} sites={sites} status={status} spends="lookups" helpKey="seo">
+      {/* The front door: look any website up, or add it to the list (lookup-box.tsx). Above everything, on every visit. */}
+      <LookupBox status={status.data} sites={sites.data} onSite={onSite} />
       {dash.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your sites…</p>}
       {dash.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-dashboard-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(dash.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void dash.refetch()}>Try again</button></div>}
       {dash.isSuccess && cards.length === 0 && !sites.isError && (
         <Empty testId="seo-dashboard-empty">
           <h3>Add your first site</h3>
-          <p>Use <b>Add your first site</b> above to start a project. You'll get its authority, backlinks, estimated organic traffic and keywords here, and weekly rank tracking for the keywords you choose.</p>
-          <p className="mt-2">Just want to look a domain up? Open <FigureLink href={seoLinks.explorer("")} testId="link-explorer-empty">Site explorer</FigureLink> — any site, yours or a competitor's.</p>
+          <p>Type your website above and choose <b>Add to my sites</b> (or use <b>Add your first site</b> in the bar) to start a project. You'll get its authority, backlinks, estimated organic traffic and keywords here, and weekly rank tracking for the keywords you choose.</p>
+          <p className="mt-2">Just want to look a domain up? <b>Look it up</b> above, or open <FigureLink href={seoLinks.explorer("")} testId="link-explorer-empty">Site explorer</FigureLink> — any site, yours or a competitor's.</p>
         </Empty>
+      )}
+      {dash.isSuccess && cards.length === 0 && !sites.isError && (
+        // What a site's card looks like once one is added — a made-up site, shown only while there is no real one (samples.tsx).
+        <SamplePreview what="what a site's card shows once you add one" testId="sample-dashboard">
+          <ProjectRow card={SAMPLE_SITE_CARD} busy={false} canAnalyse={false} price="" priceNote="" onAnalyse={() => undefined} onPick={() => undefined}
+            star={{ pending: false, onToggle: () => undefined }} group={{ editing: false, draft: "", pending: false, onDraft: () => undefined, onEdit: () => undefined, onSave: () => undefined, onCancel: () => undefined }} />
+        </SamplePreview>
       )}
       {(cards.length > 1 || activeGroup !== "all" || chip.length > 0) && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-[13px]">

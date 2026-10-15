@@ -50,6 +50,11 @@ export type HelpEntry = {
   needs?: string[];
   /** Where the feature lives. "/crm…" routes are served by the CRM (portal) host. */
   route: string;
+  /**
+   * Other page routes this entry is the "i" for (helpKeyForRoute), when a page has no entry of its own: a record's
+   * page, e.g. the project page "/crm/projects" for the pipeline entry. Prefixes, like `route`.
+   */
+  alsoAt?: string[];
   group: HelpGroup;
   /** The feature this entry is a section of; sections are listed inside their feature's card. */
   parent?: string;
@@ -67,9 +72,21 @@ export type HelpEntry = {
    * video's manifest, when it is released.
    */
   unlisted?: boolean;
-  /** null until the walkthrough is recorded. */
+  /** null until the walkthrough is recorded. The Tutorials page reads only this: "Video coming soon" means no walkthrough. */
   video: HelpVideo | null;
+  /**
+   * The film the "i" panel plays: the walkthrough when one is recorded, else the feature's intro film (the short
+   * overview from /features/<slug>, shared/help/registry.ts INTRO_FALLBACKS; a section inherits its feature's). null
+   * when neither exists. The panel labels it by `videoSource` ("Walkthrough" / "Overview film"), so the fallback is
+   * never passed off as a step-by-step recording.
+   */
+  film: HelpVideo | null;
+  /** Where `film` comes from; null when there is no film. */
+  videoSource: HelpVideoSource | null;
 };
 
-/** An entry as it is written: everything but `video`, which the registry fills from the manifest. */
-export type HelpDraft = Omit<HelpEntry, "video">;
+/** Where an entry's film comes from: its own recorded walkthrough, or its feature's intro (overview) film. */
+export type HelpVideoSource = "walkthrough" | "intro";
+
+/** An entry as it is written: everything but the films, which the registry fills from the manifests. */
+export type HelpDraft = Omit<HelpEntry, "video" | "film" | "videoSource">;

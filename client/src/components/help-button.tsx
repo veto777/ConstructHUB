@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { HelpEntry, HelpVideo } from "@shared/help/types";
-import { useHelpEntry } from "@/lib/use-help-entry";
+import { useClaimHelpMount, useHelpEntry } from "@/lib/use-help-entry";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,10 +17,15 @@ import { cn } from "@/lib/utils";
  * has prerequisites. All of it comes from the one help registry (shared/help/registry.ts); a key that is
  * not in it renders nothing, and server/help-registry.test.ts fails the build for it.
  *
- * Video: when the entry has a recorded walkthrough, a small play button sits beside the "i" and the panel
- * offers "Watch the walkthrough" (an HTML5 player in a dialog, captions track when there is one; nothing
- * about playback is remembered). While `video` is null there is NO play button on the page — only a quiet
+ * Video: when the entry has a film (`film`: its recorded walkthrough, else its feature's intro film —
+ * shared/help/registry.ts INTRO_FALLBACKS), a small play button sits beside the "i" and the panel offers
+ * "Watch the walkthrough" or "Watch the overview film" (an HTML5 player, captions track when there is one;
+ * nothing about playback is remembered). The label follows `videoSource`, so an overview film is never passed
+ * off as a step-by-step walkthrough. While `film` is null there is NO play button on the page — only a quiet
  * "Video walkthrough coming soon" line inside the panel.
+ *
+ * Coverage: every mounted "i" tells the tool shell its key (useClaimHelpMount), so the shell's crumb row can show
+ * a fallback "i" for the page's entry only when no header on the page mounted one.
  *
  * Colours: the accent is the surface's `--g-accent` (the portalled panel is its own `.g-surface`, so the
  * tokens resolve there too). Nothing is hard-coded.
@@ -94,17 +99,23 @@ export function HelpVideoPlayer({ video, title, className, testId, autoPlay = fa
   );
 }
 
+/** What the film is, in words: "walkthrough" for the entry's own recording, "overview film" for its feature's intro. */
+export const filmNoun = (entry: HelpEntry) => (entry.videoSource === "intro" ? "overview film" : "walkthrough");
+/** The film's label line: its source, length and captions ("Overview film · 1:42 · captions on"). */
+const filmLine = (entry: HelpEntry, video: HelpVideo) =>
+  `${entry.videoSource === "intro" ? "Overview film" : "Walkthrough"} · ${formatDuration(video.durationSec)} · ${video.captions ? "captions on" : "no captions"}`;
+
 /** The player in a dialog. Unmounts (and so stops) when closed. */
 export function HelpVideoDialog({ entry, open, onOpenChange }: { entry: HelpEntry; open: boolean; onOpenChange: (open: boolean) => void }) {
-  if (!entry.video) return null;
+  if (!entry.film) return null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="g-surface max-w-3xl" data-testid={`help-video-dialog-${entry.key}`}>
         <DialogHeader>
-          <DialogTitle>{entry.title} — walkthrough</DialogTitle>
-          <DialogDescription>{formatDuration(entry.video.durationSec)} · {entry.video.captions ? "captions available" : "no captions"}</DialogDescription>
+          <DialogTitle>{entry.title} — {filmNoun(entry)}</DialogTitle>
+          <DialogDescription>{filmLine(entry, entry.film)}</DialogDescription>
         </DialogHeader>
-        {open && <HelpVideoPlayer video={entry.video} title={entry.title} testId={`help-video-${entry.key}`} />}
+        {open && <HelpVideoPlayer video={entry.film} title={entry.title} testId={`help-video-${entry.key}`} />}
       </DialogContent>
     </Dialog>
   );
@@ -124,17 +135,17 @@ const ICON_BUTTON = cn(
 function PanelBody({ entry, playing, onWatch, footer }: { entry: HelpEntry; playing: boolean; onWatch: () => void; footer?: ReactNode }) {
   return (
     <>
-      {playing && entry.video && (
-        <div className="mb-4" data-testid={`help-inline-video-${entry.key}`}>
-          <HelpVideoPlayer video={entry.video} title={entry.title} testId={`help-video-${entry.key}`} autoPlay />
-          <p className="mt-1.5 text-[12px] g-text-2">{formatDuration(entry.video.durationSec)} · {entry.video.captions ? "captions on" : "no captions"}</p>
+      {playing && entry.film && (
+        <div className="mb-4" data-testid={`help-inline-video-${entry.key}`} data-video-source={entry.videoSource ?? undefined}>
+          <HelpVideoPlayer video={entry.film} title={entry.title} testId={`help-video-${entry.key}`} autoPlay />
+          <p className="mt-1.5 text-[12px] g-text-2">{filmLine(entry, entry.film)}</p>
         </div>
       )}
       <HelpParts entry={entry} testId={`help-body-${entry.key}`} />
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3" style={{ borderColor: "var(--g-divider)" }}>
-        {entry.video ? (
-          <button type="button" className="g-pill g-pill--sm" onClick={onWatch} aria-pressed={playing} data-testid={`help-watch-${entry.key}`}>
-            <PlayCircle aria-hidden="true" /><span>{playing ? "Hide the walkthrough" : `Watch the walkthrough (${formatDuration(entry.video.durationSec)})`}</span>
+        {entry.film ? (
+          <button type="button" className="g-pill g-pill--sm" onClick={onWatch} aria-pressed={playing} data-testid={`help-watch-${entry.key}`} data-video-source={entry.videoSource ?? undefined}>
+            <PlayCircle aria-hidden="true" /><span>{playing ? `Hide the ${filmNoun(entry)}` : `Watch the ${filmNoun(entry)} (${formatDuration(entry.film.durationSec)})`}</span>
           </button>
         ) : (
           <p className="text-[13px] g-text-2" data-testid={`help-video-soon-${entry.key}`}>Video walkthrough coming soon</p>
@@ -145,10 +156,15 @@ function PanelBody({ entry, playing, onWatch, footer }: { entry: HelpEntry; play
   );
 }
 
-export function HelpButton({ k, className, tutorialsLink = true, videoOnly = false }: {
+export function HelpButton({ k, className, tutorialsLink = true, videoOnly = false, fallback = false }: {
   /** A key of the help registry. */
   k: string;
   className?: string;
+  /**
+   * The tool shell's own crumb-row "i" (tool/shell.tsx): shown only while nothing else on the page mounted this
+   * key, so it does not report itself as a mount.
+   */
+  fallback?: boolean;
   /**
    * Only the walkthrough: a "Watch" button that plays the entry's video, and nothing at all while the
    * entry has none. For CRM pages, which already carry their own "i" (InfoTip) beside the title.
@@ -163,6 +179,8 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
   const [watching, setWatching] = useState(false);
   const [playing, setPlaying] = useState(false);
   const titleId = useId();
+  // Tell the tool shell this key's "i" is on the page (once the entry is known to exist), so its crumb-row fallback stays hidden.
+  useClaimHelpMount(entry ? k : undefined, !fallback);
   useEffect(() => { if (!open) setPlaying(false); }, [open]);
 
   useEffect(() => {
@@ -181,10 +199,10 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
 
   if (!entry) return null;
   if (videoOnly) {
-    if (!entry.video) return null;
+    if (!entry.film) return null;
     return (
       <span className="inline-flex items-center align-middle">
-        <button type="button" aria-label={`Watch the walkthrough: ${entry.title}`}
+        <button type="button" aria-label={`Watch the ${filmNoun(entry)}: ${entry.title}`}
           className={cn("ml-1 inline-flex h-7 items-center gap-1 rounded-full border border-primary/30 px-2.5 text-xs font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", className)}
           onClick={(e) => { e.stopPropagation(); setWatching(true); }} data-testid={`help-play-${k}`}>
           <PlayCircle className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
@@ -241,9 +259,9 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
           </PopoverContent>
         </Popover>
       )}
-      {entry.video && (
+      {entry.film && (
         <>
-          <button type="button" className={ICON_BUTTON} aria-label={`Watch the walkthrough: ${entry.title}`}
+          <button type="button" className={ICON_BUTTON} aria-label={`Watch the ${filmNoun(entry)}: ${entry.title}`}
             onClick={(e) => { e.stopPropagation(); setWatching(true); }} data-testid={`help-play-${k}`}>
             <PlayCircle className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
           </button>

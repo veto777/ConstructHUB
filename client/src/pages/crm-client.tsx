@@ -43,6 +43,7 @@ import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { QuickBid } from "@/components/crm-quick-bid";
 import { AppointmentForm, type Appointment } from "@/components/crm-appointment-form";
 import { InfoTip } from "@/components/info-tip";
+import { HelpButton } from "@/components/help-button";
 import { confirmAction } from "@/components/confirm-dialog";
 
 const money = (c?: number | null) =>
@@ -971,6 +972,8 @@ export default function CrmClientPage() {
                 <div className="flex items-center gap-1">
                   <h1 className="text-2xl font-semibold tracking-tight">{c.displayName}</h1>
                   <InfoTip k="client-detail" />
+                  {/* The client-page walkthrough (quick actions). Static key: this title is not a CrmPageHeader. */}
+                  <HelpButton k="crm-client-quick-actions" videoOnly />
                 </div>
                 {c.companyName && c.companyName !== c.displayName && (
                   <div className="text-sm text-muted-foreground mt-0.5">{c.companyName}</div>

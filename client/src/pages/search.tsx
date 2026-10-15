@@ -20,7 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppPage, StatusPill, EmptyState, Notice } from "@/components/app-ui";
-import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { SamplePreview } from "@/components/sample-preview";
 import {
   Search,
   MapPin,
@@ -613,9 +614,19 @@ export default function SearchPage() {
         as="h1"
         titleTestId="text-page-title"
         title="Search permits"
-        description="Search live permit portals by address, name, company or permit number."
+        description="Type an address, a name, a company, a license or a permit number and we search the real city and county permit portals in the area you pick."
         flush
       />
+
+      {/* The nationwide picture (the SEO Suite's number strip): the portals the live search can query today, from
+          /api/databases/counts. Shown only when the server reports the figures; never a typed-in number. */}
+      {dbCounts && !countsError && typeof dbCounts.searchable === "number" && (
+        <GoogleStatGrid cols={3}>
+          <GoogleStat label="Searchable portals" value={dbCounts.searchable.toLocaleString()} hint="Portals with a checked link and a search adapter" testId="stat-search-portals" />
+          <GoogleStat label="States covered" value={dbCounts.searchableStates != null ? dbCounts.searchableStates.toLocaleString() : "—"} testId="stat-search-states" />
+          <GoogleStat label="Counties with a searchable portal" value={dbCounts.searchableCounty != null ? dbCounts.searchableCounty.toLocaleString() : "—"} testId="stat-search-counties" />
+        </GoogleStatGrid>
+      )}
 
       <section className="space-y-4" aria-label="Search form">
         {/* US coverage map (owner request): states fill blue where county permits are
@@ -1192,12 +1203,39 @@ export default function SearchPage() {
         </div>
       )}
 
+      {/* Before the first search: how it works, what will appear and where it comes from, and the SHAPE of a result.
+          Government data is never invented here (CLAUDE.md): the preview carries field labels only, no values. */}
       {!searchId && !searchMutation.isPending && !noPortalsMessage && (
-        <EmptyState
-          icon={Search}
-          title="Ready to search"
-          description="Enter a search term above. Results from each portal appear as they're found."
-        />
+        <section className="space-y-4" data-testid="empty-search-ready" aria-label="Before you search">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="g-callout">
+              <h3>How this works</h3>
+              <ol className="mt-1 list-decimal space-y-1 pl-5">
+                <li>Pick a place: a state, and a county or city if you want to narrow it (or click a dot on the map).</li>
+                <li>Type an address, a name, a company, a license number or a permit number and press Search.</li>
+                <li>We search the live portal in each place, show every portal's progress, and keep the search in History so you can run it again.</li>
+              </ol>
+            </div>
+            <div className="g-callout">
+              <h3>What will appear here</h3>
+              <p>One row per permit, exactly as the city or county portal lists it: the address, permit number, type, status, issue date and which portal it came from, with contacts and details when the portal publishes them.</p>
+              <p className="mt-2">Results come only from the {typeof dbCounts?.searchable === "number" ? `${dbCounts.searchable.toLocaleString()} ` : ""}portals the live search can query (a checked official link plus a search adapter) and from matches saved by earlier searches. A portal that could not be searched is named, so an empty list never means no permit exists.</p>
+            </div>
+          </div>
+          <SamplePreview what="the shape of one result, labels only (no real permit)" testId="sample-search-result">
+            <GoogleList>
+              <GoogleListRow
+                title="Street address"
+                badges={<><span className="g-chip g-chip--sm">Permit type</span><span className="g-chip g-chip--sm">Status</span></>}
+                meta={["Permit number", "Issued date", "City or county portal"]}
+                actions={<><GooglePill icon={Eye} label="View details" /><GooglePill icon={Building} label="Property lookup" /></>}
+              >
+                <p className="g-card__line">Work description</p>
+                <p className="g-card__meta">Applicant · Contractor · Parcel number</p>
+              </GoogleListRow>
+            </GoogleList>
+          </SamplePreview>
+        </section>
       )}
     </AppPage>
   );

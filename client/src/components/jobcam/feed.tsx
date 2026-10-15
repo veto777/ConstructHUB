@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { Camera, CheckSquare, Grid3X3, Image as ImageIcon, Loader2, Rows3, Search, Star, Video, X, Trash2, Tag as TagIcon, Share2, CalendarDays, Eye, EyeOff } from "lucide-react";
 import { GooglePill, GoogleSectionHeader } from "@/components/google";
 import { EmptyState } from "@/components/crm-ui";
+import { SampleJobcamGrid } from "@/components/crm-sample-previews";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { jobcamError, jobcamFetch, JOBCAM_USAGE_KEY, type JobcamMediaItem } from "@/lib/jobcam-api";
@@ -193,9 +194,14 @@ function JobcamFeedInner({ projectId, customerId, compact = false, title, descri
       ) : feed.isError ? (
         <p className="text-sm text-destructive" role="alert">Couldn't load the feed. {jobcamError(feed.error)}</p>
       ) : !items.length ? (
-        <EmptyState compact icon={Camera} title={active ? "Nothing matches those filters" : "No photos or videos yet"}
-          description={active ? "Clear a filter or widen the dates." : storageFull ? "Storage is full — free up space or request more to add photos and video." : "Open the camera — every shot lands in this job with its time and location."}
-          action={!active && !storageFull ? <Link href={captureHref}><GooglePill variant="solid" icon={Camera} label="Open camera" testId="jobcam-empty-camera" /></Link> : undefined} />
+        <>
+          <EmptyState compact icon={Camera} title={active ? "Nothing matches those filters" : "No photos or videos yet"}
+            description={active ? "Clear a filter or widen the dates." : storageFull ? "Storage is full — free up space or request more to add photos and video." : "Open the camera — every shot lands in this job with its time and location."}
+            action={!active && !storageFull ? <Link href={captureHref}><GooglePill variant="solid" icon={Camera} label="Open camera" testId="jobcam-empty-camera" /></Link> : undefined} />
+          {/* No filter and nothing shot yet (for this job, or company-wide on Recent): a sample of the feed.
+              Not in the compact panels inside a client's or project's page — those are one record's photos. */}
+          {!active && !compact && <SampleJobcamGrid />}
+        </>
       ) : (
         <>
           <MediaGrid items={items} view={compact ? "grid" : view} selectable={selecting} selected={selected} onToggle={toggle} onOpen={setOpen} showProject={!projectId} dense={compact} />

@@ -16,6 +16,7 @@ import { EMAIL_RE, customerErrorMessage, duplicateMatches, type DuplicateMatch }
 import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ChevronRight, Download, Upload } from "lucide-react";
 import { SegmentedTabs, TabCount } from "@/components/tool";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable, crmTableCards } from "@/components/crm-ui";
+import { SampleClientsTable } from "@/components/crm-sample-previews";
 
 interface Client {
   id: string;
@@ -345,6 +346,7 @@ export default function CrmClientsPage() {
           />
         </Card>
       ) : !bookTotal || !clients ? (
+        <>
         <Card>
           <EmptyState
             icon={Users}
@@ -359,6 +361,13 @@ export default function CrmClientsPage() {
             ) : undefined}
           />
         </Card>
+        {/* The whole book is empty (bookTotal is the server's count across every tab): show a sample. */}
+        <SampleClientsTable cta={canManage ? (
+          <Button size="sm" variant="outline" onClick={() => setOpen(true)} data-testid="button-new-client-sample">
+            <Plus className="h-4 w-4 mr-1" /> Add your first client
+          </Button>
+        ) : undefined} />
+        </>
       ) : (
         (() => {
           // The server already filtered to this tab; total is how many

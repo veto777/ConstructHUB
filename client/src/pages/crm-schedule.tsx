@@ -17,11 +17,14 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone,
 } from "@/components/crm-ui";
+import { SampleScheduleList } from "@/components/crm-sample-previews";
 import { cn } from "@/lib/utils";
 
 type View = "month" | "week" | "agenda";
 
 const RANGES = [7, 14, 30] as const;
+/** The agenda endpoint clamps `days` to 1–60 (server/crm/schedule.ts). */
+const MAX_AGENDA_DAYS = 60;
 
 function dayLabel(iso: string): string {
   const d = dayStart(new Date(iso));
@@ -404,35 +407,64 @@ export default function CrmSchedulePage() {
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-1 rounded-full border bg-muted/40 p-1 w-fit" data-testid="schedule-range">
-            {RANGES.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setDays(r)}
-                data-testid={`button-days-${r}`}
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
-                  days === r ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {r}d
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-full border bg-muted/40 p-1 w-fit" data-testid="schedule-range">
+              {RANGES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setDays(r)}
+                  data-testid={`button-days-${r}`}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                    days === r ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {r}d
+                </button>
+              ))}
+            </div>
+            {/* Any number of days, not only the presets — the server accepts 1–60 (server/crm/schedule.ts). */}
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              or next
+              <input
+                type="number" min={1} max={MAX_AGENDA_DAYS} inputMode="numeric"
+                value={days}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value, 10);
+                  if (Number.isFinite(n)) setDays(Math.min(Math.max(n, 1), MAX_AGENDA_DAYS));
+                }}
+                aria-label="Number of days to list"
+                data-testid="input-days-custom"
+                className="h-7 w-16 rounded-md border border-input bg-background px-2 text-xs tabular-nums text-foreground"
+              />
+              days (up to {MAX_AGENDA_DAYS})
+            </label>
           </div>
 
           {groups.length === 0 ? (
-            <div className="rounded-xl border bg-card">
-              <EmptyState
-                icon={CalendarDays}
-                title={scope === "all"
-                  ? `Nothing scheduled in the next ${days} days`
-                  : `No visits for this filter in the next ${days} days`}
-                description={canManage
-                  ? "Click a day on the calendar (or the Add button) to book your first visit."
-                  : "Visits booked on your projects will show up here, grouped by day."}
-              />
-            </div>
+            <>
+              <div className="rounded-xl border bg-card">
+                <EmptyState
+                  icon={CalendarDays}
+                  title={scope === "all"
+                    ? `Nothing scheduled in the next ${days} days`
+                    : `No visits for this filter in the next ${days} days`}
+                  description={canManage
+                    ? "Click a day on the calendar (or the Add button) to book your first visit."
+                    : "Visits booked on your projects will show up here, grouped by day."}
+                />
+              </div>
+              {/* Only when nobody's calendar has anything coming: the server's list is empty before the crew
+                  filter is applied, so an empty "My calendar" with visits elsewhere shows no sample. */}
+              {(agendaData?.appointments.length ?? 0) === 0 && (
+                <SampleScheduleList cta={canManage ? (
+                  <Button size="sm" variant="outline" onClick={() => openCreate(new Date())} data-testid="button-add-appointment-sample">
+                    <Plus className="h-4 w-4 mr-1" /> Book your first visit
+                  </Button>
+                ) : undefined} />
+              )}
+            </>
           ) : (
             <div className="space-y-5" data-testid="schedule-list">
               {groups.map((g) => (

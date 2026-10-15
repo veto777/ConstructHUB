@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
+import { HelpButton } from "@/components/help-button";
 import { GooglePill } from "@/components/google";
 import { useRoute } from "wouter";
 import {
@@ -181,9 +182,12 @@ export default function GoogleAdsGuideSection() {
               </span>
             </div>
 
-            <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-section-title">
-              {section.title}
-            </h1>
+            <div className="flex items-start gap-2">
+              <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-section-title">
+                {section.title}
+              </h1>
+              <HelpButton k="ads-guide" className="mt-1" />
+            </div>
             <p className="g-text-2 text-sm leading-relaxed max-w-3xl" data-testid="text-section-subtitle">
               {section.subtitle}
             </p>

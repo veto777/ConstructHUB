@@ -17,6 +17,7 @@ import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone, crmTable, crmTableCards,
 } from "@/components/crm-ui";
 import { EstimateDiscounts } from "@/components/crm-discounts";
+import { HelpButton } from "@/components/help-button";
 import { money } from "@/lib/estimate-math";
 import { cn } from "@/lib/utils";
 import {
@@ -331,6 +332,9 @@ export default function CrmEstimateDetailPage() {
     <CrmPage>
       <CrmPageHeader
         icon={FileText}
+        infoKey="estimate-detail"
+        /* The route lookup would land on the Estimates LIST entry; this page's walkthrough is the editor's. */
+        help={<HelpButton k="crm-estimate-edit" videoOnly />}
         title={
           <span className="flex items-center gap-2.5 flex-wrap">
             {e.number} · {e.title}
