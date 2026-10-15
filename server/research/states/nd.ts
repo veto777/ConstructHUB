@@ -86,13 +86,13 @@ export function ndContractorHit(r: FsRow, d: Record<string, string>, matchedOn: 
 
 /**
  * Who holds an ND contractor license (round 2, decision 2). The register publishes no entity type, only the name it
- * was issued under: "<person> DBA <trade name>" is a person's own license; a name that reads as a business is the
- * business's; a bare personal name ("BOB JOHNSON") is left unknown, so its contacts are kept private.
+ * was issued under: "<person> DBA <trade name>" is a person's own license; any other name is left unknown, a
+ * company-like one included (round 3, decision 3: a name never makes a holder a business), so its contacts are kept
+ * private.
  */
 export function ndContractorHolder(title: string | null): "business" | "individual" | null {
   if (!title) return null;
-  if (/\s(?:DBA|D\/B\/A)\s/i.test(title)) return "individual";
-  return looksLikeBusiness(title) ? "business" : null;
+  return /\s(?:DBA|D\/B\/A)\s/i.test(title) ? "individual" : null;
 }
 
 /** Detail drawers opened per search: politeness caps, noted when hit. */

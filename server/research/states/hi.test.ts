@@ -30,9 +30,9 @@ describe("HI DCCA", () => {
     ];
     const hits = parsePvlReport(rows, "Hawaii Contractors License Board licenses", "contractors");
     expect(hits).toHaveLength(2);
-    expect(hits[0].hit).toMatchObject({ businessName: "22&W CONSTRUCTION INC", specialty: "Classes: B General Building, C-31a", expires: "2026-09-30", address: "91-1188 ILIAHIALOE LP EWA BEACH Hawaii 96706" });
+    expect(hits[0].hit).toMatchObject({ businessName: "22&W CONSTRUCTION INC", specialty: "Classes: B General Building, C-31a", expires: "2026-09-30", address: "EWA BEACH Hawaii 96706" }); // round 3, decision 3: no entity type, no street
     expect(hits[0].hit.status).toContain("2026-04-06");
-    expect(hits[0].keys).toEqual({ licenses: ["CT-39093-0"], addresses: ["91-1188 ILIAHIALOE LP EWA BEACH Hawaii 96706"] });
+    expect(hits[0].keys).toEqual({ licenses: ["CT-39093-0"] });
     expect(hits[1]).toMatchObject({ person: "ZU WEN HE", hit: { principal: "ZU WEN HE", businessName: null } });
     // A person alone: no street address (a home address) and no address key, city/state/ZIP only; not a business word.
     expect(hits[1].hit.address).toBe("HONOLULU Hawaii 96822");
@@ -77,7 +77,9 @@ describe("HI round-2 audit (2026-10-16)", () => {
     expect(h.hit).toMatchObject({ businessName: "HE CONSTRUCTION", holder: "individual", address: "HONOLULU Hawaii 96822" });
     expect(h.keys).toEqual({ licenses: ["CT-33278-0"] });
     const [b] = parsePvlReport(rows("22&W CONSTRUCTION INC", ""), "Hawaii Contractors License Board licenses", "contractors");
-    expect(b.hit).toMatchObject({ holder: "business", address: "3054 Lanikaula HONOLULU Hawaii 96822" });
+    // Round 3, decision 3: no entity type is published, so a company-like name leaves the holder unknown (no street).
+    expect(b.hit).toMatchObject({ businessName: "22&W CONSTRUCTION INC", holder: null, address: "HONOLULU Hawaii 96822" });
+    expect(b.keys).toEqual({ licenses: ["CT-33278-0"] });
     expect(b.component).toBe("Hawaii Contractors License Board licenses");
   });
 });

@@ -83,3 +83,12 @@ describe("Arizona round-2 audit (2026-10-16)", () => {
     } finally { vi.unstubAllGlobals(); resetHostState(); }
   }, 20_000);
 });
+
+describe("AZ account address (round 3)", () => {
+  it("keeps city, state and ZIP only", async () => {
+    const { rocCity } = await import("./az");
+    expect(rocCity("EL MIRAGE, AZ, 85335")).toBe("EL MIRAGE, AZ, 85335");
+    expect(rocCity("123 W Main St, Phoenix, AZ, 85001")).toBe("Phoenix, AZ, 85001");
+    expect(rocCity(null)).toBeNull();
+  });
+});

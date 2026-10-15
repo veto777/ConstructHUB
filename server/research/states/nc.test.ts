@@ -80,7 +80,7 @@ describe("ARLS holder (audit round 2, decision 2)", () => {
     expect(arlsHolder(true, "Qualifier")).toBe("individual");
     expect(arlsHolder(true, null)).toBe("individual");
     expect(arlsHolder(false, "License")).toBe("business");
-    expect(arlsHolder(false, null)).toBe("business");
+    expect(arlsHolder(false, null)).toBeNull(); // round 3, decision 3: no account type shown is unknown
     expect(arlsHolder(false, "Registration")).toBeNull();
   });
 });

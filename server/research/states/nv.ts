@@ -56,7 +56,8 @@ export function parseNscbLicenses(html: string, kind: "person" | "company" | "li
       specialty: [limits.join(" ") || null, bizId ? `NV business id ${bizId}` : null].filter(Boolean).join(". ") || null,
       status, principal: principal ?? null, city: [city, st].filter(Boolean).join(", ") || null, expires: null,
       matchedOn: kind === "company" ? "business" : kind === "license" ? "license" : "principal",
-      // Every NSCB license is a contractor's license (classes A, B, C-…), issued to the contracting business.
+      // Every NSCB license is a contractor's license (classes A, B, C-…), issued to the contracting business named
+      // in its legal-name column, its principal listed apart (publisher's definition; kept in round 3, decision 3).
       holder: "business",
       ...(detailsTarget ? { detailsTarget } : {}),
     });

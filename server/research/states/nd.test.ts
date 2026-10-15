@@ -39,7 +39,7 @@ describe("North Dakota (audit 2026-10-15)", () => {
 describe("ND holder and searched kinds (audit round 2, decisions 2 and 8)", () => {
   it("a license under '<person> DBA <name>' is the person's; a business name the business's; a bare personal name unknown", () => {
     expect(ndContractorHolder("EUGENE JOHNSON DBA JOHNSON CONSTRUCTION")).toBe("individual");
-    expect(ndContractorHolder("JOHNSON CONSTRUCTION LLC")).toBe("business");
+    expect(ndContractorHolder("JOHNSON CONSTRUCTION LLC")).toBeNull(); // round 3, decision 3: a name never makes a business
     expect(ndContractorHolder("BOB JOHNSON")).toBeNull();
   });
   it("lookups that can't search a kind of name say so", () => {

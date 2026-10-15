@@ -37,6 +37,16 @@ type RocComplaint = {
   License_Number_Respondent__r?: { Name?: string | null; Primary_Licensee__r?: { Name?: string | null } | null } | null;
 };
 
+/**
+ * The account's "City, ST, ZIP" (round 3, per-state note): only those three parts are kept, so a street the ROC might
+ * put in front ("123 Main St, Phoenix, AZ, 85001") never reaches the report's city.
+ */
+export function rocCity(address: string | null | undefined): string | null {
+  const parts = (address ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+  const tail = parts.slice(-3).filter((p) => !/^\d+\s+\S/.test(p));
+  return clean(tail.join(", ")) || null;
+}
+
 const MAX_DETAILS = 15;
 
 /** "Douglas Guy Mack (President) " → "Douglas Guy Mack". */
@@ -97,10 +107,12 @@ export function rocLicenseHits(rows: RocAccount[], name: string, kind: "person" 
         businessName: clean(a.accountName), licenseNumber: clean(l.licenseNo), licenseType: clean(l.subType), specialty: null,
         status: clean(l.status),
         principal: kind === "person" ? (qp && samePersonName(name, qp) ? qp : matchedPerson ?? qp) : qp ?? people[0] ?? null,
-        city: clean(a.address), expires: null, matchedOn: kind === "company" ? "business" : kind === "license" ? "license" : "principal",
+        city: rocCity(a.address), expires: null, matchedOn: kind === "company" ? "business" : kind === "license" ? "license" : "principal",
         phone: clean(a.phone),
         people: Array.from(named, ([n, r]) => ({ name: n, role: Array.from(new Set(r)).join("; ") || null })),
-        // A ROC license is a contractor's license held by the account (the business); its people are listed apart.
+        // A ROC license is a contractor's license held by the account: the ROC's register is of licensed contracting
+        // businesses (the account), with its qualifying party and officers listed apart (publisher's definition; kept
+        // as "business" in round 3, decision 3). The account address is city, state and ZIP only (rocCity).
         holder: "business",
       });
     }

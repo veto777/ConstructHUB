@@ -99,17 +99,22 @@ export function businessParts(text: string | null): string[] {
 
 export type DesOrder = {
   orderType: string | null; orderNumber: string | null; date: string | null; businesses: string[]; county: string | null;
+  /** The order date as published, when it could not be normalized (a two-digit year: the century isn't stated). */
+  dateText?: string | null;
   location: string | null; city: string | null; program: string | null; violations: string | null; penalty: number | null;
 };
 
 const LONG_MONTH = /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})/i;
-/** "June 12, 2025", "8/13/2026" or "8/24/26" → YYYY-MM-DD. */
-function longDate(v: string | null): string | null {
+/**
+ * "June 12, 2025" or "8/13/2026" → YYYY-MM-DD. A two-digit year ("8/24/26") gives null: the century is not stated, so
+ * it is never guessed (round 3, decision 13); the publisher's text is kept on the record instead (dateText).
+ */
+export function longDate(v: string | null): string | null {
   const t = v?.trim() ?? "";
   const m = t.match(LONG_MONTH);
   if (m) return `${m[3]}-${String(MONTHS.indexOf(m[1].toLowerCase()) + 1).padStart(2, "0")}-${m[2].padStart(2, "0")}`;
-  const n = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\b/);
-  return n ? `${n[3].length === 2 ? `20${n[3]}` : n[3]}-${n[1].padStart(2, "0")}-${n[2].padStart(2, "0")}` : null;
+  const n = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+  return n ? `${n[3]}-${n[1].padStart(2, "0")}-${n[2].padStart(2, "0")}` : null;
 }
 
 /** Every order in one monthly report's text. */
@@ -143,6 +148,7 @@ export function parseDesReport(text: string): DesOrder[] {
     const pen = action.match(/civil penalty[^$]{0,200}?\(\$\s?([\d,]+(?:\.\d{2})?)\)/i) ?? action.match(/civil penalty[^$]{0,120}?\$\s?([\d,]+(?:\.\d{2})?)/i);
     out.push({
       orderType: clean(m?.[1] ?? null), orderNumber: m?.[2] ?? null, date: longDate(f["order date"] ?? null), businesses,
+      dateText: longDate(f["order date"] ?? null) ? null : clean(f["order date"] ?? null),
       county: clean(f["county"] ?? null), location: loc, city, program: entryProgram,
       violations: violations ? violations.slice(0, 400) : null, penalty: pen ? Number(pen[1].replace(/,/g, "")) : null,
     });
@@ -183,7 +189,7 @@ export function desHit(o: DesOrder, sourceUrl: string): EnforcementHit | null {
     state: "SC", source: "South Carolina DES environmental enforcement orders", sourceUrl, category: "environmental",
     name: o.businesses.join(" / "), id: o.orderNumber, date: o.date, endDate: null, status: o.orderType,
     city: o.city ?? (o.county ? `${o.county.replace(/\s+County$/i, "")} County` : null),
-    detail: [o.program, o.violations ? `Violations: ${o.violations}` : null].filter(Boolean).join(". ") || null,
+    detail: [o.program, o.dateText ? `Order date as published: ${o.dateText}` : null, o.violations ? `Violations: ${o.violations}` : null].filter(Boolean).join(". ") || null,
     // Adverse only from what the report publishes: a civil penalty. An order with no penalty printed stays unknown.
     amount: o.penalty, adverse: adverseFrom(o.penalty ? "civil penalty" : null),
     ...(o.location ? { address: o.location } : {}),

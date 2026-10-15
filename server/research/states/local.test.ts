@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PHL_BUSINESS_TYPES, entityHolder, isConstruction, licenseHit, mdcPhone, phlAddress } from "./local";
+import { DC_BUSINESS_TYPES, DC_INDIVIDUAL_TYPES, PHL_BUSINESS_TYPES, PHL_INDIVIDUAL_TYPES, isConstruction, licenseHit, mdcPhone, phlAddress } from "./local";
+import { entityHolder } from "../licenses";
 
 describe("local sources' parsers", () => {
   it("reads a Philadelphia permit contractor's address block", () => {
@@ -42,10 +43,20 @@ describe("local license rows (audit 2026-10-15)", () => {
     }
   });
   it("holders from the publisher's own entity type and license class", () => {
-    expect(entityHolder("SOLE", /^SOLE$/i)).toBe("individual");
-    expect(entityHolder("CORP", /^SOLE$/i)).toBe("business");
-    expect(entityHolder(null, /^SOLE$/i)).toBeNull();
-    expect(entityHolder("Sole proprietorship", /sole proprietorship/i)).toBe("individual");
+    const lb = { business: /^(?:CORP|LLC|LLP|PARTNER|NON-PROFIT)$/, individual: /^SOLE$/ };
+    expect(entityHolder("SOLE", lb)).toBe("individual");
+    expect(entityHolder("CORP", lb)).toBe("business");
+    expect(entityHolder(null, lb)).toBeNull();
+    // Round 3, decision 3: a value on neither list is unknown, never a business.
+    expect(entityHolder("TRUSTEE", lb)).toBeNull();
+    const dc = { business: DC_BUSINESS_TYPES, individual: DC_INDIVIDUAL_TYPES };
+    expect(entityHolder("Domestic Limited Liability Company", dc)).toBe("business");
+    expect(entityHolder("Corporation (For Profit)", dc)).toBe("business");
+    expect(entityHolder("Domestic Sole Proprietor", dc)).toBe("individual");
+    for (const v of ["Unknown", "Trade Name", "For Profit", "Name Registration"]) expect(entityHolder(v, dc)).toBeNull();
+    const phl = { business: PHL_BUSINESS_TYPES, individual: PHL_INDIVIDUAL_TYPES };
+    expect(entityHolder("FIRE SUPPRESSION WORKER-SPECIALTY", phl)).toBe("individual");
+    expect(entityHolder("SOMETHING NEW", phl)).toBeNull();
     expect(PHL_BUSINESS_TYPES.test("ELECTRICAL CONTRACTOR")).toBe(true);
     expect(PHL_BUSINESS_TYPES.test("PLUMBER JOURNEYMAN")).toBe(false);
     expect(PHL_BUSINESS_TYPES.test("FIRE SUPPRESSION WORKER")).toBe(false);

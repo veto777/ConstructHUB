@@ -20,6 +20,9 @@ describe("Oklahoma CIB roofing registrations", () => {
     expect(roofingHit({ ...REG, company_type: "LLC" })!.hit.holder).toBe("business");
     expect(roofingHit({ ...REG, company_type: "Sole Proprietorship" })!.hit.holder).toBe("individual");
     expect(roofingHit({ ...REG, company_type: "" })!.hit.holder).toBeNull();
+    // Round 3, decision 3: a value CIB does not list is unknown, never a business.
+    expect(roofingHit({ ...REG, company_type: "Trust" })!.hit.holder).toBeNull();
+    expect(roofingHit({ ...REG, company_type: "Corporation" })!.hit.holder).toBe("business");
   });
 });
 

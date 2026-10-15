@@ -109,10 +109,11 @@ const IA_SOS_ACTIVE: BulkSource = {
       const name = clean(r.legal_name);
       if (!name) continue;
       const address = joinAddr(r.ho_address_1, r.ho_city, r.ho_state, r.ho_zip);
-      const raAddress = joinAddr(r.ra_address_1, r.ra_city, r.ra_state, r.ra_zip);
+      // Only the entity's own home-office address is a key: the registered agent's address is the agent's (often a
+      // person's or a filing service's), not the business's (round 3, per-state note).
       yield {
         kind: "enforcement", business: name, person: null,
-        keys: { licenses: [], phones: [], addresses: [address, raAddress] },
+        keys: { licenses: [], phones: [], addresses: [address] },
         hit: {
           state: "IA", source: "Iowa Secretary of State active business entities", sourceUrl: hubPage(554), category: "business_status",
           name, id: clean(r.corp_number), date: isoDay(r.effective_date), endDate: null,

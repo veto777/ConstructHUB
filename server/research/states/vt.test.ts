@@ -26,7 +26,7 @@ describe("VT OPR rosters (audit round 2)", () => {
     expect(biz.hit).toMatchObject({ status: "Active", holder: "business" });
     expect(biz.hit.discipline).toBeUndefined();
   });
-  it("the browser page goes through the guard: robots.txt-disallowed requests are aborted, a 403 stops the load (decision 6)", async () => {
+  it("the browser page goes through the full guard: robots.txt, redirect targets, a 403 stops the load (round 3, decision 5)", async () => {
     const { vi } = await import("vitest");
     const { guardPage } = await import("./vt");
     const { resetHostState, hostBlocked, PortalBlockedError } = await import("../http");
@@ -36,18 +36,33 @@ describe("VT OPR rosters (audit round 2)", () => {
       let handler: any, onResponse: any;
       const page = { route: async (_p: string, h: any) => { handler = h; }, on: (_e: string, h: any) => { onResponse = h; } };
       const check = await guardPage(page);
-      const route = (url: string) => { const r = { request: () => ({ url: () => url }), abort: vi.fn(), continue: vi.fn() }; return r; };
+      const answers: Record<string, { status: number; headers: Record<string, string> }> = {
+        "https://vt.example.test/public/page": { status: 200, headers: {} },
+        "https://vt.example.test/public/moved": { status: 302, headers: { location: "/private/file.xlsx" } },
+      };
+      const route = (url: string, type = "document") => ({
+        request: () => ({ url: () => url, resourceType: () => type }),
+        fetch: vi.fn(async () => { const a = answers[url] ?? { status: 200, headers: {} }; return { status: () => a.status, headers: () => a.headers }; }),
+        fulfill: vi.fn(async () => undefined), abort: vi.fn(async () => undefined), continue: vi.fn(async () => undefined),
+      });
       const ok = route("https://vt.example.test/public/page"), no = route("https://vt.example.test/private/file.xlsx");
-      await handler(ok); await handler(no);
-      expect(ok.continue).toHaveBeenCalled();
+      const moved = route("https://vt.example.test/public/moved"), img = route("https://vt.example.test/public/logo.png", "image");
+      await handler(ok); await handler(no); await handler(moved); await handler(img);
+      expect(ok.fetch).toHaveBeenCalled();
+      expect(ok.fulfill).toHaveBeenCalled();
+      expect(no.fetch).not.toHaveBeenCalled();
       expect(no.abort).toHaveBeenCalled();
-      expect(() => check()).not.toThrow();
+      // A redirect to a disallowed path is stopped before the browser follows it.
+      expect(moved.fulfill).not.toHaveBeenCalled();
+      expect(moved.abort).toHaveBeenCalled();
+      expect(img.continue).toHaveBeenCalled();
+      expect(() => check()).toThrow(PortalBlockedError); // robots.txt refusals of page loads stop the load too
       onResponse({ url: () => "https://vt.example.test/public/x", status: () => 403, headers: () => ({}) });
-      expect(() => check()).toThrow(PortalBlockedError);
       expect(hostBlocked("https://vt.example.test/anything")).not.toBeNull();
       const after = route("https://vt.example.test/public/page2");
       await handler(after);
+      expect(after.fetch).not.toHaveBeenCalled();
       expect(after.abort).toHaveBeenCalled();
     } finally { spy.mockRestore(); resetHostState(); }
-  });
+  }, 20_000);
 });

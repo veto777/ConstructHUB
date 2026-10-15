@@ -36,7 +36,8 @@ describe("Minnesota DLI", () => {
 
   it("derives adverse from each order's own words", () => {
     const o = parseMnOrders(ORDERS);
-    expect(o.map((x) => mnOrderAdverse(x.order))).toEqual([true, true, true, true]);
+    // A penalty "stayed with conditions" leaves what stands unstated: unknown (round 3, decision 6), even beside a revocation.
+    expect(o.map((x) => mnOrderAdverse(x.order))).toEqual([null, true, null, null]);
     // A caption whose business word is only "Homes" (a surname too) is not taken for a business.
     expect(parseMnOrders(ORDERS.replace("Adamant Painting and Renovations, LLC, and Adam Sherman, Individually", "Adam Homes"))
       .some((x) => x.name === "Adam Homes")).toBe(false);

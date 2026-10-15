@@ -35,7 +35,6 @@ const DHS_ASBESTOS_PAGE = "https://www.dhs.wisconsin.gov/asbestos/contractors.ht
 const BUSINESS = /\b(INC|LLC|L\.L\.C|CORP|CORPORATION|CO|COMPANY|LTD|LLP|SERVICES?|DRILLING|WELL|PUMPS?|PUMPING|ENTERPRI[SZ]ES?|PLUMBING|SEPTIC|SUPPLY|GEOTHERMAL|ELECTRIC|HEATING|SONS|BROTHERS|BROS)\b|&/i;
 export const isPersonName = (n: string) => /^[A-Z][A-Z'.\- ]*,\s+[A-Z]/i.test(n) ? !BUSINESS.test(n) : !BUSINESS.test(n) && !looksLikeBusiness(n);
 /** A legal entity's name: the registered form says it is a company. */
-const ENTITY = /\b(INC|INCORPORATED|LLC|L\.L\.C|CORP|CORPORATION|CO|COMPANY|LTD|LLP)\b\.?/i;
 const dash = (v: string | undefined) => clean(v?.replace(/^-$/, ""));
 /** Street lines (a line with no digit is a company name in the DNR files, not a street), city, state and ZIP. */
 export function wiAddress(lines: (string | undefined)[], city?: string, st?: string, zip?: string): string | null {
@@ -68,8 +67,6 @@ export function dnrRows(rows: string[][], type: string): BulkHit[] {
     seen.add(no);
     const person = isPersonName(raw);
     const city = dash(r[7]), st = dash(r[8]);
-    const address = wiAddress([r[5], r[6]], r[7], r[8], r[9]);
-    const phones = [dash(r[3]), dash(r[4])].filter((p): p is string => !!p);
     out.push({
       kind: "license",
       hit: {
@@ -78,17 +75,17 @@ export function dnrRows(rows: string[][], type: string): BulkHit[] {
         specialty: updated ? `Listed in the DNR directory (${clean(updated)})` : "Listed in the DNR directory", status: null,
         principal: person ? flip(raw) : null, city: [city, st && st !== "WI" ? st : null].filter(Boolean).join(", ") || null, expires: null,
         matchedOn: person ? "principal" : "business",
-        // The DNR files publish no entity type: a person's name is an individual's license, a legal entity's name
-        // (Inc, LLC, Corp, …) a business's; a name that only reads as a business ("… WELL SERVICE") is unknown
-        // (round 2, decisions 2 and 3), and its contact details stay out of the report like an individual's.
-        holder: person ? "individual" : ENTITY.test(raw) ? "business" : null,
-        // A person's mailing address and phones are a home address and phone: city only, never a key.
-        address: person ? null : address, phone: person ? null : phones[0] ?? null,
+        // The DNR files publish no entity type: a person's name is an individual's license; any other name, an entity
+        // form in it (Inc, LLC) included, leaves the holder unknown (round 3, decision 3: a name never makes a holder
+        // a business), and its contact details stay out of the report like an individual's.
+        holder: person ? "individual" : null,
+        // Without a business holder the mailing address and phones may be a home's: city only, never a key.
+        address: null, phone: null,
         ...(person ? { people: [{ name: flip(raw)!, role: type.replace(/ \(DNR directory\)$/, " license holder") }] } : {}),
       },
       business: person ? null : raw, person: person ? raw : null,
       // Each phone is its own key ("608-555-0101, 608-555-0102" joined would match neither).
-      keys: person ? { licenses: [no] } : { licenses: [no], phones, addresses: [address] },
+      keys: { licenses: [no] },
     });
   }
   return out;

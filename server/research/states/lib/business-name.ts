@@ -6,10 +6,13 @@
  *   - a "dba" / "d/b/a" / "doing business as" form, or
  *   - a trade or business word that is not a common surname (Electric, Plumbing, Construction, Services, …), as a
  *     WHOLE word ("Roofing" counts, "Roofner" does not; audit round 2, decision 3), or
- *   - a single word (people are listed with at least two names).
- * Everything else, a bare two- or three-word name above all, is a person: when in doubt the row is dropped from
+ *   - "The …" or "<name> of <place>".
+ * Everything else is a person: a bare two- or three-word name above all, and a single word too (a surname alone,
+ * "SMITH", is not shown to be a business; round 3, decision 3). When in doubt the row is dropped from
  * enforcement rather than pinned on a business. This is a fallback: a source that publishes an entity type or a
- * license class (corporation, sole proprietor, journeyman, …) uses that instead.
+ * license class (corporation, sole proprietor, journeyman, …) uses that instead. It may decide whether a record
+ * counts as a business's for enforcement; it never sets a license's holder (round 3, decision 3), so it never
+ * unlocks an address or phone.
  */
 
 const SUFFIX = /\b(?:inc|incorporated|llc|l\s?l\s?c|corp|corporation|co|company|companies|ltd|limited|lp|llp|lllp|pllc|pc|p\s?c|pa|plc|na|assn|association|cooperative|co-op)\b\.?/i;
@@ -51,6 +54,6 @@ export function looksLikeBusiness(name: string | null | undefined): boolean {
   if (words.some((w) => TRADE.has(w))) return true;
   // "The …" / "(THE)" and "<name> of <place>" franchises ("Paul Davis of Reno Lake Tahoe") are businesses.
   if (/^the\s|\(the\)/i.test(t) || (/\sof\s/i.test(t) && words.length >= 4)) return true;
-  // "LAST, FIRST" is a person; a single word with no comma is a trade name.
-  return words.length === 1 && !t.includes(",");
+  // Anything else (a bare name, a single word that may be a surname) is not shown to be a business.
+  return false;
 }

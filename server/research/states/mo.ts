@@ -160,11 +160,12 @@ export const moIsBusiness = (rat: string | null, name: string | null): boolean =
 /**
  * Who holds a MO PRO license (round 2, decision 2): a corporation's certificate is a business's; the architect,
  * engineer, surveyor and landscape architect licenses are a person's own. The electrical contractor license is held
- * by a person or a firm and the search doesn't say which: a business only when the name reads as one, else unknown.
+ * by a person or a firm and the search doesn't say which: unknown, whatever the name reads like (round 3, decision 3;
+ * the name still decides which column it is shown in, moIsBusiness).
  */
-export function moHolder(rat: string | null, name: string | null): "business" | "individual" | null {
+export function moHolder(rat: string | null, _name: string | null): "business" | "individual" | null {
   if (BUSINESS_PROFESSION.test(rat ?? "")) return "business";
-  if (rat === "Electrical Contractor") return looksLikeBusiness(name) ? "business" : null;
+  if (rat === "Electrical Contractor") return null;
   return rat ? "individual" : null;
 }
 

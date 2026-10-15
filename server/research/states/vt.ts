@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { LicenseHit } from "@shared/research-reports";
 import { CHROMIUM_ARGS, USER_AGENT } from "../../scrapers/polite-fetch";
-import { guard, hostBlocked, noteResponse, robotsAllowed } from "../http";
+import { guardBrowser } from "../http";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { xlsxRecords } from "./lib/g2-xlsx";
 import type { StatePack } from "./types";
@@ -38,8 +38,7 @@ const STATUSES = ["Active", "Inactive per Request", "Expired", "Disciplined"];
 
 /** Download one roster through the guest page; returns the saved .xlsx path (the caller deletes it). */
 async function fetchRoster(page: any, r: { profession: string; type: string }, check: () => void): Promise<string> {
-  // The navigation itself passes the same guard as every other request (round 2, decision 6).
-  await guard(OPR_LOOKUP, 2000);
+  // The navigation passes the page's guard (guardPage) like every other request.
   await page.goto(OPR_LOOKUP, { waitUntil: "networkidle", timeout: 120_000 });
   check();
   await page.click("button:has-text('PROFESSION ROSTER DOWNLOAD')");
@@ -61,24 +60,11 @@ async function fetchRoster(page: any, r: { profession: string; type: string }, c
 }
 
 /**
- * Puts a browser page behind the research HTTP guard (round 2, decision 6): every request the page makes is aborted
- * when its host has denied access or robots.txt doesn't allow it, and every response tells the shared host state
- * (a 401/403 blocks the host; a Retry-After sets its cooldown). The returned check throws the first access denial
- * seen, so the load stops instead of moving on.
+ * Puts a browser page behind the research HTTP guard (round 3, decision 5): every page load and XHR passes the full
+ * guard (block, robots.txt, cooldown, rate limit), redirects included; every response tells the shared host state.
+ * The returned check throws the first access denial seen, so the load stops instead of moving on.
  */
-export async function guardPage(page: any): Promise<() => void> {
-  let denied: unknown = null;
-  await page.route("**/*", async (route: any) => {
-    const url: string = route.request().url();
-    if (!/^https?:/i.test(url)) return route.continue();
-    if (hostBlocked(url) || !(await robotsAllowed(url))) return route.abort("blockedbyclient");
-    return route.continue();
-  });
-  page.on("response", (res: any) => {
-    try { noteResponse(res.url(), res.status(), res.headers()["retry-after"]); } catch (err) { denied ??= err; }
-  });
-  return () => { if (denied) throw denied; };
-}
+export const guardPage = (page: any): Promise<() => void> => guardBrowser(page, 2000);
 
 /**
  * One roster row. An individual's roster address is where they live (audit 2026-10-15): city, state and ZIP only, no

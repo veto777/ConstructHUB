@@ -7,6 +7,7 @@ const details = {
     LicenseNumber: "ABSOLR*779PR", UbiNumber: "605320678", LicenseType: "Construction Contractor", BusinessName: "ABSOLUTE ROOFING",
     PhoneNumber: "2082155090", Address1: "621 N GLENN RD", City: "SPOKANE VALLEY", State: "WA", Zip: "99206", StatusDescription: "EXPIRED",
     ExpirationDate: "11/16/2025", SpecialtyName1: "GENERAL", SpecialtyName2: "UNUSED",
+    BusinessType: "Limited Liability Company", // added for the round-3 holder tests (Verify publishes this field)
     BusinesOwners: [{ Name: "NORTON, CARISSA EVE", RoleDescription: "PARTNER/MEMBER" }],
     Violations: [{ InfractionId: "NTHRM01754", IssueDate: "12/05/2025", StatusDescription: "Not Satisfied", ViolationAmount: 5000.0, ViolationAmountDue: 5440.0,
       ItemTypeDescription: "CONSTRUCTION INFRACTION", RcwCode: "18.27.200(1)(b) RCW", ViolatorName: "ABSOLUTE ROOFING AND MAINTENANCE LLC", CityName: "SPOKANE VALLEY",
@@ -75,5 +76,15 @@ describe("WA L&I Verify (audit round 2)", () => {
     expect(verifyLicenseHit(details, null, "license").holder).toBe("business");
     expect(verifyLicenseHit({ Contractor: { LicenseNumber: "BEARDJS867P8", UbiNumber: "", BusinessName: "BEARD, JOSEPH S" } }, null, "principal").holder).toBe("individual");
     expect(pack.liveLicenses![0].kinds).toEqual(["person"]);
+  });
+  // Round 3, decision 3: a sole proprietor has a UBI too; Verify's BusinessType decides, an unlisted one is unknown.
+  it("a UBI registration whose BusinessType is Individual or unlisted keeps no street or phone", () => {
+    for (const BusinessType of ["Individual", "", "Something New"]) {
+      const c = { ...details.Contractor, BusinessType };
+      const h = verifyLicenseHit({ ...details, Contractor: c }, null, "license");
+      expect(h).toMatchObject({ holder: BusinessType === "Individual" ? "individual" : null, address: null, phone: null });
+      const e = verifyEnforcement({ Contractor: { ...c, Summons: [], Warrants: [], Lapses: [] } }, "ABSOLUTE ROOFING", "u")[0];
+      expect(e).toMatchObject({ address: null, phone: null });
+    }
   });
 });

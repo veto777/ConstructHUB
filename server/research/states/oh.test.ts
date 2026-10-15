@@ -31,6 +31,7 @@ describe("OH holders and components (audit round 2)", () => {
   it("OCILB: the qualifying individual holds the license; a company-only row is the company's", async () => {
     const { ocilbRow } = await import("./oh");
     expect(ocilbRow({ Name: "JOHN Q SMITH", Company: "SMITH ELECTRIC LLC", FormattedCredential: "EL.12345", Type: "EL" })!.hit).toMatchObject({ holder: "individual" });
-    expect(ocilbRow({ Name: "", Company: "SMITH ELECTRIC LLC", FormattedCredential: "EL.12346", Type: "EL" })!.hit).toMatchObject({ holder: "business" });
+    // Round 3, decision 3: a company name alone (no individual) leaves the holder unknown.
+    expect(ocilbRow({ Name: "", Company: "SMITH ELECTRIC LLC", FormattedCredential: "EL.12346", Type: "EL" })!.hit).toMatchObject({ holder: null });
   });
 });

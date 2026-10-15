@@ -16,6 +16,8 @@ import type { EnforcementHit } from "@shared/research-reports";
 import { politeFetch, politeText } from "../http";
 import { hasEnded } from "../adverse";
 import { looksLikeBusiness } from "./lib/business-name";
+import { entityHolder } from "../licenses";
+import { DC_BUSINESS_TYPES, DC_INDIVIDUAL_TYPES } from "./local";
 import { clean, type BulkHit } from "../bulk";
 import { decodeEntities } from "../bulk-sources";
 import type { StatePack } from "./types";
@@ -45,13 +47,13 @@ export function bblActivity(v: string | null): string | null {
 /**
  * Who holds the license, from ENTITYTYPE and the endorsement (round 2, decision 2; values checked 2026-10-16): a
  * Home Improvement Salesperson endorsement and a sole proprietor (Domestic/Foreign Sole Proprietor, Sole
- * Proprietorship) are an individual; "Trade Name", "Name Registration", "Unknown" or blank don't say (null); every
- * other entity type (corporations, LLCs, partnerships, government, …) is a business. The trade name never decides.
+ * Proprietorship) are an individual; the listed entity types (corporations, LLCs, partnerships, government, …;
+ * ./local.ts DC_BUSINESS_TYPES) a business; anything else ("Trade Name", "Name Registration", "Unknown", "For
+ * Profit", blank, or a type DLCP adds later) doesn't say (null; round 3, decision 3). The trade name never decides.
  */
 export function bblHolder(entityType: string | null, activity: string | null): "business" | "individual" | null {
-  if (/salesperson/i.test(activity ?? "") || /sole propriet/i.test(entityType ?? "")) return "individual";
-  if (!entityType || /^(?:trade name|name registration|unknown)$/i.test(entityType)) return null;
-  return "business";
+  if (/salesperson/i.test(activity ?? "")) return "individual";
+  return entityHolder(entityType, { business: DC_BUSINESS_TYPES, individual: DC_INDIVIDUAL_TYPES });
 }
 
 export function bblHit(r: Attrs): BulkHit | null {

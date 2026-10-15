@@ -21,6 +21,7 @@
  * Not used: DOSH (WISHA) safety inspections from Verify (federal OSHA data in ../records.ts covers state-plan
  * inspections); the bond-impaired flag on data.wa.gov bzff-4fmt (the same lawsuits come from Verify with amounts).
  */
+import { entityHolder } from "../licenses";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { clean } from "../bulk";
 import type { BulkHit, BulkSource } from "../bulk";
@@ -72,6 +73,12 @@ const MAX_DETAILS = 10;
 const verifyAddress = (c: any) => [clean(c.Address1), clean(c.Address2), clean(c.City), clean(c.State), clean(c.Zip)].filter(Boolean).join(" ") || null;
 const verifyPhone = (c: any) => clean(c.PhoneNumber);
 
+/** Verify's BusinessType (the same values as the L&I dataset's businesstypecodedesc, ../licenses.ts). */
+export const verifyHolder = (v: unknown) => entityHolder(v, {
+  business: /^(?:corporation|limited liability company|partnership|limited liability partnership|joint venture|association|trust)$/i,
+  individual: /^individual$/i,
+});
+
 /** One Verify license record as a report hit; owners and governing people come from the record itself. */
 export function verifyLicenseHit(details: any, row: VerifyRow | null, matchedOn: LicenseHit["matchedOn"]): LicenseHit {
   const c = details.Contractor ?? {};
@@ -93,9 +100,12 @@ export function verifyLicenseHit(details: any, row: VerifyRow | null, matchedOn:
     city: [clean(c.City) ?? clean(row?.City), clean(c.State) ?? clean(row?.State)].filter(Boolean).join(", ") || null,
     expires: anyDay(c.ExpirationDate), matchedOn,
     // A tradesperson's address is a home address: only a business's address is kept. A certificate (no UBI) is the
-    // tradesperson's own; a registration with a UBI is the business's (round 2, decision 2).
-    holder: isTrades ? "individual" : "business",
-    address: isTrades ? null : verifyAddress(c), phone: isTrades ? null : verifyPhone(c),
+    // tradesperson's own (round 2, decision 2). A registration with a UBI says who holds it in BusinessType (checked
+    // live 2026-10-16: "Individual" for a sole proprietor, who has a UBI too); round 3, decision 3: only the listed
+    // entity types make it a business's, so a sole proprietor's home address and phone stay out.
+    holder: isTrades ? "individual" : verifyHolder(c.BusinessType),
+    address: isTrades || verifyHolder(c.BusinessType) !== "business" ? null : verifyAddress(c),
+    phone: isTrades || verifyHolder(c.BusinessType) !== "business" ? null : verifyPhone(c),
     people: Array.from(people, ([n, role]) => ({ name: n, role })),
   };
 }
@@ -134,7 +144,10 @@ export function verifyEnforcement(details: any, businessName: string, url: strin
   const c = details.Contractor ?? {};
   const name = clean(c.BusinessName) ?? businessName;
   const city = [clean(c.City), clean(c.State)].filter(Boolean).join(", ") || null;
-  const base = { state: "WA", sourceUrl: url, name, address: verifyAddress(c), phone: verifyPhone(c), licenseNumber: clean(c.LicenseNumber) };
+  // A sole proprietor's registration (BusinessType "Individual") is still the registered business's record, but its
+  // street and phone may be a home's: shown only for a listed entity type (round 3, decisions 2 and 3).
+  const biz = verifyHolder(c.BusinessType) === "business";
+  const base = { state: "WA", sourceUrl: url, name, address: biz ? verifyAddress(c) : null, phone: biz ? verifyPhone(c) : null, licenseNumber: clean(c.LicenseNumber) };
   const out: EnforcementHit[] = [];
   for (const v of c.Violations ?? []) {
     const status = clean(v.StatusDescription);

@@ -35,7 +35,7 @@ const DPOR_FILES = "https://www.dpor.virginia.gov/sites/default/files/Records%20
  * decision 2): contractor, firm and entity lists license businesses; tradesman, mechanic, inspector and professional
  * lists license people (a business name on their row is where they work).
  */
-type DporList = { file: string; type: string; holder: "business" | "individual" };
+type DporList = { file: string; type: string; holder: "business" | "individual"; mayBeEmpty?: boolean };
 const CONTRACTOR_LISTS: DporList[] = [
   { file: "2701", type: "Class A Contractor", holder: "business" },
   { file: "2705a", type: "Class A Contractor", holder: "business" },
@@ -50,7 +50,8 @@ const CONTRACTOR_LISTS: DporList[] = [
   { file: "2718", type: "Certified Elevator Mechanic", holder: "individual" },
   { file: "2719", type: "Certified Water Well Systems Provider", holder: "individual" },
   { file: "2720", type: "Certified Accessibility Mechanic", holder: "individual" },
-  { file: "2721", type: "Emergency Elevator Mechanic (declared state of emergency)", holder: "individual" },
+  // Only filled during a declared state of emergency: the published file is its header alone (checked 2026-10-16).
+  { file: "2721", type: "Emergency Elevator Mechanic (declared state of emergency)", holder: "individual", mayBeEmpty: true },
   { file: "2723", type: "Certified Automatic Fire Sprinkler Inspector", holder: "individual" },
 ];
 const APELSCIDLA_LISTS: DporList[] = [
@@ -147,7 +148,7 @@ function dporLoader(lists: DporList[], source: string): () => AsyncIterable<Bulk
         // Each list file is a component: the 70% rule applies to it on its own (round 2, decision 10).
         if (h) yield { ...h, component: `${list.file} ${list.type}` };
       }
-      if (!rows) throw new Error(`DPOR list ${list.file} (${list.type}) had no rows; kept the previous load`);
+      if (!rows && !list.mayBeEmpty) throw new Error(`DPOR list ${list.file} (${list.type}) had no rows; kept the previous load`);
     }
   };
 }

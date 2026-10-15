@@ -55,8 +55,9 @@ export function ocilbRow(r: Record<string, string>): BulkHit | null {
       city: [clean(r["Company City"]), clean(r["Company State"]) !== "OH" ? clean(r["Company State"]) : null].filter(Boolean).join(", ") || null,
       expires: usDate(r["Expiration Date"]), matchedOn: company ? "business" : "principal",
       // OCILB licenses the qualifying individual (Name, LastName); the company is the one they qualify. A row with no
-      // individual is the company's own (round 2, decision 2: the company's address then stays).
-      holder: who ? "individual" : "business",
+      // individual says nothing more about who holds it: unknown (round 3, decision 3: a company name alone never
+      // makes the holder a business), so the company address stays out.
+      holder: who ? "individual" : null,
       address, phone, ...(who ? { people: [{ name: who, role: "Qualifying individual" }] } : {}),
     },
     business: company, person: who,

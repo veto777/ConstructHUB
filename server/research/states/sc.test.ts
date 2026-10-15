@@ -149,3 +149,17 @@ describe("SC adverse (audit 2026-10-15)", () => {
     expect(desHit({ ...o, penalty: null }, "u")!.adverse).toBeNull();
   });
 });
+
+describe("SC order dates (round 3, decision 13)", () => {
+  it("never guesses the century of a two-digit year; the publisher's text is kept on the record", async () => {
+    const { longDate, desHit } = await import("./sc");
+    expect(longDate("June 12, 2025")).toBe("2025-06-12");
+    expect(longDate("8/13/2026")).toBe("2026-08-13");
+    expect(longDate("8/24/26")).toBeNull();
+    expect(longDate("9/13/99")).toBeNull();
+    const hit = desHit({ orderType: "Consent Order", orderNumber: "26-01-W", date: null, dateText: "8/24/26", businesses: ["ACME CONSTRUCTION LLC"],
+      county: null, location: null, city: null, program: "Water", violations: null, penalty: null }, "u");
+    expect(hit?.date).toBeNull();
+    expect(hit?.detail).toContain("Order date as published: 8/24/26");
+  });
+});

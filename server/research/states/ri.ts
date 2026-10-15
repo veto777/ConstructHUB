@@ -261,7 +261,9 @@ async function* riRostersLoader(): AsyncIterable<BulkHit> {
         const coa = /Certificate of Authorization/i.test(type ?? "");
         const firm = coa || (r.page === "solarRetailerRoster" && looksLikeBusiness(name));
         // An individual's address is a person's: city, state and ZIP only, and no address key (audit 2026-10-15, decision 4).
-        const address = clean([...(firm ? [get("Address 1"), get("Address 2")] : []), get("City"), get("State"), get("Zip Code")].filter(Boolean).join(", "));
+        // A street only on a certificate of authorization (a firm by the board's definition): a solar retailer whose
+        // name only reads as a business has an unknown holder (round 3, decision 3), so city, state and ZIP only.
+        const address = clean([...(coa ? [get("Address 1"), get("Address 2")] : []), get("City"), get("State"), get("Zip Code")].filter(Boolean).join(", "));
         const hit: LicenseHit = {
           state: "RI", source: "Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",
           sourceUrl: DBR_ROSTERS_PAGE, businessName: firm ? name : null, licenseNumber: no, licenseType: type, specialty: null,
@@ -271,7 +273,7 @@ async function* riRostersLoader(): AsyncIterable<BulkHit> {
           holder: coa ? "business" : r.page === "solarRetailerRoster" ? null : "individual",
           address, people: firm ? [] : [{ name, role: null }],
         };
-        yield { kind: "license", hit, business: firm ? name : null, person: firm ? null : name, keys: { licenses: [no], addresses: firm ? [address] : [] }, component: r.label };
+        yield { kind: "license", hit, business: firm ? name : null, person: firm ? null : name, keys: { licenses: [no], addresses: coa ? [address] : [] }, component: r.label };
       }
     } finally {
       await fs.rm(path, { force: true });

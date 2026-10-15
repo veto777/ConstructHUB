@@ -14,10 +14,12 @@ describe("WI audit fixes (2026-10-15)", () => {
     expect(p.hit).toMatchObject({ principal: "JOSHUA L JOHNSON", businessName: null, address: null, phone: null, city: "WISCONSIN DELLS" });
     expect(p.keys).toEqual({ licenses: ["7213"] });
   });
-  it("a business row keeps its address and every phone as its own key (not one joined string)", () => {
+  // Round 3, decision 3: the directory publishes no entity type, so an entity's name leaves the holder unknown and
+  // its mailing address and phones out (they may be a home's).
+  it("an entity-named row's holder is unknown: no street, no phone, license key only", () => {
     const [, b] = dnrRows(ROWS, "Well drilling (DNR directory)");
-    expect(b.hit).toMatchObject({ phone: "(608)253-2751", address: "3774 ST RD 13, WISCONSIN DELLS, WI 53965-8906" });
-    expect(b.keys?.phones).toEqual(["(608)253-2751", "(877)553-7855"]);
+    expect(b.hit).toMatchObject({ businessName: "MARSHALL WELL DRILLING CORP", holder: null, phone: null, address: null });
+    expect(b.keys).toEqual({ licenses: ["6946"] });
   });
   it("a surname that is also a trade word stays a person", () => {
     expect(isPersonName("WELLS, JOHN")).toBe(true);
@@ -26,10 +28,10 @@ describe("WI audit fixes (2026-10-15)", () => {
 });
 
 describe("WI holders (audit round 2, decision 2)", () => {
-  it("a person is the holder; a legal entity's name is a business; a trade-sounding name alone is unknown", () => {
+  it("a person is the holder; any other name (an entity form or a trade-sounding name) is unknown", () => {
     const [p, b] = dnrRows(ROWS, "Well drilling (DNR directory)");
     expect(p.hit.holder).toBe("individual");
-    expect(b.hit.holder).toBe("business");
+    expect(b.hit.holder).toBeNull();
     const rows = [...ROWS.slice(0, 2), ["-", "7000", "QUINNELL'S SEPTIC & WELL SERVICE", "(608)555-0101", "-", "1 MAIN ST", "-", "MADISON", "WI", "53703", "x"]];
     expect(dnrRows(rows, "Well drilling (DNR directory)")[0].hit.holder).toBeNull();
   });

@@ -13,6 +13,7 @@
  *
  * Nebraska has no state general-contractor license; contractors register with the Department of Labor (above).
  */
+import { entityHolder } from "../licenses";
 import type { LicenseHit } from "@shared/research-reports";
 import { promises as fs } from "node:fs";
 import { clean, download, usDate, type BulkSource } from "../bulk";
@@ -59,6 +60,9 @@ export function parseConregDetail(html: string): Record<string, string> {
   return out;
 }
 
+/** Entity forms that make a registration a business's (any other value is unknown). */
+export const NE_BUSINESS_ENTITIES = /^(?:(?:s |c |professional |non-?profit )?corporation|limited liability company|llc|limited liability partnership|llp|limited partnership|general partnership|partnership|joint venture|trust|association)$/i;
+
 export function conregHit(id: string, d: Record<string, string>, matchedOn: LicenseHit["matchedOn"]): LicenseHit | null {
   const name = clean(d["Contractor/Subcontractor Name"]);
   if (!name) return null;
@@ -77,8 +81,9 @@ export function conregHit(id: string, d: Record<string, string>, matchedOn: Lice
     expires: usDate(d["Registration Expiration"]), matchedOn,
     address: joinAddr(street, d["City"], d["State"], d["Zip"]), phone: clean(d["Telephone"]), people: person ? [{ name: person, role: "Sole proprietor" }] : [],
     // The registration's own "Business Entity" says who holds it (round 2, decisions 2 and 3): a sole proprietorship is
-    // the person's, whatever name it trades under; any other entity a business; none given, unknown.
-    holder: d["Business Entity"] ? (/sole/i.test(d["Business Entity"]) ? "individual" : "business") : null,
+    // the person's, whatever name it trades under; a listed entity form a business; anything else, or none given,
+    // unknown (round 3, decision 3).
+    holder: entityHolder(d["Business Entity"], { business: NE_BUSINESS_ENTITIES, individual: /sole/i }),
   };
 }
 

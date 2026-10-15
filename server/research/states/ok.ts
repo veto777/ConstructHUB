@@ -44,8 +44,9 @@ export function roofingHit(r: Reg): BulkHit | null {
     status: s(r.statusName), principal: person, city: [s(r.company_city), s(r.company_state)].filter(Boolean).join(", ") || null,
     expires: s(r.renewalDate)?.slice(0, 10) ?? null, matchedOn: company ? "business" : "principal",
     // company_type, checked 2026-10-16: Corporation, LLC, Partnership, Sole Proprietorship or blank (round 2,
-    // decisions 2 and 3: the publisher's entity type, not the presence of a company name).
-    holder: entityHolder(r.company_type, /^sole proprietorship$/i),
+    // decisions 2 and 3: the publisher's entity type, not the presence of a company name). Any other value is
+    // unknown (round 3, decision 3).
+    holder: entityHolder(r.company_type, { business: /^(?:corporation|llc|partnership)$/i, individual: /^sole proprietorship$/i }),
     address, phone: s(r.company_telephone), people: person ? [{ name: person, role: null }] : [],
   };
   return { kind: "license", hit, business: [company, dba].filter(Boolean).join(" ") || null, person, keys: { licenses: [number], phones: [hit.phone], addresses: [address] } };

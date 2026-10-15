@@ -38,7 +38,8 @@ describe("MO PRO discipline and holder (audit round 2, decisions 1 and 2)", () =
   it("the holder comes from the license class", () => {
     expect(moHolder("Engineering Corporation", "Amptron Electric Company")).toBe("business");
     expect(moHolder("Professional Engineer", "Mark E Davis")).toBe("individual");
-    expect(moHolder("Electrical Contractor", "Precision Electric LLC")).toBe("business");
+    // Round 3, decision 3: a company-like name never makes the holder a business.
+    expect(moHolder("Electrical Contractor", "Precision Electric LLC")).toBeNull();
     expect(moHolder("Electrical Contractor", "Mark E Davis")).toBeNull();
   });
 });

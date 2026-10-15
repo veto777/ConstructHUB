@@ -37,14 +37,15 @@ const LICENSES: LicenseSource[] = [
   { state: "MD", source: "Montgomery County building contractor licenses", ...soda("c7hs-c9qq"),
     fields: { businessName: "applicant", licenseNumber: "licenseno", licenseType: "licensetype", specialty: null, status: null, principal: "applicant", city: "city", expires: "expiredate" },
     personField: "applicant", address: "addr1", zip: "zip", phone: "telephone",
-    // The county publishes no entity type: a business only when the applicant's name reads as one (round 2, decision 2).
-    holder: (r) => (looksLikeBusiness(String(r.applicant ?? "")) ? "business" : null) },
+    // The county publishes no entity type, and builders are licensed under a company's or a person's own name: the
+    // holder is unknown, whatever the name reads like (round 3, decision 3), so no street or phone is shown.
+    holder: () => null },
   { state: "MD", source: "Montgomery County electrical business licenses", ...soda("ydri-y5u9"),
     fields: { businessName: "applicant", licenseNumber: "licenseno", licenseType: "licensetype", specialty: null, status: null, principal: null, city: "city", expires: "expiredate" },
-    personField: null, address: "address1", zip: "zip", holder: () => "business" },
+    personField: null, address: "address1", zip: "zip", holder: () => "business" }, // a register of electrical businesses (the county's definition)
   { state: "MD", source: "Montgomery County limited electrical business licenses", ...soda("rmjr-4zb9"),
     fields: { businessName: "applicant", licenseNumber: "licenseno", licenseType: "licensetype", specialty: null, status: null, principal: null, city: "city", expires: "expiredate" },
-    personField: null, address: "addr1", zip: "zip", holder: () => "business" },
+    personField: null, address: "addr1", zip: "zip", holder: () => "business" }, // a register of limited electrical businesses (the county's definition)
   { state: "MD", source: "Montgomery County master electrician licenses", ...soda("v8mn-6i2r"),
     fields: { businessName: null, licenseNumber: "licenseno", licenseType: "licensetype", specialty: null, status: null, principal: "applicant", city: "city", expires: "expiredate" },
     personField: "applicant", address: "addr1", zip: "zip", holder: () => "individual" },

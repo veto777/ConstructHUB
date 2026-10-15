@@ -93,7 +93,9 @@ async function lslbcQuery(body: URLSearchParams, referer: string, matchedOn: Lic
         state: "LA", source: "Louisiana State Licensing Board for Contractors", sourceUrl: SEARCH_PAGE,
         businessName: det.name ?? row.name, licenseNumber: l.number, licenseType: l.type, specialty, status: l.status,
         principal, city: det.city, expires: l.expires, matchedOn, address: det.address, phone: det.phone, people,
-        // A contractor license (its classes held through qualifying parties) is the business's (round 2, decision 2).
+        // A contractor license (its classes held through qualifying parties) is the business's (round 2, decision 2):
+        // the LSLBC's register licenses the contracting business, with its qualifying parties listed apart
+        // (publisher's definition; kept in round 3, decision 3).
         holder: "business",
       });
     }

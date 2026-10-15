@@ -52,6 +52,8 @@ describe("NE holder and searched kinds (audit round 2, decisions 2, 3 and 8)", (
     expect(conregHit("1", parseConregDetail(DETAIL), "business")?.holder).toBe("business");
     const sole = parseConregDetail(DETAIL.replace("<dd>Corporation</dd>", "<dd>Sole Proprietorship</dd>").replace(/KIEWIT BUILDING GROUP INC\./g, "SMITH ROOFING"));
     expect(conregHit("1", sole, "business")?.holder).toBe("individual");
+    // Round 3, decision 3: an entity form the registration does not list is unknown.
+    expect(conregHit("1", parseConregDetail(DETAIL.replace("<dd>Corporation</dd>", "<dd>Other</dd>")), "business")?.holder).toBeNull();
   });
   it("the electrical lookup (people only) declares it", () => {
     expect((pack.liveLicenses ?? []).find((l) => l.source === "Nebraska State Electrical Division licenses")?.kinds).toEqual(["person"]);

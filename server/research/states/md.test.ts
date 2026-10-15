@@ -27,3 +27,12 @@ describe("Maryland BPW debarments", () => {
     expect(bpwHit(r, "2031-06-01")).toMatchObject({ adverse: false, status: "Debarment period over (Five Years (5/6/2026-5/5/2031))" });
   });
 });
+
+describe("MD holders (round 3, decision 3)", () => {
+  it("a builder license's holder is never set from the applicant's name: unknown for a surname alone and for a company-like name", async () => {
+    const { pack } = await import("./md");
+    const builders = pack.licenses!.find((l) => l.source === "Montgomery County building contractor licenses")!;
+    expect(builders.holder!({ applicant: "SMITH" })).toBeNull();
+    expect(builders.holder!({ applicant: "SMITH BUILDERS LLC" })).toBeNull();
+  });
+});
