@@ -7,12 +7,19 @@
  *   live  ND State Electrical Board: "Find a Licensed Contractor" and "Lookup a Licensed or Registered Electrician".
  *   live  ND State Plumbing Board license lookup (plumbers, sewer and water, water conditioning; the board's JSON).
  *   live  ND Secretary of State business entity status (FirstStop business search; status and standing), companies.
+ *   nd-ag-cease-desist  Attorney General Consumer Protection "Cease and Desist Orders" table
+ *         (attorneygeneral.nd.gov/consumer-resources/enforcement-actions; robots.txt disallows only /wp-admin/; the
+ *         site's disclaimer sets no reuse terms): the orders whose violations name an unlicensed contractor or
+ *         construction, as enforcement records for the business named. The Name column (individuals) is never kept.
  *
  * North Dakota licenses general contractors statewide through the Secretary of State (the first source).
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { clean, usDate } from "../bulk";
-import { politeFetch, rethrowIfBlocked } from "../http";
+import { clean, usDate, type BulkHit, type BulkSource } from "../bulk";
+import { politeFetch, politeText, rethrowIfBlocked } from "../http";
+import { decodeEntities } from "../bulk-sources";
+import { personNameForm } from "./lib/business-name";
+import { adverseFrom } from "../adverse";
 import type { LiveEnforcementSearch, LiveLicenseSearch, StatePack } from "./types";
 import type { IdQuery } from "../identifiers";
 import { capNote, noteOf, withNote } from "../notes";
@@ -271,11 +278,73 @@ const ND_PLUMBING: LiveLicenseSearch = {
   kinds: ["person"],
 };
 
+// ── Attorney General cease and desist orders (unlicensed contractors) ───────────────────────────────────────────
+
+const AG_PAGE = "https://attorneygeneral.nd.gov/consumer-resources/enforcement-actions/";
+const AG_SOURCE = "North Dakota Attorney General cease and desist orders (unlicensed contractors)";
+const MONTH_NAMES = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+
+export type NdAgRow = { date: string | null; business: string | null; violations: string | null; file: string | null };
+
+/** "June 16, 2023" → "2023-06-16". */
+const longDay = (v: string | null) => {
+  const m = v?.match(/^([A-Za-z]+)\.?\s+(\d{1,2}),\s*(\d{4})$/);
+  const mo = m ? MONTH_NAMES.indexOf(m[1].toLowerCase()) + 1 : 0;
+  return m && mo ? `${m[3]}-${String(mo).padStart(2, "0")}-${m[2].padStart(2, "0")}` : null;
+};
+
+/** The "Cease and Desist Orders" table: Action Date, Name (people, never kept), Business Name, Violations, File. */
+export function parseNdAgOrders(html: string): NdAgRow[] {
+  const table = html.match(/<table[^>]*aria-label="Cease and Desist Orders"[\s\S]*?<\/table>/)?.[0] ?? "";
+  const cell = (v: string | undefined) => clean(decodeEntities((v ?? "").replace(/<[^>]+>/g, " ")));
+  return Array.from(table.matchAll(/<tr data-row_id[^>]*>([\s\S]*?)<\/tr>/g)).map((m) => {
+    const c = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((x) => x[1]);
+    const href = c[4]?.match(/href="([^"]+)"/)?.[1];
+    return { date: longDay(cell(c[0])), business: cell(c[2]), violations: cell(c[3]), file: href ? new URL(href, AG_PAGE).toString() : null };
+  });
+}
+
+/**
+ * The business an order names, for a contractor order (its violations say "Unlicensed contractor" or "Construction").
+ * "X D/B/A Y" gives both names as published; a name in a personal form is left out (companies only, FCRA).
+ */
+export function ndAgBusinesses(r: NdAgRow): string[] {
+  if (!r.business || !/contractor|construction/i.test(r.violations ?? "")) return [];
+  // The cell can list several names ("Double Diamond Construction, Double Diamond Buildings", "WJA Builders, <a
+  // person>"): split on commas and "d/b/a", an entity word ("LLC", "Inc.") staying with the name before it.
+  const parts: string[] = [];
+  for (const piece of r.business.split(/\s+d\/b\/a\s+|,/i).map((p) => p.trim().replace(/^see also:\s*/i, "")).filter(Boolean)) {
+    if (/^(?:L\.?L\.?[CP]|Inc|Corp|Co|Ltd|LLLP|P\.?C|L\.?P)\.?$/i.test(piece) && parts.length) parts[parts.length - 1] += `, ${piece}`;
+    else parts.push(piece);
+  }
+  return Array.from(new Set(parts)).filter((n) => personNameForm(n) === null && looksLikeBusiness(n));
+}
+
+/** One order as an enforcement record: the Attorney General's cease and desist order, adverse from that wording. */
+export function ndAgHit(r: NdAgRow, business: string): EnforcementHit {
+  const status = "Cease and desist order by the North Dakota Attorney General";
+  return {
+    state: "ND", source: AG_SOURCE, sourceUrl: r.file ?? AG_PAGE, category: "discipline", name: business, id: null, date: r.date, endDate: null,
+    status, city: null, detail: r.violations ? `Violations: ${r.violations}` : null, amount: null, adverse: adverseFrom("Cease and desist order"),
+  };
+}
+
+const ND_AG_ORDERS: BulkSource = {
+  id: "nd-ag-cease-desist", state: "ND", label: AG_SOURCE, pageUrl: AG_PAGE, everyHours: 24 * 7, minRows: 40,
+  companiesOnly: true, category: "discipline",
+  load: async function* (): AsyncIterable<BulkHit> {
+    const rows = parseNdAgOrders(await politeText(AG_PAGE, {}, { minDelayMs: 1500 }));
+    if (rows.length < 100) throw new Error(`the Attorney General's enforcement table changed (${rows.length} rows read)`);
+    for (const r of rows) for (const business of ndAgBusinesses(r)) yield { kind: "enforcement", hit: ndAgHit(r, business), business, person: null };
+  },
+};
+
 export const pack: StatePack = {
   state: "ND",
   checked: "2026-10-15",
   liveLicenses: [ND_CONTRACTORS, ND_ELECTRICAL, ND_PLUMBING],
   liveEnforcement: [ND_SOS_STATUS],
+  bulk: [ND_AG_ORDERS],
   blocked: [
     "ND Secretary of State bulk lists: contractor and business lists are sold through 'Data List Requests'; only registered agents and lobbyists are free",
     "ND Secretary of State contractor search takes a name or SOS control number only, so contractor licenses can't be searched by license number",

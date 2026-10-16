@@ -1,0 +1,555 @@
+{
+ "generatedAt": "2026-10-16T00:28:37.858Z",
+ "commit": "f92e897a",
+ "options": {
+  "states": [
+   "ND",
+   "NC"
+  ],
+  "onlyFailed": false,
+  "useLoaded": true,
+  "portals": false
+ },
+ "states": [
+  {
+   "state": "IN",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "CREATIVE SIGN RESOURCES",
+     "kind": "company",
+     "golden": {
+      "role": "company",
+      "name": "CREATIVE SIGN RESOURCES",
+      "kind": "company",
+      "source": "Indianapolis contractor licenses (Business and Neighborhood Services)",
+      "sourceId": "in-indy",
+      "from": "bulk file in-indy, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
+      "recordId": "C6558900",
+      "expected": {
+       "kind": "license",
+       "source": "Indianapolis contractor licenses (Business and Neighborhood Services)",
+       "licenseNumber": "C6558900",
+       "businessName": "CREATIVE SIGN RESOURCES",
+       "matchedOn": "business"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 31,
+     "found": true,
+     "where": "licenses: Indianapolis contractor licenses (Business and Neighborhood Services)",
+     "cells": [
+      {
+       "source": "Indianapolis contractor licenses (Business and Neighborhood Services)",
+       "section": "licenses",
+       "cell": "found 5"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 5 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    }
+   ],
+   "nulls": [
+    {
+     "role": "enforcement",
+     "reason": "No usable record of a company with an enforcement or discipline record found in: in-indy (discipline); IN original enforcement"
+    },
+    {
+     "role": "person",
+     "reason": "No usable record of an individual license holder found in: in-indy"
+    }
+   ],
+   "loads": [],
+   "issues": []
+  },
+  {
+   "state": "NC",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "M.B. Haynes Corporation, T/A",
+     "kind": "company",
+     "golden": {
+      "role": "company",
+      "name": "M.B. Haynes Corporation, T/A",
+      "kind": "company",
+      "source": "NC Licensing Board for General Contractors",
+      "sourceId": "https://portal.nclbgc.org/Public/Search",
+      "from": "live lookup, search \"Construction\"",
+      "recordId": "L.01245",
+      "expected": {
+       "kind": "license",
+       "source": "NC Licensing Board for General Contractors",
+       "licenseNumber": "L.01245",
+       "businessName": "M.B. Haynes Corporation, T/A",
+       "matchedOn": "business"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 139611,
+     "found": true,
+     "where": "licenses: NC Licensing Board for General Contractors",
+     "cells": [
+      {
+       "source": "NC Irrigation Contractors' Licensing Board disciplinary actions",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Landscape Contractors' Licensing Board enforcement actions",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Licensing Board for General Contractors",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "NC Board of Examiners of Electrical Contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Board of Examiners of Plumbing, Heating & Fire Sprinkler Contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Licensing Board for General Contractors: disciplinary actions",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 1 license record(s) and 0 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "person",
+     "name": "John B. Smith",
+     "kind": "person",
+     "golden": {
+      "role": "person",
+      "name": "John B. Smith",
+      "kind": "person",
+      "source": "NC Board of Examiners of Electrical Contractors",
+      "sourceId": "https://arls-public.ncbeec.org/Public/Search",
+      "from": "live lookup, search \"John Smith\"",
+      "recordId": "I.08556",
+      "expected": {
+       "kind": "license",
+       "source": "NC Board of Examiners of Electrical Contractors",
+       "licenseNumber": "I.08556",
+       "businessName": "John B. Smith",
+       "person": "John B. Smith",
+       "matchedOn": "principal"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 334640,
+     "found": true,
+     "where": "licenses: NC Board of Examiners of Electrical Contractors",
+     "cells": [
+      {
+       "source": "NC Irrigation Contractors' Licensing Board disciplinary actions",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      },
+      {
+       "source": "NC Landscape Contractors' Licensing Board enforcement actions",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      },
+      {
+       "source": "NC Licensing Board for General Contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Board of Examiners of Electrical Contractors",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "NC Board of Examiners of Plumbing, Heating & Fire Sprinkler Contractors",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "NC Licensing Board for General Contractors: disciplinary actions",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      }
+     ],
+     "issues": [
+      {
+       "severity": "slow",
+       "state": "NC",
+       "source": "report",
+       "subject": "person \"John B. Smith\"",
+       "detail": "report took 335s (limit 300s)"
+      }
+     ],
+     "summary": "Found 2 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "enforcement",
+     "name": "Hi-Tech Irrigation Service, Inc.",
+     "kind": "company",
+     "golden": {
+      "role": "enforcement",
+      "name": "Hi-Tech Irrigation Service, Inc.",
+      "kind": "company",
+      "source": "NC Irrigation Contractors' Licensing Board disciplinary actions",
+      "sourceId": "nc-iclb-discipline",
+      "from": "bulk file nc-iclb-discipline, loaded 2026-10-16",
+      "recordId": "U13-032",
+      "expected": {
+       "kind": "enforcement",
+       "source": "NC Irrigation Contractors' Licensing Board disciplinary actions",
+       "id": "U13-032",
+       "name": "Hi-Tech Irrigation Service, Inc.",
+       "category": "discipline"
+      },
+      "picked": "2026-10-16"
+     },
+     "ms": 3055,
+     "found": true,
+     "where": "enforcement: NC Irrigation Contractors' Licensing Board disciplinary actions",
+     "cells": [
+      {
+       "source": "NC Irrigation Contractors' Licensing Board disciplinary actions",
+       "section": "records",
+       "cell": "found 1"
+      },
+      {
+       "source": "NC Landscape Contractors' Licensing Board enforcement actions",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Licensing Board for General Contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Board of Examiners of Electrical Contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Board of Examiners of Plumbing, Heating & Fire Sprinkler Contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Licensing Board for General Contractors: disciplinary actions",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "enforcement",
+     "name": "Cox Lawn, LLC",
+     "kind": "company",
+     "golden": {
+      "role": "enforcement",
+      "name": "Cox Lawn, LLC",
+      "kind": "company",
+      "source": "NC Landscape Contractors' Licensing Board enforcement actions",
+      "sourceId": "nc-lclb-enforcement",
+      "from": "bulk file nc-lclb-enforcement, loaded 2026-10-16",
+      "recordId": "22.158.U",
+      "expected": {
+       "kind": "enforcement",
+       "source": "NC Landscape Contractors' Licensing Board enforcement actions",
+       "id": "22.158.U",
+       "name": "Cox Lawn, LLC",
+       "category": "discipline"
+      },
+      "picked": "2026-10-16"
+     },
+     "ms": 2991,
+     "found": true,
+     "where": "enforcement: NC Landscape Contractors' Licensing Board enforcement actions",
+     "cells": [
+      {
+       "source": "NC Irrigation Contractors' Licensing Board disciplinary actions",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Landscape Contractors' Licensing Board enforcement actions",
+       "section": "records",
+       "cell": "found 1"
+      },
+      {
+       "source": "NC Licensing Board for General Contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Board of Examiners of Electrical Contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Board of Examiners of Plumbing, Heating & Fire Sprinkler Contractors",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "NC Licensing Board for General Contractors: disciplinary actions",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    }
+   ],
+   "nulls": [
+    {
+     "role": "enforcement",
+     "reason": "No usable record of a company with an enforcement or discipline record found in: NC Licensing Board for General Contractors: disciplinary actions; NC original enforcement"
+    }
+   ],
+   "loads": [],
+   "issues": [
+    {
+     "severity": "slow",
+     "state": "NC",
+     "source": "report",
+     "subject": "person \"John B. Smith\"",
+     "detail": "report took 335s (limit 300s)"
+    }
+   ]
+  },
+  {
+   "state": "ND",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "2 NUTZ CONSTRUCTION",
+     "kind": "company",
+     "golden": {
+      "role": "company",
+      "name": "2 NUTZ CONSTRUCTION",
+      "kind": "company",
+      "source": "North Dakota Secretary of State contractor licenses",
+      "sourceId": "https://firststop.sos.nd.gov/search/contractor",
+      "from": "live lookup, search \"Construction\"",
+      "recordId": "35011",
+      "expected": {
+       "kind": "license",
+       "source": "North Dakota Secretary of State contractor licenses",
+       "licenseNumber": "35011",
+       "businessName": "2 NUTZ CONSTRUCTION",
+       "matchedOn": "business"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 15113,
+     "found": true,
+     "where": "licenses: North Dakota Secretary of State contractor licenses",
+     "cells": [
+      {
+       "source": "North Dakota Attorney General cease and desist orders (unlicensed contractors)",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "North Dakota Secretary of State contractor licenses",
+       "section": "licenses",
+       "cell": "found 1"
+      },
+      {
+       "source": "North Dakota State Electrical Board",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "North Dakota State Plumbing Board licenses",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this lookup has no business name search)"
+      },
+      {
+       "source": "North Dakota Secretary of State business entity status",
+       "section": "records",
+       "cell": "found 2"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 1 license record(s) and 2 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "person",
+     "name": "AUSTIN SMITH",
+     "kind": "person",
+     "golden": {
+      "role": "person",
+      "name": "AUSTIN SMITH",
+      "kind": "person",
+      "source": "North Dakota State Electrical Board",
+      "sourceId": "https://www.ndseb.com/search-1/lookup-a-licensedorregistered-electrician/",
+      "from": "live lookup, search \"Smith\"",
+      "recordId": "A 16547",
+      "expected": {
+       "kind": "license",
+       "source": "North Dakota State Electrical Board electricians",
+       "licenseNumber": "A 16547",
+       "businessName": null,
+       "person": "AUSTIN SMITH",
+       "matchedOn": "principal"
+      },
+      "picked": "2026-10-15"
+     },
+     "ms": 5528,
+     "found": true,
+     "where": "licenses: North Dakota State Electrical Board electricians",
+     "cells": [
+      {
+       "source": "North Dakota Attorney General cease and desist orders (unlicensed contractors)",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      },
+      {
+       "source": "North Dakota Secretary of State contractor licenses",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this lookup has no person name search)"
+      },
+      {
+       "source": "North Dakota State Electrical Board",
+       "section": "licenses",
+       "cell": "found 3"
+      },
+      {
+       "source": "North Dakota State Plumbing Board licenses",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "North Dakota Secretary of State business entity status",
+       "section": "records",
+       "cell": "n/a (companies only)"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 3 license record(s). Not searched: permit portals, consumer complaints, state enforcement records, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    },
+    {
+     "role": "enforcement",
+     "name": "Tri City Building Services",
+     "kind": "company",
+     "golden": {
+      "role": "enforcement",
+      "name": "Tri City Building Services",
+      "kind": "company",
+      "source": "North Dakota Attorney General cease and desist orders (unlicensed contractors)",
+      "sourceId": "nd-ag-cease-desist",
+      "from": "bulk file nd-ag-cease-desist, loaded 2026-10-16",
+      "recordId": null,
+      "expected": {
+       "kind": "enforcement",
+       "source": "North Dakota Attorney General cease and desist orders (unlicensed contractors)",
+       "id": null,
+       "name": "Tri City Building Services",
+       "category": "discipline"
+      },
+      "picked": "2026-10-16"
+     },
+     "ms": 2045,
+     "found": true,
+     "where": "enforcement: North Dakota Attorney General cease and desist orders (unlicensed contractors)",
+     "cells": [
+      {
+       "source": "North Dakota Attorney General cease and desist orders (unlicensed contractors)",
+       "section": "records",
+       "cell": "found 1"
+      },
+      {
+       "source": "North Dakota Secretary of State contractor licenses",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "North Dakota State Electrical Board",
+       "section": "licenses",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "North Dakota State Plumbing Board licenses",
+       "section": "licenses",
+       "cell": "not searched (Not searched: this lookup has no business name search)"
+      },
+      {
+       "source": "North Dakota Secretary of State business entity status",
+       "section": "records",
+       "cell": "searched, 0"
+      },
+      {
+       "source": "SAM.gov federal exclusions and debarments (Public V2 extract)",
+       "section": "records",
+       "cell": "searched, 0"
+      }
+     ],
+     "issues": [],
+     "summary": "Found 0 license record(s) and 1 state enforcement or standing record(s). Not searched: permit portals, consumer complaints, federal court cases and OSHA inspections.",
+     "publisherLinks": []
+    }
+   ],
+   "nulls": [
+    {
+     "role": "enforcement",
+     "reason": "No usable record of a company with an enforcement or discipline record found in: North Dakota Secretary of State business entity status; ND original enforcement"
+    }
+   ],
+   "loads": [],
+   "issues": []
+  }
+ ],
+ "issues": [
+  {
+   "severity": "slow",
+   "state": "NC",
+   "source": "report",
+   "subject": "person \"John B. Smith\"",
+   "detail": "report took 335s (limit 300s)"
+  }
+ ]
+}

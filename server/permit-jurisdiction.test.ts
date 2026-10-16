@@ -138,7 +138,8 @@ describe("city / county name collisions in the shipped directory data", () => {
     ["Orange", "TX", true, false, "own", ["Orange, TX"]],              // and no longer "West Orange"
     ["Delaware", "OH", true, false, "own", ["Delaware, OH"]],
     ["Appling", "GA", false, true, "routed", ["Columbia County, GA"]], // was Appling County
-    ["Monroe", "IN", false, true, "routed", ["Adams County, IN"]],     // was Monroe County
+    // was Monroe County; now its own county's office (Adams), since its route came from an IN.gov report (A14: removed)
+    ["Monroe", "IN", false, true, "county", ["Adams County, IN"]],
     ["Madison", "TN", false, true, "routed", ["Davidson County, TN"]], // was Madison County + Madisonville
     ["Evangeline", "LA", false, true, "routed", ["Acadia Parish, LA"]],
     ["Franklin", "GA", false, true, "county", ["Heard County, GA"]],   // was Franklin County

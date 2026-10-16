@@ -1849,6 +1849,40 @@
       "matchedOn": "principal"
      },
      "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Hi-Tech Irrigation Service, Inc.",
+     "kind": "company",
+     "source": "NC Irrigation Contractors' Licensing Board disciplinary actions",
+     "sourceId": "nc-iclb-discipline",
+     "from": "bulk file nc-iclb-discipline, loaded 2026-10-16",
+     "recordId": "U13-032",
+     "expected": {
+      "kind": "enforcement",
+      "source": "NC Irrigation Contractors' Licensing Board disciplinary actions",
+      "id": "U13-032",
+      "name": "Hi-Tech Irrigation Service, Inc.",
+      "category": "discipline"
+     },
+     "picked": "2026-10-16"
+    },
+    {
+     "role": "enforcement",
+     "name": "Cox Lawn, LLC",
+     "kind": "company",
+     "source": "NC Landscape Contractors' Licensing Board enforcement actions",
+     "sourceId": "nc-lclb-enforcement",
+     "from": "bulk file nc-lclb-enforcement, loaded 2026-10-16",
+     "recordId": "22.158.U",
+     "expected": {
+      "kind": "enforcement",
+      "source": "NC Landscape Contractors' Licensing Board enforcement actions",
+      "id": "22.158.U",
+      "name": "Cox Lawn, LLC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-16"
     }
    ]
   },
@@ -1900,6 +1934,23 @@
       "matchedOn": "principal"
      },
      "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Tri City Building Services",
+     "kind": "company",
+     "source": "North Dakota Attorney General cease and desist orders (unlicensed contractors)",
+     "sourceId": "nd-ag-cease-desist",
+     "from": "bulk file nd-ag-cease-desist, loaded 2026-10-16",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "North Dakota Attorney General cease and desist orders (unlicensed contractors)",
+      "id": null,
+      "name": "Tri City Building Services",
+      "category": "discipline"
+     },
+     "picked": "2026-10-16"
     }
    ]
   },
