@@ -281,4 +281,11 @@ describe("California CSLB files without header rows (CSLB, 2026-10-16)", () => {
     await expect(all(cslbRows(master, personnel))).rejects.toThrow(/no header row, and 51 columns where the known layout has 52/);
     await Promise.all([master, personnel].map((p) => fs.rm(p)));
   });
+
+  it("fails the load when a file is cut off mid-row", async () => {
+    const master = await file(MASTER);
+    const personnel = await file(headless(PERSONNEL).replace(/\n[^\n]*\n$/, "\n88,06/27/2004,Class/Title,15972, Principal| AKA, BRUNS\n"));
+    await expect(all(cslbRows(master, personnel))).rejects.toThrow(/a row of 6 columns where the layout has 19 \(file cut off\?\)/);
+    await Promise.all([master, personnel].map((p) => fs.rm(p)));
+  });
 });

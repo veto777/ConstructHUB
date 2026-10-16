@@ -681,7 +681,7 @@ async function* parseCsv(chunks: AsyncIterable<Buffer>, dec: TextDecoder, delimi
 
 /**
  * Rows as objects keyed by the header row. With `known`, a file whose first row is not that header is read with it
- * (CSLB dropped its header rows on 2026-10-16); a row count of columns other than the known header's fails the load.
+ * (CSLB dropped its header rows on 2026-10-16), and any row with another number of columns fails the load.
  */
 export async function* csvRecords(path: string, delimiter = ",", known?: string[]): AsyncIterable<Record<string, string>> {
   yield* recordsOf(csvRows(path, delimiter), known);
@@ -702,6 +702,9 @@ async function* recordsOf(rows: AsyncIterable<string[]>, known?: string[]): Asyn
       header = known;
     }
     if (r.length === 1 && r[0] === "") continue;
+    // A known layout is held to on every row: a short one is a file cut off mid-row (CSLB ends a slow download at
+    // about 150 s without an error; PersonnelData on 2026-10-16 stopped at 21.9 MB of ~86 MB, mid-row).
+    if (known && r.length !== header.length) throw new Error(`a row of ${r.length} columns where the layout has ${header.length} (file cut off?)`);
     const o: Record<string, string> = {};
     header.forEach((h, i) => { o[h] = (r[i] ?? "").trim(); });
     yield o;
