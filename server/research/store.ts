@@ -6,6 +6,7 @@
 import { pool } from "../db";
 import { reportHit } from "./privacy";
 import { ALL_BULK_SOURCES } from "./registry";
+import { WITHDRAWN_REPORT_SOURCES } from "./bulk";
 import { localityOf } from "./identifiers";
 import { licenseRef } from "./xref";
 import { looksLikeBusiness, personNameForm } from "./states/lib/business-name";
@@ -161,6 +162,9 @@ export function reportTotals(subjects: ResearchSubjectReport[]): ResearchReport[
   };
 }
 
+/** The line a saved report shows when shownReport left out a withdrawn source's records. */
+export const WITHDRAWN_NOTE = "A source was withdrawn after this report was made, so its records are no longer shown here.";
+
 /** What a person's report says about company-only records (the runner's own line for a person). */
 const PERSON_RECORD_SOURCES: NonNullable<ResearchSubjectReport["recordSources"]> = [{ source: "Complaints, lawsuits, enforcement and OSHA records", scope: "", searched: false, note: "Searched for companies only, not for individual people" }];
 
@@ -178,10 +182,31 @@ export function shownReport(r: ResearchReport | null): ResearchReport | null {
   const version = r.snapshotVersion ?? 1;
   // Before version 2 holders are recomputed (A10, decision 5); before version 3 enforcement subjects and contacts too
   // (round 6, decision 4).
-  const legacyHolders = version < 2, legacyContacts = version < 3;
+  const legacyHolders = version < 2, legacyContacts = version < 3, legacyRules = version < 4;
   const show = (h: LicenseHit, kind: "person" | "company") => reportHit(legacyHolders ? legacyReportHolder(h) : h, kind);
-  const enforcement = (list: EnforcementHit[] | undefined) => list && (legacyContacts ? list.map(legacyReportEnforcement).filter((e): e is EnforcementHit => !!e) : list);
-  const subjects = r.subjects.map((s): ResearchSubjectReport => {
+  // Before version 4 each enforcement record is checked again by its source's current rule (round 8, finding 1: an SD
+  // lien whose owner was a business only by "Brothers" is a person's and is dropped).
+  legacySubjects ??= new Map(ALL_BULK_SOURCES.filter((s) => s.legacyEnforcement).map((s) => [s.label, s.legacyEnforcement!]));
+  const recheck = (h: EnforcementHit): EnforcementHit | null => { const rule = legacySubjects!.get(h.source); return rule ? rule(h, 0) : h; };
+  const enforcement = (list: EnforcementHit[] | undefined) => list && (legacyContacts ? list.map(legacyReportEnforcement).filter((e): e is EnforcementHit => !!e)
+    : legacyRules ? list.map(recheck).filter((e): e is EnforcementHit => !!e) : list);
+  const subjects = r.subjects.map((raw): ResearchSubjectReport => {
+    // Records and source lines of a source withdrawn after the report was made are not shown (round 8, finding 4).
+    let withdrawn = false;
+    const keep = <T extends { source: string }>(list: T[] | undefined): T[] | undefined => {
+      if (!list) return list;
+      const kept = list.filter((x) => !WITHDRAWN_REPORT_SOURCES.has(x.source));
+      if (kept.length !== list.length) withdrawn = true;
+      return kept;
+    };
+    const s: ResearchSubjectReport = {
+      ...raw, licenses: keep(raw.licenses)!, licenseSources: keep(raw.licenseSources)!,
+      ...(raw.relatedLicenses ? { relatedLicenses: keep(raw.relatedLicenses) } : {}),
+      ...(raw.enforcement ? { enforcement: keep(raw.enforcement) } : {}),
+      ...(raw.relatedEnforcement ? { relatedEnforcement: keep(raw.relatedEnforcement) } : {}),
+      ...(raw.recordSources ? { recordSources: keep(raw.recordSources) } : {}),
+    };
+    if (withdrawn) s.withdrawnNote = WITHDRAWN_NOTE;
     const person = s.kind === "person";
     const licenses = s.licenses.map((h) => show(h, s.kind));
     // Each of the subject's own records as relationship prose names it, with the phone and street the report shows on

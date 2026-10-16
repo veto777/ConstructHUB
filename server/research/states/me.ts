@@ -29,7 +29,7 @@ import { politeFetch } from "../http";
 import { clean } from "../bulk";
 import { flipPerson } from "../person-name";
 import { capNote, withNote } from "../notes";
-import { text } from "./lib/g4-html";
+import { htmlPerson, text } from "./lib/g4-html";
 import type { LiveLicenseSearch, StatePack } from "./types";
 
 const DEP = "https://www.maine.gov/dep/waste";
@@ -41,36 +41,49 @@ const MAX = 15;
 const CACHE_MS = 3600_000;
 const cache = new Map<string, { at: number; html: string }>();
 
-async function page(url: string, label: string): Promise<string> {
+/**
+ * A page, cached for an hour only once `check` has read it whole (round 8, finding 7): an unreadable or partial page
+ * is an error (the source reads "not searched"), never a cached empty list.
+ */
+async function page(url: string, label: string, check: (html: string) => unknown): Promise<string> {
   const c = cache.get(url);
   if (c && Date.now() - c.at < CACHE_MS) return c.html;
   const res = await politeFetch(url, {}, { minDelayMs: 1000 });
   if (!res.ok) throw new Error(`${label} returned HTTP ${res.status}`);
   const html = await res.text();
+  try { check(html); } catch (err: any) { throw new Error(`${label}: the source answered with an unreadable page (${String(err?.message ?? err).slice(0, 120)})`); }
   cache.set(url, { at: Date.now(), html });
   return html;
 }
 
 /** For tests: forget the cached pages. */
 export const clearMaineCache = () => cache.clear();
+/** For tests with small fixture pages: the per-list row floors (null: the real ones). */
+let floorOverride: number | null = null;
+export const setMaineFloorForTests = (n: number | null) => { floorOverride = n; };
+const floor = (n: number) => floorOverride ?? n;
 
 /**
- * The one table of a page as records keyed by its own <th> headers. The headers must be exactly the expected ones:
- * a page whose columns changed is an error, never a silently mis-read table.
+ * The one table of a page as records keyed by its own <th> headers. The headers must be exactly the expected ones,
+ * and every data row must have exactly those cells, with at least `minRows` rows (round 8, finding 7): a page whose
+ * columns changed, a malformed row or a near-empty list is an error, never a silently mis-read table. Person columns
+ * are read with htmlPerson (round 8, finding 2): a <br> or block boundary between two names stays a list.
  */
-export function headedTable(html: string, expected: string[]): Record<string, string | null>[] {
+export function headedTable(html: string, expected: string[], opts: { person?: string[]; minRows?: number } = {}): Record<string, string | null>[] {
   const table = html.match(/<table[^>]*>([\s\S]*?)<\/table>/i)?.[1];
   if (!table) throw new Error("the page has no table");
   const head = Array.from(table.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi)).map((m) => text(m[1]) ?? "");
   if (head.join("|") !== expected.join("|")) throw new Error(`the table's columns changed (${head.join(", ")})`);
   const out: Record<string, string | null>[] = [];
   for (const m of Array.from(table.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi))) {
-    const cells = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((c) => text(c[1]));
-    if (cells.length !== expected.length) continue;
+    const raw = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((c) => c[1]);
+    if (!raw.length) continue; // the header row
+    if (raw.length !== expected.length) throw new Error(`a row has ${raw.length} cells, not ${expected.length}`);
     const rec: Record<string, string | null> = {};
-    expected.forEach((h, i) => { rec[h] = cells[i]; });
+    expected.forEach((h, i) => { rec[h] = opts.person?.includes(h) ? htmlPerson(raw[i]) : text(raw[i]); });
     out.push(rec);
   }
+  if (out.length < (opts.minRows ?? 1)) throw new Error(`only ${out.length} rows (at least ${opts.minRows ?? 1} expected)`);
   return out;
 }
 
@@ -78,13 +91,14 @@ export function headedTable(html: string, expected: string[]): Record<string, st
 
 const ASBESTOS_COLUMNS = ["Business Name", "Address", "City", "State", "Zip", "Phone"];
 const ASBESTOS_SOURCE = "Maine DEP licensed asbestos abatement contractors and consultants";
+// Rows on 2026-10-15: 71 contractors, 62 consultants; a page with fewer than the floor is not read.
 const ASBESTOS_LISTS = [
-  { url: ASBESTOS_CONTRACTORS, type: "Asbestos abatement contractor" },
-  { url: ASBESTOS_CONSULTANTS, type: "Asbestos consultant" },
+  { url: ASBESTOS_CONTRACTORS, type: "Asbestos abatement contractor", minRows: 35 },
+  { url: ASBESTOS_CONSULTANTS, type: "Asbestos consultant", minRows: 30 },
 ];
 
-export function asbestosHits(html: string, url: string, type: string, matchedOn: LicenseHit["matchedOn"] = "business"): LicenseHit[] {
-  return headedTable(html, ASBESTOS_COLUMNS).filter((r) => r["Business Name"]).map((r) => {
+export function asbestosHits(html: string, url: string, type: string, matchedOn: LicenseHit["matchedOn"] = "business", minRows = 1): LicenseHit[] {
+  return headedTable(html, ASBESTOS_COLUMNS, { minRows }).filter((r) => r["Business Name"]).map((r) => {
     const locality = [r.City, [r.State, r.Zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
     return {
       state: "ME", source: ASBESTOS_SOURCE, sourceUrl: url, businessName: r["Business Name"], licenseNumber: null,
@@ -98,7 +112,10 @@ export function asbestosHits(html: string, url: string, type: string, matchedOn:
 
 async function asbestosAll(matchedOn: LicenseHit["matchedOn"]): Promise<LicenseHit[]> {
   const out: LicenseHit[] = [];
-  for (const l of ASBESTOS_LISTS) out.push(...asbestosHits(await page(l.url, "Maine DEP asbestos list"), l.url, l.type, matchedOn));
+  for (const l of ASBESTOS_LISTS) {
+    const html = await page(l.url, "Maine DEP asbestos list", (h) => asbestosHits(h, l.url, l.type, matchedOn, floor(l.minRows)));
+    out.push(...asbestosHits(html, l.url, l.type, matchedOn, floor(l.minRows)));
+  }
   return out;
 }
 
@@ -132,9 +149,12 @@ export function ustPerson(v: string | null): string | null {
   return flipPerson(v);
 }
 
-export function ustHits(html: string, matchedOn: LicenseHit["matchedOn"] = "principal"): LicenseHit[] {
+/** Rows on 2026-10-15: 95; a page with fewer than this is not read. */
+const UST_MIN_ROWS = 45;
+
+export function ustHits(html: string, matchedOn: LicenseHit["matchedOn"] = "principal", minRows = 1): LicenseHit[] {
   const out: LicenseHit[] = [];
-  for (const r of headedTable(html, UST_COLUMNS)) {
+  for (const r of headedTable(html, UST_COLUMNS, { person: ["Name"], minRows })) {
     const raw = r.Name;
     if (!raw) continue;
     const marks = Array.from(raw.matchAll(/\(\s*([^)]+?)\s*\)/g)).map((m) => m[1]);
@@ -157,7 +177,7 @@ export function ustHits(html: string, matchedOn: LicenseHit["matchedOn"] = "prin
 }
 
 async function ustSearch(name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
-  const html = await page(UST_INSTALLERS, "Maine DEP tank installer list");
+  const html = await page(UST_INSTALLERS, "Maine DEP tank installer list", (h) => ustHits(h, "principal", floor(UST_MIN_ROWS)));
   const found = kind === "company"
     ? ustHits(html, "business").filter((h) => companyNamed(name, h.businessName))
     : ustHits(html, "principal").filter((h) => personMatches(name, h.principal));

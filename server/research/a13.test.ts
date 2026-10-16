@@ -83,7 +83,7 @@ describe("Ohio AG Public Inspection File", () => {
     expect(opifSuppliers("SMITH, JOHN")).toEqual([]);
     const [, row] = parseOpifResults(OPIF_RESULTS).rows;
     const h = opifHit(row, "Howard Smith Construction", parseOpifDetail(OPIF_DETAIL));
-    expect(h).toMatchObject({ state: "OH", category: "court_case", name: "Howard Smith Construction", id: "10001077", date: "1990-01-24", city: "Hamilton County, OH", adverse: true });
+    expect(h).toMatchObject({ state: "OH", category: "court_case", name: "Howard Smith Construction", id: "10001077 (issue 1076)", date: "1990-01-24", city: "Hamilton County, OH", adverse: true });
     expect(h.sourceUrl).toBe("https://opif.ohioattorneygeneral.gov/Case/Detail/1076");
     expect(JSON.stringify(h)).not.toMatch(/Celebrezze v\. Smith/);
   });

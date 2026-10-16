@@ -2,7 +2,8 @@
  * Is this name a business or a person? (audit 2026-10-15, decision 5). Enforcement records are kept for companies
  * only (FCRA), so a pack that reads names from a roster or a PDF must not take "David Power" for a business. A name
  * counts as a business only when it carries
- *   - a corporate suffix (Inc, LLC, Corp, Co, Company, Ltd, LP, LLP, PLLC, PC, PA) or "& Sons"/"Bros", or
+ *   - a corporate suffix (Inc, LLC, Corp, Co, Company, Ltd, LP, LLP, PLLC, PC, PA) or "& Sons"/"Bros"/"& Brothers"
+ *     (never "Brothers" alone, a surname), or
  *   - a "dba" / "d/b/a" / "doing business as" form, or
  *   - a trade or business word that is not a common surname (Electric, Plumbing, Construction, Services, …), as a
  *     WHOLE word ("Roofing" counts, "Roofner" does not; audit round 2, decision 3), or
@@ -16,7 +17,8 @@
  */
 
 const SUFFIX = /\b(?:inc|incorporated|llc|l\s?l\s?c|corp|corporation|co|company|companies|ltd|limited|lp|llp|lllp|pllc|pc|p\s?c|pa|plc|na|assn|association|cooperative|co-op)\b\.?/i;
-const FAMILY = /&\s*sons?\b|\band sons?\b|\bbros\b|\bbrothers\b/i;
+// "Brothers" alone is a surname ("JOHN BROTHERS"); only "& Brothers"/"and Brothers" is a business form (round 8, finding 1).
+const FAMILY = /&\s*sons?\b|\band sons?\b|\bbros\b|&\s*brothers\b|\band brothers\b/i;
 const DBA = /\bd\/?b\/?a\b|\bdoing business as\b|\ba\/k\/a\b|\bt\/a\b|\btrading as\b/i;
 /**
  * Trade and business words that are not common U.S. surnames. Words that are surnames as well (Power, Mason,

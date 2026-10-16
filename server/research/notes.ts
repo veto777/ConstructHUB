@@ -35,11 +35,15 @@ export function safeDecode(v: string): string {
  * Why a source couldn't be searched, in the words a customer reads (acceptance run, 2026-10-15). An access refusal
  * (a robots.txt that refuses or can't be read, a bot challenge, a 401/403, a host blocked earlier in the run, a wait
  * too long to take) is "the site refused automated access" (or, for a robots.txt rule, that robots.txt doesn't allow
- * it), not a technical error; anything else is the error itself.
+ * it), not a technical error; an unreadable answer is "the source answered with an unreadable page"; anything else is
+ * the error itself.
  */
 export function failureReason(err: unknown): { refused: boolean; reason: string } {
   const msg = String((err as { message?: unknown } | null)?.message ?? err);
   if (/robots\.txt disallows|which robots\.txt does not allow/i.test(msg)) return { refused: true, reason: "the site's robots.txt does not allow automated searches" };
+  // An answer that isn't the source's own success page (an error body, a malformed or partial table) is not a search:
+  // "not searched", never 0 matches (round 8, finding 7).
+  if (/the source answered with an unreadable page/i.test(msg)) return { refused: true, reason: "the source answered with an unreadable page" };
   const blocked = (err as { name?: unknown } | null)?.name === "PortalBlockedError";
   if (blocked || /robots\.txt|bot challenge|denied access earlier|ERR_BLOCKED_BY_CLIENT/i.test(msg)) return { refused: true, reason: "the site refused automated access" };
   return { refused: false, reason: msg.slice(0, 200) };

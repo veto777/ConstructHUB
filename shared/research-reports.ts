@@ -229,14 +229,18 @@ export type ResearchSubjectReport = {
   relatedEnforcement?: EnforcementHit[];
   /** What the cross-reference pass searched, and what it left out (caps, ties too common to mean anything). */
   relatedNotes?: string[];
+  /** Set when shownReport dropped records of a source withdrawn after the report was made (round 8, finding 4). */
+  withdrawnNote?: string;
 };
 
 /**
  * The version of the rules a stored report was made under (A10, decision 5). 2: license holders are the publisher's
  * own (round 3) and recomputed for old bulk rows (round 4). A report without it is older: shown with today's rules,
- * and a holder it can't verify is treated as unknown (server/research/store.ts shownReport).
+ * and a holder it can't verify is treated as unknown (server/research/store.ts shownReport). 3: enforcement subjects
+ * and contacts under round 6's rules. 4: every source's enforcement rule as of round 8 (an older report's records are
+ * checked again by their source's current rule).
  */
-export const REPORT_SNAPSHOT_VERSION = 3;
+export const REPORT_SNAPSHOT_VERSION = 4;
 /*
  * 3 (round 6, decision 4): enforcement subjects and contacts follow today's rules, and relationship prose names a phone
  * or street only when it is one the report shows. An older report has its enforcement records checked again and their

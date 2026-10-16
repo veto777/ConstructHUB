@@ -16,7 +16,7 @@
 import { flipPerson, personText } from "../person-name";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { politeFetch, rethrowIfBlocked } from "../http";
-import { tokens, wholeWordMatch } from "../licenses";
+import { dbaNames, tokens, wholeWordMatch } from "../licenses";
 import { clean } from "../bulk";
 import type { BulkHit, BulkSource } from "../bulk";
 import { normLicense, type IdQuery } from "../identifiers";
@@ -127,9 +127,8 @@ async function nscbSearch(by: "1" | "2" | "12", fields: Record<string, string>, 
   return withNscbDetails(s, res, parseNscbLicenses(res.html, kind).filter(keep));
 }
 
-/** "LEGAL NAME dba TRADE NAME" as its names; a name without "dba" (or "d/b/a", "aka") is itself. */
-export const nscbCompanyNames = (name: string): string[] =>
-  name.split(/\s+(?:dba|d\/b\/a|aka)\s+/i).map((n) => n.trim()).filter((n) => n.length >= 2);
+/** "LEGAL NAME dba TRADE NAME" as its names (the shared dbaNames, without the whole); any other name is itself. */
+export const nscbCompanyNames = (name: string): string[] => { const all = dbaNames(name); return all.length > 1 ? all.slice(1) : all; };
 
 /**
  * The person-search fields: first name and last name, as the board's form takes them. A middle name or initial and a

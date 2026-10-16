@@ -128,7 +128,7 @@ export const KEY_VERSION = 3;
  * enforcement subject checked again (BulkSource.legacyEnforcement, or the business-name rule), since the rule that
  * let it in has changed. Raise it when a classifier changes.
  */
-export const PAYLOAD_VERSION = 6;
+export const PAYLOAD_VERSION = 7;
 /*
  * Version 4 (round 4, decision 4): a Florida DBA needs a DBA marker, and entity abbreviations count only as the
  * name's last word. Older complaint rows are re-read by flLegacyComplaint.
@@ -136,6 +136,8 @@ export const PAYLOAD_VERSION = 6;
  * business. Only FL complaints re-reads its version-4 rows (its enforcementRuleVersion is 5).
  * Version 6 (round 6, decision 2): an FL "SURNAME SURNAME, FIRST" form is ambiguous whatever its words ("SMITH JONES,
  * GENERAL H"). FL complaints re-reads its version-4 and -5 rows (enforcementRuleVersion 6).
+ * Version 7 (round 8, finding 1): "Brothers" alone is no longer a business form. SD tax liens re-read older rows
+ * (enforcementRuleVersion 7, sdLegacyLien): an individual owner's lien, DBA or not, is dropped.
  */
 
 /** The version from which an enforcement row is current for a source that sets no enforcementRuleVersion of its own. */
@@ -285,10 +287,11 @@ async function loadSourceRun(src: BulkSource): Promise<number> {
 /** One pass of purgeLegacyKeys reads this many table pages at a time (a TID range scan: about 2,000 rows, no sort). */
 const PURGE_PAGES = 200;
 /** Bump to run the purge again under a newer rule. */
-export const PURGE_JOB = "purge-legacy-contact-keys-v2";
+export const PURGE_JOB = "purge-legacy-contact-keys-v3";
 /*
  * v2 (round 6, decision 2): FL complaint rows stored before PAYLOAD_VERSION 6 whose respondent is now an ambiguous
  * personal form lose their street keys too.
+ * v3 (round 8, finding 1): SD tax-lien rows of an individual owner (a DBA included) lose their street keys.
  */
 
 /**
@@ -353,6 +356,24 @@ export async function purgeLegacyKeys(sources: BulkSource[], log = (m: string) =
  * registered", so a source switched off by configuration keeps its rows.
  */
 export const RETIRED_BULK_SOURCES: readonly string[] = ["mo-dpr-ae", "mo-dpr-electrical", "pa-pittsburgh", "sc-des-enforcement", "wv-purchasing-debarred", "wi-dnr-wells", "wi-dhs-abatement"];
+
+/**
+ * The names saved reports show for withdrawn sources (round 8, finding 4): each retired bulk source's records (as their
+ * `source` field reads; WI DHS and Pittsburgh wrote one name per file) and the live lookups removed since reports were
+ * first sold (Alaska DCCED: robots.txt now a challenge; WV Division of Labor: robots.txt answers 500). A saved report
+ * no longer shows their records (store.ts shownReport).
+ */
+export const WITHDRAWN_REPORT_SOURCES: ReadonlySet<string> = new Set([
+  "Missouri architects, engineers, land surveyors and landscape architects (active)", // mo-dpr-ae
+  "Missouri statewide electrical contractor licenses (active)", // mo-dpr-electrical
+  "Pittsburgh PLI licensed contractors", "Pittsburgh PLI trade licenses", // pa-pittsburgh
+  "South Carolina DES environmental enforcement orders", // sc-des-enforcement
+  "WV Purchasing Division debarred vendors", // wv-purchasing-debarred
+  "Wisconsin DNR licensed well drillers and pump installers", // wi-dnr-wells
+  "Wisconsin DHS certified lead companies", "Wisconsin DHS certified asbestos companies", "Wisconsin DHS certified lead and asbestos companies", // wi-dhs-abatement
+  "Alaska DCCED business licenses", // live, removed
+  "WV Division of Labor certified plumbers", "WV Division of Labor certified HVAC technicians", // live, removed
+]);
 
 /**
  * Deletes the stored rows and the load record of each retired source that is not registered, in batches of 5,000 rows

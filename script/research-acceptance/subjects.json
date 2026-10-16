@@ -1108,28 +1108,28 @@
   },
   {
    "state": "MD",
-   "picked": "2026-10-15",
+   "picked": "2026-10-16",
    "subjects": [
     {
      "role": "company",
-     "name": "VC Homes LLC",
+     "name": "CRESCENDO BUILDERS, LLC",
      "kind": "company",
      "source": "Montgomery County building contractor licenses",
      "sourceId": "https://data.montgomerycountymd.gov/d/c7hs-c9qq",
-     "from": "Socrata dataset https://data.montgomerycountymd.gov/d/c7hs-c9qq, row BC232328 (the publisher lists no status: a list of current licenses)",
-     "recordId": "BC232328",
+     "from": "Socrata dataset https://data.montgomerycountymd.gov/d/c7hs-c9qq, row BC3955 (the publisher lists no status: a list of current licenses)",
+     "recordId": "BC3955",
      "expected": {
       "kind": "license",
       "source": "Montgomery County building contractor licenses",
-      "licenseNumber": "BC232328",
-      "businessName": "VC Homes LLC",
+      "licenseNumber": "BC3955",
+      "businessName": "CRESCENDO BUILDERS, LLC",
       "matchedOn": "business"
      },
-     "picked": "2026-10-15"
+     "picked": "2026-10-16"
     },
     {
      "role": "enforcement",
-     "name": "Val Construction Co., Inc.",
+     "name": "Computer Health Associates, Inc.",
      "kind": "company",
      "source": "Maryland Board of Public Works debarments",
      "sourceId": "md-bpw-debarments",
@@ -1139,28 +1139,28 @@
       "kind": "enforcement",
       "source": "Maryland Board of Public Works debarments",
       "id": null,
-      "name": "Val Construction Co., Inc.",
+      "name": "Computer Health Associates, Inc.",
       "category": "debarment"
      },
-     "picked": "2026-10-15"
+     "picked": "2026-10-16"
     },
     {
      "role": "person",
-     "name": "INC. A. R. DESIGN GROUP",
+     "name": "R. KENDALL ALLEN",
      "kind": "person",
      "source": "Montgomery County building contractor licenses",
      "sourceId": "https://data.montgomerycountymd.gov/d/c7hs-c9qq",
-     "from": "Socrata dataset https://data.montgomerycountymd.gov/d/c7hs-c9qq, row BC3760",
-     "recordId": "BC3760",
+     "from": "Socrata dataset https://data.montgomerycountymd.gov/d/c7hs-c9qq, row BC3230",
+     "recordId": "BC3230",
      "expected": {
       "kind": "license",
       "source": "Montgomery County building contractor licenses",
-      "licenseNumber": "BC3760",
-      "businessName": "A. R. DESIGN GROUP, INC.",
-      "person": "INC. A. R. DESIGN GROUP",
+      "licenseNumber": "BC3230",
+      "businessName": null,
+      "person": "R. KENDALL ALLEN",
       "matchedOn": "principal"
      },
-     "picked": "2026-10-15"
+     "picked": "2026-10-16"
     }
    ]
   },
@@ -1956,42 +1956,24 @@
   },
   {
    "state": "OH",
-   "picked": "2026-10-15",
+   "picked": "2026-10-16",
    "subjects": [
     {
      "role": "company",
-     "name": "M C SERVICES INC",
+     "name": "KAVOD MECHANICAL SERVICE LLC",
      "kind": "company",
      "source": "Ohio Construction Industry Licensing Board contractor licenses",
      "sourceId": "oh-ocilb",
      "from": "bulk file oh-ocilb, loaded 2026-10-15",
-     "recordId": "EL.19185",
+     "recordId": "RE.51759",
      "expected": {
       "kind": "license",
       "source": "Ohio Construction Industry Licensing Board contractor licenses",
-      "licenseNumber": "EL.19185",
-      "businessName": "M C SERVICES INC",
+      "licenseNumber": "RE.51759",
+      "businessName": "KAVOD MECHANICAL SERVICE LLC",
       "matchedOn": "business"
      },
-     "picked": "2026-10-15"
-    },
-    {
-     "role": "person",
-     "name": "ANTHONY PATRICK",
-     "kind": "person",
-     "source": "Ohio Construction Industry Licensing Board contractor licenses",
-     "sourceId": "oh-ocilb",
-     "from": "bulk file oh-ocilb, loaded 2026-10-15",
-     "recordId": "EL.35300",
-     "expected": {
-      "kind": "license",
-      "source": "Ohio Construction Industry Licensing Board contractor licenses",
-      "licenseNumber": "EL.35300",
-      "businessName": "TNT ELECTRIC",
-      "person": "ANTHONY PATRICK",
-      "matchedOn": "principal"
-     },
-     "picked": "2026-10-15"
+     "picked": "2026-10-16"
     },
     {
      "role": "enforcement",
@@ -2000,15 +1982,33 @@
      "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
      "sourceId": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
      "from": "live search \"Construction\"",
-     "recordId": "10000082",
+     "recordId": "10000082 (issue 82)",
      "expected": {
       "kind": "enforcement",
       "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
-      "id": "10000082",
+      "id": "10000082 (issue 82)",
       "name": "Pave-Way Construction Company",
       "category": "court_case"
      },
-     "picked": "2026-10-15"
+     "picked": "2026-10-16"
+    },
+    {
+     "role": "person",
+     "name": "GREG C MULBARGER",
+     "kind": "person",
+     "source": "Ohio Construction Industry Licensing Board contractor licenses",
+     "sourceId": "oh-ocilb",
+     "from": "bulk file oh-ocilb, loaded 2026-10-15",
+     "recordId": "HY.20601",
+     "expected": {
+      "kind": "license",
+      "source": "Ohio Construction Industry Licensing Board contractor licenses",
+      "licenseNumber": "HY.20601",
+      "businessName": "MULBARGER PLUMBING LLC",
+      "person": "GREG C MULBARGER",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-16"
     }
    ]
   },

@@ -248,15 +248,27 @@ export function parseUjsCases(html: string): EnforcementHit[] {
   return out;
 }
 
+/**
+ * The latest filing date the form accepts, as the form itself states it (the FiledEndDate field's
+ * data-aopc-defaultMax, the portal's own local date). Today's UTC date was refused after 8 p.m. Eastern ("Date Filed
+ * End Date must be less than …"), and the form came back with no results grid (A15). Without it: yesterday in UTC.
+ */
+export function ujsEndDate(form: string, now = new Date()): string {
+  const field = form.match(/<input[^>]*name="FiledEndDate"[^>]*>/)?.[0] ?? form.match(/<input[^>]*data-aopc-defaultMax="\d{4}-\d{2}-\d{2}"[^>]*name="FiledEndDate"[^>]*>/)?.[0];
+  const max = field?.match(/data-aopc-defaultMax="(\d{4}-\d{2}-\d{2})"/)?.[1];
+  return max ?? new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
+}
+
 async function searchUjs(name: string): Promise<EnforcementHit[]> {
   const q = name.replace(/[^A-Za-z0-9&' .,-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 100);
   if (q.length < 3) return [];
   const page = await politeFetch(UJS, {}, { minDelayMs: 2000 });
   if (!page.ok) throw new Error(`PA UJS portal returned HTTP ${page.status}`);
-  const token = (await page.text()).match(/name="__RequestVerificationToken" type="hidden" value="([^"]+)"/)?.[1];
+  const form = await page.text();
+  const token = form.match(/name="__RequestVerificationToken" type="hidden" value="([^"]+)"/)?.[1];
   if (!token) throw new Error("PA UJS portal search page changed (no form token)");
   const cookie = (page.headers.getSetCookie?.() ?? []).map((c) => c.split(";")[0]).join("; ");
-  const body = new URLSearchParams({ SearchBy: "Organization", OrganizationName: q, FiledStartDate: "1899-01-01", FiledEndDate: new Date().toISOString().slice(0, 10), __RequestVerificationToken: token });
+  const body = new URLSearchParams({ SearchBy: "Organization", OrganizationName: q, FiledStartDate: "1899-01-01", FiledEndDate: ujsEndDate(form), __RequestVerificationToken: token });
   const res = await politeFetch(UJS, { method: "POST", body: body.toString(), headers: { "content-type": "application/x-www-form-urlencoded", referer: UJS, ...(cookie ? { cookie } : {}) } }, { minDelayMs: 2000 });
   if (!res.ok) throw new Error(`PA UJS portal returned HTTP ${res.status}`);
   return parseUjsCases(await res.text());

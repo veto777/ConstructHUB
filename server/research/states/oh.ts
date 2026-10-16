@@ -215,13 +215,30 @@ export function opifHit(row: OpifRow, supplier: string, d: Record<string, string
   const summary = d?.["Issue Summary"] ?? null;
   return {
     state: "OH", source: OPIF_SOURCE, sourceUrl: `${OPIF}/Case/Detail/${row.issueId}`, category: "court_case",
-    name: supplier, id: row.pif, date: mdyDay(d?.["Date in Pif"]), endDate: null,
+    // One id per issue (the PIF number and the issue): two issues of one case never merge (round 8, finding 6).
+    name: supplier, id: `${row.pif} (issue ${row.issueId})`, date: mdyDay(d?.["Date in Pif"]), endDate: null,
     status: "Consumer-law court decision in the Ohio Attorney General's Public Inspection File",
     city: d?.County ? `${d.County} County, OH` : null,
     detail: [row.caseNumber ? `Case ${row.caseNumber}` : null, d?.Court ? `court: ${d.Court}` : null, d?.["Subject Matter"] ? `subject: ${d["Subject Matter"]}` : null,
       d?.Keywords ? `issues: ${d.Keywords}` : null, summary ? `summary: ${summary}` : null].filter(Boolean).join("; ").slice(0, 1000) || null,
     amount: null, adverse: summary ? adverseFrom(summary) : null,
   };
+}
+
+/**
+ * The rows to report: one per issue of a case (each issue has its own page and summary; round 8, finding 6: PIF
+ * 10001171 has issues 1170 and 2328) and per business named as supplier that is the searched name.
+ */
+export function opifPicks(rows: OpifRow[], name: string): { row: OpifRow; supplier: string }[] {
+  const picked: { row: OpifRow; supplier: string }[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) for (const supplier of opifSuppliers(row.supplier)) {
+    const k = `${row.issueId}|${supplier.toUpperCase()}`;
+    if (!companyNamed(name, supplier) || seen.has(k)) continue;
+    seen.add(k);
+    picked.push({ row, supplier });
+  }
+  return picked;
 }
 
 /** The supplier cell's business names ("Jones Paving; Jones Construction"); a person's name is left out (companies only). */
@@ -265,15 +282,7 @@ export async function searchOpif(name: string): Promise<EnforcementHit[]> {
     rows.push(...r.rows);
     if (!r.rows.length || rows.length >= (total ?? 0)) break;
   }
-  // One record per business named as supplier on a case (a case shows once per issue: kept once).
-  const picked: { row: OpifRow; supplier: string }[] = [];
-  const seen = new Set<string>();
-  for (const row of rows) for (const supplier of opifSuppliers(row.supplier)) {
-    const k = `${row.pif}|${supplier.toUpperCase()}`;
-    if (!companyNamed(name, supplier) || seen.has(k)) continue;
-    seen.add(k);
-    picked.push({ row, supplier });
-  }
+  const picked = opifPicks(rows, name);
   const out: EnforcementHit[] = [];
   const pages = new Map<string, Record<string, string | null> | null>();
   for (const [i, { row, supplier }] of picked.entries()) {
@@ -285,7 +294,7 @@ export async function searchOpif(name: string): Promise<EnforcementHit[]> {
   }
   return withNote(out, [
     total != null && rows.length < total ? `read the first ${rows.length} of ${total} cases matching the name` : null,
-    picked.length > OPIF_DETAILS ? `court, date and summary read for the first ${OPIF_DETAILS} of ${picked.length} rulings` : null,
+    picked.length > OPIF_DETAILS ? `court, date and summary read for the first ${OPIF_DETAILS} of ${picked.length} case issues; the others' outcomes are not known` : null,
   ].filter(Boolean).join("; ") || null);
 }
 
