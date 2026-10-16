@@ -180,6 +180,12 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
         newlyAgreed = await store.upsertPartner({ domain: companyDomain(m.fromEmail), contactEmail: m.fromEmail, contactName: m.fromName, d });
         partnerId = newlyAgreed.partner.id;
       }
+      // "Thanks / sounds good": nothing to answer (2026-10-15: Homes&Exterior's thank-you hit the loop limit).
+      if (d.noReplyNeeded && !asksIfAi(m.body)) {
+        await store.finishMessage(m.id, "replied", `No reply needed: ${d.summary || "they closed the loop"} — read by ${d.provider}`, null, partnerId);
+        out.replied++;
+        continue;
+      }
       const problem = replyProblem(d.reply);
       if (asksIfAi(m.body)) { body = personWillReply(first); status = "needs_owner"; reason = "They asked whether we are an AI or a person — a person on the team answers this one"; }
       else if (problem) { body = holdingReply(first); status = "needs_owner"; reason = [problem, d.ownerQuestion, `Drafted by ${d.provider}`].filter(Boolean).join(" — "); }

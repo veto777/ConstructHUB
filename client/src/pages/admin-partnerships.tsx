@@ -4,7 +4,7 @@
  * every email sent and received. The server reads media@ every 30 minutes and answers each email; anything that would
  * cost money waits for the owner. Platform admins only.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { Handshake, Inbox, Loader2, Lock, Mail, MessageSquare, Play, Scale, Send, Sparkles, StickyNote } from "lucide-react";
@@ -44,6 +44,31 @@ const when = (iso: string) => `${format(new Date(iso), "MMM d, yyyy, h:mm a")} (
 const getJson = async <T,>(url: string): Promise<T> => (await apiRequest("GET", url)).json();
 const refresh = () => queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/admin/media-inbox") });
 
+/** Unsent text kept in this browser (owner 2026-10-15: closing the panel by accident erased a reply). */
+function useDraft<T>(key: string, initial: T): [T, (v: T) => void, () => void] {
+  const read = (): T => { try { const v = localStorage.getItem(key); return v ? { ...initial, ...JSON.parse(v) } : initial; } catch { return initial; } };
+  const [v, setV] = useState<T>(read);
+  useEffect(() => { setV(read()); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const set = (next: T) => { setV(next); try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* private window */ } };
+  const clear = () => { setV(initial); try { localStorage.removeItem(key); } catch { /* private window */ } };
+  return [v, set, clear];
+}
+/** A clearly headed block in the company panel, each with its own background so the parts don't blend. */
+function Panel({ title, icon: Icon, tone = "plain", children, testId }: { title: string; icon?: typeof Mail; tone?: "plain" | "reply" | "notes" | "alert"; children: React.ReactNode; testId?: string }) {
+  const tones = {
+    plain: "border-border bg-card",
+    reply: "border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40",
+    notes: "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30",
+    alert: "border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30",
+  } as const;
+  return (
+    <section className={`rounded-xl border p-4 ${tones[tone]}`} data-testid={testId}>
+      <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-foreground">{Icon && <Icon className="h-4 w-4" aria-hidden="true" />}{title}</h3>
+      {children}
+    </section>
+  );
+}
+
 function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onClose: () => void }) {
   const { toast } = useToast();
   const [toFinalize, setToFinalize] = useState<string | null>(null);
@@ -61,45 +86,52 @@ function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onCl
   if (!partner) return null;
   return (
     <Sheet open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="sheet-partner">
+      {/* Only the close button or Esc closes it: a stray click outside never throws away a half-written reply. */}
+      <SheetContent className="w-full overflow-y-auto bg-muted/40 sm:max-w-2xl" onInteractOutside={(e) => e.preventDefault()} data-testid="sheet-partner">
         <SheetHeader>
-          <SheetTitle>{partner.company}</SheetTitle>
-          <SheetDescription>{[partner.domain, MEDIA_PARTNER_KIND_LABELS[partner.kind], partner.contactEmail].filter(Boolean).join(" · ")}</SheetDescription>
+          <SheetTitle className="flex flex-wrap items-center gap-2 text-xl">{partner.company}<StatusPill tone={PARTNER_TONE[partner.status]}>{MEDIA_PARTNER_STATUS_LABELS[partner.status]}</StatusPill></SheetTitle>
+          <SheetDescription className="text-sm text-foreground/70">{[partner.domain, MEDIA_PARTNER_KIND_LABELS[partner.kind], partner.contactEmail].filter(Boolean).join(" · ")}</SheetDescription>
         </SheetHeader>
-        <div className="mt-4 space-y-4 text-sm">
-          <div className="flex flex-wrap gap-2">
-            <Select value={partner.status} onValueChange={(v) => save.mutate({ status: v })}>
-              <SelectTrigger className="w-48" data-testid="select-partner-status"><SelectValue /></SelectTrigger>
-              <SelectContent>{MEDIA_PARTNER_STATUSES.map((s) => <SelectItem key={s} value={s}>{MEDIA_PARTNER_STATUS_LABELS[s]}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={partner.kind} onValueChange={(v) => save.mutate({ kind: v })}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>{MEDIA_PARTNER_KINDS.map((k) => <SelectItem key={k} value={k}>{MEDIA_PARTNER_KIND_LABELS[k]}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          {partner.summary && <p>{partner.summary}</p>}
-          <ContactBox partner={partner} onSave={(b) => save.mutate(b)} saving={save.isPending} />
-          <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2">
-            <dt className="text-muted-foreground">Agreement</dt><dd>{partner.agreement ?? "—"}</dd>
-            <dt className="text-muted-foreground">Cost terms</dt><dd>{partner.costTerms ?? "None mentioned"}</dd>
-            <dt className="text-muted-foreground">Owner decision</dt><dd>{partner.ownerQuestion ?? "—"}</dd>
-            <dt className="text-muted-foreground">Added to</dt><dd>{partner.addedTo ?? "Not yet (added when agreed)"}</dd>
-            <dt className="text-muted-foreground">Agreed</dt><dd>{partner.agreedAt ? ago(partner.agreedAt) : "—"}</dd>
-          </dl>
-          <div>
-            <div className="mb-1 font-medium">What we need to finalize</div>
-            <Textarea rows={3} value={toFinalize ?? partner.toFinalize ?? ""} onChange={(e) => setToFinalize(e.target.value)} data-testid="input-partner-finalize" />
-            {toFinalize !== null && <Button size="sm" className="mt-2" disabled={save.isPending} onClick={() => save.mutate({ toFinalize: toFinalize.trim() || null })}>Save</Button>}
-          </div>
-          <NotesBox partner={partner} />
-          <div>
-            <div className="mb-2 flex items-center gap-2 font-medium"><MessageSquare className="h-4 w-4" aria-hidden="true" />Conversation ({msgs?.total ?? 0})</div>
-            {/* Oldest first, like a mail thread; the newest is open. */}
-            <div className="space-y-2" data-testid="list-partner-thread">
-              {[...(msgs?.rows ?? [])].reverse().map((m, i, all) => <MessageCard key={m.id} m={m} defaultOpen={i === all.length - 1} />)}
+        <div className="mt-4 space-y-4 text-sm text-foreground">
+          {partner.ownerQuestion && (
+            <Panel title="Your call" tone="alert" testId="panel-partner-your-call"><p className="text-sm">{partner.ownerQuestion}</p></Panel>
+          )}
+          <Panel title="Conversation" icon={MessageSquare} testId="panel-partner-conversation">
+            {/* Oldest first, like a mail thread; the newest is open. Ours are blue on the right, theirs white on the left. */}
+            <div className="space-y-3" data-testid="list-partner-thread">
+              {[...(msgs?.rows ?? [])].reverse().map((m, i, all) => <MessageCard key={m.id} m={m} defaultOpen={i === all.length - 1} inThread />)}
+              {msgs && !msgs.rows.length && <p className="text-muted-foreground">No emails yet.</p>}
             </div>
-          </div>
+          </Panel>
           <ReplyBox partner={partner} />
+          <NotesBox partner={partner} />
+          <Panel title="Status and details" icon={Handshake} testId="panel-partner-details">
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Select value={partner.status} onValueChange={(v) => save.mutate({ status: v })}>
+                  <SelectTrigger className="w-48 bg-background" data-testid="select-partner-status"><SelectValue /></SelectTrigger>
+                  <SelectContent>{MEDIA_PARTNER_STATUSES.map((s) => <SelectItem key={s} value={s}>{MEDIA_PARTNER_STATUS_LABELS[s]}</SelectItem>)}</SelectContent>
+                </Select>
+                <Select value={partner.kind} onValueChange={(v) => save.mutate({ kind: v })}>
+                  <SelectTrigger className="w-40 bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent>{MEDIA_PARTNER_KINDS.map((k) => <SelectItem key={k} value={k}>{MEDIA_PARTNER_KIND_LABELS[k]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {partner.summary && <p>{partner.summary}</p>}
+              <ContactBox partner={partner} onSave={(b) => save.mutate(b)} saving={save.isPending} />
+              <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2">
+                <dt className="font-medium text-foreground/70">Agreement</dt><dd>{partner.agreement ?? "—"}</dd>
+                <dt className="font-medium text-foreground/70">Their prices</dt><dd>{partner.costTerms ?? "None mentioned"}</dd>
+                <dt className="font-medium text-foreground/70">Added to</dt><dd>{partner.addedTo ?? "Not yet (added when agreed)"}</dd>
+                <dt className="font-medium text-foreground/70">Agreed</dt><dd>{partner.agreedAt ? ago(partner.agreedAt) : "—"}</dd>
+              </dl>
+              <div>
+                <div className="mb-1 font-medium">What we need to finalize</div>
+                <Textarea className="bg-background" rows={3} value={toFinalize ?? partner.toFinalize ?? ""} onChange={(e) => setToFinalize(e.target.value)} data-testid="input-partner-finalize" />
+                {toFinalize !== null && <Button size="sm" className="mt-2" disabled={save.isPending} onClick={() => save.mutate({ toFinalize: toFinalize.trim() || null })}>Save</Button>}
+              </div>
+            </div>
+          </Panel>
           {partner.status !== "declined" && <StopBox partner={partner} />}
         </div>
       </SheetContent>
@@ -107,7 +139,7 @@ function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onCl
   );
 }
 
-function MessageCard({ m, defaultOpen = false, onOpenCompany }: { m: MediaMessage; defaultOpen?: boolean; onOpenCompany?: () => void }) {
+function MessageCard({ m, defaultOpen = false, onOpenCompany, inThread = false }: { m: MediaMessage; defaultOpen?: boolean; onOpenCompany?: () => void; inThread?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const { toast } = useToast();
   const handled = useMutation({
@@ -115,20 +147,26 @@ function MessageCard({ m, defaultOpen = false, onOpenCompany }: { m: MediaMessag
     onSuccess: () => { toast({ title: "Marked handled" }); void refresh(); },
   });
   return (
-    <div className="rounded-lg border p-3" data-testid={`card-media-message-${m.id}`}>
+    <div
+      className={`rounded-lg border p-3 ${m.direction === "out"
+        ? `border-l-4 border-l-blue-600 bg-blue-50 dark:bg-blue-950/40 ${inThread ? "ml-6" : ""}`
+        : `border-l-4 border-l-slate-500 bg-background ${inThread ? "mr-6" : ""}`}`}
+      data-testid={`card-media-message-${m.id}`}
+    >
       <button type="button" className="flex w-full items-start gap-2 text-left" onClick={() => setOpen(!open)}>
         {m.direction === "out" ? <Send className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-label="Sent" /> : <Inbox className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-label="Received" />}
         <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">{m.subject || "(no subject)"}</div>
-          <div className="truncate text-xs text-muted-foreground">
+          <div className={`mb-0.5 text-[11px] font-semibold uppercase tracking-wide ${m.direction === "out" ? "text-blue-700 dark:text-blue-300" : "text-slate-600 dark:text-slate-300"}`}>{m.direction === "out" ? "We wrote" : "They wrote"}</div>
+          <div className="truncate font-semibold text-foreground">{m.subject || "(no subject)"}</div>
+          <div className="truncate text-xs text-foreground/70">
             {m.direction === "out" ? `To ${m.toEmail}` : `From ${m.fromName ? `${m.fromName} <${m.fromEmail}>` : m.fromEmail}`}{m.company ? ` · ${m.company}` : ""}
           </div>
-          <div className="text-xs text-muted-foreground" data-testid={`text-media-message-when-${m.id}`}>{m.direction === "out" ? "Sent" : "Received"} {when(m.receivedAt)}</div>
+          <div className="text-xs text-foreground/70" data-testid={`text-media-message-when-${m.id}`}>{m.direction === "out" ? "Sent" : "Received"} {when(m.receivedAt)}</div>
           {m.reason && m.direction === "in" && <div className="mt-0.5 text-xs text-muted-foreground">{m.reason}</div>}
         </div>
         {m.direction === "in" && <StatusPill tone={MESSAGE_TONE[m.status]}>{MEDIA_MESSAGE_STATUS_LABELS[m.status]}</StatusPill>}
       </button>
-      {open && <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/50 p-2 font-sans text-xs">{m.body}</pre>}
+      {open && <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-background p-3 font-sans text-sm leading-relaxed text-foreground">{m.body}</pre>}
       {open && (onOpenCompany || (m.direction === "in" && (m.status === "needs_owner" || m.status === "failed"))) && (
         <div className="mt-2 flex flex-wrap gap-2">
           {onOpenCompany && <Button size="sm" onClick={onOpenCompany} data-testid={`button-open-conversation-${m.id}`}><MessageSquare className="mr-2 h-4 w-4" />Open conversation & reply</Button>}
@@ -190,53 +228,56 @@ function StopBox({ partner }: { partner: MediaPartner }) {
 /** The admin's own notes on a company: never sent, but the AI reads them when it drafts a reply. */
 function NotesBox({ partner }: { partner: MediaPartner }) {
   const { toast } = useToast();
-  const [notes, setNotes] = useState<string | null>(null);
+  const [draft, setDraft, clearDraft] = useDraft<{ notes: string | null }>(`partnerships:notes:${partner.id}`, { notes: null });
+  const notes = draft.notes;
+  const setNotes = (v: string) => setDraft({ notes: v });
   const save = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/admin/media-inbox/partners/${partner.id}`, { notes: notes?.trim() || null })).json(),
-    onSuccess: () => { toast({ title: "Notes saved" }); setNotes(null); void refresh(); },
+    onSuccess: () => { toast({ title: "Notes saved" }); clearDraft(); void refresh(); },
     onError: (e) => toast({ title: "Could not save", description: apiErrorMessage(e), variant: "destructive" }),
   });
   return (
-    <div>
-      <div className="mb-1 flex items-center gap-2 font-medium"><StickyNote className="h-4 w-4" aria-hidden="true" />Notes</div>
-      <Textarea rows={3} placeholder="Anything to remember about this company. Only you see these; the AI uses them when it writes a draft." value={notes ?? partner.notes ?? ""} onChange={(e) => setNotes(e.target.value)} data-testid="input-partner-notes" />
+    <Panel title="Notes" icon={StickyNote} tone="notes" testId="panel-partner-notes">
+      <Textarea className="bg-background" rows={3} placeholder="Anything to remember about this company. Only you see these; the AI uses them when it writes a draft." value={notes ?? partner.notes ?? ""} onChange={(e) => setNotes(e.target.value)} data-testid="input-partner-notes" />
       {notes !== null && <Button size="sm" className="mt-2" disabled={save.isPending} onClick={() => save.mutate()} data-testid="button-save-partner-notes">Save notes</Button>}
-    </div>
+    </Panel>
   );
 }
 
 /** Reply from media@ under the company's last email; "Write with AI" fills the box for the admin to edit first. */
 function ReplyBox({ partner }: { partner: MediaPartner }) {
   const { toast } = useToast();
-  const [f, setF] = useState({ to: "", subject: "", body: "", instructions: "" });
+  const [f, setF, clearF] = useDraft(`partnerships:reply:${partner.id}`, { to: "", subject: "", body: "", instructions: "" });
   const draft = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/admin/media-inbox/partners/${partner.id}/draft`, f.instructions.trim() ? { instructions: f.instructions.trim() } : {})).json(),
-    onSuccess: (r: { body: string; to: string; subject: string }) => setF((cur) => ({ ...cur, body: r.body, to: cur.to || r.to, subject: cur.subject || r.subject })),
+    onSuccess: (r: { body: string; to: string; subject: string }) => setF({ ...f, body: r.body, to: f.to || r.to, subject: f.subject || r.subject }),
     onError: (e) => toast({ title: "No draft", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const send = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/admin/media-inbox/partners/${partner.id}/reply`, { to: f.to, subject: f.subject, body: f.body })).json(),
-    onSuccess: () => { toast({ title: `Sent to ${f.to}` }); setF({ to: "", subject: "", body: "", instructions: "" }); void refresh(); },
+    onSuccess: () => { toast({ title: `Sent to ${f.to}` }); clearF(); void refresh(); },
     onError: (e) => toast({ title: "Not sent", description: apiErrorMessage(e), variant: "destructive" }),
   });
   // To and subject start from the last email (filled by the first draft, or typed).
   const ready = f.to.trim() && f.subject.trim() && f.body.trim();
   return (
-    <div className="space-y-2 rounded-lg border p-3" data-testid="box-partner-reply">
-      <div className="flex items-center gap-2 font-medium"><Send className="h-4 w-4" aria-hidden="true" />Reply</div>
+    <Panel title="Reply" icon={Send} tone="reply" testId="box-partner-reply">
+      <div className="space-y-2">
+      {f.body && <p className="text-xs text-foreground/70">Your unsent reply is saved in this browser until you send it.</p>}
       <div className="flex gap-2">
-        <Input placeholder="Tell the AI what to say (optional), e.g. “say yes to the call, ask for their pricing”" value={f.instructions} onChange={(e) => setF({ ...f, instructions: e.target.value })} data-testid="input-reply-instructions" />
+        <Input className="bg-background" placeholder="Tell the AI what to say (optional), e.g. “say yes to the call, ask for their pricing”" value={f.instructions} onChange={(e) => setF({ ...f, instructions: e.target.value })} data-testid="input-reply-instructions" />
         <Button type="button" variant="outline" disabled={draft.isPending} onClick={() => draft.mutate()} data-testid="button-reply-ai">
           {draft.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}Write with AI
         </Button>
       </div>
-      <Input placeholder="To" type="email" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} data-testid="input-reply-to" />
-      <Input placeholder="Subject" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} data-testid="input-reply-subject" />
-      <Textarea rows={8} placeholder="Your reply (Leah Peterson's Construct HUB Media Team signature is added)" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} data-testid="input-reply-body" />
+      <Input className="bg-background" placeholder="To" type="email" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} data-testid="input-reply-to" />
+      <Input className="bg-background" placeholder="Subject" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} data-testid="input-reply-subject" />
+      <Textarea className="bg-background text-sm" rows={10} placeholder="Your reply (Leah Peterson's Construct HUB Media Team signature is added)" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} data-testid="input-reply-body" />
       <Button disabled={send.isPending || !ready} onClick={() => send.mutate()} data-testid="button-reply-send">
         {send.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}Send from media@
       </Button>
-    </div>
+      </div>
+    </Panel>
   );
 }
 
