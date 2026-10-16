@@ -841,6 +841,10 @@ export const cslbHolder = (type: string | undefined): "business" | "individual" 
 const cslbName = (raw: string) => { const [last, ...rest] = raw.trim().split(/\s{2,}/); return clean(`${rest.join(" ")} ${last ?? ""}`); };
 const pipes = (v: string | undefined) => (v ?? "").split("|").map((t) => t.trim());
 
+/** The files' columns, from their header rows on 2026-10-14: CSLB sent the files without them from 2026-10-16. */
+export const CSLB_MASTER_COLUMNS = ["LicenseNo", "LastUpdate", "BusinessName", "BUS-NAME-2", "FullBusinessName", "MailingAddress", "City", "State", "County", "ZIPCode", "country", "BusinessPhone", "BusinessType", "IssueDate", "ReissueDate", "ExpirationDate", "InactivationDate", "ReactivationDate", "PendingSuspension", "PendingClassRemoval", "PendingClassReplace", "PrimaryStatus", "SecondaryStatus", "Classifications(s)", "AsbestosReg", "WorkersCompCoverageType", "WCInsuranceCompany", "WCPolicyNumber", "WCEffectiveDate", "WCExpirationDate", "WCCancellationDate", "WCSuspendDate", "CBSuretyCompany", "CBNumber", "CBEffectiveDate", "CBCancellationDate", "CBAmount", "WBSuretyCompany", "WBNumber", "WBEffectiveDate", "WBCancellationDate", "WBAmount", "DBSuretyCompany", "DBNumber", "DBEffectiveDate", "DBCancellationDate", "DBAmount", "DateRequired", "DiscpCaseRegion", "DBBondReason", "DBCaseNo", "NAME-TP-2"];
+export const CSLB_PERSONNEL_COLUMNS = ["LIC-NO", "LastUpdated", "REC-TP", "SEQ-NO", "Name-TP", "Name", "EMP-Titl-CDE", "CL-CDE", "CL-CDE-STAT", "ASSN-DT", "DIS-ASSN-DT", "SURETY-TP", "SuretyCompany", "BOND-NO", "BOND-AMT", "EffectiveDate", "CancellationDate", "JointVentureLicenseType", "JointVentureLicenseNumber"];
+
 /**
  * Everyone PersonnelData ties to each license: officers, RMOs, RMEs, members, partners, sole owners, with each
  * title's classification and dates (a title with a disassociation date is a former one). Name-TP "Principal| AKA" rows
@@ -848,7 +852,7 @@ const pipes = (v: string | undefined) => (v ?? "").split("|").map((t) => t.trim(
  */
 export async function cslbPersonnel(path: string): Promise<Map<string, (Person & { raw: string; aka: string[] })[]>> {
   const out = new Map<string, (Person & { raw: string; aka: string[] })[]>();
-  for await (const r of csvRecords(path)) {
+  for await (const r of csvRecords(path, ",", CSLB_PERSONNEL_COLUMNS)) {
     const no = clean(r["LIC-NO"]);
     const types = pipes(r["Name-TP"]), names = pipes(r.Name);
     if (!no || !names[0]) continue;
@@ -880,7 +884,7 @@ export async function cslbPersonnel(path: string): Promise<Map<string, (Person &
 export async function* cslbRows(masterPath: string, personnelPath: string): AsyncIterable<BulkHit> {
   const personnel = await cslbPersonnel(personnelPath);
   const inMaster = new Set<string>();
-  for await (const r of csvRecords(masterPath)) {
+  for await (const r of csvRecords(masterPath, ",", CSLB_MASTER_COLUMNS)) {
     const no = clean(r.LicenseNo);
     const name = clean(r.BusinessName);
     if (!no || !name) continue;

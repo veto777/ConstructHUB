@@ -252,3 +252,33 @@ describe("FL complaint respondents: a placeholder DBA is no DBA (live 2026-10-15
     expect(flRespondentIsBusiness("MUNCY, WILLIAM", ["MUNCY ROOFING, LLC"])).toBe(false); // no DBA marker: an address line (round 4, decision 4)
   });
 });
+
+describe("California CSLB files without header rows (CSLB, 2026-10-16)", () => {
+  const MASTER = `LicenseNo,LastUpdate,BusinessName,BUS-NAME-2,FullBusinessName,MailingAddress,City,State,County,ZIPCode,country,BusinessPhone,BusinessType,IssueDate,ReissueDate,ExpirationDate,InactivationDate,ReactivationDate,PendingSuspension,PendingClassRemoval,PendingClassReplace,PrimaryStatus,SecondaryStatus,Classifications(s),AsbestosReg,WorkersCompCoverageType,WCInsuranceCompany,WCPolicyNumber,WCEffectiveDate,WCExpirationDate,WCCancellationDate,WCSuspendDate,CBSuretyCompany,CBNumber,CBEffectiveDate,CBCancellationDate,CBAmount,WBSuretyCompany,WBNumber,WBEffectiveDate,WBCancellationDate,WBAmount,DBSuretyCompany,DBNumber,DBEffectiveDate,DBCancellationDate,DBAmount,DateRequired,DiscpCaseRegion,DBBondReason,DBCaseNo,NAME-TP-2
+141212,08/04/2026,SPRINKMANN SONS CORPORATION,,,12100 WEST SILVER SPRING ROAD,MILWAUKEE,WI,,53225,,(414) 462 7750,Corporation,10/01/1953,,01/31/2027,,,,,,Work Comp Susp,,C-2,,License does not have current W/C,TRAVELERS PROPERTY CASUALTY COMPANY OF AMERICA, UB6K86221, 06/01/2024, 06/01/2026,, 06/01/2026,AMERICAN CONTRACTORS INDEMNITY COMPANY,SC930966,01/01/2023,,25000,,,,,,,,,,,,,,,
+`;
+  const PERSONNEL = `LIC-NO,LastUpdated,REC-TP,SEQ-NO,Name-TP,Name,EMP-Titl-CDE,CL-CDE,CL-CDE-STAT,ASSN-DT,DIS-ASSN-DT,SURETY-TP,SuretyCompany,BOND-NO,BOND-AMT,EffectiveDate,CancellationDate,JointVentureLicenseType,JointVentureLicenseNumber
+141212,03/30/2007,Class/Title,833456, Principal, SPRINKMANN                         PETER          WILLIAM, Officer, , , 03/30/2007, ,,,,,,,,
+141212,06/27/2004,Class/Title,343388, Principal, SPRINKMANN                         WILLIAM        E           JR, Chief Executive Officer/President| Responsible Managing Officer/Chief Executive Officer/President, | C-2, | Y, 11/26/1979| 10/03/1985, 10/03/1985| ,Percentage Statement,,,,10/03/1985,,,
+141212,06/27/2004,Class/Title,422524, Principal, WAHNER                             CLARENCE       Q, Responsible Managing Employee, C-2, N, 10/01/1953, 03/29/1982,Qualifiers Bond,UNITED STATES FIDELITY AND GUARANTY COMPANY,46011073472,5000,01/01/1980,07/01/1995,,
+88,06/27/2004,Class/Title,15972, Principal| AKA, BRUNS                              LYNN           LUYET| KETTERING                          LYNN           LAVON, Responsible Managing Employee, C-8, N, 11/29/1990, 12/18/1990,,,,,,,,
+`;
+  const headless = (t: string) => t.slice(t.indexOf("\n") + 1);
+
+  it("reads them with the known columns, exactly as with the headers", async () => {
+    const withHeaders = [await file(MASTER), await file(PERSONNEL)];
+    const without = [await file(headless(MASTER)), await file(headless(PERSONNEL))];
+    const a = await all(cslbRows(withHeaders[0], withHeaders[1]));
+    const b = await all(cslbRows(without[0], without[1]));
+    await Promise.all([...withHeaders, ...without].map((p) => fs.rm(p)));
+    expect(a.length).toBeGreaterThan(0);
+    expect(b).toEqual(a);
+  });
+
+  it("fails the load when a headerless file has another number of columns", async () => {
+    const master = await file(headless(MASTER).replace(/,\n/, "\n"));
+    const personnel = await file(PERSONNEL);
+    await expect(all(cslbRows(master, personnel))).rejects.toThrow(/no header row, and 51 columns where the known layout has 52/);
+    await Promise.all([master, personnel].map((p) => fs.rm(p)));
+  });
+});

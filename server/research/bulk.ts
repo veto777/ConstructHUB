@@ -679,9 +679,12 @@ async function* parseCsv(chunks: AsyncIterable<Buffer>, dec: TextDecoder, delimi
   if (field !== "" || row.length) { row.push(field.replace(/\r$/, "")); yield row; }
 }
 
-/** Rows as objects keyed by the header row. */
-export async function* csvRecords(path: string, delimiter = ","): AsyncIterable<Record<string, string>> {
-  yield* recordsOf(csvRows(path, delimiter));
+/**
+ * Rows as objects keyed by the header row. With `known`, a file whose first row is not that header is read with it
+ * (CSLB dropped its header rows on 2026-10-16); a row count of columns other than the known header's fails the load.
+ */
+export async function* csvRecords(path: string, delimiter = ",", known?: string[]): AsyncIterable<Record<string, string>> {
+  yield* recordsOf(csvRows(path, delimiter), known);
 }
 
 /** Rows of a stream as objects keyed by the header row (csvRowsFrom). */
@@ -689,10 +692,15 @@ export async function* csvRecordsFrom(chunks: AsyncIterable<Buffer>, delimiter =
   yield* recordsOf(csvRowsFrom(chunks, delimiter));
 }
 
-async function* recordsOf(rows: AsyncIterable<string[]>): AsyncIterable<Record<string, string>> {
+async function* recordsOf(rows: AsyncIterable<string[]>, known?: string[]): AsyncIterable<Record<string, string>> {
   let header: string[] | null = null;
   for await (const r of rows) {
-    if (!header) { header = r.map((h) => h.trim().replace(/^﻿/, "")); continue; }
+    if (!header) {
+      const first = r.map((h) => h.trim().replace(/^\uFEFF/, ""));
+      if (!known || first[0] === known[0]) { header = first; continue; }
+      if (r.length !== known.length) throw new Error(`no header row, and ${r.length} columns where the known layout has ${known.length}`);
+      header = known;
+    }
     if (r.length === 1 && r[0] === "") continue;
     const o: Record<string, string> = {};
     header.forEach((h, i) => { o[h] = (r[i] ?? "").trim(); });
