@@ -10,6 +10,7 @@ import {
 import { pool } from "../db";
 import { KEY_VERSION, bulkSchemaReady, sourceStatus } from "./bulk";
 import { SAM_SOURCE_ID } from "./sam";
+import { COURTLISTENER_ALLOWED } from "./records";
 
 const sortIds = (ids: Iterable<CoverageId>) => COVERAGE_ID_ORDER.filter((i) => new Set(ids).has(i));
 const sortKinds = (kinds: Iterable<CoverageKind>) => COVERAGE_KIND_ORDER.filter((k) => new Set(kinds).has(k));
@@ -20,7 +21,7 @@ const sortKinds = (kinds: Iterable<CoverageKind>) => COVERAGE_KIND_ORDER.filter(
  */
 export async function coverageRuntime(): Promise<CoverageRuntime> {
   const sam = await sourceStatus(SAM_SOURCE_ID).catch(() => null);
-  return { osha: !!process.env.DOL_API_KEY, samExclusions: !!sam?.loaded };
+  return { osha: !!process.env.DOL_API_KEY, samExclusions: !!sam?.loaded, federalCourts: COURTLISTENER_ALLOWED };
 }
 
 // ── Run-time facets of the daily files ────────────────────────────────────────────────────────────────────────────

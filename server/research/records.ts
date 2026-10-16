@@ -3,9 +3,9 @@
  * complaints would make the report a background check; shared/research-reports.ts RESEARCH_NOT_FCRA):
  *
  *   - State attorney general consumer complaints, from official open data (WA statewide and current; OR 2017–2019).
- *   - Federal court dockets naming the company, nationwide (CourtListener's RECAP archive, free API): NOT SEARCHED since
- *     2026-10-15. courtlistener.com's robots.txt says "User-agent: *  Disallow: /" (only named search engines get other
- *     rules), so under HARD RULE 2 the search is off (COURTLISTENER_ALLOWED). The code stays for when that changes.
+ *   - Federal court dockets naming the company, nationwide (CourtListener's RECAP archive, REST API v4). Owner order
+ *     2026-10-15: searched again, through the API only, with the owner's own CourtListener account (COURTLISTENER_TOKEN);
+ *     see COURTLISTENER_ALLOWED and http.ts ROBOTS_OWNER_EXEMPT.
  *   - Federal OSHA inspections of the company's establishments, nationwide (U.S. DOL API v4, needs DOL_API_KEY; the key
  *     goes in the query string, `like` is case-sensitive, no match is HTTP 204).
  *
@@ -83,11 +83,12 @@ export async function searchComplaints(src: ComplaintSource, name: string): Prom
 }
 
 /**
- * CourtListener's robots.txt disallows every path for unnamed agents ("Be conservative; Block everything", read
- * 2026-10-15), so its search is not run (HARD RULE 2: never get around a robots.txt Disallow). Flip only when its
- * robots.txt allows our agent; http.ts would refuse the requests anyway.
+ * OWNER ORDER 2026-10-15: CourtListener's federal dockets are searched again. Its robots.txt disallows unnamed agents,
+ * but the owner (with legal advice: the court records are public and the API is offered for programmatic use) signed
+ * up for an account himself and ordered the search back on. Only the REST API is used (http.ts ROBOTS_OWNER_EXEMPT
+ * covers /api/rest/ and nothing else), with the account's token when COURTLISTENER_TOKEN is set, at the published rate.
  */
-export const COURTLISTENER_ALLOWED = false;
+export const COURTLISTENER_ALLOWED = true;
 export const COURTLISTENER_BLOCKED_NOTE = "Not searched by ConstructHUB: courtlistener.com's robots.txt disallows automated access for all but named search engines (checked 2026-10-15)";
 
 // ── Federal court dockets (CourtListener) ────────────────────────────────────────────────────────────────────────

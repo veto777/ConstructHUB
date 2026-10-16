@@ -90,7 +90,7 @@ export type CoverageManifest = {
 
 /** Live facets of the daily files, from the loaded rows (what they're really indexed by). */
 /** What the running server can search beyond the build's manifest (decided from the server's own settings). */
-export type CoverageRuntime = { osha: boolean; samExclusions?: boolean };
+export type CoverageRuntime = { osha: boolean; samExclusions?: boolean; federalCourts?: boolean };
 
 /** The nationwide sources the running server really searches (a `needs` source only when the server has it). */
 export const nationwideNow = <T extends Pick<CoverageSource, "needs">>(list: T[], runtime: CoverageRuntime | undefined): T[] =>
@@ -137,6 +137,7 @@ export function runtimeRecordsPhrase(runtime: CoverageRuntime | undefined): stri
   const extra = [
     ...(runtime?.samExclusions === true ? ["federal exclusions and debarments (SAM.gov)"] : []),
     ...(runtime?.osha === true ? ["OSHA inspections (federal)"] : []),
+    ...(runtime?.federalCourts === true ? ["federal court cases"] : []),
   ];
   if (!extra.length) return "";
   return extra.length === 1 ? `, and ${extra[0]}` : `, ${extra.slice(0, -1).join(", ")}, and ${extra[extra.length - 1]}`;

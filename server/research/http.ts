@@ -551,9 +551,16 @@ export async function robotsAllowed(url: string): Promise<boolean> {
 }
 
 /** Throws PortalBlockedError when robots.txt disallows the URL for us, or couldn't be read. */
+/**
+ * OWNER ORDER 2026-10-15, the one exception to HARD RULE 2: CourtListener's REST API (the owner's own account, legal
+ * advice taken). Only these API prefixes; every other path on the host, and every other host, still obeys robots.txt.
+ */
+export const ROBOTS_OWNER_EXEMPT = ["https://www.courtlistener.com/api/rest/"];
+
 export async function checkRobots(url: string): Promise<void> {
   const u = new URL(url);
   if (u.pathname === "/robots.txt") return;
+  if (ROBOTS_OWNER_EXEMPT.some((p) => u.href.startsWith(p))) return;
   const r = await robotsFor(u.origin);
   if (r.denied) throw new PortalBlockedError(url, 0, `${u.host}: ${r.denied}; no automated requests until it can be read`);
   if (!robotsAllows(r.rules, u.pathname + u.search)) {
