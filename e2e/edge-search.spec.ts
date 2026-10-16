@@ -101,10 +101,11 @@ test("Cloudflare 1,000-site list → bulk preview → confirmation → durable q
 }) => {
   await page.goto("/cloudflare");
   await expect(
-    page.getByRole("heading", { name: "Cloudflare protection" }),
+    // 274cbb40: inside the Website tool shell the h1 is the view name
+    page.getByRole("heading", { name: "Sites", level: 1 }),
   ).toBeVisible();
-  await page.getByLabel("Search sites", { exact: true }).fill(tag);
-  await expect(page.getByText("1000 sites", { exact: true })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search sites…" }).fill(tag);
+  await expect(page.getByText("1,000 sites", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Next sites" }).click();
   await expect(
     page.getByRole("button", { name: `${tag}-0026`, exact: true }),
@@ -156,13 +157,16 @@ test("Search Console 1,000-property list → cached analytics → bulk sync → 
   page,
 }) => {
   await page.goto("/search-console");
-  await page.getByLabel("Search sites", { exact: true }).fill(tag);
-  await expect(page.getByText("1000 sites", { exact: true })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search sites…" }).fill(tag);
+  await expect(page.getByText("1,000 sites", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: `${tag}-0001`, exact: true }).click();
+  // b1cab0ae: the one-line totals became a "Search performance overview" (Clicks/Impressions/CTR/Average position)
   await expect(
-    page.getByText("Clicks: 7 · Impressions: 70 · CTR: 10.00% · Position: 3.0"),
-  ).toBeVisible();
+    page.getByRole("region", { name: "Search performance overview" }).getByRole("definition"),
+  ).toHaveText(["7", "70", "10.00%", "3.0"]);
   await expect(page.getByText(/Submitted and indexed · PASS/)).toBeVisible();
+  // b1cab0ae: an opened site replaces the list; close it to get back to bulk selection
+  await page.getByRole("button", { name: "Close details" }).click();
   await page.getByLabel("Select this page").check();
   await page.getByRole("button", { name: "Sync selected (25)" }).click();
   await expect
@@ -183,12 +187,11 @@ test("Search Console 1,000-property list → cached analytics → bulk sync → 
       [gsc],
     )
   ).rows[0].id;
-  await page
-    .getByLabel("Property IDs and URLs")
-    .fill(`${a}, https://${tag}-1.example.invalid/about`);
-  await page
-    .getByRole("button", { name: "Queue inspections", exact: true })
-    .click();
+  // b1cab0ae: the free-text "Property IDs and URLs" box became per-row Property/URL inputs with a review dialog
+  await page.getByRole("combobox", { name: /^Property\b/ }).first().selectOption(String(a));
+  await page.getByRole("textbox", { name: /^URL\b/ }).first().fill(`https://${tag}-1.example.invalid/about`);
+  await page.getByRole("button", { name: "Review inspections", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Confirm and queue", exact: true }).click();
   await expect
     .poll(async () =>
       Number(
@@ -208,5 +211,5 @@ test("Search Console 1,000-property list → cached analytics → bulk sync → 
   await page.getByRole("radio").first().check();
   await page.getByRole("link", { name: "Onboarding", exact: true }).click();
   await page.getByLabel("Search Locations", { exact: true }).fill(tag);
-  await expect(page.getByText("1000 results", { exact: true })).toBeVisible();
+  await expect(page.getByText("1,000 results", { exact: true })).toBeVisible();
 });

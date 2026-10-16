@@ -134,10 +134,11 @@ test.describe("settings shell — desktop", () => {
     }
 
     // The ⓘ next to the title opens the plain-English entry for the open section.
-    await page.getByTestId("info-tip-account-integrations").click();
-    await expect(page.getByTestId("info-dialog-account-integrations")).toBeVisible();
+    // Since 4f9f281c the section "i" is the help-registry HelpButton (helpKey account.integrations), not an InfoTip.
+    await page.getByTestId("help-button-account.integrations").click();
+    await expect(page.getByTestId("help-panel-account.integrations")).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(page.getByTestId("info-dialog-account-integrations")).toBeHidden();
+    await expect(page.getByTestId("help-panel-account.integrations")).toBeHidden();
     expect(pageErrors).toEqual([]);
   });
 
@@ -180,7 +181,7 @@ test.describe("settings shell — desktop", () => {
 
     const L = PLANS.pro.limits;
     const n = (v: number) => v.toLocaleString("en-US");
-    for (const key of ["locations", "guardCadenceMinutes", "gridCredits", "reviewTemplates", "autoPublishAiReplies", "protectedSites", "siteScans", "competitorScans", "permitSearches", "crmSeats", "teamTextSegments", "clientTexting"]) {
+    for (const key of ["locations", "guardCadenceMinutes", "gridCredits", "reviewTemplates", "autoPublishAiReplies", "protectedSites", "siteScans", "competitorScans", "permitSearches", "teamTextSegments", "clientTexting"]) {
       await expect(page.getByTestId(`limit-${key}`), key).toBeVisible();
     }
     await expect(page.getByTestId("limit-locations-included")).toContainText(n(L.locations));
@@ -191,7 +192,7 @@ test.describe("settings shell — desktop", () => {
     await expect(page.getByTestId("limit-gridCredits").getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
     await expect(page.getByTestId("limit-permitSearches-used")).toContainText(`120 of ${n(L.permitSearches)} this month`);
     await expect(page.getByTestId("limit-siteScans-used")).toContainText(`2 of ${n(L.siteScans)} this month`);
-    await expect(page.getByTestId("limit-crmSeats-used")).toContainText(`2 of ${n(L.crmSeats)}`);
+    // No CRM seats row: platform plans grant no CRM seats since the CRM became its own product (fd964e1d).
     await expect(page.getByTestId("limit-protectedSites-used")).toContainText(`1 of ${n(L.protectedSites)}`);
     await expect(page.getByTestId("limit-reviewTemplates-used")).toContainText(`1 of ${n(L.reviewTemplates)}`);
     await expect(page.getByTestId("limit-autoPublishAiReplies-included")).toContainText(L.autoPublishAiReplies ? "Included" : "Not included");

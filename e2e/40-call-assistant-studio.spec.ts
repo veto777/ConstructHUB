@@ -474,7 +474,7 @@ test.describe("Call Assistant — Overview and Simulator", () => {
     await mockVoice(page, { published: true });
     await gotoCrm(page, "/call-assistant");
     await expect(page.getByTestId("metric-overview-minutes")).toContainText("120");
-    await expect(page.getByTestId("text-overview-minutes-pct")).toHaveText("24%");
+    await expect(page.getByTestId("text-overview-minutes-pct")).toHaveText(`${Math.round((120 / 1000) * 100)}%`); // the mock's 120 of 1,000 included minutes (mock repriced in 2e20bffa)
     await expect(page.getByTestId("row-overview-number-0")).toContainText("(360) 555-0100");
     // Same labels as the Calls tab, and each row opens that call.
     await expect(page.getByTestId("row-overview-call-0")).toContainText("Lead");

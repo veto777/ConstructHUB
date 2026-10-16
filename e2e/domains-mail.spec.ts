@@ -149,7 +149,8 @@ test("forwarding setup, shared-secret rejection, confirmation and critical trans
   await expect(
     page.getByRole("link", { name: "Confirm forwarding at Google" }),
   ).toHaveAttribute("href", "https://mail.google.com/mail/vf-fixture");
-  await page.getByLabel("Alert severity").selectOption("critical");
+  // Exact: the filter also has a "Type your own" pill labelled "Alert severity: type your own value" (custom filter values, 4f9f281c).
+  await page.getByLabel("Alert severity", { exact: true }).selectOption("critical");
   await expect(
     page.getByRole("heading", { name: `Domain transfer request ${suffix}` }),
   ).toBeVisible();

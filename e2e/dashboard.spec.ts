@@ -14,6 +14,7 @@ import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { E2E_BASE_URL } from "./helpers";
 import { DASHBOARD_GROUPS, DASHBOARD_TILES, type DashboardPayload } from "../shared/dashboard";
+import { MODULE_NAMES, PLANS } from "../shared/plans";
 
 /** Shown inside the CRM card (money, then leads / follow-ups / visits), never as grid tiles. */
 const CRM_CARD = new Set(["crm", "crmLeads", "crmSchedule"]);
@@ -228,15 +229,19 @@ test.describe("signed-in dashboard: sample scenarios", () => {
     }
     await expect(page.locator('[data-testid^="tile-"][data-status]')).toHaveCount(DASHBOARD_TILES.length - CRM_CARD.size);
 
-    await expect(tile(page, "cloudflare")).toHaveAttribute("data-status", "locked");
+    // The "full" sample is the Agency plan and, since e1f35e3e, carries that plan's modules: Cloudflare is
+    // included (not set up yet), so the only locked tile here is the add-on below.
+    await expect(tile(page, "cloudflare")).toHaveAttribute("data-status", "empty");
     // The AI Call Assistant is on sale (launched) and the Growth sample hasn't bought it: locked as an add-on — never
     // "Coming soon", and never "Pro" / "On a higher plan" for an account whose plan already sells it.
     await expect(tile(page, "callAssistant")).toHaveAttribute("data-status", "locked");
     await expect(tile(page, "callAssistant")).not.toContainText("Coming soon");
     await expect(page.getByTestId("status-callAssistant")).toHaveText("Separate service");
-    await expect(tile(page, "callAssistant")).toHaveAttribute("title", "AI Call Assistant is an add-on for the Pro, Growth and Agency plans");
+    // A separate service on its own subscription since 2e20bffa: no plan names on the chip.
+    await expect(tile(page, "callAssistant")).toHaveAttribute("title", "AI Call Assistant is a separate service with its own subscription");
     await expect(tile(page, "callAssistant").getByTestId("link-tile-callAssistant-intro")).toHaveAttribute("href", "/call-assistant");
-    await expect(page.getByTestId("locked-row-run")).toContainText("Not on your plan");
+    // A row holding only the separate-service add-on reads "Not on your account" (2e20bffa).
+    await expect(page.getByTestId("locked-row-run")).toContainText("Not on your account");
     await expect(tile(page, "social")).toHaveAttribute("data-status", "error");
     await expect(tile(page, "social").getByTestId("link-tile-social")).toHaveAttribute("href", "/social-media");
     await expect(tile(page, "media")).toHaveAttribute("data-status", "empty");
@@ -265,7 +270,8 @@ test.describe("signed-in dashboard: sample scenarios", () => {
 
     await expect(page.getByTestId("usage-searches")).toBeVisible();
     await expect(page.getByTestId("link-usage-searches")).toHaveAttribute("href", "/search");
-    await expect(page.getByTestId("link-usage-crmSeats")).toHaveAttribute("href", /^https?:\/\/portal\./);
+    // No CRM seats meter on a platform plan's sample since the CRM became its own product (fd964e1d).
+    await expect(page.getByTestId("link-usage-crmSeats")).toHaveCount(0);
     await expect(page.getByTestId("list-dashboard-recent").locator("li")).not.toHaveCount(0);
 
     // Headings run h1 → h2 → h3.
@@ -275,13 +281,14 @@ test.describe("signed-in dashboard: sample scenarios", () => {
   });
 
   test("locked tiles fold into one row per group with a single link to the plans", async ({ page }) => {
-    await useScenario(page, "full");
+    // The no-plan sample: the Agency "full" sample has every Protect module since e1f35e3e, so nothing there is plan-locked.
+    await useScenario(page, "noplan");
     await openDashboard(page);
     const row = page.getByTestId("locked-row-protect");
     const cf = row.getByTestId("tile-cloudflare");
     await expect(cf).toHaveAttribute("data-status", "locked");
-    await expect(cf.getByTestId("status-cloudflare")).toContainText("Agency");
-    await expect(cf).toHaveAttribute("title", /Cloudflare \+ Search Console is included with the Agency plan/);
+    await expect(cf.getByTestId("status-cloudflare")).toContainText(PLANS.pro.name);
+    await expect(cf).toHaveAttribute("title", `${MODULE_NAMES.cloudflareSearchConsole} is included with the ${PLANS.pro.name} plan`);
     // No numbers, and no per-tile prompt box: one "See plans" per group; each chip opens its feature page.
     await expect(row.locator('[data-testid^="metric-"]')).toHaveCount(0);
     await expect(row.locator('[data-testid^="locked-cloudflare"]')).toHaveCount(0);
@@ -355,7 +362,9 @@ test.describe("signed-in dashboard: sample scenarios", () => {
     await expect(page.getByTestId("badge-dashboard-plan")).toContainText("Choose a plan");
     await expect(page.getByTestId("badge-dashboard-plan")).toHaveAttribute("href", "/pricing");
     await expect(tile(page, "gbp")).toHaveAttribute("data-status", "locked");
-    await expect(tile(page, "property")).toHaveAttribute("data-status", "ok");
+    // Property Records is a Pro module since c3d99fc3 (locked here too); the free Guides tile stays open.
+    await expect(tile(page, "property")).toHaveAttribute("data-status", "locked");
+    await expect(tile(page, "guides")).toHaveAttribute("data-status", "ok");
     await expect(page.getByTestId("link-dashboard-manage-plan")).toHaveCount(0);
   });
 
@@ -472,11 +481,14 @@ test.describe("signed-in dashboard: clear tasks and customize", () => {
     // Keyboard: the Done button is a real button; focus lands on the next item afterwards.
     await card.getByTestId("button-needs-done-reviews.unanswered").focus();
     await expect(card.getByTestId("button-needs-done-reviews.unanswered")).toHaveAccessibleName("Done: Awaiting reply (Google Reviews)");
+    // The UI updates optimistically; let the PUT land before the reload below, or the reload can abort it.
+    const saved = page.waitForResponse((r) => r.url().includes("/api/dashboard/dismissals") && r.request().method() === "PUT");
     await page.keyboard.press("Enter");
     await expect(card.getByTestId("needs-reviews.unanswered")).toHaveCount(0);
     await expect(card).toHaveAttribute("data-count", String(count - 1));
     await expect(page.locator(":focus")).toHaveAttribute("data-testid", /^link-needs-/);
     await expect(page.getByTestId("text-needs-live")).toContainText("Cleared “Awaiting reply”");
+    expect((await saved).ok()).toBe(true);
 
     await page.reload();
     await expect(needs(page)).toHaveAttribute("data-count", String(count - 1));
@@ -488,9 +500,11 @@ test.describe("signed-in dashboard: clear tasks and customize", () => {
     const row = needs(page).getByTestId("cleared-reviews.unanswered");
     await expect(row).toContainText("Done · comes back if the number changes");
     await shot(page, "controls-cleared-1440");
+    const restored = page.waitForResponse((r) => r.url().includes("/api/dashboard/dismissals/") && r.request().method() === "DELETE");
     await row.getByRole("button", { name: "Restore Awaiting reply (Google Reviews)" }).click();
     await expect(needs(page).getByTestId("needs-reviews.unanswered")).toBeVisible();
     await expect(needs(page)).toHaveAttribute("data-count", String(count));
+    expect((await restored).ok()).toBe(true);
     await page.reload();
     await expect(needs(page).getByTestId("needs-reviews.unanswered")).toBeVisible();
     await expect(needs(page).getByTestId("button-needs-show-cleared")).toHaveCount(0);
@@ -501,8 +515,11 @@ test.describe("signed-in dashboard: clear tasks and customize", () => {
     await openDashboard(page);
     const count = Number(await needs(page).getAttribute("data-count"));
     await needs(page).getByTestId("button-needs-snooze-clickGuard.suspicious30d").click();
+    // As with Done: the snooze shows at once; wait for its PUT before reloading.
+    const snoozeSaved = page.waitForResponse((r) => r.url().includes("/api/dashboard/dismissals") && r.request().method() === "PUT");
     await page.getByTestId("menu-needs-snooze-tomorrow-clickGuard.suspicious30d").click();
     await expect(needs(page).getByTestId("needs-clickGuard.suspicious30d")).toHaveCount(0);
+    expect((await snoozeSaved).ok()).toBe(true);
 
     await page.reload();
     await expect(needs(page)).toHaveAttribute("data-count", String(count - 1));
@@ -518,16 +535,20 @@ test.describe("signed-in dashboard: clear tasks and customize", () => {
     expect(until.getTime()).toBeGreaterThan(Date.now());
     expect(until.getTime() - Date.now()).toBeLessThan(2 * 86_400_000);
 
+    const clearSaved = page.waitForResponse((r) => r.url().includes("/api/dashboard/dismissals") && r.request().method() === "PUT");
     await needs(page).getByTestId("button-needs-clear-all").click();
     await expect(needs(page)).toHaveAttribute("data-count", "0");
     await expect(needs(page)).toContainText("Nothing needs you today.");
+    expect((await clearSaved).ok()).toBe(true);
     await page.reload();
     await expect(needs(page)).toHaveAttribute("data-count", "0");
     await expect(needs(page).getByTestId("button-needs-show-cleared")).toHaveText(`Show cleared (${count})`);
     await needs(page).getByTestId("button-needs-show-cleared").click();
     await expect(needs(page).getByTestId("list-needs-cleared").locator("li")).toHaveCount(count);
+    const restoreSaved = page.waitForResponse((r) => r.url().includes("/api/dashboard/dismissals") && r.request().method() === "DELETE");
     await needs(page).getByTestId("button-needs-restore-all").click();
     await expect(needs(page)).toHaveAttribute("data-count", String(count));
+    expect((await restoreSaved).ok()).toBe(true);
     await page.reload();
     await expect(needs(page)).toHaveAttribute("data-count", String(count));
   });
@@ -543,7 +564,8 @@ test.describe("signed-in dashboard: clear tasks and customize", () => {
     for (const def of DASHBOARD_TILES.filter((d) => !CRM_CARD.has(d.key))) {
       await expect(sheet.getByTestId(`customize-tile-${def.key}`)).toBeVisible();
     }
-    await expect(sheet.getByTestId("badge-customize-locked-cloudflare")).toContainText("Agency plan");
+    // The Agency sample includes Cloudflare since e1f35e3e (no locked badge); the add-on is the locked one.
+    await expect(sheet.getByTestId("badge-customize-locked-cloudflare")).toHaveCount(0);
     await expect(sheet.getByTestId("badge-customize-locked-callAssistant")).toHaveText("Separate service");
     await expect.poll(async () => (await sheet.boundingBox())!.x).toBeLessThanOrEqual(1440 - 447);
     await viewShot(page, "controls-customize-1440");

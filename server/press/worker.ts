@@ -11,6 +11,7 @@
  *                    Anything a program should not decide (a question, an unmatched email) waits for the owner.
  * One process at a time (a Postgres advisory lock). Nothing is charged twice: a resend after changes reuses the credit.
  */
+import { registerWorker, workerInterval } from "../workers";
 import { pool } from "../db";
 import { getFromR2, isR2Key } from "../r2";
 import { PRIMARY_DOMAIN } from "../site-context";
@@ -253,14 +254,17 @@ export async function runPressPass(opts: { inbox: boolean } = { inbox: true }): 
   } finally { client.release(); }
 }
 
-let timers: NodeJS.Timeout[] = [];
+let handles: { stop: () => unknown }[] = [];
 export function startPressWorker(env: NodeJS.ProcessEnv = process.env) {
   const cfg = pressWorkerConfig(env);
   if (!cfg.enabled) return;
-  timers.forEach((t) => clearInterval(t)); timers = [];
-  setTimeout(() => void runPressPass({ inbox: true }).catch((e) => console.error("[press] boot pass:", e)), 90_000).unref();
-  timers.push(setInterval(() => void runPressPass({ inbox: false }).catch((e) => console.error("[press] submit pass:", e)), cfg.submitMinutes * 60_000));
-  timers.push(setInterval(() => void runPressPass({ inbox: true }).catch((e) => console.error("[press] inbox pass:", e)), cfg.inboxHours * 3_600_000));
-  timers.forEach((t) => t.unref());
+  handles.forEach((h) => h.stop()); handles = [];
+  // Registered with the shutdown registry (server/workers.ts): stopped before the pool closes.
+  const boot = setTimeout(() => void runPressPass({ inbox: true }).catch((e) => console.error("[press] boot pass:", e)), 90_000);
+  boot.unref();
+  const unregisterBoot = registerWorker("press boot pass", () => clearTimeout(boot));
+  handles.push({ stop: () => { clearTimeout(boot); unregisterBoot(); } });
+  handles.push(workerInterval("press submit pass", () => runPressPass({ inbox: false }).catch((e) => console.error("[press] submit pass:", e)), cfg.submitMinutes * 60_000));
+  handles.push(workerInterval("press inbox pass", () => runPressPass({ inbox: true }).catch((e) => console.error("[press] inbox pass:", e)), cfg.inboxHours * 3_600_000));
   console.log(`[press] worker: submissions every ${cfg.submitMinutes} min, inbox every ${cfg.inboxHours} h (${mailboxConfigured() ? mailboxConfig().user : "mailbox not configured"}; wire ${wireConfigured() ? "set" : "not set"})`);
 }

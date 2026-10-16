@@ -250,7 +250,8 @@ test("account history and reports fit a narrow mobile viewport", async ({
       },
     }),
   );
-  await page.goto("/site-scan");
+  // Scan history is its own view in the Website tool shell (/site-scan/history).
+  await page.goto("/site-scan/history");
   await page.getByRole("button", { name: /sitescan-mobile/ }).click();
   await expect(
     page.getByRole("heading", { name: "AI fix plan — draft" }),
@@ -462,7 +463,8 @@ test("agency search with 1,000 locations, bulk queue, factual checklist, done, r
       r.url().endsWith(`/api/sitescan/jobs/${id}/retry`),
     );
     await page
-      .getByRole("button", { name: "Rescan / retry PageSpeed" })
+      // PageSpeed was set to 0 pages, so the button says it stays off (c818ee74).
+      .getByRole("button", { name: "Rescan (PageSpeed stays off)" })
       .click();
     expect((await retry).status()).toBe(202);
     await runSiteScanWorker({

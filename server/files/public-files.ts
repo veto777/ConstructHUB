@@ -57,8 +57,21 @@ const cleanSegment = (s: unknown): s is string =>
  * The R2 key for an allowlisted public object, or null (→ 404) for anything else. Takes the route's
  * params (same signature as the 2026-10-16 hotfix on main, which this supersedes).
  */
+// Two-segment keys: uploadToR2(…, folder, ext) with no fileName writes `<folder>/<uuid>.<ext>` (profile avatars,
+// media-library uploads). They never matched the three-part route, so those images were broken before 2026-10-16.
+const TWO_SEGMENT_RULES: readonly { folder: string; filename: (f: string) => boolean }[] = [
+  { folder: "avatars", filename: (f) => UUID_FILE.test(f) },
+  { folder: "media", filename: (f) => new RegExp(`^${UUID}\\.(?:jpe?g|png|webp|gif|mp4|mov)$`, "i").test(f) },
+];
+
 export function publicFileKey(params: { folder?: unknown; subfolder?: unknown; filename?: unknown } | null | undefined): string | null {
   const { folder, subfolder, filename } = params ?? {};
+  if (subfolder === undefined) {
+    if (!cleanSegment(folder) || !cleanSegment(filename)) return null;
+    if (!TWO_SEGMENT_RULES.some((r) => r.folder === folder && r.filename(filename))) return null;
+    const key2 = `${folder}/${filename}`;
+    return isPrivateMediaKey(key2) ? null : key2;
+  }
   if (!cleanSegment(folder) || !cleanSegment(subfolder) || !cleanSegment(filename)) return null;
   const rule = PUBLIC_FILE_RULES.find((r) => r.folder === folder && r.subfolder(subfolder) && r.filename(filename));
   if (!rule) return null;
@@ -155,6 +168,9 @@ export function registerPublicFileRoutes(app: Express, opts: { read?: PublicFile
       res.status(500).json({ message: download ? "Failed to download file" : "Failed to serve file" });
     }
   };
+  // Two-segment routes first: `<folder>/<file>/download` would otherwise match the three-part view route.
+  app.get("/api/files/:folder/:filename", serve(false));
+  app.get("/api/files/:folder/:filename/download", serve(true));
   app.get("/api/files/:folder/:subfolder/:filename", serve(false));
   app.get("/api/files/:folder/:subfolder/:filename/download", serve(true));
 }

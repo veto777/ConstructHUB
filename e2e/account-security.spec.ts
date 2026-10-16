@@ -10,7 +10,7 @@ test.beforeAll(async()=>{
  email=`security-browser-${Date.now()}@example.invalid`;
  ({rows:[{id}]}=await pool.query('INSERT INTO users(email,password_hash,email_verified) VALUES($1,$2,true) RETURNING id',[email,await bcrypt.hash(password,4)]));
 });
-test.afterAll(async()=>{await pool.query('DELETE FROM session WHERE sess->\'passport\'->>\'user\'=$1',[String(id)]);await pool.query('DELETE FROM users WHERE id=$1',[id]);await pool.end();});
+test.afterAll(async()=>{await pool.query('DELETE FROM subscriptions WHERE user_id=$1',[id]);await pool.query('DELETE FROM session WHERE sess->\'passport\'->>\'user\'=$1',[String(id)]);await pool.query('DELETE FROM users WHERE id=$1',[id]);await pool.end();});
 test('enrolls with QR, uses recovery sign-in, remembers/revokes device, and verifies sensitive actions',async({page})=>{
  await page.goto('/auth');
  await page.getByTestId('input-login-email').fill(email);await page.getByTestId('input-login-password').fill(password);await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/auth/login')),page.getByTestId('button-login').click()]);
@@ -57,6 +57,8 @@ test('Google security alert opens account remediation, step-up retries disconnec
  const {rows:[alert]}=await pool.query("SELECT body FROM user_notifications WHERE user_id=$1 AND kind='google.disconnected'",[id]);expect(alert.body).toContain('google-fixture@example.invalid');expect(alert.body).toContain('IP:');expect(alert.body).toContain('Device:');
  await page.getByRole('link',{name:'Reset password',exact:true}).click();await expect(page.getByTestId('input-forgot-email')).toBeVisible();
  await pool.query(`UPDATE session SET sess=(sess::jsonb-'recentAuth')::json WHERE sess->'passport'->>'user'=$1`,[String(id)]);
+ // /locations is plan-gated since be117773 (a plan-less account gets the feature landing), so the fixture needs a plan to reach the Connect link.
+ await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'starter','active')",[id]);
  await page.route('https://accounts.google.com/**',r=>r.fulfill({contentType:'text/html',body:'<h1>Mock Google consent</h1>'}));
  await page.goto('/locations');await page.getByRole('link',{name:'Connect Google Business Profile',exact:true}).click();await expect(page.getByRole('heading',{name:'Verify your identity'})).toBeVisible();await page.getByLabel('Verification',{exact:true}).fill(password);await page.getByRole('button',{name:'Verify and continue'}).click();await expect(page.getByRole('heading',{name:'Mock Google consent'})).toBeVisible();
 });
@@ -96,7 +98,7 @@ test('Google-only owner verifies an emailed code and retries authenticator enrol
   await page.getByTestId('button-enable-2fa').click();
   await expect(page.getByRole('heading', { name: 'Verify your identity' })).toBeVisible();
   await page.getByRole('button', { name: 'Email a verification code' }).click();
-  await expect(page.getByRole('button', { name: 'Code sent' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resend code', exact: true })).toBeVisible();
   const { readFile } = await import('node:fs/promises');
   const mails = (await readFile('tmp/email-outbox.jsonl', 'utf8')).trim().split('\n').map(line => JSON.parse(line));
   const mail = mails.filter(mail => JSON.stringify(mail.to).includes(email)).at(-1);

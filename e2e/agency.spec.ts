@@ -18,6 +18,7 @@ test('1,000 locations: server search, pagination, select all matching, queued bu
   await expect(page.getByText('1–50 of 1000',{exact:true})).toBeVisible();
   await expect(page.locator('[data-testid^="agency-location-"]')).toHaveCount(50);
   await page.getByRole('button',{name:'Next page',exact:true}).click();await expect(page.getByText('51–100 of 1000',{exact:true})).toBeVisible();
+  await page.locator('summary',{hasText:'More'}).click();// selection controls sit under "More" until something is selected (agency-workspace.tsx)
   await page.getByRole('button',{name:'Select all matching (1000)'}).click();
   await page.getByLabel('Bulk action').selectOption('assign');await page.getByLabel('Assign to client').selectOption(String(client));
   await page.getByRole('button',{name:'Queue selected action'}).click();await expect(page.getByRole('status').filter({hasText:'1000 location actions queued'})).toBeVisible();
@@ -28,10 +29,14 @@ test('1,000 locations: server search, pagination, select all matching, queued bu
 });
 test('client metadata and scoped team membership are editable in the browser',async({page})=>{
   await page.goto('/agency/clients');
-  await page.getByLabel('Client name').fill('Browser client created');await page.getByLabel('Contact email').fill('new-client@example.invalid');await page.getByLabel('Client folder').fill('West');await page.getByLabel('Client tags').fill('roofing, active');await page.getByLabel('Client notes').fill('Browser fixture notes');await page.getByRole('button',{name:'Create client',exact:true}).click();
-  await expect(page.getByRole('button',{name:'Edit Browser client created'})).toBeVisible();await page.getByRole('button',{name:'Edit Browser client created'}).click();await page.getByLabel('Client name').fill('Browser client edited');await page.getByRole('button',{name:'Save client',exact:true}).click();await expect(page.getByRole('button',{name:'Edit Browser client edited'})).toBeVisible();
+  await page.getByLabel('Client name').fill('Browser client created');await page.getByLabel('Contact email').fill('new-client@example.invalid');await page.getByText('More client details',{exact:true}).click();await page.getByLabel('Client folder').fill('West');await page.getByLabel('Client tags').fill('roofing, active');await page.getByLabel('Client notes').fill('Browser fixture notes');await page.getByRole('button',{name:'Create client',exact:true}).click();
+  // 4f9f281c: clients are Google-style list rows; each row has a plain "Edit" pill
+  const clientRow=(name:string)=>page.locator('[data-testid^="agency-client-"]').filter({has:page.getByText(name,{exact:true})});
+  await expect(clientRow('Browser client created')).toBeVisible();await clientRow('Browser client created').getByRole('button',{name:'Edit',exact:true}).click();await page.getByLabel('Client name').fill('Browser client edited');await page.getByRole('button',{name:'Save client',exact:true}).click();await expect(clientRow('Browser client edited').getByRole('button',{name:'Edit',exact:true})).toBeVisible();
   await page.getByTestId('subnav-agency-team').click();await expect(page).toHaveURL(/\/agency\/team/);const email=(await q('SELECT email FROM users WHERE id=$1',[member]))[0].email;
-  await page.getByLabel('Member email').fill(email);await page.getByLabel('Member role').selectOption('viewer');await page.getByLabel('Member client IDs').fill(String(client));await page.getByRole('button',{name:'Save member',exact:true}).click();await expect(page.getByText(email+' · viewer · '+client,{exact:false})).toBeVisible();
+  await page.getByLabel('Member email').fill(email);await page.getByLabel('Member role').selectOption('viewer');// 4f9f281c: client IDs textbox became a searchable client checklist; member rows show "Clients: <names>"
+  await page.getByLabel('Find client').fill(prefix);await page.getByRole('checkbox',{name:prefix,exact:true}).check();await page.getByRole('button',{name:'Save member',exact:true}).click();
+  const memberRow=page.getByTestId('agency-member-'+member);await expect(memberRow).toContainText(email);await expect(memberRow).toContainText('viewer');await expect(memberRow).toContainText('Clients: '+prefix);
   expect((await q('SELECT role,all_clients FROM agency_members WHERE user_id=1 AND member_id=$1',[member]))[0]).toEqual({role:'viewer',all_clients:false});
 });
 test('client onboarding queues instructions to the connected agency email and opens a capability link without OAuth',async({page})=>{
@@ -40,8 +45,10 @@ test('client onboarding queues instructions to the connected agency email and op
     await page.goto('/agency/onboarding');
     await page.getByLabel('Onboarding client').selectOption(String(client));await page.getByLabel('Agency Google account').selectOption('agency-browser-fixture');
     await page.getByLabel('Onboarding business name').fill('Onboarding browser fixture');await page.getByLabel('Onboarding Place ID').fill('browser-fixture-place');
-    await page.getByRole('button',{name:'Email manager instructions'}).click();await expect(page.getByText('Email queued · browser@example.invalid → manager@example.invalid')).toBeVisible();
-    const link=await page.getByLabel('Copyable onboarding link').first().inputValue();const target=new URL(link);
+    await page.getByRole('button',{name:'Email manager instructions'}).click();// 4f9f281c: onboarding requests became Google-style list rows (status chip + meta, "Open instructions" link instead of a copy textbox)
+    const row=page.locator('[data-testid^="agency-onboarding-"]').filter({hasText:'Onboarding browser fixture'}).first();
+    await expect(row).toContainText('browser@example.invalid → manager@example.invalid');await expect(row).toContainText('Email queued');
+    const link=await row.getByRole('link',{name:'Open instructions'}).getAttribute('href');const target=new URL(link!,page.url());
     const r=await page.request.get(target.pathname);expect(r.status()).toBe(200);expect(await r.text()).toContain('manager@example.invalid');expect(await r.text()).toContain('Choose Manager');
     expect((await q("SELECT status,opened_at FROM agency_onboarding WHERE user_id=1 AND subject='agency-browser-fixture'"))[0]).toMatchObject({status:'opened',opened_at:expect.any(Date)});
   }finally{await q("DELETE FROM agency_onboarding WHERE user_id=1 AND subject='agency-browser-fixture'");await q("DELETE FROM gbp_grants WHERE user_id=1 AND google_subject='agency-browser-fixture'");}

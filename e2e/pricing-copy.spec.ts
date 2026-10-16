@@ -42,12 +42,12 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
 
 test("Terms list the new plans, add-ons, trial and sales-rep services", async ({ page }) => {
   await page.goto("/terms");
-  await expect(page.getByTestId("text-effective-date")).toHaveText("Last updated: October 7, 2026");
+  await expect(page.getByTestId("text-effective-date")).toHaveText("Last updated: October 14, 2026"); // bumped in cdcfe38b (Compliance Dept terms)
   const plans = page.getByTestId("list-plans");
   for (const key of PLAN_KEYS) await expect(plans).toContainText(`${PLANS[key].name} — ${planPriceLine(key)}`);
   await expect(page.getByTestId("section-subscription-plans")).toContainText("1-day trial");
   await expect(page.getByTestId("section-subscription-plans")).toContainText("There is no free plan");
-  await expect(page.getByTestId("section-add-ons")).toContainText("Extra seat — $15/month");
+  await expect(page.getByTestId("section-add-ons")).toContainText(`${ADDONS.extra_seat.name} — $${ADDONS.extra_seat.monthlyCents / 100}/month`); // renamed "Extra team seat" in 1833850c
   await expect(page.getByTestId("section-done-for-you")).toContainText("$1,000 or more");
   await expect(page.getByTestId("section-done-for-you")).toContainText(SALES_REP_LABEL);
   // Consulting sessions are no longer sold (owner decision 2026-09-30); custom work is quoted.
@@ -110,7 +110,7 @@ test("AI Call Assistant: a separate service, every figure from the price book on
   await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.ownNumbers);
   await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.cancel);
   await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.payment);
-  await expect(faq).toContainText(`Yes. ${callAssistantYearlyNote()}.`);
+  await expect(faq).toContainText(`Yes: ${callAssistantYearlyNote()}.`);
   for (const q of ["What counts as a minute?", "Do spam calls use my minutes?", "Which tier do I need?", "Do I need a ConstructHUB plan?", "What if I need more than the top tier?"]) await expect(faq).toContainText(q);
   await expect(faq).toContainText(callAssistantTierAdvice());
   await expect(faq).toContainText(callAssistantOverageRule());
@@ -179,6 +179,11 @@ test("AI Call Assistant: a separate service, every figure from the price book on
 });
 
 test("Master Class: modules and bundle at $1,000+ are sold through a sales rep", async ({ page }) => {
+  // Dev user 1 is a platform admin, so its real course access includes everything; answer as an account without it.
+  await page.route("**/api/course-access", (r) => r.fulfill({ json: {
+    included: false, purchases: [], unlocked: { licensing: false, gmb: false, website: false, seo: false },
+    all: false, any: false, devPreview: false, signedIn: true,
+  } }));
   await page.goto("/master-class?tab=pricing");
   await expect(page.getByTestId("text-bundle-price")).toHaveCount(0);
   await expect(page.locator('[data-testid^="button-module-sales-"]').first()).toBeVisible();

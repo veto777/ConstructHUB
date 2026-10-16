@@ -144,6 +144,8 @@ export async function emitCrmEvent(orgId: string, event: string, payload: any): 
               "ConstructHUB-Event": event,
             },
             body, signal: ctl.signal,
+            // Never follow a redirect: the URL was checked against private/link-local addresses, a Location header was not.
+            redirect: "manual",
           });
           clearTimeout(timer);
           lastStatus = r.status;

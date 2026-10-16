@@ -53,6 +53,9 @@ const PUBLIC: Record<string, string> = {
   [`logos/gmb/${U()}.jpg`]: "image/jpeg",
   [`photos/reviews/${U()}.jpeg`]: "image/jpeg",
   [`media/${U()}/acme-roofing-tampa-1.jpg`]: "image/jpeg",
+  // Two-segment keys (avatars, media-library uploads) on GET /api/files/:folder/:filename (2026-10-16).
+  [`avatars/${U()}.png`]: "image/png",
+  [`media/${U()}.jpg`]: "image/jpeg",
   [`social/${randomUUID().replace(/-/g, "")}/media.mp4`]: "video/mp4",
 };
 const ORG = `org-${U().slice(0, 8)}`;
@@ -63,14 +66,12 @@ const PRIVATE: string[] = [
   `jobcam-dev1/${ORG}/${U()}/thumb.jpg`,
   `ytvideo/42/${U()}/original.mp4`,
   `issue-reports/${U()}.png`,
-  `avatars/${U()}.png`,
   `backups/db/constructhub-2026-10-15.dump`,
   `crm/attachments/estimate-1001.pdf`,
   `support/recordings/RE123.mp3`,
   `press/inbox/${U()}.pdf`,
   `research/reports/${U()}.pdf`,
   `logos/company/not-a-uuid.png`,
-  `media/${U()}.jpg`,
   `tutorials/getting-started.abcd1234.mp4`,
 ];
 for (const [k, t] of Object.entries(PUBLIC)) bucket.set(k, { body: Buffer.from(`public:${k}`), contentType: t });
@@ -81,8 +82,9 @@ const k3 = (folder: unknown, subfolder: unknown, filename: unknown) => ({ folder
 describe("publicFileKey — pure", () => {
   it("accepts every public-by-design shape", () => {
     for (const k of Object.keys(PUBLIC)) {
-      const [folder, subfolder, filename] = k.split("/");
-      expect(publicFileKey({ folder, subfolder, filename }), k).toBe(k);
+      const parts = k.split("/");
+      const params = parts.length === 2 ? { folder: parts[0], filename: parts[1] } : { folder: parts[0], subfolder: parts[1], filename: parts[2] };
+      expect(publicFileKey(params), k).toBe(k);
     }
   });
   it("refuses private prefixes and smuggled separators", () => {

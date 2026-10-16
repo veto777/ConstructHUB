@@ -94,6 +94,8 @@ beforeAll(async () => {
     const raw = String(init.body);
     const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries(init.headers ?? {})) headers[k.toLowerCase()] = String(v);
+    // A signed delivery must never follow a redirect off the validated host (Kimi review, 2026-10-16).
+    if (init.redirect !== "manual") throw new Error(`webhook delivered with redirect=${init.redirect}`);
     deliveries.push({ event: headers["constructhub-event"], body: JSON.parse(raw), headers, raw });
     return new Response("ok", { status: hookStatus });
   }));
