@@ -1529,3 +1529,9 @@ bdb16ef2 (sc-llr-board-orders, va-eva-debarred) was deployed from a clean detach
 (/mnt/scratch/worktrees/ConstructHUB-deploy-b, removed afterwards) with `DEPLOY_ALLOW_UNSAFE=1`. Why: the
 branch `main` was checked out in ~/ConstructHUB-release by another session, so it couldn't be checked out again
 without moving that session's tree. The commit built was exactly origin/main and the tree was clean; deploy OK.
+
+## 2026-10-16 — robots-only sources batch A deployed with DEPLOY_ALLOW_UNSAFE=1
+6f2a2623 (ID eDOPL licenses, OR CCB complaint/discipline history, LA plumbing board roster, WV CLB license search +
+wv-clb-actions) was deployed from a clean detached checkout of origin/main (/mnt/scratch/worktrees/ConstructHUB-deploy-a,
+removed afterwards) with `DEPLOY_ALLOW_UNSAFE=1`, for the same reason as above: `main` is checked out in
+~/ConstructHUB-release by another session. The commit built was exactly origin/main and the tree was clean; deploy OK.
