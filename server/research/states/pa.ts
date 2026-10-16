@@ -289,6 +289,8 @@ export const pack: StatePack = {
     { id: "pa-philadelphia", state: "PA", label: "Philadelphia L&I trade licenses", pageUrl: PHL_PAGE, everyHours: 24, minRows: 35_000, load: phillyLoader },
     { id: "pa-dli-debarments", state: "PA", label: "Pennsylvania L&I Prevailing Wage Act debarments", pageUrl: PA_DLI_DEBAR, everyHours: 24 * 7, minRows: 3,
       load: dliDebarmentsLoader, companiesOnly: true, category: "debarment" },
+    // Back on by OWNER ORDER 2026-10-15: data.wprdc.org's robots.txt Disallow no longer stops a search (http.ts).
+    { id: "pa-pittsburgh", state: "PA", label: "Pittsburgh PLI contractor and trade licenses", pageUrl: PGH_PAGE, everyHours: 24 * 7, minRows: 7_000, load: pittsburghLoader },
   ],
   enforcement: ENFORCEMENT,
   liveEnforcement: LIVE_ENFORCEMENT,
@@ -297,7 +299,6 @@ export const pack: StatePack = {
     "PA Attorney General home improvement contractor registry (hicsearch.attorneygeneral.gov): Cloudflare Turnstile CAPTCHA on the search and its .xlsx download",
     "PA Department of State PALS license verification (pals.pa.gov; architects, engineers, crane operators and other state boards): the search loads Google reCAPTCHA v3",
     "PA Attorney General consumer complaints: no open dataset on data.pa.gov",
-    "Pittsburgh PLI contractor and trade licenses (data.wprdc.org): robots.txt disallows /api/ and /datastore/dump/ for every agent (checked 2026-10-15); the loader is kept (pittsburghLoader) but not registered",
     "PA Common Pleas civil cases: not on the UJS web portal (county systems only)",
   ],
 };

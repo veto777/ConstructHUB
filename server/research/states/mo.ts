@@ -246,16 +246,14 @@ export const pack: StatePack = {
   checked: "2026-10-15",
   licenses: [MO_OWTS],
   liveLicenses: [MO_LIVE],
-  // MO_ELECTRICAL and MO_AE are kept for the record but not registered: their files are served from
-  // modpr.file.force.com, whose robots.txt (Salesforce's) disallows every path for all agents but Googlebot
-  // (checked 2026-10-15). The live licensee search covers the same licenses.
-  bulk: [],
+  // MO_ELECTRICAL and MO_AE are back on by OWNER ORDER 2026-10-15: modpr.file.force.com's robots.txt Disallow no longer
+  // stops a download (http.ts). The live licensee search adds non-active licenses and discipline status.
+  bulk: [MO_ELECTRICAL, MO_AE],
   noStatewideGcLicense:
     "Missouri does not license general contractors statewide; cities and counties license contractors and trades, and the optional statewide electrical contractor license is searched above",
   blocked: [
     "Missouri Division of Labor Standards contractor debarment list (labor.mo.gov/contractor-debarment-list): reads 'No contractors debarred at this time' on 2026-10-15, nothing to search",
     "Missouri Secretary of State business entities: no free bulk file or open API (the online search is per entity)",
-    "MO PRO downloadable listings (electrical contractors; architects, engineers, land surveyors, landscape architects): the files are served from modpr.file.force.com, whose robots.txt disallows all paths for every agent but Googlebot (checked 2026-10-15), so they are not downloaded; the live licensee search covers these licenses",
     "MO PRO downloadable listings hold active licenses only; non-active licenses and discipline status come from the live licensee search",
   ],
 };

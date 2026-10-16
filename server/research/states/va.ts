@@ -224,11 +224,10 @@ async function searchScc(name: string): Promise<EnforcementHit[]> {
   return withNote(out, notes.join("; ") || null);
 }
 
-// The SCC copies were searched through data.virginia.gov's CKAN datastore API, which its robots.txt disallows
-// (Disallow: /api/ and /datastore/*, checked 2026-10-15), so the search is not registered (HARD RULE 2). The allowed
-// path is each dataset's file download (corp.xlsx, ~1M rows), not loaded yet.
+// The SCC copies are searched through data.virginia.gov's CKAN datastore API. Its robots.txt disallows /api/ and
+// /datastore/*; back on by OWNER ORDER 2026-10-15, under which a robots.txt Disallow no longer stops a search (http.ts).
 export const SCC_SEARCH: LiveEnforcementSearch = { source: "Virginia SCC business entity status (open data)", scope: "Corporations (copy of 2024-11-14) and LLCs (copy of 2026-03-24, first 1,048,575 rows)", category: "business_status", search: searchScc };
-const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [];
+const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [SCC_SEARCH];
 
 export const pack: StatePack = {
   state: "VA",
@@ -239,7 +238,6 @@ export const pack: StatePack = {
     "DPOR License Lookup (dporweb.dpor.virginia.gov/LicenseLookup), which also carries board orders: reCAPTCHA on the search",
     "DPOR disciplinary orders: no list or download; published only per licensee in the CAPTCHA lookup and in board minutes on Town Hall (PDF)",
     "eVA Inactive Vendor List (DGS debarred/enjoined contractors, logi.cgieva.com Report9020): robots.txt Disallow: /",
-    "SCC business entities on data.virginia.gov (corporation, llc-limited-liability-company): robots.txt disallows /api/ and /datastore/* (checked 2026-10-15), so the datastore search is not used; the datasets' .xlsx downloads are allowed but not loaded yet",
     "SCC Clerk's Information System bulk data: paid subscription ($1,000/month per the SCC page); only the dated open-data copies are used",
     "data.virginia.gov SCC Lien Details: no debtor names, only filing numbers",
   ],

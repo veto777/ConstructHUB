@@ -352,7 +352,9 @@ export async function purgeLegacyKeys(sources: BulkSource[], log = (m: string) =
  * reads them (every read is by a registered source's id), so they are deleted. Named one by one, never "whatever isn't
  * registered", so a source switched off by configuration keeps its rows.
  */
-export const RETIRED_BULK_SOURCES: readonly string[] = ["mo-dpr-ae", "mo-dpr-electrical", "pa-pittsburgh", "sc-des-enforcement", "wv-purchasing-debarred", "wi-dnr-wells", "wi-dhs-abatement"];
+// mo-dpr-ae, mo-dpr-electrical, pa-pittsburgh and wv-purchasing-debarred are registered again (OWNER ORDER 2026-10-15:
+// a robots.txt Disallow no longer stops a search), so they are no longer retired.
+export const RETIRED_BULK_SOURCES: readonly string[] = ["sc-des-enforcement", "wi-dnr-wells", "wi-dhs-abatement"];
 
 /**
  * Deletes the stored rows and the load record of each retired source that is not registered, in batches of 5,000 rows

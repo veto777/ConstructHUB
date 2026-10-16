@@ -1,10 +1,14 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Session, pickZipMember, unzipFirst } from "./g6-common";
 import { PortalBlockedError, resetHostState } from "../../http";
+import { setRobotsEnforced as __setRobotsEnforced } from "../../http";
+// These tests exercise the robots.txt Disallow rule, which the OWNER ORDER of 2026-10-15 switched off in production.
+beforeAll(() => __setRobotsEnforced(true));
+afterAll(() => __setRobotsEnforced(false));
 
 describe("g6 zip members", () => {
   it("picks the one member that matches, folders aside", () => {

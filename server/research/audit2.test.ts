@@ -2,7 +2,7 @@
  * Regression tests for the core fixes of the round-2 Codex audit (2026-10-15, decisions 1–13). Each would have caught
  * its finding. Pack-specific fixes are tested in states/<st>.test.ts.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,6 +17,10 @@ import { politeFetch as permitFetch, retryAfterMs as permitRetryAfter } from "..
 import { LicenseSet, crossReference, licenseKey, searchById, searchCustomerIds, type LicenseFinder } from "./xref";
 import { liveFinder, namesMatch } from "./runner";
 import { dateOf, entityHolder } from "./licenses";
+import { setRobotsEnforced as __setRobotsEnforced } from "./http";
+// These tests exercise the robots.txt Disallow rule, which the OWNER ORDER of 2026-10-15 switched off in production.
+beforeAll(() => __setRobotsEnforced(true));
+afterAll(() => __setRobotsEnforced(false));
 
 const lic = (o: Partial<LicenseHit>): LicenseHit => ({
   state: "SD", source: "Test board", sourceUrl: "https://example.test", businessName: null, licenseNumber: null, licenseType: "Plumber",

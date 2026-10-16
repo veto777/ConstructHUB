@@ -185,12 +185,19 @@ describe("coverage claims (decision 11)", () => {
   });
 });
 
-describe("CourtListener is searched again (OWNER ORDER 2026-10-15)", () => {
-  it("is on, and only its REST API skips robots.txt", async () => {
+describe("robots.txt no longer stops a search (OWNER ORDER 2026-10-15)", () => {
+  it("CourtListener is on, and a robots.txt Disallow lets the request through (a challenge still refuses: audit2)", async () => {
     const { COURTLISTENER_ALLOWED } = await import("./records");
-    const { ROBOTS_OWNER_EXEMPT } = await import("./http");
+    const { robotsAllowed, checkRobots, resetHostState } = await import("./http");
     expect(COURTLISTENER_ALLOWED).toBe(true);
-    expect(ROBOTS_OWNER_EXEMPT).toEqual(["https://www.courtlistener.com/api/rest/"]);
+    resetHostState();
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u) =>
+      /deny\.test/.test(String(u)) ? new Response("User-agent: *\nDisallow: /", { status: 200, headers: { "content-type": "text/plain" } })
+        : new Response("Forbidden", { status: 403 }));
+    expect(await robotsAllowed("https://deny.test/api/x")).toBe(true);
+    await expect(checkRobots("https://deny.test/api/x")).resolves.toBeUndefined();
+    vi.restoreAllMocks();
+    resetHostState();
   });
 });
 

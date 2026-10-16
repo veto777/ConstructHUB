@@ -3,9 +3,13 @@
  * the scraper's API posts are followed hop by hop through the guard, each answer noted against the URL that answered)
  * and #12 (request-owned turns; an expired turn aborts its request before the next one may go).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import { PortalBlockedError, blockHost, guard, guardBrowser, hostBlocked, noteResponse, releaseHost, resetHostState, robotsFor, type Turn } from "./http";
 import { researchPost, researchTransport, type ResearchTransport } from "../scrapers/research-transport";
+import { setRobotsEnforced as __setRobotsEnforced } from "./http";
+// These tests exercise the robots.txt Disallow rule, which the OWNER ORDER of 2026-10-15 switched off in production.
+beforeAll(() => __setRobotsEnforced(true));
+afterAll(() => __setRobotsEnforced(false));
 
 afterEach(() => { vi.restoreAllMocks(); resetHostState(); });
 
