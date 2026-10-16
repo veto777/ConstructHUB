@@ -12,6 +12,7 @@
  * Anyone who asks us to stop is never emailed again (backlink_suppression).
  * One process at a time (a Postgres advisory lock).
  */
+import { promises as dns } from "node:dns";
 import { MEDIA_INBOX_PARAMETERS } from "@shared/media-inbox";
 import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
@@ -33,7 +34,20 @@ export const MAX_ATTEMPTS = MEDIA_INBOX_PARAMETERS.aiAttemptsBeforeHolding;
 export const MAX_REPLIES_PER_DAY = MEDIA_INBOX_PARAMETERS.maxRepliesPerSenderPerDay;
 const ANSWER_BATCH = 25;
 
-export const workerDeps = { fetchSince, sendMail, decide, extractNextStep };
+/**
+ * Can the address's domain receive mail at all? Bounces hurt the new mailbox (2026-10-15: 9 of ~140 cold emails, ~6%;
+ * Gmail flags senders past ~2%). Port 25 is closed on the server, so mailboxes can't be probed: a domain with no MX
+ * record (or a null MX) is skipped; a DNS timeout is not held against it.
+ */
+export async function acceptsMail(domain: string): Promise<boolean> {
+  try {
+    const mx = await dns.resolveMx(domain);
+    return mx.some((r) => r.exchange && r.exchange !== ".");
+  } catch (e: any) {
+    return !["ENOTFOUND", "ENODATA", "ESERVFAIL", "NXDOMAIN"].includes(e?.code);
+  }
+}
+export const workerDeps = { fetchSince, sendMail, decide, extractNextStep, acceptsMail };
 
 /**
  * Step 2b: an auto-reply from a company we contacted is never answered, but it is read (owner, 2026-10-14: "do not
@@ -364,6 +378,9 @@ export async function sendQueued(): Promise<{ queued: number; sent: number; skip
   for (const q of await store.nextQueued(Math.min(room, Math.max(1, Math.ceil(allowance / 4))))) {
     if (await isSuppressed(q.to_email) || machineReason({ fromEmail: q.to_email, subject: "" })) { await store.finishQueued(q.id, "skipped", "Suppressed or not a person's address"); skipped++; continue; }
     if (await store.partnerIdForEmail(q.to_email, q.domain)) { await store.finishQueued(q.id, "skipped", "Already in contact"); skipped++; continue; }
+    if (await store.hasBounced(q.to_email)) { await store.finishQueued(q.id, "skipped", "This address bounced before"); skipped++; continue; }
+    const mailDomain = q.to_email.split("@")[1] ?? "";
+    if (!(await workerDeps.acceptsMail(mailDomain))) { await store.finishQueued(q.id, "skipped", `${mailDomain} has no mail server (no MX record)`); skipped++; continue; }
     const t = QUEUE_TEMPLATES[q.kind] ?? QUEUE_TEMPLATES.directory;
     const body = t.body(q.company);
     const messageId = await workerDeps.sendMail({ to: q.to_email, subject: t.subject, body });
