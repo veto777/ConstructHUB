@@ -740,7 +740,13 @@ export async function refreshDueSources(sources: BulkSource[], log = (m: string)
     // past its window (CSLB on 2026-10-15: reached at 12:52 UTC behind the key-format reloads, and cut off).
     const open = (src: BulkSource) => !!src.utcHours?.includes(new Date().getUTCHours());
     const ordered = [...sources.filter(open), ...sources.filter((s) => !open(s) && stale(s)), ...sources.filter((s) => !open(s) && !stale(s))];
-    for (const src of ordered) {
+    // A windowed source that failed in this pass is tried again an hour later while its start hours last, ahead of the
+    // rest of the queue (CSLB on 2026-10-16: failed at 09:46 UTC, then a 72-minute load held the pass past its window).
+    const failedAt = new Map<string, number>();
+    const retryDue = () => sources.find((s) => s.utcHours && failedAt.has(s.id) && Date.now() - failedAt.get(s.id)! > 3600_000 && open(s));
+    const queue = [...ordered];
+    for (let src = queue.shift(); src; src = retryDue() ?? queue.shift()) {
+      if (failedAt.delete(src.id)) byId.set(src.id, { ...byId.get(src.id), attempted_at: null });
       const r = byId.get(src.id);
       const due = (t: Date | null, hours: number) => !t || Date.now() - new Date(t).getTime() > hours * 3600_000;
       // A failed source waits 6 hours before the next try; a loaded one waits its full interval (an old key format: due now).
@@ -752,6 +758,7 @@ export async function refreshDueSources(sources: BulkSource[], log = (m: string)
         log(`${src.id}: loaded ${n} rows in ${Math.round((Date.now() - t0) / 1000)}s`);
       } catch (err: any) {
         log(`${src.id}: load failed: ${String(err?.message ?? err).slice(0, 300)}`);
+        if (src.utcHours) failedAt.set(src.id, t0);
       }
       await sleep(5_000);
     }

@@ -25,13 +25,14 @@
  */
 import { flipPerson, personText } from "./person-name";
 import { execFile, spawn } from "node:child_process";
+import type { IncomingMessage } from "node:http";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { inflateSync } from "node:zlib";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { USER_AGENT, fetchWithDeadline, rateLimitHost, rethrowIfBlocked } from "./http";
+import { USER_AGENT, fetchWithDeadline, rateLimitHost, refuseChallengeBody, rethrowIfBlocked } from "./http";
 import { adverseFrom } from "./adverse";
 import { curlProxy, proxyFailure, researchEgress } from "./egress";
 import { looksLikeBusiness, looksLikeBusinessTrailingSuffix, personNameForm } from "./states/lib/business-name";
@@ -794,6 +795,18 @@ const CSLB = "https://www.cslb.ca.gov/onlineservices/dataportal/ContractorList";
 const CSLB_START_HOURS = [9, 10, 11];
 /** CSLB serves its files fast only in the small hours, Pacific time (09–13 UTC); later tries are cut off. */
 const cslbWindowOpen = () => new Date().getUTCHours() >= 9 && new Date().getUTCHours() < 13;
+/**
+ * What CSLB sent instead of a CSV, for the error: its type, status, size and first characters (on 2026-10-16 it was
+ * "no file (HTTP 200)" with nothing else to go on). A bot challenge page blocks the host and throws (A10, finding 6).
+ */
+async function cslbNotAFile(url: string, res: IncomingMessage): Promise<string> {
+  let head = "";
+  try { for await (const c of res) { head += (c as Buffer).toString("utf8"); if (head.length >= 64 * 1024) break; } }
+  finally { res.destroy(); }
+  refuseChallengeBody(url, res.statusCode ?? 0, head);
+  const start = head.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+  return `CSLB sent ${res.headers["content-type"] ?? "no file"} (HTTP ${res.statusCode}, ${head.length >= 64 * 1024 ? "64 KB+" : `${head.length} bytes`}${start ? `: "${start}"` : ""})`;
+}
 async function cslbFile(file: "MasterLicenseData" | "PersonnelData"): Promise<string> {
   const url = `https://www.cslb.ca.gov/OnlineServices/DataPortal/DownLoadFile.ashx?fName=${file}&type=C`;
   let last: unknown;
@@ -803,13 +816,14 @@ async function cslbFile(file: "MasterLicenseData" | "PersonnelData"): Promise<st
     try {
       await rateLimitHost(url, 2000);
       const res = await plainRequest(url, { timeoutMs: 10 * 60_000 });
-      if (!/text\/csv/i.test(String(res.headers["content-type"] ?? ""))) { res.resume(); throw new Error(`CSLB sent ${res.headers["content-type"] ?? "no file"} (HTTP ${res.statusCode})`); }
+      if (!/text\/csv/i.test(String(res.headers["content-type"] ?? ""))) throw new Error(await cslbNotAFile(url, res));
       return await saveResponse(res);
     } catch (err) {
       // An access denial (401/403, robots.txt, a cooldown too long) is never retried (round 2, decision 6).
       rethrowIfBlocked(err);
       last = err;
-      await new Promise((r) => setTimeout(r, 60_000 * (attempt + 1)));
+      // 5, then 10 minutes: on 2026-10-16 CSLB sent an empty answer for at least 6 minutes (09:39–09:46 UTC).
+      await new Promise((r) => setTimeout(r, 5 * 60_000 * (attempt + 1)));
     }
   }
   throw last;
