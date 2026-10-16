@@ -17,6 +17,7 @@ import { join } from "node:path";
 import type { LicenseHit } from "@shared/research-reports";
 import { CHROMIUM_ARGS, USER_AGENT } from "../../scrapers/polite-fetch";
 import { guardBrowser } from "../http";
+import { newResearchContext } from "../egress";
 import { clean, usDate, type BulkHit } from "../bulk";
 import { xlsxRecords } from "./lib/g2-xlsx";
 import { personText } from "../person-name";
@@ -102,7 +103,8 @@ async function* vtOprLoader(): AsyncIterable<BulkHit> {
   const { chromium } = await import("playwright-core");
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, headless: true, args: CHROMIUM_ARGS });
   try {
-    const context = await browser.newContext({ userAgent: USER_AGENT, acceptDownloads: true });
+    // Through the research proxy when RESEARCH_PROXY_URL is set (egress.ts).
+    const context = await newResearchContext(browser, { userAgent: USER_AGENT, acceptDownloads: true });
     const page = await context.newPage();
     const check = await guardPage(page);
     for (const r of ROSTERS) {

@@ -2,7 +2,7 @@
 import { pool } from "../db";
 import type { MediaDecision } from "./ai";
 import type { Inbound } from "./mailbox";
-import type { MediaPartnerKind } from "@shared/media-inbox";
+import type { MediaPartnerKind, MediaQueueRow, MediaSettings } from "@shared/media-inbox";
 
 export const storeDeps = { db: () => pool };
 const db = () => storeDeps.db();
@@ -540,4 +540,86 @@ export async function firstOutbound(partnerId: number): Promise<{ subject: strin
 
 export async function markAutoReplyTried(messageId: number) {
   await db().query(`UPDATE media_messages SET attempts = attempts + 1 WHERE id = $1`, [messageId]);
+}
+
+// ── admin controls ───────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** The admin's saved settings (only the fields they changed; worker.ts fills the rest from env). */
+export async function getSettings(): Promise<Partial<MediaSettings>> {
+  const r = await db().query(`SELECT value FROM media_settings WHERE id = 1`);
+  return (r.rows[0]?.value ?? {}) as Partial<MediaSettings>;
+}
+
+export async function saveSettings(patch: Partial<MediaSettings>): Promise<void> {
+  await db().query(
+    `INSERT INTO media_settings (id, value) VALUES (1, $1::jsonb) ON CONFLICT (id) DO UPDATE SET value = media_settings.value || $1::jsonb, updated_at = now()`,
+    [JSON.stringify(patch)]);
+}
+
+const queueRow = (x: any): MediaQueueRow => ({
+  id: x.id, domain: x.domain, company: x.company, kind: x.kind, toEmail: x.to_email, status: x.status, reason: x.reason, source: x.source,
+  queuedAt: new Date(x.queued_at).toISOString(), sentAt: x.sent_at ? new Date(x.sent_at).toISOString() : null,
+});
+
+export async function listQueue(f: { status: string; kind?: string; q?: string; limit: number; offset: number }): Promise<{ rows: MediaQueueRow[]; total: number }> {
+  const like = f.q ? `%${f.q.replace(/[%_\\]/g, (c) => `\\${c}`)}%` : null;
+  const r = await db().query(
+    `SELECT *, count(*) OVER()::int AS total FROM media_outreach_queue
+      WHERE status = $1 AND ($2::text IS NULL OR kind = $2) AND ($3::text IS NULL OR company ILIKE $3 OR domain ILIKE $3 OR to_email ILIKE $3)
+      ORDER BY CASE WHEN $1 = 'queued' THEN id END ASC, coalesce(sent_at, queued_at) DESC, id DESC LIMIT $4 OFFSET $5`,
+    [f.status, f.kind ?? null, like, f.limit, f.offset]);
+  return { rows: r.rows.map(queueRow), total: Number(r.rows[0]?.total ?? 0) };
+}
+
+export async function queueByKind(): Promise<Record<string, number>> {
+  const r = await db().query(`SELECT kind, count(*)::int n FROM media_outreach_queue WHERE status = 'queued' GROUP BY kind`);
+  return Object.fromEntries(r.rows.map((x) => [x.kind, x.n]));
+}
+
+export async function getQueued(id: number): Promise<MediaQueueRow | null> {
+  const r = await db().query(`SELECT * FROM media_outreach_queue WHERE id = $1`, [id]);
+  return r.rows[0] ? queueRow(r.rows[0]) : null;
+}
+
+export async function updateQueued(id: number, f: { company?: string; toEmail?: string; kind?: string; status?: "queued" | "skipped" }) {
+  await db().query(
+    `UPDATE media_outreach_queue SET company = COALESCE($2, company), to_email = COALESCE($3, to_email), kind = COALESCE($4, kind),
+       status = COALESCE($5, status), reason = CASE WHEN $5 = 'skipped' THEN 'Skipped by an admin' WHEN $5 = 'queued' THEN NULL ELSE reason END
+      WHERE id = $1 AND status <> 'sent'`,
+    [id, f.company ?? null, f.toEmail ?? null, f.kind ?? null, f.status ?? null]);
+}
+
+/** Add one contact by hand; an existing domain is updated and put back in the queue unless already sent. */
+export async function addQueued(r: { domain: string; company: string; kind: string; email: string }): Promise<number> {
+  const x = await db().query(
+    `INSERT INTO media_outreach_queue (domain, company, kind, to_email, source) VALUES ($1, $2, $3, $4, 'admin')
+     ON CONFLICT (domain) DO UPDATE SET company = $2, kind = $3, to_email = $4, status = CASE WHEN media_outreach_queue.status = 'sent' THEN 'sent' ELSE 'queued' END, reason = NULL
+     RETURNING id`, [r.domain, r.company, r.kind, r.email.toLowerCase()]);
+  return x.rows[0].id;
+}
+
+export async function updatePartnerContact(id: number, f: { company?: string; contactName?: string | null; contactEmail?: string | null }) {
+  await db().query(
+    `UPDATE media_partners SET company = COALESCE($2, company), contact_name = CASE WHEN $3::boolean THEN $4 ELSE contact_name END,
+       contact_email = CASE WHEN $5::boolean THEN $6 ELSE contact_email END, updated_at = now() WHERE id = $1`,
+    [id, f.company ?? null, f.contactName !== undefined, f.contactName ?? null, f.contactEmail !== undefined, f.contactEmail?.toLowerCase() ?? null]);
+}
+
+/** Stop emailing a company: declined, every address we used suppressed, its waiting emails closed. */
+export async function stopPartner(id: number): Promise<string[]> {
+  const r = await db().query(
+    `UPDATE media_partners SET status = 'declined', owner_question = NULL, summary = concat_ws(' ', summary, '· Stopped by an admin.'), updated_at = now()
+      WHERE id = $1 RETURNING contact_email, tried_emails`, [id]);
+  if (!r.rows[0]) return [];
+  const emails = [...new Set([r.rows[0].contact_email, ...(r.rows[0].tried_emails ?? [])].filter(Boolean).map((e: string) => e.toLowerCase()))];
+  for (const e of emails) await db().query(`INSERT INTO backlink_suppression (value, reason) VALUES ($1, 'Stopped by an admin (media@)') ON CONFLICT (value) DO NOTHING`, [e]);
+  await db().query(`UPDATE media_outreach_queue SET status = 'skipped', reason = 'Company stopped by an admin' WHERE status = 'queued' AND lower(to_email) = ANY($1)`, [emails]);
+  await db().query(`UPDATE media_messages SET status = 'replied', reason = concat_ws(' · ', reason, 'Closed: company stopped by an admin') WHERE partner_id = $1 AND direction = 'in' AND status IN ('new','needs_owner','failed')`, [id]);
+  return emails;
+}
+
+/** Automatic replies are off: new emails wait for the admin instead. */
+export async function holdNew(): Promise<number> {
+  const r = await db().query(`UPDATE media_messages SET status = 'needs_owner', reason = 'Automatic replies are off — answer it from the company page' WHERE direction = 'in' AND status = 'new'`);
+  return r.rowCount ?? 0;
 }

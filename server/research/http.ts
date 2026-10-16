@@ -17,12 +17,16 @@
  *   - Access denials throw PortalBlockedError; a source's catch rethrows it (rethrowIfBlocked) instead of moving on to
  *     the next request. Other HTTP errors (a 404 on one detail page) are plain Errors.
  *
+ * Every request here leaves through the research egress (./egress.ts): RESEARCH_PROXY_URL's proxy when it is set,
+ * this server's own address when not; a proxy failure is a ResearchProxyError, never a direct retry.
+ *
  * Every source under server/research uses this module (not ../scrapers/polite-fetch directly). A source with its own
  * client (a plain HTTPS request, a browser) calls guard() before each request and noteResponse() after it.
  */
 import { PortalBlockedError, USER_AGENT, rateLimitHost as limitHost, sleep } from "../scrapers/polite-fetch";
+import { ResearchProxyError, assertBrowserEgress, researchFetch } from "./egress";
 
-export { PortalBlockedError, USER_AGENT, sleep };
+export { PortalBlockedError, ResearchProxyError, USER_AGENT, sleep };
 
 export type ResearchFetchOptions = {
   minDelayMs?: number;
@@ -50,9 +54,12 @@ export function retryAfterMs(v: string | null | undefined, now = Date.now()): nu
   return Number.isFinite(at) ? Math.max(0, at - now) : null;
 }
 
-/** Rethrows an access denial (401/403, robots.txt, a blocked host, a cooldown too long to wait); anything else returns. */
+/**
+ * Rethrows an access denial (401/403, robots.txt, a blocked host, a cooldown too long to wait) or a research proxy
+ * failure (RESEARCH_PROXY_URL set but unreachable: every later request would fail the same way); anything else returns.
+ */
 export function rethrowIfBlocked(err: unknown): void {
-  if (err instanceof PortalBlockedError) throw err;
+  if (err instanceof PortalBlockedError || err instanceof ResearchProxyError) throw err;
 }
 
 // ── Per-host state ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -334,7 +341,7 @@ async function fetchRobots(origin: string, chain: Set<string>): Promise<{ status
           turn.signal.addEventListener("abort", () => rej(turn.signal.reason), { once: true });
         })]);
       } else {
-        const r = await fetch(cur, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.any([AbortSignal.timeout(15_000), turn.signal]), redirect: "manual" });
+        const r = await researchFetch(cur, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.any([AbortSignal.timeout(15_000), turn.signal]), redirect: "manual" });
         // Every answer but a redirect is read: a 5xx can be a challenge page too (round 6, decision 5).
         const read = !REDIRECTS.has(r.status);
         res = { status: r.status, location: r.headers.get("location"), retryAfter: r.headers.get("retry-after"), text: read ? (await r.text()).slice(0, 200_000) : (await r.body?.cancel().catch(() => undefined), "") };
@@ -510,6 +517,8 @@ async function readRobots(origin: string, chain: Set<string>): Promise<{ rules: 
     if (REDIRECTS.has(res.status)) return { rules: [], denied: "robots.txt redirected without a location" };
     return { rules: [] };
   } catch (err) {
+    // The research proxy failing is not the host's robots.txt failing: no host is refused or cached for it.
+    if (err instanceof ResearchProxyError) throw err;
     const e = err as { status?: number; message?: string };
     const refused = err instanceof PortalBlockedError;
     return {
@@ -589,6 +598,8 @@ type Routable = { route: (pattern: string, handler: (route: any) => Promise<unkn
  * The returned check throws the first access denial seen, so a load stops instead of moving on.
  */
 export async function guardBrowser(target: Routable, minDelayMs = 1000): Promise<() => void> {
+  // With RESEARCH_PROXY_URL set, only a context opened through the research proxy is guarded (and so used).
+  assertBrowserEgress(target);
   let denied: unknown = null;
   const deny = (err: unknown) => { if (err instanceof PortalBlockedError) denied ??= err; };
   /** Requests answered here: every hop's answer is already noted (the "response" event would note the last one against the first URL). */
@@ -716,7 +727,7 @@ async function hops(url: string, init: RequestInit, signal: AbortSignal, minDela
     let res: Response;
     try {
       // The turn's signal aborts the request if it outlives its turn (round 4, finding 12).
-      res = await fetch(cur, { ...init, method, body: method === "GET" || method === "HEAD" ? undefined : body, headers, signal: AbortSignal.any([signal, turn.signal]), redirect: "manual" });
+      res = await researchFetch(cur, { ...init, method, body: method === "GET" || method === "HEAD" ? undefined : body, headers, signal: AbortSignal.any([signal, turn.signal]), redirect: "manual" });
     } catch (e) {
       turn.release();
       // Node gives up connecting after 10 s; no request reached the server, so a fresh connection is tried again.
