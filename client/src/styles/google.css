@@ -369,6 +369,13 @@
   text-decoration: none;
 }
 .g-card__title button:hover, .g-card__title a:hover { text-decoration: underline; }
+/* A row with its own detail view opens from anywhere on it (owner 2026-10-15: "every container you should be able to
+   press"): the title button stretches over the row; links and controls inside stay on top and keep working. */
+.g-card--opens { position: relative; }
+.g-card--opens:hover { background: var(--g-chip); }
+.g-card--opens .g-card__open::after { content: ""; position: absolute; inset: 0; cursor: pointer; }
+.g-card--opens:hover .g-card__open { text-decoration: underline; }
+.g-card--opens :is(.g-card__trailing, .g-card__actions, .g-card__thumb, .g-card__line a, .g-card__meta a, .g-card__body a, .g-card__body button:not(.g-card__open), .g-card__body input, .g-card__body select, .g-card__body label) { position: relative; z-index: 1; }
 .g-card__line { margin: 2px 0 0; font-size: 14px; line-height: 20px; color: var(--g-text-2); overflow-wrap: anywhere; }
 .g-card__line a { color: inherit; }
 .g-card__line a:hover { color: var(--g-text); text-decoration: underline; }
