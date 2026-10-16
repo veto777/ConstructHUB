@@ -60,7 +60,11 @@ test("manual inventory, server search, bulk client mapping and queued monitoring
     page.getByRole("heading", { name: "Domains", exact: true }),
   ).toBeVisible();
   await page.getByLabel("Manual domains").fill(domain);
+  // Search only after the add answered: a search typed while the POST is in flight starts a list fetch that can
+  // read the table before the insert, and the post-add invalidation does not repeat that in-flight fetch.
+  const added = page.waitForResponse((r) => r.url().endsWith("/api/domains/manual") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Add domains", exact: true }).click();
+  expect((await added).status()).toBe(201);
   await page.getByLabel("Search domains", { exact: true }).fill(domain);
   await expect(
     page.getByRole("article").filter({ hasText: domain }).first(),
