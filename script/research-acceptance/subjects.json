@@ -193,6 +193,23 @@
       "matchedOn": "principal"
      },
      "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Wilson Building Maintenancee, Inc. DBA - Artisan Surface Systems",
+     "kind": "company",
+     "source": "Arkansas Contractors Licensing Board and Residential Contractors Committee hearing orders and settlement agreements",
+     "sourceId": "ar-clb-hearings",
+     "from": "bulk file ar-clb-hearings, loaded 2026-10-16",
+     "recordId": "40583",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Arkansas Contractors Licensing Board and Residential Contractors Committee hearing orders and settlement agreements",
+      "id": "40583",
+      "name": "Wilson Building Maintenancee, Inc. DBA - Artisan Surface Systems",
+      "category": "discipline"
+     },
+     "picked": "2026-10-16"
     }
    ]
   },
@@ -938,6 +955,23 @@
       "matchedOn": "principal"
      },
      "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "D.W. Wilburn, Inc.",
+     "kind": "company",
+     "source": "KY Occupational Safety and Health Review Commission decisions (contested citations)",
+     "sourceId": "ky-koshrc-decisions",
+     "from": "bulk file ky-koshrc-decisions, loaded 2026-10-16",
+     "recordId": "5288-15",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Kentucky Occupational Safety and Health Review Commission decisions",
+      "id": "5288-15",
+      "name": "D.W. Wilburn, Inc.",
+      "category": "discipline"
+     },
+     "picked": "2026-10-16"
     }
    ]
   },
@@ -2522,6 +2556,23 @@
       "matchedOn": "principal"
      },
      "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "FAITH IN HIM CONSTRUCTION LLC",
+     "kind": "company",
+     "source": "Virginia DPOR Board for Contractors license revocations (news releases)",
+     "sourceId": "va-dpor-revocations",
+     "from": "bulk file va-dpor-revocations, loaded 2026-10-15",
+     "recordId": "2023-01633",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Virginia DPOR Board for Contractors license revocations (news releases)",
+      "id": "2023-01633",
+      "name": "FAITH IN HIM CONSTRUCTION LLC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-16"
     }
    ]
   },

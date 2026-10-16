@@ -38,6 +38,9 @@ All network access goes through `server/research/http.ts` (`politeFetch`, `guard
 unreadable robots.txt means no), queues about one request per second per host, honors Retry-After, and blocks a host
 for the rest of the run after a 401/403 or a challenge page. Nothing in the research code works around any of these.
 
+`http.ts` does **not** read `Crawl-delay`. A host that asks for one (labor.arkansas.gov 10 s, townhall.virginia.gov 5 s)
+must be paced by its pack (`rateLimitHost`), as `ar-clb-hearings` does.
+
 ## 3. Bulk file rules (what keeps a bad download out)
 
 - **Row floor** (`minRows`): about 70% of the count on the day the source was added. A load below it is an error and
@@ -116,13 +119,18 @@ in order:
    publisher (`/api/views/<id>.json` for Socrata), and the date checked (`checked`).
 2. **robots.txt** for every URL the code will request (page, API, download, each redirect hop). A Disallow means no.
    Don't look for another path to the same data.
-3. **Terms.** Read them. No source whose terms bar automated access or commercial use. Quote the clause in the pack's
-   `blocked` note when you leave a source out.
+3. **Terms.** Read them, and the site's privacy page and footer: a city's "commercial use … is prohibited without
+   written permission" clause is often only there (Detroit, 2026-10-15). No source whose terms bar automated access
+   or commercial use. Quote the clause in the pack's `blocked` note when you leave a source out. Do steps 2 and 3
+   **before the first request** to any data URL on the host, not after a sample download.
 4. **No walls.** A CAPTCHA, login, 403, WAF or bot challenge means the source goes in `blocked` with the reason. Never
    work around one.
 5. **Map the publisher's own values.** Status codes and license classes from the publisher's published table. An
    unknown code shows as "code X". `holder` comes only from a documented business/individual list (`entityHolder`).
    Enforcement rows set `companiesOnly: true` and `person: null`.
+   A respondent printed as "Person d/b/a Trade Name" is a sole proprietor: drop it, as VA, KY and AR do. Keep a
+   d/b/a only when the party before it carries an entity word (Inc, LLC, Corp, Co., …). No kept row's status or
+   detail may quote a person's name (cut conditions that name homeowners).
 6. **Size and schedule**: under about 1.5M rows and about 1 GB/day. `everyHours` 24 or 24×7. `minRows` about 70% of
    today's count. `utcHours` if the publisher asks for off-hours. Raise `rowShape` when you change the row layout on
    purpose.
@@ -159,7 +167,7 @@ Permit portals are left out unless `--portals` (a full sweep takes hours per sta
 
 <!-- GENERATED: script/research-acceptance.ts --playbook (do not edit by hand between these markers) -->
 
-Generated 2026-10-15 from the registry (207 state sources, 2 nationwide). robots.txt was read live on that date for each source's page and API URL (fails closed: an unreadable robots.txt counts as no). Bulk-file floors: a new load needs more than 70% of the last good load and at least the row floor; key format version 3.
+Generated 2026-10-16 from the registry (210 state sources, 2 nationwide). robots.txt was read live on that date for each source's page and API URL (fails closed: an unreadable robots.txt counts as no). Bulk-file floors: a new load needs more than 70% of the last good load and at least the row floor; key format version 3.
 
 ### Nationwide (every report)
 
@@ -227,11 +235,12 @@ Checked live: 2026-10-15.
 | Arkansas HVAC/R Licensing Board roster ([page](https://labor.arkansas.gov/licensing/hvac-licensing-board/hvac-roster/)) | labor.arkansas.gov | bulk file `ar-hvacr-roster` (official download, indexed) | licenses | name | every 168h, floor 23000 | none | allowed |
 | Arkansas Fire Protection Licensing Board: licensed sprinkler companies ([page](https://labor.arkansas.gov/licensing/fire-protection-licensing-board/roster-search/)) | labor.arkansas.gov | bulk file `ar-fire-sprinkler` (official download, indexed) | licenses | name | every 168h, floor 75 | none | allowed |
 | Arkansas Fire Protection Licensing Board: portable and fixed fire-extinguishing systems companies ([page](https://labor.arkansas.gov/licensing/fire-protection-licensing-board/roster-search/)) | labor.arkansas.gov | bulk file `ar-fire-portable` (official download, indexed) | licenses | name | every 168h, floor 65 | none | allowed |
+| Arkansas Contractors Licensing Board and Residential Contractors Committee hearing orders and settlement agreements ([page](https://labor.arkansas.gov/licensing/arkansas-contractors-licensing-board/hearings-finding-of-fact/)) | labor.arkansas.gov | bulk file `ar-clb-hearings` (official download, indexed) | discipline (companies only) | name | every 168h, floor 1400 | none | allowed |
 
 Looked at and not used (from the pack's `blocked` notes):
 
 - Contractors Licensing Board search (aclb2.arkansas.gov/clbsearch.php, linked from the board's 'Find a Licensed Contractor' page): the server never answered on 2026-10-15 (connection timed out from tower1 and vb11); retried 2026-10-15 06:46 and 06:47 UTC from tower1 and vb11, robots.txt and the search page both timed out after 30 s. The board publishes no downloadable roster
-- Contractors Licensing Board hearings / findings of fact (labor.arkansas.gov hearings-finding-of-fact): scanned-image PDFs with no text layer
+- Contractors Licensing Board hearings / findings of fact (labor.arkansas.gov hearings-finding-of-fact), corrected 2026-10-15: 316 of the 428 PDFs on labor.arkansas.gov (2003 to March 2024) have a text layer and are read above (ar-clb-hearings), 6 of them skipped as unreadable; 112 (most from August 2024 on, a few older) are scanned images with no text layer (no OCR), and the 8 links to www.aclb.arkansas.gov redirect to the board's home page
 - Electrical and HVAC/R rosters: business rows carry no business name, so only people are searchable there
 
 ### CA
@@ -470,6 +479,7 @@ Checked live: 2026-10-15. No statewide GC license: Kentucky does not license gen
 
 | Source | Publisher | Access | Holds | Searched by | Refresh / floor | Keys | robots.txt (page; API) |
 |---|---|---|---|---|---|---|---|
+| KY Occupational Safety and Health Review Commission decisions (contested citations) ([page](https://koshrc.ky.gov/Pages/Decisions.aspx)) | koshrc.ky.gov | bulk file `ky-koshrc-decisions` (official download, indexed) | discipline (companies only) | name | every 168h, floor 197 | none | allowed |
 | Louisville Metro contractor licenses (as of 2022-06-19) (city/county) ([page](https://www.arcgis.com/home/item.html?id=267c8cf7a9254e5aaf6c22cfa43f4122)) | www.arcgis.com | bulk file `ky-louisville-contractors` (official download, indexed) | licenses | name | every 168h, floor 2200 | none | allowed |
 | Kentucky Department of Housing, Buildings and Construction ([page](https://dhbc.ky.gov/Search/HBC_List_Licensees.aspx)) | dhbc.ky.gov | the agency's own lookup (page or API), live per report | licenses | name, owner, license | live | none | allowed |
 
@@ -987,12 +997,14 @@ Checked live: 2026-10-15.
 | Virginia DPOR Board for Contractors licenses (contractors and tradesmen) ([page](https://www.dpor.virginia.gov/RegulantLists)) | www.dpor.virginia.gov | bulk file `va-dpor-contractors` (official download, indexed) | licenses | name | every 24h, floor 60000 | none | allowed |
 | Virginia DPOR architects, engineers, land surveyors and landscape architects ([page](https://www.dpor.virginia.gov/RegulantLists)) | www.dpor.virginia.gov | bulk file `va-dpor-apelscidla` (official download, indexed) | licenses | name | every 168h, floor 32000 | none | allowed |
 | Virginia DPOR asbestos and lead abatement contractors, home inspectors ([page](https://www.dpor.virginia.gov/RegulantLists)) | www.dpor.virginia.gov | bulk file `va-dpor-alhi` (official download, indexed) | licenses | name | every 168h, floor 800 | none | allowed |
+| Virginia DPOR Board for Contractors license revocations (news releases) ([page](https://www.dpor.virginia.gov/NewsReleases)) | www.dpor.virginia.gov | bulk file `va-dpor-revocations` (official download, indexed) | discipline (companies only) | name | every 168h, floor 217 | none | allowed |
 | Norfolk business licenses (construction) (city/county) ([page](https://data.norfolk.gov/d/dpi6-sct5)) | data.norfolk.gov | bulk file `va-norfolk-contractors` (official download, indexed) | licenses | name | every 168h, floor 1100 | SOCRATA_APP_TOKEN (optional) | allowed |
 
 Looked at and not used (from the pack's `blocked` notes):
 
 - DPOR License Lookup (dporweb.dpor.virginia.gov/LicenseLookup), which also carries board orders: reCAPTCHA on the search
-- DPOR disciplinary orders: no list or download; published only per licensee in the CAPTCHA lookup and in board minutes on Town Hall (PDF)
+- DPOR disciplinary orders: no list or download; published only per licensee in the CAPTCHA lookup and in board minutes on Town Hall (PDF). Revocations are loaded from the News Releases page (va-dpor-revocations)
+- Board for Contractors consent orders and fines in Town Hall meeting minutes (townhall.virginia.gov/L/meetings.cfm?BoardID=10): checked 2026-10-15, not built. The final minutes (v2 and later, e.g. Minutes_DPOR_39828_v2.pdf for April 28, 2026, 64 pages, and Minutes_DPOR_38882_v3.pdf for October 7, 2025) are scanned page images (PaperStream Capture, no text layer: pdftotext gives nothing), so reading them would mean OCR. Only the v1 drafts have text (Minutes_DPOR_40744_v1.pdf, August 25, 2026), and they are marked DRAFT (the watermark's letters are interleaved with the text), set in two columns with margin labels, and each case paragraph quotes the respondent's earlier consent orders and fines next to the new sanctions (per-count fines, a total, Recovery Fund payments to consumer claimants): respondent, outcome and amount can't be read reliably from them
 - eVA Inactive Vendor List (DGS debarred/enjoined contractors, logi.cgieva.com Report9020): robots.txt Disallow: /
 - SCC business entities on data.virginia.gov (corporation, llc-limited-liability-company): robots.txt disallows /api/ and /datastore/* (checked 2026-10-15), so the datastore search is not used; the datasets' .xlsx downloads are allowed but not loaded yet
 - SCC Clerk's Information System bulk data: paid subscription ($1,000/month per the SCC page); only the dated open-data copies are used
@@ -1071,6 +1083,7 @@ Looked at and not used (from the pack's `blocked` notes):
 - Dallas active contractors (dallasopendata.com jhgk-eg9m): last updated 2017-03-31
 - Denver business licenses (data.colorado.gov s9wt-dsfz, ArcGIS ODC_active_business_licenses): no contractor license types; Denver's contractor licenses are not published
 - Detroit BSEED business licenses (current): no contractor license types
+- Detroit Office of Inspector General debarment list (detroitmi.gov, PDF under /sites/detroitmi.localhost/files/, e.g. 2026-02 "OIG Debarment List 09FEB26.pdf"; companies and individuals, debarments and interim suspensions): robots.txt allows it, but detroitmi.gov/privacy says "Commercial use of the information or our online services is prohibited without written permission of the City of Detroit." and the footer says "All material is the property of the City of Detroit and may only be used with permission."; not used without that written permission
 - Cincinnati business licenses (data.cincinnati-oh.gov 7dk3-gngs): no contractor license types
 - St. Louis business licenses 2024 (ArcGIS Business_License_2024): no business type to keep construction to
 - Atlanta business licenses (ArcGIS GBL_WFL1): last updated 2023-04-24; the 2026 layer covers Main Street districts only
