@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { csvRecords } from "../bulk";
-import { checkDporColumns, sccHit, vaLongDate, vaRegulantHit, vaReleaseLines, vaRevocationEntries, vaRevocationHits, vaRevocationIndex, vaRevokedBusiness, vaSpecialties } from "./va";
+import { checkDporColumns, EVA_STATUSES, evaBusinesses, evaHit, parseEvaReport, sccHit, vaLongDate, vaRegulantHit, vaReleaseLines, vaRevocationEntries, vaRevocationHits, vaRevocationIndex, vaRevokedBusiness, vaSpecialties } from "./va";
 
 // Rows as published in DPOR's regulant lists on 2026-10-15 (2701__crnt.txt, 2710__crnt.txt), e-mail column blanked.
 const HEADER = "BOARD\tOCCUPATION\tCERTIFICATE #\tINDIVIDUAL NAME\tBUSINESS NAME\tFIRST LINE ADDRESS\tSECOND LINE ADDRESS\tP O BOX #\tCITY\tSTATE\tFIVE DIGIT ZIP CODE\tZIP CODE EXTENSION\tPROVINCE\tCOUNTRY\tPOSTAL CODE\tEXPIRATION DATE\tCERTIFICATION DATE\tLICENSE RANK\tLICENSE SPECIALTY\tEMAILADDRESS";
@@ -156,5 +156,37 @@ File No. 2022-0095 | License No. 2705145177</p>
     expect(vaLongDate("Oct. 26. 2021")).toBe("2021-10-26");
     expect(vaLongDate("Sept. 22, 2020")).toBe("2020-09-22");
     expect(vaLongDate("sometime in 2021")).toBeNull();
+  });
+});
+
+// Trimmed from logi.cgieva.com Report9020_Data (eVA Inactive Vendor List, eVA Status = Debarred), saved 2026-10-15
+// (drill-down links shortened).
+const EVA_HEAD = `<title>eVA Inactive Vendor List</title><TABLE><THEAD><TR><TH id="colLGL_NM-TH">Legal Name</TH></TR></THEAD>`;
+const EVA_DEBARRED = `${EVA_HEAD}
+<TR Row="1" CLASS=""><TD id="colSTATUS_Row1" CLASS="rdThemeDataTableCell alignLeft"><SPAN id="lblSTATUS_Row1">Debarred</SPAN><BR /><SPAN  id="lblREG_TYPE_Row1"><font color="#FF0000" size="1">Self</font></SPAN></TD><TD id="colHQ_Row1" CLASS="rdThemeDataTableCell alignLeft"><SPAN CLASS="headerTextSmall10" id="lblHQ_Row1">Y</SPAN></TD><TD id="colVEND_CUST_CD_Row1" CLASS="rdThemeDataTableCell alignLeft"> <a href="#" id="actDrilldown_Row1"><SPAN TITLE="Click for more detail!" CLASS="DrillDownUnderline" id="lblVEND_CUST_CD_Row1">E34719</SPAN></a></TD><TD id="colLGL_NM_Row1" CLASS="rdThemeDataTableCell left"><SPAN  id="lblLGL_NM_Row1">AccesSecurity,&#160;Inc.</SPAN></TD><TD id="colLOC_NM_Row1" CLASS="rdThemeDataTableCell left"><SPAN  id="lblLOC_NM_Row1">AccesSecurity</SPAN></TD><TD id="colSTR_1_NM_Row1" CLASS="rdThemeDataTableCell left"><SPAN  id="lblSTR_1_NM_Row1">6&#160;Royal&#160;Street,&#160;SW</SPAN></TD><TD id="colCITY_NM_Row1" CLASS="rdThemeDataTableCell left"><SPAN id="lblCITY_NM_Row1">Leesburg</SPAN></TD><TD id="colST_Row1" CLASS="rdThemeDataTableCell left"><SPAN id="lblST_Row1">VA</SPAN></TD><TD id="colZIP_Row1" CLASS="rdThemeDataTableCell left"><SPAN id="lblZIP_Row1">20176</SPAN></TD></TR>
+<TR Row="18" CLASS="ThemeAlternatingRow TD"><TD id="colSTATUS_Row18" CLASS="rdThemeDataTableCell alignLeft"><SPAN id="lblSTATUS_Row18">Debarred</SPAN><BR /><SPAN  id="lblREG_TYPE_Row18"><font color="#FF0000" size="1">State</font></SPAN></TD><TD id="colHQ_Row18" CLASS="rdThemeDataTableCell alignLeft"><SPAN CLASS="headerTextSmall10" id="lblHQ_Row18">Y</SPAN></TD><TD id="colVEND_CUST_CD_Row18" CLASS="rdThemeDataTableCell alignLeft"> <a href="#" id="actDrilldown_Row18"><SPAN TITLE="Click for more detail!" CLASS="DrillDownUnderline" id="lblVEND_CUST_CD_Row18">VS0000251080</SPAN></a></TD><TD id="colLGL_NM_Row18" CLASS="rdThemeDataTableCell left"><SPAN  id="lblLGL_NM_Row18">David&#160;Horton</SPAN></TD><TD id="colLOC_NM_Row18" CLASS="rdThemeDataTableCell left"><SPAN  id="lblLOC_NM_Row18">Newport&#160;News&#160;VA</SPAN></TD><TD id="colSTR_1_NM_Row18" CLASS="rdThemeDataTableCell left"><SPAN  id="lblSTR_1_NM_Row18">716&#160;Mainsail&#160;Dr</SPAN></TD><TD id="colCITY_NM_Row18" CLASS="rdThemeDataTableCell left"><SPAN id="lblCITY_NM_Row18">Newport News</SPAN></TD><TD id="colST_Row18" CLASS="rdThemeDataTableCell left"><SPAN id="lblST_Row18">VA</SPAN></TD><TD id="colZIP_Row18" CLASS="rdThemeDataTableCell left"><SPAN id="lblZIP_Row18">23608-4712</SPAN></TD></TR>
+<TR Row="19" CLASS=""><TD id="colSTATUS_Row19" CLASS="rdThemeDataTableCell alignLeft"><SPAN id="lblSTATUS_Row19">Debarred</SPAN><BR /><SPAN  id="lblREG_TYPE_Row19"><font color="#FF0000" size="1">Self</font></SPAN></TD><TD id="colHQ_Row19" CLASS="rdThemeDataTableCell alignLeft"><SPAN CLASS="headerTextSmall10" id="lblHQ_Row19">Y</SPAN></TD><TD id="colVEND_CUST_CD_Row19" CLASS="rdThemeDataTableCell alignLeft"> <a href="#" id="actDrilldown_Row19"><SPAN TITLE="Click for more detail!" CLASS="DrillDownUnderline" id="lblVEND_CUST_CD_Row19">VS0000087069</SPAN></a></TD><TD id="colLGL_NM_Row19" CLASS="rdThemeDataTableCell left"><SPAN  id="lblLGL_NM_Row19">David&#160;Horton&#160;Logistics</SPAN></TD><TD id="colLOC_NM_Row19" CLASS="rdThemeDataTableCell left"><SPAN  id="lblLOC_NM_Row19">Newport&#160;News&#160;Office</SPAN></TD><TD id="colSTR_1_NM_Row19" CLASS="rdThemeDataTableCell left"><SPAN  id="lblSTR_1_NM_Row19">POBox&#160;14051</SPAN></TD><TD id="colCITY_NM_Row19" CLASS="rdThemeDataTableCell left"><SPAN id="lblCITY_NM_Row19">Newport News</SPAN></TD><TD id="colST_Row19" CLASS="rdThemeDataTableCell left"><SPAN id="lblST_Row19">VA</SPAN></TD><TD id="colZIP_Row19" CLASS="rdThemeDataTableCell left"><SPAN id="lblZIP_Row19">23608</SPAN></TD></TR>
+</TABLE>`;
+const EVA_NONE = `${EVA_HEAD}</TABLE><SPAN id="divShowNoData"><b><p align="center">No data found. Please search for a different value</p></b></SPAN>`;
+
+describe("Virginia eVA Inactive Vendor List", () => {
+  it("reads the report's rows", () => {
+    const rows = parseEvaReport(EVA_DEBARRED);
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toEqual({ status: "Debarred", entered: "Self", evaId: "E34719", name: "AccesSecurity, Inc.", street: "6 Royal Street, SW", city: "Leesburg", st: "VA", zip: "20176" });
+  });
+  it("treats \"No data found\" as empty and anything else unexpected as an error", () => {
+    expect(parseEvaReport(EVA_NONE)).toEqual([]);
+    expect(() => parseEvaReport(EVA_HEAD)).toThrow(/no rows/);
+    expect(() => parseEvaReport("<html>Server error</html>")).toThrow(/unexpected page/);
+  });
+  it("keeps companies only", () => {
+    const names = evaBusinesses(parseEvaReport(EVA_DEBARRED)).map((r) => r.name);
+    expect(names).toContain("AccesSecurity, Inc.");
+    expect(names).not.toContain("David Horton");
+  });
+  it("makes a debarment hit with no invented dates", () => {
+    const [r] = parseEvaReport(EVA_DEBARRED);
+    expect(evaHit(r, EVA_STATUSES[0])).toMatchObject({ state: "VA", category: "debarment", name: "AccesSecurity, Inc.", id: "eVA ID E34719", date: null, endDate: null, city: "Leesburg, VA", address: "6 Royal Street, SW, Leesburg, VA 20176", adverse: true });
   });
 });

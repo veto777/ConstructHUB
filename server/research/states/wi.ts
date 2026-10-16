@@ -156,7 +156,7 @@ export const pack: StatePack = {
     "DSPS credential lookup (license.wi.gov, the LicensE platform): Cloudflare blocks our bot (\"Sorry, you have been blocked\"); dwelling contractors, qualifiers, plumbers, electricians and HVAC are not searchable",
     "DSPS old lookup and Reports of Decisions (online.drl.wi.gov): 403 with a CAPTCHA page",
     "DSPS Credential/License List Purchasing (dspslicenselist.wi.gov): a paid list service, and the host does not resolve from here",
-    "Department of Revenue delinquent taxpayer list: its data service (ww2.revenue.wi.gov) has robots.txt Disallow: /",
+    "Department of Revenue delinquent taxpayer list (www.revenue.wi.gov/Pages/Delqlist/DelqSearch.aspx, read through ww2.revenue.wi.gov/WebServicesPublicWeb/rest/delinquents/all; ~19,350 taxpayers on 2026-10-15): not used, because DOR's Legal Notices, Disclaimers and Terms of Use (www.revenue.wi.gov/Pages/HTML/disclaim.aspx, read 2026-10-15) say \"The material on the Department's website is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on this website. ... For a copy or use of information on the Department website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\" (the service itself answers without a CAPTCHA or login; its robots.txt Disallow no longer counts, OWNER ORDER 2026-10-15)",
     "DWD worker-misclassification stop-work orders: no published list found",
   ],
 };

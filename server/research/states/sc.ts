@@ -13,19 +13,30 @@
  * reports through late 2024 list "Individual/Entity", "Facility", "Location" and "Mailing Address"; later ones
  * "Individual/Entity/Facility" and "County". A personal mailing address is never kept.
  *
+ *   sc-llr-board-orders  LLR Public Board Orders (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 for the Contractor's
+ *                       Licensing Board, 46 for the Residential Builders Commission): one page per board lists every
+ *                       public order (Order Date, Name, License Type, License Number). Companies only: rows naming a
+ *                       person ("LAST, FIRST") or a bare name are left out. The order documents behind "View Order" ask
+ *                       for a reCAPTCHA and are not read, so a hit says an order was issued, not what it decided.
+ *                       eservice.llr.sc.gov's robots.txt is "Disallow: /"; used by OWNER ORDER 2026-10-15 (a robots.txt
+ *                       Disallow no longer stops a search). llr.sc.gov's Disclaimer (aboutus/disclaimer.aspx) is a
+ *                       liability disclaimer only, with no rule against reuse.
+ *
  * No license source: rechecked live 2026-10-15, every free South Carolina contractor license list is behind a
- * reCAPTCHA or a robots.txt Disallow, or on a site whose terms forbid reuse (see `blocked`).
+ * reCAPTCHA or a login, or on a site whose terms forbid reuse (see `blocked`).
  * Removed 2026-10-15 (coordinator's decision): des.sc.gov's "Website Accessibility and Policies" page says "You may
  * not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any
  * part of this site except as specifically permitted by SCDES in writing", so sc-des-enforcement is no longer
- * registered (the code below is kept, unused) and South Carolina has no searchable source.
+ * registered (the code below is kept, unused).
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit } from "@shared/research-reports";
 import { politeFetch } from "../http";
 import { decodeEntities } from "../bulk-sources";
-import { clean, download, type BulkHit } from "../bulk";
+import { clean, download, usDate, type BulkHit } from "../bulk";
 import { pdfText, textLines } from "./lib/a3-pdf";
+import { htmlText } from "./lib/g3-common";
+import { looksLikeBusinessTrailingSuffix, personNameForm } from "./lib/business-name";
 import type { StatePack } from "./types";
 import { adverseFrom } from "../adverse";
 
@@ -222,16 +233,146 @@ async function* desOrders(): AsyncIterable<BulkHit> {
   }
 }
 
+// ── LLR Public Board Orders (Contractor's Licensing Board, Residential Builders Commission) ───────────────────
+const LLR_ORDERS = "https://eservice.llr.sc.gov/PublicOrdersWeb/";
+/** LLR's own division ids (the same ids its licensee lookup uses: div=69 and div=46). */
+export const LLR_BOARDS = [
+  { division: "69", board: "SC Contractor's Licensing Board" },
+  { division: "46", board: "SC Residential Builders Commission" },
+] as const;
+export const llrOrdersUrl = (division: string) => `${LLR_ORDERS}?divisionId=${division}`;
+
+export type LlrOrderRow = { fileId: string | null; date: string | null; dateText: string | null; name: string; licenseType: string | null; licenseNumber: string | null };
+
+/**
+ * The orders table of one board's list (Order Date, Name, License Type, License Number, and a "View Order" link whose
+ * fileId names the order). A page without the table's header is an error, never "no orders". A date later than
+ * `today` (one row reads 5/13/2029) is not taken as the order's date: it stays as published (dateText).
+ */
+export function parseLlrOrders(html: string, today = new Date().toISOString().slice(0, 10)): LlrOrderRow[] {
+  if (!/<th[^>]*>\s*Order Date\s*<\/th>\s*<th[^>]*>\s*Name\s*<\/th>\s*<th[^>]*>\s*License Type\s*<\/th>\s*<th[^>]*>\s*License Number\s*<\/th>/i.test(html)) {
+    throw new Error("SC LLR Public Board Orders: unexpected page (no orders table)");
+  }
+  const out: LlrOrderRow[] = [];
+  for (const m of Array.from(html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi))) {
+    const cells = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((c) => c[1]);
+    if (cells.length !== 5) continue;
+    const name = htmlText(cells[2]);
+    if (!name) continue;
+    const fileId = decodeEntities(cells[0]).match(/[?&]fileId=(\d+)/i)?.[1] ?? null;
+    const published = htmlText(cells[1]);
+    const iso = usDate(published);
+    out.push({
+      fileId, name, licenseType: htmlText(cells[3]), licenseNumber: htmlText(cells[4]),
+      date: iso && iso <= today ? iso : null, dateText: iso && iso <= today ? null : published,
+    });
+  }
+  return out;
+}
+
+const readsAsCompany = (n: string) => personNameForm(n) === null && looksLikeBusinessTrailingSuffix(n);
+/** Given names after a comma: "Vraj", "Juan Pablo", "David & Lauren", "April / Kevin", "Casey Black". */
+function givenNames(p: string): boolean {
+  const words = p.split(/\s*(?:&|\/|\band\b)\s*|\s+/i).filter(Boolean);
+  return words.length >= 1 && words.length <= 4 && words.every((w) => /^[A-Z][A-Za-z'’.-]*$/.test(w)) && !looksLikeBusinessTrailingSuffix(p);
+}
+/** A surname before the slash: one or two plain name words ("Patel", "Vega Mendivil"). */
+const surname = (p: string) => /^[A-Z][A-Za-z'’-]*(?: [A-Z][A-Za-z'’-]*)?$/.test(p) && !looksLikeBusinessTrailingSuffix(p);
+/** An entity form no surname is (Co and Pa are left out: "NEALY FENCE CO., BRADLEY" stays ambiguous). */
+const ENDS_IN_ENTITY = /(?:^|[\s,])(?:inc|incorporated|llc|l\.l\.c|corp|corporation|ltd|limited|llp|lllp|pllc|company|companies)\.?\s*$/i;
+
+/**
+ * The business a row names, or null when it names none (companies only, FCRA). The list prints people "LAST, FIRST"
+ * ("WILSON, WILLARD E", "Villatoro, Osman"), and the Residential Builders Commission often names the licensee with
+ * the business: "Patel/Trinity Home Remodeling, LLC, Vraj", "Brooks Bentley dba Carolina Gutters, LLC", "Casey's Custom
+ * Home Services LLC, Casey Black". From those only the business is kept; the person is never part of the name.
+ * Anything else is kept only when the whole name reads as a business by the shared rules (an entity form as its last
+ * word, a trade word, "& Sons"): a bare name ("CASS LOWRIE") or an ambiguous one ("STROUD'S REMODELING, DAVID") is
+ * left out.
+ */
+export function llrBusinessName(raw: string): { name: string; personLeftOut: boolean } | null {
+  const t = raw.replace(/\s+/g, " ").replace(/\s+,/g, ",").replace(/[\s,]+$/, "").trim();
+  // "Brooks Bentley dba Carolina Gutters, LLC", "FOUR SEASONS (dba Carroll & Sons Inc)".
+  const dba = t.split(/\s*\(?\s*\b(?:d\.?\s?\/?\s?b\.?\s?\/?\s?a\.?|doing business as)\s+/i);
+  if (dba.length === 2) {
+    const parts = dba.map((p) => p.replace(/[()]/g, "").trim()).filter(Boolean);
+    const kept = parts.filter(readsAsCompany);
+    return kept.length ? { name: kept.join(" / "), personLeftOut: kept.length < parts.length } : null;
+  }
+  // "Surname/Business, First": "Hollfelder/GTL Contracting LLC, Rich", "Miller / Dirt Cheap Hauling & Services, April / Kevin".
+  const sl = t.match(/^([^/,]+?)\s*\/\s*(.+?),\s*([^,]+)$/);
+  if (sl && surname(sl[1].trim()) && givenNames(sl[3].trim())) {
+    const b = sl[2].trim();
+    return readsAsCompany(b) ? { name: b, personLeftOut: true } : null;
+  }
+  // "Business LLC, First [Last]": "Powells Home Improvments LLC, Mason", "Dean and Sons Construction, Brian".
+  const i = t.lastIndexOf(",");
+  if (i > 0) {
+    const b = t.slice(0, i).trim(), p = t.slice(i + 1).trim();
+    if (givenNames(p) && (ENDS_IN_ENTITY.test(b) || /&\s*sons?\b|\band sons?\b/i.test(b))) return readsAsCompany(b) ? { name: b, personLeftOut: true } : null;
+  }
+  return readsAsCompany(t) ? { name: t, personLeftOut: false } : null;
+}
+
+/** The rows that name a business, each under the business's name only. */
+export const llrBusinessRows = (rows: LlrOrderRow[]): (LlrOrderRow & { personLeftOut: boolean })[] =>
+  rows.flatMap((r) => { const b = llrBusinessName(r.name); return b ? [{ ...r, name: b.name, personLeftOut: b.personLeftOut }] : []; });
+
+/**
+ * One row as a report hit. The list says only that the board issued an order: the order itself sits behind a
+ * reCAPTCHA on LLR's site and is not read, so what it decided is unknown (adverse null, never guessed). License type
+ * codes (CLG, CLM, RBB, …) are shown as published; LLR doesn't define them on the page.
+ */
+export function llrOrderHit(r: LlrOrderRow & { personLeftOut?: boolean }, board: (typeof LLR_BOARDS)[number]): EnforcementHit {
+  return {
+    state: "SC", source: "SC LLR public board orders (contractors and residential builders)", sourceUrl: llrOrdersUrl(board.division), category: "discipline",
+    name: r.name, id: r.fileId ? `order file ${r.fileId}` : null, date: r.date, endDate: null,
+    status: `Board order issued by the ${board.board.replace(/^SC /, "")} (listed on LLR's Public Board Orders)`,
+    city: null,
+    detail: [
+      r.licenseType || r.licenseNumber ? `License ${[r.licenseType ? `type ${r.licenseType}` : null, r.licenseNumber ? `no. ${r.licenseNumber}` : null].filter(Boolean).join(" ")} (as published)` : null,
+      r.dateText ? `Order date as published: ${r.dateText}` : null,
+      r.personLeftOut ? "The list's entry also names an individual, who is left out" : null,
+      "The order's text is behind a reCAPTCHA on LLR's site and was not read",
+    ].filter(Boolean).join("; "),
+    amount: null, adverse: null,
+    ...(r.licenseNumber ? { licenseNumber: r.licenseNumber } : {}),
+  };
+}
+
+async function* llrOrdersLoader(): AsyncIterable<BulkHit> {
+  for (const board of LLR_BOARDS) {
+    // One page per board carries its whole list (about 1,900 and 6,400 rows, 1 MB and 3 MB on 2026-10-15).
+    const res = await politeFetch(llrOrdersUrl(board.division), {}, { minDelayMs: 2000, timeoutMs: 120_000 });
+    if (!res.ok) throw new Error(`SC LLR Public Board Orders (division ${board.division}) returned HTTP ${res.status}`);
+    const rows = parseLlrOrders(await res.text());
+    if (rows.length < 100) throw new Error(`SC LLR Public Board Orders (division ${board.division}): only ${rows.length} rows`);
+    const seen = new Set<string>();
+    for (const r of llrBusinessRows(rows)) {
+      const key = `${r.fileId}|${r.name}|${r.licenseNumber}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      yield { kind: "enforcement", hit: llrOrderHit(r, board), business: r.name, person: null, keys: { licenses: [r.licenseNumber] }, component: board.board };
+    }
+  }
+}
+
 export const pack: StatePack = {
   state: "SC",
   checked: "2026-10-15",
   // sc-des-enforcement is not registered (coordinator, 2026-10-15): des.sc.gov's terms bar republishing (see `blocked`).
   // Its parser and loader (desOrders) are kept; its stored rows are deleted at boot (bulk.ts RETIRED_BULK_SOURCES).
-  bulk: [],
+  bulk: [
+    // OWNER ORDER 2026-10-15: eservice.llr.sc.gov's robots.txt Disallow no longer stops a search (http.ts). Business
+    // rows on 2026-10-15: 1,206 of 1,889 (Contractor's Licensing Board) and 143 of 6,446 (Residential Builders Commission).
+    { id: "sc-llr-board-orders", state: "SC", label: "SC LLR public board orders (Contractor's Licensing Board, Residential Builders Commission)",
+      pageUrl: llrOrdersUrl("69"), everyHours: 24 * 7, minRows: 900, load: llrOrdersLoader, companiesOnly: true, category: "discipline" },
+  ],
   blocked: [
     "SC DES environmental enforcement action reports (the monthly PDFs linked from des.sc.gov \"Environmental Enforcement Actions\"; was sc-des-enforcement): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\" (coordinator's decision, 2026-10-15)",
     "SC LLR licensee lookup (verify.llronline.com/LicLookup/Contractors/Contractor.aspx?div=69 for the Contractor's Licensing Board's general and mechanical contractors, Resbu/Resbu.aspx?div=46 for the Residential Builders Commission, BurgFire for burglar/fire/sprinkler): a g-recaptcha widget on every search form, the Find button hidden until it is solved; rechecked 2026-10-15",
-    "SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 and 46, /OnlineVerificationBulk): eservice.llr.sc.gov/robots.txt is \"User-agent: * / Disallow: /\"; rechecked 2026-10-15",
+    "SC LLR bulk license verification (eservice.llr.sc.gov/OnlineVerificationBulk): a login (username and password, \"Don't have an account? Register Here!\") with a reCAPTCHA; checked 2026-10-15",
+    "SC LLR board order documents (the \"View Order\" PDFs of eservice.llr.sc.gov/PublicOrdersWeb, /PublicOrder/Download): \"To download this public order verify that you are not a robot\", a reCAPTCHA on every order (2026-10-15); only the list (date, name, license type and number) is used, as sc-llr-board-orders",
     "SC Contractor's Licensing Board meeting minutes (llr.sc.gov/clb/minutes, robots-allowed PDFs): disciplinary hearings are listed by case number only (\"In accordance with Board confidentiality statutes, the hearing was closed\"), no respondent named; checked the 2026-07-30 minutes",
     "SC LLR license rosters: sold by mailed request ($10 check per roster with a signed Family Privacy Protection Act statement, llr.sc.gov/AboutUs/MediaCenter/pidocs/Statement_Compliance.pdf, linked as 'Licensee List Request' from llr.sc.gov/clb); needs the owner",
     "SC DES Asbestos Contractors and Consultants Search (apps.des.sc.gov/AsbestosContractorsAndConsultants, with free CSV exports /CSV and /CSV/<type>: ~200 contractors, ~870 consultants and air samplers on 2026-10-15) and the UST Class I/II certified contractors PDF (des.sc.gov List_of_Certified_Contractors_August2026.pdf): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\"",
