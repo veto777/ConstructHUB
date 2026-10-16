@@ -456,6 +456,14 @@ export async function finishQueued(id: number, status: "sent" | "skipped", reaso
   await db().query(`UPDATE media_outreach_queue SET status = $2, reason = $3, sent_at = CASE WHEN $2 = 'sent' THEN now() END WHERE id = $1`, [id, status, reason]);
 }
 
+/** Did a delivery-failure notice name this address? (bounce notices are stored as automated mail) */
+export async function hasBounced(email: string): Promise<boolean> {
+  const r = await db().query(
+    `SELECT 1 FROM media_messages WHERE direction = 'in' AND (from_email ILIKE 'mailer-daemon@%' OR from_email ILIKE 'postmaster@%')
+       AND position(lower($1) IN lower(body)) > 0 LIMIT 1`, [email]);
+  return Boolean(r.rows[0]);
+}
+
 export async function queueCounts() {
   const r = await db().query(`SELECT count(*) FILTER (WHERE status = 'queued')::int queued, count(*) FILTER (WHERE status = 'sent')::int sent,
     count(*) FILTER (WHERE status = 'sent' AND sent_at >= date_trunc('day', now()))::int sent_today FROM media_outreach_queue`);
