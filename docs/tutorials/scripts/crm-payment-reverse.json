@@ -26,7 +26,7 @@
       "narration": "The payment is still listed, now marked reversed, with who reversed it and why." },
     { "action": "highlight", "selector": "[data-testid=\"text-collected\"]", "caption": "Collected to date",
       "narration": "Collected to date no longer counts it." },
-    { "action": "highlight", "selector": "[data-testid=\"link-portal-nav-payments\"]", "caption": "Menu: Payments",
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-payments\"]", "caption": "Menu: Payments",
       "narration": "The Payments page in the menu lists every payment, with the same Reverse button." }
   ],
   "youtube": {

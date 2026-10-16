@@ -1,4 +1,6 @@
 import type { FeaturePage } from "./types";
+import { ALACARTE } from "../alacarte";
+import { planNamesWhere } from "../plan-copy";
 
 /**
  * Posts & Photos — every claim is backed by the code in `sources`:
@@ -21,8 +23,22 @@ import type { FeaturePage } from "./types";
  *     gbp-content.tsx, content.ts (/refresh, /jobs/:id)
  *   - daily caps (publishing, AI drafts) and the notices (gbp.post_published, gbp.post_failed):
  *     content.ts takeBudget calls, server/notification-kinds.ts
- *   - Agency bulk post/photo batches: client/src/components/agency-workspace.tsx ("Schedule post/photo batch")
+ *   - Agency bulk post/photo batches: client/src/components/agency-workspace.tsx ("Schedule post/photo batch"); the
+ *     workspace is the agencyWorkspace module, so the plan names are read from the price book
+ *   - pricing: the WHOLE queue is gated, not only the AI: enqueue(), /draft, job retry and bulk all call
+ *     requireAutoPosts → hasModule("autoPosts") (server/gbp/content.ts). autoPosts is a Pro-and-up module
+ *     (shared/plans.ts PRO_MODULES) or the à la carte "AI Google posts" item (shared/alacarte.ts ai_posts) —
+ *     never "every plan". Plan names below come from the price book, never typed.
+ *   - the same queue is fed by the Google Business Profile box in Social Media → New post
+ *     (client/src/pages/social-media.tsx, help social-media.google-business-profile)
  */
+
+/** Plans whose modules include scheduled Google posts, cheapest first ("Pro, Agency and Unlimited"). */
+const POST_PLANS = planNamesWhere((plan) => plan.modules.autoPosts);
+/** Plans without it ("Solo and Team"), which can add the à la carte item instead. */
+const PLANS_WITHOUT = planNamesWhere((plan) => !plan.modules.autoPosts);
+/** Plans with the agency workspace, where batches across client locations live. */
+const WORKSPACE_PLANS = planNamesWhere((plan) => plan.modules.agencyWorkspace);
 
 const page: FeaturePage = {
   key: "gbpContent",
@@ -81,6 +97,11 @@ const page: FeaturePage = {
       body: "AI text stays a draft until you approve it. Approving authorizes publishing at the scheduled times.",
     },
     {
+      icon: "share",
+      title: "Also from Social Media",
+      body: "Tick Google Business Profile when you write a social post and the same text goes out as a Google update, through this same queue.",
+    },
+    {
       icon: "list",
       title: "Calendar, queue and history",
       body: "See every item by day, refresh its status from Google, cancel anything still queued, and retry a failure.",
@@ -92,8 +113,8 @@ const page: FeaturePage = {
     },
     {
       icon: "layers",
-      title: "Batches on Agency",
-      body: "Agency accounts can schedule a post or photo batch across many client locations at once.",
+      title: "Batches across client locations",
+      body: `On the ${WORKSPACE_PLANS} plans, the agency workspace can schedule a post or photo batch across many client locations at once.`,
     },
   ],
   audience: [
@@ -111,8 +132,9 @@ const page: FeaturePage = {
     },
   ],
   pricing: {
-    kind: "plan",
-    note: "Publishing needs a location linked to Google through a connected account. Daily caps keep publishing and AI drafts at a steady pace.",
+    kind: "module",
+    module: "autoPosts",
+    note: `Also sold on its own as the ${ALACARTE.ai_posts.name} item, for an account without one of these plans. Publishing needs a location linked to Google through a connected account.`,
   },
   faqs: [
     {
@@ -121,7 +143,7 @@ const page: FeaturePage = {
     },
     {
       q: "Which plans include it?",
-      a: "Every plan. You can upload up to 100 photos at a time, 15 MB each, attach up to 10 photos to a post, and write up to 1,500 characters per update. Daily caps apply to publishing and to AI drafts.",
+      a: `The ${POST_PLANS} plans. On ${PLANS_WITHOUT}, or with no plan, you can add the ${ALACARTE.ai_posts.name} item on its own from the pricing page. You can upload up to 100 photos at a time, 15 MB each, attach up to 10 photos to a post, and write up to 1,500 characters per update. Daily caps apply to publishing and to AI drafts.`,
     },
     {
       q: "Will it keep posting on its own?",

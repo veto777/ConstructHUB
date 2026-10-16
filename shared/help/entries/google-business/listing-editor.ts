@@ -12,7 +12,7 @@ const entry: HelpDraft = {
     "Check the result beside each field; a pending field is not saved until Google reviews it.",
     "Tick fields and locations under “Apply to other locations” and choose Apply now to copy the change.",
   ],
-  howItWorks: "Only the changed fields go to Google, and the form flags what the server would refuse because both run the same rules. A field counts as Saved only when Google's reply carries the value sent; Pending when Google reports it under review; Not confirmed otherwise, so reload and check before trying again. Every save is written to your account activity and sends you a notice, and Profile Watch learns the new values as yours. Changing the address can make Google ask you to verify the listing again.",
+  howItWorks: "Only the changed fields go to Google, and the form flags what the server would refuse because both run the same rules. A field counts as Saved only when Google's reply carries the value sent; Pending when Google reports it under review; Not confirmed otherwise, so reload and check before trying again. Every save is written to your account activity and sends you a notice, and where Profile Watch is on, it learns the new values as yours. Changing the address can make Google ask you to verify the listing again.",
   needs: ["Any plan that includes locations.", "A location linked to its Google Business Profile, through a Google account that owns or manages the listing."],
 };
 export default entry;

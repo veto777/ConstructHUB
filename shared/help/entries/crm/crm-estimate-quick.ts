@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "A short estimate form that opens on the client’s own page, for a job with only a few lines.",
   whatItDoes: "You give the estimate a title and type each line: what the work is, a quantity, a unit price and the scope the client will read. The line totals, subtotal and total add up as you type. “Create estimate” saves it on the client’s page, where you can preview and send it.",
   howToUse: [
-    "CRM → Clients, and open the client.",
+    "Open CRM → Clients and open the client.",
     "Choose “New estimate” under Quick actions.",
     "Type a title, then each line: item, quantity, unit price and scope. “Add line” gives you another.",
     "Choose “Create estimate”. It appears under Estimates on the client’s page.",

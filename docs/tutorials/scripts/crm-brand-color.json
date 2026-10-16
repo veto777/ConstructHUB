@@ -97,7 +97,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-settings\"]",
+      "selector": "[data-testid=\"tool-rail-settings\"]",
       "caption": "Where to find it",
       "narration": "You will find Company theme under Settings, in the left menu."
     }

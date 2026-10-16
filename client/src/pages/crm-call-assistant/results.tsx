@@ -79,14 +79,14 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
               <div className="flex items-center gap-1.5 text-sm">
                 <Label htmlFor="results-days" className="sr-only">Number of days</Label>
                 <span className="text-muted-foreground">Last</span>
-                <Input id="results-days" type="number" inputMode="numeric" min={1} max={365} value={days} className="h-9 w-20 tabular-nums"
+                <Input id="results-days" type="number" inputMode="numeric" min={1} max={365} value={days} className="h-9 w-20 tabular-nums max-sm:h-11"
                   onChange={(e) => setDays(e.target.value)} onBlur={() => setDays(String(customDays))} data-testid="input-results-days" />
                 <span className="text-muted-foreground">days</span>
               </div>
             )}
             <div className="w-40">
               <Select value={range} onValueChange={(v) => setRange(v as ResultsRange | typeof CUSTOM)}>
-                <SelectTrigger aria-label="Period" data-testid="select-results-range"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label="Period" className="max-sm:h-11" data-testid="select-results-range"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(Object.keys(RANGE_LABELS) as ResultsRange[]).map((r) => <SelectItem key={r} value={r}>{RANGE_LABELS[r]}</SelectItem>)}
                   <SelectItem value={CUSTOM} data-testid="option-results-range-custom">Custom number of days…</SelectItem>

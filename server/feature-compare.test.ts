@@ -121,7 +121,9 @@ describe("every Compare section", () => {
     // The honest gaps the research named.
     expect(compareOf("seo").theyNotUs).toMatch(/Daily rank checks \(ours are weekly/);
     expect(compareOf("reviews").theyNotUs).toMatch(/by text \(ours go by email\)/);
-    expect(compareOf("social").theyNotUs).toMatch(/does not post to your Google profile/);
+    // 2026-10-15: Google Business Profile is a Social Media channel now, so the gap is Marky's fully automatic photo posts.
+    expect(compareOf("social").theyNotUs).toMatch(/job photos into finished posts automatically/);
+    expect(compareOf("social").theyNotUs).not.toMatch(/does not post to your Google profile/);
     expect(compareOf("texting").theyNotUs).toMatch(/two-way inbox/);
   });
 

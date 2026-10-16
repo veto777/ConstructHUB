@@ -115,7 +115,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-schedule\"]",
+      "selector": "[data-testid=\"tool-rail-schedule\"]",
       "caption": "Menu: Schedule",
       "narration": "You'll find Schedule in the menu on the left."
     }

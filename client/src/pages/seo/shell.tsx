@@ -450,7 +450,12 @@ function AddSiteForm({ onDone }: { onDone: (id?: number) => void }) {
   const [serpDepth, setDepth] = useState(10);
   const m = useMutation({
     mutationFn: () => api("POST", "/api/seo/sites", { domain, devices, serpDepth }),
-    onSuccess: (site: SeoSite) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); onDone(site.id); },
+    onSuccess: (site: SeoSite & { existing?: boolean }) => {
+      void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      // An existing site keeps its own settings (server: ON CONFLICT DO NOTHING); they change under its tracking settings.
+      if (site.existing) toast({ title: `${site.domain} is already one of your sites`, description: "Its tracking settings were left as they are — change them in the site's tracking settings." });
+      onDone(site.id);
+    },
     onError: (e) => toast({ title: "Couldn't add the site", description: apiErrorMessage(e), variant: "destructive" }),
   });
   return (

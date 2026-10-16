@@ -100,7 +100,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-integrations\"]",
+      "selector": "[data-testid=\"tool-rail-integrations\"]",
       "caption": "Where to find it",
       "narration": "You will find the HOVER card under Integrations, in the left menu."
     }

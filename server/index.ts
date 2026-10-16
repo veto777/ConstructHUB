@@ -54,6 +54,12 @@ app.use(CLIENT_ERROR_PATH, express.json({ limit: CLIENT_ERROR_BODY_LIMIT }));
 import { USER_REPORT_PATH, USER_REPORT_BODY_LIMIT } from "./ops/user-reports";
 app.use(USER_REPORT_PATH, express.json({ limit: USER_REPORT_BODY_LIMIT }));
 app.use("/api/ads", express.json({ limit: "512kb" }));
+// Bounded JSON for the GBP posts queue, the SEO suite and mail alerts (review w3-r2 L2): every field is zod-bounded
+// afterwards, but the catch-all below would parse 50 MB into memory first. Sized to the largest valid body: SEO lists
+// and keyword imports take up to 1,000 rows; a Google queue batch up to 100 posts of 1,500 characters.
+app.use("/api/seo", express.json({ limit: "1mb" }));
+app.use("/api/gbp/content", express.json({ limit: "512kb" }));
+app.use("/api/mail-alerts", express.json({ limit: "256kb" }));
 app.use(
   express.json({
     limit: "50mb",

@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "A row of buttons under a client's details that starts the common jobs for that client: Schedule appointment, New estimate, Add to pipeline and Take a payment.",
   whatItDoes: "Schedule appointment books a visit that shows on the client's page and on the calendar. New estimate starts an estimate for this client. Add to pipeline creates a project for them in the Lead column. Take a payment opens the payment form for this client.",
   howToUse: [
-    "CRM → Clients, and click the client's name.",
+    "Open CRM → Clients and click the client's name.",
     "Choose Schedule appointment, give the visit a title, a start and an end, and choose Schedule.",
     "Choose Add to pipeline, name the project and choose Create project.",
     "Choose New estimate or Take a payment when you need them.",

@@ -150,6 +150,9 @@ export function sentToPersonCondition(id: SQL, outcome: SQL): SQL {
 /** The Results panel's numbers for one org, counted from voice_calls (see the /calls/summary route). */
 export async function callResultsSummary(orgId: string, range: CallResultsRange, timezone: unknown) {
   const tz = summaryTimezone(timezone);
+  // Only "all" means every call ever. Any other value goes through the one parser, so a range it does not know
+  // ("1.5d", "1e3d", a typo) counts the last 30 days, never all time (review w3-r2 L4).
+  range = range === "month" || range === "all" ? range : parseCallResultsRange(range);
   const days = range === "month" || range === "all" ? null : Number(/^(\d+)d$/.exec(range)?.[1]);
   const since =
     days != null && Number.isInteger(days) && days > 0 ? sql`now() AT TIME ZONE 'UTC' - make_interval(days => ${days})`

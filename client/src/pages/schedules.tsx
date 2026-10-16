@@ -109,7 +109,7 @@ export default function SchedulesPage() {
 
   if (error) {
     return (
-      <AppPage width="narrow">
+      <AppPage width="narrow" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11">
         <GoogleSectionHeader as="h1" title="Scrape schedules" description="Automatic permit refreshes for live-searchable portals." flush />
         <Notice tone={String(error).includes("403") ? "info" : "danger"} testId="notice-schedules-error">
           {String(error).includes("403") ? "Administrator access is required to manage these shared schedules." : "Schedules could not be loaded. Please sign in or try again later."}
@@ -119,7 +119,7 @@ export default function SchedulesPage() {
   }
 
   return (
-    <AppPage width="narrow" testId="page-schedules">
+    <AppPage width="narrow" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-schedules">
       {/* Google's list format (owner, 2026-10-07): a quiet header, hairline rows, pill actions. */}
       <GoogleSectionHeader
         as="h1"
@@ -186,6 +186,7 @@ export default function SchedulesPage() {
                     toggleMutation.mutate({ id: schedule.id, isActive: checked })
                   }
                   aria-label={schedule.isActive ? "Pause schedule" : "Resume schedule"}
+                  className="relative max-sm:after:absolute max-sm:after:-inset-2.5 max-sm:after:content-['']"
                   data-testid={`switch-schedule-${schedule.id}`}
                 />
                 <GooglePill

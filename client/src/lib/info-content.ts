@@ -103,7 +103,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     body: [
       "Everything about one client, stacked on a single page: their contact info up top, then estimates, invoices, projects, activity, notes and measurements below.",
       "This is the screen you work from during a sales call. You can create an estimate, record a payment, or check whether they opened your last bid — all without leaving the page.",
-      "The \"View as client\" button shows you exactly what the client sees in their portal, so you never have to guess what's on their end.",
+      "The \"See what the client sees\" button shows you exactly what the client sees in their portal, so you never have to guess what's on their end.",
       "Example: a client says they never got your invoice. Open their page, see the invoice was sent Tuesday but never viewed, and resend it with one tap while they're on the line.",
     ],
   },
@@ -150,9 +150,9 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "client-timeline": {
     title: "Activity timeline",
     body: [
-      "A running diary of everything that's happened with this client, in order: estimates sent, emails opened, payments made, notes added, files uploaded.",
+      "A running diary of everything that's happened with this client, in order: estimates sent, opened (and for how long), approved or declined, payments, the client's portal comments, files uploaded, messages you sent and financing clicks.",
       "You don't write anything here — the system keeps the diary for you. It's the fastest way to answer \"what's the story with this customer?\" before you call them back.",
-      "Example: a client insists nobody contacted them. The timeline shows the estimate was emailed on the 3rd, they opened it twice on the 4th, and a team member logged a call on the 6th.",
+      "Example: a client insists nobody contacted them. The timeline shows the estimate was emailed on the 3rd and they opened it twice on the 4th.",
     ],
   },
 
@@ -168,7 +168,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   measurements: {
     title: "Measurements",
     body: [
-      "Roof and wall measurements for this client's property — square footage, pitch, waste factor — pulled in from HOVER or entered by hand after a site visit.",
+      "Roof and wall measurements for this client's property — square footage, pitch, waste factor — pulled in from HOVER, or imported from a report you upload or paste on the Measurement reports page.",
       "These numbers do real work: Quick Bid and per-square-foot price book items use them to price jobs automatically, so a good measurement report means a bid in minutes instead of an evening with a calculator.",
       "Example: the HOVER report says 2,210 sq ft of siding. Your siding line item is priced per square foot, so the system multiplies it out — plus waste — and the estimate practically writes itself.",
     ],
@@ -188,9 +188,9 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     title: "Pipeline",
     body: [
       "Every job you're working on, laid out as cards in columns from first contact to done-and-paid. It's your whole business on one board.",
-      "Drag a card to the next column as the job moves along, or use the menu on the card. The columns match the real life of a job: new lead, bid sent, approved, scheduled, in progress, complete.",
-      "Nothing falls through the cracks here — a card that sits too long in \"bid sent\" is a job you're about to lose to a follow-up call from someone else.",
-      "Example: you glance at the board, see four bids sitting in \"Sent\" for over a week, and spend twenty minutes calling those four homeowners. Two of them sign.",
+      "Drag a card to the next column as the job moves along, or use the menu on the card. The columns follow a job from Lead and Estimating through Proposal Sent, Approved, Scheduled, In Progress, Waiting on Trades, Punch List and Complete, to Invoiced and Paid (plus Cancelled).",
+      "Nothing falls through the cracks here — a card that sits too long in \"Proposal Sent\" is a job you're about to lose to a follow-up call from someone else.",
+      "Example: you glance at the board, see four bids sitting in \"Proposal Sent\" for over a week, and spend twenty minutes calling those four homeowners. Two of them sign.",
     ],
   },
 
@@ -207,9 +207,9 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   invoices: {
     title: "Invoices",
     body: [
-      "Every bill your company has sent, with running totals of what's paid, what's due, and what's overdue. This page is your accounts receivable at a glance.",
-      "Filter by status to build your collections call list: \"sent\" and past due means it's time for a friendly nudge. The client pays online through their own secure link, or you record checks and cash by hand.",
-      "Example: it's the 1st of the month. You filter invoices to unpaid, see $23,400 outstanding across six clients, and work down the list — three pay the same day from the reminder link.",
+      "Every bill your company has sent, each with its status, due date and total. Overdue ones are marked Overdue.",
+      "Filter by status to build your collections call list: Sent, Partial or Overdue means it's time for a friendly nudge. The client pays online through their own secure link, or you record checks and cash by hand.",
+      "Example: it's the 1st of the month. You filter invoices to Overdue and work down the list — three pay the same day from the reminder link.",
     ],
   },
 
@@ -227,7 +227,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     title: "The project page",
     body: [
       "One page per job. The top shows the job's name, number and stage; when you can see costs, four figures follow — Revised contract (the contract value plus change orders), Budget, Committed and Actual cost — with gross profit and margin beside them.",
-      "The tabs below are the job's working lists: Costing, Change orders, Punch list, Daily logs, Selections, Permits and JobCam. Each one is empty until you add to it.",
+      "The tabs below are the job's working lists: Costing, Change orders, Punch list, Daily logs, Selections, Permits and JobCam. Each list starts empty until you add to it, except Permits, which fills itself from the job's address.",
       "Example: a homeowner adds a skylight mid-job. You write the change order on this page, the revised contract goes up by its amount, and the margin figure tells you whether the job is still on track.",
     ],
   },
@@ -281,7 +281,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
       "The fastest way to price a job: it takes the client's latest measurement report and your per-square-foot prices, and builds the bid for you.",
       "Here's how it thinks. The report says the house has 2,210 square feet of siding. Your price book says siding is $4.50 per square foot. Quick Bid multiplies the square footage by your price, adds the waste factor, and lays out the finished lines for you to check.",
       "Nothing is final until you say so — you review every line, fix quantities or prices if you want, then send it like any other estimate.",
-      "It needs two things to work: a measurement report on the client (from HOVER or entered by hand) and price book items priced per square foot. If the button is greyed out, one of those is missing.",
+      "It needs two things to work: a measurement report on the client (from HOVER, or uploaded or pasted on the Measurement reports page) and price book items priced per square foot. If the button is greyed out, one of those is missing.",
     ],
   },
 
@@ -290,7 +290,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     body: [
       "Your company's master price list — every product and service you sell, priced once, so estimates are picking from a menu instead of re-typing numbers.",
       "Each item (a \"SKU\") has a name, a unit and a price. Units can be each, hour, square foot, linear foot and so on. Items priced per square foot are the magic ones — they hook into measurement reports so bids price themselves.",
-      "Waste factors are built in honestly: if siding needs 12% extra for cuts and mistakes, you set 12% on the item and every estimate includes it automatically.",
+      "Waste is built in honestly: if a material needs 12% extra for cuts and mistakes, set 12% waste on that material, and every item that uses it adds 12% to the quantity. Quick Bid takes the waste from the measurement report.",
       "Example: lumber prices jump. You change \"Architectural shingle install\" from $385 to $410 per square once, and every new estimate from the whole team uses the new number.",
     ],
   },
@@ -300,7 +300,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     body: [
       "Where you connect your own Stripe account so clients can pay you online by card or bank transfer. The money goes straight to your bank — ConstructHub never touches it.",
       "Connecting takes a few minutes: Stripe asks for your business and bank details once, and after that every invoice and every client portal has a Pay button on it.",
-      "You also control the rules here: whether to offer cards, bank transfer (ACH) or both, and whether card processing fees get passed to the client. Bank transfer is much cheaper on big jobs — 0.8% capped at $5 versus about 3% for cards.",
+      "In CRM → Settings you also control the rules: whether to offer cards, bank transfer (ACH) or both, and whether card processing fees get passed to the client. Bank transfer is much cheaper on big jobs — 0.8% capped at $5 versus about 3% for cards.",
       "Example: a $12,000 invoice paid by bank transfer costs you $5 in fees. The same invoice on a card costs about $350. You set \"ACH only above $5,000\" and keep the difference.",
     ],
   },
@@ -319,7 +319,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     body: [
       "A \"Finance this project\" button on your estimates, invoices and client portal that sends the client to your lender or financing partner — GreenSky, Synchrony, whoever you work with.",
       "Big jobs close easier when the client sees a monthly payment option right next to the price. Add your lender's application link here once and it appears everywhere your clients look.",
-      "You can add up to ten links and mark one as primary — that's the one clients see. Clicks are tracked, so you know how many clients actually consider financing.",
+      "You can add up to ten links and mark one as primary. That's the button on your estimates and invoices; the client portal lists all of them, primary first. Clicks in the client portal are tracked, so you know how many clients actually consider financing.",
       "Example: a homeowner balks at an $18,000 roof. They tap \"Finance this project\", apply with your lender while the motivation is hot, and approve the job the same week at $299 a month.",
     ],
   },
@@ -338,7 +338,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     title: "Messages",
     body: [
       "Two-way conversations with your clients, one thread per client. A client writes to you from their portal; your reply shows up in their portal and is also emailed to them when they have an email address on file.",
-      "Unread threads are counted on the Messages tab, so a client waiting on an answer is hard to miss.",
+      "Unread client messages are counted on the Messages tab, so a client waiting on an answer is hard to miss.",
       "The Client activity tab is the live feed of what clients are doing: opening an estimate, approving a bid, paying an invoice.",
       "Example: Dana W. asks in her portal whether the crew can start Tuesday. You answer here; she sees it in her portal and gets it by email too.",
     ],
@@ -356,7 +356,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "team-invite": {
     title: "Inviting someone",
     body: [
-      "Type their email, pick a role, hit invite. They get an email with a link — one tap and they're in, no password gymnastics.",
+      "Type their email, pick a role, hit invite. They get an email with a link. They sign in (or create an account) with that email address and accept.",
       "The role you pick here is the only decision that matters: it controls what they can see and change. Read the role descriptions on each team member below if you're unsure — when in doubt, give less access. You can always bump it up later.",
       "Invitations that haven't been accepted yet show up as pending; you can resend the email or cancel the invite anytime.",
       "Example: your new crew lead starts Monday. You invite him Sunday night as Field — he opens the link on his phone at the job site and can see his schedule before his first coffee.",
@@ -385,7 +385,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "role-admin": {
     title: "Role: Admin",
     body: [
-      "Your right hand. An admin can run the whole company day to day — clients, estimates, invoices, prices, team, settings — everything except the handful of owner-only powers like permanent deletion.",
+      "Your right hand. An admin can run the whole company day to day — clients, estimates, invoices, prices, team, settings — everything except permanent deletion (owner only), integrations and bulk data export.",
       "Admins can also be scoped to one division, so a branch manager sees their branch without wandering through the other one's numbers.",
       "Give this to an office manager or a branch lead you trust to run things while you're on a roof.",
       "Example: your office manager in the Florida division is an admin scoped to Florida — she runs her whole branch, and the Washington books simply aren't hers to see.",
@@ -450,8 +450,8 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   admin: {
     title: "Platform admin",
     body: [
-      "The ConstructHub staff console — a read-only control tower over every account and company on the platform. It's how the team spots trouble, checks usage, and supports customers.",
-      "This page exists for ConstructHub employees only; regular company accounts never see it. Nothing here edits your data — it's monitoring, not a back door.",
+      "The ConstructHub staff console over every account and company on the platform. It's how the team spots trouble, checks usage, and supports customers.",
+      "This page exists for ConstructHub employees only; regular company accounts never see it. It is mostly monitoring. Its only changes are platform settings, such as the founding offer, a company's JobCam storage tier and beta invites. It never edits a company's clients, estimates or invoices.",
       "Example: a contractor emails support saying their invite link broke. Staff look the account up here, confirm what happened, and fix it in minutes.",
     ],
   },
@@ -487,7 +487,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   webhooks: {
     title: "Webhooks",
     body: [
-      "A doorbell for your data. A webhook is a web address you give us; every time something happens — an estimate approved, an invoice paid — we ring that address with the details, instantly.",
+      "A doorbell for your data. A webhook is a web address you give us; every time an invoice is sent, viewed or paid, or a payment succeeds, fails, is refunded or reversed, we ring that address with the details. Other events can be picked in the list, but today they are never sent.",
       "This is how tech-savvy teams wire ConstructHub into their own systems: when the doorbell rings, their software reacts — updating a spreadsheet, pinging a dispatcher, whatever they build.",
       "Like API keys, this is a developer feature. No developer, no need to touch it — everything works without it.",
       "Example: your IT guy sets a webhook on \"invoice paid\" that posts to the company chat. The whole office sees \"Chen paid $9,600\" ten seconds after it happens.",
@@ -516,9 +516,9 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "lead-capture": {
     title: "Lead capture",
     body: [
-      "A ready-made \"Request an estimate\" form you can put on your own website or link from anywhere. A stranger fills it out, and they land in your client list and pipeline as a brand-new lead — no email lost, no voicemail forgotten.",
+      "A ready-made \"Request an estimate\" form you can put on your own website or link from anywhere. A stranger fills it out, and they land in your client list as a new client marked as a website lead, and you get an email — no email lost, no voicemail forgotten.",
       "Copy the embed code into your website (any web person can do this in five minutes), or just share the link in your Google profile and social pages.",
-      "Example: a homeowner finds you on Google at 11pm, taps the link, types her name and address, and Tuesday morning she's sitting at the top of your pipeline waiting for your call.",
+      "Example: a homeowner finds you on Google at 11pm, taps the link, types her name and address, and Tuesday morning she's at the top of your client list waiting for your call.",
     ],
   },
 
@@ -528,7 +528,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     title: "Settings",
     body: [
       "The control room for your whole company: what prints on your documents, which emails you get, how you take payment, and where your leads come from.",
-      "Every card is one topic, and every card has its own ⓘ if you want the long version. Switches and colour picks save the moment you change them; forms save with their button.",
+      "Every card is one topic, and every card has its own ⓘ if you want the long version. Most switches and colour picks save the moment you change them. The Scheduled exports switch and the card-fee switch save with their card's button, and forms save with their own button.",
       "Set this up once when you start — after that you'll only come back when something in the business changes.",
     ],
   },
@@ -546,15 +546,15 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     title: "Estimate & invoice defaults",
     body: [
       "The fine print and starting values every new document begins with: your estimate and invoice footers, terms & conditions, warranty text, default deposit and default sales tax.",
-      "Set them once here and they pre-fill on every new estimate or invoice. You can still edit any of it per document — these are starting points, not handcuffs.",
-      "Example: every estimate you send automatically ends with \"Fully licensed and insured. 10-year workmanship warranty.\" — because you typed it here once.",
+      "Today only some of them are used. Your terms are copied onto each new estimate, and the sales tax is used when an estimate has none of its own. The warranty text and terms also show on the client's estimate page and contract, including ones already sent, so a change shows there too. The footers and the default deposit are saved but not used on documents.",
+      "Example: every estimate page your clients open shows \"10-year workmanship warranty.\" — because you typed it here once.",
     ],
   },
 
   "settings-notifications": {
     title: "Notifications",
     body: [
-      "Which emails the system sends to YOU. A client opened your estimate, a bid was approved, a payment arrived — turn each one on or off to taste.",
+      "Which alerts the system sends to YOU — in the app, by email and by text. A client opened your estimate, a bid was approved, a payment arrived — turn each channel on or off for each one.",
       "This only controls your copies. Emails to your clients — the estimate or invoice itself — always send, no matter what you switch off here.",
       "Example: you want to know the second money arrives but you're tired of \"client viewed\" pings during dinner. Payment emails on, view emails off. Done.",
     ],
@@ -600,16 +600,16 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "lead-sources": {
     title: "Lead sources",
     body: [
-      "Where your clients come from — Google, yard sign, referral, the home show. You tag each client with their source on their page, and this card keeps the list tidy.",
-      "Six months of tagging and you'll know something most contractors only guess at: which marketing actually produces jobs, and which is a bonfire.",
-      "Example: at year end you count — 40% of your closed jobs came from referrals, 5% from the $6,000 magazine ad. Next year's budget writes itself.",
+      "Where your clients come from. This card lists the sources already on your clients. Your web form sets \"Website\" and the Call Assistant sets \"Call Assistant\"; the API can set others. There is no source picker on the client page.",
+      "It shows which of your channels bring in clients, so you can see what is working.",
+      "Example: at year end you see that most new clients came from your web form and the rest from the Call Assistant, and you plan next year's marketing around that.",
     ],
   },
 
   "price-lock": {
     title: "Price floor lock",
     body: [
-      "A floor under your prices. With the lock on, your team can price jobs at or above the price book numbers — but never below. Only you can still edit SKUs, price charts and discounts.",
+      "A floor under your prices. With the lock on, your team can price jobs at or above the price book numbers — but never below. Only you are exempt: your own estimates and discount offers can still go below the floor. The lock does not change who may edit the price book.",
       "This is the cure for the salesperson who discounts to be liked. The floor is your margin, enforced by the software instead of by an argument.",
       "Example: your price book says siding is $4.50 a square foot. With the lock on, a rep quoting $3.90 to win a job simply can't — the system won't let the price through.",
     ],
@@ -618,7 +618,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   backups: {
     title: "Backups",
     body: [
-      "Your safety net: scheduled exports of your own data — clients, estimates, invoices, projects and notes — so you always hold an independent copy of your business.",
+      "Your safety net: scheduled exports of your clients, estimates and invoices, so you always hold an independent copy of your business.",
       "Turn it on and the platform hands you a complete export on a schedule you choose. Keep the files somewhere safe that's yours, like your own cloud drive.",
       "ConstructHub keeps short-lived internal backups for disasters, but those are for us, not you — your own scheduled export is the copy you can actually count on.",
       "Example: you set a weekly export every Sunday night. Whatever ever happens — a mistake, a misunderstanding, a meteor — your client book and document history are sitting in your drive.",
@@ -659,7 +659,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "signed-contracts": {
     title: "Signed contracts",
     body: [
-      "The legally binding paperwork, signed electronically and stored where neither side can lose it. When your contractor sends a contract, you review and sign it right in your browser — no printing or scanning.",
+      "The legally binding paperwork, signed electronically and stored where neither side can lose it. When you approve an estimate, typing your name signs it, and it becomes your contract — no printing or scanning.",
       "Once signed, both sides get the finished document and it lives here permanently, with the date and signature record attached.",
       "Example: six months after the job, a warranty question comes up. You open this section, pull up the signed agreement, and the exact terms are right there in black and white.",
     ],
@@ -699,10 +699,10 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "email-gating": {
     title: "Email-verified links",
     body: [
-      "Every estimate and invoice link is private. When a client opens one for the first time, they confirm their email with a one-tap code — after that, their device remembers them.",
+      "Every estimate and invoice link is private. Opening it from the email signs the client in. On another device they enter their email and we email them a secure link. After that the device remembers them for 30 days.",
       "Why the extra step: these pages show prices, addresses and payment buttons. The email check keeps a forwarded link or a nosy neighbor from seeing your client's business — and it's what lets the system tell you exactly when your client opened the bid.",
-      "If a client says the link \"doesn't work\", it almost always means they typed the wrong email — have them request a fresh code with the email you have on file.",
-      "Example: a client forwards their estimate link to their brother-in-law for advice. Without the client's email code, all he sees is a sign-in prompt — the numbers stay private.",
+      "If a client says the link \"doesn't work\", it almost always means they typed the wrong email — have them request a fresh link with the email you have on file.",
+      "Example: a client forwards their estimate link to their brother-in-law for advice. Without access to the client's email, all he sees is a sign-in prompt — the numbers stay private.",
     ],
   },
 

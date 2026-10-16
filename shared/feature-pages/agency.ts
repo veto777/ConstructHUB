@@ -1,5 +1,6 @@
 import type { FeaturePage } from "./types";
-import { ADDONS, PLANS, planForModule } from "../plans";
+import { ADDONS, PLANS, isUnlimited, planForModule } from "../plans";
+import { planNamesWhere } from "../plan-copy";
 
 /**
  * Agency workspace (/agency) — the Agency plan's multi-client workspace.
@@ -12,7 +13,11 @@ import { ADDONS, PLANS, planForModule } from "../plans";
  *     grants access, members need a ConstructHUB login: server/agency/routes.ts PUT /team, server/agency/access.ts,
  *     client/src/pages/agency.tsx (Team tab copy)
  *   - seats on the agency workspace team (agencySeats + the Extra team seat add-on):
- *     PLANS.growth.limits.agencySeats, ADDONS.extra_seat
+ *     PLANS.growth.limits.agencySeats, ADDONS.extra_seat. NOT shared with the CRM: since the 2026-10-07 split
+ *     server/crm/tenancy.ts seatHolders() counts platform seats (agency_members) and CRM seats (crm_members)
+ *     separately, and shared/plans.ts PlanLimits says agencySeats are not CRM seats
+ *   - client workspaces are capped per plan (limits.clientWorkspaces, -1 = no cap), enforced under an advisory lock
+ *     with a 403 limit_reached on POST /api/agency/clients (server/agency/routes.ts)
  *   - bulk actions (sync, link & sync, unlink, assign client, Watch mode, AI reply settings, post/photo batch,
  *     Site Scans), select a page or all matching, queued with a Jobs log: server/agency/jobs.ts bulkInput,
  *     client/src/components/agency-workspace.tsx
@@ -34,6 +39,10 @@ import { ADDONS, PLANS, planForModule } from "../plans";
 // The cheapest plan that unlocks the workspace — the Agency plan (key "growth") today;
 // the page prices from the price book, never from a typed amount.
 const AGENCY = PLANS[planForModule("agencyWorkspace")];
+/** Client workspaces on the cheapest workspace plan ("10 client workspaces"), or "unlimited client workspaces". */
+const WORKSPACES = isUnlimited(AGENCY.limits.clientWorkspaces) ? "unlimited client workspaces" : `${AGENCY.limits.clientWorkspaces} client workspaces`;
+/** Workspace plans with no cap on client workspaces ("Unlimited"). */
+const UNCAPPED_PLANS = planNamesWhere((plan) => plan.modules.agencyWorkspace && isUnlimited(plan.limits.clientWorkspaces));
 
 const page: FeaturePage = {
   key: "agency",
@@ -139,8 +148,8 @@ const page: FeaturePage = {
       a: `The ${AGENCY.name} plan and a Google account that manages, or will manage, your clients' Business Profiles. Each team member needs their own ConstructHUB login.`,
     },
     {
-      q: "How many locations and team seats are included?",
-      a: `The ${AGENCY.name} plan includes ${AGENCY.limits.locations} client locations and ${AGENCY.limits.agencySeats} agency team seats. Outgrow either and you move up a plan — there is no per-location pricing; an extra seat on the way up is the ${ADDONS.extra_seat.name} add-on.`,
+      q: "How many clients, locations and team seats are included?",
+      a: `The ${AGENCY.name} plan includes ${WORKSPACES}, ${AGENCY.limits.locations} client locations and ${AGENCY.limits.agencySeats} agency team seats${UNCAPPED_PLANS ? `; the ${UNCAPPED_PLANS} plan has no cap on client workspaces` : ""}. Agency team seats are separate from CRM seats, because the CRM is its own product. Outgrow either and you move up a plan — there is no per-location pricing; an extra seat on the way up is the ${ADDONS.extra_seat.name} add-on.`,
     },
     {
       q: "Do my clients have to share a password or connect anything?",
@@ -162,7 +171,7 @@ const page: FeaturePage = {
   // worker query; 30-day expiry: server/agency/schema.ts; auto-accept + unassigned: onboarding.ts auto_accept_all; bulk
   // actions, page or all matching, retries with growing waits, a rate limit waits an hour: server/agency/jobs.ts bulkInput,
   // the job runner; the owner's plan covers members: server/agency/access.ts workspaceEntitled; roles + client access:
-  // server/agency/routes.ts PUT /team; shared seats: server/crm/tenancy.ts getOwnerSeatUsage.
+  // server/agency/routes.ts PUT /team; separate platform and CRM seats: server/crm/tenancy.ts seatHolders.
   inDepth: {
     heading: { title: "Managing Client Google Profiles, ", em: "Explained" },
     paragraphs: [
@@ -182,8 +191,8 @@ const page: FeaturePage = {
         "retried a few times with growing waits, a Google rate limit waits an hour, and anything that still fails shows " +
         "its error.",
       "Team access follows the workspace owner's plan, so team members need their own ConstructHUB login but no plan of " +
-        "their own. Seats are shared with your CRM team, and each person's role and client list decide what they can see " +
-        "and change.",
+        "their own. Team seats come from your platform plan and are counted apart from CRM seats, because the CRM is a " +
+        "separate product, and each person's role and client list decide what they can see and change.",
     ],
   },
   related: ["gbp", "profileGuard", "siteScan"],

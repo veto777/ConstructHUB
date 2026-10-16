@@ -40,7 +40,8 @@ test("owner history and Gold competitor UI show real provider failure", async ({
   await expect(page.getByTestId(`card-query-${queryId}`)).toContainText("Owned browser fixture");
   await expect(page.locator('[data-testid^="card-query-"]')).toHaveCount(1);
   await page.goto("/schedules");
-  await expect(page.getByRole("alert")).toContainText("Administrator access is required");
+  // An info notice (app-ui Notice, tone "info") is role="status", not an alert.
+  await expect(page.getByTestId("notice-schedules-error")).toContainText("Administrator access is required");
   await expect(page.getByTestId("button-add-schedule")).toHaveCount(0);
   await page.goto("/competitors");
   await expect(page.getByTestId("button-start-scan")).toBeVisible();
@@ -58,12 +59,15 @@ test("owner history and Gold competitor UI show real provider failure", async ({
 test("contractor enables a custom referral offer; disabling hides both cards", async ({ page, context, browser }) => {
   await signedIn(context);
   await page.goto("/settings");
+  // Settings → My account keeps the referral offer in a collapsed "Review referral settings" section.
+  await page.getByText("Review referral settings", { exact: true }).click();
   const toggle = page.getByRole("switch", { name: "Show my referral offer" });
   await expect(toggle).not.toBeChecked();
   await page.getByLabel("Offer and terms").fill("Fixture offer: a project credit for a referred customer, unrelated to reviews.");
   await toggle.click();
   await page.getByRole("button", { name: "Save referral settings", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Referral settings saved");
+  // The settings page carries other live regions (role="status"); match the referral one by its text.
+  await expect(page.getByRole("status").filter({ hasText: "Referral settings saved" })).toBeVisible();
   const token = randomUUID(); tokens.push(token);
   await pool.query("insert into review_requests(user_id,client_name,client_email,company_name,google_profile_url,token) values($1,'Browser customer','browser@example.invalid','Fixture contractor','https://www.google.com/',$2)", [userId, token]);
   const customer = await browser.newContext();
@@ -88,6 +92,8 @@ test("Google link click records only an open without contacting Google", async (
   await pool.query("insert into review_requests(user_id,client_name,client_email,google_profile_url,token) values($1,'Browser customer','browser@example.invalid','https://www.google.com/',$2)", [userId, token]);
   await page.context().route("https://www.google.com/**", r => r.abort());
   await page.goto(`/review/${token}`);
+  // The public review link shows once the score is at or above the owner's threshold (be3d72fd).
+  await page.getByTestId("button-rating-10").click();
   await page.getByTestId("link-google-review-always").click();
   await expect.poll(async () => (await pool.query("select google_link_opened from review_requests where token=$1", [token])).rows[0].google_link_opened).toBe(true);
   expect((await pool.query("select review_submitted,status from review_requests where token=$1", [token])).rows[0]).toEqual({ review_submitted: false, status: "sent" });

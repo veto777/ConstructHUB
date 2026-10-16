@@ -93,7 +93,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-domains\"]",
+      "selector": "[data-testid=\"tool-rail-domains\"]",
       "caption": "Menu: Domains",
       "narration": "You'll find Domains in the menu on the left, under Google Business."
     }

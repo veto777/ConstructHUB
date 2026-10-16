@@ -153,3 +153,25 @@ describe("GET /api/mail-alerts category and severity filters", () => {
     expect(counts[0]).not.toContain("registrar");
   });
 });
+
+describe("GET /api/mail-alerts search escapes LIKE wildcards (review w3-r2 L3)", () => {
+  const qParam = () => { const calls = filterCalls(); expect(calls.length).toBe(2); return calls.map(([, params]) => params[1]); };
+
+  it("`%` and `_` are literal characters in the pattern, not wildcards", async () => {
+    expect((await list({ q: "%" })).status).toBe(200);
+    for (const p of qParam()) expect(p).toBe("%\\%%");
+    mocks.query.mockClear();
+    await list({ q: "50%_off" });
+    for (const p of qParam()) expect(p).toBe("%50\\%\\_off%");
+  });
+
+  it("a backslash is escaped too, so it cannot escape the closing wildcard", async () => {
+    await list({ q: "a\\" });
+    for (const p of qParam()) expect(p).toBe("%a\\\\%");
+  });
+
+  it("ordinary text is unchanged inside the wildcards", async () => {
+    await list({ q: "Profile suspended" });
+    for (const p of qParam()) expect(p).toBe("%Profile suspended%");
+  });
+});

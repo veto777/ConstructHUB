@@ -226,7 +226,7 @@ export default function ResearchOrderPage() {
           <div className="flex flex-wrap gap-1.5" data-testid="list-states">
             {US_STATES.map((s) => (
               <button key={s.code} type="button" onClick={() => toggleState(s.code)} title={s.name} aria-pressed={states.includes(s.code)}
-                className={`rounded-md border px-2 py-1 text-xs font-medium ${states.includes(s.code) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
+                className={`rounded-md border px-2 py-1 text-xs font-medium max-sm:min-h-11 max-sm:min-w-11 ${states.includes(s.code) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}
                 data-testid={`button-state-${s.code}`}>{s.code}</button>
             ))}
           </div>
@@ -237,7 +237,7 @@ export default function ResearchOrderPage() {
           <legend className="font-semibold">Trades to focus on <span className="font-normal text-muted-foreground text-sm">(optional; matching permits are listed first)</span></legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {RESEARCH_TRADE_KEYS.map((k) => (
-              <label key={k} className="flex items-center gap-2 text-sm">
+              <label key={k} className="flex items-center gap-2 text-sm max-sm:min-h-11">
                 <Checkbox checked={trades.includes(k)} onCheckedChange={(v) => setTrades((p) => v ? [...p, k] : p.filter((t) => t !== k))} data-testid={`checkbox-trade-${k}`} />
                 {RESEARCH_TRADES[k].label}
               </label>

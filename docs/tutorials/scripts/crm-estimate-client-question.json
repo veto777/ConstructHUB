@@ -64,13 +64,13 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "selector": "[data-testid=\"tool-rail-messages\"]",
       "caption": "Unread count",
       "narration": "The number beside Messages has gone up."
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "selector": "[data-testid=\"tool-rail-messages\"]",
       "caption": "Open Messages",
       "narration": "Open Messages.",
       "holdMs": 900
@@ -105,7 +105,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "selector": "[data-testid=\"tool-rail-messages\"]",
       "caption": "Where to find it",
       "narration": "Questions from estimates land under Messages, in the left menu."
     }

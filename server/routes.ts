@@ -48,7 +48,8 @@ import { registerAdsConsultantRoutes } from "./ads-consultant";
 import { registerHubRoutes } from "./hub";
 import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
-import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
+import { uploadToR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
+import { registerPublicFileRoutes } from "./files/public-files";
 import { db, pool } from "./db";
 import { searchQueries, scrapeSchedules, trackedDomains, permitDatabases, subscriptions, reviewTemplates, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
 import { CITATION_DIRECTORIES, LEGACY_CITATION_NAMES, citationRank } from "./citations/directories";
@@ -6406,37 +6407,9 @@ function main() {
   // unless server/tutorials/fixtures/gate.ts says so (never under NODE_ENV=production).
   registerTutorialFixtures(app);
 
-  app.get("/api/files/:folder/:subfolder/:filename", async (req, res) => {
-    try {
-      const key = `${req.params.folder}/${req.params.subfolder}/${req.params.filename}`;
-      if (!key) return res.status(400).json({ message: "Missing file key" });
-
-      const { body, contentType } = await getFromR2(key);
-      if (!body) return res.status(404).json({ message: "File not found" });
-
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-
-      const nodeStream = body as any;
-      if (typeof nodeStream.pipe === "function") {
-        nodeStream.pipe(res);
-      } else if (typeof nodeStream[Symbol.asyncIterator] === "function") {
-        for await (const chunk of nodeStream) {
-          res.write(chunk);
-        }
-        res.end();
-      } else {
-        const arrayBuf = await nodeStream.arrayBuffer();
-        res.send(Buffer.from(arrayBuf));
-      }
-    } catch (err: any) {
-      if (err?.name === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) {
-        return res.status(404).json({ message: "File not found" });
-      }
-      console.error("Error serving R2 file:", err);
-      res.status(500).json({ message: "Failed to serve file" });
-    }
-  });
+  // Public R2 files: an allowlist of public-by-design prefixes only (server/files/public-files.ts).
+  // Recordings, JobCam, customer videos, issue screenshots… are served by their own gated routes.
+  registerPublicFileRoutes(app);
 
   // My account photo/logo uploads: takes a base64 jpeg/png/webp/gif (≤2MB), stores it in R2 under
   // avatars/ or logos/company, and returns the URL for PATCH /api/auth/profile.
@@ -6501,37 +6474,6 @@ function main() {
     } catch (err: any) {
       console.error("Error uploading review photos:", err);
       res.status(500).json({ message: "Failed to upload photos" });
-    }
-  });
-
-  app.get("/api/files/:folder/:subfolder/:filename/download", async (req, res) => {
-    try {
-      const key = `${req.params.folder}/${req.params.subfolder}/${req.params.filename}`;
-      const { body, contentType } = await getFromR2(key);
-      if (!body) return res.status(404).json({ message: "File not found" });
-
-      const originalName = req.query.name as string || req.params.filename;
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Content-Disposition", `attachment; filename="${originalName}"`);
-      res.setHeader("Cache-Control", "no-cache");
-
-      const nodeStream = body as any;
-      if (typeof nodeStream.pipe === "function") {
-        nodeStream.pipe(res);
-      } else if (typeof nodeStream[Symbol.asyncIterator] === "function") {
-        for await (const chunk of nodeStream) {
-          res.write(chunk);
-        }
-        res.end();
-      } else {
-        const arrayBuf = await nodeStream.arrayBuffer();
-        res.send(Buffer.from(arrayBuf));
-      }
-    } catch (err: any) {
-      if (err?.name === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) {
-        return res.status(404).json({ message: "File not found" });
-      }
-      res.status(500).json({ message: "Failed to download file" });
     }
   });
 

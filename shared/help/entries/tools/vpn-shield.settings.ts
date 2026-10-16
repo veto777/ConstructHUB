@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "vpn-shield.settings", parent: "vpn-shield", group: "Tools", route: "/vpn-shield", title: "VPN Shield → Settings",
   whatItIs: "What happens to a flagged visitor on this site, and which addresses are never flagged.",
-  whatItDoes: "Three modes (Log only records and blocks nobody, Block shows an overlay instead of your page, Redirect sends the visitor to your link instead of your page), a redirect link, and a whitelist of up to 500 of your own IP addresses that are never blocked.",
+  whatItDoes: "Three modes: Log only records and blocks nobody, Block shows a cover screen instead of your page, and Redirect sends the visitor to your link. You also set the redirect link and a whitelist of up to 500 of your own IP addresses that are never blocked.",
   howToUse: [
     "Open VPN Shield → Settings and pick the site.",
     "Keep Log only until you have read some flagged visits, then choose Block or Redirect.",

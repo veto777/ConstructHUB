@@ -12,7 +12,7 @@ const entry: HelpDraft = {
     "Pick the action and its settings under Apply to selected locations.",
     "Choose Queue selected action, then follow the jobs under the Jobs tab.",
   ],
-  howItWorks: "Each queued action becomes one job per location, run by the server in the background a few seconds later. A location you lose access to while a job waits is skipped. Set Watch mode needs an approved saved copy of the listing on each location and fails safely where there is none. Unlink removes the Google data ConstructHUB holds and never changes the listing on Google.",
+  howItWorks: "Each queued action becomes one job per location, run in the background a few seconds later. A location you lose access to while a job waits is skipped. Set Watch mode needs an approved saved copy of the listing on each location and fails safely where there is none. Unlink removes the Google data ConstructHUB holds and never changes the listing on Google.",
   needs: ["The Agency workspace (the agency module; which plan carries it comes from the plan model).", "A role in the workspace that can change locations: owner, admin or manager."],
 };
 export default entry;

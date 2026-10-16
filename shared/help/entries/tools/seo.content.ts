@@ -8,10 +8,10 @@ const SAVED = savedForWords(SEO_SAVED_DAYS);
 const entry: HelpDraft = {
   key: "seo.content", parent: "seo", group: "Tools", route: "/seo/content", title: "SEO Suite → Content explorer",
   whatItIs: "A search of the web for pages written about a topic: who writes about what you sell, how strong their site is and when they published.",
-  whatItDoes: "Each page of 25 results shows the page’s title, site, authority, date and author, with filters for sort order, publish date, lowest site authority and kind of site (blogs, news, company sites, forums, shops), and a switch to leave your own site out. For the pages on screen you can add how many sites link to each and its search visits, at the price shown. Each figure opens that page or site in Site explorer, and the results export to CSV.",
+  whatItDoes: "Each page of 25 results shows the article’s title, site, authority, date and author. Filters set sort order, publish date, lowest site authority and kind of site (blogs, news, company sites, forums, shops), and a switch leaves your own site out. For the articles on screen you can add how many sites link to each and its search visits, at the price shown. Each figure opens that page or site in Site explorer, and the results export to CSV.",
   howToUse: [
-    "Type a topic your customers care about (“roof replacement cost”) and press Search; a search you ran in the last " + SAVED + " reopens free, otherwise the price of a page is shown before you run it.",
-    "Narrow with the filters: Published takes the listed windows or a custom number of days (up to two years), and Site authority at least takes the listed values or any number from 1 to 100.",
+    "Type a topic your customers care about (“roof replacement cost”) and press Search; a search from less than " + SAVED + " ago reopens free, otherwise the price shows first.",
+    "Narrow with the filters, such as Published (up to two years back) and Site authority at least (1 to 100).",
     "Choose “Add linking sites and search visits” to see which of these sites are worth asking for a link.",
     "Open a result’s figures in Site explorer, or export the page.",
   ],

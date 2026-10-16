@@ -62,6 +62,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow } from "./client-auth";
 import { storeGeneratedPdf, storeGeneratedFile } from "./attachments";
+import { queueCrmEvent, customerEventPayload } from "./integrations";
 import { oauthBaseUrl } from "../site-context";
 import { recordFailure } from "../ops/issues";
 import { providerFixture, type HoverFixture } from "../tutorials/fixtures";
@@ -881,6 +882,7 @@ async function linkOrCreateHoverCustomer(
       } as any)
       .returning();
     customerCreated = true;
+    queueCrmEvent(orgId, "customer.created", { ...customerEventPayload(customer), source: "hover" });
   }
   return { customer, matchedVia, ambiguous, customerCreated };
 }

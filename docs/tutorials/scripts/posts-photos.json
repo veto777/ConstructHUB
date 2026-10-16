@@ -30,7 +30,7 @@
       "narration": "Calendar, queue and history lists every item, newest first." },
     { "action": "highlight", "selector": "xpath=(//article[contains(.,\"queued\")])[1]", "caption": "Kind, time, status",
       "narration": "Each item shows its kind, its time and its status." },
-    { "action": "highlight", "selector": "[data-testid=\"tool-rail-content\"]", "caption": "Google Business → Posts & Photos",
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-posts\"]", "caption": "Google Business → Posts & Photos",
       "narration": "You'll find Posts and Photos in the Google Business rail on the left." }
   ],
   "youtube": {

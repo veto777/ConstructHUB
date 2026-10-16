@@ -717,7 +717,7 @@ export default function SiteScanPage() {
       setShare("");
     });
   return (
-    <AppPage testId="page-site-scan">
+    <AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-site-scan">
       {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, Google's search box, hairline rows, pills.
           The "i" follows the address: /site-scan is the feature's entry, /site-scan/history its Scan history section. */}
       <GoogleSectionHeader

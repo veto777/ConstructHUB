@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "ip-tracker.traffic", parent: "ip-tracker", group: "Tools", route: "/ip-tracker", title: "IP Tracker → Traffic",
   whatItIs: "Where visits came from, one row per sending site.",
-  whatItDoes: "It counts the sources, page loads and unique visitors for the range, then lists each sending site with its page loads, visitors and share. A visit with no record of the page that sent it is counted under NO REFERRER DATA; typed addresses, bookmarks, and many apps and ad clicks arrive that way.",
+  whatItDoes: "It counts the sources and page loads for the range, plus the visitors added up source by source (a visitor who came from two sources counts in both). Then it lists each sending site with its page loads, visitors and share. A visit with no record of the page that sent it is counted under NO REFERRER DATA; typed addresses, bookmarks, and many apps and ad clicks arrive that way.",
   howToUse: [
     "Open IP Tracker → Traffic and pick the site.",
     "Choose Last 7 days, Last 30 days, This month or All time, or type a From and To date.",

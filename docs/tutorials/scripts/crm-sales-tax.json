@@ -37,7 +37,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "selector": "[data-testid=\"tool-rail-estimates\"]",
       "caption": "Estimates",
       "chapter": "Write a new estimate",
       "narration": "Now let's see it on a new estimate. Open Estimates."
@@ -127,7 +127,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-settings\"]",
+      "selector": "[data-testid=\"tool-rail-settings\"]",
       "caption": "Menu: Settings",
       "narration": "You'll find the rate in Settings, under Estimate and invoice defaults."
     }

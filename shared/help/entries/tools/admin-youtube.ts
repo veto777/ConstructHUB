@@ -10,7 +10,7 @@ const entry: HelpDraft = {
     "Choose Connect YouTube channel and allow the permissions Google asks for.",
     "Check the channel shown is the expected one, and Reconnect if the connection expired.",
   ],
-  howItWorks: "Connect is a plain link: the server sends the browser to Google and back with ?result=connected or failed, and this page never receives a sign-in token. Uploads start as Private; a scheduled one is made public by YouTube at its publish time.",
+  howItWorks: "Connect is a plain link to Google’s sign-in and back, and this page never sees the sign-in itself. Uploads start as Private; a scheduled one is made public by YouTube at its publish time.",
   needs: ["Platform admin access and Google sign-in set up on the server."],
 };
 export default entry;

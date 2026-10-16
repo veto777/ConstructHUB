@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "click-guard.tools", parent: "click-guard", group: "Google Ads", route: "/google-ads", title: "Click Guard → Tools",
   whatItIs: "The Tools section of Click Guard: the tracking code for the selected website, ready to copy.",
-  whatItDoes: "Tracking script shows one line of code, written for the website chosen at the top, and a Copy button. It goes in the <head> of every page your ads send people to; on each page load it records the visit with the visitor’s IP address, device type, browser, screen size and a device fingerprint, which is what the Dashboard, Traffic sources and Traffic signals count. The Conversion tracking card says what is not built: Click Guard records page visits only, never form submissions, calls or conversion values.",
+  whatItDoes: "Tracking script shows one line of code, written for the website chosen at the top, and a Copy button. It goes in the <head> of every page your ads send people to. Each time the page loads it records the visitor’s IP address, device type, browser, screen size and device fingerprint, which feed the Dashboard, Traffic sources and Traffic signals. The Conversion tracking card says what is not built: Click Guard records page visits only, never form submissions, calls or conversion values.",
   howToUse: [
     "Open Google Ads → Click Guard → Tools in the sidebar and pick the website at the top.",
     "Choose Copy on the Tracking script card.",

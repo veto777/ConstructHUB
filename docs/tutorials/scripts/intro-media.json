@@ -99,7 +99,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-photo-optimizer\"]",
+      "selector": "[data-testid=\"tool-rail-photos\"]",
       "caption": "Menu: Photo Optimizer",
       "narration": "You'll find Photo Optimizer in the menu on the left, under Google Business, with Media Library under it."
     }

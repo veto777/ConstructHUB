@@ -25,7 +25,7 @@
  *     own column and is never sent to the issue desk.
  *
  * The screenshot (an image, ≤ 5 MB) goes to R2 under issue-reports/ — a key the
- * public /api/files route cannot reach (it serves three-segment keys only) —
+ * public /api/files route never serves (it is an allowlist: server/files/public-files.ts) —
  * and only platform admins can open it. Without R2 it is not kept, and the
  * answer says so; nothing is ever written to local disk.
  */

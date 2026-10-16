@@ -151,6 +151,23 @@ routes** (`/admin…`, `/lsa-account-manager…`) keep their on-page "i" but the
 card; the player waits for "Watch tutorial" and reads `entry.video` only. `#help-<key>` opens that feature,
 `#group-<slug>` scrolls to a group.
 
+### SamplePreview — empty-state samples (`client/src/components/sample-preview.tsx`)
+
+Not the "i", but it is how a page explains itself before it has data (owner 2026-10-15). Rules from the file:
+- Shown **only while the real dataset is empty**; one real record and the caller renders the real thing. Never
+  mixed with real rows. Never used for government, permit or compliance records (CLAUDE.md: no fabricated data).
+- Built from static client fixtures: nothing stored, sent to the server or counted. Every value is obviously made
+  up ("Sample Roofing Co.", "123 Example St").
+- `<SamplePreview what="…" cta={…} testId>`: a dashed amber `<section aria-label="Sample data: <what>">`
+  (`data-sample="true"`); the visible "Sample data · <what>" badge is `aria-hidden`; the optional `cta` (the one
+  action that brings real data) sits in the badge row, outside the sample; the children are dimmed, `inert` and
+  `aria-hidden`, so nothing in them is read, tabbed to or clicked.
+- `lazySample(() => import(fixtureModule), "Name")` loads a fixture module only when the empty state renders
+  (`traffic-tool/samples.tsx`, `crm-sample-previews.tsx`, `crm-call-assistant/samples.tsx`); a failed chunk draws
+  nothing and non-chunk errors go to `reportClientError`. Users: `google-ads.tsx`, `locations.tsx`, `domains.tsx`,
+  `social-media.tsx`, `agency.tsx`, `yelp.tsx`, `vpn-shield.tsx`. Help text may mention the sample when it is
+  there (the `ranking-grid` entry's `howItWorks`).
+
 ## 4. Tests that enforce it (all static, no server)
 
 - `server/help-registry.test.ts` — every `<HelpButton k="…">` and `helpKey: "…"` row in `client/src` exists
@@ -168,6 +185,8 @@ card; the player waits for "Watch tutorial" and reads `entry.video` only. `#help
 - `server/help-a11y-ui.test.ts` — static markup: the "i" is a named button with `aria-haspopup="dialog"`, the
   fallback says "About this page", the play button names the film by source, the player's `aria-label` is
   "Walkthrough video: …" / "Overview film: …", no autoplay unless asked, unknown key renders "".
+  It also pins SamplePreview: the section's `aria-label`, the `aria-hidden` badge, the `inert` + `aria-hidden`
+  sample and the CTA placed before (outside) it.
 
 ## 5. Audits (`scripts/tutorials/`)
 

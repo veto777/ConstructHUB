@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { PRESET_IDS, PRIMARY_PRESETS } from "../shared/hub-presets";
+import { PLANS } from "../shared/plans";
 
 /**
  * Gabe — the corner assistant (the Hub widget). Run with playwright.hub.config.ts (two servers:
@@ -10,6 +11,9 @@ test.skip(!process.env.HUB_E2E, "run with -c playwright.hub.config.ts");
 const SIGNED_IN = process.env.HUB_SIGNED_IN_URL || "http://127.0.0.1:8301";
 const SIGNED_OUT = process.env.HUB_SIGNED_OUT_URL || "http://127.0.0.1:8302";
 const SHOTS = process.env.HUB_SCREENSHOT_DIR;
+// The pricing chip's Solo line, from the price book (shared/plans.ts), never a typed number.
+const dollars = (cents: number) => `$${(cents / 100).toLocaleString("en-US")}`;
+const SOLO_PRICE = `${dollars(PLANS.starter.monthlyCents)}/month or ${dollars(PLANS.starter.annualCents)}/year`;
 
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` });
@@ -68,7 +72,7 @@ test.describe("signed out", () => {
     await page.keyboard.press("Enter");
     // While the answer loads and after it arrives, focus never falls to <body>.
     expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
-    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText("$29/month or $290/year");
+    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText(SOLO_PRICE);
     expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
@@ -93,7 +97,7 @@ test.describe("signed out", () => {
     await page.goto(`${SIGNED_OUT}/`);
     const panel = await openHub(page);
     await panel.getByTestId("hub-chip-pricing").click();
-    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText("$29/month or $290/year");
+    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText(SOLO_PRICE);
     const box = (await panel.boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(390);

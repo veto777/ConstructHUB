@@ -84,7 +84,7 @@ export default function HistoryPage() {
   })();
 
   return (
-    <AppPage width="narrow" testId="page-history">
+    <AppPage width="narrow" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-history">
       {/* Google's list format (owner, 2026-10-07): a quiet header, hairline rows, pill actions. */}
       <GoogleSectionHeader
         as="h1"

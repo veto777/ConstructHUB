@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "ads-manager.every-client-in-one-list", parent: "ads-manager", group: "Google Ads", route: "/ads-manager", title: "Agency Ads & LSA → Every client in one list",
   whatItIs: "The Client accounts list of the Agency Ads & LSA manager: every account under your Google Ads manager account (the MCC), one row each.",
-  whatItDoes: "Each row shows the customer ID, name, status, currency and timezone, whether Local Services campaigns were found (LSA account, No LSA campaigns found, or LSA not checked), the Click Guard domain mapping and when the account was last checked. Campaigns opens the campaigns from the last audit with their IDs and types. The search box matches a name or customer ID; Filters adds a status filter and an LSA filter.",
+  whatItDoes: "Each row shows the customer ID, name, status, currency and time zone, and the Click Guard website it is matched to. It also says whether Local Services campaigns were found (LSA account, No LSA campaigns found, or LSA not checked) and when it was last checked. Campaigns opens the campaigns from the last audit with their IDs and types. The search box matches a name or customer ID; Filters adds a status filter and an LSA filter.",
   howToUse: [
     "Open Google Ads → Agency → Client accounts in the sidebar.",
     "Read a row: status, currency and timezone, the LSA result and when it was last checked.",

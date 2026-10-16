@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
+// The Posts page also lists Bulk posts runs (components/bulk-posts.tsx) under the same /api/gbp/content/:id prefix;
+// a mock of that prefix must answer that list in its own shape.
+const BULK_RUNS_NONE = { runs: [], workerEnabled: false, fileloaded: false };
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 let location: number;
 test.beforeAll(async () => {
@@ -40,6 +43,7 @@ test('mocked AI and uploads: bulk captions stay editable; style and photo approv
     let queued: any;
     await page.route(`**/api/gbp/content/${location}**`, async (route) => {
         const path = new URL(route.request().url()).pathname, body = route.request().method() !== 'GET' && !path.endsWith('/upload') ? route.request().postDataJSON() : {};
+        if (path.endsWith('/bulk-posts')) return route.fulfill({ json: BULK_RUNS_NONE });
         if (path.endsWith('/upload')) {
             const p = { id: photos.length + 1, name: `Fixture ${photos.length + 1}.jpg`, url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' };
             photos.push(p);
@@ -82,6 +86,7 @@ test('AI update is a draft until edited and approved, and provider failures can 
     let jobs:any[]=[];let approved:any;
     await page.route(`**/api/gbp/content/${location}**`,async route=>{
         const path=new URL(route.request().url()).pathname;
+        if (path.endsWith('/bulk-posts')) return route.fulfill({ json: BULK_RUNS_NONE });
         if(path.endsWith('/photos'))return route.fulfill({json:[]});
         if(path.endsWith('/draft'))return route.fulfill({json:{draft:true,drafts:[{text:'Fixture generated update'}]}});
         if(path.endsWith('/queue')){approved=route.request().postDataJSON();jobs=[{id:123,kind:'post',payload:{summary:approved.items[0].summary},due_at:'2027-01-01T12:00:00Z',status:'failed',error:'Google denied permission'}];return route.fulfill({json:jobs});}
@@ -150,6 +155,7 @@ test('partial upload exposes saved photos immediately and allows retrying the re
     let uploads = 0;
     await page.route(`**/api/gbp/content/${location}**`, route => {
         const path = new URL(route.request().url()).pathname;
+        if (path.endsWith('/bulk-posts')) return route.fulfill({ json: BULK_RUNS_NONE });
         if (path.endsWith('/upload')) {
             uploads++;
             if (uploads === 2) return route.fulfill({ status: 400, json: {message:'Fixture upload failure'} });
@@ -175,6 +181,7 @@ test('100-file boundary uploads sequentially and refuses 101 before any request'
     const photos: any[] = [];
     await page.route(`**/api/gbp/content/${location}**`, async route => {
         const path = new URL(route.request().url()).pathname;
+        if (path.endsWith('/bulk-posts')) return route.fulfill({ json: BULK_RUNS_NONE });
         if (path.endsWith('/upload')) {
             uploads++;
             const photo = {id:uploads,name:`Boundary fixture ${uploads}.jpg`,url:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'};

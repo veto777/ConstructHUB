@@ -4,9 +4,9 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "crm-billing", group: "CRM", route: "/crm/team", title: "Seats on your CRM plan",
   whatItIs: "Where you see how many people your CRM plan has room for, and how many of those seats are in use.",
-  whatItDoes: "The Seats card on the Team tab names your CRM plan, says how many seats it includes and how many are in use, and shows a “used of total” badge that is green while a seat is free.",
+  whatItDoes: "The Seats card on the Team tab names your CRM plan and says how many seats it includes and how many are in use. Its “used of total” badge stays green while a seat is free.",
   howToUse: [
-    "CRM → Team & Company → Team. Seats is the first card.",
+    "Open CRM → Team & Company → Team; Seats is the first card.",
     "Read the badge: seats used, out of the seats your plan includes.",
     "Scroll to Team members to see who is using them.",
   ],

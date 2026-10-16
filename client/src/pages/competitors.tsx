@@ -264,7 +264,7 @@ export default function CompetitorsPage() {
     // it isn't on this account — no plan names, no "See plans" button.
     if (inNativeApp()) {
       return (
-        <GoogleSurface page><AppPage width="narrow" className="before:hidden">
+        <GoogleSurface page><AppPage width="narrow" className="before:hidden max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11">
           <PageHeader title={<span data-testid="text-locked-title">Competitor intelligence</span>} description="Compare businesses and review signals in your local market." />
           <AppLocked name="Competitor Intel" testId="text-plan-required" />
         </AppPage></GoogleSurface>
@@ -272,7 +272,7 @@ export default function CompetitorsPage() {
     }
     const requiredName = planRequired.requiredPlan ? PLANS[planRequired.requiredPlan].name : null;
     return (
-      <GoogleSurface page><AppPage width="narrow" className="before:hidden">
+      <GoogleSurface page><AppPage width="narrow" className="before:hidden max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11">
         <PageHeader title={<span data-testid="text-locked-title">Competitor intelligence</span>} description="Compare businesses and review signals in your local market." />
         <Section>
           <p className="text-muted-foreground" data-testid="text-plan-required">
@@ -298,7 +298,7 @@ export default function CompetitorsPage() {
 
   // Google look (owner, 2026-10-06): the page sits on a GoogleSurface; the scans are tool panels (SEO Suite's look).
   return (
-    <GoogleSurface page><AppPage className="before:hidden">
+    <GoogleSurface page><AppPage className="before:hidden max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11">
       <PageHeader title={<span ref={titleRef} tabIndex={-1} data-testid="text-competitors-title">Competitor intelligence</span>} description={COMPETITORS_SUBTITLE} />
 
       {/* ── New scan: three fields, first step clear ───────────────────────────────────────────────────── */}
@@ -331,6 +331,7 @@ export default function CompetitorsPage() {
                   value={customIndustry}
                   onChange={e => setCustomIndustry(e.target.value)}
                   autoFocus
+                  className="max-sm:h-11"
                   data-testid="input-industry-custom"
                 />
               )}
@@ -363,7 +364,7 @@ export default function CompetitorsPage() {
                   onChange={e => setRadius(e.target.value)}
                   aria-label="Custom radius in miles"
                   aria-invalid={radius !== "" && !radiusOk}
-                  className="w-24"
+                  className="w-24 max-sm:h-11"
                   data-testid="input-radius"
                 />
               </div>

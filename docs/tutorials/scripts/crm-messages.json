@@ -86,7 +86,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "selector": "[data-testid=\"tool-rail-messages\"]",
       "caption": "Menu: Messages",
       "narration": "You'll find Messages in the menu on the left."
     }

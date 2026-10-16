@@ -82,7 +82,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "selector": "[data-testid=\"tool-rail-clients\"]",
       "caption": "Where to find it",
       "narration": "They are at the top of every client's page, under Clients."
     }

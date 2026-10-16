@@ -134,7 +134,7 @@ export function SearchConsoleConnectSteps({ open }: { open: boolean }) {
           <p className="pt-1"><OutLink href={SEARCH_CONSOLE_URL} testId="link-search-console">Open Google Search Console</OutLink></p>
         </Step>
         <Step n={2} title="Choose “Connect Google Search Console” below">
-          <p>ConstructHUB may first ask you to confirm it is you. Then Google's own sign-in page opens.</p>
+          <p>Google's own sign-in page opens.</p>
         </Step>
         <Step n={3} title="Pick that Google account and allow access">
           <p>Google lists what is being asked for: your email address and Search Console. Tick the Search Console box if Google shows one, then choose Continue or Allow.</p>

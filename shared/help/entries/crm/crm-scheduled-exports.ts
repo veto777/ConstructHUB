@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "An export of your clients, estimates and invoices, emailed to you on a schedule.",
   whatItDoes: "Scheduled exports emails the export every week, every two weeks or every number of days you choose, as three CSV files or one Excel file with three sheets. “Send export now” sends one right away and the card shows when the last one went out.",
   howToUse: [
-    "CRM → Settings, and scroll to Scheduled exports (the owner sees this card).",
+    "Open CRM → Settings and scroll to Scheduled exports (only the owner sees this card).",
     "Switch on Automatic email exports, then choose the frequency and the format.",
     "Leave “Send to” blank to use your company email, or type another address.",
     "Choose Save export settings. “Send export now” sends one immediately.",

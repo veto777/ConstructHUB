@@ -74,7 +74,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-jobcam\"]",
+      "selector": "[data-testid=\"tool-rail-jobcam\"]",
       "caption": "Menu: JobCam",
       "narration": "You will find JobCam in the menu on the left."
     }

@@ -70,7 +70,7 @@
     },
     {
       "action": "click",
-      "selector": "[role=\"tab\"]:has-text(\"Clients\")",
+      "selector": "[data-testid=\"subnav-agency-clients\"]",
       "caption": "Clients",
       "chapter": "Clients, team, onboarding",
       "narration": "Clients is where you add a client workspace, with a name and a contact email."
@@ -83,19 +83,19 @@
     },
     {
       "action": "click",
-      "selector": "[role=\"tab\"]:has-text(\"Team\")",
+      "selector": "[data-testid=\"subnav-agency-team\"]",
       "caption": "Team",
       "narration": "Team gives each person a role, admin, manager or viewer, and the clients they work on."
     },
     {
       "action": "click",
-      "selector": "[role=\"tab\"]:has-text(\"Onboarding\")",
+      "selector": "[data-testid=\"subnav-agency-onboarding\"]",
       "caption": "Onboarding",
       "narration": "Onboarding emails a client the steps to add your agency as a Manager on Google. They keep ownership."
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-agency\"]",
+      "selector": "[data-testid=\"tool-rail-agency\"]",
       "caption": "Menu: Agency",
       "narration": "You'll find Agency in the menu on the left, under Google Business."
     }

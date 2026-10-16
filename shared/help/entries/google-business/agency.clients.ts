@@ -4,10 +4,10 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "agency.clients", parent: "agency", group: "Google Business", route: "/agency", title: "Agency → Clients",
   whatItIs: "One record for each business your agency looks after. Locations, onboarding requests and team access all hang off it.",
-  whatItDoes: "The top row counts your clients, the locations assigned to one, and the locations still unassigned. Each client card shows its contact email, folder, tags, notes, location count and open onboarding requests. Pills on the card open its locations, email it the Google manager steps, or edit it. The search box matches name, email, folder and tags.",
+  whatItDoes: "The top row counts your clients, the locations assigned to one, and the locations still unassigned. Each client card shows its contact email, folder, tags, notes, location count and open onboarding requests. Pills on the card open its locations, open Onboarding with this client chosen (to send the Google manager steps), or edit it. The search box matches name, email, folder and tags.",
   howToUse: [
     "Open Agency under Google Business in the sidebar, then the Clients tab.",
-    "Type the name and contact email under New client; the onboarding steps are emailed to that address.",
+    "Type the name and contact email under New client. That is where the onboarding steps go when you send them from the Onboarding tab.",
     "Open More client details to add a folder, tags and notes if you want them.",
     "Choose Create client, or Edit on a card and then Save client to change one later.",
     "Assign locations on the Locations tab: tick them, Apply to selected locations, Assign client.",

@@ -91,7 +91,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "selector": "[data-testid=\"tool-rail-clients\"]",
       "caption": "Where to find it",
       "narration": "You will find this on the client's page, under Clients."
     }

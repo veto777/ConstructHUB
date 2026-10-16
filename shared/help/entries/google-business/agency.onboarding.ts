@@ -12,7 +12,7 @@ const entry: HelpDraft = {
     "Choose Email manager instructions; the email goes out within a minute.",
     "Watch the status move from sent to linked, and use Send reminder (once a day) if the client stalls.",
   ],
-  howItWorks: "The client keeps ownership and only adds your Google account as a Manager. The server checks that account's pending invitations in the background and accepts only one that matches a request, by Place ID or by name and address; a request that could match two invitations is left for you. The listing is then linked to the client, or a new location is created within the plan's allowance, and its first sync is queued. Reminders also go out on their own after 3 and 6 days, requests expire after 30 days, and the instructions link only shows the steps, with no sign-in behind it.",
-  needs: ["The Agency workspace (the agency module; which plan carries it comes from the plan model).", "A connected agency Google account with Business Profile access.", "A client with a contact email."],
+  howItWorks: "The client keeps ownership and only adds your Google account as a Manager. ConstructHUB checks that account’s waiting invitations in the background and accepts only one that matches a request, by Google’s place ID or by name and address; an invitation that could match two of your requests is left for you. The listing is then linked to the client, or a new location is created within the plan’s allowance, and its first sync is queued. Reminders go out on their own after 3 and 6 days, requests expire after 30 days, and the instructions link only shows the steps, with no sign-in behind it.",
+  needs: ["The Agency workspace (the agency module; which plan carries it comes from the plan model).", "A connected agency Google account with Google Business Profile access.", "A client with a contact email."],
 };
 export default entry;

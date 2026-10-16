@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "A tester for price book formulas: the math that turns a measurement into a quantity.",
   whatItDoes: "The Formulas tab takes a formula and sample numbers for squares and waste, and shows the answer and the symbols the formula used. You can change the numbers or type a formula of your own.",
   howToUse: [
-    "CRM → Price book → Formulas.",
+    "Open CRM → Price book → Formulas.",
     "Leave the sample formula, or type your own with symbols in square brackets.",
     "Type sample numbers for squares and waste.",
     "Choose Test and read the answer.",

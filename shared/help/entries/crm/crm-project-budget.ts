@@ -6,8 +6,8 @@ const entry: HelpDraft = {
   whatItIs: "A budget for one job, split by cost code, to compare with what you commit and spend.",
   whatItDoes: "On a job's Costing tab, an entry of type Budget adds a budget amount to a cost code. Each code gets a line showing Budget, Committed, Actual and Variance, and the Budget box at the top of the job adds the lines up.",
   howToUse: [
-    "CRM → Pipeline, and open the job.",
-    "On the Costing tab, choose Budget under Entry.",
+    "Open CRM → Pipeline and open the job.",
+    "Choose Budget under Entry on the Costing tab.",
     "Pick the cost code, type the amount, and click the plus button.",
     "Repeat for each code you want to track.",
   ],

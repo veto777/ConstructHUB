@@ -64,6 +64,8 @@ beforeEach(() => {
         }
         if (sql.includes('SET status=$4')) return { rows: [{ status: args[3] }], rowCount: 1 };
         if (sql.includes('FROM media_photos')) return { rows: [{ id: 3, r2_key: 'media/test.jpg' }] };
+        // The per-account queue cap (review w3-r2 M2): nothing waiting in these fixtures.
+        if (sql.includes("status='queued'") && sql.startsWith('SELECT count(*)')) return { rows: [{ n: 0 }], rowCount: 1 };
         if (sql.includes('ORDER BY due_at DESC')) return { rows: m.jobs };
         return { rows: [], rowCount: 0 };
     });

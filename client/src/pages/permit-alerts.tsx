@@ -56,7 +56,7 @@ export default function PermitAlertsPage() {
   if (planGate) {
     return (
       <GoogleSurface page>
-        <AppPage testId="page-permit-alerts">
+        <AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-permit-alerts">
           {header}
           <PlanRequired module="permitAlerts" error={gateError} className="max-w-3xl" />
         </AppPage>
@@ -75,7 +75,7 @@ export default function PermitAlertsPage() {
 
   return (
     <GoogleSurface page>
-      <AppPage testId="page-permit-alerts">
+      <AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-permit-alerts">
         {header}
         {error && <Notice tone="danger" testId="notice-permit-alerts-error">{apiErrorMessage(error)}</Notice>}
         {listError && !planGate && <Notice tone="danger">{apiErrorMessage(listError, "Could not load your watches")} <Button onClick={() => void refetch()}>Retry</Button></Notice>}

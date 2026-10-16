@@ -169,7 +169,7 @@ describe('GET /agency/onboarding: client name and stage counts',()=>{
     expect(o['Counts A sent']).toMatchObject({client_id:clientA,client_name:'Client A',status:'sent'});
     expect(o['Counts A linked']).toMatchObject({client_name:'Client A',status:'linked'});
     expect(o['Counts B expired']).toMatchObject({client_name:'Client B',status:'expired',error:'Fixture expiry'});
-    for(const item of r.data.items){expect(item.token_hash).toBeUndefined();expect(item.token_enc).toBeUndefined();expect(item.link).toContain('/api/agency-onboarding/');}
+    for(const item of r.data.items){expect(item.token_hash).toBeUndefined();expect(item.token_enc).toBeUndefined();expect(item.link).toContain('/api/agency-onboarding/');expect(item.agency_email).toBe('agency@example.invalid');}
   });
   it('scopes a member\'s rows and counts to its client',async()=>{
     const r=await call('get','/onboarding',admin,owner);
@@ -181,7 +181,7 @@ describe('GET /agency/onboarding: client name and stage counts',()=>{
     const r=await call('get','/onboarding',viewer,owner);
     expect(r.status).toBe(200);expect(r.data.total).toBe(3);
     expect(r.data.counts).toEqual({waiting:1,accepting:0,linked:1,expired:1,withError:1});
-    for(const item of r.data.items){expect(item.client_name).toBeTruthy();expect(item.token_hash).toBeUndefined();expect(item.token_enc).toBeUndefined();expect(item.link??null).toBeNull();}
+    for(const item of r.data.items){expect(item.client_name).toBeTruthy();expect(item.token_hash).toBeUndefined();expect(item.token_enc).toBeUndefined();expect(item.link??null).toBeNull();expect(item.agency_email??null).toBeNull();}
   });
   it('shows another workspace only its own requests',async()=>{
     const r=await call('get','/onboarding',other,other);

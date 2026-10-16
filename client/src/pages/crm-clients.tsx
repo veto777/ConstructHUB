@@ -364,7 +364,7 @@ export default function CrmClientsPage() {
         </Card>
         {/* The whole book is empty (bookTotal is the server's count across every tab): show a sample. */}
         <SampleClientsTable cta={canManage ? (
-          <Button size="sm" variant="outline" onClick={() => setOpen(true)} data-testid="button-new-client-sample">
+          <Button size="sm" variant="outline" className="max-sm:min-h-11" onClick={() => setOpen(true)} data-testid="button-new-client-sample">
             <Plus className="h-4 w-4 mr-1" /> Add your first client
           </Button>
         ) : undefined} />

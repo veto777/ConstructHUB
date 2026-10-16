@@ -92,7 +92,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-competitor-intel\"]",
+      "selector": "[data-testid=\"tool-rail-competitors\"]",
       "caption": "Menu: Competitor Intel",
       "narration": "You'll find Competitor Intel in the menu on the left, under Tools."
     }

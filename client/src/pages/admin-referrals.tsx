@@ -71,7 +71,7 @@ export default function AdminReferralsPage() {
               ))}
             </SegmentedTabs>
             {filter === CUSTOM && (
-              <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Type a status, e.g. earned" aria-label="Status to match" className="h-9 w-56" autoFocus data-testid="input-referral-status-custom" />
+              <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Type a status, e.g. earned" aria-label="Status to match" className="h-9 w-56 max-sm:h-11" autoFocus data-testid="input-referral-status-custom" />
             )}
           </div>
 

@@ -93,7 +93,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-settings\"]",
+      "selector": "[data-testid=\"tool-rail-settings\"]",
       "caption": "Where to find it",
       "narration": "Payment methods are in Settings, near the bottom of the left menu."
     }

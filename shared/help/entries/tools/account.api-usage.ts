@@ -10,7 +10,7 @@ const entry: HelpDraft = {
     "Pick a period, or type your own number of days.",
     "Read the chart to see which key spent the units, then the table for the exact numbers per day.",
   ],
-  howItWorks: "The server counts each request as it is served: 1 unit for a read plus 1 per 100 rows, 5 for a write. When a key hits its own cap or the plan’s monthly units, the API answers “quota exceeded” until the month resets; nothing is dropped silently. Before any key has been used, clearly marked sample data shows what the panel will look like.",
+  howItWorks: "Each request is counted as it is answered: 1 unit for a read plus 1 per 100 records returned, 5 for a write. When a key hits its own cap or the plan’s monthly units, the API answers “quota exceeded” until the month resets; nothing is dropped silently. When the chosen period has no API calls, clearly marked sample data shows what the panel will look like.",
   needs: ["Not shown in the iPhone apps, which sell nothing."],
 };
 export default entry;

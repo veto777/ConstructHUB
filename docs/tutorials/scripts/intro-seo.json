@@ -33,7 +33,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"tool-tab-rank\"]",
+      "selector": "[data-testid=\"tool-rail-rank\"]",
       "caption": "The open tool, at the top",
       "narration": "The tool you're in shows at the top; the rest are on the left."
     },

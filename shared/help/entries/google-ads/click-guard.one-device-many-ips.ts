@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "click-guard.one-device-many-ips", parent: "click-guard", group: "Google Ads", route: "/google-ads", title: "Click Guard → One device, many IPs",
   whatItIs: "How Click Guard notices the same device coming back from different IP addresses.",
-  whatItDoes: "The tracking code takes a browser fingerprint, a short code made from how that browser draws a small test image. It reports it with each visit along with the IP address, device type, browser, operating system and screen size. When the same fingerprint was seen from another address within the day, the visit is flagged “Same device fingerprint seen from different IPs” and the reason is kept on Blocked IPs.",
+  whatItDoes: "The tracking code takes a browser fingerprint, a short code made from how that browser draws a small test image. It reports it with each visit along with the IP address, device type, browser, operating system and screen size. When the same device fingerprint shows up from another address that day, the visit is flagged “Same device fingerprint seen from different IPs”. The reason is kept on Blocked IPs.",
   howToUse: [
     "Open Google Ads → Click Guard → Traffic signals in the sidebar and look for the fingerprint reason on Blocked IPs.",
     "Scroll to the Clicks report and search for the start of the range to see the matching visits side by side.",

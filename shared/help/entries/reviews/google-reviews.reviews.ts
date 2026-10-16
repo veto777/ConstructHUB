@@ -12,7 +12,7 @@ const entry: HelpDraft = {
     "Choose Note to add a private note for your team.",
     "Pick the location, a mode and a scope in AI review replies, then approve or edit each draft in the queue.",
   ],
-  howItWorks: "Reviews are pulled from Google for each linked location and stored with that location; a review typed in by hand is marked as not from Google. Publishing a reply sends it to Google through the same connection and shows Google's answer. Only a review that came from Google can be replied to there. AI drafts are written from the review text and your settings, stay drafts until you publish them, and can get facts wrong, so read every one.",
+  howItWorks: "Reviews are pulled from Google for each linked location and stored with that location; a review typed in by hand is marked as not from Google. Publishing a reply sends it to Google through the same connection and shows Google's answer. Only a review that came from Google can be replied to there. AI replies are written from the review text and your settings. In Draft for approval mode they stay drafts until you publish them. In Auto-publish mode, on plans that include it, they go to Google without review for reviews above 2 stars, or for every review when low ratings are allowed. They can get facts wrong, so read every one.",
   needs: ["A connected Google account and a linked location (Google Business → Locations)."],
 };
 export default entry;

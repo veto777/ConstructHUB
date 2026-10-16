@@ -9,9 +9,9 @@ const entry: HelpDraft = {
     "Open the job’s JobCam page and choose Share.",
     "Pick the live timeline, or select photos first for a gallery. Add a title, and a password or expiry if you want them.",
     "Choose “Make the link”, then copy it or send it to the client by email or text.",
-    "To turn a link off, choose Share again and Revoke it under Existing links.",
+    "Choose Share again and Revoke a link under Existing links to turn it off.",
   ],
-  howItWorks: "The person who opens the link sees your company name, the job and the photos, without signing in. A live timeline shows every photo on the job and keeps updating; a gallery shows only the photos you picked. A revoked or expired link shows a notice instead of the photos.",
+  howItWorks: "The person who opens the link sees your company name, the job and the photos, without signing in. A live timeline shows the job’s photos marked Visible to client and keeps updating. A gallery shows only the photos you picked, and you can only pick visible ones. A revoked or expired link shows a notice instead of the photos.",
   needs: ["A ConstructHub CRM plan with JobCam — the CRM is a separate product with its own plans.", "A job with photos.", "The client’s email address or mobile number, to send the link."],
   // HELD (2026-10-08): the recorded cut shows a newly made share link readable for about a second, and the
   // dialog's "Prefilled from ." defect. Not posted and not in the app (its manifest waits in

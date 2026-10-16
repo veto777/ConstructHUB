@@ -112,13 +112,13 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "selector": "[data-testid=\"tool-rail-estimates\"]",
       "caption": "Ready for estimates",
       "narration": "The item is now ready to add to any new estimate."
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "selector": "[data-testid=\"tool-rail-pricebook\"]",
       "caption": "Menu: Price book",
       "narration": "You'll find Price book in the menu on the left."
     }

@@ -36,7 +36,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"tab-vpn-blocked\"]",
+      "selector": "[data-testid=\"subnav-vpn-shield-blocked\"]",
       "caption": "Every flagged visit",
       "chapter": "Every flagged visit",
       "narration": "Flagged visits lists each one: the IP, how it was detected, and the action taken."
@@ -61,13 +61,13 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"tab-vpn-install\"]",
+      "selector": "[data-testid=\"subnav-vpn-shield-install\"]",
       "caption": "Its own script tag",
       "narration": "Install script has the tag to paste into your site. It's separate from the Click Guard code."
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"tab-vpn-settings\"]",
+      "selector": "[data-testid=\"subnav-vpn-shield-settings\"]",
       "caption": "Block, log or redirect",
       "chapter": "Block, log or redirect",
       "narration": "In Settings, you choose the response: Log only, Block, or Redirect to a page you pick."
@@ -92,7 +92,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-vpn-shield\"]",
+      "selector": "[data-testid=\"tool-rail-vpn-shield\"]",
       "caption": "Menu: VPN Shield",
       "narration": "You'll find VPN Shield in the menu on the left, under Tools."
     }

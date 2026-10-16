@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "account.api-keys", parent: "account", group: "Tools", route: "/settings", title: "Account settings → API keys",
   whatItIs: "Keys that let your own tools (a spreadsheet, a script, your own AI assistant) read your data. With write scope they can also create records the way you would by hand.",
-  whatItDoes: "It shows this month’s API units against the plan’s allowance, then every key with its name, prefix…suffix, scope, units used this month, its own limit, when it was added, last used and when it expires. Generate creates a key with a name, an optional monthly unit cap and an expiry; the full key is shown once. The menu on a key renames it, changes its cap or revokes it.",
+  whatItDoes: "It shows this month’s API use against your plan’s allowance. Each key shows its name, its first and last characters, what it may do, its use this month, its own limit, and when it was added, last used and expires. Generate creates a key with a name, an optional monthly unit cap and an expiry; the full key is shown once. The menu on a key renames it, changes its cap or revokes it.",
   howToUse: [
     "Open Settings → API keys.",
     "Choose Generate, name the key, pick its scope, cap and expiry, and confirm it’s you.",

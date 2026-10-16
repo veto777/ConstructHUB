@@ -1,15 +1,19 @@
 import type { FeatureAllowance, FeatureCompare, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
-import { ADDONS, PLANS } from "../plans";
-import { joinNames } from "../plan-copy";
+import { planNamesWhere } from "../plan-copy";
 
 /**
  * Google Business Profile (the Locations page) — every claim is backed by the code in `sources`:
  *   - connect one or more Google accounts (business.manage), import listings, "Managed by <email>":
  *     server/gbp/routes.ts (/api/gbp/connect, /api/gbp/locations, /api/gbp/import), client/src/pages/locations.tsx
  *   - add a location by searching Google instead: POST /api/locations/search-google + POST /api/locations (server/routes.ts)
- *   - the location count is the plan's `locations` allowance (+ Extra location add-ons): server/routes.ts
- *     registerPlanGates (/api/gbp/import) and POST /api/locations (requirePlan + sendLocationLimit)
+ *   - the location count is the plan's `locations` allowance: server/routes.ts registerPlanGates (/api/gbp/import)
+ *     and POST /api/locations (requirePlan + sendLocationLimit). The Extra location add-on is no longer sold
+ *     (shared/plans.ts ADDONS.extra_location.availableOn = []): more locations = a bigger plan, no per-location pricing
+ *   - the Listing editor edits the live listing (name, categories, phones, website, description, address/service
+ *     area, hours, status, attributes, services, labels), sends only changed fields, shows Google's answer per field
+ *     and copies a change to other linked locations: client/src/pages/listing-editor.tsx,
+ *     server/gbp/listing-editor.ts, help google-business/listing-editor. Syncs themselves stay read-only.
  *   - automatic sync every six hours while connected, only on an active plan: server/agency/jobs.ts (syncDue, scheduleSyncs)
  *   - what a sync reads (profile fields, business + customer photos, reviews, daily performance; 90 days first,
  *     then a one-time back-fill of PERFORMANCE_HISTORY_DAYS; "verified listings only" message): server/gbp/service.ts syncLocation
@@ -18,11 +22,15 @@ import { joinNames } from "../plan-copy";
  *   - the citation checklist (Google row filled from the linked listing, the rest marked by the owner):
  *     server/routes.ts /api/citations/campaigns/:id/run and PATCH /api/citations/:id
  *   - removing a location never touches the Google listing: locations.tsx SettingsTab copy, DELETE /api/locations/:id
- *   - Agency bulk actions (sync, link, Watch mode…): client/src/components/agency-workspace.tsx
+ *   - Agency bulk actions (sync, link, Watch mode…): client/src/components/agency-workspace.tsx, the agencyWorkspace
+ *     module — plan names read from the price book
  */
 
 const LOCATIONS: FeatureAllowance = { limit: "locations", unit: "Google Business Profile locations", period: "count" };
-const EXTRA_LOCATION_PLANS = joinNames(ADDONS.extra_location.availableOn.map((k) => PLANS[k].name));
+/** Plans with the agency workspace, where the bulk tools live ("Agency and Unlimited"). */
+const WORKSPACE_PLANS = planNamesWhere((plan) => plan.modules.agencyWorkspace);
+/** No add-on adds locations any more: a bigger plan includes more (ADDONS.extra_location is no longer sold). */
+const MORE_LOCATIONS = "Outgrow the included locations and you move up a plan — there is no per-location pricing.";
 
 export const GBP_COMPARE: FeatureCompare = {
   // Prices read on 2026-10-10 from: localo.com/pricing, brightlocal.com/pricing/, synup.com/pricing,
@@ -72,7 +80,7 @@ const page: FeaturePage = {
     },
     {
       title: "Work from one page",
-      body: "Open a location to read its insights, turn on Profile Watch, keep its social links and work through its citation checklist.",
+      body: "Open a location to read its insights, turn on Profile Watch and work through its citation checklist, and fix the listing itself in the Listing editor.",
     },
   ],
   cards: [
@@ -97,6 +105,11 @@ const page: FeaturePage = {
       body: "The photos you posted and the ones customers added, counted separately and synced from the listing.",
     },
     {
+      icon: "wrench",
+      title: "Listing editor",
+      body: "Edit the name, categories, phones, website, description, hours, services and more, then save to Google. Only the changed fields go, Google's answer shows beside each one, and a change can be copied to your other locations.",
+    },
+    {
       icon: "clipboard",
       title: "Citation checklist",
       body: "A checklist of the main business directories, Google first. The Google row fills in from your linked listing; you mark each of the others listed, wrong or missing.",
@@ -113,8 +126,8 @@ const page: FeaturePage = {
     },
     {
       icon: "layers",
-      title: "Bulk tools on Agency",
-      body: `On the ${PLANS.agency.name} plan, sync, link, set Profile Watch and schedule posts across many client locations at once.`,
+      title: "Bulk tools for agencies",
+      body: `On the ${WORKSPACE_PLANS} plans, sync, link, set Profile Watch and schedule posts across many client locations at once.`,
     },
   ],
   spotlight: {
@@ -133,7 +146,7 @@ const page: FeaturePage = {
         "Business name", "Address", "Phone", "Website", "Categories", "Services", "Hours", "Service areas",
         "Open status", "Business photos", "Customer photos", "Reviews", "Daily performance",
       ],
-      note: "Reading only: a sync never edits your Google listing.",
+      note: "A sync only reads: your listing changes only when you save in the Listing editor.",
     },
   },
   audience: [
@@ -153,7 +166,7 @@ const page: FeaturePage = {
   pricing: {
     kind: "plan",
     allowance: LOCATIONS,
-    note: `Need more locations? The ${ADDONS.extra_location.name} add-on adds one at a time on the ${EXTRA_LOCATION_PLANS} plans; the ${PLANS.agency.name} plan prices locations above its included ones.`,
+    note: MORE_LOCATIONS,
   },
   faqs: [
     {
@@ -162,11 +175,11 @@ const page: FeaturePage = {
     },
     {
       q: "Which plans include it, and how many locations?",
-      a: `Every plan includes it. ${allowanceLine(LOCATIONS)}. Extra locations come as an add-on on the ${EXTRA_LOCATION_PLANS} plans.`,
+      a: `Every plan includes it. ${allowanceLine(LOCATIONS)}. ${MORE_LOCATIONS}`,
     },
     {
       q: "Will it change my Google listing?",
-      a: "Importing and syncing only read from Google. The Locations page shows your details; you change them in Google Business Profile. Removing a location from ConstructHUB doesn't affect your Google listing.",
+      a: "Importing and syncing only read from Google. The listing changes only when you save a change in the Listing editor, which sends just the fields you edited and shows Google's answer for each. Removing a location from ConstructHUB doesn't affect your Google listing.",
     },
     {
       q: "Why don't I see performance figures?",
@@ -204,8 +217,8 @@ const page: FeaturePage = {
         "are marked not final yet. Google keeps a rolling window, but every day ConstructHUB has synced stays stored, " +
         "so your own history keeps growing.",
       "Google shares performance figures only for listings it has verified, so an unverified listing syncs its details " +
-        "and shows a message instead of figures. The Locations page reads your listing; it doesn't edit it. You keep " +
-        "making changes in Google Business Profile, and the next sync brings them in. Unlinking a location stops the " +
+        "and shows a message instead of figures. A sync only reads your listing. To change it, the Listing editor sends " +
+        "just the fields you edited and shows Google's answer for each, and the next sync brings it in. Unlinking a location stops the " +
         "sync and clears the Google data stored for it, and removing a location from ConstructHUB leaves your Google " +
         "listing exactly as it is.",
     ],
@@ -225,6 +238,8 @@ const page: FeaturePage = {
   },
   sources: [
     "client/src/pages/locations.tsx",
+    "client/src/pages/listing-editor.tsx",
+    "server/gbp/listing-editor.ts",
     "client/src/components/agency-workspace.tsx",
     "server/gbp/routes.ts",
     "server/gbp/service.ts",

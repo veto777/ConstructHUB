@@ -29,7 +29,8 @@ import {
 import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
 import { requireOrg, requirePermission, requireOwnerRole, stripMoney, type OrgContext } from "./tenancy";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
-import { requireCrmFeature, emitCrmEvent, webhookUrlIsSafe } from "./integrations";
+import { requireCrmFeature, emitCrmEvent, queueCrmEvent, webhookUrlIsSafe } from "./integrations";
+import { invoiceDefaultsFromOrg } from "./doc-defaults";
 import { autoSendPaymentReceipt } from "./receipts";
 import { logActivity } from "./activity";
 import { sendWithFallback } from "../email";
@@ -242,10 +243,12 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     if (d.projectId && !(await ownProject(ctx.org.id, d.projectId))) {
       return res.status(400).json({ message: "Project not found in this organization" });
     }
+    let fromEstimate: typeof crmEstimates.$inferSelect | null = null;
     if (d.estimateId) {
-      const [estimate] = await db.select({ id: crmEstimates.id }).from(crmEstimates)
+      const [estimate] = await db.select().from(crmEstimates)
         .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, d.estimateId))).limit(1);
       if (!estimate) return res.status(400).json({ message: "Estimate not found in this organization" });
+      fromEstimate = estimate;
     }
     // Number + insert in one transaction: the allocation lock is held until
     // this invoice exists, so no two invoices in the org share a number.
@@ -255,6 +258,8 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
         orgId: ctx.org.id, customerId: d.customerId, projectId: d.projectId ?? null,
         estimateId: d.estimateId ?? null, number, title: d.title,
         taxRateBps: d.taxRateBps, retainageBps: d.retainageBps, notes: d.notes ?? null,
+        // Settings → invoice footer, warranty and terms, snapshotted (doc-defaults.ts).
+        ...invoiceDefaultsFromOrg(ctx.org, fromEstimate),
         publicToken: tok(), dueAt: new Date(Date.now() + d.dueInDays * 86400000),
       } as any).returning();
       if (d.items.length) {
@@ -332,6 +337,8 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
         title: pct < 10000 ? `${est.title} — progress billing` : est.title,
         taxRateBps: est.taxRateBps, retainageBps, publicToken: tok(),
         dueAt: new Date(Date.now() + 30 * 86400000),
+        // Invoice footer from Settings; warranty and terms as signed on the estimate.
+        ...invoiceDefaultsFromOrg(ctx.org, est),
         // The draw this invoice bills, so the next one knows what is left.
         customFields: { progressBps: pct },
       } as any).returning();
@@ -1008,6 +1015,11 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       signatureName: approve ? parsed.data.signatureName ?? null : null,
       updatedAt: new Date(),
     }).where(eq(crmChangeOrders.id, co.id)).returning();
+    queueCrmEvent(co.orgId, approve ? "changeorder.approved" : "changeorder.declined", {
+      changeOrderId: co.id, projectId: co.projectId, number: co.number, title: co.title,
+      amountCents: co.amountCents, scheduleImpactDays: co.scheduleImpactDays ?? null,
+      ...(approve ? { signatureName: row.signatureName } : {}),
+    });
     // An approved CO moves the schedule; the MONEY is derived, not stored.
     // contractValueCents stays the BASE contract (set at estimate approval) and
     // the costing endpoint computes revised = base + approved COs — folding the

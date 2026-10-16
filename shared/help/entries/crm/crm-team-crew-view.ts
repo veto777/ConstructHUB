@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "What the CRM looks like for a team member signed in with the field role, compared with what you see as the owner.",
   whatItDoes: "A field member has a shorter menu, with no Messages, Invoices, Integrations or Settings. With “See all jobs” off they see only the clients and projects of their own jobs, and with “See prices” off the totals show as a dash. Schedule and JobCam stay in their menu.",
   howToUse: [
-    "CRM → Team & Company → Team, and find the person.",
+    "Open CRM → Team & Company → Team and find the person.",
     "Check the role beside their name. The invite form says what the field role sees.",
     "Use the switches under their name to turn one permission on or off for that person.",
   ],

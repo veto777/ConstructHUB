@@ -11,7 +11,7 @@ const entry: HelpDraft = {
     "Choose Connect agency Google account and sign in with the account your clients will invite as a manager.",
     "Leave Auto-accept off unless you want every invitation that account receives accepted, matched or not.",
   ],
-  howItWorks: "The name and the Auto-accept switch are saved on the owner's account. With Auto-accept off, only an invitation that matches one of your onboarding requests is accepted; with it on, every pending invitation is, but an unmatched listing is never guessed onto a client and waits under Locations as unassigned. Refresh Google listings asks for a new look at the connected accounts, at most once every ten minutes, and refuses when no account is connected. Connect opens Google's own sign-in; the access is stored encrypted and shown here as connected or needing reconnect.",
+  howItWorks: "The name and the Auto-accept switch are saved on the owner's account. With Auto-accept off, only an invitation that matches one of your onboarding requests is accepted; with it on, every waiting invitation is, but a listing that matches no client waits under Locations as unassigned. Refresh Google listings looks at the connected accounts again, at most twice in any ten minutes, and refuses when no account is connected. Connect opens Google's own sign-in; the access is stored encrypted and shown here as connected or needing reconnect.",
   needs: ["The Agency workspace (the agency module; which plan carries it comes from the plan model).", "The owner role: members cannot open this tab."],
 };
 export default entry;

@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "ads-manager.local-services-checks", parent: "ads-manager", group: "Google Ads", route: "/ads-manager", title: "Agency Ads & LSA → Local Services checks",
   whatItIs: "What the Agency Ads & LSA manager shows for client accounts that run Local Services Ads.",
-  whatItDoes: "Client accounts marks each client as LSA account, No LSA campaigns found or LSA not checked, and the LSA filter keeps only one of those. Campaigns lists a client’s campaigns, Local Services ones included. For an LSA account the health audit also reads the service areas, job types and budget Google has on file and counts the charged leads that still need feedback; that finding links to LSA Leads, where each lead is reviewed with its dispute evidence.",
+  whatItDoes: "Client accounts marks each client as LSA account, No LSA campaigns found or LSA not checked, and the LSA filter keeps only one of those. Campaigns lists a client’s campaigns, Local Services ones included. For an LSA account the health audit also reads the service areas, job types and budget Google has on file, and counts the charged leads that still need feedback. That finding links to LSA Leads, where you review each lead with its dispute evidence.",
   howToUse: [
     "Open Google Ads → Agency → Client accounts in the sidebar, open Filters and set LSA to LSA identified.",
     "Choose Campaigns on a client to see its Local Services campaign beside the search campaigns.",

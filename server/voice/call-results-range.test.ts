@@ -132,3 +132,23 @@ describe("the typed day count reaches Postgres as a bound parameter", () => {
     }
   });
 });
+
+describe("callResultsSummary never falls open to all time (review w3-r2 L4)", () => {
+  it.each(["1.5d", "1e3d", "week", "", "0d", "999d"])("an unknown range %j counts the last 30 days", async (range) => {
+    mocks.executed.length = 0;
+    await callResultsSummary("org-range-test", range as any, "America/Chicago");
+    expect(mocks.executed.length).toBeGreaterThanOrEqual(1);
+    for (const q of mocks.executed) {
+      const { text, params } = flatten(q);
+      expect(text).toContain("make_interval(days =>");
+      expect(text).toContain("started_at >=");
+      expect(params).toContain(30);
+    }
+  });
+
+  it("a valid typed count is kept (45d binds 45)", async () => {
+    mocks.executed.length = 0;
+    await callResultsSummary("org-range-test", "45d", "America/Chicago");
+    for (const q of mocks.executed) expect(flatten(q).params).toContain(45);
+  });
+});

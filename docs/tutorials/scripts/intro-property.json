@@ -96,7 +96,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-property-records\"]",
+      "selector": "[data-testid=\"tool-rail-property\"]",
       "caption": "Menu: Property Records",
       "narration": "You'll find Property Records in the menu, under Permits & Databases."
     }

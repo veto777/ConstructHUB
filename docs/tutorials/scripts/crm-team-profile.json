@@ -76,7 +76,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-team\"]",
+      "selector": "[data-testid=\"tool-rail-team\"]",
       "caption": "Menu: Team & Company",
       "narration": "You'll also find My profile under Team and Company in the menu."
     }

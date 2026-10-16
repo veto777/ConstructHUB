@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "What the CRM shows you once a client has approved an estimate — and what to do next.",
   whatItDoes: "The estimate’s page gets a banner naming who approved it, and the estimate becomes a signed contract that can no longer be edited or deleted. On the client’s page the estimate shows who approved it and when, the project moves to Approved by itself, and Create invoice appears on the estimate. The client is counted under Job Won on the Clients list.",
   howToUse: [
-    "CRM → Estimates, tick Approved, and open the estimate.",
+    "Open CRM → Estimates, tick Approved, and open the estimate.",
     "Read the banner: who approved it.",
     "Click the client’s name to see their estimate, their project and Create invoice.",
     "Choose Create invoice when you are ready to bill.",

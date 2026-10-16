@@ -1,6 +1,8 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
 import { PLANS, planForModule } from "../plans";
+import { planNamesWhere } from "../plan-copy";
+import { ALACARTE } from "../alacarte";
 
 /**
  * Permit Database Search (+ the Database Directory).
@@ -24,6 +26,8 @@ import { PLANS, planForModule } from "../plans";
  *     client/src/pages/permit-alerts.tsx
  */
 
+/** Plans with permit alerts (permitAlerts module), cheapest first — read from the price book. */
+const ALERT_PLANS = planNamesWhere((plan) => plan.modules.permitAlerts);
 const SEARCHES: FeatureAllowance = { limit: "permitSearches", unit: "permit searches", period: "month" };
 
 const page: FeaturePage = {
@@ -150,7 +154,7 @@ const page: FeaturePage = {
     },
     {
       q: "How do permit alerts work, and which portals do they cover?",
-      a: "A watch names the jurisdictions to follow and what to look for: one address or parcel, a contractor's name or license, or a set of trades (roofing, HVAC, electrical, plumbing, solar, pool, remodel, new construction and more) in an area. Every hour each watched portal is asked for the permits it listed since the last check; new matches go out as one digest per watch by email, text or Telegram, and every match is kept on the Permit Alerts page. Only a portal that can list permits by date can be watched, so coverage varies by jurisdiction: the directory and the watch itself say Alerts supported where it is, and a watch on a portal that isn't supported yet starts working the day its portal is. Alerts are a separate module on the plans that include it.",
+      a: `A watch names the jurisdictions to follow and what to look for: one address or parcel, a contractor's name or license, or a set of trades (roofing, HVAC, electrical, plumbing, solar, pool, remodel, new construction and more) in an area. Every hour each watched portal is asked for the permits it listed since the last check; new matches go out as one digest per watch by email, text or Telegram, and every match is kept on the Permit Alerts page. Only a portal that can list permits by date can be watched, so coverage varies by jurisdiction: the directory and the watch itself say Alerts supported where it is, and a watch on a portal that isn't supported yet starts working the day its portal is. Alerts come with the ${ALERT_PLANS} plans, or the ${ALACARTE.permits.name} item on its own.`,
     },
   ],
   // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):

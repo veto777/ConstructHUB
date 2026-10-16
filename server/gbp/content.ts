@@ -153,6 +153,10 @@ export async function payloadFor(user: number, raw: unknown) {
         ...(v.event ? { event: { title: v.event.title, schedule: { startDate: start!.date, startTime: start!.time, endDate: end!.date, endTime: end!.time } } } : {}), ...(v.topicType === 'OFFER' ? { offer: v.offer || {} } : {}) };
 }
 function sortJson(value: any): any { return Array.isArray(value) ? value.map(sortJson) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(k => [k, sortJson(value[k])])) : value; }
+/** Most items one account may have waiting (status 'queued') at once; the worker publishes at most 100 a day. */
+export const MAX_QUEUED_PER_USER = 500;
+/** Items (not requests) one account may queue per 10-minute window. */
+export const QUEUE_ITEMS_PER_WINDOW = 500;
 export async function enqueue(user: number, location: number, raw: unknown) {
     const loc = await ownedLocation(user, location);
     await requireAutoPosts(user);
@@ -173,6 +177,16 @@ export async function enqueue(user: number, location: number, raw: unknown) {
             await c.query('COMMIT');
             return previous;
         }
+        // Outstanding work is bounded per account (review w3-r2 M2): a replay above is still answered, but a new batch
+        // that would take the account past MAX_QUEUED_PER_USER waiting items is refused in words. One lock per account
+        // (not per request key) so two batches sent at once cannot both pass the count.
+        await c.query("SELECT pg_advisory_xact_lock($1,hashtext('gbp-content-queue-cap'))", [user]);
+        const queued = Number((await c.query("SELECT count(*)::int AS n FROM gbp_content_jobs WHERE user_id=$1 AND status='queued'", [user])).rows[0].n);
+        if (queued + b.items.length > MAX_QUEUED_PER_USER)
+            throw new GoogleError('invalid', `You already have ${queued} posts and photos waiting to publish. Up to ${MAX_QUEUED_PER_USER} can wait at once — let some publish or remove a few, then add these.`, 409);
+        // The request budget counts each queued item, not each request (180 requests × 100 items was 18,000 rows).
+        if (!await takeBudget(`gbp-content-items:${user}`, QUEUE_ITEMS_PER_WINDOW, b.items.length))
+            throw new GoogleError('quota', 'Too many posts and photos were queued in the last few minutes. Wait a little and try again.', 429);
         for (let i = 0; i < b.items.length; i++)
             await c.query(`INSERT INTO gbp_content_jobs(user_id,location_id,request_key,item_index,kind,payload,due_at,target,schedule)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(user_id,request_key,item_index) DO NOTHING`, [user, location, b.requestKey, i, b.items[i].kind, JSON.stringify(payloads[i]), times[i], JSON.stringify(target), JSON.stringify(b.schedule)]);

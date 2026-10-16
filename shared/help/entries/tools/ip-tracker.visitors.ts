@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "ip-tracker.visitors", parent: "ip-tracker", group: "Tools", route: "/ip-tracker", title: "IP Tracker → Visitors",
   whatItIs: "The list of everyone who visited, one row per IP address.",
-  whatItDoes: "Each row shows the address, how many visits and pages, city and country, device and browser, when it was last seen, a green dot while it was seen in the last 20 minutes, and a Suspicious mark when Click Guard flagged it. Opening a row shows the browser, system, screen, language and time zone, the computer ID (fingerprint), the first and last visit, the reasons for any flag, and the 50 newest visits with where each came from and landed.",
+  whatItDoes: "Each row shows the address, visits and pages, city and country, device and browser, and when it was last seen. A green dot means seen in the last 20 minutes, and a Suspicious mark means Click Guard flagged it. Open a row for the browser, system, screen, language, time zone, computer ID (fingerprint), first and last visit, and any flag reasons. It also lists the 50 newest visits with where each came from and landed. The panel reads only the site's newest 1,000 visits, so on a busy site the first visit and the totals come from that window.",
   howToUse: [
     "Open IP Tracker → Visitors and pick the site at the top.",
     "Type part of an address in the search box to find one visitor.",

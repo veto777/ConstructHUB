@@ -17,6 +17,7 @@ import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/co
 import { AlertTriangle, ExternalLink, Search } from "lucide-react";
 import { SamplePreview } from "@/components/sample-preview";
 import { useToast } from "@/hooks/use-toast";
+import type { EntitlementsInfo } from "@/lib/pricing-display";
 import {
   autoSchema,
   postSchema,
@@ -316,7 +317,13 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   // no draft state, so "Save draft" keeps the Google copy in this composer only. The request key is kept until the
   // post is accepted, so a retry replays instead of queuing twice.
   const gbpLinked = !!data?.business?.gbp_location_name;
-  const [gbpOn, setGbpOn] = useState(false), [gbpPhotoId, setGbpPhotoId] = useState("");
+  // The Google posts queue needs the autoPosts module (server/gbp/content.ts requireAutoPosts → 402, Pro and above):
+  // a plan without it is told so in place of the checkbox (review w3-r2 L1). While /api/entitlements is loading or
+  // failed the checkbox stays offered and the server's own refusal is shown.
+  const entitlements = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"] });
+  const gbpPlanBlocked = !!entitlements.data && entitlements.data.modules?.autoPosts !== true;
+  const [gbpChecked, setGbpOn] = useState(false), [gbpPhotoId, setGbpPhotoId] = useState("");
+  const gbpOn = gbpChecked && !gbpPlanBlocked;
   const [gbpRequestKey, setGbpRequestKey] = useState(() => crypto.randomUUID());
   const gbpPhotos = useQuery<{ id: number; name: string; url: string }[]>({ queryKey: [`/api/gbp/content/${businessId}/photos`], enabled: !all && !!businessId && gbpLinked && gbpOn });
   const gbpText = tweaks.gbp ?? text;
@@ -466,8 +473,16 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
           await (await apiRequest("POST", `/api/gbp/content/${businessId}/queue`, gbpQueueBody(scheduledTime))).json();
           gbpQueued = true;
         } catch (e) {
-          toast({ title: body ? "Posted to social, but not to Google" : "Could not queue the Google post", description: apiErrorMessage(e), variant: "destructive" });
-          if (!body) return;
+          // Social went out but Google did not: the composer keeps the text, the Google tick, its photo, the request
+          // key and the saved social submission, so pressing Post again replays — the social post by its id (never
+          // twice) and the Google copy by its key (review w3-r2 L1). Nothing is cleared on this path.
+          toast({
+            title: body ? "Posted to social, but not to Google" : "Could not queue the Google post",
+            description: `${apiErrorMessage(e)}${body ? " Your text is kept here: post again to retry Google — the social post will not go out twice." : ""}`,
+            variant: "destructive",
+          });
+          if (body) { setLatestPosts(result.posts || []); setOffset(0); }
+          return;
         }
       }
       setGbpRequestKey(crypto.randomUUID());
@@ -644,9 +659,14 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
               {/* Google Business Profile: the same post to the linked Google listing, through the Google posts queue. */}
               {!all && (
                 <div className="space-y-3 rounded-lg border p-3" data-testid="composer-gbp" data-linked={gbpLinked ? "true" : "false"}>
-                  {gbpLinked ? (
+                  {gbpLinked && gbpPlanBlocked ? (
+                    <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="text-gbp-needs-plan">
+                      <NetworkIcon platform="gbp" />
+                      <span>Google Business Profile — posting to Google from here needs the Pro plan or above. <Link className="g-link" href="/pricing" data-testid="link-gbp-plan">See plans</Link></span>
+                    </p>
+                  ) : gbpLinked ? (
                     <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={gbpOn} onChange={(e) => setGbpOn(e.target.checked)} data-testid="checkbox-gbp" />
+                      <input type="checkbox" checked={gbpChecked} onChange={(e) => setGbpOn(e.target.checked)} data-testid="checkbox-gbp" />
                       <NetworkIcon platform="gbp" />
                       {data?.business?.business_name} · Google Business Profile
                     </label>

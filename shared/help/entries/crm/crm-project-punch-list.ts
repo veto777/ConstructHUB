@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "The short list of things left to finish on a job, kept on the project.",
   whatItDoes: "Each punch item has a title and, if you want, a location. Items start open. Done crosses an item out and marks it done; Reopen brings it back.",
   howToUse: [
-    "CRM → Pipeline, open the project, and choose the Punch list tab.",
+    "Open CRM → Pipeline, open the project, and choose the Punch list tab.",
     "Type the item, add a location, and click the plus button.",
     "Choose Done on an item when it is finished.",
     "Choose Reopen if it needs another look.",

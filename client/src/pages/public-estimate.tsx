@@ -1170,6 +1170,9 @@ export default function PublicEstimatePage() {
           {company.warrantyText && (
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{company.warrantyText}</p>
           )}
+          {e.footerText && (
+            <p className="text-xs text-muted-foreground whitespace-pre-wrap" data-testid="text-estimate-footer">{e.footerText}</p>
+          )}
           <div className="flex flex-wrap items-center gap-4 pt-2">
             {company.logoUrl && (
               <img src={company.logoUrl} alt={company.name} className="h-14 object-contain" />

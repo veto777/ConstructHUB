@@ -129,7 +129,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "selector": "[data-testid=\"tool-rail-clients\"]",
       "caption": "Where to find it",
       "narration": "Project Photos is on every client's page, under Clients."
     }

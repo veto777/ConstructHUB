@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "A switch under the scan form that scans the website again every month, and the list of the sites set up that way.",
   whatItDoes: "“Rescan this site every month” turns the schedule on or off for the website typed in the form, saving the form’s page counts and profile choice with it. The Monthly rescans list shows each scheduled site with its page limit and the date of its next run, and a Turn off button. Up to 10 sites can be scheduled.",
   howToUse: [
-    "Type the website URL, the page counts and, if you want, the Business Profile to compare with.",
+    "Type the website URL, the page counts and, if you want, the Google Business Profile to compare with.",
     "Turn on “Rescan this site every month”; the line beside it shows the next run date.",
     "Find the site later under Monthly rescans, where “Turn off” removes the schedule.",
     "Read each monthly report in Scan history, where the score’s move since the scan before is shown.",

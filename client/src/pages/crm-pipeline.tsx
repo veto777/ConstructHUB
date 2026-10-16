@@ -325,7 +325,7 @@ export default function CrmPipelinePage() {
           server's true count, not the loaded page) — gone the moment one lead exists. */}
       {!projects.length && totalProjects === 0 && (
         <SamplePipelineBoard cta={canMove ? (
-          <Button size="sm" variant="outline" onClick={() => setNewLeadOpen(true)} data-testid="button-new-lead-sample">
+          <Button size="sm" variant="outline" className="max-sm:min-h-11" onClick={() => setNewLeadOpen(true)} data-testid="button-new-lead-sample">
             <Plus className="h-4 w-4 mr-1" /> Add your first lead
           </Button>
         ) : undefined} />

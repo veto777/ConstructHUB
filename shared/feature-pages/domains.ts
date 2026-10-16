@@ -4,7 +4,7 @@ import { plansWhere } from "../plan-copy";
 import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
 
 /**
- * Domains — half of the Agency-only "Domains + Gmail alerts" module.
+ * Domains — half of the "Domains + Gmail alerts" module (Pro and up today; names read from the price book).
  *
  * Every claim below is backed by the code in `sources`:
  *   - registrar API connections (Porkbun, Name.com; key + secret stored encrypted; recent sign-in to connect):
@@ -23,7 +23,7 @@ import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
  *   - records hosted on Cloudflare are not edited: types.ts desired()
  *   - point nameservers at the Cloudflare zone's pair: routes.ts /cloudflare-preview, server/domains/cloudflare-link.ts
  *   - registrar guides: server/domains/guides.ts
- *   - saved keys removable without the plan; Agency-only gate otherwise: routes.ts requireModule("domainsMailAlerts")
+ *   - saved keys removable without the plan; plan-module gate otherwise: routes.ts requireModule("domainsMailAlerts")
  */
 
 const MODULE_PLAN = PLANS[planForModule("domainsMailAlerts")].name;
@@ -132,7 +132,7 @@ const page: FeaturePage = {
     },
     {
       q: "Which plan includes it?",
-      a: `Domains comes with the ${MODULE_PLAN} plan, together with Mail alerts.${ONLY_PLAN ? " No other plan includes it." : ""}`,
+      a: `Domains comes with the ${MODULE_PLAN} plan${ONLY_PLAN ? "" : " and every plan above it"}, together with Mail alerts.${ONLY_PLAN ? " No other plan includes it." : ""}`,
     },
     {
       q: "Can it renew or transfer my domains?",

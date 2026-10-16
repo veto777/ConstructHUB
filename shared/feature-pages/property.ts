@@ -144,7 +144,8 @@ const page: FeaturePage = {
   },
   related: ["permits", "crm", "crmLeads"],
   app: { href: "/property", surface: "app" },
-  tryIt: { label: "Browse the directory now", href: "/property" },
+  // No tryIt: /property needs a sign-in and the propertyRecords module (GET /api/property-appraisers answers 401/402,
+  // client/src/pages/property.tsx), so it is not a no-account way to try it.
   headings: {
     steps: { title: "From County to Records in ", em: "Four\u00a0Steps" },
     cards: { title: "What the Directory ", em: "Gives You" },

@@ -6,12 +6,12 @@ const entry: HelpDraft = {
   whatItIs: "How you tell the CRM about money a client paid you directly — a check, cash, a wire or a card taken another way.",
   whatItDoes: "Record payment on an invoice takes the amount, the method and an optional note such as a check number. The amount starts at what is still due. Saving updates the invoice, the client’s outstanding balance and the amount collected, and lists the payment under Payments on the client’s page.",
   howToUse: [
-    "CRM → Clients, then open the client.",
-    "Under Invoices, choose Record payment on the invoice.",
+    "Open CRM → Clients and open the client.",
+    "Choose Record payment on the invoice under Invoices.",
     "Check the amount, pick the method and add a note.",
     "Choose Record. The invoice shows what is paid and what is still due.",
   ],
-  howItWorks: "A payment for less than what is due leaves the invoice Partial; paying the rest marks it Paid. A recorded payment can be reversed from the Payments list if it was entered by mistake.",
+  howItWorks: "A payment for less than what is due leaves the invoice Partial; paying the rest marks it Paid. The account owner can reverse a recorded payment from the Payments list if it was entered by mistake.",
   needs: ["A ConstructHub CRM plan — the CRM is a separate product with its own plans.", "An invoice with a balance due."],
 };
 export default entry;

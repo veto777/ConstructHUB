@@ -437,7 +437,7 @@ export default function CrmSchedulePage() {
                 }}
                 aria-label="Number of days to list"
                 data-testid="input-days-custom"
-                className="h-7 w-16 rounded-md border border-input bg-background px-2 text-xs tabular-nums text-foreground"
+                className="h-7 w-16 rounded-md border border-input bg-background px-2 text-xs tabular-nums text-foreground max-sm:h-11 max-sm:text-base"
               />
               days (up to {MAX_AGENDA_DAYS})
             </label>
@@ -460,7 +460,7 @@ export default function CrmSchedulePage() {
                   filter is applied, so an empty "My calendar" with visits elsewhere shows no sample. */}
               {(agendaData?.appointments.length ?? 0) === 0 && (
                 <SampleScheduleList cta={canManage ? (
-                  <Button size="sm" variant="outline" onClick={() => openCreate(new Date())} data-testid="button-add-appointment-sample">
+                  <Button size="sm" variant="outline" className="max-sm:min-h-11" onClick={() => openCreate(new Date())} data-testid="button-add-appointment-sample">
                     <Plus className="h-4 w-4 mr-1" /> Book your first visit
                   </Button>
                 ) : undefined} />

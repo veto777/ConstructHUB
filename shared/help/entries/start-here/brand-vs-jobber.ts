@@ -5,7 +5,7 @@ import { CRM_TRIAL_DAYS } from "../../../crm-plans";
 const entry: HelpDraft = {
   key: "brand-vs-jobber", group: "Start here", route: "/pricing", title: "Jobber vs ConstructHUB CRM",
   whatItIs: "A side-by-side look at the published list prices of ConstructHUB CRM and Jobber for the same number of people. Both were read from each company’s pricing page on 8 October 2026.",
-  whatItDoes: "For one person the monthly list prices are close. For five people, Jobber’s lowest plan that includes five users lists at about twice ConstructHUB CRM Essentials, which has five seats. Jobber sells its sales pipeline as an add-on; ConstructHUB CRM has a pipeline on every plan. The two products do not have the same features: Jobber lists an app marketplace and other tools ConstructHUB CRM does not have. ConstructHUB’s permit office directory, in Business tools, is free to browse.",
+  whatItDoes: "For one person the monthly list prices are close; for five people, Jobber’s lowest plan that includes five users lists at about twice ConstructHUB CRM Essentials, which has five seats. Jobber sells its sales pipeline as an add-on; ConstructHUB CRM has a pipeline on every plan. The two products do not have the same features: Jobber lists an app marketplace and other tools ConstructHUB CRM does not have. ConstructHUB’s permit office directory, in Business tools, is free to browse.",
   howToUse: [
     "Open constructhub.us/pricing and read each CRM plan’s price, its seats and its Not included list.",
     "Open Jobber’s pricing page and compare the same number of people, on the same billing period.",

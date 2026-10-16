@@ -36,7 +36,8 @@ import {
   ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend, estimateExpiryOnExtend,
 } from "./entities";
 import { notifyOrgOwners } from "./owner-notify";
-import { emitCrmEvent } from "./integrations";
+import { emitCrmEvent, queueCrmEvent, queueProjectStageChange } from "./integrations";
+import { estimateDocText, invoiceDocText } from "./doc-defaults";
 import { recordActivity, logActivity } from "./activity";
 import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER } from "./sms";
 import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
@@ -254,10 +255,15 @@ function publicEstimateView(
   // same math the server applies on approve (server/crm/discounts.ts).
   const bases = lineBases(items);
   const taxableBaseCents = Math.max(0, bases.taxableCents - bases.lineDiscountCents);
+  // The estimate's own copy of the Settings defaults — editing Settings later
+  // never rewrites a document already out (older, pre-snapshot estimates
+  // still print live Settings: doc-defaults.ts).
+  const docText = estimateDocText(est, org);
   return {
     estimate: {
       id: est.id, number: est.number, title: est.title, status: est.status,
       introText: est.introText, termsText: est.termsText,
+      footerText: docText.footerText,
       subtotalCents: est.subtotalCents, discountCents: est.discountCents,
       taxRateBps: est.taxRateBps,
       taxCents: est.taxCents, totalCents: est.totalCents, depositCents: est.depositCents,
@@ -279,10 +285,10 @@ function publicEstimateView(
       // The DIVISION's letterhead when the work belongs to one — a Florida
       // estimate never goes out under the WA HQ address.
       ...companyBranding(org, division),
-      warrantyText: org.warrantyText,
+      warrantyText: docText.warrantyText,
       // Org-wide T&C render on a separate linked page (?terms=1), HCP-style —
-      // never inline on the estimate itself.
-      termsAndConditions: org.termsAndConditions,
+      // never inline on the estimate itself. The estimate's snapshot of them.
+      termsAndConditions: docText.companyTermsText,
       // The org's theme accent (server-resolved hex + hsl pair) — the public
       // page sets CSS variables from these verbatim.
       ...themePayload(org.customFields),
@@ -526,11 +532,20 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       linkLabel: "Open estimates",
     });
 
+    queueCrmEvent(ctx.org.id, "estimate.sent", {
+      estimateId: est.id, number: est.number, customerId: est.customerId, projectId: est.projectId ?? null,
+      totalCents: row.totalCents, to, resend: !!est.sentAt,
+    });
+
     if (est.projectId) {
-      await db.update(crmProjects)
+      const [proj] = await db.select({ status: crmProjects.status }).from(crmProjects)
+        .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, est.projectId))).limit(1).catch(() => []);
+      const moved = await db.update(crmProjects)
         .set({ status: "proposal_sent", stageChangedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, est.projectId)))
-        .catch(() => {});
+        .returning({ id: crmProjects.id })
+        .catch(() => []);
+      if (proj && moved.length) queueProjectStageChange(ctx.org.id, est.projectId, proj.status, "proposal_sent");
     }
 
     res.json({ estimate: presentEstimate(row, ctx), link, emailed, emailError, texted, smsTo, smsError });
@@ -612,6 +627,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       if (countView) {
         if (!est.firstViewedAt) {
           await logEvent(est.orgId, est.id, "viewed", "client", req, { firstView: true });
+          // Like invoice.viewed: once, on the client's first real open.
+          queueCrmEvent(est.orgId, "estimate.viewed", {
+            estimateId: est.id, number: est.number, customerId: est.customerId, projectId: est.projectId ?? null,
+          });
           // Tell the sender the moment it's first opened.
           notifyOwner(est.orgId, est, cust, org, "opened").catch(() => {});
         } else {
@@ -783,12 +802,23 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
 
     // Approving advances the project — Leap's "Job Awarded" gate. The contract
     // value is the APPROVED total (after any selected optional discounts).
+    queueCrmEvent(est.orgId, approve ? "estimate.approved" : "estimate.declined", {
+      estimateId: est.id, number: est.number, customerId: est.customerId, projectId: est.projectId ?? null,
+      ...(approve
+        ? { approvedTotalCents: row.approvedTotalCents ?? row.totalCents, signatureName: row.signatureName }
+        : { reason: row.declineReason }),
+    });
+
     if (est.projectId) {
-      await db.update(crmProjects).set({
+      const [proj] = await db.select({ status: crmProjects.status }).from(crmProjects)
+        .where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId))).limit(1).catch(() => []);
+      const moved = await db.update(crmProjects).set({
         status: approve ? "approved" : "estimating",
         contractValueCents: approve ? (approval?.totals.totalCents ?? est.totalCents) : undefined,
         stageChangedAt: new Date(), updatedAt: new Date(),
-      } as any).where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId))).catch(() => {});
+      } as any).where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId)))
+        .returning({ id: crmProjects.id }).catch(() => []);
+      if (proj && moved.length) queueProjectStageChange(est.orgId, est.projectId, proj.status, approve ? "approved" : "estimating");
     }
 
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
@@ -861,6 +891,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       number: await nextDocNumber(tx, crmEstimates, est.orgId, "E"),
       title: `${est.title} — your selections`.slice(0, 200),
       introText: est.introText, termsText: est.termsText,
+      // The same footer/warranty/terms the client was shown on the original
+      // (an older original without a snapshot keeps following Settings, too).
+      footerText: est.footerText, warrantyText: est.warrantyText, companyTermsText: est.companyTermsText,
+      defaultsSnapshotAt: est.defaultsSnapshotAt, depositBps: est.depositBps,
       taxRateBps: est.taxRateBps,
       publicToken: randomBytes(24).toString("hex"),
       status: "sent", sentAt: new Date(), sentToEmail: est.sentToEmail,
@@ -1666,7 +1700,9 @@ async function deliverSignedContract(
       name: o.name, description: o.description, recommended: o.recommended,
       totalCents: o.showTotal ? o.totalCents : null,
     })),
-    terms: org.termsAndConditions,
+    // The company terms as this estimate carries them (snapshot, or live
+    // Settings for an older estimate) — the same text the client page showed.
+    terms: estimateDocText(est, org).companyTermsText,
   });
   const fileName = contractFileName(est.number);
   const att = await storeGeneratedPdf({
@@ -1887,6 +1923,8 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         retainageCents: inv.retainageCents, paidCents: inv.paidCents, refundedCents: refundSummary.refundedCents,
         dueCents: due, dueAt: inv.dueAt, paidAt: inv.paidAt, notes: inv.notes,
         createdAt: inv.createdAt,
+        // Footer, warranty and terms as copied onto this invoice (doc-defaults.ts).
+        ...invoiceDocText(inv, org),
       },
       items: items.map((i) => ({
         id: i.id, name: i.name, description: i.description, unit: i.unit,

@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "A way to put a visit on the calendar without leaving the client you are looking at.",
   whatItDoes: "Schedule appointment on a client’s page opens a short form: a title, when it starts and ends, and optional notes. The visit is saved against that client, listed in the Schedule section of their page, and shown on the Schedule calendar.",
   howToUse: [
-    "CRM → Clients, and open the client.",
+    "Open CRM → Clients and open the client.",
     "Choose Schedule appointment under Quick actions.",
     "Give the visit a title and set when it starts and ends. Notes are optional.",
     "Choose Schedule. The visit is listed on the client’s page and on the calendar.",

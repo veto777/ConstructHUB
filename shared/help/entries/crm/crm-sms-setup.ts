@@ -6,8 +6,8 @@ const entry: HelpDraft = {
   whatItIs: "The SMS card in Settings: which number your texts come from, and which texts the CRM sends.",
   whatItDoes: "You choose the number your texts come from, switch on texting estimates to clients, and switch on a text to yourself when a bid is signed or money lands. “Send a test text” checks that it works.",
   howToUse: [
-    "CRM → Settings, and scroll to the SMS card.",
-    "Under “Which number your texts come from”, choose the shared ConstructHUB number or a number of your own, and save.",
+    "Open CRM → Settings and scroll to the SMS card.",
+    "Choose the shared ConstructHUB number or a number of your own under “Which number your texts come from”, and save.",
     "Switch on “Text estimates to clients” and “Text me when a bid is signed or money lands”.",
     "Tick the consent box under the notification switches, so alerts can reach your own phone.",
     "Type a mobile number under “Send a test text” and choose “Send test text”.",

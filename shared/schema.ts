@@ -1930,6 +1930,17 @@ export const crmEstimates = pgTable("crm_estimates", {
   // approvedTotalCents is the number to bill — totalCents stays the quoted one.
   approvedTotalCents: integer("approved_total_cents"),
   selectedDiscounts: jsonb("selected_discounts"),
+  // Settings → Estimate & invoice defaults, copied on at creation
+  // (server/crm/doc-defaults.ts). The client page and contract print these,
+  // so a later Settings edit never changes a document already out. Null
+  // defaultsSnapshotAt = a pre-snapshot document, which prints live Settings.
+  footerText: text("footer_text"),
+  warrantyText: text("warranty_text"),
+  companyTermsText: text("company_terms_text"),
+  // The org's default deposit percent, when the deposit follows it: the deposit
+  // is re-derived from the total on every recalc. A typed deposit clears it.
+  depositBps: integer("deposit_bps"),
+  defaultsSnapshotAt: timestamp("defaults_snapshot_at"),
   customFields: jsonb("custom_fields"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -2136,6 +2147,11 @@ export const crmInvoices = pgTable("crm_invoices", {
   paidAt: timestamp("paid_at"),
   voidedAt: timestamp("voided_at"),
   notes: text("notes"),
+  // Settings defaults snapshot (server/crm/doc-defaults.ts) — see crmEstimates.
+  footerText: text("footer_text"),
+  warrantyText: text("warranty_text"),
+  termsText: text("terms_text"),
+  defaultsSnapshotAt: timestamp("defaults_snapshot_at"),
   customFields: jsonb("custom_fields"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

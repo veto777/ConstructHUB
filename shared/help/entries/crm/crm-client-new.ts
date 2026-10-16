@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "The New client form: a name, and whatever contact details you have.",
   whatItDoes: "Adds the client to your list and creates their private portal automatically. Notes typed here show as intake notes on the client's page, for your team only.",
   howToUse: [
-    "CRM → Clients → New client.",
+    "Open CRM → Clients → New client.",
     "Type the client's name, then their email, phone and service address.",
     "Add notes for your team if you like, and choose Create client.",
     "Click the new name in the list to open the client's page.",

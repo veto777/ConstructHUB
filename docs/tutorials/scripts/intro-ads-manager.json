@@ -18,7 +18,7 @@
     },
     {
       "action": "click",
-      "selector": "button:has-text(\"Client accounts\")",
+      "selector": "[data-testid=\"subnav-ads-manager-accounts\"]",
       "caption": "Client accounts",
       "narration": "Client accounts lists each account: status, currency, timezone, and whether Local Services campaigns were found."
     },
@@ -43,7 +43,7 @@
     },
     {
       "action": "click",
-      "selector": "button:has-text(\"Health audit\")",
+      "selector": "[data-testid=\"subnav-ads-manager-findings\"]",
       "caption": "Health audit",
       "narration": "Health audit lists each finding by account, with its severity and a way to fix it."
     },
@@ -61,7 +61,7 @@
     },
     {
       "action": "click",
-      "selector": "button:has-text(\"Protection previews\")",
+      "selector": "[data-testid=\"subnav-ads-manager-plans\"]",
       "caption": "Protection previews",
       "chapter": "Preview before Google",
       "narration": "Next, Protection previews."
@@ -104,7 +104,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-agency-ads-&-lsa\"]",
+      "selector": "[data-testid=\"tool-rail-ads-manager\"]",
       "caption": "Menu: Agency Ads & LSA",
       "narration": "You'll find Agency Ads and LSA in the menu on the left, under Google Ads."
     }

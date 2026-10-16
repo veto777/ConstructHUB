@@ -90,7 +90,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "selector": "[data-testid=\"tool-rail-pipeline\"]",
       "caption": "Menu: Pipeline",
       "narration": "You'll find your jobs under Pipeline in the menu.",
       "holdMs": 600

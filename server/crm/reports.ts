@@ -30,7 +30,7 @@ import { db } from "../db";
 import { crmCustomers, crmMeasurements, crmProjects } from "@shared/schema";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
-import { requireApiKey } from "./integrations";
+import { requireApiKey, queueCrmEvent, customerEventPayload } from "./integrations";
 import { requireClient } from "./client-auth";
 
 type GetUser = (req: any, res: any) => any;
@@ -275,6 +275,7 @@ async function createCustomer(
       notes: "Created from an imported measurement report.",
     } as any)
     .returning();
+  queueCrmEvent(orgId, "customer.created", { ...customerEventPayload(row), source: "measurement_report" });
   return row;
 }
 

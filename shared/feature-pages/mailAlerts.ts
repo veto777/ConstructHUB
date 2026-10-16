@@ -4,7 +4,7 @@ import { plansWhere } from "../plan-copy";
 import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
 
 /**
- * Mail alerts — half of the Agency-only "Domains + Gmail alerts" module.
+ * Mail alerts — half of the "Domains + Gmail alerts" module (Pro and up today; names read from the price book).
  *
  * Every claim below is backed by the code in `sources`:
  *   - the private forwarding address and the Gmail setup steps (forwarding confirmation, sender filter, keep
@@ -21,7 +21,7 @@ import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
  *     page-wide Critical/Unread/Unmapped counts the inbox triage leads with
  *   - optional read-only Gmail connection (only when enabled), last 30 days of known senders:
  *     server/mail-alerts/gmail.ts GMAIL_SCOPE, classify.ts GMAIL_QUERY
- *   - Agency-only gate: requireMailModule() in routes.ts (requireModule("domainsMailAlerts") in gmail.ts)
+ *   - plan-module gate: requireMailModule() in routes.ts (requireModule("domainsMailAlerts") in gmail.ts)
  */
 
 const MODULE_PLAN = PLANS[planForModule("domainsMailAlerts")].name;
@@ -128,7 +128,7 @@ const page: FeaturePage = {
     },
     {
       q: "Which plan includes it?",
-      a: `Mail alerts comes with the ${MODULE_PLAN} plan, together with Domains.${ONLY_PLAN ? " No other plan includes it." : ""} Alerts forwarded while your plan doesn't include it are kept for 30 days and show up once it does.`,
+      a: `Mail alerts comes with the ${MODULE_PLAN} plan${ONLY_PLAN ? "" : " and every plan above it"}, together with Domains.${ONLY_PLAN ? " No other plan includes it." : ""} Alerts forwarded while your plan doesn't include it are kept for 30 days and show up once it does.`,
     },
     {
       q: "Does it read my whole inbox?",

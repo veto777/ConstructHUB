@@ -10,6 +10,6 @@ const entry: HelpDraft = {
     "Narrow the list with Area, Event, Since or the search box.",
     "Choose Export CSV to keep a copy of what is shown.",
   ],
-  howItWorks: "Events are written by the server as they happen and read back here; the page never changes them. The IP address and device describe the request and can reflect a proxy (a service in between).",
+  howItWorks: "Events are recorded as they happen and shown here; the page never changes them. The IP address and device describe the request and can reflect a proxy (a service in between).",
 };
 export default entry;

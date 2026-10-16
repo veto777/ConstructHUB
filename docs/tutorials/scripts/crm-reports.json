@@ -75,7 +75,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-settings\"]",
+      "selector": "[data-testid=\"tool-rail-settings\"]",
       "caption": "Menu: Settings",
       "narration": "To get here, open Settings in the menu, then Measurement reports."
     }

@@ -35,7 +35,7 @@ export const CLICK_GUARD_COMPARE: FeatureCompare = {
   alacarte: ["click_guard"],
   checkedOn: "2026-10-10",
   competitors: [
-    { name: "ClickCease", plan: "Starter", price: { kind: "monthly", cents: 9900 }, per: "1 site", note: "a lower intro price for the first three cycles", source: "https://www.clickcease.com/pricing" },
+    { name: "ClickCease", plan: "Starter", price: { kind: "monthly", cents: 9900 }, per: "1 site", note: "a lower intro price for the first three cycles", source: "https://www.clickcease.com/pricing.html" },
     { name: "ClickGUARD", plan: "Lite", price: { kind: "monthly", cents: 7400 }, per: "1 site", source: "https://www.clickguard.com/pricing" },
     { name: "Fraud Blocker", plan: "Standard", price: { kind: "monthly", cents: 7900 }, per: "1 site", source: "https://fraudblocker.com/pricing" },
     { name: "Lunio", price: { kind: "quote" } },
@@ -143,7 +143,7 @@ const page: FeaturePage = {
     },
     {
       title: "Agencies with client ad accounts",
-      body: "Protect each client's website, and on the Agency plan the Google Ads manager can apply a client's list after a preview.",
+      body: `Protect each client's website, and from the ${ADS_MANAGER_PLAN} plan up the Google Ads manager can apply a client's list after a preview.`,
     },
   ],
   pricing: {
@@ -206,7 +206,7 @@ const page: FeaturePage = {
       "A flag is a pattern, not proof. Several real customers behind one office or phone network can share an IP and " +
         "trip the visit limits, so check the blocked list and whitelist the addresses you trust. Click Guard only " +
         "sees visits where the tracking code runs, it doesn't file refund claims with Google, and an exclusion only " +
-        `applies to campaigns that accept IP exclusions. On the ${ADS_MANAGER_PLAN} plan, the Google Ads manager can ` +
+        `applies to campaigns that accept IP exclusions. From the ${ADS_MANAGER_PLAN} plan up, the Google Ads manager can ` +
         "preview a mapped client's Click Guard list as exclusions in that client's ad account before applying it.",
     ],
   },

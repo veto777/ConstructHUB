@@ -95,7 +95,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-search-permits\"]",
+      "selector": "[data-testid=\"tool-rail-search\"]",
       "caption": "Menu: Permits & Databases",
       "narration": "You'll find Search Permits, the Database Directory and Permit Alerts in the menu, under Permits & Databases."
     }

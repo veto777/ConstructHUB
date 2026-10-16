@@ -88,7 +88,7 @@ import { alertPage, unreadAlerts, undeliveredAlerts, markAlertsRead, ALERT_KINDS
 import { seoErrorResponse, publicFailure, publicNote, SEO_VENDOR_NAME, SeoCustomerError } from "./public-errors";
 import { seoLocks, requestQueues } from "./locks";
 import { trackWork } from "../shutdown";
-import { siteCapRefuses } from "./site-cap";
+import { addSiteOrExisting, siteCapRefuses } from "./site-cap";
 import { recordUnhandledError } from "../ops/server-errors";
 import { recordFailure } from "../ops/issues";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
@@ -396,12 +396,10 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
     // The cap counts only sites the account does not have yet (server/seo/site-cap.ts).
     if (await siteCapRefuses(user, domain, MAX_SITES)) return res.status(403).json({ message: `Up to ${MAX_SITES} sites can be tracked.` });
-    const { rows: [site] } = await pool.query(
-      `INSERT INTO seo_sites(user_id,domain,location_code,language_code,devices,serp_depth) VALUES($1,$2,$3,$4,$5,$6)
-       ON CONFLICT(user_id,domain) DO UPDATE SET location_code=EXCLUDED.location_code,language_code=EXCLUDED.language_code,devices=EXCLUDED.devices,serp_depth=EXCLUDED.serp_depth
-       RETURNING *, 0 AS keyword_count`,
-      [user, domain, input.locationCode, input.languageCode, input.devices, input.serpDepth]);
-    res.status(201).json(siteView(site));
+    // A site the account already has is left exactly as it is and answered with existing: true (review w3-r2 M1,
+    // server/seo/site-cap.ts addSiteOrExisting): an add never resets a tracked site's market, devices or SERP depth.
+    const { site, existing } = await addSiteOrExisting(user, domain, input);
+    res.status(existing ? 200 : 201).json({ ...siteView(site), existing });
   }));
 
   route("delete", "/api/seo/sites/:id", async (req, res, user) => {

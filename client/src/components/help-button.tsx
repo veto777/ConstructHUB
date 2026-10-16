@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject, useCallback } from "react";
 import { Info, PlayCircle } from "lucide-react";
 import { Link } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -150,10 +150,18 @@ const ICON_BUTTON = cn(
  */
 function PanelBody({ entry, playing, onWatch, footer }: { entry: HelpEntry; playing: boolean; onWatch: () => void; footer?: ReactNode }) {
   const videoId = useId();
+  // Stable, so it runs once when the player mounts (an inline ref would re-scroll on every render).
+  const revealPlayer = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    requestAnimationFrame(() => el.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" }));
+  }, []);
   return (
     <>
       {playing && entry.film && (
-        <div id={videoId} className="mb-4" data-testid={`help-inline-video-${entry.key}`} data-video-source={entry.videoSource ?? undefined}>
+        // The Watch button sits at the bottom of a scrolled sheet on phones: bring the player into view when it opens.
+        <div id={videoId} className="mb-4 scroll-mt-4" data-testid={`help-inline-video-${entry.key}`} data-video-source={entry.videoSource ?? undefined}
+          ref={revealPlayer}>
           <HelpVideoPlayer video={entry.film} title={entry.title} kind={filmKind(entry)} testId={`help-video-${entry.key}`} autoPlay />
           <p className="mt-1.5 text-[12px] g-text-2">{filmLine(entry, entry.film)}</p>
         </div>
@@ -221,7 +229,7 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
     return (
       <span className="inline-flex items-center align-middle">
         <button type="button" ref={playRef} aria-label={`Watch the ${filmNoun(entry)}: ${entry.title}`} aria-haspopup="dialog"
-          className={cn("ml-1 inline-flex h-7 items-center gap-1 rounded-full border border-primary/30 px-2.5 text-xs font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", className)}
+          className={cn("relative ml-1 inline-flex h-7 items-center gap-1 rounded-full border border-primary/30 px-2.5 text-xs before:absolute before:inset-x-0 before:-inset-y-2 font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", className)}
           onClick={(e) => { e.stopPropagation(); setWatching(true); }} data-testid={`help-play-${k}`}>
           <PlayCircle className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
           Watch

@@ -14,7 +14,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"tab-connection-connections\"]",
+      "selector": "[data-testid=\"subnav-cloudflare-connections\"]",
       "caption": "Open the Connections tab",
       "narration": "Open the Connections tab."
     },
@@ -88,7 +88,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"tab-connection-work-queue\"]",
+      "selector": "[data-testid=\"subnav-cloudflare-work-queue\"]",
       "caption": "Work queue shows the import finishing",
       "narration": "Open Work queue to watch the import finish. When it says done, your sites are on the Sites tab.",
       "holdMs": 2000

@@ -34,7 +34,8 @@ import { FEATURES_PATH, featureIntroPath } from "@shared/feature-pages";
 import { FooterGuides } from "@/components/public-page-chrome";
 import { SocialLinks } from "@/components/social-links";
 import { DFY_PATH, dfyPageByKey, dfyPagePath } from "@shared/dfy-pages";
-import { useHelpEntry } from "@/lib/use-help-entry";
+import { helpVideoFor } from "@shared/help/videos";
+import brandFilmEntry from "@shared/help/entries/start-here/brand-what-is-constructhub";
 import { IntroVideoFrame } from "@/components/feature-landing/intro-video";
 
 /**
@@ -42,8 +43,12 @@ import { IntroVideoFrame } from "@/components/feature-landing/intro-video";
  * main landing page"): the "What is ConstructHUB?" entry of the help registry, whose video exists
  * only through its uploaded manifest (shared/help/videos/brand-what-is-constructhub.json). Without
  * the manifest the band below falls back to its text-and-buttons form.
+ *
+ * Read from that one entry file and the manifest (helpVideoFor, the registry's own `video` builder) — never
+ * through the registry: it is ~120 KB gzipped, and every Meta-ad visit lands here
+ * (server/help-registry.test.ts holds this page to it).
  */
-const BRAND_FILM_KEY = "brand-what-is-constructhub";
+const BRAND_FILM = { title: brandFilmEntry.title, video: helpVideoFor(brandFilmEntry.key) };
 
 
 /** Button recipes — anchors styled as buttons (no <button> nested in <a>). */
@@ -242,7 +247,7 @@ export default function LandingPage() {
   });
   const { data: counts } = usePermitDirectoryCounts();
   const hasVerified = typeof counts?.verifiedPortals === "number";
-  const film = useHelpEntry(BRAND_FILM_KEY);
+  const film = BRAND_FILM;
   // Only jurisdictions with a real permit portal behind them are counted (audit lane 6, owner 2026-10-04: the old
   // "Jurisdictions Listed" headline counted all 32,853 directory rows although only ~2% have a portal).
   const stats: { value: number | undefined; suffix?: string; label: string }[] = [

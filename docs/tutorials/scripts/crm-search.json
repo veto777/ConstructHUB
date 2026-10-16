@@ -18,7 +18,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "selector": "[data-testid=\"tool-rail-clients\"]",
       "caption": "The menu",
       "narration": "The menu on the left has every part of the CRM, from Home down to Settings."
     },
@@ -49,7 +49,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "selector": "[data-testid=\"tool-rail-clients\"]",
       "caption": "Clients",
       "narration": "Some pages also have a video. Let's open Clients."
     },
@@ -74,7 +74,7 @@
     },
     {
       "action": "scroll",
-      "selector": "[data-testid=\"link-portal-nav-tutorials\"]",
+      "selector": "[data-testid=\"button-all-tools\"]",
       "caption": "Tutorials",
       "narration": "Tutorials, near the bottom of the menu, lists every walkthrough."
     }

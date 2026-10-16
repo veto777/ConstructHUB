@@ -6,8 +6,8 @@ const entry: HelpDraft = {
   whatItIs: "What happens when a client writes to you from their portal, and how you answer.",
   whatItDoes: "The client's message appears in Messages with an unread dot, with an unread count beside Messages in the menu and a timer showing how long they have waited. Your reply shows in their portal and is sent to their email.",
   howToUse: [
-    "Your client signs in to their portal, chooses Messages, writes and sends.",
-    "In the CRM, the number beside Messages goes up. Open Messages.",
+    "Ask your client to sign in to their portal, choose Messages, and write to you.",
+    "Open Messages in the CRM when the number beside it goes up.",
     "Choose the conversation to read it.",
     "Type your answer underneath and send it.",
   ],

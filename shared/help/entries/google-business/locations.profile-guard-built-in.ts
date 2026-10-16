@@ -5,7 +5,7 @@ const entry: HelpDraft = {
   key: "locations.profile-guard-built-in", parent: "locations", group: "Google Business", route: "/locations",
   title: "Locations → Profile Watch built in",
   whatItIs: "The Profile Watch tab every linked location carries, so edit alerts sit next to the listing they watch.",
-  whatItDoes: "It shows the mode (Off, Notify, or Lockdown, which puts your approved value back after a change), the last check, the watched fields, and the owner-approved copy it compares Google against. Pending changes and history lists each edit with the approved and the detected value, with Approve and Reject.",
+  whatItDoes: "It shows the mode: Off, Notify, or Lockdown (which puts your approved value back after a change). It also shows the last check, the watched fields and the approved copy it compares Google against. Pending changes and history lists each edit with the approved and the detected value, with Approve and Reject.",
   howToUse: [
     "Open Locations under Google Business and choose Open profile on a linked location.",
     "Choose Profile Watch.",

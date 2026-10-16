@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "social-media.auto", parent: "social-media", group: "Tools", route: "/social-media", title: "Social Media → Auto mode",
   whatItIs: "ConstructHUB writing posts for the business on a schedule, as drafts for your approval or straight to your accounts.",
-  whatItDoes: "It turns auto mode on or off and sets the publishing mode: an approval queue, where every generated post waits as a draft, or fully automatic, which publishes to the saved destinations without review. You set how many posts per day or week (1 to 7), the content mix (project photos, tips, review highlights, offers, recent Google updates), instructions and writing examples, a timezone, blackout hours, and a daily budget of 0 to 20 AI requests. Content sources hold offers you type and Google updates synced from the linked listing; auto mode draws on them for 30 days.",
+  whatItDoes: "It turns auto mode on or off and sets how posts go out: in an approval queue every written post waits as a draft, while fully automatic publishes to your saved accounts without review. You set posts per day or week (1 to 7) and the mix: project photos, tips, review highlights, offers and recent Google updates. You also set instructions, writing examples, a time zone, quiet hours and a daily limit of 0 to 20 AI requests. Content sources hold offers you type and updates pulled from the linked Google listing, used for 30 days.",
   howToUse: [
     "Open Auto mode for the business and tick Enable auto mode.",
     "Choose the publishing mode; Approval queue is the safe choice, where generated posts wait under Posts → Drafts.",

@@ -4,8 +4,8 @@
  *
  *   Look it up    → Site explorer for that site. Opening it buys NOTHING: a saved report opens free, otherwise the
  *                   explorer's own Analyse button waits, with the price beside it (explorer.tsx).
- *   Add to my sites → POST /api/seo/sites, the same request the shell's "Add a site" form and Site explorer send
- *                   (desktop + mobile, top 10). Free: a site with no keywords is never checked (server/seo/jobs.ts
+ *   Add to my sites → POST /api/seo/sites with only the domain (Site explorer sends the same): a new site gets
+ *                   desktop + mobile, top 10; one already on the list is left as it is. Free: a site with no keywords is never checked (server/seo/jobs.ts
  *                   reads only sites that have keywords), and the dashboard card's Analyse / Run first crawl each
  *                   show their cost before they run.
  *
@@ -25,21 +25,24 @@ import { cleanDomain } from "./domain";
 
 /**
  * Adds a website to the account's sites (dashboard + rank tracker) — the one request every "Add to my sites" button
- * sends. A site already on the list is not sent again: it is simply chosen, and the caller is told.
+ * sends. Only the domain goes: a new site gets the default settings, and a site the account already has is left
+ * exactly as it is — the server answers it with existing: true (review w3-r2 M1), and the caller is told. The
+ * server's answer decides "already one of your sites", never a site list that may still be loading.
  */
-export function useAddSite({ sites, onSite, onAdded }: { sites: SeoSite[] | undefined; onSite: (id: number) => void; onAdded?: (site: SeoSite, already: boolean) => void }) {
+export function useAddSite({ onSite, onAdded }: { sites?: SeoSite[] | undefined; onSite: (id: number) => void; onAdded?: (site: SeoSite, already: boolean) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const m = useMutation({
-    mutationFn: (domain: string) => api("POST", "/api/seo/sites", { domain, devices: "both", serpDepth: 10 }) as Promise<SeoSite>,
-    onSuccess: (site) => { refreshSeoData(qc); onSite(site.id); toast({ title: `${site.domain} added to your sites`, description: "It's on your SEO dashboard. Add the keywords you care about under Rank tracker — checks only run, and only cost SEO data, once there are keywords." }); onAdded?.(site, false); },
+    mutationFn: (domain: string) => api("POST", "/api/seo/sites", { domain }) as Promise<SeoSite & { existing?: boolean }>,
+    onSuccess: (site) => {
+      refreshSeoData(qc); onSite(site.id);
+      if (site.existing) { toast({ title: `${site.domain} is already one of your sites` }); onAdded?.(site, true); return; }
+      toast({ title: `${site.domain} added to your sites`, description: "It's on your SEO dashboard. Add the keywords you care about under Rank tracker — checks only run, and only cost SEO data, once there are keywords." });
+      onAdded?.(site, false);
+    },
     onError: (e) => toast({ title: "Couldn't add the site", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const add = (domain: string) => {
-    const have = (sites ?? []).find((s) => s.domain === domain);
-    if (have) { onSite(have.id); toast({ title: `${domain} is already one of your sites` }); onAdded?.(have, true); return; }
-    m.mutate(domain);
-  };
+  const add = (domain: string) => m.mutate(domain);
   return { add, pending: m.isPending, pendingDomain: m.isPending ? m.variables ?? null : null };
 }
 

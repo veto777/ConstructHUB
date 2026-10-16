@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "One page per job, with its money at the top and its working lists in tabs.",
   whatItDoes: "The top of the page shows the project’s name, number and stage, then four figures: Revised contract (with the change orders in it), Budget, Committed and Actual cost. Gross profit is the revised contract minus the actual cost posted so far, with the margin beside it. The tabs below are Costing, Change orders, Punch list, Daily logs, Selections, Permits and JobCam.",
   howToUse: [
-    "CRM → Pipeline, and click a project’s name on its card.",
+    "Open CRM → Pipeline and click a project’s name on its card.",
     "Read the four figures and the gross profit line.",
     "Open a tab to work on that part of the job.",
     "Choose Pipeline at the top of the page to go back to the board.",

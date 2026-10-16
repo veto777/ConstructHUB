@@ -98,14 +98,14 @@
     },
     {
       "action": "scroll-to",
-      "selector": "[data-testid=\"link-nav-posts-&-photos\"]",
+      "selector": "[data-testid=\"tool-rail-posts\"]",
       "offset": 260,
       "caption": "Photos and words in, published on schedule",
       "narration": "Photos and words in, approved by you, published on your schedule."
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-posts-&-photos\"]",
+      "selector": "[data-testid=\"tool-rail-posts\"]",
       "caption": "Menu: Posts & Photos",
       "narration": "You'll find Posts and Photos in the menu on the left, under Google Business."
     }

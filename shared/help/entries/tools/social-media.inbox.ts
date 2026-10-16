@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "social-media.inbox", parent: "social-media", group: "Tools", route: "/social-media", title: "Social Media → Inbox",
   whatItIs: "The comments on the business’s published posts, answered from one place.",
-  whatItDoes: "It lists the published posts; Comments on a post loads its comments and replies from the network, where you can reply, hide a comment or delete one, as far as the network allows for that comment.",
+  whatItDoes: "It lists your published posts. On a post published through ConstructHUB’s own apps (not TikTok or X), Comments loads its comments and replies from the network. Reply, hide or delete a comment, as far as the network allows.",
   howToUse: [
     "Open Inbox for the business.",
     "Choose Comments on a post to read what people wrote.",

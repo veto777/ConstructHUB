@@ -18,7 +18,7 @@
     },
     {
       "action": "select",
-      "selector": "xpath=//span[text()=\"Linked GBP location\"]/following-sibling::select",
+      "selector": "[data-testid=\"select-scan-location\"]",
       "value": "Summit Roofing Co.",
       "caption": "Pick a location",
       "narration": "Pick one of your Google Business Profile locations. Site Scan fills in its website and checks the site against it."
@@ -36,8 +36,8 @@
       "narration": "Monthly rescan is on for this site, so it scans again on its own every month."
     },
     {
-      "action": "highlight",
-      "selector": "xpath=//*[@data-testid=\"list-scan-history\"]/*[1]",
+      "action": "click",
+      "selector": "[data-testid=\"subnav-site-scan-history\"]",
       "caption": "History & score trend",
       "chapter": "Read the report",
       "narration": "Every scan stays in your history, with its overall score and how far it moved since the scan before."
@@ -87,7 +87,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-site-scan\"]",
+      "selector": "[data-testid=\"tool-rail-site-scan\"]",
       "caption": "Menu: Site Scan",
       "narration": "You'll find Site Scan in the menu on the left, under Tools."
     }

@@ -505,11 +505,11 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
               <SampleDocsTable kind={kind} cta={
                 kind === "estimates" ? (
                   <Link href="/crm/estimates/new">
-                    <Button size="sm" variant="outline" data-testid="button-new-estimate-sample">Create your first estimate</Button>
+                    <Button size="sm" variant="outline" className="max-sm:min-h-11" data-testid="button-new-estimate-sample">Create your first estimate</Button>
                   </Link>
                 ) : (
                   <Link href="/crm/clients">
-                    <Button size="sm" variant="outline" data-testid="button-invoice-from-client-sample">Invoice from a client's page</Button>
+                    <Button size="sm" variant="outline" className="max-sm:min-h-11" data-testid="button-invoice-from-client-sample">Invoice from a client's page</Button>
                   </Link>
                 )
               } />

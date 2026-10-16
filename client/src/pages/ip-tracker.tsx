@@ -591,8 +591,8 @@ export default function IpTrackerPage() {
           "Open the site once: its first visit replaces the sample below within about 30 seconds.",
         ]} />}
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Input ref={domainInput} placeholder="example.com" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newDomain.trim()) addDomainMutation.mutate(); }} aria-label="Site domain" data-testid="input-domain" />
-          <Input placeholder="Display name (optional)" value={newDomainName} onChange={(e) => setNewDomainName(e.target.value)} aria-label="Display name" data-testid="input-domain-name" />
+          <Input ref={domainInput} placeholder="example.com" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newDomain.trim()) addDomainMutation.mutate(); }} aria-label="Site domain" className="max-sm:h-11" data-testid="input-domain" />
+          <Input placeholder="Display name (optional)" value={newDomainName} onChange={(e) => setNewDomainName(e.target.value)} aria-label="Display name" className="max-sm:h-11" data-testid="input-domain-name" />
         </div>
         <div className="flex gap-2">
           <GooglePill variant="solid" label={addDomainMutation.isPending ? "Adding…" : "Add"} onClick={() => addDomainMutation.mutate()} disabled={!newDomain.trim() || addDomainMutation.isPending} testId="button-save-domain" />
@@ -604,7 +604,7 @@ export default function IpTrackerPage() {
   );
 
   return (
-    <AppPage width="wide" testId="page-ip-tracker">
+    <AppPage width="wide" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-ip-tracker">
       {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
       <GoogleSectionHeader
         as="h1"

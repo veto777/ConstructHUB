@@ -10,7 +10,7 @@ const entry: HelpDraft = {
     "Read the lessons in order; the address keeps the open lesson, so you can come back to it.",
     "Choose Enroll if a module is locked to see the modules and the bundle.",
   ],
-  howItWorks: "The page asks the server once which modules this account may read; the answer is worked out per module from purchases, the bundle or a plan that includes the course. Lesson text is not in the app download: a module loads it only when it is open and only for an account that may read it. While the access check is loading or has failed the page says so instead of treating it as “not bought”.",
+  howItWorks: "The page checks once which modules this account may read; the answer is worked out per module from purchases, the bundle or a plan that includes the course. Lesson text is not in the app download: a module loads it only when it is open and only for an account that may read it. While the access check is loading or has failed the page says so instead of treating it as “not bought”.",
   needs: ["A Master Class purchase (a module or the bundle) or a plan that includes the course."],
 };
 export default entry;

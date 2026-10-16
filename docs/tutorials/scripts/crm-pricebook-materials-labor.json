@@ -136,7 +136,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "selector": "[data-testid=\"tool-rail-pricebook\"]",
       "caption": "Where to find it",
       "narration": "Materials and Labor are tabs of the Price book, in the left menu."
     }

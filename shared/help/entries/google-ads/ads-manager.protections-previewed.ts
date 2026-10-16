@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "ads-manager.protections-previewed", parent: "ads-manager", group: "Google Ads", route: "/ads-manager", title: "Agency Ads & LSA → Protections, previewed",
   whatItIs: "The five bulk protections of the Agency Ads & LSA manager and the preview each account gets before anything is written to Google.",
-  whatItDoes: "Under Client accounts → Advanced, Bulk protection preview offers presence-only location targeting, Click Guard IP exclusions (rotate oldest), shared negative keywords, account-wide placement exclusions and an ad schedule, each with its own settings. Queue protection previews builds one preview per selected account. Protection previews lists them; Review preview opens one with its summary, warnings, number of operations and expiry, and Technical details holds the raw operations.",
+  whatItDoes: "Bulk protection preview, under Client accounts → Advanced, offers five protections with their own settings. They are presence-only location targeting (people actually in your area), Click Guard IP blocks (the oldest are dropped to stay under Google’s 500 limit), shared negative keywords, account-wide placement exclusions and an ad schedule. Queue protection previews builds one preview per selected account. Protection previews lists them; Review preview opens one with its summary, warnings, number of operations and expiry, and Technical details holds the raw operations.",
   howToUse: [
     "Open Google Ads → Agency → Client accounts in the sidebar, then open Advanced · Bulk protections and domain mapping.",
     "Choose a Protection and check its settings: the negative keyword list, the placements, or the schedule lines.",

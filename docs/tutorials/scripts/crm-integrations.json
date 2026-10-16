@@ -80,7 +80,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-integrations\"]",
+      "selector": "[data-testid=\"tool-rail-integrations\"]",
       "caption": "Where to find it",
       "narration": "Integrations is near the bottom of the left menu."
     }

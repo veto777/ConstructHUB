@@ -30,7 +30,7 @@
       "narration": "Click the number, and the client's page opens." },
     { "action": "highlight", "selector": "[data-testid=\"invoice-demo-invoice-inv-1999\"]", "caption": "The invoice on the client's page",
       "narration": "The invoice is under Invoices, with Resend, Preview and Record payment." },
-    { "action": "highlight", "selector": "[data-testid=\"link-portal-nav-invoices\"]", "caption": "Menu: Invoices",
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-invoices\"]", "caption": "Menu: Invoices",
       "narration": "You'll find Invoices in the menu on the left." }
   ],
   "youtube": {

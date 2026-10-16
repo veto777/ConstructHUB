@@ -10,6 +10,6 @@ const entry: HelpDraft = {
     "Flip In app or Email for each kind of alert.",
     "Allow phone notifications in the card at the top of the iPhone app.",
   ],
-  howItWorks: "Each switch saves the moment you flip it, and the row shows an error if the save failed. Security emails stay on for every account.",
+  howItWorks: "Each switch saves the moment you flip it; if a save fails, the error shows at the top of the list. Security emails stay on for every account.",
 };
 export default entry;

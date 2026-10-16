@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "The sales tax rate the CRM puts on a new estimate when you have not set a more specific one.",
   whatItDoes: "Default sales tax (%) in Settings → Estimate & invoice defaults is your company-wide rate. A new estimate made after you save it gets that rate, and shows the tax on its own line above the total.",
   howToUse: [
-    "CRM → Settings, and scroll to Estimate & invoice defaults.",
+    "Open CRM → Settings and scroll to Estimate & invoice defaults.",
     "Type your rate in Default sales tax (%) and choose Save defaults.",
     "Create an estimate: the review step says sales tax is added automatically.",
     "Open the estimate to see the Tax line and the total.",

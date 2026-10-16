@@ -57,7 +57,7 @@ const NOTIFICATIONS = [
   { key: "spamReport", label: "Weekly spam report", description: "AI Call Assistant: once a week, the spam calls it stopped for you (only weeks with spam)." },
   { key: "jobApproved", label: "Job approved (PM email)", description: "The project-manager handoff email when a client signs." },
   { key: "clientComments", label: "Client comments", description: "A client sent a message or photo from their portal." },
-  { key: "financeClick", label: "Financing interest", description: "A client clicked the financing option on an estimate." },
+  { key: "financeClick", label: "Financing interest", description: "A client opened one of your financing links from their client portal." },
   { key: "paymentReceipt", label: "Payment receipts", description: "The receipt email that goes out when a payment is recorded." },
 ] as const;
 
@@ -2170,7 +2170,7 @@ export default function CrmSettingsPage() {
             icon={Tag}
             title="Lead sources"
             infoKey="lead-sources"
-            description="Where your clients come from. Set per client on the client's page."
+            description="Where your clients come from. Your web form and the Call Assistant set it; there is no picker on the client page."
           />
         </CardHeader>
         <CardContent>

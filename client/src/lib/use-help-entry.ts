@@ -3,9 +3,12 @@
  * It used to ride in the first download of every page because the home page looks up its overview film
  * and HelpButton looks up its entry at render time; a Meta ad click on a phone paid for all of it before
  * the landing page could draw. The first lookup fetches the registry chunk; from then on it is synchronous.
+ * Which entry a page's "i" opens is decided without it: shared/help/routes.ts is the registry's route fields alone.
  */
-import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { HelpEntry } from "@shared/help/types";
+import { HELP_ROUTES } from "@shared/help/routes";
+import { helpKeyForRouteIn } from "@shared/help/route-match";
 
 type Registry = typeof import("@shared/help/registry");
 let registry: Registry | undefined;
@@ -16,17 +19,12 @@ export function loadHelpRegistry(): Promise<Registry> {
 }
 
 /**
- * The help key whose route matches `pathname` (shared/help/registry.ts helpKeyForRoute): undefined until the
- * registry has loaded, and for a page no entry covers. Page headers use it to mount their "i" automatically.
+ * The help key whose route matches `pathname` (shared/help/registry.ts helpKeyForRoute — the same matcher, over the
+ * generated route table shared/help/routes.ts): undefined for a page no entry covers. Synchronous and registry-free,
+ * so page headers decide whether to mount their "i" on first render; opening the panel still loads the entry text.
  */
 export function useHelpKeyForRoute(pathname: string): string | undefined {
-  const [key, setKey] = useState<string | undefined>(() => registry?.helpKeyForRoute(pathname));
-  useEffect(() => {
-    let on = true;
-    loadHelpRegistry().then((m) => { if (on) setKey(m.helpKeyForRoute(pathname)); });
-    return () => { on = false; };
-  }, [pathname]);
-  return key;
+  return useMemo(() => helpKeyForRouteIn(HELP_ROUTES, pathname), [pathname]);
 }
 
 /** The help entry for `key`: undefined until the registry has loaded (and for a key it does not have). */

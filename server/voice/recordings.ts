@@ -7,11 +7,10 @@
  * the CRM streams through GET /api/crm/voice/calls/:id/recording. Nothing is
  * ever served from a public bucket URL.
  *
- * Why four segments and not SPEC's voice/<orgId>/<callSid>.wav: the app's
- * public, unauthenticated GET /api/files/:folder/:subfolder/:filename
- * (server/routes.ts) serves ANY three-segment R2 key, so a three-segment
- * recording key would be world-readable to anyone holding the org id and call
- * sid. A four-segment key cannot match that route. (LANE-NOTES-calls-crm.md)
+ * Why four segments and not SPEC's voice/<orgId>/<callSid>.wav: historical. The public
+ * GET /api/files/:folder/:subfolder/:filename once served any key — including four-segment ones via
+ * an encoded "%2F" (Express 5 decodes it inside a param). It is now an allowlist of public prefixes
+ * (server/files/public-files.ts) and voice/ is not on it; only the member route above streams these.
  */
 import { getFromR2, putToR2Key, r2Configured } from "../r2";
 

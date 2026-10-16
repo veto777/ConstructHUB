@@ -24,6 +24,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { resolveEstimateTaxRate } from "./tax";
 import { logEvent, presentEstimate, presentEstimateItem, recalcEstimate } from "./entities";
+import { estimateDefaultsFromOrg } from "./doc-defaults";
 import { inferSqftMetric, quickBidLine, type SqftMetric } from "./quickbid-math";
 import { nextDocNumber } from "./doc-number";
 
@@ -144,6 +145,8 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
         orgId: ctx.org.id, customerId: cust.id, projectId: null,
         number, title,
         introText: null, termsText: ctx.org.termsAndConditions ?? null,
+        // Settings → Estimate & invoice defaults, snapshotted (doc-defaults.ts).
+        ...estimateDefaultsFromOrg(ctx.org),
         taxRateBps: tax.bps, publicToken: token(), createdByMemberId: ctx.member.id,
         customFields: {
           quickBid: { measurementId: m.id, provider: m.provider, itemIds: p.data.itemIds },

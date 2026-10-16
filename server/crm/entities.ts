@@ -36,6 +36,8 @@ import {
 import { logTeamActivity, projectStageLabel } from "./stats";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
+import { estimateDefaultsFromOrg, estimateDocText, depositFromBps } from "./doc-defaults";
+import { queueCrmEvent, queueProjectStageChange, customerEventPayload, projectEventPayload } from "./integrations";
 import {
   divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps, getDivision,
 } from "./divisions";
@@ -260,6 +262,12 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
     taxCents: money ? e.taxCents : undefined,
     totalCents: money ? e.totalCents : undefined,
     depositCents: money ? e.depositCents : undefined,
+    // Non-null while the deposit follows the default percent from Settings.
+    depositBps: money ? e.depositBps : undefined,
+    // The document's own copy of the Settings defaults (doc-defaults.ts);
+    // defaultsSnapshotAt null = an older document that prints live Settings.
+    footerText: e.footerText, warrantyText: e.warrantyText, companyTermsText: e.companyTermsText,
+    defaultsSnapshotAt: e.defaultsSnapshotAt,
     // What the client actually signed for: the total after any optional
     // discounts they ticked (null until approval), and those discounts.
     approvedTotalCents: money ? e.approvedTotalCents : undefined,
@@ -276,7 +284,9 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
 
 /** Documents Center rows: the list never renders intro/terms, so they don't ship. */
 function presentEstimateRow(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
-  const { introText: _intro, termsText: _terms, ...row } = presentEstimate(e, ctx);
+  const {
+    introText: _intro, termsText: _terms, footerText: _footer, warrantyText: _warranty, companyTermsText: _company, ...row
+  } = presentEstimate(e, ctx);
   return row;
 }
 
@@ -303,6 +313,8 @@ async function recalcEstimate(orgId: string, estimateId: string) {
   const [row] = await db.update(crmEstimates).set({
     subtotalCents: t.subtotalCents, discountCents: t.discountCents, taxCents: t.taxCents,
     totalCents: t.totalCents, updatedAt: new Date(),
+    // A deposit that follows the org's default percent tracks the total.
+    ...(est.depositBps != null && !est.approvedAt ? { depositCents: depositFromBps(t.totalCents, est.depositBps) } : {}),
   }).where(eq(crmEstimates.id, estimateId)).returning();
   return row;
 }
@@ -611,6 +623,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       entityType: "customer", entityId: row.id, customerId: row.id,
       meta: { name: row.displayName },
     });
+    queueCrmEvent(ctx.org.id, "customer.created", customerEventPayload(row));
     res.status(201).json({ ...row, portalToken: undefined, portalPath: canShareWholeClientPortal(ctx) ? `/portal/${row.portalToken}` : undefined });
   });
 
@@ -699,6 +712,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         entityType: "customer", entityId: row.id, customerId: row.id,
         meta: { fields },
       });
+      queueCrmEvent(ctx.org.id, "customer.updated", { ...customerEventPayload(row), fields });
     }
     res.json({ ...row, portalToken: undefined });
   });
@@ -926,6 +940,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       } as any).returning();
       return inserted;
     });
+    queueCrmEvent(ctx.org.id, "project.created", projectEventPayload(row));
     res.status(201).json(presentProject(row, ctx));
   });
 
@@ -965,6 +980,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         title: `moved ${row.name} to ${projectStageLabel(row.status)}`,
         link: `/crm/projects/${row.id}`,
       });
+      queueProjectStageChange(ctx.org.id, row.id, before.status, row.status);
     }
     res.json(presentProject(row, ctx));
   });
@@ -1307,6 +1323,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         number, title: d.title, introText: d.introText ?? null,
         termsText: d.termsText ?? ctx.org.termsAndConditions ?? null,
         taxRateBps: d.taxRateBps, depositCents: d.depositCents ?? null,
+        // Footer, warranty, company terms and the default deposit percent are
+        // copied from Settings now; a deposit typed on this request wins.
+        ...estimateDefaultsFromOrg(ctx.org),
+        ...(d.depositCents !== undefined ? { depositBps: null } : {}),
         publicToken: token(), createdByMemberId: ctx.member.id,
         // No expiry on a draft — the 7-day clock starts when it is SENT
         // (portal.ts), so a draft never burns its validity window unsent.
@@ -1374,7 +1394,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const floorMsg = await priceFloorViolation(ctx, parsed.data.items);
     if (floorMsg) return res.status(422).json({ message: floorMsg });
 
-    const depositMsg = depositRefusal(e.depositCents, estimateTotals(parsed.data.items, e.taxRateBps).totalCents);
+    const nextTotal = estimateTotals(parsed.data.items, e.taxRateBps).totalCents;
+    const depositMsg = depositRefusal(e.depositBps != null ? depositFromBps(nextTotal, e.depositBps) : e.depositCents, nextTotal);
     if (depositMsg) return res.status(400).json({ message: `${depositMsg} Lower the deposit first.` });
 
     await db.delete(crmEstimateItems)
@@ -1410,6 +1431,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       termsText: z.string().max(20000).nullable().optional(),
       taxRateBps: z.number().int().min(0).max(3000).optional(),
       depositCents: z.number().int().min(0).nullable().optional(),
+      // This document's own copy of the Settings defaults.
+      footerText: z.string().max(5000).nullable().optional(),
+      warrantyText: z.string().max(5000).nullable().optional(),
+      companyTermsText: z.string().max(20000).nullable().optional(),
       projectId: z.string().max(64).nullable().optional(),
       divisionId: z.string().max(64).nullable().optional(),
       // "approved" is never set here — approval is the client's signature.
@@ -1458,14 +1483,36 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       const lines = d.items ?? await db.select().from(crmEstimateItems)
         .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, e.id)));
       const total = estimateTotals(lines, d.taxRateBps ?? e.taxRateBps ?? 0).totalCents;
-      const depositMsg = depositRefusal(d.depositCents !== undefined ? d.depositCents : e.depositCents, total);
+      const depositMsg = depositRefusal(
+        d.depositCents !== undefined ? d.depositCents
+          : e.depositBps != null ? depositFromBps(total, e.depositBps) : e.depositCents,
+        total,
+      );
       if (depositMsg) return res.status(400).json({ message: depositMsg });
     }
 
     const { items, ...fields } = d;
     const patch: any = { updatedAt: new Date() };
-    for (const k of ["title", "introText", "termsText", "taxRateBps", "depositCents", "projectId", "divisionId", "status"] as const) {
+    for (const k of [
+      "title", "introText", "termsText", "taxRateBps", "depositCents", "projectId", "divisionId", "status",
+      "footerText", "warrantyText", "companyTermsText",
+    ] as const) {
       if (fields[k] !== undefined) patch[k] = fields[k];
+    }
+    // A typed deposit stops following the default percent.
+    if (fields.depositCents !== undefined) patch.depositBps = null;
+    // Editing this document's own footer/warranty/terms makes it a snapshot
+    // document (an older one stops printing live Settings for those fields).
+    if ((fields.footerText !== undefined || fields.warrantyText !== undefined || fields.companyTermsText !== undefined)
+      && !e.defaultsSnapshotAt) {
+      const live = estimateDocText(e, ctx.org);
+      patch.footerText ??= live.footerText;
+      patch.warrantyText ??= live.warrantyText;
+      patch.companyTermsText ??= live.companyTermsText;
+      if (fields.footerText !== undefined) patch.footerText = fields.footerText;
+      if (fields.warrantyText !== undefined) patch.warrantyText = fields.warrantyText;
+      if (fields.companyTermsText !== undefined) patch.companyTermsText = fields.companyTermsText;
+      patch.defaultsSnapshotAt = new Date();
     }
     const now = new Date();
     if (statusTo === "sent") {
@@ -1487,6 +1534,14 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       await logEvent(ctx.org.id, e.id, `marked_${statusTo}`, ctx.member.id, req, {
         from: e.status, to: statusTo, manual: true,
       });
+      // Marked by hand (paper hand-over, a decline by phone): the same webhook
+      // a real send or a client decline fires, flagged manual.
+      if (statusTo === "sent" || statusTo === "declined") {
+        queueCrmEvent(ctx.org.id, statusTo === "sent" ? "estimate.sent" : "estimate.declined", {
+          estimateId: e.id, number: e.number, customerId: e.customerId,
+          projectId: patch.projectId ?? e.projectId ?? null, manual: true,
+        });
+      }
     }
 
     if (items) {
@@ -1500,7 +1555,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     }
 
     const fresh = await recalcEstimate(ctx.org.id, e.id);
-    const changed = [...Object.keys(patch).filter((k) => k !== "updatedAt"), ...(items ? ["items"] : [])];
+    const changed = [
+      ...Object.keys(patch).filter((k) => !["updatedAt", "depositBps", "defaultsSnapshotAt"].includes(k)),
+      ...(items ? ["items"] : []),
+    ];
     await logEvent(ctx.org.id, e.id, "updated", ctx.member.id, req, {
       fields: changed, afterSend: !!e.sentAt,
     });

@@ -4,11 +4,11 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "crm-jobcam-upload", group: "CRM", route: "/crm/jobcam", title: "Add photos to JobCam",
   whatItIs: "How photos you already have get onto a job, and how the ones you choose reach your client.",
-  whatItDoes: "Photos you add from your computer or camera roll are filed to the project you pick. A photo stays private to your team until you mark it visible to the client; then it appears in that client’s portal.",
+  whatItDoes: "Photos you add from your computer or camera roll are filed to the project you pick. A photo stays hidden from your client until you mark it visible to the client. Then it shows in their portal and on your share links.",
   howToUse: [
-    "CRM → JobCam → Open camera, and choose the project.",
+    "Open CRM → JobCam → Open camera and choose the project.",
     "Choose the last-shot tile to add photos from your computer or camera roll.",
-    "Back on the project’s JobCam page, choose Select and tick the photos.",
+    "Choose Select on the project’s JobCam page and tick the photos.",
     "Choose to show them to the client. They appear in the client’s portal.",
   ],
   howItWorks: "Each file is queued and uploaded in the background, so you can keep working. Your client signs in to their portal with a link sent to their email — no password — and sees only the photos you made visible.",

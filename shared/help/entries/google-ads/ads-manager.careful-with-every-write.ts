@@ -11,7 +11,7 @@ const entry: HelpDraft = {
     "Tick I reviewed the selected previews, then choose Confirm selected previews.",
     "Tick an applied change and choose Preview reversal of selected applied changes to undo it, then confirm that preview the same way.",
   ],
-  howItWorks: "Each preview carries a fingerprint of the account as it was read. The server reads the account again right before writing and refuses to write when the fingerprint no longer matches, so a stale preview is never applied. A write whose outcome Google did not confirm shows Outcome unknown: check it in Google Ads before creating another change. Results depend on Google accepting each change.",
+  howItWorks: "Each preview carries a fingerprint of the account as it was read. ConstructHUB reads the account again right before changing it and stops if the account no longer matches the preview, so an out-of-date preview is never applied. A write whose outcome Google did not confirm shows Outcome unknown: check it in Google Ads before creating another change. Results depend on Google accepting each change.",
   needs: ["A plan that includes the Agency Ads & LSA module.", "A connected and verified Google Ads manager (MCC) account.", "A preview that has not expired."],
 };
 export default entry;

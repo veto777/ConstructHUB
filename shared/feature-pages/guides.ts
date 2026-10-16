@@ -59,6 +59,21 @@ const page: FeaturePage = {
   ],
   cards: [
     {
+      icon: "eye",
+      title: "The \"i\" on every page",
+      body: "Every tool's title has an \"i\" that explains, in four short parts, what the page is for, what it does, how to run it and how it works, with a walkthrough or overview film where one exists.",
+    },
+    {
+      icon: "book",
+      title: "Tutorials",
+      body: "The Tutorials page gathers that help for every feature in one place, grouped like the sidebar, with a search box and a link to open each tool.",
+    },
+    {
+      icon: "sparkles",
+      title: "Sample previews",
+      body: "An empty page shows a dimmed example badged Sample data, so you can see what the tool will look like before your own data arrives. It disappears once there is real data.",
+    },
+    {
       icon: "megaphone",
       title: "Google Ads guide",
       body: "12 sections for contractor campaigns: setup, settings to switch off, assets, keywords, location targeting, bidding, ad copy, landing pages, IP exclusions, tracking, click fraud and a launch checklist.",
@@ -105,7 +120,7 @@ const page: FeaturePage = {
         "Add the domain", "Check DNS records", "Switch nameservers", "Create the limited key", "Agency member option",
         "Connect Search Console", "Client adds the agency user", "Sync properties", "Submit sitemaps", "Disconnect and revoke",
       ],
-      note: `Connecting Cloudflare and Search Console in ConstructHUB is part of the ${CONNECTIONS_PLAN} plan.`,
+      note: `Connecting Cloudflare and Search Console in ConstructHUB is included with the ${CONNECTIONS_PLAN} plans.`,
     },
   },
   audience: [
@@ -137,7 +152,7 @@ const page: FeaturePage = {
     },
     {
       q: "What do I need for the Cloudflare and Search Console steps?",
-      a: `Your own Cloudflare account and access to your domain registrar, or a Google account with access to the site's Search Console property. Connecting them inside ConstructHUB is part of the ${CONNECTIONS_PLAN} plan; the walkthrough itself is free to read.`,
+      a: `Your own Cloudflare account and access to your domain registrar, or a Google account with access to the site's Search Console property. Connecting them inside ConstructHUB is included with the ${CONNECTIONS_PLAN} plans; the walkthrough itself is free to read.`,
     },
     {
       q: "Does it remember where I was?",
@@ -199,6 +214,10 @@ const page: FeaturePage = {
   },
   sources: [
     "client/src/pages/guides.tsx",
+    "client/src/pages/tutorials.tsx",
+    "client/src/components/help-button.tsx",
+    "client/src/components/sample-preview.tsx",
+    "shared/help/registry.ts",
     "client/src/components/guides/library.ts",
     "client/src/components/guides/progress.ts",
     "client/src/pages/social-media.tsx",
