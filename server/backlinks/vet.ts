@@ -34,9 +34,11 @@ const DIRECTORY_PAGE = new RegExp([
   String.raw`(store|dealer|retailer|installer|pro|contractor)[- ]?(locator|search|finder|list)|\blocator\b|where[- ]to[- ]buy|pro[- ]search`,
   String.raw`verify[- ](a[- ])?licen[cs]e|licen[cs]e[- ](lookup|search|verification)`,
   String.raw`\/list\/(category|ql|search)|\/(installers|contractors|dealers|retailers|members|pros)\/?$|\bdirectory\b`,
+  // an association's member roster: "Current Members", /nari-members/, "Member Roster" (2026-10-16)
+  String.raw`\b(current|active) members\b|\bmember roster\b|\bmembers? list\b|\/[a-z]+-members\/?$`,
 ].join("|"), "i");
 /** A link (its text + path) to the site's own business/member directory — never a staff, board or church directory. */
-const DIRECTORY_LINK = /member(ship)?[- ]?(directory|search)|business[- ]directory|company[- ]directory|(find|search)[- ]a[- ](member|business|contractor)|\/list\/?$|\/(member-?|business-?)?directory\/?$/;
+const DIRECTORY_LINK = /member(ship)?[- ]?(directory|search|roster|list)|members? list|(current|active|our) members|business[- ]directory|company[- ]directory|(find|search)[- ]a[- ](member|business|contractor|pro)\b|\/list\/?$|\/(member-?|business-?)?directory\/?$|\/([a-z]+-)?members\/?$/;
 const NOT_A_LISTING = /\b(staff|employee|faculty|board|church|student|alumni|clergy|parish|school|sermon)s?\b/;
 const PROFILE_PATH = /^\/(@[^/]+|(profiles?|users?|members?|people|u|authors?|community\/profile)\/)/i;
 
@@ -167,7 +169,7 @@ export function analyzePage(page: { url: string; status: number; body: string })
     } else if (!contactUrl && /\bcontact\b/.test(label)) contactUrl = abs.href;
     for (const p of SUBMISSION_PATTERNS) if (p.re.test(label)) submissionHints.add(p.hint);
     if (!submissionLink && host && (host === domain || host.endsWith(`.${domain}`)) && SUBMISSION_PAGE.test(label) && !PROFILE_PATH.test(abs.pathname)) submissionLink = abs.href;
-    if (!directoryLink && host && (host === domain || host.endsWith(`.${domain}`)) && DIRECTORY_LINK.test(label.trim()) && !NOT_A_LISTING.test(label) && !PROFILE_PATH.test(abs.pathname)) { abs.hash = ""; directoryLink = abs.href; }
+    if (!directoryLink && host && (host === domain || host.endsWith(`.${domain}`)) && DIRECTORY_LINK.test(label.trim()) && !NOT_A_LISTING.test(label) && (!PROFILE_PATH.test(abs.pathname) || /^\/members?\/?$/i.test(abs.pathname))) { abs.hash = ""; directoryLink = abs.href; }
   });
   const scan = `${$("title").text()} ${text}`.slice(0, 200_000);
   for (const p of SUBMISSION_PATTERNS) if (p.re.test(scan)) submissionHints.add(p.hint);

@@ -30,6 +30,20 @@ policy — they put the customer's site at risk). Paid placements are pitched as
 | `BACKLINKS_SENDER_NAME` / `BACKLINKS_SENDER_ADDRESS` | ConstructHUB Partnerships / — | signature and the CAN-SPAM postal address |
 | `BACKLINKS_OUTREACH_DAILY` | 30 | emails per day |
 
+## Search families (2026-10-16)
+
+Every query carries its template (`backlink_queries.template`). A family gets 5 trial searches; after that families
+run best-first by quality sources found per search, and a family under 0.5 per search is paused
+(`FAMILY_TRIAL` / `FAMILY_MIN_YIELD` in `server/backlinks/store.ts`). `GET /api/admin/backlinks/families` lists them.
+Measured before the change: chamber/association member directories 3.7 quality per search (368 in 100), "add your
+business" 2.8, "write for us" 2.0; "useful links" 0.14, news tips 0.2, "contribute an article" 0.1. City chamber,
+city HBA, state builders-exchange, NARI and HBA families were added (+807 queries) because those families lead.
+
+A chamber or association that arrives on its home page (expansion, imports) is graded on its own Business/Member
+Directory link, read and confirmed as a directory page (third request). Before this, expansion's 2,943 candidates
+graded 1% quality; 4,687 directory/citation rejections were re-queued. `.us` locality government hosts
+(`*.state.XX.us`, `ci.`, `co.`, `k12.`…) are excluded like `.gov` (catalogue licence lookups keep their place).
+
 ## Not built yet
 
 1. Reply handling (read the outreach inbox, mark replied/opted-out, capture price and terms).

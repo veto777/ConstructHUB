@@ -423,6 +423,16 @@ describe("a chamber reached through its home page (expansion, imports)", () => {
       expect(g.reasons.join(" ")).toContain("publishes a public business directory (https://spokanevalleychamber.org/list/)");
     });
   });
+  it("reads an association's roster: 'Current Members' and a plain Members page", async () => {
+    const nari = `<html lang="en"><head><title>Idaho NARI</title></head><body><p>${words(400, "remodeling")}</p>
+      <a href="https://remodelingdoneright.nari.org/find">Find a NARI Professional</a><a href="/nari-members/">Current Members</a></body></html>`;
+    const roster = `<html lang="en"><head><title>Current Members – Idaho NARI</title></head><body><h1>Current Members</h1><p>${words(300, "remodeler")}</p></body></html>`;
+    await withPages({ "https://idahonari.org/": nari, "https://idahonari.org/nari-members/": roster }, async () => {
+      expect((await readSite("https://idahonari.org/", "idahonari.org")).directoryUrl).toBe("https://idahonari.org/nari-members/");
+    });
+    const mca = `<html lang="en"><head><title>Arizona MCA</title></head><body><a href="/about-us/directors-committees/">Directors &amp; Committees</a><a href="/members/">Members</a></body></html>`;
+    expect(analyzePage({ url: "https://arizonamca.org/", status: 200, body: mca }).directoryLink).toBe("https://arizonamca.org/members/");
+  });
   it("does not count a directory link that is dead", async () => {
     await withPages({ "https://spokanevalleychamber.org/": home }, async () => {
       const s = await readSite("https://spokanevalleychamber.org/", "spokanevalleychamber.org");
