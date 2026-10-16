@@ -19,15 +19,18 @@ import { db, pool } from "./db";
 import { chAnalyticsEvents, users } from "@shared/schema";
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { requirePlatformAdmin } from "./crm/admin";
+import { rateLimit } from "./growth-limits";
 import { campaignReport, consentedVisitorId, isMintedVisitorId, landingColumns } from "./analytics-attribution";
 
 type GetUser = (req: any, res: any) => any;
 
-/** Events accepted per visitor (the server-minted ch_vid) per 15-minute window (batch rows count). */
+/** Events accepted per visitor id per 15-minute window (batch rows count). A fairness limit only: the ch_vid
+ *  cookie is a UUID the browser holds, so a script can present new ids (Kimi review, 2026-10-16). */
 export const EVENTS_VISITOR_LIMIT = 120;
-/** Backstop per IP per window. An office or a mobile carrier puts many real visitors behind one IP,
- *  so this is generous; it only stops one IP minting visitor ids to flood the dashboard. */
-export const EVENTS_IP_LIMIT = 2000;
+/** The real ceiling: events per IP per window. An office shares one IP, so it allows ~40 page views a
+ *  minute from one address; a script inventing visitor ids cannot get past it. Minting ids through
+ *  /api/analytics/consent is rate-limited separately. */
+export const EVENTS_IP_LIMIT = 600;
 export const EVENTS_WINDOW_MS = 15 * 60 * 1000;
 
 /**
@@ -100,7 +103,8 @@ export function anonymizeIp(ip: string): string {
 }
 
 export function registerAnalyticsRoutes(app: Express, getDevUser: GetUser): void {
-  app.post("/api/analytics/consent", (req: any, res) => {
+  // Each granted consent mints a fresh visitor id: limited per IP so ids cannot be minted in bulk.
+  app.post("/api/analytics/consent", rateLimit("analytics-consent", 30, 60, 15 * 60_000), (req: any, res) => {
     const granted = req.body?.granted === true;
     const cookies: string[] = [`ch_consent=${granted ? "granted" : "denied"}; ${consentOpts}`];
     if (granted) {

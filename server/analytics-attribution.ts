@@ -77,7 +77,8 @@ export function parseCookieHeader(header: unknown): Record<string, string> {
   return out;
 }
 
-/** The server only ever mints UUID visitor ids — anything else is forged. */
+/** The server only ever mints UUID visitor ids, so anything else is forged. A UUID-shaped id is not proof the
+ * server minted it (the browser holds the cookie); limits that matter key on the IP (server/analytics.ts). */
 const MINTED_VID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export function isMintedVisitorId(vid: string): boolean {
   return MINTED_VID.test(vid);
