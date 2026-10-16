@@ -33,6 +33,7 @@ import { inflateSync } from "node:zlib";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { USER_AGENT, fetchWithDeadline, rateLimitHost, rethrowIfBlocked } from "./http";
 import { adverseFrom } from "./adverse";
+import { curlProxy, proxyFailure, researchEgress } from "./egress";
 import { looksLikeBusiness, looksLikeBusinessTrailingSuffix, personNameForm } from "./states/lib/business-name";
 import { clean, csvRecords, csvRows, download, lines, plainRequest, saveResponse, usDate, type BulkHit, type BulkSource } from "./bulk";
 import { type IdKeys } from "./identifiers";
@@ -532,6 +533,23 @@ const SUNBIZ_HOST_KEYS = [
   "sftp.floridados.gov ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEoTyT4Kp6MNXcKhRwwN5Je/j7HAwtWvhXKT41h0x8l0SWEuPnh0QfhMHXMMhxvAItK5y/CoUZBTeO8aVmGJ/TE=",
 ].join("\n");
 
+/**
+ * curl's environment and extra arguments for the Sunbiz SFTP server: HOME (for the pinned known_hosts), plus the
+ * research proxy when RESEARCH_PROXY_URL is set (egress.ts: in the child's ALL_PROXY, never on the command line).
+ */
+function sunbizCurlEnv(home: string): { env: NodeJS.ProcessEnv; args: string[] } {
+  const p = curlProxy();
+  return { env: { ...(p.env ?? process.env), HOME: home }, args: p.args };
+}
+/** curl exit codes that mean the proxy itself failed: 5 (proxy name not resolved), 7 (no connection), 97 (proxy handshake). */
+const CURL_PROXY_CODES = new Set([5, 7, 97]);
+/** A curl failure while the research proxy is on, as a ResearchProxyError when it is the proxy's. */
+function curlFailure(err: unknown, code: unknown, url: string): unknown {
+  return researchEgress().mode === "proxy" && CURL_PROXY_CODES.has(Number(code)) ? proxyFailure(err, url) : err;
+}
+const curlRun = (args: string[], url: string, opts: Parameters<typeof run>[2]) =>
+  run("curl", args, opts).catch((err: { code?: unknown }) => { throw curlFailure(err, err?.code, url); });
+
 /** Sunbiz's public SFTP login is published on its data-downloads page (it is not a secret). */
 async function sunbizFile(file: string): Promise<string> {
   const home = await fs.mkdtemp(join(tmpdir(), "ch-sftp-"));
@@ -539,8 +557,9 @@ async function sunbizFile(file: string): Promise<string> {
   try {
     await fs.mkdir(join(home, ".ssh"), { mode: 0o700 });
     await fs.writeFile(join(home, ".ssh", "known_hosts"), `${SUNBIZ_HOST_KEYS}\n`);
-    await run("curl", ["-sS", "--fail", "--max-time", "900", "-u", "Public:PubAccess1845!", "-o", out, `${SUNBIZ_SFTP}/${file}`],
-      { maxBuffer: 1 << 20, env: { ...process.env, HOME: home } });
+    const { env, args } = sunbizCurlEnv(home);
+    await curlRun(["-sS", "--fail", "--max-time", "900", ...args, "-u", "Public:PubAccess1845!", "-o", out, `${SUNBIZ_SFTP}/${file}`], SUNBIZ_SFTP,
+      { maxBuffer: 1 << 20, env });
     return out;
   } finally {
     await fs.rm(home, { recursive: true, force: true });
@@ -602,9 +621,11 @@ async function sunbizHome(): Promise<string> {
   await fs.writeFile(join(home, ".ssh", "known_hosts"), `${SUNBIZ_HOST_KEYS}\n`);
   return home;
 }
-const sunbizCurl = (home: string, extra: string[], file: string) =>
-  run("curl", ["-sS", "--fail", "--max-time", "300", "-u", "Public:PubAccess1845!", ...extra, `${SUNBIZ_SFTP.replace(/\/flr$/, "")}/${file}`],
-    { maxBuffer: 64 << 20, encoding: "buffer", env: { ...process.env, HOME: home } }).then((r) => r.stdout as Buffer);
+const sunbizCurl = (home: string, extra: string[], file: string) => {
+  const { env, args } = sunbizCurlEnv(home);
+  return curlRun(["-sS", "--fail", "--max-time", "300", ...args, "-u", "Public:PubAccess1845!", ...extra, `${SUNBIZ_SFTP.replace(/\/flr$/, "")}/${file}`], SUNBIZ_SFTP,
+    { maxBuffer: 64 << 20, encoding: "buffer", env }).then((r) => r.stdout as unknown as Buffer);
+};
 
 /** The members of a remote zip (name, local-header offset, compressed size), from its central directory. */
 async function remoteZipMembers(home: string, file: string): Promise<{ name: string; offset: number; size: number; method: number }[]> {
@@ -628,8 +649,12 @@ async function remoteZipMembers(home: string, file: string): Promise<{ name: str
 
 /** The lines of one member, inflated as they arrive (curl byte range → funzip), never stored. */
 async function* remoteZipLines(home: string, file: string, m: { offset: number; size: number }): AsyncIterable<string> {
-  const curl = spawn("curl", ["-sS", "--fail", "--max-time", "3600", "-u", "Public:PubAccess1845!", "-r", `${m.offset}-${m.offset + m.size + 65_535}`, `${SUNBIZ_SFTP.replace(/\/flr$/, "")}/${file}`],
-    { env: { ...process.env, HOME: home }, stdio: ["ignore", "pipe", "pipe"] });
+  const { env, args } = sunbizCurlEnv(home);
+  const curl = spawn("curl", ["-sS", "--fail", "--max-time", "3600", ...args, "-u", "Public:PubAccess1845!", "-r", `${m.offset}-${m.offset + m.size + 65_535}`, `${SUNBIZ_SFTP.replace(/\/flr$/, "")}/${file}`],
+    { env, stdio: ["ignore", "pipe", "pipe"] });
+  let curlErr = "";
+  curl.stderr.on("data", (d) => { curlErr += String(d).slice(0, 500); });
+  const curlDone = new Promise<number | null>((resolve) => curl.on("close", (code) => resolve(code)));
   const unzip = spawn("funzip", [], { stdio: ["pipe", "pipe", "pipe"] });
   curl.stdout.pipe(unzip.stdin);
   unzip.stdin.on("error", () => {}); // funzip stops reading at the member's end; curl then sees a closed pipe
@@ -644,7 +669,11 @@ async function* remoteZipLines(home: string, file: string, m: { offset: number; 
   }
   if (rest) yield rest;
   curl.kill();
-  if ((await done) !== 0) throw new Error(`funzip failed: ${errText.slice(0, 200)}`);
+  if ((await done) !== 0) {
+    // No data because the research proxy failed reads as that, not as a broken zip.
+    const code = await Promise.race([curlDone, new Promise<null>((r) => setTimeout(() => r(null), 2000))]);
+    throw curlFailure(new Error(`funzip failed: ${errText.slice(0, 200)}${curlErr ? ` (curl: ${curlErr.trim().slice(0, 200)})` : ""}`), code, SUNBIZ_SFTP);
+  }
 }
 
 /** One corporate record → a hit, by the Corporate File Definitions' positions (1-based in the definitions). */

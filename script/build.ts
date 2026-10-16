@@ -77,6 +77,18 @@ var import_meta_url = __bundled_import_meta_url;`,
     logLevel: "info",
   });
 
+  // The guarded one-off sender for support@ and social@ (OWNER LAW 2026-10-15; server/tools/send-email.ts).
+  await esbuild({
+    entryPoints: ["server/tools/send-email-cli.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "dist/send-email.cjs",
+    minify: true,
+    external: externals,
+    logLevel: "warning",
+  });
+
   console.log("copying server data files...");
   await mkdir("dist/data", { recursive: true });
   await cp("server/data", "dist/data", { recursive: true });

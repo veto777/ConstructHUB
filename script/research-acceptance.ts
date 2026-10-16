@@ -47,6 +47,7 @@ import { personNamed } from "../server/research/xref";
 import { researchOrderSchema, reportSummary, STATE_CODES, type LicenseHit, type ResearchReport, type ResearchSubjectReport } from "@shared/research-reports";
 import type { CoverageManifest, CoverageSource } from "@shared/research-coverage";
 import { isGolden, pickFromSource, pickState, type Golden, type GoldenSlot, type StateSubjects } from "./research-acceptance/pick";
+import { norm, recall, sameName } from "./research-acceptance/recall";
 
 const DIR = join(import.meta.dirname, "research-acceptance");
 const RESULTS = join(DIR, "results");
@@ -137,11 +138,6 @@ async function loadMissing(sources: BulkSource[]): Promise<string[]> {
 
 // ── Checks ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
-const norm = (v: string | null | undefined) => String(v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-const sameName = (a: string | null | undefined, b: string | null | undefined) => {
-  const x = norm(a), y = norm(b);
-  return !!x && !!y && (x === y || x.startsWith(y) || y.startsWith(x));
-};
 /** A street left in an address once city, state and ZIP are taken off: a house number or a PO box. */
 const hasStreet = (a: string) => /\b\d+[A-Z]?\s+[A-Z]/i.test(a.replace(/\b\d{5}(?:-\d{4})?\b/g, "")) || /\bP\.?\s?O\.?\s+BOX\b/i.test(a);
 const leadingCount = (note: string): number | null => { const m = note.match(/^\s*(\d+)\s/); return m ? Number(m[1]) : null; };
@@ -152,38 +148,6 @@ function urlsIn(v: unknown, out: string[] = []): string[] {
   else if (Array.isArray(v)) for (const x of v) urlsIn(x, out);
   else if (v && typeof v === "object") for (const x of Object.values(v)) urlsIn(x, out);
   return out;
-}
-
-function recall(g: Golden, s: ResearchSubjectReport): { found: boolean; where: string | null; issue: string | null } {
-  const e = g.expected;
-  if (e.kind === "license") {
-    // By license number; a record the publisher gives no number is matched by its source and name.
-    const same = (h: LicenseHit) => e.licenseNumber ? norm(h.licenseNumber) === norm(e.licenseNumber)
-      : h.source === e.source && (e.matchedOn === "business" ? sameName(h.businessName, e.businessName)
-        : [h.principal, ...(h.people ?? []).map((p) => p.name)].some((n) => sameName(n, e.person) || personNamed(e.person ?? "", h)));
-    const own = s.licenses.find(same);
-    if (own) {
-      if (own.matchedOn !== e.matchedOn) return { found: true, where: `licenses (matched on ${own.matchedOn})`, issue: `found, but matched on "${own.matchedOn}", expected "${e.matchedOn}"` };
-      return { found: true, where: `licenses: ${own.source}`, issue: null };
-    }
-    const rel = (s.relatedLicenses ?? []).find(same);
-    if (rel) return { found: false, where: `related licenses (${rel.relatedVia ?? "?"})`, issue: `license ${e.licenseNumber} listed only as a related record (${rel.relatedVia ?? "no tie"}), not as the subject's own` };
-    return { found: false, where: null, issue: `license ${e.licenseNumber ?? `"${e.businessName ?? e.person}" (no number published)`} (${e.source}) not in the report` };
-  }
-  if (e.kind === "enforcement") {
-    const match = (h: { source: string; id: string | null; name: string | null }) =>
-      (e.id ? norm(h.id) === norm(e.id) : true) && (sameName(h.name, e.name) || sameName(h.name, g.name)) && (h.source === e.source || !!e.id);
-    const own = (s.enforcement ?? []).find(match);
-    if (own) {
-      if (own.category !== e.category) return { found: true, where: `enforcement (${own.category})`, issue: `found under category "${own.category}", expected "${e.category}"` };
-      return { found: true, where: `enforcement: ${own.source}`, issue: null };
-    }
-    const rel = (s.relatedEnforcement ?? []).find(match);
-    if (rel) return { found: false, where: "related enforcement", issue: `record ${e.id ?? e.name} listed only as related (${rel.relatedVia ?? "no tie"})` };
-    return { found: false, where: null, issue: `enforcement record ${e.id ?? ""} "${e.name}" (${e.source}, ${e.category}) not in the report` };
-  }
-  const own = (s.complaints ?? []).find((c) => (e.id && c.id === e.id) || sameName(c.business, e.business));
-  return own ? { found: true, where: `complaints: ${own.source}`, issue: null } : { found: false, where: null, issue: `complaint ${e.id ?? ""} "${e.business}" (${e.source}) not in the report` };
 }
 
 function check(state: string, g: Golden, report: ResearchReport, ms: number, sources: CoverageSource[], nationwide: CoverageSource[], hosts: Set<string>): SubjectResult {

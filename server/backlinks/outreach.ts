@@ -12,6 +12,7 @@
  * Directories and citations get no email: they take a form submission (a later phase).
  */
 import nodemailer from "nodemailer";
+import { botTellProblem } from "../outbound-guard";
 import { signatureText } from "../email-signature";
 import type { BacklinkKind, BacklinkSignals } from "@shared/backlinks";
 import { pool } from "../db";
@@ -121,6 +122,14 @@ export async function sendApproved(c: OutreachConfig = outreachConfig()): Promis
   for (const r of rows) {
     if (await isSuppressed(r.to_email)) {
       await pool.query(`UPDATE backlink_outreach SET status = 'opted_out' WHERE id = $1`, [r.id]);
+      skipped++;
+      continue;
+    }
+    // OWNER LAW 2026-10-15 (server/outbound-guard.ts): a pitch that gives a bot away is held, never sent.
+    const tell = botTellProblem(`${r.subject}\n${r.body}`);
+    if (tell) {
+      await pool.query(`UPDATE backlink_outreach SET status = 'draft' WHERE id = $1`, [r.id]);
+      await pool.query(`INSERT INTO backlink_events (source_id, type, detail) VALUES ($1, 'outreach_held', $2)`, [r.source_id, JSON.stringify({ to: r.to_email, reason: tell })]);
       skipped++;
       continue;
     }

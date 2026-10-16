@@ -12,6 +12,7 @@
  * One process at a time (a Postgres advisory lock). Nothing is charged twice: a resend after changes reuses the credit.
  */
 import { registerWorker, workerInterval } from "../workers";
+import { BotTellError, assertNoBotTell } from "../outbound-guard";
 import { pool } from "../db";
 import { getFromR2, isR2Key } from "../r2";
 import { PRIMARY_DOMAIN } from "../site-context";
@@ -83,6 +84,9 @@ export async function submitReady(): Promise<{ sent: number; held: number; faile
     if (claimed.status !== "queued") continue;
     try {
       const { subject, body } = submissionMail(r);
+      // OWNER LAW 2026-10-15 (server/outbound-guard.ts): nothing to the wire may give a bot away. Hard tells only: the
+      // release is the customer's own news and may say "automated" about their business.
+      assertNoBotTell({ to: mailboxConfig().wireTo, subject, body }, "hard");
       const attachments: OutgoingAttachment[] = [];
       for (const p of r.input.photos.slice(0, 6)) {
         const key = p.key || (isR2Key(p.url.replace(/^\/api\/files\//, "")) ? p.url.replace(/^\/api\/files\//, "") : "");
@@ -99,6 +103,13 @@ export async function submitReady(): Promise<{ sent: number; held: number; faile
       await store.updateRelease(r.id, { status: "submitted", submitted_at: new Date(), wire_message_id: r.wire_message_id ?? messageId, attempts: r.attempts + 1, last_error: null });
       out.sent++;
     } catch (e: any) {
+      if (e instanceof BotTellError) {
+        // Never retried as is: back to a draft the customer rewords, with the reason on the release.
+        console.error(`[press] submit ${r.code} held: ${e.problem}`);
+        await store.updateRelease(r.id, { status: "draft", last_error: `Not sent: ${e.problem.replace(/^The email/, "The release")}. Please reword that part and approve it again.` });
+        out.failed++;
+        continue;
+      }
       console.error(`[press] submit ${r.code} failed: ${e?.message ?? e}`);
       await store.updateRelease(r.id, { status: "ready", attempts: r.attempts + 1, last_error: `Send failed: ${String(e?.message ?? e).slice(0, 300)}` });
       out.failed++;

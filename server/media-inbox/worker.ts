@@ -13,7 +13,7 @@
  * One process at a time (a Postgres advisory lock).
  */
 import { promises as dns } from "node:dns";
-import { MEDIA_INBOX_PARAMETERS } from "@shared/media-inbox";
+import { MEDIA_INBOX_PARAMETERS, STOP_LINE_RE, type MediaSettings, type MediaTemplateKind } from "@shared/media-inbox";
 import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
 import { classifySites, decide, extractNextStep, mediaAiConfigured, planForm } from "./ai";
@@ -179,6 +179,12 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
       if (d.relevant) {
         newlyAgreed = await store.upsertPartner({ domain: companyDomain(m.fromEmail), contactEmail: m.fromEmail, contactName: m.fromName, d });
         partnerId = newlyAgreed.partner.id;
+      }
+      // "Thanks / sounds good": nothing to answer (2026-10-15: Homes&Exterior's thank-you hit the loop limit).
+      if (d.noReplyNeeded && !asksIfAi(m.body)) {
+        await store.finishMessage(m.id, "replied", `No reply needed: ${d.summary || "they closed the loop"} — read by ${d.provider}`, null, partnerId);
+        out.replied++;
+        continue;
       }
       const problem = replyProblem(d.reply);
       if (asksIfAi(m.body)) { body = personWillReply(first); status = "needs_owner"; reason = "They asked whether we are an AI or a person — a person on the team answers this one"; }
@@ -348,6 +354,60 @@ export function dailyAllowance(daysSending: number, env: NodeJS.ProcessEnv = pro
 const perDay = (env: NodeJS.ProcessEnv = process.env) => dailyAllowance(0, env);
 export const outreachPerDay = perDay;
 
+/** The admin's settings over the env defaults (MEDIA_OUTREACH_PER_DAY: unset = ramp, 0 = paused, n = fixed). */
+export function resolveSettings(saved: Partial<MediaSettings>, env: NodeJS.ProcessEnv = process.env): MediaSettings {
+  const fixed = Number(env.MEDIA_OUTREACH_PER_DAY);
+  const envFixed = env.MEDIA_OUTREACH_PER_DAY?.trim() && Number.isFinite(fixed) && fixed >= 0 ? Math.floor(fixed) : null;
+  return {
+    outreach: saved.outreach ?? (envFixed === null ? "ramp" : envFixed === 0 ? "paused" : "fixed"),
+    rampStart: saved.rampStart ?? MEDIA_INBOX_PARAMETERS.newContactsPerDay,
+    rampStep: saved.rampStep ?? 25,
+    maxPerDay: saved.maxPerDay ?? num(env.MEDIA_OUTREACH_MAX_PER_DAY, 400),
+    fixedPerDay: saved.fixedPerDay ?? envFixed ?? MEDIA_INBOX_PARAMETERS.newContactsPerDay,
+    autoReplies: saved.autoReplies ?? true,
+    followUps: saved.followUps ?? true,
+    templates: saved.templates ?? {},
+  };
+}
+
+/** Today's first-contact allowance under these settings. */
+export function allowanceFor(s: MediaSettings, daysSending: number): number {
+  if (s.outreach === "paused") return 0;
+  if (s.outreach === "fixed") return Math.max(0, Math.floor(s.fixedPerDay));
+  return Math.max(0, Math.min(s.maxPerDay, s.rampStart + s.rampStep * Math.max(0, Math.floor(daysSending))));
+}
+
+export const currentSettings = async () => resolveSettings(await store.getSettings());
+
+/** The first-contact email for a queue row: the admin's edited template when there is one, else the built-in one. */
+export function queueEmail(kind: string, company: string, s: Pick<MediaSettings, "templates">) {
+  const t = QUEUE_TEMPLATES[kind] ?? QUEUE_TEMPLATES.directory;
+  const custom = s.templates[(QUEUE_TEMPLATES[kind] ? kind : "directory") as MediaTemplateKind];
+  if (custom && custom.subject.trim() && custom.body.trim() && STOP_LINE_RE.test(custom.body)) {
+    const fill = (v: string) => v.replace(/\{company\}/g, company);
+    return { subject: fill(custom.subject.trim()), body: fill(custom.body.trim()), kind: t.kind };
+  }
+  return { subject: t.subject, body: t.body(company), kind: t.kind };
+}
+
+export type QueueItem = { id: number; domain: string; company: string; kind: string; to_email: string };
+
+/** Send one queued email after the safety checks. Returns why it was skipped, or null when sent. */
+export async function sendOne(q: QueueItem, s: MediaSettings): Promise<string | null> {
+  const skip = async (why: string) => { await store.finishQueued(q.id, "skipped", why); return why; };
+  if (await isSuppressed(q.to_email) || machineReason({ fromEmail: q.to_email, subject: "" })) return skip("Suppressed or not a person's address");
+  if (await store.partnerIdForEmail(q.to_email, q.domain)) return skip("Already in contact");
+  if (await store.hasBounced(q.to_email)) return skip("This address bounced before");
+  const mailDomain = q.to_email.split("@")[1] ?? "";
+  if (!(await workerDeps.acceptsMail(mailDomain))) return skip(`${mailDomain} has no mail server (no MX record)`);
+  const e = queueEmail(q.kind, q.company, s);
+  const messageId = await workerDeps.sendMail({ to: q.to_email, subject: e.subject, body: e.body });
+  const partnerId = await store.partnerForOutreach(q.company, q.domain, e.kind, q.to_email);
+  await store.saveOutbound(mailboxConfig().user, { messageId, threadKey: null, to: q.to_email, subject: e.subject, body: e.body, partnerId, purpose: "outreach" });
+  await store.finishQueued(q.id, "sent", null);
+  return null;
+}
+
 export const CLASSIFY_BATCH = 25, CLASSIFY_BATCHES_PER_PASS = 8;
 /** Sort vetted directories into listing directories, trade associations, chambers and the rest (ai.ts classifySites). */
 export async function classifyDirectories(): Promise<number> {
@@ -371,24 +431,14 @@ export async function sendQueued(): Promise<{ queued: number; sent: number; skip
   // lookups, chambers and listed businesses' own Gmail addresses (2026-10-14). Publishers need real readers (below).
   await classifyDirectories().catch((e) => console.error(`[media-inbox] classifying directories failed: ${e?.message ?? e}`));
   const queued = await store.queueVettedPublishers(pickEmail, siteName) + await store.queueClassified(pickEmail, siteName);
-  const allowance = dailyAllowance(await store.daysSending());
+  const s = await currentSettings();
+  const allowance = allowanceFor(s, await store.daysSending());
   if (!allowance) return { queued, sent: 0, skipped: 0 };
   const room = Math.max(0, allowance - (await store.outreachSentToday()));
   let sent = 0, skipped = 0;
   // Spread through the day: at most a quarter of the daily share per pass.
   for (const q of await store.nextQueued(Math.min(room, Math.max(1, Math.ceil(allowance / 4))))) {
-    if (await isSuppressed(q.to_email) || machineReason({ fromEmail: q.to_email, subject: "" })) { await store.finishQueued(q.id, "skipped", "Suppressed or not a person's address"); skipped++; continue; }
-    if (await store.partnerIdForEmail(q.to_email, q.domain)) { await store.finishQueued(q.id, "skipped", "Already in contact"); skipped++; continue; }
-    if (await store.hasBounced(q.to_email)) { await store.finishQueued(q.id, "skipped", "This address bounced before"); skipped++; continue; }
-    const mailDomain = q.to_email.split("@")[1] ?? "";
-    if (!(await workerDeps.acceptsMail(mailDomain))) { await store.finishQueued(q.id, "skipped", `${mailDomain} has no mail server (no MX record)`); skipped++; continue; }
-    const t = QUEUE_TEMPLATES[q.kind] ?? QUEUE_TEMPLATES.directory;
-    const body = t.body(q.company);
-    const messageId = await workerDeps.sendMail({ to: q.to_email, subject: t.subject, body });
-    const partnerId = await store.partnerForOutreach(q.company, q.domain, t.kind, q.to_email);
-    await store.saveOutbound(mailbox, { messageId, threadKey: null, to: q.to_email, subject: t.subject, body, partnerId, purpose: "outreach" });
-    await store.finishQueued(q.id, "sent", null);
-    sent++;
+    if (await sendOne(q, s)) skipped++; else sent++;
   }
   return { queued, sent, skipped };
 }
@@ -405,11 +455,13 @@ export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; r
   try {
     if (!(await client.query(`SELECT pg_try_advisory_lock($1) ok`, [LOCK_KEY])).rows[0]?.ok) return { ok: false, skipped: "A pass is already running" };
     try {
+      const settings = await currentSettings();
       const r = await readInbox();
-      const a = await answerPending();
+      // Automatic replies off: new emails wait for the admin (answered from the company page).
+      const a = settings.autoReplies ? await answerPending() : { replied: 0, held: await store.holdNew(), failed: 0, optedOut: 0 };
       const ar = await readAutoReplies();
       const act = await actOnNextSteps();
-      const f = await followUpSilent();
+      const f = settings.followUps ? await followUpSilent() : { followedUp: 0, newContacts: 0, exhausted: 0 };
       const q = await sendQueued();
       await store.markPass(mailboxConfig().user, null);
       return { ok: true, read: r.read, ...a, autoRepliesRead: ar.read, nextSteps: act, ...f, newlyQueued: q.queued, outreachSent: q.sent };

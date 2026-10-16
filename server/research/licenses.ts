@@ -424,6 +424,16 @@ export function companyNamed(name: string, business: string | null | undefined):
 /** The one shared single-person check (./person-name.ts): licenses, permits, the cross-reference and the runner. */
 export { onePersonField } from "./person-name";
 
+/**
+ * "LEGAL NAME dba TRADE NAME" (also "d/b/a", "aka", "doing business as") as the names it stands for: the whole, then
+ * each name; any other name is itself (round 8, finding 3). A search splits a dba name into its names, and the final
+ * re-check (xref.ts nameMatches) accepts a record carrying any of them, so the two never disagree.
+ */
+export function dbaNames(name: string): string[] {
+  const parts = name.split(/\s+(?:dba|d\/b\/a|aka|a\/k\/a|doing business as)\s+/i).map((n) => n.trim()).filter((n) => n.replace(/[^a-z0-9]/gi, "").length >= 2);
+  return parts.length > 1 ? [name.trim(), ...parts] : [name.trim()];
+}
+
 export function personMatches(name: string, person: string | null | undefined): boolean {
   if (person && !onePersonField(person)) return false;
   const want = nameWords(name), have = nameWords(person ?? "");

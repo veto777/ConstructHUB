@@ -11,7 +11,7 @@ function log(message: string, source = "scraper") {
 import { liveSearchOutcome, scrapeFailureReason } from "./live-search-outcome";
 import type { AdapterCtx, PermitRecord, PermitSearchType, PortalAdapter } from "./scrapers/types";
 import { USER_AGENT as ADAPTER_USER_AGENT } from "./scrapers/polite-fetch";
-import { guardResearchContext, researchPost } from "./scrapers/research-transport";
+import { guardResearchContext, researchNewContext, researchPost } from "./scrapers/research-transport";
 
 // CHROMIUM_PATH wins. The Replit-era Nix build is used only where it exists;
 // anywhere else playwright-core launches its own managed headless build (the
@@ -69,7 +69,7 @@ async function getBrowser(): Promise<Browser> {
 
 async function createIsolatedPage(): Promise<{ page: Page; context: BrowserContext }> {
   const browser = await getBrowser();
-  const context = await browser.newContext({
+  const context = await researchNewContext(browser, {
     viewport: { width: 1280, height: 900 },
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
   });
@@ -2389,7 +2389,7 @@ async function boundedPermitDetail(work: (page: Page, context: BrowserContext) =
     const run = (async () => {
       const browser = await getBrowser();
       if (expired) return null;
-      context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      context = await researchNewContext(browser, { viewport: { width: 1280, height: 900 } });
       if (expired) { await context.close(); return null; }
       await guardResearchContext(context);
       context.setDefaultTimeout(15_000);
@@ -2582,7 +2582,7 @@ function buildAdapterCtx(args: { databaseId: number; databaseName: string; juris
     ...args,
     browser: async () => {
       const browser = await getBrowser();
-      const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, userAgent: ADAPTER_USER_AGENT });
+      const context = await researchNewContext(browser, { viewport: { width: 1280, height: 900 }, userAgent: ADAPTER_USER_AGENT });
       context.setDefaultTimeout(60000);
       context.setDefaultNavigationTimeout(60000);
       contexts.push(context);

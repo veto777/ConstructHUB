@@ -26,7 +26,7 @@
 import type { LicenseHit } from "@shared/research-reports";
 import { clean, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { decodeEntities, politeFetch, politeJson, politeText } from "../http";
-import { flipPerson } from "../person-name";
+import { flipPerson, htmlLines, personText } from "../person-name";
 import type { StatePack } from "./types";
 import { pdfText, textLines } from "./lib/a3-pdf";
 
@@ -39,17 +39,19 @@ const ASB_TYPES: Record<string, string> = {
 };
 
 const cellText = (v: string): string | null => clean(decodeEntities(v.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ")));
+/** A person cell (the permittee): a <br> or block boundary between two names stays a list (round 8, finding 2). */
+const personCell = (v: string): string | null => personText(decodeEntities(htmlLines(v)));
 
 /** The rows of the accreditation table (the API's `html`), keyed by its header cells, lower-cased. */
 export function asbestosRows(html: string): Record<string, string | null>[] {
-  const rows = Array.from(html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi), (m) => Array.from(m[1].matchAll(/<t([dh])[^>]*>([\s\S]*?)<\/t\1>/gi), (c) => ({ th: c[1].toLowerCase() === "h", v: cellText(c[2]) })));
+  const rows = Array.from(html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi), (m) => Array.from(m[1].matchAll(/<t([dh])[^>]*>([\s\S]*?)<\/t\1>/gi), (c) => ({ th: c[1].toLowerCase() === "h", v: cellText(c[2]), raw: c[2] })));
   const head = rows.find((r) => r.length && r.every((c) => c.th));
   if (!head) throw new Error("the Montana DEQ accreditation table changed layout (no header row)");
   const names = head.map((c) => (c.v ?? "").toLowerCase());
   for (const want of ["permittee", "city", "state", "zip", "expire date", "type", "permit"]) {
     if (!names.includes(want)) throw new Error(`the Montana DEQ accreditation table changed layout (no "${want}" column)`);
   }
-  return rows.filter((r) => r.length === names.length && !r.every((c) => c.th)).map((r) => Object.fromEntries(names.map((n, i) => [n, r[i].v])));
+  return rows.filter((r) => r.length === names.length && !r.every((c) => c.th)).map((r) => Object.fromEntries(names.map((n, i) => [n, n === "permittee" ? personCell(r[i].raw) : r[i].v])));
 }
 
 /** One accreditation as a license hit. A person's accreditation: no street or phone (round 2, decision 2). */

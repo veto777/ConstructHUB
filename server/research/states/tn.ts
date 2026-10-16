@@ -290,6 +290,22 @@ export function verifyHit(c: VerifyCard, matchedOn: LicenseHit["matchedOn"]): Li
   };
 }
 
+/**
+ * A results page as the search's own success answer, or an error (round 8, finding 7): a numeric resultCount and a
+ * results list (null only for a count of 0), no longer than a page, and not empty while the count says rows remain.
+ * Anything else ({"error": "Search unavailable"}, a missing count) is an unreadable answer, so the source reads "not
+ * searched", never 0 matches.
+ */
+export function verifyPage(r: unknown, start: number): VerifyCard[] {
+  const x = r as { resultCount?: unknown; results?: unknown } | null;
+  const count = x?.resultCount;
+  const rows = x?.results === null && count === 0 ? [] : x?.results;
+  const ok = typeof count === "number" && Number.isInteger(count) && count >= 0 && Array.isArray(rows) && rows.length <= VERIFY_ROWS
+    && !(count > start && rows.length === 0) && rows.every((c) => c && typeof c === "object");
+  if (!ok) throw new Error("TN Commerce & Insurance license search: the source answered with an unreadable page");
+  return rows as VerifyCard[];
+}
+
 /** One search (the page's own form request), the contractor boards only, up to VERIFY_PAGES pages of results. */
 async function verifySearch(values: Record<string, string>, keep: (c: VerifyCard) => boolean): Promise<{ cards: VerifyCard[]; more: boolean }> {
   const out: VerifyCard[] = [];
@@ -299,7 +315,7 @@ async function verifySearch(values: Record<string, string>, keep: (c: VerifyCard
       appliedFilters: VERIFY_BOARDS.map((b) => `board:${b}`).join(","), highlight: "true",
       formRequest: { metadata: null, values }, lookupString: null, rows: VERIFY_ROWS, start: page * VERIFY_ROWS, type: "credential",
     }, "TN Commerce & Insurance license search", 1200);
-    const rows = r.results ?? [];
+    const rows = verifyPage(r, page * VERIFY_ROWS);
     const kept = rows.filter(keep);
     out.push(...kept);
     // The search ranks its results; when the last page read still had matches and the search has more, say so.

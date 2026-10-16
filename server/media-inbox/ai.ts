@@ -50,8 +50,19 @@ ${MEDIA_INBOX_LAWS.map((l, i) => `${i + 1}. ${l.law}`).join("\n")}
 
 PARAMETERS:
 - Reply in under ${MEDIA_INBOX_PARAMETERS.maxReplyWords} words. Sign off "Best regards," with nothing after it (the team signature is added).
-- needs_owner = true whenever the email involves money, fees, a meeting, a contract or terms, a legal question or access to data;
-  then thank them, say the team will review and follow up, and put the decision in owner_question.
+- A price list, rate card, quote or paid offer (sponsored posts, link insertions, paid features, subscriptions, plans) is YOURS to
+  answer — needs_owner = false (owner, 2026-10-15: "these are the types of emails you should be handling yourself"). Thank them,
+  explain how we pay (per placement, only after one of our customers buys it on our platform — no upfront payment), and ask whether
+  that works or whether they have a free route (see the "free next step" law for what to ask THIS kind of company). Never repeat
+  their amounts. Put their prices in cost_terms.
+- If this thread already told them how we pay and they still only offer paid-upfront work: thank them, say we'll keep their
+  rates on file and get back in touch if that changes, stage = "declined", needs_owner = false.
+- needs_owner = true only for: a meeting or call they want to book, a contract or terms to sign, a legal question, a request
+  for our data or account access, or questions about our company we can't answer from the facts (e.g. "your website doesn't
+  load", "who are you"). Then thank them, say the team will follow up, and put the decision in owner_question.
+- no_reply_needed = true when their email only closes the loop ("thanks", "sounds good", "got it") and asks nothing: we send
+  nothing (an answer would just start a loop).
+- Match the company's kind: never ask a newspaper or article site about directory listings, bulk uploads or street addresses.
 - relevant = false for spam, scams, phishing or anything unrelated to the purpose above.
 
 Also judge the relationship from the whole thread:
@@ -62,12 +73,12 @@ Also judge the relationship from the whole thread:
 - cost_terms: any money they mentioned, quoted exactly (null if none); owner_question: the decision the owner must make (null if none).
 
 Return JSON only:
-{"reply": string, "relevant": boolean, "needs_owner": boolean, "owner_question": string|null, "company": string|null,
+{"reply": string, "relevant": boolean, "needs_owner": boolean, "no_reply_needed": boolean, "owner_question": string|null, "company": string|null,
  "kind": string, "stage": string, "summary": string, "agreement": string|null, "to_finalize": string|null, "cost_terms": string|null}`;
 
 export type ThreadMessage = { direction: "in" | "out"; from: string; at: string; subject: string; body: string };
 export type MediaDecision = {
-  reply: string; relevant: boolean; needsOwner: boolean; ownerQuestion: string | null; company: string | null;
+  reply: string; relevant: boolean; needsOwner: boolean; noReplyNeeded: boolean; ownerQuestion: string | null; company: string | null;
   kind: MediaPartnerKind; stage: MediaPartnerStatus; summary: string; agreement: string | null; toFinalize: string | null; costTerms: string | null;
 };
 
@@ -81,7 +92,7 @@ export function parseDecision(raw: string): MediaDecision {
   const kind = (MEDIA_PARTNER_KINDS as readonly string[]).includes(j.kind) ? j.kind : "other";
   const stage = (["talking", "agreed", "declined"] as string[]).includes(j.stage) ? j.stage : "talking";
   return {
-    reply, relevant: j.relevant !== false, needsOwner: j.needs_owner === true, ownerQuestion: str(j.owner_question, 500),
+    reply, relevant: j.relevant !== false, needsOwner: j.needs_owner === true, noReplyNeeded: j.no_reply_needed === true && j.needs_owner !== true, ownerQuestion: str(j.owner_question, 500),
     company: str(j.company, 120), kind, stage: stage as (typeof MEDIA_PARTNER_STATUSES)[number], summary: str(j.summary, 600) ?? "",
     agreement: str(j.agreement, 600), toFinalize: str(j.to_finalize, 600), costTerms: str(j.cost_terms, 600),
   };

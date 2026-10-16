@@ -26,7 +26,7 @@ import { failureReason } from "./notes";
 import type { EnforcementHit, LicenseHit, RecordSource, RelatedTie, ResearchSubjectInput } from "@shared/research-reports";
 import { RELATED_TIES } from "@shared/research-reports";
 import { addressMatch, addressQueryKey, describeId, normLicense, normPhone, streetKey, type IdQuery } from "./identifiers";
-import { companyNamed, nameWords, personMatches, tokens, wholeWordMatch } from "./licenses";
+import { companyNamed, dbaNames, nameWords, personMatches, tokens, wholeWordMatch } from "./licenses";
 
 /** Identifier searches per subject: the customer's own and the cross-reference hop together. */
 export const MAX_ID_SEARCHES = 25;
@@ -91,9 +91,12 @@ export function businessNamed(business: string, recordName: string | null | unde
   return (recordName ?? "").split(/\s+\/\s+/).some((part) => businessCore(part) === want);
 }
 
-/** The re-check every name hit gets: the business name for a company, one named person for a person. */
+/**
+ * The re-check every name hit gets: the business name for a company (any of a "LEGAL dba TRADE" name's names: round 8,
+ * finding 3), one named person for a person.
+ */
 export function nameMatches(name: string, kind: "person" | "company", hit: LicenseHit): boolean {
-  return kind === "company" ? companyNamed(name, hit.businessName) : personNamed(name, hit);
+  return kind === "company" ? dbaNames(name).some((n) => companyNamed(n, hit.businessName)) : personNamed(name, hit);
 }
 
 // ── Dedupe ─────────────────────────────────────────────────────────────────────────────────────────────────────

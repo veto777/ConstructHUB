@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ASBESTOS_CONSULTANTS, ASBESTOS_CONTRACTORS, UST_INSTALLERS, asbestosHits, clearMaineCache, headedTable, pack, ustHits, ustPerson } from "./me";
+import { ASBESTOS_CONSULTANTS, ASBESTOS_CONTRACTORS, UST_INSTALLERS, asbestosHits, clearMaineCache, headedTable, pack, ustHits, ustPerson, setMaineFloorForTests } from "./me";
 import { resetHostState } from "../http";
 
 // Trimmed from www.maine.gov/dep/waste/asbestos/asbestoscontractors.html, fetched 2026-10-15.
@@ -94,16 +94,17 @@ describe("Maine DEP tables", () => {
 });
 
 describe("Maine live searches", () => {
-  afterEach(() => { vi.unstubAllGlobals(); resetHostState(); clearMaineCache(); });
+  afterEach(() => { vi.unstubAllGlobals(); resetHostState(); clearMaineCache(); setMaineFloorForTests(null); });
   const stub = () => {
-    resetHostState(); clearMaineCache();
+    resetHostState(); clearMaineCache(); setMaineFloorForTests(1);
     const calls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       const u = String(url); calls.push(u);
       if (u.endsWith("/robots.txt")) return new Response("User-agent: *\nDisallow: /cgi-bin/\n", { status: 200 });
       if (u === UST_INSTALLERS) return new Response(UST, { status: 200 });
       if (u === ASBESTOS_CONTRACTORS) return new Response(ASBESTOS, { status: 200 });
-      if (u === ASBESTOS_CONSULTANTS) return new Response(ASBESTOS.replace(/<tr>\s*<td>[\s\S]*<\/tr>/, ""), { status: 200 });
+      // A consultants list with one firm of its own (an empty table is an error now: round 8, finding 7).
+      if (u === ASBESTOS_CONSULTANTS) return new Response(ASBESTOS.replace(/<tr>\s*<td>[\s\S]*<\/tr>/, "<tr><td>Northern Air Quality Consulting</td><td>1 Main St</td><td>Bangor</td><td>ME</td><td>04401</td><td>(207) 555-0101</td></tr>"), { status: 200 });
       return new Response("", { status: 404 });
     }));
     return calls;
@@ -132,7 +133,7 @@ describe("Maine live searches", () => {
   });
 
   it("a non-2xx page is an error, never an empty result", async () => {
-    resetHostState(); clearMaineCache();
+    resetHostState(); clearMaineCache(); setMaineFloorForTests(1);
     vi.stubGlobal("fetch", vi.fn(async (url: string) => String(url).endsWith("/robots.txt") ? new Response("", { status: 404 }) : new Response("gone", { status: 404 })));
     await expect(pack.liveLicenses![1].search("Marc St. Pierre", "person")).rejects.toThrow(/HTTP 404/);
   });

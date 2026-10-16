@@ -26,9 +26,25 @@ export type ResearchTransport = {
    * when it is one.
    */
   checkBody?: (url: string, status: number, body: string) => void;
+  /** Extra newContext options for the search's browser contexts (the research proxy, when RESEARCH_PROXY_URL is set). */
+  contextOptions?: () => Promise<Record<string, unknown>>;
+  /** Records a context opened with those options (the guard refuses a context that was not, while the proxy is on). */
+  markContext?: (context: object) => void;
 };
 
 export const researchTransport = new AsyncLocalStorage<ResearchTransport>();
+
+/**
+ * browser.newContext(options), plus the research transport's own options (its egress proxy) when a research permit
+ * search is running. Outside one it is browser.newContext(options), exactly as before.
+ */
+export async function researchNewContext<C extends object, O extends object>(browser: { newContext(options?: O): Promise<C> }, options: O): Promise<C> {
+  const store = researchTransport.getStore();
+  const extra = (await store?.contextOptions?.()) ?? {};
+  const context = await browser.newContext({ ...options, ...extra } as O);
+  if (Object.keys(extra).length) store?.markContext?.(context);
+  return context;
+}
 
 /** Puts the context behind the research guard when a research permit search is running (otherwise nothing). */
 export async function guardResearchContext(context: unknown): Promise<void> {

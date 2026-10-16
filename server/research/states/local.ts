@@ -779,6 +779,13 @@ export const LOCAL_BLOCKED: string[] = [
   "Dallas active contractors (dallasopendata.com jhgk-eg9m): last updated 2017-03-31",
   "Denver business licenses (data.colorado.gov s9wt-dsfz, ArcGIS ODC_active_business_licenses): no contractor license types; Denver's contractor licenses are not published",
   "Detroit BSEED business licenses (current): no contractor license types",
+  // Checked 2026-10-15, robots.txt first: detroitmi.gov/robots.txt (200) allows /sites/…/files/ and /government/
+  // (it disallows "/*?", "/search*", /admin/, /user/login, …). Terms read next, before any request for the list: the
+  // site footer says "All material is the property of the City of Detroit and may only be used with permission.", and
+  // detroitmi.gov/privacy ("Privacy Policy / Disclaimer") says "Commercial use of the information or our online
+  // services is prohibited without written permission of the City of Detroit." ConstructHUB's reports are a paid
+  // product, so the list was not requested and no source was built; it needs the City's written permission first.
+  "Detroit Office of Inspector General debarment list (detroitmi.gov, PDF under /sites/detroitmi.localhost/files/, e.g. 2026-02 \"OIG Debarment List 09FEB26.pdf\"; companies and individuals, debarments and interim suspensions): robots.txt allows it, but detroitmi.gov/privacy says \"Commercial use of the information or our online services is prohibited without written permission of the City of Detroit.\" and the footer says \"All material is the property of the City of Detroit and may only be used with permission.\"; not used without that written permission",
   "Cincinnati business licenses (data.cincinnati-oh.gov 7dk3-gngs): no contractor license types",
   "St. Louis business licenses 2024 (ArcGIS Business_License_2024): no business type to keep construction to",
   "Atlanta business licenses (ArcGIS GBL_WFL1): last updated 2023-04-24; the 2026 layer covers Main Street districts only",

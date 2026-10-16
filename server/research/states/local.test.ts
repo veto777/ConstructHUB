@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DC_BUSINESS_TYPES, DC_INDIVIDUAL_TYPES, PHL_BUSINESS_TYPES, PHL_INDIVIDUAL_TYPES, isConstruction, licenseHit, mdcPhone, phlAddress } from "./local";
+import { DC_BUSINESS_TYPES, DC_INDIVIDUAL_TYPES, LOCAL_BLOCKED, LOCAL_BULK, PHL_BUSINESS_TYPES, PHL_INDIVIDUAL_TYPES, isConstruction, licenseHit, mdcPhone, phlAddress } from "./local";
 import { entityHolder } from "../licenses";
 
 describe("local sources' parsers", () => {
@@ -60,5 +60,16 @@ describe("local license rows (audit 2026-10-15)", () => {
     expect(PHL_BUSINESS_TYPES.test("ELECTRICAL CONTRACTOR")).toBe(true);
     expect(PHL_BUSINESS_TYPES.test("PLUMBER JOURNEYMAN")).toBe(false);
     expect(PHL_BUSINESS_TYPES.test("FIRE SUPPRESSION WORKER")).toBe(false);
+  });
+});
+
+describe("Detroit OIG debarment list (2026-10-15)", () => {
+  // detroitmi.gov/privacy: "Commercial use of the information or our online services is prohibited without written
+  // permission of the City of Detroit." So it is a blocked note, not a source, until that permission is given.
+  it("is recorded as blocked by the City's terms, and no MI debarment source is loaded", () => {
+    const note = LOCAL_BLOCKED.find((n) => n.startsWith("Detroit Office of Inspector General debarment list"));
+    expect(note).toMatch(/Commercial use of the information or our online services is prohibited without written permission of the City of Detroit\./);
+    expect(LOCAL_BULK.some((s) => s.state === "MI" && s.category === "debarment")).toBe(false);
+    expect(LOCAL_BLOCKED).toContain("Detroit BSEED business licenses (current): no contractor license types");
   });
 });

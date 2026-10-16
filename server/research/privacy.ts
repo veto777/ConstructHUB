@@ -53,11 +53,13 @@ const DATE_TAIL = String.raw`(?:(?:on|as of|since|effective|eff\.?|through|thru|
 const STANDING_EXPR = new RegExp(String.raw`^(?:(?:${STANDING}|active in renewal|not expired|listed as (?:active|licensed)|valid (?:&|and) in good standing|voluntar(?:y|ily) (?:surrender(?:ed)?|termination|terminated))(?:\s+${DATE_TAIL})?|on the board's roster of ${DATE}|listed in the [^;]{1,100} directory of ${DATE})$`, "i");
 
 /**
- * Pieces that say nothing about the license's standing and are left out: the source attributions our own packs write
+ * Pieces that say nothing about the license's standing and are left out: exactly the source attributions our own packs
+ * write, word for word (round 8, finding 5: "on the board's list pending disciplinary review" is a qualification, so it
+ * is not one of them and the status is null)
  * ("on the Secretary of State's list of active entities", "on DPOR's regulant list", "current-license report of
  * 2026-04-06", "as of 2024-10-25", "the layer's last update") and a publisher's one-letter status code ("C - Current").
  */
-const ATTRIBUTION = new RegExp(String.raw`^(?:on (?:the |DPOR's )[^;]*\blist\b[^;]*|current-license report of ${DATE}|as of ${DATE}|the layer's last update|[A-Z])$`);
+const ATTRIBUTION = new RegExp(String.raw`^(?:on the Secretary of State's list of active entities|on DPOR's regulant list|on the Department of Labor's list of active licenses|on the Department of State's active-entity list|on the Department of State's active list|current-license report of ${DATE}|as of ${DATE}|the layer's last update|[A-Z])$`);
 
 /**
  * A license status as a standing (round 3, decision 1; round 7, finding 3): kept only when every piece of it is a

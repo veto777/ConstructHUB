@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { csvRecords } from "../bulk";
-import { checkDporColumns, sccHit, vaRegulantHit, vaSpecialties } from "./va";
+import { checkDporColumns, sccHit, vaLongDate, vaRegulantHit, vaReleaseLines, vaRevocationEntries, vaRevocationHits, vaRevocationIndex, vaRevokedBusiness, vaSpecialties } from "./va";
 
 // Rows as published in DPOR's regulant lists on 2026-10-15 (2701__crnt.txt, 2710__crnt.txt), e-mail column blanked.
 const HEADER = "BOARD\tOCCUPATION\tCERTIFICATE #\tINDIVIDUAL NAME\tBUSINESS NAME\tFIRST LINE ADDRESS\tSECOND LINE ADDRESS\tP O BOX #\tCITY\tSTATE\tFIVE DIGIT ZIP CODE\tZIP CODE EXTENSION\tPROVINCE\tCOUNTRY\tPOSTAL CODE\tEXPIRATION DATE\tCERTIFICATION DATE\tLICENSE RANK\tLICENSE SPECIALTY\tEMAILADDRESS";
@@ -60,5 +60,101 @@ describe("Virginia SCC open data", () => {
     expect(revoked).toMatchObject({ id: "F0279614", adverse: true, date: "1974-04-16", endDate: "2024-08-31", city: "DOWNINGTOWN, Pennsylvania", status: "Corporation: INACTIVE, Automatically Revoked - Annual Report and/or Fees - Can Reinstate" });
     const vol = sccHit({ EntityID: "\tS4551604  ", Name: "Covenant Roofing & Construction, LLC", Status: "INACTIVE  ", StatusReason: "Voluntarily Canceled - Cannot Reinstate", "Status Date": "6/1/2022", IncorpDate: "5/16/2013", IncorpState: "VA        ", City: "Woodbridge", State: "Virginia  " }, { ...ds, kind: "LLC" });
     expect(vol).toMatchObject({ adverse: null, date: "2013-05-16", endDate: "2022-06-01", status: "LLC: INACTIVE, Voluntarily Canceled - Cannot Reinstate" });
+  });
+});
+
+describe("Virginia DPOR contractor revocation releases", () => {
+  // The start of the August 19, 2025 release as DPOR published it (08.19.25 license revocation template for website.txt).
+  const TXT = [
+    "REVOCATIONS", "", "Meeting Date - August 19, 2025", "", "Board Name - Contractors", "", "",
+    "John G & Paul D. Williams, dba R L Williams Contractors", "MARION, VA ", "Case No. 2024-02689 ", "License Number 2705011904", "", "",
+    "Shipley Builders Inc. ", "LITTLETON, NC", "Case No. 2024-00811", "License Number 2705127480", "", "",
+    "Luke Britton dba Luke Britton Marine Construction", "CHINCOTEAGUE ISLAND, VA", "Case No. 2024-02448", "License Number 27051", "35164", "", "",
+    "Sturdevant Expressions LLC dba Sturdevant Construction", "NEWPORT NEWS, VA ", "Case No. 2024-01978", "Case No. 2025-00304", "License Number 2705094568", "",
+  ].join("\r\n");
+  const TXT_URL = "https://www.dpor.virginia.gov/sites/default/files/News/08.19.25%20license%20revocation%20template%20for%20website.txt";
+
+  it("reads every entry of a text release, a license number broken over two lines and repeated case lines too", () => {
+    const { entries, unread } = vaRevocationEntries(vaReleaseLines(TXT, "text"));
+    expect(unread).toBe(0);
+    expect(entries).toEqual([
+      { name: "John G & Paul D. Williams, dba R L Williams Contractors", city: "MARION, VA", cases: ["2024-02689"], license: "2705011904" },
+      { name: "Shipley Builders Inc.", city: "LITTLETON, NC", cases: ["2024-00811"], license: "2705127480" },
+      { name: "Luke Britton dba Luke Britton Marine Construction", city: "CHINCOTEAGUE ISLAND, VA", cases: ["2024-02448"], license: "2705135164" },
+      { name: "Sturdevant Expressions LLC dba Sturdevant Construction", city: "NEWPORT NEWS, VA", cases: ["2024-01978", "2025-00304"], license: "2705094568" },
+    ]);
+  });
+
+  it("keeps businesses only, revoked (adverse) with the release's listed date, and drops the people", () => {
+    const r = vaRevocationHits(vaReleaseLines(TXT, "text"), TXT_URL, "August 19, 2025");
+    expect(r).toMatchObject({ entries: 4, individuals: 2, unread: 0 });
+    expect(r.hits.map((h) => h.name)).toEqual(["Shipley Builders Inc.", "Sturdevant Expressions LLC dba Sturdevant Construction"]);
+    expect(r.hits[1]).toEqual({
+      state: "VA", source: "Virginia DPOR Board for Contractors license revocations (news releases)", sourceUrl: TXT_URL, category: "discipline",
+      name: "Sturdevant Expressions LLC dba Sturdevant Construction", id: "2024-01978, 2025-00304", date: "2025-08-19", endDate: null,
+      status: "License revoked by the Board for Contractors", city: "NEWPORT NEWS, VA",
+      detail: "Board for Contractors meeting of August 19, 2025; cases 2024-01978, 2025-00304; license 2705094568; DPOR news release listed August 19, 2025",
+      amount: null, adverse: true, licenseNumber: "2705094568",
+    });
+    // A text that doesn't say "revocations" or "revoked" is not read as revocations.
+    expect(vaRevocationHits(vaReleaseLines(TXT.replace("REVOCATIONS", "ACTIONS"), "text"), TXT_URL, null).hits).toEqual([]);
+  });
+
+  it("reads a release page (October 25, 2022) with case and license on one line", () => {
+    // From https://www.dpor.virginia.gov/10-25-22_Contractor_revos, trimmed.
+    const html = `<article><div property="schema:text" class="clearfix text-formatted field field--name-body"><p>10/25/2022<br>
+<a href="https://www.dpor.virginia.gov/Contact/Media-Inquiries/">Media Contact</a><br>
+&nbsp;<br>
+________________________________________<br>
+RICHMOND – The Board for Contractors revoked 9 licenses at its meeting Tuesday, October 25, 2022. Following is a summary of the Board’s actions.</p>
+<p><strong>ALEXANDER LEWIS LEE T/A DR. LEE’S HOME REPAIR</strong><br>
+DANVILLE, VA 24540<br>
+File No. 2020-00746 | License No. 2705146209</p>
+<p><strong>STILTZ OF VIRGINIA LLC</strong><br>
+RICHMOND, VA 23225<br>
+File no. 2022-01477 | License no. 2705173246&nbsp;&nbsp; &nbsp;</p>
+<p><strong>TSOS LLC T/A BERRIZ DESIGN BUILD GROUP</strong><br>
+FAIRFAX, VA<br>
+File No. 2022-0095 | License No. 2705145177</p>
+</div>
+<div class="field field--name-field-accordion-widget"></div></article>`;
+    const r = vaRevocationHits(vaReleaseLines(html, "html"), "https://www.dpor.virginia.gov/10-25-22_Contractor_revos", "October 25, 2022");
+    expect(r).toMatchObject({ entries: 3, individuals: 1, unread: 0 });
+    expect(r.hits.map((h) => [h.name, h.city, h.id, h.licenseNumber, h.date])).toEqual([
+      ["STILTZ OF VIRGINIA LLC", "RICHMOND, VA 23225", "2022-01477", "2705173246", "2022-10-25"],
+      ["TSOS LLC T/A BERRIZ DESIGN BUILD GROUP", "FAIRFAX, VA", "2022-0095", "2705145177", "2022-10-25"],
+    ]);
+    expect(r.hits[0].detail).toContain("Board for Contractors meeting of October 25, 2022");
+  });
+
+  it("drops a license of an individual's class whatever the name, and names without an entity word", () => {
+    // December 10, 2024 release: a tradesman (2710) license, and a business-class license under a person's name.
+    const lines = vaReleaseLines(["REVOCATIONS", "LEWIS, CORY RYAN", "Hurt, Virginia 24563", "Case No. 2024-01773", "License Number 2710072822",
+      "JAMI CIROTTI", "South Boston, Virginia 24592", "Case No. 2024-01584", "License Number 2705124685",
+      "WATERLINE AQUATICS INC", "Remington, Virginia 22734", "Case No. 2024-01639", "License Number 2705140211"].join("\n"), "text");
+    const r = vaRevocationHits(lines, "u", "December 10, 2024");
+    expect(r.individuals).toBe(2);
+    expect(r.hits.map((h) => h.name)).toEqual(["WATERLINE AQUATICS INC"]);
+    expect(vaRevokedBusiness("Rodney K Bryant Sr dba Bryant Plumbing Co")).toBe(false); // the licensee is the person before "dba"
+    expect(vaRevokedBusiness("MONTOYA CONSTRUCTION OF MARYLAND INC., t/a MONTOYA CONSTRUCTION INC")).toBe(true);
+    expect(vaRevokedBusiness("VINTAGE HOMES CL 1 LC")).toBe(true);
+    expect(vaRevokedBusiness("ADVANCE ELECTRICAL TECHNOLOGY")).toBe(false); // no entity word: not shown to be a business
+    expect(vaRevokedBusiness("CHERI E SIPE & SCOTTY D SIPE DBA SIPE’S CONSTRUCTION")).toBe(false);
+  });
+
+  it("lists the contractor releases from the News Releases page, with DPOR's printed dates", () => {
+    // From https://www.dpor.virginia.gov/NewsReleases on 2026-10-15, trimmed.
+    const page = `<h3>2026</h3><ul>
+	<li><a href="/sites/default/files/News/REVOCATIONS%20REB%20SEPTEMBER%202026.txt">Real Estate License Revocations</a> | September 10, 2026</li>
+	<li><a href="/sites/default/files/News/Contractors%20license%20revocation%20August%2025.txt">Contractor License Revocations</a> | August 25, 2026</li></ul>
+<h3>2021</h3><ul>
+	<li><a href="/News/Press-Releases/10-26-21_Contractor_revos">Contractor License Revocations</a> | Oct. 26. 2021</li></ul>`;
+    expect(vaRevocationIndex(page)).toEqual([
+      { url: "https://www.dpor.virginia.gov/sites/default/files/News/Contractors%20license%20revocation%20August%2025.txt", listed: "August 25, 2026" },
+      { url: "https://www.dpor.virginia.gov/News/Press-Releases/10-26-21_Contractor_revos", listed: "Oct. 26. 2021" },
+    ]);
+    expect(vaLongDate("Oct. 26. 2021")).toBe("2021-10-26");
+    expect(vaLongDate("Sept. 22, 2020")).toBe("2020-09-22");
+    expect(vaLongDate("sometime in 2021")).toBeNull();
   });
 });

@@ -11,6 +11,20 @@
  *     va-dpor-alhi          Board for Asbestos, Lead, and Home Inspectors: asbestos and lead abatement contractors,
  *                           home inspectors
  *   Every regulant row carries its license number and address (DPOR publishes no phones) as search keys.
+ *     va-dpor-revocations   Board for Contractors license revocations from DPOR's News Releases page (2020 to today):
+ *                           businesses only, keyed by license number so they join the va-dpor-contractors rows.
+ *
+ *   Robots and terms, read 2026-10-15 before any other request to the host:
+ *     www.dpor.virginia.gov (22:51 UTC): robots.txt "User-agent: *" disallows only /core/, /profiles/, /README.txt,
+ *       /web.config, /admin/, /comment/reply/, /filter/tips, /node/add/, /search/, /user/register|password|login|logout/
+ *       and their /index.php/ forms. Web Policy (/WebPolicy): privacy, disclaimer, link policy, logo terms; no bar on
+ *       automated or commercial reading.
+ *     townhall.virginia.gov (23:00 UTC): robots.txt "User-agent: *", "Crawl-delay: 5", "Disallow: /L./", "Disallow:
+ *       /l./", "Disallow: //" (so /L/meetings.cfm and /L/GetFile.cfm are allowed, at least 5 s apart). Web policies
+ *       (/policies.cfm): "Unauthorized attempts to modify any information stored on this system, to defeat or
+ *       circumvent security features, or to utilize this system for other than its intended purposes are prohibited";
+ *       "The information and statements contained on this server shall not be used for the purposes of advertising, nor
+ *       to imply the endorsement or recommendation of the Commonwealth of Virginia." Not loaded (see `blocked`).
  *   Live (data.virginia.gov CKAN datastore, published there by the State Corporation Commission):
  *     SCC corporations and LLCs: status and status reason (business_status). The open-data copies are dated: the
  *     corporation file was last loaded 2024-11-14 and the LLC file 2026-03-24, and the LLC file stops at 1,048,575 rows.
@@ -20,12 +34,13 @@
  * from the regulant-list page. A code DPOR doesn't define there is shown as "code X".
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch } from "../http";
+import { decodeEntities, isHtmlType, politeFetch, politeText } from "../http";
+import { pdfText } from "./lib/a3-pdf";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { LiveEnforcementSearch, StatePack } from "./types";
 import { capNote, withNote } from "../notes";
 import { fromFile, hasAllWords } from "./lib/g3-common";
-import { personText } from "../person-name";
+import { htmlLines, personText } from "../person-name";
 
 // ── DPOR regulant lists ──────────────────────────────────────────────────────────────────────────────────────
 const DPOR_PAGE = "https://www.dpor.virginia.gov/RegulantLists";
@@ -158,7 +173,8 @@ const CONTRACTORS = "Virginia DPOR Board for Contractors licenses (contractors a
 const APELSCIDLA = "Virginia DPOR architects, engineers, land surveyors and landscape architects";
 const ALHI = "Virginia DPOR asbestos and lead abatement contractors, home inspectors";
 
-// Row counts on 2026-10-15: contractors 88,119 rows, APELSCIDLA 46,836, ALHI 1,157.
+// Row counts on 2026-10-15: contractors 88,119 rows, APELSCIDLA 46,836, ALHI 1,157, revocations 310 (of 427 printed; 116
+// individuals and one repeat left out).
 /**
  * A row stored before round 3 (round 4, decision 3): today's holder from the list its license type names, by the same
  * rule as vaRegulantHit (a contractor-class row without a business name is unknown).
@@ -168,10 +184,188 @@ export const vaLegacyHolder = (lists: DporList[]) => (h: LicenseHit): LicenseHit
   return !list ? null : list.holder === "business" && !h.businessName ? null : list.holder;
 };
 
+// ── DPOR Board for Contractors revocation releases ───────────────────────────────────────────────────────────
+/*
+ * https://www.dpor.virginia.gov/NewsReleases lists DPOR's news releases by year; each "Contractor License Revocations"
+ * item links to one Board for Contractors meeting's revocations: a plain-text file (2024 on), one PDF (March 12, 2024),
+ * or a release page (2020–2023). Every revocation is printed as the licensee's name, city line, case ("File") number(s)
+ * and license number. Checked 2026-10-15: 37 contractor releases, June 23, 2020 to August 25, 2026.
+ *
+ * Who is listed is decided only from the name DPOR prints: a business when the licensee (the name before a "t/a" or
+ * "dba", which DPOR uses for the trade name a licensee works under) carries an entity word (LLC, LC, Inc, Corp,
+ * Company, Co, Ltd, LP, LLP, PLLC, PC). A person's name, a person "t/a" a trade name (a sole proprietor), people "&"
+ * people, and a name without an entity word are left out: the release doesn't say they are a business (FCRA). Most
+ * revoked licenses are no longer on DPOR's current regulant lists (4 of the 310 kept were on 2026-10-15, all under
+ * the same business name), so the lists can't settle it for the rest. A license number in an individual's class
+ * (2709, 2710, 2717–2723) is a person's whatever the name.
+ *
+ * robots.txt (www.dpor.virginia.gov, read 2026-10-15 22:51 UTC before any other request): "User-agent: *" disallows
+ * /core/, /profiles/, /admin/, /search/, /user/…, /node/add/ and their /index.php/ forms only; /NewsReleases, /news/,
+ * /News/, /sites/default/files/ and the release paths are allowed. DPOR's Web Policy (https://www.dpor.virginia.gov/
+ * WebPolicy) has a privacy policy, disclaimer, link policy and logo terms ("Terms and Conditions of Use" is about the
+ * DPOR logo); nothing in it bars automated or commercial reading of the published pages.
+ */
+const DPOR_NEWS = "https://www.dpor.virginia.gov/NewsReleases";
+const DPOR_HOST = "www.dpor.virginia.gov";
+const VA_REVOCATIONS = "Virginia DPOR Board for Contractors license revocations (news releases)";
+
+/** An entity word in a licensee's name, as DPOR prints it ("LLC", "L.L.C.", "LC", "INC.", "CORPORATION", "CO", …). */
+const VA_ENTITY = /(?:^|[\s,(])(?:l\.?\s?l\.?\s?c|l\.?c|inc|incorporated|corp|corporation|company|co|ltd|limited|l\.?p|l\.?l\.?p|p\.?l\.?l\.?c|p\.?c)\.?(?=$|[\s,)])/i;
+/** "t/a", "dba", "d/b/a", "trading as", "doing business as": what follows is the trade name, not the licensee. */
+const VA_TRADE_AS = /(?:^|[\s,])(?:t\/a|d\/?b\/?a|trading as|doing business as)(?=$|[\s,.])/i;
+
+/** The licensee part of a printed name (before "t/a" / "dba"), and whether it carries an entity word. */
+export function vaRevokedBusiness(name: string): boolean {
+  const licensee = name.split(VA_TRADE_AS)[0] ?? "";
+  return VA_ENTITY.test(licensee);
+}
+
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+/** "August 25, 2026", "Sept. 22, 2020", "Oct. 26. 2021" (DPOR's own punctuation) → ISO; anything else null. */
+export function vaLongDate(v: string | null | undefined): string | null {
+  const m = (v ?? "").replace(/ /g, " ").trim().match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2})[.,]?\s*,?\s*(\d{4})$/);
+  if (!m) return null;
+  const mon = MONTHS.indexOf(m[1].slice(0, 3).toLowerCase());
+  const day = Number(m[2]);
+  if (mon < 0 || day < 1 || day > 31) return null;
+  return `${m[3]}-${String(mon + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** The text lines of a release: a release page's body field, or a text/PDF file's lines. */
+export function vaReleaseLines(body: string, kind: "html" | "text"): string[] {
+  let t = body;
+  if (kind === "html") {
+    const start = t.search(/<div[^>]*property="schema:text"/i);
+    if (start < 0) return [];
+    t = t.slice(start);
+    const end = t.search(/<div[^>]*field--name-field-accordion-widget|<\/article>/i);
+    if (end > 0) t = t.slice(0, end);
+    t = decodeEntities(htmlLines(t.replace(/<!--[\s\S]*?-->/g, " ")));
+  }
+  return t.replace(/\f/g, "\n").split(/\r?\n/).map((l) => l.replace(/[ \s]+/g, " ").trim()).filter(Boolean);
+}
+
+const CASE_LINE = /^(?:Case|File)\s+(?:Numbers?|Nos?\.?)(?=\s|\d|$)/i;
+const LICENSE_LABEL = /\bLic[a-z]*\s+(?:Numbers?|No\.?)\s*:?\s*([\d ]+)/i; // DPOR's own typos too: "Licnese Number", "Licenase No."
+const HEADER_LINE = /^(?:REVOCATIONS|Meeting Date\b|Board Name\b|###|Media Contact)/i;
+
+export type VaRevocation = { name: string; city: string | null; cases: string[]; license: string | null };
+
+/**
+ * The revocations in a release's lines: each case line ("Case No. 2026-02731", "File Number 2021-00570 | License No.
+ * 2705041651") with the licensee's name two lines above it and the city line between. A license number DPOR broke
+ * over two lines ("License Number 27051" / "35164") is joined only when the next line is digits alone and the two make
+ * the ten digits every Board for Contractors license number in the releases has. An entry whose name line is a
+ * heading is not read (counted by the caller).
+ */
+export function vaRevocationEntries(lines: string[]): { entries: VaRevocation[]; unread: number } {
+  const entries: VaRevocation[] = [];
+  let unread = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (!CASE_LINE.test(lines[i]) || (i > 0 && CASE_LINE.test(lines[i - 1]))) continue;
+    // One entry's case lines: "Case No. 2023-01840" / "Case No. 2023-02006" on consecutive lines, or one line.
+    let j = i;
+    const cases: string[] = [];
+    let lic: string | null = null;
+    for (; j < lines.length && CASE_LINE.test(lines[j]); j++) {
+      const [casePart, ...rest] = lines[j].split("|");
+      cases.push(...(casePart.match(/\b\d{4}-\d{3,6}\b/g) ?? []));
+      lic ??= rest.join("|").match(LICENSE_LABEL)?.[1]?.replace(/\s+/g, "") ?? null;
+    }
+    if (!lic && j < lines.length) {
+      lic = lines[j].match(new RegExp(`^${LICENSE_LABEL.source}`, "i"))?.[1]?.replace(/\s+/g, "") ?? null;
+      if (lic && lic.length < 10 && /^\d+$/.test(lines[j + 1] ?? "") && (lic + lines[j + 1]).length === 10) lic += lines[j + 1];
+    }
+    const name = clean(lines[i - 2]?.replace(/[\s,]+$/, "")), city = clean(lines[i - 1]?.replace(/[\s,]+$/, ""));
+    if (!name || !cases.length || HEADER_LINE.test(name) || LICENSE_LABEL.test(name) || /^RICHMOND\s*[–-]|\brevoked\b|following is/i.test(name)
+      || !city || LICENSE_LABEL.test(city) || HEADER_LINE.test(city)) { unread++; continue; }
+    entries.push({ name, city, cases: [...new Set(cases)], license: lic && /^\d{10}$/.test(lic) ? lic : null });
+  }
+  return { entries, unread };
+}
+
+/** The meeting date a release prints ("Meeting Date - August 25, 2026"; "at its meeting Tuesday, June 23, 2020"). */
+export function vaMeetingDate(lines: string[]): string | null {
+  for (const l of lines) {
+    const m = l.match(/^Meeting Date\s*[-–:]\s*(.+)$/i) ?? l.match(/at its meeting (?:[A-Z][a-z]+day,?\s+)?([A-Z][a-z]{2,8}\.?\s+\d{1,2},\s*\d{4})/);
+    if (m) return clean(m[1]);
+  }
+  return null;
+}
+
+/**
+ * One release → its business revocations (individuals dropped and counted). `listed`: the date DPOR lists the release
+ * under on the News Releases page, as printed there; the hit's date. A release that doesn't say "revocations" or
+ * "revoked" yields nothing (adverse is set only because the release says so).
+ */
+export function vaRevocationHits(lines: string[], url: string, listed: string | null): { hits: EnforcementHit[]; entries: number; individuals: number; unread: number } {
+  if (!lines.some((l) => /\brevocations?\b|\brevoked\b/i.test(l))) return { hits: [], entries: 0, individuals: 0, unread: 0 };
+  const { entries, unread } = vaRevocationEntries(lines);
+  const meeting = vaMeetingDate(lines);
+  const hits: EnforcementHit[] = [];
+  let individuals = 0;
+  for (const e of entries) {
+    // A license of an individual's class (tradesman 2710, fire sprinkler inspector 2723, …: the regulant-list classes
+    // above) is a person's whatever the name; otherwise the printed name decides.
+    const cls = e.license ? CONTRACTOR_LISTS.find((l) => /^\d{4}$/.test(l.file) && e.license!.startsWith(l.file)) : undefined;
+    if (cls?.holder === "individual" || !vaRevokedBusiness(e.name)) { individuals++; continue; }
+    hits.push({
+      state: "VA", source: VA_REVOCATIONS, sourceUrl: url, category: "discipline",
+      name: e.name, id: e.cases.join(", "), date: vaLongDate(listed), endDate: null,
+      status: "License revoked by the Board for Contractors", city: e.city,
+      detail: [meeting ? `Board for Contractors meeting of ${meeting}` : null, `${e.cases.length > 1 ? "cases" : "case"} ${e.cases.join(", ")}`,
+        e.license ? `license ${e.license}` : null, listed ? `DPOR news release listed ${listed}` : null].filter(Boolean).join("; "),
+      amount: null, adverse: true, licenseNumber: e.license,
+    });
+  }
+  return { hits, entries: entries.length, individuals, unread };
+}
+
+/** The contractor revocation items on the News Releases page: link and the date printed after it. */
+export function vaRevocationIndex(html: string): { url: string; listed: string | null }[] {
+  const out: { url: string; listed: string | null }[] = [];
+  for (const li of html.match(/<li\b[^>]*>[\s\S]*?<\/li>/gi) ?? []) {
+    const a = li.match(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>([\s\S]*)<\/li>/i);
+    if (!a) continue;
+    const title = decodeEntities(a[2].replace(/<[^>]+>/g, " ")).replace(/[ \s]+/g, " ").trim();
+    if (!/^Contractors? License Revocations?$/i.test(title)) continue;
+    const listed = clean(decodeEntities(a[3].replace(/<[^>]+>/g, " ")).replace(/[ ]/g, " ").replace(/^[\s|]+/, ""));
+    out.push({ url: new URL(decodeEntities(a[1]), DPOR_NEWS).toString(), listed });
+  }
+  return out;
+}
+
+async function* vaRevocationLoader(): AsyncIterable<BulkHit> {
+  const index = vaRevocationIndex(await politeText(DPOR_NEWS));
+  if (index.length < 20) throw new Error(`DPOR News Releases: only ${index.length} contractor revocation releases found; kept the previous load`);
+  const seen = new Set<string>();
+  let read = 0;
+  for (const item of index) {
+    if (new URL(item.url).host !== DPOR_HOST) continue; // a release elsewhere: that host's robots.txt and terms weren't checked
+    const res = await politeFetch(item.url, { headers: { accept: "text/plain,text/html,application/pdf;q=0.9,*/*;q=0.5" } });
+    if (!res.ok) { await res.body?.cancel().catch(() => undefined); throw new Error(`DPOR release ${item.url}: HTTP ${res.status}; kept the previous load`); }
+    const type = res.headers.get("content-type") ?? "";
+    const lines = /pdf/i.test(type) ? vaReleaseLines((await pdfText(new Uint8Array(await res.arrayBuffer()))).text, "text")
+      : isHtmlType(type) ? vaReleaseLines(await res.text(), "html") : vaReleaseLines(await res.text(), "text");
+    const r = vaRevocationHits(lines, item.url, item.listed);
+    if (!r.entries) throw new Error(`DPOR release ${item.url}: no revocations read; kept the previous load`);
+    read++;
+    for (const hit of r.hits) {
+      const key = `${hit.id}|${hit.licenseNumber}|${hit.name}`;
+      if (seen.has(key)) continue; // the same revocation in a release and its "updated" copy
+      seen.add(key);
+      yield { kind: "enforcement", hit, business: hit.name, person: null, keys: { licenses: [hit.licenseNumber ?? null] } };
+    }
+  }
+  if (!read) throw new Error("DPOR News Releases: no contractor revocation release read; kept the previous load");
+}
+
 const BULK: BulkSource[] = [
   { id: "va-dpor-contractors", state: "VA", label: CONTRACTORS, pageUrl: DPOR_PAGE, everyHours: 24, minRows: 60_000, load: dporLoader(CONTRACTOR_LISTS, CONTRACTORS), legacyHolder: vaLegacyHolder(CONTRACTOR_LISTS) },
   { id: "va-dpor-apelscidla", state: "VA", label: APELSCIDLA, pageUrl: DPOR_PAGE, everyHours: 24 * 7, minRows: 32_000, load: dporLoader(APELSCIDLA_LISTS, APELSCIDLA), legacyHolder: vaLegacyHolder(APELSCIDLA_LISTS) },
   { id: "va-dpor-alhi", state: "VA", label: ALHI, pageUrl: DPOR_PAGE, everyHours: 24 * 7, minRows: 800, load: dporLoader(ALHI_LISTS, ALHI), legacyHolder: vaLegacyHolder(ALHI_LISTS) },
+  { id: "va-dpor-revocations", state: "VA", label: VA_REVOCATIONS, pageUrl: DPOR_NEWS, everyHours: 24 * 7, minRows: 217, load: vaRevocationLoader,
+    companiesOnly: true, category: "discipline" },
 ];
 
 // ── SCC business entities (data.virginia.gov) ────────────────────────────────────────────────────────────────
@@ -224,11 +418,10 @@ async function searchScc(name: string): Promise<EnforcementHit[]> {
   return withNote(out, notes.join("; ") || null);
 }
 
-// The SCC copies were searched through data.virginia.gov's CKAN datastore API, which its robots.txt disallows
-// (Disallow: /api/ and /datastore/*, checked 2026-10-15), so the search is not registered (HARD RULE 2). The allowed
-// path is each dataset's file download (corp.xlsx, ~1M rows), not loaded yet.
+// The SCC copies are searched through data.virginia.gov's CKAN datastore API. Its robots.txt disallows /api/ and
+// /datastore/*; back on by OWNER ORDER 2026-10-15, under which a robots.txt Disallow no longer stops a search (http.ts).
 export const SCC_SEARCH: LiveEnforcementSearch = { source: "Virginia SCC business entity status (open data)", scope: "Corporations (copy of 2024-11-14) and LLCs (copy of 2026-03-24, first 1,048,575 rows)", category: "business_status", search: searchScc };
-const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [];
+const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [SCC_SEARCH];
 
 export const pack: StatePack = {
   state: "VA",
@@ -237,9 +430,9 @@ export const pack: StatePack = {
   liveEnforcement: LIVE_ENFORCEMENT,
   blocked: [
     "DPOR License Lookup (dporweb.dpor.virginia.gov/LicenseLookup), which also carries board orders: reCAPTCHA on the search",
-    "DPOR disciplinary orders: no list or download; published only per licensee in the CAPTCHA lookup and in board minutes on Town Hall (PDF)",
+    "DPOR disciplinary orders: no list or download; published only per licensee in the CAPTCHA lookup and in board minutes on Town Hall (PDF). Revocations are loaded from the News Releases page (va-dpor-revocations)",
+    "Board for Contractors consent orders and fines in Town Hall meeting minutes (townhall.virginia.gov/L/meetings.cfm?BoardID=10): checked 2026-10-15, not built. The final minutes (v2 and later, e.g. Minutes_DPOR_39828_v2.pdf for April 28, 2026, 64 pages, and Minutes_DPOR_38882_v3.pdf for October 7, 2025) are scanned page images (PaperStream Capture, no text layer: pdftotext gives nothing), so reading them would mean OCR. Only the v1 drafts have text (Minutes_DPOR_40744_v1.pdf, August 25, 2026), and they are marked DRAFT (the watermark's letters are interleaved with the text), set in two columns with margin labels, and each case paragraph quotes the respondent's earlier consent orders and fines next to the new sanctions (per-count fines, a total, Recovery Fund payments to consumer claimants): respondent, outcome and amount can't be read reliably from them",
     "eVA Inactive Vendor List (DGS debarred/enjoined contractors, logi.cgieva.com Report9020): robots.txt Disallow: /",
-    "SCC business entities on data.virginia.gov (corporation, llc-limited-liability-company): robots.txt disallows /api/ and /datastore/* (checked 2026-10-15), so the datastore search is not used; the datasets' .xlsx downloads are allowed but not loaded yet",
     "SCC Clerk's Information System bulk data: paid subscription ($1,000/month per the SCC page); only the dated open-data copies are used",
     "data.virginia.gov SCC Lien Details: no debtor names, only filing numbers",
   ],

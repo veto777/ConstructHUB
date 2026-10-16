@@ -42,19 +42,10 @@ const SIGNED = /\b(we('ve| have)? signed|signed (the|your) (contract|agreement|o
 const MEETING_TIME = /\b(\d{1,2}(:\d{2})?\s?(am|pm)\b|(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+at\s+\d)/i;
 
 const SECRETS = /\b(password|passcode|api[ _-]?key|secret key|access token|login details|credentials)\b|\bsk-[a-z0-9]{16,}|\b(card|account|routing) number\b/i;
-// OWNER LAW, 2026-10-15 (after Free Law Project ticketed our "signup blocked by the captcha" email): nothing we send to
-// a platform, PR outlet, agency or partner may reveal that a bot or a script is behind it — no captchas, bot checks,
-// blocked sign-ups, crawling, scraping, rate limits or "automated" anything. Such an email is never sent.
-const BOT_TELL = /\b(re|h)?captcha|\bturnstile\b|\bbot[ -]?(check|detection|protection)|\b(verification|security) (puzzle|challenge|check)|\bprove (we|i|that we|that i)('re| are|'m| am)? (a )?human|\bhuman verification|\b(sign[ -]?up|registration|account creation|log[ -]?in|access)( (page|form))? (was |is |got |keeps )?(blocked|failing|failed|rejected)|\bblocked (us|our (sign[ -]?up|account|access|requests?))|\bautomat(ed|ion|ically)\b|\b(our|a|the) (bot|script|crawler|scraper|spider)s?\b|\bscrap(er|ers|ing)\b|\bcrawl(ed|er|ers|ing)\b|\bheadless\b|\brobots\.txt\b|\brate[ -]?limit|\buser[ -]agent\b|\bprogrammatic(ally)?\b/i;
+// OWNER LAW, 2026-10-15: the check lives in server/outbound-guard.ts, shared with support@, social@, outreach and press.
+export { botTellProblem } from "../outbound-guard";
+import { botTellProblem } from "../outbound-guard";
 
-/** Why outgoing text would tell the recipient a bot or a script is behind it, or null (OWNER LAW 2026-10-15). */
-export function botTellProblem(text: string): string | null {
-  if (AI_SELF.test(text)) return "The email talks about being an AI or names an AI provider";
-  const m = text.match(BOT_TELL);
-  return m ? `The email gives away that a bot or a script is behind it ("${m[0]}")` : null;
-}
-
-const AI_SELF = /\b(as an ai|an ai (language )?model|i('| a)?m an ai|language model|chatgpt|openai|truthcoder|anthropic|claude)\b/i;
 
 /** Why a drafted reply must not go out, or null when it is safe (the laws marked `code` in shared/media-inbox.ts). */
 export function replyProblem(reply: string): string | null {
@@ -112,7 +103,7 @@ export function formMessage(firstBody: string): string {
     .split("\n").filter((l) => !/reply\s+["“]?stop|unsubscribe/i.test(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-// Owner, 2026-10-14: "dont tell anyone we are ai ever". So no email volunteers it (AI_SELF above), and none claims a
+// Owner, 2026-10-14: "dont tell anyone we are ai ever". So no email volunteers it (botTellProblem, ../outbound-guard), and none claims a
 // person wrote it (CLAIMS_HUMAN below). Someone asking straight out is answered by a person: the model never replies.
 const ASKS_IF_AI = /\b(are|r) (you|u|these( emails)?|this( email)?) (an? |being |written by (an? )?)?(ai|bot|robot|automated|chatgpt|llm|real person|human|person)\b|\bis this (an? )?(ai|bot|automated|real person|human)\b|\byou('re| are) (an? )?(ai|bot)\b|\b(written|sent|generated) by (an? )?(ai|bot)\b/i;
 export const asksIfAi = (body: string) => ASKS_IF_AI.test(body.slice(0, 2000));

@@ -566,6 +566,7 @@ function SubjectReport({ s, i }: { s: ResearchSubjectReport; i: number }) {
   return (
     <section className="space-y-4 break-inside-avoid-page" data-testid={`section-subject-${i}`}>
       <h2 className="text-xl font-semibold">{s.name} <span className="text-sm font-normal text-muted-foreground">({s.kind})</span></h2>
+      {s.withdrawnNote && <p className="text-sm text-muted-foreground" data-testid={`text-withdrawn-${i}`}>{s.withdrawnNote}</p>}
 
       <div className="space-y-2">
         <h3 className="font-semibold">License records ({countOrNot(s.licenses.length, subjectLicensesSearched(s))})</h3>

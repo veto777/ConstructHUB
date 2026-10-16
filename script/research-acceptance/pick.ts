@@ -20,6 +20,8 @@ import { allBulkSourcesFor, allLicenseSourcesFor, liveLicenseSearchesFor } from 
 import { searchSodaEnforcement, searchStateEnforcement } from "../../server/research/state-records";
 import { disciplineRecord, standingStatus } from "../../server/research/privacy";
 import { nameMatches } from "../../server/research/xref";
+import { onePersonField } from "../../server/research/person-name";
+import { looksLikeBusiness } from "../../server/research/states/lib/business-name";
 import { STATE_PACKS } from "../../server/research/states";
 import { LOCAL_BULK, LOCAL_LICENSES, LOCAL_LIVE, LOCAL_LIVE_ENFORCEMENT, LOCAL_ENFORCEMENT } from "../../server/research/states/local";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
@@ -69,8 +71,9 @@ export function typedName(name: string): string {
 const usableName = (n: string | null | undefined): n is string =>
   !!n && /[A-Za-z]{2}/.test(n) && n.trim().split(/\s+/).length >= 2 && n.length <= 110 && !/^(n\/?a|none|unknown|escrow|test)\b/i.test(n.trim());
 
+/** The first named person on a license: one person's name, never a business written in a person field (A15: Montgomery County's "A. R. DESIGN GROUP, INC."). */
 const personOf = (h: LicenseHit): string | null => {
-  const people = [h.principal, ...(h.people ?? []).map((p) => p.name)].filter(usableName);
+  const people = [h.principal, ...(h.people ?? []).map((p) => p.name)].filter(usableName).filter((n) => onePersonField(n!) && !looksLikeBusiness(n));
   return people.length ? typedName(people[0]) : null;
 };
 

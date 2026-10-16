@@ -193,6 +193,8 @@ process.on("unhandledRejection", (reason) => {
         log(`serving on port ${port}`);
       },
     );
+    // Where research crawls leave from: RESEARCH_PROXY_URL's proxy, or direct (host only, never the credentials).
+    (await import("./research/egress")).logResearchEgress((line) => log(line, "research"));
     // SIGTERM (a deploy's restart): stop accepting, finish in-flight requests and tracked paid work (up to
     // SHUTDOWN_DRAIN_MS, 20 s), close the pools, exit — instead of dying mid-request.
     // Free disk space: read at boot and every 15 min; low space is logged, recorded on the issue desk and shown on

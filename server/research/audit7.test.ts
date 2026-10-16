@@ -1,7 +1,7 @@
 /**
  * Codex round-7 audit (2026-10-15): each finding with Codex's failing input.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import { PortalBlockedError, hostBlocked, resetHostState, robotsAllowed, robotsFor, setRobotsRetryMs } from "./http";
 import { failureNote } from "./notes";
 import { kyQuery } from "./states/ky";
@@ -20,6 +20,10 @@ import { parseCbrDetails } from "./states/ut";
 import { reportHit, standingStatus } from "./privacy";
 import { shownReport, shownVia } from "./store";
 import { licenseRef } from "./xref";
+import { setRobotsEnforced as __setRobotsEnforced } from "./http";
+// These tests exercise the robots.txt Disallow rule, which the OWNER ORDER of 2026-10-15 switched off in production.
+beforeAll(() => __setRobotsEnforced(true));
+afterAll(() => __setRobotsEnforced(false));
 
 const lic = (o: Partial<LicenseHit>): LicenseHit => ({
   state: "NE", source: "Nebraska State Electrical Division", sourceUrl: "https://example.test/a", businessName: null, licenseNumber: "EC 03136",

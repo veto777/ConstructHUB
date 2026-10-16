@@ -28,6 +28,7 @@ import type { StatePack } from "./types";
 import { pdfTable } from "./lib/g6-pdf";
 import { pdfText, textLines } from "./lib/a3-pdf";
 import { looksLikeBusiness, usd } from "./lib/g8-common";
+import { personNameForm } from "./lib/business-name";
 import { decodeEntities, politeFetch, politeText } from "../http";
 import type { EnforcementHit } from "@shared/research-reports";
 
@@ -172,9 +173,21 @@ export function parseDelinquent(text: string): { reportDate: string | null; rows
   return { reportDate, rows };
 }
 
+/**
+ * The owner is a business: a business form and no personal name form. A person's lien stays a person's whatever its
+ * DBA says ("JOHN BROTHERS" dba "BROTHERS PLUMBING" is an individual's lien: no row; round 8, finding 1).
+ */
+export const sdOwnerIsBusiness = (owner: string): boolean => personNameForm(owner) === null && looksLikeBusiness(owner);
+
+/** A stored row from before SD_RULE_VERSION: kept only when its owner (the name before " dba ") is a business today. */
+export function sdLegacyLien(h: EnforcementHit): EnforcementHit | null {
+  const owner = (h.name ?? "").split(/\s+dba\s+/i)[0].trim();
+  return owner && sdOwnerIsBusiness(owner) ? h : null;
+}
+
 /** A row as report hits, one per business name (owner, and a different DBA); none when the owner is not a business. */
 export function delinquentHits(r: DelinquentRow, reportDate: string | null): BulkHit[] {
-  if (!looksLikeBusiness(r.owner)) return []; // companies only (FCRA): a person's tax lien is not searched
+  if (!sdOwnerIsBusiness(r.owner)) return []; // companies only (FCRA): a person's tax lien is not searched, nor its DBA
   const dba = r.dba && r.dba.toUpperCase() !== r.owner.toUpperCase() ? r.dba : null;
   const day = reportDate ? `${reportDate.slice(5, 7)}/${reportDate.slice(8, 10)}/${reportDate.slice(0, 4)}` : null;
   const parts = [r.tax != null ? `tax due ${usd(r.tax)}` : null, r.interest != null ? `interest due ${usd(r.interest)}` : null, r.penalty != null ? `penalty due ${usd(r.penalty)}` : null].filter(Boolean);
@@ -194,6 +207,8 @@ const SD_DOR_DELINQUENT: BulkSource = {
   id: "sd-dor-tax-delinquent", state: "SD", label: DOR_SOURCE, pageUrl: DOR_PAGE,
   everyHours: 24 * 7, minRows: 133, // 190 on the report of 09/15/2026 (139 business owners of 200 entries, plus 51 distinct DBA names)
   companiesOnly: true, category: "tax_lien",
+  // Rows stored before round 8 are re-read: an owner that was a business only by "Brothers" is a person (sdLegacyLien).
+  legacyEnforcement: sdLegacyLien, enforcementRuleVersion: 7,
   load: async function* () {
     const url = delinquentPdfUrl(await politeText(DOR_PAGE, {}, { minDelayMs: 1500 }));
     if (!url) throw new Error("the Department of Revenue taxes page no longer links the Top 100 Delinquent Report");

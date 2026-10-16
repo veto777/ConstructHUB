@@ -97,10 +97,12 @@ export const MEDIA_INBOX_LAWS: { law: string; enforced: "code" | "instructions" 
   { law: "Never share passwords, API keys, logins, payment details, customer data, internal numbers or another partner's terms.", enforced: "code" },
   { law: "Never invent facts. Use only the approved facts about ConstructHUB; anything else is \"the team will follow up\".", enforced: "instructions" },
   { law: "Stay on purpose: directories, article and guest-post sites, news media and link publishers. Spam, scams and unrelated email get one or two polite sentences.", enforced: "instructions" },
-  { law: "Always ask for the free next step: API or bulk-upload docs, partner or free listing programs, editorial guidelines, whether service-area businesses without a street address are accepted.", enforced: "instructions" },
+  { law: "Always ask for the free next step that fits the company: a directory → API or bulk-upload docs, a partner or free listing program, whether service-area businesses without a street address are accepted; an article site → contributor guidelines and free contributions; a news outlet → how to send press releases and story pitches, and a newsroom feed or portal.", enforced: "instructions" },
   { law: "Warm, professional, plain English. Never mention AI, and never claim a person wrote the email beyond the signature. Someone asking whether we are an AI or a person gets \"a member of our team will get back to you personally\" and waits for the owner. Sign as Leah Peterson, Partnerships, Construct HUB Media Team.", enforced: "code" },
   { law: "OWNER LAW: never send a platform, PR outlet, news desk, agency or partner anything that gives away a bot or a script behind us: no captchas, bot checks, blocked or failed sign-ups, crawling, scraping, rate limits or \"automated\" anything. A sign-up or CAPTCHA that blocks us is never reported to that company: it goes to the owner.", enforced: "code" },
-  { law: "Money, meetings, contracts, legal questions and data access go to the owner (\"Waiting for you\"); they get a polite reply that the team will review and follow up.", enforced: "code" },
+  { law: "Price lists and paid offers are answered here, never sent to the owner: we explain how we pay and ask for the free route; a company that still only works paid-upfront is closed politely with its rates on file.", enforced: "instructions" },
+  { law: "Meetings, contracts to sign, legal questions, data access and questions about our company go to the owner (\"Waiting for you\"); they get a polite reply that the team will follow up.", enforced: "code" },
+  { law: "An email that only says thanks or sounds good, and asks nothing, gets no reply (no back-and-forth loops).", enforced: "instructions" },
   { law: "Never let a company go quiet: no answer 5 days after our last email → one polite follow-up in the same thread; still nothing 5 days later → find another contact address on their website and write to them (at most 3 addresses per company, never one that is already tried).", enforced: "code" },
   { law: "Anyone who says stop, unsubscribe, remove me or not interested is never emailed again (no reply, no follow-up); every first-contact email says so.", enforced: "code" },
   { law: "Record every company: what kind it is, where the relationship stands, any cost terms quoted, what was agreed and what is left to finalize.", enforced: "code" },
@@ -118,3 +120,32 @@ export const MEDIA_INBOX_PARAMETERS = {
   newContactsPerDay: 50,
   aiOrder: ["TruthCoder", "TruthCoder 2.0", "OpenAI", "Anthropic"],
 } as const;
+
+/** What the admin controls on /admin/partnerships (stored in media_settings; unset fields fall back to the server's env). */
+export const MEDIA_OUTREACH_MODES = ["ramp", "fixed", "paused"] as const;
+export type MediaOutreachMode = (typeof MEDIA_OUTREACH_MODES)[number];
+export const MEDIA_TEMPLATE_KINDS = ["directory", "association", "article", "news"] as const;
+export type MediaTemplateKind = (typeof MEDIA_TEMPLATE_KINDS)[number];
+export const MEDIA_TEMPLATE_KIND_LABELS: Record<MediaTemplateKind, string> = {
+  directory: "Directory", association: "Chamber / association", article: "Article site", news: "News media",
+};
+export type MediaSettings = {
+  /** ramp: start + step a day up to max · fixed: fixedPerDay a day · paused: no first-contact emails. */
+  outreach: MediaOutreachMode;
+  rampStart: number;
+  rampStep: number;
+  maxPerDay: number;
+  fixedPerDay: number;
+  /** Answer incoming email automatically (off: every new email waits for you). */
+  autoReplies: boolean;
+  /** Follow up after silence and try a new contact address. */
+  followUps: boolean;
+  /** Admin-edited first-contact emails; {company} is replaced by the company name. */
+  templates: Partial<Record<MediaTemplateKind, { subject: string; body: string }>>;
+};
+export type MediaQueueRow = {
+  id: number; domain: string; company: string; kind: string; toEmail: string; status: "queued" | "sent" | "skipped";
+  reason: string | null; source: string; queuedAt: string; sentAt: string | null;
+};
+/** Every first-contact email must offer a way out (the stop line). */
+export const STOP_LINE_RE = /reply\s+["“]?stop/i;
