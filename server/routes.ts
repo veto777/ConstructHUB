@@ -6411,10 +6411,23 @@ function main() {
   // unless server/tutorials/fixtures/gate.ts says so (never under NODE_ENV=production).
   registerTutorialFixtures(app);
 
+
+  // HOTFIX 2026-10-16: the public file routes take exactly folder/subfolder/filename. Express decodes %2F inside a
+  // param, so an encoded slash reached any object in the bucket (call recordings were downloadable by URL). Refuse
+  // slashes, backslashes and dot-segments in every part, and the private top-level folders served by their own
+  // authenticated routes.
+  const PRIVATE_FILE_FOLDERS = new Set(["voice", "jobcam", "ytvideo", "crm", "backups", "support", "research"]);
+  function publicFileKey(params: Record<string, string>): string | null {
+    const parts = [params.folder, params.subfolder, params.filename].map((v) => String(v ?? ""));
+    if (parts.some((v) => !v || /[\/\\]/.test(v) || v === "." || v === ".." || v.includes(".."))) return null;
+    if (PRIVATE_FILE_FOLDERS.has(parts[0].toLowerCase())) return null;
+    return parts.join("/");
+  }
+  
   app.get("/api/files/:folder/:subfolder/:filename", async (req, res) => {
     try {
-      const key = `${req.params.folder}/${req.params.subfolder}/${req.params.filename}`;
-      if (!key) return res.status(400).json({ message: "Missing file key" });
+      const key = publicFileKey(req.params as Record<string, string>);
+      if (!key) return res.status(404).json({ message: "File not found" });
 
       const { body, contentType } = await getFromR2(key);
       if (!body) return res.status(404).json({ message: "File not found" });
@@ -6511,11 +6524,12 @@ function main() {
 
   app.get("/api/files/:folder/:subfolder/:filename/download", async (req, res) => {
     try {
-      const key = `${req.params.folder}/${req.params.subfolder}/${req.params.filename}`;
+      const key = publicFileKey(req.params as Record<string, string>);
+      if (!key) return res.status(404).json({ message: "File not found" });
       const { body, contentType } = await getFromR2(key);
       if (!body) return res.status(404).json({ message: "File not found" });
 
-      const originalName = req.query.name as string || req.params.filename;
+      const originalName = String(req.query.name || req.params.filename).replace(/[^\w.\- ]+/g, "_").slice(0, 120) || "download";
       res.setHeader("Content-Type", contentType);
       res.setHeader("Content-Disposition", `attachment; filename="${originalName}"`);
       res.setHeader("Cache-Control", "no-cache");
