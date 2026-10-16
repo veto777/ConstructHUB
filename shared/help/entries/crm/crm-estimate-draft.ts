@@ -6,9 +6,9 @@ const entry: HelpDraft = {
   whatItIs: "“Save as draft” on the last step of a new estimate: it keeps the estimate without sending anything to the client.",
   whatItDoes: "The draft gets its estimate number and is listed on the Estimates page with the status Draft. You open it from there, change it with Edit, and send it with Send when it is ready.",
   howToUse: [
-    "CRM → Estimates → New estimate. Pick the client, add the work, and choose Review.",
+    "Open CRM → Estimates → New estimate, pick the client, add the work and choose Review.",
     "Give it a title and choose “Save as draft” instead of “Send estimate”.",
-    "Later, open Estimates and tick Draft to list your drafts.",
+    "Open Estimates later and tick Draft to list your drafts.",
     "Open the draft, choose Edit to change it, then Send.",
   ],
   howItWorks: "A draft is not emailed and the client cannot see it. Sending it emails the client a private link and changes the status to Sent.",

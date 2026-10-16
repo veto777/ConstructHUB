@@ -112,7 +112,7 @@ const page: FeaturePage = {
   pricing: {
     kind: "service",
     service: "gbpReinstatement",
-    note: "Sending the request form is free; the price is for a case we take on.",
+    note: "Sending the request form is free; the price is for a case we take on, and it is non-refundable because Google alone decides whether a profile is reinstated.",
   },
   faqs: [
     {
@@ -121,7 +121,7 @@ const page: FeaturePage = {
     },
     {
       q: "How much does it cost?",
-      a: `${PRICE} per project, paid once. It isn't a subscription and it isn't part of any plan. Sending the form costs nothing, and we tell you whether we think we can help before taking the case.`,
+      a: `${PRICE} per project, paid once. It isn't a subscription and it isn't part of any plan, and it is non-refundable: Google alone decides whether a profile comes back, so no one can promise it will. Sending the form costs nothing, and we tell you whether we think we can help before taking the case.`,
     },
     {
       q: "Will my profile definitely come back?",

@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "An activity log under each person on the Team tab: what they did in the CRM, newest first, with the time.",
   whatItDoes: "Each line says who did what — for example that a team member recorded a payment, with the amount and the invoice. The log covers estimates, invoices, client changes, price book changes, payments, exports of the client list and team changes. A member with nothing logged shows “No activity recorded yet.”",
   howToUse: [
-    "CRM → Team & Company → Team.",
+    "Open CRM → Team & Company → Team.",
     "Find the person and choose Activity under their name.",
     "Read the lines, newest first. Choose “Hide activity” to close the log.",
   ],

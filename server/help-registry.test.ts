@@ -5,7 +5,9 @@ import { HELP_ENTRIES, HELP_FEATURES, HELP_GROUPS, INTRO_FALLBACKS, NO_INTRO_FAL
 import { parseTutorialScript, STEP_ACTIONS } from "@shared/help/step-script";
 import { TUTORIAL_FILE, VIDEO_MANIFEST, helpVideoFor, tutorialMediaUrl } from "@shared/help/videos";
 import { createHash } from "crypto";
-import { indexes } from "../scripts/tutorials/gen-index";
+import { ROUTES_FILE, indexes, routeIndex } from "../scripts/tutorials/gen-index";
+import { HELP_ROUTES } from "@shared/help/routes";
+import { helpKeyForRouteIn } from "@shared/help/route-match";
 import { HELP_GROUPS as GROUPS } from "@shared/help/types";
 import { isKnownPath } from "@shared/app-routes";
 import { PLANS, PLAN_KEYS, planForModule } from "@shared/plans";
@@ -308,6 +310,27 @@ describe("help registry", () => {
     // "/" is never a prefix match: the home film is not every page's entry.
     expect(helpKeyForRoute("/settings")).not.toBe("brand-what-is-constructhub");
     for (const e of HELP_ENTRIES) if (e.unlisted) expect(helpKeyForRoute(e.route)).not.toBe(e.key);
+  });
+
+  it("decides a page's \"i\" from the generated route table exactly as the registry does (shared/help/routes.ts)", () => {
+    expect(fs.readFileSync(ROUTES_FILE, "utf8"), "shared/help/routes.ts is stale — npx tsx scripts/tutorials/gen-index.ts").toBe(routeIndex(HELP_ENTRIES));
+    const paths = new Set<string>(["/", "/no-such-page", "/crm/clients/12", "/crm/settings?tab=x"]);
+    for (const e of HELP_ENTRIES) for (const r of [e.route, ...(e.alsoAt ?? [])]) { paths.add(r); paths.add(`${r}/123`); }
+    for (const p of Array.from(paths)) expect(helpKeyForRouteIn(HELP_ROUTES, p), p).toBe(helpKeyForRoute(p));
+    // The client reads the table, never the registry, to pick the key.
+    const hook = read("client/src/lib/use-help-entry.ts");
+    expect(hook).toMatch(/export function useHelpKeyForRoute[^]*?helpKeyForRouteIn\(HELP_ROUTES/);
+  });
+
+  it("keeps the help registry out of the landing page: the brand film reads its one entry file and the manifest", () => {
+    // Every Meta-ad click lands on "/"; the registry chunk is ~120 KB gzipped.
+    const src = read("client/src/pages/landing.tsx");
+    expect(src).not.toMatch(/use-help-entry|useHelpEntry|loadHelpRegistry|@shared\/help\/registry|@shared\/help\/entries(\/index)?["']/);
+    expect(src).toMatch(/from "@shared\/help\/entries\/start-here\/brand-what-is-constructhub"/);
+    expect(src).toMatch(/helpVideoFor\(brandFilmEntry\.key\)/);
+    // Same film the registry would give: the entry's title and its manifest video.
+    expect(helpEntry("brand-what-is-constructhub")?.title).toBeTruthy();
+    expect(helpEntry("brand-what-is-constructhub")?.video).toEqual(helpVideoFor("brand-what-is-constructhub"));
   });
 
   it("help entries that live one per file are collected, named after their key and filed under their group", () => {

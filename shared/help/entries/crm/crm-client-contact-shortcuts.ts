@@ -3,10 +3,10 @@ import type { HelpDraft } from "../../types";
 /** Written from client/src/pages/crm-client.tsx (the contact row under the client's name) as it runs. */
 const entry: HelpDraft = {
   key: "crm-client-contact-shortcuts", group: "CRM", route: "/crm/clients", title: "Call, text, email or map a client",
-  whatItIs: "The contact row at the top of a client's page: the email address, the phone number with a call and a text button, and the address — each one a link.",
+  whatItIs: "The contact row at the top of a client's page: email, phone (with call and text buttons) and address. Each one is a link.",
   whatItDoes: "The email address starts a new email to the client. The phone number and the small phone button call the number. The speech-bubble button starts a text message to it. The address opens in Maps in a new tab.",
   howToUse: [
-    "CRM → Clients, and click the client's name.",
+    "Open CRM → Clients and click the client's name.",
     "Click the email address to write to them, or the phone number to call.",
     "Use the small buttons beside the number to call or text.",
     "Click the address to open it in Maps.",

@@ -69,10 +69,10 @@ export function InfoTip({ k, className }: { k: string; className?: string }) {
             className,
           )}
         >
-          <Info className="h-4 w-4" strokeWidth={1.8} />
+          <Info className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-md" data-testid={`info-dialog-${k}`}>
+      <DialogContent className="max-w-md motion-reduce:!animate-none" data-testid={`info-dialog-${k}`}>
         <DialogHeader>
           <DialogTitle data-testid={`info-title-${k}`}>{entry.title}</DialogTitle>
         </DialogHeader>

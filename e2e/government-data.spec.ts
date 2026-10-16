@@ -85,7 +85,9 @@ test('unconfirmed source-listed office and permit links remain clickable and dat
  await page.goto('/property');
  await expect(page.getByTestId('button-visit-appraiser-99301')).toHaveAttribute('href',common.portalUrl);
  await expect(page.getByText('Official site · not auto-verified · Last checked 2026-09-28')).toBeVisible();
- await expect(page.getByTestId('link-appraiser-fallback-99301')).toHaveCount(0);
+ // Property records also offers the web search beside an unconfirmed site (permits lane fixes, 26741b3f); the
+ // source-listed link itself stays clickable and dated above.
+ await expect(page.getByTestId('link-appraiser-fallback-99301')).toHaveCount(1);
  await page.route('**/api/databases?*',route=>route.fulfill({json:{total:1,databases:[{...common,name:'Source-listed permit office',jurisdiction:'Fixture, WA',jurisdictionType:'city'}]}}));
  await page.goto('/databases');
  await expect(page.getByTestId('link-portal-url-99301')).toHaveAttribute('href',common.portalUrl);

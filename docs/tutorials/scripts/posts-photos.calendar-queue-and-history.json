@@ -26,7 +26,7 @@
       "narration": "Cancel takes a queued item out of the queue." },
     { "action": "highlight", "selector": "xpath=(//article[contains(.,\"cancelled\")])[1]", "caption": "Marked cancelled",
       "narration": "It stays in the list, marked cancelled, so the record is complete." },
-    { "action": "highlight", "selector": "[data-testid=\"tool-rail-content\"]", "caption": "Google Business → Posts & Photos",
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-posts\"]", "caption": "Google Business → Posts & Photos",
       "narration": "You'll find Posts and Photos in the Google Business rail on the left." }
   ],
   "youtube": {

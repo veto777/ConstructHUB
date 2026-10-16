@@ -286,7 +286,7 @@ export async function notifyClientComment(
 
   const to = [...recipients].join(",");
   // Dev has no SMTP — the send is logged/stubbed there; the row is the record.
-  console.log(`[crm] client comment notification → ${to}`);
+  console.log(`[crm] client comment notification → ${recipients.size} recipient(s) (org ${org.id})`);
   await sendWithFallback({
     to,
     subject: `💬 ${customer.displayName} sent you a message${context} — reply quickly`,

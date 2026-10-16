@@ -20,6 +20,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { normalizePhone, sendSms } from "../crm/sms";
 import type { CallTaskSpec } from "./call-tasks";
 import { recordActivity } from "../crm/activity";
+import { queueCrmEvent, customerEventPayload, projectEventPayload } from "../crm/integrations";
 import { sendWithFallback } from "../email";
 import { appForLink, pushSoon } from "../apns";
 import type { OrgVoiceContext } from "./org-profile";
@@ -238,6 +239,7 @@ async function deliverLeadLocked(args: Parameters<typeof deliverLead>[0]): Promi
       return row;
     });
     created = true;
+    queueCrmEvent(org.id, "customer.created", { ...customerEventPayload(customer), source: "call_assistant" });
   }
   call.customerId = customer.id;
 
@@ -246,15 +248,17 @@ async function deliverLeadLocked(args: Parameters<typeof deliverLead>[0]): Promi
   const projectName = [facts.need || "Phone lead", facts.city].filter(Boolean).join(" — ").slice(0, 200);
   if (!projectId && profile.leadDelivery.crm.createProject) {
     const customerId = customer.id;
-    projectId = await db.transaction(async (tx) => {
-      const [project] = await tx.insert(crmProjects).values({
+    const project = await db.transaction(async (tx) => {
+      const [row] = await tx.insert(crmProjects).values({
         orgId: org.id, customerId, name: projectName, status: "lead",
         addressLine1: facts.address, city: facts.city, state,
         description: call.summary ?? null,
-      }).returning({ id: crmProjects.id });
-      await tx.update(voiceCalls).set({ projectId: project.id }).where(eq(voiceCalls.id, call.id));
-      return project.id;
+      }).returning();
+      await tx.update(voiceCalls).set({ projectId: row.id }).where(eq(voiceCalls.id, call.id));
+      return row;
     });
+    queueCrmEvent(org.id, "project.created", { ...projectEventPayload(project), source: "call_assistant" });
+    projectId = project.id;
     call.projectId = projectId;
   }
 

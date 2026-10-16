@@ -36,6 +36,7 @@ import {
   webhookSecretToken,
   handleWebhookUpdate,
 } from "./telegram";
+import { workerInterval } from "../workers";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -387,10 +388,10 @@ export function startLsaTimers(): void {
   void resumeDisputeQueue();
 
   // Promote due scheduled disputes every minute.
-  setInterval(() => void promoteDueScheduledDisputes(), 60_000).unref();
+  workerInterval("LSA scheduled disputes", () => promoteDueScheduledDisputes(), 60_000);
 
   // Rotating incremental sync every minute (no-op until accounts exist).
-  setInterval(() => void runRotatingSync(), 60_000).unref();
+  workerInterval("LSA rotating sync", () => runRotatingSync(), 60_000);
 
   // Register the Telegram webhook in production only.
   if (process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT) {

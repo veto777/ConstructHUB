@@ -68,7 +68,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "selector": "[data-testid=\"tool-rail-pipeline\"]",
       "caption": "Pipeline",
       "chapter": "On the pipeline",
       "narration": "It has a card on the Pipeline too. Open Pipeline in the menu.",
@@ -95,7 +95,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "selector": "[data-testid=\"tool-rail-clients\"]",
       "caption": "Menu: Clients",
       "narration": "You'll find your clients under Clients, in the menu on the left."
     }

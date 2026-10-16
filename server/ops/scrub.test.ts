@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 // The issue desk's scrubber (server/ops/scrub.ts): nothing secret or personal
 // reaches ops_issues, and nothing it is handed can make it throw.
-import { errorFacts, MAX_DETAIL_BYTES, scrubDetail, scrubText, stackFrames } from "./scrub";
+import { errorFacts, maskPhoneNumber, MAX_DETAIL_BYTES, scrubDetail, scrubText, stackFrames } from "./scrub";
 
 describe("scrubText", () => {
   it("removes tokens, keys and credentials", () => {
@@ -23,6 +23,35 @@ describe("scrubText", () => {
     expect(s).toContain("postgres://[redacted]@127.0.0.x:5432/db");
     expect(s).toContain("code=[redacted]");
     expect(s).toContain("ok=1");
+  });
+
+  it("redacts secret-named members of JSON echoed inside a string", () => {
+    const s = scrubText('400 from provider: {"email":"jane.doe@gmail.com","password":"hunter2","apiKey":"abc-123","otp":123456,"client_secret":"s3cr3t","name":"Jane"}');
+    expect(s).not.toMatch(/hunter2|abc-123|123456|s3cr3t/);
+    expect(s).toContain('"password":"[redacted]"');
+    expect(s).toContain('"apiKey":"[redacted]"');
+    expect(s).toContain('"otp":"[redacted]"');
+    expect(s).toContain('"client_secret":"[redacted]"');
+    expect(s).toContain('"name":"Jane"');
+    expect(s).toContain('"email":"j***@gmail.com"');
+    // The \"escaped\" form a provider puts in its message when it stringifies the body twice.
+    const e = scrubText('Unexpected body {\\"refresh_token\\":\\"1//abc\\",\\"grant_type\\":\\"refresh_token\\"}');
+    expect(e).not.toContain("1//abc");
+    expect(e).toContain("grant_type");
+  });
+
+  it("redacts a secret at the start of a form body or after a space, not only after ? or &", () => {
+    expect(scrubText("password=hunter2&email=jane@x.com")).toBe("password=[redacted]&email=j***@x.com");
+    expect(scrubText("code=4/0AbCdEf&redirect_uri=https://x.test/cb")).toContain("code=[redacted]&redirect_uri=");
+    expect(scrubText("smtp login failed: pass=hunter2 token=abc.def user=bob")).toBe("smtp login failed: pass=[redacted] token=[redacted] user=bob");
+    // After a space only the unambiguous names are secrets: an error code or state stays readable.
+    expect(scrubText("fetch failed code=ECONNREFUSED state=open")).toBe("fetch failed code=ECONNREFUSED state=open");
+  });
+
+  it("maskPhoneNumber keeps the last two digits only", () => {
+    expect(maskPhoneNumber("+18325550142")).toBe("[phone …42]");
+    expect(maskPhoneNumber("(832) 555-0142")).toBe("[phone …42]");
+    expect(maskPhoneNumber("")).toBe("[phone …]");
   });
 
   it("masks emails and phone numbers, and drops the host part of an IP", () => {

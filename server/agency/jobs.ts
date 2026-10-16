@@ -14,6 +14,7 @@ import { getEntitlements } from '../entitlements';
 import { reserveQuotaFor, refundReservation } from '../growth-quotas';
 import { accessFor, agencyPlanPaused, gbpSyncPaused, ownerHasPlan, filters, locationAccess, locationFilter, locationJoin, positiveId, requireWrite, clientAccess, workspaceEntitled, type AgencyAccess } from './access';
 import { recordFailure } from '../ops/issues';
+import { workerInterval } from "../workers";
 export const bulkInput = z.object({
   requestKey:z.string().uuid(), action:z.enum(['sync','unlink','link','guard','ai-replies','content','scan','assign']),
   selection:z.object({allMatching:z.boolean().default(false),ids:z.array(positiveId).max(50).default([]),filters:filters.default({})}).strict(),
@@ -173,5 +174,5 @@ export async function scheduleSyncs(onlyUser?:number) {
 }
 export function startAgencyWorker() {
   if(process.env.GBP_SYNC_DISABLED==='true')return;
-  const timer=setInterval(()=>void scheduleSyncs().then(()=>runAgencyJobs()).catch((e)=>{console.error('Agency queue tick failed');void recordFailure('job','Agency queue tick',e);}),15000);timer.unref();return timer;
+  return workerInterval('Agency queue worker',()=>scheduleSyncs().then(()=>runAgencyJobs()).catch((e)=>{console.error('Agency queue tick failed');void recordFailure('job','Agency queue tick',e);}),15000).timer;
 }

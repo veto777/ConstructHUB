@@ -4,12 +4,12 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "crm-google-calendar", group: "CRM", route: "/crm/settings", title: "Sync with Google Calendar",
   whatItIs: "The Calendar card in Settings, which pushes the CRM’s schedule into Google Calendar.",
-  whatItDoes: "Once a Google account is connected, every appointment in the CRM is written into a calendar named “ConstructHub CRM” in that account. The card shows when it was connected and when it last synced, and “Sync now” pushes the schedule straight away.",
+  whatItDoes: "Once a Google account is connected, “Sync now” writes your CRM appointments into a calendar named “ConstructHub CRM” in that account. Nothing syncs on its own: Google is only updated when you choose “Sync now”. The card shows when it was connected and when it last synced, and “Sync now” sends up to 1,000 appointments each time.",
   howToUse: [
-    "CRM → Settings, and scroll to the Calendar card.",
-    "Under “Company Google Calendar”, choose “Connect Google Calendar” and sign in on Google’s own screen.",
-    "Back in Settings the card reads Connected. Choose “Sync now” to push your schedule.",
-    "For just your own appointments, connect your own calendar under Team & Company → My profile.",
+    "Open CRM → Settings and scroll to the Calendar card.",
+    "Choose “Connect Google Calendar” under “Company Google Calendar” and sign in on Google’s own screen.",
+    "Choose “Sync now” once the card reads Connected, to send your schedule to Google.",
+    "Connect your own calendar under Team & Company → My profile for just your own appointments.",
   ],
   howItWorks: "The company calendar carries everyone’s appointments. A team member’s own calendar carries only theirs, and is separate. The same card also has a private feed link that any calendar app can subscribe to. Disconnect stops the sync.",
   needs: ["A ConstructHub CRM plan — the CRM is a separate product with its own plans.", "A Google account to hold the calendar."],

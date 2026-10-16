@@ -1,5 +1,7 @@
 import type { FeaturePage } from "./types";
 import { planNamesWhere } from "../plan-copy";
+import { PLANS, planForModule } from "../plans";
+import { ALACARTE } from "../alacarte";
 
 /**
  * Agency Ads & LSA — the Google Ads manager for agencies (/ads-manager).
@@ -21,10 +23,19 @@ import { planNamesWhere } from "../plan-copy";
  *   - protections (presence-only, Click Guard IP exclusions with rotation, shared negatives, account-wide
  *     placements, ad schedule), per-account previews, confirm checkbox, expiry, re-check before writing,
  *     reversal preview: server/ads/protections.ts, server/ads/worker.ts, client/src/pages/ads-manager.tsx
- *   - Agency-only module: server/ads/routes.ts requireModule('adsManager'), shared/plans.ts modules
+ *   - recommendations: tick client accounts and owner-approved playbook steps (flagged-IP exclusions, job-seeker
+ *     negatives, presence-only targeting, a tracking URL suffix, ad schedule, placement exclusions), each previewed
+ *     per account before anything is written: client/src/pages/ads-manager.tsx (Recommendations), server/ads/playbook.ts,
+ *     shared/ads-playbook.ts. The Landing door tab is platform-admin only and is not advertised.
+ *   - add one client account by customer ID (Link account → POST /api/ads/link queues a link job from your MCC):
+ *     client/src/pages/ads-manager.tsx (Client accounts), server/ads/routes.ts
+ *   - the adsManager module starts at Pro (shared/plans.ts PRO_MODULES), not only Agency:
+ *     server/ads/routes.ts requireModule('adsManager'). Plan names are read from the price book.
  */
 
 const PLAN_NAMES = planNamesWhere((plan) => plan.modules.adsManager);
+/** The cheapest plan with the Ads manager ("Pro"). */
+const FIRST_PLAN = PLANS[planForModule("adsManager")].name;
 
 const page: FeaturePage = {
   key: "adsManager",
@@ -32,7 +43,7 @@ const page: FeaturePage = {
   group: "win",
   status: "ready",
   title: "Agency Ads & LSA",
-  kicker: "For agencies",
+  kicker: "Google Ads manager",
   headline: { lead: "Audit and Protect Client Ad Accounts ", swipe: "in\u00a0Bulk" },
   lede:
     "Connect your Google Ads manager account, request access to client accounts, run a health audit across them, " +
@@ -66,6 +77,16 @@ const page: FeaturePage = {
       icon: "send",
       title: "Access requests in bulk",
       body: "Request access to up to 1,000 clients at a time. Clients can decline, and you can cancel any invitation that's still pending.",
+    },
+    {
+      icon: "sparkles",
+      title: "Recommendations",
+      body: "Tick client accounts and the playbook steps to apply: exclude flagged IPs, block job-seeker searches, show ads only to people in the service area, track every click, run ads only in answering hours, and block low-quality placements. Each account gets its own preview first.",
+    },
+    {
+      icon: "link",
+      title: "Link one account",
+      body: "Type a client's customer ID to send a link request from your manager account, and follow it until the client accepts.",
     },
     {
       icon: "clipboard",
@@ -129,8 +150,8 @@ const page: FeaturePage = {
       a: "A Google Ads manager (MCC) account and a Google sign-in that can manage it. Client accounts show up once they're linked to your MCC, so clients need to accept your invitation first. If the Google Ads connection isn't switched on for ConstructHUB yet, the page tells you so.",
     },
     {
-      q: "Which plan includes it?",
-      a: `It's part of the ${PLAN_NAMES} plan; no other plan includes it.`,
+      q: "Which plans include it?",
+      a: `It's included from the ${FIRST_PLAN} plan up (${PLAN_NAMES}). Without one of those plans, the ${ALACARTE.ads_manager.name} item adds it on its own.`,
     },
     {
       q: "Will it change my clients' campaigns on its own?",

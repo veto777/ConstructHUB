@@ -18,7 +18,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"tool-tab-calls\"]",
+      "selector": "[data-testid=\"tool-rail-calls\"]",
       "caption": "Calls",
       "narration": "Open Calls to see what it did with every call."
     },
@@ -81,7 +81,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"tool-tab-studio\"]",
+      "selector": "[data-testid=\"tool-rail-studio\"]",
       "caption": "Agent studio",
       "chapter": "Teach it your business",
       "narration": "In Agent studio you teach it your business: services, service area, hours and policies."

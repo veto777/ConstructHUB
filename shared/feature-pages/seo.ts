@@ -88,8 +88,8 @@ const page: FeaturePage = {
   hero: { mascot: "standing", bubble: "Let's see where your site really ranks." },
   steps: [
     {
-      title: "Add your site",
-      body: "Enter your domain, pick the country, and choose desktop, mobile or both. Decide how deep the results are read, from the top 10 to the top 100.",
+      title: "Look up or add a site",
+      body: "Type any website into Look up any website: Look it up opens Site explorer for it, and Add to my sites puts it on your dashboard and in the rank tracker for free. Pick the country, desktop, mobile or both, and how deep the results are read, from the top 10 to the top 100.",
     },
     {
       title: "Choose your keywords",
@@ -109,6 +109,11 @@ const page: FeaturePage = {
     },
   ],
   cards: [
+    {
+      icon: "search",
+      title: "Look up any website",
+      body: "One box on the dashboard for any address. Look it up opens Site explorer, where a saved report opens free and a new one is bought only when you press Analyse, with its cost shown first. Add to my sites is free: nothing is checked or charged until you add keywords.",
+    },
     {
       icon: "trending-up",
       title: "Rank tracker",
@@ -276,6 +281,7 @@ const page: FeaturePage = {
       "Track your website's rankings weekly, explore any site's keywords and backlinks, audit your pages and plan the work. Every lookup is priced before you buy.",
   },
   sources: [
+    "client/src/pages/seo/lookup-box.tsx",
     "client/src/pages/seo/dashboard.tsx",
     "client/src/pages/seo/index.tsx",
     "client/src/pages/seo/rank-history.tsx",

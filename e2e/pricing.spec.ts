@@ -19,7 +19,9 @@ type Sub = Record<string, unknown>;
 const NO_SUB: Sub = { plan: "free", status: "inactive" };
 const PRO_STRIPE: Sub = { plan: "pro", status: "active", stripeSubscriptionId: "sub_P_test", currentPeriodEnd: "2026-11-01T12:00:00Z", billingInterval: "month", addons: { protected_site: 1 }, agencyLocations: null };
 const PLATINUM_STRIPE: Sub = { plan: "platinum", status: "active", stripeSubscriptionId: "sub_P_legacy", currentPeriodEnd: "2026-11-01T12:00:00Z", billingInterval: "month", addons: {}, agencyLocations: null };
-const AGENCY_STRIPE: Sub = { plan: "agency", status: "active", stripeSubscriptionId: "sub_P_agency", currentPeriodEnd: "2027-10-01T12:00:00Z", billingInterval: "year", addons: { extra_seat: 2 }, agencyLocations: 25 };
+const AGENCY_STRIPE: Sub = { plan: "agency", status: "active", stripeSubscriptionId: "sub_P_agency", currentPeriodEnd: "2027-10-01T12:00:00Z", billingInterval: "year", addons: { competitor_pack: 2 }, agencyLocations: 25 };
+// The flat Unlimited plan: the same key without a billed location count (a count marks the legacy banded Agency, 3ac5f4b5).
+const UNLIMITED_STRIPE: Sub = { ...AGENCY_STRIPE, agencyLocations: null, addons: {} };
 const CANCELED_STRIPE: Sub = { plan: "pro", status: "canceled", stripeSubscriptionId: "sub_P_old", currentPeriodEnd: null, billingInterval: null, addons: {}, agencyLocations: null };
 
 /** Mock every billing endpoint the page can call and record what it sends. */
@@ -27,11 +29,22 @@ async function mockBilling(page: Page, sub: Sub) {
   const calls = { checkout: [] as any[], changePlan: [] as any[], addons: [] as any[], inquiry: [] as any[], cartCheckout: [] as any[] };
   await page.route("**/api/stripe/subscription", (r) => r.fulfill({ json: sub }));
   await page.route("**/api/stripe/create-checkout", async (r) => { calls.checkout.push(r.request().postDataJSON()); await r.fulfill({ json: {} }); });
+  // The change-plan dialog quotes the total from the server first (2f8222c2); answer with the price-book price.
+  await page.route("**/api/stripe/change-plan-preview", async (r) => {
+    const b = r.request().postDataJSON() as { plan: PlanKey; interval: "month" | "year" };
+    await r.fulfill({ json: { recurringCents: b.interval === "year" ? PLANS[b.plan].annualCents : PLANS[b.plan].monthlyCents, interval: b.interval } });
+  });
   await page.route("**/api/stripe/change-plan", async (r) => { calls.changePlan.push(r.request().postDataJSON()); await r.fulfill({ json: { ok: true } }); });
   await page.route("**/api/stripe/addons", async (r) => { calls.addons.push(r.request().postDataJSON()); await r.fulfill({ json: { ok: true } }); });
   await page.route("**/api/stripe/create-cart-checkout", async (r) => { calls.cartCheckout.push(r.request().postDataJSON()); await r.fulfill({ json: {} }); });
   await page.route("**/api/seo-inquiry", async (r) => { calls.inquiry.push(r.request().postDataJSON()); await r.fulfill({ json: { success: true } }); });
   return calls;
+}
+
+/** A first purchase opens the purchase review before Stripe (069ffdfc); confirm it. */
+async function chooseFirstPlan(page: Page, plan: PlanKey) {
+  await page.getByTestId(`button-subscribe-${plan}`).click();
+  await page.getByTestId("dialog-purchase-review").getByTestId("button-review-confirm").click();
 }
 
 /** Nothing wider than the screen outside a deliberate horizontal scroller. */
@@ -83,7 +96,9 @@ test.describe("pricing page", () => {
     await expect(page.getByTestId("cell-compare-autoPublish-starter").locator("svg")).toHaveAttribute("aria-label", "Not included");
     await expect(page.getByTestId("cell-compare-autoPublish-pro").locator("svg")).toHaveAttribute("aria-label", "Included");
     // Coming modules show the badge on the plans that promise them, nothing on the others.
-    await expect(page.getByTestId("cell-compare-permitAlerts-growth")).toContainText("Coming");
+    // Permit alerts shipped (d8ff3902): now a plain check on the plans that include them; CSV export is still Coming.
+    await expect(page.getByTestId("cell-compare-permitAlerts-growth").locator("svg")).toHaveAttribute("aria-label", PLANS.growth.modules.permitAlerts ? "Included" : "Not included");
+    await expect(page.getByTestId("cell-compare-permitAlerts-growth")).not.toContainText("Coming");
     await expect(page.getByTestId("cell-compare-permitAlerts-starter").locator("svg")).toHaveAttribute("aria-label", "Not included");
     await expect(page.getByTestId("cell-compare-csvExport-pro")).toContainText("Coming");
     // Texting numbers and the SEO suite are worded from the price book.
@@ -163,10 +178,12 @@ test.describe("pricing page", () => {
   test("no subscription: plan buttons start a checkout with plan + interval", async ({ page }) => {
     const calls = await mockBilling(page, NO_SUB);
     await gotoCrm(page, "/pricing");
-    await page.getByTestId("button-subscribe-pro").click();
+    await chooseFirstPlan(page, "pro");
     await expect.poll(() => calls.checkout.length).toBe(1);
+    // The mocked checkout returns no Stripe URL, so nothing navigates away: close the review to go on.
+    await page.getByTestId("button-review-cancel").click();
     await page.getByTestId("button-interval-year").click();
-    await page.getByTestId("button-subscribe-growth").click();
+    await chooseFirstPlan(page, "growth");
     await expect.poll(() => calls.checkout.length).toBe(2);
     expect(calls.checkout).toEqual([{ plan: "pro", interval: "month" }, { plan: "growth", interval: "year" }]);
     expect(calls.changePlan).toEqual([]);
@@ -199,13 +216,13 @@ test.describe("pricing page: returning and Agency subscribers", () => {
     const calls = await mockBilling(page, CANCELED_STRIPE);
     await gotoCrm(page, "/pricing");
     for (const k of PLAN_KEYS) await expect(page.getByTestId(`button-subscribe-${k}`)).toHaveText(`Choose ${PLANS[k].name}`);
-    await page.getByTestId("button-subscribe-pro").click();
+    await chooseFirstPlan(page, "pro");
     await expect.poll(() => calls.checkout).toEqual([{ plan: "pro", interval: "month" }]);
     expect(calls.changePlan).toEqual([]);
   });
 
   test("an Unlimited subscriber switching billing changes the same subscription, never a second checkout", async ({ page }) => {
-    const calls = await mockBilling(page, AGENCY_STRIPE);
+    const calls = await mockBilling(page, UNLIMITED_STRIPE);
     await gotoCrm(page, "/pricing?interval=year");
     await expect(page.getByTestId("button-subscribe-agency")).toHaveText("Current plan");
     await page.getByTestId("button-interval-month").click();
@@ -274,28 +291,30 @@ test.describe("settings billing", () => {
     await expect(page.getByTestId("text-addons-legacy")).toContainText(`switch to ${PLANS.agency.name}`);
     await expect(page.getByTestId("row-billing-locations")).toHaveCount(0);
     await expect(page.getByTestId("row-billing-addon-extra_location")).toHaveCount(0); // not sold on Agency
-    await expect(page.getByTestId("button-addon-inc-extra_seat")).toBeDisabled();
+    await expect(page.getByTestId("button-addon-inc-competitor_pack")).toBeDisabled(); // extra_seat is not sold on Unlimited (1833850c)
     expect(calls.addons).toEqual([]);
   });
 
   test("Agency: add-on + / − send the new total and the location count changes the plan", async ({ page }) => {
     const calls = await mockBilling(page, AGENCY_STRIPE);
     await gotoCrm(page, "/settings?tab=billing");
-    await expect(page.getByTestId("text-current-plan")).toContainText(`${PLANS.agency.name} plan`);
+    // A billed location count is the legacy banded Agency, shown by that name (3ac5f4b5).
+    await expect(page.getByTestId("text-current-plan")).toContainText("Legacy Agency plan");
     await expect(page.getByTestId("text-plan-interval")).toHaveText(`Billed yearly · ${usd(agencyMonthlyCents(25)! * LEGACY_BAND_ANNUAL_MONTHS)}/yr for 25 locations`);
     await expect(page.getByTestId("row-billing-locations")).toContainText("billed for 25 now");
-    await expect(page.getByTestId("text-addon-qty-extra_seat")).toHaveText("2");
-    await page.getByTestId("button-addon-inc-extra_seat").click();
-    await expect.poll(() => calls.addons).toEqual([{ addons: { extra_seat: 3 } }]);
-    await page.getByTestId("button-addon-dec-extra_seat").click();
+    await expect(page.getByTestId("text-addon-qty-competitor_pack")).toHaveText("2");
+    await page.getByTestId("button-addon-inc-competitor_pack").click();
+    await expect.poll(() => calls.addons).toEqual([{ addons: { competitor_pack: 3 } }]);
+    await page.getByTestId("button-addon-dec-competitor_pack").click();
     await expect.poll(() => calls.addons.length).toBe(2);
-    expect(calls.addons[1]).toEqual({ addons: { extra_seat: 1 } });
-    await expect(page.getByTestId("button-addon-dec-competitor_pack")).toBeDisabled();
+    expect(calls.addons[1]).toEqual({ addons: { competitor_pack: 1 } });
+    await expect(page.getByTestId("button-addon-dec-grid_pack")).toBeDisabled();
 
     await page.getByTestId("input-billing-locations").fill("30");
     await expect(page.getByTestId("text-billing-locations-quote")).toHaveText(`30 locations = ${usd(agencyMonthlyCents(30)! * LEGACY_BAND_ANNUAL_MONTHS)}/yr`);
     await page.getByTestId("button-billing-locations").click();
-    await expect.poll(() => calls.changePlan).toEqual([{ plan: "agency", interval: "year", locations: 30 }]);
+    // The location edit omits plan so a legacy band never migrates to Unlimited (3ac5f4b5).
+    await expect.poll(() => calls.changePlan).toEqual([{ locations: 30 }]);
     expect(calls.checkout).toEqual([]);
   });
 
@@ -424,7 +443,7 @@ test.describe("pricing page: refusals with a next step", () => {
     await mockBilling(page, NO_SUB);
     await page.route("**/api/stripe/create-checkout", (r) => r.fulfill({ status: 409, json: { code: "talk_to_sales", message: "Talk to a sales rep" } }));
     await gotoCrm(page, "/pricing");
-    await page.getByTestId("button-subscribe-growth").click();
+    await chooseFirstPlan(page, "growth");
     await expect(page.getByTestId("dialog-talk-to-sales").getByTestId("text-sales-topic")).toContainText(`${PLANS.growth.name} plan`);
   });
 
@@ -437,7 +456,7 @@ test.describe("pricing page: refusals with a next step", () => {
       await r.fulfill({ status: 409, json: { code: "has_subscription", message: "You already have a subscription." } });
     });
     await gotoCrm(page, "/pricing");
-    await page.getByTestId("button-subscribe-growth").click();
+    await chooseFirstPlan(page, "growth");
     const dialog = page.getByTestId("dialog-change-plan");
     await expect(dialog).toContainText(`${PLANS.growth.name} at ${usd(PLANS.growth.monthlyCents)}/mo`);
     await page.getByTestId("button-confirm-change-plan").click();

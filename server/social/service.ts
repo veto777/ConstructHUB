@@ -30,6 +30,7 @@ import { aiModel } from "../ai-config";
 import { AiAnswerError, aiClient, aiComplete, NO_TOOLS_RULE, type ChatClient } from "../ai-output";
 import { recordFailure } from "../ops/issues";
 import { getEntitlements, usersWithModule } from "../entitlements";
+import { workerInterval } from "../workers";
 export async function disconnect(userId: number, req: any, businessId: number | null = null) {
   // An Outstand connection also lets go of the accounts at Outstand (best effort; ours are deleted either way).
   const { rows: [conn] } = await pool.query("SELECT key_enc FROM social_connections WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2", [userId, businessId]);
@@ -775,14 +776,13 @@ export async function runSocialWorker(
 }
 export function startSocialWorker() {
   if (process.env.SOCIAL_WORKER_DISABLED === "true") return;
-  const timer = setInterval(
+  return workerInterval(
+    "Social worker",
     () =>
-      void runSocialWorker().catch((e) => {
+      runSocialWorker().catch((e) => {
         console.error("Social worker tick failed");
         void recordFailure("job", "Social worker tick", e);
       }),
     15000,
-  );
-  timer.unref();
-  return timer;
+  ).timer;
 }

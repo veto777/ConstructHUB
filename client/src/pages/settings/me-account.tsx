@@ -1005,7 +1005,7 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                         <div className="flex items-center gap-2">
                           <code className="font-mono text-sm font-semibold tracking-wider" data-testid={`text-beta-code-${c.id}`}>{c.code}</code>
-                          <button type="button" onClick={() => copyCode(c.code)} aria-label={`Copy invite link for ${c.code}`} className="text-muted-foreground hover:text-foreground" data-testid={`button-copy-code-${c.id}`}>
+                          <button type="button" onClick={() => copyCode(c.code)} aria-label={`Copy invite link for ${c.code}`} className="inline-flex h-11 w-11 -my-3 -mx-2.5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground" data-testid={`button-copy-code-${c.id}`}>
                             <Copy className="h-3.5 w-3.5" />
                           </button>
                           <Badge variant="outline" className="text-xs">{c.trialDays === 0 ? "∞" : `${c.trialDays || 2}d`}</Badge>

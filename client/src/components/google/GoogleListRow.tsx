@@ -51,13 +51,13 @@ export function GoogleListRow({
   className?: string;
 } & Omit<HTMLAttributes<HTMLElement>, "title">) {
   const heading = onOpen
-    ? <button type="button" onClick={onOpen} data-testid={titleTestId}>{title}</button>
+    ? <button type="button" className="g-card__open" onClick={onOpen} data-testid={titleTestId}>{title}</button>
     : href
       ? <a href={href} data-testid={titleTestId} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined}>{title}</a>
       : <span data-testid={titleTestId}>{title}</span>;
   const metaNode = Array.isArray(meta) ? <GoogleMeta parts={meta} /> : meta ? <p className="g-card__line">{meta}</p> : null;
   return (
-    <Tag className={cn("g-card", className)} data-testid={testId} {...rest}>
+    <Tag className={cn("g-card", onOpen && "g-card--opens", className)} data-testid={testId} {...rest}>
       <div className="g-card__row">
         {leading && <span className="g-card__lead" aria-hidden="true">{leading}</span>}
         <div className="g-card__body">

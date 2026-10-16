@@ -77,7 +77,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-settings\"]",
+      "selector": "[data-testid=\"tool-rail-settings\"]",
       "caption": "Where to find it",
       "narration": "The company calendar is in Settings, in the left menu."
     }

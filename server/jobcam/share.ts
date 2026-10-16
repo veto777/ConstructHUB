@@ -9,8 +9,12 @@
  *     a view counter. Every file read is gated by the same access check.
  *   - Client portal /api/client/jobcam: the shots a team member switched on for
  *     the client (client_visible) from the homeowner's projects — read-only,
- *     scoped to the session's customer ids like every portal read. Share links
- *     are their own explicit act of sharing and do not consult that flag.
+ *     scoped to the session's customer ids like every portal read.
+ *   - "Hidden from client" (client_visible = false) holds on EVERY guest read:
+ *     a share link's feed and file routes skip hidden shots (a live timeline
+ *     and a gallery alike), a hidden shot's file is a 404 by id, and a gallery
+ *     cannot be made from hidden shots. Switching a shot on makes it appear on
+ *     existing links; switching it off takes it away again.
  */
 import type { Express } from "express";
 import { z } from "zod";
@@ -28,7 +32,7 @@ import { logActivity } from "../crm/activity";
 import { messageNoteBody } from "../crm/messages";
 import { canManageJobcam, visibleProject } from "./access";
 import { requireJobcamPlan } from "./plan";
-import { presentMedia, projectSummary, membersMap, streamVariant, queryFeed, parseFeedParams, feedCursor, portalMediaWhere } from "./routes";
+import { presentMedia, projectSummary, membersMap, streamVariant, queryFeed, parseFeedParams, feedCursor, portalMediaWhere, shareMediaWhere } from "./routes";
 import { expiryFromPreset, hashSharePassword, looksLikeShareToken, newShareToken, safeEqual, shareAccess, shareLinkState, shareSecret, signShareSession, verifySharePassword } from "./share-auth";
 
 type GetUser = (req: any, res: any) => any;
@@ -116,11 +120,19 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     const b = parsed.data;
     let mediaIds: string[] | null = null;
     if (b.kind === "gallery") {
-      // Only this project's own, ready media can be in a gallery.
+      // Only this project's own, ready media can be in a gallery — and never a
+      // shot the team hid from the client (the public routes would skip it anyway).
       const ids = b.mediaIds ?? [];
-      const rows = ids.length ? await db.select({ id: jobcamMedia.id }).from(jobcamMedia)
+      const rows = ids.length ? await db.select({ id: jobcamMedia.id, clientVisible: jobcamMedia.clientVisible }).from(jobcamMedia)
         .where(and(eq(jobcamMedia.orgId, ctx.org.id), eq(jobcamMedia.projectId, project.id), isNull(jobcamMedia.deletedAt), eq(jobcamMedia.status, "ready"), inArray(jobcamMedia.id, ids))) : [];
       if (!rows.length) return res.status(400).json({ message: "Pick at least one photo or video for a gallery link (or share the live timeline)." });
+      const hidden = rows.filter((r) => !r.clientVisible).length;
+      if (hidden) {
+        return res.status(409).json({
+          message: `${hidden === 1 ? "1 of the shots you picked is" : `${hidden} of the shots you picked are`} hidden from the client. Switch ${hidden === 1 ? "it" : "them"} to Visible to client first, or leave ${hidden === 1 ? "it" : "them"} out.`,
+          hiddenCount: hidden,
+        });
+      }
       const keep = new Set(rows.map((r) => r.id));
       mediaIds = ids.filter((i) => keep.has(i));
     }
@@ -296,7 +308,10 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     const s = await gate(req, res); if (!s) return;
     const p = parseFeedParams(req.query);
     const rows = await queryFeed({
-      orgId: s.orgId, projectIds: [s.projectId], mediaIds: s.kind === "gallery" ? (s.mediaIds ?? []) : null,
+      // A gallery is its fixed set; anything other than a timeline is treated as one (fail closed).
+      orgId: s.orgId, projectIds: [s.projectId], mediaIds: s.kind === "timeline" ? null : (s.mediaIds ?? []),
+      // Hidden from client means hidden on every share link too.
+      clientVisibleOnly: true,
       tags: p.tags, tagMode: p.tagMode, kind: p.kind, limit: Math.min(p.limit, 120) + 1, before: p.before,
     });
     const page = rows.slice(0, Math.min(p.limit, 120));
@@ -310,9 +325,8 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
 
   app.get("/api/jc/:token/media/:id/file/:variant", async (req: any, res) => {
     const s = await gate(req, res); if (!s) return;
-    const where = [eq(jobcamMedia.orgId, s.orgId), eq(jobcamMedia.projectId, s.projectId), eq(jobcamMedia.id, req.params.id), isNull(jobcamMedia.deletedAt), eq(jobcamMedia.status, "ready")];
-    if (s.kind === "gallery") where.push(inArray(jobcamMedia.id, s.mediaIds?.length ? s.mediaIds : ["-"]));
-    const [m] = await db.select().from(jobcamMedia).where(and(...where)).limit(1);
+    // Hidden, deleted, not-ready or outside the link's set: a 404 even when the id is known.
+    const [m] = await db.select().from(jobcamMedia).where(shareMediaWhere(s, String(req.params.id))).limit(1);
     if (!m) return res.status(404).json({ message: "Not found" });
     const variant = String(req.params.variant);
     // Guests never get the untouched original unless the link allows details; the display rendition is the share copy.

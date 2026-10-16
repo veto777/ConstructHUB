@@ -6,9 +6,9 @@ const entry: HelpDraft = {
   whatItIs: "The choices a client still has to make on a job, each with the allowance you priced for it.",
   whatItDoes: "A selection has a name, a category and an allowance. Update records what the client chose, what it really cost and its status. When the actual cost is above the allowance, the line shows how much it is over.",
   howToUse: [
-    "CRM → Pipeline, open the project, and choose the Selections tab.",
+    "Open CRM → Pipeline, open the project, and choose the Selections tab.",
     "Type the selection, its category and the allowance, and click the plus button.",
-    "When the client decides, choose Update on the line.",
+    "Choose Update on the line when the client decides.",
     "Type the chosen option and the actual cost, set the status, and choose Save.",
   ],
   howItWorks: "The tab works out the overage from the allowance and the actual cost you typed. It shows the amount; it does not bill it for you.",

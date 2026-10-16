@@ -16,7 +16,8 @@ import {
 } from "@/components/crm-ui";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { InfoTip } from "@/components/info-tip";
-import { SampleDocsTable } from "@/components/crm-sample-previews";
+import { lazySample } from "@/components/sample-preview";
+const SampleDocsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleDocsTable");
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -504,11 +505,11 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
               <SampleDocsTable kind={kind} cta={
                 kind === "estimates" ? (
                   <Link href="/crm/estimates/new">
-                    <Button size="sm" variant="outline" data-testid="button-new-estimate-sample">Create your first estimate</Button>
+                    <Button size="sm" variant="outline" className="max-sm:min-h-11" data-testid="button-new-estimate-sample">Create your first estimate</Button>
                   </Link>
                 ) : (
                   <Link href="/crm/clients">
-                    <Button size="sm" variant="outline" data-testid="button-invoice-from-client-sample">Invoice from a client's page</Button>
+                    <Button size="sm" variant="outline" className="max-sm:min-h-11" data-testid="button-invoice-from-client-sample">Invoice from a client's page</Button>
                   </Link>
                 )
               } />

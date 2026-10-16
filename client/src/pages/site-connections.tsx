@@ -787,7 +787,7 @@ export default function SiteConnections({
   );
   if (planGate)
     return (
-      <AppPage testId={`page-site-connections-${provider}`}>
+      <AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId={`page-site-connections-${provider}`}>
         {header}
         <PlanRequired
           module="cloudflareSearchConsole"
@@ -797,7 +797,7 @@ export default function SiteConnections({
       </AppPage>
     );
   return (
-    <AppPage testId={`page-site-connections-${provider}`}>
+    <AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId={`page-site-connections-${provider}`}>
       {header}
       <SavedDataSummary>
       {config.error &&

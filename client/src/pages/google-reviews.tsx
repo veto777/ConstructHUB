@@ -603,7 +603,7 @@ export default function GoogleReviewsPage() {
                 </div>
               ) : reviews.length === 0 ? (
                 <SamplePreview what="what your sent requests look like here" testId="sample-review-requests"
-                  cta={<Button size="sm" onClick={openSendDialog} data-testid="button-first-review-request">New review request</Button>}>
+                  cta={<Button size="sm" className="max-sm:min-h-11" onClick={openSendDialog} data-testid="button-first-review-request">New review request</Button>}>
                   <div className="space-y-3">
                     {SAMPLE_REQUESTS.map((r) => (
                       <div key={r.name} className="flex items-center gap-3 rounded-xl border bg-card p-4">
@@ -948,7 +948,7 @@ export default function GoogleReviewsPage() {
             >
               {templates.length === 0 ? (
                 <SamplePreview what="what a saved profile looks like here" testId="sample-review-profiles"
-                  cta={<Button variant="outline" size="sm" onClick={openNewTemplate} data-testid="button-create-first-template"><Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Add your first profile</Button>}>
+                  cta={<Button variant="outline" size="sm" className="max-sm:min-h-11" onClick={openNewTemplate} data-testid="button-create-first-template"><Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Add your first profile</Button>}>
                   <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Building2 className="h-4 w-4" aria-hidden="true" /></div>
                     <div className="min-w-0 flex-1">
@@ -1137,11 +1137,11 @@ export default function GoogleReviewsPage() {
                 {[
                   { name: "Yelp", url: "https://biz.yelp.com" },
                   { name: "BBB", url: "https://www.bbb.org/near-me" },
-                  { name: "Angi", url: "https://www.angi.com/pro/login" },
+                  { name: "Angi", url: "https://office.angi.com" },
                   { name: "GuildQuality", url: "https://www.guildquality.com/login" },
                   { name: "HomeAdvisor", url: "https://pro.homeadvisor.com" },
                   { name: "Houzz", url: "https://www.houzz.com/pro/login" },
-                  { name: "Thumbtack", url: "https://pro.thumbtack.com" },
+                  { name: "Thumbtack", url: "https://www.thumbtack.com/login" },
                   { name: "Facebook", url: "https://business.facebook.com" },
                 ].map((platform) => (
                   <a
@@ -2637,7 +2637,7 @@ function ReminderSettingsCard() {
                   {(customInterval || !INTERVAL_PRESETS.includes(Number(currentSettings.intervalHours))) && (
                     <Input type="number" inputMode="numeric" min={1} max={720} step={1} value={currentSettings.intervalHours} aria-label="Custom hours between reminders (1 to 720)"
                       onChange={e => { const n = parseInt(e.target.value, 10); if (Number.isInteger(n) && n >= 1 && n <= 720) updateField("intervalHours", n); }}
-                      data-testid="input-interval-custom" />
+                      className="max-sm:h-11" data-testid="input-interval-custom" />
                   )}
                 </div>
 
@@ -2664,7 +2664,7 @@ function ReminderSettingsCard() {
                   {(customMax || !MAX_PRESETS.includes(Number(currentSettings.maxReminders))) && (
                     <Input type="number" inputMode="numeric" min={0} max={10} step={1} value={currentSettings.maxReminders} aria-label="Custom number of reminders (0 to 10)"
                       onChange={e => { const n = parseInt(e.target.value, 10); if (Number.isInteger(n) && n >= 0 && n <= 10) updateField("maxReminders", n); }}
-                      data-testid="input-max-reminders-custom" />
+                      className="max-sm:h-11" data-testid="input-max-reminders-custom" />
                   )}
                 </div>
               </div>
@@ -2795,7 +2795,7 @@ function FeedbackRoutingCard() {
             {customThreshold && (
               <Input type="number" inputMode="numeric" min={1} max={10} step={1} value={threshold} aria-label="Custom feedback-routing score (1 to 10)"
                 onChange={(e) => { const n = parseInt(e.target.value, 10); if (Number.isInteger(n) && n >= 1 && n <= 10) setDraft(n); }}
-                data-testid="input-escalation-threshold-custom" />
+                className="max-sm:h-11" data-testid="input-escalation-threshold-custom" />
             )}
           </div>
           <p className="text-sm leading-relaxed text-muted-foreground sm:pt-7" data-testid="text-escalation-summary">

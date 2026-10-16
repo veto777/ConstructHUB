@@ -184,7 +184,7 @@ export default function DatabasesPage() {
   const activeFilters = (selectedState !== "all" ? 1 : 0) + (selectedCountyId !== "all" ? 1 : 0);
 
   return (
-    <AppPage width="narrow" testId="page-databases">
+    <AppPage width="narrow" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-databases">
       {/* Google's local-pack format (owner, 2026-10-07): a quiet header, number tiles, filter pills, hairline rows. */}
       <GoogleSectionHeader
         as="h1"

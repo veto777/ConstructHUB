@@ -116,7 +116,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "selector": "[data-testid=\"tool-rail-estimates\"]",
       "caption": "The full builder",
       "narration": "For a bigger job, the full builder under Estimates adds work from your price book."
     }

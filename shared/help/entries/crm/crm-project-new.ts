@@ -6,8 +6,8 @@ const entry: HelpDraft = {
   whatItIs: "A new job for a client you already have, started from their page.",
   whatItDoes: "New project in the Projects section of a client’s page asks for one thing: the project’s name. The project gets the next project number, is listed on the client’s page, and gets a card on the Pipeline board.",
   howToUse: [
-    "CRM → Clients, and open the client.",
-    "In the Projects section choose New project.",
+    "Open CRM → Clients and open the client.",
+    "Choose New project in the Projects section.",
     "Type the project name and choose Create project.",
     "Click the project to open its page, or find its card on the Pipeline.",
   ],

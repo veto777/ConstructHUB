@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "A dated record of what got done on a job each day.",
   whatItDoes: "A log holds what was done, the weather and how many crew were on the job. File log saves it under today’s date at the top of the list. Edit changes a log’s text, date, weather or crew count.",
   howToUse: [
-    "CRM → Pipeline, open the project, and choose the Daily logs tab.",
+    "Open CRM → Pipeline, open the project, and choose the Daily logs tab.",
     "Type what got done today.",
     "Add the weather and the number of crew.",
     "Choose File log.",

@@ -19,7 +19,7 @@ import { apiMonthStart, apiMonthResetsAt } from "../account/api-keys";
 import {
   crmPayments, crmInvoices, crmEstimates, crmProjects, crmCustomers, crmOrgs,
   crmApiKeys, crmWebhooks, crmMembers, crmEstimateEvents, crmPaymentAccounts,
-  crmNotificationChannel,
+  crmNotificationChannel, CRM_WEBHOOK_EVENTS,
 } from "@shared/schema";
 import { and, eq, desc, sql, isNull } from "drizzle-orm";
 import { sendWithFallback } from "../email";
@@ -144,6 +144,8 @@ export async function emitCrmEvent(orgId: string, event: string, payload: any): 
               "ConstructHUB-Event": event,
             },
             body, signal: ctl.signal,
+            // Never follow a redirect: the URL was checked against private/link-local addresses, a Location header was not.
+            redirect: "manual",
           });
           clearTimeout(timer);
           lastStatus = r.status;
@@ -163,6 +165,46 @@ export async function emitCrmEvent(orgId: string, event: string, payload: any): 
   } catch (e: any) {
     console.error("[crm] emitCrmEvent failed:", e?.message || e);
   }
+}
+
+/**
+ * The same delivery as emitCrmEvent (signed, three tries, lastStatus /
+ * failureCount on the webhook row), without holding the request open: a
+ * customer endpoint that is slow or down must never delay saving a client,
+ * a project or a visit. Used by the record events (customer.*, project.*,
+ * estimate.*, changeorder.*, appointment.*). Never throws.
+ */
+export function queueCrmEvent(orgId: string, event: (typeof CRM_WEBHOOK_EVENTS)[number], payload: any): void {
+  void emitCrmEvent(orgId, event, payload);
+}
+
+/** A client as webhook data — contact fields only, never the portal token. */
+export function customerEventPayload(c: {
+  id: string; displayName?: string | null; firstName?: string | null; lastName?: string | null;
+  companyName?: string | null; email?: string | null; phone?: string | null;
+  addressLine1?: string | null; city?: string | null; state?: string | null; postalCode?: string | null;
+}) {
+  return {
+    customerId: c.id, displayName: c.displayName ?? null, firstName: c.firstName ?? null,
+    lastName: c.lastName ?? null, companyName: c.companyName ?? null, email: c.email ?? null,
+    phone: c.phone ?? null, addressLine1: c.addressLine1 ?? null, city: c.city ?? null,
+    state: c.state ?? null, postalCode: c.postalCode ?? null,
+  };
+}
+
+/** A project as webhook data. */
+export function projectEventPayload(p: {
+  id: string; customerId: string; number?: string | null; name?: string | null; status?: string | null;
+}) {
+  return { projectId: p.id, customerId: p.customerId, number: p.number ?? null, name: p.name ?? null, status: p.status ?? null };
+}
+
+/** project.stage_changed — only for a real move (from ≠ to). */
+export function queueProjectStageChange(
+  orgId: string, projectId: string, from: string | null | undefined, to: string | null | undefined,
+): void {
+  if (!to || from === to) return;
+  queueCrmEvent(orgId, "project.stage_changed", { projectId, from: from ?? null, to });
 }
 
 // ── API-key auth for the public read API ────────────────────────────────────

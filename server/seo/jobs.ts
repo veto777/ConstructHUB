@@ -35,6 +35,7 @@ import { raiseLinkAlerts, rankAlertPlan, saveRankAlerts, deliverAlert, type RunC
 
 import { publicFailure } from "./public-errors";
 import { backlogWarning, closeDecision } from "./collect-plan";
+import { workerInterval } from "../workers";
 
 /** Runs `fn` in one transaction on its own connection. */
 async function withTransaction<T>(fn: (db: { query: typeof pool.query }) => Promise<T>): Promise<T> {
@@ -624,7 +625,5 @@ export async function seoTick(): Promise<void> {
 
 export function startSeoWorker() {
   if (process.env.SEO_JOBS_DISABLED === "true") return;
-  const timer = setInterval(() => void seoTick().catch((e) => { console.error("[seo] tick failed", e?.message ?? e); void recordFailure("job", "SEO tick", e); }), TICK_MS);
-  timer.unref();
-  return timer;
+  return workerInterval("SEO worker", () => seoTick().catch((e) => { console.error("[seo] tick failed", e?.message ?? e); void recordFailure("job", "SEO tick", e); }), TICK_MS).timer;
 }

@@ -27,6 +27,7 @@ import { geocodeAddress } from "./geocode";
 import { deliverDigest, type DeliveryResults } from "./deliver";
 import { contentHash, matchWatch, normalizeAddress } from "./matching";
 import type { WatchKind, WatchParams } from "@shared/permit-alerts";
+import { workerInterval } from "../workers";
 
 export const PERMIT_POLL_INTERVAL_MS = 60 * 60 * 1000;
 export const PERMIT_POLL_BACKOFF_MS = 6 * 60 * 60 * 1000;
@@ -262,7 +263,5 @@ export async function permitAlertsTick(): Promise<PollOutcome[]> {
 
 export function startPermitAlertsWorker() {
   if (process.env.PERMIT_ALERTS_DISABLED === "true") return;
-  const timer = setInterval(() => void permitAlertsTick().catch((e) => { console.error("[permit-alerts] tick failed", e?.message ?? e); void recordFailure("job", "Permit alerts tick", e); }), TICK_MS);
-  timer.unref();
-  return timer;
+  return workerInterval("Permit alerts worker", () => permitAlertsTick().catch((e) => { console.error("[permit-alerts] tick failed", e?.message ?? e); void recordFailure("job", "Permit alerts tick", e); }), TICK_MS).timer;
 }

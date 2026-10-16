@@ -141,14 +141,14 @@ export function ApiUsagePanel({ days: initialDays = 30 }: ApiUsagePanelProps = {
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Period</span>
-              <select aria-label="Usage period" value={preset} onChange={(e) => setPreset(e.target.value)} className="h-8 rounded-md border bg-background px-2 text-sm text-foreground" data-testid="select-api-usage-period">
+              <select aria-label="Usage period" value={preset} onChange={(e) => setPreset(e.target.value)} className="h-8 rounded-md border bg-background px-2 text-sm text-foreground max-sm:h-11" data-testid="select-api-usage-period">
                 {DAY_PRESETS.map((d) => <option key={d} value={String(d)}>Last {d} days</option>)}
                 <option value="custom">Custom…</option>
               </select>
             </label>
             {preset === "custom" && (
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Input type="number" inputMode="numeric" min={1} max={MAX_DAYS} value={customDays} onChange={(e) => setCustomDays(e.target.value)} placeholder="Days" className="h-8 w-24 text-sm" aria-label="Number of days" data-testid="input-api-usage-days" />
+                <Input type="number" inputMode="numeric" min={1} max={MAX_DAYS} value={customDays} onChange={(e) => setCustomDays(e.target.value)} placeholder="Days" className="h-8 w-24 text-sm max-sm:h-11" aria-label="Number of days" data-testid="input-api-usage-days" />
                 <span>days (up to {MAX_DAYS})</span>
               </label>
             )}

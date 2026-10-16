@@ -83,13 +83,13 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-gmb-edit-monitor\"]",
+      "selector": "[data-testid=\"tool-rail-monitor\"]",
       "caption": "Menu: GMB Edit Monitor",
       "narration": "GMB Edit Monitor is in the menu on the left, under Google Business."
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-locations\"]",
+      "selector": "[data-testid=\"tool-rail-locations\"]",
       "caption": "Profile Watch: a tab on every location",
       "narration": "Profile Watch is a tab on every linked location, under Locations."
     }

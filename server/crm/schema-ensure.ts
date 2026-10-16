@@ -546,6 +546,16 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS approved_total_cents integer;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS selected_discounts jsonb;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS division_id varchar;
+    -- Document defaults snapshot (server/crm/doc-defaults.ts).
+    ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS footer_text text;
+    ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS warranty_text text;
+    ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS company_terms_text text;
+    ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS deposit_bps integer;
+    ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS defaults_snapshot_at timestamp;
+    ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS footer_text text;
+    ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS warranty_text text;
+    ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS terms_text text;
+    ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS defaults_snapshot_at timestamp;
     ALTER TABLE crm_pb_items ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     ALTER TABLE crm_pb_materials ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     -- per_sqft pricing mode (Quick Bid): rate per sq ft + which measurement
@@ -571,6 +581,18 @@ export async function ensureCrmSchema(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS crm_estimate_discounts_est_idx ON crm_estimate_discounts (estimate_id);
   `);
+
+  // Document defaults snapshot backfill — UNSENT DRAFTS ONLY. A draft has never
+  // been in a client's hands, so it takes today's Settings text and keeps it
+  // from now on. Anything sent, viewed, signed, paid or voided is left with no
+  // snapshot and keeps printing live Settings exactly as before. Idempotent:
+  // only rows still without a snapshot are touched. The deposit is not
+  // backfilled — an existing draft's numbers never change behind its author.
+  try {
+    await backfillDocDefaultsSnapshots(pool);
+  } catch (e: any) {
+    console.warn("[crm] document defaults backfill skipped:", e?.message || e);
+  }
 
   // ── Client engagement sessions (public estimate/invoice dwell time) ──────
   await pool.query(`
@@ -825,4 +847,32 @@ export async function ensureCrmSchema(): Promise<void> {
   } catch (e: any) {
     console.warn("[crm] doc-number unique indexes skipped:", e?.message || e);
   }
+}
+
+/** The unsent-draft snapshot backfill (exported for tests). */
+export async function backfillDocDefaultsSnapshots(q: { query: (sql: string) => Promise<any> }): Promise<void> {
+  await q.query(`
+    UPDATE crm_estimates e
+    SET footer_text = CASE WHEN btrim(coalesce(o.estimate_footer, '')) = '' THEN NULL ELSE o.estimate_footer END,
+        warranty_text = CASE WHEN btrim(coalesce(o.warranty_text, '')) = '' THEN NULL ELSE o.warranty_text END,
+        company_terms_text = CASE WHEN btrim(coalesce(o.terms_and_conditions, '')) = '' THEN NULL ELSE o.terms_and_conditions END,
+        defaults_snapshot_at = now()
+    FROM crm_orgs o
+    WHERE o.id = e.org_id
+      AND e.defaults_snapshot_at IS NULL
+      AND e.status = 'draft' AND e.sent_at IS NULL
+      AND e.approved_at IS NULL AND e.declined_at IS NULL
+  `);
+  await q.query(`
+    UPDATE crm_invoices i
+    SET footer_text = CASE WHEN btrim(coalesce(o.invoice_footer, '')) = '' THEN NULL ELSE o.invoice_footer END,
+        warranty_text = CASE WHEN btrim(coalesce(o.warranty_text, '')) = '' THEN NULL ELSE o.warranty_text END,
+        terms_text = CASE WHEN btrim(coalesce(o.terms_and_conditions, '')) = '' THEN NULL ELSE o.terms_and_conditions END,
+        defaults_snapshot_at = now()
+    FROM crm_orgs o
+    WHERE o.id = i.org_id
+      AND i.defaults_snapshot_at IS NULL
+      AND i.status = 'draft' AND i.sent_at IS NULL
+      AND i.voided_at IS NULL AND i.paid_at IS NULL AND COALESCE(i.paid_cents, 0) = 0
+  `);
 }

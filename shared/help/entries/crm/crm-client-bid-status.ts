@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "The All, Job Won, Undecided and Declined tabs above the client list, and the Bid column beside each client.",
   whatItDoes: "Each tab shows the clients in that group, with a count. The status comes from the client's estimates: Job Won when one is approved, Undecided when one is sent and not answered, Declined when one was declined.",
   howToUse: [
-    "CRM → Clients.",
+    "Open CRM → Clients.",
     "Click Job Won, Undecided or Declined to see only those clients.",
     "Type in the search box to search inside the tab you are on.",
     "Click All to see everyone again.",

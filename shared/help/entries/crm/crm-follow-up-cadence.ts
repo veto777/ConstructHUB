@@ -6,8 +6,8 @@ const entry: HelpDraft = {
   whatItIs: "A weekly or biweekly reminder to check in with a client, so nobody goes cold.",
   whatItDoes: "Home lists the clients who are due under Needs attention → Due for follow-up. Done logs the follow-up under Activity and moves the client's next date on. The Follow-ups window shows everyone on a rhythm and their next due date.",
   howToUse: [
-    "CRM → Home. Under Needs attention, “Due for follow-up” shows who to contact today.",
-    "After you have been in touch, choose Done beside their name.",
+    "Open CRM → Home and read “Due for follow-up” under Needs attention: it shows who to contact today.",
+    "Choose Done beside their name after you have been in touch.",
     "Choose Follow-ups to add a client: search, click their name, and they start weekly.",
     "Use the list beside a client to switch between Weekly and Biweekly, or choose Off to stop.",
   ],

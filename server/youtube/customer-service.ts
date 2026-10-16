@@ -19,6 +19,7 @@ import {
 import { getEntitlements } from "../entitlements";
 import { youtubeCompanyGrant } from "./store";
 import { handleOf, keyIsOwn, storedVideoSource } from "./customer-media";
+import { workerInterval } from "../workers";
 
 /* ── Plain words ──────────────────────────────────────────────────────────── */
 
@@ -252,11 +253,9 @@ export function kickCustomerYoutubeWorker(): void {
 
 export function startCustomerYoutubeWorker() {
   if (process.env.YOUTUBE_CUSTOMER_WORKER_DISABLED === "true") return;
-  const timer = setInterval(() => void runCustomerYoutubeWorker().catch(async (e) => {
+  return workerInterval("YouTube customer upload worker", () => runCustomerYoutubeWorker().catch(async (e) => {
     console.error("[youtube] customer worker tick failed:", (e as Error)?.message);
     const { recordFailure } = await import("../ops/issues");
     void recordFailure("job", "YouTube customer upload worker tick", e);
-  }), 15_000);
-  timer.unref();
-  return timer;
+  }), 15_000).timer;
 }

@@ -92,6 +92,7 @@ export function isBackupDue(cfg: BackupConfig, now: Date = new Date()): boolean 
 
 import { toCsv, type CellValue } from "./csv";
 import { recordFailure } from "../ops/issues";
+import { workerInterval } from "../workers";
 export { csvCell, toCsv } from "./csv";
 export interface BackupSection {
   name: string;
@@ -335,13 +336,11 @@ export async function runDueBackups(now: Date = new Date()): Promise<void> {
 export function startBackupScheduler(): void {
   if (schedulerStarted) return;
   schedulerStarted = true;
-  const timer = setInterval(() => {
+  workerInterval("CRM backup scheduler", () =>
     runDueBackups().catch((e) => {
       console.error("[crm-backup] tick failed:", e?.message || e);
       void recordFailure("job", "CRM backup scheduler tick", e);
-    });
-  }, BACKUP_SCHEDULER_TICK_MS);
-  timer.unref();
+    }), BACKUP_SCHEDULER_TICK_MS);
 }
 
 // ── Routes (owner only, always — admins get 403) ─────────────────────────────

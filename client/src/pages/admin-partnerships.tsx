@@ -275,7 +275,7 @@ export default function AdminPartnershipsPage() {
           <Stat label="Finalized" value={n(s.partners.finalized)} onClick={() => setPartnerTab("finalized")} selected={partnerTab === "finalized"} />
           <Stat label="Talking" value={n(s.partners.talking)} onClick={() => setPartnerTab("talking")} selected={partnerTab === "talking"} />
           <Stat label="Emails sent" value={n(s.sent)} hint={`${n(received)} received`} onClick={() => setMailTab("out")} />
-          <Stat label="Directories queued" value={n(s.queue.queued)} hint={`${n(s.queue.sentToday)} of ${n(s.queue.perDay)} sent today · ${n(s.queue.sent)} so far`} testId="stat-partners-queue" />
+          <Stat label="Directories queued" value={n(s.queue.queued)} hint={`${n(s.queue.sentToday)} of ${n(s.queue.perDay)} sent today · ${n(s.queue.sent)} so far`} onClick={() => setMailTab("out")} testId="stat-partners-queue" />
           <Stat label="Waiting for you" value={n(s.counts.needs_owner)} tone={s.counts.needs_owner ? "bad" : "default"} onClick={() => setMailTab("needs_owner")} hint={`checked ${ago(s.lastPassAt)}`} />
         </StatGrid>
 
@@ -285,7 +285,7 @@ export default function AdminPartnershipsPage() {
           </Button>
         }>
           <Tabs value={partnerTab} onValueChange={(v) => setPartnerTab(v as typeof partnerTab)} className="mb-3">
-            <TabsList className="flex-wrap">
+            <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="all">All</TabsTrigger>
               {MEDIA_PARTNER_STATUSES.map((st) => <TabsTrigger key={st} value={st}>{MEDIA_PARTNER_STATUS_LABELS[st]} ({n(s.partners[st])})</TabsTrigger>)}
             </TabsList>
@@ -320,7 +320,7 @@ export default function AdminPartnershipsPage() {
 
         <Section title="Emails" icon={Mail}>
           <Tabs value={mailTab} onValueChange={(v) => { setMailTab(v as typeof mailTab); setPage(0); }} className="mb-3">
-            <TabsList className="flex-wrap">
+            <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="out" data-testid="tab-media-sent">Sent ({n(s.sent)})</TabsTrigger>
               <TabsTrigger value="in">Received ({n(received)})</TabsTrigger>

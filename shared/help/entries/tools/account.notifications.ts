@@ -6,10 +6,10 @@ const entry: HelpDraft = {
   whatItIs: "Which alerts reach you in the app and which are also emailed.",
   whatItDoes: "One row per kind of alert with two switches: In app and Email. Security alerts are always emailed and their email switch cannot be turned off. In the iPhone app a card at the top turns on phone notifications; they follow the in-app switches.",
   howToUse: [
-    "Settings → Notifications.",
+    "Open Settings → Notifications.",
     "Flip In app or Email for each kind of alert.",
-    "In the iPhone app, allow phone notifications in the card at the top.",
+    "Allow phone notifications in the card at the top of the iPhone app.",
   ],
-  howItWorks: "Each switch saves the moment you flip it and the row shows an error if the save failed. Security emails stay on for every account.",
+  howItWorks: "Each switch saves the moment you flip it; if a save fails, the error shows at the top of the list. Security emails stay on for every account.",
 };
 export default entry;

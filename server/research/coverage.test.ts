@@ -29,9 +29,9 @@ describe("coverage manifest (from the registry)", () => {
 
   it("every source can be searched some way, and nationwide records are listed once", () => {
     for (const s of manifest.states) for (const src of s.sources) expect(src.ids.length, `${s.state}: ${src.label}`).toBeGreaterThan(0);
-    // CourtListener is off (its robots.txt disallows us), so it isn't claimed (audit 2026-10-15). OSHA is listed with
+    // CourtListener is on again (owner order 2026-10-15), so it is claimed. OSHA is listed with
     // `needs: "osha"` whatever the build holds: the running server's key decides whether the page shows it (round 4).
-    expect(manifest.nationwide.some((n) => /CourtListener/.test(n.label))).toBe(false);
+    expect(manifest.nationwide.some((n) => /CourtListener/.test(n.label))).toBe(true);
     expect(manifest.nationwide.find((n) => /OSHA/.test(n.label))).toMatchObject({ needs: "osha" });
     expect(nationwideNow(manifest.nationwide, { osha: false }).some((n) => /OSHA/.test(n.label))).toBe(false);
     expect(nationwideNow(manifest.nationwide, { osha: true }).some((n) => /OSHA/.test(n.label))).toBe(true);

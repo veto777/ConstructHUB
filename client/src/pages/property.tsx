@@ -169,14 +169,14 @@ export default function PropertyPage() {
   const hasFilters = stateFilter !== "all" || countyFilter !== "all" || searchQuery.trim() !== "";
   const activeFilters = (stateFilter !== "all" ? 1 : 0) + (countyFilter !== "all" ? 1 : 0);
 
-  if (error && (!rawAppraisers || planRequiredFrom(error) || /^40[123]:/.test(error.message))) return <AppPage width="narrow" testId="page-property">
+  if (error && (!rawAppraisers || planRequiredFrom(error) || /^40[123]:/.test(error.message))) return <AppPage width="narrow" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-property">
     <GoogleSectionHeader as="h1" title="Property records" flush />
     {planRequiredFrom(error) ? <PlanRequired module="propertyRecords" error={error} /> : /^401:/.test(error.message) ?
       <Notice tone="info">Sign in to access Property Records. Included with {planNamesWhere(p => p.modules.propertyRecords)}. <Button asChild variant="outline"><a href={`/auth?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}>Sign in</a></Button></Notice> :
       <Notice tone="danger">Couldn't load property offices. <Button variant="outline" onClick={() => void refetch()}>Retry</Button></Notice>}
   </AppPage>;
   return (
-    <AppPage width="narrow" testId="page-property">
+    <AppPage width="narrow" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-property">
       {error && <Notice tone="danger">Refresh failed — showing saved property offices. <Button variant="outline" onClick={() => void refetch()}>Retry</Button></Notice>}
       {/* Google's local-pack format (owner, 2026-10-07): a quiet header, hairline rows, pill actions. */}
       <GoogleSectionHeader

@@ -95,7 +95,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-cloudflare\"]",
+      "selector": "[data-testid=\"tool-rail-cloudflare\"]",
       "caption": "Menu: Cloudflare",
       "narration": "You'll find Cloudflare in the menu on the left, under Tools."
     }

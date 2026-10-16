@@ -9,6 +9,7 @@ import {aiModel} from '../ai-config';
 import {aiClient,aiComplete,NO_TOOLS_RULE,type ChatClient} from '../ai-output';
 import {getEntitlements} from '../entitlements';
 import { recordFailure } from '../ops/issues';
+import { workerInterval } from "../workers";
 export const replySettingsSchema=z.object({
   mode:z.enum(['off','draft','auto']).default('off'), scope:z.enum(['future','existing']).default('future'),
   tone:z.string().trim().min(1).max(200).default('Warm and professional'), signOff:z.string().trim().max(150).default(''),
@@ -158,5 +159,5 @@ export async function runReplyWorker(process=processReplies) {
 }
 export function startReplyWorker() {
   if(process.env.GBP_SYNC_DISABLED==='true')return;
-  const timer=setInterval(()=>void runReplyWorker().catch((e)=>{console.error('GBP reply worker failed');void recordFailure('job','GBP reply worker tick',e);}),60_000);timer.unref();return timer;
+  return workerInterval('GBP reply worker',()=>runReplyWorker().catch((e)=>{console.error('GBP reply worker failed');void recordFailure('job','GBP reply worker tick',e);}),60_000).timer;
 }

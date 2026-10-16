@@ -303,7 +303,8 @@ test.describe("settings api keys", () => {
     await expect(page.locator('[data-testid="card-api-upgrade"]')).toHaveCount(0);
 
     const head = page.getByTestId("table-api-keys").locator("thead");
-    for (const col of ["Title", "Key", "Scope", "Units consumed", "Limit", "Added", "Last used", "Expires"]) await expect(head).toContainText(col);
+    // "Units consumed" became "Units used" in 7c298f26.
+    for (const col of ["Title", "Key", "Scope", "Units used", "Limit", "Added", "Last used", "Expires"]) await expect(head).toContainText(col);
     await expect(page.getByTestId("text-key-name-key_a1")).toHaveText("Zapier");
     await expect(page.getByTestId("text-key-masked-key_a1")).toHaveText("chub_a1b2c3…x9");
     await expect(page.getByTestId("text-key-scopes-key_a1")).toHaveText("Read");
@@ -388,6 +389,8 @@ test.describe("settings api keys", () => {
   });
 
   test("menu: rename, set monthly limit, revoke with confirmation", async ({ page }) => {
+    // Gabe's one-time welcome bubble (bottom-right, 15 s) sits over the table's last row actions; mark it seen.
+    await page.addInitScript(() => { localStorage.setItem("hub.welcomeSeen", "1"); localStorage.setItem("hub.welcomeSeen:1", "1"); });
     const calls = await mockAccount(page);
     await gotoCrm(page, API_URL);
     await page.getByTestId("button-key-menu-key_a1").click();
@@ -496,9 +499,11 @@ test.describe("developers page", () => {
     await expect(tag.getByTestId("endpoint-get-api-v1-growth-posts")).toContainText("List posts");
     const create = tag.getByTestId("endpoint-post-api-v1-growth-posts");
     await expect(create).toContainText("Create a post");
-    await create.locator("summary").click();
+    // The endpoint's own summary; the examples block nested inside it has a <summary> too (695a68a1).
+    await create.locator(":scope > summary").click();
     await expect(create).toContainText("Stored exactly as sent.");
-    await expect(create).toContainText("Cost: 5 unit(s).");
+    // Cost reads "5 units" (pluralized) since 7c298f26.
+    await expect(create).toContainText("Cost: 5 units");
     await expect(create).toContainText("201 — Created.");
     await page.getByTestId("link-developers-keys").click();
     await expect(page).toHaveURL(/[?&]tab=api-keys(&|$)/);

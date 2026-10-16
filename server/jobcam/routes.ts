@@ -267,6 +267,21 @@ export function portalMediaWhere(customerIds: string[], id: string): SQL {
   )!;
 }
 
+/**
+ * The one row a public share link may open by id: the link's own org and
+ * project, ready, not deleted, switched on for the client, and — for a gallery
+ * — one of the shots the link was made with. A shot the team hid from the
+ * client is a 404 even to a viewer who knows (or guesses) its id.
+ */
+export function shareMediaWhere(s: { orgId: string; projectId: string; kind: string; mediaIds?: string[] | null }, id: string): SQL {
+  const where: SQL[] = [
+    eq(jobcamMedia.orgId, s.orgId), eq(jobcamMedia.projectId, s.projectId), eq(jobcamMedia.id, id),
+    isNull(jobcamMedia.deletedAt), eq(jobcamMedia.status, "ready"), eq(jobcamMedia.clientVisible, true),
+  ];
+  if (s.kind !== "timeline") where.push(inArray(jobcamMedia.id, s.mediaIds?.length ? s.mediaIds : ["-"]));
+  return and(...where)!;
+}
+
 export function parseFeedParams(q: Record<string, any>) {
   const str = (k: string) => (typeof q[k] === "string" && q[k].trim() ? String(q[k]).trim().slice(0, 300) : null);
   const date = (k: string) => { const s = str(k); if (!s) return null; const d = new Date(s); return Number.isFinite(d.getTime()) ? d : null; };

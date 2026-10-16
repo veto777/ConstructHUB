@@ -21,11 +21,16 @@ const DEBAR_TEXT = "                 PREVAILING WAGE DEBARMENT LIST\n    The fol
 const OPIF_DETAIL = "<div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">PIF Number:</span> <div class=\"col-sm-8\"> 10001077 </div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Case Name:</span> <div class=\"col-sm-8\"> State ex rel. Celebrezze v. Smith; Howard Smith Construction </div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Supplier:</span> <div class=\"col-sm-8\">Howard Smith Construction</div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Case Number:</span> <div class=\"col-sm-8\">A8906328</div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Date in Pif:</span> <div class=\"col-sm-8\">1/24/1990</div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Court:</span> <div class=\"col-sm-8\">C.P.</div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">County:</span> <div class=\"col-sm-8\">Hamilton</div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Keywords:</span> <div class=\"col-sm-8\">Failure to Deliver; Deposits</div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Statute Cites:</span> <div class=\"col-sm-8\">&#167; 1345.02(B)(2), &#167; 1345.01</div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Rules & Regulations:</span> <div class=\"col-sm-8\">&#167; 109:4-3-09(A)(2), &#167; 109:4-3-09(B)(2)</div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Subject Matter:</span> <div class=\"col-sm-8\">Home Improvements</div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Category:</span> <div class=\"col-sm-8\"></div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Sub-Category:</span> <div class=\"col-sm-8\"></div> </div> <div class=\"mb-3 row\"> <span class=\"form-label-display col-sm-4\">Issue Summary:</span> <div class=\"col-sm-8\">Supplier permanently enjoined from accepting money from consumer for home improvement goods and services and then permitting eight weeks to elapse without delivering the goods and services ordered or making a full refund to the consumer. Supplier to pay: $3,650 in restitution, $25,000 in civil penalties. </div> </div> </div> <br/> </div> <br/> </div> <footer> <div class=\"container footer-container\"> <div class=\"container copyright\"> ";
 
 describe("terms decisions: removed sources, blocked notes and the boot cleanup", () => {
-  it("SC DES, WV Purchasing and the WI DNR/DHS files are not registered, and their rows are deleted at boot", () => {
+  it("SC DES and the WI DNR/DHS files (terms) are not registered and their rows are deleted at boot; the robots-only ones are back", () => {
     const ids = new Set(ALL_BULK_SOURCES.map((s) => s.id));
-    for (const id of ["sc-des-enforcement", "wv-purchasing-debarred", "wi-dnr-wells", "wi-dhs-abatement"]) {
+    for (const id of ["sc-des-enforcement", "wi-dnr-wells", "wi-dhs-abatement"]) {
       expect(ids.has(id), id).toBe(false);
       expect(RETIRED_BULK_SOURCES, id).toContain(id);
+    }
+    // OWNER ORDER 2026-10-15: a robots.txt Disallow no longer stops a search.
+    for (const id of ["wv-purchasing-debarred", "pa-pittsburgh", "mo-dpr-electrical", "mo-dpr-ae"]) {
+      expect(ids.has(id), id).toBe(true);
+      expect(RETIRED_BULK_SOURCES, id).not.toContain(id);
     }
     expect(sc.bulk ?? []).toEqual([]);
     expect(wi.bulk ?? []).toEqual([]);
@@ -33,7 +38,6 @@ describe("terms decisions: removed sources, blocked notes and the boot cleanup",
   it("each blocked note quotes the clause or names the refusal", () => {
     const has = (p: { blocked?: string[] }, re: RegExp) => (p.blocked ?? []).some((b) => re.test(b));
     expect(has(sc, /You may not: \(1\) reproduce.*except as specifically permitted by SCDES in writing/)).toBe(true);
-    expect(has(wv, /purchasing\.wv\.gov.*Disallow: \/.*side door/)).toBe(true);
     expect(has(wi, /DNR.*noncommercial use of the general public/)).toBe(true);
     expect(has(wi, /DHS.*Wisconsin\.gov.*noncommercial use of the general public/)).toBe(true);
     expect(has(wi, /WisDOT.*noncommercial use of the general public/)).toBe(true);

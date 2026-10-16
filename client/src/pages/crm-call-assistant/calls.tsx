@@ -19,7 +19,9 @@ import { CALL_ASSISTANT_SPAM } from "@shared/plan-copy";
 import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
 import { CallDetailSheet, EscalationRow } from "./calls-detail";
 import { CallResults } from "./results";
-import { SampleCallsPreview, SampleSpamPreview } from "./samples";
+import { lazySample } from "@/components/sample-preview";
+const SampleCallsPreview = lazySample(() => import("./samples"), "SampleCallsPreview");
+const SampleSpamPreview = lazySample(() => import("./samples"), "SampleSpamPreview");
 import { GooglePill } from "@/components/google";
 import {
   OUTCOME_LABELS, outcomeLabel, outcomeTone, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, LIVE_REFRESH_MS, callFingerprint,

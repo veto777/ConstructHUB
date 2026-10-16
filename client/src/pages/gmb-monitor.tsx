@@ -291,6 +291,9 @@ function ReviewResponseTool() {
   const [reviewerName, setReviewerName] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [tone, setTone] = useState("professional");
+  // "Custom": the owner describes the tone in their own words (plain text, up to 120 characters; the server checks it too).
+  const [customTone, setCustomTone] = useState("");
+  const customToneMissing = tone === "custom" && !customTone.trim();
   const [generatedResponse, setGeneratedResponse] = useState("");
   const [customEdit, setCustomEdit] = useState("");
   const [showWarning, setShowWarning] = useState(false);
@@ -301,6 +304,7 @@ function ReviewResponseTool() {
         reviewText,
         businessName,
         tone,
+        customTone: tone === "custom" ? customTone.trim() : undefined,
         reviewerName,
       });
       return res.json();
@@ -394,14 +398,32 @@ function ReviewResponseTool() {
                 <SelectItem value="professional">Professional</SelectItem>
                 <SelectItem value="empathetic">Empathetic (for negative reviews)</SelectItem>
                 <SelectItem value="grateful">Grateful (for positive reviews)</SelectItem>
+                <SelectItem value="custom">Custom — describe the tone…</SelectItem>
               </SelectContent>
             </Select>
+            {tone === "custom" && (
+              <div className="mt-2">
+                <Label htmlFor="custom-tone" className="text-xs mb-1 block">Describe the tone you want</Label>
+                <Input
+                  id="custom-tone"
+                  value={customTone}
+                  onChange={(e) => setCustomTone(e.target.value.slice(0, 120))}
+                  maxLength={120}
+                  placeholder="e.g. warm and short, like a neighbor; no corporate words"
+                  className="min-h-10 text-sm"
+                  data-testid="input-custom-tone"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1" data-testid="text-custom-tone-help">
+                  A few plain words about tone and wording, up to 120 characters ({customTone.length}/120). The reply still follows the review and our rules: no offers, discounts or contact details are added.
+                </p>
+              </div>
+            )}
           </div>
           <Button
             size="sm"
             variant="outline" className="mt-4 gap-1.5"
             onClick={() => generateMutation.mutate()}
-            disabled={!reviewText.trim() || generateMutation.isPending}
+            disabled={!reviewText.trim() || customToneMissing || generateMutation.isPending}
             data-testid="button-generate-response"
           >
             {generateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
@@ -552,7 +574,7 @@ export default function GmbMonitorPage() {
   const lastChecked = listings?.map(l => l.lastCheckedAt).filter((d): d is NonNullable<typeof d> => !!d).sort().pop();
 
   return (
-    <GoogleSurface page><AppPage className="before:hidden" width="narrow">
+    <GoogleSurface page><AppPage className="before:hidden max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" width="narrow">
       <PageHeader title={<span data-testid="text-page-title">GMB Edit Monitor</span>} description="Check your Google listings for changes whenever you need." actions={<>
         <Button onClick={()=>setShowAddForm(!showAddForm)} data-testid="button-add-listing">Add business</Button>
         {monitoredCount>0&&<Button variant="outline" onClick={()=>checkAllMutation.mutate()} disabled={checkAllMutation.isPending} data-testid="button-check-all">{checkAllMutation.isPending?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:null}Check all ({monitoredCount})</Button>}
@@ -663,7 +685,7 @@ export default function GmbMonitorPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0"><Label className="text-[10px] leading-tight text-right text-muted-foreground">Include in Check All</Label><Switch checked aria-label="Included in Check All" /></div>
+                <div className="flex items-center gap-1.5 shrink-0"><Label className="text-[10px] leading-tight text-right text-muted-foreground max-w-[4.5rem] sm:max-w-none">Include in Check All</Label><Switch checked aria-label="Included in Check All" /></div>
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-border/40">
                 <Button size="sm" variant="outline" className="min-h-10 text-xs gap-1.5"><RefreshCw className="h-3 w-3" /> Check now</Button>

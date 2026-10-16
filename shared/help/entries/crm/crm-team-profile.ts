@@ -4,9 +4,9 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "crm-team-profile", group: "CRM", route: "/crm/team", title: "Your profile",
   whatItIs: "Your own name, title and mobile number in the CRM — how you appear to your crew and on the schedule.",
-  whatItDoes: "My profile holds your name, your title and your mobile number, and shows the role you have. Save profile stores them and takes you back to Home.",
+  whatItDoes: "My profile holds your name, your title and your mobile number, and shows the role you have. Save profile stores them and moves you on to the next setup step, or back to Home once setup is done.",
   howToUse: [
-    "CRM → Team & Company → My profile, or click your name at the bottom of the menu.",
+    "Open CRM → Team & Company → My profile, or click your name at the bottom of the menu.",
     "Check your name, then type your title and your mobile number.",
     "Choose Save profile.",
   ],

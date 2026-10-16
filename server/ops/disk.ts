@@ -7,7 +7,7 @@
  */
 import { statfs } from "node:fs/promises";
 import { recordIssue } from "./issues";
-import { onShutdown } from "../shutdown";
+import { workerInterval } from "../workers";
 
 const envNum = (name: string, fallback: number, min = 0) => { const n = Number(process.env[name]); return Number.isFinite(n) && n >= min ? n : fallback; };
 export const DISK_WARN_FREE_GB = envNum("DISK_WARN_FREE_GB", 10, 0.1);
@@ -61,11 +61,8 @@ export async function checkDisk(record: (input: Parameters<typeof recordIssue>[0
   return s;
 }
 
-/** Boot: check now and every DISK_WATCH_MINUTES; the timer stops with the process. */
+/** Boot: check now and every DISK_WATCH_MINUTES; the timer stops with the process (server/workers.ts). */
 export function startDiskWatch(): NodeJS.Timeout {
   void checkDisk().then((s) => { if (s.ok && !s.warn) console.log(`[disk] ${describeDisk(s)}`); }).catch(() => {});
-  const timer = setInterval(() => { void checkDisk().catch(() => {}); }, DISK_WATCH_MINUTES * 60_000);
-  timer.unref();
-  onShutdown("disk watch", () => clearInterval(timer));
-  return timer;
+  return workerInterval("disk watch", () => checkDisk().catch(() => {}), DISK_WATCH_MINUTES * 60_000).timer!;
 }

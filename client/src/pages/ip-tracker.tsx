@@ -26,7 +26,8 @@ import { useToolView } from "@/hooks/use-tool-view";
 import { IP_TRACKER_VIEWS } from "@/components/traffic-tool/nav";
 import { ALL_TIME, RangePicker, StepsCard, WindowPicker, daysAgo, inRange, localDayKey, rangeBounds, rangeKey, rangeQuery, type DateRange } from "@/components/traffic-tool/shared";
 import { DailyVisitsChart, PagesTable, PlatformBreakdowns, GeoTable, SitePanel, SitesSummaryStrip, SourcesTable, StatTiles, VISIT_ROW_CAP, VisitorDetailPanel, VisitorRow, countLabel, type Analytics, type DomainWithStats, type GeoData, type OnlineFigure, type PageStat, type PlatformData, type Visitor, type VisitorDetail } from "@/components/traffic-tool/ip-views";
-import { IpSample } from "@/components/traffic-tool/samples";
+import { lazySample } from "@/components/sample-preview";
+const IpSample = lazySample(() => import("@/components/traffic-tool/samples"), "IpSample");
 import { Search, Plus, Copy, Trash2, MoreHorizontal, Code2 } from "lucide-react";
 
 // The icon pickers live with the shared pieces now; the UI tests import them from here.
@@ -590,8 +591,8 @@ export default function IpTrackerPage() {
           "Open the site once: its first visit replaces the sample below within about 30 seconds.",
         ]} />}
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Input ref={domainInput} placeholder="example.com" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newDomain.trim()) addDomainMutation.mutate(); }} aria-label="Site domain" data-testid="input-domain" />
-          <Input placeholder="Display name (optional)" value={newDomainName} onChange={(e) => setNewDomainName(e.target.value)} aria-label="Display name" data-testid="input-domain-name" />
+          <Input ref={domainInput} placeholder="example.com" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newDomain.trim()) addDomainMutation.mutate(); }} aria-label="Site domain" className="max-sm:h-11" data-testid="input-domain" />
+          <Input placeholder="Display name (optional)" value={newDomainName} onChange={(e) => setNewDomainName(e.target.value)} aria-label="Display name" className="max-sm:h-11" data-testid="input-domain-name" />
         </div>
         <div className="flex gap-2">
           <GooglePill variant="solid" label={addDomainMutation.isPending ? "Adding…" : "Add"} onClick={() => addDomainMutation.mutate()} disabled={!newDomain.trim() || addDomainMutation.isPending} testId="button-save-domain" />
@@ -603,7 +604,7 @@ export default function IpTrackerPage() {
   );
 
   return (
-    <AppPage width="wide" testId="page-ip-tracker">
+    <AppPage width="wide" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-ip-tracker">
       {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
       <GoogleSectionHeader
         as="h1"

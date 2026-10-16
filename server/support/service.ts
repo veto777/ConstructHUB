@@ -38,6 +38,7 @@ import { freshState, turn, LINES, type Account, type CallState, type Category, t
 import { CLIPS, freshIvrState, ivrTurn, type ClipId, type IvrDeps, type IvrInput, type IvrReply } from "./ivr";
 import { admitIvrCall, codeSendGate, LIMITS, meterCall, minutesExhausted, realStore } from "./limits";
 import { mirrorSupportCallSoon } from "./call-log";
+import { workerInterval } from "../workers";
 
 const DAY = 24 * 3_600_000;
 let warnedPepper = false;
@@ -358,7 +359,7 @@ export function registerSupportRoutes(app: Express, getDevUser: any) {
     if (!r?.ok) return res.status(502).json({ message: "Recording unavailable" });
     res.setHeader("Cache-Control", "no-store"); res.type("audio/mpeg"); res.send(Buffer.from(await r.arrayBuffer()));
   });
-  setInterval(() => { transcribeSweep().catch((e) => console.error("[support] transcribe sweep failed:", e?.message || e)); }, 30_000).unref();
+  workerInterval("support transcribe sweep", () => transcribeSweep().catch((e) => console.error("[support] transcribe sweep failed:", e?.message || e)), 30_000);
 
   app.post(`${VOICE_INTERNAL_PATH}/support/start`, requireVoiceInternal, async (req, res) => {
     const { callSid, from } = req.body || {};

@@ -28,6 +28,7 @@ import { JOBCAM_DDL } from "../server/jobcam/schema";
 import { YOUTUBE_DDL } from "../server/youtube/schema";
 import { YOUTUBE_CUSTOMER_DDL } from "../server/youtube/customer-schema";
 import { ANALYTICS_ATTRIBUTION_DDL } from "../server/analytics-attribution";
+import { SCRAPE_SCHEDULE_DDL } from "../server/scrape-schedule-input";
 
 import { ensureDirectorySchema } from "../server/directories/schema";
 import { seedDirectories } from "../server/directories/catalogue";
@@ -45,6 +46,8 @@ const STATEMENTS = [
   `ALTER TABLE property_appraisers ADD COLUMN IF NOT EXISTS last_verified_at timestamp`,
   `ALTER TABLE permit_databases   ADD COLUMN IF NOT EXISTS link_status text DEFAULT 'unchecked'`,
   `ALTER TABLE permit_databases   ADD COLUMN IF NOT EXISTS last_verified_at timestamp`,
+  // Scrape schedules: the custom "every N hours" interval (boot runs it too, server/growth-schema.ts).
+  ...SCRAPE_SCHEDULE_DDL,
   // State guides: per-agency link status + last-checked date; sos_url nullable.
   ...STATE_GUIDES_LINK_STATUS_DDL,
   // Plan billing: interval, add-on quantities and billed Agency locations on
@@ -103,6 +106,22 @@ const STATEMENTS = [
   // Campaign attribution: landing / utm_* / referrer_host on ch_analytics_events,
   // ch_signup_attribution, ch_analytics_meta (server/analytics-attribution.ts; boot runs these too).
   ...ANALYTICS_ATTRIBUTION_DDL,
+  // DB review w3-r8 (2026-10-15) — indexes for queries that only had a seq-scan path
+  // (boot runs these too: server/competitors/schema.ts, server/gbp/schema.ts,
+  // server/gbp/content.ts, server/agency/schema.ts).
+  // Competitor Intel: a scan's listings are read by scan (GET /api/competitors/scans/:id,
+  // rating order) and deleted/reselected by scan on every rescan (server/competitors/store.ts).
+  `CREATE INDEX IF NOT EXISTS competitor_listings_scan_idx ON competitor_listings (scan_id, user_id)`,
+  // Competitor Intel cards list: the owner's scans newest first.
+  `CREATE INDEX IF NOT EXISTS competitor_scans_user_idx ON competitor_scans (user_id, created_at DESC)`,
+  // Agency status filters + dashboard counts (server/agency/access.ts statusSql.unanswered /
+  // .failed): an EXISTS per location against tables that had no location index.
+  `CREATE INDEX IF NOT EXISTS google_profile_reviews_unanswered_idx ON google_profile_reviews (location_id, user_id) WHERE NOT google_deleted AND reply_comment IS NULL`,
+  `CREATE INDEX IF NOT EXISTS gbp_content_jobs_location_status_idx ON gbp_content_jobs (location_id, status)`,
+  // Agency Jobs tab: the owner's jobs newest first (nothing prunes agency_jobs, so this grows).
+  `CREATE INDEX IF NOT EXISTS agency_jobs_owner_created_idx ON agency_jobs (user_id, created_at DESC, id)`,
+  // Agency Onboarding tab without a client filter.
+  `CREATE INDEX IF NOT EXISTS agency_onboarding_owner_created_idx ON agency_onboarding (user_id, created_at DESC)`,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;

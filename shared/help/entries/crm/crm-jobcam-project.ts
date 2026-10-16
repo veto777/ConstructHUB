@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "One job’s photos and video, on the project they belong to.",
   whatItDoes: "The JobCam tab of a project shows that job’s shots, newest first. Open feed gives them a page of their own, with the same search, filters, timeline and Select as the main JobCam feed, plus Share. Open camera is where new shots for the job are taken.",
   howToUse: [
-    "CRM → Pipeline, open the project, and choose the JobCam tab.",
+    "Open CRM → Pipeline, open the project, and choose the JobCam tab.",
     "Click a shot to see it full size.",
     "Choose Open feed for the job’s own photo page.",
     "Search, filter or switch to Timeline there, the same way as in the main feed.",

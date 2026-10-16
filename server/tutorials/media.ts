@@ -19,6 +19,7 @@ import { Readable } from "stream";
 import type { Express, Request, Response } from "express";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { TUTORIAL_FILE, TUTORIAL_PREFIX } from "@shared/help/videos";
+import { R2_READ_TIMEOUT_MS, isR2Timeout, r2RequestHandler } from "../r2-http";
 
 const TYPES: Record<string, string> = { mp4: "video/mp4", vtt: "text/vtt; charset=utf-8", jpg: "image/jpeg" };
 
@@ -55,11 +56,22 @@ export const tutorialStorageMode = (): "r2" | "local" => (process.env.TUTORIALS_
 const BUCKET = process.env.R2_BUCKET_NAME || "constructhub";
 const localRoot = () => process.env.TUTORIALS_LOCAL_DIR || path.join(process.cwd(), "tmp", "tutorials");
 
-let s3: S3Client | null = null;
-const client = () => (s3 ??= new S3Client({
+// The client has timeouts and a bounded pool (server/r2-http.ts). `S3Like` and the setter exist so the tests
+// can stand in a mocked or a fake-R2 client.
+type S3Like = Pick<S3Client, "send">;
+let s3: S3Like | null = null;
+let readTimeoutMs = R2_READ_TIMEOUT_MS;
+const client = (): S3Like => (s3 ??= new S3Client({
   region: "auto", endpoint: process.env.R2_ENDPOINT!,
   credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID!, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY! },
+  requestHandler: r2RequestHandler(),
+  maxAttempts: 2,
 }));
+/** Tests only: replace the R2 client (null = build the real one again) and the read deadline. */
+export function setTutorialR2ForTests(c: S3Like | null, timeoutMs = R2_READ_TIMEOUT_MS): void {
+  s3 = c;
+  readTimeoutMs = timeoutMs;
+}
 
 type Served = { status: 200 | 206 | 416; body?: Readable; size?: number; length?: number; contentRange?: string };
 
@@ -73,12 +85,37 @@ async function fromLocal(file: string, rangeHeader: unknown): Promise<Served | n
   return { status: 206, body: fs.createReadStream(p, range), size, length: range.end - range.start + 1, contentRange: `bytes ${range.start}-${range.end}/${size}` };
 }
 
-async function fromR2(key: string, rangeHeader: unknown): Promise<Served | null> {
+/**
+ * `pending`, or a rejection as soon as `signal` aborts — so the route never waits on a send() that does
+ * not honour its abort. If such a send() answers later anyway, its body is destroyed, not leaked.
+ */
+function untilAborted<T extends { Body?: unknown }>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(Object.assign(new Error("R2 read aborted"), { name: "AbortError" }));
+      pending.then((late) => { const b = late?.Body as any; if (typeof b?.destroy === "function") b.destroy(); else b?.cancel?.(); }, () => {});
+    };
+    if (signal.aborted) return onAbort();
+    signal.addEventListener("abort", onAbort, { once: true });
+    pending.then(
+      (v) => { signal.removeEventListener("abort", onAbort); resolve(v); },
+      (e) => { signal.removeEventListener("abort", onAbort); reject(e); },
+    );
+  });
+}
+
+async function fromR2(key: string, rangeHeader: unknown, abortSignal: AbortSignal): Promise<Served | null> {
   // Only a range we would accept ourselves is passed on; anything else gets the whole object.
   const m = typeof rangeHeader === "string" ? /^bytes=(\d{0,15})-(\d{0,15})$/.exec(rangeHeader.trim()) : null;
   const range = m && (m[1] || m[2]) && !(m[1] && m[2] && Number(m[2]) < Number(m[1])) ? `bytes=${m[1]}-${m[2]}` : undefined;
   try {
-    const r = await client().send(new GetObjectCommand({ Bucket: BUCKET, Key: key, ...(range ? { Range: range } : {}) }));
+    // abortSignal: the viewer left or the deadline passed — the in-flight request (or its place in the
+    // socket queue) is dropped. requestTimeout: per attempt, to the response headers.
+    const pending = client().send(
+      new GetObjectCommand({ Bucket: BUCKET, Key: key, ...(range ? { Range: range } : {}) }),
+      { abortSignal, requestTimeout: readTimeoutMs },
+    );
+    const r = await untilAborted(pending, abortSignal);
     if (!r.Body) return null;
     const raw = r.Body as any;
     const body: Readable = typeof raw.pipe === "function" ? raw : Readable.fromWeb(raw);
@@ -91,16 +128,39 @@ async function fromR2(key: string, rangeHeader: unknown): Promise<Served | null>
   }
 }
 
+/**
+ * Incident 2026-10-15: every R2 response body must be read to the end or destroyed, or its socket stays
+ * checked out of the client's pool; once the pool was full, every later media request hung. So the
+ * "viewer went away" hook is attached BEFORE the R2 read starts, the read is aborted when it fires, and
+ * every path that does not pipe the body (HEAD, viewer gone, error) destroys it. A read that does not
+ * answer in time is a 504, never a hang.
+ */
 export function registerTutorialMediaRoutes(app: Express): void {
   app.get("/api/tutorials/media/:file", async (req: Request, res: Response) => {
     const object = tutorialObject(req.params.file);
     if (!object) return res.status(404).json({ message: "Not found" });
+    const ac = new AbortController();
+    let body: Readable | undefined;
+    let viewerGone = false;
+    let timedOut = false;
+    const release = () => {
+      if (!ac.signal.aborted) ac.abort();
+      if (body && !body.destroyed) body.destroy();
+    };
+    // "close" also fires after a normal finish; releasing then is a no-op.
+    res.on("close", () => { if (!res.writableFinished) viewerGone = true; release(); });
+    if (req.socket?.destroyed) { viewerGone = true; return; }
+    const deadline = setTimeout(() => { timedOut = true; ac.abort(); }, readTimeoutMs);
     try {
       const file = String(req.params.file);
-      const served = tutorialStorageMode() === "r2" ? await fromR2(object.key, req.headers.range) : await fromLocal(file, req.headers.range);
+      const served = tutorialStorageMode() === "r2" ? await fromR2(object.key, req.headers.range, ac.signal) : await fromLocal(file, req.headers.range);
+      clearTimeout(deadline);
+      body = served?.body;
+      if (viewerGone || res.destroyed) return release();
       if (!served) return res.status(404).json({ message: "Not found" });
       res.setHeader("Accept-Ranges", "bytes");
       if (served.status === 416) {
+        release();
         if (served.size !== undefined) res.setHeader("Content-Range", `bytes */${served.size}`);
         return res.status(416).end();
       }
@@ -110,14 +170,21 @@ export function registerTutorialMediaRoutes(app: Express): void {
       res.setHeader("X-Content-Type-Options", "nosniff");
       if (served.length !== undefined) res.setHeader("Content-Length", String(served.length));
       if (served.contentRange) res.setHeader("Content-Range", served.contentRange);
-      const body = served.body!;
-      if (req.method === "HEAD") { body.destroy(); return res.end(); }
-      body.on("error", () => { if (!res.headersSent) res.status(500).end(); else res.destroy(); });
-      res.on("close", () => body.destroy());
-      body.pipe(res);
-    } catch (err) {
+      const stream = served.body!;
+      if (req.method === "HEAD") { release(); return res.end(); }
+      if (stream.destroyed) throw new Error("R2 body closed before it was read");
+      stream.on("error", () => { release(); if (!res.headersSent) res.status(500).end(); else res.destroy(); });
+      stream.pipe(res);
+    } catch (err: any) {
+      clearTimeout(deadline);
+      release();
+      if (viewerGone || res.destroyed || res.headersSent) return;
+      if (timedOut || isR2Timeout(err)) {
+        console.warn(`Tutorial media: R2 did not answer for ${object.key} (${timedOut ? "deadline" : err?.message})`);
+        return res.status(504).json({ message: "The video store did not answer in time. Try again." });
+      }
       console.error("Error serving tutorial media:", err);
-      if (!res.headersSent) res.status(500).json({ message: "Could not load the video" });
+      res.status(500).json({ message: "Could not load the video" });
     }
   });
 }

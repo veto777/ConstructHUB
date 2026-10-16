@@ -71,7 +71,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "selector": "[data-testid=\"tool-rail-clients\"]",
       "caption": "Where to find it",
       "narration": "You reach this page from Import, on the Clients page."
     }

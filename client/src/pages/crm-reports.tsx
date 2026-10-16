@@ -14,7 +14,8 @@ import {
   CrmPage, CrmPageHeader, EmptyState, ErrorCard, SectionTitle, StatusPill,
   crmTable, statusTone,
 } from "@/components/crm-ui";
-import { SampleReportsTable } from "@/components/crm-sample-previews";
+import { lazySample } from "@/components/sample-preview";
+const SampleReportsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleReportsTable");
 import { confirmAction } from "@/components/confirm-dialog";
 
 /**

@@ -51,6 +51,7 @@ export async function ensureAgencySchema() {
     CREATE INDEX IF NOT EXISTS agency_jobs_due ON agency_jobs(status,due_at,user_id,priority,created_at);
     CREATE INDEX IF NOT EXISTS agency_jobs_pending_owner ON agency_jobs(user_id) WHERE status IN ('queued','running');
     CREATE INDEX IF NOT EXISTS agency_jobs_batch_owner ON agency_jobs(user_id,batch_id);
+    CREATE INDEX IF NOT EXISTS agency_jobs_owner_created_idx ON agency_jobs(user_id,created_at DESC,id); -- Jobs tab order (w3-r8)
     CREATE UNIQUE INDEX IF NOT EXISTS agency_sync_pending ON agency_jobs(location_id) WHERE action='sync' AND status IN ('queued','running');
     CREATE TABLE IF NOT EXISTS agency_worker_turns (user_id integer PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,last_at timestamptz NOT NULL DEFAULT 'epoch');
     CREATE TABLE IF NOT EXISTS agency_discovery (
@@ -70,6 +71,7 @@ export async function ensureAgencySchema() {
       created_at timestamptz NOT NULL DEFAULT now(), FOREIGN KEY(user_id,client_id) REFERENCES agency_clients(user_id,id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS agency_onboarding_owner ON agency_onboarding(user_id,client_id,created_at DESC);
+    CREATE INDEX IF NOT EXISTS agency_onboarding_owner_created_idx ON agency_onboarding(user_id,created_at DESC); -- Onboarding tab, no client filter (w3-r8)
     CREATE TABLE IF NOT EXISTS agency_google_invitations (
       user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE, subject text NOT NULL, name text NOT NULL,
       target jsonb NOT NULL, status text NOT NULL DEFAULT 'received', error text,
@@ -80,5 +82,6 @@ export async function ensureAgencySchema() {
       PRIMARY KEY(user_id,subject)
     );
     ALTER TABLE agency_poll_grants ADD COLUMN IF NOT EXISTS refresh_requested boolean NOT NULL DEFAULT false;
+    ALTER TABLE agency_onboarding ADD COLUMN IF NOT EXISTS actor_id integer;
   `);
 }

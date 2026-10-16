@@ -92,7 +92,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-locations\"]",
+      "selector": "[data-testid=\"tool-rail-locations\"]",
       "caption": "Menu: Locations",
       "narration": "You'll find Locations in the menu on the left, under Google Business."
     }

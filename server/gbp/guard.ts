@@ -6,6 +6,7 @@ import { clientFor, ownedLocation, withLocationLock, publicError } from './servi
 import { getEntitlements } from '../entitlements';
 import { PLANS, PLAN_KEYS } from '@shared/plans';
 import { recordFailure } from '../ops/issues';
+import { workerInterval } from "../workers";
 
 export const GUARD_FIELDS = ['title','phoneNumbers','websiteUri','storefrontAddress','categories','profile.description','regularHours','specialHours','serviceArea','openInfo.openingDate','openInfo.status'] as const;
 export type GuardField = typeof GUARD_FIELDS[number];
@@ -195,5 +196,5 @@ export async function runGuardWorker(check=checkGuard,onlyUser?:number) {
 }
 export function startGuardWorker() {
   if(process.env.GBP_SYNC_DISABLED==='true')return;
-  const timer=setInterval(()=>void runGuardWorker().catch((e)=>{console.error('Profile Watch worker failed');void recordFailure('job','Profile Watch worker tick',e);}),60_000);timer.unref();return timer;
+  return workerInterval('Profile Watch worker',()=>runGuardWorker().catch((e)=>{console.error('Profile Watch worker failed');void recordFailure('job','Profile Watch worker tick',e);}),60_000).timer;
 }

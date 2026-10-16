@@ -36,15 +36,19 @@ async function slowCpu(page: Page) {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
 }
-const mounted = (page: Page) => page.waitForFunction(() => !document.querySelector('#root > main[style*="max-width:720px"]') && !!document.querySelector("#root [data-testid]"), null, { timeout: 60_000 });
+// `text`: for a page whose rendered state carries no test id (the invalid-link ErrorCard — the cookie banner that used
+// to supply one on every page was removed in 5d751735), the app's own text marks the mount instead.
+const mounted = (page: Page, text?: string) => page.waitForFunction((t) => !document.querySelector('#root > main[style*="max-width:720px"]')
+  && (!!document.querySelector("#root [data-testid]") || (!!t && !!document.getElementById("root")?.innerText.includes(t))), text ?? null, { timeout: 60_000 });
 const bootLog = (page: Page) => page.evaluate(() => (window as any).__boot as BootLog);
 
+const MOUNT_TEXT: Record<string, string> = { "/e/not-a-real-token": "This link isn't valid" };
 for (const path of ["/", "/crm", "/crm/clients", "/auth", "/e/not-a-real-token"]) {
   test(`with JavaScript, the fallback is never shown while ${path} loads`, async ({ page }) => {
     await watchBoot(page);
     await slowCpu(page);
     await page.goto(path, { waitUntil: "commit" });
-    await mounted(page);
+    await mounted(page, MOUNT_TEXT[path]);
     const log = await bootLog(page);
     expect(log.samples).toBeGreaterThan(3);
     expect(log.fallbackShown, "frames or DOM changes during which the static fallback was displayed").toBe(0);

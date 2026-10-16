@@ -28,7 +28,8 @@ test('owner previews a snapshot, reauthenticates, changes guard mode, approves/r
   await page.getByLabel('Watch mode').selectOption('notify');await page.getByRole('button',{name:'Preview current Google values'}).click();await expect(page.getByText('Approved name',{exact:true})).toBeVisible();
   await expect(page.getByText('Google-only accounts need an authenticator or password configured in Settings.',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Approve snapshot and save settings'}).click();
-  await expect(page.getByRole('dialog')).toContainText('Nothing is sent to anyone else');
+  // a634737f (sleeker Verify dialog) shortened the description copy.
+  await expect(page.getByRole('dialog')).toContainText("A quick check that it's you.");
   await page.getByRole('button',{name:'Email a verification code'}).click();
   await page.getByLabel('Verification',{exact:true}).fill('123456');
   await page.getByRole('button',{name:'Verify and continue'}).click();await expect(page.getByText('Current mode: notify.',{exact:false})).toBeVisible();
@@ -53,7 +54,7 @@ test('AI settings preserve low-rating approval, backfill requires preview and co
   await page.route('**/api/gbp/reports/reviews/7',r=>r.fulfill({json:{text:'Review: Browser customer\nRating: 1\nReview fixture',formUrl:'https://support.google.com/business/workflow/9945796',reportedAt:null}}));
   await page.goto('/google-reviews/reviews');await page.getByLabel('AI reply location').selectOption('987');await page.getByLabel('AI mode',{exact:true}).selectOption('auto');await page.getByLabel('Review scope').selectOption('existing');
   await page.getByRole('button',{name:'Save AI reply settings'}).click();await page.getByRole('button',{name:'Preview existing reviews'}).click();await expect(page.getByText(/Browser customer · 1 stars · Review fixture — draft for approval/)).toBeVisible();expect(confirmed).toBe(false);
-  await page.getByRole('button',{name:'Confirm backfill'}).click();await expect(page.getByLabel('Draft for Browser customer')).toHaveValue('Thank you for your feedback.');await page.getByRole('button',{name:'Approve and publish to Google'}).click();await expect(page.getByText('Posted on Google:')).toBeVisible();
+  await page.getByRole('button',{name:'Confirm backfill'}).click();await expect(page.getByLabel('Draft for Browser customer')).toHaveValue('Thank you for your feedback.');await page.getByRole('button',{name:'Approve and publish to Google'}).click();await expect(page.getByText('Posted on Google',{exact:true})).toBeVisible(); // bc40516c: Google-style reply block labels it "Posted on Google"
   await page.getByRole('button',{name:'Report review',exact:true}).click();await expect(page.getByRole('link',{name:"Open Google's official form"})).toHaveAttribute('href','https://support.google.com/business/workflow/9945796');
 });
 

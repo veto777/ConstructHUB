@@ -21,6 +21,7 @@ import {
 import { and, asc, desc, eq, gte, lt, lte, inArray, ne } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { logTeamActivity } from "./stats";
+import { queueCrmEvent } from "./integrations";
 import { divisionScopeOf, appointmentDivisionVisible, divisionMapsForOrg } from "./divisions";
 
 type GetUser = (req: any, res: any) => any;
@@ -58,6 +59,16 @@ const parseTime = (s: string | null | undefined): Date | null => {
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 };
+
+/** A visit as webhook data — crew notes stay internal. */
+function appointmentEventPayload(a: typeof crmAppointments.$inferSelect) {
+  return {
+    appointmentId: a.id, title: a.title, status: a.status,
+    projectId: a.projectId ?? null, customerId: a.customerId ?? null, jobId: a.jobId ?? null,
+    startsAt: a.startsAt, endsAt: a.endsAt ?? null, allDay: a.allDay,
+    completedAt: a.completedAt ?? null,
+  };
+}
 
 export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): void {
   async function ctxFor(req: any, res: any, perm?: any): Promise<OrgContext | null> {
@@ -272,6 +283,7 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
       title: `scheduled ${row.title}`,
       link: row.projectId ? `/crm/projects/${row.projectId}` : "/crm/schedule",
     });
+    queueCrmEvent(ctx.org.id, "appointment.scheduled", appointmentEventPayload(row));
     res.status(201).json({ appointment: row, conflicts });
   });
 
@@ -335,6 +347,10 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
         title: `rescheduled ${row.title}`,
         link: row.projectId ? `/crm/projects/${row.projectId}` : "/crm/schedule",
       });
+    }
+    // Only the move INTO complete — re-saving a finished visit is not a second completion.
+    if (row && row.status === "complete" && appt.status !== "complete") {
+      queueCrmEvent(ctx.org.id, "appointment.completed", appointmentEventPayload(row));
     }
     res.json(row);
   });

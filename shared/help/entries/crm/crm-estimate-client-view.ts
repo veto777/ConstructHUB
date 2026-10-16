@@ -6,9 +6,9 @@ const entry: HelpDraft = {
   whatItIs: "The page your client lands on when they open the link in the estimate email: your estimate laid out as a document, with a place to approve it.",
   whatItDoes: "The client reads your company details, who the estimate is prepared for, each line with its quantity and price, and the subtotal, tax and total. They approve by typing their full name and choosing “Approve this estimate”. The page then says “Approved — thank you!”, and in your CRM the estimate is marked approved.",
   howToUse: [
-    "CRM → Estimates, open the estimate and choose Send. The line under the buttons shows when it was sent and whether it has been opened.",
-    "Your client opens the link in the email and reads the estimate.",
-    "Under “Ready to go ahead?” they type their full name and choose “Approve this estimate”.",
+    "Open CRM → Estimates, open the estimate and choose Send.",
+    "Check the line under the buttons: it shows when it was sent and whether the client opened it.",
+    "Wait for the client to type their full name under “Ready to go ahead?” and choose “Approve this estimate”.",
     "Open the estimate again in your CRM: it says who approved it, and that it is now a signed contract.",
   ],
   howItWorks: "An approved estimate can no longer be edited or deleted. When your payment account is connected, the client's page also shows a Pay button after they approve. Preview on the estimate's page shows you the same page with approving and paying switched off.",

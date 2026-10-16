@@ -45,7 +45,8 @@ it('recovers Roseau only from the archived challenge URL and leaves verification
 it('omits seed-default search capabilities and describes records as held on office sites', () => {
   state.query.data = [{ ...office, searchableFields: ['Address', 'Owner', 'Parcel'] }];
   const html = renderToStaticMarkup(createElement(PropertyPage));
-  expect(html).not.toContain('g-chip');
+  // An element carrying the chip class (the page wrapper's phone tap-size rule mentions g-chip inside a selector).
+  expect(html).not.toMatch(/class="(?:[^"]*\s)?g-chip(?:\s|")/);
   expect(html).toContain('Their own sites hold ownership');
 });
 

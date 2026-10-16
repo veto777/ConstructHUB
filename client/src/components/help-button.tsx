@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject, useCallback } from "react";
 import { Info, PlayCircle } from "lucide-react";
 import { Link } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -29,6 +29,11 @@ import { cn } from "@/lib/utils";
  *
  * Colours: the accent is the surface's `--g-accent` (the portalled panel is its own `.g-surface`, so the
  * tokens resolve there too). Nothing is hard-coded.
+ *
+ * Keyboard: the "i" is a plain button (Enter/Space open it); Radix moves focus into the panel, Tab wraps inside it,
+ * Esc closes it and puts focus back on the "i". "Watch…" is a disclosure (aria-expanded + aria-controls) of the inline
+ * player, whose accessible name says what it is ("Overview film: Domains"). With prefers-reduced-motion the panel
+ * appears without its fade; the film still starts, because the person just pressed Watch.
  *
  * Esc and outside clicks are handled here as well as by Radix, for the reason InfoTip gives: this app's
  * dismissable-layer version can ignore both on a layer's second mount. Both paths only set open=false.
@@ -83,12 +88,17 @@ const VIDEO_TYPES: Record<string, string> = { mp4: "video/mp4", webm: "video/web
  * `autoPlay` is for a player mounted BY a press on its own poster (feature-landing/intro-video.tsx):
  * the person has just asked for the film, so it starts — still never a video that plays on its own.
  */
-export function HelpVideoPlayer({ video, title, className, testId, autoPlay = false }: { video: HelpVideo; title: string; className?: string; testId?: string; autoPlay?: boolean }) {
+export function HelpVideoPlayer({ video, title, kind = "Walkthrough video", className, testId, autoPlay = false }: {
+  video: HelpVideo; title: string;
+  /** What the film is, for the player's accessible name: "Walkthrough video" (default) or "Overview film". */
+  kind?: string;
+  className?: string; testId?: string; autoPlay?: boolean;
+}) {
   return (
     <video
       className={cn("aspect-video w-full rounded-lg bg-black", className)}
       controls playsInline preload="metadata" poster={video.poster} autoPlay={autoPlay}
-      aria-label={`Walkthrough video: ${title}`} data-testid={testId}
+      aria-label={`${kind}: ${title}`} data-testid={testId}
       // Some browsers load a default track but leave it hidden: turn the captions on once it is there.
       onLoadedMetadata={(e) => { const track = e.currentTarget.textTracks[0]; if (video.captions && track && track.mode === "disabled") track.mode = "showing"; }}
     >
@@ -101,21 +111,27 @@ export function HelpVideoPlayer({ video, title, className, testId, autoPlay = fa
 
 /** What the film is, in words: "walkthrough" for the entry's own recording, "overview film" for its feature's intro. */
 export const filmNoun = (entry: HelpEntry) => (entry.videoSource === "intro" ? "overview film" : "walkthrough");
+/** The same, as the player's accessible name ("Overview film: Domains" / "Walkthrough video: Domains"). */
+export const filmKind = (entry: HelpEntry) => (entry.videoSource === "intro" ? "Overview film" : "Walkthrough video");
 /** The film's label line: its source, length and captions ("Overview film · 1:42 · captions on"). */
 const filmLine = (entry: HelpEntry, video: HelpVideo) =>
   `${entry.videoSource === "intro" ? "Overview film" : "Walkthrough"} · ${formatDuration(video.durationSec)} · ${video.captions ? "captions on" : "no captions"}`;
 
-/** The player in a dialog. Unmounts (and so stops) when closed. */
-export function HelpVideoDialog({ entry, open, onOpenChange }: { entry: HelpEntry; open: boolean; onOpenChange: (open: boolean) => void }) {
+/**
+ * The player in a dialog. Unmounts (and so stops) when closed. It is opened by state from a plain button rather
+ * than a Radix trigger, so Radix has nothing to return focus to: `returnFocusTo` is that button, focused on close.
+ */
+export function HelpVideoDialog({ entry, open, onOpenChange, returnFocusTo }: { entry: HelpEntry; open: boolean; onOpenChange: (open: boolean) => void; returnFocusTo?: RefObject<HTMLElement | null> }) {
   if (!entry.film) return null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="g-surface max-w-3xl" data-testid={`help-video-dialog-${entry.key}`}>
+      <DialogContent className="g-surface max-w-3xl motion-reduce:!animate-none" data-testid={`help-video-dialog-${entry.key}`}
+        onCloseAutoFocus={(e) => { if (returnFocusTo?.current) { e.preventDefault(); returnFocusTo.current.focus(); } }}>
         <DialogHeader>
           <DialogTitle>{entry.title} — {filmNoun(entry)}</DialogTitle>
           <DialogDescription>{filmLine(entry, entry.film)}</DialogDescription>
         </DialogHeader>
-        {open && <HelpVideoPlayer video={entry.film} title={entry.title} testId={`help-video-${entry.key}`} />}
+        {open && <HelpVideoPlayer video={entry.film} title={entry.title} kind={filmKind(entry)} testId={`help-video-${entry.key}`} />}
       </DialogContent>
     </Dialog>
   );
@@ -133,18 +149,27 @@ const ICON_BUTTON = cn(
  * the i window") — "Watch the walkthrough" swaps the player in above the text; closing the panel stops it.
  */
 function PanelBody({ entry, playing, onWatch, footer }: { entry: HelpEntry; playing: boolean; onWatch: () => void; footer?: ReactNode }) {
+  const videoId = useId();
+  // Stable, so it runs once when the player mounts (an inline ref would re-scroll on every render).
+  const revealPlayer = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    requestAnimationFrame(() => el.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" }));
+  }, []);
   return (
     <>
       {playing && entry.film && (
-        <div className="mb-4" data-testid={`help-inline-video-${entry.key}`} data-video-source={entry.videoSource ?? undefined}>
-          <HelpVideoPlayer video={entry.film} title={entry.title} testId={`help-video-${entry.key}`} autoPlay />
+        // The Watch button sits at the bottom of a scrolled sheet on phones: bring the player into view when it opens.
+        <div id={videoId} className="mb-4 scroll-mt-4" data-testid={`help-inline-video-${entry.key}`} data-video-source={entry.videoSource ?? undefined}
+          ref={revealPlayer}>
+          <HelpVideoPlayer video={entry.film} title={entry.title} kind={filmKind(entry)} testId={`help-video-${entry.key}`} autoPlay />
           <p className="mt-1.5 text-[12px] g-text-2">{filmLine(entry, entry.film)}</p>
         </div>
       )}
       <HelpParts entry={entry} testId={`help-body-${entry.key}`} />
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3" style={{ borderColor: "var(--g-divider)" }}>
         {entry.film ? (
-          <button type="button" className="g-pill g-pill--sm" onClick={onWatch} aria-pressed={playing} data-testid={`help-watch-${entry.key}`} data-video-source={entry.videoSource ?? undefined}>
+          <button type="button" className="g-pill g-pill--sm" onClick={onWatch} aria-expanded={playing} aria-controls={playing ? videoId : undefined} data-testid={`help-watch-${entry.key}`} data-video-source={entry.videoSource ?? undefined}>
             <PlayCircle aria-hidden="true" /><span>{playing ? `Hide the ${filmNoun(entry)}` : `Watch the ${filmNoun(entry)} (${formatDuration(entry.film.durationSec)})`}</span>
           </button>
         ) : (
@@ -179,6 +204,7 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
   const [watching, setWatching] = useState(false);
   const [playing, setPlaying] = useState(false);
   const titleId = useId();
+  const playRef = useRef<HTMLButtonElement>(null);
   // Tell the tool shell this key's "i" is on the page (once the entry is known to exist), so its crumb-row fallback stays hidden.
   useClaimHelpMount(entry ? k : undefined, !fallback);
   useEffect(() => { if (!open) setPlaying(false); }, [open]);
@@ -202,13 +228,13 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
     if (!entry.film) return null;
     return (
       <span className="inline-flex items-center align-middle">
-        <button type="button" aria-label={`Watch the ${filmNoun(entry)}: ${entry.title}`}
-          className={cn("ml-1 inline-flex h-7 items-center gap-1 rounded-full border border-primary/30 px-2.5 text-xs font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", className)}
+        <button type="button" ref={playRef} aria-label={`Watch the ${filmNoun(entry)}: ${entry.title}`} aria-haspopup="dialog"
+          className={cn("relative ml-1 inline-flex h-7 items-center gap-1 rounded-full border border-primary/30 px-2.5 text-xs before:absolute before:inset-x-0 before:-inset-y-2 font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", className)}
           onClick={(e) => { e.stopPropagation(); setWatching(true); }} data-testid={`help-play-${k}`}>
           <PlayCircle className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
           Watch
         </button>
-        <HelpVideoDialog entry={entry} open={watching} onOpenChange={setWatching} />
+        <HelpVideoDialog entry={entry} open={watching} onOpenChange={setWatching} returnFocusTo={playRef} />
       </span>
     );
   }
@@ -217,7 +243,7 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
     <button
       type="button"
       className={cn(ICON_BUTTON, className)}
-      aria-label={`About ${entry.title}`}
+      aria-label={fallback ? `About this page: ${entry.title}` : `About ${entry.title}`}
       aria-haspopup="dialog"
       // Help can sit inside rows and tab strips — never let the click act on what wraps it.
       onClick={(e) => e.stopPropagation()}
@@ -237,7 +263,7 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
       {isMobile ? (
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>{trigger}</SheetTrigger>
-          <SheetContent side="bottom" className="g-surface max-h-[85dvh] overflow-y-auto rounded-t-2xl p-5 pb-8" data-testid={`help-panel-${k}`}>
+          <SheetContent side="bottom" className="g-surface max-h-[85dvh] overflow-y-auto rounded-t-2xl p-5 pb-8 motion-reduce:!animate-none motion-reduce:!transition-none" data-testid={`help-panel-${k}`}>
             <SheetHeader className="mb-3 pr-8 text-left">
               <SheetTitle className="text-[18px] font-normal g-text" data-testid={`help-title-${k}`}>{entry.title}</SheetTitle>
               <SheetDescription className="sr-only">What it’s for, what it does, how to run it and how it works.</SheetDescription>
@@ -250,7 +276,7 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
           <PopoverContent
             role="dialog" aria-labelledby={titleId} align="start" sideOffset={6} collisionPadding={12}
-            className={cn("g-surface max-h-[min(36rem,var(--radix-popover-content-available-height))] overflow-y-auto rounded-xl p-5",
+            className={cn("g-surface max-h-[min(36rem,var(--radix-popover-content-available-height))] overflow-y-auto rounded-xl p-5 motion-reduce:!animate-none",
               playing ? "w-[min(40rem,calc(100vw-1.5rem))]" : "w-[min(26rem,calc(100vw-1.5rem))]")}
             data-testid={`help-panel-${k}`}
           >
@@ -261,11 +287,11 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
       )}
       {entry.film && (
         <>
-          <button type="button" className={ICON_BUTTON} aria-label={`Watch the ${filmNoun(entry)}: ${entry.title}`}
+          <button type="button" ref={playRef} className={ICON_BUTTON} aria-label={`Watch the ${filmNoun(entry)}: ${entry.title}`} aria-haspopup="dialog"
             onClick={(e) => { e.stopPropagation(); setWatching(true); }} data-testid={`help-play-${k}`}>
             <PlayCircle className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
           </button>
-          <HelpVideoDialog entry={entry} open={watching} onOpenChange={setWatching} />
+          <HelpVideoDialog entry={entry} open={watching} onOpenChange={setWatching} returnFocusTo={playRef} />
         </>
       )}
     </span>

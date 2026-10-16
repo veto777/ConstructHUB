@@ -13,7 +13,8 @@ import {
   MessageSquare, Send, ArrowLeft, Clock,
 } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar } from "@/components/crm-ui";
-import { SampleInboxList } from "@/components/crm-sample-previews";
+import { lazySample } from "@/components/sample-preview";
+const SampleInboxList = lazySample(() => import("@/components/crm-sample-previews"), "SampleInboxList");
 
 /* ── Shared bits ─────────────────────────────────────────────────────────── */
 

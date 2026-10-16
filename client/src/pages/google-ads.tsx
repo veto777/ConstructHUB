@@ -130,8 +130,8 @@ function RangePicker({ dateRange, setDateRange, custom, setCustom, testPrefix }:
       <GooglePill size="sm" selected={dateRange === "custom"} ariaPressed={dateRange === "custom"} label="Custom dates" onClick={() => setDateRange("custom")} testId={`${testPrefix}-custom`} />
       {dateRange === "custom" && (
         <span className="flex flex-wrap items-center gap-2 text-sm">
-          <label className="flex items-center gap-1">From <input type="date" className="g-input !w-auto !py-1" value={custom.start} max={custom.end || todayISO()} onChange={e => setCustom({ ...custom, start: e.target.value })} data-testid={`${testPrefix}-start`} /></label>
-          <label className="flex items-center gap-1">To <input type="date" className="g-input !w-auto !py-1" value={custom.end} min={custom.start} max={todayISO()} onChange={e => setCustom({ ...custom, end: e.target.value })} data-testid={`${testPrefix}-end`} /></label>
+          <label className="flex items-center gap-1">From <input type="date" className="g-input !w-auto !py-1 max-sm:!min-h-11" value={custom.start} max={custom.end || todayISO()} onChange={e => setCustom({ ...custom, start: e.target.value })} data-testid={`${testPrefix}-start`} /></label>
+          <label className="flex items-center gap-1">To <input type="date" className="g-input !w-auto !py-1 max-sm:!min-h-11" value={custom.end} min={custom.start} max={todayISO()} onChange={e => setCustom({ ...custom, end: e.target.value })} data-testid={`${testPrefix}-end`} /></label>
         </span>
       )}
     </>

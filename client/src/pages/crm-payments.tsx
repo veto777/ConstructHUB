@@ -18,7 +18,8 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle, statusTone,
 } from "@/components/crm-ui";
-import { SamplePaymentsList } from "@/components/crm-sample-previews";
+import { lazySample } from "@/components/sample-preview";
+const SamplePaymentsList = lazySample(() => import("@/components/crm-sample-previews"), "SamplePaymentsList");
 import { TakePaymentDialog } from "@/components/crm-take-payment";
 
 const money = (c?: number | null) =>
@@ -416,7 +417,7 @@ export default function CrmPaymentsPage() {
               {/* The list is the org's whole payment history: empty means none yet, so show a sample. */}
               <SamplePaymentsList cta={
                 <Link href="/crm/clients">
-                  <Button size="sm" variant="outline" data-testid="button-record-payment-sample">Record one from a client's page</Button>
+                  <Button size="sm" variant="outline" className="max-sm:min-h-11" data-testid="button-record-payment-sample">Record one from a client's page</Button>
                 </Link>
               } />
             </>
@@ -433,7 +434,7 @@ export default function CrmPaymentsPage() {
                       {" "}· {METHOD_LABELS[p.method] ?? p.method ?? p.provider} · {PURPOSE_LABELS[p.purpose] ?? p.purpose}
                     </span>
                   </div>
-                  <div className="text-sm truncate" data-testid={`payment-who-${p.id}`}>
+                  <div className="text-sm break-words sm:truncate" data-testid={`payment-who-${p.id}`}>
                     <Link href={`/crm/clients/${p.customerId}`} className="font-medium hover:underline">
                       {p.customerName ?? "Client"}
                     </Link>

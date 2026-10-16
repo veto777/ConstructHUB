@@ -113,7 +113,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "selector": "[data-testid=\"tool-rail-pricebook\"]",
       "caption": "Menu: Price book",
       "narration": "You'll find Price book in the menu on the left."
     }

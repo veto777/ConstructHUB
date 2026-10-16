@@ -23,7 +23,8 @@ import { BuyNumberWizard } from "./numbers-buy";
 import { ForwardingInstructions } from "./numbers-forwarding";
 import { NUMBERS_KEY, NumberStatusPill, formatDate, formatPhone, type NumbersResponse, type VoiceNumber } from "./numbers-shared";
 import { HowItWorks } from "./how-it-works";
-import { SampleNumbersPreview } from "./samples";
+import { lazySample } from "@/components/sample-preview";
+const SampleNumbersPreview = lazySample(() => import("./samples"), "SampleNumbersPreview");
 import type { VoiceStatus } from "./index";
 
 /**

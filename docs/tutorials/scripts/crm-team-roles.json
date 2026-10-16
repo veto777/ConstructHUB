@@ -81,7 +81,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-team\"]",
+      "selector": "[data-testid=\"tool-rail-team\"]",
       "caption": "Menu: Team & Company",
       "narration": "You'll find roles under Team and Company in the menu."
     }

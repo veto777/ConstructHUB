@@ -6,8 +6,8 @@ const entry: HelpDraft = {
   whatItIs: "A one-click reminder to a client whose estimate is sent but not answered.",
   whatItDoes: "Remind sends the client an email with a link back to the estimate, and a text as well when texting is set up and the client has a mobile number. The CRM confirms what went out.",
   howToUse: [
-    "CRM → Clients, and open the client.",
-    "Under Estimates, find the sent estimate that is still waiting.",
+    "Open CRM → Clients and open the client.",
+    "Find the sent estimate that is still waiting under Estimates.",
     "Choose Remind.",
     "Read the confirmation: it says whether an email, a text or both were sent.",
   ],

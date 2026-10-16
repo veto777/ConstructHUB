@@ -23,16 +23,15 @@
       "narration": "Open this roofing company. ConstructHUB connects its social accounts directly."
     },
     {
-      "action": "scroll-to",
-      "selector": "text=Post to",
-      "offset": 120,
+      "action": "click",
+      "selector": "[data-testid=\"tool-rail-compose\"]",
       "caption": "Post to",
       "chapter": "Compose a post",
       "narration": "Under Compose, the accounts mapped to it are already ticked."
     },
     {
       "action": "click",
-      "selector": "label:text-is(\"Summit Roofing Co. \u00b7 linkedin\") input",
+      "selector": "label:text-is(\"Summit Roofing Co. \u00b7 LinkedIn\") input",
       "caption": "Choose the accounts",
       "narration": "Untick any to skip. This post skips LinkedIn."
     },
@@ -96,7 +95,7 @@
     },
     {
       "action": "click",
-      "selector": "button:has-text(\"Auto mode\")",
+      "selector": "[data-testid=\"tool-rail-auto\"]",
       "caption": "Auto mode",
       "chapter": "Auto mode",
       "narration": "Auto mode drafts posts for you, in the mix you choose."
@@ -115,7 +114,7 @@
     },
     {
       "action": "goto",
-      "url": "/social-media?business=all",
+      "url": "/social-media/posts?business=all",
       "caption": "All-clients calendar",
       "chapter": "Every client",
       "narration": "Running several businesses? The All-clients calendar lists all their posts."
@@ -135,7 +134,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-social-media\"]",
+      "selector": "[data-testid=\"tool-rail-overview\"]",
       "caption": "Menu: Social Media",
       "narration": "You'll find Social Media in the left menu, under Tools."
     }

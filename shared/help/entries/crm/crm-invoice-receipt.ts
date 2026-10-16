@@ -4,10 +4,10 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "crm-invoice-receipt", group: "CRM", route: "/crm/clients", title: "Send a receipt",
   whatItIs: "A receipt for an invoice: every payment received on it so far, and what is still owing.",
-  whatItDoes: "The Receipt button on an invoice opens the receipt to date — the invoice lines, each payment with its date and method, the total paid and the balance owing — and “Send receipt” emails it to the client.",
+  whatItDoes: "The Receipt button on an invoice opens the receipt so far: the invoice lines, each payment with its date and method, the total paid and the balance owing. “Send receipt” emails it to the client.",
   howToUse: [
-    "CRM → Clients, and open the client.",
-    "Under Invoices, choose Receipt on the invoice.",
+    "Open CRM → Clients and open the client.",
+    "Choose Receipt on the invoice under Invoices.",
     "Read the receipt: payments received, total paid, balance owing.",
     "Choose “Send receipt”. It goes to the email address on the client’s file.",
   ],

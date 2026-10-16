@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "The hands-on option on the Import page: ask our team to move your data from another system for you.",
   whatItDoes: "You say which system you are leaving and add an optional note. The request is emailed to our team and the page confirms it was received.",
   howToUse: [
-    "CRM → Clients → Import, and scroll to the bottom of the page.",
+    "Open CRM → Clients → Import and scroll to the bottom of the page.",
     "Choose the system you are on, or “Something else”.",
     "Add a note about what you have, such as how many clients and how many years of invoices.",
     "Choose “Request a hands-on migration”.",

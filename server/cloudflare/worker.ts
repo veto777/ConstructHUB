@@ -19,6 +19,7 @@ import { logActivity, notifyUser } from "../account-events";
 import { getEntitlements } from "../entitlements";
 import { MODULE_NAMES, PLANS, planForModule } from "@shared/plans";
 import { recordFailure } from "../ops/issues";
+import { workerInterval } from "../workers";
 /** Queued Cloudflare and Search Console work runs only while the owner's plan includes the module. */
 const edgeAllowed = async (user: number) =>
   (await getEntitlements(user)).modules.cloudflareSearchConsole;
@@ -324,7 +325,7 @@ export function startEdgeWorker() {
   if (process.env.EDGE_SEARCH_WORKER_ENABLED !== "true") return;
   let busy = false,
     last = 0;
-  const timer = setInterval(async () => {
+  workerInterval("Edge search worker", async () => {
     if (busy) return;
     busy = true;
     try {
@@ -340,5 +341,4 @@ export function startEdgeWorker() {
       busy = false;
     }
   }, 1000);
-  timer.unref();
 }

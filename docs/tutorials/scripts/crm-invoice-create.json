@@ -32,7 +32,7 @@
       "narration": "The invoice is now marked sent. Record payment is here for when the money comes in." },
     { "action": "highlight", "selector": "[data-testid=\"text-invoiced-demo-estimate-e-1998\"]", "caption": "Invoiced",
       "narration": "And the estimate shows it's been invoiced, with the invoice number." },
-    { "action": "highlight", "selector": "[data-testid=\"link-portal-nav-invoices\"]", "caption": "Menu: Invoices",
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-invoices\"]", "caption": "Menu: Invoices",
       "narration": "Every invoice you send is listed under Invoices in the menu." }
   ],
   "youtube": {

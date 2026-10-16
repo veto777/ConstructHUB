@@ -43,7 +43,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"tab-fraud\"]",
+      "selector": "[data-testid=\"subnav-click-guard-fraud\"]",
       "caption": "Traffic signals",
       "narration": "Choose Traffic signals, where the flagged traffic lives, with Blocked IPs first."
     },
@@ -74,7 +74,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"tab-link-ads\"]",
+      "selector": "[data-testid=\"subnav-click-guard-link-ads\"]",
       "caption": "Google Ads script",
       "chapter": "Into Google Ads",
       "narration": "Google Ads script turns the list into IP exclusions: paste one script into your Ads account and schedule it hourly."
@@ -87,7 +87,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-click-guard\"]",
+      "selector": "[data-testid=\"tool-rail-click-guard\"]",
       "caption": "Menu: Click Guard",
       "narration": "You'll find Click Guard in the menu on the left, under Google Ads."
     }

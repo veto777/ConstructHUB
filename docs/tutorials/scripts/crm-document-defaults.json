@@ -76,7 +76,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-settings\"]",
+      "selector": "[data-testid=\"tool-rail-settings\"]",
       "caption": "Menu: Settings",
       "narration": "You'll find these defaults under Settings in the menu."
     }

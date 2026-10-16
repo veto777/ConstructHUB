@@ -6,12 +6,12 @@ const entry: HelpDraft = {
   whatItIs: "A secure link your client opens to pay an invoice online, by bank account or card.",
   whatItDoes: "Take a payment makes a checkout link for the balance of the invoice you pick. When the client pays, the payment appears under Recent payments and the invoice is marked Paid. A bank payment shows as processing until it clears.",
   howToUse: [
-    "CRM → Payments. Under Take a payment, search for the client and choose them.",
+    "Open CRM → Payments, search for the client under Take a payment and choose them.",
     "Choose Take a payment, then pick the invoice.",
     "Choose “Create payment link”, and copy the link that appears.",
     "Text or email the link to your client. Recent payments shows the money when it lands.",
   ],
-  howItWorks: "The link opens a checkout page hosted by Stripe on your own Stripe account, so the money goes straight to you. Only one link can be open for an invoice at a time.",
+  howItWorks: "The link opens a checkout page hosted by Stripe on your own Stripe account, so the money goes straight to you. Only one link can be open for an invoice at a time. If you pass the card fee on, the link offers bank transfer only; a client who wants to pay by card uses the invoice page.",
   needs: ["A ConstructHub CRM plan — the CRM is a separate product with its own plans.", "Your Stripe account connected on the Payments page.", "An invoice with a balance."],
 };
 export default entry;

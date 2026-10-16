@@ -92,7 +92,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-home\"]",
+      "selector": "[data-testid=\"tool-rail-home\"]",
       "caption": "Menu: Home",
       "narration": "You'll find Needs attention on Home, at the top of the menu."
     }

@@ -115,7 +115,7 @@ const page: FeaturePage = {
     },
     {
       q: "Which plan includes it?",
-      a: `Search Console comes with the ${MODULE_PLAN} plan, together with Cloudflare.${ONLY_PLAN ? " No other plan includes it." : ""}`,
+      a: `Search Console comes with the ${MODULE_PLAN} plan${ONLY_PLAN ? "" : " and every plan above it"}, together with Cloudflare.${ONLY_PLAN ? " No other plan includes it." : ""}`,
     },
     {
       q: "Will it get my pages indexed?",

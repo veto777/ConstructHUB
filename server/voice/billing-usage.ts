@@ -71,6 +71,7 @@ import type { VoiceUsageRow } from "@shared/schema";
 import { recordFailure } from "../ops/issues";
 import { withCallAssistantLock } from "../billing/locks";
 import { VOICE_SCHEMA_DDL } from "./schema";
+import { workerInterval } from "../workers";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
 
@@ -379,8 +380,7 @@ export function startVoiceMeterRetryWorker(): void {
       void recordFailure("job", "Call Assistant metering retry sweep", e);
     } finally { running = false; }
   };
-  setTimeout(run, METER_RETRY_FIRST_DELAY_MS).unref();
-  setInterval(run, METER_RETRY_EVERY_MS).unref();
+  workerInterval("Call Assistant metering retry", run, METER_RETRY_EVERY_MS, { firstAfterMs: METER_RETRY_FIRST_DELAY_MS });
 }
 
 /** The month's row, or null when nothing was counted yet. */
@@ -1197,6 +1197,5 @@ export function startVoiceOverageWorker(): void {
       void recordFailure("job", "Call Assistant overage billing sweep", e);
     } finally { running = false; }
   };
-  setTimeout(run, SWEEP_FIRST_DELAY_MS).unref();
-  setInterval(run, SWEEP_EVERY_MS).unref();
+  workerInterval("Call Assistant overage sweep", run, SWEEP_EVERY_MS, { firstAfterMs: SWEEP_FIRST_DELAY_MS });
 }

@@ -16,10 +16,13 @@ test("start, live progress, report, draft, PDF, share and revoke", async ({
   request,
 }) => {
   await page.goto("/site-scan");
+  // Inside the SEO tool shell the page title reads "New scan" (the shell's
+  // crumb carries "Site Scan").
   await expect(
-    page.getByRole("heading", { name: "Site Scan", exact: true }),
+    page.getByRole("heading", { name: "New scan", exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Website URL").fill("https://sitescan-browser.test");
+  // By test id: the monthly-rescan switch's label also says "website URL".
+  await page.getByTestId("input-scan-url").fill("https://sitescan-browser.test");
   await page.getByLabel("Pages to speed-test", { exact: true }).fill("0");
   await page.getByLabel("Pages to check", { exact: true }).fill("3");
   const started = page.waitForResponse(
@@ -100,10 +103,14 @@ test("start, live progress, report, draft, PDF, share and revoke", async ({
       await request.get("/api/sitescan/shared/" + href!.split("/").pop())
     ).status(),
   ).toBe(404);
-  await page.getByRole("button", { name: "Enable monthly rescan" }).click();
-  await expect(
-    page.getByRole("button", { name: "Disable monthly rescan" }),
-  ).toBeVisible();
+  // Monthly rescan is a Switch that shows its state for the URL above.
+  const rescan = page.getByRole("switch", {
+    name: /Rescan this site every month/,
+  });
+  await expect(rescan).not.toBeChecked();
+  await rescan.click();
+  await expect(rescan).toBeChecked();
+  await expect(rescan).toHaveAccessibleName(/On, next run/);
 });
 test("public lead magnet shows summary and email verification guidance", async ({
   page,
@@ -243,7 +250,8 @@ test("account history and reports fit a narrow mobile viewport", async ({
       },
     }),
   );
-  await page.goto("/site-scan");
+  // Scan history is its own view in the Website tool shell (/site-scan/history).
+  await page.goto("/site-scan/history");
   await page.getByRole("button", { name: /sitescan-mobile/ }).click();
   await expect(
     page.getByRole("heading", { name: "AI fix plan — draft" }),
@@ -455,7 +463,8 @@ test("agency search with 1,000 locations, bulk queue, factual checklist, done, r
       r.url().endsWith(`/api/sitescan/jobs/${id}/retry`),
     );
     await page
-      .getByRole("button", { name: "Rescan / retry PageSpeed" })
+      // PageSpeed was set to 0 pages, so the button says it stays off (c818ee74).
+      .getByRole("button", { name: "Rescan (PageSpeed stays off)" })
       .click();
     expect((await retry).status()).toBe(202);
     await runSiteScanWorker({

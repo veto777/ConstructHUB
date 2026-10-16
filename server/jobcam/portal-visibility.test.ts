@@ -3,7 +3,7 @@
  * on (jobcam_media.client_visible). Two layers:
  *
  *   1. Pure: the SQL both portal reads build carries the client_visible
- *      condition (and the member / share-link feed does not).
+ *      condition (and the member feed does not).
  *   2. Against the running dev server (CRM_TEST_BASE_URL, like the other
  *      money-path suites): a hidden shot is absent from /api/client/jobcam and
  *      its file URL is a 404 for a portal session that knows the id; a visible
@@ -38,7 +38,7 @@ describe("jobcam portal visibility — the SQL (pure)", () => {
     expect(q.params).toContain("ready");
   });
 
-  it("the member feed and share links do not consult the flag", () => {
+  it("the member feed does not consult the flag (share links do — share-visibility.test.ts)", () => {
     const q = render(and(...feedWhere({ orgId: "o1", projectIds: ["p1"] })!));
     expect(q.sql).not.toContain("client_visible");
   });

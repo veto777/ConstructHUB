@@ -23,6 +23,9 @@ type Summary = {
   counts: { releases: Partial<Record<PressReleaseStatus, number>>; messages: Record<string, number>; orders: number; creditsSold: number; creditsUsed: number };
 };
 type AdminRelease = PressReleaseView & { email: string | null; lastError: string | null; attempts: number };
+/** Inbound wire attachments are private: links stored before 2026-10-16 point at the public file route, which
+ * now refuses them, so they are read through the platform-admin route instead. */
+const pressAttachmentHref = (url: string) => url.replace(/^(?:https?:\/\/[^/]+)?\/api\/files\/press\/inbox\//, "/api/admin/press/attachments/");
 type Message = { id: number; direction: "in" | "out"; release_id: number | null; from_email: string; subject: string; body: string; kind: string | null; status: string; reason: string | null; received_at: string; attachments: { name: string; url: string }[] };
 
 const getJson = async <T,>(url: string): Promise<T> => (await apiRequest("GET", url)).json();
@@ -118,7 +121,7 @@ export default function AdminPressPage() {
               </div>
               {m.reason && <div className="text-xs text-muted-foreground">{m.reason}</div>}
               <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Text</summary><pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-muted p-2">{m.body}</pre></details>
-              {m.attachments?.length > 0 && <div className="text-xs">{m.attachments.map((a) => <a key={a.url} className="mr-3 underline" href={a.url} target="_blank" rel="noreferrer">{a.name}</a>)}</div>}
+              {m.attachments?.length > 0 && <div className="text-xs">{m.attachments.map((a) => <a key={a.url} className="mr-3 underline" href={pressAttachmentHref(a.url)} target="_blank" rel="noreferrer">{a.name}</a>)}</div>}
               {m.status === "needs_owner" && <Button size="sm" variant="outline" onClick={() => act.mutate({ url: `/api/admin/press/messages/${m.id}/handled` })} disabled={act.isPending}>Handled</Button>}
             </li>
           ))}

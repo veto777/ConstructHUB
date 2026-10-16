@@ -77,7 +77,9 @@ export function registerMailAlertRoutes(
       .parse(req.query);
     const params = [
       id,
-      `%${p.q}%`,
+      // Search is a substring match: `%`, `_` and `\` the person typed are literal characters, not wildcards
+      // (review w3-r2 L3; the same escape as agency/routes.ts and cloudflare/common.ts).
+      `%${p.q.replace(/[\\%_]/g, "\\$&")}%`,
       p.category,
       p.severity,
       p.locationId || null,

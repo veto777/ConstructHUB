@@ -132,7 +132,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "selector": "[data-testid=\"tool-rail-estimates\"]",
       "caption": "Menu: Estimates",
       "narration": "You'll find Estimates in the menu on the left."
     }

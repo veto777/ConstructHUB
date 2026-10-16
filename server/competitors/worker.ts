@@ -9,6 +9,7 @@ import {
   defaultExecuteDeps,
   type ExecuteDeps,
 } from "./scan";
+import { workerInterval } from "../workers";
 
 /** The scan card's copy when the results could not be written (the raw driver error is recorded for ops). */
 export const SAVE_FAILED = "Couldn't save the scan results. Run the scan again — it has not counted against your monthly limit.";
@@ -166,7 +167,7 @@ export async function removeCompetitorScan(userId: number, scanId: number, _now:
 export function startCompetitorWorker(tickMs = 2_000): NodeJS.Timeout | null {
   if (process.env.COMPETITOR_WORKER_DISABLED === "true") return null;
   let busy = false;
-  const timer = setInterval(async () => {
+  return workerInterval("Competitor Intel worker", async () => {
     if (busy) return;
     busy = true;
     try {
@@ -177,7 +178,5 @@ export function startCompetitorWorker(tickMs = 2_000): NodeJS.Timeout | null {
     } finally {
       busy = false;
     }
-  }, tickMs);
-  timer.unref();
-  return timer;
+  }, tickMs).timer;
 }

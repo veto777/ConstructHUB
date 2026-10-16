@@ -75,7 +75,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "selector": "[data-testid=\"tool-rail-clients\"]",
       "caption": "Clients",
       "chapter": "Where it is kept",
       "narration": "The message is saved with the client. Open Clients to see it.",

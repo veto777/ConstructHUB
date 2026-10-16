@@ -167,7 +167,8 @@ export async function fulfilResearchCheckout(session: Stripe.Checkout.Session, u
     from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`, to: process.env.SMTP_EMAIL, replyTo: order.email,
     subject: `Research report ordered #${id} (${order.tier}): the bot is on it`,
     html: `<p>${escapeHtml(order.email)} ordered: ${escapeHtml(order.input.subjects.map((s) => `${s.name} (${s.kind})`).join(", "))} in ${escapeHtml(order.input.states.join(", "))}.</p>
-      <p>Purpose: ${escapeHtml(order.input.purpose || "not given")}</p>`,
+      <p>Purpose: ${escapeHtml(order.input.purpose || "not given")}</p>
+      <p>Anything else we should know (the customer's note): ${escapeHtml(order.input.notes || "none")}</p>`,
   }).catch(() => undefined);
   void drainResearchQueue().catch((err) => console.error("[research] queue:", err));
 }

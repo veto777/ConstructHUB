@@ -3,7 +3,7 @@
  * transport blocks the host that sent it; HTML character references are decoded before matching) and #7 (robots.txt
  * paths are compared percent-encoding-normalized, RFC 9309 §2.2.2).
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import {
   PortalBlockedError, challengePage, decodeEntities, fetchWithDeadline, guard, guardBrowser, hostBlocked, noteResponse, normalizeRobotsPath,
   politeFetch, refuseChallengeBody, releaseHost, resetHostState, robotsAllowed, robotsAllows, robotsFor, visibleText, type Turn,
@@ -11,6 +11,10 @@ import {
 import { download } from "./bulk";
 import { researchPost, researchTransport, type ResearchTransport } from "../scrapers/research-transport";
 import { promises as fs } from "node:fs";
+import { setRobotsEnforced as __setRobotsEnforced } from "./http";
+// These tests exercise the robots.txt Disallow rule, which the OWNER ORDER of 2026-10-15 switched off in production.
+beforeAll(() => __setRobotsEnforced(true));
+afterAll(() => __setRobotsEnforced(false));
 
 afterEach(() => { vi.restoreAllMocks(); resetHostState(); });
 

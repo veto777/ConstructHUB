@@ -25,6 +25,12 @@
 .seo-layout .tool-slot > .seo-explorer-form > button { flex: none; }
 @media (max-width: 767px) {
   .seo-layout .tool-slot > .seo-explorer-form > label { flex-basis: 100%; max-width: none; }
+  /* The phone slot is a wrapping column: a 100% flex-basis there is 100% of its HEIGHT, which pushed the usage line into
+     a second column off the right edge (the page scrolled to 752px). The form takes the row, the usage line the next. */
+  .seo-layout .tool-slot--page > .seo-explorer-form { flex: 0 0 auto; width: 100%; }
+  /* The usage chips wrap on a phone rather than scroll out of sight with a hidden scrollbar ("tracked keywords 0 · unlimite"). */
+  .seo-layout .tool-slot--page .stat-chips { flex-wrap: wrap; overflow-x: visible; }
+  .seo-layout .tool-slot--page .stat-chips > * { flex: 0 1 auto; max-width: 100%; }
 }
 .seo-layout [data-testid="grid-cells"] { max-width: 100%; overflow-x: auto; padding: 4px; }
 @media (min-width: 640px) {

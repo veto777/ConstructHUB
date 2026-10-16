@@ -13,7 +13,7 @@ import { simpleParser, type AddressObject } from "mailparser";
 import nodemailer from "nodemailer";
 import { PRESS_MAILBOX } from "@shared/press";
 import { signatureHtml, signatureText } from "../email-signature";
-import { getR2Url, r2Configured, uploadToR2 } from "../r2";
+import { r2Configured, uploadToR2 } from "../r2";
 import { stripQuoted } from "../media-inbox/mailbox";
 
 export const PRESS_SIGNATURE_TEAM = "ConstructHUB Press Team";
@@ -62,7 +62,7 @@ export async function fetchSince(lastUid: number, uidValidity: string | null): P
           const text = /^text\/(csv|plain)|json/i.test(a.contentType) && a.content.length < 512 * 1024 ? a.content.toString("utf8") : undefined;
           let url = "";
           if (r2Configured()) {
-            try { url = getR2Url(await uploadToR2(a.content, a.contentType || "application/octet-stream", "press/inbox", extOf(name, a.contentType))); }
+            try { const key = await uploadToR2(a.content, a.contentType || "application/octet-stream", "press/inbox", extOf(name, a.contentType)); url = `/api/admin/press/attachments/${key.slice("press/inbox/".length)}`; }
             catch (e: any) { console.error(`[press] attachment ${name} not stored: ${e?.message ?? e}`); }
           }
           attachments.push({ name, url, contentType: a.contentType, size: a.content.length, ...(text ? { text } : {}) });

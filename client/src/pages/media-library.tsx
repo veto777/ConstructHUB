@@ -327,7 +327,7 @@ export default function MediaLibraryPage() {
   // Google's format (owner, 2026-10-07): quiet titles, Google's search box, folders as hairline rows, pill actions.
   return (
     <GoogleSurface page>
-    <AppPage width="wide" testId="page-media-library">
+    <AppPage width="wide" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-media-library">
       {activeFolderId ? (
         <header className="space-y-3">
           <GooglePill

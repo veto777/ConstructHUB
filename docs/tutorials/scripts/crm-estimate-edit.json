@@ -32,7 +32,7 @@
       "narration": "This line shows the new send time, and how long the estimate stays valid." },
     { "action": "highlight", "selector": "[data-testid=\"events-trail\"]", "caption": "History",
       "narration": "History keeps the record: updated, then sent." },
-    { "action": "highlight", "selector": "[data-testid=\"link-portal-nav-estimates\"]", "caption": "Menu: Estimates",
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-estimates\"]", "caption": "Menu: Estimates",
       "narration": "You'll find Estimates in the menu on the left." }
   ],
   "youtube": {

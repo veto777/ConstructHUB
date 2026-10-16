@@ -105,7 +105,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-payments\"]",
+      "selector": "[data-testid=\"tool-rail-payments\"]",
       "caption": "Where to find it",
       "narration": "You will find Payments in the left menu of your CRM."
     }

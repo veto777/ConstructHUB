@@ -8,8 +8,15 @@ import { planNamesWhere } from "../plan-copy";
  *     Accounts (ConstructHUB Direct, server/social/native.ts, and ConstructHUB's Outstand account, server/social/outstand.ts);
  *     no separate posting subscription; the stored connection is encrypted, never shown again:
  *     client/src/components/social-connect.tsx, server/social/client.ts encryptKey, server/social/schedule.ts connection()
- *   - networks: X (Twitter), Facebook, Instagram, LinkedIn, Threads, Bluesky, TikTok, YouTube, Pinterest, with a
- *     per-network text tweak and character cap: shared/social.ts platforms / socialLimits
+ *   - networks: X (Twitter), Facebook, Instagram, LinkedIn, Threads, Bluesky, TikTok, YouTube, Pinterest, Reddit
+ *     (a subreddit and a title), Mastodon and Tumblr, with a per-network text tweak and character cap:
+ *     shared/social.ts platforms / socialLimits / targetFor
+ *   - Google Business Profile as a channel: a GBP box in the composer for a business linked in Locations, its own
+ *     1,500-character tweak and an optional Media Library photo, sent through the Posts & Photos queue and gated
+ *     like it (autoPosts): client/src/pages/social-media.tsx, help social-media.google-business-profile
+ *   - Inbox (read, reply to, hide or delete comments where the network allows) and Analytics (followers, reach,
+ *     views and engagement over 7 or 28 days, per-post numbers): client/src/components/social-insights.tsx,
+ *     /social-media/inbox and /social-media/analytics (client/src/App.tsx), help social-media.inbox / .analytics
  *   - up to 20 destinations and 10 public media links per post, uploads under 100 MB, post now / schedule / draft:
  *     shared/social.ts postSchema, social-media.tsx upload()
  *   - a business comes from Locations; accounts and pages are mapped per business: social-media.tsx BusinessSelector,
@@ -33,6 +40,8 @@ import { planNamesWhere } from "../plan-copy";
 const SOCIAL_PLANS = planNamesWhere((plan) => plan.modules.socialPublishing);
 /** The plans without it ("Solo and Team"), which can add the à la carte item instead. */
 const PLANS_WITHOUT = planNamesWhere((plan) => !plan.modules.socialPublishing);
+/** The Google Business Profile channel runs through the Posts & Photos queue, so it needs that module too. */
+const GBP_CHANNEL_PLANS = planNamesWhere((plan) => plan.modules.autoPosts);
 
 const page: FeaturePage = {
   key: "social",
@@ -68,7 +77,17 @@ const page: FeaturePage = {
     {
       icon: "send",
       title: "One post, many networks",
-      body: "Facebook, Instagram, LinkedIn, X, Threads, Bluesky, TikTok, YouTube and Pinterest, up to 20 destinations per post.",
+      body: "Facebook, Instagram, LinkedIn, X, Threads, Bluesky, TikTok, YouTube, Pinterest, Reddit, Mastodon and Tumblr, up to 20 destinations per post.",
+    },
+    {
+      icon: "map-pin",
+      title: "Your Google profile too",
+      body: `Tick Google Business Profile and the same post goes out as an update on the business's Google listing, with its own text and a photo from your Media Library. It needs the business linked in Locations and scheduled Google posts, which come with the ${GBP_CHANNEL_PLANS} plans or the ${ALACARTE.ai_posts.name} item.`,
+    },
+    {
+      icon: "inbox",
+      title: "Inbox and analytics",
+      body: "Read and answer comments on your published posts from one inbox, and see followers, reach and each post's likes, comments and views as the networks report them.",
     },
     {
       icon: "settings",
@@ -194,7 +213,7 @@ const page: FeaturePage = {
       "A daily AI budget and quiet hours, with drafts that wait for your approval unless you choose fully automatic.",
       "Bulk posting across every business you manage, with placeholders per business.",
     ],
-    theyNotUs: "Ours does not post to your Google profile from here (that is AI Google posts); Marky does.",
+    theyNotUs: "Marky turns job photos into finished posts automatically; ours drafts from your photos and material and waits for your approval unless you choose fully automatic.",
   },
   related: ["gbpContent", "media", "gbp"],
   app: { href: "/social-media", surface: "app" },
@@ -209,6 +228,7 @@ const page: FeaturePage = {
   },
   sources: [
     "client/src/pages/social-media.tsx",
+    "client/src/components/social-insights.tsx",
     "client/src/pages/guides.tsx",
     "client/src/components/social-connect.tsx",
     "shared/social.ts",

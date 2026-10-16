@@ -1,4 +1,5 @@
 import { pool } from "./db";
+import { SCRAPE_SCHEDULE_DDL } from "./scrape-schedule-input";
 
 // Additive migration: legacy rows deliberately remain unowned.
 export async function ensureGrowthSchema() {
@@ -40,5 +41,7 @@ export async function ensureGrowthSchema() {
     CREATE INDEX IF NOT EXISTS click_visits_domain_visited_idx ON click_visits (domain_id, visited_at);
     CREATE INDEX IF NOT EXISTS vpn_visits_domain_visited_idx ON vpn_visits (domain_id, visited_at);
     CREATE INDEX IF NOT EXISTS tracked_domains_user_idx ON tracked_domains (user_id);
+    -- Scrape schedules: a custom "every N hours" interval (NULL = the preset frequency).
+    ${SCRAPE_SCHEDULE_DDL.join(";\n")};
   `);
 }

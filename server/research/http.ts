@@ -5,7 +5,8 @@
  *   - A deadline that covers the body, not just the headers: a server that sends headers and then stalls can't hold
  *     the serial report queue or the daily file refresh. `timeoutMs` bounds the headers, `bodyTimeoutMs` the whole
  *     exchange (body included).
- *   - robots.txt is honored at run time (HARD RULE 2), and fails closed: a 2xx robots.txt is parsed, a 404 or 410
+ *   - robots.txt is read at run time; since the OWNER ORDER of 2026-10-15 its Disallow rules no longer stop a search
+ *     (see setRobotsEnforced). An unreadable one still fails closed: a 2xx robots.txt is parsed, a 404 or 410
  *     allows, and a 401, 403, 429, 5xx, timeout or a challenge/error page served as robots.txt disallows the
  *     whole host for an hour, then it is fetched again.
  *   - Redirects are followed by hand (at most MAX_HOPS), and every hop is checked against robots.txt, the host's
@@ -542,21 +543,30 @@ export async function robotsFor(origin: string, chain: Set<string> = new Set()):
   return work;
 }
 
+/**
+ * OWNER ORDER 2026-10-15 ("turn all of them on", legal advice taken): a robots.txt Disallow no longer stops a search;
+ * this replaces HARD RULE 2. robots.txt is still read (for its crawl delay and visiting hours where a source honours
+ * them), and a robots.txt that answers with a bot challenge or a 401/403 still refuses the host: that is an access
+ * block, not a robots rule, and is never worked around. Tests of the old rule switch it back on (setRobotsEnforced).
+ */
+let robotsEnforced = false;
+export function setRobotsEnforced(on: boolean): void { robotsEnforced = on; }
+
 /** True when robots.txt lets us request the URL (an unreadable robots.txt does not). */
 export async function robotsAllowed(url: string): Promise<boolean> {
   const u = new URL(url);
   if (u.pathname === "/robots.txt") return true;
   const r = await robotsFor(u.origin);
-  return !r.denied && robotsAllows(r.rules, u.pathname + u.search);
+  return !r.denied && (!robotsEnforced || robotsAllows(r.rules, u.pathname + u.search));
 }
 
-/** Throws PortalBlockedError when robots.txt disallows the URL for us, or couldn't be read. */
+/** Throws PortalBlockedError when robots.txt couldn't be read (a challenge or a refusal), or, only with the old rule switched on, when it disallows the URL. */
 export async function checkRobots(url: string): Promise<void> {
   const u = new URL(url);
   if (u.pathname === "/robots.txt") return;
   const r = await robotsFor(u.origin);
   if (r.denied) throw new PortalBlockedError(url, 0, `${u.host}: ${r.denied}; no automated requests until it can be read`);
-  if (!robotsAllows(r.rules, u.pathname + u.search)) {
+  if (robotsEnforced && !robotsAllows(r.rules, u.pathname + u.search)) {
     throw new PortalBlockedError(url, 0, `robots.txt disallows ${u.host}${u.pathname} for automated requests`);
   }
 }

@@ -59,7 +59,8 @@ export function SocialWeek({ businessId, all, business, full = false }: { busine
         <h2 className="text-lg font-medium">{full ? range : "This week"}</h2>
         {!full && <span className="text-sm g-text-2">{range}</span>}
         <span className="text-sm g-text-2">· {total} post{total === 1 ? "" : "s"}</span>
-        <span className="ml-auto flex items-center gap-1">
+        {/* Phone width: the week buttons and "New post" wrap instead of pushing the last one off the edge. */}
+        <span className="ml-auto flex flex-wrap items-center justify-end gap-1">
           {full && <>
             <GooglePill size="sm" variant="quiet" icon={ChevronLeft} label="Previous week" onClick={() => shift(-1)} testId="button-week-prev" />
             <GooglePill size="sm" variant="quiet" label="Today" onClick={() => setWeekStart(startOfWeek(new Date()))} testId="button-week-today" />

@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "Tags on job-site photos and videos, so you can find them again by what they show.",
   whatItDoes: "Select lets you tick several photos and add or remove a tag on all of them at once; you can pick an existing tag or type a new one. The Tags filter beside the search box narrows the feed to the tags you tick.",
   howToUse: [
-    "CRM → Pipeline, open the job, choose its JobCam tab and Open feed. (JobCam in the menu shows every job.)",
+    "Open the job from CRM → Pipeline, choose its JobCam tab and Open feed (JobCam in the menu shows every job).",
     "Choose Select and tick the photos.",
     "Choose Tags in the bar, pick or type a tag, close the list, then choose Add.",
     "Choose Done. Use the Tags filter beside the search box to show only tagged photos.",

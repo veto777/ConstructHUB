@@ -4,9 +4,9 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "crm-client-portal-preview", group: "CRM", route: "/crm/clients", title: "See what the client sees",
   whatItIs: "A read-only look at one client's portal, exactly as that client sees it.",
-  whatItDoes: "“See what the client sees” on a client's page opens their portal in a new tab with a Contractor preview banner: their home page, estimates, invoices and receipts, signed contracts, measurement reports, photos, messages and your contact details. Uploads, messages and financing applications are switched off in the preview.",
+  whatItDoes: "“See what the client sees” on a client's page opens their portal in a new tab, under a Contractor preview banner. You see their home page, estimates, invoices and receipts, signed contracts, measurement reports, photos, messages and your contact details. Uploads, messages and financing applications are switched off in the preview.",
   howToUse: [
-    "CRM → Clients, and open the client.",
+    "Open CRM → Clients and open the client.",
     "Choose “See what the client sees”, under their name.",
     "Use the client's menu on the left to look at each section.",
     "Close the tab to come back. “Copy portal link” copies the client's own link to send them.",

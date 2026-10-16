@@ -22,7 +22,7 @@ import { allowanceLine } from "./pricing";
  *   - opens and time spent on the client timeline: server/crm/notes-timeline.ts
  *   - reminder resends the estimate by email, and by text from the org's own number: server/crm/sms.ts
  *   - no automatic drip: the only CRM timers are backups and HOVER (server/crm/backups.ts, hover.ts)
- *   - call leads filed into the CRM by the AI Call Assistant (an add-on not yet on sale): server/voice/leads.ts
+ *   - call leads filed into the CRM by the AI Call Assistant (a separate service on its own subscription since 2026-10-08, shared/plan-copy.ts CALL_ASSISTANT_SEPARATE_LINE): server/voice/leads.ts
  */
 
 const SEATS: FeatureAllowance = { limit: "crmPlanSeats", unit: "CRM seats", period: "count" };
@@ -119,7 +119,7 @@ const page: FeaturePage = {
     },
     {
       q: "Does it pull in leads from Google, ads or phone calls?",
-      a: "Not by itself. Leads come from New lead and your website form. The AI Call Assistant add-on files the leads from the calls it answers into the CRM.",
+      a: "Not by itself. Leads come from New lead and your website form. The AI Call Assistant, a separate service with its own subscription, files the leads from the calls it answers into the CRM.",
     },
     {
       q: "Does it follow up for me?",

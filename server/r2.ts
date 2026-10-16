@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
+import { R2_READ_TIMEOUT_MS, r2RequestHandler } from "./r2-http";
 
 const s3 = new S3Client({
   region: "auto",
@@ -8,6 +9,8 @@ const s3 = new S3Client({
     accessKeyId: process.env.R2_ACCESS_KEY_ID!,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
   },
+  // Timeouts + a bounded pool: an unconsumed body must not be able to hang every later request (r2-http.ts).
+  requestHandler: r2RequestHandler(),
 });
 
 const BUCKET = process.env.R2_BUCKET_NAME || "constructhub";
@@ -33,14 +36,14 @@ export async function uploadToR2(
 }
 
 /** `range` is an HTTP Range header value ("bytes=0-99"), passed through to R2 for media seeking. */
-export async function getFromR2(key: string, opts: { range?: string } = {}): Promise<{
+export async function getFromR2(key: string, opts: { range?: string; abortSignal?: AbortSignal } = {}): Promise<{
   body: ReadableStream | null; contentType: string; contentLength?: number; contentRange?: string;
 }> {
   const result = await s3.send(new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
     ...(opts.range ? { Range: opts.range } : {}),
-  }));
+  }), { requestTimeout: R2_READ_TIMEOUT_MS, ...(opts.abortSignal ? { abortSignal: opts.abortSignal } : {}) });
 
   return {
     body: result.Body as any,

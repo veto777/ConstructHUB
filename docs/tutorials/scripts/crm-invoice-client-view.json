@@ -131,7 +131,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-invoices\"]",
+      "selector": "[data-testid=\"tool-rail-invoices\"]",
       "caption": "Where to find it",
       "narration": "Invoices is in the left menu."
     }

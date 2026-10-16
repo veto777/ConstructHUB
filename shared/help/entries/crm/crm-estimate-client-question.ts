@@ -6,9 +6,9 @@ const entry: HelpDraft = {
   whatItIs: "The question box on the client's estimate page, and where the question lands for you.",
   whatItDoes: "A client types a question on the estimate and sends it. It appears in your Messages inbox, in that client's conversation, marked with the estimate's number. Your reply is emailed to the client and shows in their portal.",
   howToUse: [
-    "Your client opens the estimate and scrolls to “Questions about this estimate?”.",
-    "They type the question and choose Send.",
-    "In the CRM, open Messages and choose the client's conversation.",
+    "Point your client to “Questions about this estimate?” on the estimate.",
+    "Let them type the question and choose Send.",
+    "Open Messages in the CRM and choose the client's conversation.",
     "Type your answer underneath and send it.",
   ],
   howItWorks: "The question box names the salesperson on the estimate. The number beside Messages in the menu goes up until the conversation is opened.",

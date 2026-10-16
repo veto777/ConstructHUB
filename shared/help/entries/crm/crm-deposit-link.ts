@@ -7,8 +7,8 @@ const entry: HelpDraft = {
   whatItDoes: "An estimate can carry a deposit amount. Once the client approves it, their estimate page offers “Pay your deposit”, and Take a payment gives you a deposit link you can send yourself. The deposit then shows on your Payments page.",
   howToUse: [
     "Open the estimate, choose Edit, type the amount under “Deposit $” and save.",
-    "The client approves the estimate on their page. It then offers “Pay your deposit”.",
-    "To send the link yourself: open the client, choose “Take a payment”, then “Create deposit link” under “Deposit on a signed estimate”.",
+    "Wait for the client to approve the estimate; their page then offers “Pay your deposit”.",
+    "Send the link yourself if you like: open the client, choose “Take a payment”, then “Create deposit link” under “Deposit on a signed estimate”.",
     "Copy the link and text or email it. The payment appears under Recent payments.",
   ],
   howItWorks: "The link opens a checkout page hosted by Stripe on your own Stripe account. The deposit link is offered only for an approved estimate with a deposit that has not been paid and that has not been invoiced yet. A deposit cannot be more than the estimate total.",

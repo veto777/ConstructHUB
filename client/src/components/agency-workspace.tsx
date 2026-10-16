@@ -133,11 +133,11 @@ function AgencyBulkWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>void;c
       </div>}
       {!selectAll&&!selected.length&&<details className="text-sm"><summary className="cursor-pointer py-2">More</summary><div className="flex flex-wrap gap-2 py-2"><Button variant="outline" onClick={()=>{setSelectionKey(selectedKey);setAll(false);setIds(data?.items.map((l:any)=>l.id)||[]);}}>Select page</Button><Button variant="outline" onClick={()=>{setSelectionKey(selectedKey);setAll(true);setIds([]);}}>Select all matching ({data?.total??0})</Button><a className="inline-flex min-h-10 items-center underline" href={'/api/agency/export?'+f.params}>Export matching CSV</a></div></details>}
       {/* Each location as a Google local-pack entry with its bulk-select box (owner, 2026-10-06). */}
-      <div className="g-surface" data-testid="agency-locations-list">{data?.items.map((l:any)=>{const p=googlePill(l);return <div key={l.id} className="flex items-start gap-3 g-divider first:border-t-0" data-testid={`agency-location-${l.id}`}>
+      <div className="g-surface" data-testid="agency-locations-list">{data?.items.map((l:any)=>{const p=googlePill(l);return <div key={l.id} className="flex flex-wrap sm:flex-nowrap items-start gap-3 g-divider first:border-t-0" data-testid={`agency-location-${l.id}`}>
         <input aria-label={`Select ${l.businessName}`} className="mt-5 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]" type="checkbox" checked={selectAll||selected.includes(l.id)} onChange={e=>{setSelectionKey(selectedKey);setAll(false);setIds(e.target.checked?[...selected,l.id]:selected.filter(id=>id!==l.id));}}/>
         <div className="min-w-0 flex-1"><LocationLocalCard location={l} latestReview={latestReviews.get(l.id)} onOpen={()=>onOpen?onOpen(l.id):window.location.assign(`/locations?location=${l.id}`)} meta={<>{l.clientName||'Unassigned'} · <span className={p.tone==='success'?'g-open':p.tone==='warning'?'g-closed':undefined}>{p.label}</span></>}/></div>
         {/* The Google step for this row — Connect, Link & sync, or Synced — on the row itself (owner 2026-10-14: "i cant sync it"). */}
-        {writable&&<div className="shrink-0 pt-4 pr-2 w-full sm:w-auto sm:max-w-[240px]"><GbpLinkCell locationId={l.id}/></div>}
+        {writable&&<div className="shrink-0 w-full pl-8 pb-4 sm:w-auto sm:pl-0 sm:pb-0 sm:pt-4 sm:pr-2 sm:max-w-[240px]"><GbpLinkCell locationId={l.id}/></div>}
       </div>;})}</div>
       <Pager offset={f.offset} total={data?.total??0} onChange={f.setOffset}/>
       {writable&&(selectAll||selected.length>0)&&<fieldset disabled={mutation.isPending} className="border rounded p-3 space-y-3"><legend>Apply to selected locations</legend>

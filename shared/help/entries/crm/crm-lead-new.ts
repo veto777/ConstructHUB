@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "New lead on the Pipeline: a job you have not won yet, added as a card in the first stage.",
   whatItDoes: "Creates the lead for a new client or one you already have, with an estimated value if you know it. The card lands in the Lead column, and Home lists it under Needs attention.",
   howToUse: [
-    "CRM → Pipeline → New lead.",
+    "Open CRM → Pipeline → New lead.",
     "Type a lead name that says who and what job.",
     "Choose New client and type their name, or choose Existing client and search for them.",
     "Add an estimated value if you have one, and choose Add to pipeline.",

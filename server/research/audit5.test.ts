@@ -100,6 +100,7 @@ describe("decision 11: OSHA and SAM.gov only when the running server has them", 
     expect(runtimeRecordsPhrase({ osha: false, samExclusions: false })).toBe("");
     expect(runtimeRecordsPhrase({ osha: true })).toBe(", and OSHA inspections (federal)");
     expect(runtimeRecordsPhrase({ osha: true, samExclusions: true })).toBe(", federal exclusions and debarments (SAM.gov), and OSHA inspections (federal)");
+    expect(runtimeRecordsPhrase({ osha: false, federalCourts: true })).toBe(", and federal court cases");
   });
   it("Hub names OSHA only with the key", () => {
     setKnowledgeFact("samExclusions", true); setKnowledgeFact("samExclusions", false); // re-render now

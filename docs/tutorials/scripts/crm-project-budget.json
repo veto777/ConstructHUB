@@ -119,7 +119,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "selector": "[data-testid=\"tool-rail-pipeline\"]",
       "caption": "Where to find it",
       "narration": "Open any job from Pipeline, in the left menu."
     }

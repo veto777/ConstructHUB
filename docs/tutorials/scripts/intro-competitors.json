@@ -30,7 +30,7 @@
     },
     {
       "action": "click",
-      "selector": "summary:has-text(\"Advanced\")",
+      "selector": "[data-testid=\"button-radius-25\"]",
       "caption": "Search radius",
       "narration": "Under Advanced, set the radius: 10, 25, 50 or 100 miles."
     },
@@ -55,7 +55,7 @@
     },
     {
       "action": "highlight",
-      "selector": "xpath=//*[text()=\"Total Competitors\"]/ancestor::div[contains(@class,\"grid\")][1]",
+      "selector": "[data-testid=\"metrics-scan-910001\"]",
       "caption": "Businesses by signal band",
       "narration": "The top row counts the businesses, and how many show few, some or more review signals."
     },
@@ -74,7 +74,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"card-competitor-910003\"] .max-w-xs",
+      "selector": "[data-testid=\"text-signals-910003\"]",
       "caption": "BS Meter, with its reasons",
       "narration": "The BS Meter scores signals worth a closer look, from 0 to 100, and lists every reason, like a keyword-stuffed name."
     },
@@ -92,7 +92,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-competitor-intel\"]",
+      "selector": "[data-testid=\"tool-rail-competitors\"]",
       "caption": "Menu: Competitor Intel",
       "narration": "You'll find Competitor Intel in the menu on the left, under Tools."
     }

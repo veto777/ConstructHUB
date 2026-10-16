@@ -97,7 +97,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-home\"]",
+      "selector": "[data-testid=\"tool-rail-home\"]",
       "caption": "Menu: Home",
       "narration": "You'll find Home at the top of the menu on the left."
     }

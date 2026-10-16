@@ -4,9 +4,9 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "crm-client-portal", group: "CRM", route: "/crm/clients", title: "The client portal, from the client’s side",
   whatItIs: "A look at the portal each of your clients gets, opened the way they see it.",
-  whatItDoes: "“See what the client sees” on a client’s page opens their portal as a read-only preview: Home with what needs their action, Estimates, Invoices & receipts, Signed contracts, Measurement reports, Photos, Messages and Contact us.",
+  whatItDoes: "“See what the client sees” on a client’s page opens their portal as a look-only preview. It has Home (what needs their action), Estimates, Invoices & receipts, Signed contracts, Measurement reports, Photos, Messages and Contact us.",
   howToUse: [
-    "CRM → Clients, and open a client.",
+    "Open CRM → Clients and open a client.",
     "Choose See what the client sees.",
     "Click through the portal’s menu to see each section as the client does.",
   ],

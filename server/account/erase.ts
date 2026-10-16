@@ -14,6 +14,7 @@
 import { pool } from "../db";
 import { deleteFromR2, isR2Key } from "../r2";
 import { ERASE_AFTER_DAYS } from "./delete";
+import { workerInterval } from "../workers";
 
 /** Rows keyed by the user, without a cascade from users (erased explicitly). Children before parents is not needed:
  *  the delete loop retries a table that a foreign key still holds back. */
@@ -190,7 +191,6 @@ export function startAccountEraseWorker(env: NodeJS.ProcessEnv = process.env): b
   const run = () => eraseDueAccounts()
     .then((rs) => { if (rs.length) console.log("[account-erase]", JSON.stringify(rs.map((r) => ({ id: r.userId, status: r.status, reason: r.reason, files: r.files })))); })
     .catch((e) => console.error("[account-erase] run failed:", e?.message ?? e));
-  setTimeout(run, 5 * 60_000).unref?.();
-  setInterval(run, 24 * 3_600_000).unref?.();
+  workerInterval("account erase", run, 24 * 3_600_000, { firstAfterMs: 5 * 60_000 });
   return true;
 }

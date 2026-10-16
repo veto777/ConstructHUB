@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "The import page: bring clients, then estimates and invoices, into the CRM from a CSV or TSV export of another system or a spreadsheet.",
   whatItDoes: "You pick what the file holds, choose the file and preview it. The CRM guesses which column is which and shows every row before anything is saved. Import then creates the rows and tells you how many were created, skipped as duplicates, or had errors.",
   howToUse: [
-    "CRM → Clients → Import (or Settings → Import).",
+    "Open CRM → Clients → Import (or Settings → Import).",
     "Pick Clients, choose your CSV or TSV export, and choose Preview.",
     "Check the column mapping and the rows underneath; change a column's list if the guess is wrong.",
     "Choose Import, then View your clients.",

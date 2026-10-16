@@ -27,6 +27,7 @@ import { downloadToFile, putObjectFromFile, mediaKey, abortMultipart, keyBelongs
 import { readImageMeta, readVideoMeta, sniffMedia, sniffMatchesKind, FFMPEG_SAFE_INPUT } from "./exif";
 import { LIMITS, UPLOAD_TTL_MS, nextMediaStatus } from "./upload-state";
 import { bumpJobcamUsage, recountJobcamUsage } from "./usage";
+import { workerInterval } from "../workers";
 
 const DISPLAY_MAX = 2048;
 const THUMB_MAX = 400;
@@ -89,8 +90,7 @@ export function startJobcamSweeper(): void {
   if (sweeper) return;
   const tick = () => sweepExpiredUploads().catch((e: any) => console.error("[jobcam] sweep failed:", e?.message || e));
   void tick();
-  sweeper = setInterval(tick, 60 * 60 * 1000);
-  sweeper.unref();
+  sweeper = workerInterval("Jobcam upload sweeper", tick, 60 * 60 * 1000).timer;
 }
 
 /** Boot: anything still `processing` was interrupted by a restart — run it again. */

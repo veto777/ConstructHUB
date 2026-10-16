@@ -354,7 +354,7 @@ export default function DirectoriesPage() {
   const directories = useQuery<Directory[]>({ queryKey: ["/api/directories/directories"], queryFn: () => getJson("/api/directories/directories"), enabled: !!chosen });
   return (
     <GoogleSurface page>
-      <AppPage width="wide" testId="page-directories">
+      <AppPage width="wide" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-directories">
         <GoogleSectionHeader
           as="h1"
           title="Directory Sync"

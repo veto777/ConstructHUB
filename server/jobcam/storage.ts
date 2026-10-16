@@ -25,6 +25,7 @@ import { Hash } from "@smithy/hash-node";
 import { HttpRequest } from "@smithy/protocol-http";
 import { buildQueryString } from "@smithy/querystring-builder";
 import { r2Configured } from "../r2";
+import { R2_READ_TIMEOUT_MS, r2RequestHandler } from "../r2-http";
 import { PART_URL_TTL_S } from "./upload-state";
 
 export type StorageMode = "r2" | "local";
@@ -47,6 +48,8 @@ function client(): S3Client {
       region: "auto",
       endpoint: process.env.R2_ENDPOINT!,
       credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID!, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY! },
+      // Timeouts + a bounded pool: an unconsumed body must not be able to hang every later request (r2-http.ts).
+      requestHandler: r2RequestHandler(),
     });
   }
   return s3;
@@ -81,6 +84,18 @@ export function assertKey(key: string): string {
     throw new Error("Invalid JobCam storage key");
   }
   return key;
+}
+
+/**
+ * True for an object that only a gated route may serve: JobCam media and the
+ * YouTube customer videos stored beside it (`jobcam[-x]/…`, `ytvideo[-x]/…`).
+ * The generic public /api/files route refuses these — Express decodes "%2F" in
+ * a param, so without this a URL like /api/files/jobcam%2F<org>/<id>/original.jpg
+ * would stream any shot, hidden from the client or not, past every share gate.
+ */
+export function isPrivateMediaKey(key: string): boolean {
+  const first = String(key ?? "").replace(/^\/+/, "").split(/[\/\\]/)[0].toLowerCase();
+  return /^(?:jobcam|ytvideo)(?:-|$)/.test(first);
 }
 
 export function mediaKey(orgId: string, mediaId: string, name: string): string {
@@ -235,7 +250,7 @@ export async function objectSize(key: string): Promise<number | null> {
   assertKey(key);
   try {
     if (storageMode() === "r2") {
-      const r = await client().send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+      const r = await client().send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }), { requestTimeout: R2_READ_TIMEOUT_MS });
       return typeof r.ContentLength === "number" ? r.ContentLength : null;
     }
     return (await fs.promises.stat(localPath(key))).size;
@@ -258,7 +273,7 @@ export async function getObject(key: string, mime: string, rawRange?: string): P
   const range = cleanRange(rawRange);
   if (storageMode() === "r2") {
     try {
-      const r = await client().send(new GetObjectCommand({ Bucket: BUCKET, Key: key, ...(range ? { Range: range } : {}) }));
+      const r = await client().send(new GetObjectCommand({ Bucket: BUCKET, Key: key, ...(range ? { Range: range } : {}) }), { requestTimeout: R2_READ_TIMEOUT_MS });
       if (!r.Body) return null;
       const body = r.Body as any;
       const stream: Readable = typeof body.pipe === "function" ? body : Readable.fromWeb(body);

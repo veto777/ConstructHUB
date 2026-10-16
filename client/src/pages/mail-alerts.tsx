@@ -195,7 +195,7 @@ export default function MailAlertsPage() {
   if (planGate)
     return (
       <GoogleSurface page>
-        <AppPage testId="page-mail-alerts">
+        <AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-mail-alerts">
           {header}
           <PlanRequired
             module="domainsMailAlerts"
@@ -237,7 +237,7 @@ export default function MailAlertsPage() {
   ];
   return (
     <GoogleSurface page>
-    <AppPage testId="page-mail-alerts">
+    <AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-mail-alerts">
       {header}
       {error && <Notice tone="danger">{error}</Notice>}
       {totalAlerts !== null && totalAlerts > 0 && (

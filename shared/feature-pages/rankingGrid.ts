@@ -1,6 +1,7 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
 import { gridCreditCost } from "../plans";
+import { planNamesWhere } from "../plan-copy";
 
 /**
  * GMB Ranking Grid — every claim is backed by the code in `sources`:
@@ -17,11 +18,16 @@ import { gridCreditCost } from "../plans";
  *   - the report: pins coloured 1–3 / 4–10 / 11–20 / not found, Rank Summary (average, best, ranked / un-ranked,
  *     top-3 count, max distance), Rank Distribution, the businesses found most across the grid (found at, average
  *     rank, best rank), Print / PDF, Scan History: client/src/pages/ranking-grid.tsx
+ *   - grid watches (a local grid that repeats every week or month and alerts when the area clearly moves) live in the
+ *     SEO Suite's Local grid, behind the gridWatches module (Agency and up): client/src/pages/seo/grid.tsx,
+ *     server/seo/grid-monitor.ts, server/seo/routes.ts sendModuleRequired("gridWatches"). Plan names read below.
  */
 
 const CREDITS: FeatureAllowance = {
   limit: "gridCredits", perLocation: "gridCreditsPerLocation", unit: "ranking-grid credits", period: "month",
 };
+/** Plans with repeating grid watches, cheapest first. */
+const GRID_WATCH_PLANS = planNamesWhere((plan) => plan.modules.gridWatches);
 const credits = (n: number) => `${gridCreditCost(n)} ${gridCreditCost(n) === 1 ? "credit" : "credits"}`;
 
 const page: FeaturePage = {
@@ -84,6 +90,11 @@ const page: FeaturePage = {
       icon: "file",
       title: "Print or save as PDF",
       body: "Print the report or save it as a PDF to share with your team or a client.",
+    },
+    {
+      icon: "refresh",
+      title: "Grid watches",
+      body: `On the ${GRID_WATCH_PLANS} plans, a local grid in the SEO Suite can repeat every week or month, compare itself with the scan before, and alert you when the area clearly gets better or worse.`,
     },
   ],
   spotlight: {
@@ -206,6 +217,8 @@ const page: FeaturePage = {
       "Check where your business ranks on Google Maps for a keyword across your service area, point by point on a grid, and see who outranks you where.",
   },
   sources: [
+    "client/src/pages/seo/grid.tsx",
+    "server/seo/grid-monitor.ts",
     "client/src/pages/ranking-grid.tsx",
     "server/routes.ts",
     "server/growth-quotas.ts",

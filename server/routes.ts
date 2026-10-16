@@ -23,8 +23,10 @@ import { escapeHtml, oneLine, firstZodMessage, visitorIp, edgeGeo, normalizeBloc
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { photoDescription, reviewResponse, reviewFunnelDraft } from "./ai-features";
+import { photoDescription, reviewResponse, reviewFunnelDraft, reviewToneInput } from "./ai-features";
 import { AiAnswerError, aiErrorTag } from "./ai-output";
+import { scheduleInput, schedulePatchInput, settleFrequency } from "./scrape-schedule-input";
+import { scheduleIntervalMs } from "@shared/scrape-schedules";
 import { scrapeByPlatform, getScrapeProgress, getAllScrapeJobs, startLiveSearch, getLiveSearchJob, scrapePermitDetail } from "./scraper";
 import { readSearchPage, SEARCH_PAGE_MESSAGE } from "./search-page";
 import { effectiveVpnMode, savedVpnMode, VPN_DEFAULT_MODE } from "./vpn-mode";
@@ -46,7 +48,8 @@ import { registerAdsConsultantRoutes } from "./ads-consultant";
 import { registerHubRoutes } from "./hub";
 import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, extractPlaceName, extractMapsDataCid, extractMapsDataSearchQuery, extractMapsDataKgmid, extractMapsBusinessCoords, hexCidToDecimal } from "./google-url-resolver";
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
-import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
+import { uploadToR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
+import { registerPublicFileRoutes } from "./files/public-files";
 import { db, pool } from "./db";
 import { searchQueries, scrapeSchedules, trackedDomains, permitDatabases, subscriptions, reviewTemplates, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
 import { CITATION_DIRECTORIES, LEGACY_CITATION_NAMES, citationRank } from "./citations/directories";
@@ -58,9 +61,12 @@ import { isPlatformAdmin as isAdmin } from "./admin";
 import { platformGatePassed, ADMIN_REAUTH_BODY } from "./crm/admin";
 import { trialCodeDays, ACCESS_GRANT_MIN_DAYS, ACCESS_GRANT_MAX_DAYS } from "@shared/access-grants";
 import { recordFailure } from "./ops/issues";
+import { logError } from "./ops/log";
 import { ensureCompetitorWorkerSchema } from "./competitors/schema";
+import { listingOrder } from "./competitors/listing-order";
 import { competitorScanActions } from "./competitors/routes";
 import { enqueueCompetitorScan, removeCompetitorScan, startCompetitorWorker } from "./competitors/worker";
+import { workerInterval } from "./workers";
 
 // SECURITY: local-dev auth bypass (treat anonymous requests as user 1). This is
 // deliberately decoupled from NODE_ENV — it requires an explicit opt-in env var
@@ -169,7 +175,7 @@ type ProcessingJob = {
   error?: string;
 };
 const processingJobs = new Map<string, ProcessingJob>();
-setInterval(() => {
+workerInterval("photo upload cleanup", () => {
   const cutoff = Date.now() - 60 * 60 * 1000;
   if (![...processingJobs.values()].some(job => job.status === "running")) {
     for (const [id, file] of uploadedFiles) if (file.createdAt < cutoff) {
@@ -179,7 +185,7 @@ setInterval(() => {
   for (const [id, job] of processingJobs.entries()) {
     if (job.finishedAt && job.finishedAt < cutoff) processingJobs.delete(id);
   }
-}, 10 * 60 * 1000).unref();
+}, 10 * 60 * 1000);
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1101,13 +1107,7 @@ export async function registerRoutes(
     res.json(schedules);
   });
 
-  const scheduleInput = z.object({
-    databaseId: z.number({ required_error: "Choose a permit portal", invalid_type_error: "Choose a permit portal" }).int().positive("Choose a permit portal"),
-    searchType: z.enum(["address", "name", "company", "license", "permit"], { errorMap: () => ({ message: "Choose a search type" }) }),
-    searchValue: z.string({ required_error: "Enter what to search for" }).trim().min(1, "Enter what to search for").max(200, "Search value is too long"),
-    frequency: z.enum(["daily", "weekly", "monthly"], { errorMap: () => ({ message: "Frequency must be daily, weekly or monthly" }) }).default("daily"),
-    isActive: z.boolean().default(true),
-  });
+  // The request shape (presets or a custom "every N hours") lives in server/scrape-schedule-input.ts.
   // A schedule can only run against a portal with a verified live link and a live-search adapter.
   const findPortal = async (databaseId: number) =>
     (await db.select().from(permitDatabases).where(eq(permitDatabases.id, databaseId)))[0] ?? null;
@@ -1143,10 +1143,12 @@ export async function registerRoutes(
     try {
       const id = parseInt(req.params.id);
       if (!Number.isInteger(id)) return res.status(404).json({ message: "Schedule not found" });
-      const parsed = scheduleInput.partial().strict().safeParse(req.body ?? {});
+      const parsed = schedulePatchInput.safeParse(req.body ?? {});
       if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
       const changes: Partial<typeof parsed.data> = {};
       for (const [key, value] of Object.entries(parsed.data)) if (key in (req.body ?? {})) (changes as any)[key] = value;
+      const frequencyProblem = settleFrequency(changes);
+      if (frequencyProblem) return res.status(400).json({ message: frequencyProblem });
       if (Object.keys(changes).length === 0) return res.status(400).json({ message: "Nothing to update" });
       if (changes.databaseId !== undefined && (await rejectScheduleTarget(res, changes.databaseId))) return;
       const updated = await storage.updateScrapeSchedule(id, changes);
@@ -1173,14 +1175,13 @@ export async function registerRoutes(
   // cannot run it too) and searched once against its portal. Results go into
   // the shared permit cache under a query with no owner, like the directory.
   // lastRunAt is written only after a search actually ran.
-  const SCHEDULE_INTERVAL_MS: Record<string, number> = { daily: 86_400_000, weekly: 7 * 86_400_000, monthly: 30 * 86_400_000 };
   async function runDueScrapeSchedules() {
     const now = new Date();
     const stillDue = or(isNull(scrapeSchedules.nextRunAt), lte(scrapeSchedules.nextRunAt, now));
     const due = await db.select().from(scrapeSchedules)
       .where(and(eq(scrapeSchedules.isActive, true), stillDue)).orderBy(asc(scrapeSchedules.id)).limit(5);
     for (const schedule of due) {
-      const nextRunAt = new Date(now.getTime() + (SCHEDULE_INTERVAL_MS[schedule.frequency] ?? SCHEDULE_INTERVAL_MS.daily));
+      const nextRunAt = new Date(now.getTime() + scheduleIntervalMs(schedule));
       const [claimed] = await db.update(scrapeSchedules).set({ nextRunAt })
         .where(and(eq(scrapeSchedules.id, schedule.id), eq(scrapeSchedules.isActive, true), stillDue)).returning({ id: scrapeSchedules.id });
       if (!claimed) continue;
@@ -1220,8 +1221,7 @@ export async function registerRoutes(
       try { await runDueScrapeSchedules(); } catch (err) { console.error("Scrape schedule runner failed:", err); void recordFailure("job", "Scrape schedule runner", err); }
       finally { scheduleBusy = false; }
     };
-    setInterval(tick, 15 * 60 * 1000).unref();
-    setTimeout(tick, 60 * 1000).unref();
+    workerInterval("scrape schedule runner", tick, 15 * 60 * 1000, { firstAfterMs: 60 * 1000 });
   }
 
   // The Property Records page (/property): every county assessor/appraiser office (NETR-sourced
@@ -1907,12 +1907,12 @@ export async function registerRoutes(
   });
 
   const downloadTokens = new Map<string, { ids: string[]; createdAt: number }>();
-  setInterval(() => {
+  workerInterval("photo download token cleanup", () => {
     const cutoff = Date.now() - 10 * 60 * 1000;
     for (const [t, v] of downloadTokens.entries()) {
       if (v.createdAt < cutoff) downloadTokens.delete(t);
     }
-  }, 60 * 1000).unref();
+  }, 60 * 1000);
 
   app.post("/api/photos/download-all/prepare", (req, res) => {
     const { processedIds } = req.body;
@@ -2470,12 +2470,15 @@ export async function registerRoutes(
 
   app.post("/api/gmb/review-response", async (req, res) => {
     try {
-      const { reviewText, businessName, tone, reviewerName } = req.body;
+      const { reviewText, businessName, tone, customTone, reviewerName } = req.body;
       if (typeof reviewText !== "string" || !reviewText.trim()) return res.status(400).json({ message: "reviewText is required" });
       if (reviewText.length > 5000) return res.status(400).json({ message: "Reviews longer than 5,000 characters can't be answered here." });
+      // A preset tone, or "custom" with a short plain-text note (server/ai-features.ts reviewToneInput).
+      const toneChoice = reviewToneInput.safeParse({ tone, customTone });
+      if (!toneChoice.success) return res.status(400).json({ message: toneChoice.error.issues[0]?.message ?? "Choose a tone" });
 
       // Rules, delimiters and output checks live in reviewResponse (server/ai-features.ts).
-      res.json({ response: await reviewResponse({ reviewText, businessName, tone, reviewerName }) });
+      res.json({ response: await reviewResponse({ reviewText, businessName, ...toneChoice.data, reviewerName }) });
     } catch (err: any) {
       console.error("Review response generation failed:", aiErrorTag(err));
       res.status(503).json({ message: "AI responses are unavailable right now — please try again later." });
@@ -2813,9 +2816,10 @@ export async function registerRoutes(
       if (!scan) return res.status(404).json({ message: "Scan not found" });
       // Best-rated first, most-reviewed among equals; a listing with no rating yet goes last (Postgres puts
       // NULL first on a plain DESC, which put an unrated 0-review business at the top of the pack).
+      // rating is stored as text: compared as a number (Kimi review 2026-10-15), never alphabetically, and
+      // only when it looks like one — see server/competitors/listing-order.ts.
       const listings = await db.select().from(competitorListings).where(and(eq(competitorListings.scanId, scanId), eq(competitorListings.userId, userId)))
-        // rating is stored as text: compare it as a number (Kimi review 2026-10-15), never alphabetically.
-        .orderBy(sql`NULLIF(${competitorListings.rating}, '')::numeric DESC NULLS LAST`, sql`${competitorListings.reviewCount} DESC NULLS LAST`, asc(competitorListings.id));
+        .orderBy(...listingOrder());
       res.json({ scan, listings: listings.map(presentListing) });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
@@ -6338,14 +6342,14 @@ function main() {
             nextReminderAt: nextTime,
           });
 
-          console.log(`Sent reminder #${newCount} to ${request.clientEmail} for review ${request.id}`);
+          console.log(`Sent reminder #${newCount} for review ${request.id}`);
         } catch (err) {
-          console.error(`Failed to send reminder for review ${request.id}:`, err);
+          logError(`Failed to send reminder for review ${request.id}:`, err);
           void recordFailure("job", "Review reminder email", err, { reviewRequestId: request.id }, "warning");
         }
       }
     } catch (err) {
-      console.error("Reminder scheduler error:", err);
+      logError("Reminder scheduler error:", err);
       void recordFailure("job", "Review reminder scheduler", err);
     }
   }
@@ -6388,22 +6392,20 @@ function main() {
             nextReminderAt: firstReminderTime,
           });
 
-          console.log(`Sent scheduled review request ${request.id} to ${request.clientEmail}`);
+          console.log(`Sent scheduled review request ${request.id}`);
         } catch (err) {
-          console.error(`Failed to send scheduled review ${request.id}:`, err);
+          logError(`Failed to send scheduled review ${request.id}:`, err);
           void recordFailure("job", "Scheduled review request email", err, { reviewRequestId: request.id }, "warning");
         }
       }
     } catch (err) {
-      console.error("Scheduled review processor error:", err);
+      logError("Scheduled review processor error:", err);
       void recordFailure("job", "Scheduled review processor", err);
     }
   }
 
-  setInterval(processReminders, 5 * 60 * 1000);
-  setTimeout(processReminders, 30 * 1000);
-  setInterval(processScheduledReviews, 2 * 60 * 1000);
-  setTimeout(processScheduledReviews, 45 * 1000);
+  workerInterval("review reminders", processReminders, 5 * 60 * 1000, { firstAfterMs: 30 * 1000 });
+  workerInterval("scheduled review requests", processScheduledReviews, 2 * 60 * 1000, { firstAfterMs: 45 * 1000 });
 
   // Walkthrough videos (help registry): public, immutable, Range-aware — see server/tutorials/media.ts.
   registerTutorialMediaRoutes(app);
@@ -6411,50 +6413,9 @@ function main() {
   // unless server/tutorials/fixtures/gate.ts says so (never under NODE_ENV=production).
   registerTutorialFixtures(app);
 
-
-  // HOTFIX 2026-10-16: the public file routes take exactly folder/subfolder/filename. Express decodes %2F inside a
-  // param, so an encoded slash reached any object in the bucket (call recordings were downloadable by URL). Refuse
-  // slashes, backslashes and dot-segments in every part, and the private top-level folders served by their own
-  // authenticated routes.
-  const PRIVATE_FILE_FOLDERS = new Set(["voice", "jobcam", "ytvideo", "crm", "backups", "support", "research"]);
-  function publicFileKey(params: Record<string, string>): string | null {
-    const parts = [params.folder, params.subfolder, params.filename].map((v) => String(v ?? ""));
-    if (parts.some((v) => !v || /[\/\\]/.test(v) || v === "." || v === ".." || v.includes(".."))) return null;
-    if (PRIVATE_FILE_FOLDERS.has(parts[0].toLowerCase())) return null;
-    return parts.join("/");
-  }
-  
-  app.get("/api/files/:folder/:subfolder/:filename", async (req, res) => {
-    try {
-      const key = publicFileKey(req.params as Record<string, string>);
-      if (!key) return res.status(404).json({ message: "File not found" });
-
-      const { body, contentType } = await getFromR2(key);
-      if (!body) return res.status(404).json({ message: "File not found" });
-
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-
-      const nodeStream = body as any;
-      if (typeof nodeStream.pipe === "function") {
-        nodeStream.pipe(res);
-      } else if (typeof nodeStream[Symbol.asyncIterator] === "function") {
-        for await (const chunk of nodeStream) {
-          res.write(chunk);
-        }
-        res.end();
-      } else {
-        const arrayBuf = await nodeStream.arrayBuffer();
-        res.send(Buffer.from(arrayBuf));
-      }
-    } catch (err: any) {
-      if (err?.name === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) {
-        return res.status(404).json({ message: "File not found" });
-      }
-      console.error("Error serving R2 file:", err);
-      res.status(500).json({ message: "Failed to serve file" });
-    }
-  });
+  // Public R2 files: an allowlist of public-by-design prefixes only (server/files/public-files.ts).
+  // Recordings, JobCam, customer videos, issue screenshots… are served by their own gated routes.
+  registerPublicFileRoutes(app);
 
   // My account photo/logo uploads: takes a base64 jpeg/png/webp/gif (≤2MB), stores it in R2 under
   // avatars/ or logos/company, and returns the URL for PATCH /api/auth/profile.
@@ -6519,38 +6480,6 @@ function main() {
     } catch (err: any) {
       console.error("Error uploading review photos:", err);
       res.status(500).json({ message: "Failed to upload photos" });
-    }
-  });
-
-  app.get("/api/files/:folder/:subfolder/:filename/download", async (req, res) => {
-    try {
-      const key = publicFileKey(req.params as Record<string, string>);
-      if (!key) return res.status(404).json({ message: "File not found" });
-      const { body, contentType } = await getFromR2(key);
-      if (!body) return res.status(404).json({ message: "File not found" });
-
-      const originalName = String(req.query.name || req.params.filename).replace(/[^\w.\- ]+/g, "_").slice(0, 120) || "download";
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Content-Disposition", `attachment; filename="${originalName}"`);
-      res.setHeader("Cache-Control", "no-cache");
-
-      const nodeStream = body as any;
-      if (typeof nodeStream.pipe === "function") {
-        nodeStream.pipe(res);
-      } else if (typeof nodeStream[Symbol.asyncIterator] === "function") {
-        for await (const chunk of nodeStream) {
-          res.write(chunk);
-        }
-        res.end();
-      } else {
-        const arrayBuf = await nodeStream.arrayBuffer();
-        res.send(Buffer.from(arrayBuf));
-      }
-    } catch (err: any) {
-      if (err?.name === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) {
-        return res.status(404).json({ message: "File not found" });
-      }
-      res.status(500).json({ message: "Failed to download file" });
     }
   });
 

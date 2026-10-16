@@ -27,7 +27,17 @@ const SHOTS = process.env.FP_SCREENSHOT_DIR;
 
 function watchErrors(page: Page): string[] {
   const errors: string[] = [];
-  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  // A failed resource load is judged by its response below (the console line carries no address).
+  page.on("console", (m) => { if (m.type() === "error" && !m.text().startsWith("Failed to load resource:")) errors.push(m.text()); });
+  // The walkthrough poster/video/captions come from the media store, which a dev lane does not have (no R2
+  // credentials, no tmp/tutorials): they 404 here by design (server/tutorials/media.ts). The first-party analytics
+  // intake throttles per IP (server/analytics.ts EVENTS_IP_LIMIT), and a whole suite drives one IP: its 429 is that
+  // designed throttle. Every other failed response still counts.
+  page.on("response", (r) => {
+    if (r.status() < 400 || /\/api\/tutorials\/media\//.test(r.url())) return;
+    if (r.status() === 429 && /\/api\/analytics\/events$/.test(r.url())) return;
+    errors.push(`${r.status()} ${r.url()}`);
+  });
   page.on("pageerror", (e) => errors.push(String(e)));
   return errors;
 }

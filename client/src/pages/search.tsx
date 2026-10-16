@@ -608,7 +608,7 @@ export default function SearchPage() {
   const portalWord = (n: number) => `${n} portal${n === 1 ? "" : "s"}`;
 
   return (
-    <AppPage width="narrow" testId="page-search">
+    <AppPage width="narrow" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-search">
       {/* Google's search format (owner, 2026-10-07): a quiet header, search-type pills, the rounded search box. */}
       <GoogleSectionHeader
         as="h1"
@@ -773,7 +773,7 @@ export default function SearchPage() {
         <button
           type="button"
           onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-1.5 text-sm font-medium g-text-2 hover:text-foreground transition-colors w-full"
+          className="flex items-center gap-1.5 text-sm font-medium g-text-2 hover:text-foreground transition-colors w-full max-sm:min-h-11"
           data-testid="button-toggle-filters"
         >
           <SlidersHorizontal className="h-3 w-3" />

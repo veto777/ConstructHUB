@@ -35,7 +35,7 @@ export const EXTERNAL_DFY_PAGES: readonly ExternalDfyPage[] = [
   {
     key: "gbpReinstatement",
     title: "GBP Reinstatement",
-    lede: "Suspended Google Business Profile? Our team reviews your case, fixes guideline issues and writes and submits the appeal.",
+    lede: "Suspended Google Business Profile? Our team reviews your case, fixes guideline issues and writes and submits the appeal. Non-refundable: Google alone decides reinstatement.",
     path: "/reinstatement",
     // One price per project from the price book (shared/plans.ts GBP_REINSTATEMENT_CENTS), as on /features/reinstatement.
     pricing: { kind: "service", service: "gbpReinstatement" },

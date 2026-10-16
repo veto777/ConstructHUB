@@ -94,7 +94,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-home\"]",
+      "selector": "[data-testid=\"tool-rail-home\"]",
       "caption": "Where to find it",
       "narration": "Follow-ups are on Home, at the top of the left menu."
     }

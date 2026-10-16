@@ -27,6 +27,7 @@ import {
   crmNotificationChannel,
 } from "@shared/schema";
 import { notifyMembers } from "./notify";
+import { queueCrmEvent, customerEventPayload } from "./integrations";
 import { and, eq, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { portalBaseUrl } from "../site-context";
@@ -240,7 +241,8 @@ export function registerCrmLeadCaptureRoutes(app: Express, getDevUser: GetUser):
       ownerMemberId: owner?.id ?? null,
       tags: ["website-lead"],
       portalToken: randomBytes(24).toString("hex"),
-    }).returning({ id: crmCustomers.id });
+    }).returning();
+    queueCrmEvent(org.id, "customer.created", { ...customerEventPayload(created), source: "website_lead" });
 
     // The bell item opens this lead, not the whole client list.
     notifyLeadReceived(org, owner, { id: created.id, name, email, phone, message })

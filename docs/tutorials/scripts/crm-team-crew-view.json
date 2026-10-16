@@ -50,28 +50,28 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "selector": "[data-testid=\"tool-rail-clients\"]",
       "caption": "Clients",
       "narration": "The Clients list shows only those three.",
       "holdMs": 700
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "selector": "[data-testid=\"tool-rail-pipeline\"]",
       "caption": "Pipeline",
       "narration": "And the pipeline shows only his projects.",
       "holdMs": 700
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "selector": "[data-testid=\"tool-rail-estimates\"]",
       "caption": "Estimates",
       "narration": "Estimates lists only his job.",
       "holdMs": 700
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "selector": "[data-testid=\"tool-rail-pricebook\"]",
       "caption": "Price book",
       "narration": "The price book lists the work for him,",
       "chapter": "No prices",
@@ -85,7 +85,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-schedule\"]",
+      "selector": "[data-testid=\"tool-rail-schedule\"]",
       "caption": "Schedule and JobCam",
       "narration": "He still has Schedule and JobCam, for his visits and job photos."
     },
@@ -106,7 +106,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-team\"]",
+      "selector": "[data-testid=\"tool-rail-team\"]",
       "caption": "Where to find it",
       "narration": "You will find them under Team and Company, in the left menu."
     }

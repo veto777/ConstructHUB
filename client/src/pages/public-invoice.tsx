@@ -276,6 +276,18 @@ export default function PublicInvoicePage() {
             </div>
 
             {inv.notes && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{inv.notes}</p>}
+            {inv.warrantyText && (
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap" data-testid="text-invoice-warranty">{inv.warrantyText}</p>
+            )}
+            {inv.termsText && (
+              <details className="text-xs text-muted-foreground" data-testid="text-invoice-terms">
+                <summary className="cursor-pointer font-medium">Terms and conditions</summary>
+                <p className="mt-2 whitespace-pre-wrap">{inv.termsText}</p>
+              </details>
+            )}
+            {inv.footerText && (
+              <p className="text-xs text-muted-foreground whitespace-pre-wrap" data-testid="text-invoice-footer">{inv.footerText}</p>
+            )}
           </CardContent>
           {/* Footer band — company name · license # · website. */}
           <div className="border-t bg-muted/30 px-6 py-3.5 text-center text-xs text-muted-foreground" data-testid="document-footer">

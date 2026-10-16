@@ -103,7 +103,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-team\"]",
+      "selector": "[data-testid=\"tool-rail-team\"]",
       "caption": "Where to find it",
       "narration": "Only the owner can open these logs. They are under Team and Company."
     }

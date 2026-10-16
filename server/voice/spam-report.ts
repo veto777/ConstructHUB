@@ -37,6 +37,7 @@ import { CALL_ASSISTANT_NAME } from "@shared/plans";
 import { CALL_ASSISTANT_SPAM } from "@shared/plan-copy";
 import { emailLayout, type EmailMessage } from "../account/billing-email-templates";
 import { recordFailure } from "../ops/issues";
+import { workerInterval } from "../workers";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
 
@@ -282,7 +283,6 @@ export function startVoiceSpamReportWorker(): boolean {
       void recordFailure("job", "Weekly spam report run", e);
     } finally { running = false; }
   };
-  setTimeout(run, FIRST_DELAY_MS).unref();
-  setInterval(run, CHECK_EVERY_MS).unref();
+  workerInterval("weekly spam report", run, CHECK_EVERY_MS, { firstAfterMs: FIRST_DELAY_MS });
   return true;
 }

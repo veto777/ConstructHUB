@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { PRESET_IDS, PRIMARY_PRESETS } from "../shared/hub-presets";
+import { PLANS } from "../shared/plans";
 
 /**
  * Gabe — the corner assistant (the Hub widget). Run with playwright.hub.config.ts (two servers:
@@ -10,6 +11,9 @@ test.skip(!process.env.HUB_E2E, "run with -c playwright.hub.config.ts");
 const SIGNED_IN = process.env.HUB_SIGNED_IN_URL || "http://127.0.0.1:8301";
 const SIGNED_OUT = process.env.HUB_SIGNED_OUT_URL || "http://127.0.0.1:8302";
 const SHOTS = process.env.HUB_SCREENSHOT_DIR;
+// The pricing chip's Solo line, from the price book (shared/plans.ts), never a typed number.
+const dollars = (cents: number) => `$${(cents / 100).toLocaleString("en-US")}`;
+const SOLO_PRICE = `${dollars(PLANS.starter.monthlyCents)}/month or ${dollars(PLANS.starter.annualCents)}/year`;
 
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` });
@@ -33,7 +37,8 @@ test.describe("signed out", () => {
     await panel.getByTestId("hub-more").click();
     await expect(panel.locator("[data-hub-chip]")).toHaveCount(PRESET_IDS.length);
     await expect(panel.getByTestId("hub-input")).toHaveCount(0);
-    await expect(panel.getByTestId("hub-signup-cta")).toContainText("Create a free account to ask Gabe anything");
+    await expect(panel.getByTestId("hub-signup-cta")).toContainText("Typed questions need a verified account");
+    await expect(panel.getByTestId("hub-signup-link")).toHaveText("Create account");
     await expect(panel.getByTestId("hub-signup-link")).toHaveAttribute("href", "/auth");
 
     await panel.getByTestId("hub-chip-trial").click();
@@ -68,7 +73,7 @@ test.describe("signed out", () => {
     await page.keyboard.press("Enter");
     // While the answer loads and after it arrives, focus never falls to <body>.
     expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
-    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText("$29/month or $290/year");
+    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText(SOLO_PRICE);
     expect(await panel.evaluate((el) => el.contains(document.activeElement))).toBe(true);
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
@@ -93,7 +98,7 @@ test.describe("signed out", () => {
     await page.goto(`${SIGNED_OUT}/`);
     const panel = await openHub(page);
     await panel.getByTestId("hub-chip-pricing").click();
-    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText("$29/month or $290/year");
+    await expect(panel.getByTestId("hub-msg-assistant").last()).toContainText(SOLO_PRICE);
     const box = (await panel.boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(390);
@@ -124,7 +129,8 @@ test.describe("signed in", () => {
       { body: { reply: "Text <img src=x onerror=alert(1)> stays text.", kind: "answer", conversationId: convo, index: 3, sig: sig("b") } },
     ]);
     // A returning account (welcome already seen) gets the regular greeting.
-    await page.addInitScript(() => window.localStorage.setItem("hub.welcomeSeen", "1"));
+    // The welcome flag is per account (hub-widget.tsx welcomeFlagKey): the dev bypass signs in as user 1.
+    await page.addInitScript(() => { window.localStorage.setItem("hub.welcomeSeen", "1"); window.localStorage.setItem("hub.welcomeSeen:1", "1"); });
     await page.goto(`${SIGNED_IN}/`);
     await expect(page.getByTestId("hub-welcome-dot")).toHaveCount(0);
     const panel = await openHub(page);
@@ -173,7 +179,8 @@ test.describe("signed in", () => {
 
   test("keyboard: 'Start a new chat' moves focus to the text box, and Escape closes from anywhere", async ({ page }) => {
     await mockChat(page, [{ body: { reply: "Open **Locations** first.", kind: "answer", conversationId: convo, index: 1, sig: sig("d") } }]);
-    await page.addInitScript(() => window.localStorage.setItem("hub.welcomeSeen", "1"));
+    // The welcome flag is per account (hub-widget.tsx welcomeFlagKey): the dev bypass signs in as user 1.
+    await page.addInitScript(() => { window.localStorage.setItem("hub.welcomeSeen", "1"); window.localStorage.setItem("hub.welcomeSeen:1", "1"); });
     await page.goto(`${SIGNED_IN}/`);
     const panel = await openHub(page);
     await panel.getByTestId("hub-input").fill("How do I connect Google?");
@@ -192,7 +199,8 @@ test.describe("signed in", () => {
   test("390px: a long unbroken message wraps inside its bubble", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockChat(page, [{ body: { reply: "Mock answer.", kind: "answer", conversationId: convo, index: 1, sig: sig("e") } }]);
-    await page.addInitScript(() => window.localStorage.setItem("hub.welcomeSeen", "1"));
+    // The welcome flag is per account (hub-widget.tsx welcomeFlagKey): the dev bypass signs in as user 1.
+    await page.addInitScript(() => { window.localStorage.setItem("hub.welcomeSeen", "1"); window.localStorage.setItem("hub.welcomeSeen:1", "1"); });
     await page.goto(`${SIGNED_IN}/`);
     const panel = await openHub(page);
     await panel.getByTestId("hub-input").fill(`Is this link ok https://constructhub.us/settings?tab=billing&${"a".repeat(90)} for Pro?`);

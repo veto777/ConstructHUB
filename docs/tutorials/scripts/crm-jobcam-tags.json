@@ -137,7 +137,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-jobcam\"]",
+      "selector": "[data-testid=\"tool-rail-jobcam\"]",
       "caption": "Where to find it",
       "narration": "JobCam in the left menu has the same tools, across all your jobs."
     }

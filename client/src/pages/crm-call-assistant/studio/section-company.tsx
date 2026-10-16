@@ -68,7 +68,7 @@ function TimezoneField({ value, onChange, disabled }: SectionProps<string>) {
       {custom && (
         <div className="space-y-1.5">
           <Label htmlFor="company-timezone-other" className="sr-only">Time zone name</Label>
-          <Input id="company-timezone-other" value={value} disabled={disabled} placeholder="America/Boise" aria-invalid={!valid} data-testid="input-company-timezone-other"
+          <Input id="company-timezone-other" value={value} disabled={disabled} placeholder="America/Boise" aria-invalid={!valid} className="max-sm:h-11" data-testid="input-company-timezone-other"
             onChange={(e) => onChange(e.target.value.trim())} list="company-timezone-zones" />
           <datalist id="company-timezone-zones">
             {(typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : []).map((z) => <option key={z} value={z} />)}

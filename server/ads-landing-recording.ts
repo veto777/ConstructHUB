@@ -5,6 +5,7 @@ import { pool } from "./db";
 import { visitorIp } from "./route-guards";
 import { requirePlatformAdmin } from "./crm/admin";
 import { ADS_LANDING_PATHS } from "./ads-landing";
+import { workerInterval } from "./workers";
 
 export const MAX_RECORDING_BYTES = 10 * 1024 * 1024;
 const JSON_LIMIT = 40 * 1024 * 1024;
@@ -58,7 +59,7 @@ export function registerAdsLandingRecording(app: Express): void {
   void ready().catch(() => console.warn("[ads-lp] recording storage unavailable"));
   if (!retentionStarted) {
     retentionStarted = true;
-    setInterval(() => void ready().then(pruneRecordings).catch(() => console.warn("[ads-lp] recording retention failed")), 24 * 3600e3).unref();
+    workerInterval("ads landing recording retention", () => ready().then(pruneRecordings).catch(() => console.warn("[ads-lp] recording retention failed")), 24 * 3600e3);
   }
   app.use("/api/ads-lp", (_req, res, next) => { res.setHeader("Cache-Control", "private, no-store"); next(); });
   app.post("/api/ads-lp/rr", (req, res, next) => {

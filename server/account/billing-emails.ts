@@ -51,6 +51,7 @@ import {
   dateWords, intervalWord, money, safeUrl,
   type EmailMessage, type SubscriptionFacts, type InvoiceFacts, type ReceiptLine, type PurchaseFacts, type PurchaseKind, type PlanChangeFacts,
 } from "./billing-email-templates";
+import { workerInterval } from "../workers";
 
 export type { EmailMessage, SubscriptionFacts, InvoiceFacts, PurchaseFacts, PurchaseKind, PlanChangeFacts };
 
@@ -336,11 +337,8 @@ export function startEmailOutboxDrainer(opts: { intervalMs?: number; firstRunMs?
       running = false;
     }
   };
-  const first = setTimeout(run, Math.max(opts.firstRunMs ?? Math.min(intervalMs, 15_000), 0));
-  const every = setInterval(run, intervalMs);
-  first.unref();
-  every.unref();
-  drainer = { stop() { clearTimeout(first); clearInterval(every); drainer = null; } };
+  const worker = workerInterval("email outbox drain", run, intervalMs, { firstAfterMs: Math.max(opts.firstRunMs ?? Math.min(intervalMs, 15_000), 0) });
+  drainer = { stop() { void worker.stop(); drainer = null; } };
   return drainer;
 }
 

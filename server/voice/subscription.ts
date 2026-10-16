@@ -84,6 +84,7 @@ import {
   callAssistantSchemaReady, callAssistantSubscriptionRow, type CallAssistantAttemptRow, type CallAssistantSubscriptionRow,
 } from "./subscription-store";
 import { isPlatformAdminEmail } from "../admin";
+import { workerInterval } from "../workers";
 
 export const CALL_ASSISTANT_PRODUCT = "call_assistant";
 export const CALL_ASSISTANT_CHECKOUT_TYPE = "call_assistant";
@@ -410,8 +411,7 @@ export function startCallAssistantReconcileWorker(): void {
       void recordFailure("call_assistant", "Duplicate Call Assistant subscription retry sweep", e);
     } finally { running = false; }
   };
-  setTimeout(run, RECONCILE_FIRST_DELAY_MS).unref();
-  setInterval(run, RECONCILE_EVERY_MS).unref();
+  workerInterval("Call Assistant duplicate-cancellation retry", run, RECONCILE_EVERY_MS, { firstAfterMs: RECONCILE_FIRST_DELAY_MS });
 }
 
 /** What GET /api/call-assistant/billing/subscription (and the change route) report. */

@@ -89,7 +89,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "selector": "[data-testid=\"tool-rail-clients\"]",
       "caption": "Where to find it",
       "narration": "Every client you add under Clients gets a portal."
     }

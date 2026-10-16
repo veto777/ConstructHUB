@@ -95,7 +95,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-integrations\"]",
+      "selector": "[data-testid=\"tool-rail-integrations\"]",
       "caption": "Menu: Integrations",
       "narration": "You'll find both under Integrations in the menu."
     }

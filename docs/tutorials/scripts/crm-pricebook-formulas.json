@@ -92,7 +92,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "selector": "[data-testid=\"tool-rail-pricebook\"]",
       "caption": "Where to find it",
       "narration": "Formulas is the last tab of the Price book, in the left menu."
     }

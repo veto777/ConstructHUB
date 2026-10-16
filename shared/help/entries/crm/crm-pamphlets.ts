@@ -6,7 +6,7 @@ const entry: HelpDraft = {
   whatItIs: "Company-wide documents, such as a brochure, a warranty or a care guide, that every client can download from their portal.",
   whatItDoes: "“Company pamphlets” at the bottom of any client's page uploads a PDF or a picture for the whole company. Each client sees it on the Home page of their portal, under your company's name, with a Download button.",
   howToUse: [
-    "CRM → Clients, and open any client.",
+    "Open CRM → Clients and open any client.",
     "Scroll to “Company pamphlets” at the bottom of the page.",
     "Choose Upload PDF and pick the file.",
     "Use the bin beside a file to remove it for every client.",

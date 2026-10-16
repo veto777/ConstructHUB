@@ -35,12 +35,12 @@ import {
  */
 export function ComplianceFrame({ next, testId, children }: { next: string; testId: string; children: ReactNode }) {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-  if (user) return <AppPage width="wide" testId={testId}>{children}</AppPage>;
+  if (user) return <AppPage width="wide" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId={testId}>{children}</AppPage>;
   return (
     <div className="h-full overflow-y-auto">
       <PublicPageHeader next={next} />
       <GoogleSurface accent="brand">
-        <main className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-8 sm:py-12 space-y-5 sm:space-y-6" data-testid={testId}>{children}</main>
+        <main className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-8 sm:py-12 space-y-5 sm:space-y-6 max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" data-testid={testId}>{children}</main>
       </GoogleSurface>
       <PublicPageFooter />
     </div>
@@ -79,7 +79,7 @@ function AgencyRow({ a, i, unconfirmed }: { a: ComplianceAgency; i: number; unco
         {a.permitLookupUrl && <LinkPill href={a.permitLookupUrl} label="Look up a permit" icon={Search} unconfirmed={unconfirmed} testId={`link-permit-lookup-${i}`} />}
         {a.openDataUrl && <LinkPill href={a.openDataUrl} label="Open data" icon={Database} unconfirmed={unconfirmed} />}
         {a.website && <LinkPill href={a.website} label="Agency website" icon={Globe} unconfirmed={unconfirmed} />}
-        {a.phone && <GooglePill icon={Phone} label={a.phone} href={`tel:${a.phone.replace(/[^\d+]/g, "")}`} size="sm" title={`Call ${a.name}`} />}
+        {a.phone && <GooglePill icon={Phone} label={a.phone} href={`tel:${a.phone.replace(/[^\d+]/g, "")}`} size="sm" title={`Call ${a.name}`} className="max-w-full !whitespace-normal py-1 text-left" />}
       </>}
     />
   );

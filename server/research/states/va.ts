@@ -418,11 +418,10 @@ async function searchScc(name: string): Promise<EnforcementHit[]> {
   return withNote(out, notes.join("; ") || null);
 }
 
-// The SCC copies were searched through data.virginia.gov's CKAN datastore API, which its robots.txt disallows
-// (Disallow: /api/ and /datastore/*, checked 2026-10-15), so the search is not registered (HARD RULE 2). The allowed
-// path is each dataset's file download (corp.xlsx, ~1M rows), not loaded yet.
+// The SCC copies are searched through data.virginia.gov's CKAN datastore API. Its robots.txt disallows /api/ and
+// /datastore/*; back on by OWNER ORDER 2026-10-15, under which a robots.txt Disallow no longer stops a search (http.ts).
 export const SCC_SEARCH: LiveEnforcementSearch = { source: "Virginia SCC business entity status (open data)", scope: "Corporations (copy of 2024-11-14) and LLCs (copy of 2026-03-24, first 1,048,575 rows)", category: "business_status", search: searchScc };
-const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [];
+const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [SCC_SEARCH];
 
 export const pack: StatePack = {
   state: "VA",
@@ -434,7 +433,6 @@ export const pack: StatePack = {
     "DPOR disciplinary orders: no list or download; published only per licensee in the CAPTCHA lookup and in board minutes on Town Hall (PDF). Revocations are loaded from the News Releases page (va-dpor-revocations)",
     "Board for Contractors consent orders and fines in Town Hall meeting minutes (townhall.virginia.gov/L/meetings.cfm?BoardID=10): checked 2026-10-15, not built. The final minutes (v2 and later, e.g. Minutes_DPOR_39828_v2.pdf for April 28, 2026, 64 pages, and Minutes_DPOR_38882_v3.pdf for October 7, 2025) are scanned page images (PaperStream Capture, no text layer: pdftotext gives nothing), so reading them would mean OCR. Only the v1 drafts have text (Minutes_DPOR_40744_v1.pdf, August 25, 2026), and they are marked DRAFT (the watermark's letters are interleaved with the text), set in two columns with margin labels, and each case paragraph quotes the respondent's earlier consent orders and fines next to the new sanctions (per-count fines, a total, Recovery Fund payments to consumer claimants): respondent, outcome and amount can't be read reliably from them",
     "eVA Inactive Vendor List (DGS debarred/enjoined contractors, logi.cgieva.com Report9020): robots.txt Disallow: /",
-    "SCC business entities on data.virginia.gov (corporation, llc-limited-liability-company): robots.txt disallows /api/ and /datastore/* (checked 2026-10-15), so the datastore search is not used; the datasets' .xlsx downloads are allowed but not loaded yet",
     "SCC Clerk's Information System bulk data: paid subscription ($1,000/month per the SCC page); only the dated open-data copies are used",
     "data.virginia.gov SCC Lien Details: no debtor names, only filing numbers",
   ],

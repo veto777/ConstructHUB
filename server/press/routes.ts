@@ -28,7 +28,7 @@ import { rateLimit } from "../growth-limits";
 import { requirePlatformAdmin } from "../crm/admin";
 import { sendWithFallback } from "../email";
 import { escapeHtml, firstZodMessage } from "../route-guards";
-import { getR2Url, r2Configured, uploadToR2 } from "../r2";
+import { getFromR2, getR2Url, r2Configured, uploadToR2 } from "../r2";
 import {
   PRESS_CHECKOUT_TYPE, PRESS_NEWS_TYPES, PRESS_PACKAGES, PRESS_PATH, PRESS_RECOMMENDED_GAP_DAYS, PRESS_RELEASE_STATUSES, PRESS_TIERS,
   pressPackage, pressPackagePrice, pressPackageTier, type PressReleaseInput, type PressReleaseText, type PressTier,
@@ -87,6 +87,31 @@ const setup = () => ({ ai: pressAiConfigured(), mailbox: mailboxConfigured(), wi
 
 export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser = defaultGetUser) {
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 4 }, fileFilter: (_r, f, cb) => cb(null, ["image/jpeg", "image/png", "image/webp"].includes(f.mimetype)) });
+
+  // Inbound wire attachments are private (never on the public /api/files allow-list): platform admins only.
+  app.get("/api/admin/press/attachments/:file", async (req, res) => {
+    if (!(await requirePlatformAdmin(req, res, getUser))) return;
+    const file = String(req.params.file ?? "");
+    if (!/^[0-9a-f-]{36}\.[A-Za-z0-9_-]{1,32}$/i.test(file)) return res.status(404).json({ message: "File not found" });
+    const ac = new AbortController();
+    res.on("close", () => ac.abort());
+    try {
+      const { body, contentType } = await getFromR2(`press/inbox/${file}`, { abortSignal: ac.signal });
+      if (!body) return res.status(404).json({ message: "File not found" });
+      const stream = body as any;
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader("X-Original-Content-Type", String(contentType || "").slice(0, 100));
+      res.setHeader("Content-Disposition", `attachment; filename="${file}"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.on("close", () => stream.destroy?.());
+      stream.on?.("error", () => res.destroy());
+      stream.pipe(res);
+    } catch (err: any) {
+      if (err?.name === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) return res.status(404).json({ message: "File not found" });
+      if (!res.headersSent) res.status(500).json({ message: "Could not read the attachment" });
+    }
+  });
 
   app.get("/api/press/overview", async (req, res) => {
     try {

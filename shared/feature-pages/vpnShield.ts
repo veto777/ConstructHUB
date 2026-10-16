@@ -1,7 +1,7 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
 import { CLICK_GUARD_COMPARE } from "./clickGuard";
-import { ADDONS, PLANS } from "../plans";
+import { ADDONS, PLANS, planForModule } from "../plans";
 import { plansWhere } from "../plan-copy";
 
 /**
@@ -21,6 +21,8 @@ import { plansWhere } from "../plan-copy";
  *   - adding a website is gated on protectedSites ≠ 0: server/routes.ts POST /api/click-guard/domains
  */
 
+/** The cheapest plan with the Cloudflare tool (cloudflareSearchConsole module), read from the price book. */
+const EDGE_PLAN = PLANS[planForModule("cloudflareSearchConsole")].name;
 const SITES: FeatureAllowance = { limit: "protectedSites", unit: "websites", period: "count" };
 const FIRST_PLAN = PLANS[plansWhere((plan) => plan.limits.protectedSites !== 0)[0] ?? "agency"].name;
 
@@ -120,7 +122,7 @@ const page: FeaturePage = {
     },
     {
       q: "Is it a firewall?",
-      a: "No. It acts in the browser after the page loads: someone who blocks scripts still sees your site, and requests to your server aren't stopped. On the Agency plan, the Cloudflare tool can block IP addresses you choose at the edge.",
+      a: `No. It acts in the browser after the page loads: someone who blocks scripts still sees your site, and requests to your server aren't stopped. From the ${EDGE_PLAN} plan up, the Cloudflare tool can block IP addresses you choose at the edge.`,
     },
   ],
   // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): its own script and the crawler skip are

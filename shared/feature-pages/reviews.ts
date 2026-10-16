@@ -1,6 +1,7 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
 import { planNamesWhere } from "../plan-copy";
+import { ALACARTE } from "../alacarte";
 
 /**
  * Google Reviews — every claim is backed by the code in `sources`:
@@ -15,7 +16,12 @@ import { planNamesWhere } from "../plan-copy";
  *     Nextdoor, Thumbtack, other; pasted links, up to 8), a PRIMARY destination (usually Google), and a
  *     per-request choice of which sites to include: shared/review-links.ts, google-reviews.tsx
  *     (Other review sites, Primary destination, Where to send them)
- *   - follow-up reminders (interval, how many, time windows, timezone): server/review-reminders.ts, processReminders
+ *   - follow-up reminders (interval, how many, time windows, timezone): server/review-reminders.ts, processReminders;
+ *     the settings answer 402 and reminders arm only with hasModule("reviewReminders") (server/routes.ts 6186–6360),
+ *     a module of the Team plan and up (shared/plans.ts) or the à la carte Google Reviews item — names read below
+ *   - removed reviews: every sync keeps a review Google stopped returning, with its full text, logs the change and
+ *     alerts; "Copy for Google" assembles what Google's support form asks for, "Report a missing review to Google"
+ *     links to that form: client/src/pages/locations.tsx ReviewsTab, help locations.reviews
  *   - unsubscribe honoured (409 on a suppressed address): server/routes.ts isReviewSuppressed, server/review-suppression.ts
  *   - the client's page: a public page, no account; a private 1–10 rating; a Back button to fix a mis-tapped
  *     rating; the "Help Us Improve" private form; the public review step (and its showReview flag) only at or
@@ -44,6 +50,8 @@ import { planNamesWhere } from "../plan-copy";
 
 const TEMPLATES: FeatureAllowance = { limit: "reviewTemplates", unit: "saved review profiles", period: "count" };
 const AUTO_PUBLISH_PLANS = planNamesWhere((plan) => plan.limits.autoPublishAiReplies);
+/** Follow-up reminders are a plan module (reviewReminders), not part of every plan. */
+const REMINDER_PLANS = planNamesWhere((plan) => plan.modules.reviewReminders);
 
 const page: FeaturePage = {
   key: "reviews",
@@ -69,7 +77,7 @@ const page: FeaturePage = {
     },
     {
       title: "Send the request",
-      body: "Enter the customer's name and email, add a personal note or job photos, and send it now or schedule it. Reminders follow up on their own with people who haven't answered.",
+      body: `Enter the customer's name and email, add a personal note or job photos, and send it now or schedule it. On the ${REMINDER_PLANS} plans, reminders follow up on their own with people who haven't answered.`,
     },
     {
       title: "The customer rates the job",
@@ -114,7 +122,7 @@ const page: FeaturePage = {
     {
       icon: "bell",
       title: "Follow-up reminders",
-      body: "Pick how often and how many times to remind customers who haven't answered, and the hours of the day reminders may go out.",
+      body: `Pick how often and how many times to remind customers who haven't answered, and the hours of the day reminders may go out. Reminders come with the ${REMINDER_PLANS} plans.`,
     },
     {
       icon: "sparkles",
@@ -125,6 +133,11 @@ const page: FeaturePage = {
       icon: "message",
       title: "Reviews, replies and reports",
       body: "Reviews from each linked listing sync in, filtered by stars or answered and unanswered, with an alert when a new one lands. AI drafts replies you approve, and Report covers reviews that break Google's rules.",
+    },
+    {
+      icon: "history",
+      title: "Removed reviews kept",
+      body: "When Google drops a review from your linked listing, the next sync keeps its full text, logs the change and alerts you. Copy for Google gathers what Google's support form asks for, and a link opens that form.",
     },
   ],
   spotlight: {
@@ -154,7 +167,7 @@ const page: FeaturePage = {
     },
     {
       title: "Contractors who forget to ask",
-      body: "Send the request when the job wraps up, and let reminders do the follow-up.",
+      body: "Send the request when the job wraps up, and let reminders do the follow-up on the plans that include them.",
     },
     {
       title: "Owners who reply to every review",
@@ -168,7 +181,7 @@ const page: FeaturePage = {
   pricing: {
     kind: "plan",
     allowance: TEMPLATES,
-    note: `Every plan drafts AI replies for you to approve; publishing them automatically is included with the ${AUTO_PUBLISH_PLANS} plans.`,
+    note: `Every plan drafts AI replies for you to approve. Follow-up reminders come with the ${REMINDER_PLANS} plans, and publishing AI replies automatically with the ${AUTO_PUBLISH_PLANS} plans.`,
   },
   faqs: [
     {
@@ -177,7 +190,7 @@ const page: FeaturePage = {
     },
     {
       q: "Which plans include it?",
-      a: `Every plan includes review requests, feedback routing, review alerts and AI reply drafts. Publishing AI replies automatically is included with the ${AUTO_PUBLISH_PLANS} plans. ${allowanceLine(TEMPLATES)}.`,
+      a: `Every plan includes review requests, feedback routing, review alerts, removed-review tracking and AI reply drafts. Follow-up reminders are included with the ${REMINDER_PLANS} plans, and publishing AI replies automatically with the ${AUTO_PUBLISH_PLANS} plans; the ${ALACARTE.reviews.name} item adds both on its own. ${allowanceLine(TEMPLATES)}.`,
     },
     {
       q: "How does the threshold work, and can I change it?",
@@ -211,8 +224,8 @@ const page: FeaturePage = {
       "Google Reviews is a review request tool for contractors. When a job wraps up, you send the customer an " +
         "email with your company name and logo, an optional personal note and job photos, your choice of email " +
         "theme and a copy to yourself by BCC. Send it now or on a schedule; the email links to a short public " +
-        "page, no account needed, where the customer rates the job privately from 1 to 10. Follow-up reminders " +
-        "go out on their own until the customer answers.",
+        "page, no account needed, where the customer rates the job privately from 1 to 10. On the plans that " +
+        "include them, follow-up reminders go out on their own until the customer answers.",
       "A review profile holds your Google review link and a default description of the work. You can paste the " +
         "link, or pick one of your linked Google listings and have the name and link filled in for you; when no " +
         "Google account is linked, the dialog offers the connect step first. A profile can also carry your review " +
@@ -256,7 +269,7 @@ const page: FeaturePage = {
       "Requests with your job photos and a personal note, sent now or scheduled, with follow-up reminders on your schedule.",
       "Your own review pages on other sites (Yelp, BBB, Houzz and more) on a profile with a primary destination, and a per-request choice of what to include.",
     ],
-    theyNotUs: "Review requests by text (ours go by email), monitoring of other review sites, and website widgets.",
+    theyNotUs: "Review requests by text (ours go by email) and website widgets; outside Google, ours watches Yelp only, from the Yelp page.",
   },
   related: ["gbp", "profileGuard", "crm"],
   app: { href: "/google-reviews", surface: "app" },

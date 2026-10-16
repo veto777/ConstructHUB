@@ -10,6 +10,7 @@ import { createSign } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { pool } from "../db";
+import { workerInterval } from "../workers";
 
 export const WATCHED_APPS = [
   { id: "6819417454", name: "ConstructHUB: Contractor Tools" },
@@ -109,6 +110,5 @@ export function startAppReviewWatch(): void {
     } catch (e: any) { console.warn(`[app-review] check failed: ${e?.message ?? e}`); }
   };
   void run();
-  timer = setInterval(run, 15 * 60_000);
-  timer.unref();
+  timer = workerInterval("App Review watch", run, 15 * 60_000).timer;
 }

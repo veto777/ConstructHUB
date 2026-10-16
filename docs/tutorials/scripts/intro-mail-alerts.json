@@ -93,7 +93,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-mail-alerts\"]",
+      "selector": "[data-testid=\"subnav-domains-mail\"]",
       "caption": "Menu: Mail alerts",
       "narration": "You'll find Mail alerts in the menu on the left, under Google Business, next to Domains."
     }

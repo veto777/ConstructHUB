@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
+// The Posts page also lists Bulk posts runs (components/bulk-posts.tsx) under the same /api/gbp/content/:id prefix;
+// a mock of that prefix must answer that list in its own shape.
+const BULK_RUNS_NONE = { runs: [], workerEnabled: false, fileloaded: false };
+// Real queue rows only: an empty queue shows a badged SamplePreview (data-sample) with two sample <article>s.
+const queueRows = (page: import('@playwright/test').Page) => page.locator('article:not([data-sample] article)');
+// Advanced schedule, AI drafts and style, and Advanced photo settings are collapsed <details> (f1ba7ecc, fe52d74f).
+const disclose = (page: import('@playwright/test').Page, summary: string) => page.locator('summary', { hasText: summary }).click();
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 let location: number;
 test.beforeAll(async () => {
@@ -18,18 +25,19 @@ test('real API: compose a cadence batch, schedule, reload and cancel', async ({ 
     await page.getByLabel('Post draft').fill('Fixture update two — browser test');
     await page.getByRole('button', { name: 'Add post to draft batch' }).click();
     await page.getByLabel('First publish').fill('2027-01-04T09:00');
+    await disclose(page, 'Advanced schedule');
     await page.getByLabel('Cadence').selectOption('week');
     await page.getByLabel('Items per period').fill('2');
     await page.getByRole('button', { name: 'Approve & queue post' }).click();
     await expect(page.getByText('Approved content added to the queue.')).toBeVisible();
-    await expect(page.locator('article')).toHaveCount(2);
+    await expect(queueRows(page)).toHaveCount(2);
     await page.reload();
     await page.getByLabel('Location', { exact: true }).selectOption(String(location));
-    await expect(page.locator('article')).toHaveCount(2);
+    await expect(queueRows(page)).toHaveCount(2);
     await page.getByRole('button', { name: 'Calendar', exact: true }).click();
-    await expect(page.locator('article').first()).toContainText('Fixture update one');
+    await expect(queueRows(page).first()).toContainText('Fixture update one');
     await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
-    await expect(page.locator('article').first()).toContainText('cancelled');
+    await expect(queueRows(page).first()).toContainText('cancelled');
     const jobs = (await db.query('SELECT * FROM gbp_content_jobs WHERE location_id=$1 ORDER BY due_at', [location])).rows;
     expect(jobs).toHaveLength(2);
     expect(new Date(jobs[1].due_at).getTime() - new Date(jobs[0].due_at).getTime()).toBe(302400000);
@@ -40,6 +48,7 @@ test('mocked AI and uploads: bulk captions stay editable; style and photo approv
     let queued: any;
     await page.route(`**/api/gbp/content/${location}**`, async (route) => {
         const path = new URL(route.request().url()).pathname, body = route.request().method() !== 'GET' && !path.endsWith('/upload') ? route.request().postDataJSON() : {};
+        if (path.endsWith('/bulk-posts')) return route.fulfill({ json: BULK_RUNS_NONE });
         if (path.endsWith('/upload')) {
             const p = { id: photos.length + 1, name: `Fixture ${photos.length + 1}.jpg`, url: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' };
             photos.push(p);
@@ -60,28 +69,31 @@ test('mocked AI and uploads: bulk captions stay editable; style and photo approv
         }
         return route.fulfill({ json: { jobs, style: null, workerEnabled: false } });
     });
-    await page.goto('/gbp-content');
+    await page.goto('/gbp-photos'); // Photos split from Posts into their own tool (fe52d74f)
     await page.getByLabel('Location', { exact: true }).selectOption(String(location));
     await page.getByLabel('Upload photos', { exact: true }).setInputFiles([{ name: 'one.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('fixture') }, { name: 'two.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('fixture') }]);
     await expect(page.getByText('2 selected', { exact: true })).toBeVisible();
+    await disclose(page, 'AI drafts and style');
     await page.getByRole('button', { name: 'Generate caption drafts' }).click();
     await expect(page.getByLabel('Caption for Fixture 1.jpg')).toHaveValue('AI draft 1');
     await page.getByLabel('Caption for Fixture 1.jpg').fill('Owner edited caption');
-    await expect(page.locator('article')).toHaveCount(0);
+    await expect(queueRows(page)).toHaveCount(0);
     await page.getByRole('button', { name: 'Learn from past updates' }).click();
     await expect(page.getByLabel('Style guidance', { exact: true })).toHaveValue('Fixture learned tone and CTA patterns');
     await page.getByLabel('Style guidance', { exact: true }).fill('Owner edited guidance');
     await page.getByRole('button', { name: 'Save style guidance' }).click();
     await page.getByRole('button', { name: 'Approve & queue photos' }).click();
-    await expect(page.locator('article')).toHaveCount(2);
+    await expect(queueRows(page)).toHaveCount(2);
     expect(queued.items[0].summary).toBe('Owner edited caption');
     expect(queued.items[1].summary).toBe('AI draft 2');
-    await expect(page.getByText('Google strips EXIF on upload;', { exact: false })).toBeVisible();
+    await disclose(page, 'Advanced photo settings');
+    await expect(page.getByText('Google strips EXIF on upload.', { exact: false })).toBeVisible(); // f1ba7ecc copy
 });
 test('AI update is a draft until edited and approved, and provider failures can be retried', async ({page}) => {
     let jobs:any[]=[];let approved:any;
     await page.route(`**/api/gbp/content/${location}**`,async route=>{
         const path=new URL(route.request().url()).pathname;
+        if (path.endsWith('/bulk-posts')) return route.fulfill({ json: BULK_RUNS_NONE });
         if(path.endsWith('/photos'))return route.fulfill({json:[]});
         if(path.endsWith('/draft'))return route.fulfill({json:{draft:true,drafts:[{text:'Fixture generated update'}]}});
         if(path.endsWith('/queue')){approved=route.request().postDataJSON();jobs=[{id:123,kind:'post',payload:{summary:approved.items[0].summary},due_at:'2027-01-01T12:00:00Z',status:'failed',error:'Google denied permission'}];return route.fulfill({json:jobs});}
@@ -89,9 +101,9 @@ test('AI update is a draft until edited and approved, and provider failures can 
         return route.fulfill({json:{jobs,style:null,workerEnabled:false}});
     });
     await page.goto('/gbp-content');await page.getByLabel('Location',{exact:true}).selectOption(String(location));
-    await page.getByRole('button',{name:'Generate post draft'}).click();await expect(page.getByLabel('Post draft')).toHaveValue('Fixture generated update');await expect(page.locator('article')).toHaveCount(0);
-    await page.getByLabel('Post draft').fill('Owner edited update');await page.getByRole('button',{name:'Approve & queue post'}).click();await expect(page.locator('article')).toContainText('Google denied permission');expect(approved.items[0].summary).toBe('Owner edited update');
-    await page.getByRole('button',{name:'Retry',exact:true}).click();await expect(page.locator('article')).toContainText('queued');
+    await disclose(page,'AI drafts and style');await page.getByRole('button',{name:'Generate post draft'}).click();await expect(page.getByLabel('Post draft')).toHaveValue('Fixture generated update');await expect(queueRows(page)).toHaveCount(0);
+    await page.getByLabel('Post draft').fill('Owner edited update');await page.getByRole('button',{name:'Approve & queue post'}).click();await expect(queueRows(page)).toContainText('Google denied permission');expect(approved.items[0].summary).toBe('Owner edited update');
+    await page.getByRole('button',{name:'Retry',exact:true}).click();await expect(queueRows(page)).toContainText('queued');
 });
 
 // The Locations list is the AgencyWorkspace table (paged envelope from /api/agency/locations); opening a row
@@ -150,6 +162,7 @@ test('partial upload exposes saved photos immediately and allows retrying the re
     let uploads = 0;
     await page.route(`**/api/gbp/content/${location}**`, route => {
         const path = new URL(route.request().url()).pathname;
+        if (path.endsWith('/bulk-posts')) return route.fulfill({ json: BULK_RUNS_NONE });
         if (path.endsWith('/upload')) {
             uploads++;
             if (uploads === 2) return route.fulfill({ status: 400, json: {message:'Fixture upload failure'} });
@@ -158,7 +171,7 @@ test('partial upload exposes saved photos immediately and allows retrying the re
         }
         return route.fulfill({json:path.endsWith('/photos')?photos:{jobs:[],style:null,workerEnabled:false}});
     });
-    await page.goto('/gbp-content');
+    await page.goto('/gbp-photos'); // the photo uploader is the Photos tool now (fe52d74f)
     await page.getByLabel('Location', {exact:true}).selectOption(String(location));
     const files = ['one.jpg','two.jpg'].map(name => ({name,mimeType:'image/jpeg',buffer:Buffer.from('fixture')}));
     await page.getByLabel('Upload photos', {exact:true}).setInputFiles(files);
@@ -175,6 +188,7 @@ test('100-file boundary uploads sequentially and refuses 101 before any request'
     const photos: any[] = [];
     await page.route(`**/api/gbp/content/${location}**`, async route => {
         const path = new URL(route.request().url()).pathname;
+        if (path.endsWith('/bulk-posts')) return route.fulfill({ json: BULK_RUNS_NONE });
         if (path.endsWith('/upload')) {
             uploads++;
             const photo = {id:uploads,name:`Boundary fixture ${uploads}.jpg`,url:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'};
@@ -183,11 +197,12 @@ test('100-file boundary uploads sequentially and refuses 101 before any request'
         }
         return route.fulfill({json:path.endsWith('/photos')?photos:{jobs:[],style:null,workerEnabled:false}});
     });
-    await page.goto('/gbp-content');
+    await page.goto('/gbp-photos'); // the photo uploader is the Photos tool now (fe52d74f)
     await page.getByLabel('Location', {exact:true}).selectOption(String(location));
     const files = Array.from({length:101}, (_,i)=>({name:`fixture-${i}.jpg`,mimeType:'image/jpeg',buffer:Buffer.from('fixture')}));
     await page.getByLabel('Upload photos', {exact:true}).setInputFiles(files);
-    await expect(page.getByRole('alert')).toContainText('Choose at most 100 photos');
+    // The page also carries warning Notices (role=alert); target the upload refusal.
+    await expect(page.getByRole('alert').filter({ hasText: 'Choose at most 100 photos' })).toBeVisible();
     expect(uploads).toBe(0);
     await page.getByLabel('Upload photos', {exact:true}).setInputFiles(files.slice(0,100));
     await expect(page.getByText('100 selected',{exact:true})).toBeVisible();
@@ -203,12 +218,14 @@ test('profile Photos tab points to the shipped publisher and shows unknown count
     await expect(page.getByTestId('text-customer-photo-count')).toHaveText('—');
     await expect(page.getByText('Link to Google Business Profile to see photo counts').first()).toBeVisible();
     await expect(page.getByText('we do not currently support photo uploads',{exact:false})).toHaveCount(0);
-    await page.getByTestId('button-posts-photos').click();
-    await expect(page).toHaveURL(/\/gbp-content$/);
+    // fe52d74f replaced the "Posts & Photos" link button with an in-tab publisher shown only once linked.
+    await expect(page.getByTestId('photos-upload-schedule')).toHaveCount(0);
 });
 
 test('profile Photos tab distinguishes a count Google never reported from zero on a linked location', async ({ page }) => {
     await page.route('**/api/locations/99885', route => route.fulfill({json:{id:99885,businessName:'Photos linked fixture',gbpLocationName:'locations/fixture',gbpAccountName:'accounts/fixture',businessPhotoCount:null,customerPhotoCount:0}}));
+    // Counts show only after a successful profile sync (0b3f348a); report one so a stored 0 is a real zero.
+    await page.route(/\/api\/gbp\/status\?locationId=99885/, route => route.fulfill({json:{locations:[{id:99885,kind:'profile',last_success:'2026-10-01T00:00:00Z'}]}}));
     await page.route(/\/api\/gbp\/locations\/99885\/media/, route => route.fulfill({json:{total:0,syncedAt:null,items:[]}}));
     await page.goto('/locations?location=99885&tab=photos');
     await expect(page.getByTestId('text-business-photo-count')).toHaveText('—');
@@ -227,8 +244,9 @@ test('unlinked Places import remains available and renders weekday text without 
     await page.route('**/api/locations/99885/import-google', route=>{imported=true;return route.fulfill({json:fixture});});
     await page.goto('/locations');
     // Address column: the full Google address once (no repeated city/state), the street line completed with city, state and ZIP.
-    await expect(page.getByTestId('agency-location-99885').locator('td').nth(3)).toHaveText(fullGoogleAddress);
-    await expect(page.getByTestId('agency-location-99886').locator('td').nth(3)).toHaveText('5 Fixture Ave, Fixture City, ST 00000');
+    // Rows are local-pack cards now (9f15ab6f); the address is its own exact text node in the card.
+    await expect(page.getByTestId('agency-location-99885').getByText(fullGoogleAddress, { exact: true })).toBeVisible();
+    await expect(page.getByTestId('agency-location-99886').getByText('5 Fixture Ave, Fixture City, ST 00000', { exact: true })).toBeVisible();
     await page.getByRole('button',{name:'Unlinked audit fixture',exact:true}).click();
     await expect(page).toHaveURL(/[?&]location=99885(&|$)/);
     await page.getByTestId('tab-info').click();
@@ -248,6 +266,7 @@ test.describe('route-mocked location states', () => {
         await page.route(/\/api\/gbp\/linkage/, route => route.fulfill({ json: { accounts: [], locations: [], errors: [] } }));
         await page.route(/\/api\/gbp\/content\/99701/, route => {
             const path = new URL(route.request().url()).pathname;
+            if (path.endsWith('/bulk-posts')) return route.fulfill({ json: BULK_RUNS_NONE });
             return route.fulfill({ json: path.endsWith('/photos') ? [] : { jobs: [], style: null, workerEnabled: false } });
         });
     });
@@ -266,6 +285,7 @@ test.describe('route-mocked location states', () => {
     test('items per period 0 is refused before queueing', async ({ page }) => {
         await page.goto(`/gbp-content?location=${LINKED.id}`);
         await page.getByLabel('Post draft').fill('Fixture update');
+        await disclose(page, 'Advanced schedule');
         await page.getByLabel('Items per period').fill('0');
         await expect(page.locator('#items-per-period-error')).toHaveText('Items per period must be a whole number from 1 to 100.');
         await expect(page.getByRole('button', { name: 'Approve & queue post' })).toBeDisabled();

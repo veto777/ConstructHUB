@@ -110,7 +110,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "selector": "[data-testid=\"tool-rail-estimates\"]",
       "caption": "Where to find it",
       "narration": "Every estimate is under Estimates, in the left menu."
     }

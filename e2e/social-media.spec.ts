@@ -7,9 +7,8 @@ import { autoSchema } from "../shared/social";
  * "All … businesses and bulk actions…" choice (?pick=1) shows the full list with its pills.
  */
 async function openView(page: Page, key: "overview" | "calendar" | "compose" | "posts" | "analytics" | "inbox" | "accounts" | "auto" | "guides") {
-  const rail = page.getByTestId(`tool-rail-${key}`);
-  if (await rail.isVisible()) await rail.click();
-  else await page.getByTestId(`tool-tab-${key}`).click();
+  // Rail on wide screens, top tabs on phones: click whichever is shown (waits, unlike isVisible()).
+  await page.getByTestId(`tool-rail-${key}`).or(page.getByTestId(`tool-tab-${key}`)).filter({ visible: true }).first().click();
   await expect(page).toHaveURL(new RegExp(`/social-media${key === "overview" ? "" : `/${key}`}(\\?|$)`));
 }
 const businessSwitch = (page: Page) => page.getByTestId("social-business-switch").locator("select");
@@ -49,7 +48,7 @@ test(`lost ${draft ? "draft" : "post"} response survives navigation and reload w
   });
   await page.goto("/social-media/compose?business=1");
   await page.getByLabel("Post text", { exact: true }).fill("Recovery fixture update");
-  await page.getByLabel("threads text tweak", { exact: true }).fill("Threads recovery fixture");
+  await page.getByLabel("Threads text tweak", { exact: true }).fill("Threads recovery fixture"); // network display name (18fb07f4)
   await page.getByLabel("Public media URLs", { exact: true }).fill("https://example.com/recovery.jpg");
   await page.getByRole("button", { name: draft ? "Save draft" : "Post now", exact: true }).click();
   const retry = page.getByRole("button", { name: "Retry saved submission", exact: true });
@@ -266,12 +265,12 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   await expect(page.getByTestId("network-twitter").getByText("Fixture business", { exact: true })).toBeVisible();
   await openView(page, "compose");
   await page.locator("fieldset")
-    .getByRole("checkbox", { name: "Fixture business · twitter" })
+    .getByRole("checkbox", { name: "X Fixture business · X", exact: true }) // logo alt + network display name (18fb07f4)
     .check();
   await page
     .getByLabel("Post text", { exact: true })
     .fill("Fixture project update");
-  await page.getByLabel("twitter text tweak").fill("Short fixture update");
+  await page.getByLabel("X text tweak", { exact: true }).fill("Short fixture update");
   await page
     .getByLabel("Media Library", { exact: true })
     .selectOption("https://example.com/fixture.jpg");
@@ -292,7 +291,7 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   // Scheduling clears the composer (the toast says so); pick the account again for auto mode.
   await openView(page, "compose");
   await page.locator("fieldset")
-    .getByRole("checkbox", { name: "Fixture business · twitter" })
+    .getByRole("checkbox", { name: "X Fixture business · X", exact: true }) // logo alt + network display name (18fb07f4)
     .check();
   const post = requests.find((r) => r.path === "/api/social/posts").body;
   expect(post.destinations[0].accountId).toBe("fixture-x");
@@ -368,7 +367,7 @@ test("growth tools remain discoverable with Google Business collapsed", async ({
     await expect(page.getByTestId(`link-nav-${name}`)).toBeVisible();
   await google.click();
   await expect(google).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByTestId("link-nav-posts-&-photos")).toBeVisible();
+  await expect(page.getByTestId("link-nav-posts")).toBeVisible(); // Posts & Photos split into Posts + Photos (fe52d74f)
 });
 
 test("social tabs and guides fit a narrow phone viewport", async ({ page }) => {
@@ -385,6 +384,7 @@ test("social tabs and guides fit a narrow phone viewport", async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+const TWO_BUSINESSES = [{ id: 1, business_name: "Fixture business" }, { id: 2, business_name: "Second business" }];
 const YT_STATUS = { configured: false, connected: false, needsReconnect: false, channel: null, connectedAt: null, lastError: null, limits: { perDay: 3, usedToday: 0, sharedLimitReached: false, maxBytes: 1, maxWaitingFiles: 1, fileTypes: [] } };
 
 test("unsaved draft edits survive status-filter, tab and business-switch round trips", async ({ page }) => {
@@ -392,7 +392,7 @@ test("unsaved draft edits survive status-filter, tab and business-switch round t
   const queued = { id: "22222222-2222-4222-8222-222222222222", state: "queued", due_at: new Date(Date.now() + 86400000).toISOString(), business_name: "Fixture business", payload: { post: { content: { platform: "twitter", text: "Fixture queued text" } } } };
   await page.route("**/api/social**", route => {
     const path = new URL(route.request().url()).pathname;
-    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: TWO_BUSINESSES, total: 2 } }); // one business turns ?business=all into that business (97c227e5)
     if (path === "/api/social") return route.fulfill({ json: { connected: true, accounts: [], settings: autoSchema.parse({}), posts: [draft, queued], total: 2, defaults: [] } });
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
@@ -411,7 +411,7 @@ test("unsaved draft edits survive status-filter, tab and business-switch round t
   await businessList(page);
   await page.getByRole("button", { name: "All-clients calendar", exact: true }).click();
   await expect(page).toHaveURL(/business=all/);
-  // One business: the bar's menu has no other entry to pick, so go back through the list's Open button.
+  // Back through the list's Open button.
   await businessList(page);
   await page.getByTestId("button-open-business-1").click();
   await expect(page).toHaveURL(/business=1/);
@@ -425,12 +425,12 @@ test("unsaved draft edits survive status-filter, tab and business-switch round t
 test("'How it works' opens the standalone social guides from all-clients mode", async ({ page }) => {
   await page.route("**/api/social**", route => {
     const path = new URL(route.request().url()).pathname;
-    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: TWO_BUSINESSES, total: 2 } }); // one business turns ?business=all into that business (97c227e5)
     if (path === "/api/social/calendar") return route.fulfill({ json: { posts: [], total: 0 } });
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=all");
+  await page.goto("/social-media/posts?business=all");
   await page.getByRole("heading", { name: /^All clients/ }).waitFor();
   await page.getByRole("link", { name: "How it works", exact: true }).click();
   await expect(page).toHaveURL(/\/guides\?topic=social$/);
@@ -445,12 +445,12 @@ test("bulk cancel asks first, naming the count and the businesses", async ({ pag
   await page.route("**/api/social**", route => {
     const req = route.request(), path = new URL(req.url()).pathname;
     if (path === "/api/social/posts/bulk-action") { bulkBody = req.postDataJSON(); return route.fulfill({ json: { results: [p1, p2].map((p) => ({ id: p.id, ok: true })) } }); }
-    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: TWO_BUSINESSES, total: 2 } }); // one business turns ?business=all into that business (97c227e5)
     if (path === "/api/social/calendar") return route.fulfill({ json: { posts: [p1, p2], total: 2 } });
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=all");
+  await page.goto("/social-media/posts?business=all");
   await page.getByRole("button", { name: "Select this page of posts", exact: true }).click();
   await page.getByRole("button", { name: "Cancel selected posts", exact: true }).click();
   const dialog = page.getByTestId("dialog-bulk-cancel-posts");
@@ -496,6 +496,8 @@ test("zero-match business search says so; only a truly empty account says add a 
   await expect(page.getByTestId("text-no-business-match")).toHaveCount(0);
 });
 
+// A content source is a Google-style row: kind as the title, text as its meta (06e27847).
+const sourceRow=(page:Page)=>page.getByTestId('list-social-sources').getByText('Business A private fixture source',{exact:true});
 test('agency searches 1,000 saved businesses, remembers URL scope, isolates sources and queues bulk work', async ({page})=>{
   const {Pool}=await import('pg');
   const db=new Pool({connectionString:process.env.DATABASE_URL});
@@ -508,21 +510,21 @@ test('agency searches 1,000 saved businesses, remembers URL scope, isolates sour
     await page.getByLabel('Search businesses',{exact:true}).fill(marker);
     await expect(page.getByText('1000 businesses.',{exact:false})).toBeVisible();
     await page.getByRole('button',{name:'Next businesses',exact:true}).click();
-    await expect(page.getByRole('button',{name:`${marker} 0026 · Fixture city`,exact:true})).toBeVisible();
+    await expect(page.getByRole('button',{name:`${marker} 0026`,exact:true})).toBeVisible(); // Google-style rows: city is row meta, not the button name
     await page.getByLabel('Search businesses',{exact:true}).fill(`${marker} 0001`);
-    await page.getByRole('button',{name:`${a.business_name} · Fixture city`,exact:true}).click();
+    await page.getByRole('button',{name:a.business_name,exact:true}).click();
     await expect(page).toHaveURL(new RegExp(`business=${a.id}`));
     await openView(page,'auto');
     await page.getByLabel('Source text',{exact:true}).fill('Business A private fixture source');
     await page.getByRole('button',{name:'Add content source',exact:true}).click();
-    await expect(page.getByText('offers: Business A private fixture source',{exact:true})).toBeVisible();
+    await expect(sourceRow(page)).toBeVisible();
     await page.reload();
     await expect(page).toHaveURL(new RegExp(`business=${a.id}`));
-    await expect(page.getByText('offers: Business A private fixture source',{exact:true})).toBeVisible();
+    await expect(sourceRow(page)).toBeVisible();
     await businessList(page);
     await page.getByLabel('Search businesses',{exact:true}).fill(`${marker} 0002`);
-    await page.getByRole('button',{name:`${b.business_name} · Fixture city`,exact:true}).click();
-    await expect(page.getByText('offers: Business A private fixture source',{exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:b.business_name,exact:true}).click();
+    await expect(sourceRow(page)).toHaveCount(0);
     await businessList(page);
     await page.getByRole('button',{name:'Bulk actions (0)',exact:true}).click();
     await page.getByRole('checkbox',{name:`Select ${b.business_name} for bulk`,exact:true}).check();
@@ -535,6 +537,7 @@ test('agency searches 1,000 saved businesses, remembers URL scope, isolates sour
     expect((await db.query('SELECT payload FROM social_bulk_jobs WHERE user_id=1 AND business_id=$1',[a.id])).rows[0].payload.mediaUrls).toEqual(['https://example.com/agency-fixture.jpg']);
     await page.getByRole('button',{name:'All-clients calendar',exact:true}).click();
     await expect(page).toHaveURL(/business=all/);
+    await openView(page,'posts'); // all clients covers the calendar/posts lists only; Auto needs one business (0f27d2d7)
     await expect(page.getByLabel('Search calendar',{exact:true})).toBeVisible();
     await page.getByLabel('Post status filter',{exact:true}).selectOption('draft');
     await expect(page.getByRole('heading',{name:/^All clients/})).toBeVisible();
@@ -590,11 +593,11 @@ test("all-clients calendar keeps saved data under a strip with Retry when a refr
       if (calendarDown) return route.abort();
       return route.fulfill({ json: { posts: [queued], total: 1 } });
     }
-    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: TWO_BUSINESSES, total: 2 } }); // one business turns ?business=all into that business (97c227e5)
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=all");
+  await page.goto("/social-media/posts?business=all");
   await expect(page.getByText("Saved queued text", { exact: true })).toBeVisible();
   calendarDown = true;
   // The queue polls every 15 seconds; the failed poll must surface as a strip over saved data.
@@ -622,11 +625,11 @@ test("stale bulk selection prunes itself when a selected post leaves draft or qu
   await page.route("**/api/social**", route => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/social/calendar") return route.fulfill({ json: { posts: published ? [{ ...queued, state: "published" }] : [queued], total: 1 } });
-    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: TWO_BUSINESSES, total: 2 } }); // one business turns ?business=all into that business (97c227e5)
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=all");
+  await page.goto("/social-media/posts?business=all");
   await page.getByLabel(`Select post ${queued.id}`).check();
   await expect(page.getByText("1 selected", { exact: false }).first()).toBeVisible();
   // A refetch (a filter change fetches with a new key) reconciles the selection against post state.
@@ -640,11 +643,11 @@ test("zero-match post search says so instead of pretending the account is empty"
   await page.route("**/api/social**", route => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/social/calendar") return route.fulfill({ json: { posts: [], total: 0 } });
-    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: TWO_BUSINESSES, total: 2 } }); // one business turns ?business=all into that business (97c227e5)
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=all");
+  await page.goto("/social-media/posts?business=all");
   await page.getByLabel("Search calendar", { exact: true }).fill("nothing-matches-this");
   await expect(page.getByTestId("text-social-posts-empty")).toHaveText("No posts match your search or filters.");
   // No filter with no posts at all keeps the original empty-state copy.
@@ -658,11 +661,11 @@ test("unsaved-edit gate names the businesses and Discard all edits reverts every
   await page.route("**/api/social**", route => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/social/calendar") return route.fulfill({ json: { posts: [d1, d2], total: 2 } });
-    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: TWO_BUSINESSES, total: 2 } }); // one business turns ?business=all into that business (97c227e5)
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=all");
+  await page.goto("/social-media/posts?business=all");
   // The unique per-row labels find each draft without ambiguity.
   const edit1 = page.getByLabel("Edit draft for Fixture business · twitter", { exact: true });
   const edit2 = page.getByLabel("Edit draft for Second business · facebook", { exact: true });
@@ -686,11 +689,11 @@ test("partial bulk failure keeps the failed ids selected with the error visible"
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/social/posts/bulk-action") return route.fulfill({ json: { results: [{ id: p1.id, ok: true }, { id: p2.id, ok: false, error: "Post already submitted or finalized" }] } });
     if (path === "/api/social/calendar") return route.fulfill({ json: { posts: [p1, p2], total: 2 } });
-    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: TWO_BUSINESSES, total: 2 } }); // one business turns ?business=all into that business (97c227e5)
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=all");
+  await page.goto("/social-media/posts?business=all");
   await page.getByLabel(`Select post ${p1.id}`).check();
   await page.getByLabel(`Select post ${p2.id}`).check();
   await page.getByRole("button", { name: "Cancel selected posts", exact: true }).click();

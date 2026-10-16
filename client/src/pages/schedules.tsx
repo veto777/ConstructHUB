@@ -40,6 +40,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { ScrapeSchedule, PermitDatabase } from "@shared/schema";
+import { SCHEDULE_MAX_EVERY_HOURS, SCHEDULE_TICK_MINUTES, customEveryHours, describeScheduleFrequency } from "@shared/scrape-schedules";
 
 /** A schedule can only refresh a portal the live scraper supports and whose link is usable. */
 const isLiveSearchable = (db: PermitDatabase) => governmentLinksAvailable(db) && canScrapeGovernmentPortal(db);
@@ -108,7 +109,7 @@ export default function SchedulesPage() {
 
   if (error) {
     return (
-      <AppPage width="narrow">
+      <AppPage width="narrow" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11">
         <GoogleSectionHeader as="h1" title="Scrape schedules" description="Automatic permit refreshes for live-searchable portals." flush />
         <Notice tone={String(error).includes("403") ? "info" : "danger"} testId="notice-schedules-error">
           {String(error).includes("403") ? "Administrator access is required to manage these shared schedules." : "Schedules could not be loaded. Please sign in or try again later."}
@@ -118,7 +119,7 @@ export default function SchedulesPage() {
   }
 
   return (
-    <AppPage width="narrow" testId="page-schedules">
+    <AppPage width="narrow" className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-schedules">
       {/* Google's list format (owner, 2026-10-07): a quiet header, hairline rows, pill actions. */}
       <GoogleSectionHeader
         as="h1"
@@ -174,7 +175,7 @@ export default function SchedulesPage() {
               title={getDatabaseName(schedule.databaseId)}
               meta={[
                 schedule.isActive ? <span key="state" className="g-open">Active</span> : <span key="state">Paused</span>,
-                <span key="freq" className="capitalize">{schedule.frequency}</span>,
+                <span key="freq">{describeScheduleFrequency(schedule)}</span>,
                 <span key="query"><span className="capitalize">{schedule.searchType}</span>: "{schedule.searchValue}"</span>,
                 schedule.lastRunAt ? `Last run ${new Date(schedule.lastRunAt).toLocaleDateString()}` : null,
               ]}
@@ -185,6 +186,7 @@ export default function SchedulesPage() {
                     toggleMutation.mutate({ id: schedule.id, isActive: checked })
                   }
                   aria-label={schedule.isActive ? "Pause schedule" : "Resume schedule"}
+                  className="relative max-sm:after:absolute max-sm:after:-inset-2.5 max-sm:after:content-['']"
                   data-testid={`switch-schedule-${schedule.id}`}
                 />
                 <GooglePill
@@ -207,7 +209,7 @@ export default function SchedulesPage() {
         /* No schedule yet: what a row will show and where its data comes from. No sample schedules (CLAUDE.md). */
         <div className="g-callout" data-testid="empty-schedules">
           <h3 className="inline-flex items-center gap-2"><Clock className="h-4 w-4" aria-hidden="true" /> No schedules yet</h3>
-          <p>Each schedule will be listed here with its portal, whether it is active, how often it runs (daily, weekly or monthly), what it searches for and when it last ran, with a switch to pause it and a bin to delete it.</p>
+          <p>Each schedule will be listed here with its portal, whether it is active, how often it runs (daily, weekly, monthly, or your own number of hours or days), what it searches for and when it last ran, with a switch to pause it and a bin to delete it.</p>
           <p className="mt-2">Every 15 minutes the server runs the schedules that are due and saves what each portal returns into the shared permit cache, the same stored matches Search permits shows first. A schedule can only target one of the {databasesLoading ? "" : `${databases.length.toLocaleString()} `}portal addresses the live search can query (a checked official link plus a search adapter for its platform; places that share one portal count once).</p>
           <div className="mt-3"><GooglePill icon={Plus} variant="solid" label="Add schedule" onClick={() => setDialogOpen(true)} testId="button-empty-add-schedule" /></div>
         </div>
@@ -219,7 +221,7 @@ export default function SchedulesPage() {
             <AlertDialogTitle>Delete this schedule?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete
-                ? `${getDatabaseName(pendingDelete.databaseId)} — ${pendingDelete.searchType}: "${pendingDelete.searchValue}" (${pendingDelete.frequency}). It stops refreshing and can't be restored.`
+                ? `${getDatabaseName(pendingDelete.databaseId)} — ${pendingDelete.searchType}: "${pendingDelete.searchValue}" (${describeScheduleFrequency(pendingDelete).toLowerCase()}). It stops refreshing and can't be restored.`
                 : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -256,6 +258,11 @@ function AddScheduleForm({
   const [searchType, setSearchType] = useState("address");
   const [searchValue, setSearchValue] = useState("");
   const [frequency, setFrequency] = useState("daily");
+  // "Custom": run every N hours or days (1 hour to 30 days); the server checks the same limits.
+  const [everyAmount, setEveryAmount] = useState("6");
+  const [everyUnit, setEveryUnit] = useState<"hours" | "days">("hours");
+  const everyHours = customEveryHours(everyAmount, everyUnit);
+  const customInvalid = frequency === "custom" && everyHours === null;
   const { toast } = useToast();
 
   const createMutation = useMutation({
@@ -273,12 +280,13 @@ function AddScheduleForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!databaseId || !searchValue.trim()) return;
+    if (!databaseId || !searchValue.trim() || customInvalid) return;
     createMutation.mutate({
       databaseId: parseInt(databaseId),
       searchType,
       searchValue: searchValue.trim(),
       frequency,
+      everyHours: frequency === "custom" ? everyHours : null,
       isActive: true,
     });
   };
@@ -330,10 +338,45 @@ function AddScheduleForm({
               <SelectItem value="daily">Daily</SelectItem>
               <SelectItem value="weekly">Weekly</SelectItem>
               <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="custom">Custom — every N hours or days…</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
+
+      {frequency === "custom" && (
+        <div className="space-y-1.5" data-testid="section-schedule-custom">
+          <Label className="text-xs font-medium text-muted-foreground" htmlFor="schedule-every">Run every</Label>
+          <div className="flex gap-2">
+            <Input
+              id="schedule-every"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={everyUnit === "days" ? SCHEDULE_MAX_EVERY_HOURS / 24 : SCHEDULE_MAX_EVERY_HOURS}
+              value={everyAmount}
+              onChange={(e) => setEveryAmount(e.target.value)}
+              className="w-28"
+              aria-invalid={customInvalid}
+              data-testid="input-schedule-every"
+            />
+            <Select value={everyUnit} onValueChange={(v) => setEveryUnit(v as "hours" | "days")}>
+              <SelectTrigger className="w-32" data-testid="select-schedule-every-unit">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hours">hours</SelectItem>
+                <SelectItem value="days">days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-[11px] text-muted-foreground" data-testid="text-schedule-custom-help">
+            {everyHours !== null
+              ? `Runs ${describeScheduleFrequency({ frequency: "custom", everyHours }).toLowerCase()}. The server looks for due schedules every ${SCHEDULE_TICK_MINUTES} minutes, so a run can start up to ${SCHEDULE_TICK_MINUTES} minutes after it is due.`
+              : `Enter a whole number from 1 to ${SCHEDULE_MAX_EVERY_HOURS} hours (1 to ${SCHEDULE_MAX_EVERY_HOURS / 24} days).`}
+          </p>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label className="text-xs font-medium text-muted-foreground">Search value</Label>
@@ -348,7 +391,7 @@ function AddScheduleForm({
       <Button
         type="submit"
         className="w-full"
-        disabled={createMutation.isPending || !databaseId || !searchValue.trim()}
+        disabled={createMutation.isPending || !databaseId || !searchValue.trim() || customInvalid}
         data-testid="button-create-schedule"
       >
         {createMutation.isPending ? (

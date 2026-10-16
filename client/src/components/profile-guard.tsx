@@ -9,6 +9,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { GbpLinkCell, useGbpLinkage } from '@/components/gbp-connection';
 import { InfoTip } from '@/components/info-tip';
+import { PLANS, PLAN_KEYS } from '@shared/plans';
+import { joinNames } from '@shared/plan-copy';
+/** How often Profile Watch checks, by the location owner's plan (server/gbp/guard.ts runGuardWorker reads guardCadenceMinutes). */
+const GUARD_CADENCE_TEXT=`How often it checks depends on the plan: ${joinNames(PLAN_KEYS.map(k=>`${PLANS[k].name} every ${PLANS[k].limits.guardCadenceMinutes} minutes`))}.`;
 /** Google failures arrive as {message,kind,needsAuth}; turn the ones a contractor can act on into plain next steps. */
 export function guardErrorMessage(e: unknown): string {
   let body: any = null;
@@ -68,7 +72,7 @@ export function ProfileGuard({locationId,linked}:{locationId:number;linked:boole
   const selected:string[]=watched??(data.snapshot?data.watched:Object.keys(fieldLabels));
   const act=(method:string,path:string,body?:any)=>mutation.mutateAsync({method,path,body});
   return <div role="region" aria-label="Profile Watch"><Section title={<span className="inline-flex items-center gap-1">Profile Watch <InfoTip k="profile-watch" /></span>} contentClassName="space-y-4 text-sm">
-    <details><summary className="cursor-pointer py-2">How checks work</summary><p className="text-sm">Checks every 15 minutes. Lockdown reasserts approved values after detection; it cannot block Google edits. Google may delay publication. Public suggestions cannot be distinguished reliably from other Google updates.</p></details>
+    <details><summary className="cursor-pointer py-2">How checks work</summary><p className="text-sm">{GUARD_CADENCE_TEXT} Lockdown reasserts approved values after detection; it cannot block Google edits. Google may delay publication. Public suggestions cannot be distinguished reliably from other Google updates.</p></details>
     <p>Current mode: {data.mode}. {data.checkedAt?`Last checked ${new Date(data.checkedAt).toLocaleString()}`:'Not checked yet'}</p>
     {data.lastError&&<p role="alert">{data.lastError}</p>}
     <label className="block">Mode <select aria-label="Watch mode" className="border rounded p-2 bg-background" value={mode??data.mode} onChange={e=>setMode(e.target.value)}><option value="off">Off</option><option value="notify">Notify</option><option value="lockdown">Lockdown (auto-reject)</option></select></label>

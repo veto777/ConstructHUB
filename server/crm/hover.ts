@@ -62,9 +62,11 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow } from "./client-auth";
 import { storeGeneratedPdf, storeGeneratedFile } from "./attachments";
+import { queueCrmEvent, customerEventPayload } from "./integrations";
 import { oauthBaseUrl } from "../site-context";
 import { recordFailure } from "../ops/issues";
 import { providerFixture, type HoverFixture } from "../tutorials/fixtures";
+import { workerInterval } from "../workers";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -880,6 +882,7 @@ async function linkOrCreateHoverCustomer(
       } as any)
       .returning();
     customerCreated = true;
+    queueCrmEvent(orgId, "customer.created", { ...customerEventPayload(customer), source: "hover" });
   }
   return { customer, matchedVia, ambiguous, customerCreated };
 }
@@ -1261,13 +1264,11 @@ export async function runDueHoverSyncs(now: Date = new Date()): Promise<void> {
 export function startHoverScheduler(): void {
   if (hoverSchedulerStarted) return;
   hoverSchedulerStarted = true;
-  const timer = setInterval(() => {
+  workerInterval("HOVER sync scheduler", () =>
     runDueHoverSyncs().catch((e) => {
       console.error("[hover] scheduler tick failed:", e?.message || e);
       void recordFailure("job", "HOVER sync scheduler tick", e);
-    });
-  }, HOVER_TICK_MS);
-  timer.unref();
+    }), HOVER_TICK_MS);
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────────

@@ -149,7 +149,7 @@ const page: FeaturePage = {
     },
     {
       q: "Which plan includes it?",
-      a: `Cloudflare comes with the ${MODULE_PLAN} plan, together with Search Console.${ONLY_PLAN ? " No other plan includes it." : ""}`,
+      a: `Cloudflare comes with the ${MODULE_PLAN} plan${ONLY_PLAN ? "" : " and every plan above it"}, together with Search Console.${ONLY_PLAN ? " No other plan includes it." : ""}`,
     },
     {
       q: "Will it change my Cloudflare settings on its own?",

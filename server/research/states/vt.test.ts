@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { vtRosterHit } from "./vt";
+import { setRobotsEnforced as __setRobotsEnforced } from "../http";
+// These tests exercise the robots.txt Disallow rule, which the OWNER ORDER of 2026-10-15 switched off in production.
+beforeAll(() => __setRobotsEnforced(true));
+afterAll(() => __setRobotsEnforced(false));
 
 // Column names of the OPR roster .xlsx (2026-10-15); values below are placeholders for the layout, not records.
 describe("VT OPR rosters (audit 2026-10-15)", () => {

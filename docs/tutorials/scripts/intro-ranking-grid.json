@@ -93,7 +93,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-nav-gmb-ranking-grid\"]",
+      "selector": "[data-testid=\"tool-rail-grid\"]",
       "caption": "Menu: GMB Ranking Grid",
       "narration": "You'll find the GMB Ranking Grid in the menu on the left, under Google Business."
     }

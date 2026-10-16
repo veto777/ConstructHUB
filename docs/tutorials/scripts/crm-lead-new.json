@@ -67,7 +67,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"link-portal-nav-home\"]",
+      "selector": "[data-testid=\"tool-rail-home\"]",
       "caption": "Home",
       "narration": "It also shows on Home.",
       "holdMs": 700
@@ -86,7 +86,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "selector": "[data-testid=\"tool-rail-pipeline\"]",
       "caption": "Menu: Pipeline",
       "narration": "You'll find New lead on the Pipeline, in the menu on the left."
     }

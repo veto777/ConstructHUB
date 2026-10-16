@@ -26,7 +26,8 @@ import { VPN_SHIELD_VIEWS } from "@/components/traffic-tool/nav";
 import { countryName } from "@/components/ip-tracker/country-names";
 import { ALL_TIME, RangePicker, StepsCard, inRange, rangeBounds, type DateRange } from "@/components/traffic-tool/shared";
 import { DetectionsChart, FlaggedVisitRow, TopLists, VpnSitePanel, VpnSummaryStrip, sparklineDays, type VpnDomain, type VpnStats, type VpnVisit } from "@/components/traffic-tool/vpn-views";
-import { VpnSample } from "@/components/traffic-tool/samples";
+import { lazySample } from "@/components/sample-preview";
+const VpnSample = lazySample(() => import("@/components/traffic-tool/samples"), "VpnSample");
 import { Copy, Clock, Search, Code2 } from "lucide-react";
 
 /** Each section: its label, its line in the full-screen tool, and the help entry its "i" opens (shared/help/registry.ts). */
@@ -100,8 +101,8 @@ function SetupCard({ onCreated }: { onCreated: (id: number) => void }) {
         ]} />
         <p className="sr-only" data-testid="text-vpn-setup-steps">Step 1 of 3 — add the website. New sites start in Log only.</p>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Input ref={input} placeholder="example.com" value={domain} onChange={(e) => setDomain(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && domain.trim()) addMutation.mutate(); }} aria-label="Site domain" data-testid="input-vpn-setup-domain" />
-          <Input placeholder="Display name (optional)" value={name} onChange={(e) => setName(e.target.value)} aria-label="Display name" data-testid="input-vpn-setup-name" />
+          <Input ref={input} placeholder="example.com" value={domain} onChange={(e) => setDomain(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && domain.trim()) addMutation.mutate(); }} aria-label="Site domain" className="max-sm:h-11" data-testid="input-vpn-setup-domain" />
+          <Input placeholder="Display name (optional)" value={name} onChange={(e) => setName(e.target.value)} aria-label="Display name" className="max-sm:h-11" data-testid="input-vpn-setup-name" />
         </div>
         <div className="flex flex-wrap gap-2">
           <GooglePill variant="solid" label={addMutation.isPending ? "Adding…" : "Add site"} onClick={() => addMutation.mutate()} disabled={!domain.trim() || addMutation.isPending} testId="button-vpn-setup-add" />
@@ -449,7 +450,7 @@ export default function VpnShieldPage() {
   ) : undefined;
 
   return (
-    <AppPage testId="page-vpn-shield">
+    <AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-vpn-shield">
       {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
       <GoogleSectionHeader
         as="h1"

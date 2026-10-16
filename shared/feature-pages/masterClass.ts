@@ -1,5 +1,6 @@
 import type { FeaturePage } from "./types";
 import { planNamesWhere } from "../plan-copy";
+import { ALACARTE } from "../alacarte";
 
 /**
  * Master Class — the contractor business course.
@@ -27,12 +28,17 @@ import { planNamesWhere } from "../plan-copy";
  *     the page reads the bundle's price from the server catalog: server/catalog.ts (COURSE_BUNDLE, isSalesOnly),
  *     server/routes.ts (/api/course-catalog), server/stripe.ts (create-course-checkout), shared/plans.ts (showsPrice)
  *   - the plan that includes the course: shared/plans.ts (PlanModules.masterClass), read through planNamesWhere
+ *   - the à la carte subscription: shared/alacarte.ts master_class grants modules.masterClass, which
+ *     server/course-access.ts (hasModule "masterClass") treats as the whole course; the same page's compare block
+ *     prices it from the à la carte price book, so the copy names all three ways in (plan, subscription, sales rep)
  *   - purchases belong to the signed-in account (course_purchases.user_id): shared/schema.ts; the dashboard tile's
  *     "Modules unlocked": server/dashboard/tiles/learn.ts
  */
 
 /** The plans whose modules include the Master Class — read from the price book, never typed. */
 const INCLUDED_PLAN = planNamesWhere((p) => p.modules.masterClass);
+/** The monthly à la carte item that opens the whole course (shared/alacarte.ts). */
+const SUBSCRIPTION = ALACARTE.master_class.name;
 
 const page: FeaturePage = {
   key: "masterClass",
@@ -53,7 +59,7 @@ const page: FeaturePage = {
     },
     {
       title: "Choose your modules",
-      body: `Pick the modules you need, or the complete bundle of all four. A sales rep quotes them for your business; the ${INCLUDED_PLAN} plan includes the whole course.`,
+      body: `Subscribe to the whole course month to month as the ${SUBSCRIPTION} item, or buy the modules you need, or the complete bundle of all four, through a sales rep. The ${INCLUDED_PLAN} plan includes the whole course.`,
     },
     {
       title: "Unlock the course",
@@ -137,7 +143,7 @@ const page: FeaturePage = {
   pricing: {
     kind: "sales",
     topic: "The Master Class",
-    note: `The ${INCLUDED_PLAN} plan includes it. On any other plan, buy the modules you want, or the complete bundle of all four.`,
+    note: `The ${INCLUDED_PLAN} plan includes it. Otherwise, subscribe to the whole course as the ${SUBSCRIPTION} item (priced below), or buy modules or the bundle outright through a sales rep.`,
   },
   faqs: [
     {
@@ -146,7 +152,7 @@ const page: FeaturePage = {
     },
     {
       q: "How is it sold? Is it in my plan?",
-      a: `The ${INCLUDED_PLAN} plan includes the whole course. On any other plan the four modules are sold one at a time or as the complete bundle, and a sales rep quotes them. The course unlocks on your ConstructHUB account, and any Master Class purchase also unlocks the full Google Ads guide.`,
+      a: `The ${INCLUDED_PLAN} plan includes the whole course. Without it, there are two ways in: a monthly subscription to the whole course, the ${SUBSCRIPTION} item on the pricing page, or the four modules bought outright one at a time or as the complete bundle, which a sales rep quotes. The course unlocks on your ConstructHUB account, and any Master Class purchase also unlocks the full Google Ads guide.`,
     },
     {
       q: "How current are the state guides?",
@@ -189,8 +195,8 @@ const page: FeaturePage = {
         "its link was last checked.",
       "Before you buy, the free overview shows which states require a state contractor license and a side-by-side " +
         "table of every state's license, workers' comp, sales tax on labor, B&O tax, bond and filing office. The " +
-        "modules and the complete bundle are quoted by a sales rep rather than checked out online, the " +
-        `${INCLUDED_PLAN} plan includes the course, and a purchase is ` +
+        "whole course is sold as a monthly subscription, the modules and the complete bundle are quoted by a sales " +
+        `rep, the ${INCLUDED_PLAN} plan includes the course, and a purchase is ` +
         "recorded on your ConstructHUB account, so the module it unlocks opens wherever you sign in. Each module is a " +
         "home of ordered lessons with an outline; a lesson's link survives a reload, and Mark done keeps your place in " +
         "the browser you read it in.",

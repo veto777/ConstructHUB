@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { q } from "./db";
+import { PLANS } from "../shared/plans";
 
 /**
  * /admin/access: a platform admin finds an account, grants it Pro for 30 days,
@@ -94,7 +95,8 @@ test("grant 30 days, see it active, revoke it, see it ended (1440)", async ({ pa
   const confirm = page.getByTestId("dialog-confirm-grant");
   await expect(confirm).toContainText(`Give ${account.email} Pro access?`);
   await confirm.getByTestId("button-confirm-grant").click();
-  await expect(page.getByText(`Pro access granted to ${account.email}`)).toBeVisible();
+  // The toast text is also mirrored by the toast's aria-live announcer; take the first (the toast itself).
+  await expect(page.getByText(`${PLANS.pro.name} access granted to ${account.email}`).first()).toBeVisible();
 
   const [grant] = await q<{ id: number }>("select id from admin_access_grants where user_id = $1", [account.id]);
   const row = page.getByTestId(`row-active-grant-${grant.id}`);
@@ -114,7 +116,7 @@ test("grant 30 days, see it active, revoke it, see it ended (1440)", async ({ pa
   const revoke = page.getByTestId("dialog-confirm-revoke");
   await expect(revoke).toContainText(`Revoke ${account.email}'s Pro access?`);
   await revoke.getByTestId("button-confirm-revoke").click();
-  await expect(page.getByText(`Pro access for ${account.email} has ended.`)).toBeVisible();
+  await expect(page.getByText(`${PLANS.pro.name} access for ${account.email} has ended.`, { exact: true })).toBeVisible();
   await expect(revoke).toBeHidden();
   await expect(page.getByTestId(`row-active-grant-${grant.id}`)).toHaveCount(0);
   const ended = page.getByTestId(`row-ended-grant-${grant.id}`);
@@ -140,7 +142,8 @@ test("phone width: search, the grant form and the lists fit (390)", async ({ pag
   await page.getByTestId(`button-grant-days-90-${other.id}`).click();
   await page.getByTestId(`button-grant-${other.id}`).click();
   await page.getByTestId("button-confirm-grant").click();
-  await expect(page.getByText(`Starter access granted to ${other.email}`)).toBeVisible();
+  // The default grant plan is the starter key, shown by its price-book name ("Solo" since 1833850c).
+  await expect(page.getByText(`${PLANS.starter.name} access granted to ${other.email}`).first()).toBeVisible();
 
   await findAccount(page, account);
   await page.getByTestId(`button-open-grant-${account.id}`).click();

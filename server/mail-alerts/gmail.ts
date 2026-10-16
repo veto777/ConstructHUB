@@ -12,6 +12,7 @@ import { GMAIL_QUERY, classifyMail, parseMail } from "./classify";
 import { storeMatched, purgeExpiredMail, hash } from "./service";
 import { z } from "zod";
 import { recordFailure } from "../ops/issues";
+import { workerInterval } from "../workers";
 export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 declare module "express-session" {
   interface SessionData {
@@ -329,7 +330,7 @@ export async function runMailWorker(
 }
 export function startMailWorker() {
   let busy = false;
-  const timer = setInterval(async () => {
+  workerInterval("Mail Alerts worker", async () => {
     if (busy) return;
     busy = true;
     try {
@@ -341,5 +342,4 @@ export function startMailWorker() {
       busy = false;
     }
   }, 60000);
-  timer.unref();
 }

@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { maskEmailAddress, scrubText } from "./ops/scrub";
 import { providerFixture, type EmailFixture } from "./tutorials/fixtures";
 import fs from "fs";
 import path from "path";
@@ -185,14 +186,15 @@ export async function trySend(useBackup: boolean, mailOptions: any, replyToSelf:
   const rejected = Array.isArray(info.rejected) ? info.rejected.map(String) : [];
 
   if (rejected.length > 0) {
-    console.warn(`[SMTP ${label}] Some recipients rejected: ${rejected.join(", ")}`);
+    console.warn(`[SMTP ${label}] ${rejected.length} recipient(s) rejected: ${rejected.map(maskEmailAddress).join(", ")}`);
   }
 
   if (accepted.length === 0 && mailOptions.to) {
     throw Object.assign(new Error(`No recipients accepted by ${label} SMTP`), { stage: "rejected" });
   }
 
-  console.log(`[SMTP ${label}] Delivered to ${accepted.join(", ")} | Response: ${info.response}`);
+  // The journal keeps the count and a masked address (j***@domain), never the recipient.
+  console.log(`[SMTP ${label}] Delivered to ${accepted.length} recipient(s) (${accepted.map(maskEmailAddress).join(", ")}) | Response: ${scrubText(String(info.response ?? ""), 200)}`);
   return { accepted, rejected, response: info.response };
 }
 
@@ -227,7 +229,7 @@ function sinkToOutbox(mailOptions: any): { accepted: string[]; rejected: string[
   }) + "\n");
   // Tutorial recording slots only (null everywhere else): the recorder plays the recipient.
   providerFixture<EmailFixture>("email")?.captured(mailOptions);
-  console.log(`[SMTP SINK] Not production — captured to tmp/email-outbox.jsonl instead of sending (to: ${to.join(", ")})`);
+  console.log(`[SMTP SINK] Not production — captured to tmp/email-outbox.jsonl instead of sending (to: ${to.map(maskEmailAddress).join(", ")})`);
   return { accepted: to, rejected: [], response: "sink: written to tmp/email-outbox.jsonl" };
 }
 
