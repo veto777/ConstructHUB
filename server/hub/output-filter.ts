@@ -748,11 +748,9 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
   // O10 — commercial claims. "Unlimited" is a sold plan name on the 2026-10-09
   // ladder (shared/plans.ts), never a claim: mask capitalized name mentions
   // (bare, or with "the/to/on/with" before it, or "plan/tier" after) so the
-  // sweep never reads the name as an "unlimited" promise. The plan's own
-  // tagline words the name in lowercase ("the only unlimited plan on the
-  // market") and the pack and the preset answers quote it verbatim, so the
-  // lowercase name next to "plan"/"tier" is masked too. Lowercase "unlimited"
-  // anywhere else ("unlimited locations") stays a blocked claim.
+  // sweep never reads the name as an "unlimited" promise. The lowercase name
+  // next to "plan"/"tier" is masked too. Lowercase "unlimited" anywhere else
+  // ("unlimited locations") stays a blocked claim.
   const commercialText = linkless
     .replace(/\b(?:the |to |on |with |from )?Unlimited(?: plan| tier)?\b/g, "Top plan")
     .replace(/\bunlimited (?:plan|tier)\b/g, "Top plan");

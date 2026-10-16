@@ -62,8 +62,8 @@ const PLAN_STYLE: Record<PlanKey, { icon: any; card: string; ribbon: string; but
   },
 };
 
-/** Unlimited is the hero of the ladder: the one plan with no caps. */
-const PLAN_RIBBON: Partial<Record<PlanKey, string>> = { agency: "No caps" };
+/** Unlimited is the hero of the ladder: no count limits (paid-data tools still have monthly caps). */
+const PLAN_RIBBON: Partial<Record<PlanKey, string>> = { agency: "Top plan" };
 
 const SERVICE_ICONS: Record<string, any> = {
   formation: Wrench, website: Globe, "seo-ads": Megaphone, "seo-packages": Search, "business-build": Briefcase, custom: MessageSquare,

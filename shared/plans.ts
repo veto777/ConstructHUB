@@ -3,7 +3,7 @@
  * server (checkout, entitlements, quotas) and the client (pricing page, upgrade
  * prompts). Owner decisions 2026-10-09 (the cost-based rebuild — docs/pricing/README.md):
  *   - Five plans: Solo $29 (1 location) / Team $49 (10) / Pro $99 (25) /
- *     Agency $199 (100) / Unlimited $449 (no caps). Annual = ANNUAL_MONTHS × monthly.
+ *     Agency $199 (100) / Unlimited $449 (no count limits; paid-data tools keep monthly caps). Annual = ANNUAL_MONTHS × monthly.
  *     Plan KEYS keep their old names so stored subscriptions still resolve:
  *     starter = Solo, team = Team (new), pro = Pro, growth = Agency,
  *     agency = Unlimited. Never rename a key; rename `name`.
@@ -479,7 +479,7 @@ export const PLANS: Record<PlanKey, Plan> = {
   },
   agency: {
     key: "agency", name: "Unlimited", monthlyCents: 44900, annualCents: 493900,
-    tagline: "No caps. The only unlimited plan on the market.",
+    tagline: "No limits on locations, seats or client workspaces, and the highest monthly allowances on the paid data tools.",
     features: [
       "Everything in Agency",
       "Unlimited locations, seats, client workspaces and websites",
