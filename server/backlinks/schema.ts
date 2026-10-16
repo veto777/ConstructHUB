@@ -59,6 +59,7 @@ export async function ensureBacklinkSchema() {
     -- After the CREATE: on a fresh database the ALTER used to run first and the boot died with
     -- "relation backlink_queries does not exist" (only existing databases ever got past it).
     ALTER TABLE backlink_queries ADD COLUMN IF NOT EXISTS task_id text, ADD COLUMN IF NOT EXISTS task_posted_at timestamptz;
+    ALTER TABLE backlink_queries ADD COLUMN IF NOT EXISTS template text;
     CREATE TABLE IF NOT EXISTS backlink_events (
       id bigserial PRIMARY KEY,
       source_id integer NOT NULL REFERENCES backlink_sources(id) ON DELETE CASCADE,

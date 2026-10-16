@@ -23,25 +23,61 @@ export const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
 
 // ── Query bank ──────────────────────────────────────────────────────────────
 
-/** Puts every bank query in the table once (new templates appear on the next boot). */
+/** Puts every bank query in the table once (new templates appear on the next boot) and tags each with its template. */
 export async function seedQueries(): Promise<number> {
   const bank = buildQueryBank();
   const r = await db().query(
-    `INSERT INTO backlink_queries (kind, niche, query)
-     SELECT * FROM unnest($1::text[], $2::text[], $3::text[]) ON CONFLICT (query) DO NOTHING`,
-    [bank.map((q) => q.kind), bank.map((q) => q.niche), bank.map((q) => q.query)],
+    `INSERT INTO backlink_queries (kind, niche, query, template)
+     SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::text[])
+     ON CONFLICT (query) DO UPDATE SET template = EXCLUDED.template WHERE backlink_queries.template IS DISTINCT FROM EXCLUDED.template`,
+    [bank.map((q) => q.kind), bank.map((q) => q.niche), bank.map((q) => q.query), bank.map((q) => q.template)],
   );
   return r.rowCount ?? 0;
 }
 
+/**
+ * Families (one template across its niches, states or cities) are judged by the quality sources their searches found.
+ * A family is "learning" until it has run FAMILY_TRIAL searches; after that it runs in order of quality found per search,
+ * and one under FAMILY_MIN_YIELD per search is paused (2026-10-16: "useful links" found 3 in 22 searches, member
+ * directories 368 in 100). Families keep their place when the bank grows.
+ */
+export const FAMILY_TRIAL = 5;
+export const FAMILY_MIN_YIELD = 0.5;
+
 export type QueryRow = { id: number; kind: BacklinkKind; niche: string; query: string };
-/** Never-run queries first, then the longest-unrun, each at most once every `repeatDays`. */
+/** Never-run queries first — learning families, then the best-yielding — then the longest-unrun, each at most once every `repeatDays`. */
 export async function dueQueries(limit: number, repeatDays = 60): Promise<QueryRow[]> {
   const r = await db().query(
-    `SELECT id, kind, niche, query FROM backlink_queries
-      WHERE task_id IS NULL AND (last_run_at IS NULL OR last_run_at < now() - make_interval(days => $2))
-      ORDER BY last_run_at NULLS FIRST, id LIMIT $1`, [limit, repeatDays]);
+    `WITH fam AS (
+       SELECT q.template, sum(q.runs)::float runs, count(s.id) FILTER (WHERE s.tier IN ('A','B') AND s.kind <> 'pbn')::float quality
+         FROM backlink_queries q LEFT JOIN backlink_sources s ON s.discovered_via = q.query
+        WHERE q.runs > 0 AND q.template IS NOT NULL GROUP BY q.template),
+     due AS (
+       SELECT q.id, q.kind, q.niche, q.query, q.last_run_at, coalesce(f.runs, 0) fruns, f.quality fquality,
+              row_number() OVER (PARTITION BY q.template ORDER BY q.last_run_at NULLS FIRST, q.id) rn
+         FROM backlink_queries q LEFT JOIN fam f ON f.template = q.template
+        WHERE q.task_id IS NULL AND (q.last_run_at IS NULL OR q.last_run_at < now() - make_interval(days => $2)))
+     SELECT id, kind, niche, query FROM due
+      WHERE NOT (fruns >= $3 AND fquality / fruns < $4)
+      -- a learning family gets only its trial searches up front; the rest wait for the verdict
+      ORDER BY last_run_at IS NULL DESC,
+               CASE WHEN fruns >= $3 THEN fquality / fruns WHEN rn <= $3 - fruns THEN 1e9 ELSE -1 END DESC,
+               last_run_at NULLS FIRST, id
+      LIMIT $1`, [limit, repeatDays, FAMILY_TRIAL, FAMILY_MIN_YIELD]);
   return r.rows;
+}
+
+/** Each search family with what it found, best first: the admin page and the session notes read this. */
+export async function queryFamilies(): Promise<{ template: string; queries: number; runs: number; quality: number; perSearch: number | null; paused: boolean }[]> {
+  const r = await db().query(
+    `WITH qs AS (SELECT template, count(*)::int queries, sum(runs)::int runs FROM backlink_queries WHERE template IS NOT NULL GROUP BY 1),
+          found AS (SELECT q.template, count(*)::int quality FROM backlink_queries q JOIN backlink_sources s ON s.discovered_via = q.query
+                     WHERE s.tier IN ('A','B') AND s.kind <> 'pbn' GROUP BY 1)
+     SELECT qs.template, qs.queries, qs.runs, coalesce(found.quality, 0) quality FROM qs LEFT JOIN found USING (template)`);
+  return r.rows.map((x: any) => {
+    const perSearch = x.runs > 0 ? x.quality / x.runs : null;
+    return { ...x, perSearch, paused: x.runs >= FAMILY_TRIAL && (perSearch ?? 0) < FAMILY_MIN_YIELD };
+  }).sort((a: any, b: any) => (b.perSearch ?? Infinity) - (a.perSearch ?? Infinity));
 }
 
 export async function recordQueryRun(id: number, found: number, newFound: number, costUsd: number) {

@@ -2,6 +2,7 @@
  * The Backlinks database's admin surface (platform admins only — requirePlatformAdmin, second factor included):
  *
  *   GET  /api/admin/backlinks/summary                        progress to the goal, counts, spend, what is configured
+ *   GET  /api/admin/backlinks/families                       each search family: searches run, quality found, paused or not
  *   GET  /api/admin/backlinks/sources?kind&status&tier&q&quality&limit&offset
  *   GET  /api/admin/backlinks/sources/:id                    detail: signals, metrics, reasons, events, outreach
  *   POST /api/admin/backlinks/sources/:id/status {status, priceUsd?, turnaroundDays?, notes?}
@@ -64,6 +65,12 @@ export function registerBacklinkRoutes(app: Express, getDevUser: GetUser): void 
     try {
       res.json(await store.summary(cfg.capUsd, { dataSource: isConfigured(), worker: cfg.enabled, outreachSend: sendBlocker(outreachConfig()) === null }));
     } catch (e) { failed(res, "load the summary", e); }
+  });
+
+  app.get("/api/admin/backlinks/families", async (req, res) => {
+    if (!(await admin(req, res))) return;
+    res.setHeader("Cache-Control", "no-store");
+    try { res.json(await store.queryFamilies()); } catch (e) { failed(res, "load the search families", e); }
   });
 
   app.get("/api/admin/backlinks/sources", async (req, res) => {

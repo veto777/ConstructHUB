@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildQueryBank, hitsFromItems, isExcluded, normalizeDomain, parseImportLine, QUERY_TEMPLATES, NICHES, US_STATES } from "./discover";
-import { analyzePage, classifyKind, decodeCfEmail, gradeSource, mergeSignals, spelledOutEmails, vetDeps } from "./vet";
+import { buildQueryBank, hitsFromItems, isExcluded, normalizeDomain, parseImportLine, QUERY_TEMPLATES, NICHES, US_STATES, US_CITIES } from "./discover";
+import { analyzePage, classifyKind, decodeCfEmail, gradeSource, mergeSignals, readSite, spelledOutEmails, vetDeps } from "./vet";
 import { contactLinks, findContacts } from "./contacts";
 import { listPages, relatedSites } from "./expand";
 import { composePitch, siteName, pickEmail, sendBlocker, outreachConfig, withFooter } from "./outreach";
@@ -32,14 +32,19 @@ describe("discovery", () => {
     expect(isExcluded("m.facebook.com")).toBe(true);
     expect(isExcluded("permits.seattle.gov")).toBe(true);
     expect(isExcluded("notfacebook.com")).toBe(false);
+    // .us locality government hosts (2026-10-16: a state legislator's page was graded an A citation)
+    for (const gov of ["assembly.state.ny.us", "ci.boston.ma.us", "co.harris.tx.us", "k12.wa.us", "www.lib.ma.us"]) expect(isExcluded(gov)).toBe(true);
+    for (const ok of ["denver.co.us", "smithroofing.us", "chamber.us"]) expect(isExcluded(ok)).toBe(false);
   });
   it("builds one deduplicated bank covering every niche and state template", () => {
     const bank = buildQueryBank();
     expect(new Set(bank.map((q) => q.query)).size).toBe(bank.length);
-    const expected = Object.values(QUERY_TEMPLATES).flat().reduce((a, t) => a + (t.per === "niche" ? NICHES.length : t.per === "state" ? US_STATES.length : 1), 0);
+    const expected = Object.values(QUERY_TEMPLATES).flat().reduce((a, t) => a + (t.per === "niche" ? NICHES.length : t.per === "state" ? US_STATES.length : t.per === "city" ? US_CITIES.length : 1), 0);
     expect(bank.length).toBe(expected);
     expect(bank.every((q) => !/\b(intitle|inurl|site):/i.test(q.query))).toBe(true); // operators bill 5x
     expect(bank.some((q) => q.kind === "pbn")).toBe(false);
+    expect(bank.every((q) => q.template.startsWith(`${q.kind}: `) && !/\{[nsc]\}/.test(q.query))).toBe(true);
+    expect(new Set(US_CITIES).size).toBe(US_CITIES.length);
   });
   it("keeps one organic hit per domain and drops excluded ones", () => {
     const hits = hitsFromItems([
@@ -391,5 +396,38 @@ describe("discovery through the standard queue", () => {
       expect(calls.at(-1).path).toBe("/serp/google/organic/task_get/regular/t1");
       expect(discoveryEstimateUsd("standard")).toBeLessThan(discoveryEstimateUsd() / 3);
     } finally { discoverDeps.request = orig; }
+  });
+});
+
+describe("a chamber reached through its home page (expansion, imports)", () => {
+  const home = `<html lang="en"><head><title>Spokane Valley Chamber of Commerce</title></head><body><h1>Welcome</h1>
+    <p>${words(700, "business")}</p><a href="/staff-directory">Staff Directory</a><a href="/list/">Business Directory</a>
+    <a href="mailto:info@spokanevalleychamber.org">Email</a></body></html>`;
+  const dir = `<html lang="en"><head><title>Business Directory - Spokane Valley Chamber</title></head><body><h1>Business Directory</h1>
+    <p>${words(300, "contractor")}</p></body></html>`;
+  const withPages = async (pages: Record<string, string>, run: () => Promise<void>) => {
+    const orig = vetDeps.fetch;
+    vetDeps.fetch = async (url: string) => (pages[url] ? { url, status: 200, body: pages[url], bytes: 0, headers: {}, redirects: [] } : { url, status: 404, body: "", bytes: 0, headers: {}, redirects: [] });
+    try { await run(); } finally { vetDeps.fetch = orig; }
+  };
+
+  it("finds the directory link and skips a staff directory", () => {
+    expect(analyzePage({ url: "https://spokanevalleychamber.org/", status: 200, body: home }).directoryLink).toBe("https://spokanevalleychamber.org/list/");
+  });
+  it("reads the linked directory and grades the chamber on it instead of rejecting it", async () => {
+    await withPages({ "https://spokanevalleychamber.org/": home, "https://spokanevalleychamber.org/list/": dir }, async () => {
+      const s = await readSite("https://spokanevalleychamber.org/", "spokanevalleychamber.org");
+      expect(s.directoryUrl).toBe("https://spokanevalleychamber.org/list/");
+      const g = gradeSource("directory", s, null);
+      expect(g.tier).not.toBe("X");
+      expect(g.reasons.join(" ")).toContain("publishes a public business directory (https://spokanevalleychamber.org/list/)");
+    });
+  });
+  it("does not count a directory link that is dead", async () => {
+    await withPages({ "https://spokanevalleychamber.org/": home }, async () => {
+      const s = await readSite("https://spokanevalleychamber.org/", "spokanevalleychamber.org");
+      expect(s.directoryUrl ?? null).toBeNull();
+      expect(gradeSource("directory", s, null).tier).toBe("X");
+    });
   });
 });

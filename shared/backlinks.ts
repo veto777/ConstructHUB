@@ -97,6 +97,9 @@ export type BacklinkSignals = {
   submissionUrl?: string | null;
   /** The found page is a public business/member directory (directories and citations are joined by being listed). */
   directoryUrl?: string | null;
+  /** A same-site link to the site's own business/member directory ("Business Directory", /list, /member-directory). The
+   *  vetter reads it when the found page is not a directory itself — how a chamber reached through its home page gets in. */
+  directoryLink?: string | null;
   /** The found page is a user profile on a platform (it speaks for its author, not for the site). */
   profilePage?: boolean;
   /** Why the found page is a list/seller of guest-post sites or a job board, not a publisher. */

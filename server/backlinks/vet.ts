@@ -35,6 +35,9 @@ const DIRECTORY_PAGE = new RegExp([
   String.raw`verify[- ](a[- ])?licen[cs]e|licen[cs]e[- ](lookup|search|verification)`,
   String.raw`\/list\/(category|ql|search)|\/(installers|contractors|dealers|retailers|members|pros)\/?$|\bdirectory\b`,
 ].join("|"), "i");
+/** A link (its text + path) to the site's own business/member directory — never a staff, board or church directory. */
+const DIRECTORY_LINK = /member(ship)?[- ]?(directory|search)|business[- ]directory|company[- ]directory|(find|search)[- ]a[- ](member|business|contractor)|\/list\/?$|\/(member-?|business-?)?directory\/?$/;
+const NOT_A_LISTING = /\b(staff|employee|faculty|board|church|student|alumni|clergy|parish|school|sermon)s?\b/;
 const PROFILE_PATH = /^\/(@[^/]+|(profiles?|users?|members?|people|u|authors?|community\/profile)\/)/i;
 
 /** Sites written for another country's audience: no use to a US contractor's local SEO. Generic-use ccTLDs are kept. */
@@ -145,6 +148,7 @@ export function analyzePage(page: { url: string; status: number; body: string })
   let contactUrl: string | null = null;
   const submissionHints = new Set<string>();
   let submissionLink: string | null = null;
+  let directoryLink: string | null = null;
   let path = "/";
   try { path = new URL(page.url).pathname; } catch { /* keep "/" */ }
   const heading = `${$("title").first().text()} ${$("h1").first().text()}`;
@@ -163,6 +167,7 @@ export function analyzePage(page: { url: string; status: number; body: string })
     } else if (!contactUrl && /\bcontact\b/.test(label)) contactUrl = abs.href;
     for (const p of SUBMISSION_PATTERNS) if (p.re.test(label)) submissionHints.add(p.hint);
     if (!submissionLink && host && (host === domain || host.endsWith(`.${domain}`)) && SUBMISSION_PAGE.test(label) && !PROFILE_PATH.test(abs.pathname)) submissionLink = abs.href;
+    if (!directoryLink && host && (host === domain || host.endsWith(`.${domain}`)) && DIRECTORY_LINK.test(label.trim()) && !NOT_A_LISTING.test(label) && !PROFILE_PATH.test(abs.pathname)) { abs.hash = ""; directoryLink = abs.href; }
   });
   const scan = `${$("title").text()} ${text}`.slice(0, 200_000);
   for (const p of SUBMISSION_PATTERNS) if (p.re.test(scan)) submissionHints.add(p.hint);
@@ -187,6 +192,7 @@ export function analyzePage(page: { url: string; status: number; body: string })
     // A user profile on a platform never speaks for the site, even when it says "guest posting".
     submissionUrl: profilePage ? null : SUBMISSION_PAGE.test(`${heading} ${decodeURIComponent(path)}`) ? page.url : submissionLink,
     directoryUrl: DIRECTORY_PAGE.test(`${heading} ${decodeURIComponent(path)}`) ? page.url : null,
+    directoryLink,
     profilePage,
     listPage: LIST_PAGE.find((l) => l.re.test(`${heading} ${decodeURIComponent(path)}`))?.why ?? null,
   };
@@ -216,6 +222,7 @@ export function mergeSignals(a: BacklinkSignals, b: BacklinkSignals | null): Bac
     // `a` is the page the search found, `b` the home page.
     submissionUrl: a.submissionUrl ?? b.submissionUrl ?? null,
     directoryUrl: a.directoryUrl ?? b.directoryUrl ?? null,
+    directoryLink: a.directoryLink ?? b.directoryLink ?? null,
     profilePage: a.profilePage,
     listPage: a.listPage ?? null,
     homeTitle: b.title,
@@ -333,5 +340,12 @@ export async function readSite(discoveredUrl: string, domain: string): Promise<B
   const sameAsHome = (u: string) => normalizeDomain(u) === domain && new URL(u).pathname.replace(/\/$/, "") === "";
   const second = sameAsHome(discoveredUrl) ? null : await vetDeps.fetch(home).then(analyzePage).catch(() => null);
   if (!first && !second) throw new Error("The site could not be loaded");
-  return first ? mergeSignals(first, second) : second!;
+  const s = first ? mergeSignals(first, second) : second!;
+  // A chamber or association reached through its home page (expansion, imports): its own directory link is read, and
+  // counts only when that page loads and is a directory itself. Third request at most.
+  if (!s.submissionUrl && !s.directoryUrl && s.directoryLink && s.httpStatus > 0 && s.httpStatus < 400) {
+    const dir = await vetDeps.fetch(s.directoryLink).then(analyzePage).catch(() => null);
+    if (dir && dir.httpStatus < 400 && dir.directoryUrl && normalizeDomain(dir.fetchedUrl)?.endsWith(domain)) s.directoryUrl = dir.directoryUrl;
+  }
+  return s;
 }
