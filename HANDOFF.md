@@ -1,3 +1,25 @@
+## 🔒 2026-10-16 — security, privacy and reliability wave (deployed 01:53 UTC, main 1b6fb1e9)
+- **Call recordings were publicly downloadable** via `/api/files/voice%2F<org>%2Frecordings/<sid>.wav` (Express 5 decodes
+  %2F in params). Hotfixed 00:06 UTC (main dee1bad9), then replaced by an allow-list: `server/files/public-files.ts` serves
+  only logos/company, logos/gmb, photos/reviews, media/<uuid>/<name>.jpg, social/<token>/media.*, press/photos/<uuid>.*,
+  and two-segment avatars/<uuid>.*, media/<uuid>.* (those never loaded before). Everything else is 404. Private stores have
+  their own routes: recordings `GET /api/crm/voice/calls/:id/recording`, press inbox `GET /api/admin/press/attachments/:file`.
+  **A new public R2 prefix must be added to PUBLIC_FILE_RULES**, or it 404s.
+- **Tutorial media hung** after ~500 quick requests (R2 socket pool exhausted by bodies never destroyed on viewer close;
+  23:47 UTC 10-15, cleared by restart). `server/r2-http.ts` handler (timeouts, bounded pool) on every R2 client; reads abort
+  on close; 504 on timeout.
+- JobCam share links never list or serve shots hidden from the client. CRM webhooks: every offered event fires, deliveries
+  never follow redirects. CRM estimates/invoices snapshot footer/warranty/terms/deposit at creation.
+- Agency: contact email needs admin, per-member send budget, scoped team names, no link for viewers.
+- Seed permit portals: 88 guessed/dead URLs (Replit seed) replaced from verified permit-portals.json or nulled; boot step
+  `server/seed-dead-urls.ts` corrected production (20 nulled, 1 partial). 62 seed URLs still unverified (see seed-urls.test.ts).
+- Orderly shutdown: `server/workers.ts` registry — every interval/timeout worker registers (`workerInterval` /
+  `registerWorker`); new workers must too, or they tick into the closed pool on deploy.
+- Logs mask recipients/phones; body-parser errors never log bodies (`server/ops/log.ts` logError). ~100 legacy
+  `console.error(label, err)` sites remain (list in the debug session scratch w3-r7 follow-up).
+- Owner decisions open: contract §6 vs Terms §6 early-termination; Unlimited plan meters (150 grid / 50 scans) and the
+  "reinstatement at half price" bullet with no code; research custom trade; trial without card; Meta ad targeting.
+
 ## 🧭 2026-10-15 — every page explains itself: "i" + walkthrough, facelifts, sample previews (branch `debug/review-report-competitor-sort`)
 - **Owner's program (given page by page on 2026-10-15):** every app page carries an "i" beside its title that says in
   plain words what the page is for and how to use it, with the walkthrough playing **inside** the panel; bare forms
