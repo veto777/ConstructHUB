@@ -1523,3 +1523,9 @@ out of `SOCIAL_NATIVE_PUBLIC_NETWORKS` until Pinterest grants Standard access. B
 - Prod env now has `DATAFORSEO_LOGIN/PASSWORD` (from the preview — this also switches the SEO toolset on, under
   `SEO_MONTHLY_BUDGET_USD`), `BACKLINKS_WORKER_ENABLED=true`, budget 25, 40 searches/day. Outreach SENDING stays off
   (`BACKLINKS_OUTREACH_SEND` + outreach mailbox/postal address are owner-pending).
+
+## 2026-10-16 — robots-only research sources deployed with DEPLOY_ALLOW_UNSAFE=1
+bdb16ef2 (sc-llr-board-orders, va-eva-debarred) was deployed from a clean detached checkout of origin/main
+(/mnt/scratch/worktrees/ConstructHUB-deploy-b, removed afterwards) with `DEPLOY_ALLOW_UNSAFE=1`. Why: the
+branch `main` was checked out in ~/ConstructHUB-release by another session, so it couldn't be checked out again
+without moving that session's tree. The commit built was exactly origin/main and the tree was clean; deploy OK.
