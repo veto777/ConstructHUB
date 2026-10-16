@@ -12,6 +12,7 @@
  */
 import { createWriteStream, createReadStream, promises as fs } from "node:fs";
 import { request as httpsRequest } from "node:https";
+import { researchHttpsAgent } from "./egress";
 import type { IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -517,6 +518,8 @@ export async function plainRequest(url: string, opts: { method?: string; headers
       method: opts.method ?? "GET",
       headers: { "user-agent": USER_AGENT, ...(opts.headers ?? {}), ...(body != null ? { "content-length": String(Buffer.byteLength(body)) } : {}) },
       timeout: opts.timeoutMs ?? 60_000,
+      // Through the research proxy when RESEARCH_PROXY_URL is set (egress.ts); Node's default agent when not.
+      agent: researchHttpsAgent(),
     }, (res) => {
       // The socket timeout only catches silence; this deadline covers the whole response, body included.
       const total = setTimeout(() => res.destroy(new Error(`response not finished in ${Math.round(totalMs / 1000)}s: ${url}`)), totalMs);

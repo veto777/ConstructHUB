@@ -42,6 +42,7 @@ import { capNote, failureNote, noteOf } from "./notes";
 import { disciplineRecord, privateHit, reportHit } from "./privacy";
 import { guard, guardBrowser, noteResponse, politeFetch, refuseChallengeBody, releaseHost, withRun, type Turn } from "./http";
 import { researchTransport, type ResearchTransport } from "../scrapers/research-transport";
+import { markProxiedContext, researchContextOptions } from "./egress";
 import type { IdQuery } from "./identifiers";
 import { previewCompanyRecords, searchCompanyRecords, searchEnforcement } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
@@ -235,6 +236,9 @@ const PERMIT_TRANSPORT: ResearchTransport = {
   after: (url, status, retryAfter, turn) => { releaseHost(url, turn as Turn); noteResponse(url, status, retryAfter); },
   // A 2xx challenge page on an EnerGov API post blocks the host that answered (round 5, decision 6).
   checkBody: refuseChallengeBody,
+  // With RESEARCH_PROXY_URL set, the search's browser contexts open through the research proxy (egress.ts).
+  contextOptions: researchContextOptions,
+  markContext: markProxiedContext,
 };
 
 /** A portal refused by robots.txt or an access denial reads as that, not as a failed search. */

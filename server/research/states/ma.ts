@@ -22,6 +22,7 @@
  *       read page by page instead.
  */
 import { request as httpsRequest } from "node:https";
+import { researchHttpsAgent } from "../egress";
 import { rootCertificates } from "node:tls";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { USER_AGENT, guard, isHtmlType, noteResponse, refuseChallengeBody, useRobotsFetcher } from "../http";
@@ -102,7 +103,7 @@ async function hicRequest(url: string, body: string | null): Promise<string> {
     const headers: Record<string, string> = { "user-agent": USER_AGENT };
     if (body != null) Object.assign(headers, { "content-type": "application/x-www-form-urlencoded; charset=UTF-8", "content-length": String(Buffer.byteLength(body)), referer: HIC_PAGE });
     const req = httpsRequest(url, {
-      method: body != null ? "POST" : "GET", ca: HIC_CA, timeout: 90_000, headers, signal: turn.signal,
+      method: body != null ? "POST" : "GET", ca: HIC_CA, timeout: 90_000, headers, signal: turn.signal, agent: researchHttpsAgent(),
     }, (res) => {
       turn.release();
       try { noteResponse(url, res.statusCode ?? 0, res.headers["retry-after"] as string | undefined); }
@@ -127,7 +128,7 @@ async function hicRequest(url: string, body: string | null): Promise<string> {
 
 // robots.txt is read with the same CA list (fetch() can't verify this server's chain), then checked like any host's.
 useRobotsFetcher(HIC_ORIGIN, (url) => new Promise((resolve, reject) => {
-  const req = httpsRequest(url, { ca: HIC_CA, timeout: 15_000, headers: { "user-agent": USER_AGENT } }, (res) => {
+  const req = httpsRequest(url, { ca: HIC_CA, timeout: 15_000, headers: { "user-agent": USER_AGENT }, agent: researchHttpsAgent() }, (res) => {
     const chunks: Buffer[] = [];
     res.on("data", (c) => chunks.push(c as Buffer));
     res.on("end", () => resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString("utf8"), location: res.headers.location ?? null, retryAfter: (res.headers["retry-after"] as string | undefined) ?? null }));
