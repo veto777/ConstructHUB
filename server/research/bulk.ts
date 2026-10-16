@@ -366,11 +366,8 @@ export const RETIRED_BULK_SOURCES: readonly string[] = ["sc-des-enforcement", "w
  * no longer shows their records (store.ts shownReport).
  */
 export const WITHDRAWN_REPORT_SOURCES: ReadonlySet<string> = new Set([
-  "Missouri architects, engineers, land surveyors and landscape architects (active)", // mo-dpr-ae
-  "Missouri statewide electrical contractor licenses (active)", // mo-dpr-electrical
-  "Pittsburgh PLI licensed contractors", "Pittsburgh PLI trade licenses", // pa-pittsburgh
+  // MO DPR, Pittsburgh PLI and WV Purchasing are registered again (owner order 2026-10-15), so their records show.
   "South Carolina DES environmental enforcement orders", // sc-des-enforcement
-  "WV Purchasing Division debarred vendors", // wv-purchasing-debarred
   "Wisconsin DNR licensed well drillers and pump installers", // wi-dnr-wells
   "Wisconsin DHS certified lead companies", "Wisconsin DHS certified asbestos companies", "Wisconsin DHS certified lead and asbestos companies", // wi-dhs-abatement
   "Alaska DCCED business licenses", // live, removed

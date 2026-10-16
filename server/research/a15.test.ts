@@ -98,7 +98,9 @@ describe("#4 saved reports drop withdrawn sources' records", () => {
     expect(shown.totals.licenses).toBe(1);
     expect(shown.totals.enforcement).toBe(0);
     expect(shownReport(report(subject({ licenses: [lic({})] }), 4))!.subjects[0].withdrawnNote).toBeUndefined();
-    for (const l of ["Alaska DCCED business licenses", "WV Purchasing Division debarred vendors", "Pittsburgh PLI trade licenses"]) expect(WITHDRAWN_REPORT_SOURCES.has(l), l).toBe(true);
+    for (const l of ["Alaska DCCED business licenses", "South Carolina DES environmental enforcement orders"]) expect(WITHDRAWN_REPORT_SOURCES.has(l), l).toBe(true);
+    // registered again (owner order 2026-10-15: robots.txt is advisory), so their records still show
+    for (const l of ["WV Purchasing Division debarred vendors", "Pittsburgh PLI trade licenses", "Missouri statewide electrical contractor licenses (active)"]) expect(WITHDRAWN_REPORT_SOURCES.has(l), l).toBe(false);
   });
 });
 
