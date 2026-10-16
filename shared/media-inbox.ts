@@ -118,3 +118,32 @@ export const MEDIA_INBOX_PARAMETERS = {
   newContactsPerDay: 50,
   aiOrder: ["TruthCoder", "TruthCoder 2.0", "OpenAI", "Anthropic"],
 } as const;
+
+/** What the admin controls on /admin/partnerships (stored in media_settings; unset fields fall back to the server's env). */
+export const MEDIA_OUTREACH_MODES = ["ramp", "fixed", "paused"] as const;
+export type MediaOutreachMode = (typeof MEDIA_OUTREACH_MODES)[number];
+export const MEDIA_TEMPLATE_KINDS = ["directory", "association", "article", "news"] as const;
+export type MediaTemplateKind = (typeof MEDIA_TEMPLATE_KINDS)[number];
+export const MEDIA_TEMPLATE_KIND_LABELS: Record<MediaTemplateKind, string> = {
+  directory: "Directory", association: "Chamber / association", article: "Article site", news: "News media",
+};
+export type MediaSettings = {
+  /** ramp: start + step a day up to max · fixed: fixedPerDay a day · paused: no first-contact emails. */
+  outreach: MediaOutreachMode;
+  rampStart: number;
+  rampStep: number;
+  maxPerDay: number;
+  fixedPerDay: number;
+  /** Answer incoming email automatically (off: every new email waits for you). */
+  autoReplies: boolean;
+  /** Follow up after silence and try a new contact address. */
+  followUps: boolean;
+  /** Admin-edited first-contact emails; {company} is replaced by the company name. */
+  templates: Partial<Record<MediaTemplateKind, { subject: string; body: string }>>;
+};
+export type MediaQueueRow = {
+  id: number; domain: string; company: string; kind: string; toEmail: string; status: "queued" | "sent" | "skipped";
+  reason: string | null; source: string; queuedAt: string; sentAt: string | null;
+};
+/** Every first-contact email must offer a way out (the stop line). */
+export const STOP_LINE_RE = /reply\s+["“]?stop/i;

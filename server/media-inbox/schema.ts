@@ -38,6 +38,8 @@ ALTER TABLE backlink_sources ADD COLUMN IF NOT EXISTS partner_class text, ADD CO
  ADD COLUMN IF NOT EXISTS partner_name text;
 -- The admin's own notes on a company (owner, 2026-10-15); read by the AI when it drafts a reply from the admin page.
 ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS notes text;
+-- The admin's controls (owner, 2026-10-15: "everything has to be manageable through here"): one JSON row.
+CREATE TABLE IF NOT EXISTS media_settings (id integer PRIMARY KEY DEFAULT 1 CHECK (id = 1), value jsonb NOT NULL DEFAULT '{}', updated_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS media_inbox_state (
  mailbox text PRIMARY KEY, uid_validity text, last_uid bigint NOT NULL DEFAULT 0,
  last_pass_at timestamptz, last_pass_error text

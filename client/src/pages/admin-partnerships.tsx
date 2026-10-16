@@ -25,6 +25,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
 import { VerificationCancelled } from "@/components/recent-auth";
+import { QueueSection, SettingsSection } from "./admin-partnerships-controls";
 
 type Summary = {
   mailbox: string | null; configured: boolean; enabled: boolean; intervalMin: number; lastPassAt: string | null; lastPassError: string | null;
@@ -77,6 +78,7 @@ function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onCl
             </Select>
           </div>
           {partner.summary && <p>{partner.summary}</p>}
+          <ContactBox partner={partner} onSave={(b) => save.mutate(b)} saving={save.isPending} />
           <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2">
             <dt className="text-muted-foreground">Agreement</dt><dd>{partner.agreement ?? "—"}</dd>
             <dt className="text-muted-foreground">Cost terms</dt><dd>{partner.costTerms ?? "None mentioned"}</dd>
@@ -98,6 +100,7 @@ function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onCl
             </div>
           </div>
           <ReplyBox partner={partner} />
+          {partner.status !== "declined" && <StopBox partner={partner} />}
         </div>
       </SheetContent>
     </Sheet>
@@ -133,6 +136,52 @@ function MessageCard({ m, defaultOpen = false, onOpenCompany }: { m: MediaMessag
             <Button size="sm" variant="outline" disabled={handled.isPending} onClick={() => handled.mutate()}>Mark handled</Button>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Who we talk to at the company: editable. */
+function ContactBox({ partner, onSave, saving }: { partner: MediaPartner; onSave: (b: Record<string, unknown>) => void; saving: boolean }) {
+  const init = { company: partner.company, contactName: partner.contactName ?? "", contactEmail: partner.contactEmail ?? "", domain: partner.domain ?? "" };
+  const [f, setF] = useState(init);
+  const dirty = JSON.stringify(f) !== JSON.stringify(init);
+  return (
+    <div className="grid gap-2 sm:grid-cols-2" data-testid="form-partner-contact">
+      <Input placeholder="Company name" value={f.company} onChange={(e) => setF({ ...f, company: e.target.value })} data-testid="input-partner-company" />
+      <Input placeholder="Website (example.com)" value={f.domain} onChange={(e) => setF({ ...f, domain: e.target.value })} />
+      <Input placeholder="Contact name" value={f.contactName} onChange={(e) => setF({ ...f, contactName: e.target.value })} />
+      <Input placeholder="Contact email" type="email" value={f.contactEmail} onChange={(e) => setF({ ...f, contactEmail: e.target.value })} data-testid="input-partner-email" />
+      {dirty && (
+        <div className="sm:col-span-2">
+          <Button size="sm" disabled={saving || !f.company.trim()} onClick={() => onSave({
+            company: f.company.trim(), contactName: f.contactName.trim() || null, contactEmail: f.contactEmail.trim() || null, domain: f.domain.trim().toLowerCase() || null,
+          })} data-testid="button-save-partner-contact">Save details</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Stop emailing a company: no more replies, follow-ups or queue emails to its addresses. */
+function StopBox({ partner }: { partner: MediaPartner }) {
+  const { toast } = useToast();
+  const [sure, setSure] = useState(false);
+  const stop = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/admin/media-inbox/partners/${partner.id}/stop`, {})).json(),
+    onSuccess: (r: { suppressed: string[] }) => { toast({ title: `Stopped emailing ${partner.company}`, description: r.suppressed.join(", ") || undefined }); setSure(false); void refresh(); },
+    onError: (e) => toast({ title: "Could not stop", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  return (
+    <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+      {sure ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span>Mark {partner.company} declined and never email its addresses again?</span>
+          <Button size="sm" variant="destructive" disabled={stop.isPending} onClick={() => stop.mutate()} data-testid="button-partner-stop-confirm">Yes, stop</Button>
+          <Button size="sm" variant="outline" onClick={() => setSure(false)}>Cancel</Button>
+        </div>
+      ) : (
+        <Button size="sm" variant="ghost" onClick={() => setSure(true)} data-testid="button-partner-stop">Stop emailing this company</Button>
       )}
     </div>
   );
@@ -275,7 +324,7 @@ export default function AdminPartnershipsPage() {
           <Stat label="Finalized" value={n(s.partners.finalized)} onClick={() => setPartnerTab("finalized")} selected={partnerTab === "finalized"} />
           <Stat label="Talking" value={n(s.partners.talking)} onClick={() => setPartnerTab("talking")} selected={partnerTab === "talking"} />
           <Stat label="Emails sent" value={n(s.sent)} hint={`${n(received)} received`} onClick={() => setMailTab("out")} />
-          <Stat label="Directories queued" value={n(s.queue.queued)} hint={`${n(s.queue.sentToday)} of ${n(s.queue.perDay)} sent today · ${n(s.queue.sent)} so far`} onClick={() => setMailTab("out")} testId="stat-partners-queue" />
+          <Stat label="Directories queued" value={n(s.queue.queued)} hint={`${n(s.queue.sentToday)} of ${n(s.queue.perDay)} sent today · ${n(s.queue.sent)} so far`} onClick={() => document.querySelector("[data-testid=list-queue]")?.scrollIntoView({ behavior: "smooth", block: "start" })} testId="stat-partners-queue" />
           <Stat label="Waiting for you" value={n(s.counts.needs_owner)} tone={s.counts.needs_owner ? "bad" : "default"} onClick={() => setMailTab("needs_owner")} hint={`checked ${ago(s.lastPassAt)}`} />
         </StatGrid>
 
@@ -342,6 +391,9 @@ export default function AdminPartnershipsPage() {
             </div>
           )}
         </Section>
+
+        <QueueSection />
+        <SettingsSection />
 
         <Section title="Inbox laws" icon={Scale} description="What the AI answering media@ must follow. Laws marked “Checked in code” are verified on every reply before it is sent, whichever model wrote it; a reply that breaks one is replaced by a holding reply and waits for you.">
           <ol className="list-decimal space-y-1.5 pl-5 text-sm" data-testid="list-inbox-laws">
