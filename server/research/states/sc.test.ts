@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { businessParts, desHit, desReportLinks, parseDesReport } from "./sc";
+import { businessParts, desHit, desReportLinks, llrBusinessName, llrBusinessRows, llrOrderHit, LLR_BOARDS, parseDesReport, parseLlrOrders } from "./sc";
 
 // Excerpts of `pdftotext -layout` output of SC DES monthly enforcement reports, saved 2026-10-15
 // (des.sc.gov/about-scdes/programs-divisions/environmental-enforcement-actions).
@@ -161,5 +161,93 @@ describe("SC order dates (round 3, decision 13)", () => {
       county: null, location: null, city: null, program: "Water", violations: null, penalty: null }, "u");
     expect(hit?.date).toBeNull();
     expect(hit?.detail).toContain("Order date as published: 8/24/26");
+  });
+});
+
+// Trimmed from eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69, saved 2026-10-15 (hashes shortened; the last
+// row's future date is one the live list carries on another row).
+const LLR_PAGE = `<table class="table">
+  <thead>
+    <tr>
+      <th scope="col"></th>
+      <th scope="col">Order Date </th>
+      <th scope="col">Name</th>
+      <th scope="col"> License Type</th>
+      <th scope="col"> License Number</th>
+    </tr>
+  </thead>
+  <tbody>
+<tr>
+  <td>
+    <a href="/PublicOrdersWeb/PublicOrder/Download?divisionId=69&amp;fileId=34007.pdf&amp;contactId=1&amp;hash=A6">View Order</a>
+  </td>
+  <td>10/6/2026</td>
+  <td>BLAW CONSTRUCTION CO LLC </td>
+  <td>CLG </td>
+  <td>12061</td>
+</tr>
+<tr>
+  <td>
+    <a href="/PublicOrdersWeb/PublicOrder/Download?divisionId=69&amp;fileId=34012.pdf&amp;contactId=1&amp;hash=A6">View Order</a>
+  </td>
+  <td>10/6/2026</td>
+  <td>WILSON, WILLARD E </td>
+  <td>CQG </td>
+  <td>9821</td>
+</tr>
+<tr>
+  <td>
+    <a href="/PublicOrdersWeb/PublicOrder/Download?divisionId=69&amp;fileId=30985.pdf&amp;contactId=1&amp;hash=A6">View Order</a>
+  </td>
+  <td>7/15/2024</td>
+  <td>Miller / Dirt Cheap Hauling &amp; Services, April / Kevin  </td>
+  <td>REV </td>
+  <td>9861800</td>
+</tr>
+<tr>
+  <td>
+    <a href="/PublicOrdersWeb/PublicOrder/Download?divisionId=69&amp;fileId=2278.pdf&amp;contactId=1&amp;hash=A6">View Order</a>
+  </td>
+  <td>4/11/2009</td>
+  <td>FOUR SEASONS (dba Carroll &amp; Sons Inc)</td>
+  <td>CLM </td>
+  <td>2798</td>
+</tr>
+<tr>
+  <td>
+    <a href="/PublicOrdersWeb/PublicOrder/Download?divisionId=69&amp;fileId=99.pdf&amp;contactId=1&amp;hash=A6">View Order</a>
+  </td>
+  <td>5/13/2029</td>
+  <td>BROOM HEATING &amp; AIR CONDITIONING INC</td>
+  <td>CLM </td>
+  <td>113565</td>
+</tr>
+  </tbody>
+</table>`;
+
+describe("SC LLR public board orders", () => {
+  it("reads every row of the orders table", () => {
+    const rows = parseLlrOrders(LLR_PAGE, "2026-10-15");
+    expect(rows).toHaveLength(5);
+    expect(rows[0]).toEqual({ fileId: "34007", date: "2026-10-06", dateText: null, name: "BLAW CONSTRUCTION CO LLC", licenseType: "CLG", licenseNumber: "12061" });
+    // A date in the future is kept only as published.
+    expect(rows[4]).toMatchObject({ date: null, dateText: "5/13/2029" });
+  });
+  it("fails on a page without the orders table", () => {
+    expect(() => parseLlrOrders("<html><body>Maintenance</body></html>")).toThrow(/no orders table/);
+  });
+  it("keeps businesses only, never the person a row also names", () => {
+    const kept = llrBusinessRows(parseLlrOrders(LLR_PAGE, "2026-10-15"));
+    expect(kept.map((r) => r.name)).toEqual(["BLAW CONSTRUCTION CO LLC", "Dirt Cheap Hauling & Services", "Carroll & Sons Inc", "BROOM HEATING & AIR CONDITIONING INC"]);
+    expect(kept.map((r) => r.personLeftOut)).toEqual([false, true, true, false]);
+    expect(llrBusinessName("WILSON, WILLARD E")).toBeNull();
+    expect(llrBusinessName("CASS LOWRIE")).toBeNull();
+  });
+  it("says an order was issued, never what it decided", () => {
+    const [r] = llrBusinessRows(parseLlrOrders(LLR_PAGE, "2026-10-15"));
+    const hit = llrOrderHit(r, LLR_BOARDS[0]);
+    expect(hit).toMatchObject({ state: "SC", category: "discipline", name: "BLAW CONSTRUCTION CO LLC", id: "order file 34007", date: "2026-10-06", adverse: null, licenseNumber: "12061" });
+    expect(hit.sourceUrl).toBe("https://eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69");
+    expect(hit.detail).toContain("License type CLG no. 12061");
   });
 });

@@ -1127,7 +1127,9 @@ async function* caDcaLoader(): AsyncIterable<BulkHit> {
 // ── California DIR certified electricians ────────────────────────────────────────────────────────────────────
 const DIR_ECU_PAGE = "https://data.ca.gov/dataset/dir-electrician-certification-unit-ecu";
 // The publisher's own file downloads (publish.data.ca.gov, linked from the dataset page; its robots.txt allows them).
-// data.ca.gov's /datastore/dump/ is disallowed by its robots.txt (checked 2026-10-15), so it is not used.
+// data.ca.gov's /datastore/dump/ (robots.txt-disallowed, which no longer stops a search: OWNER ORDER 2026-10-15) is not used
+// because it adds nothing: compared live 2026-10-15, the dump of the certified electrician list has the same 37,372 rows
+// as this download, plus CKAN's own _id column and ISO dates.
 const DIR_ECU_DATASET = "https://publish.data.ca.gov/dataset/469f1d7f-81dd-4e5b-a2db-ad4eece1134b/resource";
 const DIR_ECU_FILES: { url: string; type: string }[] = [
   { url: `${DIR_ECU_DATASET}/291bacb8-2fdb-4d9c-a330-113781ce2f59/download/certified_electrician_list.csv`, type: "Certified Electrician" },

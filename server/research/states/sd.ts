@@ -227,7 +227,7 @@ export const pack: StatePack = {
   noStatewideGcLicense:
     "South Dakota does not license general contractors statewide; plumbers and electricians are licensed by state commissions (the plumbing lists are searched above)",
   blocked: [
-    "South Dakota Electrical Commission license portal (sdec.portalus.thentiacloud.net, Thentia; electrical contractors and electricians): re-checked 2026-10-15, robots.txt 'User-agent: * / Disallow: /'. dlr.sd.gov/electrical publishes no licensee or contractor list",
+    "South Dakota Electrical Commission license portal (sdec.portalus.thentiacloud.net, Thentia; electrical contractors and electricians; linked from dlr.sd.gov/electrical): re-checked 2026-10-15, the portal and its public register (/webs/portal/register/) redirect to /maintenance/portal/ (\"The portal is currently undergoing maintenance. Please try again later.\"), and the register's search service returns no rows for any name, so there is nothing to read; its robots.txt Disallow no longer counts (OWNER ORDER 2026-10-15). dlr.sd.gov/electrical publishes no licensee or contractor list",
     "SD Plumbing Commission: no company list; its PLUMBING CONTRACTOR and SEWER AND WATER CONTRACTOR licenses are issued to people and are in the lists above (dlr.sd.gov/plumbing/consumer_info.aspx, re-checked 2026-10-15)",
     "Department of Revenue contractor's excise tax licenses: no public list or lookup (dor.sd.gov/businesses/taxes/contractors-excise-tax; the tax license application at apps.sd.gov/rv23cedar is an account system)",
     "Electrical and Plumbing commission discipline: only meeting documents on boardsandcommissions.sd.gov (BoardID=35, 77), no discipline list",

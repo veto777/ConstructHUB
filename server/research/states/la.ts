@@ -8,13 +8,24 @@
  *     qualifying parties. Companies by name (ByName), people by qualifying-party name (ByQP).
  *   LSLBC contractor violations (lslbc.gov/contractor-violations/, the board's published hearing results), bulk,
  *     weekly, companies only: hearing date, job number, allegation and action taken, 2019 to today.
+ *   State Plumbing Board roster (public.spbla.com, the board's "SPBLA Rosters" search, checked live 2026-10-15), live
+ *     per report: master and journeyman plumbers, master and natural gas fitters, apprentices and the other SPBLA
+ *     license types, each a person's own license with the employer, license status (the board's "Current"/"Inactive"
+ *     plus its Active/Inactive flag), WSPS flag and expiration date. Searched by plumber last name, by company
+ *     ("Company Name Contains", the employer) and by license number, through the page's own JSON datatable
+ *     (/license/datatable). No CAPTCHA, login or challenge; robots.txt says "Disallow: /" (advisory since the owner's
+ *     order of 2026-10-15). The page says the roster "is provided as a free resource for the purposes of verifying
+ *     the licensing status of plumbers in the State of Louisiana. All other use is prohibited": it is used for that
+ *     only (a per-report license check), never downloaded in bulk. The board's restrictions and revocation fields are
+ *     not read: discipline is for companies only, and these are individuals' licenses.
  */
 import { promises as fs } from "node:fs";
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
 import { politeFetch } from "../http";
-import { tokens } from "../licenses";
+import { companyNamed, nameWords, personMatches, tokens } from "../licenses";
+import { decodeEntities } from "../bulk-sources";
 import { normLicense, type IdQuery } from "../identifiers";
-import { download, usDate, type BulkHit, type BulkSource } from "../bulk";
+import { clean, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { firstAmount, htmlPerson, htmlRows, tableRows, text } from "./lib/g4-html";
 import { adverseFrom } from "../adverse";
 import { capNote, noteOf, withNote } from "../notes";
@@ -132,6 +143,117 @@ export async function searchLslbcBy(q: IdQuery): Promise<LicenseHit[] | null> {
   return withNote(hits.filter((h) => normLicense(h.licenseNumber) === want || (digitsOnly && Number(h.licenseNumber?.match(/\d+/g)?.join("") ?? NaN) === Number(digits))), noteOf(hits));
 }
 
+// ── State Plumbing Board roster (live) ────────────────────────────────────────────────────────────────────────
+const SPBLA = "https://public.spbla.com/";
+const SPBLA_SOURCE = "Louisiana State Plumbing Board licenses";
+const SPBLA_PAGE_ROWS = 100;
+const SPBLA_MAX_ROWS = 300;
+/** Words the roster's "contains" search is told to leave out of a company name (its own instructions). */
+const SPBLA_GENERIC = new Set(["PLUMBING", "PLUMBERS", "PLUMBER", "LLC", "INC", "CO", "CORP", "COMPANY", "LTD", "AND", "THE", "OF", "DBA", "SERVICE", "SERVICES", "&"]);
+/** Employer entries that name no employer ("Retired", "NOT WORKING IN THE TRADE", live 2026-10-15). */
+const SPBLA_NO_EMPLOYER = /^(?:retired|not working in the trade|none|unemployed|n\/?a)$/i;
+
+/** One roster row as the board's datatable sends it (fields used here only). */
+export type SpblaRow = {
+  license_number?: string | null; license_type?: string | null; person_name_first?: string | null; person_name_last?: string | null;
+  employer?: string | null; address?: string | null; details?: string | null; license_status?: string | null;
+  license_type_status?: string | null; expiration_date?: unknown;
+};
+
+const plain = (v: string | null | undefined) => clean(decodeEntities((v ?? "").replace(/<br\s*\/?>|<\/br>/gi, " ").replace(/<[^>]+>/g, " ")));
+
+/** The board's serialized date objects ({"…DateTimeOption…_inner_value": {date: "2026-12-31 00:00:00"}}) → "2026-12-31". */
+export function spblaDay(v: unknown): string | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    if (!k.endsWith("_inner_value") || !x || typeof x !== "object") continue;
+    const o = x as Record<string, unknown>;
+    if (o["\u0000*\u0000endOfTime"] === true || o["\u0000*\u0000startOfTime"] === true) return null;
+    const m = typeof o.date === "string" ? o.date.match(/^(\d{4}-\d{2}-\d{2})/) : null;
+    return m ? m[1] : null;
+  }
+  return null;
+}
+
+/** One roster row as a license: the plumber's own license, with the employer the board lists. */
+export function spblaHit(r: SpblaRow, matchedOn: LicenseHit["matchedOn"]): LicenseHit {
+  const who = clean([plain(r.person_name_first), plain(r.person_name_last)].filter(Boolean).join(" "));
+  const employer = plain(r.employer);
+  const business = employer && !SPBLA_NO_EMPLOYER.test(employer) ? employer : null;
+  // "Master Plumber</br>Active</br>WSPS": the type, then the board's own flags (Active/Inactive, WSPS).
+  const typeParts = (r.license_type_status ?? "").split(/<\/?br\s*\/?>/i).map((p) => plain(p)).filter((p): p is string => !!p);
+  const type = plain(r.license_type) ?? typeParts[0] ?? null;
+  const flags = typeParts.slice(1);
+  const title = plain(r.license_status?.match(/title="([^"]*)"/)?.[1]);
+  const status = Array.from(new Set([title, ...flags.filter((f) => f !== "WSPS")].filter((v): v is string => !!v))).join(", ") || null;
+  const addrLines = (r.address ?? "").split(/<br\s*\/?>|\n/i).map((l) => plain(l)).filter((l): l is string => !!l && l !== ", LA" && l !== ",");
+  const cityLine = addrLines[addrLines.length - 1]?.match(/^(.+?),\s*([A-Z]{2})\b/);
+  const phone = r.details?.match(/\(\d{3}\)\s*\d{3}-\d{4}/)?.[0] ?? null;
+  return {
+    state: "LA", source: SPBLA_SOURCE, sourceUrl: SPBLA, businessName: business, licenseNumber: plain(r.license_number),
+    licenseType: type, specialty: flags.includes("WSPS") ? "WSPS" : null, status,
+    principal: who, city: cityLine ? `${cityLine[1].trim()}, ${cityLine[2]}` : null,
+    expires: spblaDay(r.expiration_date), matchedOn,
+    address: cityLine ? addrLines.join(", ") : null, phone,
+    people: who ? [{ name: who, role: type }] : [],
+    // The board licenses plumbers, gas fitters and apprentices as persons; the company is the employer it lists.
+    holder: "individual",
+  };
+}
+
+/** One "contains" search of the roster's datatable, page by page up to the cap. */
+async function spblaRows(filter: Record<string, string>): Promise<SpblaRow[]> {
+  const out: SpblaRow[] = [];
+  let total = 0;
+  for (let start = 0; start < SPBLA_MAX_ROWS; start += SPBLA_PAGE_ROWS) {
+    const u = new URL("license/datatable", SPBLA);
+    u.searchParams.set("draw", String(start / SPBLA_PAGE_ROWS + 1));
+    u.searchParams.set("start", String(start));
+    u.searchParams.set("length", String(SPBLA_PAGE_ROWS));
+    for (const [k, v] of Object.entries(filter)) u.searchParams.set(`filter[${k}]`, v);
+    const res = await politeFetch(u.toString(), { headers: { accept: "application/json", referer: SPBLA } }, { minDelayMs: 1500 });
+    if (!res.ok) throw new Error(`Louisiana State Plumbing Board roster returned HTTP ${res.status}`);
+    const body = await res.json() as { recordsFiltered?: number; data?: SpblaRow[] };
+    if (!body || !Array.isArray(body.data)) throw new Error("Louisiana State Plumbing Board roster returned an unexpected payload");
+    total = Number(body.recordsFiltered ?? 0);
+    out.push(...body.data);
+    if (body.data.length < SPBLA_PAGE_ROWS || out.length >= total) break;
+  }
+  return withNote(out, total > out.length ? capNote(out.length, total, "roster rows") : null);
+}
+
+/** The most distinctive word of a company name for the roster's "contains" search (the board: leave out "Plumbing" and suffixes). */
+export function spblaCompanyWord(name: string): string | null {
+  const words = name.toUpperCase().replace(/&#0?39;|’/g, "'").split(/[^A-Z0-9'-]+/).map((w) => w.replace(/^[-']+|[-']+$/g, "")).filter((w) => w.length >= 2 && !SPBLA_GENERIC.has(w));
+  return words.sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
+export async function searchSpbla(name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
+  if (kind === "company") {
+    const word = spblaCompanyWord(name);
+    if (!word || word.length < 3) return [];
+    const rows = await spblaRows({ employer_name: word });
+    return withNote(rows.map((r) => spblaHit(r, "business")).filter((h) => companyNamed(name, h.businessName)), noteOf(rows));
+  }
+  // "Enter either a first name or a last name, not both": the last name is searched and the whole name matched here.
+  const words = nameWords(name).filter((w) => w.length >= 2 && !["JR", "SR", "II", "III", "IV"].includes(w));
+  if (words.length < 2) return [];
+  const rows = await spblaRows({ person_name: words[words.length - 1] });
+  return withNote(rows.map((r) => spblaHit(r, "principal")).filter((h) => personMatches(name, h.principal)), noteOf(rows));
+}
+
+/** By license number: the board's form takes the numeric part ("MP1614" → 1614); a typed prefix must agree. */
+export async function searchSpblaBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null; // the roster searches by name, company, number or address text only
+  const m = q.value.trim().toUpperCase().replace(/[\s.-]+/g, "").match(/^([A-Z]{0,4})0*(\d{1,7})$/);
+  if (!m) return null;
+  const rows = await spblaRows({ license_number: m[2] });
+  return withNote(rows.map((r) => spblaHit(r, "license")).filter((h) => {
+    const n = (h.licenseNumber ?? "").toUpperCase().match(/^([A-Z]*)0*(\d+)$/);
+    return !!n && n[2] === m[2] && (!m[1] || n[1] === m[1]);
+  }), noteOf(rows));
+}
+
 // ── Contractor violations (bulk) ──────────────────────────────────────────────────────────────────────────────
 const LA_ADVERSE = /guilty|fine|revok|suspen|penalt|costs assessed|cease/i;
 const LA_NOT_ADVERSE = /not guilty|dismiss|no violation|found not/i;
@@ -174,11 +296,13 @@ const BULK: BulkSource[] = [
 export const pack: StatePack = {
   state: "LA",
   checked: "2026-10-15",
-  liveLicenses: [{ source: "Louisiana State Licensing Board for Contractors", sourceUrl: SEARCH_PAGE, search: searchLslbc, searchBy: searchLslbcBy }],
+  liveLicenses: [
+    { source: "Louisiana State Licensing Board for Contractors", sourceUrl: SEARCH_PAGE, search: searchLslbc, searchBy: searchLslbcBy },
+    { source: SPBLA_SOURCE, sourceUrl: SPBLA, search: searchSpbla, searchBy: searchSpblaBy },
+  ],
   bulk: BULK,
   blocked: [
     "LSLBC roster download (arlspublic _DetailedLookupRoster): a paid download (online fee per roster)",
-    "Louisiana State Plumbing Board roster (public.spbla.com): robots.txt disallows every path",
     "LSLBC Act 204 civil action reports (lslbc.gov/act-204-civil-action-report/): quarterly PDF reports only, not a name search",
   ],
 };

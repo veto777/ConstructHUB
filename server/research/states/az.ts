@@ -223,6 +223,6 @@ export const pack: StatePack = {
   liveEnforcement,
   blocked: [
     "roc.az.gov / azroc.gov posting lists (active contractor lists, new licenses, discipline CSVs): every path, robots.txt included, answers a Cloudflare JS challenge (HTTP 403)",
-    "Arizona Corporation Commission eCorp (ecorp.azcc.gov): robots.txt disallows every path",
+    "Arizona Corporation Commission eCorp (ecorp.azcc.gov): answers HTTP 403 with an \"Access Blocked | Arizona Corporation Commission\" firewall page (Azure Front Door) on every path, robots.txt included; its DNS CNAME also carries a stray trailing space, so common resolvers fail to resolve the host (checked 2026-10-15)",
   ],
 };

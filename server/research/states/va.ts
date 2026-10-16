@@ -28,6 +28,12 @@
  *   Live (data.virginia.gov CKAN datastore, published there by the State Corporation Commission):
  *     SCC corporations and LLCs: status and status reason (business_status). The open-data copies are dated: the
  *     corporation file was last loaded 2024-11-14 and the LLC file 2026-03-24, and the LLC file stops at 1,048,575 rows.
+ *   Bulk (DGS debarment and enjoinment, dgs.virginia.gov/engineering-and-buildings/resources/debarment-enjoinment):
+ *     va-eva-debarred       eVA Inactive Vendor List (logi.cgieva.com Report9020), filtered by the report's own "eVA
+ *                           Status" list to Debarred and to Enjoined: name, eVA ID, address. No dates or periods are
+ *                           published. Companies only. logi.cgieva.com's robots.txt is "Disallow: /"; used by OWNER
+ *                           ORDER 2026-10-15. No CAPTCHA or login; DGS's web policy (Privacy & Security) sets no rule
+ *                           against reuse.
  *
  * Codes: classification and specialty abbreviations are DPOR's own ("Contractor's License Classifications &
  * Specialties", 18 VAC 50-22-20/30) and the tradesman designations are DPOR's "Combined License" sheet, both linked
@@ -39,8 +45,10 @@ import { pdfText } from "./lib/a3-pdf";
 import { clean, csvRecords, download, usDate, type BulkHit, type BulkSource } from "../bulk";
 import type { LiveEnforcementSearch, StatePack } from "./types";
 import { capNote, withNote } from "../notes";
-import { fromFile, hasAllWords } from "./lib/g3-common";
+import { fromFile, hasAllWords, htmlText } from "./lib/g3-common";
 import { htmlLines, personText } from "../person-name";
+import { looksLikeBusiness, personNameForm } from "./lib/business-name";
+import { adverseFrom } from "../adverse";
 
 // ── DPOR regulant lists ──────────────────────────────────────────────────────────────────────────────────────
 const DPOR_PAGE = "https://www.dpor.virginia.gov/RegulantLists";
@@ -418,6 +426,76 @@ async function searchScc(name: string): Promise<EnforcementHit[]> {
   return withNote(out, notes.join("; ") || null);
 }
 
+// ── eVA Inactive Vendor List: debarred and enjoined (DGS) ────────────────────────────────────────────────────
+/** Linked as "eVA Inactive Vendor List" from dgs.virginia.gov/engineering-and-buildings/resources/debarment-enjoinment. */
+export const EVA_REPORT = "https://logi.cgieva.com/External/rdPage.aspx?rdReport=Public.Reports.Report9020_Data";
+/**
+ * The two statuses that are exclusions, with the option values of the report's "eVA Status" list and DGS's own
+ * definitions (dgs.virginia.gov/procurement/resources/eva-vendor-statuses). Bad Address, Discontinued and Non Payment
+ * are account states, not sanctions, and are not loaded.
+ */
+export const EVA_STATUSES = [
+  { value: "deb", label: "Debarred", meaning: "excluded from contracting with state agencies for particular types of goods or non-professional services for a specified period" },
+  { value: "enj", label: "Enjoined", meaning: "excluded from contracting with state agencies for construction for a specified period" },
+] as const;
+export const evaStatusUrl = (value: string) =>
+  `${EVA_REPORT}&rdAgReset=True&txtSearch=&chkStartWith=0&txtOthers=&rbQueryType=2&selVendorStatus=${value}&LinkHref=True`;
+
+export type EvaRow = { status: string; entered: string | null; evaId: string | null; name: string; street: string | null; city: string | null; st: string | null; zip: string | null };
+
+/**
+ * The report's rows (each cell is a span with a per-row id: lblSTATUS_Row1, lblLGL_NM_Row1, …). "No data found" is an
+ * empty list; a page with neither rows nor that message, or with a second page, is an error (never a partial list).
+ */
+export function parseEvaReport(html: string): EvaRow[] {
+  if (!/eVA Inactive Vendor List/.test(html) || !/id="colLGL_NM-TH"/.test(html)) throw new Error("eVA Inactive Vendor List: unexpected page");
+  const pages = Number(html.match(/id="dtAnalysisGrid-PageOfPages"[^>]*>\s*(\d+)\s*</)?.[1] ?? "1");
+  if (pages > 1) throw new Error(`eVA Inactive Vendor List: ${pages} pages; only one page is read`);
+  const cell = (id: string, n: string) => {
+    const m = html.match(new RegExp(`id="${id}_Row${n}"[^>]*>([\\s\\S]*?)</(?:SPAN|span)>`));
+    return m ? clean(htmlText(m[1].replace(/<font[^>]*>|<\/font>/gi, ""))) : null;
+  };
+  const rows = Array.from(html.matchAll(/id="lblSTATUS_Row(\d+)"/g)).map((m) => m[1]);
+  if (!rows.length && !/No data found/.test(html)) throw new Error("eVA Inactive Vendor List: no rows and no \"No data found\"");
+  const out: EvaRow[] = [];
+  for (const n of rows) {
+    const name = cell("lblLGL_NM", n), status = cell("lblSTATUS", n);
+    if (!name || !status) continue;
+    out.push({ status, entered: cell("lblREG_TYPE", n), evaId: cell("lblVEND_CUST_CD", n), name, street: cell("lblSTR_1_NM", n), city: cell("lblCITY_NM", n), st: cell("lblST", n), zip: cell("lblZIP", n) });
+  }
+  return out;
+}
+
+/** Companies only (FCRA): a vendor listed under a person's name ("David Horton") is left out. */
+export const evaBusinesses = (rows: EvaRow[]) => rows.filter((r) => personNameForm(r.name) === null && looksLikeBusiness(r.name));
+
+/** One row as a report hit. The report publishes no debarment dates or periods. */
+export function evaHit(r: EvaRow, st: (typeof EVA_STATUSES)[number]): EnforcementHit {
+  return {
+    state: "VA", source: "Virginia eVA Inactive Vendor List (debarred and enjoined vendors)", sourceUrl: EVA_REPORT, category: "debarment",
+    name: r.name, id: r.evaId ? `eVA ID ${r.evaId}` : null, date: null, endDate: null,
+    status: `eVA status: ${r.status} (${st.meaning}, per DGS)`,
+    city: [r.city, r.st].filter(Boolean).join(", ") || null,
+    address: [r.street, r.city, [r.st, r.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null,
+    detail: r.entered ? `Status entry as published: ${r.entered}` : null,
+    amount: null, adverse: adverseFrom(r.status, { adverse: /\bdebarred\b|\benjoined\b/i }),
+  };
+}
+
+async function* evaLoader(): AsyncIterable<BulkHit> {
+  for (const st of EVA_STATUSES) {
+    const res = await politeFetch(evaStatusUrl(st.value), {}, { minDelayMs: 3000, timeoutMs: 90_000 });
+    if (!res.ok) throw new Error(`eVA Inactive Vendor List (${st.label}) returned HTTP ${res.status}`);
+    const rows = parseEvaReport(await res.text());
+    // The filter must have held: a row of another status means the report ignored it.
+    if (rows.some((r) => r.status.toLowerCase() !== st.label.toLowerCase())) throw new Error(`eVA Inactive Vendor List: the ${st.label} filter returned other statuses`);
+    for (const r of evaBusinesses(rows)) {
+      const hit = evaHit(r, st);
+      yield { kind: "enforcement", hit, business: r.name, person: null, keys: { addresses: [hit.address] } };
+    }
+  }
+}
+
 // The SCC copies are searched through data.virginia.gov's CKAN datastore API. Its robots.txt disallows /api/ and
 // /datastore/*; back on by OWNER ORDER 2026-10-15, under which a robots.txt Disallow no longer stops a search (http.ts).
 export const SCC_SEARCH: LiveEnforcementSearch = { source: "Virginia SCC business entity status (open data)", scope: "Corporations (copy of 2024-11-14) and LLCs (copy of 2026-03-24, first 1,048,575 rows)", category: "business_status", search: searchScc };
@@ -426,13 +504,18 @@ const LIVE_ENFORCEMENT: LiveEnforcementSearch[] = [SCC_SEARCH];
 export const pack: StatePack = {
   state: "VA",
   checked: "2026-10-15",
-  bulk: BULK,
+  bulk: [
+    ...BULK,
+    // OWNER ORDER 2026-10-15: logi.cgieva.com's robots.txt ("Disallow: /") no longer stops a search (http.ts). On
+    // 2026-10-15: 49 debarred vendors (38 under a business name), no enjoined ones.
+    { id: "va-eva-debarred", state: "VA", label: "Virginia eVA Inactive Vendor List (debarred and enjoined vendors)", pageUrl: EVA_REPORT,
+      everyHours: 24 * 7, minRows: 20, load: evaLoader, companiesOnly: true, category: "debarment" },
+  ],
   liveEnforcement: LIVE_ENFORCEMENT,
   blocked: [
     "DPOR License Lookup (dporweb.dpor.virginia.gov/LicenseLookup), which also carries board orders: reCAPTCHA on the search",
     "DPOR disciplinary orders: no list or download; published only per licensee in the CAPTCHA lookup and in board minutes on Town Hall (PDF). Revocations are loaded from the News Releases page (va-dpor-revocations)",
     "Board for Contractors consent orders and fines in Town Hall meeting minutes (townhall.virginia.gov/L/meetings.cfm?BoardID=10): checked 2026-10-15, not built. The final minutes (v2 and later, e.g. Minutes_DPOR_39828_v2.pdf for April 28, 2026, 64 pages, and Minutes_DPOR_38882_v3.pdf for October 7, 2025) are scanned page images (PaperStream Capture, no text layer: pdftotext gives nothing), so reading them would mean OCR. Only the v1 drafts have text (Minutes_DPOR_40744_v1.pdf, August 25, 2026), and they are marked DRAFT (the watermark's letters are interleaved with the text), set in two columns with margin labels, and each case paragraph quotes the respondent's earlier consent orders and fines next to the new sanctions (per-count fines, a total, Recovery Fund payments to consumer claimants): respondent, outcome and amount can't be read reliably from them",
-    "eVA Inactive Vendor List (DGS debarred/enjoined contractors, logi.cgieva.com Report9020): robots.txt Disallow: /",
     "SCC Clerk's Information System bulk data: paid subscription ($1,000/month per the SCC page); only the dated open-data copies are used",
     "data.virginia.gov SCC Lien Details: no debtor names, only filing numbers",
   ],

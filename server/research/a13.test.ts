@@ -28,11 +28,11 @@ describe("terms decisions: removed sources, blocked notes and the boot cleanup",
       expect(RETIRED_BULK_SOURCES, id).toContain(id);
     }
     // OWNER ORDER 2026-10-15: a robots.txt Disallow no longer stops a search.
-    for (const id of ["wv-purchasing-debarred", "pa-pittsburgh", "mo-dpr-electrical", "mo-dpr-ae"]) {
+    for (const id of ["wv-purchasing-debarred", "pa-pittsburgh", "mo-dpr-electrical", "mo-dpr-ae", "sc-llr-board-orders", "va-eva-debarred"]) {
       expect(ids.has(id), id).toBe(true);
       expect(RETIRED_BULK_SOURCES, id).not.toContain(id);
     }
-    expect(sc.bulk ?? []).toEqual([]);
+    expect((sc.bulk ?? []).map((s) => s.id)).toEqual(["sc-llr-board-orders"]);
     expect(wi.bulk ?? []).toEqual([]);
   });
   it("each blocked note quotes the clause or names the refusal", () => {
