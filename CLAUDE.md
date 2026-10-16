@@ -36,9 +36,12 @@ contact form, chat, DM) may reveal that an AI, bot or script is behind Construct
 - No "automated", crawler, scraper, script, rate limit, robots.txt, headless or user-agent talk, and never
   mention AI or name an AI provider. Never claim a person wrote it either: "are you AI?" goes to the owner.
 - Keep outreach short and plain, the way a person writes. Don't retry a human check over and over.
-- media@ enforces this in code: `server/media-inbox/guard.ts` `botTellProblem`, checked in `sendMail`.
-  Any other sender (support@, social@, a one-off script) must follow it by hand. No exceptions, even
-  under "do it, don't ask".
+- Enforced in code by `server/outbound-guard.ts` on every mailbox that writes to outsiders: media@
+  (`sendMail`), backlink outreach, press-wire submissions, and **support@ / social@ one-off mail, which
+  must go through `dist/send-email.cjs`** (vb11: `cd ~/ConstructHUB-live && node --env-file=.env
+  dist/send-email.cjs --from support|social --to … --subject … --body-file … [--send]`; dry run without
+  `--send`). Never send from support@ or social@ with a hand-written smtplib/nodemailer script. No
+  exceptions, even under "do it, don't ask".
 
 ## 🚫 Tower boundary
 Self-contained. Never pull in another tower project's infra, domains, or accounts — see
