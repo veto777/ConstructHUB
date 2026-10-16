@@ -2,17 +2,28 @@
  * West Virginia. Checked live 2026-10-15.
  *
  *   Live license searches (no CAPTCHA):
+ *     WV Contractor Licensing Board Contractor Search (wvclboard.wv.gov/verify, linked as "Contractor License Search"
+ *       from labor.wv.gov/database-search): the page's own JSON calls (POST /verify/ajax/ action=verifySearch with
+ *       licNo/busiClas/busiName/busiDba/city/cnty answers a count and keeps the result in the session; action=verifyPage
+ *       reads it back), by company name, DBA (a phrase matched anywhere in the field) or license number ("WV001838").
+ *       Columns as published: License #, Company, DBA, Address, County, Phone, Classification, Expires; no status and
+ *       no ownership type. A sole proprietor's license is under the person's own name. The page's script carries an
+ *       unused reCAPTCHA hook (off; no CAPTCHA was shown); its robots.txt disallows every robot, searched by OWNER
+ *       ORDER 2026-10-15 (../http.ts).
  *     WV State Fire Marshal licenses: the public Licensee Search's own JSON read endpoint
  *       (sfm-permit-public.wvoasis.gov/publicdata/LicenseeSearch, linked from firemarshal.wv.gov's Regulatory and
  *       Licensing Division page; robots.txt 404), by first and last name or license number. Its rows are mostly
  *       electricians (journeyman, master, low voltage) but also fire protection workers, home inspectors, building code
  *       officials, blasters and pyrotechnicians (license types as published, e.g. "JOURNEYMAN,ELECTRICIAN").
  *   Bulk:
+ *     wv-clb-actions  WV Contractor Licensing Board "Disciplinary Action" table (wvclboard.wv.gov/about/actions.asp:
+ *                 Date of Board Decision, License #, Licensee, a link to the Final Order PDF). Companies only: a person
+ *                 is never kept ("X DBA Y" keeps the trade name). The orders' terms are in the PDFs and are not read.
  *     wv-oic-evs  WV Offices of the Insurance Commissioner Employer Violator System: employers in default on workers'
  *                 compensation money owed (barred from state licenses and permits until paid), every business by
  *                 first letter (www.wvinsurance.gov/EVS; robots.txt absent). Companies only; owner names are not kept.
- *     wv-purchasing-debarred  NOT REGISTERED since 2026-10-15 (see `blocked`: the Division's current host disallows
- *                 every robot, and the legacy host would be a side door). Was: WV Purchasing Division debarred vendors: "vendors who are currently debarred from doing
+ *     wv-purchasing-debarred  Back on by OWNER ORDER 2026-10-15 (the Division's robots.txt Disallow no longer stops a
+ *                 search; ../http.ts). WV Purchasing Division debarred vendors: "vendors who are currently debarred from doing
  *                 business with the State of West Virginia" under W. Va. Code §5A-3-33c and 33d (one HTML table:
  *                 Vendor Name, Vendor Address, Debarment Date, Debarment Period, Debarment Scope), linked from the
  *                 Purchasing Division's site www.state.wv.us/admin/purchase (robots.txt there disallows only /scripts,
@@ -35,6 +46,9 @@ import { normLicense } from "../identifiers";
 import { tokens } from "../licenses";
 import type { LiveLicenseSearch, StatePack } from "./types";
 import { dmyDate, hasAllWords, htmlText } from "./lib/g3-common";
+import { Session } from "./lib/g6-common";
+import { anyDay, businessParts } from "./lib/g8-common";
+import { capNote, noteOf, withNote } from "../notes";
 
 // ── State Fire Marshal electricians ──────────────────────────────────────────────────────────────────────────
 const SFM_PAGE = "https://sfm-permit-public.wvoasis.gov/publicdata/LicenseeSearch";
@@ -86,6 +100,157 @@ const SFM: LiveLicenseSearch = {
     return sfmHits(await sfmRead({ LicenseNumber: q.value.trim() }), "license").filter((h) => normLicense(h.licenseNumber) === normLicense(q.value));
   },
 };
+
+// ── Contractor Licensing Board ───────────────────────────────────────────────────────────────────────────────
+const CLB_PAGE = "https://wvclboard.wv.gov/verify/";
+const CLB_AJAX = "https://wvclboard.wv.gov/verify/ajax/";
+const CLB_ACTIONS = "https://wvclboard.wv.gov/about/actions.asp";
+/** One page of the search: the page's own script asks for 20; 100 answered the same on 2026-10-15. */
+const CLB_PER_PAGE = 100;
+const CLB_MAX_PAGES = 3;
+export type ClbRow = { license?: string | null; company?: string | null; dba?: string | null; address?: string | null; city?: string | null; state?: string | null; zip?: string | null; county?: string | null; phone?: string | null; class?: string | null; expires?: string | null };
+
+/**
+ * One row of the Board's Contractor Search as a license hit, in the search's own columns (License #, Company, DBA,
+ * Address, County, Phone, Classification, Expires). The search shows no status and no ownership type, so `status`
+ * and `holder` are null (a holder the publisher doesn't name keeps city, state and ZIP only). A "Company" that reads
+ * as a person's name (a sole proprietor's license, "RANDALL A MARCHESI") is the licensee, not a business name.
+ */
+export function clbHit(r: ClbRow, matchedOn: LicenseHit["matchedOn"]): LicenseHit | null {
+  const no = clean(r.license), company = clean(r.company), dba = clean(r.dba);
+  if (!no || !company) return null;
+  const isBusiness = looksLikeBusiness(company);
+  return {
+    state: "WV", source: "WV Contractor Licensing Board contractor licenses", sourceUrl: CLB_PAGE,
+    businessName: isBusiness ? [company, dba ? `dba ${dba}` : null].filter(Boolean).join(" ") : dba,
+    licenseNumber: no, licenseType: clean(r.class), specialty: null, status: null, principal: isBusiness ? null : company,
+    city: [clean(r.city), clean(r.state)].filter(Boolean).join(", ") || null,
+    expires: anyDay(r.expires), matchedOn,
+    address: clean(r.address), phone: clean(r.phone),
+    ...(isBusiness ? {} : { people: [{ name: company, role: dba ? "Licensee, doing business as the name above" : "Licensee" }] }),
+    holder: null, // the search publishes no ownership type
+  };
+}
+
+const clbParse = (text: string): { records?: (ClbRow & { count?: unknown })[] } => {
+  try { return JSON.parse(text); } catch { throw new Error("WV Contractor Licensing Board search returned an unexpected payload"); }
+};
+
+/**
+ * One search as the page runs it: "verifySearch" answers the count and keeps the result in the session, "verifyPage"
+ * reads it back a page at a time. Only the form's own fields go up (no Referer or X-Requested-With).
+ */
+export async function clbSearch(fields: { licNo?: string; busiName?: string; busiDba?: string }): Promise<ClbRow[]> {
+  const s = new Session(2000);
+  const post = (body: Record<string, string>) => s.text(CLB_AJAX, {
+    method: "POST", body: new URLSearchParams(body).toString(), headers: { "content-type": "application/x-www-form-urlencoded; charset=UTF-8", accept: "application/json" },
+  }, "WV Contractor Licensing Board search");
+  const head = clbParse(await post({ action: "verifySearch", licNo: fields.licNo ?? "", busiClas: "", busiName: fields.busiName ?? "", busiDba: fields.busiDba ?? "", city: "", cnty: "" }));
+  const total = Number(head.records?.[0]?.count);
+  if (!Number.isFinite(total)) throw new Error("WV Contractor Licensing Board search returned an unexpected payload");
+  const rows: ClbRow[] = [];
+  for (let page = 1; rows.length < total && page <= CLB_MAX_PAGES; page++) {
+    const got = clbParse(await post({ action: "verifyPage", pageNo: String(page), recsPage: String(CLB_PER_PAGE) })).records ?? [];
+    if (!got.length) break;
+    rows.push(...got);
+  }
+  return withNote(rows, rows.length < total ? capNote(rows.length, total, "licenses") : null);
+}
+
+const CLB_SUFFIX = /\b(INC|INCORPORATED|LLC|L L C|CO|CORP|CORPORATION|COMPANY|LTD|LC|L C|PLLC|LLP)\b\.?/gi;
+/** The name as the search takes it: a whole phrase matched anywhere in the field, so suffixes and punctuation go. */
+export const clbQuery = (name: string) => clean(name.replace(/[.,]/g, " ").replace(CLB_SUFFIX, " ").replace(/\s+/g, " ")) ?? name.trim();
+
+function clbMerge(lists: ClbRow[][], matchedOn: LicenseHit["matchedOn"]): LicenseHit[] {
+  const out = new Map<string, LicenseHit>();
+  for (const rows of lists) for (const r of rows) { const h = clbHit(r, matchedOn); if (h && !out.has(h.licenseNumber!)) out.set(h.licenseNumber!, h); }
+  return withNote(Array.from(out.values()), lists.map(noteOf).filter(Boolean).join("; ") || null);
+}
+
+const CLB: LiveLicenseSearch = {
+  source: "WV Contractor Licensing Board contractor licenses", sourceUrl: CLB_PAGE,
+  search: async (name, kind) => {
+    if (kind === "person") {
+      // A sole proprietor's license is under the person's own name in the Company column: searched by the last name,
+      // the runner keeps the whole-name matches.
+      const w = tokens(name);
+      if (w.length < 2) return [];
+      return clbMerge([await clbSearch({ busiName: w[w.length - 1] })], "principal");
+    }
+    const q = clbQuery(name);
+    if (q.length < 2) return [];
+    let lists = [await clbSearch({ busiName: q }), await clbSearch({ busiDba: q })];
+    if (!lists.some((l) => l.length)) {
+      // The search matches the whole phrase ("March Westin" misses "MARCH-WESTIN"); fall back to its longest word.
+      const word = q.split(/\s+/).sort((a, b) => b.length - a.length)[0];
+      if (word && word.length >= 4 && word !== q) lists = [await clbSearch({ busiName: word }), await clbSearch({ busiDba: word })];
+    }
+    return clbMerge(lists, "business");
+  },
+  searchBy: async (q: IdQuery) => {
+    if (q.type !== "license" || !normLicense(q.value)) return null; // only license numbers are searchable
+    const v = q.value.trim().toUpperCase();
+    if (v.length < 4) return null; // the form needs at least 4 characters
+    const hits = clbMerge([await clbSearch({ licNo: v })], "license");
+    return withNote(hits.filter((h) => normLicense(h.licenseNumber) === normLicense(q.value)), noteOf(hits));
+  },
+};
+
+/** One row of the Board's "Disciplinary Action" table (Date of Board Decision, License #, Licensee, Final Order). */
+export type ClbAction = { decided: string | null; licenses: string[]; licensee: string; orderDate: string | null; orderUrl: string | null };
+
+/** The table rows. A page without the table's header is an error, not "no actions". */
+export function parseClbActions(html: string): ClbAction[] {
+  if (!/Date of Board Decision[\s\S]{0,300}License #[\s\S]{0,300}Licensee[\s\S]{0,300}Final Order/i.test(html)) throw new Error("WV Contractor Licensing Board actions: unexpected page");
+  const out: ClbAction[] = [];
+  for (const m of Array.from(html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi))) {
+    const raw = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((c) => c[1]);
+    if (raw.length < 4) continue;
+    const licensee = htmlText(raw[2]);
+    if (!licensee) continue;
+    const href = raw[3].match(/href="([^"]+)"/i)?.[1];
+    out.push({
+      decided: longDates(htmlText(raw[0]))[0] ?? null,
+      licenses: (htmlText(raw[1]) ?? "").split(/[\/,;\s]+/).filter((x) => /\d/.test(x)),
+      licensee, orderDate: longDates(htmlText(raw[3]))[0] ?? null,
+      orderUrl: href ? new URL(href.replace(/&amp;/g, "&"), CLB_ACTIONS).toString() : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * The businesses an action names, each with its license number when the row pairs them ("PRIME EXTERIORS LLC &
+ * IRONCLAD CONSTRUCTION LLC" with "WV062785/WV064411"). A person is never kept: "BRANDON BALLARD DBA WV CONCRETE"
+ * keeps the trade name only, and a row naming a person alone is left out (companies only, FCRA).
+ */
+export function clbActionBusinesses(a: ClbAction): { name: string; license: string | null }[] {
+  const halves = a.licensee.split(/\s+&\s+/);
+  if (a.licenses.length > 1 && halves.length === a.licenses.length && halves.every((h) => looksLikeBusiness(h))) {
+    return halves.map((h, i) => ({ name: h, license: a.licenses[i] }));
+  }
+  return businessParts(a.licensee).map((name) => ({ name, license: a.licenses.length === 1 ? a.licenses[0] : a.licenses.join(", ") || null }));
+}
+
+export function clbActionHit(a: ClbAction, b: { name: string; license: string | null }): EnforcementHit {
+  return {
+    state: "WV", source: "WV Contractor Licensing Board disciplinary actions", sourceUrl: CLB_ACTIONS, category: "discipline",
+    name: b.name, id: b.license, date: a.decided, endDate: null,
+    status: "Disciplinary action taken by the WV Contractor Licensing Board (final order)",
+    city: null,
+    detail: [a.orderDate ? `Final order ${a.orderDate}` : "Final order", a.orderUrl].filter(Boolean).join(": "),
+    amount: null, adverse: true, licenseNumber: b.license,
+  };
+}
+
+async function* clbActionsLoader(): AsyncIterable<BulkHit> {
+  const html = await politeText(CLB_ACTIONS, {}, { minDelayMs: 2000 });
+  for (const a of parseClbActions(html)) {
+    for (const b of clbActionBusinesses(a)) {
+      yield { kind: "enforcement", hit: clbActionHit(a, b), business: b.name, person: null, keys: { licenses: b.license ? b.license.split(", ") : [] } };
+    }
+  }
+}
 
 // ── Insurance Commissioner Employer Violator System ──────────────────────────────────────────────────────────
 const EVS = "https://www.wvinsurance.gov/EVS";
@@ -203,6 +368,10 @@ const BULK: BulkSource[] = [
   { id: "wv-oic-evs", state: "WV", label: "WV Employer Violator System (workers' comp default)", pageUrl: EVS, everyHours: 24 * 7, minRows: 1_500, load: evsLoader, companiesOnly: true, category: "debarment",
     // Row shape 1: individuals are left out since 2026-10-15 (2,646 → 1,721 rows), so a shape-0 load is not a baseline.
     rowShape: 1 },
+  // 57 actions (2021-06-30 to 2025-04-17) on 2026-10-15; companies only. Back on by OWNER ORDER 2026-10-15 (the host's
+  // robots.txt "Disallow: /" no longer stops a search; http.ts).
+  { id: "wv-clb-actions", state: "WV", label: "WV Contractor Licensing Board disciplinary actions", pageUrl: CLB_ACTIONS, everyHours: 24 * 7, minRows: 40,
+    load: clbActionsLoader, companiesOnly: true, category: "discipline" },
   // Back on by OWNER ORDER 2026-10-15 (purchasing.wv.gov's robots.txt Disallow no longer stops a search; http.ts).
   { id: "wv-purchasing-debarred", state: "WV", label: "WV Purchasing Division debarred vendors", pageUrl: DEBAR, everyHours: 24 * 7, minRows: 9,
     load: wvDebarLoader, companiesOnly: true, category: "debarment" },
@@ -213,10 +382,9 @@ export const wvDebarredLoader = wvDebarLoader;
 export const pack: StatePack = {
   state: "WV",
   checked: "2026-10-15",
-  liveLicenses: [SFM],
+  liveLicenses: [SFM, CLB],
   bulk: BULK,
   blocked: [
-    "WV Contractor Licensing Board license search and board actions (wvclboard.wv.gov/verify, linked as \"Contractor License Search\" from labor.wv.gov/database-search; /about/actions.asp): robots.txt \"User-agent: * / Disallow: /\" (re-checked 2026-10-15; http:// and www. redirect to the same file)",
     "WV Division of Labor certified plumbers, HVAC technicians, manufactured-housing licensees, elevator and amusement-ride inspectors and registered service companies (www.wvlabor.com/new_searches/*.cfm, linked from labor.wv.gov/database-search): robots.txt answers HTTP 500 (2026-10-15), read as a refusal of the host (RFC 9309); https:// does not connect",
     "WV Secretary of State business search (apps.sos.wv.gov/business/corporations): the form carries bot-trap fields, treated as an anti-bot measure; bulk data is a paid subscription",
   ],

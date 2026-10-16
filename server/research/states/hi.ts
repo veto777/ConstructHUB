@@ -297,7 +297,7 @@ export const pack: StatePack = {
   blocked: [
     "PVL license search (mypvl.dcca.hawaii.gov): robots.txt disallows every path and Cloudflare answers 403",
     "PVL List Builder (full licensee lists with every status): paid ($5 plus $0.05 a record)",
-    "Business Registration Division (hbe.dcca.hawaii.gov): robots.txt disallows every path",
+    "Business Registration Division (hbe.dcca.hawaii.gov, Hawaii Business Express): the State of Hawaii terms of use the site links (portal.ehawaii.gov/page/terms-of-use/) forbid access through any automated means (scripts, crawlers, screen scrapers) and any commercial use of data derived from it without a written agreement with the State (checked 2026-10-15)",
     "BusinessCheck (businesscheck.hawaii.gov): Cloudflare error 1016, no response",
     "Office of Consumer Protection complaints history (same API, division OCP): returned no records for test names today; not used",
   ],
