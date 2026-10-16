@@ -110,7 +110,7 @@ describe("the sidebar", () => {
     expect(src).toContain("toolAccess(url, accessCtx)");
     expect(src).toContain('queryKey: ["/api/crm/billing/subscription"]');
     expect(src).toContain("agencyMe.owner !== agencyMe.actor");
-    expect(src).toContain("export const APP_NAV = { permitsGroup, googleGroups, googleReviewsItem, yelpReviewsItem, standaloneItems, pricingGroup, shownHere };");
+    expect(src).toContain("export const APP_NAV = { permitsGroup, googleGroups, googleReviewsItem, yelpReviewsItem, standaloneItems, pricingGroup, shownHere, shownTo };");
     // The iPhone apps: a locked entry goes to the tool (its page says it is not on the account), never a sales page.
     expect(src).toContain("url: inNativeApp() ? item.url : lockedLanding(item.url)");
     expect(src).toContain('data-testid="group-more-tools"');

@@ -13,7 +13,7 @@ import {
   MessageSquare, Send, ArrowLeft, Clock,
 } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar } from "@/components/crm-ui";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SampleInboxList = lazySample(() => import("@/components/crm-sample-previews"), "SampleInboxList");
 
 /* ── Shared bits ─────────────────────────────────────────────────────────── */
@@ -156,7 +156,7 @@ function MessagesPane({ selected }: { selected: string | null }) {
           />
         </Card>
         {/* Threads are every conversation the org has: none means the inbox is empty, so show a sample. */}
-        <SampleInboxList />
+        {showSample({ isLoading, isError, total: inbox ? threads.length : undefined }) && <SampleInboxList />}
       </div>
     );
   }

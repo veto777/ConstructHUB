@@ -124,8 +124,14 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
       .where(eq(crmMembers.orgId, ctx.org.id));
     const nameOf = new Map(members.map((m) => [m.id, m.displayName || m.email]));
 
+    // Whether the org has any visit at all (any date or status, before the seat's visibility rule). The agenda
+    // shows its sample only when this is false: an empty window is not an empty calendar. A boolean, not a count.
+    const [anyVisit] = await db.select({ id: crmAppointments.id }).from(crmAppointments)
+      .where(eq(crmAppointments.orgId, ctx.org.id)).limit(1);
+
     res.json({
       days,
+      orgHasVisits: !!anyVisit,
       appointments: visible.map(({ appointment: a, projectName, projectNumber, customerName }) => ({
         id: a.id,
         title: a.title,

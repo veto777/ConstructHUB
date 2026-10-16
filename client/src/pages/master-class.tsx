@@ -172,7 +172,7 @@ export default function MasterClassPage() {
                     return (
                       <div key={mod.id} className="border-l-4 border-border pl-4" data-testid={`curriculum-${mod.category}`}>
                         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                          <h4 className="text-sm font-semibold [overflow-wrap:anywhere]">Module {i + 1}: {mod.title}</h4>
+                          <h3 className="text-sm font-semibold [overflow-wrap:anywhere]">Module {i + 1}: {mod.title}</h3>
                           {accessQ.isSuccess && open ? (
                             <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => tab && setActiveTab(tab)} data-testid={`link-curriculum-open-${mod.category}`}>
                               {access?.included ? "Included" : "Purchased"} · Open {tab ? TAB_LABELS[tab] : "module"}

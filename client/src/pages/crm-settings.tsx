@@ -33,6 +33,7 @@ import { CRM_THEME_COLORS, resolveOrgTheme } from "@shared/theme-colors";
 import { CRM_TEXTING_PLANS as TEXTING_PLANS } from "@shared/plan-copy";
 import { CrmBillingCard } from "@/components/crm-billing-card";
 import { confirmAction } from "@/components/confirm-dialog";
+import { AdminSetupNote } from "@/hooks/use-platform-admin";
 
 /**
  * Org settings — company profile, document defaults, notification switches,
@@ -1330,11 +1331,11 @@ export default function CrmSettingsPage() {
                     const next = discForm.map((x, i) => (i === idx ? { ...x, enabled: v === true } : x));
                     setDiscForm(next); saveDiscounts.mutate(next);
                   }}
-                  data-testid={`switch-discount-${o.code}`} />
+                  aria-label={`${o.label} discount`} data-testid={`switch-discount-${o.code}`} />
                 {!DISCOUNT_PRESETS.some((p) => p.code === o.code) && (
                   <Button size="sm" variant="ghost" className="text-destructive"
                     onClick={() => { const next = discForm.filter((_, i) => i !== idx); setDiscForm(next); saveDiscounts.mutate(next); }}
-                    data-testid={`button-remove-discount-${o.code}`}>
+                    aria-label={`Remove ${o.label} discount`} data-testid={`button-remove-discount-${o.code}`}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 )}
@@ -1470,7 +1471,7 @@ export default function CrmSettingsPage() {
               </div>
               <Select value={senderForm.mode}
                 onValueChange={(v) => setSenderForm((f) => ({ ...f, mode: v as typeof f.mode }))}>
-                <SelectTrigger className="w-full sm:w-96" data-testid="select-sms-mode">
+                <SelectTrigger className="w-full sm:w-96" aria-label="Which number your texts come from" data-testid="select-sms-mode">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1527,7 +1528,7 @@ export default function CrmSettingsPage() {
               checked={(org?.customFields as any)?.smsEstimates === true && smsStatus?.canTextClients !== false}
               onCheckedChange={(v) => saveSmsEstimates.mutate(v)}
               disabled={saveSmsEstimates.isPending || !smsStatus?.configured || smsStatus?.canTextClients === false}
-              data-testid="switch-sms-estimates"
+              aria-label="Text estimates to clients" data-testid="switch-sms-estimates"
             />
           </div>
 
@@ -1544,7 +1545,7 @@ export default function CrmSettingsPage() {
               checked={(org?.customFields as any)?.voiceNudge === true}
               onCheckedChange={(v) => saveVoiceNudge.mutate(v)}
               disabled={saveVoiceNudge.isPending}
-              data-testid="switch-voice-nudge"
+              aria-label="Call the client to check their email" data-testid="switch-voice-nudge"
             />
           </div>
 
@@ -1560,7 +1561,7 @@ export default function CrmSettingsPage() {
               checked={(org?.customFields as any)?.smsAlerts === true}
               onCheckedChange={(v) => saveSmsAlerts.mutate(v)}
               disabled={saveSmsAlerts.isPending || !smsStatus?.configured}
-              data-testid="switch-sms-alerts"
+              aria-label="Text me when a bid is signed or money lands" data-testid="switch-sms-alerts"
             />
           </div>
 
@@ -1606,7 +1607,7 @@ export default function CrmSettingsPage() {
                 checked={priceFloorLock.enabled === true}
                 onCheckedChange={(v) => saveLock.mutate({ enabled: v })}
                 disabled={saveLock.isPending}
-                data-testid="switch-price-lock"
+                aria-label="Lock pricing" data-testid="switch-price-lock"
               />
             </div>
             <div className="flex flex-wrap items-end gap-3">
@@ -1653,15 +1654,15 @@ export default function CrmSettingsPage() {
               <Switch
                 checked={backupForm.enabled}
                 onCheckedChange={(v) => setBackupForm((f) => ({ ...f, enabled: v }))}
-                data-testid="switch-backup-enabled"
+                aria-label="Automatic email exports" data-testid="switch-backup-enabled"
               />
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1.5">
-                <Label>Frequency</Label>
+                <Label htmlFor="backup-frequency">Frequency</Label>
                 <Select value={backupForm.frequency}
                   onValueChange={(v) => setBackupForm((f) => ({ ...f, frequency: v as typeof f.frequency }))}>
-                  <SelectTrigger className="w-44" data-testid="select-backup-frequency">
+                  <SelectTrigger id="backup-frequency" className="w-44" data-testid="select-backup-frequency">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1681,10 +1682,10 @@ export default function CrmSettingsPage() {
                 </div>
               )}
               <div className="space-y-1.5">
-                <Label>Format</Label>
+                <Label htmlFor="backup-format">Format</Label>
                 <Select value={backupForm.format}
                   onValueChange={(v) => setBackupForm((f) => ({ ...f, format: v as typeof f.format }))}>
-                  <SelectTrigger className="w-56" data-testid="select-backup-format">
+                  <SelectTrigger id="backup-format" className="w-56" data-testid="select-backup-format">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1797,10 +1798,10 @@ export default function CrmSettingsPage() {
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1.5">
-                <Label>Allowed methods</Label>
+                <Label htmlFor="rail-mode">Allowed methods</Label>
                 <Select value={feeForm.railMode}
                   onValueChange={(v) => setFeeForm((f) => ({ ...f, railMode: v as typeof f.railMode }))}>
-                  <SelectTrigger className="w-64" data-testid="select-rail-mode">
+                  <SelectTrigger id="rail-mode" className="w-64" data-testid="select-rail-mode">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1847,7 +1848,7 @@ export default function CrmSettingsPage() {
               <Switch
                 checked={feeForm.passFeeToClient}
                 onCheckedChange={(v) => setFeeForm((f) => ({ ...f, passFeeToClient: v }))}
-                data-testid="switch-pass-fee"
+                aria-label="Pass the card processing fee to the client" data-testid="switch-pass-fee"
               />
             </div>
             {feeForm.passFeeToClient && (
@@ -1913,7 +1914,7 @@ export default function CrmSettingsPage() {
                           if (next.length && !next.some((x) => x.primary)) next[0] = { ...next[0], primary: true };
                           saveLinks(next);
                         }}
-                        disabled={savePaySettings.isPending} data-testid={`button-remove-financing-${i}`}>
+                        disabled={savePaySettings.isPending} aria-label={`Remove ${l.label}`} data-testid={`button-remove-financing-${i}`}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -1923,10 +1924,10 @@ export default function CrmSettingsPage() {
             )}
             {finLinks.length < 10 && (
               <div className="flex flex-wrap gap-2">
-                <Input placeholder="Label (e.g. GreenSky financing)" className="sm:w-56"
+                <Input placeholder="Label (e.g. GreenSky financing)" aria-label="Financing link label" className="sm:w-56"
                   data-testid="input-financing-label"
                   value={newLink.label} onChange={(e) => setNewLink((n) => ({ ...n, label: e.target.value }))} />
-                <Input placeholder="https://…" className="flex-1 min-w-48"
+                <Input placeholder="https://…" aria-label="Financing link URL" className="flex-1 min-w-48"
                   data-testid="input-financing-url"
                   value={newLink.url} onChange={(e) => setNewLink((n) => ({ ...n, url: e.target.value }))} />
                 <Button size="sm" variant="outline" className="shrink-0"
@@ -2035,12 +2036,15 @@ export default function CrmSettingsPage() {
             {gcalStatus && !gcalStatus.configured && (
               <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3"
                 data-testid="text-google-calendar-not-configured">
-                <div className="text-sm font-medium">Not configured on this server</div>
+                <div className="text-sm font-medium">Google Calendar sync isn’t switched on yet</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Missing environment {(gcalStatus.missing ?? []).length === 1 ? "variable" : "variables"}:{" "}
-                  <code>{(gcalStatus.missing ?? []).join(", ")}</code>. Add {(gcalStatus.missing ?? []).length === 1 ? "it" : "them"} to
-                  the server <code>.env</code> and restart — the same Google OAuth client the sign-in flow uses,
-                  with the <code>calendar.app.created</code> scope authorized.
+                  We’re switching it on; there is nothing for you to do. Your schedule keeps working here meanwhile.
+                  <AdminSetupNote>
+                    missing environment {(gcalStatus.missing ?? []).length === 1 ? "variable" : "variables"}{" "}
+                    <code>{(gcalStatus.missing ?? []).join(", ")}</code> — add {(gcalStatus.missing ?? []).length === 1 ? "it" : "them"} to
+                    the server <code>.env</code> and restart (the sign-in flow’s Google OAuth client, with the{" "}
+                    <code>calendar.app.created</code> scope authorized).
+                  </AdminSetupNote>
                 </p>
               </div>
             )}

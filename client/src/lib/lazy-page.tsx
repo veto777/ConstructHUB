@@ -6,7 +6,7 @@
  * page says so and offers a reload; only an unexplained failure is reported
  * to the issue desk.
  */
-import { lazy, type ComponentType } from "react";
+import { lazy, useEffect, useState, type ComponentType } from "react";
 import { isChunkLoadError, recoverFromStaleBuild, type StaleBuildOutcome } from "./stale-build";
 import { reportClientError } from "./report-client-errors";
 
@@ -39,7 +39,9 @@ export function lazyPage<T extends ComponentType<any>>(load: () => Promise<{ def
     try {
       return await load();
     } catch (err) {
-      if (!isChunkLoadError(err)) throw err;
+      // Any other import failure (a module that throws while it loads) would unmount the app to a blank page: say
+      // so and offer a reload instead, and report it.
+      if (!isChunkLoadError(err)) { reportClientError(err); return { default: loadFailedNotice("same_build") as unknown as T }; }
       const outcome = await recoverFromStaleBuild();
       // The page is being replaced: stay suspended under the "Updating…" notice.
       if (outcome === "reloading") return new Promise<never>(() => {});
@@ -47,4 +49,39 @@ export function lazyPage<T extends ComponentType<any>>(load: () => Promise<{ def
       return { default: loadFailedNotice(outcome) as unknown as T };
     }
   });
+}
+
+/** After this long the loading state offers a reload (a chunk that never arrives, e.g. a stalled connection). */
+export const PAGE_SLOW_MS = 12_000;
+
+/**
+ * The Suspense fallback while a page's chunk loads: nothing for a moment (no flash on a fast load), then a spinner,
+ * then — if it still hasn't arrived — a visible Reload instead of an endless blank page (review w2-agent10).
+ */
+export function PageLoading() {
+  const [stage, setStage] = useState<"wait" | "spin" | "slow">("wait");
+  useEffect(() => {
+    const spin = window.setTimeout(() => setStage("spin"), 800);
+    const slow = window.setTimeout(() => setStage("slow"), PAGE_SLOW_MS);
+    return () => { window.clearTimeout(spin); window.clearTimeout(slow); };
+  }, []);
+  if (stage === "wait") return null;
+  return (
+    <div role="status" aria-live="polite" data-testid="page-loading" className="flex min-h-[50vh] flex-col items-center justify-center gap-3 p-6 text-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-hidden />
+      {stage === "slow" ? (
+        <>
+          <p className="text-sm text-muted-foreground">This page is taking longer than usual to load.</p>
+          <button
+            type="button"
+            data-testid="button-reload-slow-page"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            onClick={() => window.location.reload()}
+          >
+            Reload
+          </button>
+        </>
+      ) : <span className="sr-only">Loading…</span>}
+    </div>
+  );
 }

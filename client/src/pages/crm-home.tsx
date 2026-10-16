@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -571,11 +571,13 @@ export default function CrmHomePage() {
       {/* Follow-up cadences: who you want a weekly/biweekly nudge for. */}
       <Dialog open={followUpsOpen} onOpenChange={setFollowUpsOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-follow-ups">
-          <DialogHeader><DialogTitle>Follow-up cadences</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Pick a weekly or biweekly rhythm per client. When one comes due it lands in
-            Needs attention so nobody goes cold.
-          </p>
+          <DialogHeader>
+            <DialogTitle>Follow-up cadences</DialogTitle>
+            <DialogDescription>
+              Pick a weekly or biweekly rhythm per client. When one comes due it lands in
+              Needs attention so nobody goes cold.
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-2">
             {(followUpsData?.followUps ?? []).map((f: any) => (
               <div key={f.customerId} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"

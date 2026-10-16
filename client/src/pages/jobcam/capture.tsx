@@ -21,7 +21,7 @@ import { useLocation, useSearch } from "wouter";
 import {
   Camera, ChevronDown, Grid3X3, Images, Loader2, MapPin, RefreshCw, Search, Video, X, Zap, ZapOff, Circle, Square, Check,
 } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
 import { enqueueUpload, bootJobcamQueue } from "@/lib/jobcam-queue";
@@ -344,7 +344,7 @@ function CaptureCamera() {
       {/* Project picker */}
       <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
         <SheetContent side="bottom" className="g-surface z-[70] max-h-[85dvh] overflow-y-auto rounded-t-2xl px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]" data-testid="jobcam-project-picker">
-          <SheetHeader className="text-left"><SheetTitle>Which job?</SheetTitle></SheetHeader>
+          <SheetHeader className="text-left"><SheetTitle>Which job?</SheetTitle><SheetDescription className="sr-only">Choose the project these photos and videos belong to.</SheetDescription></SheetHeader>
           <div className="relative mt-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input value={pickerQ} onChange={(e) => setPickerQ(e.target.value)} placeholder="Search projects, addresses, clients" className="g-input pl-9" data-testid="jobcam-project-search" />

@@ -194,9 +194,9 @@ export default function SeoPlanPage() {
     <SeoShell title="Action plan" description="What you have decided to do about what the SEO tools found — and what is done." site={site} onSite={changeSite} sites={sites} status={status} helpKey="seo.plan">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="plan-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
       {chip && site && <ActiveFilter onClear={() => clearParams(OWN_PARAMS, false)} clearLabel="All open tasks">{chip}</ActiveFilter>}
-      {!site && sites.isSuccess && <Empty testId="plan-empty-sites"><h3>No sites yet</h3><p>Add your site above; findings you choose to act on are kept here for it.</p></Empty>}
+      {!site && sites.isSuccess && <Empty testId="plan-empty-sites"><h2>No sites yet</h2><p>Add your site above; findings you choose to act on are kept here for it.</p></Empty>}
       {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading the plan…</p>}
-      {site && q.isError && <div className="g-callout" role="alert"><h3>Couldn't load the plan</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
+      {site && q.isError && <div className="g-callout" role="alert"><h2>Couldn't load the plan</h2><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
       {site && q.data && (
         <>
           {/* The plan's counts in one row (as the dashboard lays a site's figures out); each opens the tasks it counts. */}
@@ -228,7 +228,7 @@ export default function SeoPlanPage() {
           )}
           {all.length === 0 ? (
             <Empty testId="plan-empty">
-              <h3>Nothing in the plan yet</h3>
+              <h2>Nothing in the plan yet</h2>
               <p>Wherever the SEO tools find something worth doing there is an <b>Add to plan</b> button: a keyword just off page one in <Link href={seoLinks.explorer(site.domain, "keywords")} className={TEXT_LINK}>Opportunities</Link>, a site that stopped linking on <Link href={seoLinks.backlinks(site.id, { section: "lost" })} className={TEXT_LINK}>Backlinks</Link>, an issue in the <Link href={seoLinks.audit(site.id)} className={TEXT_LINK}>Site audit</Link>. Add it, work through the list, and tick things off here.</p>
             </Empty>
           ) : shown.length === 0 ? <Empty testId="plan-none">{ownerParam || dueSoon ? "No task in this list matches the narrowing above." : showClosed ? (list === "closed" ? "Nothing done or dropped yet." : `Nothing ${STATUS_WORDS[list].toLowerCase()}${kind !== "all" ? " of this kind" : ""}.`) : list === "overdue" ? "Nothing past its due date." : list !== "open" ? `Nothing ${STATUS_WORDS[list].toLowerCase()}${kind !== "all" ? " of this kind" : ""}.` : kind === "all" ? "Nothing open — everything in the plan is done or dropped." : "Nothing open of this kind."}</Empty> : (

@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle } from "@/lib/page-titles";
 import { VerificationCancelled } from "@/components/recent-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -265,7 +266,7 @@ function TokenRow({ t, now, onRevoke }: { t: TokenItem; now: number; onRevoke: (
 }
 
 export default function AdminCodeApiPage() {
-  useDocumentTitle("Code API | ConstructHUB");
+  useDocumentTitle(appPageTitle("/admin/code-api")!);
   const { toast } = useToast();
   const now = useNow();
   const { data, isLoading, error } = useQuery<Payload>({ queryKey: [KEY], refetchInterval: 60_000 });
@@ -320,13 +321,13 @@ export default function AdminCodeApiPage() {
       <GoogleSectionHeader as="h1" title="Code API" description="Give an AI agent or a developer 24–48 hours of access to the ConstructHUB code. Their changes land on their own GitHub branch for you to review." flush />
 
       {isLoading && <p className="text-sm text-muted-foreground"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading…</p>}
-      {error && <Alert variant="destructive"><AlertTitle>Could not load</AlertTitle><AlertDescription>{apiErrorMessage(error)}</AlertDescription></Alert>}
+      {error && <Alert variant="destructive"><AlertTitle level={2}>Could not load</AlertTitle><AlertDescription>{apiErrorMessage(error)}</AlertDescription></Alert>}
 
       {data && (<>
         {!data.configured && (
           <Alert variant="destructive" data-testid="alert-not-configured">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Not switched on yet</AlertTitle>
+            <AlertTitle level={2}>Not switched on yet</AlertTitle>
             <AlertDescription>This server has no repository connection (DEV_API_REPO_URL and a GitHub deploy key). Tokens can't be issued until it does.</AlertDescription>
           </Alert>
         )}
@@ -367,22 +368,22 @@ export default function AdminCodeApiPage() {
                 <Input id="token-name" maxLength={80} placeholder="e.g. Codex — permit scrapers, or Jane (contract dev)" value={name} onChange={(e) => setName(e.target.value)} data-testid="input-token-name" />
               </div>
               <div className="space-y-1.5">
-                <Label>Used by</Label>
+                <Label htmlFor="select-holder">Used by</Label>
                 <Select value={holder} onValueChange={(v) => setHolder(v as "agent" | "person")}>
-                  <SelectTrigger data-testid="select-holder"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="select-holder" data-testid="select-holder"><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="agent">AI agent</SelectItem><SelectItem value="person">Person</SelectItem></SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Access</Label>
+                <Label htmlFor="select-access">Access</Label>
                 <Select value={access} onValueChange={(v) => setAccess(v as "read" | "write")}>
-                  <SelectTrigger data-testid="select-access"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="select-access" data-testid="select-access"><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="write">Read + change code</SelectItem><SelectItem value="read">Read only</SelectItem></SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5 sm:col-span-2">
-                <Label>Expires after</Label>
-                <div className="flex gap-2">
+                <Label id="expires-after-label">Expires after</Label>
+                <div className="flex gap-2" role="group" aria-labelledby="expires-after-label">
                   {[data.hours.min, data.hours.max].map((h) => (
                     <Button key={h} type="button" variant={hours === h ? "default" : "outline"} size="sm" onClick={() => setHours(h)} data-testid={`button-hours-${h}`}>{h} hours</Button>
                   ))}

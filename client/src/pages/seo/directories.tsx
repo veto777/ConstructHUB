@@ -19,7 +19,7 @@ import { Download, Loader2, Play, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, Empty, fmtDate, isNotRunYet, money, SAVED_FOR, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, isNotRunYet, money, SAVED_FOR, type SeoStatus, hideSeoPrices } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
 import { seoLinks, setParams } from "./links";
 import { marketParams } from "./keyword-links";
@@ -135,13 +135,13 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId, marke
         </div>
       )}
       {applied && !dirty && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved copy…</p>}
-      {applied && !dirty && saved.isError && <div className="g-callout" role="alert"><h3>Couldn't check for a saved copy</h3><p>{apiErrorMessage(saved.error)} Nothing has been charged.</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
+      {applied && !dirty && saved.isError && <div className="g-callout" role="alert"><h2>Couldn't check for a saved copy</h2><p>{apiErrorMessage(saved.error)} Nothing has been charged.</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
       {applied && !dirty && saved.isSuccess && !d && (
         <Empty testId="directories-not-run">
-          <h3>{sitesAsked} site{sitesAsked === 1 ? "" : "s"} ready to check</h3>
+          <h2>{sitesAsked} site{sitesAsked === 1 ? "" : "s"} ready to check</h2>
           <p>{price == null ? "The price couldn't be loaded, so this can't be bought yet — reload the page." : !canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
           <Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay || !body} onClick={() => body && run.mutate({ body, key: queryKey, again: false })} data-testid="button-directories-run">
-            {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Checking…</> : <><Play className="mr-1 h-4 w-4" /> Check the directories{price != null ? ` — up to ${money(price)}` : ""}</>}
+            {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Checking…</> : <><Play className="mr-1 h-4 w-4" /> Check the directories{price != null && !hideSeoPrices() ? ` — up to ${money(price)}` : ""}</>}
           </Button>
         </Empty>
       )}
@@ -150,7 +150,7 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId, marke
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
             <span className="g-text-2" data-testid="text-directories-meta">
               {onIt != null ? <>{domain} is linked from <Fig href={here({ only: "linked" })} testId="link-directories-linked" label={`${onIt} directories that link to ${domain}`}>{onIt}</Fig> of these <Fig href={here({ only: null })} testId="link-directories-all" label={`All ${d.rows.length} directories`}>{d.rows.length}</Fig></> : `${domain}'s own check didn't load`}{d.sites.length > 1 && usKnown ? <> · <Fig href={here({ only: "gaps" })} testId="link-directories-gaps" label={`${gaps.length} directories that link to a competitor and not to you`}>{gaps.length} that link to a competitor and not to you</Fig></> : ""} · <Fig href={seoLinks.usage({ month: d.fetchedAt.slice(0, 7) })} testId="link-directories-as-of" label={`as of ${fmtDate(d.fetchedAt)} — when these directories were checked; that month's lookups on the Usage page`}>as of {fmtDate(d.fetchedAt)}</Fig> ·{" "}
-              <button type="button" className={FIG} disabled={run.isPending || !canPay || !status?.configured || !body} onClick={() => body && run.mutate({ body, key: queryKey, again: true })}>{run.isPending ? "Checking…" : `Check again${price != null ? ` — up to ${money(price)}` : ""}`}</button>
+              <button type="button" className={FIG} disabled={run.isPending || !canPay || !status?.configured || !body} onClick={() => body && run.mutate({ body, key: queryKey, again: true })}>{run.isPending ? "Checking…" : `Check again${!hideSeoPrices() && price != null ? ` — up to ${money(price)}` : ""}`}</button>
             </span>
             <span className="ml-auto flex flex-wrap items-center gap-2">
               {planSiteId != null && gaps.length > 0 && <AddToPlan siteId={planSiteId} label={`Add the ${gaps.length} to check to the plan`} testId="button-directories-plan" tasks={gaps.map(planTask)} />}
@@ -165,7 +165,7 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId, marke
           )}
           {d.missing.length > 0 && <p className="mb-2 text-[13px]" role="status" style={{ color: "var(--g-red)" }} data-testid="text-directories-missing">The check for {d.missing.join(", ")} didn't load and was not charged — {d.missing.length === 1 ? "its column shows" : "their columns show"} "?" rather than a guess.{" "}
             <button type="button" className={FIG} disabled={run.isPending || !status?.configured || !body || quote(d.missing.length) == null || !(status?.credits == null || status.credits.availableCents === -1 || status.credits.availableCents >= quote(d.missing.length)!)} onClick={() => body && run.mutate({ body, key: queryKey, again: false, missingOnly: true })} data-testid="button-directories-retry">
-              {run.isPending ? "Checking…" : `Check just ${d.missing.length === 1 ? "that site" : "those sites"} again${quote(d.missing.length) != null ? ` — up to ${money(quote(d.missing.length)!)}` : ""}`}
+              {run.isPending ? "Checking…" : `Check just ${d.missing.length === 1 ? "that site" : "those sites"} again${quote(d.missing.length) != null && !hideSeoPrices() ? ` — up to ${money(quote(d.missing.length)!)}` : ""}`}
             </button> The columns that loaded are kept and not bought again.</p>}
           {(d.partial?.length ?? 0) > 0 && <p className="mb-2 text-[13px]" role="status" data-testid="text-directories-partial">For {d.partial!.join(", ")} there were more linking pages than one lookup returns. A directory not among them shows "?" for {d.partial!.length === 1 ? "that site" : "those sites"} — not looked at, rather than "no link".</p>}
           <div className="overflow-x-auto">

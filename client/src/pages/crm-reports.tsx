@@ -14,7 +14,7 @@ import {
   CrmPage, CrmPageHeader, EmptyState, ErrorCard, SectionTitle, StatusPill,
   crmTable, statusTone,
 } from "@/components/crm-ui";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SampleReportsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleReportsTable");
 import { confirmAction } from "@/components/confirm-dialog";
 
@@ -350,7 +350,7 @@ export default function CrmReportsPage() {
                 description="Upload a HOVER PDF or paste a report above — the parsed client lands on your Clients page." />
             </Card>
             {/* The list is every import the org has made: empty means none yet, so show a sample. */}
-            <SampleReportsTable />
+            {showSample({ isLoading, isError, total: reports?.length }) && <SampleReportsTable />}
           </>
         ) : (
           <>

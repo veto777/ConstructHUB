@@ -249,7 +249,7 @@ export default function LsaGuidePage() {
               <div className="flex items-start gap-3">
                 <BadgeCheck className="h-5 w-5 g-open flex-shrink-0 mt-0.5" aria-hidden="true" />
                 <div>
-                  <h4 className="g-card__title g-card__title--md mb-1">LSA Is Better Than Google Ads — Here's Why</h4>
+                  <h2 className="g-card__title g-card__title--md mb-1">LSA Is Better Than Google Ads — Here's Why</h2>
                   <p className="g-card__line">
                     With LSA, you don't get charged until someone actually calls you. Unlike Google Ads where you pay for every click (including bots and competitors), LSA only charges for real customer contacts. The Google Verified badge builds instant trust, reviews are front and center, and you appear at the absolute top of search results. But there are tricks to staying on top — and this guide covers all of them.
                   </p>
@@ -435,7 +435,7 @@ export default function LsaGuidePage() {
           <Card className="max-w-4xl mx-auto shadow-none" data-testid="card-bottom-cta">
             <CardContent className="p-6 text-center">
               <BadgeCheck className="h-8 w-8 g-open mx-auto mb-3" aria-hidden="true" />
-              <h3 className="g-header__title mb-2">Ready to Dominate Local Search?</h3>
+              <h2 className="g-header__title mb-2">Ready to Dominate Local Search?</h2>
               <p className="g-text-2 text-sm leading-relaxed max-w-2xl mx-auto mb-4">
                 {inNativeApp()
                   ? "LSA is just one piece of the puzzle. Set up Click Guard to protect your Google Ads campaigns from click fraud."

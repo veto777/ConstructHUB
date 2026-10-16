@@ -6,7 +6,7 @@ vi.mock('@tanstack/react-query', () => ({ useQuery: (opts: any) => { state.queri
 vi.mock('@/lib/queryClient', () => ({ apiRequest: vi.fn(), apiErrorMessage: vi.fn(), queryClient: {} }));
 vi.mock('@/hooks/use-url-param', () => ({ useUrlParam: () => [null, vi.fn()] }));
 vi.mock('@/components/google', () => ({ GoogleSurface: ({ children }: any) => children, GoogleStat: ({ label, value }: any) => `${label}: ${value}`, GoogleStatGrid: ({ children }: any) => children, GoogleList: ({ children }: any) => children, GoogleListRow: ({ title, meta }: any) => `${title} ${Array.isArray(meta) ? meta.join(' ') : ''}`, GooglePill: ({ label }: any) => label, relativeTime: () => 'just now' }));
-vi.mock('@/components/sample-preview', () => ({ SamplePreview: ({ children, what }: any) => React.createElement('section', { 'data-sample': 'true' }, `Sample data: ${what}`, children) }));
+vi.mock('@/components/sample-preview', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/components/sample-preview')>()), SamplePreview: ({ children, what }: any) => React.createElement('section', { 'data-sample': 'true' }, `Sample data: ${what}`, children) }));
 vi.mock('@/components/app-ui', () => ({ AppPage: ({ children }: any) => children, PageHeader: ({ title, helpKey }: any) => `${title} [help:${helpKey}]`, AppTabsList: ({ children }: any) => children, Section: ({ children }: any) => children }));
 vi.mock('@/components/ui/tabs', () => ({ Tabs: ({ children }: any) => children, TabsTrigger: ({ children }: any) => children }));
 vi.mock('@/components/agency-workspace', () => ({ AgencyWorkspace: () => 'Agency locations', Pager: () => null, selectClass: '', useAgencyFilter: vi.fn() }));

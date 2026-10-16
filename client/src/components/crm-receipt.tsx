@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2, ReceiptText, Send } from "lucide-react";
@@ -70,6 +70,7 @@ export function InvoiceReceiptButton({
                 <InfoTip k="receipts" />
               </span>
             </DialogTitle>
+            <DialogDescription>Every payment on this invoice and what is still owed. Send it to email the client a copy.</DialogDescription>
           </DialogHeader>
 
           {isLoading ? (

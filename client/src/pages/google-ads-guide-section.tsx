@@ -116,7 +116,7 @@ export default function GoogleAdsGuideSection() {
     return (
       <div className="h-full overflow-y-auto bg-background text-foreground">
         <div className="max-w-2xl mx-auto px-4 py-12 text-center space-y-4" data-testid="view-guide-section-error">
-          <h2 className="g-header__title">Couldn't load this section</h2>
+          <h1 className="g-header__title !text-[20px] !leading-[24px]">Couldn't load this section</h1>
           <p className="g-text-2 text-sm">Check your connection and try again.</p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <GooglePill variant="solid" label={<>{isFetching && <Loader2 className="h-4 w-4 mr-2 animate-spin inline" aria-hidden="true" />} Try again</>} onClick={() => refetch()} disabled={isFetching} testId="button-retry-section" />
@@ -138,9 +138,9 @@ export default function GoogleAdsGuideSection() {
                 <Lock aria-hidden="true" />
                 <span>Master Class Students Only</span>
               </div>
-              <h2 className="g-header__title mb-2" data-testid="text-section-locked-title">
+              <h1 className="g-header__title !text-[20px] !leading-[24px] mb-2" data-testid="text-section-locked-title">
                 {result.title || "Google Ads Playbook"}
-              </h2>
+              </h1>
               <p className="g-text-2 text-sm mb-6 max-w-md mx-auto">
                 This section of the Google Ads playbook is included with Master Class plan access or any Master Class purchase.
               </p>
@@ -161,7 +161,7 @@ export default function GoogleAdsGuideSection() {
     return (
       <div className="h-full overflow-y-auto bg-background text-foreground">
         <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-          <h2 className="g-header__title mb-4">Section not found</h2>
+          <h1 className="g-header__title !text-[20px] !leading-[24px] mb-4">Section not found</h1>
           <GooglePill icon={ArrowLeft} variant="solid" href="/google-ads-guide" label="Back to Google Ads Guide" />
         </div>
       </div>

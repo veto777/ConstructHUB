@@ -159,9 +159,9 @@ export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlI
   ].filter(Boolean).join(" ");
   const chip = words.length > 0 && <ActiveFilter words={words.join(" · ")} clearHref={clearHref} extra={foreign ? { href: foreign.href, label: foreign.label, testId: "link-foreign-tab" } : undefined}>{explain || null}</ActiveFilter>;
   if (q.isLoading) return <>{chip}<p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading the crawled pages…</p></>;
-  if (q.isError) return <>{chip}<div className="g-callout" role="alert" data-testid="audit-pages-error"><h3>Couldn't load the pages</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div></>;
-  if (unreadable) return <>{chip}<Empty testId="audit-pages-unreadable"><h3>The newest crawl could not be read</h3><p>The crawl that finished {fmtDate(unreadable.scannedAt)} was not saved in a form we can read, so nothing is shown from it (and no older crawl in its place). Run a new crawl.</p></Empty></>;
-  if (!d || d.pages.length === 0) return <>{chip}<Empty testId="audit-pages-empty"><h3>No pages to show</h3><p>The crawl did not save any pages for {site.domain}. Run a new crawl.</p></Empty></>;
+  if (q.isError) return <>{chip}<div className="g-callout" role="alert" data-testid="audit-pages-error"><h2>Couldn't load the pages</h2><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div></>;
+  if (unreadable) return <>{chip}<Empty testId="audit-pages-unreadable"><h2>The newest crawl could not be read</h2><p>The crawl that finished {fmtDate(unreadable.scannedAt)} was not saved in a form we can read, so nothing is shown from it (and no older crawl in its place). Run a new crawl.</p></Empty></>;
+  if (!d || d.pages.length === 0) return <>{chip}<Empty testId="audit-pages-empty"><h2>No pages to show</h2><p>The crawl did not save any pages for {site.domain}. Run a new crawl.</p></Empty></>;
   const s = d.summary, measured = s.linksMeasured !== false;
   const cutCount = (c: Cut) => (c.count ? c.count(overview) : d.pages.filter(c.test).length);
   const rowHref = (r: Row) => here({ page: r.path });
@@ -180,7 +180,7 @@ export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlI
       </div>
       {!measured && (
         <div id="pages-links-unmeasured" className="g-callout mb-3" role="status" data-testid="pages-links-unmeasured">
-          <h3>Links between your pages could not be measured</h3>
+          <h2>Links between your pages could not be measured</h2>
           <p>Most pages of {site.domain} have no links to other pages in their page source. That usually means the menus and links are added by JavaScript after the page loads — this crawl reads the source without running scripts, so it cannot say which pages link to which, or how many clicks deep a page is. Google does run scripts, but more slowly and less reliably than it reads plain links; putting your main menu and in-page links in the page's HTML is the safer choice.</p>
         </div>
       )}
@@ -203,7 +203,7 @@ export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlI
         <span className="g-text-2 text-[13px]" data-testid="text-pages-count"><Link href={`${here({})}#table-audit-pages`} className={`g-text-2 ${FIG}`} title="The pages listed below" data-testid="link-pages-count">{fmtNum(rows.length)} page{rows.length === 1 ? "" : "s"}</Link></span>
         <button type="button" className="g-pill g-pill--sm ml-auto max-sm:!min-h-11" onClick={exportCsv} disabled={!rows.length} data-testid="button-pages-export"><Download /> Export</button>
       </div>
-      {rows.length === 0 ? <Empty testId="audit-pages-none"><h3>No page matches</h3><p>{cut?.count ? "These addresses have no row: the crawl saved no page for them." : issue && issueKnown ? <>No crawled page is listed under “{issueTitles[issue]}” — its entries are not pages of the crawl (an address outside the site, or a check that has no page). <Link href={issueHref(issue)} className={`g-link ${FIG}`} data-testid="link-pages-issue-tab">See it on the Issues tab</Link>.</> : "Clear the search box or choose another filter."}</p></Empty> : (
+      {rows.length === 0 ? <Empty testId="audit-pages-none"><h2>No page matches</h2><p>{cut?.count ? "These addresses have no row: the crawl saved no page for them." : issue && issueKnown ? <>No crawled page is listed under “{issueTitles[issue]}” — its entries are not pages of the crawl (an address outside the site, or a check that has no page). <Link href={issueHref(issue)} className={`g-link ${FIG}`} data-testid="link-pages-issue-tab">See it on the Issues tab</Link>.</> : "Clear the search box or choose another filter."}</p></Empty> : (
         <div className="overflow-x-auto">
           <table id="table-audit-pages" className={COMPACT_TABLE} data-testid="table-audit-pages">
             <thead><tr><th aria-label="Show details" className="w-12" />{COLS.map((c) => (

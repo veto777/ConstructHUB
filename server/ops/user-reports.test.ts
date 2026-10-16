@@ -576,17 +576,19 @@ describe("the page, the footers and what the issue desk is told", () => {
     expect(dash).toContain(`<Link href="/tutorials"`);
     expect(dash).toContain(`<Link href={reportIssueHref()}`);
     const crm = app.slice(app.indexOf('data-testid="footer-crm"'), app.indexOf("</footer>", app.indexOf('data-testid="footer-crm"')));
-    expect(crm).toContain(`href={marketingUrl("/tutorials#group-crm")}`);
+    // Help on the signed-out faces (and the CRM host, whose session the marketing host doesn't share) is a public page:
+    // /tutorials needs a sign-in there (live audit 2026-10-15).
+    expect(crm).toContain(`href={marketingUrl("/features/crm")}`);
     expect(crm).toContain(`<Link href={reportIssueHref("/crm/report-issue")}`);
     const chrome = read("client/src/components/public-page-chrome.tsx");
     for (const id of ["footer-public-page-app", "footer-public-page"]) {
       const at = chrome.indexOf(`data-testid="${id}"`);
       const footer = chrome.slice(at, chrome.indexOf("</footer>", at));
-      expect(footer, id).toContain(`<Link href="/tutorials"`);
+      expect(footer, id).toContain(id === "footer-public-page-app" ? `<Link href="/support"` : `<Link href="/features/guides"`);
       expect(footer, id).toContain(`<Link href={reportIssueHref()}`);
     }
     const landing = read("client/src/pages/landing.tsx");
-    expect(landing).toContain(`data-testid="link-footer-help"`);
+    expect(landing).toContain(`<Link href="/features/guides" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-help"`);
     expect(landing).toContain(`<Link href="/report-issue"`);
     // Neither link is a sales page: the iPhone apps do not redirect them away.
     expect(app.match(/const APP_SALES_PATHS = \[[^\]]*\]/)![0]).not.toMatch(/tutorials|report-issue/);

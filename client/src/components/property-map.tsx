@@ -114,15 +114,13 @@ function PropertyMapInner({ offices, onShowCounty, onShowState }: { offices: Pro
     return coverage.byFips.get(id)?.shade ?? "empty";
   };
 
+  // The legend counts OFFICES by the rule the stat row above the map and every list row use (propertyOfficeLinks), so
+  // the page gives one number for each kind (review w2-agent10: 2,719 vs 2,693 when the legend counted counties).
   const counts = useMemo(() => {
     const n = { site: 0, phone: 0, none: 0 };
-    for (const s of shapes.values()) {
-      if (TOWN_ASSESSED_STATES.has(s.usps)) continue;
-      const k = coverage.byFips.get(s.id)?.shade;
-      if (k === "site") n.site++; else if (k === "phone") n.phone++; else n.none++;
-    }
+    for (const o of offices) n[propertyOfficeLinks(o).shade]++;
     return n;
-  }, [shapes, coverage]);
+  }, [offices]);
 
   // 3,100 county paths: build the layer once per data change, not on every hover or zoom (React skips
   // an identical element), and keep strokes one screen pixel with non-scaling-stroke.
@@ -207,9 +205,9 @@ function PropertyMapInner({ offices, onShowCounty, onShowState }: { offices: Pro
         .dark .permit-map { --pm-site: hsl(var(--primary) / 0.7); --pm-phone: hsl(38 92% 55% / 0.55); }
       `}</style>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-xs g-text-2 border-b" data-testid="property-map-legend">
-        <LegendSwatch fill={FILL.site} label={`Records site · ${counts.site.toLocaleString()}`} />
-        <LegendSwatch fill={FILL.phone} label={`Phone only · ${counts.phone.toLocaleString()}`} />
-        <LegendSwatch fill={FILL.none} label={`Nothing listed · ${counts.none.toLocaleString()}`} border />
+        <LegendSwatch fill={FILL.site} label={`Records site · ${counts.site.toLocaleString()} offices`} />
+        <LegendSwatch fill={FILL.phone} label={`Phone only · ${counts.phone.toLocaleString()} offices`} />
+        <LegendSwatch fill={FILL.none} label={`Nothing listed · ${counts.none.toLocaleString()} offices`} border />
         <LegendSwatch fill={FILL.town} label="Town-assessed (New England)" border />
         {topo && <span className="sm:ml-auto" data-testid="property-map-list-only">{listOnly > 0 ? `${listOnly.toLocaleString()} office${listOnly === 1 ? "" : "s"} list only · ` : ""}zoom in for names</span>}
       </div>

@@ -12,9 +12,9 @@ import { Camera, Clock, Mail, MapPin, Phone, Video } from "lucide-react";
 import { SamplePreview } from "@/components/sample-preview";
 import { InitialAvatar, StatusPill, crmTable, crmTableCards, statusTone, type PillTone } from "@/components/crm-ui";
 import { cn } from "@/lib/utils";
+import { money, money0 } from "@/lib/estimate-math";
 
-const money = (dollars: number) => `$${dollars.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-const money0 = (dollars: number) => `$${dollars.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+// Fixture amounts are in cents and go through the CRM's own formatters, like the real rows.
 
 /** Three made-up clients, reused across the samples so the pages tell one story. */
 const SAMPLE_CLIENTS = [
@@ -78,9 +78,9 @@ export function SampleClientsTable({ cta }: { cta?: ReactNode }) {
 /* ── Pipeline ────────────────────────────────────────────────────────────── */
 
 const SAMPLE_CARDS = [
-  { stage: "Lead", name: "Roof replacement — Sample Homeowner", number: "P-0001", value: 18400, trades: ["Roofing"] },
-  { stage: "Bid sent", name: "Siding + gutters — Example Property Co.", number: "P-0002", value: 26900, trades: ["Siding", "Gutters"] },
-  { stage: "Approved", name: "Bathroom remodel — Demo Family", number: "P-0003", value: 9600, trades: ["Remodel"] },
+  { stage: "Lead", name: "Roof replacement — Sample Homeowner", number: "P-0001", value: 1840000, trades: ["Roofing"] },
+  { stage: "Bid sent", name: "Siding + gutters — Example Property Co.", number: "P-0002", value: 2690000, trades: ["Siding", "Gutters"] },
+  { stage: "Approved", name: "Bathroom remodel — Demo Family", number: "P-0003", value: 960000, trades: ["Remodel"] },
 ];
 
 export function SamplePipelineBoard({ cta }: { cta?: ReactNode }) {
@@ -116,14 +116,14 @@ export function SamplePipelineBoard({ cta }: { cta?: ReactNode }) {
 
 const SAMPLE_DOCS = {
   estimates: [
-    { number: "EST-0001", client: "Sample Homeowner", title: "Roof replacement", status: "sent", total: 18400 },
-    { number: "EST-0002", client: "Example Property Co.", title: "Siding + gutters", status: "approved", total: 26900 },
-    { number: "EST-0003", client: "Demo Family", title: "Bathroom remodel", status: "draft", total: 9600 },
+    { number: "EST-0001", client: "Sample Homeowner", title: "Roof replacement", status: "sent", total: 1840000 },
+    { number: "EST-0002", client: "Example Property Co.", title: "Siding + gutters", status: "approved", total: 2690000 },
+    { number: "EST-0003", client: "Demo Family", title: "Bathroom remodel", status: "draft", total: 960000 },
   ],
   invoices: [
-    { number: "INV-0001", client: "Example Property Co.", title: "Deposit — siding + gutters", status: "paid", total: 8070 },
-    { number: "INV-0002", client: "Sample Homeowner", title: "Roof replacement", status: "sent", total: 18400 },
-    { number: "INV-0003", client: "Demo Family", title: "Bathroom remodel — progress", status: "partial", total: 4800 },
+    { number: "INV-0001", client: "Example Property Co.", title: "Deposit — siding + gutters", status: "paid", total: 807000 },
+    { number: "INV-0002", client: "Sample Homeowner", title: "Roof replacement", status: "sent", total: 1840000 },
+    { number: "INV-0003", client: "Demo Family", title: "Bathroom remodel — progress", status: "partial", total: 480000 },
   ],
 } as const;
 
@@ -166,9 +166,9 @@ export function SampleDocsTable({ kind, cta }: { kind: "estimates" | "invoices";
 /* ── Payments ────────────────────────────────────────────────────────────── */
 
 const SAMPLE_PAYMENTS = [
-  { amount: 8070, method: "Bank transfer (ACH)", purpose: "Deposit", client: "Example Property Co.", doc: "Invoice INV-0001", status: "succeeded" },
-  { amount: 4800, method: "Card", purpose: "Progress payment", client: "Demo Family", doc: "Invoice INV-0003", status: "succeeded" },
-  { amount: 1500, method: "Check", purpose: "Deposit", client: "Sample Homeowner", doc: "Estimate EST-0001", status: "succeeded" },
+  { amount: 807000, method: "Bank transfer (ACH)", purpose: "Deposit", client: "Example Property Co.", doc: "Invoice INV-0001", status: "succeeded" },
+  { amount: 480000, method: "Card", purpose: "Progress payment", client: "Demo Family", doc: "Invoice INV-0003", status: "succeeded" },
+  { amount: 150000, method: "Check", purpose: "Deposit", client: "Sample Homeowner", doc: "Estimate EST-0001", status: "succeeded" },
 ];
 
 export function SamplePaymentsList({ cta }: { cta?: ReactNode }) {

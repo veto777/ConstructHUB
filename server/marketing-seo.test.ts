@@ -428,8 +428,12 @@ describe("the prerendered pages on the server", () => {
     for (const p of ["/search", "/auth", "/free-site-scan", "/google-ads-guide/campaign-setup", "/review/AbC123", "/features/call-assistant"]) {
       expect((await get(p)).status, p).toBe(200);
     }
-    const auth = await (await get("/auth")).text();
+    const authRes = await get("/auth");
+    const auth = await authRes.text();
     expect(auth).toContain(`<title>${APP_PAGE_META["/auth"].title}</title>`);
+    // The sign-in page is reachable but kept out of search results (live audit 2026-10-15).
+    expect(auth).toContain('<meta name="robots" content="noindex" />');
+    expect(authRes.headers.get("x-robots-tag")).toBe("noindex");
     expect(auth).not.toContain(HOME_META.title);
   });
 

@@ -215,6 +215,7 @@ export default function CrmProjectPage() {
   if (isError || directError || !project) {
     return (
       <ErrorCard
+        level={1}
         title={isError ? "Couldn't load this project" : "Project not found"}
         description={isError
           ? "Check your connection and refresh the page."

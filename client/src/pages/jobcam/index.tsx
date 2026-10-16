@@ -8,10 +8,11 @@ import { Camera } from "lucide-react";
 import { CrmPage, CrmPageHeader } from "@/components/crm-ui";
 import { JobcamFeed } from "@/components/jobcam/feed";
 import { bootJobcamQueue } from "@/lib/jobcam-queue";
+import { crmPageTitle } from "@/lib/page-titles";
 
 export default function JobcamRecentPage() {
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
-  useEffect(() => { bootJobcamQueue(); document.title = "JobCam"; }, []);
+  useEffect(() => { bootJobcamQueue(); document.title = crmPageTitle("/crm/jobcam"); }, []);
   const canManage = me?.permissions?.manageJobs === true || me?.permissions?.manageCustomers === true;
   return (
     <CrmPage wide>

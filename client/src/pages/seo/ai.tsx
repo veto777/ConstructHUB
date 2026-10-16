@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AiSummaryPanel, monthName } from "./ai-summary";
-import { ActiveFilter, api, clearParams, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useAddress, useHash, useScrollTo, useSelectedSite, useSeoSites, useSeoStatus, useSiteMissing, type SeoStatus } from "./shell";
+import { ActiveFilter, api, clearParams, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useAddress, useHash, useScrollTo, useSelectedSite, useSeoSites, useSeoStatus, useSiteMissing, type SeoStatus, hideSeoPrices } from "./shell";
 import { seoLinks, setParam, setParams } from "./links";
 import { CARD, FIGURE_LINK, Heading, LinkedFigure, MetricRow, QUIET_LINK, RatioBar, TAP, TEXT_LINK } from "./viz-more";
 
@@ -123,18 +123,18 @@ function Mentions({ status, domain: initial, wanted, siteId }: { status: SeoStat
         <Button type="submit" disabled={!input.trim()} data-testid="button-ai-mentions-check"><Search className="mr-1 h-4 w-4" /> Check</Button>
       </form>
       {asked && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved result…</p>}
-      {asked && saved.isError && <div className="g-callout" role="alert"><h3>Couldn't check for a saved result</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
+      {asked && saved.isError && <div className="g-callout" role="alert"><h2>Couldn't check for a saved result</h2><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
       {asked && saved.isSuccess && !page && (
         <Empty testId="ai-mentions-not-run">
-          <h3>AI mentions of {asked.domain}</h3>
+          <h2>AI mentions of {asked.domain}</h2>
           <p>Not looked up yet.{!can(status, price) && " You don't have enough SEO data left — add credit above."}</p>
-          <Button className="mt-2" disabled={run.isPending || !status?.configured || !can(status, price)} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-ai-mentions-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Looking…</> : `Look it up${price != null ? ` — about ${money(price)}` : ""}`}</Button>
+          <Button className="mt-2" disabled={run.isPending || !status?.configured || !can(status, price)} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-ai-mentions-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Looking…</> : `Look it up${!hideSeoPrices() && price != null ? ` — about ${money(price)}` : ""}`}</Button>
         </Empty>
       )}
       {page && (
         <div data-testid="ai-mentions-result">
           <div className="mb-3"><LinkedFigure href={seoLinks.explorer(page.domain)} testId="ai-mentions-total" label={`${page.platform === "google" ? "Google AI Overview" : "ChatGPT"} answer${(page.total ?? page.rows.length) === 1 ? "" : "s"} that use ${page.domain} as a source`} value={fmtNum(page.total ?? page.rows.length)} foot={<>as of <Link href={seoLinks.ai(siteId, { mentions: page.domain, platform: page.platform })} className={QUIET_LINK}>{fmtDate(page.fetchedAt)}</Link> · United States</>} /></div>
-          {page.rows.length === 0 ? <Empty><h3>No AI answers use this site yet</h3><p>That is normal for a local business. AI answers lean on pages that explain a topic clearly and are quoted by other sites — guides, comparisons, cost pages — and on review and directory sites. The "Ask the assistants" check above shows who they named, when last asked, for your service and city.</p></Empty> : (
+          {page.rows.length === 0 ? <Empty><h2>No AI answers use this site yet</h2><p>That is normal for a local business. AI answers lean on pages that explain a topic clearly and are quoted by other sites — guides, comparisons, cost pages — and on review and directory sites. The "Ask the assistants" check above shows who they named, when last asked, for your service and city.</p></Empty> : (
             <div className="overflow-x-auto"><table className="g-table w-full" data-testid="table-ai-mentions">
               <thead><tr><th>Question people ask</th><th className="num">Searches / mo</th><th>Other sites used in the same answer</th><th className="num">Seen</th></tr></thead>
               {/* A question opens in Keywords explorer (its searches a month on the volume chart there); each other site in Site explorer. The date is the source's and has no view of its own: it opens the question. */}
@@ -271,9 +271,9 @@ export default function SeoAiPage() {
   return (
     <SeoShell title="AI visibility" description="When a customer asks ChatGPT, Gemini or Perplexity for what you do — are you named, and is your website one of their sources?" site={site} onSite={changeSite} sites={sites} status={status} spends="lookups" helpKey="seo.ai">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="ai-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
-      {!site && sites.isSuccess && <Empty testId="ai-empty-sites"><h3>No sites yet</h3><p>Add your site above; then ask the assistants the question your customers ask.</p></Empty>}
+      {!site && sites.isSuccess && <Empty testId="ai-empty-sites"><h2>No sites yet</h2><p>Add your site above; then ask the assistants the question your customers ask.</p></Empty>}
       {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>}
-      {site && q.isError && <div className="g-callout" role="alert" data-testid="ai-error"><h3>Couldn't load AI visibility</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
+      {site && q.isError && <div className="g-callout" role="alert" data-testid="ai-error"><h2>Couldn't load AI visibility</h2><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
       {site && d && (
         <>
           {/* One chip for everything the address narrows or opens here; its clear control drops all of it (the question too). */}
@@ -283,7 +283,7 @@ export default function SeoAiPage() {
           {filtering && (
             <section className="mb-6" data-testid="ai-answers">
               <p className="g-text-2 mb-2 text-[12px]">Every saved answer that matches. The figures in "The picture so far" count only the newest answer to each question from each assistant (and, at the top, only those from the last weeks), so a count there can be smaller than this list.</p>
-              {listed.length === 0 ? <Empty testId="ai-answers-none"><h3>No saved answer matches</h3><p>Clear the narrowing above, or ask the assistants again.</p></Empty> : (
+              {listed.length === 0 ? <Empty testId="ai-answers-none"><h2>No saved answer matches</h2><p>Clear the narrowing above, or ask the assistants again.</p></Empty> : (
                 <div className="overflow-x-auto"><table className="g-table w-full" data-testid="table-ai-answers">
                   <thead><tr><th>Asked</th><th>Question</th><th>Assistant</th><th>Named you</th><th>Used your website</th><th>Businesses it named</th></tr></thead>
                   {/* Each cell opens the saved answers it is one of: the date its month, a verdict the answers to that question that say the same. */}
@@ -304,7 +304,7 @@ export default function SeoAiPage() {
           <AiSummaryPanel site={site} />
           {!d.businessName && (
             <form className="g-callout mb-4" onSubmit={(e) => { e.preventDefault(); if (name.trim()) saveName.mutate(); }} data-testid="form-ai-business-name">
-              <h3>First: what is your business called?</h3>
+              <h2>First: what is your business called?</h2>
               <p>An answer usually names a business, not its web address. Enter the name exactly as on your Google Business Profile so we can tell whether you were named.</p>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row"><label className="min-w-0 flex-1 sm:max-w-sm"><span className="sr-only">Business name</span><input className="g-input w-full" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="Alpine Exteriors" data-testid="input-ai-business-name" /></label>
                 <Button type="submit" disabled={!name.trim() || saveName.isPending}>{saveName.isPending ? "Saving…" : "Save name"}</Button></div>
@@ -322,13 +322,13 @@ export default function SeoAiPage() {
               </div>
             </fieldset>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Button type="submit" disabled={!ready || ask.isPending || !status.data?.configured || !can(status.data, hold)} data-testid="button-ai-ask">{ask.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Asking — up to a minute…</> : `Ask${price != null && engines.length ? ` — about ${money(price)}` : ""}`}</Button>
+              <Button type="submit" disabled={!ready || ask.isPending || !status.data?.configured || !can(status.data, hold)} data-testid="button-ai-ask">{ask.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Asking — up to a minute…</> : `Ask${!hideSeoPrices() && price != null && engines.length ? ` — about ${money(price)}` : ""}`}</Button>
               <span className="g-text-2 text-[13px]">{!can(status.data, hold) ? `You need ${hold != null ? money(hold) : "more"} of SEO data available to start (the most it can cost) — add credit above.` : "Each assistant is asked with its web search on, as a customer would use it. Answers vary from one day to the next; the history shows the trend."}</span>
             </div>
           </form>
 
-          {d.prompts.length === 0 && !shown && !ask.isPending && <Empty testId="ai-empty"><h3>Nothing asked yet</h3><p>Ask the question your customers ask — "best roofing contractor in my city" — and see which businesses each assistant names, and which websites it relied on.</p></Empty>}
-          {openPrompt !== null && !shown && d.prompts.length > 0 && !ask.isPending && <Empty testId="ai-prompt-missing"><h3>No saved answers to "{openPrompt}"</h3><p>It has not been asked for {site.domain}, or its answers are older than the history keeps. <Link href={seoLinks.ai(site.id)} className={TEXT_LINK}>Show the newest question</Link></p>{byPrefix.length > 1 && <p className="mt-1">{byPrefix.length} saved questions begin that way: {byPrefix.map((p, i) => <span key={p.prompt}>{i > 0 && " · "}<Link href={seoLinks.ai(site.id, { prompt: p.prompt })} className={TEXT_LINK}>"{p.prompt}"</Link></span>)}</p>}</Empty>}
+          {d.prompts.length === 0 && !shown && !ask.isPending && <Empty testId="ai-empty"><h2>Nothing asked yet</h2><p>Ask the question your customers ask — "best roofing contractor in my city" — and see which businesses each assistant names, and which websites it relied on.</p></Empty>}
+          {openPrompt !== null && !shown && d.prompts.length > 0 && !ask.isPending && <Empty testId="ai-prompt-missing"><h2>No saved answers to "{openPrompt}"</h2><p>It has not been asked for {site.domain}, or its answers are older than the history keeps. <Link href={seoLinks.ai(site.id)} className={TEXT_LINK}>Show the newest question</Link></p>{byPrefix.length > 1 && <p className="mt-1">{byPrefix.length} saved questions begin that way: {byPrefix.map((p, i) => <span key={p.prompt}>{i > 0 && " · "}<Link href={seoLinks.ai(site.id, { prompt: p.prompt })} className={TEXT_LINK}>"{p.prompt}"</Link></span>)}</p>}</Empty>}
           {shown && (
             <section className="mt-5" data-testid="ai-result">
               {/* The question on screen is an address (?prompt=), so a report or a colleague can link straight to it. */}

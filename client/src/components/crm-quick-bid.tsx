@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { InfoTip } from "@/components/info-tip";
@@ -203,7 +203,7 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
           data-testid={step === "pick" ? "dialog-quick-bid" : "dialog-quick-bid-review"}>
           {step === "pick" ? (
             <>
-              <DialogHeader><DialogTitle>Quick Bid — price from the report</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>Quick Bid — price from the report</DialogTitle><DialogDescription>Pick the line items to price from this measurement report, then review the estimate.</DialogDescription></DialogHeader>
               {measurement && (
                 <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm"
                   data-testid="text-quick-bid-measurement">
@@ -323,6 +323,7 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
         <DialogContent data-testid="dialog-quick-bid-send">
           <DialogHeader>
             <DialogTitle>Send estimate {estimate?.number}</DialogTitle>
+            <DialogDescription>Email the estimate to the client with a link to review and approve it.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>

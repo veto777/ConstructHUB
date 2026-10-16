@@ -20,3 +20,10 @@ export const savedForWords = (days: number): string => (days === 7 ? "a week" : 
  */
 export const authorityOf = (rank: number | null | undefined): number | null =>
   rank == null || !Number.isFinite(rank) ? null : Math.max(0, Math.min(100, Math.round(rank / 10)));
+
+/** Content explorer's "Published" filter: any whole number of days up to two years (server/seo/content.ts contentInput.sinceDays). */
+export const SEO_CONTENT_SINCE_MAX_DAYS = 730;
+/** A minimum-authority filter on the 0–100 scale above: 1 to 100 (contentInput.minAuthority). */
+export const SEO_AUTHORITY_MIN = 1, SEO_AUTHORITY_MAX = 100;
+/** How deep a rank check reads a results page: 10 to 100 results (server/seo/routes.ts siteInput.serpDepth). */
+export const SEO_SERP_DEPTH_MIN = 10, SEO_SERP_DEPTH_MAX = 100;

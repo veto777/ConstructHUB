@@ -32,6 +32,12 @@ export function applySeoHead(location: string) {
   link.href = canonical;
   setMeta("property", "og:url", canonical);
 
+  // A noindex app page (/auth) keeps its robots meta while shown, and a page reached from it drops the one the
+  // server wrote (the 404 page's noindex goes the same way once the visitor moves to a real page).
+  const robots = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+  if (APP_PAGE_META[path]?.noindex) setMeta("name", "robots", "noindex");
+  else if (robots?.content === "noindex") robots.remove();
+
   const head = seoHeadFor(path);
   const current = document.head.querySelector<HTMLScriptElement>('script[type="application/ld+json"][data-seo="jsonld"]');
   const text = head ?? APP_PAGE_META[path];

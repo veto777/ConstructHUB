@@ -20,6 +20,7 @@ import { lsaLeads, lsaAccounts, lsaConnections, type LsaConnection, type LsaAcco
 import { and, eq, count, inArray, sql } from "drizzle-orm";
 import { storage } from "../storage";
 import { recordFailure } from "../ops/issues";
+import { logError } from "../ops/log";
 
 const CUSTOMER_CLIENT_QUERY = `
   SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager, customer_client.status, customer_client.level
@@ -373,7 +374,7 @@ export async function syncAccount(conn: LsaConnection, account: LsaAccount): Pro
       isLsaEnrolled: true,
     });
   } catch (e) {
-    console.error(`[lsa] manager-account bridge failed for ${cid}:`, e);
+    logError(`[lsa] manager-account bridge failed for ${cid}:`, e);
   }
 
   // DM the owner about brand-new leads (sequential, best-effort).

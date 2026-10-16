@@ -2,7 +2,7 @@ import { Tabs, TabsTrigger } from "@/components/ui/tabs";
 import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid, GoogleList, GoogleListRow } from "@/components/google";
 import { HelpButton } from "@/components/help-button";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { useAppOrigin } from "@/lib/app-origin";
 import { useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
@@ -215,7 +215,7 @@ export default function ClickGuardPage() {
   const [ipSearch, setIpSearch] = useState("");
   const [blockIpInput, setBlockIpInput] = useState("");
 
-  const { data: domains = [], isLoading: domainsLoading } = useQuery<DomainWithStats[]>({
+  const { data: domains = [], isLoading: domainsLoading, isError: domainsError } = useQuery<DomainWithStats[]>({
     queryKey: ["/api/click-guard/domains"],
   });
 
@@ -434,6 +434,12 @@ export default function ClickGuardPage() {
                 <div className="flex items-center justify-center py-20">
                   <div className="animate-spin h-8 w-8 border-2 border-border border-t-transparent rounded-full" />
                 </div>
+              ) : domainsError && !selectedDomain ? (
+                <Section flush className="bg-card border-border">
+                  <CardContent className="p-8 text-center" role="alert" data-testid="text-domains-error">
+                    <p className="text-sm text-destructive">Couldn't load your domains — refresh to try again. This is a failed request, not an empty account.</p>
+                  </CardContent>
+                </Section>
               ) : !selectedDomain ? (
                 <>
                 <Section flush className="bg-card border-border">
@@ -444,9 +450,9 @@ export default function ClickGuardPage() {
                     <GooglePill icon={Plus} label="Add your first domain" onClick={() => setShowAddDomain(true)} testId="button-add-first-domain" />
                   </CardContent>
                 </Section>
-                  <SamplePreview what={activeTab === "dashboard" ? "what the Dashboard shows once a website is tracked" : "what Click Guard shows once a website is tracked"} testId="sample-click-guard" className="mt-4" cta={<GooglePill size="sm" variant="solid" icon={Plus} label="Add your first domain" onClick={() => setShowAddDomain(true)} />}>
+                  {showSample({ isLoading: domainsLoading, isError: domainsError, total: domains.length }) && <SamplePreview what={activeTab === "dashboard" ? "what the Dashboard shows once a website is tracked" : "what Click Guard shows once a website is tracked"} testId="sample-click-guard" className="mt-4" cta={<GooglePill size="sm" variant="solid" icon={Plus} label="Add your first domain" onClick={() => setShowAddDomain(true)} />}>
                     <SampleDashboard />
-                  </SamplePreview>
+                  </SamplePreview>}
                 </>
               ) : (
                 <>

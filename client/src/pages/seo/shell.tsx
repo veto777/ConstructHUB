@@ -21,10 +21,10 @@ import { AppPage } from "@/components/app-ui";
 import { SegmentedTabs, useToolSlot } from "@/components/tool";
 import { Button } from "@/components/ui/button";
 import { planRequiredFrom } from "@/components/plan-required";
-import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PLANS } from "@shared/plans";
-import { SEO_SAVED_DAYS, savedForWords } from "@shared/seo-constants";
+import { SEO_SAVED_DAYS, SEO_SERP_DEPTH_MAX, SEO_SERP_DEPTH_MIN, savedForWords } from "@shared/seo-constants";
 import { inNativeApp } from "@/lib/app-shell";
 import { seoLinks, setParam } from "./links";
 
@@ -79,10 +79,21 @@ export const unitsLeft = (u: Unit | undefined) => !u ? 0 : u.limit < 0 ? Infinit
 /** Cents as dollars: "$1.04". */
 export const money = (cents: number | null | undefined) => cents == null ? "—" : `$${(cents / 100).toFixed(2)}`;
 /** "about $1.04" for a price shown before a lookup runs. */
-export const priceOf = (status: SeoStatus | undefined, key: keyof SeoPrices) => status?.prices ? `about ${money(status.prices[key])}` : "";
+/** Unlimited SEO data (-1): nothing a lookup uses is charged, so prices are not shown. */
+export const seoUnlimited = (s: Pick<SeoStatus, "credits"> | undefined) => s?.credits?.includedCents === -1 || s?.credits?.availableCents === -1;
+/**
+ * Whether prices are left off buttons and notes: the plan's SEO data is unlimited, so a lookup costs the customer
+ * nothing (review w2-agent10: "Analyse · $1.20" under "SEO data this month unlimited"). Read from the status every SEO
+ * page already holds (useSeoStatus), so it changes with it. Gating ("can I afford it") never uses this.
+ */
+export const hideSeoPrices = () => seoUnlimited(queryClient.getQueryData<SeoStatus>(["/api/seo/status"]));
+export const priceOf = (status: SeoStatus | undefined, key: keyof SeoPrices) => status?.prices && !seoUnlimited(status) ? `about ${money(status.prices[key])}` : "";
+/** A price suffix for a button or note (" — about $1.20"), or "" when the price is unknown or the plan's SEO data is unlimited. */
+export const priceSuffix = (status: Pick<SeoStatus, "credits"> | undefined, cents: number | null | undefined, words = " — about ") =>
+  cents != null && !seoUnlimited(status) ? `${words}${money(cents)}` : "";
 /** Enough credit for this lookup? (true while the status is loading, so buttons are not disabled for nothing) */
 export const canAfford = (status: SeoStatus | undefined, key: keyof SeoPrices) =>
-  !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= (status.holds?.[key] ?? status.prices[key] ?? 0);
+  !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= (status.holds?.[key] ?? status.prices?.[key] ?? 0);
 
 /**
  * After something changed what the worker-fed pages show (keywords tracked, a site added): every tracked-site view,
@@ -94,7 +105,7 @@ export const refreshSeoData = (qc: { invalidateQueries: (f: { predicate: (q: { q
 /** Says so when more than the typical price is set aside while a lookup runs. */
 export const holdNote = (status: SeoStatus | undefined, key: keyof SeoPrices) => {
   const hold = status?.holds?.[key], price = status?.prices?.[key];
-  return hold != null && price != null && hold > price ? ` Up to ${money(hold)} is set aside while it runs; what isn't used comes straight back.` : "";
+  return hold != null && price != null && hold > price && !seoUnlimited(status) ? ` Up to ${money(hold)} is set aside while it runs; what isn't used comes straight back.` : "";
 };
 
 /** A saved-copy check that answered 404: not run yet, or run and expired (saved.ts `lastRunAt`) — as opposed to a check that failed. */
@@ -255,7 +266,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
           <PlanGate requiredPlan={gate.requiredPlan} message={gate.message} />
         ) : (
           <>
-            {picker && sites.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-sites-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>}
+            {picker && sites.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-sites-error"><h2>Couldn't load your sites</h2><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>}
             {status.data && !status.data.configured && spends && <NotReadyNotice spends={spends} />}
             {children}
             <details className="tool-about"><summary>How dates are counted</summary><p data-testid="seo-dates-note">Dates of checks, crawls and reports are UTC days — the day each is filed under; in the US evening that is already the next day.</p></details>
@@ -269,7 +280,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
 function PlanGate({ requiredPlan, message }: { requiredPlan: keyof typeof PLANS; message: string }) {
   return (
     <div className="g-callout" data-testid="seo-plan-gate">
-      <h3>ConstructHUB SEO is included with the {PLANS[requiredPlan].name} plan</h3>
+      <h2>ConstructHUB SEO is included with the {PLANS[requiredPlan].name} plan</h2>
       <p>{message}</p>
       <p className="mt-1">Accounts that already have the SEO tools keep them.</p>
       <div className="mt-3"><Link href={seoLinks.pricing()} className="g-pill g-pill--solid">See {PLANS[requiredPlan].name}</Link></div>
@@ -333,7 +344,7 @@ function UsageLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
       )}
       {adding && canBuy && (
         <div className="g-callout mt-2" data-testid="panel-add-credit">
-          <h3>Add SEO data credit</h3>
+          <h2>Add SEO data credit</h2>
           <p>Prepaid, used only after this month's included allowance, and it doesn't expire. Paid by card through Stripe; a receipt is emailed.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {(status.data?.packs ?? []).map((cents) => (
@@ -371,7 +382,7 @@ export function DataSourceCard({ admin }: { admin: NonNullable<SeoStatus["admin"
   const pct = admin.capUsd > 0 ? Math.min(100, Math.round((admin.spentUsd / admin.capUsd) * 100)) : 100;
   return (
     <div className="g-callout mb-5" data-testid="seo-admin-data-source">
-      <h3>Data source <span className="g-text-2 text-[12px] font-normal">· platform admins only</span></h3>
+      <h2>Data source <span className="g-text-2 text-[12px] font-normal">· platform admins only</span></h2>
       <p>
         {admin.vendor}: <b className="g-text font-medium">{admin.configured ? "connected" : "not connected"}</b>
         {" · "}wholesale spend {admin.month}: <b className="g-text font-medium">{fmtUsd(admin.spentUsd)}</b> of the {fmtUsd(admin.capUsd)} internal cap ({pct}%)
@@ -413,14 +424,14 @@ const DEPTHS = [
   { depth: 100, label: "Top 100" },
 ];
 /** How deep a check reads, as the server accepts it (siteInput.serpDepth: 10 to 100 results). */
-export const DEPTH_MIN = 10, DEPTH_MAX = 100;
-export const DEVICE_OPTIONS: [SeoSite["devices"], string][] = [["both", "Desktop + mobile"], ["desktop", "Desktop only"], ["mobile", "Mobile only"]];
+const DEPTH_MIN = SEO_SERP_DEPTH_MIN, DEPTH_MAX = SEO_SERP_DEPTH_MAX;
+const DEVICE_OPTIONS: [SeoSite["devices"], string][] = [["both", "Desktop + mobile"], ["desktop", "Desktop only"], ["mobile", "Mobile only"]];
 
 /**
  * "How deep to check": the usual depths, plus "Custom…" for any depth the server takes (10–100 results) — a preset
  * list never shuts out a number the server would accept (owner's rule, 2026-10-15).
  */
-export function DepthPicker({ value, onChange, disabled, testId = "select-site-depth" }: { value: number; onChange: (depth: number) => void; disabled?: boolean; testId?: string }) {
+function DepthPicker({ value, onChange, disabled, testId = "select-site-depth" }: { value: number; onChange: (depth: number) => void; disabled?: boolean; testId?: string }) {
   const preset = DEPTHS.some((d) => d.depth === value);
   const [custom, setCustom] = useState(!preset);
   const [draft, setDraft] = useState(String(value));

@@ -146,7 +146,7 @@ export function businessToolsMatrix(): PlanMatrixSection[] {
     { key: "competitorScans", label: "Competitor Intel scans / month", cell: (p) => count(p.limits.competitorScans) },
     { key: "citationAudits", label: "Citation audits / month", cell: (p) => count(p.limits.citationAudits) },
     // ── Texting ───────────────────────────────────────────────────────────
-    { key: "teamTexts", label: "Team text alert segments / month", cell: (p) => count(p.limits.teamTextSegments) },
+    { key: "teamTexts", label: "Team text alerts / month (a long text counts as 2 or more)", cell: (p) => count(p.limits.teamTextSegments) },
     {
       key: "clientTextingNumber", label: "Client-texting number on our carrier",
       cell: (p) =>
@@ -265,7 +265,7 @@ export function crmMatrixRows(): CrmMatrixRow[] {
     crmRow({ key: "scheduling", label: "Scheduling & dispatch calendar", cell: (p) => p.limits.scheduling }),
     crmRow({ key: "clientPortal", label: "Client portal", cell: (p) => p.limits.clientPortal }),
     crmRow({ key: "jobCosting", label: "Change orders + job costing", cell: (p) => p.limits.jobCosting }),
-    crmRow({ key: "teamTexts", label: "Team text alert segments / month", cell: (p) => crmCount(p.limits.teamTextSegments) }),
+    crmRow({ key: "teamTexts", label: "Team text alerts / month (a long text counts as 2 or more)", cell: (p) => crmCount(p.limits.teamTextSegments) }),
     crmRow({
       key: "clientTexting", label: "Client texting",
       cell: (p) =>

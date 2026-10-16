@@ -5,25 +5,28 @@
  */
 import { dq } from "../pool";
 import { EMPTY, int, iso, metric, num, ok, watch, type TileSources } from "./types";
+import { loadGoogleConnection } from "../../gbp/connection-status";
 
 export const growTiles: TileSources = {
   async gbp(ctx) {
-    const [[r], locations] = await Promise.all([
-      dq(`SELECT (SELECT count(*)::int FROM gbp_grants WHERE user_id=$1) grants,
-                 (SELECT count(*)::int FROM gbp_grants WHERE user_id=$1 AND reconnect_required) reconnect,
-                 (SELECT count(DISTINCT s.location_id)::int FROM gbp_sync_status s
+    // The connection state is the shared truth every Google page prints (shared/gbp-connection.ts), not a grant count.
+    const [[r], locations, google] = await Promise.all([
+      dq(`SELECT (SELECT count(DISTINCT s.location_id)::int FROM gbp_sync_status s
                     JOIN business_locations l ON l.id=s.location_id AND l.user_id=$1
                    WHERE s.last_error IS NOT NULL) sync_issues`, [ctx.userId]),
       ctx.locations(),
+      loadGoogleConnection(ctx.userId, { query: (sql, params) => dq(sql, params) }),
     ]);
-    if (!int(r.grants) && !locations) return EMPTY;
-    const reconnect = int(r.reconnect);
+    if (google.state === "not_connected" && !locations) return EMPTY;
+    const tone = google.state === "connected" ? "good" : google.state === "needs_reconnect" ? "warn" : undefined;
     // Results first; the location quota is the header's meter, so it comes last here.
     return ok([
-      metric("googleAccounts", "Google accounts", int(r.grants), "count", reconnect ? { hint: `${reconnect} need${reconnect === 1 ? "s" : ""} reconnecting`, tone: "warn" } : {}),
+      metric("googleConnection", "Google connection", google.label, "text", { hint: google.state === "needs_reconnect" ? "Google access ended" : undefined, tone }),
+      metric("lastSync", "Last sync", iso(google.lastSync), "datetime"),
       metric("syncIssues", "Sync issues", int(r.sync_issues), "count", { tone: watch(int(r.sync_issues)) }),
       metric("locations", "Locations linked", locations, "count", { limit: ctx.ent.allowances?.locations }),
-    ], int(r.grants) ? undefined : { label: "Connect Google", href: "/locations", surface: "app" });
+    ], google.state === "not_connected" ? { label: "Connect Google", href: "/locations", surface: "app" }
+      : google.state === "needs_reconnect" ? { label: "Reconnect Google", href: "/locations", surface: "app" } : undefined);
   },
 
   async reviews(ctx) {

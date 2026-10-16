@@ -6,6 +6,7 @@
  */
 import { z } from "zod";
 import { request, assertOk, taskItems, safeHttpUrl, safeDomain, normalizeDomain } from "./dataforseo";
+import { SEO_AUTHORITY_MAX, SEO_AUTHORITY_MIN, SEO_CONTENT_SINCE_MAX_DAYS } from "@shared/seo-constants";
 
 export const CONTENT_ESTIMATE_USD = 0.03, CONTENT_TYPICAL_USD = 0.0245;
 export const CONTENT_SORTS = { relevance: "score,desc", authority: "domain_rank,desc", newest: "content_info.date_published,desc" } as const;
@@ -15,9 +16,9 @@ export const contentInput = z.object({
   query: z.string().trim().min(2).max(120).regex(/^[^%_\\]+$/, "No % _ or \\ in the search text"),
   sort: z.enum(["relevance", "authority", "newest"]).default("relevance"),
   /** Only pages published in the last N days (the page offers 30 / 90 / 365 / 730 and takes any number up to two years). */
-  sinceDays: z.number().int().min(1).max(730).optional(),
+  sinceDays: z.number().int().min(1).max(SEO_CONTENT_SINCE_MAX_DAYS).optional(),
   /** Only sites with at least this authority (0–100). */
-  minAuthority: z.number().int().min(1).max(100).optional(),
+  minAuthority: z.number().int().min(SEO_AUTHORITY_MIN).max(SEO_AUTHORITY_MAX).optional(),
   kind: z.enum(CONTENT_KINDS).optional(),
   /** Leave out one site (usually the customer's own). */
   exclude: z.string().max(253).refine((v) => !!normalizeDomain(v), "Enter the website to leave out like example.com").optional(),

@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { StatusPill, type PillTone } from "@/components/crm-ui";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle } from "@/lib/page-titles";
 import { VerificationCancelled } from "@/components/recent-auth";
 import { cn } from "@/lib/utils";
 
@@ -270,7 +271,7 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
 }
 
 export default function AdminIssuesPage() {
-  useDocumentTitle("Issues | ConstructHUB");
+  useDocumentTitle(appPageTitle("/admin/issues")!);
   const [status, setStatusFilter] = useState<IssueStatus | "all">("all");
   const [source, setSource] = useState<string>("all");
   const [openId, setOpenId] = useState<number | null>(null);
@@ -356,6 +357,9 @@ export default function AdminIssuesPage() {
             <p className="mt-1 text-sm text-muted-foreground">When something fails, it shows up here and Claude takes a look.</p>
           </div>
         ) : (
+          <>
+          {/* Each row's title is an h3 (GoogleListRow); the list gets its h2 for screen readers only, so the outline doesn't skip. */}
+          <h2 className="sr-only">Issue list</h2>
           <GoogleList as="ul" testId="list-issues">
             {data.issues.map((i) => (
               <GoogleListRow
@@ -378,6 +382,7 @@ export default function AdminIssuesPage() {
               />
             ))}
           </GoogleList>
+          </>
         )}
       </div>
       {data.total > data.issues.length && (

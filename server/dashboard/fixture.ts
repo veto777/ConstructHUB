@@ -34,7 +34,7 @@ const HOUR = 3_600_000, DAY = 24 * HOUR;
 /** Sample metrics for a set-up account. */
 function fullMetrics(key: DashboardTileKey, now: Date, limits: PlanLimits): DashboardMetric[] {
   switch (key) {
-    case "gbp": return [m("googleAccounts", "Google accounts", 1, "count"), m("syncIssues", "Sync issues", 0, "count", { tone: "good" }), m("locations", "Locations linked", 2, "count", { limit: limits.locations })];
+    case "gbp": return [m("googleConnection", "Google connection", "Connected", "text", { tone: "good" }), m("lastSync", "Last sync", ago(now, 3 * HOUR), "datetime"), m("syncIssues", "Sync issues", 0, "count", { tone: "good" }), m("locations", "Locations linked", 2, "count", { limit: limits.locations })];
     case "reviews": return [m("rating", "Average rating", 4.7, "rating"), m("newThisWeek", "New this week", 3, "count", { tone: "good" }), m("unanswered", "Awaiting reply", 2, "count", { tone: "warn" })];
     case "profileGuard": return [m("pending", "Edits to review", 1, "count", { tone: "warn" }), m("guarded", "Locations guarded", 2, "count"), m("lastCheck", "Last check", ago(now, 12 * 60_000), "datetime")];
     case "rankingGrid": return [m("averageRank", "Average rank (last grid)", "4.2", "text"), m("lastScan", "Last grid", ago(now, 3 * DAY), "datetime"), m("credits", "Credits used", 6, "count", { limit: limits.gridCredits, hint: "this month" })];

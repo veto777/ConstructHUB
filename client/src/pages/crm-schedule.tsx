@@ -17,7 +17,7 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone,
 } from "@/components/crm-ui";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SampleScheduleList = lazySample(() => import("@/components/crm-sample-previews"), "SampleScheduleList");
 import { cn } from "@/lib/utils";
 
@@ -119,7 +119,7 @@ export default function CrmSchedulePage() {
     enabled: view !== "agenda",
   });
 
-  const { data: agendaData, isLoading: agendaLoading, isError: agendaError } = useQuery<{ days: number; appointments: Appointment[] }>({
+  const { data: agendaData, isLoading: agendaLoading, isError: agendaError } = useQuery<{ days: number; appointments: Appointment[]; orgHasVisits?: boolean }>({
     queryKey: ["/api/crm/schedule", `?days=${days}`],
     queryFn: async () => {
       const r = await fetch(`/api/crm/schedule?days=${days}`, { credentials: "include" });
@@ -254,7 +254,7 @@ export default function CrmSchedulePage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Select value={scope} onValueChange={setScope}>
-              <SelectTrigger className="h-8 w-[180px] text-xs" data-testid="select-calendar-scope">
+              <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Whose calendar" data-testid="select-calendar-scope">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -297,13 +297,13 @@ export default function CrmSchedulePage() {
       {view !== "agenda" && (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => shift(-1)} data-testid="button-cal-prev">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => shift(-1)} aria-label="Previous" data-testid="button-cal-prev">
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" className="h-8" onClick={() => setCursor(new Date())} data-testid="button-cal-today">
               Today
             </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => shift(1)} data-testid="button-cal-next">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => shift(1)} aria-label="Next" data-testid="button-cal-next">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -448,17 +448,21 @@ export default function CrmSchedulePage() {
               <div className="rounded-xl border bg-card">
                 <EmptyState
                   icon={CalendarDays}
-                  title={scope === "all"
-                    ? `Nothing scheduled in the next ${days} days`
-                    : `No visits for this filter in the next ${days} days`}
+                  title={scope !== "all"
+                    ? `No visits for this filter in the next ${days} days`
+                    : agendaData?.orgHasVisits
+                      ? `Nothing in this range — no visits in the next ${days} days`
+                      : `Nothing scheduled in the next ${days} days`}
                   description={canManage
                     ? "Click a day on the calendar (or the Add button) to book your first visit."
                     : "Visits booked on your projects will show up here, grouped by day."}
                 />
               </div>
-              {/* Only when nobody's calendar has anything coming: the server's list is empty before the crew
-                  filter is applied, so an empty "My calendar" with visits elsewhere shows no sample. */}
-              {(agendaData?.appointments.length ?? 0) === 0 && (
+              {/* Only when the org has no visit at all (orgHasVisits: any date, any status, before the seat's
+                  visibility rule) — not when the visits fall outside the N-day window, sit on someone else's
+                  calendar, or are hidden from this seat. An older server without the flag never shows the sample. */}
+              {showSample({ isLoading: agendaLoading, isError: agendaError,
+                total: agendaData?.appointments.length || (agendaData?.orgHasVisits === false ? 0 : undefined) }) && (
                 <SampleScheduleList cta={canManage ? (
                   <Button size="sm" variant="outline" className="max-sm:min-h-11" onClick={() => openCreate(new Date())} data-testid="button-add-appointment-sample">
                     <Plus className="h-4 w-4 mr-1" /> Book your first visit

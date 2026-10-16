@@ -21,7 +21,7 @@ import { Download, ListPlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, useAddress, type SeoSite, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, useAddress, type SeoSite, type SeoStatus, hideSeoPrices } from "./shell";
 import { PALETTE } from "./viz";
 import { BarFigure, BLOCK_LINK, FIG_LINK, KdBadge, LINK_CUE, TEXT_LINK } from "./viz-keywords";
 
@@ -192,12 +192,12 @@ export function BulkKeywords({ status, site, onTrack, initial = "", market, onMa
       </form>
       <div className="mt-4">
         {asked.length > 0 && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved analysis…</p>}
-        {asked.length > 0 && saved.isError && <div className="g-callout" role="alert"><h3>Couldn't check for a saved analysis</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
+        {asked.length > 0 && saved.isError && <div className="g-callout" role="alert"><h2>Couldn't check for a saved analysis</h2><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
         {asked.length > 0 && saved.isSuccess && !page && (
           <Empty testId="bulk-not-run">
-            <h3>{asked.length} keyword{asked.length === 1 ? "" : "s"} ready to analyse</h3>
+            <h2>{asked.length} keyword{asked.length === 1 ? "" : "s"} ready to analyse</h2>
             <p>{!canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
-            <Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-bulk-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : `Get the numbers${price != null ? ` — about ${money(price)}` : ""}`}</Button>
+            <Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-bulk-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : `Get the numbers${!hideSeoPrices() && price != null ? ` — about ${money(price)}` : ""}`}</Button>
           </Empty>
         )}
         {page && (
@@ -211,7 +211,7 @@ export function BulkKeywords({ status, site, onTrack, initial = "", market, onMa
                 <button type="button" className={PILL} disabled={!page.rows.length} onClick={() => downloadCsv("keywords.csv", [["Keyword", "Volume", "Difficulty", "CPC", "Intent"], ...page.rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null])])} data-testid="button-bulk-export"><Download /> Export</button>
               </span>
             </div>
-            {page.rows.length > 0 ? <KeywordTable rows={page.rows} picked={picked} toggle={toggle} setPicked={set} market={market} testId="table-bulk" /> : <Empty><h3>No numbers for these keywords</h3><p>None of them has enough searches in the United States to be measured.</p></Empty>}
+            {page.rows.length > 0 ? <KeywordTable rows={page.rows} picked={picked} toggle={toggle} setPicked={set} market={market} testId="table-bulk" /> : <Empty><h2>No numbers for these keywords</h2><p>None of them has enough searches in the United States to be measured.</p></Empty>}
             {page.notFound.length > 0 && <p className="g-text-2 mt-2 text-[13px]" data-testid="text-bulk-notfound">No numbers for {page.notFound.length} keyword{page.notFound.length === 1 ? "" : "s"} (too few searches to measure): {page.notFound.slice(0, 20).join(", ")}{page.notFound.length > 20 ? "…" : ""}</p>}
           </>
         )}
@@ -270,7 +270,7 @@ export function KeywordLists({ status, site, onTrack }: { status: SeoStatus | un
   return (
     <div data-testid="keyword-lists">
       {lists.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your lists…</p>}
-      {lists.isError && <div className="g-callout" role="alert"><h3>Couldn't load your lists</h3><p>{apiErrorMessage(lists.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void lists.refetch()}>Try again</button></div>}
+      {lists.isError && <div className="g-callout" role="alert"><h2>Couldn't load your lists</h2><p>{apiErrorMessage(lists.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void lists.refetch()}>Try again</button></div>}
       {lists.isSuccess && (
         <div className="flex flex-col gap-5 lg:flex-row">
           <div className="flex-none lg:w-64">
@@ -289,9 +289,9 @@ export function KeywordLists({ status, site, onTrack }: { status: SeoStatus | un
             )}
           </div>
           <div className="min-w-0 flex-1">
-            {current === null && all.length === 0 && <Empty testId="lists-empty"><h3>Keep your keyword research</h3><p>A list holds the keywords you want to come back to — by service, by city, by customer. It is free to open and edit; the numbers are the ones each keyword had when you added it, until you refresh them.</p></Empty>}
+            {current === null && all.length === 0 && <Empty testId="lists-empty"><h2>Keep your keyword research</h2><p>A list holds the keywords you want to come back to — by service, by city, by customer. It is free to open and edit; the numbers are the ones each keyword had when you added it, until you refresh them.</p></Empty>}
             {current !== null && items.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Opening the list…</p>}
-            {current !== null && items.isError && <div className="g-callout" role="alert"><h3>Couldn't open the list</h3><p>{apiErrorMessage(items.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void items.refetch()}>Try again</button></div>}
+            {current !== null && items.isError && <div className="g-callout" role="alert"><h2>Couldn't open the list</h2><p>{apiErrorMessage(items.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void items.refetch()}>Try again</button></div>}
             {items.data && (
               <>
                 {/* The chip says what the address opened: a list other than the first (the one shown with no `list`), or a list that no longer exists. */}
@@ -304,12 +304,12 @@ export function KeywordLists({ status, site, onTrack }: { status: SeoStatus | un
                   <span className="ml-auto flex flex-wrap items-center gap-2">
                     {onTrack && site && <button type="button" className={PILL} disabled={!chosen.length} onClick={() => onTrack(chosen, listMarket)} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
                     <button type="button" className={PILL} disabled={!chosen.length || remove.isPending} onClick={() => remove.mutate(chosen.map((r) => r.keyword))} data-testid="button-list-remove"><Trash2 /> Remove {chosen.length || ""}</button>
-                    <button type="button" className={PILL} disabled={!rows.length || renew.isPending || !status?.configured || !affordable(status, price)} onClick={() => renew.mutate()} title={price != null ? `Today's numbers for all ${rows.length} keywords, saved back to this list — about ${money(price)}` : undefined} data-testid="button-list-refresh">{renew.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} {renew.isPending ? "Refreshing…" : `Refresh numbers${price != null && rows.length ? ` · about ${money(price)}` : ""}`}</button>
+                    <button type="button" className={PILL} disabled={!rows.length || renew.isPending || !status?.configured || !affordable(status, price)} onClick={() => renew.mutate()} title={price != null ? `Today's numbers for all ${rows.length} keywords, saved back to this list — about ${money(price)}` : undefined} data-testid="button-list-refresh">{renew.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} {renew.isPending ? "Refreshing…" : `Refresh numbers${!hideSeoPrices() && price != null && rows.length ? ` · about ${money(price)}` : ""}`}</button>
                     <button type="button" className={PILL} disabled={!rows.length} onClick={() => downloadCsv(`${items.data!.list.name.replace(/[^a-z0-9]+/gi, "-")}.csv`, [["Keyword", "Volume", "Difficulty", "CPC", "Intent", "Added"], ...rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null, r.addedAt.slice(0, 10)])])} data-testid="button-list-export"><Download /> Export</button>
                     <button type="button" className={`${PILL} g-pill--danger`} disabled={drop.isPending} onClick={() => { if (window.confirm(`Delete the list "${items.data!.list.name}" and its ${rows.length} keywords? This can't be undone.`)) drop.mutate(items.data!.list.id); }} data-testid="button-list-delete"><Trash2 /> Delete list</button>
                   </span>
                 </div>
-                {rows.length === 0 ? <Empty testId="list-empty"><h3>This list is empty</h3><p>Tick keywords in a keyword report, a bulk analysis or a content gap and choose "Add to a list".</p></Empty>
+                {rows.length === 0 ? <Empty testId="list-empty"><h2>This list is empty</h2><p>Tick keywords in a keyword report, a bulk analysis or a content gap and choose "Add to a list".</p></Empty>
                   : <KeywordTable rows={rows} picked={picked} toggle={toggle} setPicked={set} market={listMarket} onRemove={(k) => remove.mutate([k])} testId="table-list" />}
               </>
             )}

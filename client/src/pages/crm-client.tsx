@@ -224,6 +224,7 @@ function EstimateOptionsDialog({ estimate, open, onOpenChange }: {
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Good / better / best — {estimate.number}</DialogTitle>
+          <DialogDescription>Give the client scope options on this estimate to choose from.</DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
@@ -552,9 +553,11 @@ export default function CrmClientPage() {
     queryKey: ["/api/crm/members"], enabled: !!id && canManageJobs,
   });
 
+  // Only once the client itself has loaded: for a missing or foreign client the
+  // thread would just 404 alongside it.
   const { data: thread } = useQuery<any>({
     queryKey: [`/api/crm/inbox/${id}`],
-    enabled: !!id && canManageCustomers,
+    enabled: !!id && !!data && canManageCustomers,
     retry: false,
   });
 
@@ -927,6 +930,7 @@ export default function CrmClientPage() {
     // point back to the list.
     return (
       <ErrorCard
+        level={1}
         title={connectionProblem ? "Couldn't load this client" : "This client isn't available"}
         description={connectionProblem
           ? "Check your connection and refresh the page."
@@ -1044,7 +1048,7 @@ export default function CrmClientPage() {
                   </Button>
                   <Dialog open={editOpen} onOpenChange={setEditOpen}>
                     <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-client">
-                      <DialogHeader><DialogTitle>Edit {c.displayName}</DialogTitle></DialogHeader>
+                      <DialogHeader><DialogTitle>Edit {c.displayName}</DialogTitle><DialogDescription>Update this client's name and contact details.</DialogDescription></DialogHeader>
                       <div className="space-y-3">
                         <div>
                           <Label htmlFor="edit-name">Name</Label>
@@ -1367,7 +1371,7 @@ export default function CrmClientPage() {
                 <Button size="sm" data-testid="button-new-estimate"><Plus className="h-4 w-4 mr-2" /> New estimate</Button>
               </DialogTrigger>
               <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
-                <DialogHeader><DialogTitle>New estimate for {c.displayName}</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>New estimate for {c.displayName}</DialogTitle><DialogDescription>Add the line items, then save it as a draft or send it.</DialogDescription></DialogHeader>
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="sm:col-span-2">
@@ -1744,7 +1748,7 @@ export default function CrmClientPage() {
                 </Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>New project for {c.displayName}</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>New project for {c.displayName}</DialogTitle><DialogDescription>A project holds the job's schedule, photos, notes and money in one place.</DialogDescription></DialogHeader>
                 <div>
                   <Label htmlFor="p-name">Project name</Label>
                   <Input id="p-name" value={projName} onChange={(e) => setProjName(e.target.value)}
@@ -1903,6 +1907,7 @@ export default function CrmClientPage() {
         <DialogContent data-testid="dialog-schedule-appointment">
           <DialogHeader>
             <DialogTitle>Schedule — {c.displayName}</DialogTitle>
+            <DialogDescription>Put a visit with this client on the calendar.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -1962,6 +1967,7 @@ export default function CrmClientPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Record payment — {payFor?.number}</DialogTitle>
+            <DialogDescription>Log a payment you received outside the app, such as cash or a check.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>

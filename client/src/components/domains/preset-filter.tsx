@@ -17,7 +17,7 @@ import { GooglePill } from "@/components/google";
  * options, and in Chrome every arrow press is a change — an option that swapped the control out would fire
  * on the way past it.
  */
-export function PresetFilter({ label, value, onChange, presets, allLabel, placeholder, selectClass, testId }: {
+export function PresetFilter({ label, value, onChange, presets, allLabel, placeholder, maxLength, selectClass, testId }: {
   /** The accessible name of the control ("Filter registrar"). */
   label: string;
   value: string;
@@ -27,6 +27,8 @@ export function PresetFilter({ label, value, onChange, presets, allLabel, placeh
   /** The "" option: "All registrars". */
   allLabel: string;
   placeholder?: string;
+  /** The longest typed value the server takes (e.g. Mail Alerts' 40-character category/severity). */
+  maxLength?: number;
   selectClass: string;
   testId?: string;
 }) {
@@ -51,6 +53,7 @@ export function PresetFilter({ label, value, onChange, presets, allLabel, placeh
           className="h-10 w-full rounded-full max-sm:h-11 sm:w-44"
           placeholder={placeholder ?? "Type a value and press Enter"}
           value={draft}
+          maxLength={maxLength}
           autoFocus
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}

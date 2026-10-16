@@ -15,7 +15,7 @@ import { AppPage, Notice, Toolbar } from "@/components/app-ui";
 import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { AlertTriangle, ExternalLink, Search } from "lucide-react";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { useToast } from "@/hooks/use-toast";
 import type { EntitlementsInfo } from "@/lib/pricing-display";
 import {
@@ -41,6 +41,15 @@ import { TikTokDeclaration, TikTokPanel } from "@/components/social-tiktok";
 
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass = "h-10 w-full rounded-full border border-input bg-background px-4 text-sm";
+
+/** Post states in words (the server's tokens stay the filter values). */
+const POST_STATE_LABELS: Record<string, string> = {
+  draft: "Draft", queued: "Scheduled", submitting: "Sending", submitted: "Sent, waiting for the network",
+  published: "Published", failed: "Failed", uncertain: "Unconfirmed", cancelled: "Cancelled",
+};
+const postStateLabel = (state: string) => POST_STATE_LABELS[state] ?? state;
+/** One entry per network for the platform filter: "x" and the legacy "twitter" are one network (the server matches both). */
+const PLATFORM_FILTERS = Object.keys(socialLimits).filter((p) => p !== "twitter");
 /** The sample posts shown while a business has none (SamplePreview rules: obviously made up, never stored or sent). */
 const SAMPLE_POSTS = [
   { id: "s1", platform: "facebook", state: "Scheduled", when: "Mon 9:00 AM", text: "Sample Roofing Co. finished a full roof replacement on Example St this week — call for a free estimate." },
@@ -275,6 +284,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   const setTab = (v: string) => navigate(socialHref(v === "queue" ? "posts" : (v as SocialView), all ? "all" : String(businessId)));
   // Posts: the menu's All / Drafts / Scheduled / Published / Failed is ?state=; Inbox and Analytics list published posts.
   const [stateParam] = useUrlParam("state");
+  const publishedView = view === "inbox" || view === "analytics";
   useEffect(() => {
     const want = view === "inbox" || view === "analytics" ? "published" : view === "posts" ? (stateParam ?? "") : null;
     if (want !== null) { setPostState(want); setOffset(0); }
@@ -948,24 +958,27 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                     onChange={(e) => { setCalendarDate(e.target.value); setOffset(0); }}
                   />
                 </label>
-                <label className="block space-y-1.5">
+                {/* Analytics and Inbox list published posts only, so a status filter has nothing to choose. */}
+                {!publishedView && <label className="block space-y-1.5">
                   <span className="text-sm font-medium">Status</span>
-                  <select aria-label="Post status filter" className={selectClass} value={postState} onChange={e => { setPostState(e.target.value); setOffset(0); }}>{["", "draft", "queued", "submitting", "submitted", "published", "failed", "uncertain", "cancelled"].map(s => <option key={s} value={s}>{s || "All statuses"}</option>)}</select>
-                </label>
+                  <select aria-label="Post status filter" className={selectClass} value={postState} onChange={e => { setPostState(e.target.value); setOffset(0); }}>{["", "draft", "queued", "submitting", "submitted", "published", "failed", "uncertain", "cancelled"].map(s => <option key={s} value={s}>{s ? postStateLabel(s) : "All statuses"}</option>)}</select>
+                </label>}
                 <label className="block space-y-1.5">
                   <span className="text-sm font-medium">Platform</span>
-                  <select aria-label="Post platform filter" className={selectClass} value={postPlatform} onChange={e => { setPostPlatform(e.target.value); setOffset(0); }}>{["", ...Object.keys(socialLimits)].map(p => <option key={p} value={p}>{p || "All platforms"}</option>)}</select>
+                  <select aria-label="Post platform filter" className={selectClass} value={postPlatform} onChange={e => { setPostPlatform(e.target.value); setOffset(0); }}>{["", ...PLATFORM_FILTERS].map(p => <option key={p} value={p}>{p === "x" ? "X (Twitter)" : p ? networkName(p) : "All platforms"}</option>)}</select>
                 </label>
               </>}
             />
             {!error && !queuePosts.length && (
               <p className="text-sm text-muted-foreground" data-testid="text-social-posts-empty">
-                {postSearch || postState || postPlatform || calendarDate
+                {postSearch || (postState && !publishedView) || postPlatform || calendarDate
                   ? "No posts match your search or filters."
+                  : view === "inbox" ? "No published posts yet, so there are no comments to answer. Comments on your published posts show up here."
+                  : view === "analytics" ? "No published posts yet. Once a post is published, it shows here next to your accounts’ reach and engagement."
                   : "No posts yet. Compose your first update or generate an AI draft."}
               </p>
             )}
-            {!error && !isLoading && !queuePosts.length && !(postSearch || postState || postPlatform || calendarDate) && (
+            {showSample({ isLoading, isError: !!error, total: queuePosts.length, filtered: !!(postSearch || postState || postPlatform || calendarDate), page: offset }) && (
               <SamplePreview what="what your posts list looks like" testId="sample-social-posts"
                 cta={!all && <GooglePill size="sm" variant="solid" href={socialHref("compose", String(businessId))} label="Write a post" />}>
                 <GoogleList>
@@ -977,6 +990,8 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
               </SamplePreview>
             )}
             <p className="text-sm text-muted-foreground">{error ? "Post count unavailable" : `${data?.total ?? 0} matching posts`}</p>
+            {/* Approve / cancel act on drafts and scheduled posts; Analytics and Inbox list published posts only. */}
+            {!publishedView && <>
             <div className="flex flex-wrap gap-2">
               <GooglePill size="sm" onClick={() => setSelected((old) => ({ ...old, ...Object.fromEntries(queuePosts.filter((p: any) => ["draft", "queued"].includes(p.state)).map((p: any) => [p.id, p.business_name || "Legacy / unassigned"])) }))} label="Select this page of posts" />
               <GooglePill size="sm" disabled={!selectedPosts.length} onClick={() => { setSelected({}); setBulkFailed([]); }} label="Clear selection" testId="button-clear-selection" />
@@ -992,6 +1007,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                 <GooglePill size="sm" variant="quiet" label="Discard all edits" testId="button-discard-all-edits" onClick={discardAllEdits} />
               </div>
             )}
+            </>}
             {bulkErrors.map((error, i) => <p role="alert" key={i} className="text-sm text-destructive">{error}</p>)}
             <Pager offset={offset} setOffset={setOffset} more={offset + 25 < (data?.total || 0)} label="posts" />
             {queuePosts.length > 0 && <GoogleList testId="list-social-posts">
@@ -1438,7 +1454,7 @@ function PostRow({
     <article className="g-card space-y-2" data-testid={`card-post-${p.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         {["draft", "queued"].includes(p.state) && <input type="checkbox" aria-label={`Select post ${p.id}`} checked={selected} onChange={e => onSelect(e.target.checked)} />}
-        <span className={`g-chip g-chip--sm ${p.state === "failed" ? "g-closed" : p.state === "published" ? "g-open" : ""}`}>{p.state}</span>
+        <span className={`g-chip g-chip--sm ${p.state === "failed" ? "g-closed" : p.state === "published" ? "g-open" : ""}`}>{postStateLabel(p.state)}</span>
         <span className="g-card__title g-card__title--md">{p.business_name || "Legacy / unassigned"}</span>
         <NetworkBadge platform={p.payload.post.content.platform} className="text-sm g-text-2" />
         <span className="text-sm g-text-2">
@@ -1601,7 +1617,7 @@ function SocialOverview({ business, businessId, accounts }: { business: string; 
       </section>
       <section className="rounded-xl border border-border p-4">
         <div className="mb-2 flex items-center gap-2"><h2 className="text-lg font-medium">Upcoming posts</h2><a className="g-link ml-auto text-sm" href={socialHref("calendar", business)}>Calendar</a></div>
-        {next.isLoading ? <p className="text-sm g-text-2">Loading…</p> : upcoming.length ? (
+        {next.isLoading ? <p className="text-sm g-text-2">Loading…</p> : next.isError && !next.data ? <p className="text-sm text-destructive" role="alert" data-testid="text-social-upcoming-error">Couldn't load upcoming posts — refresh to try again.</p> : upcoming.length ? (
           <ul className="space-y-2">{upcoming.map((p) => (
             <li key={p.id} className="flex items-start gap-2 text-sm">
               <NetworkIcon platform={p.payload?.post?.content?.platform ?? ""} className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1611,7 +1627,7 @@ function SocialOverview({ business, businessId, accounts }: { business: string; 
           </ul>
         ) : <>
           <p className="text-sm g-text-2">Nothing scheduled. <a className="g-link" href={socialHref("compose", business)}>Write a post</a>.</p>
-          <SamplePreview what="what upcoming posts look like" className="mt-3" testId="sample-social-upcoming">
+          {showSample({ isLoading: next.isLoading, isError: next.isError && !next.data, total: next.data ? upcoming.length : undefined }) && <SamplePreview what="what upcoming posts look like" className="mt-3" testId="sample-social-upcoming">
             <ul className="space-y-2">{SAMPLE_POSTS.filter((p) => p.state === "Scheduled").map((p) => (
               <li key={p.id} className="flex items-start gap-2 text-sm">
                 <NetworkIcon platform={p.platform} className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1619,7 +1635,7 @@ function SocialOverview({ business, businessId, accounts }: { business: string; 
                 <span className="line-clamp-1 break-words">{p.text}</span>
               </li>))}
             </ul>
-          </SamplePreview>
+          </SamplePreview>}
         </>}
       </section>
     </div>

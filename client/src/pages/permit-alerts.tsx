@@ -14,6 +14,7 @@ import { AppPage, Notice } from "@/components/app-ui";
 import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid, relativeTime } from "@/components/google";
 import { PlanRequired, planRequiredFrom, pollUnlessPlanRequired } from "@/components/plan-required";
 import { WATCH_KINDS, WATCH_KIND_LABELS, MAX_RADIUS_MILES, type PermitWatchDto, type WatchKind } from "@shared/permit-alerts";
+import { AdminSetupNote } from "@/hooks/use-platform-admin";
 
 type Jurisdiction = { id: number; name: string; jurisdiction: string; jurisdictionType: string; platform: string | null; alertsSupported: boolean };
 type Hit = { id: number; reason: string | null; matchedAt: string; notifiedAt: string | null; channelResults: Record<string, { ok: boolean; detail?: string | null }> | null; permit: Record<string, any> };
@@ -81,7 +82,7 @@ export default function PermitAlertsPage() {
         {listError && !planGate && <Notice tone="danger">{apiErrorMessage(listError, "Could not load your watches")} <Button onClick={() => void refetch()}>Retry</Button></Notice>}
         <Notice tone="info" testId="notice-permit-alerts-coverage">
           Alerts need a portal that can list permits by date. Each jurisdiction on a watch says whether its portal supports that today; one that doesn't is kept on the watch and starts working the day its portal is supported.
-          {data && !data.geocoder ? " Distance matching is off on this server, so an area watch covers its whole jurisdictions." : ""}
+          {data && !data.geocoder ? <> An area watch covers the whole city or county you pick.<AdminSetupNote>distance matching is off — no geocoder is configured on this server.</AdminSetupNote></> : ""}
         </Notice>
         <Dialog open={showForm} onOpenChange={open => { if (!busy) setShowForm(open); }}>
           {/* `g-surface`: the dialog portals to <body>, outside the platform surface, so the form's pills

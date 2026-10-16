@@ -7,7 +7,7 @@
 import { Fragment, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowRight, ArrowUpRight, CheckCircle2, ChevronDown, FileSearch, Link2, Loader2, Plus, Printer, Trash2, XCircle } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, ChevronDown, Link2, Loader2, Plus, Printer, Trash2, XCircle } from "lucide-react";
 import { GoogleList, GoogleListRow, GooglePill, GoogleSectionHeader } from "@/components/google";
 import { HelpButton } from "@/components/help-button";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -130,7 +130,7 @@ export default function ResearchOrderPage() {
 
       {/* How this works: three steps, in the order the form runs them. The long explanation is in the "i". */}
       <section className="g-callout max-w-3xl" data-testid="section-research-what" aria-labelledby="research-how">
-        <h3 id="research-how">How this works</h3>
+        <h2 id="research-how">How this works</h2>
         <ol className="mt-1 list-decimal space-y-1 pl-5">
           <li>Add the names (Company or Person), pick up to {MAX_STATES} states and, if you like, the trades to list first. License numbers, phones and addresses you already know can be added at no extra charge.</li>
           <li>Tick the three agreements and continue. You see a free preview of what will be searched before you pay.</li>
@@ -688,7 +688,7 @@ export function ResearchOrderStatusPage() {
           )}
           {(o.status === "paid" || o.status === "researching") && (
             <div className="g-callout max-w-3xl" data-testid="text-researching">
-              <h3 className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Paid. The research bot is {o.status === "paid" ? "about to start" : "searching now"}.</h3>
+              <h2 className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Paid. The research bot is {o.status === "paid" ? "about to start" : "searching now"}.</h2>
               <p>Big states can take a few hours; we'll email you when the report is ready, and this page refreshes itself.</p>
               {/* What will appear: the report's sections as the code renders them (SubjectReport). No sample content. */}
               <p className="mt-2">What the report will show for each name: License records, Related licenses and businesses (with what ties each one), Permits{o.input.subjects.some((s) => s.kind === "company") ? ", and for the company Consumer complaints, State enforcement and standing records, Federal court cases and OSHA inspections" : ""}, then the list of every portal that was searched or could not be. Every row links to the agency's or portal's own record; a source that did not run is shown as “not searched”, never as zero found.</p>

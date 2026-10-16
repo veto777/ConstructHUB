@@ -32,12 +32,13 @@ import {
 } from "lucide-react";
 import { PLANS, PLAN_KEYS, type PlanKey } from "@shared/plans";
 import { COMPETITOR_INTEL_PLANS } from "@shared/plan-copy";
+import { COMPETITOR_RADIUS_MAX, COMPETITOR_RADIUS_MIN } from "@shared/competitor-scan";
 import { AppLocked } from "@/components/app-locked";
 import { inNativeApp } from "@/lib/app-shell";
 import { GoogleSurface, GoogleLocalCard, GooglePill, GoogleMoreButton, GoogleAiOverview, AiEntity, GoogleSectionHeader, formatCount } from "@/components/google";
 import { MetricStrip, StatCell, StatusBadge, type Tone } from "@/components/tool";
 import { DistributionBar } from "@/pages/seo/viz";
-import { SamplePreview } from "@/components/sample-preview";
+import { SAMPLE_BUSINESS, SamplePreview, showSample } from "@/components/sample-preview";
 import { usageLine, type EntitlementsInfo } from "@/lib/pricing-display";
 import { COMPETITORS_SUBTITLE, commonPhrasesBadge } from "@/components/competitors/review-signals";
 import { topRatedPicks } from "@/components/competitors/top-rated";
@@ -87,7 +88,7 @@ const INDUSTRIES = [
 const CUSTOM_INDUSTRY = "__custom__";
 /** Radius presets (miles); any whole number from 1 to 100 can be typed as well (the server's range). */
 const RADIUS_PRESETS = [10, 25, 50, 100];
-const RADIUS_MIN = 1, RADIUS_MAX = 100;
+const RADIUS_MIN = COMPETITOR_RADIUS_MIN, RADIUS_MAX = COMPETITOR_RADIUS_MAX;
 
 /** A scan that has not reached a terminal state yet: queued or indexing. */
 const ACTIVE_STATUSES = ["pending", "running"];
@@ -101,10 +102,22 @@ type Listing = {
 /* ── Review signals: the band, its colour, and one plain line ──────────────────────────────────────────────── */
 
 type Band = { key: "few" | "some" | "more"; label: string; tone: Tone; color: string; badge: string };
+/**
+ * A band's colour is its StatusBadge tone (tool.css --tool-*-bg). Its outlined badge uses theme tokens: good news is
+ * a neutral chip (the platform pill rule in index.css, "three colors only"), a warning is muted, more signals is red.
+ */
+const TONE_COLOR: Record<Exclude<Tone, "none">, string> = { good: "var(--tool-good-bg)", warn: "var(--tool-warn-bg)", bad: "var(--tool-bad-bg)" };
+const TONE_BADGE: Record<Exclude<Tone, "none">, string> = {
+  // `!`: the outline Badge sets its own faint border colour; the neutral chip keeps the theme's visible --border.
+  good: "bg-muted text-foreground !border-[hsl(var(--border))]",
+  warn: "bg-muted text-muted-foreground border-border",
+  bad: "bg-destructive/10 text-destructive border-destructive/20",
+};
+const makeBand = (key: Band["key"], label: string, tone: Exclude<Tone, "none">): Band => ({ key, label, tone, color: TONE_COLOR[tone], badge: TONE_BADGE[tone] });
 const BANDS: Record<Band["key"], Band> = {
-  few: { key: "few", label: "Few signals", tone: "good", color: "#1e8e3e", badge: "bg-green-500/10 text-green-600 border-green-500/20" },
-  some: { key: "some", label: "Some signals", tone: "warn", color: "#f29900", badge: "bg-muted text-muted-foreground border-border" },
-  more: { key: "more", label: "More signals", tone: "bad", color: "#d93025", badge: "bg-red-500/10 text-red-500 border-red-500/20" },
+  few: makeBand("few", "Few signals", "good"),
+  some: makeBand("some", "Some signals", "warn"),
+  more: makeBand("more", "More signals", "bad"),
 };
 const bandOf = (score: number): Band => (score >= 60 ? BANDS.more : score >= 30 ? BANDS.some : BANDS.few);
 const scoreOf = (l: Listing) => l.bsScore || 0;
@@ -122,17 +135,17 @@ function signalLine(l: Listing): string {
 
 /** How the listings spread across rating bands and review-count bands. */
 const RATING_BANDS: [string, (r: number | null) => boolean, string][] = [
-  ["5.0", (r) => r != null && r >= 5, "#1e8e3e"],
-  ["4.5–4.9", (r) => r != null && r >= 4.5 && r < 5, "#34a853"],
-  ["4.0–4.4", (r) => r != null && r >= 4 && r < 4.5, "#f9ab00"],
-  ["Below 4.0", (r) => r != null && r < 4, "#d93025"],
-  ["No rating", (r) => r == null, "#e3e5e8"],
+  ["5.0", (r) => r != null && r >= 5, "var(--tool-good-bg)"],
+  ["4.5–4.9", (r) => r != null && r >= 4.5 && r < 5, "color-mix(in srgb, var(--g-green) 75%, var(--g-surface))"],
+  ["4.0–4.4", (r) => r != null && r >= 4 && r < 4.5, "var(--g-star)"],
+  ["Below 4.0", (r) => r != null && r < 4, "var(--g-red)"],
+  ["No rating", (r) => r == null, "var(--g-divider)"],
 ];
 const REVIEW_BANDS: [string, (n: number) => boolean, string][] = [
-  ["100+ reviews", (n) => n >= 100, "#1a73e8"],
-  ["25–99", (n) => n >= 25 && n < 100, "#669df6"],
-  ["1–24", (n) => n >= 1 && n < 25, "#aecbfa"],
-  ["None yet", (n) => n < 1, "#e3e5e8"],
+  ["100+ reviews", (n) => n >= 100, "var(--g-blue)"],
+  ["25–99", (n) => n >= 25 && n < 100, "color-mix(in srgb, var(--g-blue) 65%, var(--g-surface))"],
+  ["1–24", (n) => n >= 1 && n < 25, "color-mix(in srgb, var(--g-blue) 35%, var(--g-surface))"],
+  ["None yet", (n) => n < 1, "var(--g-divider)"],
 ];
 
 function Distribution({ title, parts, testId }: { title: string; parts: { label: string; value: number; color: string }[]; testId: string }) {
@@ -294,7 +307,7 @@ export default function CompetitorsPage() {
     );
   }
 
-  const noScans = !!scans && scans.length === 0;
+  const noScans = showSample({ isLoading: scansLoading, isError: !!scansError, total: scans?.length });
 
   // Google look (owner, 2026-10-06): the page sits on a GoogleSurface; the scans are tool panels (SEO Suite's look).
   return (
@@ -396,7 +409,7 @@ export default function CompetitorsPage() {
       {noScans && (
         <>
           <div className="g-callout" data-testid="card-how-it-works">
-            <h3>How this works</h3>
+            <h2>How this works</h2>
             <ol className="mt-2 list-decimal space-y-1 pl-5">
               <li>Pick your trade (or type one), name the city or address, and set how far out to look.</li>
               <li>Scan market reads the businesses Google lists there, with their rating, review count, phone and website. It uses one of your monthly scans.</li>
@@ -445,7 +458,7 @@ export default function CompetitorsPage() {
 /* ── A sample scan (static fixtures, shown only while the account has no scan) ─────────────────────────────── */
 
 const SAMPLE_LISTINGS: Listing[] = [
-  { id: -1, businessName: "Sample Roofing Co.", rating: "4.9", reviewCount: 212, category: "Roofing contractor", address: "123 Example St, Sampletown", bsScore: 10, bsReasons: [] },
+  { id: -1, businessName: SAMPLE_BUSINESS.name, rating: "4.9", reviewCount: 212, category: "Roofing contractor", address: SAMPLE_BUSINESS.address, bsScore: 10, bsReasons: [] },
   { id: -2, businessName: "Example Exteriors LLC", rating: "4.8", reviewCount: 96, category: "Siding contractor", address: "45 Placeholder Ave, Sampletown", bsScore: 20, bsReasons: ["Perfect rating; consider the sample size and business context"] },
   { id: -3, businessName: "Demo Home Services", rating: "4.2", reviewCount: 31, category: "General contractor", address: "9 Fixture Rd, Sampletown", bsScore: 45, bsReasons: ["Several sampled reviews repeat the same phrases"] },
 ];

@@ -24,6 +24,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle } from "@/lib/page-titles";
 import { VerificationCancelled } from "@/components/recent-auth";
 
 type Summary = {
@@ -68,11 +69,11 @@ function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onCl
         <div className="mt-4 space-y-4 text-sm">
           <div className="flex flex-wrap gap-2">
             <Select value={partner.status} onValueChange={(v) => save.mutate({ status: v })}>
-              <SelectTrigger className="w-48" data-testid="select-partner-status"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-48" aria-label="Status" data-testid="select-partner-status"><SelectValue /></SelectTrigger>
               <SelectContent>{MEDIA_PARTNER_STATUSES.map((s) => <SelectItem key={s} value={s}>{MEDIA_PARTNER_STATUS_LABELS[s]}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={partner.kind} onValueChange={(v) => save.mutate({ kind: v })}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-40" aria-label="Kind"><SelectValue /></SelectTrigger>
               <SelectContent>{MEDIA_PARTNER_KINDS.map((k) => <SelectItem key={k} value={k}>{MEDIA_PARTNER_KIND_LABELS[k]}</SelectItem>)}</SelectContent>
             </Select>
           </div>
@@ -85,8 +86,8 @@ function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onCl
             <dt className="text-muted-foreground">Agreed</dt><dd>{partner.agreedAt ? ago(partner.agreedAt) : "—"}</dd>
           </dl>
           <div>
-            <div className="mb-1 font-medium">What we need to finalize</div>
-            <Textarea rows={3} value={toFinalize ?? partner.toFinalize ?? ""} onChange={(e) => setToFinalize(e.target.value)} data-testid="input-partner-finalize" />
+            <div className="mb-1 font-medium" id="partner-finalize-label">What we need to finalize</div>
+            <Textarea rows={3} aria-labelledby="partner-finalize-label" value={toFinalize ?? partner.toFinalize ?? ""} onChange={(e) => setToFinalize(e.target.value)} data-testid="input-partner-finalize" />
             {toFinalize !== null && <Button size="sm" className="mt-2" disabled={save.isPending} onClick={() => save.mutate({ toFinalize: toFinalize.trim() || null })}>Save</Button>}
           </div>
           <NotesBox partner={partner} />
@@ -150,7 +151,7 @@ function NotesBox({ partner }: { partner: MediaPartner }) {
   return (
     <div>
       <div className="mb-1 flex items-center gap-2 font-medium"><StickyNote className="h-4 w-4" aria-hidden="true" />Notes</div>
-      <Textarea rows={3} placeholder="Anything to remember about this company. Only you see these; the AI uses them when it writes a draft." value={notes ?? partner.notes ?? ""} onChange={(e) => setNotes(e.target.value)} data-testid="input-partner-notes" />
+      <Textarea rows={3} aria-label="Notes" placeholder="Anything to remember about this company. Only you see these; the AI uses them when it writes a draft." value={notes ?? partner.notes ?? ""} onChange={(e) => setNotes(e.target.value)} data-testid="input-partner-notes" />
       {notes !== null && <Button size="sm" className="mt-2" disabled={save.isPending} onClick={() => save.mutate()} data-testid="button-save-partner-notes">Save notes</Button>}
     </div>
   );
@@ -176,14 +177,14 @@ function ReplyBox({ partner }: { partner: MediaPartner }) {
     <div className="space-y-2 rounded-lg border p-3" data-testid="box-partner-reply">
       <div className="flex items-center gap-2 font-medium"><Send className="h-4 w-4" aria-hidden="true" />Reply</div>
       <div className="flex gap-2">
-        <Input placeholder="Tell the AI what to say (optional), e.g. “say yes to the call, ask for their pricing”" value={f.instructions} onChange={(e) => setF({ ...f, instructions: e.target.value })} data-testid="input-reply-instructions" />
+        <Input aria-label="Instructions for the draft" placeholder="Tell the AI what to say (optional), e.g. “say yes to the call, ask for their pricing”" value={f.instructions} onChange={(e) => setF({ ...f, instructions: e.target.value })} data-testid="input-reply-instructions" />
         <Button type="button" variant="outline" disabled={draft.isPending} onClick={() => draft.mutate()} data-testid="button-reply-ai">
           {draft.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}Write with AI
         </Button>
       </div>
-      <Input placeholder="To" type="email" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} data-testid="input-reply-to" />
-      <Input placeholder="Subject" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} data-testid="input-reply-subject" />
-      <Textarea rows={8} placeholder="Your reply (Leah Peterson's Construct HUB Media Team signature is added)" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} data-testid="input-reply-body" />
+      <Input aria-label="To" placeholder="To" type="email" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} data-testid="input-reply-to" />
+      <Input aria-label="Subject" placeholder="Subject" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} data-testid="input-reply-subject" />
+      <Textarea rows={8} aria-label="Reply" placeholder="Your reply (Leah Peterson's Construct HUB Media Team signature is added)" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} data-testid="input-reply-body" />
       <Button disabled={send.isPending || !ready} onClick={() => send.mutate()} data-testid="button-reply-send">
         {send.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}Send from media@
       </Button>
@@ -202,15 +203,15 @@ function SendBox() {
   });
   return (
     <div className="grid gap-2 sm:grid-cols-2">
-      <Input placeholder="Company" value={f.company} onChange={set("company")} data-testid="input-send-company" />
-      <Input placeholder="Website (example.com)" value={f.domain} onChange={set("domain")} />
+      <Input aria-label="Company" placeholder="Company" value={f.company} onChange={set("company")} data-testid="input-send-company" />
+      <Input aria-label="Website" placeholder="Website (example.com)" value={f.domain} onChange={set("domain")} />
       <Select value={f.kind} onValueChange={(v) => setF({ ...f, kind: v as MediaPartnerKind })}>
-        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectTrigger aria-label="Kind"><SelectValue /></SelectTrigger>
         <SelectContent>{MEDIA_PARTNER_KINDS.map((k) => <SelectItem key={k} value={k}>{MEDIA_PARTNER_KIND_LABELS[k]}</SelectItem>)}</SelectContent>
       </Select>
-      <Input placeholder="To (email)" type="email" value={f.to} onChange={set("to")} data-testid="input-send-to" />
-      <Input className="sm:col-span-2" placeholder="Subject" value={f.subject} onChange={set("subject")} />
-      <Textarea className="sm:col-span-2" rows={6} placeholder="Message (Leah Peterson's Construct HUB Media Team signature is added)" value={f.body} onChange={set("body")} />
+      <Input aria-label="To (email)" placeholder="To (email)" type="email" value={f.to} onChange={set("to")} data-testid="input-send-to" />
+      <Input className="sm:col-span-2" aria-label="Subject" placeholder="Subject" value={f.subject} onChange={set("subject")} />
+      <Textarea className="sm:col-span-2" rows={6} aria-label="Message" placeholder="Message (Leah Peterson's Construct HUB Media Team signature is added)" value={f.body} onChange={set("body")} />
       <div className="sm:col-span-2">
         <Button disabled={send.isPending || !f.company || !f.to || !f.subject || !f.body} onClick={() => send.mutate()} data-testid="button-send-media">
           {send.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}Send from media@
@@ -221,7 +222,7 @@ function SendBox() {
 }
 
 export default function AdminPartnershipsPage() {
-  useDocumentTitle("Partnerships");
+  useDocumentTitle(appPageTitle("/admin/partnerships")!);
   const { toast } = useToast();
   const [partnerTab, setPartnerTab] = useState<"all" | MediaPartnerStatus>("all");
   const [mailTab, setMailTab] = useState<"all" | "out" | "in" | "needs_owner" | "declined">("all");

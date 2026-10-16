@@ -51,6 +51,7 @@ export function withSeoHead(html: string, path: string, opts: { origin?: string;
   out = setMeta(out, "property", "og:image", head?.image ?? DEFAULT_OG_IMAGE);
   out = setMeta(out, "name", "twitter:image", head?.image ?? DEFAULT_OG_IMAGE);
   const tags = [`<link rel="canonical" href="${escapeAttr(canonical)}" />`];
+  if (pageMetaFor(path)?.noindex) tags.unshift(`<meta name="robots" content="noindex" />`);
   if (head && head.jsonLd.length) {
     tags.push(`<script type="application/ld+json" data-seo="jsonld" data-path="${escapeAttr(path)}">${serializeJsonLd(head.jsonLd)}</script>`);
   }

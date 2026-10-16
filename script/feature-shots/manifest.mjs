@@ -16,7 +16,8 @@ for (const file of fs.readdirSync(SHOTS).filter((f) => f.endsWith(".json")).sort
     if (!s.alt || !s.caption) throw new Error(`${file}: ${s.key}-${s.n} needs alt and caption`);
     const { width, height } = await sharp(img).metadata();
     const host = s.route.startsWith("/crm") ? "portal.constructhub.us" : "constructhub.us";
-    const route = s.url ?? s.route;
+    // ?portal=1 is the capture lane's switch onto the CRM host, not part of the address a customer sees.
+    const route = (s.url ?? s.route).replace(/([?&])portal=1(&|$|(?=#))/, (_, lead, tail) => (tail ? lead : "")).replace(/\?$/, "");
     (byKey[s.key] ??= []).push({ n: s.n, src: `/feature-shots/${s.key}-${s.n}.webp`, alt: s.alt, caption: s.caption, url: `${host}${route === "/" ? "" : route}`, width, height });
   }
 }

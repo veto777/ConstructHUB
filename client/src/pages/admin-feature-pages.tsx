@@ -16,6 +16,7 @@ import { Link } from "wouter";
 import { ExternalLink, LayoutGrid, Lock } from "lucide-react";
 import { DashLink, FOCUS_RING } from "@/components/dashboard/dash-link";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle } from "@/lib/page-titles";
 
 type Row = {
   key: string;
@@ -41,7 +42,7 @@ const STATUS: Record<Row["status"], { label: string; className: string; title: s
 const linkClass = `inline-flex items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline underline-offset-4 break-all ${FOCUS_RING}`;
 
 export default function AdminFeaturePagesPage() {
-  useDocumentTitle("Feature pages | ConstructHUB");
+  useDocumentTitle(appPageTitle("/admin/feature-pages")!);
   const { data, isLoading, error } = useQuery<Payload>({ queryKey: ["/api/admin/feature-pages"], retry: false });
 
   if (isLoading) {

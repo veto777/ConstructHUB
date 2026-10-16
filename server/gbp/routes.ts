@@ -22,6 +22,7 @@ import { GBP_SCOPE, GoogleError, METRICS } from './client';
 import { grantStatus, saveGrant, purgeGoogleData } from './grants';
 import { discoverAll, importLocations, syncLocation, reply, publicError, autoLinkAndSync, unlinkLocation } from './service';
 import { recordFailure } from '../ops/issues';
+import { loadGoogleConnection } from './connection-status';
 declare module 'express-session' { interface SessionData { gbpOAuth?: {state:string;userId:number;expires:number;redirect:string} } }
 export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, options: { http?: typeof fetch; afterConnect?: (userId: number, subject: string) => Promise<unknown> } = {}) {
   app.use(['/api/gbp/connect', '/api/gbp/disconnect'], rateLimit('google-connections',10,30));
@@ -65,7 +66,15 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     const {rows:locations}=await pool.query(`SELECT l.id,l.business_name AS name,g.email AS account_email,s.kind,s.last_success,s.last_attempt,s.last_error FROM business_locations l
       LEFT JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject
       LEFT JOIN gbp_sync_status s ON s.location_id=l.id WHERE l.user_id=$1 AND l.gbp_location_name IS NOT NULL AND l.id=ANY($2::int[]) ORDER BY l.id,s.kind`,[id,visible.items.map(l=>l.id)]);
-    res.json({...await grantStatus(id),locations});
+    // `connection` is the one state every page prints (shared/gbp-connection.ts); `locations` keeps the per-kind rows.
+    res.json({...await grantStatus(id),locations,connection:await loadGoogleConnection(id,{locationIds:visible.items.map(l=>l.id)})});
+  });
+  // The one Google-connection answer (connected / needs reconnect / not connected + last sync), read by the
+  // Google Business overview, Locations, Google Reviews, Posts, Photos, Listing editor and GMB Edit Monitor.
+  route('get','/api/gbp/connection',async(req,res,id)=>{
+    const locationId=req.query.locationId?z.coerce.number().int().positive().parse(req.query.locationId):null;
+    if(locationId)await locationAccess(await accessFor(id),locationId);
+    res.json(await loadGoogleConnection(id,locationId?{locationIds:[locationId]}:{}));
   });
   // Me → Password & security "Wasn't you?": removes one linked Google account (or all) with its
   // listings' Google data, then tries to revoke the token at Google.
@@ -109,17 +118,19 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
   // Per-location answer to "which Google account is this synced through, and which still need one?"
   route('get','/api/gbp/linkage',async(req,res,id)=>{
     const page=await listLocations(await accessFor(id),filters.parse(req.query));
-    const {rows:locations}=await pool.query(`SELECT l.id,l.place_id,l.business_name,l.gbp_location_name,l.gbp_unlinked_by_user,g.email AS account_email,(g.google_subject IS NOT NULL AND NOT g.reconnect_required) AS account_ok,
-      (SELECT max(last_success) FROM gbp_sync_status s WHERE s.location_id=l.id) AS last_success,
-      (SELECT string_agg(last_error,'; ') FROM gbp_sync_status s WHERE s.location_id=l.id AND last_error IS NOT NULL) AS last_error
-      FROM business_locations l LEFT JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject WHERE l.user_id=$1 AND l.id=ANY($2::int[]) ORDER BY l.id`,[id,page.items.map(l=>l.id)]);
+    const {rows:locations}=await pool.query(`SELECT l.id,l.place_id,l.business_name,l.gbp_location_name,l.gbp_unlinked_by_user
+      FROM business_locations l WHERE l.user_id=$1 AND l.id=ANY($2::int[]) ORDER BY l.id`,[id,page.items.map(l=>l.id)]);
+    // Linked rows take their state and last sync from the shared connection truth (shared/gbp-connection.ts).
+    const connection=await loadGoogleConnection(id,{locationIds:page.items.map(l=>l.id)});
+    const truth=new Map(connection.locations.map(l=>[l.id,l]));
     const {rows:found}=await pool.query(`SELECT d.data,d.subject,g.email FROM agency_discovery d JOIN gbp_grants g ON g.user_id=d.user_id AND g.google_subject=d.subject AND NOT g.reconnect_required WHERE d.user_id=$1 AND d.seen_at>now()-interval '24 hours'`,[id]);
     // A listing is "ready to link" to a location by place id, or — for a location typed in by hand, which has
     // none — by business name when exactly one discovered listing carries that name (a chain's identically
     // named branches are left to the Import tab). Mirrors importVerifiedLocations.
     const key=(s:unknown)=>String(s??'').toLowerCase().replace(/[^a-z0-9]/g,'');
     res.json({accounts:(await grantStatus(id)).accounts,errors:[],total:page.total,locations:locations.map(l=>{
-      if(l.gbp_location_name)return {id:l.id,state:l.account_ok?'synced':'reconnect',accountEmail:l.account_email,lastSuccess:l.last_success,lastError:l.last_error};
+      const t=truth.get(l.id);
+      if(l.gbp_location_name)return {id:l.id,state:t?.state==='connected'?'synced':'reconnect',accountEmail:t?.accountEmail??null,lastSuccess:t?.lastSync??null,lastError:t?.lastError??null};
       let match=l.place_id?found.find(f=>f.data.placeId===l.place_id):undefined;
       if(!match&&!l.place_id){const same=found.filter(f=>key(f.data.businessName)===key(l.business_name));if(same.length===1)match=same[0];}
       return match?{id:l.id,state:'available',unlinkedByUser:l.gbp_unlinked_by_user,accountEmail:match.email,listing:{accountResource:match.data.accountResource,gbpName:match.data.gbpName,grantSubject:match.subject}}:{id:l.id,state:'unlinked'};

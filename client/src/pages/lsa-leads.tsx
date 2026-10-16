@@ -1,6 +1,6 @@
 import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -142,8 +142,8 @@ function SampleAccounts() {
         <GoogleStat label="Spend" value="$1,240.00" />
       </GoogleStatGrid>
       <GoogleList>
-        <GoogleListRow size="md" title="Sample Roofing Co." badges={<span className="g-chip g-chip--sm g-open">LSA</span>} meta={["123-456-7890", "22 leads", <span key="c" className="g-closed">14 charged</span>, "$940.00 spend"]} actions={<><GooglePill size="sm" label="Open leads" /><GooglePill size="sm" label="Charged leads" /></>} />
-        <GoogleListRow size="md" title="Sample Plumbing LLC" badges={<span className="g-chip g-chip--sm g-open">LSA</span>} meta={["123-456-7891", "9 leads", <span key="c" className="g-closed">5 charged</span>, "$300.00 spend"]} actions={<><GooglePill size="sm" label="Open leads" /><GooglePill size="sm" label="Charged leads" /></>} />
+        <GoogleListRow size="md" title="Sample Roofing Co." badges={<span className="g-chip g-chip--sm g-open">LSA</span>} meta={["000-000-0001", "22 leads", <span key="c" className="g-closed">14 charged</span>, "$940.00 spend"]} actions={<><GooglePill size="sm" label="Open leads" /><GooglePill size="sm" label="Charged leads" /></>} />
+        <GoogleListRow size="md" title="Sample Plumbing LLC" badges={<span className="g-chip g-chip--sm g-open">LSA</span>} meta={["000-000-0002", "9 leads", <span key="c" className="g-closed">5 charged</span>, "$300.00 spend"]} actions={<><GooglePill size="sm" label="Open leads" /><GooglePill size="sm" label="Charged leads" /></>} />
       </GoogleList>
     </>
   );
@@ -306,7 +306,8 @@ export default function LsaLeadsPage() {
         )}
       </Section>}
 
-      {status && !status.connected && (
+      {/* Not connected: nothing can have synced, so the account list is empty by construction. */}
+      {status && showSample({ total: status.connected ? undefined : 0 }) && (
         <SamplePreview what="what you’ll see once Google Ads is connected" testId="sample-lsa-accounts" cta={<GooglePill size="sm" variant="solid" icon={Link2} label="Connect Google Ads" onClick={connect} disabled={!status.configured} />}>
           <SampleAccounts />
         </SamplePreview>
@@ -464,6 +465,8 @@ function AccountsOverview({ onOpen, onSync, syncing }: { onOpen: (a: LsaAccount,
         ) : accounts.length === 0 ? (
           debouncedQ ? (
             <p className="text-sm text-muted-foreground py-6 text-center">No account matches “{debouncedQ}”.</p>
+          ) : !showSample({ isLoading, isError: !!error, total: data?.total, filtered: !!debouncedQ, page: page - 1 }) ? (
+            <p className="text-sm text-muted-foreground py-6 text-center" data-testid="text-no-accounts-page">No accounts on this page.</p>
           ) : (
             <SamplePreview what="what you’ll see once your first sync finishes" testId="sample-lsa-accounts" cta={<GooglePill size="sm" variant="solid" icon={RefreshCw} label={syncing ? "Syncing…" : "Sync now"} onClick={onSync} disabled={syncing} />}>
               <SampleAccounts />
@@ -703,6 +706,8 @@ function AccountDetail({ account, initialFilter = "all", onBack }: { account: Ls
             <p className="text-sm text-muted-foreground py-6 text-center">No lead on this page matches “{find.trim()}”.</p>
           ) : filter !== "all" ? (
             <p className="text-sm text-muted-foreground py-6 text-center">No {filter} leads for this account yet.</p>
+          ) : !showSample({ isLoading, isError: !!error, total: data?.total, filtered: !!find.trim() || filter !== "all", page: page - 1 }) ? (
+            <p className="text-sm text-muted-foreground py-6 text-center" data-testid="text-no-leads-page">No leads on this page.</p>
           ) : (
             <SamplePreview what="what a lead looks like once this account has synced one" testId="sample-lsa-leads">
               <SampleLeads />

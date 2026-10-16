@@ -59,7 +59,8 @@ export function BusinessSelector({ value, onChange, accountTotal }: { value: str
         description={error ? "Businesses unavailable." : data ? (data.total === 0 ? "No businesses yet. Add one in Locations, then come back here." : data.total === 1 ? "Your business. Open it to connect accounts, write posts and set auto mode." : `${data.total} businesses. Click Open on the one you want to work on.`) : "Loading businesses…"}
         actions={<>
           {value && <GooglePill size="sm" onClick={() => setExpanded(false)} label="Close switcher" />}
-          {(data?.total ?? 0) > 1 && <GooglePill size="sm" onClick={() => choose("all")} label="All-clients calendar" />}
+          {/* Account total, not the search-filtered page total: a search narrowed to one match must not hide the all-clients view. */}
+          {(accountTotal ?? data?.total ?? 0) > 1 && <GooglePill size="sm" onClick={() => choose("all")} label="All-clients calendar" />}
           <GooglePill size="sm" selected={bulk} ariaPressed={bulk} onClick={() => setBulk(!bulk)} testId="button-bulk-actions" label={`Bulk actions (${ids.length})`} />
         </>}
       />

@@ -43,7 +43,7 @@ import {
 import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd, serpKeywordMultiplier, estimateLostLinksUsd } from "./pricing";
 import { creditStatus, outOfCreditMessage, owedCreditMessage } from "./credits";
 import { retailCents, SEO_CREDIT_PACKS } from "@shared/seo-credits";
-import { SEO_SAVED_DAYS } from "@shared/seo-constants";
+import { SEO_SAVED_DAYS, SEO_SERP_DEPTH_MAX, SEO_SERP_DEPTH_MIN } from "@shared/seo-constants";
 import {
   reportInput, reportRequest, TooManyFilters, SCOPED_TABLES, isKeywordTable, reportCacheKey, cacheKey, cached, lastSavedAt, saveCached, fetchReportPage, fetchKeywordOverview,
   effectiveReport, fetchAdsSnapshot, adsPage, ADS_MAX, ADS_ESTIMATE_USD, ADS_TYPICAL_USD, type AdsSnapshot,
@@ -92,6 +92,7 @@ import { addSiteOrExisting, siteCapRefuses } from "./site-cap";
 import { recordUnhandledError } from "../ops/server-errors";
 import { recordFailure } from "../ops/issues";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
+import { logError } from "../ops/log";
 
 /**
  * What each lookup costs the customer, in cents (wholesale estimate x SEO_MARKUP).
@@ -200,7 +201,7 @@ const siteInput = z.object({
   locationCode: z.number().int().positive().default(2840),
   languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
   devices: z.enum(["desktop", "mobile", "both"]).default("both"),
-  serpDepth: z.number().int().min(10).max(100).default(10),
+  serpDepth: z.number().int().min(SEO_SERP_DEPTH_MIN).max(SEO_SERP_DEPTH_MAX).default(10),
 }).strict();
 const keywordsInput = z.object({
   keywords: z.array(z.string().trim().min(1).max(200)).min(1).max(500),
@@ -276,7 +277,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
         // the exact wording — vendor, upstream text, wholesale dollars — goes to the log, the issue desk and admins.
         const out = seoErrorResponse(e, { admin: isPlatformAdmin(req.user) });
         if (e instanceof DataForSeoError) console.warn(`[seo] vendor error ${e.code} on ${req.method} ${req.path}: ${e.message}`);
-        else if (out.unexpected) console.error(`[seo] ${req.method} ${req.path} failed:`, e);
+        else if (out.unexpected) logError(`[seo] ${req.method} ${req.path} failed:`, e);
         // The issue desk hears of every 5xx except "not switched on yet", which is a state, not a failure.
         if (!(e instanceof DataForSeoError && e.code === "not_configured")) recordUnhandledError(req, res, e, out.status);
         if (res.headersSent) return;

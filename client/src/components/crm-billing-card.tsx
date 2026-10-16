@@ -83,9 +83,13 @@ export function CrmBillingCard() {
                 <a href={marketingUrl("/pricing#crm")}>{sub?.hasLiveSubscription ? "Change CRM plan" : "Choose a CRM plan"}</a>
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={portal.open} disabled={portal.isPending} data-testid="button-crm-manage-billing">
-              Manage billing
-            </Button>
+            {/* Stripe's portal needs a Stripe customer: with no CRM subscription the request can only fail,
+                so the honest action is the plan button above. */}
+            {sub?.hasStripeSubscription && (
+              <Button variant="outline" size="sm" onClick={portal.open} disabled={portal.isPending} data-testid="button-crm-manage-billing">
+                Manage billing
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -93,8 +93,9 @@ export function PublicPageFooter() {
           <span aria-hidden className="opacity-40">·</span>
           <a href="/support" className="hover:text-mkt-navy-ink transition-colors">Support</a>
           <span aria-hidden className="opacity-40">·</span>
-          {/* Help and the report page sell nothing, so they stay inside the apps too. */}
-          <Link href="/tutorials" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-help">Help</Link>
+          {/* Help and the report page sell nothing, so they stay inside the apps too. Signed out, the apps open only
+              the support and legal pages (App.tsx), so Help is the support page there. */}
+          <Link href="/support" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-help">Help</Link>
           <span aria-hidden className="opacity-40">·</span>
           <Link href={reportIssueHref()} onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-report-issue">Report an issue</Link>
           <span aria-hidden className="opacity-40">·</span>
@@ -118,7 +119,7 @@ export function PublicPageFooter() {
         <span aria-hidden className="opacity-40">·</span>
         <Link href="/call-assistant" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-call-assistant">AI Call Assistant</Link>
         <span aria-hidden className="opacity-40">·</span>
-        <Link href="/tutorials" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-help">Help</Link>
+        <Link href="/features/guides" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-help">Help</Link>
         <span aria-hidden className="opacity-40">·</span>
         <Link href={reportIssueHref()} onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-report-issue">Report an issue</Link>
         <span aria-hidden className="opacity-40">·</span>

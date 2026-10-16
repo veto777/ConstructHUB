@@ -49,6 +49,7 @@ import { CRM_PLANS, CRM_PLAN_KEYS, type CrmPlanLimits } from "@shared/crm-plans"
 
 import { providerFixture, type SmsFixture } from "../tutorials/fixtures";
 import { maskPhoneNumber } from "../ops/scrub";
+import { logError } from "../ops/log";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -946,7 +947,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
         emailed = true;
       } catch (e: any) {
         emailError = String(e?.message || e).slice(0, 300);
-        console.error("[crm] estimate reminder email failed:", emailError);
+        logError("[crm] estimate reminder email failed:", emailError);
       }
     }
 

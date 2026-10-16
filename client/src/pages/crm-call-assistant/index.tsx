@@ -9,7 +9,6 @@ import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CrmPage, CrmPageHeader } from "@/components/crm-ui";
 import { callAssistantGateFrom } from "@/components/plan-required";
 import { AppLocked } from "@/components/app-locked";
 import { inNativeApp } from "@/lib/app-shell";

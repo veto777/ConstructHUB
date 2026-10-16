@@ -271,7 +271,7 @@ export function ScreensSection({ page, screens, n, tone }: { page: Pick<LandingC
         </div>
       )}
       <Dialog open={zoom} onOpenChange={setZoom}>
-        <DialogContent className="max-w-[min(96vw,1600px)] p-2 sm:p-3">
+        <DialogContent className="max-w-[min(96vw,1600px)] p-2 sm:p-3" aria-describedby={undefined}>
           <DialogTitle className="sr-only">{shot.caption}</DialogTitle>
           <DialogClose asChild>
             <button

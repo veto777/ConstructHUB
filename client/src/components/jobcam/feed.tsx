@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { Camera, CheckSquare, Grid3X3, Image as ImageIcon, Loader2, Rows3, Search, Star, Video, X, Trash2, Tag as TagIcon, Share2, CalendarDays, Eye, EyeOff } from "lucide-react";
 import { GooglePill, GoogleSectionHeader } from "@/components/google";
 import { EmptyState } from "@/components/crm-ui";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SampleJobcamGrid = lazySample(() => import("@/components/crm-sample-previews"), "SampleJobcamGrid");
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -144,7 +144,7 @@ function JobcamFeedInner({ projectId, customerId, compact = false, title, descri
         <div className="flex flex-wrap items-center gap-2" data-testid="jobcam-filters">
           <label className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input value={draftQ} onChange={(e) => setDraftQ(e.target.value)} placeholder={projectId ? "Search tags, captions, people" : "Search projects, addresses, tags, people"} className="g-input pl-9 h-9" data-testid="jobcam-search" />
+            <input value={draftQ} onChange={(e) => setDraftQ(e.target.value)} placeholder={projectId ? "Search tags, captions, people" : "Search projects, addresses, tags, people"} className="g-input pl-9 h-9" aria-label={projectId ? "Search tags, captions, people" : "Search projects, addresses, tags, people"} data-testid="jobcam-search" />
           </label>
           <TagPicker value={filters.tags} onChange={(tags) => setFilters({ ...filters, tags })} mode={filters.mode} onMode={(mode) => setFilters({ ...filters, mode })} label="Tags" testId="jobcam-filter-tags" />
           <GooglePill size="sm" icon={Star} label="Starred" selected={filters.starred} onClick={() => setFilters({ ...filters, starred: !filters.starred })} ariaPressed={filters.starred} testId="jobcam-filter-starred" />
@@ -201,7 +201,7 @@ function JobcamFeedInner({ projectId, customerId, compact = false, title, descri
             action={!active && !storageFull ? <Link href={captureHref}><GooglePill variant="solid" icon={Camera} label="Open camera" testId="jobcam-empty-camera" /></Link> : undefined} />
           {/* No filter and nothing shot yet (for this job, or company-wide on Recent): a sample of the feed.
               Not in the compact panels inside a client's or project's page — those are one record's photos. */}
-          {!active && !compact && <SampleJobcamGrid />}
+          {!compact && showSample({ isLoading: feed.isLoading, isError: feed.isError, total: items.length, filtered: active }) && <SampleJobcamGrid />}
         </>
       ) : (
         <>

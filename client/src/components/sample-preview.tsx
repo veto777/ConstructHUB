@@ -34,6 +34,39 @@ export function lazySample<M extends object, K extends keyof M>(load: () => Prom
 }
 
 /**
+ * The one guard every <SamplePreview> call site goes through: true ONLY when the real dataset is known to be
+ * empty. Never while the request is loading, never after it failed (an error is not "no data"), never when a
+ * filter, search, date range or permission narrows a dataset that may hold rows, and never past the first page.
+ *
+ *  - `total`    — the real, unfiltered record count. `undefined`/`null` means "not known yet" → no sample.
+ *  - `filtered` — any filter/search/range/permission is narrowing what the caller sees.
+ *  - `page`     — zero-based page index or row offset; anything but 0 means "past the first page".
+ *
+ * A range-only empty result ("no visits in the last 7 days" for a site that had visits before) is not empty data:
+ * pass the range as `filtered` and say "Nothing in this range" instead (see `NothingInRange`).
+ */
+export function showSample({ isLoading, isError, total, filtered, page }: {
+  isLoading?: boolean;
+  isError?: boolean;
+  total: number | null | undefined;
+  filtered?: boolean;
+  page?: number;
+}): boolean {
+  if (isLoading || isError || filtered) return false;
+  if (page) return false;
+  return total === 0;
+}
+
+/** The honest empty state for a dataset that has records, just none in the chosen range/window. */
+export function NothingInRange({ children, className, testId }: { children?: ReactNode; className?: string; testId?: string }) {
+  return (
+    <p className={cn("rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground", className)} data-testid={testId ?? "nothing-in-range"}>
+      {children ?? "Nothing in this range."}
+    </p>
+  );
+}
+
+/**
  * A clearly labelled SAMPLE of what a page shows once it has real data (owner 2026-10-15: "add a placeholder
  * that says demo, and once you add real data the demo is replaced … so the clients know what each feature is").
  *
@@ -71,4 +104,22 @@ export function SamplePreview({ children, what, cta, className, testId }: {
       </div>
     </section>
   );
+}
+
+/* ── Fixture helpers: one made-up business and one clock for every page's sample ─────────────────────────────── */
+
+/**
+ * The one made-up business the samples are about. Obviously fictional (reserved `.example` domain, "Sample …"
+ * name, "Example St") so it can never be mistaken for a real record. Pages build their fixtures from it.
+ */
+export const SAMPLE_BUSINESS = {
+  name: "Sample Roofing Co.",
+  domain: "sample-roofing.example",
+  email: "owner@sample-roofing.example",
+  address: "123 Example St, Sampletown",
+} as const;
+
+/** A fixture timestamp this long before now, as an ISO string: `sampleAgo({ hours: 3 })`, `sampleAgo({ days: 2 })`. */
+export function sampleAgo({ minutes = 0, hours = 0, days = 0 }: { minutes?: number; hours?: number; days?: number }): string {
+  return new Date(Date.now() - ((days * 24 + hours) * 60 + minutes) * 60_000).toISOString();
 }

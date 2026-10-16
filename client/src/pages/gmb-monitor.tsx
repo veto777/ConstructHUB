@@ -1,6 +1,7 @@
 import { AppPage, PageHeader, Section } from "@/components/app-ui";
+import { GbpPrerequisite } from "@/components/gbp-prerequisite";
 import { GoogleSurface, GoogleStat, GoogleStatGrid } from "@/components/google";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
@@ -344,9 +345,9 @@ function ReviewResponseTool() {
 
   return (
     <div className="py-4" data-testid="card-review-response-tool">
-      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+      <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-muted-foreground" /> Review response draft
-      </h3>
+      </h2>
       <p className="text-xs text-muted-foreground mb-4">
         Paste a review, then edit the draft before replying on Google.
       </p>
@@ -354,8 +355,9 @@ function ReviewResponseTool() {
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <Label className="text-xs mb-1 block">Business name</Label>
+            <Label htmlFor="input-review-business" className="text-xs mb-1 block">Business name</Label>
             <Input
+              id="input-review-business"
               placeholder="Your business name"
               value={businessName}
               onChange={e => setBusinessName(e.target.value)}
@@ -364,8 +366,9 @@ function ReviewResponseTool() {
             />
           </div>
           <div>
-            <Label className="text-xs mb-1 block">Reviewer name (optional)</Label>
+            <Label htmlFor="input-reviewer-name" className="text-xs mb-1 block">Reviewer name (optional)</Label>
             <Input
+              id="input-reviewer-name"
               placeholder="Customer's name"
               value={reviewerName}
               onChange={e => setReviewerName(e.target.value)}
@@ -376,8 +379,9 @@ function ReviewResponseTool() {
         </div>
 
         <div>
-          <Label className="text-xs mb-1 block">Customer review</Label>
+          <Label htmlFor="textarea-review-text" className="text-xs mb-1 block">Customer review</Label>
           <Textarea
+            id="textarea-review-text"
             placeholder="Paste the customer review here..."
             value={reviewText}
             onChange={e => setReviewText(e.target.value)}
@@ -389,9 +393,9 @@ function ReviewResponseTool() {
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1">
-            <Label className="text-xs mb-1 block">Response tone</Label>
+            <Label htmlFor="select-tone" className="text-xs mb-1 block">Response tone</Label>
             <Select value={tone} onValueChange={setTone}>
-              <SelectTrigger className="min-h-10 text-sm" data-testid="select-tone">
+              <SelectTrigger id="select-tone" className="min-h-10 text-sm" data-testid="select-tone">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -433,8 +437,9 @@ function ReviewResponseTool() {
 
         {generatedResponse && (
           <div className="space-y-2 mt-2 pt-3 border-t border-border/40">
-            <Label className="text-xs mb-1 block">Generated response (edit if needed)</Label>
+            <Label htmlFor="textarea-generated-response" className="text-xs mb-1 block">Generated response (edit if needed)</Label>
             <Textarea
+              id="textarea-generated-response"
               value={customEdit}
               onChange={e => handleCustomEditChange(e.target.value)}
               rows={4}
@@ -478,9 +483,12 @@ export default function GmbMonitorPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const { data: listings, isLoading } = useQuery<GmbListing[]>({
+  const { data: listings, isLoading, isError: listingsError } = useQuery<GmbListing[]>({
     queryKey: ["/api/gmb/listings"],
   });
+  // Seed the monitor from Locations: the business is usually already there (review w2-agent10 #15).
+  const { data: myLocations } = useQuery<{ id: number; businessName: string; placeId?: string | null; address?: string | null; city?: string | null; state?: string | null; phone?: string | null; website?: string | null; categories?: string[] | null }[]>({ queryKey: ["/api/locations"] });
+  const seed = (myLocations ?? []).find((l) => l.placeId && !(listings ?? []).some((g) => g.placeId === l.placeId));
 
   const addMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -576,7 +584,7 @@ export default function GmbMonitorPage() {
   return (
     <GoogleSurface page><AppPage className="before:hidden max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" width="narrow">
       <PageHeader title={<span data-testid="text-page-title">GMB Edit Monitor</span>} description="Check your Google listings for changes whenever you need." actions={<>
-        <Button onClick={()=>setShowAddForm(!showAddForm)} data-testid="button-add-listing">Add business</Button>
+        {!!listings?.length&&<Button onClick={()=>setShowAddForm(!showAddForm)} data-testid="button-add-listing">Add business</Button>}
         {monitoredCount>0&&<Button variant="outline" onClick={()=>checkAllMutation.mutate()} disabled={checkAllMutation.isPending} data-testid="button-check-all">{checkAllMutation.isPending?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:null}Check all ({monitoredCount})</Button>}
       </>}/>
       <p className="text-sm text-muted-foreground">Checks run on demand; this tool does not send automatic alerts.</p>
@@ -590,12 +598,13 @@ export default function GmbMonitorPage() {
       )}
         {showAddForm && (
           <Card className="p-4 rounded-xl">
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
               <Search className="h-4 w-4" /> Find a business on Google
-            </h3>
+            </h2>
             <div className="flex gap-2">
               <Input
                 placeholder="Business name, address, or Google Maps URL..."
+                aria-label="Business name, address, or Google Maps URL"
                 value={searchQuery}
                 onChange={e => { setSearchQuery(e.target.value); if (searchError) setSearchError(""); }}
                 onKeyDown={e => e.key === "Enter" && handleSearch()}
@@ -652,24 +661,30 @@ export default function GmbMonitorPage() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : listings && listings.length > 0 ? (
+          <>
+          {/* Each listing's name is an h3: an outline level above them for screen readers (no visual change). */}
+          <h2 className="sr-only">Your listings</h2>
           <div className="space-y-3">
             {listings.map(listing => (
               <ListingCard key={listing.id} listing={listing} />
             ))}
           </div>
-        ) : (
-          <Card className="p-12 text-center">
-            <Eye className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
-            <h3 className="text-lg font-semibold mb-1">No listings added yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Add your Google Business listings, then use Check now to spot changes like name edits, address updates, photo count changes, and more.
-            </p>
-            <Button variant="outline" onClick={() => setShowAddForm(true)} data-testid="button-add-first">
-              <Plus className="h-4 w-4 mr-2" /> Add your first business
-            </Button>
+          </>
+        ) : listingsError ? (
+          <Card className="p-8 text-center" role="alert" data-testid="text-listings-error">
+            <p className="text-sm text-destructive">Couldn't load your listings — refresh to try again.</p>
           </Card>
+        ) : (
+          <GbpPrerequisite tool="monitor" met={false}
+            detail={seed ? `${seed.businessName} is already in your Locations.` : "Add the Google listing you want to watch."}
+            action={seed
+              ? { label: `Watch ${seed.businessName}`, disabled: addMutation.isPending, onClick: () => addMutation.mutate({
+                  placeId: seed.placeId, businessName: seed.businessName,
+                  address: [seed.address, seed.city, seed.state].filter(Boolean).join(", ") || null,
+                  phone: seed.phone ?? null, website: seed.website ?? null, category: seed.categories?.[0] ?? null }) }
+              : { label: "Find your business on Google", onClick: () => setShowAddForm(true) }} />
         )}
-        {!isLoading && !listings?.length && (
+        {showSample({ isLoading, isError: listingsError, total: listings?.length }) && (
           <SamplePreview what="what a tracked listing looks like here" testId="sample-listing">
             <Card className="p-4">
               <div className="flex items-start justify-between gap-3">

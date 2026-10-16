@@ -26,7 +26,7 @@ import { VPN_SHIELD_VIEWS } from "@/components/traffic-tool/nav";
 import { countryName } from "@/components/ip-tracker/country-names";
 import { ALL_TIME, RangePicker, StepsCard, inRange, rangeBounds, type DateRange } from "@/components/traffic-tool/shared";
 import { DetectionsChart, FlaggedVisitRow, TopLists, VpnSitePanel, VpnSummaryStrip, sparklineDays, type VpnDomain, type VpnStats, type VpnVisit } from "@/components/traffic-tool/vpn-views";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const VpnSample = lazySample(() => import("@/components/traffic-tool/samples"), "VpnSample");
 import { Copy, Clock, Search, Code2 } from "lucide-react";
 
@@ -121,7 +121,7 @@ function OverviewTab({ domainId, domains, statsQuery, onPickSite, onInstall }: {
   const blockedCount = visits ? visits.filter((v) => v.action === "block").length : null;
   const days = sparklineDays(visits);
   const recentTotal = days.reduce((s, d) => s + d.count, 0);
-  const nothingYet = !!stats && stats.total === 0;
+  const nothingYet = showSample({ isLoading: statsQuery.isLoading, isError: statsQuery.isError && !stats, total: stats?.total });
   // "…" only while a figure is still loading; a failed load says so; a site with no detection yet gets the sample.
   const fig = (n: number | undefined) => (stats ? n ?? 0 : statsQuery.isError ? "Unavailable" : "…");
 
@@ -195,7 +195,7 @@ function BlockedVisitorsTab({ domainId, onInstall }: { domainId: number | null; 
   const safePage = Math.min(page, Math.max(totalPages, 1));
   const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage);
   const narrowed = !!q || !!action || range.preset !== "all";
-  const nothingYet = !!visits && visits.length === 0 && !narrowed;
+  const nothingYet = showSample({ isLoading: visitsQuery.isLoading, isError: visitsError, total: visits?.length, filtered: narrowed });
 
   return (
     <div className="space-y-4">
@@ -383,13 +383,13 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
 
       {blockMode === "redirect" && (
         <Section title="Redirect URL">
-          <Input type="url" inputMode="url" placeholder="https://example.com/blocked" value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} aria-invalid={!!redirectError} data-testid="input-redirect-url" />
+          <Input type="url" inputMode="url" aria-label="Redirect URL" placeholder="https://example.com/blocked" value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} aria-invalid={!!redirectError} data-testid="input-redirect-url" />
           {redirectError && <p className="mt-2 text-xs text-destructive" data-testid="text-redirect-url-error">{redirectError}</p>}
         </Section>
       )}
 
       <Section title="Whitelisted IPs" description="Public IP addresses that should never be blocked, one per line, such as your office's public IP or the address you test from. Your site sees the public address, never a private one like 192.168.x.x.">
-        <Textarea placeholder={"203.0.113.10\n2001:db8::10"} value={whitelistedIps} onChange={(e) => setWhitelistedIps(e.target.value)} className="resize-none font-mono text-sm" rows={5} aria-invalid={!!whitelistError} data-testid="textarea-whitelisted-ips" />
+        <Textarea aria-label="Whitelisted IPs, one per line" placeholder={"203.0.113.10\n2001:db8::10"} value={whitelistedIps} onChange={(e) => setWhitelistedIps(e.target.value)} className="resize-none font-mono text-sm" rows={5} aria-invalid={!!whitelistError} data-testid="textarea-whitelisted-ips" />
         {whitelistError && <p className="mt-2 text-xs text-destructive" data-testid="text-whitelist-error">{whitelistError}</p>}
       </Section>
 
@@ -427,7 +427,7 @@ export default function VpnShieldPage() {
   const domains = domainsQuery.data ?? undefined;
   const domainsLoading = domainsQuery.isLoading;
   const domainsError = domainsQuery.isError && !domains;
-  const noSites = !!domains && domains.length === 0;
+  const noSites = showSample({ isLoading: domainsLoading, isError: domainsError, total: domains?.length });
 
   const selectedDomain = (domains ?? []).find((d) => d.id === selectedDomainId) || domains?.[0];
   const domainId = selectedDomain?.id ?? null;

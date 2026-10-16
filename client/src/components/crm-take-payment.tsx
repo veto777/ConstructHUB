@@ -19,7 +19,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -183,6 +183,7 @@ export function TakePaymentDialog({
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="dialog-take-payment">
         <DialogHeader>
           <DialogTitle>Take a payment — {customerName}</DialogTitle>
+          <DialogDescription>Collect a deposit or an invoice payment from this client.</DialogDescription>
         </DialogHeader>
 
         {deposits.length > 0 && (

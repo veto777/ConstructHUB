@@ -34,6 +34,8 @@ function Glyph({ item }: { item: NavEntry }) {
 /** Every other ConstructHUB tool, as the sidebar lists them (its own lists: APP_NAV). Social Media`s shell uses it too. */
 export function AllTools({ close }: { close: () => void }) {
   const [location] = useLocation();
+  const { data: me } = useQuery<{ isPlatformAdmin?: boolean } | null>({ queryKey: ["/api/auth/me"] });
+  const shownToMe = APP_NAV.shownTo(me?.isPlatformAdmin === true);
   const item = (i: NavEntry, sub = false) => {
     const className = `tool-all__item${sub ? " tool-all__sub" : ""}`;
     const testId = `all-tools-${i.url.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "home"}`;
@@ -42,10 +44,10 @@ export function AllTools({ close }: { close: () => void }) {
       ? <a key={i.url} href={portalUrl(i.crmPath)} className={className} data-testid={testId}>{body}</a>
       : <Link key={i.url} href={i.url} onClick={close} className={className} aria-current={location === i.url ? "page" : undefined} data-testid={testId}>{body}</Link>;
   };
-  const group = (g: { label: string; icon: any; logo?: string; logoComponent?: NavEntry["logoComponent"]; children: NavEntry[] }) => (
+  const group = (g: { label: string; icon: any; logo?: string; logoComponent?: NavEntry["logoComponent"]; children: (NavEntry & { adminOnly?: boolean })[] }) => (
     <div className="tool-all__group" key={g.label}>
       <div className="tool-all__item" style={{ fontWeight: 600 }}><Glyph item={{ title: g.label, url: "", icon: g.icon, logo: g.logo, logoComponent: g.logoComponent }} /><span>{g.label}</span></div>
-      {g.children.filter(APP_NAV.shownHere).map((c) => item(c, true))}
+      {g.children.filter(APP_NAV.shownHere).filter(shownToMe).map((c) => item(c, true))}
     </div>
   );
   return (

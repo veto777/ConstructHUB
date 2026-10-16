@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { AppPage, Notice } from "@/components/app-ui";
 import { GoogleAiOverview, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { MetricStrip, StatCell, StatusBadge, scoreTone } from "@/components/tool";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { HelpButton } from "@/components/help-button";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Download, ExternalLink, Search, Trash2 } from "lucide-react";
@@ -365,7 +365,7 @@ export function ScanReport({
               {report.psi?.some((p: any) =>
                 ["no_key", "configuration"].includes(p.reason),
               )
-                ? "Server owner: add PAGESPEED_API_KEY and enable the PageSpeed Insights API, then use Rescan / retry PageSpeed."
+                ? "Page speed measuring isn't switched on yet; the rest of the scan is complete. Use Rescan / retry PageSpeed later."
                 : "Use Rescan / retry PageSpeed to measure again."}
             </p>
           )}
@@ -1147,6 +1147,8 @@ export default function SiteScanPage() {
         )}
         {data?.jobs.length === 0 && (historyQ || historyStatus || clientFilter ? (
           <p className="text-sm g-text-2" data-testid="text-history-no-match">No scans match these filters.</p>
+        ) : !showSample({ isError: !!listError && !data, total: data?.jobs.length, filtered: !!(historyQ || historyStatus || clientFilter), page: historyOffset }) ? (
+          <p className="text-sm g-text-2" data-testid="text-history-no-page">No scans on this page.</p>
         ) : (
           // Nothing scanned yet: what the history looks like, on made-up numbers, until the first real scan replaces it.
           <SamplePreview what="what your scan history looks like after a scan" testId="sample-scan-history"

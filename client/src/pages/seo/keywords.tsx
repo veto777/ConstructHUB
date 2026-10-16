@@ -18,7 +18,7 @@
 import { ServicePlanner } from "./planner";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { ActiveFilter, holdNote, isNotRunYet, refreshSeoData } from "./shell";
+import { ActiveFilter, holdNote, isNotRunYet, refreshSeoData, hideSeoPrices } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -280,18 +280,18 @@ export default function SeoKeywordsPage() {
       </form>
       {googleKeywords ? (
         <p className="g-text-2 mb-4 text-[13px]" data-testid="text-keyword-cost">
-          Google's own numbers for {placeWords(place, market.label)} — search volume, cost per click, bids and four years of months — are free. The full lookup (difficulty, who ranks, traffic potential) costs about <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-keyword-price">{price}</Link> of your SEO data and is free to reopen for a week.{holdNote(status.data, "keywordOverview")}{!affordable && " You don't have enough SEO data left for the full lookup — add credit above."}
+          Google's own numbers for {placeWords(place, market.label)} — search volume, cost per click, bids and four years of months — are free. The full lookup (difficulty, who ranks, traffic potential) {hideSeoPrices() ? "is included in your unlimited SEO data and free to reopen for a week." : <>costs about <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-keyword-price">{price}</Link> of your SEO data and is free to reopen for a week.</>}{holdNote(status.data, "keywordOverview")}{!affordable && " You don't have enough SEO data left for the full lookup — add credit above."}
         </p>
       ) : (
         <p className="g-text-2 mb-4 text-[13px]" data-testid="text-keyword-cost">
-          A keyword's overview costs about <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-keyword-price">{price}</Link> of your SEO data and is free to reopen for a week.{holdNote(status.data, "keywordOverview")} {placeWords(place, market.label)}, Google.{!affordable && " You don't have enough SEO data left — add credit above."}
+          A keyword's overview {hideSeoPrices() ? "is included in your unlimited SEO data and free to reopen for a week." : <>costs about <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-keyword-price">{price}</Link> of your SEO data and is free to reopen for a week.</>}{holdNote(status.data, "keywordOverview")} {placeWords(place, market.label)}, Google.{!affordable && " You don't have enough SEO data left — add credit above."}
         </p>
       )}
       {chips.length > 0 && <div data-testid="keyword-filters">{chips.map((c) => <ActiveFilter key={c.key} onClear={c.clear} clearLabel={c.label}>{c.words}</ActiveFilter>)}</div>}
       {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> {lookup.isPending ? (googleKeywords ? "Getting Google's numbers…" : "Getting volume, difficulty and the top results…") : "Opening the saved overview…"}</p>}
-      {!o && !busy && !keyword && <Empty testId="keywords-intro"><h3>Research any keyword</h3><p>Enter a search term to see its monthly volume over time, how hard it is to rank for, what an ad click costs, who held the top ten when it was looked up — and hundreds of related searches you can track.</p></Empty>}
-      {!o && !busy && keyword && saved.isError && <div className="g-callout" role="alert" data-testid="keywords-saved-error"><h3>Couldn't check for a saved overview</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
-      {!o && !busy && keyword && !saved.isError && <Empty testId="keywords-not-found"><h3>No overview for "{keyword}" yet</h3><p>Press <b>Look up</b> to get it.</p></Empty>}
+      {!o && !busy && !keyword && <Empty testId="keywords-intro"><h2>Research any keyword</h2><p>Enter a search term to see its monthly volume over time, how hard it is to rank for, what an ad click costs, who held the top ten when it was looked up — and hundreds of related searches you can track.</p></Empty>}
+      {!o && !busy && keyword && saved.isError && <div className="g-callout" role="alert" data-testid="keywords-saved-error"><h2>Couldn't check for a saved overview</h2><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
+      {!o && !busy && keyword && !saved.isError && <Empty testId="keywords-not-found"><h2>No overview for "{keyword}" yet</h2><p>Press <b>Look up</b> to get it.</p></Empty>}
 
       {o && (
         <div data-testid="keyword-overview">
@@ -301,8 +301,8 @@ export default function SeoKeywordsPage() {
             {o.free && <span className="g-text-2 text-[12px]" data-testid="text-keyword-free">Google's numbers for {placeWords(o.place ?? place, market.label)} · free</span>}
             {!o.free && o.place && <span className="g-text-2 text-[12px]" data-testid="text-keyword-place">Searched from {o.place.label}</span>}
             {o.free
-              ? <button type="button" className={PILL} disabled={full.isPending || !configured || !affordable} onClick={() => full.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} title={`Difficulty, who ranks and traffic potential — about ${price}`} data-testid="button-keyword-full">{full.isPending ? <Loader2 className="animate-spin" /> : null} Full lookup · {price}</button>
-              : <button type="button" className={PILL} disabled={refresh.isPending || !configured || !affordable} onClick={() => refresh.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} title={`Looks it up again — about ${price}`} data-testid="button-keyword-refresh">{refresh.isPending ? <Loader2 className="animate-spin" /> : null} Refresh · {price}</button>}
+              ? <button type="button" className={PILL} disabled={full.isPending || !configured || !affordable} onClick={() => full.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} title={`Difficulty, who ranks and traffic potential${hideSeoPrices() ? "" : ` — about ${price}`}`} data-testid="button-keyword-full">{full.isPending ? <Loader2 className="animate-spin" /> : null} Full lookup · {price}</button>
+              : <button type="button" className={PILL} disabled={refresh.isPending || !configured || !affordable} onClick={() => refresh.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} title={`Looks it up again${hideSeoPrices() ? "" : ` — about ${price}`}`} data-testid="button-keyword-refresh">{refresh.isPending ? <Loader2 className="animate-spin" /> : null} Refresh · {price}</button>}
             <span className="ml-auto"><AddToList market={market} rows={[{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty, intent: o.intent }]} label="Save to a list" /></span>
             {site && <button type="button" className={PILL} disabled={track.isPending} onClick={() => track.mutate({ rows: [{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty }], from: market })} data-testid="button-track-keyword"><Plus /> Track on {site.domain}</button>}
             {site && isTracked && <Link href={seoLinks.rankTracker(site.id, { keyword: o.keyword })} className={`${PILL} ${LINK_CUE}`} title={`Already tracked on ${site.domain} — its checks in the rank tracker`} data-testid="link-tracked-keyword">In the rank tracker</Link>}
@@ -314,7 +314,7 @@ export default function SeoKeywordsPage() {
                 foot={peak ? <Link href={addr({ section: "volume", month: peak.month })} className={TEXT_LINK} data-testid="link-volume-peak">Peak {fmtNum(peak.volume)} in {monthLabel(peak.month)}</Link> : "per month"}
                 chart={<Link href={addr({ section: "volume", month: undefined })} className={`${LINK_CUE} block min-h-11`} aria-label="Search volume by month" data-testid="link-volume-chart"><GradientSpark range height={44} points={trend} color={PALETTE.keywords} format={fmtNum} /></Link>} />
               <MetricColumn label="Difficulty" value={o.free
-                  ? <button type="button" className={PILL} disabled={full.isPending || !configured || !affordable} onClick={() => full.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} title={`Difficulty, who ranks and traffic potential — about ${price}`} data-testid="button-difficulty-full">{full.isPending ? <Loader2 className="animate-spin" /> : null} Full lookup · {price}</button>
+                  ? <button type="button" className={PILL} disabled={full.isPending || !configured || !affordable} onClick={() => full.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} title={`Difficulty, who ranks and traffic potential${hideSeoPrices() ? "" : ` — about ${price}`}`} data-testid="button-difficulty-full">{full.isPending ? <Loader2 className="animate-spin" /> : null} Full lookup · {price}</button>
                   : <Link href={addr({ section: "serp" })} className={BLOCK_LINK} title="The pages it is worked out from" data-testid="link-difficulty"><KdBadge value={o.difficulty} size="lg" /></Link>}
                 foot={o.free ? "With who ranks and traffic potential" : o.topAvg.referringDomains != null ? <Link href={addr({ section: "serp" })} className={TEXT_LINK} data-testid="link-top-avg">Top pages average {fmtNum(o.topAvg.referringDomains)} referring domains</Link> : "0–100"} />
               <MetricColumn label="Cost per click" value={<Link href={addr({ section: "cpc" })} className={FIG_LINK} title="No view lists the bids — this opens who ranks" data-testid="link-cpc">{o.cpc == null ? "—" : `$${o.cpc.toFixed(2)}`}</Link>}
@@ -355,7 +355,7 @@ export default function SeoKeywordsPage() {
             <Heading className="mb-2" note={o.free ? undefined : <>Google's top results as saved on <Link href={seoLinks.usage({ month: o.fetchedAt.slice(0, 7) })} className={TEXT_LINK} title="When these results were saved — that month's lookups on the Usage page" data-testid="link-serp-saved-on">{fmtDate(o.fetchedAt)}</Link> (desktop{o.place ? `, searched from ${o.place.label}` : ""})</>}>Who ranks</Heading>
             {o.free && (
               <div className="g-callout" data-testid="keyword-serp-full">
-                <h3>Who ranks, difficulty and traffic potential</h3>
+                <h2>Who ranks, difficulty and traffic potential</h2>
                 <p>Google's free numbers don't say who holds the top ten{place ? ` in ${place.label}` : ""} or how hard it is to rank. The full lookup gets them — about {price} of your SEO data, free to reopen for a week.</p>
                 <Button className="mt-2" disabled={full.isPending || !configured || !affordable} onClick={() => full.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} data-testid="button-serp-full">{full.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}Full lookup — about {price}</Button>
                 {!affordable && <p className="mt-2 text-[13px]" style={{ color: "var(--g-red)" }}>Not enough SEO data left — add credit above.</p>}

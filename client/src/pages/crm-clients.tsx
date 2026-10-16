@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -16,7 +16,7 @@ import { EMAIL_RE, customerErrorMessage, duplicateMatches, type DuplicateMatch }
 import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ChevronRight, Download, Upload } from "lucide-react";
 import { SegmentedTabs, TabCount } from "@/components/tool";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable, crmTableCards } from "@/components/crm-ui";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SampleClientsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleClientsTable");
 
 interface Client {
@@ -211,7 +211,7 @@ export default function CrmClientsPage() {
               <Button data-testid="button-new-client"><Plus className="h-4 w-4 mr-2" /> New client</Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>New client</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>New client</DialogTitle><DialogDescription>Add a client to your CRM. Only the name is required.</DialogDescription></DialogHeader>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <Label htmlFor="c-name">Client name *</Label>
@@ -310,7 +310,7 @@ export default function CrmClientsPage() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative max-w-md flex-1 min-w-[220px]">
           <Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
-          <Input className="pl-9 bg-card" placeholder="Search name, email, phone or address"
+          <Input className="pl-9 bg-card" placeholder="Search name, email, phone or address" aria-label="Search clients"
             value={q} onChange={(e) => setQ(e.target.value)} data-testid="input-search-clients" />
         </div>
         {/* Bid outcome tabs — where does every client stand on their bid? */}
@@ -363,11 +363,11 @@ export default function CrmClientsPage() {
           />
         </Card>
         {/* The whole book is empty (bookTotal is the server's count across every tab): show a sample. */}
-        <SampleClientsTable cta={canManage ? (
+        {showSample({ isLoading: isLoading || isPlaceholderData, isError, total: latest?.bidCounts ? bookTotal : undefined, filtered: !!qDebounced.trim() }) && <SampleClientsTable cta={canManage ? (
           <Button size="sm" variant="outline" className="max-sm:min-h-11" onClick={() => setOpen(true)} data-testid="button-new-client-sample">
             <Plus className="h-4 w-4 mr-1" /> Add your first client
           </Button>
-        ) : undefined} />
+        ) : undefined} />}
         </>
       ) : (
         (() => {

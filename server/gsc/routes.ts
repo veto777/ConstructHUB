@@ -8,6 +8,7 @@ import {
   routeFor,
   registerAssetRoutes,
   connectionNotice,
+  signInConfigured,
   type Auth,
 } from "../cloudflare/routes";
 import {
@@ -48,7 +49,7 @@ export function registerGscRoutes(
   // No "verify your identity" step (owner, 2026-10-13, as for Cloudflare): Google checks who the customer is next.
   route("get", "/api/gsc/connect", async (req, res, user) => {
     await budget(user, "connect");
-    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET)
+    if (!signInConfigured("gsc"))
       throw new ProviderError("Google OAuth is not configured", 503);
     const state = randomBytes(32).toString("hex"),
       redirect = `${oauthBaseUrl(req)}/api/gsc/callback`;

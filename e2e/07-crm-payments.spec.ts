@@ -23,7 +23,7 @@ test.describe("/crm/payments", () => {
         const r = await page.request.get("/api/crm/payments/connect/stripe");
         expect(r.status(), "stripe connect endpoint").toBeLessThan(500);
       } else {
-        await expect(page.getByText(/Not configured on this server/)).toBeVisible();
+        await expect(page.getByText(/Card payments aren’t switched on yet/)).toBeVisible();
       }
     }
 

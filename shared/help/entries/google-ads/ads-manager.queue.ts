@@ -11,7 +11,7 @@ const entry: HelpDraft = {
     "Type a customer ID in the search box to follow one client’s jobs, or open Filters and pick a status.",
     "Open the section a Done job belongs to: Client accounts, Access invitations, Protection previews or Health audit.",
   ],
-  howItWorks: "ConstructHUB runs the jobs in the background, one at a time, and saves each result. When the page says “The Ads worker is off”, jobs stay Queued until it is switched on. A job whose outcome Google did not confirm is marked Unknown rather than Done: check the account in Google Ads before queuing the same change again.",
+  howItWorks: "ConstructHUB runs the jobs in the background, one at a time, and saves each result. When the page says “Ads jobs are paused for now”, jobs stay Queued until they are switched back on. A job whose outcome Google did not confirm is marked Unknown rather than Done: check the account in Google Ads before queuing the same change again.",
   needs: ["A plan that includes the Agency Ads & LSA module.", "A connected Google Ads manager (MCC) account."],
 };
 export default entry;

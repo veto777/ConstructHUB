@@ -209,7 +209,7 @@ export function registerSocialRoutes(
     const params=[id,businessId,all,`%${q.search}%`,q.state,q.platform,q.day||null,q.timezone];
     const where=`p.user_id=$1 AND ($3 OR p.business_id IS NOT DISTINCT FROM $2) AND
       (p.payload->'post'->'content'->>'text' ILIKE $4 OR l.business_name ILIKE $4) AND ($5='' OR p.state=$5)
-      AND ($6='' OR p.payload->'post'->'content'->>'platform'=$6)
+      AND ($6='' OR p.payload->'post'->'content'->>'platform'=$6 OR ($6='x' AND p.payload->'post'->'content'->>'platform'='twitter'))
       AND ($7::date IS NULL OR (COALESCE(p.scheduled_at,p.created_at) AT TIME ZONE $8)::date=$7::date)`;
     const {rows:posts}=await pool.query(`SELECT p.*,l.business_name FROM social_posts p LEFT JOIN business_locations l ON l.id=p.business_id AND l.user_id=p.user_id
       WHERE ${where} ORDER BY COALESCE(p.scheduled_at,p.created_at) ${q.order==='asc'?'ASC':'DESC'},p.id LIMIT $9 OFFSET $10`,[...params,q.limit,q.offset]);

@@ -197,6 +197,9 @@ function summary(row: CrmSubscriptionRow | undefined) {
     trialEndsAt: row?.status === "trialing" ? row?.trial_end ?? null : null,
     cancelAtPeriodEnd: Boolean(row?.cancel_at_period_end),
     hasLiveSubscription: Boolean(row?.stripe_subscription_id && LIVE_STATUSES.has(row.status)),
+    /** A CRM subscription was ever started in Stripe (live or ended), so the account has a Stripe
+     *  customer and the billing portal can open. Without one, "Manage billing" would only 400. */
+    hasStripeSubscription: Boolean(row?.stripe_subscription_id),
   };
 }
 

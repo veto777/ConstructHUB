@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { apiErrorMessage } from "@/lib/queryClient";
@@ -129,6 +129,12 @@ export function ApiUsagePanel({ days: initialDays = 30 }: ApiUsagePanelProps = {
   const tableRows = useMemo(() => [...rows].sort((a, b) => b.date.localeCompare(a.date)), [rows]);
   const totals = usage.data?.totals ?? { units: 0, requests: 0 };
   const activeKeys = keyIds.filter((id) => rows.some((d) => (d.byKey?.[id] ?? 0) > 0)).length;
+  // The period is a range filter: an empty window is not an empty account. The sample shows only when no key has
+  // ever been used (keys' lastUsedAt, this month's plan usage); a used account with a quiet window says so instead.
+  const windowEmpty = rows.length === 0 || keyIds.length === 0;
+  const keys = keysQuery.data;
+  const everUsed = keys ? keys.keys.filter((k) => k.lastUsedAt).length + (keys.plan.usedThisMonth > 0 ? 1 : 0) : undefined;
+  const sample = showSample({ isLoading: usage.isLoading || keysQuery.isLoading, isError: !!usage.error || keysQuery.isError, total: windowEmpty ? everUsed : rows.length });
 
   return (
     <div className="space-y-6">
@@ -178,12 +184,14 @@ export function ApiUsagePanel({ days: initialDays = 30 }: ApiUsagePanelProps = {
               {rows.length === 0 || keyIds.length === 0 ? (
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground rounded-lg bg-muted/50 p-4" data-testid="text-api-usage-empty">
-                    No API calls in the last {days} days.
+                    {sample ? `No API calls in the last ${days} days.` : `Nothing in this range. No API calls in the last ${days} days.`}
                   </p>
                   {/* Nothing real to show yet: a badged sample of the chart and table, replaced by the real series the moment a key is used. */}
-                  <SamplePreview what="what this panel shows once a key has made calls" testId="sample-api-usage">
-                    <SampleUsage />
-                  </SamplePreview>
+                  {sample && (
+                    <SamplePreview what="what this panel shows once a key has made calls" testId="sample-api-usage">
+                      <SampleUsage />
+                    </SamplePreview>
+                  )}
                 </div>
               ) : (
                 <>

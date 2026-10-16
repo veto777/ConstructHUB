@@ -199,8 +199,8 @@ export function ProjectRow({ card, busy, canAnalyse, price, priceNote, onAnalyse
           <Link href={seoLinks.rankTracker(s.id)} className="tool-btn" onClick={pick} data-testid={`link-rank-${s.id}`}>Rank tracker</Link>
           <Link href={seoLinks.audit(s.id)} className="tool-btn" onClick={pick} data-testid={`link-audit-${s.id}`}>Site audit</Link>
           <Link href={seoLinks.plan(s.id)} className="tool-btn" onClick={pick} data-testid={`link-plan-${s.id}`} aria-label={`Action plan${openTasks == null ? " — count unavailable" : openTasks ? ` — ${openTasks} open` : ""}`}>Action plan{openTasks == null ? <span className="tool-muted">· ?</span> : openTasks ? <span className="tool-tabs__count" style={{ background: "var(--tool-active)", borderRadius: 9999, padding: "0 6px", fontSize: 11, fontWeight: 600 }}>{openTasks}</span> : null}</Link>
-          <button type="button" className="tool-btn" disabled={busy || !canAnalyse} onClick={onAnalyse} data-testid={`button-analyse-${s.id}`} title={`A new report costs about ${price} of your SEO data.${priceNote}`}>
-            {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} {r ? "Refresh" : "Analyse"} · {price}
+          <button type="button" className="tool-btn" disabled={busy || !canAnalyse} onClick={onAnalyse} data-testid={`button-analyse-${s.id}`} title={price ? `A new report costs about ${price} of your SEO data.${priceNote}` : undefined}>
+            {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} {r ? "Refresh" : "Analyse"}{price ? ` · ${price}` : ""}
           </button>
         </div>
       </div>
@@ -252,7 +252,7 @@ export function ProjectRow({ card, busy, canAnalyse, price, priceNote, onAnalyse
         <MetricStrip cols={[1, 3, 3]} testId={`start-${s.id}`}>
           {/* Three steps to fill this row; each says whether it is done. Nothing here is a figure until a step has run. */}
           <StartStep n={1} done={false} title="Analyse the site" text="Authority, backlinks, estimated search traffic, keywords and competitors — with two years of monthly history.">
-            <button type="button" className="tool-btn" disabled={busy || !canAnalyse} onClick={onAnalyse} data-testid={`button-analyse-empty-${s.id}`}>{busy ? <Loader2 className="animate-spin" /> : null}Analyse — about {price}</button>
+            <button type="button" className="tool-btn" disabled={busy || !canAnalyse} onClick={onAnalyse} data-testid={`button-analyse-empty-${s.id}`}>{busy ? <Loader2 className="animate-spin" /> : null}Analyse{price ? ` — about ${price}` : ""}</button>
           </StartStep>
           <StartStep n={2} done={(s.keywordCount ?? 0) > 0} title="Track your keywords"
             text={(s.keywordCount ?? 0) > 0 ? <><FigureLink href={seoLinks.rankTracker(s.id, { panel: "keywords" })} onClick={pick} testId={`link-start-tracked-${s.id}`}>{fmtNum(s.keywordCount)} tracked</FigureLink> — checked every week by default.</> : "Your services and towns: where the site is found in Google and the map pack, every week."}>

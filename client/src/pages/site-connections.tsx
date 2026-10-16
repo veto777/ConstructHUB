@@ -35,7 +35,7 @@ import { Link, useSearch } from "wouter";
 import { SiteConnectionGuide } from "./site-connection-guide";
 import { AppPage, Toolbar, Notice } from "@/components/app-ui";
 import { MetricStrip, StatCell, ToolTabs } from "@/components/tool";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { useInToolShell } from "@/components/tool/in-shell";
 import { useToolView } from "@/hooks/use-tool-view";
 import { CLOUDFLARE_VIEWS, SEARCH_CONSOLE_VIEWS } from "@/components/website-tool/nav";
@@ -46,6 +46,7 @@ import {
 } from "@/components/google";
 import { Search, CheckCircle2, ArrowLeft, ExternalLink } from "lucide-react";
 import { HelpButton } from "@/components/help-button";
+import { AdminSetupNote } from "@/hooks/use-platform-admin";
 import {
   CloudflareConnectSteps,
   CloudflareTokenSteps,
@@ -269,6 +270,7 @@ export function DataList({
   filters = [],
   columns,
   sortable = false,
+  as = "h3",
 }: {
   url: string;
   title: string;
@@ -279,6 +281,8 @@ export function DataList({
   columns?: Column[];
   /** Wire sort/dir to the server (sorted in SQL before pagination) and persist them in the URL. */
   sortable?: boolean;
+  /** The heading level: h2 when the list is the page's first section (straight under the h1), else h3. */
+  as?: "h2" | "h3";
 }) {
   const [q, Q] = useReportParam(`filter.${title}`),
     [page, P] = useReportPage(`page.${title}`),
@@ -303,7 +307,7 @@ export function DataList({
   return (
     <section className="space-y-3">
       <GoogleSectionHeader
-        as="h3"
+        as={as}
         title={label ?? title}
         count={data.data?.total == null ? null : formatNumber(data.data.total)}
         flush
@@ -557,7 +561,7 @@ function MetricRows({ asset }: { asset: any }) {
 /** Only an in-app path may be a "from" link: "/locations?location=7", never "//evil" or "https://…". */
 const safeBack = (v: string | null) => (v && v.startsWith("/") && !v.startsWith("//") ? v : null);
 
-export function LocationSearchSummary({ locationId, businessName }: { locationId: number; businessName?: string }) {
+export function LocationSearchSummary({ locationId, businessName, hideWhenEmpty = false }: { locationId: number; businessName?: string; hideWhenEmpty?: boolean }) {
   // The Search Console page gets a way back to this location (owner 2026-10-15: "you can't get back to the google page").
   const openHref = `/search-console?from=${encodeURIComponent(`/locations?location=${locationId}&tab=insights`)}${businessName ? `&fromLabel=${encodeURIComponent(businessName)}` : ""}`;
   // The server picks the location's linked property; linking a different one or a new sync changes
@@ -571,6 +575,8 @@ export function LocationSearchSummary({ locationId, businessName }: { locationId
   const s = (data as any)?.search;
   // The containing location page remains useful without this optional module.
   if (planRequiredFrom(error)) return null;
+  // A location page shows the card only when Search Console has numbers for it (review w2-agent10 #2).
+  if (hideWhenEmpty && (isLoading || error || !s)) return null;
   if (isLoading) return <LoadingReport />;
   if (error && !data)
     return <ReportError error={error} retry={() => void refetch()} />;
@@ -700,6 +706,8 @@ export default function SiteConnections({
     queryKey: [`${base}/connections?limit=1`],
     queryFn: () => read(`${base}/connections?limit=1`),
   });
+  // The server says whether its provider sign-in is set up; without it "Connect" could only fail (503).
+  const signInOff = config.data?.signInConfigured === false;
   const planGate = [config.error, assets.error, actionError].find((e) =>
     planRequiredFrom(e),
   );
@@ -814,9 +822,10 @@ export default function SiteConnections({
         ))}
       {config.isLoading && <LoadingReport />}
       {config.data?.workerEnabled === false && (
-        <Notice tone="warning">
-          Background processing is disabled. Queued work will wait until the
-          owner enables the site integration worker.
+        <Notice tone="info">
+          Imports and checks are paused for now; queued work runs once we switch
+          them back on. Connecting and reviewing your sites still work.
+          <AdminSetupNote>the site integration worker is off.</AdminSetupNote>
         </Notice>
       )}
       {new URLSearchParams(window.location.search).get("connection") ===
@@ -898,7 +907,7 @@ export default function SiteConnections({
         </div>
       )}
       {!inShell && <TabStrip tabs={TABS} active={tab} onChange={T} />}
-      {tab === "Guide" && <SiteConnectionGuide />}
+      {tab === "Guide" && <SiteConnectionGuide provider={cf ? "cloudflare" : "gsc"} />}
       {tab === "Connections" && (
         <div className="space-y-5 sm:space-y-6">
           <section>
@@ -933,7 +942,7 @@ export default function SiteConnections({
                   </p>
                   <GooglePill
                     variant="solid"
-                    disabled={busy}
+                    disabled={busy || signInOff}
                     className="w-full sm:w-auto"
                     testId="button-connect-cloudflare"
                     icon={BRAND.cloudflare.icon}
@@ -950,6 +959,11 @@ export default function SiteConnections({
                     }
                   />
                 </div>
+                {signInOff && (
+                  <p className="text-sm g-text-2" data-testid="text-cloudflare-signin-off">
+                    Cloudflare sign-in isn't available on this server yet. Use the Global API Key or a scoped token below instead.
+                  </p>
+                )}
                 <details className="g-card border-t" data-testid="cloudflare-key-fallback">
                   <summary className="cursor-pointer text-sm font-medium">
                     Other ways to connect: Global API Key or a scoped token
@@ -1102,22 +1116,31 @@ export default function SiteConnections({
                     here any more (owner, 2026-10-13: "not sure what this is and why we need it"); the route stays for ops. */}
               </div>
             ) : (
-              <GooglePill
-                variant="solid"
-                disabled={busy}
-                className="w-full sm:w-auto"
-                onClick={() =>
-                  act(async () => {
-                    const d = await read(`${base}/connect`);
-                    window.location.assign(d.url);
-                  })
-                }
-                icon={BRAND.search_console.icon}
-                label="Connect Google Search Console"
-              />
+              <div className="space-y-2">
+                <GooglePill
+                  variant="solid"
+                  disabled={busy || signInOff}
+                  className="w-full sm:w-auto"
+                  testId="button-connect-search-console"
+                  onClick={() =>
+                    act(async () => {
+                      const d = await read(`${base}/connect`);
+                      window.location.assign(d.url);
+                    })
+                  }
+                  icon={BRAND.search_console.icon}
+                  label="Connect Google Search Console"
+                />
+                {signInOff && (
+                  <p className="text-sm g-text-2" data-testid="text-search-console-signin-off">
+                    Google sign-in isn't set up on this server yet, so Search Console can't be connected here right now.
+                  </p>
+                )}
+              </div>
             )}
           </section>
           <DataList
+            as="h2"
             title="Connections"
             url={`${base}/connections`}
             render={(c) => (
@@ -1517,7 +1540,7 @@ export default function SiteConnections({
                       )}
                       {/* No site yet (nothing matches the search is a different case, said above): what the list looks like,
                           on made-up sites, until the first real one replaces it. */}
-                      {!q && !status && (
+                      {showSample({ isLoading: assets.isLoading, isError: !!assets.error && !assets.data, total: assets.data ? assets.data.items.length : undefined, filtered: !!(q || status), page: page - 1 }) && (
                         <SamplePreview what={`what you'll see once ${cf ? "a Cloudflare account" : "Search Console"} is connected`} testId={`sample-sites-${provider}`}
                           cta={<GooglePill size="sm" label="Connect to replace this sample" onClick={() => T("Connections")} />}>
                           <div className="space-y-3">
@@ -1750,6 +1773,7 @@ export default function SiteConnections({
       )}
       {tab === "Work queue" && (
         <DataList
+          as="h2"
           title="Work queue"
           label={inShell ? "Jobs" : undefined}
           url={`${base}/jobs`}
@@ -1776,6 +1800,7 @@ export default function SiteConnections({
       )}
       {tab === "Edge audit" && (
         <DataList
+          as="h2"
           title="Edge audit"
           label={inShell ? "Changes" : undefined}
           url={`${base}/actions`}

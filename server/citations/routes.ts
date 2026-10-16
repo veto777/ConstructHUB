@@ -15,6 +15,7 @@ import { requirePlan, getEntitlements } from "../entitlements";
 import { monthlyLimit, quotaKey, reserveMonthlyQuota } from "../growth-quotas";
 import { webSearchMode } from "./finder";
 import { exportCsv, importCsv, latestAudit, profileFor, startAudit, templateCsv } from "./audit";
+import { fail500, hasClientStatus } from "../ops/log";
 
 const slug = (s: string) => s.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "citations";
 
@@ -47,7 +48,7 @@ export function registerCitationRoutes(app: Express, getDevUser: (req: any, res:
         ready: !!profile, readyReason: profile ? null : "Add the business phone and city to this location first; the audit needs them to tell your business from others with the same name.",
         capabilities: { webSearch: webSearchMode() !== "off", webSearchProvider: webSearchMode() },
       });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) { fail500(res, "GET /api/citations/campaigns/:id/audit failed:", e); }
   });
 
   app.post("/api/citations/campaigns/:id/audit", async (req: any, res) => {
@@ -62,7 +63,7 @@ export function registerCitationRoutes(app: Express, getDevUser: (req: any, res:
       if (!busy && !(await reserveMonthlyQuota(req, res, "citationAudits"))) return;
       const r = await startAudit(o.campaign.id, o.user.id);
       res.status(r.started ? 202 : 200).json(r);
-    } catch (e: any) { res.status(e.status || 500).json({ message: e.message }); }
+    } catch (e: any) { fail500(res, "POST /api/citations/campaigns/:id/audit failed:", e, hasClientStatus); }
   });
 
   app.post("/api/citations/campaigns/:id/import", express.text({ type: ["text/csv", "text/plain", "application/csv", "application/vnd.ms-excel"], limit: "2mb" }), async (req: any, res) => {
@@ -72,7 +73,7 @@ export function registerCitationRoutes(app: Express, getDevUser: (req: any, res:
     const csv = typeof req.body === "string" ? req.body : typeof req.body?.csv === "string" ? req.body.csv : "";
     if (!csv.trim()) return res.status(400).json({ message: "Send the spreadsheet as CSV text (in Excel: File → Save As → CSV)." });
     try { res.json(await importCsv(o.campaign.id, csv)); }
-    catch (e: any) { res.status(500).json({ message: e.message }); }
+    catch (e: any) { fail500(res, "POST /api/citations/campaigns/:id/import failed:", e); }
   });
 
   app.get("/api/citations/campaigns/:id/export.csv", async (req: any, res) => {
@@ -83,6 +84,6 @@ export function registerCitationRoutes(app: Express, getDevUser: (req: any, res:
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="citations-${slug(o.campaign.businessName)}-${new Date().toISOString().slice(0, 10)}.csv"`);
       res.send(exportCsv(o.campaign, rows));
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) { fail500(res, "GET /api/citations/campaigns/:id/export.csv failed:", e); }
   });
 }

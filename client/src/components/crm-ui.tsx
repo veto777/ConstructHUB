@@ -273,10 +273,13 @@ export function ErrorCard({
   title,
   description,
   children,
+  level = 2,
 }: {
   title: string;
   description?: string;
   children?: React.ReactNode;
+  /** The title's heading level: 1 when the card is the whole page (a record that isn't there), else 2. */
+  level?: 1 | 2 | 3;
 }) {
   return (
     <div className="px-4 sm:px-6 pt-10 max-w-lg mx-auto">
@@ -291,7 +294,7 @@ export function ErrorCard({
               </svg>
             </div>
             <div>
-              <div className="font-semibold">{title}</div>
+              <div className="font-semibold" role="heading" aria-level={level}>{title}</div>
               {description && (
                 <p className="text-sm text-muted-foreground mt-1">{description}</p>
               )}

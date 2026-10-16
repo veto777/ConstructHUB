@@ -24,7 +24,7 @@ export { fullAddress } from '@/lib/address';
 export function Pager({offset,total,onChange}:{offset:number;total:number;onChange:(n:number)=>void}) {
   return <div className="flex flex-wrap gap-2 items-center justify-between text-sm"><Button variant="outline" disabled={!offset} onClick={()=>onChange(Math.max(0,offset-50))}>Previous page</Button><span>{total?offset+1:0}–{Math.min(offset+50,total)} of {total}</span><Button variant="outline" disabled={offset+50>=total} onClick={()=>onChange(offset+50)}>Next page</Button></div>;
 }
-const statusLabels={all:'All statuses',synced:'Synced',reconnect:'Needs reconnect',unlinked:'Not linked',guard:'Watch alerts',unanswered:'Unanswered reviews',failed:'Failed posts'};
+const statusLabels={all:'All statuses',synced:'Connected',reconnect:'Needs reconnect',unlinked:'Not connected',guard:'Watch alerts',unanswered:'Unanswered reviews',failed:'Failed posts'};
 /** The agency bulk workspace when the open workspace's plan includes it. Without it, compact spots show nothing
  *  and the full list (the Locations page) is the owner's own location list, served by /api/locations. */
 export function AgencyWorkspace(props:{onOpen?:(id:number)=>void;compact?:boolean}) {
@@ -88,12 +88,12 @@ function AgencyBulkWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>void;c
   const {data:linkage}=useQuery<any>({queryKey:['/api/gbp/linkage']});
   const googlePill=(l:any):{tone:'success'|'warning'|'neutral';label:string}=>{
     const st=linkage?.locations?.find((x:any)=>x.id===l.id)?.state as string|undefined;
-    if(st==='synced')return{tone:'success',label:'Linked'};
+    if(st==='synced')return{tone:'success',label:'Connected'};
     if(st==='reconnect')return{tone:'warning',label:'Needs reconnect'};
-    if(st==='unlinked'||st==='available')return{tone:'neutral',label:'Not linked'};
+    if(st==='unlinked'||st==='available')return{tone:'neutral',label:'Not connected'};
     // Linkage still loading, off the first page, or withheld from a delegated workspace member: keep the
     // name-based answer rather than guessing.
-    return{tone:l.gbpLocationName?'success':'neutral',label:l.gbpLocationName?'Linked':'Not linked'};
+    return{tone:l.gbpLocationName?'success':'neutral',label:l.gbpLocationName?'Connected':'Not connected'};
   };
   const {data:stats}=useQuery<any>({queryKey:['/api/agency/dashboard',f.params.toString()],queryFn:()=>apiRequest('GET','/api/agency/dashboard?'+f.params).then(r=>r.json())});
   const {data:recentReviews}=useQuery<{items:any[]}>({queryKey:['/api/google-profile-reviews','paged','snippets',f.params.toString()],queryFn:()=>apiRequest('GET','/api/google-profile-reviews?paged=true&'+f.params).then(r=>r.json()),enabled:!!data?.items?.length,staleTime:60_000});
@@ -114,7 +114,7 @@ function AgencyBulkWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>void;c
     if(action==='content')payload={approved:true,items:kind==='post'?[{kind,summary:text,photoIds:photoIds.split(',').filter(Boolean).map(Number)}]:photoIds.split(',').filter(Boolean).map(id=>({kind,summary:text,photoIds:[Number(id)]})),schedule:{start:start?new Date(start).toISOString():new Date().toISOString()}};
     return (await apiRequest('POST','/api/agency/bulk',{requestKey:crypto.randomUUID(),action,payload,selection:{ids:selected,allMatching:selectAll,filters:f.filters}})).json();
   },onSuccess:r=>{setMessage(`${r.queued} location actions queued. See Agency → Jobs for progress and failures.`);setIds([]);setAll(false);queryClient.invalidateQueries({queryKey:['/api/agency']});},onError:e=>setMessage(apiErrorMessage(e))});
-  return <>{(!compact||expanded)&&stats&&<StatGrid cols={2}><Stat label="Locations" value={data?.total??'—'}/><Stat label="Need reconnect" value={stats.reconnect??0}/></StatGrid>}<Section title={compact ? "Agency locations" : "Your locations"} contentClassName="space-y-4">
+  return <>{(!compact||expanded)&&stats&&<StatGrid cols={2}><Stat label="Locations" value={data?.total??'—'}/><Stat label="Needs reconnect" value={stats.reconnect??0}/></StatGrid>}<Section title={compact ? "Agency locations" : "Your locations"} contentClassName="space-y-4">
     <div className="flex flex-wrap items-center gap-3"><a href="/agency" className="text-sm text-muted-foreground underline">Agency</a><span className="text-sm">{me?.workspace?.name||'Clients & locations'} · {me?.role}</span>{compact&&<Button variant="outline" onClick={()=>setExpanded(!expanded)}>{expanded?'Hide bulk locations':'Bulk location actions'}</Button>}</div>
     {(!compact || expanded) && <>
 

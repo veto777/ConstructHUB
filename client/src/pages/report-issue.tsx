@@ -23,6 +23,7 @@ import { HelpButton } from "@/components/help-button";
 import { PublicPageFooter } from "@/components/public-page-chrome";
 import { StatusPill, type PillTone } from "@/components/crm-ui";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle, crmPageTitle } from "@/lib/page-titles";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { recentClientErrors } from "@/lib/report-client-errors";
 import { marketingUrl } from "@/lib/site";
@@ -67,7 +68,7 @@ const label = "block text-sm font-medium text-[color:var(--g-text)]";
 const hint = "mt-1 text-xs text-[color:var(--g-text-2)]";
 
 function ReportIssueView({ crm = false }: { crm?: boolean }) {
-  useDocumentTitle("Report an issue | ConstructHUB");
+  useDocumentTitle(crm ? crmPageTitle("/crm/report-issue") : appPageTitle("/report-issue")!);
   const { data: mine, isLoading: mineLoading } = useQuery<Mine>({
     queryKey: ["/api/issues/mine"],
     queryFn: async () => {
@@ -244,7 +245,7 @@ function ReportIssueView({ crm = false }: { crm?: boolean }) {
 
               <div>
                 <span className={label}>Screenshot <span className="font-normal text-[color:var(--g-text-2)]">(optional)</span></span>
-                <input ref={fileRef} type="file" accept={SCREENSHOT_TYPES.join(",")} className="sr-only" tabIndex={-1}
+                <input ref={fileRef} type="file" accept={SCREENSHOT_TYPES.join(",")} className="sr-only" tabIndex={-1} aria-label="Screenshot (optional)"
                   onChange={(e) => { void chooseShot(e.target.files?.[0]); e.target.value = ""; }} data-testid="input-report-screenshot" />
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   <GooglePill size="sm" icon={ImagePlus} label={shot ? "Choose another image" : "Add a screenshot"} onClick={() => fileRef.current?.click()} testId="button-report-screenshot" />

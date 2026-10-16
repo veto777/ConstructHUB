@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { AppPage, EmptyState } from "@/components/app-ui";
 import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,6 +66,8 @@ export default function MediaLibraryPage() {
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed folder load is not an empty library: no sample, an honest error instead.
+  const [foldersError, setFoldersError] = useState(false);
   const [activeFolderId, setActiveFolderId] = useState<number | null>(null);
   const [activeFolder, setActiveFolder] = useState<Folder | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -103,8 +105,8 @@ export default function MediaLibraryPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/media/folders", { credentials: "include" });
-      if (res.ok) setFolders(await res.json());
-    } catch {} finally { setLoading(false); }
+      if (res.ok) { setFolders(await res.json()); setFoldersError(false); } else setFoldersError(true);
+    } catch { setFoldersError(true); } finally { setLoading(false); }
   }, []);
 
   const fetchPhotos = useCallback(async (folderId: number) => {
@@ -314,7 +316,7 @@ export default function MediaLibraryPage() {
   const filteredPhotos = photos.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   useEffect(() => {
-    document.title = activeFolderId ? `${activeFolder?.name || "Folder"} — Media Library | ConstructHUB` : "Media Library | ConstructHUB";
+    document.title = activeFolderId ? `${activeFolder?.name || "Folder"} · Media Library · ConstructHUB` : "Media Library · ConstructHUB";
   }, [activeFolderId, activeFolder]);
 
   const startEditFolder = (folder: Folder) => {
@@ -619,7 +621,9 @@ export default function MediaLibraryPage() {
         </div>
       ) : !activeFolderId ? (
         <>
-          {filteredFolders.length === 0 && !searchQuery ? (
+          {foldersError && folders.length === 0 ? (
+            <p className="py-12 text-center text-sm text-destructive" role="alert" data-testid="text-folders-error">Couldn't load your folders — refresh to try again.</p>
+          ) : showSample({ isLoading: loading, isError: foldersError, total: folders.length, filtered: !!searchQuery }) ? (
             <div data-testid="text-empty-state" className="space-y-4">
               <EmptyState
                 icon={FolderOpen}

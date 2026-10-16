@@ -20,6 +20,7 @@ import { fetchSince, mailboxConfig, mailboxConfigured, sendMail, wireConfigured,
 import * as store from "./store";
 import { readWireReply, releaseAsText, reviseRelease } from "./writer";
 import { checkRelease } from "./guidelines";
+import { logError } from "../ops/log";
 
 const num = (v: string | undefined, d: number) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : d; };
 export const pressWorkerConfig = (env: NodeJS.ProcessEnv = process.env) => ({
@@ -260,11 +261,11 @@ export function startPressWorker(env: NodeJS.ProcessEnv = process.env) {
   if (!cfg.enabled) return;
   handles.forEach((h) => h.stop()); handles = [];
   // Registered with the shutdown registry (server/workers.ts): stopped before the pool closes.
-  const boot = setTimeout(() => void runPressPass({ inbox: true }).catch((e) => console.error("[press] boot pass:", e)), 90_000);
+  const boot = setTimeout(() => void runPressPass({ inbox: true }).catch((e) => logError("[press] boot pass:", e)), 90_000);
   boot.unref();
   const unregisterBoot = registerWorker("press boot pass", () => clearTimeout(boot));
   handles.push({ stop: () => { clearTimeout(boot); unregisterBoot(); } });
-  handles.push(workerInterval("press submit pass", () => runPressPass({ inbox: false }).catch((e) => console.error("[press] submit pass:", e)), cfg.submitMinutes * 60_000));
-  handles.push(workerInterval("press inbox pass", () => runPressPass({ inbox: true }).catch((e) => console.error("[press] inbox pass:", e)), cfg.inboxHours * 3_600_000));
+  handles.push(workerInterval("press submit pass", () => runPressPass({ inbox: false }).catch((e) => logError("[press] submit pass:", e)), cfg.submitMinutes * 60_000));
+  handles.push(workerInterval("press inbox pass", () => runPressPass({ inbox: true }).catch((e) => logError("[press] inbox pass:", e)), cfg.inboxHours * 3_600_000));
   console.log(`[press] worker: submissions every ${cfg.submitMinutes} min, inbox every ${cfg.inboxHours} h (${mailboxConfigured() ? mailboxConfig().user : "mailbox not configured"}; wire ${wireConfigured() ? "set" : "not set"})`);
 }

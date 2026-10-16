@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle } from "@/lib/page-titles";
 import { VerificationCancelled } from "@/components/recent-auth";
 
 type Summary = {
@@ -34,7 +35,7 @@ const ago = (iso: string | null) => (iso ? `${formatDistanceToNowStrict(new Date
 const n = (v: number | undefined) => (v ?? 0).toLocaleString("en-US");
 
 export default function AdminPressPage() {
-  useDocumentTitle("Press Wire desk");
+  useDocumentTitle(appPageTitle("/admin/press")!);
   const { toast } = useToast();
   const [status, setStatus] = useState<PressReleaseStatus | "all">("all");
   const [msgStatus, setMsgStatus] = useState<string>("needs_owner");

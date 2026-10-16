@@ -119,7 +119,7 @@ test('linked profile without a public Place ID can import and surfaces partial s
     await page.route('**/api/gbp/linkage', route => route.fulfill({ json: { accounts: [], locations: [], errors: [] } }));
     await page.route('**/api/locations/99881/import-google', route => route.fulfill({ json: { ...fixture, syncWarnings: ['Social profiles: Google denied permission.'] } }));
     await page.goto('/locations');
-    await expect(page.getByTestId('agency-location-99881')).toContainText('Linked');
+    await expect(page.getByTestId('agency-location-99881')).toContainText('Connected');
     await page.getByRole('button', { name: 'Profile audit fixture', exact: true }).click();
     await expect(page).toHaveURL(/[?&]location=99881(&|$)/);
     await page.getByTestId('tab-info').click();

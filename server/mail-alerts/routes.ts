@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
+import { MAIL_ALERT_FILTER_MAX } from "@shared/mail-alerts";
 import { pool } from "../db";
 import { rateLimit } from "../growth-limits";
 import { requireMailModule } from "./gmail";
@@ -69,8 +70,8 @@ export function registerMailAlertRoutes(
         // Any short text: the inbox filters offer the known categories (gbp, gsc, ads, cloudflare, registrar,
         // forwarding) and severities (critical, warning, info) and also take a typed value — an equality
         // match in the parameterised query below, so an unknown value simply matches nothing.
-        category: z.string().max(40).default(""),
-        severity: z.string().max(40).default(""),
+        category: z.string().max(MAIL_ALERT_FILTER_MAX).default(""),
+        severity: z.string().max(MAIL_ALERT_FILTER_MAX).default(""),
         unread: z.enum(["", "1"]).default(""),
         mapped: z.enum(["", "mapped", "unmapped"]).default(""),
       })

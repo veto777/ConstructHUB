@@ -69,3 +69,9 @@ export const money = (c?: number | null): string =>
   c === null || c === undefined
     ? "—"
     : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
+/** Cents as whole dollars ("$18,400"), the pipeline board's figure. */
+export const money0 = (c?: number | null): string =>
+  c === null || c === undefined
+    ? "—"
+    : `$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;

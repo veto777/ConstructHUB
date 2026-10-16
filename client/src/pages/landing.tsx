@@ -191,7 +191,7 @@ const services = [
     icon: Crosshair,
     title: "Competitor Intelligence",
     href: featureIntroPath("competitors"),
-    description: "Analyze competitors in your market. Track their permit activity, ranking positions, and business moves so you always stay one step ahead.",
+    description: "See the businesses Google lists for your trade around your town: each one's rating, review count, phone and website, with a careful look at a sample of their reviews.",
   },
   {
     icon: GraduationCap,
@@ -305,7 +305,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="col-span-2 mt-6 text-base sm:text-lg text-mkt-ink-soft max-w-[36rem] leading-relaxed animate-in-delay-2">
-              Whether you're starting from scratch or scaling an existing operation — we provide every tool, resource, and service you need. From LLC formation and licensing to GMB optimization and SEO domination. And if you don't want to do it yourself, we'll build your entire business for you.
+              Whether you're starting from scratch or scaling an existing operation — we provide every tool, resource, and service you need. From LLC formation and licensing to Google Business Profile care and SEO. And if you don't want to do it yourself, our done-for-you services do the work for you.
             </p>
 
             <div className="col-span-2 mt-8 max-w-[17.5rem] sm:max-w-none flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 animate-in-delay-3">
@@ -379,7 +379,7 @@ export default function LandingPage() {
               </h2>
             </div>
             <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
-              From forming your LLC to ranking #1 on Google Maps — a full suite of tools and services built by contractors who scaled from solo operators to hundreds of employees.
+              From forming your LLC to ranking #1 on Google Maps — a full suite of tools and services built by people who ran contracting companies.
             </p>
           </div>
 
@@ -610,7 +610,7 @@ export default function LandingPage() {
             Ready to Build Your Business?
           </h2>
           <p className="mt-5 text-[17px] leading-relaxed text-mkt-navy-muted max-w-xl mx-auto">
-            Use our DIY tools to start and grow at your own pace — or let us build your entire business for you with our done-for-you turnkey services. Either way, {BRAND_NAME} has you covered.
+            Use our DIY tools to start and grow at your own pace — or hand the work to us with our done-for-you services. Either way, {BRAND_NAME} has you covered.
           </p>
           <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
             <Link href="/auth?mode=signup" data-testid="link-cta-signup" className={`${BTN_PRIMARY} ${BTN_LG} px-8`}>
@@ -638,7 +638,7 @@ export default function LandingPage() {
               <span aria-hidden className="opacity-40">·</span>
               <Link href={CALL_ASSISTANT_PATH} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-call-assistant">AI Call Assistant</Link>
               <span aria-hidden className="opacity-40">·</span>
-              <Link href="/tutorials" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-help">Help</Link>
+              <Link href="/features/guides" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-help">Help</Link>
               <span aria-hidden className="opacity-40">·</span>
               <Link href="/report-issue" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-report-issue">Report an issue</Link>
               <span aria-hidden className="opacity-40">·</span>

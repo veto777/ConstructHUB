@@ -167,12 +167,12 @@ export default function SeoReportsPage() {
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="reports-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
       {/* Said also when the report is empty: the address still asks for a section, and the page says it is not there. */}
       {section && r && <ActiveFilter onClear={() => clearParams(["section"], false)} clearLabel="Whole report">{!target ? `No section called "${section}" in a report (rankings, fixes, work, visibility, grid)` : d?.empty ? `"${target.words}" is not in this report — the report has no numbers for ${site?.domain ?? "the site"} yet` : sectionHere ? `Jumped to: ${target!.words}` : `"${target.words}" is not in this report yet — it appears once that tool has numbers for ${site?.domain ?? "the site"}`}</ActiveFilter>}
-      {!site && sites.isSuccess && <Empty testId="reports-empty-sites"><h3>No sites yet</h3><p>Add your site above; its report builds itself from the rank tracker, Site explorer and Site audit.</p></Empty>}
+      {!site && sites.isSuccess && <Empty testId="reports-empty-sites"><h2>No sites yet</h2><p>Add your site above; its report builds itself from the rank tracker, Site explorer and Site audit.</p></Empty>}
       {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Building the report…</p>}
-      {site && q.isError && <div className="g-callout" role="alert" data-testid="reports-error"><h3>Couldn't build the report</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
+      {site && q.isError && <div className="g-callout" role="alert" data-testid="reports-error"><h2>Couldn't build the report</h2><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
       {site && d && r && d.empty && (
         <Empty testId="reports-empty">
-          <h3>Nothing to report on {site.domain} yet</h3>
+          <h2>Nothing to report on {site.domain} yet</h2>
           <p>The report is made from numbers you already have. Get them from any of these, then come back:</p>
           <ul className="mt-2 list-disc pl-5 text-[14px]">
             <li><Link href={seoLinks.rankTracker(site.id)} className={TEXT_LINK}>Rank tracker</Link> — add keywords and run a check</li>

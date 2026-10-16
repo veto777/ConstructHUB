@@ -14,7 +14,8 @@ import { FEATURE_PAGES, FEATURES_PATH, featurePagePath } from "./feature-pages";
 import { DFY_PAGES, DFY_PATH, dfyPagePath } from "./dfy-pages";
 import { STARTING_MONTHLY_CENTS, TRIAL_LABEL, formatUsd } from "./plan-copy";
 
-export type RouteMeta = { title: string; description: string };
+/** `noindex`: a public app page search engines should not list (the sign-in page); server/seo-html.ts writes the robots meta. */
+export type RouteMeta = { title: string; description: string; noindex?: true };
 
 /** The home page's title and description (client/index.html carries the same as its defaults). */
 export const HOME_META: RouteMeta = {
@@ -118,6 +119,8 @@ export const APP_PAGE_META: Readonly<Record<string, RouteMeta>> = {
   "/auth": {
     title: "Sign In | ConstructHUB",
     description: "Sign in to your ConstructHUB account, or create one to choose a plan for your contracting business.",
+    // A sign-in form is nothing to rank (live audit 2026-10-15): reachable and titled, but kept out of the index.
+    noindex: true,
   },
   "/free-site-scan": {
     title: "Free Website Scan | ConstructHUB",

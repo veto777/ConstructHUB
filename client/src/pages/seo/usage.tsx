@@ -51,7 +51,7 @@ export default function SeoUsagePage() {
     <SeoShell title="Usage" description="Every SEO data lookup on your account: what it was, when, and what it cost." site={site} onSite={onSite} sites={sites} status={status} picker={false} helpKey="seo.usage">
       {month && <ActiveFilter onClear={() => clearParams(["month"], false)} clearLabel="Every month">{/^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? `Lookups in ${monthName(month)}` : `"${month}" — not a month (YYYY-MM)`}{d ? ` — ${fmtNum(rows.length)} of the latest ${fmtNum(d.rows.length)}` : ""}</ActiveFilter>}
       {q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your usage…</p>}
-      {q.isError && <div className="g-callout" role="alert" data-testid="usage-error"><h3>Couldn't load your usage</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
+      {q.isError && <div className="g-callout" role="alert" data-testid="usage-error"><h2>Couldn't load your usage</h2><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
       {d && (
         <>
           {/* Each figure opens what explains it: this month's lookups, or the add-credit panel. */}
@@ -66,9 +66,9 @@ export default function SeoUsagePage() {
             <button type="button" className="g-pill g-pill--sm !min-h-11 ml-auto" disabled={!d.rows.length} onClick={exportCsv} data-testid="button-usage-export"><Download /> Export</button>
           </div>
           {d.rows.length === 0 ? (
-            <Empty testId="usage-empty"><h3>No lookups yet</h3><p>Each report, keyword lookup, rank check and backlink refresh will be listed here with its cost. Opening something you already ran is free and is not listed.</p></Empty>
+            <Empty testId="usage-empty"><h2>No lookups yet</h2><p>Each report, keyword lookup, rank check and backlink refresh will be listed here with its cost. Opening something you already ran is free and is not listed.</p></Empty>
           ) : rows.length === 0 ? (
-            <Empty testId="usage-none-in-month"><h3>No lookups in {monthWords(month!)} among the latest {fmtNum(d.rows.length)}</h3><p>The monthly totals below count every lookup, also the older ones this list no longer shows.</p></Empty>
+            <Empty testId="usage-none-in-month"><h2>No lookups in {monthWords(month!)} among the latest {fmtNum(d.rows.length)}</h2><p>The monthly totals below count every lookup, also the older ones this list no longer shows.</p></Empty>
           ) : (
             <table className="g-table" data-testid="table-usage">
               <thead><tr><th>When</th><th>What</th><th className="num">Cost</th><th>Paid from</th></tr></thead>

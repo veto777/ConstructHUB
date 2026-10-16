@@ -15,7 +15,7 @@ import { Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, clearParams, Empty, fmtDate, fmtNum, money, SeoShell, useAddress, useSelectedSite, useSeoSites, useSeoStatus, useSiteMissing } from "./shell";
+import { ActiveFilter, api, clearParams, Empty, fmtDate, fmtNum, money, SeoShell, useAddress, useSelectedSite, useSeoSites, useSeoStatus, useSiteMissing, hideSeoPrices } from "./shell";
 import { seoLinks, setParam } from "./links";
 import { DeltaBadge } from "./viz";
 import { CARD, FIGURE_LINK, Heading, LinkedFigure, MetricRow, MiniBar, QUIET_LINK, RatioBar, TEXT_LINK } from "./viz-more";
@@ -214,16 +214,16 @@ export default function SeoLocalGridPage() {
     <SeoShell title="Local grid" description="Where your business shows up in Google's local results across your service area — looked up for point after point, for the searches your customers make." site={site} onSite={changeSite} sites={sites} status={status} spends="lookups" helpKey="seo.local-grid">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="grid-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
       {chip && <ActiveFilter onClear={() => clearParams(OWN_PARAMS, false)} clearLabel="Close the scan">{chip}</ActiveFilter>}
-      {!site && sites.isSuccess && <Empty testId="grid-empty-sites"><h3>No sites yet</h3><p>Add your site above; then find your business on Google Maps and scan the area around it.</p></Empty>}
+      {!site && sites.isSuccess && <Empty testId="grid-empty-sites"><h2>No sites yet</h2><p>Add your site above; then find your business on Google Maps and scan the area around it.</p></Empty>}
       {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>}
-      {site && q.isError && <div className="g-callout" role="alert"><h3>Couldn't load the local grid</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
+      {site && q.isError && <div className="g-callout" role="alert"><h2>Couldn't load the local grid</h2><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
       {site && q.data && (
         <>
           {active.data?.status === "running" && <p className="g-text mb-4 flex items-center gap-2 text-[14px]" role="status" data-testid="grid-running"><Loader2 className="h-4 w-4 animate-spin" /> Looking up Google's local results for each point — this takes a minute or two. You can leave this page; the scan will be in the list below when it is done.</p>}
           {watchingFailed && <p className="mb-3 text-[13px]" role="alert" style={{ color: "var(--g-red)" }} data-testid="grid-watch-error">Couldn't check on the running scan just now ({apiErrorMessage(active.error)}). Still trying; the scan itself is not affected.</p>}
           {openId != null && !shown && view.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Opening the scan…</p>}
-          {openId != null && !shown && view.isError && <div className="g-callout" role="alert"><h3>Couldn't open that scan</h3><p>{apiErrorMessage(view.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void view.refetch()}>Try again</button></div>}
-          {openId != null && view.data?.status === "failed" && <div className="g-callout mb-4" role="alert" data-testid="grid-failed"><h3>The scan didn't finish</h3><p>{view.data.error}</p></div>}
+          {openId != null && !shown && view.isError && <div className="g-callout" role="alert"><h2>Couldn't open that scan</h2><p>{apiErrorMessage(view.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void view.refetch()}>Try again</button></div>}
+          {openId != null && view.data?.status === "failed" && <div className="g-callout mb-4" role="alert" data-testid="grid-failed"><h2>The scan didn't finish</h2><p>{view.data.error}</p></div>}
           {shown && (
             <section className="mb-6" data-testid="grid-result">
               <Heading className="!mb-3 !text-[18px]" meta={<><Link href={here()} className={QUIET_LINK}>{shown.size} × {shown.size}, {miles(shown.spacing)} apart</Link> · <Link href={here()} className={QUIET_LINK}>{fmtDate(shown.fetchedAt)}</Link> · <Link href={seoLinks.explorer(pin?.domain || site.domain)} className={QUIET_LINK}>{shown.center.name}</Link></>}><Link href={here()} className={QUIET_LINK}>"{shown.keyword}"</Link></Heading>
@@ -319,7 +319,7 @@ export default function SeoLocalGridPage() {
                   <input className="g-input w-full" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Alpine Exteriors Bellingham WA" data-testid="input-grid-locate" autoComplete="off" />
                 </label>
                 <Button type="submit" disabled={locate.isPending || query.trim().length < 2 || !configured || !can(holds?.gridLocate ?? prices?.gridLocate)} data-testid="button-grid-locate">
-                  {locate.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Searching…</> : `Search Google Maps${prices?.gridLocate != null ? ` — about ${money(prices.gridLocate)}` : ""}`}
+                  {locate.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Searching…</> : `Search Google Maps${!hideSeoPrices() && prices?.gridLocate != null ? ` — about ${money(prices.gridLocate)}` : ""}`}
                 </Button>
                 {pin && <button type="button" className="g-pill" onClick={() => { setChanging(false); setFound(null); }}>Cancel</button>}
               </form>
@@ -362,7 +362,7 @@ export default function SeoLocalGridPage() {
                   </select>
                 </label>
                 <Button type="submit" disabled={isRunning || !keyword.trim() || !configured || !can(scanHold)} data-testid="button-grid-scan">
-                  {isRunning ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Scanning…</> : `Scan${scanPrice != null ? ` — about ${money(scanPrice)}` : ""}`}
+                  {isRunning ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Scanning…</> : `Scan${!hideSeoPrices() && scanPrice != null ? ` — about ${money(scanPrice)}` : ""}`}
                 </Button>
               </form>
               <p className="g-text-2 mt-2 text-[13px]" data-testid="text-grid-cost">
@@ -388,7 +388,7 @@ export default function SeoLocalGridPage() {
           {pin && !changing && (
             <section data-testid="grid-history">
               <Heading>Scans so far</Heading>
-              {q.data.scans.length === 0 ? <Empty testId="grid-no-scans"><h3>No scans yet</h3><p>Enter a search your customers make — "siding contractor", "roof repair near me" — and scan the area. Green points are where you are one of the first three local businesses Google lists.</p></Empty> : (
+              {q.data.scans.length === 0 ? <Empty testId="grid-no-scans"><h2>No scans yet</h2><p>Enter a search your customers make — "siding contractor", "roof repair near me" — and scan the area. Green points are where you are one of the first three local businesses Google lists.</p></Empty> : (
                 <div className="overflow-x-auto"><table className="g-table" data-testid="table-grid-scans">
                   <thead><tr><th>Search</th><th>Grid</th><th className="num">Position score</th><th className="num" title="At how many of the points checked you were one of the first three local results">Points in the first 3</th><th className="num" title="At how many of the points checked you were listed at all">Points found</th><th className="num">When</th></tr></thead>
                   {/* A scan opened here is an address (?scan=), the same one a report or alert links to; its figures open it with the points they count outlined. */}

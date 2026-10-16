@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 /* ── Formatters ─────────────────────────────────────────────────────────────── */
 
-export const pad2 = (n: number) => String(n).padStart(2, "0");
+const pad2 = (n: number) => String(n).padStart(2, "0");
 export const localDayKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 export const daysAgo = (now: Date, n: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - n);
 export const shortDay = (key: string) => new Date(`${key}T00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });

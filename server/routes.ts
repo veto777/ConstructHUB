@@ -27,6 +27,7 @@ import { photoDescription, reviewResponse, reviewFunnelDraft, reviewToneInput } 
 import { AiAnswerError, aiErrorTag } from "./ai-output";
 import { scheduleInput, schedulePatchInput, settleFrequency } from "./scrape-schedule-input";
 import { scheduleIntervalMs } from "@shared/scrape-schedules";
+import { COMPETITOR_RADIUS_MAX, COMPETITOR_RADIUS_MIN } from "@shared/competitor-scan";
 import { scrapeByPlatform, getScrapeProgress, getAllScrapeJobs, startLiveSearch, getLiveSearchJob, scrapePermitDetail } from "./scraper";
 import { readSearchPage, SEARCH_PAGE_MESSAGE } from "./search-page";
 import { effectiveVpnMode, savedVpnMode, VPN_DEFAULT_MODE } from "./vpn-mode";
@@ -57,11 +58,13 @@ import { ensureChecklist, recountCitations } from "./citations/audit";
 import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, trialInviteUrl, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
 import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
+import { postalAliasIds } from "./permit-directory-aliases";
 import { isPlatformAdmin as isAdmin } from "./admin";
 import { platformGatePassed, ADMIN_REAUTH_BODY } from "./crm/admin";
 import { trialCodeDays, ACCESS_GRANT_MIN_DAYS, ACCESS_GRANT_MAX_DAYS } from "@shared/access-grants";
 import { recordFailure } from "./ops/issues";
-import { logError } from "./ops/log";
+import { logError, fail500, hasClientStatus, safeErrorClasses } from "./ops/log";
+import { GoogleError } from "./gbp/client";
 import { ensureCompetitorWorkerSchema } from "./competitors/schema";
 import { listingOrder } from "./competitors/listing-order";
 import { competitorScanActions } from "./competitors/routes";
@@ -216,7 +219,7 @@ export async function registerRoutes(
     });
   }
   const planCheckFailed = (res: any, err: unknown) => {
-    console.error("Plan check failed:", err);
+    logError("Plan check failed:", err);
     if (!res.headersSent) res.status(500).json({ message: "Could not check your plan. Please try again." });
   };
 
@@ -497,7 +500,7 @@ export async function registerRoutes(
   const { syncCatalogueDirectories } = await import("./backlinks/store");
   syncCatalogueDirectories()
     .then((added) => { if (added) console.log(`[backlinks] ${added} directory-catalogue directories added for vetting`); })
-    .catch((err) => console.error("[backlinks] directory-catalogue sync failed:", err));
+    .catch((err) => logError("[backlinks] directory-catalogue sync failed:", err));
   const { seedQueries } = await import("./backlinks/store");
   await seedQueries();
   const { registerBacklinkRoutes } = await import("./backlinks/routes");
@@ -649,13 +652,15 @@ export async function registerRoutes(
         const issuerBy = new Map(issuers
           .sort((a, b) => Number(a.jurisdictionType === "county") - Number(b.jurisdictionType === "county"))
           .map((r) => [r.jurisdiction, governmentPermitForDisplay(r)]));
+        // Only a typed search returns postal aliases (names that are not places); the row says so.
+        const aliases = search ? new Set(await postalAliasIds()) : null;
         res.json({ ...result, databases: result.databases.map((d) => {
           const shown = governmentPermitForDisplay(d);
           const issuer = d.issuedBy ? issuerBy.get(d.issuedBy) : undefined;
           const issuedByPortal = issuer && governmentLinksAvailable(issuer) && (issuer.portalUrl || issuer.searchUrl)
             ? { jurisdiction: issuer.jurisdiction, portalUrl: issuer.portalUrl, searchUrl: issuer.searchUrl, linkStatus: issuer.linkStatus }
             : null;
-          return { ...shown, issuedByPortal };
+          return { ...shown, issuedByPortal, ...(aliases?.has(d.id) ? { postalAlias: true } : {}) };
         }) });
       } else if (req.query.searchable === "true" || req.query.scrapable === "true") {
         // Only portals with a verified live link AND a live-search adapter — the
@@ -680,7 +685,7 @@ export async function registerRoutes(
         res.json(databases.map(governmentPermitForDisplay));
       }
     } catch (err) {
-      console.error("Error listing permit databases:", err);
+      logError("Error listing permit databases:", err);
       res.status(500).json({ message: "Could not load permit databases. Please try again." });
     }
   });
@@ -692,7 +697,7 @@ export async function registerRoutes(
       const counts = await storage.getDatabaseCounts();
       res.json(counts);
     } catch (err) {
-      console.error("Error counting permit databases:", err);
+      logError("Error counting permit databases:", err);
       res.status(500).json({ message: "Could not load permit directory counts. Please try again." });
     }
   });
@@ -759,7 +764,7 @@ export async function registerRoutes(
       res.setHeader("Cache-Control", "public, max-age=600");
       res.json(permitMapCache.payload);
     } catch (err) {
-      console.error("Error building permit map:", err);
+      logError("Error building permit map:", err);
       res.status(500).json({ message: "Could not load the permit map. Please try again." });
     }
   });
@@ -865,7 +870,7 @@ export async function registerRoutes(
       const searchId = randomUUID().slice(0, 8);
       rememberSearchScope(searchId, scopeDbIds);
       startLiveSearch(searchId, query.id, searchType, searchValue, searchable.map(governmentLinksForDisplay) as any)
-        .catch((err) => console.error("Live search init error:", err));
+        .catch((err) => logError("Live search init error:", err));
 
       res.json({
         query,
@@ -878,7 +883,7 @@ export async function registerRoutes(
         searchablePortals: searchable.length,
       });
     } catch (err: any) {
-      console.error("Permit search failed:", err);
+      logError("Permit search failed:", err);
       res.status(500).json({ message: "Search failed. Please try again." });
     }
   });
@@ -903,7 +908,7 @@ export async function registerRoutes(
         hasMore: local.nextCursor !== null,
       });
     } catch (err: any) {
-      console.error("Permit result page failed:", err);
+      logError("Permit result page failed:", err);
       res.status(500).json({ message: "Could not load more results. Please try again." });
     }
   });
@@ -977,11 +982,11 @@ export async function registerRoutes(
       const platform = db.platform!;
 
       scrapeByPlatform(platform, url, searchTerm, searchType || "address", db.id, db.name, query.id, jobId, db.jurisdiction)
-        .catch((err) => console.error("Scrape error:", err));
+        .catch((err) => logError("Scrape error:", err));
 
       res.json({ jobId, queryId: query.id, message: "Scrape started" });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/scrape failed:", err);
     }
   });
 
@@ -1056,7 +1061,7 @@ export async function registerRoutes(
 
       res.json({ details: details || {}, cached: false });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/permit-details/:resultId failed:", err);
     } finally {
       if (counted) {
         detailLookupsRunning--;
@@ -1134,7 +1139,7 @@ export async function registerRoutes(
       const schedule = await storage.createScrapeSchedule({ ...parsed.data, nextRunAt: new Date() });
       res.json(schedule);
     } catch (err: any) {
-      console.error("Error creating scrape schedule:", err);
+      logError("Error creating scrape schedule:", err);
       res.status(500).json({ message: "Could not save the schedule. Please try again." });
     }
   });
@@ -1157,7 +1162,7 @@ export async function registerRoutes(
       }
       res.json(updated);
     } catch (err: any) {
-      console.error("Error updating scrape schedule:", err);
+      logError("Error updating scrape schedule:", err);
       res.status(500).json({ message: "Could not update the schedule. Please try again." });
     }
   });
@@ -1218,7 +1223,7 @@ export async function registerRoutes(
     const tick = async () => {
       if (scheduleBusy) return;
       scheduleBusy = true;
-      try { await runDueScrapeSchedules(); } catch (err) { console.error("Scrape schedule runner failed:", err); void recordFailure("job", "Scrape schedule runner", err); }
+      try { await runDueScrapeSchedules(); } catch (err) { logError("Scrape schedule runner failed:", err); void recordFailure("job", "Scrape schedule runner", err); }
       finally { scheduleBusy = false; }
     };
     workerInterval("scrape schedule runner", tick, 15 * 60 * 1000, { firstAfterMs: 60 * 1000 });
@@ -1283,7 +1288,7 @@ export async function registerRoutes(
         county: county || null,
       });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/property-lookup failed:", err);
     }
   });
 
@@ -1317,7 +1322,7 @@ export async function registerRoutes(
 
       res.json({ files: fileIds });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/photos/upload failed:", err);
     }
   });
 
@@ -1334,7 +1339,7 @@ export async function registerRoutes(
       const filters = await analyzePhoto(uploaded.path);
       res.json(filters);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/photos/auto-enhance failed:", err);
     }
   });
 
@@ -1350,7 +1355,7 @@ export async function registerRoutes(
       watermarkImages.set(wmId, { path: file.path, mimetype: file.mimetype });
       res.json({ watermarkId: wmId, originalName: file.originalname, size: file.size });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/photos/upload-watermark failed:", err);
     }
   });
 
@@ -1611,7 +1616,7 @@ export async function registerRoutes(
 
       res.json({ results: previews, nextPageToken: searchData.next_page_token || null });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/photos/business-search failed:", err);
     }
   });
 
@@ -1669,7 +1674,7 @@ export async function registerRoutes(
         lon,
       });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/photos/business-details failed:", err);
     }
   });
 
@@ -1701,7 +1706,7 @@ export async function registerRoutes(
         res.json({ description: templates[idx] });
       }
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/photos/generate-description failed:", err);
     }
   });
 
@@ -1876,11 +1881,11 @@ export async function registerRoutes(
            jobState.finishedAt = Date.now();
          }
        } finally {
-         await refundQuota(res, fileIds.length - results.length).catch(error => console.error("Photo quota refund failed", error));
+         await refundQuota(res, fileIds.length - results.length).catch(error => logError("Photo quota refund failed", error));
        }
       })();
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/photos/process failed:", err);
     }
   });
 
@@ -1934,7 +1939,7 @@ export async function registerRoutes(
 
     const archive = archiver("zip", { zlib: { level: 1 } });
     archive.on("error", (err) => {
-      console.error("Zip archive error:", err);
+      logError("Zip archive error:", err);
       try { res.destroy(err); } catch {}
     });
     archive.pipe(res);
@@ -1962,7 +1967,7 @@ export async function registerRoutes(
       const folders = await db.select().from(mediaFolders).where(eq(mediaFolders.userId, user.id)).orderBy(desc(mediaFolders.createdAt));
       res.json(folders);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "GET /api/media/folders failed:", err);
     }
   });
 
@@ -1983,7 +1988,7 @@ export async function registerRoutes(
       }).returning();
       res.json(folder);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/media/folders failed:", err);
     }
   });
 
@@ -2003,7 +2008,7 @@ export async function registerRoutes(
       if (!folder) return res.status(404).json({ message: "Folder not found" });
       res.json(folder);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "PATCH /api/media/folders/:id failed:", err);
     }
   });
 
@@ -2124,7 +2129,7 @@ export async function registerRoutes(
       }
       res.json({ results, sampledPoints: samplePoints.length, successfulCalls: successCount });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/photos/nearby-cities failed:", err);
     }
   });
 
@@ -2144,7 +2149,7 @@ export async function registerRoutes(
         res.status(404).json({ message: "Could not find coordinates for this address" });
       }
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/media/geocode failed:", err);
     }
   });
 
@@ -2164,7 +2169,7 @@ export async function registerRoutes(
       await db.delete(mediaFolders).where(and(eq(mediaFolders.id, folderId), eq(mediaFolders.userId, user.id)));
       res.json({ success: true });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "DELETE /api/media/folders/:id failed:", err);
     }
   });
 
@@ -2178,7 +2183,7 @@ export async function registerRoutes(
       const photos = await db.select().from(mediaPhotos).where(and(eq(mediaPhotos.folderId, folderId), eq(mediaPhotos.userId, user.id))).orderBy(desc(mediaPhotos.createdAt));
       res.json(photos);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "GET /api/media/folders/:id/photos failed:", err);
     }
   });
 
@@ -2195,7 +2200,7 @@ export async function registerRoutes(
       await db.delete(mediaPhotos).where(and(eq(mediaPhotos.id, photoId), eq(mediaPhotos.userId, user.id)));
       res.json({ success: true });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "DELETE /api/media/photos/:id failed:", err);
     }
   });
 
@@ -2241,7 +2246,7 @@ export async function registerRoutes(
       res.json({ saved, count: saved.length });
     } catch (err: any) {
       // Storage errors carry internal hostnames and SDK text — log them, show a plain message.
-      console.error("Media library save failed:", err);
+      logError("Media library save failed:", err);
       res.status(500).json({ message: MEDIA_STORAGE_UNAVAILABLE });
     }
   });
@@ -2278,7 +2283,7 @@ export async function registerRoutes(
       res.json({ saved, count: saved.length });
     } catch (err: any) {
       // Storage errors carry internal hostnames and SDK text — log them, show a plain message.
-      console.error("Media library save failed:", err);
+      logError("Media library save failed:", err);
       res.status(500).json({ message: MEDIA_STORAGE_UNAVAILABLE });
     }
   });
@@ -2295,7 +2300,7 @@ export async function registerRoutes(
       if (!photo) return res.status(404).json({ message: "Photo not found" });
       res.json(photo);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "PATCH /api/media/photos/:id/rename failed:", err);
     }
   });
 
@@ -2309,7 +2314,7 @@ export async function registerRoutes(
       const listings = await storage.getGmbListings(user.id);
       res.json(listings);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "GET /api/gmb/listings failed:", err);
     }
   });
 
@@ -2339,7 +2344,7 @@ export async function registerRoutes(
       });
       res.json(listing);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/gmb/listings failed:", err);
     }
   });
 
@@ -2431,7 +2436,7 @@ export async function registerRoutes(
       // compares nothing, so it must not be reported as "no changes".
       res.json({ changes, currentData, baseline: !listing.lastCheckedAt });
     } catch (err: any) {
-      console.error("GMB listing check failed:", err);
+      logError("GMB listing check failed:", err);
       res.status(500).json({ message: "Could not check this listing right now. Please try again." });
     }
   });
@@ -2448,7 +2453,7 @@ export async function registerRoutes(
       const history = await storage.getGmbEditHistory(listing.id);
       res.json(history);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "GET /api/gmb/listings/:id/history failed:", err);
     }
   });
 
@@ -2464,7 +2469,7 @@ export async function registerRoutes(
       await storage.deleteGmbListing(listing.id);
       res.json({ success: true });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "DELETE /api/gmb/listings/:id failed:", err);
     }
   });
 
@@ -2503,7 +2508,7 @@ export async function registerRoutes(
         res.status(404).json({ message: "Could not geocode" });
       }
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/ranking-grid/geocode failed:", err);
     }
   });
 
@@ -2548,7 +2553,7 @@ export async function registerRoutes(
       const buffer = await mapRes.arrayBuffer();
       res.send(Buffer.from(buffer));
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "GET /api/ranking-grid/map/:scanId failed:", err);
     }
   });
 
@@ -2561,7 +2566,7 @@ export async function registerRoutes(
       const scans = await storage.getRankingGridScans(ownerScope(req));
       res.json(scans);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "GET /api/ranking-grid/scans failed:", err);
     }
   });
 
@@ -2575,7 +2580,7 @@ export async function registerRoutes(
       const results = await storage.getRankingGridResults(scan.id);
       res.json({ scan, results });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "GET /api/ranking-grid/scans/:id failed:", err);
     }
   });
 
@@ -2632,11 +2637,11 @@ export async function registerRoutes(
       // A grid that fails gives its credits back.
       runRankingGridScan(scan.id, user.id, String(businessName), parseFloat(lat), parseFloat(lon), gridSize || 3, parseFloat(gridDistance || "1"), keyword)
         .then(ok => { if (!ok) return refundReservation(reservation, credits); })
-        .catch(err => console.error("Ranking grid scan error:", err));
+        .catch(err => logError("Ranking grid scan error:", err));
 
       res.json(scan);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/ranking-grid/scans failed:", err);
     }
   });
 
@@ -2648,7 +2653,7 @@ export async function registerRoutes(
       await storage.deleteRankingGridScan(scan.id);
       res.json({ success: true });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "DELETE /api/ranking-grid/scans/:id failed:", err);
     }
   });
 
@@ -2777,7 +2782,7 @@ export async function registerRoutes(
       });
       res.json(updated);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "PATCH /api/gmb/listings/:id failed:", err);
     }
   });
 
@@ -2802,7 +2807,7 @@ export async function registerRoutes(
       const userId = (req as any).user.id;
       const scans = await db.select().from(competitorScans).where(eq(competitorScans.userId, userId)).orderBy(desc(competitorScans.createdAt));
       res.json(scans);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "GET /api/competitors/scans failed:", err); }
   });
 
   // An expanded competitor scan: the scan row plus its indexed listings (rating order), with the
@@ -2821,15 +2826,15 @@ export async function registerRoutes(
       const listings = await db.select().from(competitorListings).where(and(eq(competitorListings.scanId, scanId), eq(competitorListings.userId, userId)))
         .orderBy(...listingOrder());
       res.json({ scan, listings: listings.map(presentListing) });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "GET /api/competitors/scans/:id failed:", err); }
   });
 
   app.post("/api/competitors/scans", async (req, res) => {
     if (!(await requireCompetitorIntel(req, res))) return;
     try {
       const userId = (req as any).user.id;
-      const parsed = z.object({ industry: z.string().trim().min(1).max(120), location: z.string().trim().min(1).max(250), radius: z.number().int().min(1).max(100).default(25) }).safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: "Provide industry, location and a radius from 1 to 100 miles." });
+      const parsed = z.object({ industry: z.string().trim().min(1).max(120), location: z.string().trim().min(1).max(250), radius: z.number().int().min(COMPETITOR_RADIUS_MIN).max(COMPETITOR_RADIUS_MAX).default(25) }).safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: `Provide industry, location and a radius from ${COMPETITOR_RADIUS_MIN} to ${COMPETITOR_RADIUS_MAX} miles.` });
       const { industry, location, radius } = parsed.data;
       const lat = null, lon = null;
       // Each scan uses one of the plan's monthly Competitor Intel scans (plus scan packs).
@@ -2842,7 +2847,7 @@ export async function registerRoutes(
         scan = await enqueueCompetitorScan(userId, { industry, location, lat, lon, radius: radius || 25 }, reservation, new Date());
       } catch (e) { await refundReservation(reservation, 1); throw e; }
       res.json(scan); // status "pending" until the worker claims it
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "POST /api/competitors/scans failed:", err); }
   });
 
   app.delete("/api/competitors/scans/:id", async (req, res) => {
@@ -2855,7 +2860,7 @@ export async function registerRoutes(
       const removed = await removeCompetitorScan(userId, scanId, new Date());
       if (!removed) return res.status(404).json({ message: "Scan not found" });
       res.json({ success: true });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "DELETE /api/competitors/scans/:id failed:", err); }
   });
 
   // No ad data source exists (the old handlers built "ads" from Google Places
@@ -2882,7 +2887,7 @@ export async function registerRoutes(
     try {
       const locations = await db.select().from(businessLocations).where(eq(businessLocations.userId, user.id)).orderBy(desc(businessLocations.createdAt));
       res.json(locations);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "GET /api/locations failed:", err); }
   });
 
   // One location row for the detail view: the header and all 8 tabs, and the not-found alert on a
@@ -2895,7 +2900,7 @@ export async function registerRoutes(
       const [location] = await db.select().from(businessLocations).where(and(eq(businessLocations.id, id), eq(businessLocations.userId, user.id)));
       if (!location) return res.status(404).json({ message: "Location not found" });
       res.json(location);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "GET /api/locations/:id failed:", err); }
   });
 
   app.post("/api/locations", async (req, res) => {
@@ -2918,7 +2923,7 @@ export async function registerRoutes(
       if (!outcome.location) return void sendLocationLimit(res, ent, outcome.used);
       res.json(outcome.location);
     } catch (err) {
-      console.error("Error adding location:", err);
+      logError("Error adding location:", err);
       if (!res.headersSent) res.status(500).json({ message: "Could not add the location. Please try again." });
     }
   });
@@ -2973,7 +2978,7 @@ export async function registerRoutes(
       }
       res.json(google ? { ...updated, google } : updated);
     } catch (err: any) {
-      console.error("Error updating location:", err);
+      logError("Error updating location:", err);
       res.status(500).json({ message: "Could not save the location. Please try again." });
     }
   });
@@ -3009,7 +3014,7 @@ export async function registerRoutes(
       await db.update(businessLocations).set({ logoUrl, updatedAt: new Date() }).where(eq(businessLocations.id, id));
       res.json({ logoUrl, google });
     } catch (err: any) {
-      console.error("Error setting the location logo:", err);
+      logError("Error setting the location logo:", err);
       res.status(500).json({ message: "Could not save the logo. Please try again." });
     }
   });
@@ -3032,7 +3037,7 @@ export async function registerRoutes(
         await tx.delete(businessLocations).where(eq(businessLocations.id, id));
       });
       res.json({ success: true });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "DELETE /api/locations/:id failed:", err); }
   });
 
   // The Add location dialog's "Search Google" tab: queries Google's Places database by name, address or
@@ -3243,7 +3248,7 @@ export async function registerRoutes(
       }));
 
       res.json({ results });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "POST /api/locations/search-google failed:", err); }
   });
 
   app.post("/api/locations/:id/import-google", async (req, res) => {
@@ -3311,7 +3316,7 @@ export async function registerRoutes(
 
       const [updated] = await db.update(businessLocations).set(updateData).where(eq(businessLocations.id, id)).returning();
       res.json(updated);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "POST /api/locations/:id/import-google failed:", err, safeErrorClasses(GoogleError)); }
   });
 
   app.post("/api/locations/:id/analytics/seed", (_req, res) => {
@@ -3335,7 +3340,7 @@ export async function registerRoutes(
     try {
       const campaigns = await db.select().from(citationCampaigns).where(eq(citationCampaigns.userId, user.id)).orderBy(desc(citationCampaigns.createdAt));
       res.json(campaigns);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "GET /api/citations/campaigns failed:", err); }
   });
 
   // The Citations tab "New Campaign" form: creates a citation campaign for one location (paid plans).
@@ -3360,7 +3365,7 @@ export async function registerRoutes(
       await db.delete(citations).where(eq(citations.campaignId, id));
       await db.delete(citationCampaigns).where(eq(citationCampaigns.id, id));
       res.json({ success: true });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "DELETE /api/citations/campaigns/:id failed:", err); }
   });
 
   // The checklist (server/citations/directories.ts), the build and the recount live in server/citations/audit.ts.
@@ -3381,7 +3386,7 @@ export async function registerRoutes(
         .sort((a, b) => a.rank - b.rank)
         .map(({ c }) => c);
       res.json({ campaign, citations: results });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "GET /api/citations/campaigns/:id/results failed:", err); }
   });
 
   // Citation checklist. There is no reliable free API that tells us whether a business is listed on each
@@ -3395,7 +3400,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       await ensureChecklist(id, user.id);
       res.json({ message: "Checklist ready", campaignId: id });
-    } catch (err: any) { res.status(err.status || 500).json({ message: err.message }); }
+    } catch (err: any) { fail500(res, "POST /api/citations/campaigns/:id/run failed:", err, hasClientStatus); }
   });
 
   // A checklist row's status select and listing-URL save: records listed/wrong/missing/unchecked and
@@ -3423,7 +3428,7 @@ export async function registerRoutes(
       res.json(updated);
     } catch (err: any) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message || "Invalid input" });
-      res.status(500).json({ message: err.message });
+      fail500(res, "PATCH /api/citations/:id failed:", err);
     }
   });
 
@@ -3442,7 +3447,7 @@ export async function registerRoutes(
       const stepCounts = new Map(counts.map((c) => [c.guideId, Number(c.n)]));
       res.json(guides.map((g) => publicStateGuide(g, stepCounts.get(g.id) ?? 0)));
     } catch (err) {
-      console.error("Error loading the state guide index:", err);
+      logError("Error loading the state guide index:", err);
       res.status(500).json({ message: "Could not load the state guides. Please try again." });
     }
   });
@@ -3472,7 +3477,7 @@ export async function registerRoutes(
       const steps = await db.select().from(stateGuideSteps).where(eq(stateGuideSteps.stateGuideId, guide.id)).orderBy(asc(stateGuideSteps.stepNumber));
       res.json({ ...guide, steps, checklist: agencyChecklist(guide) });
     } catch (err) {
-      console.error("Error loading a state guide:", err);
+      logError("Error loading a state guide:", err);
       res.status(500).json({ message: "Could not load this state guide. Please try again." });
     }
   });
@@ -3491,7 +3496,7 @@ export async function registerRoutes(
       const modules = await db.select().from(masterClassModules).where(eq(masterClassModules.isActive, true)).orderBy(asc(masterClassModules.sortOrder));
       res.json({ modules, bundle: { id: "course_bundle", name: COURSE_BUNDLE.name, priceCents: COURSE_BUNDLE.priceCents, salesOnly: isSalesOnly(COURSE_BUNDLE.priceCents) } });
     } catch (err) {
-      console.error("Error loading the course catalog:", err);
+      logError("Error loading the course catalog:", err);
       res.status(500).json({ message: "Could not load the course catalog. Please try again." });
     }
   });
@@ -3517,7 +3522,7 @@ export async function registerRoutes(
       const purchases = await db.select().from(coursePurchases).where(eq(coursePurchases.userId, user.id));
       res.json(purchases);
     } catch (err) {
-      console.error("Error resolving course access:", err);
+      logError("Error resolving course access:", err);
       res.status(500).json({ message: "Couldn't verify your course access. Please try again." });
     }
   });
@@ -3542,7 +3547,7 @@ export async function registerRoutes(
         totalSections: GOOGLE_ADS_GUIDE_ORDER.length,
       });
     } catch (err) {
-      console.error("Error loading Google Ads guide section:", err);
+      logError("Error loading Google Ads guide section:", err);
       res.status(500).json({ message: "Could not load this guide section. Please try again." });
     }
   });
@@ -3627,7 +3632,7 @@ export async function registerRoutes(
 
       res.json({ success: true });
     } catch (err: any) {
-      console.error("Sales inquiry email failed:", err);
+      logError("Sales inquiry email failed:", err);
       res.status(500).json({ message: "Failed to submit inquiry. Please try again." });
     }
   });
@@ -3661,7 +3666,7 @@ export async function registerRoutes(
 
       res.json({ success: true });
     } catch (err: any) {
-      console.error("Reinstatement email failed:", err);
+      logError("Reinstatement email failed:", err);
       res.status(500).json({ message: "Failed to submit request. Please try again." });
     }
   });
@@ -3767,7 +3772,7 @@ export async function registerRoutes(
 
       res.status(204).end();
     } catch (err: any) {
-      console.error("Click tracking error:", err);
+      logError("Click tracking error:", err);
       res.status(204).end();
     }
   });
@@ -3807,7 +3812,7 @@ export async function registerRoutes(
       );
       res.json(domainsWithStats);
     } catch (err: any) {
-      console.error("Error fetching domains:", err);
+      logError("Error fetching domains:", err);
       res.status(500).json({ message: "Failed to fetch domains" });
     }
   });
@@ -3842,7 +3847,7 @@ export async function registerRoutes(
       }
       res.json(outcome.domain);
     } catch (err: any) {
-      console.error("Error creating domain:", err);
+      logError("Error creating domain:", err);
       res.status(500).json({ message: "Failed to create domain" });
     }
   });
@@ -3861,7 +3866,7 @@ export async function registerRoutes(
       await storage.deleteTrackedDomain(id);
       res.json({ success: true });
     } catch (err: any) {
-      console.error("Error deleting domain:", err);
+      logError("Error deleting domain:", err);
       res.status(500).json({ message: "Failed to delete domain" });
     }
   });
@@ -3976,7 +3981,7 @@ export async function registerRoutes(
         trafficSources,
       });
     } catch (err: any) {
-      console.error("Error fetching analytics:", err);
+      logError("Error fetching analytics:", err);
       res.status(500).json({ message: "Failed to fetch analytics" });
     }
   });
@@ -4007,7 +4012,7 @@ export async function registerRoutes(
 
       res.json(visits);
     } catch (err: any) {
-      console.error("Error fetching visits:", err);
+      logError("Error fetching visits:", err);
       res.status(500).json({ message: "Failed to fetch visits" });
     }
   });
@@ -4324,7 +4329,7 @@ function main() {
 
       res.json(visitors);
     } catch (err: any) {
-      console.error("Error fetching visitors:", err);
+      logError("Error fetching visitors:", err);
       res.status(500).json({ message: "Failed to fetch visitors" });
     }
   });
@@ -4388,7 +4393,7 @@ function main() {
         })),
       });
     } catch (err: any) {
-      console.error("Error fetching visitor detail:", err);
+      logError("Error fetching visitor detail:", err);
       res.status(500).json({ message: "Failed to fetch visitor details" });
     }
   });
@@ -4429,7 +4434,7 @@ function main() {
 
       res.json(pages);
     } catch (err: any) {
-      console.error("Error fetching pages:", err);
+      logError("Error fetching pages:", err);
       res.status(500).json({ message: "Failed to fetch page stats" });
     }
   });
@@ -4486,7 +4491,7 @@ function main() {
 
       res.json({ countries, cities });
     } catch (err: any) {
-      console.error("Error fetching geo:", err);
+      logError("Error fetching geo:", err);
       res.status(500).json({ message: "Failed to fetch geo data" });
     }
   });
@@ -4527,7 +4532,7 @@ function main() {
 
       res.json({ browsers, oses, devices, resolutions });
     } catch (err: any) {
-      console.error("Error fetching platforms:", err);
+      logError("Error fetching platforms:", err);
       res.status(500).json({ message: "Failed to fetch platform data" });
     }
   });
@@ -4568,7 +4573,7 @@ function main() {
         visitors: Array.from(onlineIps.values()),
       });
     } catch (err: any) {
-      console.error("Error fetching online visitors:", err);
+      logError("Error fetching online visitors:", err);
       res.status(500).json({ message: "Failed to fetch online visitors" });
     }
   });
@@ -4759,7 +4764,7 @@ function main() {
 
       res.json({ blocked: false });
     } catch (err: any) {
-      console.error("Error in VPN shield track:", err);
+      logError("Error in VPN shield track:", err);
       res.status(500).json({ blocked: false });
     }
   });
@@ -4788,7 +4793,7 @@ function main() {
       );
       res.json(domainsWithStats);
     } catch (err: any) {
-      console.error("Error fetching VPN shield domains:", err);
+      logError("Error fetching VPN shield domains:", err);
       res.status(500).json({ message: "Failed to fetch domains" });
     }
   });
@@ -4848,7 +4853,7 @@ function main() {
         topCountries,
       });
     } catch (err: any) {
-      console.error("Error fetching VPN stats:", err);
+      logError("Error fetching VPN stats:", err);
       res.status(500).json({ message: "Failed to fetch VPN stats" });
     }
   });
@@ -4866,7 +4871,7 @@ function main() {
       const visits = await storage.getVpnVisits(domain.id);
       res.json(visits);
     } catch (err: any) {
-      console.error("Error fetching VPN blocked visits:", err);
+      logError("Error fetching VPN blocked visits:", err);
       res.status(500).json({ message: "Failed to fetch blocked visits" });
     }
   });
@@ -4891,7 +4896,7 @@ function main() {
         domain: domain.domain,
       });
     } catch (err: any) {
-      console.error("Error generating VPN script:", err);
+      logError("Error generating VPN script:", err);
       res.status(500).json({ message: "Failed to generate script" });
     }
   });
@@ -5058,7 +5063,7 @@ function main() {
       // What is now in force, so the page can show what was saved rather than what it sent.
       res.json({ success: true, vpnBlockMode, vpnRedirectUrl: newSettings.vpnRedirectUrl, vpnWhitelistedIps: newSettings.vpnWhitelistedIps });
     } catch (err: any) {
-      console.error("Error saving VPN settings:", err);
+      logError("Error saving VPN settings:", err);
       res.status(500).json({ message: "Failed to save settings" });
     }
   });
@@ -5105,7 +5110,7 @@ function main() {
 
       res.json({ contractId: contract.id, token, message: "Contract sent to your email" });
     } catch (err: any) {
-      console.error("Error creating contract:", err);
+      logError("Error creating contract:", err);
       res.status(500).json({ message: "Failed to create contract" });
     }
   });
@@ -5135,7 +5140,7 @@ function main() {
         expiresAt: contract.expiresAt,
       });
     } catch (err: any) {
-      console.error("Error fetching contract:", err);
+      logError("Error fetching contract:", err);
       res.status(500).json({ message: "Failed to load contract" });
     }
   });
@@ -5183,7 +5188,7 @@ function main() {
 
       res.json({ success: true, contractId: contract.id, status: "signed" });
     } catch (err: any) {
-      console.error("Error signing contract:", err);
+      logError("Error signing contract:", err);
       res.status(500).json({ message: "Failed to sign contract" });
     }
   });
@@ -5278,7 +5283,7 @@ function main() {
 
       res.json({ url: session.url });
     } catch (err: any) {
-      console.error("Error creating contract checkout:", err);
+      logError("Error creating contract checkout:", err);
       res.status(500).json({ message: "Failed to create checkout session" });
     }
   });
@@ -5377,7 +5382,7 @@ function main() {
         : "Review request sent";
       res.json({ id: request.id, token, message });
     } catch (err: any) {
-      console.error("Error creating review request:", err);
+      logError("Error creating review request:", err);
       res.status(500).json({ message: "Failed to create review request" });
     }
   });
@@ -5426,7 +5431,7 @@ function main() {
         .filter((l): l is { id: number; name: string; reviewUrl: string } => !!l.reviewUrl);
       res.json({ connected: grants.length > 0, locations });
     } catch (err: any) {
-      console.error("Error loading linked listings:", err);
+      logError("Error loading linked listings:", err);
       res.status(500).json({ message: "Failed to load linked listings" });
     }
   });
@@ -5485,7 +5490,7 @@ function main() {
       if (!outcome.template) return limitReached(outcome.used);
       res.json(outcome.template);
     } catch (err: any) {
-      console.error("Error creating template:", err);
+      logError("Error creating template:", err);
       res.status(500).json({ message: "Failed to create template" });
     }
   });
@@ -5654,7 +5659,7 @@ function main() {
 
       res.json(reviews);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "GET /api/google-profile-reviews failed:", err);
     }
   });
 
@@ -5683,7 +5688,7 @@ function main() {
       }).returning();
       res.json(review);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/google-profile-reviews failed:", err);
     }
   });
 
@@ -5701,7 +5706,7 @@ function main() {
       if (!updated) return res.status(404).json({ message: "Not found" });
       res.json(updated);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "PATCH /api/google-profile-reviews/:id/note failed:", err);
     }
   });
 
@@ -5714,7 +5719,7 @@ function main() {
         .where(and(eq(googleProfileReviews.id, id), eq(googleProfileReviews.userId, user.id)));
       res.json({ success: true });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "DELETE /api/google-profile-reviews/:id failed:", err);
     }
   });
 
@@ -5955,7 +5960,7 @@ function main() {
       await storage.updateReviewRequest(request.id, { reviewMethod: "ai" });
       res.json({ review });
     } catch (err: any) {
-      console.error("Error generating review:", err);
+      logError("Error generating review:", err);
       res.status(500).json({ message: "Failed to generate review" });
     }
   });
@@ -6047,7 +6052,7 @@ function main() {
           await sendTrialInviteEmail(recipientEmail, recipientName || "there", code, isUnlimited ? -1 : days, getBaseUrl(req));
           emailed = true;
         } catch (emailErr) {
-          console.error("Failed to send trial invite email:", emailErr);
+          logError("Failed to send trial invite email:", emailErr);
         }
       }
 
@@ -6271,7 +6276,7 @@ function main() {
       await storage.updateReviewRequest(request.id, { unsubscribed: true, nextReminderAt: null });
       res.status(200).end();
     } catch (err: any) {
-      console.error("One-click unsubscribe failed:", err);
+      logError("One-click unsubscribe failed:", err);
       res.status(500).end();
     }
   });
@@ -6451,7 +6456,7 @@ function main() {
 
       res.json({ url, key });
     } catch (err: any) {
-      console.error("Error uploading logo to R2:", err);
+      logError("Error uploading logo to R2:", err);
       res.status(500).json({ message: "Failed to upload image" });
     }
   });
@@ -6478,7 +6483,7 @@ function main() {
 
       res.json({ photos: urls });
     } catch (err: any) {
-      console.error("Error uploading review photos:", err);
+      logError("Error uploading review photos:", err);
       res.status(500).json({ message: "Failed to upload photos" });
     }
   });
@@ -6505,7 +6510,7 @@ function main() {
     try {
       await storage.createAdminAuditLog({ actorId, actorEmail, action, targetCustomerId: targetCustomerId || undefined, targetAccountName: targetAccountName || undefined, parameters, result, errorMessage });
     } catch (e) {
-      console.error("Failed to write audit log:", e);
+      logError("Failed to write audit log:", e);
     }
   }
 
@@ -6525,7 +6530,7 @@ function main() {
         hasDeveloperToken: !!conn.developerToken,
       });
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "GET /api/admin/lsa/manager failed:", e);
     }
   });
 
@@ -6562,7 +6567,7 @@ function main() {
       await auditLog((req.user as any).id, (req.user as any).email, "manager_connect", cleanId, null, { managerId: cleanId }, "success");
       res.json({ ok: true, managerId: conn.managerId, connectedAt: conn.connectedAt, tokenVerified: true });
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "POST /api/admin/lsa/manager/connect failed:", e);
     }
   });
 
@@ -6573,7 +6578,7 @@ function main() {
       await storage.disconnectLsaManagerConnection();
       res.json({ ok: true });
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "POST /api/admin/lsa/manager/disconnect failed:", e);
     }
   });
 
@@ -6598,7 +6603,7 @@ function main() {
       await auditLog((req.user as any).id, (req.user as any).email, "sync_accounts", null, null, { synced }, "success");
       res.json({ ok: true, synced });
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "POST /api/admin/lsa/manager/sync-accounts failed:", e);
     }
   });
 
@@ -6614,7 +6619,7 @@ function main() {
       const total = await storage.countLsaAccounts(q);
       res.json({ accounts, total, limit, offset });
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "GET /api/admin/lsa/accounts failed:", e);
     }
   });
 
@@ -6636,7 +6641,7 @@ function main() {
       });
       res.json(account);
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "POST /api/admin/lsa/accounts failed:", e);
     }
   });
 
@@ -6650,7 +6655,7 @@ function main() {
       const leads = await storage.getLsaLeadsByAccount(account.id, 1, 50);
       res.json({ account, leads });
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "GET /api/admin/lsa/accounts/:id failed:", e);
     }
   });
 
@@ -6672,7 +6677,7 @@ function main() {
       if (!result.ok) return res.status(502).json({ message: result.error });
       res.json(result);
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "POST /api/admin/lsa/accounts/:id/sync-leads failed:", e);
     }
   });
 
@@ -6687,7 +6692,7 @@ function main() {
       const campaigns = await fetchCampaigns(account.customerId, useManager, account.userId);
       res.json(campaigns);
     } catch (e: any) {
-      res.status(500).json({ message: `Failed to fetch campaigns: ${e.message}` });
+      fail500(res, "GET /api/admin/lsa/accounts/:id/campaigns failed:", e);
     }
   });
 
@@ -6720,7 +6725,7 @@ function main() {
       if (!result.ok) return res.status(502).json({ message: result.error });
       res.json({ ok: true });
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "PATCH /api/admin/lsa/accounts/:id/campaigns/:campaignId/settings failed:", e);
     }
   });
 
@@ -6762,7 +6767,7 @@ function main() {
       if (!result.ok) return res.status(502).json({ message: result.error });
       res.json({ ok: true });
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "PATCH /api/admin/lsa/accounts/:id/campaigns/:campaignId/budget failed:", e);
     }
   });
 
@@ -6803,12 +6808,12 @@ function main() {
           customerId: account.customerId,
           campaignName,
           actorEmail: (req.user as any).email,
-        }).catch(e => console.error("[lsa] paused-campaign alert failed:", e));
+        }).catch(e => logError("[lsa] paused-campaign alert failed:", e));
       }
 
       res.json({ ok: true });
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "PATCH /api/admin/lsa/accounts/:id/campaigns/:campaignId/status failed:", e);
     }
   });
 
@@ -6819,7 +6824,7 @@ function main() {
       const invitations = await storage.getLsaManagerInvitations();
       res.json(invitations);
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "GET /api/admin/lsa/invitations failed:", e);
     }
   });
 
@@ -6853,7 +6858,7 @@ function main() {
 
       res.json({ invitation, googleResult });
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "POST /api/admin/lsa/invitations failed:", e);
     }
   });
 
@@ -6893,7 +6898,7 @@ function main() {
 
       res.json(updated);
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "PATCH /api/admin/lsa/invitations/:id failed:", e);
     }
   });
 
@@ -6951,7 +6956,7 @@ function main() {
 
       res.json(result);
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "POST /api/admin/lsa/leads/:leadId/dispute failed:", e);
     }
   });
 
@@ -6965,7 +6970,7 @@ function main() {
       const logs = await storage.getAdminAuditLog(limit, offset);
       res.json(logs);
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      fail500(res, "GET /api/admin/lsa/audit-log failed:", e);
     }
   });
 

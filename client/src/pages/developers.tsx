@@ -348,7 +348,7 @@ export default function DevelopersPage() {
 
         <Alert className="rounded-2xl border-mkt-orange bg-mkt-card [&>svg]:text-mkt-orange-ink" data-testid="banner-developers-no-ai">
           <ShieldAlert className="h-4 w-4" aria-hidden="true" />
-          <AlertTitle className="font-display font-semibold text-[1.15rem]">What the API doesn't do</AlertTitle>
+          <AlertTitle level={2} className="font-display font-semibold text-[1.15rem]">What the API doesn't do</AlertTitle>
           <AlertDescription>
             <span data-testid="text-developers-no-ai">{API_NO_AI_NOTICE}</span>{" "}
             Posts, review replies and social posts you create through the API are stored exactly as you send them (source: api) and

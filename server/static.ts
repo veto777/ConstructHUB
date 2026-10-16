@@ -10,6 +10,7 @@ import {
 } from "./site-context";
 import { MARKETING_ROUTES, canonicalPath } from "@shared/seo";
 import { isKnownPath, marketingRouteForCase } from "@shared/app-routes";
+import { pageMetaFor } from "@shared/route-meta";
 import { withRouteMeta, withSeoHead } from "./seo-html";
 import { withGoogleTag } from "./google-tag";
 import { withMetaPixel } from "./meta-pixel";
@@ -249,6 +250,7 @@ export function serveStatic(app: Express, distPath = path.resolve(__dirname, "pu
       );
       return res.status(404).type("html").send(html);
     }
+    if (pageMetaFor(pagePath)?.noindex) res.setHeader("X-Robots-Tag", "noindex");
     res.type("html").send(withSeoHead(marketingHtml, pagePath, { origin: BASE }));
   });
 }

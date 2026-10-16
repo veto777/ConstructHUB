@@ -348,7 +348,7 @@ export default function GoogleAdFraudPage() {
               <div className="flex items-start gap-3">
                 <Siren className="h-5 w-5 text-[#FBBC05] flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-semibold text-[#FBBC05] mb-1">What This Page Is Based On</h4>
+                  <h2 className="text-sm font-semibold text-[#FBBC05] mb-1">What This Page Is Based On</h2>
                   <p className="text-xs text-muted-foreground leading-relaxed" data-testid="text-fraud-basis">
                     The figures here come from our own tracking in the contractor Google Ads accounts we reviewed (server-side IP tracking, device fingerprinting and screen recording compared against Google Ads reporting), plus published industry research from Juniper Research, Lunio, ClickPatrol, Fraud Blocker and Google's documentation. They are our observations and opinions, not an independent audit. Traffic signals do not prove fraud, and IP exclusions do not guarantee savings.
                   </p>
@@ -374,7 +374,7 @@ export default function GoogleAdFraudPage() {
                     <section.icon className={`h-5 w-5 ${section.color}`} />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-base font-semibold text-foreground">{section.title}</h3>
+                    <h2 className="text-base font-semibold text-foreground">{section.title}</h2>
                     <p className="text-xs text-muted-foreground mt-0.5">{section.subtitle}</p>
                   </div>
                   <ChevronRight className={`h-5 w-5 text-muted-foreground transition-all duration-300 flex-shrink-0 ${openSection === section.id ? "rotate-90 text-[#4285F4]" : ""}`} />
@@ -390,7 +390,7 @@ export default function GoogleAdFraudPage() {
                           </div>
                         </div>
                         <div>
-                          <h4 className="text-sm font-semibold text-foreground mb-1">{item.heading}</h4>
+                          <h3 className="text-sm font-semibold text-foreground mb-1">{item.heading}</h3>
                           <p className="text-xs text-muted-foreground leading-relaxed">{item.text}</p>
                         </div>
                       </div>
@@ -542,7 +542,7 @@ export default function GoogleAdFraudPage() {
           <Card className="max-w-4xl mx-auto shadow-none" data-testid="card-bottom-line-fraud">
             <CardContent className="p-6 text-center">
               <Flame className="h-8 w-8 text-[#FBBC05] mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-foreground mb-2">The Bottom Line</h3>
+              <h2 className="text-lg font-bold text-foreground mb-2">The Bottom Line</h2>
               <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-4">
                 Google has created an advertising ecosystem where fraud is profitable, detection is deliberately limited, evidence is hidden from advertisers, and accountability is nonexistent. They're not the referees looking out for fair play — they're the house in a casino that's rigged against you. Until regulation catches up, the only person who will protect your ad budget is you. That's why Click Guard exists.
               </p>

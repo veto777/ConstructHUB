@@ -7,11 +7,12 @@ import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { GbpConnection } from '@/components/gbp-connection';
+import { useGoogleConnection } from '@/components/gbp-connection';
+import { GbpPrerequisite } from '@/components/gbp-prerequisite';
 import { useUrlParam } from '@/hooks/use-url-param';
 import { GoogleSurface } from "@/components/google";
 import { BulkPosts } from '@/components/bulk-posts';
-import { SamplePreview } from '@/components/sample-preview';
+import { SamplePreview, showSample } from '@/components/sample-preview';
 
 type Photo={id:number;name:string;url:string};
 /** Fixed, made-up times for the sample queue shown while nothing is scheduled; never stored or sent. */
@@ -27,15 +28,18 @@ export default function GbpContentPage(){
   // A ?location= value can name a deleted or unlinked location (old link, typo);
   // only open the editor for a location that is actually linked to Google.
   const chosen=location?locations.find(l=>String(l.id)===location):undefined;
-  return <GoogleSurface page><AppPage className="before:hidden" width="narrow"><PageHeader title={mode==='posts'?'Posts':'Photos'} description={mode==='posts'?'Write or AI-draft Google updates, schedule them and approve.':'Upload, caption and schedule photos onto your Google profile.'} actions={!chosen?.gbpLocationName?<Button asChild><Link href="/locations?import=gbp">Link a location</Link></Button>:undefined}/>
+  // Linked locations whose Google access ended still open (drafts are kept); the option says so.
+  const {data:connection}=useGoogleConnection();
+  const stateOf=(id:number)=>connection?.locations.find(l=>l.id===id)?.state;
+  return <GoogleSurface page><AppPage className="before:hidden" width="narrow"><PageHeader title={mode==='posts'?'Posts':'Photos'} description={mode==='posts'?'Write or AI-draft Google updates, schedule them and approve.':'Upload, caption and schedule photos onto your Google profile.'}/>
 {locationsError&&<p role="alert">Unable to load locations. Please reload the page.</p>}
+    {!location&&<GbpPrerequisite tool={mode}/>}
     <Section title="How this works" contentClassName="text-sm" testId="gbp-content-how"><ol className="list-decimal space-y-1 pl-5">
       {mode==='posts'?<><li>Choose the linked location, then write a Google update or generate a draft and edit it.</li><li>Pick when it goes out: now, a date and time you type, or a cadence under Advanced schedule.</li><li>Approve it. Only approved items are queued and published to Google at their time.</li></>
       :<><li>Choose the linked location, then upload photos or tick ones already in your library.</li><li>Give each photo a caption (typed or AI-drafted) and a Google category.</li><li>Pick when they go out and approve them. Only approved photos are queued and published.</li></>}
     </ol></Section>
-    <Section title="Choose a profile"><label className="block text-sm">Location<select className="block border rounded p-2 w-full bg-background" aria-label="Location" value={chosen?.gbpLocationName?location:''} onChange={e=>setLocation(e.target.value)}><option value="">Choose a linked location</option>{linked.map(l=><option key={l.id} value={l.id}>{l.businessName}</option>)}</select></label></Section>
-    {!locationsLoading&&!locationsError&&!linked.length&&<p className="text-sm text-muted-foreground" data-testid="text-no-linked-locations">No locations are linked to Google Business Profile yet. Connect your Google account, then use <strong>Link &amp; sync</strong> in <Link href="/locations" className="text-primary underline">Locations</Link> to link one.</p>}
-    {!location?<GbpConnection context="content"/>
+    {linked.length>0&&<Section title="Choose a profile"><label className="block text-sm">Location<select className="block border rounded p-2 w-full bg-background" aria-label="Location" value={chosen?.gbpLocationName?location:''} onChange={e=>setLocation(e.target.value)}><option value="">Choose a linked location</option>{linked.map(l=><option key={l.id} value={l.id}>{l.businessName}{stateOf(l.id)==='needs_reconnect'?' — needs reconnect':''}</option>)}</select></label></Section>}
+    {!location?null
       :locationsLoading?<p role="status">Loading locations…</p>
       :locationsError?null
       :chosen?.gbpLocationName?<Editor key={location+mode} location={location} mode={mode}/>
@@ -159,11 +163,11 @@ function Editor({location,mode}:{location:string;mode:ContentMode}){
       </details><p>Approving authorizes Google publishing at the scheduled times. AI text remains a draft until you approve it. With a draft batch, approval queues only the posts in that batch. Unsaved drafts are lost on reload.</p><div className="flex flex-wrap gap-2">{photosMode&&<Button className="w-full sm:w-auto" disabled={!selected.length||!countValid} onClick={()=>void run(()=>queue('photo'))}>Approve &amp; queue photos</Button>}{posts&&<Button className="w-full sm:w-auto" disabled={(!summary.trim()&&!postBatch.length)||!countValid} onClick={()=>void run(()=>queue('post'))}>Approve &amp; queue post</Button>}</div>
     </fieldset></Section>
     <Section title="Calendar, queue & history" contentClassName="space-y-3 text-sm"><div className="flex flex-wrap gap-2"><Button variant="outline" aria-pressed={view==='queue'} onClick={()=>setView('queue')}>Queue</Button><Button variant="outline" aria-pressed={view==='calendar'} onClick={()=>setView('calendar')}>Calendar</Button><Button variant="outline" disabled={busy} onClick={()=>void run(async()=>{await call('/refresh',{});await refetch();setMessage('Google statuses refreshed.');})}>Refresh Google status</Button></div>
-      {!jobs.length&&<div className="space-y-3"><p>{posts?'No scheduled posts yet.':'No scheduled photos yet.'}</p>
-        <SamplePreview what={posts?'what a queued post looks like here':'what a queued photo looks like here'} testId="sample-queue">
+      {data&&!jobs.length&&<div className="space-y-3"><p>{posts?'No scheduled posts yet.':'No scheduled photos yet.'}</p>
+        {showSample({isLoading:!data&&!queueError,isError:!!queueError,total:data?jobs.length:undefined})&&<SamplePreview what={posts?'what a queued post looks like here':'what a queued photo looks like here'} testId="sample-queue">
           <article className="border rounded p-3 space-y-2"><p>{posts?'post':'photo'} · {new Date(SAMPLE_DUE_AT).toLocaleString()} · <strong>queued</strong></p><p>{posts?'Sample Roofing Co. finished a full roof replacement on Example St this week — call for a free estimate.':'Finished siding job on 123 Example St — Sample Roofing Co.'}</p></article>
           <article className="border rounded p-3 space-y-2"><p>{posts?'post':'photo'} · {new Date(SAMPLE_DONE_AT).toLocaleString()} · <strong>published</strong> · Google: LIVE</p><p>{posts?'Sample Roofing Co. is open Saturdays this spring.':'Crew at work, 456 Example Ave — Sample Roofing Co.'}</p></article>
-        </SamplePreview></div>}{(view==='calendar'?ordered:jobs).map((j:any,i:number,all:any[])=><div key={j.id}>
+        </SamplePreview>}</div>}{(view==='calendar'?ordered:jobs).map((j:any,i:number,all:any[])=><div key={j.id}>
         {view==='calendar'&&(i===0||new Date(all[i-1].due_at).toLocaleDateString()!==new Date(j.due_at).toLocaleDateString())&&<h3 className="font-semibold mt-4">{new Date(j.due_at).toLocaleDateString()}</h3>}
         <article className="border rounded p-3 space-y-2"><p>{j.kind} · {new Date(j.due_at).toLocaleString()} · <strong>{j.status}</strong>{j.google_status&&` · Google: ${j.google_status}`}</p><p>{j.payload.summary||j.payload.description||j.payload.locationAssociation?.category}</p>{j.google_name&&<p className="text-sm break-all">Google resource: {j.google_name}</p>}{j.error&&<p role="alert">{j.error}</p>}
           {['failed','uncertain'].includes(j.status)&&<Button disabled={busy} variant="outline" onClick={()=>{if(j.status==='uncertain'&&!window.confirm('Check Google first. Retrying may duplicate a successful publish. Have you verified it is missing?'))return;void run(async()=>{await call(`/jobs/${j.id}`,{action:'retry',checkedGoogle:j.status==='uncertain'},'PATCH');await refetch();});}}>Retry</Button>}

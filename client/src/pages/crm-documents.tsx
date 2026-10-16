@@ -16,7 +16,7 @@ import {
 } from "@/components/crm-ui";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { InfoTip } from "@/components/info-tip";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SampleDocsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleDocsTable");
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
@@ -445,6 +445,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
                   value={qInput}
                   onChange={(e) => setQInput(e.target.value)}
                   placeholder="Number or client name…"
+                  aria-label="Search by number or client name"
                   className="h-9 pl-8"
                 />
               </div>
@@ -500,7 +501,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
             )}
           </CardContent>
           {/* data.total is the org's count before any filter: a sample only while there are none at all. */}
-          {data.total === 0 && (
+          {showSample({ isLoading, isError, total: data.total }) && (
             <CardContent className="p-4 pt-0">
               <SampleDocsTable kind={kind} cta={
                 kind === "estimates" ? (

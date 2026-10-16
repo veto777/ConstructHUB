@@ -123,7 +123,7 @@ export function ResearchOffer({ compact = false }: { compact?: boolean }) {
   return (
     <section className="g-callout" data-testid="card-research-offer" aria-labelledby="research-offer-title">
       <p className="mb-1 inline-flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-wide g-text-2"><FileSearch className="h-3.5 w-3.5" aria-hidden="true" /> Permit &amp; License Research Report</p>
-      <h3 id="research-offer-title">Let our research bot search every permit portal in a state for you.</h3>
+      <h2 id="research-offer-title">Let our research bot search every permit portal in a state for you.</h2>
       {!compact && <p>Give us names of people or companies and the states you care about; you get a report where every finding links to its official source.</p>}
       <p className="mt-1" data-testid="text-research-price">
         <b className="g-text font-medium">{formatUsd(RESEARCH_STANDARD_CENTS)}</b> for one name in one state · <b className="g-text font-medium">{formatUsd(RESEARCH_EXTENDED_CENTS)}</b> for up to five names in up to three states · paid up front, non-refundable, nothing guaranteed.
@@ -203,12 +203,12 @@ export default function CompliancePage() {
 
       {STATE_COMPLIANCE.length === 0 ? (
         <div className="g-callout" data-testid="text-compliance-empty">
-          <h3 className="inline-flex items-center gap-2"><Building2 className="h-4 w-4" aria-hidden="true" /> The state directory is being checked</h3>
+          <h2 className="inline-flex items-center gap-2"><Building2 className="h-4 w-4" aria-hidden="true" /> The state directory is being checked</h2>
           <p>Each state's licensing boards and permit agencies appear here once their links have been opened and checked. Nothing is listed before it is confirmed.</p>
         </div>
       ) : states.length === 0 ? (
         <div className="g-callout" data-testid="text-compliance-no-match">
-          <h3>No state or agency matches “{q}”</h3>
+          <h2>No state or agency matches “{q}”</h2>
           <p>Try the state's name or two-letter code, or an agency's name or acronym. <button type="button" className="g-link" onClick={() => setQ("")}>Show every state</button></p>
         </div>
       ) : (

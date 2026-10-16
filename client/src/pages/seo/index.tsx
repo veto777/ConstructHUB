@@ -17,7 +17,7 @@ import { Loader2, Play, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, fmtUnit, money, Move, SeoShell, useSelectedSite, useSeoSites, useSeoStatus, useSiteMissing, type SeoSite } from "./shell";
+import { api, Empty, seoUnlimited, fmtDate, fmtNum, fmtUnit, money, Move, SeoShell, useSelectedSite, useSeoSites, useSeoStatus, useSiteMissing, type SeoSite } from "./shell";
 import { KeywordHistory, RankHistoryPanel, useRankHistory, type HistoryDay } from "./rank-history";
 import { RankTagsPanel } from "./rank-tags";
 import { CompetingPages } from "./competing";
@@ -28,6 +28,7 @@ import { countryLabel } from "@shared/seo-markets";
 import { unresolvedPlaceMessage } from "@shared/seo-place";
 import { seoLinks, type Movement } from "./links";
 import { SampleRankTable } from "./samples";
+import { showSample } from "@/components/sample-preview";
 import { effectiveDevice, hrefWith, keepsRow, moved, narrowingWords, PANEL_TARGET, pageParts, scopeOf, scrollToTestId, showsMapPack, slug, useRankParams, utcDay, withFeature, type RankTo } from "./rank-params";
 import { GradientSpark, MetricColumn, ORANGE, PALETTE } from "./viz";
 import { CARD, LINK, LINK_BLOCK, LinkedDistributionBar, PositionBadge, PositionSpark, SectionTitle, TABLE, TAP } from "./viz-rank";
@@ -108,7 +109,11 @@ export default function SeoOverviewPage() {
   const history = useRankHistory(site?.id ?? null, "", "");
   const o = overview.data;
   const configured = !!status.data?.configured;
+  // Unlimited SEO data: checks cost nothing, so no cents on the button or the schedule.
+  const unlimited = seoUnlimited(status.data);
   const running = o?.runs.some((r) => r.status === "queued" || r.status === "running");
+  // No keywords yet: one first step ("Add keywords") instead of a wall of empty figures and a disabled check button.
+  const noKeywords = !!o && o.rows.length === 0 && !running;
   // A check that just finished has new numbers for the history charts and the dashboard.
   const wasRunning = useRef(false);
   useEffect(() => { if (wasRunning.current && !running) refreshHistory(); wasRunning.current = !!running; }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -140,22 +145,31 @@ export default function SeoOverviewPage() {
   return (
     <SeoShell
       title="Rank tracker" description="Where your site was found in Google's results for the keywords you chose, as of each saved check — automatic checks run weekly by default." site={site} onSite={onSite} sites={sites} status={status} spends="tracking" helpKey="seo.rank-tracker"
-      actions={site && (
+      actions={site && !noKeywords && (
         <Button className="w-full sm:w-auto" disabled={!configured || !o || !o.rows.length || runNow.isPending || running} onClick={() => runNow.mutate()} data-testid="button-run-rank-check" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
           {runNow.isPending || running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-          {running ? "Checking…" : `Run check now${o?.nextCheck.priceCents ? ` · about ${money(o.nextCheck.priceCents)}` : ""}`}
+          {running ? "Checking…" : `Run check now${o?.nextCheck.priceCents && !unlimited ? ` · about ${money(o.nextCheck.priceCents)}` : ""}`}
         </Button>
       )}
     >
       {!site && sites.isSuccess && <>
-        <Empty testId="seo-empty-sites"><h3>No sites yet</h3><p>Add the domain you want to track. Then add the keywords you care about, and the first check runs on the next weekly tick — or straight away with "Run check now".</p></Empty>
+        <Empty testId="seo-empty-sites"><h2>No sites yet</h2><p>Add the domain you want to track. Then add the keywords you care about, and the first check runs on the next weekly tick — or straight away with "Run check now".</p></Empty>
         {/* What the table looks like with keywords tracked — made-up rows, shown only while there is no site (samples.tsx). */}
-        <div className="mt-4"><SampleRankTable what="what the tracker shows once a site has keywords" cta={<Link href={seoLinks.dashboard()} className="g-pill g-pill--sm !min-h-11" data-testid="link-sample-add-site">Add your first site</Link>} /></div>
+        {showSample({ isLoading: sites.isLoading, isError: sites.isError, total: sites.data?.length }) && <div className="mt-4"><SampleRankTable what="what the tracker shows once a site has keywords" cta={<Link href={seoLinks.dashboard()} className="g-pill g-pill--sm !min-h-11" data-testid="link-sample-add-site">Add your first site</Link>} /></div>}
       </>}
       {site && missing && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="text-site-missing">The address names site #{missing}, which is not one of yours (or was removed); showing {site.domain}.</p>}
       {site && overview.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your rankings…</p>}
-      {site && overview.isError && <div className="g-callout" role="alert" data-testid="rank-overview-error"><h3>Couldn't load your rankings</h3><p>{apiErrorMessage(overview.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void overview.refetch()}>Try again</button></div>}
-      {site && o && device && (
+      {site && overview.isError && <div className="g-callout" role="alert" data-testid="rank-overview-error"><h2>Couldn't load your rankings</h2><p>{apiErrorMessage(overview.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void overview.refetch()}>Try again</button></div>}
+      {site && o && noKeywords && (
+        <>
+          <Empty testId="rank-empty-keywords">
+            <h2>Add the searches you want to be found for</h2>
+            <p>Type the keywords your customers search, such as "roof repair near me". The first check runs after you add them: on the next automatic check, or straight away with "Run check now". Positions, movement and history show here after that check.</p>
+          </Empty>
+          <div className="mt-4"><AddKeywords site={site} onAdded={invalidate} primary /></div>
+        </>
+      )}
+      {site && o && device && !noKeywords && (
         <>
           {(() => {
             // The figures as one row of columns with thin dividers (as Ahrefs lays its rank tracker out), each with its
@@ -227,7 +241,7 @@ export default function SeoOverviewPage() {
               <button type="button" className="g-pill g-pill--sm max-sm:!min-h-11" disabled={volumes.isPending || !configured} onClick={() => volumes.mutate()} data-testid="button-get-volumes">{volumes.isPending ? <Loader2 className="animate-spin" /> : null} Get search volumes{status.data?.prices?.searchVolumes ? ` · about ${money(status.data.prices.searchVolumes)}` : ""}</button>
             </p>
           )}
-          <TrackingSettings site={site} onSaved={invalidate} perMonthCents={o?.nextCheck.perMonthCents} includedCents={status.data?.credits?.includedCents ?? null} />
+          <TrackingSettings site={site} onSaved={invalidate} perMonthCents={unlimited ? undefined : o?.nextCheck.perMonthCents} includedCents={status.data?.credits?.includedCents ?? null} />
           {/* The table's heading, and the chip that says how the address narrowed it — the place a figure's link lands.
               It is there with no keywords too: an address that narrows is always answered with its words. */}
           <div className="mb-2 flex scroll-mt-16 flex-wrap items-center gap-2" data-testid="rank-filter">
@@ -241,8 +255,8 @@ export default function SeoOverviewPage() {
           </div>
           {o.rows.length === 0 ? (
             <>
-              <Empty testId="seo-empty-keywords"><h3>No keywords tracked for {site.domain}</h3><p>Paste keywords above, or <Link href={seoLinks.keywords("")} className={LINK} data-testid="link-research-keywords">research keywords</Link> and track the ones with volume.</p></Empty>
-              <div className="mt-4"><SampleRankTable what={`what this table shows once ${site.domain} has keywords`} /></div>
+              <Empty testId="seo-empty-keywords"><h2>No keywords tracked for {site.domain}</h2><p>Paste keywords above, or <Link href={seoLinks.keywords("")} className={LINK} data-testid="link-research-keywords">research keywords</Link> and track the ones with volume.</p></Empty>
+              {showSample({ isLoading: overview.isLoading, isError: overview.isError && !o, total: o.rows.length }) && <div className="mt-4"><SampleRankTable what={`what this table shows once ${site.domain} has keywords`} /></div>}
             </>
           ) : (
             <>
@@ -322,7 +336,7 @@ export default function SeoOverviewPage() {
   );
 }
 
-function AddKeywords({ site, onAdded }: { site: SeoSite; onAdded: () => void }) {
+function AddKeywords({ site, onAdded, primary = false }: { site: SeoSite; onAdded: () => void; /** The page's first step (no keywords yet): a solid button. */ primary?: boolean }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -339,7 +353,7 @@ function AddKeywords({ site, onAdded }: { site: SeoSite; onAdded: () => void }) 
     onSuccess: (r: { added: number }) => { setText(""); setTag(""); setPlace(null); setTyped(""); setOpen(false); onAdded(); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added` }); },
     onError: (e) => toast({ title: "Couldn't add keywords", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  if (!open) return <div className="mb-4"><button type="button" className="g-pill" onClick={() => setOpen(true)} data-testid="button-add-keywords"><Plus /> Add keywords</button></div>;
+  if (!open) return <div className="mb-4"><button type="button" className={primary ? "g-pill g-pill--solid" : "g-pill"} onClick={() => setOpen(true)} data-testid="button-add-keywords"><Plus /> Add keywords</button></div>;
   // Typed but never chosen is not "no place": the form stops here and says so (by mouse, keyboard or any other control).
   const submit = () => {
     const problem = place ? null : unresolvedPlaceMessage(typed, defaultLabel);
@@ -348,7 +362,7 @@ function AddKeywords({ site, onAdded }: { site: SeoSite; onAdded: () => void }) 
   };
   return (
     <form className="g-callout mb-4" onSubmit={(e) => { e.preventDefault(); submit(); }} data-testid="form-add-keywords">
-      <h3>Keywords to track for {site.domain}</h3>
+      <h2>Keywords to track for {site.domain}</h2>
       <p>One per line (or comma-separated). Each is checked on {site.devices === "both" ? "desktop and mobile" : site.devices} every week.</p>
       <textarea aria-label={`Keywords to track for ${site.domain}, one per line`} className="g-input mt-2 min-h-[120px] py-2" value={text} onChange={(e) => setText(e.target.value)} placeholder={"roofing contractor tampa\nroof repair near me"} data-testid="textarea-keywords" />
       <div className="mt-2 text-[13px]"><div className="g-text-2 mb-1">Where to check from (optional) — pick a city or ZIP code{country && country !== "United States" ? " (the list has United States places)" : ""} to see what customers there see, including the map</div>
@@ -404,7 +418,7 @@ function TrackingSettings({ site, onSaved, perMonthCents, includedCents }: { sit
           </select>
         </label>
         <p className="g-text-2 mt-1 text-[12px]" data-testid="text-rank-frequency-note">
-          {perMonthCents ? `At your ${fmtNum(site.keywordCount)} tracked keyword${site.keywordCount === 1 ? "" : "s"}, a month of checks ${FREQUENCY[freq].toLowerCase()} uses about ${money(perMonthCents[freq])} of SEO data` : "The cost of a month of checks shows here once keywords are tracked"}{includedCents != null && perMonthCents ? ` — your plan includes ${money(includedCents)} a month` : ""}. Automatic checks only use your included data and are never charged to credit you bought; when it runs out, that check is skipped and the next one comes at its usual time. A site already checked on a day (UTC) is not checked again automatically that day; "Run check now" is not held to that, and uses your included data, then your bought credit.
+          {includedCents === -1 ? "Your plan's SEO data is unlimited, so automatic checks and \"Run check now\" cost nothing extra. A site already checked on a day (UTC) is not checked again automatically that day." : <>{perMonthCents ? `At your ${fmtNum(site.keywordCount)} tracked keyword${site.keywordCount === 1 ? "" : "s"}, a month of checks ${FREQUENCY[freq].toLowerCase()} uses about ${money(perMonthCents[freq])} of SEO data` : "The cost of a month of checks shows here once keywords are tracked"}{includedCents != null && perMonthCents ? ` — your plan includes ${money(includedCents)} a month` : ""}. Automatic checks only use your included data and are never charged to credit you bought; when it runs out, that check is skipped and the next one comes at its usual time. A site already checked on a day (UTC) is not checked again automatically that day; "Run check now" is not held to that, and uses your included data, then your bought credit.</>}
         </p>
         <div className="mt-3"><Button type="submit" disabled={m.isPending} aria-busy={m.isPending} data-testid="button-save-settings">{m.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden /> Saving settings…</> : "Save settings"}</Button></div>
       </form>

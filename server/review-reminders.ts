@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { REMINDER_INTERVAL_HOURS_MAX, REMINDER_INTERVAL_HOURS_MIN } from "@shared/review-reminders";
 
 export const reminderSettingsInput = z.object({
   enabled: z.boolean().default(true),
   maxReminders: z.number().int().min(0).max(10).default(3),
-  intervalHours: z.number().int().min(1).max(720).default(48),
+  intervalHours: z.number().int().min(REMINDER_INTERVAL_HOURS_MIN).max(REMINDER_INTERVAL_HOURS_MAX).default(48),
   timeWindows: z.array(z.object({ start: z.number().int().min(0).max(23), end: z.number().int().min(1).max(24) })
     .refine(w => w.start < w.end, "Window end must follow its start")).min(1).max(6)
     .refine(windows => windows.every((w, i) => windows.every((v, j) => i === j || w.end <= v.start || v.end <= w.start)), "Windows must not overlap")

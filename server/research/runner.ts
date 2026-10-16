@@ -46,6 +46,7 @@ import type { IdQuery } from "./identifiers";
 import { previewCompanyRecords, searchCompanyRecords, searchEnforcement } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
 import { registerWorker, workerInterval } from "../workers";
+import { logError } from "../ops/log";
 
 const MAX_PERMITS_PER_SUBJECT = 1000;
 const POLL_MS = 5_000;
@@ -481,7 +482,7 @@ async function sendReportEmails(order: ResearchOrderRow, report: ResearchReport)
     html: `<p>Your research report for <strong>${escapeHtml(names)}</strong> is ready. ${escapeHtml(summary)}</p>
       <p><a href="${link}">Open your report</a> (sign in to ConstructHUB to view it; you can print it or save it as a PDF).</p>
       <p style="color:#666;font-size:12px">${escapeHtml(RESEARCH_NO_GUARANTEE)}</p>`,
-  }).catch((err: unknown) => console.error(`[research] order ${order.id}: customer email failed`, err));
+  }).catch((err: unknown) => logError(`[research] order ${order.id}: customer email failed`, err));
   await sendWithFallback({
     from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
     to: process.env.SMTP_EMAIL,
@@ -504,7 +505,7 @@ export async function drainResearchQueue(): Promise<void> {
         console.log(`[research] order ${order.id}: complete (${report.totals.licenses} licenses, ${report.totals.permits} permits)`);
         await sendReportEmails(order, report);
       } catch (err: any) {
-        console.error(`[research] order ${order.id} failed:`, err);
+        logError(`[research] order ${order.id} failed:`, err);
         await failOrder(order.id, String(err?.message ?? err));
         await sendWithFallback({
           from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`, to: process.env.SMTP_EMAIL,
@@ -531,9 +532,9 @@ async function noteResearchFacts(): Promise<void> {
  */
 export function startLegacyKeyPurge(delayMs = 60_000): void {
   // First the rows of retired sources (nothing reads them; acceptance run, 2026-10-15), then the key purge.
-  const t = setTimeout(() => void dropRetiredSources(ALL_BULK_SOURCES).catch((err) => console.error("[research-bulk] retired sources:", err))
+  const t = setTimeout(() => void dropRetiredSources(ALL_BULK_SOURCES).catch((err) => logError("[research-bulk] retired sources:", err))
     .then(() => purgeLegacyKeys(ALL_BULK_SOURCES)).then((r) => { if (r) console.log(`[research-bulk] legacy key purge: ${JSON.stringify(r)}`); })
-    .catch((err) => console.error("[research-bulk] legacy key purge:", err)), delayMs);
+    .catch((err) => logError("[research-bulk] legacy key purge:", err)), delayMs);
   t.unref?.();
   registerWorker("research legacy key purge", () => clearTimeout(t));
 }
@@ -546,14 +547,14 @@ export function startResearchWorker(): void {
     requeueInterrupted()
       .then((n) => { if (n) console.log(`[research] re-queued ${n} interrupted order(s)`); })
       .then(() => drainResearchQueue())
-      .catch((err) => console.error("[research] worker start failed:", err));
+      .catch((err) => logError("[research] worker start failed:", err));
   }, 20_000);
   boot.unref?.();
   registerWorker("research queue boot", () => clearTimeout(boot));
-  workerInterval("research queue", () => drainResearchQueue().catch((err) => console.error("[research] queue:", err)), 5 * 60_000);
+  workerInterval("research queue", () => drainResearchQueue().catch((err) => logError("[research] queue:", err)), 5 * 60_000);
   // The state bulk files (hundreds of MB a day): production only, unless a dev server asks with RESEARCH_BULK=on.
   if (process.env.RESEARCH_BULK === "on" || (process.env.NODE_ENV === "production" && process.env.RESEARCH_BULK !== "off")) {
-    const refresh = () => refreshDueSources(ALL_BULK_SOURCES).catch((err) => console.error("[research-bulk] refresh:", err));
+    const refresh = () => refreshDueSources(ALL_BULK_SOURCES).catch((err) => logError("[research-bulk] refresh:", err));
     workerInterval("research bulk refresh", refresh, 60 * 60_000, { firstAfterMs: 3 * 60_000 });
   }
 }

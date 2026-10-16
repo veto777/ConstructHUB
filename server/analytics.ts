@@ -19,13 +19,59 @@ import { db, pool } from "./db";
 import { chAnalyticsEvents, users } from "@shared/schema";
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { requirePlatformAdmin } from "./crm/admin";
-import { allow } from "./crm/client-auth";
 import { campaignReport, consentedVisitorId, isMintedVisitorId, landingColumns } from "./analytics-attribution";
 
 type GetUser = (req: any, res: any) => any;
 
-/** Events accepted per IP per 15-minute window (batch rows count). */
-const EVENTS_IP_LIMIT = 120;
+/** Events accepted per visitor (the server-minted ch_vid) per 15-minute window (batch rows count). */
+export const EVENTS_VISITOR_LIMIT = 120;
+/** Backstop per IP per window. An office or a mobile carrier puts many real visitors behind one IP,
+ *  so this is generous; it only stops one IP minting visitor ids to flood the dashboard. */
+export const EVENTS_IP_LIMIT = 2000;
+export const EVENTS_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Sliding-window limiter with two budgets: one per visitor and a backstop per IP. A batch is
+ * charged to both only when both have room, so a refusal never eats either budget.
+ * `retryAfterMs` says when the tighter refusing bucket frees enough room.
+ */
+export function createEventLimiter(opts: { visitorLimit: number; ipLimit: number; windowMs: number; now?: () => number }) {
+  const now = opts.now ?? Date.now;
+  const buckets = new Map<string, number[]>();
+  const live = (key: string, t: number) => {
+    const hits = (buckets.get(key) ?? []).filter((h) => t - h < opts.windowMs);
+    if (hits.length) buckets.set(key, hits); else buckets.delete(key);
+    return hits;
+  };
+  // Room for `cost` more rows → 0; otherwise ms until the oldest blocking hit leaves the window.
+  const waitFor = (hits: number[], limit: number, cost: number, t: number) => {
+    if (hits.length + cost <= limit) return 0;
+    const blocker = hits[Math.max(0, hits.length + cost - limit - 1)];
+    return blocker === undefined ? opts.windowMs : Math.max(1, blocker + opts.windowMs - t);
+  };
+  let calls = 0;
+  return {
+    take(visitorId: string, ip: string, cost: number): { ok: true } | { ok: false; retryAfterMs: number } {
+      const t = now();
+      // Drop idle buckets now and then, so one-visit visitors don't pile up in memory.
+      if (++calls % 500 === 0) for (const key of Array.from(buckets.keys())) live(key, t);
+      const vKey = `v:${visitorId}`;
+      const iKey = `ip:${ip}`;
+      const vHits = live(vKey, t);
+      const iHits = live(iKey, t);
+      const wait = Math.max(waitFor(vHits, opts.visitorLimit, cost, t), waitFor(iHits, opts.ipLimit, cost, t));
+      if (wait > 0) return { ok: false, retryAfterMs: wait };
+      for (let i = 0; i < cost; i++) { vHits.push(t); iHits.push(t); }
+      buckets.set(vKey, vHits);
+      buckets.set(iKey, iHits);
+      return { ok: true };
+    },
+  };
+}
+
+const eventLimiter = createEventLimiter({
+  visitorLimit: EVENTS_VISITOR_LIMIT, ipLimit: EVENTS_IP_LIMIT, windowMs: EVENTS_WINDOW_MS,
+});
 
 const clientIp = (req: any) =>
   String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "")
@@ -95,10 +141,13 @@ export function registerAnalyticsRoutes(app: Express, getDevUser: GetUser): void
     }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ ok: false });
 
-    // Per-IP throttle keyed on the edge-reported client; batch rows count
-    // against the budget. Without this the endpoint is an open dashboard-
-    // poisoning vector.
-    if (!allow(`analytics:${String(req.ip || "")}`, EVENTS_IP_LIMIT, parsed.data.events.length)) {
+    // Throttled per visitor, with a generous per-IP backstop keyed on the
+    // edge-reported client; batch rows count against both budgets. Without
+    // this the endpoint is an open dashboard-poisoning vector. Retry-After
+    // tells the tracker how long to stay quiet (cookie-consent.tsx).
+    const verdict = eventLimiter.take(visitorId, String(req.ip || ""), parsed.data.events.length);
+    if (!verdict.ok) {
+      res.setHeader("Retry-After", String(Math.ceil(verdict.retryAfterMs / 1000)));
       return res.status(429).json({ ok: false, message: "Too many events. Slow down." });
     }
 

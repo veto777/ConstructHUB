@@ -30,9 +30,9 @@ export type VpnStats = { today: number; yesterday: number; sevenDays: number; th
 // Every detection is recorded; `action` is what the site's block mode did with it at the time.
 const ACTION_LABELS: Record<string, string> = { block: "Blocked", redirect: "Redirected", log: "Logged only" };
 export const actionLabel = (action: string) => ACTION_LABELS[action] ?? action;
-export const MODE_WORDS: Record<string, string> = { block: "Blocking: overlay", redirect: "Blocking: redirect", log: "Log only" };
+const MODE_WORDS: Record<string, string> = { block: "Blocking: overlay", redirect: "Blocking: redirect", log: "Log only" };
 
-export const vpnHref = (view: "" | "flagged" | "install" | "settings", siteId: number) => `/vpn-shield${view ? `/${view}` : ""}?site=${siteId}`;
+const vpnHref = (view: "" | "flagged" | "install" | "settings", siteId: number) => `/vpn-shield${view ? `/${view}` : ""}?site=${siteId}`;
 
 /* ── 30-day chart ───────────────────────────────────────────────────────────── */
 

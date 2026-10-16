@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
-import { DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -165,6 +165,7 @@ export function AppointmentForm({
     <>
       <DialogHeader>
         <DialogTitle>{initial ? "Edit appointment" : "New appointment"}</DialogTitle>
+        <DialogDescription>When the visit is, who it's with, and which crew goes.</DialogDescription>
       </DialogHeader>
       <div className="space-y-3">
         <div>

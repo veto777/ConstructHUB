@@ -1,4 +1,5 @@
 import { grantStatus } from '../gbp/grants';
+import { loadGoogleConnection } from '../gbp/connection-status';
 import type { Express } from 'express';
 import { pool } from '../db';
 import { z } from 'zod';
@@ -92,6 +93,12 @@ export function registerAgencyAccess(app:Express) {
       // No delegation for account-wide credentials, discovery, media libraries or automation settings.
       if(req.path==='/api/gbp/status'&&req.method==='GET')return void res.json({connected:(await grantStatus(a.owner)).connected,accounts:[],locations:[],delegated:true});
       if(req.path==='/api/gbp/linkage'&&req.method==='GET')return void res.json({accounts:[],locations:[],errors:[]});
+      // The shared connection state, for the owner's locations this member may see; no account emails.
+      if(req.path==='/api/gbp/connection'&&req.method==='GET'){
+        const ids=req.query.locationId?[(await locationAccess(a,z.coerce.number().int().positive().parse(req.query.locationId))).id as number]:(await listLocations(a,filters.parse({}))).items.map((l:any)=>l.id);
+        const c=await loadGoogleConnection(a.owner,{locationIds:ids});
+        return void res.json({...c,accounts:[],locations:c.locations.map(l=>({...l,accountEmail:null})),delegated:true});
+      }
       let id:number|undefined;
       const location=req.path.match(/^\/api\/(?:locations|gbp\/locations|gbp\/content)\/(\d+)(?:\/|$)/);
       if(location)id=Number(location[1]);

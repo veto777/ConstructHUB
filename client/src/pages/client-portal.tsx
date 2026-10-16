@@ -773,7 +773,7 @@ function Dashboard({ data }: { data: any }) {
                     <Menu className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-64 bg-sidebar text-sidebar-foreground border-sidebar-border p-0">
+                <SheetContent side="left" className="w-64 bg-sidebar text-sidebar-foreground border-sidebar-border p-0" aria-describedby={undefined}>
                   <SheetTitle className="sr-only">Menu</SheetTitle>
                   <div className="px-4 pt-5 pb-3">
                     <CrmLogo height={22} />

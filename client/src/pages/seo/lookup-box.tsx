@@ -58,7 +58,7 @@ export function LookupBox({ status, sites, onSite }: { status: SeoStatus | undef
   const price = priceOf(status, "explorerReport");
   return (
     <section className="g-callout mb-4" aria-labelledby="seo-lookup-title" data-testid="seo-lookup">
-      <h3 id="seo-lookup-title" className="flex items-center gap-2"><Search className="h-4 w-4" aria-hidden /> Look up any website</h3>
+      <h2 id="seo-lookup-title" className="flex items-center gap-2"><Search className="h-4 w-4" aria-hidden /> Look up any website</h2>
       <p>Yours or a competitor's. Type the site name or paste its address, then look it up — or add it straight to your sites.</p>
       <form className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); lookUp(); }} data-testid="form-seo-lookup">
         <label className="min-w-0 flex-1 sm:max-w-xl"><span className="sr-only">Website</span>

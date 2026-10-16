@@ -84,5 +84,5 @@ test('agency list Google pill agrees with the reconnect filter, not just gbpLoca
   await page.route('**/api/gbp/linkage',r=>r.fulfill({json:{accounts:[],errors:[],total:2,locations:[{id:1,state:'reconnect',accountEmail:null},{id:2,state:'unlinked'}]}}));
   await page.goto('/locations');
   await expect(page.getByTestId('agency-location-1')).toContainText('Needs reconnect');
-  await expect(page.getByTestId('agency-location-2')).toContainText('Not linked');
+  await expect(page.getByTestId('agency-location-2')).toContainText('Not connected');
 });

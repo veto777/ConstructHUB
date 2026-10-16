@@ -14,6 +14,7 @@ import { getConnectionByUserId, loginCidFor } from "./store";
 import { db } from "../db";
 import { lsaLeads } from "@shared/schema";
 import { and, or, eq, isNull, inArray, lte } from "drizzle-orm";
+import { logError } from "../ops/log";
 
 // Google's SurveyAnswer enum only has two usable values (UNSPECIFIED/UNKNOWN are
 // return-only). 👍 Good = SATISFIED, 👎 Bad = DISSATISFIED.
@@ -385,7 +386,7 @@ export async function promoteDueScheduledDisputes(): Promise<void> {
     }
     if (retired > 0) console.log(`⚠️ Retired ${retired} un-disputable scheduled lead(s).`);
   } catch (e) {
-    console.error("Failed to promote scheduled disputes:", e);
+    logError("Failed to promote scheduled disputes:", e);
   }
 }
 
@@ -421,6 +422,6 @@ export async function resumeDisputeQueue(): Promise<void> {
       console.log(`↻ Resumed ${toEnqueue.length} pending LSA dispute(s).`);
     }
   } catch (e) {
-    console.error("Failed to resume dispute queue:", e);
+    logError("Failed to resume dispute queue:", e);
   }
 }

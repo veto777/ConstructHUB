@@ -6,7 +6,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +17,7 @@ import {
   Loader2, KanbanSquare, ArrowRight, ChevronDown, ChevronUp, Plus, Pencil,
 } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard } from "@/components/crm-ui";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SamplePipelineBoard = lazySample(() => import("@/components/crm-sample-previews"), "SamplePipelineBoard");
 import { Button } from "@/components/ui/button";
 import { ClientSearchPicker, type PickOption } from "@/components/crm-search-picker";
@@ -98,7 +98,7 @@ function NewLeadDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent className="max-w-md" data-testid="dialog-new-lead">
-        <DialogHeader><DialogTitle>New lead</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New lead</DialogTitle><DialogDescription>A new job on the pipeline, starting in the Lead column.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div>
             <Label htmlFor="lead-name">Lead name</Label>
@@ -190,7 +190,7 @@ function EditProjectDialog({
 
   return (
     <>
-      <DialogHeader><DialogTitle>Edit project</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>Edit project</DialogTitle><DialogDescription>Change the project's name, stage, crew and dates.</DialogDescription></DialogHeader>
       <div className="space-y-3">
         <div>
           <Label htmlFor="edit-name">Name</Label>
@@ -210,18 +210,18 @@ function EditProjectDialog({
         )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <Label>Stage</Label>
+            <Label htmlFor="edit-stage">Stage</Label>
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger data-testid="select-edit-stage"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="edit-stage" data-testid="select-edit-stage"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {stages.map((st) => <SelectItem key={st.key} value={st.key}>{st.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label>Owner (PM)</Label>
+            <Label htmlFor="edit-owner">Owner (PM)</Label>
             <Select value={owner || "none"} onValueChange={(v) => setOwner(v === "none" ? "" : v)}>
-              <SelectTrigger data-testid="select-edit-owner"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+              <SelectTrigger id="edit-owner" data-testid="select-edit-owner"><SelectValue placeholder="Unassigned" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Unassigned</SelectItem>
                 {members.map((m) => (
@@ -323,7 +323,7 @@ export default function CrmPipelinePage() {
 
       {/* Sample board, above the empty columns, while the org has no projects at all (totalProjects is the
           server's true count, not the loaded page) — gone the moment one lead exists. */}
-      {!projects.length && totalProjects === 0 && (
+      {!projects.length && showSample({ isLoading, isError, total: totalProjects }) && (
         <SamplePipelineBoard cta={canMove ? (
           <Button size="sm" variant="outline" className="max-sm:min-h-11" onClick={() => setNewLeadOpen(true)} data-testid="button-new-lead-sample">
             <Plus className="h-4 w-4 mr-1" /> Add your first lead
@@ -412,7 +412,7 @@ export default function CrmPipelinePage() {
                             <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
                               <Select value={p.status}
                                 onValueChange={(status) => status !== p.status && move.mutate({ id: p.id, status })}>
-                                <SelectTrigger className="h-7 text-xs bg-muted/40 border-transparent" data-testid={`select-stage-${p.id}`}>
+                                <SelectTrigger className="h-7 text-xs bg-muted/40 border-transparent" aria-label={`Stage for ${p.name}`} data-testid={`select-stage-${p.id}`}>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>

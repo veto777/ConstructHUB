@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AppPage, EmptyState } from "@/components/app-ui";
+import { AppPage } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -157,7 +157,7 @@ export default function HistoryPage() {
       </>) : (
         /* Nothing saved yet: what will appear and where it comes from. No sample searches. */
         <div className="g-callout" data-testid="empty-history">
-          <h3 className="inline-flex items-center gap-2"><FileText className="h-4 w-4" aria-hidden="true" /> No searches yet</h3>
+          <h2 className="inline-flex items-center gap-2"><FileText className="h-4 w-4" aria-hidden="true" /> No searches yet</h2>
           <p>Each permit search you run will be listed here, newest first (the latest 50): what you searched for, whether it was an address, a name, a company, a license or a permit number, and when. “Search again” reopens it on Search permits with the same values filled in.</p>
           <p className="mt-2">A search is saved the moment Search permits runs it live on the portals in your area. Nothing else writes here.</p>
           <div className="mt-3"><GooglePill icon={Search} variant="solid" label="Search permits" href="/search" testId="link-history-search" /></div>

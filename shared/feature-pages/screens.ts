@@ -36,17 +36,17 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
     {"src":"/feature-shots/competitors-2.webp","alt":"Review analysis for a competitor listing, showing good and bad review counts, repeated common phrases, generic reviews and reviewer photo share.","caption":"Review signals worth a closer look","url":"constructhub.us/competitors","width":1600,"height":1152},
   ],
   "crm": [
-    {"src":"/feature-shots/crm-1.webp","alt":"ConstructHub CRM home for Summit Roofing Co. showing open estimates, jobs won, unscheduled jobs, open invoices, pipeline value, follow-ups due and a team activity feed.","caption":"CRM home: the numbers, follow-ups and team activity at a glance","url":"portal.constructhub.us/crm?portal=1","width":1600,"height":1000},
-    {"src":"/feature-shots/crm-2.webp","alt":"CRM client list with Denver-area homeowners and HOAs, their contact details, city and bid status such as Job Won or Undecided.","caption":"Every client with their own portal and bid status","url":"portal.constructhub.us/crm/clients?portal=1","width":1600,"height":1000},
-    {"src":"/feature-shots/crm-3.webp","alt":"CRM Messages inbox with client threads waiting for a reply and an open conversation between a homeowner and the roofing crew.","caption":"One inbox for client messages, with reply timers","url":"portal.constructhub.us/crm/inbox?portal=1","width":1600,"height":1000},
+    {"src":"/feature-shots/crm-1.webp","alt":"ConstructHub CRM home for Summit Roofing Co. showing open estimates, jobs won, unscheduled jobs, open invoices, pipeline value, follow-ups due and a team activity feed.","caption":"CRM home: the numbers, follow-ups and team activity at a glance","url":"portal.constructhub.us/crm","width":1600,"height":1000},
+    {"src":"/feature-shots/crm-2.webp","alt":"CRM client list with Denver-area homeowners and HOAs, their contact details, city and bid status such as Job Won or Undecided.","caption":"Every client with their own portal and bid status","url":"portal.constructhub.us/crm/clients","width":1600,"height":1000},
+    {"src":"/feature-shots/crm-3.webp","alt":"CRM Messages inbox with client threads waiting for a reply and an open conversation between a homeowner and the roofing crew.","caption":"One inbox for client messages, with reply timers","url":"portal.constructhub.us/crm/inbox","width":1600,"height":1000},
   ],
   "crmLeads": [
-    {"src":"/feature-shots/crmLeads-1.webp","alt":"CRM pipeline board with roofing leads, estimating, proposal-sent and approved projects, each card showing project number, value and trade.","caption":"Lead pipeline from first call to approved job","url":"portal.constructhub.us/crm/pipeline?portal=1","width":1600,"height":1000},
-    {"src":"/feature-shots/crmLeads-2.webp","alt":"Sales stages of the CRM pipeline: estimating, proposal sent and approved roofing projects with their dollar values.","caption":"Sales stages with the value of every bid","url":"portal.constructhub.us/crm/pipeline?portal=1","width":1600,"height":1000},
+    {"src":"/feature-shots/crmLeads-1.webp","alt":"CRM pipeline board with roofing leads, estimating, proposal-sent and approved projects, each card showing project number, value and trade.","caption":"Lead pipeline from first call to approved job","url":"portal.constructhub.us/crm/pipeline","width":1600,"height":1000},
+    {"src":"/feature-shots/crmLeads-2.webp","alt":"Sales stages of the CRM pipeline: estimating, proposal sent and approved roofing projects with their dollar values.","caption":"Sales stages with the value of every bid","url":"portal.constructhub.us/crm/pipeline","width":1600,"height":1000},
   ],
   "crmSchedule": [
-    {"src":"/feature-shots/crmSchedule-1.webp","alt":"CRM schedule month view for October with the whole crew calendar: inspections, tear-offs, gutter installs and material deliveries.","caption":"The whole crew calendar in one month view","url":"portal.constructhub.us/crm/schedule?portal=1","width":1600,"height":1000},
-    {"src":"/feature-shots/crmSchedule-2.webp","alt":"CRM schedule week view listing next week's roofing visits by day with start times.","caption":"Week view for dispatching crews","url":"portal.constructhub.us/crm/schedule?portal=1&view=week","width":1600,"height":1000},
+    {"src":"/feature-shots/crmSchedule-1.webp","alt":"CRM schedule month view for October with the whole crew calendar: inspections, tear-offs, gutter installs and material deliveries.","caption":"The whole crew calendar in one month view","url":"portal.constructhub.us/crm/schedule","width":1600,"height":1000},
+    {"src":"/feature-shots/crmSchedule-2.webp","alt":"CRM schedule week view listing next week's roofing visits by day with start times.","caption":"Week view for dispatching crews","url":"portal.constructhub.us/crm/schedule?view=week","width":1600,"height":1000},
   ],
   "customerApi": [
     {"src":"/feature-shots/customerApi-1.webp","alt":"ConstructHUB API reference listing endpoints grouped by resource, each with its HTTP method, path, required scope and description.","caption":"The API reference, generated from the OpenAPI spec","url":"constructhub.us/developers","width":1600,"height":1000},
@@ -79,8 +79,8 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
     {"src":"/feature-shots/ipTracker-3.webp","alt":"IP Tracker pages report listing each page of a roofing website with hits, unique visitors and share of traffic.","caption":"Which pages visitors actually land on","url":"constructhub.us/ip-tracker?tab=pages","width":1600,"height":1000},
   ],
   "jobcam": [
-    {"src":"/feature-shots/jobcam-1.webp","alt":"JobCam recent feed with before, damage, progress and after pictures from roofing jobs, tags, starred items and client-visible markers.","caption":"Every job-site photo, tagged and filed to its project","url":"portal.constructhub.us/crm/jobcam?portal=1","width":1600,"height":1000},
-    {"src":"/feature-shots/jobcam-2.webp","alt":"JobCam photo viewer showing a finished roof with the time taken, the crew member, GPS location, project, tag, caption and a visible-to-client switch.","caption":"Time, place, crew and project stamped on every shot","url":"portal.constructhub.us/crm/jobcam?portal=1","width":1600,"height":1000},
+    {"src":"/feature-shots/jobcam-1.webp","alt":"JobCam recent feed with before, damage, progress and after pictures from roofing jobs, tags, starred items and client-visible markers.","caption":"Every job-site photo, tagged and filed to its project","url":"portal.constructhub.us/crm/jobcam","width":1600,"height":1000},
+    {"src":"/feature-shots/jobcam-2.webp","alt":"JobCam photo viewer showing a finished roof with the time taken, the crew member, GPS location, project, tag, caption and a visible-to-client switch.","caption":"Time, place, crew and project stamped on every shot","url":"portal.constructhub.us/crm/jobcam","width":1600,"height":1000},
   ],
   "lsaLeads": [
     {"src":"/feature-shots/lsaLeads-1.webp","alt":"LSA Leads page showing the Google Ads connection with last sync time and a list of Local Services Ads accounts with lead and charged-lead counts.","caption":"Every Local Services Ads account in one list","url":"constructhub.us/lsa-leads","width":1600,"height":1000},
@@ -142,8 +142,8 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
     {"src":"/feature-shots/social-2.webp","alt":"AI-generated draft posts waiting for approval with Approve and queue buttons, above published posts with their submission status.","caption":"AI drafts wait for approval; published posts show their status","url":"constructhub.us/social-media?business=910001&tab=queue","width":1600,"height":1000},
   ],
   "texting": [
-    {"src":"/feature-shots/texting-1.webp","alt":"Client record with the text messages the office and crew sent to a homeowner, each logged with sender and time.","caption":"Texts to clients, logged on the client record","url":"portal.constructhub.us/crm/clients/40000000-0002-4000-8000-000000000001?portal=1","width":1600,"height":1043},
-    {"src":"/feature-shots/texting-2.webp","alt":"The CRM's text messaging settings card showing the company's texting number as configured.","caption":"Your company's own texting number, set up in Settings","url":"portal.constructhub.us/crm/settings?portal=1#sms","width":1600,"height":1306},
+    {"src":"/feature-shots/texting-1.webp","alt":"Client record with the text messages the office and crew sent to a homeowner, each logged with sender and time.","caption":"Texts to clients, logged on the client record","url":"portal.constructhub.us/crm/clients/40000000-0002-4000-8000-000000000001","width":1600,"height":1043},
+    {"src":"/feature-shots/texting-2.webp","alt":"The CRM's text messaging settings card showing the company's texting number as configured.","caption":"Your company's own texting number, set up in Settings","url":"portal.constructhub.us/crm/settings#sms","width":1600,"height":1306},
   ],
   "vpnShield": [
     {"src":"/feature-shots/vpnShield-1.webp","alt":"VPN Shield overview with total VPN or proxy detections, detections today, visits blocked and unique VPN IP addresses, plus a breakdown of detections by country.","caption":"VPN and proxy traffic at a glance","url":"constructhub.us/vpn-shield","width":1600,"height":1000},

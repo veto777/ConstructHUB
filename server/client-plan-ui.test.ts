@@ -59,7 +59,7 @@ describe("usage meters", () => {
     expect(limits).toContain('export const ADMIN_UNLIMITED = "Unlimited";');
     expect(limits).toContain("const admin = entitlements.isPlatformAdmin === true;");
     // No add-on rows on an all-access account, and Agency's per-location wording is not the admin's.
-    expect(limits).toContain("const addon = !admin && row.addon");
+    expect(limits).toContain("(!admin && row.addon ?");
     expect(limits).toContain('const isAgency = plan === "agency" && !admin;');
     const billing = read("client/src/pages/settings/plan-billing.tsx");
     expect(billing).toContain("usageLine(meter, admin)");

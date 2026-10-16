@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { StatusPill, type PillTone } from "@/components/crm-ui";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle } from "@/lib/page-titles";
 
 type Row = {
   id: number; status: string; reason: string | null; kind: string | null; product: string | null; tier: string | null;
@@ -35,7 +36,7 @@ const norm = (v: string) => v.trim().toLowerCase().replace(/[\s_-]+/g, " ");
 const matchesTyped = (r: Row, typed: string) => { const q = norm(typed); return !!q && (norm(r.status) === q || (!!r.reward_status && norm(r.reward_status) === q)); };
 
 export default function AdminReferralsPage() {
-  useDocumentTitle("Referrals · Admin");
+  useDocumentTitle(appPageTitle("/admin/referrals")!);
   const { toast } = useToast();
   const [filter, setFilter] = useState("all");
   const [typed, setTyped] = useState("");
@@ -77,7 +78,7 @@ export default function AdminReferralsPage() {
 
           {rows.length === 0 ? (
             <div className="g-callout" data-testid="empty-referrals">
-              <h3>{all.length === 0 ? "No referrals yet" : "No referral matches"}</h3>
+              <h2>{all.length === 0 ? "No referrals yet" : "No referral matches"}</h2>
               <p>{all.length === 0 ? "A row appears here when someone signs up through a referral link." : filter === CUSTOM ? "Type a referral status (pending, qualified, rewarded, void) or a reward status (earned, applying, applied)." : "Pick another status."}</p>
             </div>
           ) : (

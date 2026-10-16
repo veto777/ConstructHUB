@@ -19,6 +19,7 @@ import { requireOrg, requirePermission } from "./tenancy";
 import { logActivity } from "./activity";
 import { companyBranding, resolveInvoiceDivision, type CompanyBranding } from "./divisions";
 import { sendWithFallback } from "../email";
+import { logError } from "../ops/log";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -280,7 +281,7 @@ export function registerCrmReceiptRoutes(app: Express, getDevUser: GetUser): voi
       emailed = true;
     } catch (e: any) {
       emailError = String(e?.message || e).slice(0, 300);
-      console.error("[crm] receipt send failed:", emailError);
+      logError("[crm] receipt send failed:", emailError);
     }
 
     await noteReceiptEmail(inv, to, emailed).catch(() => {});

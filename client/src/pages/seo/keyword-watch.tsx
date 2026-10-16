@@ -18,7 +18,7 @@ import { Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { marketLabel } from "@shared/seo-markets";
-import { api, fmtDate, fmtNum, money, useSeoStatus, type SeoSite } from "./shell";
+import { api, fmtDate, fmtNum, money, useSeoStatus, type SeoSite, hideSeoPrices } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
 import { seoLinks } from "./links";
 import { marketParams } from "./keyword-links";
@@ -160,7 +160,7 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
         </span>
         {d.latest?.today ? <span className="g-text-2" data-testid="text-keyword-snapshot-today">The snapshot for today has been taken (one a day; days change at midnight UTC{newDay ? ` — ${newDay} for you` : ""}).</span> : (
           <button type="button" className="g-pill g-pill--sm max-sm:!min-h-11" disabled={snap.isPending || placeholder || !status.data?.configured || !canPay} onClick={() => snap.mutate({ siteId: site.id })} data-testid="button-keyword-snapshot">
-            {snap.isPending ? <Loader2 className="animate-spin" /> : null} {snap.isPending ? "Taking it…" : `Take a snapshot now${price != null ? ` — up to ${money(price)}` : ""}`}
+            {snap.isPending ? <Loader2 className="animate-spin" /> : null} {snap.isPending ? "Taking it…" : `Take a snapshot now${!hideSeoPrices() && price != null ? ` — up to ${money(price)}` : ""}`}
           </button>
         )}
         {!d.latest?.today && price == null && status.isSuccess && <span className="g-text-2">The price couldn't be loaded, so a snapshot can't be bought yet — reload the page.</span>}

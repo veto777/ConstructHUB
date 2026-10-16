@@ -13,6 +13,7 @@
  * opens, or the Search button waits.
  */
 import { cleanPageUrls, pageKey } from "@shared/seo-page-key";
+import { SEO_AUTHORITY_MAX, SEO_AUTHORITY_MIN, SEO_CONTENT_SINCE_MAX_DAYS } from "@shared/seo-constants";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { seoLinks } from "./links";
@@ -23,7 +24,7 @@ import { Download, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, SeoShell, useSelectedSite, useSeoSites, useSeoStatus, hideSeoPrices } from "./shell";
 import { lastRunAt } from "./saved";
 import { PALETTE } from "./viz";
 
@@ -34,7 +35,7 @@ type Filters = { sort: Sort; sinceDays?: number; minAuthority?: number; kind?: s
 const KINDS: [string, string][] = [["", "Any kind of site"], ["blogs", "Blogs"], ["news", "News"], ["organization", "Company sites"], ["message-boards", "Forums"], ["ecommerce", "Shops"]];
 const SINCE: readonly number[] = [30, 90, 365, 730], AUTHORITY: readonly number[] = [10, 20, 30, 50, 70];
 /** What the server takes (server/seo/content.ts contentInput): any whole number of days up to two years, any authority 1–100 — the lists above are shortcuts, and "Custom…" takes the rest. */
-const SINCE_MAX = 730, AUTHORITY_MIN = 1, AUTHORITY_MAX = 100;
+const SINCE_MAX = SEO_CONTENT_SINCE_MAX_DAYS, AUTHORITY_MIN = SEO_AUTHORITY_MIN, AUTHORITY_MAX = SEO_AUTHORITY_MAX;
 const SINCE_WORDS: Record<number, string> = { 30: "the last 30 days", 90: "the last 3 months", 365: "the last year", 730: "the last 2 years" };
 const sinceWords = (days: number) => SINCE_WORDS[days] ?? `the last ${days} days`;
 const okSince = (n: number) => Number.isInteger(n) && n >= 1 && n <= SINCE_MAX;
@@ -192,15 +193,15 @@ export default function SeoContentPage() {
       {chips.length > 0 && <div data-testid="content-active-filters">{chips.map((c) => <ActiveFilter key={c.key} onClear={() => navigate(c.href)}>{c.words}</ActiveFilter>)}</div>}
       <p className="g-text-2 mb-4 text-[13px]" data-testid="text-content-cost">Each new page of results costs about {price != null ? <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-content-price">{money(price)}</Link> : "—"} of your SEO data; a search you have run reopens free for {SAVED_FOR}. English-language pages.</p>
 
-      {!query && <Empty testId="content-intro"><h3>Find who writes about your trade</h3><p>Search a topic your customers care about — "roof replacement cost", "james hardie vs vinyl siding" — to see the pages already written about it. Use it to plan a better page of your own, and to find blogs, local news and directories worth asking for a mention. Sort by <b>Strongest sites first</b> to see the best-known sites first — authority is one sign of a link worth having, alongside how relevant and local the site is.</p></Empty>}
+      {!query && <Empty testId="content-intro"><h2>Find who writes about your trade</h2><p>Search a topic your customers care about — "roof replacement cost", "james hardie vs vinyl siding" — to see the pages already written about it. Use it to plan a better page of your own, and to find blogs, local news and directories worth asking for a mention. Sort by <b>Strongest sites first</b> to see the best-known sites first — authority is one sign of a link worth having, alongside how relevant and local the site is.</p></Empty>}
       {query && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved search…</p>}
-      {query && saved.isError && <div className="g-callout" role="alert" data-testid="content-error"><h3>Couldn't check for a saved search</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button>{offset > 0 && <Link href={prevHref} className="g-pill ml-2 mt-2 !min-h-11" data-testid="button-content-error-back">← Back to the previous results</Link>}</div>}
+      {query && saved.isError && <div className="g-callout" role="alert" data-testid="content-error"><h2>Couldn't check for a saved search</h2><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button>{offset > 0 && <Link href={prevHref} className="g-pill ml-2 mt-2 !min-h-11" data-testid="button-content-error-back">← Back to the previous results</Link>}</div>}
       {query && saved.isSuccess && !page && (
         <Empty testId="content-not-run">
-          <h3>Pages about "{query}"</h3>
+          <h2>Pages about "{query}"</h2>
           <p>{lastAt ? <>Searched <Link href={seoLinks.usage({ month: lastAt.slice(0, 7) })} className={TEXT_LINK} title="That month's lookups on the Usage page" data-testid="link-content-last-run">{fmtDate(lastAt)}</Link>; a saved search is kept for {SAVED_FOR}, so this one is run again.</> : offset ? "This page of results hasn't been opened yet." : "Not searched yet with these settings."}{!canPay && " You don't have enough SEO data left — add credit above."}</p>
           {offset > 0 && <Link href={prevHref} className="g-pill mr-2 mt-2 !min-h-11" data-testid="button-content-back">← Back to the previous results</Link>}
-          <Button className="mt-2" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-content-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Searching…</> : `${offset ? "Load these results" : "Run the search"}${price != null ? ` — about ${money(price)}` : ""}`}</Button>
+          <Button className="mt-2" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-content-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Searching…</> : `${offset ? "Load these results" : "Run the search"}${!hideSeoPrices() && price != null ? ` — about ${money(price)}` : ""}`}</Button>
         </Empty>
       )}
       {page && (
@@ -216,7 +217,7 @@ export default function SeoContentPage() {
           {saved.data?.other && site && (
             <p className="mb-2 text-[13px]" role="status" data-testid="content-other-variant">
               {f.excludeOwn ? <>This search was saved with pages from {site.domain} included — that copy is shown.</> : <>This search was saved with {site.domain} left out — that copy is shown.</>}{" "}
-              <button type="button" className="g-link" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-content-run-variant">{run.isPending ? "Searching…" : `${f.excludeOwn ? `Run it leaving ${site.domain} out` : `Run it with ${site.domain} included`}${price != null ? ` — about ${money(price)}` : ""}`}</button>
+              <button type="button" className="g-link" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-content-run-variant">{run.isPending ? "Searching…" : `${f.excludeOwn ? `Run it leaving ${site.domain} out` : `Run it with ${site.domain} included`}${!hideSeoPrices() && price != null ? ` — about ${money(price)}` : ""}`}</button>
             </p>
           )}
           {saved.data?.saved === false && <p className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="content-unsaved">These results could not be kept, so opening this search again will not be free. Export them now if you need them.</p>}
@@ -227,7 +228,7 @@ export default function SeoContentPage() {
               ) : !metrics.data?.page ? (
                 <>
                   <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={addMetrics.isPending || !status.data?.configured || !canPayMetrics || metrics.isLoading} onClick={() => addMetrics.mutate({ body: metricsBody, key: metricsKey })} data-testid="button-content-metrics">
-                    {addMetrics.isPending ? <Loader2 className="animate-spin" /> : null} Add linking sites and search visits for these {pageUrls.length} pages{metricsPrice != null ? ` — up to ${money(metricsPrice)}` : ""}
+                    {addMetrics.isPending ? <Loader2 className="animate-spin" /> : null} Add linking sites and search visits for these {pageUrls.length} pages{metricsPrice != null && !hideSeoPrices() ? ` — up to ${money(metricsPrice)}` : ""}
                   </button>
                   <span className="g-text-2">{metricsPrice == null ? (status.isLoading ? "Getting the price…" : "The price couldn't be loaded, so this can't be bought yet — reload the page.") : !canPayMetrics ? "Not enough SEO data left — add credit above." : "Shows which of these pages are worth learning from, or asking for a link."}</span>
                 </>
@@ -250,7 +251,7 @@ export default function SeoContentPage() {
               )}
             </div>
           )}
-          {page.rows.length === 0 ? <Empty testId="content-empty"><h3>No pages found</h3><p>Try fewer words, or loosen the filters.</p></Empty> : (
+          {page.rows.length === 0 ? <Empty testId="content-empty"><h2>No pages found</h2><p>Try fewer words, or loosen the filters.</p></Empty> : (
             <ul className="space-y-2" data-testid="list-content">
               {/* One card per page: the page and who wrote it on the left; its figures, each with an orange bar, on the right (underneath on a phone). Every figure leads to the Site explorer view that holds it. */}
               {ordered.map((r) => { const m = metricOf(r.url); return (

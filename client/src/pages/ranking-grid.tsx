@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GoogleSurface, GoogleStat, GoogleStatGrid } from "@/components/google";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -631,12 +631,14 @@ export default function RankingGridPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [viewingReport, setViewingReport] = useState<number | null>(null);
 
-  const { data: scans = [], isLoading: scansLoading } = useQuery<RankingGridScan[]>({
+  const { data: scans = [], isLoading: scansLoading, isError: scansError } = useQuery<RankingGridScan[]>({
     queryKey: ["/api/ranking-grid/scans"],
     refetchInterval: 5000,
   });
   // This month's ranking-grid credits, as the server counts them.
   const { data: entitlements } = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"] });
+  // The account's own businesses (Locations): one click picks one instead of typing it again (review w2-agent10 #12).
+  const { data: myLocations } = useQuery<{ id: number; businessName: string; placeId?: string | null; address?: string | null; city?: string | null; state?: string | null }[]>({ queryKey: ["/api/locations"] });
   const creditsUsage = usageLine(entitlements?.usage?.rankings, entitlements?.isPlatformAdmin === true);
 
   const searchBusinessMutation = useMutation({
@@ -751,10 +753,35 @@ export default function RankingGridPage() {
         )}
         <Section title="Scan details" contentClassName="space-y-4">
             <div className="space-y-2">
-              <Label>Business</Label>
+              <Label htmlFor="input-business-search">Business</Label>
+              {(myLocations ?? []).length > 0 && (
+                <div className="flex flex-wrap items-center gap-2" data-testid="ranking-grid-my-locations">
+                  <span className="text-sm text-muted-foreground">Your locations:</span>
+                  {(myLocations ?? []).slice(0, 6).map((loc) => {
+                    const where = [loc.city, loc.state].filter(Boolean).join(", ");
+                    const chosen = !!loc.placeId && selectedBusiness?.placeId === loc.placeId;
+                    return (
+                      <Button key={loc.id} type="button" size="sm" variant={chosen ? "default" : "outline"}
+                        disabled={selectBusinessMutation.isPending || isSearching}
+                        onClick={() => {
+                          // A location linked to its Google listing is picked straight away; otherwise its name and town are looked up.
+                          if (loc.placeId) { selectBusinessMutation.mutate(loc.placeId); return; }
+                          const q = [loc.businessName, where].filter(Boolean).join(", ");
+                          setBusinessSearch(q);
+                          setIsSearching(true);
+                          searchBusinessMutation.mutate(q);
+                        }}
+                        data-testid={`button-use-location-${loc.id}`}>
+                        {loc.businessName}{where ? ` · ${where}` : ""}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
               <div className="relative">
                 <div className="flex gap-2">
                   <Input
+                    id="input-business-search"
                     placeholder="Business name, address, or Google Maps URL..."
                     value={businessSearch}
                     onChange={(e) => setBusinessSearch(e.target.value)}
@@ -774,6 +801,7 @@ export default function RankingGridPage() {
                       setIsSearching(true);
                       searchBusinessMutation.mutate(businessSearch.trim());
                     }}
+                    aria-label="Search business"
                     data-testid="button-search-business"
                   >
                     {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
@@ -812,6 +840,7 @@ export default function RankingGridPage() {
                       setSelectedBusiness(null);
                       setBusinessSearch("");
                     }}
+                    aria-label="Clear the chosen business"
                     data-testid="button-clear-business"
                   >
                     ×
@@ -821,8 +850,9 @@ export default function RankingGridPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Keyword</Label>
+              <Label htmlFor="input-keyword">Keyword</Label>
               <Input
+                id="input-keyword"
                 placeholder="e.g. Roofing Contractor, Plumber Near Me..."
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
@@ -833,9 +863,9 @@ export default function RankingGridPage() {
             <details><summary className="cursor-pointer py-2 text-sm font-medium">Advanced · Grid size and spacing</summary>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
               <div className="space-y-2">
-                <Label>Grid size</Label>
+                <Label htmlFor="select-grid-size">Grid size</Label>
                 <Select value={gridSizeValid ? gridSize : ""} onValueChange={setGridSize}>
-                  <SelectTrigger data-testid="select-grid-size">
+                  <SelectTrigger id="select-grid-size" data-testid="select-grid-size">
                     <SelectValue placeholder="Choose a size" />
                   </SelectTrigger>
                   <SelectContent>
@@ -851,9 +881,9 @@ export default function RankingGridPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Point spacing</Label>
+                <Label htmlFor="select-grid-distance">Point spacing</Label>
                 <Select value={spacingPreset ? gridDistance : (gridDistanceValid ? "custom" : "")} onValueChange={(v) => { if (v !== "custom") setGridDistance(v); }}>
-                  <SelectTrigger data-testid="select-grid-distance">
+                  <SelectTrigger id="select-grid-distance" data-testid="select-grid-distance">
                     <SelectValue placeholder="Choose a spacing" />
                   </SelectTrigger>
                   <SelectContent>
@@ -890,7 +920,13 @@ export default function RankingGridPage() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
-        ) : scans.length === 0 ? (
+        ) : scansError && scans.length === 0 ? (
+          <Section flush>
+            <CardContent className="py-8 text-center" role="alert" data-testid="text-scans-error">
+              <p className="text-sm text-destructive">Couldn't load your scans — refresh to try again.</p>
+            </CardContent>
+          </Section>
+        ) : showSample({ isLoading: scansLoading, isError: scansError, total: scans.length }) ? (
           <div className="space-y-4">
             <Section flush>
               <CardContent className="py-12 text-center">

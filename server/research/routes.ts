@@ -25,6 +25,7 @@ import {
 import { buildPreview, drainResearchQueue } from "./runner";
 import { coverageFacets, coverageRuntime } from "./coverage";
 import { createOrder, getOrder, listOrders, markPaid, orderView, retryOrder, setCheckoutSession } from "./store";
+import { logError } from "../ops/log";
 
 export const RESEARCH_CHECKOUT_TYPE = "research_report";
 const TERMS_SNAPSHOT = [RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA].join(" ");
@@ -57,7 +58,7 @@ export function registerResearchRoutes(app: Express, deps: Deps) {
       const row = await createOrder({ userId: user.id, email: user.email, tier, priceCents: RESEARCH_TIERS[tier].cents, input, preview, terms: TERMS_SNAPSHOT });
       res.json(orderView(row));
     } catch (err: any) {
-      console.error("[research] create order failed:", err);
+      logError("[research] create order failed:", err);
       res.status(500).json({ message: "Could not create the order. Please try again." });
     }
   });
@@ -104,7 +105,7 @@ export function registerResearchRoutes(app: Express, deps: Deps) {
       res.set("Cache-Control", "public, max-age=3600");
       res.json(await coverageFacets());
     } catch (err) {
-      console.error("[research] coverage facets failed:", err);
+      logError("[research] coverage facets failed:", err);
       res.status(503).json({});
     }
   });
@@ -136,7 +137,7 @@ export function registerResearchRoutes(app: Express, deps: Deps) {
     if (!isPlatformAdmin(user)) return res.status(403).json({ message: "Administrator access required" });
     if (!(await markPaid(row.id, row.user_id, `admin-run-${row.id}`))) return res.status(409).json({ message: "This order is already paid" });
     console.log(`[research] order ${row.id} run by admin ${user.email} without payment; queued`);
-    void drainResearchQueue().catch((err) => console.error("[research] queue:", err));
+    void drainResearchQueue().catch((err) => logError("[research] queue:", err));
     res.json({ ok: true });
   });
 
@@ -170,5 +171,5 @@ export async function fulfilResearchCheckout(session: Stripe.Checkout.Session, u
       <p>Purpose: ${escapeHtml(order.input.purpose || "not given")}</p>
       <p>Anything else we should know (the customer's note): ${escapeHtml(order.input.notes || "none")}</p>`,
   }).catch(() => undefined);
-  void drainResearchQueue().catch((err) => console.error("[research] queue:", err));
+  void drainResearchQueue().catch((err) => logError("[research] queue:", err));
 }

@@ -103,6 +103,14 @@ export async function connectionNotice(
     actionUrl: "/settings?tab=security",
   });
 }
+/** Whether this server can start the provider's sign-in ("Connect with Cloudflare" / "Connect Google Search
+ *  Console"). The connections list reports it so the page disables the button with a plain sentence instead
+ *  of sending a request that can only 503. */
+export function signInConfigured(provider: "cloudflare" | "gsc", env: NodeJS.ProcessEnv = process.env): boolean {
+  return provider === "cloudflare"
+    ? cloudflareOAuthConfigured(env)
+    : Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+}
 export function registerAssetRoutes(
   app: Express,
   auth: Auth,
@@ -162,6 +170,7 @@ export function registerAssetRoutes(
           ? (process.env.CLOUDFLARE_AGENCY_EMAIL ?? null)
           : null,
       workerEnabled: process.env.EDGE_SEARCH_WORKER_ENABLED === "true",
+      signInConfigured: signInConfigured(provider),
     });
   });
   // One site's detail row (owned edge_assets), opened by clicking its name in the Sites
@@ -561,7 +570,7 @@ export function registerCloudflareRoutes(
   // checks who the customer is on the very next screen. The Global-Key and pasted-token paths keep it.
   route("get", "/api/cloudflare/connect", async (req, res, user) => {
     await budget(user, "connect");
-    if (!cloudflareOAuthConfigured()) throw new ProviderError("Cloudflare sign-in is not set up on this server", 503);
+    if (!signInConfigured("cloudflare")) throw new ProviderError("Cloudflare sign-in is not set up on this server", 503);
     const state = randomBytes(32).toString("hex"),
       redirect = `${oauthBaseUrl(req)}/api/cloudflare/oauth/callback`;
     req.session.cfOAuth = { state, userId: user, expires: Date.now() + 600000, redirect };

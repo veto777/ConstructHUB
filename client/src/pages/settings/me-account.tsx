@@ -10,7 +10,7 @@ import { ReviewReferralSettings } from "@/components/review-referral-settings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -1096,7 +1096,7 @@ const REWARD_STATUS: Record<ReferralReward["status"], string> = { earned: "Waiti
 /** "Refer a contractor": the share link, how many signed up, and the rewards earned (server/referrals). */
 function ReferralCard() {
   const { toast } = useToast();
-  const { data } = useQuery<ReferralMe>({ queryKey: ["/api/referrals/me"] });
+  const { data, isLoading: referralsLoading, isError: referralsError } = useQuery<ReferralMe>({ queryKey: ["/api/referrals/me"] });
   const copy = async (text: string) => toast({ title: (await copyToClipboard(text)) ? "Link copied" : "Copy failed — select the link and copy it" });
   const usd = (c: number | null) => (c == null ? "—" : `$${(c / 100).toFixed(2)}`);
   return (
@@ -1132,7 +1132,7 @@ function ReferralCard() {
           <p className="text-xs text-muted-foreground">A waiting reward is applied as soon as you have a plan in that product (a yearly plan for the {data.rules.annualSharePct}% reward).</p>
         )}
         {/* No referral yet: a badged, made-up sample of the rewards list, gone the moment a real one exists (never mixed with real rows). */}
-        {data && data.signedUp === 0 && data.rewards.length === 0 && (
+        {data && showSample({ isLoading: referralsLoading, isError: referralsError, total: data.signedUp + data.rewards.length }) && (
           <SamplePreview what="what you'll see once someone signs up with your link" testId="sample-referrals"
             cta={<Button size="sm" variant="outline" onClick={() => copy(data.link)} data-testid="button-copy-referral-sample"><Copy className="mr-1 h-4 w-4" />Copy link</Button>}>
             <div className="flex flex-wrap gap-4 text-sm"><span><strong>2</strong> signed up</span><span><strong>1</strong> qualified</span><span><strong>1</strong> rewards applied</span></div>

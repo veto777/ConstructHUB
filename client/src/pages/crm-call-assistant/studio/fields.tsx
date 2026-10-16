@@ -172,10 +172,10 @@ export function HoursEditor({ value, onChange, disabled }: SectionProps<VoicePro
             <Label htmlFor={`hours-${day}`} className="w-24 text-sm">{DAY_LABELS[day]}</Label>
             {d.open ? (
               <div className="flex items-center gap-2 text-sm">
-                <Input type="time" value={d.from} disabled={disabled} className="w-[7.5rem]" data-testid={`input-hours-${day}-from`}
+                <Input type="time" value={d.from} disabled={disabled} className="w-[7.5rem]" aria-label={`${DAY_LABELS[day]} opens`} data-testid={`input-hours-${day}-from`}
                   onChange={(e) => onChange({ ...value, [day]: { ...d, from: e.target.value } })} />
                 <span className="text-muted-foreground">to</span>
-                <Input type="time" value={d.to} disabled={disabled} className="w-[7.5rem]" data-testid={`input-hours-${day}-to`}
+                <Input type="time" value={d.to} disabled={disabled} className="w-[7.5rem]" aria-label={`${DAY_LABELS[day]} closes`} data-testid={`input-hours-${day}-to`}
                   onChange={(e) => onChange({ ...value, [day]: { ...d, to: e.target.value } })} />
               </div>
             ) : <span className="text-sm text-muted-foreground">Closed</span>}

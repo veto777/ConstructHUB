@@ -7,6 +7,7 @@
  * to SHELLED_TOOLS. The routes it claims are every tool `path`/`paths` and anything below them.
  */
 import type { ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { InToolShell } from "@/components/tool/in-shell";
 import { Link } from "wouter";
 import { CHLogo } from "@/components/ch-logo";
@@ -47,8 +48,12 @@ export function shelledToolFor(location: string): ToolShellConfig | null {
   return null;
 }
 
-export function ProductToolLayout({ config, actions, banner, footer, children }: { config: ToolShellConfig; actions?: ReactNode; banner?: ReactNode; footer?: ReactNode; children: ReactNode }) {
+export function ProductToolLayout({ config: fullConfig, actions, banner, footer, children }: { config: ToolShellConfig; actions?: ReactNode; banner?: ReactNode; footer?: ReactNode; children: ReactNode }) {
   const { setOpenMobile } = useSidebar();
+  // Admin-only tools (ToolDef.adminOnly) stay out of a customer's menu; the route still belongs to this tool.
+  const { data: me } = useQuery<{ isPlatformAdmin?: boolean } | null>({ queryKey: ["/api/auth/me"] });
+  const admin = me?.isPlatformAdmin === true;
+  const config = admin || !fullConfig.tools.some((t) => t.adminOnly) ? fullConfig : { ...fullConfig, tools: fullConfig.tools.filter((t) => !t.adminOnly) };
   return (
     <InToolShell.Provider value>
     <ToolShell config={config} testId={`${config.key}-tool-shell`}

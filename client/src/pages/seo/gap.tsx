@@ -27,7 +27,7 @@ import { Download, Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, kd, money, useAddress, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, kd, money, useAddress, type SeoStatus, hideSeoPrices } from "./shell";
 import { AddToList } from "./keyword-lists";
 
 export type GapKind = "content" | "links";
@@ -177,15 +177,15 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack,
           {wanted.dropped.length > 0 && ` — left out: ${wanted.dropped.join(", ")} (not a domain, the site itself, or more than ${MAX})`}
         </ActiveFilter>
       )}
-      {applied.length === 0 && <Empty testId="gap-intro"><h3>Add up to {MAX} competitors</h3><p>Type a competitor's website{offers.length ? " or pick one above" : ""}, then press <b>Compare</b>.</p></Empty>}
+      {applied.length === 0 && <Empty testId="gap-intro"><h2>Add up to {MAX} competitors</h2><p>Type a competitor's website{offers.length ? " or pick one above" : ""}, then press <b>Compare</b>.</p></Empty>}
       {applied.length > 0 && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved comparison…</p>}
-      {applied.length > 0 && saved.isError && <div className="g-callout" role="alert" data-testid="gap-saved-error"><h3>Couldn't check for a saved comparison</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
+      {applied.length > 0 && saved.isError && <div className="g-callout" role="alert" data-testid="gap-saved-error"><h2>Couldn't check for a saved comparison</h2><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
       {applied.length > 0 && saved.isSuccess && !page && (
         <Empty testId="gap-not-run">
-          <h3>Compare {domain} with {applied.join(", ")}</h3>
+          <h2>Compare {domain} with {applied.join(", ")}</h2>
           <p>This {offset > 0 ? "page" : "comparison"} hasn't been run yet.{!affordable && " You don't have enough SEO data left — add credit above."}{dirty && " You changed the competitors above — press Compare to use the new list."}</p>
           <Button className="mt-2" disabled={run.isPending || !status?.configured || !affordable || dirty} onClick={() => run.mutate({ body, key: queryKey, again: false })} data-testid="button-gap-run">
-            {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Comparing…</> : `Run comparison${priceCents != null ? ` — about ${money(priceCents)}` : ""}`}
+            {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Comparing…</> : `Run comparison${!hideSeoPrices() && priceCents != null ? ` — about ${money(priceCents)}` : ""}`}
           </Button>
         </Empty>
       )}
@@ -202,10 +202,10 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack,
             {kind === "content" && planSiteId != null && picked.size > 0 && <AddToPlan siteId={planSiteId} onDone={() => setPicked(new Set())} tasks={(page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ kind: "page" as const, title: `Write or improve a page for "${r.keyword}"`, target: r.keyword, facts: { volume: r.volume }, source: `gap:${r.keyword}` }))} />}
             {kind === "content" && onTrack && <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={!picked.size} onClick={() => { onTrack((page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty }))); setPicked(new Set()); }} data-testid="button-gap-track"><Plus /> Add {picked.size || ""} to rank tracker</button>}
           </div>
-          {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-gap-missing">{page.missing.join(", ")} didn't load this time, so {page.missing.length === 1 ? "it is" : "they are"} not in this comparison. <button type="button" className="g-link" disabled={run.isPending || !affordable} onClick={() => run.mutate({ body, key: queryKey, again: true })} data-testid="button-gap-retry">{run.isPending ? "Trying again…" : `Try again${priceCents != null ? ` — about ${money(priceCents)}` : ""}`}</button></p>}
+          {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-gap-missing">{page.missing.join(", ")} didn't load this time, so {page.missing.length === 1 ? "it is" : "they are"} not in this comparison. <button type="button" className="g-link" disabled={run.isPending || !affordable} onClick={() => run.mutate({ body, key: queryKey, again: true })} data-testid="button-gap-retry">{run.isPending ? "Trying again…" : `Try again${!hideSeoPrices() && priceCents != null ? ` — about ${money(priceCents)}` : ""}`}</button></p>}
           {kind === "content" && <p className="g-text-2 mb-2 text-[12px]">Built from each competitor's 100 highest-traffic keywords that {domain} doesn't rank for. Keywords more than one competitor ranks for come first.</p>}
           {page.rows.length === 0 ? (
-            <Empty testId="gap-empty"><h3>Nothing found</h3><p>{kind === "content" ? `No keyword these competitors rank for that ${domain} doesn't.` : `No site links to ${page.competitors.length > 1 ? "all of these competitors" : "this competitor"} without also linking to ${domain}. Try fewer competitors.`}</p></Empty>
+            <Empty testId="gap-empty"><h2>Nothing found</h2><p>{kind === "content" ? `No keyword these competitors rank for that ${domain} doesn't.` : `No site links to ${page.competitors.length > 1 ? "all of these competitors" : "this competitor"} without also linking to ${domain}. Try fewer competitors.`}</p></Empty>
           ) : kind === "content" ? (
             <div className="overflow-x-auto">
               <table className="g-table" data-testid="table-gap-content">

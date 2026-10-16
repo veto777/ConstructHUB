@@ -1,7 +1,7 @@
 import { Tabs } from "@/components/ui/tabs";
 import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid, GoogleList, GoogleListRow } from "@/components/google";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { ToolTabs } from "@/components/tool";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -134,8 +134,8 @@ function SampleAccounts() {
         <GoogleStat label="Spend" value="$1,240.00" />
       </GoogleStatGrid>
       <GoogleList>
-        <GoogleListRow size="md" title="Sample Roofing Co." badges={<><span className="g-chip g-chip--sm g-open">LSA</span><span className="g-chip g-chip--sm">central</span><span className="g-chip g-chip--sm">active</span></>} meta={["123-456-7890", "owner@example.com", "22 leads", <span key="c" className="g-closed">14 charged</span>, "2 disputed", "$940.00 spend"]} actions={<><GooglePill size="sm" label="View" /><GooglePill size="sm" label="Campaigns" /><GooglePill size="sm" label="Leads" /></>} />
-        <GoogleListRow size="md" title="Sample Plumbing LLC" badges={<><span className="g-chip g-chip--sm">self</span><span className="g-chip g-chip--sm">active</span></>} meta={["123-456-7891", "9 leads", <span key="c" className="g-closed">5 charged</span>, "$300.00 spend"]} actions={<><GooglePill size="sm" label="View" /><GooglePill size="sm" label="Campaigns" /><GooglePill size="sm" label="Leads" /></>} />
+        <GoogleListRow size="md" title="Sample Roofing Co." badges={<><span className="g-chip g-chip--sm g-open">LSA</span><span className="g-chip g-chip--sm">central</span><span className="g-chip g-chip--sm">active</span></>} meta={["000-000-0001", "owner@example.com", "22 leads", <span key="c" className="g-closed">14 charged</span>, "2 disputed", "$940.00 spend"]} actions={<><GooglePill size="sm" label="View" /><GooglePill size="sm" label="Campaigns" /><GooglePill size="sm" label="Leads" /></>} />
+        <GoogleListRow size="md" title="Sample Plumbing LLC" badges={<><span className="g-chip g-chip--sm">self</span><span className="g-chip g-chip--sm">active</span></>} meta={["000-000-0002", "9 leads", <span key="c" className="g-closed">5 charged</span>, "$300.00 spend"]} actions={<><GooglePill size="sm" label="View" /><GooglePill size="sm" label="Campaigns" /><GooglePill size="sm" label="Leads" /></>} />
       </GoogleList>
     </>
   );
@@ -143,8 +143,8 @@ function SampleAccounts() {
 function SampleInvitations() {
   return (
     <GoogleList>
-      <GoogleListRow size="md" title="Sample Roofing Co." badges={<span className="g-chip g-chip--sm">pending</span>} meta={["Customer ID: 1234567890", "Invited today"]} line="Waiting for the client to accept in their Google Ads account" actions={<><GooglePill size="sm" label="Mark accepted" /><GooglePill size="sm" label="Cancel" /></>} />
-      <GoogleListRow size="md" title="Sample Plumbing LLC" badges={<span className="g-chip g-chip--sm g-open">accepted</span>} meta={["Customer ID: 1234567891", "Invited last week"]} />
+      <GoogleListRow size="md" title="Sample Roofing Co." badges={<span className="g-chip g-chip--sm">pending</span>} meta={["Customer ID: 000-000-0001", "Invited today"]} line="Waiting for the client to accept in their Google Ads account" actions={<><GooglePill size="sm" label="Mark accepted" /><GooglePill size="sm" label="Cancel" /></>} />
+      <GoogleListRow size="md" title="Sample Plumbing LLC" badges={<span className="g-chip g-chip--sm g-open">accepted</span>} meta={["Customer ID: 000-000-0002", "Invited last week"]} />
     </GoogleList>
   );
 }
@@ -443,6 +443,7 @@ function ManagerConnectionTab() {
         <DialogContent data-testid="dialog-connect-manager">
           <DialogHeader>
             <DialogTitle>Connect manager account</DialogTitle>
+            <DialogDescription>Link the Google Ads manager account that holds your Local Services accounts.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -511,9 +512,10 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
   const [page, setPage] = useState(0);
   const pageSize = 50;
 
-  const { data: accountsData, isLoading } = useQuery<{ accounts: LsaAccount[]; total: number; limit: number; offset: number }>({
+  const { data: accountsData, isLoading, isError: accountsError } = useQuery<{ accounts: LsaAccount[]; total: number; limit: number; offset: number }>({
     queryKey: ["/api/admin/lsa/accounts", page, search],
-    queryFn: () => fetch(`/api/admin/lsa/accounts?limit=${pageSize}&offset=${page * pageSize}&q=${encodeURIComponent(search)}`).then(r => r.json()),
+    // A 4xx/5xx is an error, not an empty list (no sample on a failed request).
+    queryFn: () => fetch(`/api/admin/lsa/accounts?limit=${pageSize}&offset=${page * pageSize}&q=${encodeURIComponent(search)}`).then(r => { if (!r.ok) throw new Error(`Couldn't load accounts (${r.status})`); return r.json(); }),
   });
 
   const accounts = accountsData?.accounts || [];
@@ -586,8 +588,12 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
           <div className="animate-spin h-6 w-6 border-2 border-[#4285F4] border-t-transparent rounded-full" />
         </div>
       ) : accounts.length === 0 ? (
-        search ? (
+        accountsError ? (
+          <Section flush><CardContent className="p-8 text-center"><p className="text-sm text-destructive" role="alert" data-testid="text-accounts-error">Couldn't load accounts — refresh to try again.</p></CardContent></Section>
+        ) : search ? (
           <Section flush><CardContent className="p-8 text-center"><p className="font-medium" data-testid="text-no-accounts">No account matches “{search}”</p></CardContent></Section>
+        ) : !showSample({ isLoading, isError: accountsError, total: accountsData ? totalAccounts : undefined, filtered: !!search, page }) ? (
+          <Section flush><CardContent className="p-8 text-center"><p className="font-medium" data-testid="text-no-accounts-page">No accounts on this page.</p></CardContent></Section>
         ) : (
           <SamplePreview what="what you’ll see once accounts are synced or added" testId="sample-lsa-manager-accounts" cta={<GooglePill size="sm" variant="solid" icon={Plus} label="Add account" onClick={() => setShowAdd(true)} />}>
             <p className="sr-only" data-testid="text-no-accounts">No accounts yet</p>
@@ -662,7 +668,7 @@ function InvitationsTab() {
   const [accountName, setAccountName] = useState("");
   const [notes, setNotes] = useState("");
 
-  const { data: invitations = [], isLoading } = useQuery<LsaInvitation[]>({
+  const { data: invitations = [], isLoading, isError: invitationsError } = useQuery<LsaInvitation[]>({
     queryKey: ["/api/admin/lsa/invitations"],
   });
 
@@ -759,7 +765,9 @@ function InvitationsTab() {
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin h-6 w-6 border-2 border-[#4285F4] border-t-transparent rounded-full" />
         </div>
-      ) : invitations.length === 0 ? (
+      ) : invitationsError && invitations.length === 0 ? (
+        <Section flush><CardContent className="p-8 text-center"><p className="text-sm text-destructive" role="alert" data-testid="text-invitations-error">Couldn't load invitations — refresh to try again.</p></CardContent></Section>
+      ) : showSample({ isLoading, isError: invitationsError, total: invitations.length }) ? (
         <SamplePreview what="what you’ll see once an invitation is sent" testId="sample-lsa-invitations" cta={<GooglePill size="sm" variant="solid" icon={Plus} label="New invitation" onClick={() => setShowForm(true)} />}>
           <p className="sr-only" data-testid="text-no-invitations">No invitations yet</p>
           <SampleInvitations />
@@ -1107,8 +1115,8 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
         <DialogContent data-testid="dialog-confirm-action">
           <DialogHeader>
             <DialogTitle>{confirmDialog?.title}</DialogTitle>
+            <DialogDescription>{confirmDialog?.description}</DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">{confirmDialog?.description}</p>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmDialog(null)}>Cancel</Button>
             <Button
@@ -1127,6 +1135,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
         <DialogContent data-testid="dialog-budget">
           <DialogHeader>
             <DialogTitle>Change daily budget</DialogTitle>
+            <DialogDescription>Set how much this campaign may spend per day.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-muted-foreground">Campaign: <strong>{budgetDialog?.campaign.name}</strong></p>
@@ -1153,6 +1162,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
         <DialogContent data-testid="dialog-rename">
           <DialogHeader>
             <DialogTitle>Rename campaign</DialogTitle>
+            <DialogDescription>The new name shows in Google Ads and here.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
@@ -1178,6 +1188,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
         <DialogContent data-testid="dialog-dispute">
           <DialogHeader>
             <DialogTitle>Dispute lead</DialogTitle>
+            <DialogDescription>Ask Google to credit a charged lead that wasn't a real job inquiry.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-700 dark:text-amber-300">

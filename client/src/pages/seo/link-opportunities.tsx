@@ -67,9 +67,9 @@ export function LinkOpportunitiesView({ site, crawlId, pageHref, pageParam, here
   if (foreign) words.push(foreign.words);
   const chip = words.length > 0 && <ActiveFilter words={words.join(" · ")} clearHref={here({ page: undefined })} extra={foreign ? { href: foreign.href, label: foreign.label, testId: "link-foreign-tab" } : undefined}>{d && pageParam && !hits ? `No suggestion starts on or points to ${pageParam}: either it already links where it could, or it does not use the words of a keyword another page ranks for.` : null}</ActiveFilter>;
   if (q.isLoading) return <>{chip}<p className="g-text-2 py-6 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Reading the crawl…</p></>;
-  if (q.isError) return <>{chip}<div className="g-callout" role="alert"><h3>Couldn't work out the internal links</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div></>;
-  if (unreadable) return <>{chip}<Empty testId="link-opps-unreadable"><h3>The newest crawl could not be read</h3><p>The crawl that finished {fmtDate(unreadable.scannedAt)} was not saved in a form we can read, so nothing is shown from it (and no older crawl in its place). Run a new crawl.</p></Empty></>;
-  if (!d) return <>{chip}<Empty testId="link-opps-no-crawl"><h3>No crawl yet</h3><p>Run a crawl first; this view is worked out from the pages it reads.</p></Empty></>;
+  if (q.isError) return <>{chip}<div className="g-callout" role="alert"><h2>Couldn't work out the internal links</h2><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div></>;
+  if (unreadable) return <>{chip}<Empty testId="link-opps-unreadable"><h2>The newest crawl could not be read</h2><p>The crawl that finished {fmtDate(unreadable.scannedAt)} was not saved in a form we can read, so nothing is shown from it (and no older crawl in its place). Run a new crawl.</p></Empty></>;
+  if (!d) return <>{chip}<Empty testId="link-opps-no-crawl"><h2>No crawl yet</h2><p>Run a crawl first; this view is worked out from the pages it reads.</p></Empty></>;
   // A task is the link itself — from this page to that one — whichever keyword found it. Both addresses are kept whole,
   // so a suggestion whose addresses are too long to keep is not offered for the plan (the row says why).
   const plannable = (i: Item) => i.from.length <= 500 && i.to.length <= 300;
@@ -94,9 +94,9 @@ export function LinkOpportunitiesView({ site, crawlId, pageHref, pageParam, here
       <p className="g-text-2 mb-3 max-w-3xl text-[13px]">Pages of your site that use the words of a keyword another of your pages ranks for, but don't link to it. A link there — on those words — points visitors and search engines at the page you want found for them. Whether it reads naturally is your call: the words around each mention are shown.</p>
       {chip}
       {!d.linksMeasured ? (
-        <Empty testId="link-opps-unmeasured"><h3>The crawl can't see this site's links</h3><p>Most of its pages link nowhere in their HTML — usual when menus and links are added by JavaScript. Without knowing which links exist, nothing can be suggested here. The <Link href={go({ tab: "rendering" })} className={`g-link ${FIG} font-medium`} data-testid="link-link-opps-rendering">Rendering</Link> tab shows what a browser sees that the HTML does not.</p></Empty>
+        <Empty testId="link-opps-unmeasured"><h2>The crawl can't see this site's links</h2><p>Most of its pages link nowhere in their HTML — usual when menus and links are added by JavaScript. Without knowing which links exist, nothing can be suggested here. The <Link href={go({ tab: "rendering" })} className={`g-link ${FIG} font-medium`} data-testid="link-link-opps-rendering">Rendering</Link> tab shows what a browser sees that the HTML does not.</p></Empty>
       ) : d.targets + d.notCrawled + d.notRanking + d.notUsable + d.tooShort + d.boilerplate + (d.aliasesCut ?? 0) === 0 ? (
-        <Empty testId="link-opps-no-keywords"><h3>Nothing to look for yet</h3><p>This uses the keywords you track that your site ranks for. Add keywords in the <Link href={tracker} className={`g-link ${FIG}`} data-testid="link-link-opps-tracker">rank tracker</Link> and run a check; once a page of yours ranks, mentions of that keyword on your other pages are looked for.</p></Empty>
+        <Empty testId="link-opps-no-keywords"><h2>Nothing to look for yet</h2><p>This uses the keywords you track that your site ranks for. Add keywords in the <Link href={tracker} className={`g-link ${FIG}`} data-testid="link-link-opps-tracker">rank tracker</Link> and run a check; once a page of yours ranks, mentions of that keyword on your other pages are looked for.</p></Empty>
       ) : (
         <>
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
@@ -116,7 +116,7 @@ export function LinkOpportunitiesView({ site, crawlId, pageHref, pageParam, here
               {d.boilerplate > 0 && <li><Link href={tracker} className={`g-text-2 ${FIG}`} title="Your tracked keywords, in the rank tracker" data-testid="link-left-out-boilerplate">{plural(d.boilerplate, "keyword is", "keywords are")} on more than half of the other pages</Link> and taken to be menu or footer text — a rule of thumb (the crawl does not keep which part of a page words came from), applied when there are at least 5 other pages.</li>}
             </ul>
           )}
-          {d.items.length === 0 ? <Empty testId="link-opps-none"><h3>No suggestions from these checks</h3><p>{d.targets === 0 ? "No keyword could be looked for (see above)." : "Where the pages read use the words of the keywords looked for, they already link to the page that ranks — as far as the crawl's HTML shows."}</p></Empty> : (
+          {d.items.length === 0 ? <Empty testId="link-opps-none"><h2>No suggestions from these checks</h2><p>{d.targets === 0 ? "No keyword could be looked for (see above)." : "Where the pages read use the words of the keywords looked for, they already link to the page that ranks — as far as the crawl's HTML shows."}</p></Empty> : (
             <div className="overflow-x-auto">
               <table id="table-link-opps" className={COMPACT_TABLE} data-testid="table-link-opps">
                 <thead><tr><th>On this page…</th><th>…these words</th><th>…could link to</th><th className="num" title="Where the page being linked to ranks for these words">Position</th><th className="num">Volume / mo</th><th><span className="sr-only">Action plan</span></th></tr></thead>

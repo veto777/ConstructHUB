@@ -248,7 +248,7 @@ export default function DatabasesPage() {
                   setSelectedCountyId("all");
                 }}
               >
-                <SelectTrigger className="h-10 w-full sm:w-[200px]" data-testid="select-state-filter">
+                <SelectTrigger className="h-10 w-full sm:w-[200px]" aria-label="Filter by state" data-testid="select-state-filter">
                   <SelectValue placeholder="All states" />
                 </SelectTrigger>
                 <SelectContent>
@@ -263,7 +263,7 @@ export default function DatabasesPage() {
                   value={selectedCountyId}
                   onValueChange={handleFilterChange(setSelectedCountyId)}
                 >
-                  <SelectTrigger className="h-10 w-full sm:w-[200px]" data-testid="select-county-filter">
+                  <SelectTrigger className="h-10 w-full sm:w-[200px]" aria-label="Filter by county" data-testid="select-county-filter">
                     <SelectValue placeholder="All counties" />
                   </SelectTrigger>
                   <SelectContent>
@@ -306,6 +306,8 @@ export default function DatabasesPage() {
             Showing {((currentPage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(currentPage * PAGE_SIZE, totalResults).toLocaleString()} of {totalResults.toLocaleString()} results
             {isFetching && <Loader2 className="inline h-3 w-3 ml-2 animate-spin" />}
           </p>
+          {/* The rows are h3s: an outline level above them for screen readers (no visual change). */}
+          <h2 className="sr-only">Permit databases</h2>
           <GoogleList testId="list-databases">
             {databases.map((db) => {
               const county = countyMap.get(db.countyId);
@@ -360,6 +362,7 @@ function PaginationControls({
         className="h-8 w-8"
         disabled={currentPage === 1}
         onClick={() => onPageChange(currentPage - 1)}
+        aria-label="Previous page"
         data-testid="button-prev-page"
       >
         <ChevronLeft className="h-4 w-4" />
@@ -374,6 +377,8 @@ function PaginationControls({
             size="icon"
             className="h-8 w-8 text-xs"
             onClick={() => onPageChange(page)}
+            aria-label={`Page ${page}`}
+            aria-current={page === currentPage ? "page" : undefined}
             data-testid={`button-page-${page}`}
           >
             {page}
@@ -386,6 +391,7 @@ function PaginationControls({
         className="h-8 w-8"
         disabled={currentPage === totalPages}
         onClick={() => onPageChange(currentPage + 1)}
+        aria-label="Next page"
         data-testid="button-next-page"
       >
         <ChevronRight className="h-4 w-4" />
@@ -429,7 +435,10 @@ function DatabaseCard({ database, countyName }: { database: PermitDatabase; coun
     ? <span className={unconfirmed ? "g-text-2" : "g-open"} data-testid={`status-portal-${database.id}`}>{unconfirmed ? "Official site · unconfirmed" : "Verified portal"}</span>
     : viaCounty
       ? <span className="g-open" data-testid={`status-portal-${database.id}`}>Permits issued by {viaCountyName}</span>
-      : <span className="g-text-2" data-testid={`status-portal-${database.id}`}>No portal on record</span>;
+      : (database as PermitDatabase & { postalAlias?: boolean }).postalAlias
+        // A postal name (a ZIP code's organisation, campus or shorthand), not a place that issues permits.
+        ? <span className="g-text-2" data-testid={`status-portal-${database.id}`}>Postal name, not a permit office</span>
+        : <span className="g-text-2" data-testid={`status-portal-${database.id}`}>No portal on record</span>;
 
   // The small grey line: the link notice, the official "issued by" source, email, last scrape — only what exists.
   const notice = governmentLinksAvailable(database) ? governmentLinkNotice(database) : null;
@@ -646,9 +655,9 @@ function ScrapeDialog({
         <div className="space-y-4 pt-1">
           {searchOptions.length > 1 && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Search type</label>
+              <label htmlFor="scrape-search-type" className="text-xs font-medium text-muted-foreground">Search type</label>
               <Select value={searchType} onValueChange={setSearchType} disabled={scrapeMutation.isPending || scrapeStatus?.status === "running"}>
-                <SelectTrigger data-testid="select-scrape-type"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="scrape-search-type" data-testid="select-scrape-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {searchOptions.map((opt) => (<SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>))}
                 </SelectContent>
@@ -656,10 +665,10 @@ function ScrapeDialog({
             </div>
           )}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Search term</label>
+            <label htmlFor="scrape-search-term" className="text-xs font-medium text-muted-foreground">Search term</label>
             <div className="flex gap-2">
-              <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={getPlaceholder()} disabled={scrapeMutation.isPending || scrapeStatus?.status === "running"} onKeyDown={(e) => e.key === "Enter" && handleStartScrape()} data-testid="input-scrape-search" />
-              <Button size="icon" onClick={handleStartScrape} disabled={!searchTerm.trim() || scrapeMutation.isPending || scrapeStatus?.status === "running"} data-testid="button-start-scrape">
+              <Input id="scrape-search-term" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={getPlaceholder()} disabled={scrapeMutation.isPending || scrapeStatus?.status === "running"} onKeyDown={(e) => e.key === "Enter" && handleStartScrape()} data-testid="input-scrape-search" />
+              <Button size="icon" aria-label="Start scrape" onClick={handleStartScrape} disabled={!searchTerm.trim() || scrapeMutation.isPending || scrapeStatus?.status === "running"} data-testid="button-start-scrape">
                 {scrapeMutation.isPending || scrapeStatus?.status === "running" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               </Button>
             </div>

@@ -4,7 +4,7 @@ import type { HelpDraft } from "../../types";
 const entry: HelpDraft = {
   key: "account.limits", parent: "account", group: "Tools", route: "/settings", title: "Account settings → Limits & usage",
   whatItIs: "Everything your plan includes and how much of it you have used this month.",
-  whatItDoes: "Cards by area (Google Business Profile, Websites & ads, Permits & CRM, AI Call Assistant, API), each with a meter per limit: what is included next to what is used. Where an add-on raises a limit, its + and − sit under that limit; for the others, Change plan at the top of the page goes to Pricing. With no active plan the page offers Compare plans and Open billing.",
+  whatItDoes: "Cards by area (Google Business Profile, Websites & ads, Team, Permits & CRM, AI Call Assistant, API), each with a meter per limit: what is included next to what is used. Where an add-on raises a limit, its + and − sit under that limit; for the others, Change plan at the top of the page goes to Pricing. With no active plan the page offers Compare plans and Open billing.",
   howToUse: [
     "Open Settings → Limits & usage.",
     "Find the limit you are asking about and read used against included.",

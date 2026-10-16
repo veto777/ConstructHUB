@@ -18,9 +18,10 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle, statusTone,
 } from "@/components/crm-ui";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SamplePaymentsList = lazySample(() => import("@/components/crm-sample-previews"), "SamplePaymentsList");
 import { TakePaymentDialog } from "@/components/crm-take-payment";
+import { AdminSetupNote } from "@/hooks/use-platform-admin";
 
 const money = (c?: number | null) =>
   `$${((c ?? 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -115,7 +116,7 @@ export default function CrmPaymentsPage() {
   const canSeePrices = me?.permissions?.seePrices === true;
   const canTakePayment = me?.permissions?.takePayment === true;
   const isOwner = me?.member?.role === "owner";
-  const { data: payments, isError: paymentsError } = useQuery<any[]>({
+  const { data: payments, isLoading: paymentsLoading, isError: paymentsError } = useQuery<any[]>({
     queryKey: ["/api/crm/payments"], retry: false, enabled: canSeePrices,
   });
   const canManage = me?.permissions?.manageIntegrations === true;
@@ -240,12 +241,16 @@ export default function CrmPaymentsPage() {
           <CardContent className="p-4 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div>
-              <div className="font-medium">Not configured on this server</div>
+              <div className="font-medium">Card payments aren’t switched on yet</div>
               <p className="text-sm text-muted-foreground mt-1">
-                Missing environment {data.missing.length === 1 ? "variable" : "variables"}:{" "}
-                <code>{data.missing.join(", ")}</code>. Add {data.missing.length === 1 ? "it" : "them"} to
-                the server <code>.env</code> and restart. <code>STRIPE_CONNECT_CLIENT_ID</code> comes from
-                Stripe → Settings → Connect → Onboarding options.
+                We’re switching online card and bank payments on; there is nothing for you to do. You can still
+                record cash, check or wire payments from a client’s page.
+                <AdminSetupNote>
+                  missing environment {data.missing.length === 1 ? "variable" : "variables"}{" "}
+                  <code>{data.missing.join(", ")}</code> — add {data.missing.length === 1 ? "it" : "them"} to the
+                  server <code>.env</code> and restart. <code>STRIPE_CONNECT_CLIENT_ID</code> comes from Stripe →
+                  Settings → Connect → Onboarding options.
+                </AdminSetupNote>
               </p>
             </div>
           </CardContent>
@@ -406,6 +411,8 @@ export default function CrmPaymentsPage() {
             <p className="text-sm text-destructive flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" /> Couldn't load payments — refresh to try again.
             </p>
+          ) : paymentsLoading ? (
+            <div className="flex justify-center p-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : !payments?.length ? (
             <>
               <EmptyState
@@ -414,12 +421,15 @@ export default function CrmPaymentsPage() {
                 title="No payments yet"
                 description="Nothing yet. Payments appear here when a client pays online or you record one from a client's page."
               />
-              {/* The list is the org's whole payment history: empty means none yet, so show a sample. */}
-              <SamplePaymentsList cta={
+              {/* A sample only when the org's whole history is empty: a seat whose view is narrowed by the object
+                  policy (division-scoped, or without viewAllJobs — server/crm/object-access.ts) may see an empty list
+                  for an org that has payments, so it never gets one. */}
+              {showSample({ isLoading: paymentsLoading, isError: paymentsError, total: payments?.length,
+                filtered: me?.permissions?.viewAllJobs !== true || (!isOwner && !!me?.member?.divisionId) }) && <SamplePaymentsList cta={
                 <Link href="/crm/clients">
                   <Button size="sm" variant="outline" className="max-sm:min-h-11" data-testid="button-record-payment-sample">Record one from a client's page</Button>
                 </Link>
-              } />
+              } />}
             </>
           ) : null}
           {payments?.slice(0, 50).map((p: any) => {

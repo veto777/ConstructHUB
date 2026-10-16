@@ -12,6 +12,7 @@ import { GooglePill } from "@/components/google";
 import { JobcamFeed } from "@/components/jobcam/feed";
 import { ShareDialog } from "@/components/jobcam/share-dialog";
 import { bootJobcamQueue } from "@/lib/jobcam-queue";
+import { CRM_BRAND } from "@/lib/page-titles";
 import { HelpButton } from "@/components/help-button";
 import { Loader2 } from "lucide-react";
 
@@ -22,7 +23,7 @@ export default function JobcamProjectPage() {
   const { data: project, isLoading, isError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}`], enabled: !!id, retry: false });
   const [share, setShare] = useState<{ open: boolean; mediaIds: string[] }>({ open: false, mediaIds: [] });
   useEffect(() => { bootJobcamQueue(); }, []);
-  useEffect(() => { if (project?.name) document.title = `JobCam · ${project.name}`; }, [project?.name]);
+  useEffect(() => { if (project?.name) document.title = `${project.name} · JobCam · ${CRM_BRAND}`; }, [project?.name]);
   // Sharing needs JobCam on the plan too (the feed below shows the upgrade card without it).
   const canManage = (me?.permissions?.manageJobs === true || me?.permissions?.manageCustomers === true) && me?.crm?.jobcam !== false;
 
@@ -30,7 +31,7 @@ export default function JobcamProjectPage() {
   if (isLoading) return <div className="flex justify-center p-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (isError || !project) {
     return (
-      <ErrorCard title="Project not found" description="It may belong to a project manager other than you, or it's been removed.">
+      <ErrorCard level={1} title="Project not found" description="It may belong to a project manager other than you, or it's been removed.">
         <Link href="/crm/jobcam"><Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> JobCam</Button></Link>
       </ErrorCard>
     );

@@ -307,7 +307,7 @@ export default function CrmEstimateDetailPage() {
   }
   if (isError || !e) {
     return (
-      <ErrorCard title="Estimate not found" description="It may have been deleted, or the link is wrong.">
+      <ErrorCard level={1} title="Estimate not found" description="It may have been deleted, or the link is wrong.">
         <Link href="/crm/estimates">
           <Button variant="outline" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> All estimates</Button>
         </Link>

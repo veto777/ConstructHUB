@@ -1290,13 +1290,14 @@ export default function PhotosPage() {
         {showSaveTemplate && (
           <div className="flex items-end gap-2" data-testid="template-save-form">
             <div className="flex-1 space-y-1.5">
-              <Label className="text-xs">
+              <Label className="text-xs" htmlFor="photos-template-name">
                 {templateMode === "rename" ? "New template name" : "Template name"}
                 {templateMode === "overwrite" && (
                   <span className="text-muted-foreground font-normal"> — replaces this template's settings with your current ones</span>
                 )}
               </Label>
               <Input
+                id="photos-template-name"
                 value={templateName}
                 onChange={e => setTemplateName(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleSaveTemplate()}
@@ -1487,7 +1488,7 @@ export default function PhotosPage() {
                   }}
                   data-testid="select-saved-location"
                 >
-                  <SelectTrigger className="h-10" data-testid="select-saved-location-trigger">
+                  <SelectTrigger className="h-10" aria-label="Saved location" data-testid="select-saved-location-trigger">
                     <SelectValue placeholder="Select a saved location..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1516,11 +1517,12 @@ export default function PhotosPage() {
               </div>
             )}
             <div className="space-y-3">
-              <Label className="text-xs font-medium">Search business (Google)</Label>
+              <Label className="text-xs font-medium" htmlFor="photos-business-search">Search business (Google)</Label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="photos-business-search"
                     value={businessQuery}
                     onChange={e => { setBusinessQuery(e.target.value); if (businessSearchError) setBusinessSearchError(""); }}
                     onKeyDown={e => e.key === "Enter" && searchBusiness()}
@@ -1703,6 +1705,7 @@ export default function PhotosPage() {
           <Switch
             checked={serviceAreaEnabled}
             onCheckedChange={setServiceAreaEnabled}
+            aria-label="Service area cities"
             data-testid="switch-service-area-enabled"
           />
         }
@@ -1770,6 +1773,7 @@ export default function PhotosPage() {
                 min={5}
                 max={50}
                 step={5}
+                aria-label="Radius in miles"
                 data-testid="slider-service-radius"
               />
             </div>
@@ -1862,9 +1866,10 @@ export default function PhotosPage() {
             </div>
 
             <div className="space-y-2 pt-2 border-t border-border">
-              <Label className="text-xs">Or add specific cities manually</Label>
+              <Label className="text-xs" htmlFor="photos-manual-cities">Or add specific cities manually</Label>
               <div className="flex gap-2">
                 <Input
+                  id="photos-manual-cities"
                   value={manualCityInput}
                   onChange={(e) => setManualCityInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -1950,11 +1955,13 @@ export default function PhotosPage() {
 
       <Section title="Category & keywords">
         <div className="space-y-1.5">
-          <Label className="text-xs">Category</Label>
+          <Label className="text-xs" id="photos-category-label">Category</Label>
           <div className="relative" data-testid="select-category">
             <button
               ref={categoryBtnRef}
               type="button"
+              id="photos-category-button"
+              aria-labelledby="photos-category-label photos-category-button"
               aria-haspopup="dialog"
               aria-expanded={categoryDropdownOpen}
               onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
@@ -2173,9 +2180,10 @@ export default function PhotosPage() {
 
         {keywords.length === 0 && customKeywords.length === 0 && categories.length > 0 && (
           <div className="space-y-2">
-            <Label className="text-xs">Keywords</Label>
+            <Label className="text-xs" htmlFor="photos-custom-keyword">Keywords</Label>
             <div className="flex gap-2">
               <Input
+                id="photos-custom-keyword"
                 value={newCustomKeyword}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -2453,6 +2461,7 @@ export default function PhotosPage() {
                             value={[f.brightness]}
                             onValueChange={([v]) => updatePhotoFilter(file.id, "brightness", v)}
                             min={0.5} max={2.0} step={0.05}
+                            aria-label="Brightness"
                             data-testid="slider-brightness"
                           />
                         </div>
@@ -2465,6 +2474,7 @@ export default function PhotosPage() {
                             value={[f.contrast]}
                             onValueChange={([v]) => updatePhotoFilter(file.id, "contrast", v)}
                             min={0.5} max={2.0} step={0.05}
+                            aria-label="Contrast"
                             data-testid="slider-contrast"
                           />
                         </div>
@@ -2477,6 +2487,7 @@ export default function PhotosPage() {
                             value={[f.saturation]}
                             onValueChange={([v]) => updatePhotoFilter(file.id, "saturation", v)}
                             min={0.5} max={2.0} step={0.05}
+                            aria-label="Saturation"
                             data-testid="slider-saturation"
                           />
                         </div>
@@ -2552,6 +2563,7 @@ export default function PhotosPage() {
           <Switch
             checked={watermarkEnabled}
             onCheckedChange={setWatermarkEnabled}
+            aria-label="Watermark"
             data-testid="switch-watermark"
           />
         }
@@ -2581,8 +2593,9 @@ export default function PhotosPage() {
 
             {watermarkType === "text" ? (
               <div className="space-y-1.5">
-                <Label className="text-xs">Watermark text</Label>
+                <Label className="text-xs" htmlFor="watermark-text">Watermark text</Label>
                 <Input
+                  id="watermark-text"
                   value={watermarkText}
                   onChange={e => setWatermarkText(e.target.value)}
                   placeholder={businessInfo.companyName || "Company Name"}
@@ -2597,6 +2610,7 @@ export default function PhotosPage() {
                   type="file"
                   accept=".png,.jpg,.jpeg"
                   onChange={handleWatermarkImageSelect}
+                  aria-label="Watermark image"
                   className="hidden"
                 />
                 {watermarkImagePreview ? (
@@ -2647,6 +2661,7 @@ export default function PhotosPage() {
                 min={0.1}
                 max={1.0}
                 step={0.05}
+                aria-label="Watermark opacity"
                 data-testid="slider-watermark-opacity"
               />
             </div>
@@ -2655,14 +2670,16 @@ export default function PhotosPage() {
 
         <div className="flex items-start justify-between gap-4 pt-4 border-t border-border/60">
           <div className="min-w-0">
-            <p className="text-sm font-semibold">Mirror photos</p>
+            <p className="text-sm font-semibold">Flip left to right</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Flips every photo horizontally. Only use photos of your own work that you have the rights to.
+              Turns every photo in this batch around left to right — for a shot taken with a front camera or in a
+              mirror, where signs and lettering read backwards. Leave it off for normal photos.
             </p>
           </div>
           <Switch
             checked={mirrorPhotos}
             onCheckedChange={setMirrorPhotos}
+            aria-label="Flip left to right"
             data-testid="switch-mirror-photos"
           />
         </div>
@@ -2774,8 +2791,9 @@ export default function PhotosPage() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label className="text-xs">{mediaFolders.length > 0 ? "Or create new folder" : "Create a folder"}</Label>
+                <Label className="text-xs" htmlFor="photos-new-folder">{mediaFolders.length > 0 ? "Or create new folder" : "Create a folder"}</Label>
                 <Input
+                  id="photos-new-folder"
                   value={newFolderName}
                   onChange={e => { setNewFolderName(e.target.value); if (e.target.value) setSelectedFolderId(null); }}
                   placeholder="e.g. Roofing Project - 123 Main St"

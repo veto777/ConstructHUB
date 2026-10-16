@@ -13,8 +13,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { GoogleSurface, GoogleSectionHeader, GoogleLocalCard, GoogleAvatar, GoogleStars, GooglePill, GoogleStat, GoogleStatGrid, relativeTime } from "@/components/google";
 import { HelpButton } from "@/components/help-button";
-import { SamplePreview } from "@/components/sample-preview";
+import { SAMPLE_BUSINESS as SAMPLE_CO, SamplePreview, sampleAgo, showSample } from "@/components/sample-preview";
 import { Plus, RefreshCw, ExternalLink, Trash2, Search, Loader2, MessageSquareReply, X, Sparkles, Copy, Users, ChevronDown, Check } from "lucide-react";
+import { AdminSetupNote } from "@/hooks/use-platform-admin";
 
 type Review = { id: string; rating: number; text: string; timeCreated: string | null; url: string | null; user: { name: string; imageUrl: string | null } };
 type Trend = { reviewsGained30d: number; ratingDelta30d: number | null; days: number } | null;
@@ -176,15 +177,14 @@ function ConnectPanel({ onDone, onCancel }: { onDone: () => void; onCancel?: () 
 }
 
 /** An obviously made-up business for the sample shown while nothing is connected (never stored, never sent). */
-const sampleAgo = (days: number) => new Date(Date.now() - days * 86400000).toISOString();
 const SAMPLE_BUSINESS: Business = {
-  id: -1, yelpId: "sample", name: "Sample Roofing Co.", url: null, imageUrl: null, location: "123 Example St, Sampletown", phone: null, rating: 4.6, reviewCount: 128, reviewTotal: 128,
-  categories: ["Roofing", "Siding", "Gutter Services"], photos: [], price: null, isOpenNow: true, syncedAt: sampleAgo(0.1),
+  id: -1, yelpId: "sample", name: SAMPLE_CO.name, url: null, imageUrl: null, location: SAMPLE_CO.address, phone: null, rating: 4.6, reviewCount: 128, reviewTotal: 128,
+  categories: ["Roofing", "Siding", "Gutter Services"], photos: [], price: null, isOpenNow: true, syncedAt: sampleAgo({ days: 0.1 }),
   trend: { reviewsGained30d: 6, ratingDelta30d: 0.1, days: 30 },
   reviews: [
-    { id: "sample-1", rating: 5, text: "Replaced our whole roof in two days and left the yard cleaner than they found it. Crew showed up when they said they would.", timeCreated: sampleAgo(2), url: null, user: { name: "Jamie Example", imageUrl: null } },
-    { id: "sample-2", rating: 4, text: "Fair quote, good work on the siding. Took a week longer than planned because of the rain, but they kept us posted.", timeCreated: sampleAgo(9), url: null, user: { name: "Sam Sample", imageUrl: null } },
-    { id: "sample-3", rating: 5, text: "Fixed a leak two other companies couldn't find. Would hire again.", timeCreated: sampleAgo(20), url: null, user: { name: "Pat Placeholder", imageUrl: null } },
+    { id: "sample-1", rating: 5, text: "Replaced our whole roof in two days and left the yard cleaner than they found it. Crew showed up when they said they would.", timeCreated: sampleAgo({ days: 2 }), url: null, user: { name: "Jamie Example", imageUrl: null } },
+    { id: "sample-2", rating: 4, text: "Fair quote, good work on the siding. Took a week longer than planned because of the rain, but they kept us posted.", timeCreated: sampleAgo({ days: 9 }), url: null, user: { name: "Sam Sample", imageUrl: null } },
+    { id: "sample-3", rating: 5, text: "Fixed a leak two other companies couldn't find. Would hire again.", timeCreated: sampleAgo({ days: 20 }), url: null, user: { name: "Pat Placeholder", imageUrl: null } },
   ],
 };
 
@@ -198,7 +198,9 @@ export default function YelpPage() {
   const avgRating = rated.length ? rated.reduce((n, b) => n + (b.rating as number), 0) / rated.length : null;
   const reviews = list.reduce((n, b) => n + b.reviewCount, 0);
   const gained = list.reduce((n, b) => n + (b.trend?.reviewsGained30d ?? 0), 0);
-  const showSample = (status.data && !available) || (available && !businesses.isLoading && list.length === 0);
+  // Yelp not available on this server (nothing can be connected), or the real list is known to be empty — never while
+  // it loads or after it failed.
+  const sampleOn = (!!status.data && !available) || showSample({ isLoading: businesses.isLoading, isError: businesses.isError, total: available ? businesses.data?.businesses.length : undefined });
   return (
     <GoogleSurface page>
       <AppPage className="max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11" testId="page-yelp">
@@ -210,10 +212,12 @@ export default function YelpPage() {
           actions={available && list.length > 0 && !adding ? <GooglePill variant="solid" icon={Plus} onClick={() => setAdding(true)} label="Add business" testId="yelp-add" /> : undefined}
         />
         {status.isError && <Notice tone="danger">{apiErrorMessage(status.error)}</Notice>}
+        {businesses.isError && <Notice tone="danger">{apiErrorMessage(businesses.error)}</Notice>}
         {status.data && !available && (
-          <Notice tone="info" title="Yelp isn’t connected on this server yet" testId="yelp-unavailable">
-            An administrator sets <code className="text-xs">YELP_API_KEY</code> (a Yelp Fusion API key) in the server
-            environment and restarts the app. Until then this page shows a sample of what you will get.
+          <Notice tone="info" title="Yelp isn’t switched on yet" testId="yelp-unavailable">
+            We’re switching Yelp on; there is nothing for you to do. Until then this page shows a sample of what you
+            will get.
+            <AdminSetupNote>set <code className="text-xs">YELP_API_KEY</code> (a Yelp Fusion API key) in the server environment and restart the app.</AdminSetupNote>
           </Notice>
         )}
         {available && list.length > 0 && (
@@ -224,9 +228,9 @@ export default function YelpPage() {
             <GoogleStat label="Businesses" value={String(list.length)} hint="Connected here, up to 50" testId="stat-yelp-businesses" />
           </GoogleStatGrid>
         )}
-        {showSample && (
+        {sampleOn && (
           <div className="g-callout" data-testid="yelp-how-it-works">
-            <h3>How this works</h3>
+            <h2>How this works</h2>
             <ol className="mt-1 list-decimal space-y-1 pl-5">
               <li>Find your business on Yelp by name and city, and connect it.</li>
               <li>Its rating, review count and newest reviews are pulled in and refreshed every 12 hours — you get a notice when a new review lands.</li>
@@ -237,7 +241,7 @@ export default function YelpPage() {
         {available && (list.length === 0 || adding) && <ConnectPanel onDone={() => setAdding(false)} onCancel={adding ? () => setAdding(false) : undefined} />}
         {businesses.isLoading && <Skeleton className="h-40 w-full rounded-xl" />}
         {list.length > 0 && <div className="space-y-4">{list.map((b) => <BusinessCard key={b.id} b={b} />)}</div>}
-        {showSample && (
+        {sampleOn && (
           <SamplePreview what="what a connected business looks like" testId="sample-yelp">
             <GoogleStatGrid cols={4} className="mb-3">
               <GoogleStat label="Rating" value="4.6" hint="Out of 5 on Yelp" />

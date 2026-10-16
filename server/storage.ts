@@ -35,7 +35,8 @@ import {
   users,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, or, ilike, inArray, and, sql, gte, lte, lt, isNull, isNotNull, count, countDistinct } from "drizzle-orm";
+import { eq, desc, or, ilike, inArray, notInArray, and, sql, gte, lte, lt, isNull, isNotNull, count, countDistinct } from "drizzle-orm";
+import { postalAliasIds } from "./permit-directory-aliases";
 import { resultPage, SEARCH_PAGE_MAX, type ResultPage } from "./search-page";
 
 /**
@@ -275,6 +276,11 @@ export class DatabaseStorage implements IStorage {
           ilike(permitDatabases.jurisdiction, searchTerm)
         )!
       );
+    } else {
+      // The default listing leaves out postal aliases ("AARP, CA", "88, KY") — names that are not places
+      // (server/permit-directory-aliases.ts). A typed search still finds them, flagged by the route.
+      const aliases = await postalAliasIds();
+      if (aliases.length) conditions.push(notInArray(permitDatabases.id, aliases));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -317,6 +323,10 @@ export class DatabaseStorage implements IStorage {
       if (r.jurisdictionType === "county") county = c;
       if (r.jurisdictionType === "city") city = c;
     }
+    // Postal aliases are link-less city rows that are not places: the headline counts match the default listing.
+    const aliases = (await postalAliasIds()).length;
+    total -= aliases;
+    city -= aliases;
 
     // "Searchable" follows the platform adapter rules in @shared/government-links, so
     // only the rows that could qualify are read and the shared check decides.

@@ -11,15 +11,15 @@ import { outcomeLabel, outcomeTone } from "./calls-shared";
  * Every value is obviously made up: "Sample caller", 555-010x numbers (the reserved fictional range),
  * "Sample City". The callers' words are the kind of thing a contractor's line hears, not a real call.
  */
-export const SAMPLE_NUMBER = { phone: "(555) 010-0100", label: "Sample main office", location: "Sample City, ST", forwardedFrom: "(555) 010-0199" } as const;
+const SAMPLE_NUMBER = { phone: "(555) 010-0100", label: "Sample main office", location: "Sample City, ST", forwardedFrom: "(555) 010-0199" } as const;
 
-export type SampleCall = { no: number; when: string; caller: string; phone: string; outcome: string; about: string; length: string };
-export const SAMPLE_CALLS: readonly SampleCall[] = [
+type SampleCall = { no: number; when: string; caller: string; phone: string; outcome: string; about: string; length: string };
+const SAMPLE_CALLS: readonly SampleCall[] = [
   { no: 3, when: "Today 9:12 AM", caller: "Sample caller", phone: "(555) 010-0101", outcome: "lead_submitted", about: "Roof leak over the garage, wants an estimate this week", length: "2m 40s" },
   { no: 2, when: "Today 8:05 AM", caller: "Sample caller", phone: "(555) 010-0102", outcome: "alerted", about: "Water coming through the ceiling — asked for a person", length: "1m 05s" },
   { no: 1, when: "Yesterday 4:48 PM", caller: "Sample caller", phone: "(555) 010-0103", outcome: "info", about: "Asked whether you do gutter guards", length: "0m 52s" },
 ];
-export const SAMPLE_SPAM = { phone: "(555) 010-0100", status: "Blocked (auto)", strikes: 2, calls: 3, reason: "robocall", when: "Today 7:30 AM" } as const;
+const SAMPLE_SPAM = { phone: "(555) 010-0100", status: "Blocked (auto)", strikes: 2, calls: 3, reason: "robocall", when: "Today 7:30 AM" } as const;
 
 /** One number card, as the Numbers page shows it (numbers.tsx NumberCard) — with no real number yet. */
 export function SampleNumbersPreview({ cta }: { cta?: ReactNode }) {

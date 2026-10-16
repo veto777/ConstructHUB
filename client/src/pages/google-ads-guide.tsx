@@ -183,7 +183,7 @@ export default function GoogleAdsGuidePage() {
               <div className="g-card__lead mx-auto mb-4 !h-16 !w-16">
                 <GraduationCap className="!h-8 !w-8" aria-hidden="true" />
               </div>
-              <h3 className="g-header__title mb-2">Unlock the Full Playbook</h3>
+              <h2 className="g-header__title mb-2">Unlock the Full Playbook</h2>
               <p className="g-text-2 text-sm mb-6 max-w-md mx-auto">
                 12 detailed guide pages with step-by-step instructions, real screenshots, and every setting explained.
               </p>
@@ -251,7 +251,7 @@ export default function GoogleAdsGuidePage() {
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-[#FBBC05] flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="g-card__title g-card__title--md mb-1">Critical Warning: Google's Default Settings Are Designed to Drain Your Budget</h4>
+                  <h2 className="g-card__title g-card__title--md mb-1">Critical Warning: Google's Default Settings Are Designed to Drain Your Budget</h2>
                   <p className="g-card__line">
                     Google Ads comes with Auto-Apply, AI Max, Search Partners, Broad Match, and Automatically Created Assets all enabled by default. Every one of these features increases Google's revenue at your expense. Start with Section 1 and work through every page in order.
                   </p>
@@ -282,10 +282,10 @@ export default function GoogleAdsGuidePage() {
                   <span className="g-text-2 w-7 text-right flex-shrink-0 tabular-nums">{s.number}</span>
                   <span className="g-card__lead" aria-hidden="true"><s.icon /></span>
                   <div className="g-card__body">
-                    <h3 className="g-card__title g-card__title--md group-hover:underline">
+                    <h2 className="g-card__title g-card__title--md group-hover:underline">
                       {s.title}
                       {s.critical && <span className="g-chip g-chip--sm ml-2 align-middle !normal-case">Critical</span>}
-                    </h3>
+                    </h2>
                     <p className="g-card__line line-clamp-2">{s.description}</p>
                     {s.screenshots > 0 && (
                       <p className="g-card__meta inline-flex items-center gap-1"><ImageIcon className="h-3 w-3" aria-hidden="true" /> {s.screenshots} {s.screenshots === 1 ? "screenshot" : "screenshots"}</p>
@@ -302,7 +302,7 @@ export default function GoogleAdsGuidePage() {
           <Card className="max-w-4xl mx-auto mt-10 shadow-none" data-testid="card-bottom-cta">
             <CardContent className="p-6 text-center">
               <Shield className="h-8 w-8 text-muted-foreground mx-auto mb-3" aria-hidden="true" />
-              <h3 className="g-header__title mb-2">Ready to Protect Your Ad Budget?</h3>
+              <h2 className="g-header__title mb-2">Ready to Protect Your Ad Budget?</h2>
               <p className="g-text-2 text-sm leading-relaxed max-w-2xl mx-auto mb-4">
                 Start with Section 1 and work through the entire guide. Then set up Click Guard to protect your campaigns from click fraud.
               </p>

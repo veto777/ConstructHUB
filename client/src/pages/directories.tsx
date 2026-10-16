@@ -30,7 +30,7 @@ import {
   GoogleStatGrid,
 } from "@/components/google";
 import { HelpButton } from "@/components/help-button";
-import { SamplePreview } from "@/components/sample-preview";
+import { SAMPLE_BUSINESS, SamplePreview, sampleAgo, showSample } from "@/components/sample-preview";
 import { PresetFilter } from "@/components/domains/preset-filter";
 import {
   Catalogue,
@@ -170,18 +170,17 @@ function DirectoryProfileCard({ row, onRecheck, checking }: { row: DirectoryProf
 }
 
 /** Obviously made-up cards for the sample shown while a location has no directory profiles (never stored, never sent). */
-const sampleAgo = (hours: number) => new Date(Date.now() - hours * 3600000).toISOString();
 const sampleFields = (address: "match" | "differ" | "missing", phone: "match" | "missing"): DirectoryProfileRow["nap_result"] => ({
   matches: address === "match" && phone === "match",
   fields: {
-    name: { result: "match", expected: "Sample Roofing Co.", observed: "Sample Roofing Co.", required: true },
+    name: { result: "match", expected: SAMPLE_BUSINESS.name, observed: SAMPLE_BUSINESS.name, required: true },
     street_address: { result: address === "differ" ? "differ" : address, expected: "123 Example St", observed: address === "match" ? "123 Example St" : address === "differ" ? "123 Example Street, Suite 4" : null, required: true },
     phone: { result: phone, expected: "(555) 010-0100", observed: phone === "match" ? "(555) 010-0100" : null, required: true },
   },
 });
 const SAMPLE_ROWS: DirectoryProfileRow[] = [
-  { id: -1, profile_id: 0, location_id: 0, user_id: 0, directory_id: 0, directory_name: "Sample Trade Directory", status: "live", listing_url: "https://sample-directory.example/sample-roofing-co", last_checked_at: sampleAgo(5), billable: true, nap_result: sampleFields("match", "match"), evidence: null },
-  { id: -2, profile_id: 0, location_id: 0, user_id: 0, directory_id: 0, directory_name: "Example Local Listings", status: "mismatch", listing_url: "https://example-listings.example/biz/sample-roofing", last_checked_at: sampleAgo(30), billable: false, nap_result: sampleFields("differ", "match"), evidence: null },
+  { id: -1, profile_id: 0, location_id: 0, user_id: 0, directory_id: 0, directory_name: "Sample Trade Directory", status: "live", listing_url: "https://sample-directory.example/sample-roofing-co", last_checked_at: sampleAgo({ hours: 5 }), billable: true, nap_result: sampleFields("match", "match"), evidence: null },
+  { id: -2, profile_id: 0, location_id: 0, user_id: 0, directory_id: 0, directory_name: "Example Local Listings", status: "mismatch", listing_url: "https://example-listings.example/biz/sample-roofing", last_checked_at: sampleAgo({ hours: 30 }), billable: false, nap_result: sampleFields("differ", "match"), evidence: null },
   { id: -3, profile_id: 0, location_id: 0, user_id: 0, directory_id: 0, directory_name: "Demo Business Index", status: "queued", listing_url: "https://demo-index.example/sample-roofing-co", last_checked_at: null, billable: false, nap_result: null, evidence: { reason: null } },
 ];
 
@@ -254,7 +253,7 @@ function LocationDirectories({ location, directories }: { location: Location; di
       )}
       {total === 0 && (
         <div className="g-callout" data-testid="directories-how-it-works">
-          <h3>How this works</h3>
+          <h2>How this works</h2>
           <ol className="mt-1 list-decimal space-y-1 pl-5">
             <li>Save the business profile below — the name, address and phone you want every directory to show.</li>
             <li>Add the address of each page about your business on a directory (Yelp, BBB, Angi and the rest of the catalogue).</li>
@@ -289,7 +288,7 @@ function LocationDirectories({ location, directories }: { location: Location; di
             </div>
           )}
           {list.isLoading && <p role="status" className="text-sm g-text-2">Loading directory profiles…</p>}
-          {total === 0 && !list.isLoading ? (
+          {showSample({ isLoading: list.isLoading || summary.isLoading, isError: summary.isError, total }) ? (
             <SamplePreview what="what each directory card shows once you add a directory profile URL" testId="sample-directories" cta={addButton ?? undefined}>
               <GoogleStatGrid cols={4} className="mb-3">
                 <GoogleStat label="Directory profiles" value="3" hint="Pages about Sample Roofing Co. that we check" />
@@ -380,7 +379,7 @@ export default function DirectoriesPage() {
         {locations.isLoading && <p role="status" className="text-sm g-text-2">Loading locations…</p>}
         {locations.isSuccess && !locations.data.length && (
           <div className="g-callout" data-testid="directories-no-locations">
-            <h3>Add a business location first</h3>
+            <h2>Add a business location first</h2>
             <p>Directory Sync checks directories against a location’s name, address and phone. <Link href="/locations" className="g-accent underline">Add a location</Link> to start.</p>
           </div>
         )}

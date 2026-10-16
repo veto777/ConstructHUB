@@ -9,7 +9,7 @@ import { Link } from "wouter";
 import { AlertTriangle, ChevronRight, ExternalLink, Eye, FileText, MapPin, Monitor } from "lucide-react";
 import { GoogleStat, GoogleStatGrid } from "@/components/google";
 import { MetricStrip, StatCell } from "@/components/tool";
-import { Section } from "@/components/app-ui";
+import { Section, StatusPill } from "@/components/app-ui";
 import { countryName, geoLabel } from "@/components/ip-tracker/country-names";
 import { BreakdownList, DeviceIcon, PercentBar, TD, TH, TR, browserIcon, deviceIcon, formatDate, formatTimeAgo, osIcon, shortDay } from "./shared";
 
@@ -48,7 +48,7 @@ export const VISIT_ROW_CAP = 1000;
 export const countLabel = (n: number, partial: boolean) => (partial ? `${n.toLocaleString()}+` : n.toLocaleString());
 
 /** Where a site's sections live (the chosen site rides along as ?site=). */
-export const ipHref = (view: "" | "visitors" | "traffic" | "pages" | "geo" | "platforms", siteId: number) => `/ip-tracker${view ? `/${view}` : ""}?site=${siteId}`;
+const ipHref = (view: "" | "visitors" | "traffic" | "pages" | "geo" | "platforms", siteId: number) => `/ip-tracker${view ? `/${view}` : ""}?site=${siteId}`;
 
 /* ── Stat tiles ─────────────────────────────────────────────────────────────── */
 
@@ -99,13 +99,13 @@ export function VisitorRow({ v, expanded, onToggle, children }: { v: Visitor; ex
     <div className={`rounded-xl border bg-card transition-all ${expanded ? "ring-1 ring-primary/30" : ""}`} data-testid={`card-visitor-${v.ipAddress}`}>
       <button type="button" className="w-full cursor-pointer p-4 text-left hover:bg-muted/30 transition-colors" onClick={onToggle} aria-expanded={expanded} aria-controls={`visitor-detail-${v.ipAddress}`} data-testid={`button-expand-visitor-${v.ipAddress}`}>
         <div className="flex items-center gap-3">
-          <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${v.isOnline ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"}`} />
+          <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${v.isOnline ? "bg-primary animate-pulse" : "bg-muted-foreground/30"}`} />
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-sm font-medium break-all" data-testid={`text-ip-${v.ipAddress}`}>{v.ipAddress}</span>
-                {v.isSuspicious && <span className="inline-flex items-center gap-0.5 rounded-full border border-red-500/25 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400"><AlertTriangle className="h-2.5 w-2.5" /> Suspicious</span>}
-                {v.isOnline && <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">Online</span>}
+                {v.isSuspicious && <StatusPill tone="danger" dot={false} className="gap-0.5 px-2 text-[10px]"><AlertTriangle className="h-2.5 w-2.5" /> Suspicious</StatusPill>}
+                {v.isOnline && <StatusPill tone="success" dot={false} className="px-2 text-[10px]">Online</StatusPill>}
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1"><Eye className="h-3 w-3" /> {v.visits} visit{v.visits !== 1 ? "s" : ""}</span>
@@ -171,7 +171,7 @@ export function VisitorDetailPanel({ d }: { d: VisitorDetail }) {
               <div key={a.id} className="rounded-lg border bg-card p-3 text-xs" data-testid={`activity-${a.id}`}>
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-muted-foreground">{formatDate(a.visitedAt)}</span>
-                  {a.isSuspicious && <span className="rounded-full border border-red-500/25 bg-red-500/10 px-1.5 py-0 text-[9px] font-medium text-red-700 dark:text-red-400">Suspicious</span>}
+                  {a.isSuspicious && <StatusPill tone="danger" dot={false} className="px-1.5 py-0 text-[9px]">Suspicious</StatusPill>}
                 </div>
                 <div className="text-muted-foreground"><span className="font-medium">From:</span> {a.referrer || "NO REFERRER DATA"}</div>
                 <div className="mt-0.5 text-muted-foreground"><span className="font-medium">Landed:</span> <span className="break-all text-primary">{a.landingPage || "Unknown"}</span></div>

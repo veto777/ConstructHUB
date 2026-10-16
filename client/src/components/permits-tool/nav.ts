@@ -9,7 +9,7 @@ import type { ToolShellConfig } from "@/components/tool/shell";
 import { APP_NAV } from "@/components/app-sidebar";
 
 export function permitsNav(): ToolShellConfig {
-  const tool = (key: string, label: string, path: string, icon: any, rail?: string) => ({ key, label, rail, icon, path, to: () => path, groups: [] });
+  const tool = (key: string, label: string, path: string, icon: any, rail?: string, adminOnly?: boolean) => ({ key, label, rail, icon, path, to: () => path, groups: [], adminOnly });
   return {
     key: "permits", label: "Permits & Databases",
     tools: [
@@ -17,7 +17,8 @@ export function permitsNav(): ToolShellConfig {
       tool("databases", "Databases", "/databases", Database),
       tool("property", "Property records", "/property", Home, "Property"),
       tool("alerts", "Permit alerts", "/permit-alerts", BellRing, "Alerts"),
-      tool("schedules", "Schedules", "/schedules", CalendarClock),
+      // The shared permit-cache refresh schedules: platform admins only (the API answers 403 to anyone else).
+      tool("schedules", "Schedules", "/schedules", CalendarClock, undefined, true),
       tool("history", "History", "/history", History),
     ].filter((t) => APP_NAV.shownHere({ url: t.path })),
   };

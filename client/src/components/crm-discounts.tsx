@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -130,6 +130,7 @@ export function EstimateDiscounts({ estimate }: { estimate: any }) {
         <DialogContent className="max-w-xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Optional discounts — {estimate.number}</DialogTitle>
+            <DialogDescription>Discounts the client can choose on this estimate, each with its own conditions.</DialogDescription>
           </DialogHeader>
 
           {isLoading ? (

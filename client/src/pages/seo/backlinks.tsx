@@ -18,7 +18,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, money, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { ActiveFilter, api, money, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus, hideSeoPrices } from "./shell";
 import { DeltaBadge, DistributionBar, MetricColumn, PALETTE } from "./viz";
 import { CARD, Heading, MetricRow, PairBars } from "./viz-more";
 import { BLOCK_LINK, FIG_LINK, LINK_CUE, TAP, TEXT_LINK } from "./viz-keywords";
@@ -117,11 +117,11 @@ export default function SeoBacklinksPage() {
 
   return (
     <SeoShell title="Backlinks" description="Who links to your site: a fresh snapshot every month, refreshable any time." site={site} onSite={pickSite} sites={sites} status={status} spends="lookups"
-      actions={site && d && <Button className="w-full sm:w-auto" disabled={!configured || refresh.isPending || !canRefresh} onClick={() => refresh.mutate()} data-testid="button-refresh-backlinks" title={!configured ? "Rank tracking is being switched on for your account" : !canRefresh ? "Not enough SEO data left — add credit above" : undefined}>{refresh.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Refresh now{refreshCents != null ? ` — up to ${money(refreshCents)}` : ""}</Button>} helpKey="seo.backlinks">
-      {!site && sites.isSuccess && <Empty testId="seo-empty-sites"><h3>No sites yet</h3><p>Add a site above to see its backlinks.</p></Empty>}
+      actions={site && d && <Button className="w-full sm:w-auto" disabled={!configured || refresh.isPending || !canRefresh} onClick={() => refresh.mutate()} data-testid="button-refresh-backlinks" title={!configured ? "Rank tracking is being switched on for your account" : !canRefresh ? "Not enough SEO data left — add credit above" : undefined}>{refresh.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Refresh now{refreshCents != null && !hideSeoPrices() ? ` — up to ${money(refreshCents)}` : ""}</Button>} helpKey="seo.backlinks">
+      {!site && sites.isSuccess && <Empty testId="seo-empty-sites"><h2>No sites yet</h2><p>Add a site above to see its backlinks.</p></Empty>}
       {site && data.isLoading && <p className="g-text-2 text-[14px]" role="status">Loading backlinks…</p>}
-      {site && data.isError && <div className="g-callout" role="alert" data-testid="seo-backlinks-error"><h3>Couldn't load the backlinks</h3><p>{apiErrorMessage(data.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void data.refetch()}>Try again</button></div>}
-      {site && d && !d.snapshot && <Empty testId="seo-backlinks-empty"><h3>No snapshot for {site.domain} yet</h3><p>"Refresh now" pulls the summary and the top 100 linking pages; after that a new snapshot is taken every month on its own, and each one lists the backlinks found gone since the last.{refreshCents != null ? ` This first snapshot costs up to ${money(refreshCents)} of your SEO data.` : ""}</p></Empty>}
+      {site && data.isError && <div className="g-callout" role="alert" data-testid="seo-backlinks-error"><h2>Couldn't load the backlinks</h2><p>{apiErrorMessage(data.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void data.refetch()}>Try again</button></div>}
+      {site && d && !d.snapshot && <Empty testId="seo-backlinks-empty"><h2>No snapshot for {site.domain} yet</h2><p>"Refresh now" pulls the summary and the top 100 linking pages; after that a new snapshot is taken every month on its own, and each one lists the backlinks found gone since the last.{refreshCents != null && !hideSeoPrices() ? ` This first snapshot costs up to ${money(refreshCents)} of your SEO data.` : ""}</p></Empty>}
       {site && d?.snapshot && s && (
         <>
           {/* The snapshot's date opens its list (below); the snapshot it is compared with has no list of its own, so that date opens what changed since it (or, with no changes kept, the figures it is compared in). The next snapshot is a date with nothing behind it yet: the closest view is the Usage page, where it will show, and the title says so. */}

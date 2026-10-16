@@ -16,12 +16,13 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { accentClasses, type Accent } from "@/components/app-ui";
+import { CALL_RESULTS_MAX_DAYS, type CallResultsPreset, type CallResultsRange } from "@shared/call-results-range";
 
-export type ResultsRange = "7d" | "30d" | "month" | "all";
-/** What the summary route takes: a preset, or "<1..365>d" typed by the owner (server/voice/calls.ts parseCallResultsRange). */
-type RangeParam = ResultsRange | `${number}d`;
+export type ResultsRange = CallResultsPreset;
+/** What the summary route takes: a preset, or "<1..365>d" typed by the owner (shared/call-results-range.ts parseCallResultsRange). */
+type RangeParam = CallResultsRange;
 const CUSTOM = "custom";
-const clampDays = (n: number) => Math.min(365, Math.max(1, Math.round(n)));
+const clampDays = (n: number) => Math.min(CALL_RESULTS_MAX_DAYS, Math.max(1, Math.round(n)));
 export type ResultsPick = "lead_submitted" | "alerted" | "info" | "declined" | "hangup" | "voicemail" | "spam";
 
 type Summary = {
@@ -79,7 +80,7 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
               <div className="flex items-center gap-1.5 text-sm">
                 <Label htmlFor="results-days" className="sr-only">Number of days</Label>
                 <span className="text-muted-foreground">Last</span>
-                <Input id="results-days" type="number" inputMode="numeric" min={1} max={365} value={days} className="h-9 w-20 tabular-nums max-sm:h-11"
+                <Input id="results-days" type="number" inputMode="numeric" min={1} max={CALL_RESULTS_MAX_DAYS} value={days} className="h-9 w-20 tabular-nums max-sm:h-11"
                   onChange={(e) => setDays(e.target.value)} onBlur={() => setDays(String(customDays))} data-testid="input-results-days" />
                 <span className="text-muted-foreground">days</span>
               </div>

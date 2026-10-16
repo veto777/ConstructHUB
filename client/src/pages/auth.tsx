@@ -300,12 +300,13 @@ export default function AuthPage() {
                   ? <CrmLogo height={app ? 52 : 40} />
                   : <Link href="/" aria-label={`${BRAND_NAME} home`} data-testid="link-auth-logo-home"><CHLogo height={app ? 60 : 46} /></Link>}
               </div>
-              {/* In the apps the logo already reads ConstructHUB (CRM): the title stays for screen readers only. */}
-              <h1 className={`${app ? "sr-only " : ""}font-display font-semibold text-[1.9rem] leading-none tracking-[-0.02em] text-mkt-ink`} data-testid="text-auth-title">
+              {/* In the apps the logo already reads ConstructHUB (CRM): the wordmark stays for screen readers only.
+                  It is not the page's h1: each form's own title ("Welcome back", "Create your account"…) is. */}
+              <p className={`${app ? "sr-only " : ""}font-display font-semibold text-[1.9rem] leading-none tracking-[-0.02em] text-mkt-ink`} data-testid="text-auth-title">
                 {isPortal()
                   ? <>ConstructHub <em className="text-mkt-orange-ink">CRM</em></>
                   : <>Construct<em className="text-mkt-orange-ink">HUB</em></>}
-              </h1>
+              </p>
               <Kicker n="" className="justify-center lg:justify-start">
                 {isPortal() ? "Projects, clients & payments for contractors" : "Nationwide Contractor Services"}
               </Kicker>
@@ -330,7 +331,7 @@ export default function AuthPage() {
                     >
                       <ArrowLeft className="h-3.5 w-3.5" /> Back to sign in
                     </button>
-                    <h2 className={FORM_TITLE} data-testid="text-form-title">Two-factor sign-in</h2>
+                    <h1 className={FORM_TITLE} data-testid="text-form-title">Two-factor sign-in</h1>
                     <p className={FORM_LEDE}>
                       Enter the code from your authenticator app, or one of your recovery codes.
                     </p>
@@ -368,7 +369,7 @@ export default function AuthPage() {
               {mode === "login" && (
                 <>
                   <div className="space-y-1">
-                    <h2 className={FORM_TITLE} data-testid="text-form-title">Welcome back</h2>
+                    <h1 className={FORM_TITLE} data-testid="text-form-title">Welcome back</h1>
                     <p className={FORM_LEDE}>Sign in to your account</p>
                   </div>
 
@@ -452,7 +453,7 @@ export default function AuthPage() {
               {mode === "signup" && (
                 <>
                   <div className="space-y-1">
-                    <h2 className={FORM_TITLE} data-testid="text-form-title">Create your account</h2>
+                    <h1 className={FORM_TITLE} data-testid="text-form-title">Create your account</h1>
                     <p className={FORM_LEDE}>Get started with {isPortal() ? CRM_NAME : BRAND_NAME}</p>
                   </div>
 
@@ -581,7 +582,7 @@ export default function AuthPage() {
                     >
                       <ArrowLeft className="h-3.5 w-3.5" /> Back to login
                     </button>
-                    <h2 className={FORM_TITLE}>Reset your password</h2>
+                    <h1 className={FORM_TITLE}>Reset your password</h1>
                     <p className={FORM_LEDE}>Enter your email and we'll send you a reset link</p>
                   </div>
 
@@ -621,7 +622,7 @@ export default function AuthPage() {
               {mode === "reset-password" && (
                 <>
                   <div className="space-y-1">
-                    <h2 className={FORM_TITLE}>Set new password</h2>
+                    <h1 className={FORM_TITLE}>Set new password</h1>
                     <p className={FORM_LEDE}>Choose a new password for your account</p>
                   </div>
 

@@ -19,7 +19,7 @@ import { Download, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, useAddress, type SeoSite, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, useAddress, type SeoSite, type SeoStatus, hideSeoPrices } from "./shell";
 import { lastRunAt } from "./saved";
 import { AddToList, type KwRow } from "./keyword-lists";
 import { AddToPlan, type PlanTask } from "./plan-button";
@@ -177,7 +177,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
     );
   };
 
-  if (!site) return <Empty testId="planner-no-site"><h3>Add your site first</h3><p>The table shows where <i>your</i> site ranks for each service in each town, so it needs a site — add one above.</p></Empty>;
+  if (!site) return <Empty testId="planner-no-site"><h2>Add your site first</h2><p>The table shows where <i>your</i> site ranks for each service in each town, so it needs a site — add one above.</p></Empty>;
   return (
     <div data-testid="service-planner">
       <form className="mb-3 grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); if (draftS.length && draftT.length && !tooMany && !tooLong) {
@@ -203,11 +203,11 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
 
       {last.isError && !asked && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="planner-last-error">Couldn't load the services and towns you used last time ({apiErrorMessage(last.error)}). <button type="button" className="g-link" onClick={() => void last.refetch()}>Try again</button> — or type them in.</p>}
       {asked && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved table…</p>}
-      {asked && saved.isError && <div className="g-callout" role="alert"><h3>Couldn't check for a saved table</h3><p>{apiErrorMessage(saved.error)} Nothing has been charged.</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
-      {!asked && <Empty testId="planner-intro"><h3>Which service, in which town, needs a page?</h3><p>List what you do and where you do it. For every pairing — "roof repair lynden", "siding ferndale" — you get how often it is searched and where the keyword database has {site.domain} ranking for it. Red cells are searches people make for which the database has no ranking for you in its first 100.</p></Empty>}
+      {asked && saved.isError && <div className="g-callout" role="alert"><h2>Couldn't check for a saved table</h2><p>{apiErrorMessage(saved.error)} Nothing has been charged.</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
+      {!asked && <Empty testId="planner-intro"><h2>Which service, in which town, needs a page?</h2><p>List what you do and where you do it. For every pairing — "roof repair lynden", "siding ferndale" — you get how often it is searched and where the keyword database has {site.domain} ranking for it. Red cells are searches people make for which the database has no ranking for you in its first 100.</p></Empty>}
       {asked && saved.isSuccess && !d && (
         <Empty testId="planner-not-run">
-          <h3>{askedCells} search{askedCells === 1 ? "" : "es"} ready to check</h3>
+          <h2>{askedCells} search{askedCells === 1 ? "" : "es"} ready to check</h2>
           {/* "Nothing is charged until…" is true whatever came before; a table that was run and expired is said as such (data-testid planner-expired). */}
           {lastAt && <p data-testid="planner-expired">Last checked <Link href={seoLinks.usage({ month: lastAt.slice(0, 7) })} className={TEXT_LINK} title="That month's lookups on the Usage page">{fmtDate(lastAt)}</Link>; a saved table is kept for {SAVED_FOR}, so this one is bought again.</p>}
           <p>{askedQuote.isLoading ? "Getting the price…" : !priced ? <>Couldn't get the price for this table, so it can't be bought yet. <button type="button" className="g-link" onClick={() => void askedQuote.refetch()}>Try again</button></> : !canPay ? "You don't have enough SEO data left — add credit above." : "Nothing is charged until you press the button."}</p>
@@ -216,7 +216,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
           </Button>
         </Empty>
       )}
-      {d && stale && <Empty testId="planner-stale"><h3>This table was made for another country</h3><p>{site.domain} is now set to {market.label}; the saved table is not shown as its numbers.</p><Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: true })} data-testid="button-planner-rebuild">{run.isPending ? "Checking…" : `Build it for ${market.label}${price != null ? ` — up to ${money(price)}` : ""}`}</Button></Empty>}
+      {d && stale && <Empty testId="planner-stale"><h2>This table was made for another country</h2><p>{site.domain} is now set to {market.label}; the saved table is not shown as its numbers.</p><Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: true })} data-testid="button-planner-rebuild">{run.isPending ? "Checking…" : `Build it for ${market.label}${!hideSeoPrices() && price != null ? ` — up to ${money(price)}` : ""}`}</Button></Empty>}
       {d && !stale && (
         <>
           <Card className="mb-3">
@@ -237,7 +237,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
             <Link href={showAt(undefined)} className={TEXT_LINK} title="Every cell of the grid" data-testid="link-planner-size">{d.services.length} service{d.services.length === 1 ? "" : "s"} × {d.towns.length} town{d.towns.length === 1 ? "" : "s"}</Link>
             {" for "}<Link href={seoLinks.explorer(d.domain)} className={TEXT_LINK} title={`${d.domain} in Site explorer`} data-testid="link-planner-domain">{d.domain}</Link> · {market.label} ·{" "}
             <Link href={seoLinks.usage({ month: d.fetchedAt.slice(0, 7) })} className={TEXT_LINK} title="When this table was checked — that month's lookups on the Usage page" data-testid="link-planner-as-of">as of {fmtDate(d.fetchedAt)}</Link> ·{" "}
-            <button type="button" className="g-link min-h-11" disabled={run.isPending || !canPay || !status?.configured || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: true })} data-testid="button-planner-refresh">{run.isPending ? "Checking…" : `Check again${price != null ? ` — up to ${money(price)}` : ""}`}</button>
+            <button type="button" className="g-link min-h-11" disabled={run.isPending || !canPay || !status?.configured || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: true })} data-testid="button-planner-refresh">{run.isPending ? "Checking…" : `Check again${!hideSeoPrices() && price != null ? ` — up to ${money(price)}` : ""}`}</button>
           </p>
           {d.missing.length > 0 && <p className="mb-2 text-[13px]" role="status" style={{ color: "var(--g-red)" }} data-testid="text-planner-missing">{d.missing.includes("rankings") ? "Your rankings" : "The search volumes"} didn't load this time and {d.missing.length === 1 ? "that part was" : "those parts were"} not charged — the cells show what did load. Check again to fill it in.</p>}
           <div className="mb-2 flex flex-wrap items-center gap-2">

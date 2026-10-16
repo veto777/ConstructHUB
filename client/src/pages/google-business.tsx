@@ -17,6 +17,8 @@ import {
 import googleBusinessLogo from "@assets/google-business-logo.png";
 import { GBP_REINSTATEMENT_CENTS } from "@shared/plans";
 import { formatUsd } from "@shared/plan-copy";
+import { lastSyncText } from "@shared/gbp-connection";
+import { useGoogleConnection } from "@/components/gbp-connection";
 
 // No unsourced statistics on this page: every point is a plain description of
 // how Google Business Profile works, not a number we can't back up.
@@ -108,7 +110,7 @@ export default function GoogleBusinessPage() {
   const { data: locations } = useQuery<{ id: number; gbpLocationName?: string | null; reviewCount?: number | null }[]>({ queryKey: ["/api/locations"], enabled: !!user });
   const { data: monitored } = useQuery<{ id: number }[]>({ queryKey: ["/api/gmb/listings"], enabled: !!user });
   const { data: scans } = useQuery<{ id: number }[]>({ queryKey: ["/api/ranking-grid/scans"], enabled: !!user });
-  const linked = locations?.filter((l) => l.gbpLocationName).length;
+  const { data: connection } = useGoogleConnection(undefined, !!user);
   const reviews = locations?.reduce((n, l) => n + (l.reviewCount ?? 0), 0);
   const count = (n: number | undefined) => (n === undefined ? "—" : n.toLocaleString());
 
@@ -117,7 +119,8 @@ export default function GoogleBusinessPage() {
     <GoogleSectionHeader as="h1" titleTestId="text-hero-title" title="Google Business" description="Manage your profile, check changes and improve your local presence." flush actions={<Link href="/gmb-monitor" asChild><GooglePill variant="solid" icon={Eye} label="Start monitoring" href="/gmb-monitor" testId="link-hero-start"/></Link>}/>
     <GoogleStatGrid cols={4} className="sm:grid-cols-5">
       <GoogleStat label="Locations" value={count(locations?.length)} href="/locations" testId="stat-locations"/>
-      <GoogleStat label="Linked to Google" value={count(linked)} hint={locations && !linked ? "Connect your Google account" : "Syncing reviews and stats"} href="/locations" testId="stat-linked"/>
+      {/* The shared connection truth (shared/gbp-connection.ts): the same words as Locations, Google Reviews and home. */}
+      <GoogleStat label="Google connection" value={connection ? connection.label : "—"} tone={connection?.state === "needs_reconnect" ? "bad" : "default"} hint={connection ? (connection.state === "connected" ? lastSyncText(connection.lastSync) : connection.state === "needs_reconnect" ? `${lastSyncText(connection.lastSync)} · reconnect in Locations` : "Connect in Locations") : undefined} href="/locations" testId="stat-linked"/>
       <GoogleStat label="Google reviews" value={count(reviews)} hint="Saved from your linked listings" href="/google-reviews" testId="stat-reviews"/>
       <GoogleStat label="Monitored listings" value={count(monitored?.length)} hint="Edit Monitor" href="/gmb-monitor" testId="stat-monitored"/>
       <GoogleStat label="Ranking scans" value={count(scans?.length)} hint="Ranking grid" href="/ranking-grid" testId="stat-scans"/>

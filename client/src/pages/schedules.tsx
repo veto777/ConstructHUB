@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AppPage, EmptyState, Notice } from "@/components/app-ui";
+import { AppPage, Notice } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -208,7 +208,7 @@ export default function SchedulesPage() {
       ) : (
         /* No schedule yet: what a row will show and where its data comes from. No sample schedules (CLAUDE.md). */
         <div className="g-callout" data-testid="empty-schedules">
-          <h3 className="inline-flex items-center gap-2"><Clock className="h-4 w-4" aria-hidden="true" /> No schedules yet</h3>
+          <h2 className="inline-flex items-center gap-2"><Clock className="h-4 w-4" aria-hidden="true" /> No schedules yet</h2>
           <p>Each schedule will be listed here with its portal, whether it is active, how often it runs (daily, weekly, monthly, or your own number of hours or days), what it searches for and when it last ran, with a switch to pause it and a bin to delete it.</p>
           <p className="mt-2">Every 15 minutes the server runs the schedules that are due and saves what each portal returns into the shared permit cache, the same stored matches Search permits shows first. A schedule can only target one of the {databasesLoading ? "" : `${databases.length.toLocaleString()} `}portal addresses the live search can query (a checked official link plus a search adapter for its platform; places that share one portal count once).</p>
           <div className="mt-3"><GooglePill icon={Plus} variant="solid" label="Add schedule" onClick={() => setDialogOpen(true)} testId="button-empty-add-schedule" /></div>
@@ -294,9 +294,9 @@ function AddScheduleForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4 pt-1">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-muted-foreground">Portal</Label>
+        <Label htmlFor="select-schedule-database" className="text-xs font-medium text-muted-foreground">Portal</Label>
         <Select value={databaseId} onValueChange={setDatabaseId} disabled={loading || databases.length === 0}>
-          <SelectTrigger data-testid="select-schedule-database">
+          <SelectTrigger id="select-schedule-database" data-testid="select-schedule-database">
             <SelectValue placeholder={loading ? "Loading portals…" : databases.length ? `Select one of ${databases.length} live-searchable portals` : "No live-searchable portals available"} />
           </SelectTrigger>
           <SelectContent>
@@ -314,9 +314,9 @@ function AddScheduleForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-muted-foreground">Search type</Label>
+          <Label htmlFor="select-schedule-search-type" className="text-xs font-medium text-muted-foreground">Search type</Label>
           <Select value={searchType} onValueChange={setSearchType}>
-            <SelectTrigger data-testid="select-schedule-search-type">
+            <SelectTrigger id="select-schedule-search-type" data-testid="select-schedule-search-type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -329,9 +329,9 @@ function AddScheduleForm({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-muted-foreground">Frequency</Label>
+          <Label htmlFor="select-schedule-frequency" className="text-xs font-medium text-muted-foreground">Frequency</Label>
           <Select value={frequency} onValueChange={setFrequency}>
-            <SelectTrigger data-testid="select-schedule-frequency">
+            <SelectTrigger id="select-schedule-frequency" data-testid="select-schedule-frequency">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -361,7 +361,7 @@ function AddScheduleForm({
               data-testid="input-schedule-every"
             />
             <Select value={everyUnit} onValueChange={(v) => setEveryUnit(v as "hours" | "days")}>
-              <SelectTrigger className="w-32" data-testid="select-schedule-every-unit">
+              <SelectTrigger className="w-32" aria-label="Unit: hours or days" data-testid="select-schedule-every-unit">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -379,8 +379,9 @@ function AddScheduleForm({
       )}
 
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-muted-foreground">Search value</Label>
+        <Label htmlFor="input-schedule-search-value" className="text-xs font-medium text-muted-foreground">Search value</Label>
         <Input
+          id="input-schedule-search-value"
           placeholder="Enter the value to search for..."
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}

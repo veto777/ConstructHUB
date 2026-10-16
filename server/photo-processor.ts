@@ -2,6 +2,7 @@ import sharp from "sharp";
 import path from "path";
 import fs from "fs";
 import piexif from "piexifjs";
+import { logError } from "./ops/log";
 
 interface WatermarkOptions {
   text: string;
@@ -159,7 +160,7 @@ export async function processPhoto(options: ProcessOptions): Promise<void> {
         finalPipeline = finalPipeline.composite([{ input: svgOverlay, top: 0, left: 0 }]);
       }
     } catch (wmErr) {
-      console.error("Watermark processing error, continuing without watermark:", wmErr);
+      logError("Watermark processing error, continuing without watermark:", wmErr);
     }
   }
 
@@ -218,7 +219,7 @@ export async function processPhoto(options: ProcessOptions): Promise<void> {
       fs.writeFileSync(outputPath, newBuffer);
       fs.unlinkSync(tempPath);
     } catch (exifErr) {
-      console.error("EXIF embedding error, falling back:", exifErr);
+      logError("EXIF embedding error, falling back:", exifErr);
       fs.renameSync(tempPath, outputPath);
     }
   } else {

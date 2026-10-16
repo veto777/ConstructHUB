@@ -15,7 +15,7 @@ import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, SeoShell, useHash, useScrollTo, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, SeoShell, useHash, useScrollTo, useSelectedSite, useSeoSites, useSeoStatus, hideSeoPrices } from "./shell";
 import { seoLinks } from "./links";
 import { FIGURE_LINK, QUIET_LINK, TEXT_LINK } from "./viz-more";
 
@@ -91,14 +91,14 @@ export default function SeoBatchPage() {
         </div>
       </form>
       <div className="mt-4">
-        {asked.length === 0 && <Empty testId="batch-intro"><h3>Compare a whole list at once</h3><p>Paste the competitors from your {site ? <Link href={seoLinks.rankTracker(site.id, { panel: "competitors" })} className={TEXT_LINK}>rank tracker</Link> : "rank tracker"}, the sites from a <Link href={site ? seoLinks.explorer(site.domain, "linkIntersect") : seoLinks.explorer("")} className={TEXT_LINK}>link intersect</Link>, or any list of websites. For the full picture of one site, open it in <Link href={site ? seoLinks.explorer(site.domain) : seoLinks.explorer("")} className={TEXT_LINK}>Site explorer</Link>.</p></Empty>}
+        {asked.length === 0 && <Empty testId="batch-intro"><h2>Compare a whole list at once</h2><p>Paste the competitors from your {site ? <Link href={seoLinks.rankTracker(site.id, { panel: "competitors" })} className={TEXT_LINK}>rank tracker</Link> : "rank tracker"}, the sites from a <Link href={site ? seoLinks.explorer(site.domain, "linkIntersect") : seoLinks.explorer("")} className={TEXT_LINK}>link intersect</Link>, or any list of websites. For the full picture of one site, open it in <Link href={site ? seoLinks.explorer(site.domain) : seoLinks.explorer("")} className={TEXT_LINK}>Site explorer</Link>.</p></Empty>}
         {asked.length > 0 && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved analysis…</p>}
-        {asked.length > 0 && saved.isError && <div className="g-callout" role="alert"><h3>Couldn't check for a saved analysis</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
+        {asked.length > 0 && saved.isError && <div className="g-callout" role="alert"><h2>Couldn't check for a saved analysis</h2><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
         {asked.length > 0 && saved.isSuccess && !page && (
           <Empty testId="batch-not-run">
-            <h3>{asked.length} site{asked.length === 1 ? "" : "s"} ready to analyse</h3>
+            <h2>{asked.length} site{asked.length === 1 ? "" : "s"} ready to analyse</h2>
             <p>{!canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
-            <Button className="mt-2" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey, again: false })} data-testid="button-batch-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : `Get the numbers${price != null ? ` — about ${money(price)}` : ""}`}</Button>
+            <Button className="mt-2" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey, again: false })} data-testid="button-batch-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : `Get the numbers${!hideSeoPrices() && price != null ? ` — about ${money(price)}` : ""}`}</Button>
           </Empty>
         )}
         {page && (
@@ -107,7 +107,7 @@ export default function SeoBatchPage() {
               <span className="g-text-2" data-testid="text-batch-meta"><Link href={`${seoLinks.batch()}#table-batch`} className={QUIET_LINK} title="The websites, in the table below" data-testid="link-batch-count">{fmtNum(page.rows.length)} site{page.rows.length === 1 ? "" : "s"}</Link> · <Link href={seoLinks.usage({ month: page.fetchedAt.slice(0, 7) })} className={QUIET_LINK} title="When this was looked up — that month's lookups on the Usage page" data-testid="link-batch-as-of">as of {fmtDate(page.fetchedAt)}</Link> · United States</span>
               <button type="button" className="g-pill g-pill--sm !min-h-11 ml-auto" onClick={exportCsv} data-testid="button-batch-export"><Download /> Export</button>
             </div>
-            {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-batch-missing">Didn't load this time: {page.missing.map((m) => MISSING[m] ?? m).join(", ")}. The other columns are complete. <button type="button" className={TEXT_LINK} disabled={run.isPending || !canPay} onClick={() => run.mutate({ body, key: queryKey, again: true })} data-testid="button-batch-retry">{run.isPending ? "Trying again…" : `Try again${price != null ? ` — about ${money(price)}` : ""}`}</button></p>}
+            {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-batch-missing">Didn't load this time: {page.missing.map((m) => MISSING[m] ?? m).join(", ")}. The other columns are complete. <button type="button" className={TEXT_LINK} disabled={run.isPending || !canPay} onClick={() => run.mutate({ body, key: queryKey, again: true })} data-testid="button-batch-retry">{run.isPending ? "Trying again…" : `Try again${!hideSeoPrices() && price != null ? ` — about ${money(price)}` : ""}`}</button></p>}
             {/* On a phone the table's head is hidden (rows become cards), so the order is picked here instead. */}
             <label className="mb-2 flex items-center gap-2 text-[13px] sm:hidden"><span className="g-text-2">Order by</span>
               <select className="g-input g-select !w-auto min-h-11" value={`${sort.key}:${sort.dir}`} onChange={(e) => { const [key, dir] = e.target.value.split(":"); setSort({ key: key as SortKey, dir: dir === "1" ? 1 : -1 }); }} data-testid="select-batch-sort">

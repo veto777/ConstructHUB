@@ -221,16 +221,16 @@ export default function SeoAlertsPage() {
       <p className="g-text-2 text-[12px]">Alerts also go to the bell and your inbox (falls and lost links). Emails: <Link href={seoLinks.appSettings({ tab: "notifications" })} className={TEXT_LINK} data-testid="link-alerts-settings">Settings → Notifications</Link> · what counts as a move: {site ? <Link href={seoLinks.rankTracker(site.id)} className={TEXT_LINK}>Rank tracker → Tracking settings</Link> : "Rank tracker → Tracking settings"}.</p>
 
       {page.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading alerts…</p>}
-      {page.isError && <div className="g-callout" role="alert" data-testid="alerts-error"><h3>Couldn't load your alerts</h3><p>{apiErrorMessage(page.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void page.refetch()}>Try again</button></div>}
+      {page.isError && <div className="g-callout" role="alert" data-testid="alerts-error"><h2>Couldn't load your alerts</h2><p>{apiErrorMessage(page.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void page.refetch()}>Try again</button></div>}
       {page.isSuccess && undelivered > 0 && (
         <div className="g-callout mb-4" role="status" data-testid="alerts-undelivered">
-          <h3><Link href={seoLinks.alerts({ site: scopeSite, kind: kind === "all" ? undefined : kind, undelivered: true })} className={QUIET_LINK} data-testid="link-alerts-undelivered">{fmtNum(undelivered)} alert{undelivered === 1 ? "" : "s"} could not be sent</Link></h3>
+          <h2><Link href={seoLinks.alerts({ site: scopeSite, kind: kind === "all" ? undefined : kind, undelivered: true })} className={QUIET_LINK} data-testid="link-alerts-undelivered">{fmtNum(undelivered)} alert{undelivered === 1 ? "" : "s"} could not be sent</Link></h2>
           <p>The bell or email delivery failed again and again, so it was given up. {undelivered === 1 ? "The alert is" : "They are"} kept here, marked "Not sent" — or "Email not sent" when the bell entry went out and only the email failed.</p>
         </div>
       )}
       {page.isSuccess && alerts.length === 0 && (
         <Empty testId="alerts-empty">
-          <h3>{(page.data?.totalAll ?? 0) > 0 ? "No alerts of this kind" : scope === "site" && site ? `No alerts for ${site.domain} yet` : "No alerts yet"}</h3>
+          <h2>{(page.data?.totalAll ?? 0) > 0 ? "No alerts of this kind" : scope === "site" && site ? `No alerts for ${site.domain} yet` : "No alerts yet"}</h2>
           <p>{(page.data?.totalAll ?? 0) > 0 ? <>Choose a different kind above, or <Link href={seoLinks.alerts({ site: scope === "site" && site ? site.id : undefined })} className={TEXT_LINK}>show every kind</Link>.</> : "An alert appears here when a weekly rank check, a monthly backlink snapshot, a repeating local grid or the keyword watch finds a change in the saved data, compared with the one before it, that is big enough to qualify. The first check of a keyword has nothing to compare with, so alerts start with the second."}</p>
         </Empty>
       )}

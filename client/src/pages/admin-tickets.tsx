@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusPill, type PillTone } from "@/components/crm-ui";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle } from "@/lib/page-titles";
 
 type Row = { id: number; number: string; category: string; severity: string; title: string; status: string; created_at: string; contact_email: string; customer_number: string | null };
 type Full = Row & { recording_sid: string | null; transcript_status: string | null; channel: string; description: string; steps: string | null; device: string | null; verified_with: string | null; account_email: string | null; notes: { at: string; by: string; kind: string; text: string }[]; history: { at: string; event: string; by?: string }[] };
@@ -37,7 +38,7 @@ const norm = (v: string) => v.trim().toLowerCase().replace(/[\s_-]+/g, " ");
 const matchesTyped = (t: Row, typed: string) => { const q = norm(typed); return !!q && (norm(t.status) === q || norm(LABEL[t.status] ?? "") === q); };
 
 export default function AdminTicketsPage() {
-  useDocumentTitle("Support tickets · Admin");
+  useDocumentTitle(appPageTitle("/admin/tickets")!);
   const [filter, setFilter] = useState<string>("all");
   const [typed, setTyped] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
@@ -77,7 +78,7 @@ export default function AdminTicketsPage() {
             <div className="min-w-0">
               {rows.length === 0 ? (
                 <div className="g-callout" data-testid="empty-tickets">
-                  <h3>{all.length === 0 ? "No tickets yet" : "No ticket matches"}</h3>
+                  <h2>{all.length === 0 ? "No tickets yet" : "No ticket matches"}</h2>
                   <p>{all.length === 0 ? "A ticket appears here when Gabe opens one on the support line." : filter === CUSTOM ? "Type one of: open, in progress, waiting on customer, resolved, closed." : "Pick another status."}</p>
                 </div>
               ) : (
@@ -128,7 +129,7 @@ function TicketDetail({ id }: { id: number }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div><p className="font-mono text-xs">{t.number} · {t.severity} · {t.category}</p><h2 className="text-lg font-semibold">{t.title}</h2></div>
         <Select value={t.status} onValueChange={(v) => setStatus.mutate(v)}>
-          <SelectTrigger className="w-52" data-testid="select-ticket-status"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-52" aria-label="Ticket status" data-testid="select-ticket-status"><SelectValue /></SelectTrigger>
           <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{LABEL[s]}</SelectItem>)}</SelectContent>
         </Select>
       </div>
@@ -144,7 +145,7 @@ function TicketDetail({ id }: { id: number }) {
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase text-muted-foreground">Notes & replies</p>
         {t.notes.map((n, i) => <div key={i} className="rounded border p-2 text-sm"><p className="text-xs text-muted-foreground">{n.kind === "reply" ? "Emailed to customer" : "Internal note"} · {n.by} · {format(new Date(n.at), "MMM d, h:mm a")}</p><p className="whitespace-pre-wrap">{n.text}</p></div>)}
-        <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a note or a reply…" data-testid="input-ticket-note" />
+        <Textarea value={text} onChange={(e) => setText(e.target.value)} aria-label="Note or reply" placeholder="Write a note or a reply…" data-testid="input-ticket-note" />
         <div className="flex gap-2">
           <Button variant="outline" disabled={!text.trim() || note.isPending} onClick={() => note.mutate(false)} data-testid="button-ticket-note"><StickyNote className="mr-1 h-4 w-4" />Save note</Button>
           <Button disabled={!text.trim() || note.isPending} onClick={() => note.mutate(true)} data-testid="button-ticket-reply"><Mail className="mr-1 h-4 w-4" />Email the customer</Button>

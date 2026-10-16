@@ -27,7 +27,20 @@ function readCookie(name: string): string | null {
 const landingUtm = typeof window === "undefined" ? null : utmFromSearch(window.location.search);
 let landingSent = false;
 
+// After a 429 the tracker stays quiet until the server's Retry-After passes (the rest of its 15-minute
+// window), instead of firing a refused request — and a red console line — on every page. Kept in
+// sessionStorage too, so a full reload inside the window stays quiet as well.
+const PAUSE_KEY = "ch_analytics_paused_until";
+let pausedUntil = 0;
+try { pausedUntil = Number(sessionStorage.getItem(PAUSE_KEY)) || 0; } catch { /* storage blocked */ }
+
+function analyticsPauseMs(retryAfter: string | null): number {
+  const secs = Number(retryAfter);
+  return Number.isFinite(secs) && secs > 0 ? Math.min(secs, 15 * 60) * 1000 : 15 * 60 * 1000;
+}
+
 function sendPageview(path: string) {
+  if (Date.now() < pausedUntil) return;
   const landing = !landingSent;
   landingSent = true;
   const body = JSON.stringify({
@@ -36,19 +49,18 @@ function sendPageview(path: string) {
       ...(landing ? { landing: true, ...(landingUtm ? { utm: landingUtm } : {}) } : {}),
     }],
   });
-  // sendBeacon survives navigation; fetch is the fallback.
-  try {
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon("/api/analytics/events", new Blob([body], { type: "application/json" }));
-      return;
-    }
-  } catch { /* fall through */ }
+  // keepalive lets the request outlive a navigation (what sendBeacon was for) while still
+  // letting us read a 429 and back off.
   fetch("/api/analytics/events", {
     method: "POST",
     headers: { "content-type": "application/json" },
     credentials: "same-origin",
     body,
     keepalive: true,
+  }).then((r) => {
+    if (r.status !== 429) return;
+    pausedUntil = Date.now() + analyticsPauseMs(r.headers.get("retry-after"));
+    try { sessionStorage.setItem(PAUSE_KEY, String(pausedUntil)); } catch { /* storage blocked */ }
   }).catch(() => {});
 }
 

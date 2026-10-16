@@ -220,11 +220,12 @@ describe("buildDashboard (development database)", () => {
     expect(value(p, "gbp", "locations")).toBe(2);
     expect(tile(p, "gbp").metrics.find((m) => m.key === "locations")?.limit).toBe(UNLIMITED);
     // Results lead the tiles; quotas the header already meters come last.
-    expect(tile(p, "gbp").metrics[0].key).toBe("googleAccounts");
+    expect(tile(p, "gbp").metrics[0].key).toBe("googleConnection");
     expect(tile(p, "clickGuard").metrics.map((m) => m.key)).toEqual(["suspicious30d", "blockedIps", "sites"]);
     expect(tile(p, "rankingGrid").metrics[0].key).toBe("averageRank");
     expect(p.account.usage.find((u) => u.key === "texts")?.label).toBe("Texts");
-    expect(value(p, "gbp", "googleAccounts")).toBe(1);
+    // The seeded grant carries no Business Profile scope, so the shared truth says it needs reconnecting.
+    expect(value(p, "gbp", "googleConnection")).toBe("Needs reconnect");
     // 5★, 4★, 3★ (the Google-deleted 1★ excluded): 4.0 average, one this week, one unanswered.
     expect(value(p, "reviews", "rating")).toBe(4);
     expect(value(p, "reviews", "newThisWeek")).toBe(1);

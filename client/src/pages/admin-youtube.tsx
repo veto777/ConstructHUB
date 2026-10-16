@@ -20,6 +20,7 @@ import { FaYoutube } from "react-icons/fa6";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle } from "@/lib/page-titles";
 import { VerificationCancelled } from "@/components/recent-auth";
 
 type Status = {
@@ -139,13 +140,15 @@ export function YoutubeChannelCard({ enabled = true, heading = "h2" }: { enabled
         </Notice>
       )}
 
+      {/* The rows below are h3s: on the full page (h1) an outline level sits between them, for screen readers only. */}
+      {heading === "h1" && <h2 className="sr-only">Connection status</h2>}
       <GoogleList testId="list-youtube-status">
         <GoogleListRow
           size="md"
           testId="row-youtube-status"
           title={usable ? data.channelTitle || "Connected" : data.needsReconnect ? "Connection expired" : "Not connected"}
           badges={
-            <span className={`g-chip g-chip--sm !normal-case ${usable ? "!text-[var(--g-green)]" : data.needsReconnect ? "!text-[var(--g-red)]" : ""}`} data-testid="badge-youtube-status">
+            <span className={`g-chip g-chip--sm !normal-case ${usable ? "!text-[var(--g-green)]" : data.needsReconnect ? "!text-[var(--g-red)]" : ""}`} data-testid="badge-youtube-status" aria-hidden={!usable && !data.needsReconnect ? true : undefined}>
               {usable ? <><CheckCircle2 className="mr-1 inline h-3 w-3" aria-hidden="true" />Connected</> : data.needsReconnect ? "Needs reconnect" : "Not connected"}
             </span>
           }
@@ -215,7 +218,7 @@ export function YoutubeChannelCard({ enabled = true, heading = "h2" }: { enabled
 }
 
 export default function AdminYoutubePage() {
-  useDocumentTitle("YouTube channel | ConstructHUB");
+  useDocumentTitle(appPageTitle("/admin/youtube")!);
   const { toast } = useToast();
   // Back from Google: say what happened once, then drop ?result= so a refresh does not repeat it.
   useEffect(() => {

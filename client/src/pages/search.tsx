@@ -699,7 +699,7 @@ export default function SearchPage() {
                 setLocationSearch("");
               }}
             >
-              <SelectTrigger data-testid="select-scope-state" className="w-full">
+              <SelectTrigger aria-label="Search area: state" data-testid="select-scope-state" className="w-full">
                 <Globe className="h-3.5 w-3.5 text-muted-foreground mr-1.5" />
                 <SelectValue placeholder="All states" />
               </SelectTrigger>
@@ -724,7 +724,7 @@ export default function SearchPage() {
                 }
               }}
             >
-              <SelectTrigger data-testid="select-scope-location" className="w-full">
+              <SelectTrigger aria-label="Search area: county or city" data-testid="select-scope-location" className="w-full">
                 <SelectValue placeholder="All counties & cities" />
               </SelectTrigger>
               <SelectContent>
@@ -734,6 +734,7 @@ export default function SearchPage() {
                     <input
                       type="text"
                       placeholder="Search cities or counties..."
+                      aria-label="Search cities or counties"
                       value={locationSearch}
                       onChange={(e) => setLocationSearch(e.target.value)}
                       className="w-full pl-7 pr-2 py-1.5 text-sm rounded-md border bg-background outline-none focus:ring-1 focus:ring-ring"
@@ -790,11 +791,12 @@ export default function SearchPage() {
           <div className="space-y-3 pt-3 g-divider">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <label htmlFor="search-filter-date-from" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <CalendarDays className="h-3 w-3" />
                   Date from
                 </label>
                 <Input
+                  id="search-filter-date-from"
                   type="date"
                   value={filterDateFrom}
                   max={filterDateTo || undefined}
@@ -805,11 +807,12 @@ export default function SearchPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <label htmlFor="search-filter-date-to" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <CalendarDays className="h-3 w-3" />
                   Date to
                 </label>
                 <Input
+                  id="search-filter-date-to"
                   type="date"
                   value={filterDateTo}
                   min={filterDateFrom || undefined}
@@ -1209,7 +1212,7 @@ export default function SearchPage() {
         <section className="space-y-4" data-testid="empty-search-ready" aria-label="Before you search">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="g-callout">
-              <h3>How this works</h3>
+              <h2>How this works</h2>
               <ol className="mt-1 list-decimal space-y-1 pl-5">
                 <li>Pick a place: a state, and a county or city if you want to narrow it (or click a dot on the map).</li>
                 <li>Type an address, a name, a company, a license number or a permit number and press Search.</li>
@@ -1217,7 +1220,7 @@ export default function SearchPage() {
               </ol>
             </div>
             <div className="g-callout">
-              <h3>What will appear here</h3>
+              <h2>What will appear here</h2>
               <p>One row per permit, exactly as the city or county portal lists it: the address, permit number, type, status, issue date and which portal it came from, with contacts and details when the portal publishes them.</p>
               <p className="mt-2">Results come only from the {typeof dbCounts?.searchable === "number" ? `${dbCounts.searchable.toLocaleString()} ` : ""}portals the live search can query (a checked official link plus a search adapter) and from matches saved by earlier searches. A portal that could not be searched is named, so an empty list never means no permit exists.</p>
             </div>

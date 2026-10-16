@@ -39,6 +39,7 @@ import { mailboxConfig, mailboxConfigured, wireConfigured } from "./mailbox";
 import * as store from "./store";
 import { pressWorkerConfig, runPressPass } from "./worker";
 import { datelineFor, draftRelease, pressAiConfigured, reviseRelease } from "./writer";
+import { logError } from "../ops/log";
 
 type Deps = { getOrCreateCustomer: (userId: number, email: string) => Promise<string>; sendStripeError: (res: Response, err: unknown) => void };
 type GetUser = (req: any, res: any) => any;
@@ -128,7 +129,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
         setup: setup(),
         pacing: { lastSubmittedAt: last ? new Date(last).toISOString() : null, recommendedGapDays: PRESS_RECOMMENDED_GAP_DAYS },
       });
-    } catch (err) { console.error("[press] overview:", err); res.status(500).json({ message: "Could not load your press releases" }); }
+    } catch (err) { logError("[press] overview:", err); res.status(500).json({ message: "Could not load your press releases" }); }
   });
 
   app.get("/api/press/outlets", (req, res) => {
@@ -180,7 +181,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       if (credits[body.data.tier] < 1) return res.status(402).json({ code: "no_credit", message: `You have no ${body.data.tier === "premium" ? "Premium" : "Wire"} release credit left. Pick a package first.` });
       const row = await store.createRelease(user.id, body.data.tier, body.data.input as PressReleaseInput);
       res.json(store.releaseView(row));
-    } catch (err) { console.error("[press] create release:", err); res.status(500).json({ message: "Could not start the release" }); }
+    } catch (err) { logError("[press] create release:", err); res.status(500).json({ message: "Could not start the release" }); }
   });
 
   app.get("/api/press/releases/:id", async (req, res) => {
@@ -201,7 +202,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       const issues = txt ? checkRelease(txt, input) : [];
       const upd = await store.updateRelease(row.id, { input, text: txt, issues });
       res.json(store.releaseView(upd));
-    } catch (err) { console.error("[press] edit release:", err); res.status(500).json({ message: "Could not save" }); }
+    } catch (err) { logError("[press] edit release:", err); res.status(500).json({ message: "Could not save" }); }
   });
 
   app.post("/api/press/releases/:id/photos", async (req, res) => {
@@ -223,7 +224,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
         }
         const upd = await store.updateRelease(row.id, { input: { ...row.input, photos } });
         res.json(store.releaseView(upd));
-      } catch (e) { console.error("[press] photo upload:", e); res.status(500).json({ message: "Could not store the photo" }); }
+      } catch (e) { logError("[press] photo upload:", e); res.status(500).json({ message: "Could not store the photo" }); }
     });
   });
 
@@ -241,7 +242,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       const issues = checkRelease(t, row.input);
       const upd = await store.updateRelease(row.id, { text: t, issues });
       res.json(store.releaseView(upd));
-    } catch (err: any) { console.error("[press] draft:", err); res.status(502).json({ message: `The writer could not finish: ${String(err?.message ?? err).slice(0, 200)}` }); }
+    } catch (err: any) { logError("[press] draft:", err); res.status(502).json({ message: `The writer could not finish: ${String(err?.message ?? err).slice(0, 200)}` }); }
   });
 
   app.post("/api/press/releases/:id/approve", async (req, res) => {
@@ -258,9 +259,9 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
         return res.status(402).json({ code: "no_credit", message: `No ${row.tier === "premium" ? "Premium" : "Wire"} credit left. Pick a package to send it.` });
       }
       const upd = await store.updateRelease(row.id, { status: "ready", issues, last_error: null });
-      void runPressPass({ inbox: false }).catch((e) => console.error("[press] pass after approve:", e));
+      void runPressPass({ inbox: false }).catch((e) => logError("[press] pass after approve:", e));
       res.json(store.releaseView(upd));
-    } catch (err) { console.error("[press] approve:", err); res.status(500).json({ message: "Could not approve the release" }); }
+    } catch (err) { logError("[press] approve:", err); res.status(500).json({ message: "Could not approve the release" }); }
   });
 
   app.post("/api/press/releases/:id/cancel", async (req, res) => {
@@ -271,7 +272,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       if (!["draft", "ready", "changes_requested"].includes(row.status)) return res.status(409).json({ message: "A release that reached the wire cannot be cancelled here" });
       if (row.order_id) await store.refundCredit(row.id);
       res.json(store.releaseView(await store.updateRelease(row.id, { status: "cancelled" })));
-    } catch (err) { console.error("[press] cancel:", err); res.status(500).json({ message: "Could not cancel" }); }
+    } catch (err) { logError("[press] cancel:", err); res.status(500).json({ message: "Could not cancel" }); }
   });
 
   // ---- admin ------------------------------------------------------------------------------------------------

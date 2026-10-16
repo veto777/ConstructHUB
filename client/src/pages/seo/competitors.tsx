@@ -53,14 +53,14 @@ export default function SeoCompetitorsPage() {
       {wanted && <ActiveFilter onClear={() => { clearParams(["competitor"], false); setCompetitor(""); gap.reset(); }} clearLabel="Clear">Competitor: {wanted}{r?.competitor === clean(wanted) ? "" : " — press Find the gap to compare (nothing is bought until then)"}</ActiveFilter>}
       {site && (
         <form className="mb-4 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); if (competitor.trim()) { setParam("competitor", clean(competitor)); gap.mutate(); } }} data-testid="form-competitor">
-          <input className="g-input" placeholder="competitor.com" value={competitor} onChange={(e) => setCompetitor(e.target.value)} data-testid="input-competitor" />
+          <input className="g-input" aria-label="Competitor's website" placeholder="competitor.com" value={competitor} onChange={(e) => setCompetitor(e.target.value)} data-testid="input-competitor" />
           <Button type="submit" className="sm:w-auto" disabled={!configured || !competitor.trim() || gap.isPending || !canAfford(status.data, "competitorGap")} data-testid="button-find-gaps" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
             {gap.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />} Find the gap
           </Button>
         </form>
       )}
-      {site && !r && <Empty testId="seo-gap-empty"><h3>Compare {site.domain} with a competitor</h3><p>One comparison ({priceOf(status.data, "competitorGap")} of your SEO data) returns up to 100 keywords where the competitor ranks in Google's organic results and {site.domain} does not, with their position, the search volume and the difficulty. Track the ones worth going after. How visible the competitors you follow are on your tracked keywords is the rank tracker's <Link href={seoLinks.rankTracker(site.id, { panel: "competitors" })} className={TEXT_LINK} data-testid="link-competitors-panel">Competitors on your keywords</Link> panel (share of voice; spends nothing).</p></Empty>}
-      {!site && sites.isSuccess && <Empty testId="seo-empty-sites"><h3>No sites yet</h3><p>Add your own site above first; the gap is measured against it.</p></Empty>}
+      {site && !r && <Empty testId="seo-gap-empty"><h2>Compare {site.domain} with a competitor</h2><p>One comparison{priceOf(status.data, "competitorGap") ? ` (${priceOf(status.data, "competitorGap")} of your SEO data)` : ""} returns up to 100 keywords where the competitor ranks in Google's organic results and {site.domain} does not, with their position, the search volume and the difficulty. Track the ones worth going after. How visible the competitors you follow are on your tracked keywords is the rank tracker's <Link href={seoLinks.rankTracker(site.id, { panel: "competitors" })} className={TEXT_LINK} data-testid="link-competitors-panel">Competitors on your keywords</Link> panel (share of voice; spends nothing).</p></Empty>}
+      {!site && sites.isSuccess && <Empty testId="seo-empty-sites"><h2>No sites yet</h2><p>Add your own site above first; the gap is measured against it.</p></Empty>}
       {r && site && (
         <>
           {/* Both sites open in Site explorer; the competitor also in the rank tracker's competitors panel. */}

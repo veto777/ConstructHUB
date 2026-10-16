@@ -11,7 +11,7 @@ import { ToolTabsList as TabsList } from "@/components/tool";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -469,11 +469,11 @@ export default function CrmPriceBookPage() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input className="pl-8" value={q} onChange={(e) => setQ(e.target.value)}
-                placeholder="Search SKUs by name or code" data-testid="input-search-items" />
+                placeholder="Search SKUs by name or code" aria-label="Search SKUs by name or code" data-testid="input-search-items" />
             </div>
             {!!categories?.length && (
               <Select value={catId} onValueChange={setCatId}>
-                <SelectTrigger className="w-44" data-testid="select-item-category"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-44" aria-label="Category" data-testid="select-item-category"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All categories</SelectItem>
                   {categories.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -531,7 +531,7 @@ export default function CrmPriceBookPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Input className="w-24 h-9" type="number" min={0} step="any" placeholder="qty"
+                    <Input className="w-24 h-9" type="number" min={0} step="any" placeholder="qty" aria-label={`Quantity of ${i.name}`}
                       value={qtyById[i.id] ?? ""}
                       onChange={(e) => setQtyById({ ...qtyById, [i.id]: e.target.value })}
                       data-testid={`input-qty-${i.id}`} />
@@ -542,7 +542,7 @@ export default function CrmPriceBookPage() {
                     {canManage && (
                       <>
                         <Button size="sm" variant="ghost" onClick={() => openEdit(i)}
-                          data-testid={`button-edit-item-${i.id}`}>
+                          aria-label={`Edit ${i.name}`} data-testid={`button-edit-item-${i.id}`}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button size="sm" variant="ghost"
@@ -556,7 +556,7 @@ export default function CrmPriceBookPage() {
                             });
                           }}
                           disabled={delItem.isPending}
-                          data-testid={`button-delete-item-${i.id}`}>
+                          aria-label={`Delete ${i.name}`} data-testid={`button-delete-item-${i.id}`}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </>
@@ -636,29 +636,29 @@ export default function CrmPriceBookPage() {
             <CardContent className="space-y-4">
               {canManage && (
                 <div className="flex flex-wrap gap-2 items-end rounded-lg border bg-muted/30 p-3">
-                  <div className="flex-1 min-w-[180px]"><Label className="text-xs">Name</Label>
-                    <Input value={mat.name} maxLength={200} onChange={(e) => setMat({ ...mat, name: e.target.value })}
+                  <div className="flex-1 min-w-[180px]"><Label htmlFor="pb-name" className="text-xs">Name</Label>
+                    <Input id="pb-name" value={mat.name} maxLength={200} onChange={(e) => setMat({ ...mat, name: e.target.value })}
                       placeholder="Architectural shingles" data-testid="input-mat-name" /></div>
-                  <div className="w-28"><Label className="text-xs">SKU</Label>
-                    <Input value={mat.sku} maxLength={80} onChange={(e) => setMat({ ...mat, sku: e.target.value })} /></div>
-                  <div className="w-24"><Label className="text-xs">Unit</Label>
+                  <div className="w-28"><Label htmlFor="pb-sku" className="text-xs">SKU</Label>
+                    <Input id="pb-sku" value={mat.sku} maxLength={80} onChange={(e) => setMat({ ...mat, sku: e.target.value })} /></div>
+                  <div className="w-24"><Label htmlFor="pb-unit" className="text-xs">Unit</Label>
                     <Select value={mat.unit} onValueChange={(v) => setMat({ ...mat, unit: v })}>
-                      <SelectTrigger data-testid="select-mat-unit"><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="pb-unit" data-testid="select-mat-unit"><SelectValue /></SelectTrigger>
                       <SelectContent>{units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
                     </Select></div>
                   {seeCosts && (
-                    <div className="w-28"><Label className="text-xs">Cost $</Label>
-                      <Input type="number" min={0} step="0.01" value={mat.cost} onChange={(e) => setMat({ ...mat, cost: e.target.value })} /></div>
+                    <div className="w-28"><Label htmlFor="pb-cost" className="text-xs">Cost $</Label>
+                      <Input id="pb-cost" type="number" min={0} step="0.01" value={mat.cost} onChange={(e) => setMat({ ...mat, cost: e.target.value })} /></div>
                   )}
                   {seePrices && (
-                    <div className="w-28"><Label className="text-xs">Price $</Label>
-                      <Input type="number" min={0} step="0.01" value={mat.price} onChange={(e) => setMat({ ...mat, price: e.target.value })} /></div>
+                    <div className="w-28"><Label htmlFor="pb-price" className="text-xs">Price $</Label>
+                      <Input id="pb-price" type="number" min={0} step="0.01" value={mat.price} onChange={(e) => setMat({ ...mat, price: e.target.value })} /></div>
                   )}
-                  <div className="w-20"><Label className="text-xs">Waste%</Label>
-                    <Input type="number" min={0} max={100} value={mat.waste}
+                  <div className="w-20"><Label htmlFor="pb-waste" className="text-xs">Waste%</Label>
+                    <Input id="pb-waste" type="number" min={0} max={100} value={mat.waste}
                       onChange={(e) => setMat({ ...mat, waste: e.target.value })} /></div>
                   <Button size="sm" className="h-10" disabled={!mat.name.trim() || addMat.isPending}
-                    onClick={() => addMat.mutate()} data-testid="button-add-material"><Plus className="h-4 w-4" /></Button>
+                    onClick={() => addMat.mutate()} aria-label="Add material" data-testid="button-add-material"><Plus className="h-4 w-4" /></Button>
                 </div>
               )}
               {!materials?.length && !matsLoading && !matsError ? (
@@ -691,7 +691,7 @@ export default function CrmPriceBookPage() {
                             {seeCosts && <td className={crmTable.tdRight}>{margin}</td>}
                             {canManage && (
                               <td className={`${crmTable.tdRight} whitespace-nowrap`}>
-                                <Button size="sm" variant="ghost" data-testid={`button-edit-mat-${m.id}`}
+                                <Button size="sm" variant="ghost" aria-label={`Edit ${m.name}`} data-testid={`button-edit-mat-${m.id}`}
                                   onClick={() => setMatDlg({ id: m.id, form: {
                                     name: m.name ?? "", sku: m.sku ?? "", unit: m.unit ?? "ea",
                                     cost: dollars(m.costCents), price: dollars(m.priceCents),
@@ -699,7 +699,7 @@ export default function CrmPriceBookPage() {
                                   } })}>
                                   <Pencil className="h-4 w-4" />
                                 </Button>
-                                <Button size="sm" variant="ghost" disabled={delMat.isPending} data-testid={`button-delete-mat-${m.id}`}
+                                <Button size="sm" variant="ghost" disabled={delMat.isPending} aria-label={`Delete ${m.name}`} data-testid={`button-delete-mat-${m.id}`}
                                   onClick={() => {
                                     confirmAction({
                                       id: "delete-material",
@@ -734,19 +734,19 @@ export default function CrmPriceBookPage() {
             <CardContent className="space-y-3">
               {canManage && (
                 <div className="flex flex-wrap gap-2 items-end rounded-lg border bg-muted/30 p-3">
-                  <div className="flex-1 min-w-[160px]"><Label className="text-xs">Name</Label>
-                    <Input value={lab.name} maxLength={120} onChange={(e) => setLab({ ...lab, name: e.target.value })}
+                  <div className="flex-1 min-w-[160px]"><Label htmlFor="pb-name-2" className="text-xs">Name</Label>
+                    <Input id="pb-name-2" value={lab.name} maxLength={120} onChange={(e) => setLab({ ...lab, name: e.target.value })}
                       placeholder="Roofing crew" data-testid="input-lab-name" /></div>
                   {seeCosts && (
-                    <div><Label className="text-xs">Cost/hr $</Label>
-                      <Input type="number" min={0} step="0.01" value={lab.cost} onChange={(e) => setLab({ ...lab, cost: e.target.value })} /></div>
+                    <div><Label htmlFor="pb-cost-hr" className="text-xs">Cost/hr $</Label>
+                      <Input id="pb-cost-hr" type="number" min={0} step="0.01" value={lab.cost} onChange={(e) => setLab({ ...lab, cost: e.target.value })} /></div>
                   )}
                   {seePrices && (
-                    <div><Label className="text-xs">Price/hr $</Label>
-                      <Input type="number" min={0} step="0.01" value={lab.price} onChange={(e) => setLab({ ...lab, price: e.target.value })} /></div>
+                    <div><Label htmlFor="pb-price-hr" className="text-xs">Price/hr $</Label>
+                      <Input id="pb-price-hr" type="number" min={0} step="0.01" value={lab.price} onChange={(e) => setLab({ ...lab, price: e.target.value })} /></div>
                   )}
                   <Button size="sm" className="h-10" disabled={!lab.name.trim() || addLab.isPending} onClick={() => addLab.mutate()}
-                    data-testid="button-add-labor"><Plus className="h-4 w-4" /></Button>
+                    aria-label="Add labor rate" data-testid="button-add-labor"><Plus className="h-4 w-4" /></Button>
                 </div>
               )}
               {laborState}
@@ -764,13 +764,13 @@ export default function CrmPriceBookPage() {
                     <span className="font-medium">{money(l.hourlyPriceCents)}/hr</span>
                     {canManage && (
                       <>
-                        <Button size="sm" variant="ghost" className="ml-2" data-testid={`button-edit-lab-${l.id}`}
+                        <Button size="sm" variant="ghost" className="ml-2" aria-label={`Edit ${l.name}`} data-testid={`button-edit-lab-${l.id}`}
                           onClick={() => setLabDlg({ id: l.id, form: {
                             name: l.name ?? "", cost: dollars(l.hourlyCostCents), price: dollars(l.hourlyPriceCents),
                           } })}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" disabled={delLab.isPending} data-testid={`button-delete-lab-${l.id}`}
+                        <Button size="sm" variant="ghost" disabled={delLab.isPending} aria-label={`Delete ${l.name}`} data-testid={`button-delete-lab-${l.id}`}
                           onClick={() => {
                             confirmAction({
                               id: "delete-labor-rate",
@@ -798,17 +798,17 @@ export default function CrmPriceBookPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label className="text-xs">Formula</Label>
-                <Input value={f.formula} maxLength={500}
+                <Label htmlFor="pb-formula" className="text-xs">Formula</Label>
+                <Input id="pb-formula" value={f.formula} maxLength={500}
                   onChange={(e) => { setF({ ...f, formula: e.target.value }); setFres(null); setFwarn([]); }}
                   className="font-mono" data-testid="input-formula" />
               </div>
               <div className="flex flex-wrap gap-2 items-end">
-                <div><Label className="text-xs">[SQUARES]</Label>
-                  <Input className="w-24" type="number" value={f.squares}
+                <div><Label htmlFor="pb-squares" className="text-xs">[SQUARES]</Label>
+                  <Input id="pb-squares" className="w-24" type="number" value={f.squares}
                     onChange={(e) => setF({ ...f, squares: e.target.value })} /></div>
-                <div><Label className="text-xs">[WASTE]</Label>
-                  <Input className="w-24" type="number" value={f.waste}
+                <div><Label htmlFor="pb-waste-2" className="text-xs">[WASTE]</Label>
+                  <Input id="pb-waste-2" className="w-24" type="number" value={f.waste}
                     onChange={(e) => setF({ ...f, waste: e.target.value })} /></div>
                 <Button size="sm" onClick={() => testF.mutate()} disabled={testF.isPending} data-testid="button-test-formula">
                   {testF.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Test
@@ -842,10 +842,10 @@ export default function CrmPriceBookPage() {
         <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto" data-testid="dialog-templates">
           <DialogHeader>
             <DialogTitle>Start from a template</DialogTitle>
+            <DialogDescription>
+              The scope text is written for you — set your price, tweak the words, save.
+            </DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            The scope text is written for you — set your price, tweak the words, save.
-          </p>
           <div className="space-y-2">
             {ITEM_TEMPLATES.map((t) => (
               <button
@@ -872,27 +872,28 @@ export default function CrmPriceBookPage() {
         <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto" data-testid="dialog-item">
           <DialogHeader>
             <DialogTitle>{dlg?.id ? "Edit SKU" : "Add SKU"}</DialogTitle>
+            <DialogDescription>A price book item you can drop into any estimate.</DialogDescription>
           </DialogHeader>
           {dlg && (
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Name</Label>
-                  <Input value={dlg.form.name} maxLength={200}
+                  <Label htmlFor="pb-name-3" className="text-xs">Name</Label>
+                  <Input id="pb-name-3" value={dlg.form.name} maxLength={200}
                     onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, name: e.target.value } })}
                     placeholder="Re-roof, architectural" data-testid="input-item-name" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Code</Label>
-                  <Input value={dlg.form.code} maxLength={60}
+                  <Label htmlFor="pb-code" className="text-xs">Code</Label>
+                  <Input id="pb-code" value={dlg.form.code} maxLength={60}
                     onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, code: e.target.value } })}
                     placeholder="auto — next SKU number" data-testid="input-item-code" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Unit</Label>
+                  <Label htmlFor="pb-unit-2" className="text-xs">Unit</Label>
                   <Select value={dlg.form.unit}
                     onValueChange={(v) => setDlg({ ...dlg, form: { ...dlg.form, unit: v } })}>
-                    <SelectTrigger data-testid="select-item-unit"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="pb-unit-2" data-testid="select-item-unit"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {units.map((u: string) => (
                         <SelectItem key={u} value={u}>{u}</SelectItem>
@@ -901,10 +902,10 @@ export default function CrmPriceBookPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Pricing mode</Label>
+                  <Label htmlFor="pb-pricing-mode" className="text-xs">Pricing mode</Label>
                   <Select value={dlg.form.pricingMode}
                     onValueChange={(v) => setDlg({ ...dlg, form: { ...dlg.form, pricingMode: v } })}>
-                    <SelectTrigger data-testid="select-item-pricing"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="pb-pricing-mode" data-testid="select-item-pricing"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {modeOptions.map((m) => (
                         <SelectItem key={m} value={m}>{EDITABLE_MODES[m] ?? `${m} (current setup)`}</SelectItem>
@@ -922,16 +923,16 @@ export default function CrmPriceBookPage() {
                   <>
                     {seePrices && (
                       <div className="space-y-1.5">
-                        <Label className="text-xs">Price $</Label>
-                        <Input type="number" min={0} step="0.01" value={dlg.form.flatPrice}
+                        <Label htmlFor="pb-price-2" className="text-xs">Price $</Label>
+                        <Input id="pb-price-2" type="number" min={0} step="0.01" value={dlg.form.flatPrice}
                           onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, flatPrice: e.target.value } })}
                           data-testid="input-item-flat-price" />
                       </div>
                     )}
                     {seeCosts && (
                       <div className="space-y-1.5">
-                        <Label className="text-xs">Cost $ (optional)</Label>
-                        <Input type="number" min={0} step="0.01" value={dlg.form.flatCost}
+                        <Label htmlFor="pb-cost-optional" className="text-xs">Cost $ (optional)</Label>
+                        <Input id="pb-cost-optional" type="number" min={0} step="0.01" value={dlg.form.flatCost}
                           onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, flatCost: e.target.value } })}
                           data-testid="input-item-flat-cost" />
                       </div>
@@ -942,17 +943,17 @@ export default function CrmPriceBookPage() {
                   <>
                     {seePrices && (
                       <div className="space-y-1.5">
-                        <Label className="text-xs">Rate $/sq ft</Label>
-                        <Input type="number" min={0} step="0.01" value={dlg.form.ratePerSqft}
+                        <Label htmlFor="pb-rate-sq-ft" className="text-xs">Rate $/sq ft</Label>
+                        <Input id="pb-rate-sq-ft" type="number" min={0} step="0.01" value={dlg.form.ratePerSqft}
                           onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, ratePerSqft: e.target.value } })}
                           placeholder="18.00" data-testid="input-item-rate-sqft" />
                       </div>
                     )}
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Measured area</Label>
+                      <Label htmlFor="pb-measured-area" className="text-xs">Measured area</Label>
                       <Select value={dlg.form.sqftMetric}
                         onValueChange={(v) => setDlg({ ...dlg, form: { ...dlg.form, sqftMetric: v } })}>
-                        <SelectTrigger data-testid="select-item-sqft-metric"><SelectValue /></SelectTrigger>
+                        <SelectTrigger id="pb-measured-area" data-testid="select-item-sqft-metric"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="auto">auto (from the name)</SelectItem>
                           <SelectItem value="roof">roof sq ft</SelectItem>
@@ -964,8 +965,8 @@ export default function CrmPriceBookPage() {
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Scope / description (shows on every estimate built from this SKU)</Label>
-                <Textarea rows={6} value={dlg.form.description} maxLength={4000}
+                <Label htmlFor="pb-scope-description-shows-on-eve" className="text-xs">Scope / description (shows on every estimate built from this SKU)</Label>
+                <Textarea id="pb-scope-description-shows-on-eve" rows={6} value={dlg.form.description} maxLength={4000}
                   onChange={(e) => setDlg({ ...dlg, form: { ...dlg.form, description: e.target.value } })}
                   placeholder={"What's included, line by line. The client reads this before deciding.\n• Tear off and dispose\n• New underlayment\n• …"}
                   data-testid="input-item-description" />
@@ -993,32 +994,32 @@ export default function CrmPriceBookPage() {
 
       <Dialog open={!!matDlg} onOpenChange={(open) => { if (!open) setMatDlg(null); }}>
         <DialogContent className="max-w-lg" data-testid="dialog-material">
-          <DialogHeader><DialogTitle>Edit material</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Edit material</DialogTitle><DialogDescription>Change this material's name, unit and cost.</DialogDescription></DialogHeader>
           {matDlg && (
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5 sm:col-span-2"><Label className="text-xs">Name</Label>
-                <Input value={matDlg.form.name} maxLength={200} data-testid="input-edit-mat-name"
+              <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="pb-name-4" className="text-xs">Name</Label>
+                <Input id="pb-name-4" value={matDlg.form.name} maxLength={200} data-testid="input-edit-mat-name"
                   onChange={(e) => setMatDlg({ ...matDlg, form: { ...matDlg.form, name: e.target.value } })} /></div>
-              <div className="space-y-1.5"><Label className="text-xs">SKU</Label>
-                <Input value={matDlg.form.sku} maxLength={80}
+              <div className="space-y-1.5"><Label htmlFor="pb-sku-2" className="text-xs">SKU</Label>
+                <Input id="pb-sku-2" value={matDlg.form.sku} maxLength={80}
                   onChange={(e) => setMatDlg({ ...matDlg, form: { ...matDlg.form, sku: e.target.value } })} /></div>
-              <div className="space-y-1.5"><Label className="text-xs">Unit</Label>
+              <div className="space-y-1.5"><Label htmlFor="pb-unit-3" className="text-xs">Unit</Label>
                 <Select value={matDlg.form.unit} onValueChange={(v) => setMatDlg({ ...matDlg, form: { ...matDlg.form, unit: v } })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="pb-unit-3"><SelectValue /></SelectTrigger>
                   <SelectContent>{units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
                 </Select></div>
               {seeCosts && (
-                <div className="space-y-1.5"><Label className="text-xs">Cost $</Label>
-                  <Input type="number" min={0} step="0.01" value={matDlg.form.cost}
+                <div className="space-y-1.5"><Label htmlFor="pb-cost-2" className="text-xs">Cost $</Label>
+                  <Input id="pb-cost-2" type="number" min={0} step="0.01" value={matDlg.form.cost}
                     onChange={(e) => setMatDlg({ ...matDlg, form: { ...matDlg.form, cost: e.target.value } })} /></div>
               )}
               {seePrices && (
-                <div className="space-y-1.5"><Label className="text-xs">Price $</Label>
-                  <Input type="number" min={0} step="0.01" value={matDlg.form.price} data-testid="input-edit-mat-price"
+                <div className="space-y-1.5"><Label htmlFor="pb-price-3" className="text-xs">Price $</Label>
+                  <Input id="pb-price-3" type="number" min={0} step="0.01" value={matDlg.form.price} data-testid="input-edit-mat-price"
                     onChange={(e) => setMatDlg({ ...matDlg, form: { ...matDlg.form, price: e.target.value } })} /></div>
               )}
-              <div className="space-y-1.5"><Label className="text-xs">Waste %</Label>
-                <Input type="number" min={0} max={100} value={matDlg.form.waste}
+              <div className="space-y-1.5"><Label htmlFor="pb-waste-3" className="text-xs">Waste %</Label>
+                <Input id="pb-waste-3" type="number" min={0} max={100} value={matDlg.form.waste}
                   onChange={(e) => setMatDlg({ ...matDlg, form: { ...matDlg.form, waste: e.target.value } })} /></div>
             </div>
           )}
@@ -1034,20 +1035,20 @@ export default function CrmPriceBookPage() {
 
       <Dialog open={!!labDlg} onOpenChange={(open) => { if (!open) setLabDlg(null); }}>
         <DialogContent className="max-w-md" data-testid="dialog-labor">
-          <DialogHeader><DialogTitle>Edit labor rate</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Edit labor rate</DialogTitle><DialogDescription>Change this labor rate's name and hourly cost.</DialogDescription></DialogHeader>
           {labDlg && (
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5 sm:col-span-2"><Label className="text-xs">Name</Label>
-                <Input value={labDlg.form.name} maxLength={120} data-testid="input-edit-lab-name"
+              <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="pb-name-5" className="text-xs">Name</Label>
+                <Input id="pb-name-5" value={labDlg.form.name} maxLength={120} data-testid="input-edit-lab-name"
                   onChange={(e) => setLabDlg({ ...labDlg, form: { ...labDlg.form, name: e.target.value } })} /></div>
               {seeCosts && (
-                <div className="space-y-1.5"><Label className="text-xs">Cost/hr $</Label>
-                  <Input type="number" min={0} step="0.01" value={labDlg.form.cost}
+                <div className="space-y-1.5"><Label htmlFor="pb-cost-hr-2" className="text-xs">Cost/hr $</Label>
+                  <Input id="pb-cost-hr-2" type="number" min={0} step="0.01" value={labDlg.form.cost}
                     onChange={(e) => setLabDlg({ ...labDlg, form: { ...labDlg.form, cost: e.target.value } })} /></div>
               )}
               {seePrices && (
-                <div className="space-y-1.5"><Label className="text-xs">Price/hr $</Label>
-                  <Input type="number" min={0} step="0.01" value={labDlg.form.price} data-testid="input-edit-lab-price"
+                <div className="space-y-1.5"><Label htmlFor="pb-price-hr-2" className="text-xs">Price/hr $</Label>
+                  <Input id="pb-price-hr-2" type="number" min={0} step="0.01" value={labDlg.form.price} data-testid="input-edit-lab-price"
                     onChange={(e) => setLabDlg({ ...labDlg, form: { ...labDlg.form, price: e.target.value } })} /></div>
               )}
             </div>

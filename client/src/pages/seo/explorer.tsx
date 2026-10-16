@@ -40,6 +40,7 @@ import { findMarket, marketKey, marketLabel, SEO_MARKETS, type SeoMarket } from 
 import { AddToList } from "./keyword-lists";
 import { useAddSite } from "./lookup-box";
 import { SampleExplorerFigures } from "./samples";
+import { showSample } from "@/components/sample-preview";
 
 type GapKey = "contentGap" | "linkIntersect" | "opportunities" | "directories" | "mentions";
 type ViewKey = ReportKey | GapKey | "overview";
@@ -351,7 +352,7 @@ export default function SeoExplorerPage() {
       </form>
       </ToolBarSlot>
       <p className="g-text-2 mb-4 text-[13px]" data-testid="text-explorer-cost">
-        A new report costs {priceOf(status.data, "explorerReport")} of your SEO data. Reopening a saved one is free for {recent.data?.freeForDays ?? 7} days.{holdNote(status.data, "explorerReport")}{!affordable && " You don't have enough SEO data left for a new report — add credit above."}
+        {priceOf(status.data, "explorerReport") ? <>A new report costs {priceOf(status.data, "explorerReport")} of your SEO data. </> : null}Reopening a saved one is free for {recent.data?.freeForDays ?? 7} days.{holdNote(status.data, "explorerReport")}{!affordable && " You don't have enough SEO data left for a new report — add credit above."}
       </p>
       {/* What the address picked on the overview (a month, two months compared, a chart figure, a first-look table), with a way to clear it — the report views have their own chip. */}
       {overview.length > 0 && (
@@ -387,8 +388,8 @@ export default function SeoExplorerPage() {
         </Panel>
       )}
       {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status" data-testid="text-explorer-loading"><Loader2 className="h-4 w-4 animate-spin" /> {analyse.isPending ? "Gathering search and backlink data — about ten seconds…" : "Opening the saved report…"}</p>}
-      {savedFailed && <div className="g-callout" role="alert" data-testid="explorer-saved-error"><h3>Couldn't check for a saved report</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
-      {notFoundYet && <Empty testId="explorer-empty"><h3>No report for {domain} yet</h3><p>Press <b>Analyse</b> to build one.{standalone && <> The {MENU_LABEL[view]} report below is its own lookup: a page already run opens free, and nothing is bought until you press Run.</>}</p>
+      {savedFailed && <div className="g-callout" role="alert" data-testid="explorer-saved-error"><h2>Couldn't check for a saved report</h2><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
+      {notFoundYet && <Empty testId="explorer-empty"><h2>No report for {domain} yet</h2><p>Press <b>Analyse</b> to build one.{standalone && <> The {MENU_LABEL[view]} report below is its own lookup: a page already run opens free, and nothing is bought until you press Run.</>}</p>
         {!tracked && <p className="mt-2 flex flex-wrap items-center gap-2"><Button type="button" disabled={adder.pending} onClick={() => adder.add(shown)} data-testid="button-explorer-add-site">{adder.pending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />} Add to my sites</Button><span className="g-text-2 text-[12px]">Free — puts {shown} on your dashboard and in the rank tracker; nothing is checked or charged until you add keywords.</span></p>}
       </Empty>}
       {notFoundYet && domain && !standalone && (
@@ -400,9 +401,9 @@ export default function SeoExplorerPage() {
       )}
       {!report && !busy && !domain && (recent.data?.items.length ?? 0) === 0 && (
         <>
-          <Empty testId="explorer-intro"><h3>Look up any website</h3><p>Enter a domain to see an estimate of how much search traffic it gets, which keywords and pages earn it, who links to it and who it competes with.</p></Empty>
+          <Empty testId="explorer-intro"><h2>Look up any website</h2><p>Enter a domain to see an estimate of how much search traffic it gets, which keywords and pages earn it, who links to it and who it competes with.</p></Empty>
           {/* What a report's headline looks like — a made-up site, shown only while nothing real has been looked up (samples.tsx). */}
-          <div className="mt-4"><SampleExplorerFigures what="what a report shows once you look a site up" /></div>
+          {showSample({ isLoading: recent.isLoading, isError: recent.isError, total: recent.data?.items.length, filtered: !!domain }) && <div className="mt-4"><SampleExplorerFigures what="what a report shows once you look a site up" /></div>}
         </>
       )}
 

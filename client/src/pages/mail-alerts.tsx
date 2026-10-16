@@ -18,13 +18,15 @@ import { useToast } from "@/hooks/use-toast";
 import { AppPage, Toolbar, Notice } from "@/components/app-ui";
 import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { HelpButton } from "@/components/help-button";
-import { SamplePreview } from "@/components/sample-preview";
+import { SAMPLE_BUSINESS, SamplePreview, sampleAgo, showSample } from "@/components/sample-preview";
 import { PresetFilter } from "@/components/domains/preset-filter";
+import { MAIL_ALERT_FILTER_MAX } from "@shared/mail-alerts";
 import {
   PlanRequired,
   planRequiredFrom,
 } from "@/components/plan-required";
 import { pollWithinBudget } from "@/components/domains/polling";
+import { AdminSetupNote } from "@/hooks/use-platform-admin";
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass =
   "h-10 w-full rounded-full border bg-background px-4 text-sm sm:w-auto";
@@ -35,11 +37,10 @@ const SEVERITIES: readonly [string, string][] = [["critical", "Critical"], ["war
 const categoryLabel = (c: string) => CATEGORIES.find(([v]) => v === c)?.[1] ?? c;
 
 /** Obviously made-up alerts for the sample shown while the inbox is empty (never stored, never sent). */
-const sampleAgo = (hours: number) => new Date(Date.now() - hours * 3600000).toISOString();
 const SAMPLE_ALERTS = [
-  { id: -1, subject: "Action needed: verify your Business Profile for Sample Roofing Co.", category: "gbp", severity: "warning", sender: "businessprofile-noreply@google.com", received_at: sampleAgo(3), read_at: null, location_name: "Sample Roofing Co." },
-  { id: -2, subject: "Transfer request for example-plumbing.example", category: "registrar", severity: "critical", sender: "support@sample-registrar.example", received_at: sampleAgo(26), read_at: null, location_name: "Example Plumbing LLC" },
-  { id: -3, subject: "Your Google Ads account: policy update", category: "ads", severity: "warning", sender: "ads-noreply@google.com", received_at: sampleAgo(50), read_at: sampleAgo(40), location_name: null },
+  { id: -1, subject: `Action needed: verify your Business Profile for ${SAMPLE_BUSINESS.name}`, category: "gbp", severity: "warning", sender: "profile-alerts@sample-provider.example", received_at: sampleAgo({ hours: 3 }), read_at: null, location_name: "Sample Roofing Co." },
+  { id: -2, subject: "Transfer request for example-plumbing.example", category: "registrar", severity: "critical", sender: "support@sample-registrar.example", received_at: sampleAgo({ hours: 26 }), read_at: null, location_name: "Example Plumbing LLC" },
+  { id: -3, subject: "Your Google Ads account: policy update", category: "ads", severity: "warning", sender: "ads-alerts@sample-provider.example", received_at: sampleAgo({ hours: 50 }), read_at: sampleAgo({ hours: 40 }), location_name: null },
 ];
 
 function ListSkeleton({ rows = 5 }: { rows?: number }) {
@@ -172,7 +173,7 @@ export default function MailAlertsPage() {
   const counts = messages?.counts;
   const configured = !!settings?.address;
   // The stat row's first number whatever the filters say: every alert kept (30 days).
-  const { data: overview } = useQuery<any>({ queryKey: ["/api/mail-alerts?limit=1"], refetchInterval: pollWithinBudget(60_000) });
+  const { data: overview } = useQuery<{ total: number }>({ queryKey: ["/api/mail-alerts?limit=1"], refetchInterval: pollWithinBudget(60_000) });
   const totalAlerts: number | null = overview ? Number(overview.total || 0) : null;
   const filtering = !!(q || category || severity || unread || mapped || filterClient);
   // Google's format (owner, 2026-10-07): a quiet page title, section headings with a hairline, alerts as rows.
@@ -250,7 +251,7 @@ export default function MailAlertsPage() {
       )}
       {totalAlerts === 0 && (
         <div className="g-callout" data-testid="mail-alerts-how-it-works">
-          <h3>How this works</h3>
+          <h2>How this works</h2>
           <ol className="mt-1 list-decimal space-y-1 pl-5">
             <li>Copy your private forwarding address below.</li>
             <li>In Gmail, forward mail from the provider senders (Google Business Profile, Search Console, Google Ads, Cloudflare, your registrar) to it.</li>
@@ -311,10 +312,10 @@ export default function MailAlertsPage() {
               </div>
             </div>
           ) : (
-            <Notice tone="info" title="No forwarding address yet on this server" testId="notice-inbound-unconfigured">
-              Your private forwarding address is made from the server’s inbound mail domain, which an
-              administrator sets with <code className="text-xs">INBOUND_MAIL_DOMAIN</code> in the server
-              environment. Until then there is nothing to forward to; alerts already stored still show below.
+            <Notice tone="info" title="Your forwarding address isn’t ready yet" testId="notice-inbound-unconfigured">
+              Mail forwarding isn’t switched on yet, so there is no address to forward to; there is nothing for you
+              to do. Alerts already stored still show below.
+              <AdminSetupNote>set <code className="text-xs">INBOUND_MAIL_DOMAIN</code> in the server environment; each account’s address is made from it.</AdminSetupNote>
             </Notice>
           )
         ) : settingsError ? (
@@ -367,6 +368,7 @@ export default function MailAlertsPage() {
                   allLabel="All providers"
                   presets={CATEGORIES}
                   placeholder="Provider"
+                  maxLength={MAIL_ALERT_FILTER_MAX}
                   selectClass={selectClass}
                   testId="filter-category"
                   value={category}
@@ -381,6 +383,7 @@ export default function MailAlertsPage() {
                   allLabel="All severity levels"
                   presets={SEVERITIES}
                   placeholder="Severity"
+                  maxLength={MAIL_ALERT_FILTER_MAX}
                   selectClass={selectClass}
                   testId="filter-severity"
                   value={severity}
@@ -579,6 +582,8 @@ export default function MailAlertsPage() {
           ) : !messages?.items?.length ? (
             filtering ? (
               <p className="py-4 text-sm g-text-2" data-testid="alerts-empty-filtered">No alerts match these filters.</p>
+            ) : !showSample({ isLoading, isError: !!messagesError, total: messages?.items?.length, filtered: filtering, page: page - 1 }) ? (
+              <p className="py-4 text-sm g-text-2" data-testid="alerts-empty-page">No alerts on this page.</p>
             ) : (
               <SamplePreview
                 what="what the inbox shows once provider mail is forwarded here"

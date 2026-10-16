@@ -17,6 +17,7 @@
 import { Router, type Express, type Request, type Response } from "express";
 import { courseUnlocks, type CourseAccess, type ModuleRef } from "../state-guides";
 import { findLesson, lessonModule, lessonModuleOpen, type LessonModuleKey } from "./lessons";
+import { logError } from "../ops/log";
 
 export type MasterClassRouteDeps = {
   /** The account's included course and purchase rows (server/course-access.ts getCourseAccess). */
@@ -74,7 +75,7 @@ export function masterClassRouter(auth: Auth, devPreview = false, deps: MasterCl
       if (g.status !== 200) return res.status(g.status).json(g.body);
       res.json({ module: g.key, lessons: g.module.lessons, footer: g.module.footer ?? [] });
     } catch (err) {
-      console.error("Error loading Master Class lessons:", err);
+      logError("Error loading Master Class lessons:", err);
       res.status(500).json({ message: "Could not load the lessons. Please try again." });
     }
   });
@@ -89,7 +90,7 @@ export function masterClassRouter(auth: Auth, devPreview = false, deps: MasterCl
       if (g.status !== 200) return res.status(g.status).json(g.body);
       res.json({ module: g.key, ...lesson });
     } catch (err) {
-      console.error("Error loading a Master Class lesson:", err);
+      logError("Error loading a Master Class lesson:", err);
       res.status(500).json({ message: "Could not load this lesson. Please try again." });
     }
   });

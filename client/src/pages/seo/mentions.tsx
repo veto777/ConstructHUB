@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, ExternalLink, Loader2, Play } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, TabStrip, useAddress, type SeoStatus } from "./shell";
+import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, TabStrip, useAddress, type SeoStatus, hideSeoPrices } from "./shell";
 import { FIGURE_LINK, FOCUS_RING, LINK_CUE, QUIET_LINK, TEXT_LINK } from "./viz-more";
 import { seoLinks } from "./links";
 import { AddToPlan, type PlanTask } from "./plan-button";
@@ -129,7 +129,7 @@ export function MentionsView({ siteId, domain, status, checkId, onCheck }: { sit
   useEffect(() => { if (peek.data) { keep(peek.data); learn(peek.data, peek.data.readAt); } }, [peek.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const peekFailed = peek.isError && !kept[typed];
   if (q.isLoading) return <p className="g-text-2 py-4 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading…</p>;
-  if (q.isError) return <div className="g-callout" role="alert"><h3>Couldn't load mentions</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
+  if (q.isError) return <div className="g-callout" role="alert"><h2>Couldn't load mentions</h2><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
   const page = kept[norm(name)] ?? null;
   // Rows are read for the places on the server when the check is loaded; edited places are read here the same way
   // (whole words in the title and the excerpt) until they are saved.
@@ -196,14 +196,14 @@ export function MentionsView({ siteId, domain, status, checkId, onCheck }: { sit
           <input className="g-input w-80 max-w-full" value={placesText} onChange={(e) => setPlacesText(e.target.value)} placeholder="e.g. Bellingham, Whatcom, Lynden" data-testid="input-mentions-places" /></label>
         {placesChanged && <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={savePlaces.isPending} onClick={() => savePlaces.mutate({ siteId, places })} data-testid="button-mentions-places">Save places (free)</button>}
         <button type="button" className="g-pill" disabled={!nameOk || run.isPending || peek.isFetching || peekFailed || !status?.configured || !canPay(price)} onClick={() => run.mutate({ siteId, name: name.trim(), replaces: page?.fetchedAt })} data-testid="button-mentions-run">
-          {run.isPending ? <Loader2 className="animate-spin" /> : <Play />} {run.isPending ? "Looking…" : `${page ? "Check again" : "Look for mentions"}${price != null ? ` — up to ${money(price)}` : ""}`}
+          {run.isPending ? <Loader2 className="animate-spin" /> : <Play />} {run.isPending ? "Looking…" : `${page ? "Check again" : "Look for mentions"}${!hideSeoPrices() && price != null ? ` — up to ${money(price)}` : ""}`}
         </button>
       </div>
       {!nameOk && name.trim() && <p className="mb-2 text-[12px]" role="status" style={{ color: "var(--g-red)" }}>Use the business name only — letters, numbers, spaces and &amp; ' . , -</p>}
       {price == null && status && <p className="g-text-2 mb-2 text-[12px]">The price couldn't be loaded, so nothing can be bought yet — reload the page.</p>}
       {price != null && !canPay(price) && <p className="mb-2 text-[12px]" style={{ color: "var(--g-red)" }}>Not enough SEO data left — add credit on the SEO dashboard.</p>}
       {!page ? (
-        <Empty testId="mentions-none"><h3>{peek.isFetching ? "Looking for a saved check of this name…" : peekFailed ? "Couldn't look for a saved check of this name" : Object.keys(kept).length ? "No check saved for this name" : "Not checked yet"}</h3>{peekFailed && <p role="alert">{apiErrorMessage(peek.error)} <button type="button" className={TEXT_LINK} onClick={() => void peek.refetch()} data-testid="button-mentions-peek-retry">Look again (free)</button></p>}<p>One check lists up to {fmtNum(q.data?.rows ?? 50)} websites that use the name (one page each, your own site left out) and checks which of them link to you. Saved and free to reopen for a week.</p></Empty>
+        <Empty testId="mentions-none"><h2>{peek.isFetching ? "Looking for a saved check of this name…" : peekFailed ? "Couldn't look for a saved check of this name" : Object.keys(kept).length ? "No check saved for this name" : "Not checked yet"}</h2>{peekFailed && <p role="alert">{apiErrorMessage(peek.error)} <button type="button" className={TEXT_LINK} onClick={() => void peek.refetch()} data-testid="button-mentions-peek-retry">Look again (free)</button></p>}<p>One check lists up to {fmtNum(q.data?.rows ?? 50)} websites that use the name (one page each, your own site left out) and checks which of them link to you. Saved and free to reopen for a week.</p></Empty>
       ) : (
         <>
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">

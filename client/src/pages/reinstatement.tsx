@@ -107,33 +107,33 @@ export default function ReinstatementPage() {
   const requestForm = (                <form className="space-y-4" onSubmit={handleSubmit} data-testid="form-reinstatement">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Your name <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
-                      <Input value={formData.name} onChange={e => updateField("name", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="input-reinstate-name" />
+                      <Label htmlFor="reinstate-name" className={user ? "text-sm font-medium" : FIELD_LABEL}>Your name <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                      <Input value={formData.name} onChange={e => updateField("name", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} id="reinstate-name" data-testid="input-reinstate-name" />
                     </div>
                     <div>
-                      <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Your email <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
-                      <Input type="email" required value={formData.email} onChange={e => updateField("email", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="input-reinstate-email" />
+                      <Label htmlFor="reinstate-email" className={user ? "text-sm font-medium" : FIELD_LABEL}>Your email <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                      <Input type="email" required value={formData.email} onChange={e => updateField("email", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} id="reinstate-email" data-testid="input-reinstate-email" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Business name <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
-                      <Input value={formData.businessName} onChange={e => updateField("businessName", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="input-reinstate-business" />
+                      <Label htmlFor="reinstate-business" className={user ? "text-sm font-medium" : FIELD_LABEL}>Business name <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                      <Input value={formData.businessName} onChange={e => updateField("businessName", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} id="reinstate-business" data-testid="input-reinstate-business" />
                     </div>
                     <div>
-                      <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Website URL</Label>
-                      <Input value={formData.websiteUrl} onChange={e => updateField("websiteUrl", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="input-reinstate-website" />
+                      <Label htmlFor="reinstate-website" className={user ? "text-sm font-medium" : FIELD_LABEL}>Website URL</Label>
+                      <Input value={formData.websiteUrl} onChange={e => updateField("websiteUrl", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} id="reinstate-website" data-testid="input-reinstate-website" />
                     </div>
                   </div>
                   <div>
-                    <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Business address <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                    <Label htmlFor="reinstate-address" className={user ? "text-sm font-medium" : FIELD_LABEL}>Business address <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
                     <p className="text-xs text-muted-foreground">Please include this, even if the address is hidden.</p>
-                    <Input value={formData.businessAddress} onChange={e => updateField("businessAddress", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="input-reinstate-address" />
+                    <Input value={formData.businessAddress} onChange={e => updateField("businessAddress", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} id="reinstate-address" data-testid="input-reinstate-address" />
                   </div>
                   <div>
-                    <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Which best describes your business? <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                    <Label htmlFor="reinstate-business-type" className={user ? "text-sm font-medium" : FIELD_LABEL}>Which best describes your business? <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
                     <Select value={formData.businessType} onValueChange={v => updateField("businessType", v)}>
-                      <SelectTrigger className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="select-business-type">
+                      <SelectTrigger className={user ? "mt-1.5 min-h-10" : FIELD} id="reinstate-business-type" data-testid="select-business-type">
                         <SelectValue placeholder="Please choose one" />
                       </SelectTrigger>
                       <SelectContent>
@@ -158,8 +158,9 @@ export default function ReinstatementPage() {
                     </RadioGroup>
                   </div>
                   <div>
-                    <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Describe the problem you're having <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                    <Label htmlFor="reinstate-problem" className={user ? "text-sm font-medium" : FIELD_LABEL}>Describe the problem you're having <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
                     <Textarea
+                      id="reinstate-problem"
                       value={formData.problemDescription}
                       onChange={e => updateField("problemDescription", e.target.value)}
                       placeholder="Tell us about the suspension — when it happened, any details from Google, anything you've already tried, and anything else we should know."

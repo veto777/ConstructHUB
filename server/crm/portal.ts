@@ -51,6 +51,7 @@ import { onlinePaymentRails } from "./payments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
 import type { CrmNotificationPref } from "@shared/schema";
 import { resolveOrgTheme, themePayload } from "@shared/theme-colors";
+import { logError } from "../ops/log";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -448,7 +449,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       emailed = true;
     } catch (e: any) {
       emailError = String(e?.message || e).slice(0, 300);
-      console.error("[crm] estimate send failed:", emailError);
+      logError("[crm] estimate send failed:", emailError);
     }
 
     // Mark it sent even if SMTP failed — the link is live and copyable, so the
@@ -1830,7 +1831,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
       emailed = true;
     } catch (e: any) {
       emailError = String(e?.message || e).slice(0, 300);
-      console.error("[crm] invoice send failed:", emailError);
+      logError("[crm] invoice send failed:", emailError);
     }
 
     const [row] = await db.update(crmInvoices).set({

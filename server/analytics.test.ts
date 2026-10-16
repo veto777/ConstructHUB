@@ -6,8 +6,9 @@
  * Pinned behaviours:
  *   1. Consent is enforced exactly: ch_consent === "granted" AND a
  *      server-minted ch_vid, or nothing is recorded.
- *   2. The events endpoint is per-IP throttled (120 events/15min, batch rows
- *      counted) — the dashboard-poisoning flood now 429s.
+ *   2. The events endpoint is throttled per visitor (120 events/15min, batch
+ *      rows counted) with a generous per-IP backstop, so an office sharing one
+ *      IP is not cut off; the flood 429s with a Retry-After.
  *   3. Malformed cookie %-escapes never 500 either endpoint.
  *   4. Query strings (invite tokens!) are stripped before storage and the
  *      stored ip is anonymized to a /24.
@@ -17,7 +18,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "crypto";
 import pg from "pg";
-import { isMintedVisitorId, stripQuery, anonymizeIp } from "./analytics";
+import { isMintedVisitorId, stripQuery, anonymizeIp, createEventLimiter } from "./analytics";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
 const DATABASE_URL =
@@ -87,6 +88,44 @@ describe("analytics helpers (unit)", () => {
   });
 });
 
+describe("event limiter (unit)", () => {
+  const make = (start = 0) => {
+    let t = start;
+    const lim = createEventLimiter({ visitorLimit: 10, ipLimit: 25, windowMs: 1000, now: () => t });
+    return { lim, tick: (ms: number) => { t += ms; } };
+  };
+
+  it("caps one visitor without touching another visitor on the same IP", () => {
+    const { lim } = make();
+    expect(lim.take("a", "1.2.3.4", 10).ok).toBe(true);
+    expect(lim.take("a", "1.2.3.4", 1).ok).toBe(false);
+    expect(lim.take("b", "1.2.3.4", 10).ok).toBe(true);
+  });
+
+  it("the IP backstop still stops a flood of minted visitor ids", () => {
+    const { lim } = make();
+    expect(lim.take("a", "ip", 10).ok).toBe(true);
+    expect(lim.take("b", "ip", 10).ok).toBe(true);
+    const third = lim.take("c", "ip", 10);
+    expect(third.ok).toBe(false);
+    expect(lim.take("c", "other-ip", 10).ok).toBe(true);
+  });
+
+  it("a refusal charges neither budget, and says when to retry", () => {
+    const { lim, tick } = make();
+    expect(lim.take("a", "ip", 8).ok).toBe(true);
+    tick(400);
+    expect(lim.take("a", "ip", 2).ok).toBe(true);
+    const refused = lim.take("a", "ip", 3);
+    expect(refused).toEqual({ ok: false, retryAfterMs: 600 });
+    // The refused 3 rows were not counted against the IP either.
+    expect(lim.take("b", "ip", 10).ok).toBe(true);
+    expect(lim.take("c", "ip", 5).ok).toBe(true);
+    tick(600);
+    expect(lim.take("a", "ip", 3).ok).toBe(true);
+  });
+});
+
 describe("POST /api/analytics/events consent gate", () => {
   it("no consent cookie records nothing", async () => {
     const r = await postEvents({ events: [{ path: "/x" }] });
@@ -137,7 +176,7 @@ describe("POST /api/analytics/events consent gate", () => {
     expect(rows).toEqual([{ path: "/review/:token/unsubscribe", referrer: "https://example.invalid/contract/sign/:token" }]);
   });
 
-  it("429s once an ip blows through 120 events in the window", async () => {
+  it("429s once a visitor blows through 120 events in the window, not their office neighbour", async () => {
     const vid = randomUUID();
     vidsToClean.push(vid);
     const xff = freshXff();
@@ -150,6 +189,14 @@ describe("POST /api/analytics/events consent gate", () => {
     }
     const seventh = await postEvents(batch, cookie, xff);
     expect(seventh.status).toBe(429);
+    expect(Number(seventh.headers.get("retry-after"))).toBeGreaterThan(0);
+
+    // A second visitor behind the same IP is still counted.
+    const other = randomUUID();
+    vidsToClean.push(other);
+    const neighbour = await postEvents({ events: [{ path: "/flood/neighbour" }] }, `ch_consent=granted; ch_vid=${other}`, xff);
+    expect(neighbour.status).toBe(200);
+    expect((await neighbour.json()).recorded).toBe(1);
   });
 
   it("a malformed % sequence in the cookie header never 500s", async () => {

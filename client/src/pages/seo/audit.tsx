@@ -242,28 +242,28 @@ export default function SeoAuditPage() {
         </Button>
       )}
      helpKey="seo.audit">
-      {!site && sites.isSuccess && <Empty testId="audit-empty-sites"><h3>No sites yet</h3><p>Add your site above, then run a crawl to see its health score and issues.</p></Empty>}
+      {!site && sites.isSuccess && <Empty testId="audit-empty-sites"><h2>No sites yet</h2><p>Add your site above, then run a crawl to see its health score and issues.</p></Empty>}
       {askedSite && (site ? q.isLoading : sites.isLoading) && asked.length > 0 && <ActiveFilter words={`${asked.map((k) => wordOf(k, current[k]!)).join(", ")} (reading the crawl…)`} clearHref={seoLinks.audit(askedSite, { tab: view === "issues" ? undefined : view, at: at ?? undefined, vs: vs ?? undefined })} />}
       {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading the audit…</p>}
-      {site && q.isError && <div className="g-callout" role="alert" data-testid="audit-error"><h3>Couldn't load {at || vs ? "that crawl" : "the audit"}</h3><p>{apiErrorMessage(q.error)}{d ? " What is shown below is the crawl shown before." : ""}</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" className="g-pill" onClick={() => void q.refetch()}>Try again</button>{(at || vs) && <Link href={seoLinks.audit(site.id, { tab: view === "issues" ? undefined : view })} className="g-pill max-sm:!min-h-11" data-testid="link-audit-newest-error">Show the newest crawl</Link>}</div></div>}
+      {site && q.isError && <div className="g-callout" role="alert" data-testid="audit-error"><h2>Couldn't load {at || vs ? "that crawl" : "the audit"}</h2><p>{apiErrorMessage(q.error)}{d ? " What is shown below is the crawl shown before." : ""}</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" className="g-pill" onClick={() => void q.refetch()}>Try again</button>{(at || vs) && <Link href={seoLinks.audit(site.id, { tab: view === "issues" ? undefined : view })} className="g-pill max-sm:!min-h-11" data-testid="link-audit-newest-error">Show the newest crawl</Link>}</div></div>}
       {site && q.isPlaceholderData && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="audit-switching"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" />Loading the crawl you chose…</p>}
       {running && (
         <div className="g-callout mb-4" role="status" data-testid="audit-running">
-          <h3 className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Crawling {site?.domain}</h3>
+          <h2 className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Crawling {site?.domain}</h2>
           {/* A running crawl has no pages to open yet: its figures are progress, not data, so they lead nowhere until it finishes. */}
           <p>{running.status === "queued" ? "Waiting to start." : `${fmtNum(running.crawled)} of up to ${fmtNum(running.pageCap)} pages checked so far.`} This page updates by itself.</p>
         </div>
       )}
       {d && !running && d.lastFailed && (
         <div className="g-callout mb-4" role="alert" data-testid="audit-failed">
-          <h3>The last crawl didn't finish</h3>
+          <h2>The last crawl didn't finish</h2>
           {/* A crawl that failed saved nothing to open; its date is a fact about the failure, not a crawl to show. */}
           <p>{crawlError(d.lastFailed.error)} Started {fmtDate(d.lastFailed.createdAt)}.{a ? " The results below are from the crawl before it." : ""}</p>
         </div>
       )}
       {site && d?.newestUnreadable && (
         <div className="g-callout mb-4" role="alert" data-testid="audit-unreadable">
-          <h3>The newest crawl could not be read</h3>
+          <h2>The newest crawl could not be read</h2>
           <p>The crawl that finished {fmtDate(d.newestUnreadable.at)} was not saved in a form we can read, so no score or issues are taken from it. Run a new crawl{d.crawls?.some((c) => c.readable !== false) ? ", or look at an earlier one" : ""}.</p>
           {a ? <p className="mt-1 text-[13px]">Shown below: the crawl of {shownLink("link-unreadable-shown")}, an earlier crawl you picked.</p>
             : (() => { const ok = d.crawls?.find((c) => c.readable !== false); return ok ? <Link href={seoLinks.audit(site.id, { at: ok.jobId })} className="g-pill mt-2 max-sm:!min-h-11" data-testid="button-audit-earlier">Show the crawl of {fmtDate(ok.at)}</Link> : null; })()}
@@ -271,7 +271,7 @@ export default function SeoAuditPage() {
       )}
       {site && d && !a && !running && !d.newestUnreadable && (
         <Empty testId="audit-empty">
-          <h3>No crawl of {site.domain} yet</h3>
+          <h2>No crawl of {site.domain} yet</h2>
           <p>A crawl reads up to 150 pages of the site the way a simple crawler does — the HTML as sent, without running JavaScript — and checks each for broken pages, redirects, missing titles and descriptions, thin content, slow pages, and whether robots rules or pages with little server-sent text would keep crawlers, Google's and the AI companies' included, from reading it. It is not Googlebot: what Google itself sees can differ.</p>
           <p className="mt-2">It uses one of your plan's monthly Site Scans and no SEO data credit.</p>
         </Empty>
@@ -436,7 +436,7 @@ export default function SeoAuditPage() {
           </div>
           {narrowed.length > 0 && <ActiveFilter words={narrowed.join(" · ")} clearHref={go({})} extra={foreign ? { href: foreign.href, label: foreign.label, testId: "link-foreign-tab" } : undefined}>{issueParam && !openIssue ? `Nothing is listed under that issue in the crawl of ${fmtDate(shownDate)}. It may have been fixed, or found by another crawl.` : null}</ActiveFilter>}
           {issues.length === 0 ? (
-            <Empty testId="audit-no-issues"><h3>{a.issues.length ? "No issues match these filters" : "No issues found"}</h3><p>{a.issues.length ? "Choose a different severity or area." : "The crawl didn't find anything to fix on the pages it checked."}</p></Empty>
+            <Empty testId="audit-no-issues"><h2>{a.issues.length ? "No issues match these filters" : "No issues found"}</h2><p>{a.issues.length ? "Choose a different severity or area." : "The crawl didn't find anything to fix on the pages it checked."}</p></Empty>
           ) : (
             <div className="overflow-x-auto">
             <table className={COMPACT_TABLE} data-testid="table-audit-issues">

@@ -511,6 +511,7 @@ export default function CrmEstimateNewPage() {
               value={qInput}
               onChange={(e) => setQInput(e.target.value)}
               placeholder="Search clients — name, email, phone…"
+              aria-label="Search clients"
               className="h-12 pl-9 text-base"
               autoFocus
             />
@@ -534,11 +535,11 @@ export default function CrmEstimateNewPage() {
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                <Input data-testid="input-new-client-name" placeholder="Full name *" className="h-12 text-base"
+                <Input data-testid="input-new-client-name" placeholder="Full name *" aria-label="Full name" className="h-12 text-base"
                   value={nc.name} onChange={(e) => setNc({ ...nc, name: e.target.value })} />
-                <Input data-testid="input-new-client-email" placeholder="Email" type="email" inputMode="email"
+                <Input data-testid="input-new-client-email" placeholder="Email" aria-label="Email" type="email" inputMode="email"
                   className="h-12 text-base" value={nc.email} onChange={(e) => setNc({ ...nc, email: e.target.value })} />
-                <Input data-testid="input-new-client-phone" placeholder="Phone" type="tel" inputMode="tel"
+                <Input data-testid="input-new-client-phone" placeholder="Phone" aria-label="Phone" type="tel" inputMode="tel"
                   className="h-12 text-base" value={nc.phone} onChange={(e) => setNc({ ...nc, phone: e.target.value })} />
                 <Button className="w-full h-12" disabled={!nc.name.trim() || creating}
                   onClick={createClient} data-testid="button-create-client">
@@ -745,6 +746,7 @@ export default function CrmEstimateNewPage() {
                 }
               }}
               placeholder="Search the price book — or type a SKU # and press Enter"
+              aria-label="Search the price book"
               className="h-12 pl-9 text-base"
             />
           </div>
@@ -815,6 +817,7 @@ export default function CrmEstimateNewPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder={`Estimate for ${customer.displayName}`}
+                  aria-label="Title"
                   className="h-12 text-base mt-1"
                   data-testid="input-title"
                 />
@@ -828,6 +831,7 @@ export default function CrmEstimateNewPage() {
                   onChange={(e) => setIntro(e.target.value)}
                   rows={3}
                   placeholder="Thanks for having us out — here's the scope we discussed, what's included, and what it costs."
+                  aria-label="Message to the client"
                   className="text-base mt-1"
                   data-testid="textarea-intro"
                 />

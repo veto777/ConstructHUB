@@ -22,12 +22,12 @@ import { Loader2, X } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { holdNote } from "./shell";
-import { api, canAfford, Empty, fmtDate, fmtNum, money, SeoShell, useAddress, useHash, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
+import { api, canAfford, Empty, seoUnlimited, fmtDate, fmtNum, money, SeoShell, useAddress, useHash, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
 import { seoLinks, setParam } from "./links";
 import { compact, FigureLink, FOCUS, LINK_CUE, PALETTE, TAP } from "./viz";
 import { MetricStrip, StatusBadge, scoreTone } from "@/components/tool";
 import { PortfolioCell, ProjectRow, type SiteCard } from "@/components/seo-tool/project-row";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { LookupBox } from "./lookup-box";
 import { SAMPLE_SITE_CARD } from "./samples";
 
@@ -135,7 +135,8 @@ export default function SeoDashboardPage() {
       from: dates[0] ?? null, to: dates[dates.length - 1] ?? null, devices,
       openTasks: shownCards.some((c) => c.openTasks == null) ? null : shownCards.reduce((n, c) => n + (c.openTasks ?? 0), 0) };
   }, [shownCards]);
-  const price = status.data?.prices ? money(status.data.prices.explorerReport) : "";
+  // No cents when the plan's SEO data is unlimited (seoUnlimited).
+  const price = status.data?.prices && !seoUnlimited(status.data) ? money(status.data.prices.explorerReport) : "";
   const affordable = canAfford(status.data, "explorerReport");
   const configured = !!status.data?.configured;
   // Where a figure of the portfolio strip or the group line leads: this list, in another order or narrowed, the group kept.
@@ -156,15 +157,15 @@ export default function SeoDashboardPage() {
       {/* The front door: look any website up, or add it to the list (lookup-box.tsx). Above everything, on every visit. */}
       <LookupBox status={status.data} sites={sites.data} onSite={onSite} />
       {dash.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your sites…</p>}
-      {dash.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-dashboard-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(dash.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void dash.refetch()}>Try again</button></div>}
+      {dash.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-dashboard-error"><h2>Couldn't load your sites</h2><p>{apiErrorMessage(dash.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void dash.refetch()}>Try again</button></div>}
       {dash.isSuccess && cards.length === 0 && !sites.isError && (
         <Empty testId="seo-dashboard-empty">
-          <h3>Add your first site</h3>
+          <h2>Add your first site</h2>
           <p>Type your website above and choose <b>Add to my sites</b> (or use <b>Add your first site</b> in the bar) to start a project. You'll get its authority, backlinks, estimated organic traffic and keywords here, and weekly rank tracking for the keywords you choose.</p>
           <p className="mt-2">Just want to look a domain up? <b>Look it up</b> above, or open <FigureLink href={seoLinks.explorer("")} testId="link-explorer-empty">Site explorer</FigureLink> — any site, yours or a competitor's.</p>
         </Empty>
       )}
-      {dash.isSuccess && cards.length === 0 && !sites.isError && (
+      {showSample({ isLoading: dash.isLoading, isError: dash.isError || sites.isError, total: dash.isSuccess ? cards.length : undefined }) && (
         // What a site's card looks like once one is added — a made-up site, shown only while there is no real one (samples.tsx).
         <SamplePreview what="what a site's card shows once you add one" testId="sample-dashboard">
           <ProjectRow card={SAMPLE_SITE_CARD} busy={false} canAnalyse={false} price="" priceNote="" onAnalyse={() => undefined} onPick={() => undefined}
@@ -228,7 +229,7 @@ export default function SeoDashboardPage() {
         );
       })()}
       <div id="sites" className="scroll-mt-4 space-y-4" data-testid="seo-dashboard">
-        {cards.length > 0 && shownCards.length === 0 && (filter || activeGroup !== "all") && <Empty testId="seo-dashboard-group-empty"><h3>No sites here</h3><p>{filter ? <>No {FILTER_WORDS[filter].toLowerCase()}{activeGroup !== "all" ? ` in ${groupLabel}` : ""} yet — </> : "Choose another group above, or "}<button type="button" className={`${TAP} ${LINK_CUE} rounded-sm`} style={{ color: "var(--g-accent-ink)" }} onClick={clearNarrowing}>show all sites</button>.</p></Empty>}
+        {cards.length > 0 && shownCards.length === 0 && (filter || activeGroup !== "all") && <Empty testId="seo-dashboard-group-empty"><h2>No sites here</h2><p>{filter ? <>No {FILTER_WORDS[filter].toLowerCase()}{activeGroup !== "all" ? ` in ${groupLabel}` : ""} yet — </> : "Choose another group above, or "}<button type="button" className={`${TAP} ${LINK_CUE} rounded-sm`} style={{ color: "var(--g-accent-ink)" }} onClick={clearNarrowing}>show all sites</button>.</p></Empty>}
         {shownCards.map((card) => {
           const s = card.site;
           return (

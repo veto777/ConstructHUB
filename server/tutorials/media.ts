@@ -20,6 +20,7 @@ import type { Express, Request, Response } from "express";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { TUTORIAL_FILE, TUTORIAL_PREFIX } from "@shared/help/videos";
 import { R2_READ_TIMEOUT_MS, isR2Timeout, r2RequestHandler } from "../r2-http";
+import { logError } from "../ops/log";
 
 const TYPES: Record<string, string> = { mp4: "video/mp4", vtt: "text/vtt; charset=utf-8", jpg: "image/jpeg" };
 
@@ -183,7 +184,7 @@ export function registerTutorialMediaRoutes(app: Express): void {
         console.warn(`Tutorial media: R2 did not answer for ${object.key} (${timedOut ? "deadline" : err?.message})`);
         return res.status(504).json({ message: "The video store did not answer in time. Try again." });
       }
-      console.error("Error serving tutorial media:", err);
+      logError("Error serving tutorial media:", err);
       res.status(500).json({ message: "Could not load the video" });
     }
   });

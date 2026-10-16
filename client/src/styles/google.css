@@ -574,7 +574,7 @@ a.g-stat:hover { background: var(--g-surface-2); }
 /* .g-tabs (the tab rows) now lives in ./tool.css with the shared tool tabs and segmented tabs. */
 /* Notice / empty card. */
 .g-callout { border: 1px solid var(--g-divider); border-radius: 8px; padding: 16px; background: var(--g-surface-2); }
-.g-callout h3 { margin: 0 0 4px; font-size: 16px; line-height: 24px; font-weight: 500; color: var(--g-text); }
+.g-callout :is(h2, h3) { margin: 0 0 4px; font-size: 16px; line-height: 24px; font-weight: 500; color: var(--g-text); }
 .g-callout p, .g-callout li { margin: 0; font-size: 14px; line-height: 20px; color: var(--g-text-2); }
 .g-callout ul { margin: 8px 0 0; padding-left: 18px; }
 .g-callout code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--g-text); background: var(--g-chip); padding: 1px 5px; border-radius: 4px; }

@@ -30,6 +30,7 @@ import { isPlatformAdmin } from "./admin";
 import { siteBaseUrl, oauthBaseUrl } from "./site-context";
 import { reportMetaSignup, requestIp } from "./meta-pixel";
 import { recordSignupAttribution } from "./analytics-attribution";
+import { logError, fail500 } from "./ops/log";
 
 export { safeNextPath } from "./app-shell";
 
@@ -478,12 +479,12 @@ export async function setupAuth(app: Express) {
         const baseUrl = getBaseUrl(req);
         await sendVerificationEmail(newUser.email, verificationToken, baseUrl);
       } catch (emailErr) {
-        console.error("Failed to send verification email:", emailErr);
+        logError("Failed to send verification email:", emailErr);
       }
 
       res.json({ message: "Account created! Check your email to verify your account.", userId: newUser.id, metaEventId });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/auth/signup failed:", err);
     }
   });
 
@@ -536,7 +537,7 @@ export async function setupAuth(app: Express) {
         });
       });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/auth/login failed:", err);
     }
   });
 
@@ -590,7 +591,7 @@ export async function setupAuth(app: Express) {
         });
       });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/auth/2fa/login failed:", err);
     }
   });
 
@@ -668,7 +669,7 @@ export async function setupAuth(app: Express) {
 
       res.json({ message: "Verification email sent. Check your inbox." });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/auth/resend-verification failed:", err);
     }
   });
 
@@ -697,7 +698,7 @@ export async function setupAuth(app: Express) {
 
       res.json({ message: "If an account exists, a password reset email has been sent." });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/auth/forgot-password failed:", err);
     }
   });
 
@@ -739,7 +740,7 @@ export async function setupAuth(app: Express) {
       await securityChanged(req, user.id, "security.password_changed", "Your password was reset");
       res.json({ message: "Password reset successfully. You can now log in." });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      fail500(res, "POST /api/auth/reset-password failed:", err);
     }
   });
 

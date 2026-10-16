@@ -7,7 +7,7 @@ import { ProfileGuard, GuardStatus, GoogleReport, GOOGLE_REPORT_REVIEW_HELP } fr
 import { GbpConnection } from "@/components/gbp-connection";
 import { startGbpConnect } from "@/components/recent-auth";
 import { InfoTip } from "@/components/info-tip";
-import { SamplePreview } from "@/components/sample-preview";
+import { SamplePreview, showSample } from "@/components/sample-preview";
 import { GoogleSurface } from "@/components/google";
 import { useEffect, useRef, useState } from "react";
 import { cleanSocialLink } from "@shared/social-profile-links";
@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { BusinessLocation, CitationCampaign, Citation } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
@@ -41,14 +41,10 @@ import {
   Eye, MousePointerClick, Smartphone, Monitor, Megaphone, Upload, Download, FileSpreadsheet, ScanSearch,
 } from "lucide-react";
 import { GbpContentEditor } from "@/pages/gbp-content";
-import { GbpLinkCell } from "@/components/gbp-connection";
+import { GbpLinkCell, GoogleConnectionLine, useGoogleConnection } from "@/components/gbp-connection";
 import {
   SiFacebook, SiInstagram, SiLinkedin, SiPinterest, SiTiktok, SiX, SiYoutube,
 } from "react-icons/si";
-import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 
 const SOCIAL_PLATFORMS = [
   { key: "facebook", label: "Facebook", Icon: SiFacebook },
@@ -70,7 +66,7 @@ function showLocation(id: string | null) {
   window.history.replaceState(window.history.state, "", url.toString());
   window.dispatchEvent(new Event("urlparamchange"));
 }
-const refreshLocationLists = () => ["/api/locations", "/api/agency/locations", "/api/agency/dashboard", "/api/gbp/linkage", "/api/gbp/status"]
+const refreshLocationLists = () => ["/api/locations", "/api/agency/locations", "/api/agency/dashboard", "/api/gbp/linkage", "/api/gbp/status", "/api/gbp/connection"]
   .forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
 export default function LocationsPage() {
@@ -97,7 +93,7 @@ export default function LocationsPage() {
   return <GoogleSurface page><AppPage className="before:hidden max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11">
     <PageHeader title={<span data-testid="text-locations-title">Business Profile Locations</span>} description="Manage your locations and their connection to Google." actions={<Button data-testid="button-add-location" onClick={()=>setAddDialogOpen(true)}>Add location</Button>}/>
     <Dialog open={addDialogOpen} onOpenChange={o=>{setAddDialogOpen(o);if(!o&&importParam)setImportParam(null);}}>
-      <DialogContent><DialogHeader><DialogTitle>Add location</DialogTitle></DialogHeader><AddLocationDialog initialTab={importParam==="gbp"?"gbp":undefined} onCreated={()=>{setAddDialogOpen(false);setImportParam(null);refreshLocationLists();}}/></DialogContent>
+      <DialogContent><DialogHeader><DialogTitle>Add location</DialogTitle><DialogDescription>Add a business location by hand or import it from Google Business Profile.</DialogDescription></DialogHeader><AddLocationDialog initialTab={importParam==="gbp"?"gbp":undefined} onCreated={()=>{setAddDialogOpen(false);setImportParam(null);refreshLocationLists();}}/></DialogContent>
     </Dialog>
     {notFound&&<div role="alert" className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 p-3 text-sm" data-testid="alert-location-not-found">
       <span>Location #{notFound} was not found, or you don't have access to it.</span>
@@ -404,9 +400,15 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
     { value: "settings", label: "Settings", icon: Settings, helpKey: "locations.settings" },
     { value: "citations", label: "Citations", icon: Globe, helpKey: "locations.citation-checklist" },
   ];
-  // An unknown (?tab=reviews) or locked tab falls back to Insights instead of an empty pane.
+  // An unknown or locked tab falls back to the default instead of an empty pane. With no ?tab the page opens on the
+  // first tab that has data (review w2-agent10 #2): Insights when Google sent performance numbers, else Reviews when
+  // reviews are saved, else Insights (which then says in one line what is missing).
   const validTab = tabItems.some((t) => t.value === tabParam && !(t.value === "citations" && !isPremiumPlus));
-  const activeTab = validTab ? tabParam! : "insights";
+  const { data: defaultPerf, isLoading: defaultPerfLoading } = useQuery<PerfData>({
+    queryKey: [`/api/gbp/locations/${location.id}/performance?range=90d&group=day`], enabled: !validTab,
+  });
+  const defaultTab = defaultPerf?.available ? "insights" : location.gbpLocationName && (location.reviewCount ?? 0) > 0 ? "reviews" : "insights";
+  const activeTab = validTab ? tabParam! : defaultTab;
   const helpKey = tabItems.find((t) => t.value === activeTab)?.helpKey;
   useEffect(() => { if (tabParam && !validTab) setTabParam(null); }, [tabParam, validTab]);
   // The header chip: the uploaded logo, else the listing's profile photo from the last Google sync, else the icon.
@@ -443,7 +445,8 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
           </div>
 
           <div className="flex-1 min-w-0">
-            {activeTab === "insights" && <div className="space-y-4"><LocationSearchSummary locationId={location.id} businessName={location.businessName}/><InsightsTab location={location} /></div>}
+            {!validTab && defaultPerfLoading && <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}
+            {!(!validTab && defaultPerfLoading) && activeTab === "insights" && <InsightsTab location={location} />}
             {activeTab === "reviews" && <ReviewsTab location={location} />}
             {activeTab === "guard" && <ProfileGuard locationId={location.id} linked={!!location.gbpLocationName} />}
             {activeTab === "info" && <LocationInfoTab location={location} />}
@@ -512,9 +515,10 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
   const pending = (period: string) => !!data && (data.rows.find((r) => r.date === period)?.last_day ?? period) > data.pendingAfter;
   const rangeLabel: Record<string, string> = { "30d": "Last 30 days", "90d": "Last 90 days", "6m": "Last 6 months", "12m": "Last 12 months", "18m": "Last 18 months", all: "All stored history" };
   const select = "border rounded-md px-2 py-1.5 text-sm bg-background";
+  const { data: connection } = useGoogleConnection(location.id);
   return (
     <div className="space-y-4">
-      <GbpConnection locationId={location.id} context="locations" />
+      {data?.available && <GbpConnection locationId={location.id} context="locations" />}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h3 className="font-semibold">Google performance — {rangeLabel[range].toLowerCase()}, by {group}</h3>
@@ -534,10 +538,16 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
       </div>
       {isLoading ? <p>Loading performance…</p> : error ? <p role="alert">Unable to load performance.</p> : !data?.available ? (
         <div className="space-y-3">
-          {location.gbpLocationName
-            ? <p>No performance data yet. Metrics appear after the first successful Google sync.</p>
-            : <p>Performance unavailable. Link this location to Google and sync to retrieve real metrics.</p>}
-          <SamplePreview what="what this table shows once Google has sent performance numbers" cta={!location.gbpLocationName ? <GbpLinkCell locationId={location.id} /> : undefined} testId="sample-performance">
+          {/* One honest line instead of three "nothing here" boxes (review w2-agent10 #2): what is missing, the shared
+              connection state with its last sync, and the one action. Search Console shows only when it has numbers. */}
+          <div className="rounded-xl border p-4 space-y-2 text-sm" data-testid="insights-unavailable">
+            {location.gbpLocationName
+              ? <p>No performance data yet. {connection?.state === "needs_reconnect" ? "Google sends them again once this location's Google account is reconnected." : "Metrics appear after the first successful Google sync."}</p>
+              : <p>Performance unavailable. Link this location to Google and sync to retrieve real metrics.</p>}
+            {connection && location.gbpLocationName && <GoogleConnectionLine connection={connection} />}
+          </div>
+          {/* `available` is the server's only signal: false = Google has sent no performance numbers for this location. */}
+          {showSample({ isLoading, isError: !!error, total: data?.available ? 1 : 0 }) && <SamplePreview what="what this table shows once Google has sent performance numbers" cta={!location.gbpLocationName ? <GbpLinkCell locationId={location.id} /> : undefined} testId="sample-performance">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className={appTableCards.thead}><tr><th className="p-2 text-left">Date</th>{SAMPLE_PERF_METRICS.map((m) => <th className="p-2 whitespace-nowrap" key={m}>{PERF_LABELS[m]}</th>)}</tr></thead>
@@ -547,7 +557,7 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
                 </tbody>
               </table>
             </div>
-          </SamplePreview>
+          </SamplePreview>}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -571,6 +581,8 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
           </table>
         </div>
       )}
+      {/* Search Console sits under the performance table and only when it has numbers for this location's site. */}
+      <LocationSearchSummary locationId={location.id} businessName={location.businessName} hideWhenEmpty />
     </div>
   );
 }
@@ -750,7 +762,9 @@ function ReviewsTab({ location }: { location: BusinessLocation }) {
   const { data, isLoading, error } = useQuery<{ live: ReviewRow[]; removed: ReviewRow[]; events: ReviewEventRow[]; syncedAt: string | null; syncError: string | null; edited: number }>({
     queryKey: [`/api/gbp/locations/${location.id}/reviews`], enabled: linked, refetchInterval: 60_000,
   });
-  const [view, setView] = useState<"changes" | "removed" | "all">("changes");
+  // Opens on "Changes logged" only when there are changes; otherwise on the reviews themselves (review w2-agent10 #3).
+  const [chosenView, setView] = useState<"changes" | "removed" | "all" | null>(null);
+  const { data: connection } = useGoogleConnection(location.id);
   const [copied, setCopied] = useState<number | null>(null);
   const [copiedReport, setCopiedReport] = useState<number | null>(null);
   const copy = async (r: ReviewRow) => {
@@ -778,6 +792,7 @@ ${r.comment || "(no text)"}`;
   const kindLabel: Record<ReviewEventRow["kind"], string> = { added: "New review", edited: "Edited", removed: "Removed by Google", restored: "Back on Google" };
   const kindClass: Record<ReviewEventRow["kind"], string> = { added: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300", edited: "bg-amber-500/10 text-amber-700 dark:text-amber-300", removed: "bg-red-500/10 text-red-700 dark:text-red-300", restored: "bg-sky-500/10 text-sky-700 dark:text-sky-300" };
   const live = data?.live ?? [], removed = data?.removed ?? [], events = data?.events ?? [];
+  const view = chosenView ?? (events.length ? "changes" : "all");
   return (
     <div className="space-y-4" data-testid="tab-reviews">
       <div>
@@ -790,7 +805,11 @@ ${r.comment || "(no text)"}`;
         <button type="button" onClick={() => setView("removed")} className={`rounded-lg border p-3 text-center ${view === "removed" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`} data-testid="reviews-count-removed"><p className={`text-2xl font-bold ${removed.length ? "text-destructive" : ""}`}>{data ? removed.length : "—"}</p><p className="text-xs text-muted-foreground">Removed (text saved)</p></button>
         <button type="button" onClick={() => setView("changes")} className={`rounded-lg border p-3 text-center ${view === "changes" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`} data-testid="reviews-count-changes"><p className="text-2xl font-bold">{data ? events.length : "—"}</p><p className="text-xs text-muted-foreground">Changes logged</p></button>
       </div>
-      <p className="text-xs text-muted-foreground">{data?.syncedAt ? `Last checked ${fmtWhen(data.syncedAt)} · checked again every few hours` : "Not checked yet"}{data?.syncError ? ` · ${data.syncError}` : ""}</p>
+      {/* The shared connection state and last sync (shared/gbp-connection.ts), never "Not checked yet" above saved reviews. */}
+      {connection
+        ? <GoogleConnectionLine connection={connection} className="text-xs" />
+        : <p className="text-xs text-muted-foreground">{data?.syncedAt ? `Last checked ${fmtWhen(data.syncedAt)} · checked again every few hours` : "Not checked yet"}{data?.syncError ? ` · ${data.syncError}` : ""}</p>}
+      {connection && data?.syncError && <p className="text-xs text-destructive">{data.syncError}</p>}
       {error && <p role="alert" className="text-sm text-destructive">Could not load the reviews.</p>}
       {isLoading && <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}
 

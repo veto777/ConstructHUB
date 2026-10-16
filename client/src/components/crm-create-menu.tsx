@@ -5,7 +5,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -249,7 +249,7 @@ function CustomerDialog({ open, onOpenChange, onNavigate }: {
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setDupe(null); }}>
       <DialogContent data-testid="dialog-create-customer">
-        <DialogHeader><DialogTitle>New client</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New client</DialogTitle><DialogDescription>Add a client to your CRM. Only the name is required.</DialogDescription></DialogHeader>
         <ClientFields form={form} setForm={setForm} idPrefix="customer" />
         {dupe && (
           <DupeError error={dupe}
@@ -306,10 +306,10 @@ function LeadDialog({ open, onOpenChange, onNavigate }: {
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setDupe(null); }}>
       <DialogContent data-testid="dialog-create-lead">
-        <DialogHeader><DialogTitle>New lead</DialogTitle></DialogHeader>
-        <p className="text-sm text-muted-foreground -mt-1">
-          Lands on the pipeline in the Lead column — ready to estimate.
-        </p>
+        <DialogHeader>
+          <DialogTitle>New lead</DialogTitle>
+          <DialogDescription>Lands on the pipeline in the Lead column — ready to estimate.</DialogDescription>
+        </DialogHeader>
         <ClientFields form={form} setForm={setForm} idPrefix="lead" showNote />
         {dupe && (
           <DupeError error={dupe}
@@ -377,7 +377,7 @@ function InvoiceDialog({ open, onOpenChange, onNavigate }: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="dialog-create-invoice">
-        <DialogHeader><DialogTitle>New invoice</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New invoice</DialogTitle><DialogDescription>Pick the client, then say what it's for and how much.</DialogDescription></DialogHeader>
         <ClientPicker value={client} onChange={setClient} />
         {client && (
           <div className="grid gap-3 sm:grid-cols-3">
@@ -453,7 +453,7 @@ function MessageDialog({ open, onOpenChange, onNavigate }: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="dialog-quick-message">
-        <DialogHeader><DialogTitle>Quick message</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Quick message</DialogTitle><DialogDescription>Send a client a text or an email without leaving this page.</DialogDescription></DialogHeader>
         <ClientPicker value={client} onChange={setClient} />
 
         {client && (

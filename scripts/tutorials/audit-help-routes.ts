@@ -48,15 +48,15 @@ function routesOf(src: string, fn: string, host: Found["host"]): Found[] {
 }
 
 /** A sample address for a route pattern: each ":param" becomes "1" (helpKeyForRoute matches on the prefix). */
-export const sampleAddress = (route: string) => route.replace(/:[A-Za-z]+/g, "1");
+const sampleAddress = (route: string) => route.replace(/:[A-Za-z]+/g, "1");
 
-export type RouteAudit = Found & {
+type RouteAudit = Found & {
   address: string; key: string | null; title: string | null;
   /** "walkthrough": the entry's own film; "intro": its feature's intro film; null: nothing to play. */
   film: "walkthrough" | "intro" | null; filmKey: string | null;
 };
 
-export function auditRoutes(): RouteAudit[] {
+function auditRoutes(): RouteAudit[] {
   const src = fs.readFileSync(path.join(ROOT, "client/src/App.tsx"), "utf8");
   const found = [...routesOf(src, "DashboardRouter", "app"), ...routesOf(src, "PortalRouter", "crm")];
   return found.map((f) => {

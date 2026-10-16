@@ -6,16 +6,16 @@
  * "Sample data" and makes it inert.
  */
 import type { ReactNode } from "react";
-import { SamplePreview } from "@/components/sample-preview";
+import { SAMPLE_BUSINESS, SamplePreview } from "@/components/sample-preview";
 import { PositionBadge } from "./viz-rank";
 import { Move } from "./shell";
 import type { SiteCard } from "@/components/seo-tool/project-row";
 
-export const SAMPLE_DOMAIN = "sample-roofing.example";
+const SAMPLE_DOMAIN = SAMPLE_BUSINESS.domain;
 
 /** A dashboard card's figures for the made-up site (components/seo-tool/project-row.tsx SiteCard). */
 export const SAMPLE_SITE_CARD: SiteCard = {
-  site: { id: 0, domain: SAMPLE_DOMAIN, businessName: "Sample Roofing Co.", locationCode: 2840, languageCode: "en", devices: "both", serpDepth: 10, keywordCount: 24, nextRankCheckAt: "2026-01-12T12:00:00Z", lastRankCheckAt: "2026-01-05T12:00:00Z", nextBacklinksAt: null, lastBacklinksAt: null, group: "Sample" },
+  site: { id: 0, domain: SAMPLE_DOMAIN, businessName: SAMPLE_BUSINESS.name, locationCode: 2840, languageCode: "en", devices: "both", serpDepth: 10, keywordCount: 24, nextRankCheckAt: "2026-01-12T12:00:00Z", lastRankCheckAt: "2026-01-05T12:00:00Z", nextBacklinksAt: null, lastBacklinksAt: null, group: "Sample" },
   audit: { jobId: "sample", at: "2026-01-04T12:00:00Z", readable: true, health: 82, pages: 61, errorPages: 3, pageCap: 150, trend: [{ jobId: "sample-0", at: "2025-12-04T12:00:00Z", readable: true, health: 74, pages: 58, errorPages: 7, pageCap: 150 }, { jobId: "sample", at: "2026-01-04T12:00:00Z", readable: true, health: 82, pages: 61, errorPages: 3, pageCap: 150 }] },
   openTasks: 5,
   rank: { top3: 4, top10: 11, ranked: 19, checked: 24, checkedOn: "2026-01-05", firstOn: "2025-11-03", device: "desktop" },
@@ -27,7 +27,7 @@ export const SAMPLE_SITE_CARD: SiteCard = {
 };
 
 /** A tracked site's keyword table, as the rank tracker lays it out, with made-up positions. */
-export const SAMPLE_KEYWORDS: { keyword: string; desktop: number | null; mobile: number | null; before: number | null; volume: number; page: string }[] = [
+const SAMPLE_KEYWORDS: { keyword: string; desktop: number | null; mobile: number | null; before: number | null; volume: number; page: string }[] = [
   { keyword: "roof repair springfield", desktop: 3, mobile: 4, before: 5, volume: 480, page: "/roof-repair" },
   { keyword: "roofing contractor near me", desktop: 7, mobile: 9, before: 7, volume: 1900, page: "/" },
   { keyword: "metal roof installation cost", desktop: 12, mobile: 14, before: 18, volume: 720, page: "/metal-roofing" },

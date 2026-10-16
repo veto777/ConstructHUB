@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, type UseQueryResult } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useAppOrigin } from "@/lib/app-origin";
-import { AppPage, Section, StatusPill, Notice } from "@/components/app-ui";
+import { AppPage, StatusPill, Notice } from "@/components/app-ui";
 import { GEO_SOURCE_NOTE } from "@/components/ip-tracker/country-names";
 import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { ToolTabs } from "@/components/tool";
@@ -24,9 +24,9 @@ import { ToolBarSlot } from "@/components/tool/shell";
 import { useInToolShell } from "@/components/tool/in-shell";
 import { useToolView } from "@/hooks/use-tool-view";
 import { IP_TRACKER_VIEWS } from "@/components/traffic-tool/nav";
-import { ALL_TIME, RangePicker, StepsCard, WindowPicker, daysAgo, inRange, localDayKey, rangeBounds, rangeKey, rangeQuery, type DateRange } from "@/components/traffic-tool/shared";
+import { ALL_TIME, RangePicker, StepsCard, WindowPicker, daysAgo, localDayKey, rangeBounds, rangeKey, rangeQuery, type DateRange } from "@/components/traffic-tool/shared";
 import { DailyVisitsChart, PagesTable, PlatformBreakdowns, GeoTable, SitePanel, SitesSummaryStrip, SourcesTable, StatTiles, VISIT_ROW_CAP, VisitorDetailPanel, VisitorRow, countLabel, type Analytics, type DomainWithStats, type GeoData, type OnlineFigure, type PageStat, type PlatformData, type Visitor, type VisitorDetail } from "@/components/traffic-tool/ip-views";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample, NothingInRange } from "@/components/sample-preview";
 const IpSample = lazySample(() => import("@/components/traffic-tool/samples"), "IpSample");
 import { Search, Plus, Copy, Trash2, MoreHorizontal, Code2 } from "lucide-react";
 
@@ -201,7 +201,7 @@ export function DashboardView({ domainId, analyticsQuery, domains, domainsQuery,
   const totalVisits = domain?.stats.totalVisits ?? 0;
   // "…" only while a figure is still loading; a failed load says so; a site with no visits yet gets the sample below.
   const fig = (n: number, partial: boolean) => analytics ? countLabel(n, partial) : analyticsQuery.isError ? "Unavailable" : "…";
-  const noVisits = !!domain && totalVisits === 0 && !!analytics && analytics.totalVisits === 0;
+  const noVisits = !!domain && showSample({ isLoading: analyticsQuery.isLoading, isError: analyticsQuery.isError && !analytics, total: analytics ? totalVisits + analytics.totalVisits : undefined });
   const scrollToInstall = () => document.getElementById("install-tracking")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
@@ -286,7 +286,7 @@ function VisitorListView({ domainId, onInstall }: { domainId: number | null; onI
   const safePage = Math.min(page, Math.max(totalPages, 1));
   const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage);
   const narrowed = !!ipSearch || withinMin > 0 || range.preset !== "all";
-  const nothingYet = !!visitors && visitors.length === 0 && !narrowed;
+  const nothingYet = showSample({ isLoading: visitorsQuery.isLoading, isError: visitorsError, total: visitors?.length, filtered: narrowed });
 
   return (
     <div className="space-y-4">
@@ -337,8 +337,10 @@ function VisitorListView({ domainId, onInstall }: { domainId: number | null; onI
   );
 }
 
-export function TrafficSourcesView({ analyticsQuery, since, picker, rangeLabel, onInstall }: {
+export function TrafficSourcesView({ analyticsQuery, since, picker, rangeLabel, siteVisits, onInstall }: {
   analyticsQuery: UseQueryResult<Analytics, Error>;
+  /** The site's all-time visit count: the sample shows only when the site has never had a visit, not for an empty range. */
+  siteVisits?: number;
   since: Date;
   /** The range control, when the page offers one (presets + typed dates). */
   picker?: ReactNode;
@@ -368,8 +370,9 @@ export function TrafficSourcesView({ analyticsQuery, since, picker, rangeLabel, 
         { label: "Unique visitors", value: fig(totalVisitors), hint: sinceHint, testId: "card-stat-unique-visitors" },
       ]} />
       <MetricStatus queries={[analyticsQuery]} />
-      {analytics && sources.length === 0
-        ? <IpSample tab="traffic" tiles={false} cta={<InstallCta onOpen={onInstall} />} what={analytics.totalVisits === 0 ? "the sources table you'll see once this site sends its first visit" : "the sources table — no visit in this range yet"} />
+      {showSample({ isLoading: analyticsQuery.isLoading, isError: analyticsQuery.isError && !analytics, total: !analytics ? undefined : sources.length || siteVisits })
+        ? <IpSample tab="traffic" tiles={false} cta={<InstallCta onOpen={onInstall} />} what="the sources table you'll see once this site sends its first visit" />
+        : analytics && sources.length === 0 ? <NothingInRange testId="text-traffic-nothing-in-range">Nothing in this range.</NothingInRange>
         : <SourcesTable sources={sources} />}
     </div>
   );
@@ -402,8 +405,9 @@ export function PagesView({ domainId, onInstall }: { domainId: number | null; on
           {apiErrorMessage(pagesQuery.error, "The page list could not be loaded.")}
         </Notice>
       )}
-      {pages && pages.length === 0
-        ? <IpSample tab="pages" tiles={false} cta={<InstallCta onOpen={onInstall} />} what={range.preset === "all" ? "the pages table you'll see once this site sends its first visit" : "the pages table — no visit in this range yet"} />
+      {showSample({ isLoading: pagesQuery.isLoading, isError: pagesQuery.isError && !pages, total: pages?.length, filtered: range.preset !== "all" })
+        ? <IpSample tab="pages" tiles={false} cta={<InstallCta onOpen={onInstall} />} what="the pages table you'll see once this site sends its first visit" />
+        : pages && pages.length === 0 && range.preset !== "all" ? <NothingInRange testId="text-pages-nothing-in-range">Nothing in this range.</NothingInRange>
         : <PagesTable pages={pagesQuery.isError && !pages ? undefined : pages} loading={pagesQuery.isLoading} />}
     </div>
   );
@@ -444,8 +448,9 @@ function GeoView({ domainId, onInstall }: { domainId: number | null; onInstall?:
           {apiErrorMessage(geoQuery.error, "The geographic breakdown could not be loaded.")}
         </Notice>
       )}
-      {geo && totalVisits === 0
-        ? <IpSample tab="geo" cta={<InstallCta onOpen={onInstall} />} what={range.preset === "all" ? "the countries and cities you'll see once this site sends its first visit" : "the countries and cities — no visit in this range yet"} />
+      {showSample({ isLoading: geoQuery.isLoading, isError: geoQuery.isError && !geo, total: totalVisits, filtered: range.preset !== "all" })
+        ? <IpSample tab="geo" cta={<InstallCta onOpen={onInstall} />} what="the countries and cities you'll see once this site sends its first visit" />
+        : geo && totalVisits === 0 && range.preset !== "all" ? <NothingInRange testId="text-geo-nothing-in-range">Nothing in this range.</NothingInRange>
         : <GeoTable items={geoQuery.isError && !geo ? undefined : items} mode={subTab} loading={geoQuery.isLoading} emptyText={q ? "No place matches that filter" : "No geographic data available"} />}
     </div>
   );
@@ -469,8 +474,9 @@ function PlatformsView({ domainId, onInstall }: { domainId: number | null; onIns
         <Notice tone="danger" title="Couldn't load platform data" testId="notice-platforms-error" action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void platformsQuery.refetch()} data-testid="button-retry-platforms">Retry</Button>}>
           {apiErrorMessage(platformsQuery.error, "The browser and OS breakdown could not be loaded.")}
         </Notice>
-      ) : platforms && total === 0
-        ? <IpSample tab="platforms" cta={<InstallCta onOpen={onInstall} />} what={range.preset === "all" ? "the browser, system and device breakdown you'll see once this site sends its first visit" : "the breakdown — no visit in this range yet"} />
+      ) : showSample({ isError: platformsQuery.isError && !platforms, total, filtered: range.preset !== "all" })
+        ? <IpSample tab="platforms" cta={<InstallCta onOpen={onInstall} />} what="the browser, system and device breakdown you'll see once this site sends its first visit" />
+        : platforms && total === 0 ? <NothingInRange testId="text-platforms-nothing-in-range">Nothing in this range.</NothingInRange>
         : platforms ? <PlatformBreakdowns platforms={platforms} /> : null}
     </div>
   );
@@ -555,7 +561,7 @@ export default function IpTrackerPage() {
     onError: (err: unknown) => toast({ title: "Could not remove site", description: apiErrorMessage(err, "Failed to remove site"), variant: "destructive" }),
   });
 
-  const noSites = !!domains && domains.length === 0;
+  const noSites = showSample({ isLoading: domainsLoading, isError: domainsError, total: domains?.length });
   const openAddSite = () => { setShowAddDomain(true); requestAnimationFrame(() => domainInput.current?.focus()); };
   const goInstall = () => { setActiveTab("dashboard"); requestAnimationFrame(() => document.getElementById("install-tracking")?.scrollIntoView({ behavior: "smooth", block: "start" })); };
   const addSiteCta = <GooglePill size="sm" variant="solid" icon={Plus} label="Add your first site" onClick={openAddSite} testId="button-add-first-domain" />;
@@ -657,7 +663,7 @@ export default function IpTrackerPage() {
           {/* Keyed by site: search text, expanded rows and pagination must not leak between sites. */}
           {activeTab === "dashboard" && <DashboardView domainId={domainId} analyticsQuery={analyticsQuery} domains={domains ?? []} domainsQuery={domainsQuery} onPickSite={setSelectedDomainId} onRemoveSite={setConfirmRemove} />}
           {activeTab === "visitors" && <VisitorListView key={domainId ?? "none"} domainId={domainId} onInstall={goInstall} />}
-          {activeTab === "traffic" && <TrafficSourcesView analyticsQuery={trafficQuery} since={trafficStart} rangeLabel={trafficBounds.label} picker={<RangePicker value={trafficRange} onChange={setTrafficRange} testId="traffic-range" />} onInstall={goInstall} />}
+          {activeTab === "traffic" && <TrafficSourcesView analyticsQuery={trafficQuery} since={trafficStart} rangeLabel={trafficBounds.label} siteVisits={selectedDomain?.stats.totalVisits} picker={<RangePicker value={trafficRange} onChange={setTrafficRange} testId="traffic-range" />} onInstall={goInstall} />}
           {activeTab === "pages" && <PagesView key={domainId ?? "none"} domainId={domainId} onInstall={goInstall} />}
           {activeTab === "geo" && <GeoView key={domainId ?? "none"} domainId={domainId} onInstall={goInstall} />}
           {activeTab === "platforms" && <PlatformsView key={domainId ?? "none"} domainId={domainId} onInstall={goInstall} />}

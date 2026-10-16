@@ -328,8 +328,8 @@ export default function PricingPage() {
   // Add-ons ride on a Stripe subscription to one of the current plans (a legacy plan switches first).
   const addonsEditable = view.changesInPlace && !legacyPlan;
   const monthsFree = annualMonthsFree();
-  // Monthly / Annual switch. Shown in the hero and again above the plan cards; both drive the same
-  // interval, so the Business Tools and CRM tabs always price the same period.
+  // Monthly / Annual switch: one, above the plan cards (review w2-agent10 #14: two on one page). It drives every
+  // tab, so the Business Tools and CRM tabs always price the same period.
   const billingToggle = (suffix: string, className: string) => (
     <div
       role="radiogroup"
@@ -383,7 +383,6 @@ export default function PricingPage() {
               The CRM is a separate product with its own plans, from {CRM_FROM_PRICE}, and the {CALL_ASSISTANT_NAME} is a separate service, from {CALL_ASSISTANT_FROM_PRICE}.
               Or buy any single tool on its own, à la carte.
             </p>
-            {billingToggle("", "mt-7")}
           </div>
 
           {/* The mascot and his line on the navy grid panel (decorative). */}
@@ -429,7 +428,8 @@ export default function PricingPage() {
         )}
 
         <div>
-          {foundingOpen && (
+          {/* The founding offer is an invitation to subscribe: not shown to an account already on a plan. */}
+          {foundingOpen && !view.live && (
             <p className="mb-6 text-center text-[15px] font-semibold text-mkt-ink" data-testid="text-founding-offer">
               <Star className="inline w-4 h-4 mr-1.5 -mt-0.5 text-mkt-orange-ink" aria-hidden />
               {FOUNDING_OFFER_LINE}
@@ -452,7 +452,7 @@ export default function PricingPage() {
               </button>
             ))}
           </div>
-          <div className="flex justify-center">{billingToggle("-plans", "mt-4")}</div>
+          <div className="flex justify-center">{billingToggle("", "mt-4")}</div>
 
           {tab === "business" ? (
             <div role="tabpanel" className="mt-8">

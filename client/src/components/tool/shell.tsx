@@ -52,6 +52,8 @@ export type ToolDef = {
   groups: ToolSubGroup[];
   /** Sits at the bottom of the rail (settings-like). */
   foot?: boolean;
+  /** Platform admins only: the full-screen layouts leave it out of the menu for everyone else (still owns its route). */
+  adminOnly?: boolean;
 };
 export type ToolShellConfig = { key: string; label: string; tools: ToolDef[] };
 

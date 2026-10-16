@@ -141,7 +141,7 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
     features: [
       "Everything in Basic",
       "5 seats",
-      "Team alert texts — 500 segments / month",
+      "Team alert texts — up to 500 a month",
       "Client texting — the texting add-on",
       "Change orders, budget lines and job costing",
       "CRM API — 10,000 units / month",
@@ -165,7 +165,7 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
     features: [
       "Everything in Essentials",
       "8 seats",
-      "Team alert texts — 1,500 segments / month",
+      "Team alert texts — up to 1,500 a month",
       "1 client-texting number included",
       jobcamFeature(JOBCAM_INCLUDED_GB),
       "CRM API — 50,000 units / month",
@@ -185,7 +185,7 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
     features: [
       "Everything in Max",
       `Up to ${ELITE_SEATS} seats`,
-      "Team alert texts — 5,000 segments / month",
+      "Team alert texts — up to 5,000 a month",
       "3 client-texting numbers included",
       jobcamFeature(ELITE_JOBCAM_GB),
       "CRM API — 250,000 units / month",

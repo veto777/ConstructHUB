@@ -262,13 +262,13 @@ const entries: Draft[] = [
   {
     key: "search-console.guide", parent: "search-console", group: "Tools", route: "/search-console/guide", title: "Search Console → Guide",
     whatItIs: "Written step-by-step instructions, inside the page.",
-    whatItDoes: "The “Connect Google Search Console” card walks through connecting the agency’s Google account, onboarding a client, syncing up to 16 months of history, and sitemaps and index checks. The cards above it cover Cloudflare.",
+    whatItDoes: "Plain steps for Search Console only: connecting your Google account, bringing in up to 16 months of search numbers, how a site links to your Locations, sitemaps and page checks, adding a client's website, and disconnecting.",
     howToUse: [
       "Open the Guide tab.",
-      "Scroll to “Connect Google Search Console” and follow the numbered steps.",
-      "Use the link at the bottom for Google’s page about Search Console limits.",
+      "Follow “Connect your Google Search Console” first, then “Bring in your search numbers”.",
+      "Use “A client’s website you can’t see yet” when the site belongs to someone else.",
     ],
-    howItWorks: "The guide is fixed text. It does not read or change anything in your account. The same guide is under Social Media → Guides.",
+    howItWorks: "The guide is fixed text. It does not read or change anything in your account.",
   },
 
   /* ══ Permits & Databases ══════════════════════════════════════════════════════════════════════ */

@@ -24,7 +24,7 @@ import { Ticket, Gift,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { ToolTabsList } from "@/components/tool";
 import { HelpButton } from "@/components/help-button";
 import { useHelpKeyForRoute } from "@/lib/use-help-entry";
@@ -296,7 +296,7 @@ export function Toolbar({ search, filters, activeFilters = 0, actions, className
               </Button>
             </SheetTrigger>
             <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl sm:hidden">
-              <SheetHeader><SheetTitle>Filters</SheetTitle></SheetHeader>
+              <SheetHeader><SheetTitle>Filters</SheetTitle><SheetDescription className="sr-only">Narrow the list, then show the results.</SheetDescription></SheetHeader>
               <div className="mt-4 flex flex-col gap-3 [&>*]:w-full">{filters}</div>
               <Button className="mt-5 w-full" onClick={() => setOpen(false)}>Show results</Button>
             </SheetContent>

@@ -4,6 +4,7 @@ import { eq, desc, and, count } from "drizzle-orm";
 import { sendLsaChargedLeadAlert } from "./email";
 import { recordFailure } from "./ops/issues";
 import { workerInterval } from "./workers";
+import { logError } from "./ops/log";
 
 export const GOOGLE_ADS_API_VERSION = process.env.GOOGLE_ADS_API_VERSION || "v17";
 const GOOGLE_ADS_BASE = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
@@ -45,14 +46,14 @@ async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: 
     });
     if (!res.ok) {
       const err = await res.text();
-      console.error("[lsa-manager] Token refresh failed:", err);
+      logError("[lsa-manager] Token refresh failed:", err);
       return null;
     }
     const data = await res.json();
     const expiresAt = new Date(Date.now() + (data.expires_in - 60) * 1000);
     return { accessToken: data.access_token, expiresAt };
   } catch (e) {
-    console.error("[lsa-manager] Token refresh error:", e);
+    logError("[lsa-manager] Token refresh error:", e);
     return null;
   }
 }
@@ -654,7 +655,7 @@ export async function fetchAndStoreLeads(
         leadType: lead.leadType,
       });
     } catch (e) {
-      console.error("[lsa-manager] charged-lead alert failed:", e);
+      logError("[lsa-manager] charged-lead alert failed:", e);
     }
   }
 
@@ -686,11 +687,11 @@ export function startManagerLeadSync(intervalMs = 5 * 60 * 1000) {
         try {
           await fetchAndStoreLeads(acct.id, acct.customerId, acct.accountName, useManager, acct.userId);
         } catch (e) {
-          console.error(`[lsa-manager] lead sync failed for ${acct.customerId}:`, e);
+          logError(`[lsa-manager] lead sync failed for ${acct.customerId}:`, e);
         }
       }
     } catch (e) {
-      console.error("[lsa-manager] lead sync tick error:", e);
+      logError("[lsa-manager] lead sync tick error:", e);
       void recordFailure("job", "LSA manager lead sync tick", e);
     }
   };

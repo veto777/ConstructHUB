@@ -29,6 +29,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VerificationCancelled } from "@/components/recent-auth";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle } from "@/lib/page-titles";
 import { useToast } from "@/hooks/use-toast";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { formatUsd } from "@/lib/pricing-display";
@@ -460,7 +461,7 @@ function EndedGrants({ grants }: { grants: AccessGrantRow[] }) {
 }
 
 export default function AdminAccessPage() {
-  useDocumentTitle("Access grants | ConstructHUB");
+  useDocumentTitle(appPageTitle("/admin/access")!);
   const [query, setQuery] = useState("");
   const q = useDebounced(query.trim(), 250);
   const [openAccount, setOpenAccount] = useState<number | null>(null);

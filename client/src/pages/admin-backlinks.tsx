@@ -28,6 +28,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { appPageTitle } from "@/lib/page-titles";
 import { VerificationCancelled } from "@/components/recent-auth";
 
 type ListPayload = { rows: BacklinkSourceRow[]; total: number };
@@ -120,10 +121,10 @@ function ImportBox() {
   return (
     <div className="space-y-2" data-testid="form-backlinks-import">
       <Select value={kind} onValueChange={(v) => setKind(v as BacklinkKind)}>
-        <SelectTrigger className="w-56" data-testid="select-backlinks-import-kind"><SelectValue /></SelectTrigger>
+        <SelectTrigger className="w-56" aria-label="Kind of source" data-testid="select-backlinks-import-kind"><SelectValue /></SelectTrigger>
         <SelectContent>{BACKLINK_KINDS.filter((k) => k !== "pbn").map((k) => <SelectItem key={k} value={k}>{BACKLINK_KIND_LABELS[k]}</SelectItem>)}</SelectContent>
       </Select>
-      <Textarea rows={5} value={lines} onChange={(e) => setLines(e.target.value)} placeholder={"One domain or URL per line\nexample-home-blog.com\nhttps://example-news.com/write-for-us"} data-testid="input-backlinks-import" />
+      <Textarea rows={5} aria-label="Domains or URLs to import" value={lines} onChange={(e) => setLines(e.target.value)} placeholder={"One domain or URL per line\nexample-home-blog.com\nhttps://example-news.com/write-for-us"} data-testid="input-backlinks-import" />
       <Button size="sm" disabled={!lines.trim() || imp.isPending} onClick={() => imp.mutate()} data-testid="button-backlinks-import">
         {imp.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-1.5 h-3.5 w-3.5" />}Import
       </Button>
@@ -193,7 +194,7 @@ function SourceSheet({ id, onClose }: { id: number | null; onClose: () => void }
             <div className="space-y-2">
               <h3 className="text-sm font-semibold">Set status</h3>
               <div className="flex flex-wrap items-center gap-2">
-                <Input className="w-32" inputMode="decimal" placeholder="Price $ (opt.)" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} data-testid="input-backlink-price" />
+                <Input className="w-32" inputMode="decimal" aria-label="Price in dollars (optional)" placeholder="Price $ (opt.)" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} data-testid="input-backlink-price" />
                 {BACKLINK_ADMIN_STATUSES.filter((x) => x !== s.status).map((x) => (
                   <Button key={x} size="sm" variant="outline" disabled={setStatus.isPending} onClick={() => setStatus.mutate(x)} data-testid={`button-backlink-status-${x}`}>{BACKLINK_STATUS_LABELS[x]}</Button>
                 ))}
@@ -232,7 +233,7 @@ function SourceSheet({ id, onClose }: { id: number | null; onClose: () => void }
 }
 
 export default function AdminBacklinksPage() {
-  useDocumentTitle("Backlinks | ConstructHUB");
+  useDocumentTitle(appPageTitle("/admin/backlinks")!);
   const [view, setView] = useState<"kept" | "rejected">("kept");
   const [kind, setKind] = useState<string>("all");
   const [status, setStatusFilter] = useState<string>("all");
@@ -313,18 +314,18 @@ export default function AdminBacklinksPage() {
             </TabsList>
           </Tabs>
           <div className="mb-3 flex flex-wrap gap-2">
-            <Input className="w-48" placeholder="Search domain" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} data-testid="input-backlinks-search" />
+            <Input className="w-48" aria-label="Search domain" placeholder="Search domain" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} data-testid="input-backlinks-search" />
             <Select value={kind} onValueChange={filter(setKind)}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-44" aria-label="Kind"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="all">All kinds</SelectItem>{BACKLINK_KINDS.map((k) => <SelectItem key={k} value={k}>{BACKLINK_KIND_LABELS[k]}</SelectItem>)}</SelectContent>
             </Select>
             {view === "kept" && <>
             <Select value={tier} onValueChange={filter(setTier)}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-36" aria-label="Tier"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="all">All tiers</SelectItem><SelectItem value="quality">Quality (A+B)</SelectItem>{BACKLINK_TIERS.filter((t) => t !== "X").map((t) => <SelectItem key={t} value={t}>Tier {t}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={status} onValueChange={filter(setStatusFilter)}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-40" aria-label="Status"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="all">All statuses</SelectItem>{BACKLINK_STATUSES.filter((x) => x !== "rejected").map((x) => <SelectItem key={x} value={x}>{BACKLINK_STATUS_LABELS[x]} ({n(s.byStatus[x])})</SelectItem>)}</SelectContent>
             </Select>
             </>}

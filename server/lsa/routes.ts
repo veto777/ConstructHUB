@@ -37,6 +37,7 @@ import {
   handleWebhookUpdate,
 } from "./telegram";
 import { workerInterval } from "../workers";
+import { logError } from "../ops/log";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -133,7 +134,7 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
           const fresh = await getConnectionByUserId(user.id);
           if (fresh?.refreshToken) await syncConnection(fresh, { discover: true });
         } catch (e) {
-          console.error("LSA post-connect sync failed:", e);
+          logError("LSA post-connect sync failed:", e);
         }
       })();
 

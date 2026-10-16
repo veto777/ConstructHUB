@@ -1,8 +1,4 @@
 import type { HelpDraft } from "../../types";
-import { SEO_SAVED_DAYS, savedForWords } from "../../../seo-constants";
-
-/** The saved-copy window in words ("a week"): one constant for every SEO page (shared/seo-constants.ts). */
-const SAVED = savedForWords(SEO_SAVED_DAYS);
 
 /** Written from client/src/pages/seo/grid.tsx and server/seo/grid.ts, grid-monitor.ts as they run. */
 const entry: HelpDraft = {

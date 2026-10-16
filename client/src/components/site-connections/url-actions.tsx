@@ -99,7 +99,7 @@ export function UrlActions({
     setRows(rows.map((r, n) => (n === i ? { ...r, ...patch } : r)));
   return (
     <section className="space-y-3 pt-6">
-      <h3 className="font-medium">Sitemaps and URL inspections</h3>
+      <h2 className="font-medium">Sitemaps and URL inspections</h2>
       <p className="text-sm text-muted-foreground">
         Choose a property and enter each URL. Select the rows to submit.
         Inspection checks status; it does not request indexing.

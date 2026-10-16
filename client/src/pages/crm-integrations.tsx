@@ -18,6 +18,7 @@ import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
 } from "@/components/crm-ui";
 import { confirmAction } from "@/components/confirm-dialog";
+import { AdminSetupNote } from "@/hooks/use-platform-admin";
 
 /**
  * Integrations hub — every connection and API in one directory. HOVER lives
@@ -235,15 +236,16 @@ export default function CrmIntegrationsPage() {
         <CardContent className="space-y-4">
           {!canIntegrations ? (
             <p className="text-sm text-muted-foreground">
-              You don't have the manageIntegrations permission — ask an admin.
+              You don't have permission to manage integrations — ask your workspace owner.
             </p>
           ) : hoverError ? (
             <p className="text-sm text-destructive">Couldn't load the HOVER status — refresh to try again.</p>
           ) : !hoverStatus ? (
             <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : !hoverStatus.configured ? (
-            <EmptyState compact icon={Ruler} title="HOVER isn't configured"
-              description="This deployment has no HOVER OAuth app credentials — ask the platform team." />
+            <EmptyState compact icon={Ruler} title="HOVER isn't switched on yet"
+              description="We’re switching the HOVER connection on; there is nothing for you to do. Questions: support@constructhub.us."
+              action={<AdminSetupNote>this deployment has no HOVER OAuth app credentials.</AdminSetupNote>} />
           ) : !hoverStatus.connected ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground max-w-prose">
@@ -310,7 +312,7 @@ export default function CrmIntegrationsPage() {
                   onValueChange={(v) => hoverSchedule.mutate(Number(v))}
                   disabled={hoverSchedule.isPending}
                 >
-                  <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-hover-cadence">
+                  <SelectTrigger className="h-8 w-44 text-xs" aria-label="Auto-sync" data-testid="select-hover-cadence">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -384,9 +386,9 @@ export default function CrmIntegrationsPage() {
                 </span>
               </div>
               <div className="space-y-1.5">
-                <Label>Direct link</Label>
+                <Label htmlFor="lead-form-url">Direct link</Label>
                 <div className="flex gap-2">
-                  <Input readOnly value={leadFormUrl} data-testid="input-lead-form-url"
+                  <Input id="lead-form-url" readOnly value={leadFormUrl} data-testid="input-lead-form-url"
                     onFocus={(e) => e.target.select()} />
                   <Button size="sm" variant="outline" className="shrink-0" data-testid="button-copy-lead-link"
                     disabled={!leadFormUrl}
@@ -532,7 +534,7 @@ export default function CrmIntegrationsPage() {
                     <code className="flex-1 rounded bg-muted px-2 py-1.5 text-xs font-mono break-all">
                       {freshKey.key}
                     </code>
-                    <Button size="sm" variant="outline" data-testid="button-copy-api-key"
+                    <Button size="sm" variant="outline" aria-label="Copy key" data-testid="button-copy-api-key"
                       onClick={() => void copyText(freshKey.key, "key")}>
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
@@ -540,7 +542,7 @@ export default function CrmIntegrationsPage() {
                 </div>
               )}
               <div className="flex gap-2">
-                <Input placeholder="Key name (e.g. Zapier, reporting script)"
+                <Input placeholder="Key name (e.g. Zapier, reporting script)" aria-label="Key name"
                   data-testid="input-api-key-name"
                   value={keyName} onChange={(e) => setKeyName(e.target.value)} />
                 <Button onClick={() => createKey.mutate()} disabled={createKey.isPending}

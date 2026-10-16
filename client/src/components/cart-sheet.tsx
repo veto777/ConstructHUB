@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -103,6 +103,7 @@ export function CartSheet() {
               <Badge variant="secondary" className="ml-1">{itemCount} {itemCount === 1 ? "item" : "items"}</Badge>
             )}
           </SheetTitle>
+          <SheetDescription className="sr-only">The plans and add-ons you picked, ready to check out.</SheetDescription>
         </SheetHeader>
 
         {empty ? (

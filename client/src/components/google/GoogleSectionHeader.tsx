@@ -40,7 +40,11 @@ export function GoogleSectionHeader({ title, titleAfter, description, actions, c
         <div className={after ? "flex items-center gap-1.5" : undefined}>
           <Tag className="g-header__title">
             <span data-testid={titleTestId}>{title}</span>
-            {count != null && count !== "" && <span className="g-header__count">{typeof count === "number" ? count.toLocaleString() : count}</span>}
+            {count != null && count !== "" && <>
+              {/* The count reads as its own word ("Issues, 82"), never glued to the title ("Issues82"). */}
+              <span className="sr-only">, {typeof count === "number" ? count.toLocaleString() : count}</span>
+              <span className="g-header__count" aria-hidden="true">{typeof count === "number" ? count.toLocaleString() : count}</span>
+            </>}
           </Tag>
           {after}
         </div>

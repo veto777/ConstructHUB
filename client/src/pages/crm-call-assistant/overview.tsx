@@ -16,7 +16,7 @@ import { CallAssistantPausedBanner } from "./paused-banner";
 import { CallResults, type ResultsPick } from "./results";
 import { GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { fmtWhen, outcomeLabel, outcomeTone } from "./calls-shared";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SampleCallsPreview = lazySample(() => import("./samples"), "SampleCallsPreview");
 const SampleNumbersPreview = lazySample(() => import("./samples"), "SampleNumbersPreview");
 
@@ -215,7 +215,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
                     : "No number yet. Buy a local number in the Numbers tab, then forward your existing line to it."}
                 </p>
                 {/* An outside receptionist's lines are real numbers answered elsewhere: no sample beside them. */}
-                {!ext && <SampleNumbersPreview cta={!inNativeApp() ? <GooglePill size="sm" href="/call-assistant/numbers" label="Get a number" testId="link-sample-get-number" /> : undefined} />}
+                {showSample({ total: ext ? undefined : numbers.length }) && <SampleNumbersPreview cta={!inNativeApp() ? <GooglePill size="sm" href="/call-assistant/numbers" label="Get a number" testId="link-sample-get-number" /> : undefined} />}
               </>
             ) : (
               <GoogleList as="ul" testId="list-overview-numbers">
@@ -249,7 +249,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
                 {calls.isError ? "The call log isn't available yet." : "No calls yet. Once a forwarded line rings the assistant, every call shows here with its outcome and summary."}
               </p>
               {/* Only once the log answered and is really empty (not while it failed, and not while a receptionist's calls exist). */}
-              {calls.isSuccess && recent.length === 0 && (status.usage?.calls ?? 0) === 0 && !ext && <SampleCallsPreview compact />}
+              {showSample({ isLoading: calls.isLoading, isError: calls.isError, total: calls.isSuccess && !ext ? recent.length + (status.usage?.calls ?? 0) : undefined }) && <SampleCallsPreview compact />}
             </>
           ) : (
             <GoogleList as="ul" testId="list-overview-calls">

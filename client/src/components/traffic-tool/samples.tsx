@@ -11,14 +11,13 @@
  *     never routed), every name is "Sample …", every site "sample-roofing.example".
  */
 import type { ReactNode } from "react";
-import { SamplePreview } from "@/components/sample-preview";
+import { SAMPLE_BUSINESS, SamplePreview, sampleAgo } from "@/components/sample-preview";
 import { GoogleStat, GoogleStatGrid } from "@/components/google";
 import { localDayKey, daysAgo } from "./shared";
 import { DailyVisitsChart, GeoTable, PagesTable, PlatformBreakdowns, SitePanel, SitesSummaryStrip, SourcesTable, StatTiles, VisitorDetailPanel, VisitorRow, type DomainWithStats, type GeoData, type PageStat, type PlatformData, type TrafficSource, type Visitor, type VisitorDetail } from "./ip-views";
 import { DetectionsChart, FlaggedVisitRow, TopLists, VpnSitePanel, VpnSummaryStrip, sparklineDays, type VpnDomain, type VpnVisit } from "./vpn-views";
 
-const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
-const SITE = "sample-roofing.example";
+const SITE = SAMPLE_BUSINESS.domain;
 
 /* ── IP Tracker fixtures ────────────────────────────────────────────────────── */
 
@@ -26,35 +25,35 @@ const DAILY = [12, 18, 9, 24, 31, 27, 15, 22, 36, 29, 41, 33, 57, 42];
 const dailySeries = (now = new Date()) => DAILY.map((n, i) => [localDayKey(daysAgo(now, 13 - i)), n] as const);
 
 const SAMPLE_SITES: DomainWithStats[] = [
-  { id: -1, userId: 0, domain: SITE, trackingId: "sample", name: "Sample Roofing Co.", isActive: true, createdAt: minutesAgo(60 * 24 * 40), stats: { totalVisits: 4815, uniqueVisitors: 3102, blockedIps: 4, suspiciousVisits: 27, avgVisitsPerUser: 1.6 } },
-  { id: -2, userId: 0, domain: "sample-gutters.example", trackingId: "sample", name: "Sample Gutter Pros", isActive: true, createdAt: minutesAgo(60 * 24 * 12), stats: { totalVisits: 612, uniqueVisitors: 488, blockedIps: 0, suspiciousVisits: 3, avgVisitsPerUser: 1.3 } },
+  { id: -1, userId: 0, domain: SITE, trackingId: "sample", name: SAMPLE_BUSINESS.name, isActive: true, createdAt: sampleAgo({ minutes: 60 * 24 * 40 }), stats: { totalVisits: 4815, uniqueVisitors: 3102, blockedIps: 4, suspiciousVisits: 27, avgVisitsPerUser: 1.6 } },
+  { id: -2, userId: 0, domain: "sample-gutters.example", trackingId: "sample", name: "Sample Gutter Pros", isActive: true, createdAt: sampleAgo({ minutes: 60 * 24 * 12 }), stats: { totalVisits: 612, uniqueVisitors: 488, blockedIps: 0, suspiciousVisits: 3, avgVisitsPerUser: 1.3 } },
 ];
 
 const SAMPLE_VISITORS: Visitor[] = [
-  { ipAddress: "203.0.113.42", fingerprint: "sample-fp-a1b2c3", visits: 3, pageViews: 3, firstVisit: minutesAgo(60 * 50), lastVisit: minutesAgo(4), lastDevice: "mobile", lastBrowser: "Safari", lastOs: "iOS", screenResolution: "390x844", language: "en-US", timezone: "America/New_York", country: "US", city: "Tampa", isSuspicious: false, isOnline: true },
-  { ipAddress: "198.51.100.17", fingerprint: "sample-fp-d4e5f6", visits: 1, pageViews: 1, firstVisit: minutesAgo(12), lastVisit: minutesAgo(12), lastDevice: "desktop", lastBrowser: "Chrome", lastOs: "Windows", screenResolution: "1920x1080", language: "en-US", timezone: "America/New_York", country: "US", city: "Orlando", isSuspicious: false, isOnline: true },
-  { ipAddress: "192.0.2.88", fingerprint: "sample-fp-778899", visits: 14, pageViews: 14, firstVisit: minutesAgo(60 * 30), lastVisit: minutesAgo(38), lastDevice: "desktop", lastBrowser: "Chrome", lastOs: "Linux", screenResolution: "1366x768", language: "en-US", timezone: "UTC", country: "US", city: "Ashburn", isSuspicious: true, isOnline: false },
-  { ipAddress: "203.0.113.7", fingerprint: "sample-fp-0a1b2c", visits: 2, pageViews: 2, firstVisit: minutesAgo(60 * 26), lastVisit: minutesAgo(60 * 3), lastDevice: "mobile", lastBrowser: "Chrome", lastOs: "Android", screenResolution: "412x915", language: "es-US", timezone: "America/New_York", country: "US", city: "Brandon", isSuspicious: false, isOnline: false },
-  { ipAddress: "198.51.100.230", fingerprint: null, visits: 1, pageViews: 1, firstVisit: minutesAgo(60 * 9), lastVisit: minutesAgo(60 * 9), lastDevice: "tablet", lastBrowser: "Safari", lastOs: "iPadOS", screenResolution: "820x1180", language: "en-US", timezone: "America/Chicago", country: "US", city: "Clearwater", isSuspicious: false, isOnline: false },
+  { ipAddress: "203.0.113.42", fingerprint: "sample-fp-a1b2c3", visits: 3, pageViews: 3, firstVisit: sampleAgo({ minutes: 60 * 50 }), lastVisit: sampleAgo({ minutes: 4 }), lastDevice: "mobile", lastBrowser: "Safari", lastOs: "iOS", screenResolution: "390x844", language: "en-US", timezone: "America/New_York", country: "US", city: "Tampa", isSuspicious: false, isOnline: true },
+  { ipAddress: "198.51.100.17", fingerprint: "sample-fp-d4e5f6", visits: 1, pageViews: 1, firstVisit: sampleAgo({ minutes: 12 }), lastVisit: sampleAgo({ minutes: 12 }), lastDevice: "desktop", lastBrowser: "Chrome", lastOs: "Windows", screenResolution: "1920x1080", language: "en-US", timezone: "America/New_York", country: "US", city: "Orlando", isSuspicious: false, isOnline: true },
+  { ipAddress: "192.0.2.88", fingerprint: "sample-fp-778899", visits: 14, pageViews: 14, firstVisit: sampleAgo({ minutes: 60 * 30 }), lastVisit: sampleAgo({ minutes: 38 }), lastDevice: "desktop", lastBrowser: "Chrome", lastOs: "Linux", screenResolution: "1366x768", language: "en-US", timezone: "UTC", country: "US", city: "Ashburn", isSuspicious: true, isOnline: false },
+  { ipAddress: "203.0.113.7", fingerprint: "sample-fp-0a1b2c", visits: 2, pageViews: 2, firstVisit: sampleAgo({ minutes: 60 * 26 }), lastVisit: sampleAgo({ minutes: 60 * 3 }), lastDevice: "mobile", lastBrowser: "Chrome", lastOs: "Android", screenResolution: "412x915", language: "es-US", timezone: "America/New_York", country: "US", city: "Brandon", isSuspicious: false, isOnline: false },
+  { ipAddress: "198.51.100.230", fingerprint: null, visits: 1, pageViews: 1, firstVisit: sampleAgo({ minutes: 60 * 9 }), lastVisit: sampleAgo({ minutes: 60 * 9 }), lastDevice: "tablet", lastBrowser: "Safari", lastOs: "iPadOS", screenResolution: "820x1180", language: "en-US", timezone: "America/Chicago", country: "US", city: "Clearwater", isSuspicious: false, isOnline: false },
 ];
 
 const SAMPLE_DETAIL: VisitorDetail = {
-  ipAddress: "203.0.113.42", fingerprint: "sample-fp-a1b2c3", totalVisits: 3, firstVisit: minutesAgo(60 * 50), lastVisit: minutesAgo(4), isOnline: true, isSuspicious: false, suspicionReasons: [],
+  ipAddress: "203.0.113.42", fingerprint: "sample-fp-a1b2c3", totalVisits: 3, firstVisit: sampleAgo({ minutes: 60 * 50 }), lastVisit: sampleAgo({ minutes: 4 }), isOnline: true, isSuspicious: false, suspicionReasons: [],
   systemSpecs: { browser: "Safari", os: "iOS", deviceType: "mobile", screenResolution: "390x844", language: "en-US", timezone: "America/New_York", userAgent: "Mozilla/5.0 (iPhone; sample user agent) Safari" },
   geo: { country: "US", city: "Tampa" },
   recentActivity: [
-    { id: -1, referrer: "https://www.google.com/", landingPage: `https://${SITE}/roof-repair`, visitedAt: minutesAgo(4), deviceType: "mobile", browser: "Safari", isSuspicious: false },
-    { id: -2, referrer: null, landingPage: `https://${SITE}/free-estimate`, visitedAt: minutesAgo(60 * 20), deviceType: "mobile", browser: "Safari", isSuspicious: false },
-    { id: -3, referrer: "https://www.facebook.com/", landingPage: `https://${SITE}/`, visitedAt: minutesAgo(60 * 50), deviceType: "mobile", browser: "Safari", isSuspicious: false },
+    { id: -1, referrer: "https://search-engine.example/", landingPage: `https://${SITE}/roof-repair`, visitedAt: sampleAgo({ minutes: 4 }), deviceType: "mobile", browser: "Safari", isSuspicious: false },
+    { id: -2, referrer: null, landingPage: `https://${SITE}/free-estimate`, visitedAt: sampleAgo({ minutes: 60 * 20 }), deviceType: "mobile", browser: "Safari", isSuspicious: false },
+    { id: -3, referrer: "https://social-network.example/", landingPage: `https://${SITE}/`, visitedAt: sampleAgo({ minutes: 60 * 50 }), deviceType: "mobile", browser: "Safari", isSuspicious: false },
   ],
 };
 
 const SAMPLE_SOURCES: TrafficSource[] = [
-  { domain: "google.com", pageLoads: 148, visitors: 121, percentage: 46.5 },
+  { domain: "search-engine.example", pageLoads: 148, visitors: 121, percentage: 46.5 },
   { domain: "NO REFERRER DATA", pageLoads: 97, visitors: 80, percentage: 30.5 },
-  { domain: "facebook.com", pageLoads: 38, visitors: 35, percentage: 11.9 },
-  { domain: "bing.com", pageLoads: 21, visitors: 19, percentage: 6.6 },
-  { domain: "nextdoor.com", pageLoads: 14, visitors: 12, percentage: 4.4 },
+  { domain: "social-network.example", pageLoads: 38, visitors: 35, percentage: 11.9 },
+  { domain: "other-search.example", pageLoads: 21, visitors: 19, percentage: 6.6 },
+  { domain: "neighborhood-app.example", pageLoads: 14, visitors: 12, percentage: 4.4 },
 ];
 
 const SAMPLE_PAGES: PageStat[] = [
@@ -125,13 +124,13 @@ export function IpSample({ tab, cta, tiles = true, what }: { tab: "dashboard" | 
 /* ── VPN Shield fixtures ────────────────────────────────────────────────────── */
 
 const SAMPLE_VPN_SITES: VpnDomain[] = [
-  { id: -1, userId: 0, domain: SITE, trackingId: "sample", name: "Sample Roofing Co.", isActive: true, createdAt: minutesAgo(60 * 24 * 40), settings: { vpnBlockMode: "log" }, vpnEffectiveMode: "log", vpnStats: { totalBlocks: 23, uniqueVpnIps: 14 } },
-  { id: -2, userId: 0, domain: "sample-gutters.example", trackingId: "sample", name: "Sample Gutter Pros", isActive: true, createdAt: minutesAgo(60 * 24 * 12), settings: { vpnBlockMode: "block" }, vpnEffectiveMode: "block", vpnStats: { totalBlocks: 6, uniqueVpnIps: 5 } },
+  { id: -1, userId: 0, domain: SITE, trackingId: "sample", name: SAMPLE_BUSINESS.name, isActive: true, createdAt: sampleAgo({ minutes: 60 * 24 * 40 }), settings: { vpnBlockMode: "log" }, vpnEffectiveMode: "log", vpnStats: { totalBlocks: 23, uniqueVpnIps: 14 } },
+  { id: -2, userId: 0, domain: "sample-gutters.example", trackingId: "sample", name: "Sample Gutter Pros", isActive: true, createdAt: sampleAgo({ minutes: 60 * 24 * 12 }), settings: { vpnBlockMode: "block" }, vpnEffectiveMode: "block", vpnStats: { totalBlocks: 6, uniqueVpnIps: 5 } },
 ];
 
 const vpnVisit = (id: number, ip: string, provider: string | null, method: string, action: string, city: string, country: string, minutes: number, browser: string, os: string, device: string): VpnVisit => ({
   id, domainId: -1, ipAddress: ip, userAgent: `Mozilla/5.0 (sample user agent) ${browser}`, fingerprint: `sample-fp-${id.toString(16).padStart(6, "0")}`, browser, os, deviceType: device, country, city,
-  referrer: "https://www.google.com/", landingPage: `https://${SITE}/roof-repair`, vpnProvider: provider, detectionMethod: method, action, visitedAt: minutesAgo(minutes),
+  referrer: "https://search-engine.example/", landingPage: `https://${SITE}/roof-repair`, vpnProvider: provider, detectionMethod: method, action, visitedAt: sampleAgo({ minutes: minutes }),
 });
 const SAMPLE_VPN_VISITS: VpnVisit[] = [
   vpnVisit(-1, "203.0.113.200", "Sample VPN Co.", "Known VPN provider: Sample VPN Co.", "log", "Tampa", "US", 12, "Chrome", "Windows", "desktop"),

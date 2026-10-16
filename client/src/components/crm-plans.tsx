@@ -37,6 +37,8 @@ export type CrmSubscriptionInfo = {
   trialEndsAt: string | null;
   cancelAtPeriodEnd: boolean;
   hasLiveSubscription: boolean;
+  /** A CRM subscription exists in Stripe (live or ended): the billing portal has a customer to open. */
+  hasStripeSubscription?: boolean;
   access: { active: boolean; via: "plan" | "beta" | "admin" | null };
 };
 

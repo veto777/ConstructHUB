@@ -15,7 +15,7 @@
  */
 import { useRef, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearch } from "wouter";
-import { holdNote, isNotRunYet } from "./shell";
+import { holdNote, isNotRunYet, hideSeoPrices } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -422,7 +422,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
       {saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved copy…</p>}
       {saved.isError && !page && (
         <div className="g-callout" role="alert" data-testid="report-saved-error">
-          <h3>Couldn't check for a saved copy</h3><p>{apiErrorMessage(saved.error)} Nothing has been charged.</p>
+          <h2>Couldn't check for a saved copy</h2><p>{apiErrorMessage(saved.error)} Nothing has been charged.</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className="g-pill" onClick={() => void saved.refetch()}>Try again</button>
             {offset > 0 && <button type="button" className="g-pill" onClick={() => setOffset(Math.max(0, offset - limit))}>Back</button>}
@@ -431,11 +431,11 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
       )}
       {saved.isSuccess && !page && (
         <Empty testId="report-not-run">
-          <h3>{offset ? `Rows ${fmtNum(offset + 1)}–${fmtNum(offset + limit)} haven't been loaded` : hasFilters ? "This report hasn't been run with these settings" : "This report hasn't been run yet"}</h3>
-          <p>{whole ? `This report costs about ${price} of your SEO data and brings every ad Google's library will give (up to 120); paging through them is free.` : `Each page of a report costs about ${price} of your SEO data.`} {whole ? "It" : "A page you've run"} is kept for {SAVED_FOR} and opens free.{holdNote(status, priceKey)}</p>
+          <h2>{offset ? `Rows ${fmtNum(offset + 1)}–${fmtNum(offset + limit)} haven't been loaded` : hasFilters ? "This report hasn't been run with these settings" : "This report hasn't been run yet"}</h2>
+          <p>{hideSeoPrices() ? (whole ? "This report is included in your unlimited SEO data and brings every ad Google's library will give (up to 120); paging through them is free." : "Each page of a report is included in your unlimited SEO data.") : whole ? `This report costs about ${price} of your SEO data and brings every ad Google's library will give (up to 120); paging through them is free.` : `Each page of a report costs about ${price} of your SEO data.`} {whole ? "It" : "A page you've run"} is kept for {SAVED_FOR} and opens free.{holdNote(status, priceKey)}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button disabled={run.isPending || !status?.configured || !affordable} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-run-report">
-              {run.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}{offset ? "Load these rows" : "Run report"} — about {price}
+              {run.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}{offset ? "Load these rows" : "Run report"}{price && !hideSeoPrices() ? ` — about ${price}` : ""}
             </Button>
             {offset > 0 && <button type="button" className="g-pill" onClick={() => setOffset(Math.max(0, offset - limit))}>Back</button>}
             {!affordable && <span className="text-[13px]" style={{ color: "var(--g-red)" }}>Not enough SEO data left — add credit above.</span>}

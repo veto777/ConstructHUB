@@ -78,9 +78,9 @@ export function OutgoingLinksView({ site, crawlId, pageHref, pageParam, here, go
   if (foreign) words.push(foreign.words);
   const chip = words.length > 0 && <ActiveFilter words={words.join(" · ")} clearHref={here({ page: undefined })} extra={foreign ? { href: foreign.href, label: foreign.label, testId: "link-foreign-tab" } : undefined}>{d && pageParam && !hits ? `Only one example page is kept for each website and the first few pages for each checked address, so a link from ${pageParam} may exist without being listed.` : null}</ActiveFilter>;
   if (q.isLoading) return <>{chip}<p className="g-text-2 py-6 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Reading the crawl…</p></>;
-  if (q.isError) return <>{chip}<div className="g-callout" role="alert"><h3>Couldn't read the outgoing links</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div></>;
-  if (unreadable) return <>{chip}<Empty testId="outgoing-unreadable"><h3>The newest crawl could not be read</h3><p>The crawl that finished {fmtDate(unreadable.scannedAt)} was not saved in a form we can read, so nothing is shown from it (and no older crawl in its place). Run a new crawl.</p></Empty></>;
-  if (!d) return <>{chip}<Empty testId="outgoing-no-crawl"><h3>No crawl yet</h3><p>Run a crawl first; this view is read from the pages it saves.</p></Empty></>;
+  if (q.isError) return <>{chip}<div className="g-callout" role="alert"><h2>Couldn't read the outgoing links</h2><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div></>;
+  if (unreadable) return <>{chip}<Empty testId="outgoing-unreadable"><h2>The newest crawl could not be read</h2><p>The crawl that finished {fmtDate(unreadable.scannedAt)} was not saved in a form we can read, so nothing is shown from it (and no older crawl in its place). Run a new crawl.</p></Empty></>;
+  if (!d) return <>{chip}<Empty testId="outgoing-no-crawl"><h2>No crawl yet</h2><p>Run a crawl first; this view is read from the pages it saves.</p></Empty></>;
   const task = (b: Broken): PlanTask => ({
     kind: "page", title: `Fix or remove the link to ${b.to.replace(/^https?:\/\/(www\.)?/, "")} (${b.status === null ? "no answer" : `answered ${b.status}`}) on ${b.fromCount} page${b.fromCount === 1 ? "" : "s"}`.slice(0, 200),
     target: b.from[0] ?? null, facts: { linkTo: b.to.slice(0, 300), answered: b.status, pages: b.fromCount, crawled: d.scannedAt?.slice(0, 10) ?? null },
@@ -123,7 +123,7 @@ export function OutgoingLinksView({ site, crawlId, pageHref, pageParam, here, go
           </ul>
         )}
       </section>
-      {d.linkedDomains.length === 0 ? <Empty testId="outgoing-none"><h3>No links to other websites</h3><p>{d.linksMeasured === null ? "No page loaded." : d.linksMeasured ? "The HTML of the pages read has no web links to other websites." : "No web links were saved from the HTML (one possible reason: links added by JavaScript)."}</p></Empty> : (
+      {d.linkedDomains.length === 0 ? <Empty testId="outgoing-none"><h2>No links to other websites</h2><p>{d.linksMeasured === null ? "No page loaded." : d.linksMeasured ? "The HTML of the pages read has no web links to other websites." : "No web links were saved from the HTML (one possible reason: links added by JavaScript)."}</p></Empty> : (
         <div className="overflow-x-auto">
           <table id="table-outgoing" className={COMPACT_TABLE} data-testid="table-outgoing">
             <thead><tr><th>Website</th><th className="num">Pages linking</th><th className="num">Links</th><th>For example</th><th className="num" title="Of its addresses the crawl checked: how many, and how many were gone or a server error">Checked / broken</th></tr></thead>

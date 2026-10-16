@@ -32,10 +32,22 @@ const Alert = React.forwardRef<
 ))
 Alert.displayName = "Alert"
 
+/**
+ * A callout's title. `level` makes it a heading at that outline level (a div with role="heading", so the look never
+ * changes) when the alert is a page section; without it, the shadcn default h5.
+ */
 const AlertTitle = React.forwardRef<
   HTMLParagraphElement,
-  React.HTMLAttributes<HTMLHeadingElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLHeadingElement> & { level?: 1 | 2 | 3 | 4 | 5 | 6 }
+>(({ className, level, ...props }, ref) => level ? (
+  <div
+    ref={ref}
+    role="heading"
+    aria-level={level}
+    className={cn("mb-1 font-medium leading-none tracking-tight", className)}
+    {...props}
+  />
+) : (
   <h5
     ref={ref}
     className={cn("mb-1 font-medium leading-none tracking-tight", className)}

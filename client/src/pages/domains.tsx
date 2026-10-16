@@ -48,7 +48,7 @@ import {
   GoogleStatGrid,
 } from "@/components/google";
 import { HelpButton } from "@/components/help-button";
-import { SamplePreview } from "@/components/sample-preview";
+import { SAMPLE_BUSINESS, SamplePreview, showSample } from "@/components/sample-preview";
 import { PresetFilter } from "@/components/domains/preset-filter";
 import {
   PlanRequired,
@@ -67,6 +67,7 @@ import {
   type JobLike,
 } from "@/components/domains/dns-diff";
 import { RecordPicker } from "@/components/domains/record-picker";
+import { AdminSetupNote } from "@/hooks/use-platform-admin";
 import {
   buildRecordChange,
   scopedRecordId,
@@ -187,7 +188,7 @@ function DomainCard({ d, selected, onToggle, busy, onCheck, onMap, onChange }: {
 /** Obviously made-up domains for the sample shown while the inventory is empty (never stored, never sent). */
 const sampleDate = (days: number) => new Date(Date.now() + days * 86400000).toISOString();
 const SAMPLE_DOMAINS: DomainRow[] = [
-  { id: -1, domain: "sample-roofing.example", registrar: "porkbun", location_name: "Sample Roofing Co.", state: { expires: sampleDate(42), autoRenew: true, nameservers: ["ns1.sample-dns.example", "ns2.sample-dns.example"] }, health: { up: true, sslExpires: sampleDate(70) }, checked_at: sampleDate(-1) },
+  { id: -1, domain: SAMPLE_BUSINESS.domain, registrar: "porkbun", location_name: SAMPLE_BUSINESS.name, state: { expires: sampleDate(42), autoRenew: true, nameservers: ["ns1.sample-dns.example", "ns2.sample-dns.example"] }, health: { up: true, sslExpires: sampleDate(70) }, checked_at: sampleDate(-1) },
   { id: -2, domain: "example-plumbing.example", registrar: "namecom", location_name: "Example Plumbing LLC", state: { expires: sampleDate(9), autoRenew: false, nameservers: ["ns1.sample-dns.example", "ns2.sample-dns.example"] }, health: { up: true, sslExpires: sampleDate(200) }, checked_at: sampleDate(-1) },
   { id: -3, domain: "demo-electric.example", registrar: "manual", location_name: null, state: { expires: sampleDate(300), autoRenew: null, nameservers: null }, health: { up: false, sslExpires: null }, checked_at: sampleDate(-2) },
 ];
@@ -249,8 +250,9 @@ export default function DomainsPage() {
   // Background processing off: queued work waits rather than applying, and copy says so.
   const workerOff = guides?.workerEnabled === false;
   // The stat row's two counts, whatever the filters say: every domain, and the ones the daily check flags.
-  const { data: overview } = useQuery<any>({ queryKey: ["/api/domains?limit=1"], refetchInterval: pollWithinBudget(60_000) });
-  const { data: attentionOverview } = useQuery<any>({ queryKey: ["/api/domains?attention=1&limit=1"], refetchInterval: pollWithinBudget(60_000) });
+  // GET /api/domains answers { items, total, page } (server/domains/routes.ts); these two read only the total.
+  const { data: overview } = useQuery<{ items: DomainRow[]; total: number }>({ queryKey: ["/api/domains?limit=1"], refetchInterval: pollWithinBudget(60_000) });
+  const { data: attentionOverview } = useQuery<{ items: DomainRow[]; total: number }>({ queryKey: ["/api/domains?attention=1&limit=1"], refetchInterval: pollWithinBudget(60_000) });
   const totalDomains: number | null = overview ? Number(overview.total || 0) : null;
   const filtering = !!(q || registrar || attention);
   const {
@@ -359,11 +361,11 @@ export default function DomainsPage() {
       {error && <Notice tone="danger">{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
       {guides && !guides.workerEnabled && (
-        <Notice tone="info" title="Background checks are paused on this server" testId="notice-domains-worker-off">
+        <Notice tone="info" title="Background checks are paused for now" testId="notice-domains-worker-off">
           Registrar imports, the daily expiry and DNS checks, previews and confirmed changes wait in the queue
-          until an administrator sets <code className="text-xs">DOMAINS_WORKER_ENABLED=true</code> in the
-          server environment and restarts the app. Everything else works now: connecting a registrar, adding
-          domains, mapping them to clients, and reviewing the inventory and history.
+          until we switch background checks on; there is nothing for you to do. Everything else works now:
+          connecting a registrar, adding domains, mapping them to clients, and reviewing the inventory and history.
+          <AdminSetupNote>set <code className="text-xs">DOMAINS_WORKER_ENABLED=true</code> in the server environment and restart the app.</AdminSetupNote>
         </Notice>
       )}
       {totalDomains !== null && totalDomains > 0 && (
@@ -371,12 +373,12 @@ export default function DomainsPage() {
           <GoogleStat label="Domains watched" value={totalDomains.toLocaleString()} hint={`${(connections?.items || []).length} registrar connection${(connections?.items || []).length === 1 ? "" : "s"}`} testId="stat-domains-watched" />
           <GoogleStat label="Need attention" value={attentionOverview ? Number(attentionOverview.total || 0).toLocaleString() : "…"} tone={attentionOverview && Number(attentionOverview.total) > 0 ? "bad" : "default"} hint="Expiring in 60 days, auto-renew off, website down or SSL expiring" testId="stat-domains-attention" />
           <GoogleStat label="Previews ready" value={(jobs?.items || []).filter(canConfirmJob).length.toLocaleString()} hint="Waiting for your confirmation" testId="stat-domains-previews" />
-          <GoogleStat label="Background checks" value={guides ? (guides.workerEnabled ? "On" : "Paused") : "…"} tone={workerOff ? "bad" : "default"} hint={workerOff ? "Queued work waits for an administrator" : "Imports and daily checks run"} testId="stat-domains-worker" />
+          <GoogleStat label="Background checks" value={guides ? (guides.workerEnabled ? "On" : "Paused") : "…"} tone={workerOff ? "bad" : "default"} hint={workerOff ? "Queued work waits until they are back on" : "Imports and daily checks run"} testId="stat-domains-worker" />
         </GoogleStatGrid>
       )}
       {totalDomains === 0 && (
         <div className="g-callout" data-testid="domains-how-it-works">
-          <h3>How this works</h3>
+          <h2>How this works</h2>
           <ol className="mt-1 list-decimal space-y-1 pl-5">
             <li>Connect a registrar (Porkbun or Name.com) or add domains by typing them in.</li>
             <li>We check each domain’s expiry date, auto-renew, nameservers and website, and keep checking daily.</li>
@@ -827,6 +829,8 @@ export default function DomainsPage() {
                     ? "No domains need attention right now — nothing expiring soon, auto-renew is on and the websites answer."
                     : "No domains match these filters."}
                 </p>
+              ) : !showSample({ isLoading, isError: !!loadError, total: domains?.items?.length, filtered: filtering, page: page - 1 }) ? (
+                <p className="py-6 text-sm g-text-2" data-testid="domains-empty-page">No domains on this page.</p>
               ) : (
                 <SamplePreview
                   what="what each domain card shows once you connect a registrar or add a domain"
@@ -1332,7 +1336,7 @@ export default function DomainsPage() {
                   toast({
                     title: `${n} change${n === 1 ? "" : "s"} queued`,
                     description: workerOff
-                      ? "Domain background processing is off, so the change waits in the queue — nothing reaches the registrar until an administrator turns it back on."
+                      ? "Background checks are paused for now, so the change waits in the queue — nothing reaches the registrar until we switch them back on."
                       : "Queued for processing. After the worker applies the change, we check public DNS every 5 minutes until it shows, and you get a notification with the result.",
                   });
                   setJobSelection([]);
@@ -1349,7 +1353,7 @@ export default function DomainsPage() {
         <div className="space-y-3">
           <p className="pt-4 text-sm g-text-2">
             Server egress IP for allowlists:{" "}
-            {guides?.egressIp || "Not configured — ask your administrator"}
+            {guides?.egressIp || "Not available yet — email support@constructhub.us if your registrar asks for one"}
           </p>
           {guides?.guides?.length > 0 && (
             <GoogleList testId="list-registrar-guides">

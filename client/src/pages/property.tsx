@@ -190,7 +190,7 @@ export default function PropertyPage() {
       {appraisers && appraisers.length > 0 && (
         <GoogleStatGrid cols={3}>
           <GoogleStat label="Offices on record" value={officeTotals.offices.toLocaleString()} hint={`${officeTotals.states} states · from NETR Online's directory`} testId="stat-property-offices" />
-          <GoogleStat label="Offices with a records site" value={officeTotals.site.toLocaleString()} hint="An official site on record that passed its check (the map counts counties)" testId="stat-property-sites" />
+          <GoogleStat label="Offices with a records site" value={officeTotals.site.toLocaleString()} hint="An official site on record that passed its check" testId="stat-property-sites" />
           <GoogleStat label="Offices with phone only" value={officeTotals.phoneOnly.toLocaleString()} hint="No usable site link on record; a web search is offered instead" testId="stat-property-phone-only" />
         </GoogleStatGrid>
       )}
@@ -261,7 +261,7 @@ export default function PropertyPage() {
       ) : filtered.length === 0 ? (
         /* Nothing on record at all (a fresh database): say what will appear and where it comes from. No sample offices (CLAUDE.md). */
         <div className="g-callout" data-testid="empty-property-offices">
-          <h3>No offices on record yet</h3>
+          <h2>No offices on record yet</h2>
           <p>One row per county assessor or property appraiser office will appear here: its name, county and address, with Open portal and Search records when its official site is on record, “Find property records” (a web search) when it is not, and Call when a phone number is.</p>
           <p className="mt-2">The list comes from NETR Online's directory of assessor and appraiser offices, loaded into ConstructHUB's reference data and checked link by link; it is filled when the server's reference data is seeded. Until then, search the web for the county's assessor.</p>
           <div className="mt-3"><GooglePill icon={Search} label="Find a county assessor on the web" href="https://www.google.com/search?q=county+assessor+property+records" external testId="link-property-empty-search" /></div>
@@ -273,6 +273,8 @@ export default function PropertyPage() {
               ? `Showing ${(currentPage - 1) * perPage + 1}–${Math.min(currentPage * perPage, filtered.length)} of ${filtered.length.toLocaleString()} offices`
               : `${filtered.length} office${filtered.length !== 1 ? "s" : ""}`}
           </p>
+          {/* The rows are h3s: an outline level above them for screen readers (no visual change). */}
+          <h2 className="sr-only">Assessor and appraiser offices</h2>
           <GoogleList testId="list-appraisers">
             {paginated.map((appraiser) => <PropertyOfficeRow key={appraiser.id} appraiser={appraiser} />)}
           </GoogleList>

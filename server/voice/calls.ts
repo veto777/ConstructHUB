@@ -19,6 +19,7 @@ import { db } from "../db";
 import { voiceCalls, voiceEscalations, crmCustomers, crmProjects, voiceNumbers } from "@shared/schema";
 import { and, desc, eq, gte, inArray, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { CALL_OUTCOMES } from "@shared/voice-profile";
+import { parseCallResultsRange, type CallResultsRange } from "@shared/call-results-range";
 import { voiceContext, type GetUser } from "./context";
 import { openRecording, parseRange } from "./recordings";
 import { listSpamLedger, presentSpamRow, unblockNumber, blockNumber, spamNumber } from "./spam";
@@ -130,16 +131,8 @@ export async function outsideSpamSplitThisMonth(orgId: string, timezone: unknown
   return { spam: Number(row?.n ?? 0), blocked: Number(row?.blocked ?? 0) };
 }
 
-export type CallResultsRange = "7d" | "30d" | "month" | "all" | `${number}d`;
-
-/** The Results panel's period: a preset, or "<1..365>d" for a number of days the owner typed (anything else → 30d). */
-export function parseCallResultsRange(raw: unknown): CallResultsRange {
-  const v = String(raw ?? "");
-  if (v === "7d" || v === "30d" || v === "month" || v === "all") return v;
-  const m = /^(\d{1,3})d$/.exec(v);
-  const n = m ? Number(m[1]) : NaN;
-  return Number.isInteger(n) && n >= 1 && n <= 365 ? (`${n}d` as CallResultsRange) : "30d";
-}
+// The period type and its parser live in shared/ so the Results panel uses the same limit (1–365 typed days).
+export { parseCallResultsRange, type CallResultsRange };
 
 /** Office callbacks count too, including a voicemail whose message reached a person. */
 export function sentToPersonCondition(id: SQL, outcome: SQL): SQL {

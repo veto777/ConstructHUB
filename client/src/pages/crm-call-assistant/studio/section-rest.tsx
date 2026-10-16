@@ -224,13 +224,13 @@ export function AppointmentsSection({ value, onChange, disabled }: SectionProps<
                   {c.windows.map((w, k) => (
                     <div key={k} className="flex flex-wrap items-center gap-2 text-sm">
                       <Select value={w.day} disabled={disabled} onValueChange={(day) => set("crews", crews.map((x, j) => (j === i ? { ...x, windows: x.windows.map((y, l) => (l === k ? { ...y, day: day as typeof y.day } : y)) } : x)))}>
-                        <SelectTrigger className="w-36" data-testid={`select-crew-${i}-window-${k}-day`}><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="w-36" aria-label={`${c.name || `Crew ${i + 1}`} window ${k + 1} day`} data-testid={`select-crew-${i}-window-${k}-day`}><SelectValue /></SelectTrigger>
                         <SelectContent>{DAY_KEYS.map((d) => <SelectItem key={d} value={d}>{DAY_LABELS[d]}</SelectItem>)}</SelectContent>
                       </Select>
-                      <Input type="time" value={w.from} disabled={disabled} className="w-[7.5rem]" data-testid={`input-crew-${i}-window-${k}-from`}
+                      <Input type="time" value={w.from} disabled={disabled} className="w-[7.5rem]" aria-label={`${c.name || `Crew ${i + 1}`} window ${k + 1} starts`} data-testid={`input-crew-${i}-window-${k}-from`}
                         onChange={(e) => set("crews", crews.map((x, j) => (j === i ? { ...x, windows: x.windows.map((y, l) => (l === k ? { ...y, from: e.target.value } : y)) } : x)))} />
                       <span className="text-muted-foreground">to</span>
-                      <Input type="time" value={w.to} disabled={disabled} className="w-[7.5rem]" data-testid={`input-crew-${i}-window-${k}-to`}
+                      <Input type="time" value={w.to} disabled={disabled} className="w-[7.5rem]" aria-label={`${c.name || `Crew ${i + 1}`} window ${k + 1} ends`} data-testid={`input-crew-${i}-window-${k}-to`}
                         onChange={(e) => set("crews", crews.map((x, j) => (j === i ? { ...x, windows: x.windows.map((y, l) => (l === k ? { ...y, to: e.target.value } : y)) } : x)))} />
                       {!disabled && <Button type="button" variant="ghost" size="sm" data-testid={`button-crew-${i}-window-${k}-remove`} onClick={() => set("crews", crews.map((x, j) => (j === i ? { ...x, windows: x.windows.filter((_, l) => l !== k) } : x)))}>Remove</Button>}
                     </div>

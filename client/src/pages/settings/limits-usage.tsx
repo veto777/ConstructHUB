@@ -29,6 +29,8 @@ import { formatJobcamTier, formatJobcamUsage } from "@shared/jobcam-storage";
 
 /** API allowances arrive with the account foundation; older servers don't send them. */
 type ApiAllowances = { apiUnitsPerMonth?: number; apiRatePerMinute?: number };
+/** GET /api/agency/team — only the seat count (server/agency/routes.ts: owner + members, extra seats included). */
+type AgencyTeamSeats = { seats?: { used: number; limit: number } };
 type ApiKeysPlan = { plan?: { apiEnabled?: boolean; unitsPerMonth?: number; usedThisMonth?: number; ratePerMinute?: number } };
 
 type LimitRow = {
@@ -47,8 +49,8 @@ type LimitRow = {
   /** "/ mo" counts reset monthly; the rest are standing counts. */
   monthly?: boolean;
   hint?: string;
-  /** The add-on that raises this limit (shown when the plan can buy it). */
-  addon?: AddonKey;
+  /** The add-on(s) that raise this limit (each shown when the plan can buy it; the SEO suite has two tiers). */
+  addon?: AddonKey | readonly AddonKey[];
   /** Extra control instead of an add-on (a legacy per-location Agency subscription keeps its location-count change). */
   action?: ReactNode;
 };
@@ -121,6 +123,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
     "/api/crm/jobcam/usage", !!allowances && crmMe.data?.crm?.jobcam === true);
   const templates = useQuery<unknown[]>({ queryKey: ["/api/review-templates"], enabled: !!allowances && allowances.reviewTemplates !== 0 });
   const apiKeys = useOptionalQuery<ApiKeysPlan>("/api/account/api-keys", hasApi);
+  // Agency workspace team seats (what extra_seat raises): the count PUT /api/agency/team refuses on.
+  const team = useOptionalQuery<AgencyTeamSeats>("/api/agency/team?q=&offset=0", !!allowances && allowances.agencySeats !== 0);
   // The Call Assistant's status answers for every account (a separate service, with or without a plan).
   const voice = useOptionalQuery<VoiceStatusLite>("/api/crm/voice/status", !!entitlements);
 
@@ -167,6 +171,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   const pendingAddon = addonMutation.isPending ? addonMutation.variables?.addon : null;
   const resets = entitlements.resetsAt ? new Date(entitlements.resetsAt) : null;
   const apiPlan = apiKeys.data?.plan;
+  const seoAddonOnPlan = !admin && ADDONS.seo_basic.availableOn.includes(plan);
 
   const groups: LimitGroup[] = [
     {
@@ -192,6 +197,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         },
         meterRow("gridCredits", "Ranking-grid credits", usage.rankings, allowances.gridCredits, {
           hint: "One credit per 25 grid points.",
+          addon: "grid_pack",
         }, unl),
         {
           key: "reviewTemplates",
@@ -235,7 +241,9 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           excluded: allowances.seoKeywords === 0,
           used: allowances.seoKeywords === 0 ? null : seo.data ? Math.max(0, seo.data.usage.keywords.used) : undefined,
           ceiling: allowances.seoKeywords > 0 ? allowances.seoKeywords : undefined,
-          hint: allowances.seoKeywords === 0 ? SEO_AGENCY_HINT
+          // The SEO suite add-on (one tier per account) raises tracked keywords and the SEO data allowance together.
+          addon: ["seo_basic", "seo_pro"],
+          hint: allowances.seoKeywords === 0 ? (seoAddonOnPlan ? `${SEO_AGENCY_HINT} Or add an SEO suite below.` : SEO_AGENCY_HINT)
             : seo.data && !seo.data.configured ? "Rank tracking is being switched on for your account — check back shortly."
             : `${entitlements?.seoGrandfathered ? "Your plan keeps the SEO tools it had. " : ""}Checked on Google every week.`,
         },
@@ -251,6 +259,21 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
             : seo.data?.credits && seo.data.credits.walletCents > 0
             ? `Site explorer, keyword research, backlinks and rank checks, in dollars. Plus $${(seo.data.credits.walletCents / 100).toFixed(2)} purchased credit.`
             : "Site explorer, keyword research, backlinks and rank checks, in dollars. More can be added as prepaid credit on the SEO page.",
+        },
+      ],
+    },
+    {
+      title: "Team",
+      rows: [
+        {
+          key: "agencySeats",
+          label: "Team seats",
+          included: countText(allowances.agencySeats, unl),
+          excluded: allowances.agencySeats === 0,
+          used: allowances.agencySeats === 0 ? null : team.data?.seats ? team.data.seats.used : undefined,
+          ceiling: allowances.agencySeats > 0 ? allowances.agencySeats : undefined,
+          hint: "You and the members of your agency workspace. CRM seats come with the CRM subscription, not this plan.",
+          addon: "extra_seat",
         },
       ],
     },
@@ -455,8 +478,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
             </div>
             {group.rows.map((row) => {
               // Nothing to buy on an all-access admin account.
-              const addon = !admin && row.addon && ADDONS[row.addon].availableOn.includes(plan) ? ADDONS[row.addon] : null;
-              const qty = addon ? Math.max(0, Number(subscription?.addons?.[addon.key] ?? 0) || 0) : 0;
+              const addons = (!admin && row.addon ? ([] as AddonKey[]).concat(row.addon) : [])
+                .map((k) => ADDONS[k]).filter((a) => a.availableOn.includes(plan));
               const pct = row.ceiling && typeof row.used === "number" ? Math.min(100, Math.round((row.used / row.ceiling) * 100)) : null;
               const usedText = row.used === null ? "—"
                 : row.used === undefined ? "Not reported"
@@ -482,58 +505,68 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                       <div className={`h-full rounded-full ${pct >= 100 ? "bg-destructive" : "bg-primary"}`} style={{ width: `${pct}%` }} />
                     </div>
                   )}
-                  {(addon || row.action) && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2" data-testid={addon ? `row-limit-addon-${addon.key}` : undefined}>
-                      {addon ? (
-                        <>
-                          <div className="min-w-0 text-xs text-muted-foreground">
-                            <span className="font-medium text-foreground">{addon.name}</span> · {formatUsd(addonPriceCents(addon, interval))}{intervalSuffix(interval)} each
-                            {addon.setupCents ? ` + ${formatUsd(addon.setupCents)} one-time setup` : ""}
-                            {addon.preview && (
-                              <>
-                                {" · "}
-                                <Badge variant="outline" className="text-[10px]" data-testid={`badge-limit-addon-preview-${addon.key}`}>Coming soon</Badge>
-                              </>
-                            )}
-                            {!editable && !addon.preview && (
-                              <>
-                                {" · "}
-                                <button type="button" className="underline hover:text-foreground" onClick={() => go("billing")} data-testid={`link-limit-addon-billing-${addon.key}`}>
-                                  managed in Billing
-                                </button>
-                              </>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              className="h-10 w-10"
-                              aria-label={`Remove one ${addon.name}`}
-                              disabled={!editable || addonMutation.isPending || addonChange.checking || qty === 0 || addon.preview === true}
-                              onClick={() => void addonChange.request({ addon: addon.key, quantity: qty - 1 }, qty)}
-                              data-testid={`button-limit-addon-dec-${addon.key}`}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <span className="w-8 text-center text-sm font-semibold tabular-nums" aria-live="polite" data-testid={`text-limit-addon-qty-${addon.key}`}>
-                              {pendingAddon === addon.key ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : qty}
+                  {addons.map((addon) => {
+                    const qty = Math.max(0, Number(subscription?.addons?.[addon.key] ?? 0) || 0);
+                    // One tier per account (the SEO suite): + stops at 1, and buying one switches from the other.
+                    const max = addon.exclusiveGroup ? 1 : ADDON_MAX_QUANTITY;
+                    return (
+                      <div key={addon.key} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2" data-testid={`row-limit-addon-${addon.key}`}>
+                        <div className="min-w-0 text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">{addon.name}</span> · {formatUsd(addonPriceCents(addon, interval))}{intervalSuffix(interval)} each
+                          {addon.setupCents ? ` + ${formatUsd(addon.setupCents)} one-time setup` : ""}
+                          {addon.preview && (
+                            <>
+                              {" · "}
+                              <Badge variant="outline" className="text-[10px]" data-testid={`badge-limit-addon-preview-${addon.key}`}>Coming soon</Badge>
+                            </>
+                          )}
+                          {/* No meter on this row to show what the add-on adds, so say it is on and what it adds. */}
+                          {qty > 0 && row.used === null && (
+                            <span className="block" data-testid={`text-limit-addon-active-${addon.key}`}>
+                              <Badge variant="outline" className="mr-1 text-[10px]">Active</Badge>{addon.description}
                             </span>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              className="h-10 w-10"
-                              aria-label={`Add one ${addon.name}`}
-                              disabled={!editable || addonMutation.isPending || addon.preview === true}
-                              onClick={() => addonMutation.mutate({ addon: addon.key, quantity: qty + 1 })}
-                              data-testid={`button-limit-addon-inc-${addon.key}`}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </>
-                      ) : row.action}
-                    </div>
+                          )}
+                          {!editable && !addon.preview && (
+                            <>
+                              {" · "}
+                              <button type="button" className="underline hover:text-foreground" onClick={() => go("billing")} data-testid={`link-limit-addon-billing-${addon.key}`}>
+                                managed in Billing
+                              </button>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-10 w-10"
+                            aria-label={`Remove one ${addon.name}`}
+                            disabled={!editable || addonMutation.isPending || addonChange.checking || qty === 0 || addon.preview === true}
+                            onClick={() => void addonChange.request({ addon: addon.key, quantity: qty - 1 }, qty)}
+                            data-testid={`button-limit-addon-dec-${addon.key}`}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="w-8 text-center text-sm font-semibold tabular-nums" aria-live="polite" data-testid={`text-limit-addon-qty-${addon.key}`}>
+                            {pendingAddon === addon.key ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : qty}
+                          </span>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-10 w-10"
+                            aria-label={`Add one ${addon.name}`}
+                            disabled={!editable || addonMutation.isPending || addon.preview === true || qty >= max}
+                            onClick={() => addonMutation.mutate({ addon: addon.key, quantity: qty + 1 })}
+                            data-testid={`button-limit-addon-inc-${addon.key}`}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {row.action && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2">{row.action}</div>
                   )}
                 </div>
               );
@@ -556,7 +589,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
 /** Exposed for tests: the limit keys this page renders, in order (every PlanLimits field, the Call Assistant pair — a separate service, always listed — and the API pair when present). */
 export const LIMIT_ROW_KEYS: readonly (keyof PlanLimits | "jobcamStorage" | "callAssistantMinutes" | "callAssistantNumbers" | "apiUnitsPerMonth" | "apiRatePerMinute")[] = [
   "locations", "guardCadenceMinutes", "gridCredits", "reviewTemplates", "autoPublishAiReplies",
-  "protectedSites", "siteScans", "competitorScans",
+  "protectedSites", "siteScans", "competitorScans", "citationAudits", "seoKeywords", "seoCreditCents",
+  "agencySeats",
   "permitSearches", "teamTextSegments", "clientTexting", "jobcamStorage",
   "callAssistantMinutes", "callAssistantNumbers",
   "apiUnitsPerMonth", "apiRatePerMinute",

@@ -63,7 +63,8 @@ export function GoogleListRow({
         <div className="g-card__body">
           <h3 className={cn("g-card__title", size === "md" && "g-card__title--md")}>
             {heading}
-            {badges && <span className="ml-2 inline-flex flex-wrap items-center gap-1 align-middle">{badges}</span>}
+            {/* A separator for screen readers, so a badge never reads glued to the title ("Alpine Exteriorsdone"). */}
+            {badges && <><span className="sr-only">, </span><span className="ml-2 inline-flex flex-wrap items-center gap-1 align-middle">{badges}</span></>}
           </h3>
           {metaNode}
           {line && <p className="g-card__meta">{line}</p>}

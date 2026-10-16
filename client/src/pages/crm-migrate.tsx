@@ -292,12 +292,12 @@ export default function CrmMigratePage() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {FIELDS[entity].map((f) => (
                 <div key={f.key} className="space-y-1">
-                  <Label className="text-xs">{f.label}</Label>
+                  <Label className="text-xs" htmlFor={`map-${f.key}`}>{f.label}</Label>
                   <Select
                     value={mapping[f.key] ?? SKIP}
                     onValueChange={(v) => setMapping((m) => ({ ...m, [f.key]: v === SKIP ? null : v }))}
                   >
-                    <SelectTrigger data-testid={`select-map-${f.key}`}>
+                    <SelectTrigger id={`map-${f.key}`} data-testid={`select-map-${f.key}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -446,9 +446,9 @@ export default function CrmMigratePage() {
             <>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>Which system are you on?</Label>
+                  <Label htmlFor="assisted-system">Which system are you on?</Label>
                   <Select value={system} onValueChange={setSystem}>
-                    <SelectTrigger data-testid="select-assisted-system">
+                    <SelectTrigger id="assisted-system" data-testid="select-assisted-system">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

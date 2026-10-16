@@ -16,7 +16,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, HIGHLIGHT, money, useSeoStatus, type SeoSite } from "./shell";
+import { api, Empty, fmtDate, fmtNum, HIGHLIGHT, money, useSeoStatus, type SeoSite, hideSeoPrices } from "./shell";
 import { seoLinks } from "./links";
 import { ActiveFilter, AMBER, CHEVRON, COMPACT_TABLE, DETAIL_CELL, FIG, type AuditParams, type Foreign } from "./viz-audit";
 
@@ -156,7 +156,7 @@ export function RenderCheck({ site, pageHref, pageParam = null, resultParam = nu
     </ActiveFilter>
   );
   if (q.isLoading) return <>{chip}<p className="g-text-2 py-6 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading…</p></>;
-  if (q.isError && !q.data) return <>{chip}<div className="g-callout" role="alert"><h3>Couldn't load the rendering check</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div></>;
+  if (q.isError && !q.data) return <>{chip}<div className="g-callout" role="alert"><h2>Couldn't load the rendering check</h2><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div></>;
 
   return (
     <div data-testid="render-check">
@@ -177,9 +177,9 @@ export function RenderCheck({ site, pageHref, pageParam = null, resultParam = nu
         </fieldset>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Button type="button" disabled={running || !configured || !urls.length || urls.length > max || short || price == null} onClick={() => start.mutate({ siteId: site.id, urls })} data-testid="button-render-run">
-            {running ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Checking…</> : `Check ${urls.length} page${urls.length === 1 ? "" : "s"}${price != null ? ` — up to ${money(price)}` : ""}`}
+            {running ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Checking…</> : `Check ${urls.length} page${urls.length === 1 ? "" : "s"}${!hideSeoPrices() && price != null ? ` — up to ${money(price)}` : ""}`}
           </Button>
-          {!running && price != null && <Link href={usage} className={`g-text-2 ${FIG} text-[13px]`} title="Prices, your credit and what each check cost, on Usage" data-testid="link-render-price">up to {money(price)}: the price and your credit</Link>}
+          {!running && price != null && <Link href={usage} className={`g-text-2 ${FIG} text-[13px]`} title="Prices, your credit and what each check cost, on Usage" data-testid="link-render-price">{hideSeoPrices() ? "Usage and your SEO data" : <>up to {money(price)}: the price and your credit</>}</Link>}
           {running && <span className="g-text-2 text-[13px]" role="status">This takes about half a minute. You can leave this page; the result is kept.</span>}
           {!running && urls.length > max && <span className="text-[13px]" style={{ color: "var(--g-red)" }} role="alert">Choose <Link href={`${here({})}#render-limit`} className={FIG} title="Why there is a limit, in the note below" data-testid="link-render-max-alert">{max}</Link> pages or fewer.</span>}
           {!running && urls.length > 0 && urls.length <= max && price == null && configured && <span className="g-text-2 text-[13px]" role="status">{status.isLoading ? "Getting the price…" : "The price couldn't be loaded, so this can't be bought yet — reload the page."}</span>}
@@ -250,7 +250,7 @@ export function RenderCheck({ site, pageHref, pageParam = null, resultParam = nu
         </section>
         );
       })()}
-      {!run && !running && <Empty testId="render-empty"><h3>No rendering check yet</h3><p>Choose the pages above and run the check.</p></Empty>}
+      {!run && !running && <Empty testId="render-empty"><h2>No rendering check yet</h2><p>Choose the pages above and run the check.</p></Empty>}
     </div>
   );
 }

@@ -201,7 +201,7 @@ process.on("unhandledRejection", (reason) => {
     const { closeAllPools } = await import("./db");
     installGracefulShutdown({ server: httpServer, closePools: closeAllPools, log: (line) => log(line.replace(/^\[shutdown\] /, ""), "shutdown") });
   } catch (err) {
-    console.error("Fatal startup error:", err);
+    logError("Fatal startup error:", err);
     process.exit(1);
   }
 })();

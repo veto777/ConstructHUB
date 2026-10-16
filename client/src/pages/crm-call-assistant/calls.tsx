@@ -19,7 +19,7 @@ import { CALL_ASSISTANT_SPAM } from "@shared/plan-copy";
 import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
 import { CallDetailSheet, EscalationRow } from "./calls-detail";
 import { CallResults } from "./results";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SampleCallsPreview = lazySample(() => import("./samples"), "SampleCallsPreview");
 const SampleSpamPreview = lazySample(() => import("./samples"), "SampleSpamPreview");
 import { GooglePill } from "@/components/google";
@@ -199,7 +199,7 @@ export function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) 
       <h2 id="calls-log-title" className="sr-only">Call log</h2>
       <Toolbar search={{ value: search, onChange: setSearch, placeholder: "Search calls", testId: "input-calls-search" }} activeFilters={outcome === "all" ? 0 : 1} filters={(
           <Select value={outcome} onValueChange={setOutcome}>
-            <SelectTrigger id="calls-outcome" data-testid="select-calls-outcome"><SelectValue placeholder="All outcomes" /></SelectTrigger>
+            <SelectTrigger id="calls-outcome" aria-label="Outcome" data-testid="select-calls-outcome"><SelectValue placeholder="All outcomes" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All outcomes (no spam)</SelectItem>
               {Object.entries(OUTCOME_LABELS).filter(([k]) => k !== "spam" && k !== "blocked").map(([k, label]) => (
@@ -225,7 +225,7 @@ export function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) 
               : "Once your number is forwarded and the assistant is live, every call shows up here with its outcome, summary, transcript and recording."}
           />
           {/* The log is really empty (no filter hid anything): a clearly marked sample of three calls, gone with the first real one. */}
-          {!filtered && list.data?.total === 0 && (
+          {showSample({ isLoading: list.isLoading, isError: list.isError && !list.data, total: list.data?.total, filtered }) && (
             <SampleCallsPreview cta={<GooglePill size="sm" href="/call-assistant/numbers" label="Get a number" testId="link-sample-calls-numbers" />} />
           )}
         </>
@@ -490,7 +490,7 @@ export function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (i
         ) : !ledger.data?.entries.length ? (
           <>
             <EmptyState compact icon={ShieldAlert} title="No spam yet" description="Numbers the assistant screens out land here." />
-            <SampleSpamPreview />
+            {showSample({ isLoading: ledger.isLoading, isError: ledger.isError && !ledger.data, total: ledger.data?.entries.length }) && <SampleSpamPreview />}
           </>
         ) : (
           <div className={crmTable.wrapper}>

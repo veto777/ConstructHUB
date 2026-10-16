@@ -4,7 +4,7 @@ import { NotificationBell } from "@/components/account-security";
 import { RecentAuthModal } from "@/components/recent-auth";
 import { Switch, Route, useLocation, Link, Redirect } from "wouter";
 import { Suspense, useEffect, type ComponentType } from "react";
-import { lazyPage } from "@/lib/lazy-page";
+import { lazyPage, PageLoading } from "@/lib/lazy-page";
 import { PublicPageHeader } from "@/components/public-page-chrome";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -35,7 +35,7 @@ import CallAssistantLandingPage from "@/pages/call-assistant-landing";
 import { FeaturesCataloguePage, FeaturePageRoute, FeatureAdLanding, LegacyLanding } from "@/pages/features";
 import { ToolRouteGate } from "@/components/tool-route-gate";
 import { CrmLogo } from "@/components/crm-logo";
-import { isPortal, isClientPortal, CRM_NAME, marketingUrl } from "@/lib/site";
+import { isPortal, isClientPortal, marketingUrl, portalUrl } from "@/lib/site";
 import HomePage from "@/pages/home";
 import AdsConsultantChat from "@/components/ads-consultant-chat";
 import HubWidget from "@/components/hub/hub-widget";
@@ -46,6 +46,7 @@ import { useSeoHead } from "@/lib/seo-head";
 import { SeoToolLayout } from "@/components/seo-tool/layout";
 import { ProductToolLayout, shelledToolFor } from "@/components/tool/product-shell";
 import { pageMetaFor } from "@shared/route-meta";
+import { appPageTitle, crmPageTitle } from "@/lib/page-titles";
 
 // Every other page loads on demand too (2026-10-13): the whole app shipped as one 1.2 MB script, and a
 // Meta ad click on a phone waited 8-15 s before the landing page drew anything. Only the pages a
@@ -227,9 +228,20 @@ function CallAssistantMovedRedirect() {
   return null;
 }
 
+/** On the app host: Platform admin lives on the CRM portal (PortalRouter's /admin), so a typed
+ *  constructhub.us/admin goes there instead of showing Not Found. */
+function PortalAdminRedirect() {
+  useEffect(() => {
+    const target = portalUrl(`/admin${window.location.search}`);
+    // Already on a portal host, portalUrl answers the bare path: never reload in a loop.
+    if (/^https?:\/\//.test(target)) window.location.replace(target);
+  }, []);
+  return null;
+}
+
 function DashboardRouter() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/search" component={SearchPage} />
@@ -353,6 +365,8 @@ function DashboardRouter() {
       {/* Every done-for-you service's page (shared/dfy-pages), inside the app frame when signed in. */}
       <Route path="/done-for-you" component={DfyCataloguePage} />
       <Route path="/done-for-you/:slug" component={DfyPageRoute} />
+      {/* Platform admin itself is a CRM-portal page: send a typed /admin there. */}
+      <Route path="/admin" component={PortalAdminRedirect} />
       {/* Platform admins: every feature page, its status and links (the API answers 403 to anyone else). */}
       <Route path="/admin/feature-pages" component={AdminFeaturePagesPage} />
       {/* Platform admins: give an account a plan for 1–1000 days, extend or revoke it (the API answers 403 to anyone else). */}
@@ -457,7 +471,7 @@ const Ribboned = {
 
 function PublicRouter() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/auth" component={AuthPage} />
@@ -556,6 +570,7 @@ function SignedOutFallback() {
       setLocation(`/auth?next=${encodeURIComponent(next)}`, { replace: true });
     }
   }, [needsAccount, location, setLocation]);
+  if (location === "/admin") return <PortalAdminRedirect />;
   return needsAccount ? null : <NotFound />;
 }
 
@@ -565,21 +580,6 @@ const SELF_TITLED = ["/media-library", "/privacy", "/data-deletion", "/terms", "
 /** Feature and service pages title themselves from their content (seo.title). */
 const isSelfTitled = (location: string) =>
   SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/done-for-you/");
-const PAGE_TITLES: Record<string, string> = {
-  "/search": "Search Permits", "/databases": "Database Directory", "/property": "Property Records",
-  "/schedules": "Scrape Schedules", "/history": "Search History", "/permit-alerts": "Permit Alerts", "/photos": "Photo Optimizer",
-  "/gmb-monitor": "GMB Edit Monitor", "/ranking-grid": "GMB Ranking Grid", "/pricing": "Pricing",
-  "/competitors": "Competitor Intel", "/agency": "Agency", "/agency/clients": "Agency clients", "/agency/team": "Agency team", "/agency/onboarding": "Agency onboarding", "/agency/jobs": "Agency jobs", "/agency/settings": "Agency settings", "/locations": "Locations", "/domains": "Domains",
-  "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/directories": "Directory Sync", "/admin/directories": "Directory Sync — admin", "/social-media": "Social Media", "/social-media/calendar": "Social calendar", "/social-media/compose": "New social post", "/social-media/posts": "Social posts", "/social-media/analytics": "Social analytics", "/social-media/inbox": "Social inbox", "/social-media/accounts": "Social accounts", "/social-media/auto": "Social auto mode", "/social-media/guides": "Social guides",
-  "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan", "/site-scan/history": "Site Scan history",
-  "/seo": "SEO Suite", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/mentions": "SEO mentions", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitor gap",
-  "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/compliance": "Compliance Dept", "/press-releases": "Press Releases", "/google-business": "Google Business",
-  "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
-  "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
-  "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews", "/google-reviews/reviews": "Google reviews", "/google-reviews/profiles": "Review profiles & links", "/google-reviews/settings": "Review settings",
-  "/lsa-account-manager": "Account Manager", "/google-ads/traffic": "Click Guard", "/google-ads/signals": "Click Guard", "/google-ads/tools": "Click Guard", "/google-ads/settings": "Click Guard", "/google-ads/script": "Click Guard", "/ads-manager/accounts": "Agency Ads & LSA", "/ads-manager/invitations": "Agency Ads & LSA", "/ads-manager/previews": "Agency Ads & LSA", "/ads-manager/queue": "Agency Ads & LSA", "/ads-manager/audit": "Agency Ads & LSA", "/ads-manager/landing-door": "Agency Ads & LSA", "/lsa-account-manager/accounts": "Account Manager", "/lsa-account-manager/invitations": "Account Manager", "/lsa-account-manager/audit": "Account Manager", "/settings": "Settings", "/auth": "Sign in", "/developers": "Developers",
-  "/call-assistant": "AI Call Assistant", "/call-assistant/calls": "Calls", "/call-assistant/numbers": "Call Assistant numbers", "/call-assistant/studio": "Agent studio", "/call-assistant/simulator": "Call simulator", "/report-issue": "Report an issue",
-};
 
 /** The sidebar's collapsed/expanded choice (ui/sidebar.tsx writes this cookie) survives a reload. */
 function sidebarDefaultOpen(): boolean {
@@ -633,7 +633,7 @@ function CrmPlanGate({ children }: { children: React.ReactNode }) {
 
 function PortalRouter() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
     {/* A page the seat's permissions don't cover shows "ask your admin" (shared/crm-access.ts). */}
     <CrmAccessGate>
     <Switch>
@@ -695,7 +695,7 @@ function PortalRouter() {
 /** Signed-out portal visitors get the login screen, not the marketing landing page. */
 function PortalPublicRouter() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
     <Switch>
       {/* Client-facing links are token-authorised and must never demand a login. */}
       <Route path="/crm-terms" component={CrmTermsPage} />
@@ -750,11 +750,12 @@ function AppContent() {
   const portal = isPortal();
   const clientPortal = isClientPortal();
 
-  // The CRM is its own product — its own tab title, never the marketing one.
+  // The CRM is its own product — its own tab title, never the marketing one; each CRM page names itself
+  // ("Clients · ConstructHub CRM", lib/page-titles.ts).
   useEffect(() => {
     if (clientPortal) document.title = "Client Portal";
-    else if (portal) document.title = CRM_NAME;
-  }, [portal, clientPortal]);
+    else if (portal) document.title = crmPageTitle(location);
+  }, [portal, clientPortal, location]);
 
   // …and its own brand theme (orange primary, purple/blue accent — see
   // `.crm-theme` in index.css). Set on <html>, not the shell div, because
@@ -780,8 +781,8 @@ function AppContent() {
     // A marketing or public app page's title is the one the server wrote into its HTML (shared/route-meta.ts).
     const meta = pageMetaFor(location);
     if (meta) { document.title = meta.title; return; }
-    const key = Object.keys(PAGE_TITLES).find(p => location === p || location.startsWith(`${p}/`));
-    document.title = key ? `${PAGE_TITLES[key]} | ConstructHUB` : DEFAULT_TITLE;
+    // Every app route has its own title, "<Page> · <Tool> · ConstructHUB" (lib/page-titles.ts; server/page-titles.test.ts).
+    document.title = appPageTitle(location) ?? DEFAULT_TITLE;
   }, [location, portal, clientPortal]);
 
   // Canonical link, Open Graph / Twitter tags and JSON-LD follow the page (lib/seo-head.ts); never on the portals.
@@ -864,10 +865,13 @@ function AppContent() {
                 Platform Admin
               </span>
             </div>
-            <Link href="/crm" className="text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground"
-              data-testid="link-admin-back-to-workspace">
-              ← Back to my workspace
-            </Link>
+            {/* The admin page's one way out is its navigation landmark (it has no sidebar or ribbon). */}
+            <nav aria-label="Platform admin" className="flex">
+              <Link href="/crm" className="text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                data-testid="link-admin-back-to-workspace">
+                ← Back to my workspace
+              </Link>
+            </nav>
           </header>
           <main className="flex-1 overflow-auto">
             <CrmAdminPage />
@@ -914,7 +918,9 @@ function AppContent() {
     const crmFooter = (
       <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 px-4 py-4 text-xs text-muted-foreground" data-testid="footer-crm">
         <SocialLinks tone="app" className="basis-full" testId="social-crm-footer" />
-        <a href={marketingUrl("/tutorials#group-crm")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-help">Help</a>
+        {/* The CRM host's session is not the marketing host's: /tutorials there would ask a CRM user to sign in again
+            (live audit 2026-10-15), so Help opens the public CRM page; the sidebar keeps its Tutorials link. */}
+        <a href={marketingUrl("/features/crm")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-help">Help</a>
         <span className="mx-2 text-border">&middot;</span>
         <Link href={reportIssueHref("/crm/report-issue")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-report-issue">Report an issue</Link>
       </footer>

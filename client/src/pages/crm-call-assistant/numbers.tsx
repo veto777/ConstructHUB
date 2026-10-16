@@ -23,7 +23,7 @@ import { BuyNumberWizard } from "./numbers-buy";
 import { ForwardingInstructions } from "./numbers-forwarding";
 import { NUMBERS_KEY, NumberStatusPill, formatDate, formatPhone, type NumbersResponse, type VoiceNumber } from "./numbers-shared";
 import { HowItWorks } from "./how-it-works";
-import { lazySample } from "@/components/sample-preview";
+import { lazySample, showSample } from "@/components/sample-preview";
 const SampleNumbersPreview = lazySample(() => import("./samples"), "SampleNumbersPreview");
 import type { VoiceStatus } from "./index";
 
@@ -161,7 +161,7 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
       )}
 
       {/* No real number yet (and none being set up): a clearly marked sample of a number card. Gone the moment one exists. */}
-      {shown.length === 0 && (
+      {showSample({ isLoading: q.isLoading, isError: q.isError, total: shown.length }) && (
         <SampleNumbersPreview cta={manage && d.configured && !full && !inNativeApp() && !showWizard
           ? <GooglePill size="sm" icon={Plus} onClick={() => setBuying(true)} label="Get a number" testId="button-sample-get-number" />
           : undefined} />

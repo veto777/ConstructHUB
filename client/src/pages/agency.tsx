@@ -1,6 +1,6 @@
 import { AppPage, PageHeader, AppTabsList, Section } from '@/components/app-ui';
 import { GoogleSurface, GoogleStat, GoogleStatGrid, GoogleList, GoogleListRow, GooglePill, relativeTime } from '@/components/google';
-import { SamplePreview } from '@/components/sample-preview';
+import { SAMPLE_BUSINESS, SamplePreview, showSample } from '@/components/sample-preview';
 import { Tabs, TabsTrigger } from '@/components/ui/tabs';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -24,13 +24,13 @@ const ONBOARDING_STATUS:Record<string,{label:string;tone:'good'|'bad'|'neutral'}
 const ROLE_WORDS:Record<string,string>={owner:'Owner: everything, including members and settings.',admin:'Admin: adds clients (with all-client access), sees the Team list, edits clients and locations, queues work.',manager:'Manager: edits the clients and locations they have access to and queues work for them.',viewer:'Viewer: looks, changes nothing.'};
 const n=(v:number|null|undefined)=>v==null?'—':v.toLocaleString();
 /** Obviously made-up rows, shown only while the real list is empty (sample-preview.tsx rules). Never sent anywhere. */
-const SAMPLE_CLIENTS=[{id:-1,name:'Sample Roofing Co.',contact_email:'owner@sample-roofing.example',folder:'North',tags:['roofing','sample'],notes:'Example client record.',location_count:3,open_onboarding:1},{id:-2,name:'Sample Plumbing LLC',contact_email:null,folder:null,tags:[],notes:'',location_count:0,open_onboarding:0}];
-const SAMPLE_MEMBERS=[{member_id:-1,email:'sam@sample-agency.example',display_name:'Sam Sample',role:'manager',all_clients:false,client_names:['Sample Roofing Co.']},{member_id:-2,email:'alex@sample-agency.example',display_name:'Alex Example',role:'viewer',all_clients:true,client_names:[]}];
-const SAMPLE_ONBOARDING=[{id:'sample-1',business_name:'Sample Roofing Co.',client_name:'Sample Roofing Co.',contact_email:'owner@sample-roofing.example',agency_email:'team@sample-agency.example',status:'opened',sent_at:new Date(Date.now()-2*86400000).toISOString(),reminders:0,error:null,link:'https://example.invalid/instructions'},{id:'sample-2',business_name:'Sample Plumbing LLC',client_name:'Sample Plumbing LLC',contact_email:'hello@sample-plumbing.example',agency_email:'team@sample-agency.example',status:'linked',sent_at:new Date(Date.now()-9*86400000).toISOString(),reminders:1,error:null,link:'https://example.invalid/instructions'}];
-const SAMPLE_JOBS=[{id:'sample-1',business_name:'Sample Roofing Co.',client_name:'Sample Roofing Co.',action:'sync',status:'done',error:null,attempts:1,created_at:new Date(Date.now()-3600000).toISOString(),finished_at:new Date(Date.now()-3500000).toISOString(),location_id:0},{id:'sample-2',business_name:'Sample Plumbing LLC',client_name:'Sample Plumbing LLC',action:'guard',status:'failed',error:'Approve a Profile Watch snapshot on this location first.',attempts:1,created_at:new Date(Date.now()-7200000).toISOString(),finished_at:new Date(Date.now()-7100000).toISOString(),location_id:0}];
+const SAMPLE_CLIENTS=[{id:-1,name:SAMPLE_BUSINESS.name,contact_email:SAMPLE_BUSINESS.email,folder:'North',tags:['roofing','sample'],notes:'Example client record.',location_count:3,open_onboarding:1},{id:-2,name:'Sample Plumbing LLC',contact_email:null,folder:null,tags:[],notes:'',location_count:0,open_onboarding:0}];
+const SAMPLE_MEMBERS=[{member_id:-1,email:'sam@sample-agency.example',display_name:'Sam Sample',role:'manager',all_clients:false,client_names:[SAMPLE_BUSINESS.name]},{member_id:-2,email:'alex@sample-agency.example',display_name:'Alex Example',role:'viewer',all_clients:true,client_names:[]}];
+const SAMPLE_ONBOARDING=[{id:'sample-1',business_name:SAMPLE_BUSINESS.name,client_name:SAMPLE_BUSINESS.name,contact_email:SAMPLE_BUSINESS.email,agency_email:'team@sample-agency.example',status:'opened',sent_at:new Date(Date.now()-2*86400000).toISOString(),reminders:0,error:null,link:'https://example.invalid/instructions'},{id:'sample-2',business_name:'Sample Plumbing LLC',client_name:'Sample Plumbing LLC',contact_email:'hello@sample-plumbing.example',agency_email:'team@sample-agency.example',status:'linked',sent_at:new Date(Date.now()-9*86400000).toISOString(),reminders:1,error:null,link:'https://example.invalid/instructions'}];
+const SAMPLE_JOBS=[{id:'sample-1',business_name:SAMPLE_BUSINESS.name,client_name:SAMPLE_BUSINESS.name,action:'sync',status:'done',error:null,attempts:1,created_at:new Date(Date.now()-3600000).toISOString(),finished_at:new Date(Date.now()-3500000).toISOString(),location_id:0},{id:'sample-2',business_name:'Sample Plumbing LLC',client_name:'Sample Plumbing LLC',action:'guard',status:'failed',error:'Approve a Profile Watch snapshot on this location first.',attempts:1,created_at:new Date(Date.now()-7200000).toISOString(),finished_at:new Date(Date.now()-7100000).toISOString(),location_id:0}];
 function Chip({tone='neutral',children}:{tone?:'good'|'bad'|'neutral';children:ReactNode}){return <span className={`g-chip g-chip--sm normal-case ${tone==='good'?'g-open':tone==='bad'?'g-closed':''}`}>{children}</span>;}
 /** A short "How this works" card: at most three steps (the owner's program for bare form pages). */
-function HowItWorks({steps,testId}:{steps:string[];testId?:string}){return <div className="g-callout" data-testid={testId}><h3>How this works</h3><ol className="mt-1 list-decimal space-y-1 pl-5">{steps.slice(0,3).map(s=><li key={s}>{s}</li>)}</ol></div>;}
+function HowItWorks({steps,testId}:{steps:string[];testId?:string}){return <div className="g-callout" data-testid={testId}><h2>How this works</h2><ol className="mt-1 list-decimal space-y-1 pl-5">{steps.slice(0,3).map(s=><li key={s}>{s}</li>)}</ol></div>;}
 export default function AgencyPage(){
   // Each tab is its own address (/agency/clients …) so the Google Business menu can link to it; an old ?tab= link moves there.
   const [path,navigate]=useLocation();
@@ -108,7 +108,7 @@ export default function AgencyPage(){
   // The Google Business group: Google's blue like its siblings (owner, 2026-10-07).
   const VIEW:Record<string,[string,string]>={clients:['Clients','Each business you look after, with its contact, folder, tags, notes and how many locations are assigned to it.'],team:['Team','The people who work in this workspace, what each may do, and which clients they can see.'],onboarding:['Onboarding','Email a client the steps to add your agency as a manager on their Google Business Profile, and watch each request until the listing is linked.'],jobs:['Jobs','Every queued Google action from Locations — one row per location — with its result or the reason it failed.'],settings:['Agency settings','Your agency name, the Google account the agency works through, and whether every location invitation is accepted.']};
   const head:[string,string]=inShell&&VIEW[tab]?VIEW[tab]:['Agency workspace',entitled?"Manage clients, locations and the people who look after them.":"Manage the people on your platform team."];
-  const loaded=!!list,empty=loaded&&!list.items?.length,noData=empty&&!search&&!offset;
+  const loaded=!!list,empty=loaded&&!list.items?.length,noData=showSample({isError:!!listError&&!list,total:loaded?(list.items?.length??0):undefined,filtered:!!search,page:offset});
   const folders=[...new Set<string>((clients?.items??[]).map((c:any)=>c.folder).filter(Boolean))];
   const copyLink=(link:string)=>Promise.resolve().then(()=>navigator.clipboard.writeText(link)).then(()=>say('Link copied.'),()=>say('Select the link and copy it manually.',true));
   const clientRow=(c:any,sample=false)=><GoogleListRow key={c.id} size="md" title={c.name} testId={sample?undefined:`agency-client-${c.id}`}
@@ -120,14 +120,14 @@ export default function AgencyPage(){
       {write&&<GooglePill size="sm" icon={Pencil} label="Edit" onClick={sample?undefined:()=>{setEditId(c.id);setName(c.name);setEmail(c.contact_email||'');setNotes(c.notes);setTags(c.tags.join(', '));setFolder(c.folder||'');nameRef.current?.focus();}}/>}
     </>}/>;
   const memberRow=(m:any,sample=false)=><GoogleListRow key={m.member_id} size="md" title={m.display_name||m.email} testId={sample?undefined:`agency-member-${m.member_id}`}
-    badges={<Chip>{m.role}</Chip>}
+    badges={<><span className="sr-only">role: </span><Chip>{m.role}</Chip></>}
     meta={[m.display_name?m.email:null,m.all_clients?'All clients':m.client_names?.length?`Clients: ${m.client_names.join(', ')}`:'No clients yet — sees nothing until given one']}
     actions={owner?<>
       <GooglePill size="sm" icon={Pencil} label="Change" onClick={sample?undefined:()=>{setEmail(m.email);setRole(m.role);setAllClients(!!m.all_clients);setClientIds(m.client_ids??[]);memberRef.current?.focus();}}/>
       <GooglePill size="sm" variant="danger" icon={UserMinus} label="Remove" onClick={sample?undefined:()=>run('/team/'+m.member_id,undefined,'DELETE',`${m.email} removed from the workspace.`)}/>
     </>:undefined}/>;
   const onboardingRow=(r:any,sample=false)=>{const st=ONBOARDING_STATUS[r.status==='sent'&&!r.sent_at?'queued':r.status]??{label:r.status,tone:'neutral' as const};return <GoogleListRow key={r.id} size="md" title={r.business_name} testId={sample?undefined:`agency-onboarding-${r.id}`}
-    badges={<Chip tone={st.tone}>{st.label}</Chip>}
+    badges={<><span className="sr-only">status: </span><Chip tone={st.tone}>{st.label}</Chip></>}
     meta={[r.client_name,`${r.contact_email} → ${r.agency_email}`,r.sent_at?`Sent ${relativeTime(r.sent_at)}`:'Email queued — goes out within a minute',r.reminders?`${r.reminders} reminder${r.reminders===1?'':'s'}`:null]}
     line={r.error?<span role="alert" className="g-closed">{r.error}</span>:undefined}
     actions={<>
@@ -138,7 +138,7 @@ export default function AgencyPage(){
       {write&&['sent','opened'].includes(r.status)&&<GooglePill size="sm" icon={Send} label="Send reminder" onClick={sample?undefined:()=>run(`/onboarding/${r.id}/remind`,{},'POST','Reminder queued; it goes out on the worker’s next pass (one manual reminder a day).')}/>}
     </>}/>;};
   const jobRow=(j:any,sample=false)=><GoogleListRow key={j.id} size="md" title={j.business_name} testId={sample?undefined:`agency-job-${j.id}`}
-    badges={<Chip tone={j.status==='done'?'good':j.status==='failed'?'bad':'neutral'}>{j.status}</Chip>}
+    badges={<><span className="sr-only">status: </span><Chip tone={j.status==='done'?'good':j.status==='failed'?'bad':'neutral'}>{j.status}</Chip></>}
     meta={[ACTION_LABELS[j.action]??j.action,j.client_name||'Unassigned',`Queued ${relativeTime(j.created_at)}`,j.finished_at?`Finished ${relativeTime(j.finished_at)}`:j.status==='queued'&&j.attempts>0?`Retry ${j.attempts} pending`:null]}
     line={j.error?<span role="alert" className={j.status==='failed'?'g-closed':undefined}>{j.error}</span>:undefined}
     actions={sample?undefined:<GooglePill size="sm" icon={MapPin} label="Open location" href={`/locations?location=${j.location_id}`}/>}/>;
@@ -148,6 +148,8 @@ export default function AgencyPage(){
     {message&&<p ref={messageRef} role={failed?'alert':'status'} className={failed?'text-destructive':undefined} data-testid="agency-message">{message}</p>}
     {/* A list that could not load says so (never an empty page that looks like “nothing here”). */}
     {listError&&tab!=='locations'&&tab!=='settings'&&<p role="alert" className="text-destructive" data-testid="agency-list-error">Couldn’t load this list: {apiErrorMessage(listError)} <button type="button" className="underline" onClick={()=>void refetch()}>Try again</button></p>}
+    {/* In the tool shell the section has no visible title, so the rows' h3s get an outline level above them (no visual change). */}
+    {tab!=='locations'&&inShell&&<h2 className="sr-only">{head[0]}</h2>}
     {tab==='locations'?(entitled?<AgencyWorkspace/>:<p>Open <a className="underline" href="/locations">Locations</a> to work with your team.</p>):<Section title={inShell?undefined:tab[0].toUpperCase()+tab.slice(1)} contentClassName="space-y-4 text-sm">
       {/* Owner-only, and the saved values are only known once /api/agency/me answers (the form is seeded from them). */}
       {tab==='settings'&&owner&&<>
@@ -162,8 +164,8 @@ export default function AgencyPage(){
           <label className="flex gap-2 items-start"><input type="checkbox" className="mt-1" checked={acceptAll} onChange={e=>setAcceptAll(e.target.checked)}/><span>Auto-accept every location invitation sent to a connected agency Google account.<br/><span className="g-text-2">Off: only an invitation that matches one of your onboarding requests is accepted. Either way an invitation with no matching request is never assigned to a guessed client; it waits under Locations as unassigned.</span></span></label>
           <div className="flex flex-wrap gap-2"><Button onClick={()=>{if(!agencyName.trim())return say('Enter the agency name.',true);run('/settings',{name:agencyName.trim(),autoAcceptAll:acceptAll},'PUT','Agency settings saved.');}}>Save agency settings</Button></div>
         </fieldset>
-        <div className="space-y-2"><h3 className="font-medium">Agency Google account</h3>
-          {google&&(google.accounts?.length?<GoogleList>{google.accounts.map((g:any)=><GoogleListRow key={g.subject} size="md" title={g.email} badges={<Chip tone={g.connected?'good':'bad'}>{g.connected?'Connected':'Needs reconnect'}</Chip>} meta={[g.connected?'Reads and writes the listings it manages':'Reconnect to resume syncing']}/>)}</GoogleList>:<p className="g-text-2">No agency Google account is connected yet. Clients invite this account as a manager, so connect it before sending onboarding emails.</p>)}
+        <div className="space-y-2"><h2 className="font-medium">Agency Google account</h2>
+          {google&&(google.accounts?.length?<GoogleList>{google.accounts.map((g:any)=><GoogleListRow key={g.subject} size="md" title={g.email} badges={<><Chip tone={g.connected?'good':'bad'}>{g.connected?'Connected':'Needs reconnect'}</Chip></>} meta={[g.connected?'Reads and writes the listings it manages':'Reconnect to resume syncing']}/>)}</GoogleList>:<p className="g-text-2">No agency Google account is connected yet. Clients invite this account as a manager, so connect it before sending onboarding emails.</p>)}
           <div className="flex flex-wrap gap-2">
             <GooglePill icon={Plus} label={connectedGoogle.length?'Connect another Google account':'Connect agency Google account'} href="/api/gbp/connect"/>
             <GooglePill icon={RefreshCw} label="Refresh Google listings" disabled={busy||(!!google&&!connectedGoogle.length)} title={google&&!connectedGoogle.length?'Connect a Google account first':undefined} onClick={()=>run('/google/refresh',{},'POST','Refresh queued. The connected accounts’ listings are re-read in the background over the next few minutes; “Link & sync” on Locations then finds them.')}/>
@@ -205,7 +207,7 @@ export default function AgencyPage(){
           <GoogleStat label="Seats in use" value={list.seats?(list.seats.limit===-1?n(list.seats.used):`${n(list.seats.used)} of ${n(list.seats.limit)}`):'—'} hint={list.seats?.limit===-1?'No seat limit on this plan':'Owner + members, on the plan'} tone={list.seats&&list.seats.limit!==-1&&list.seats.used>=list.seats.limit?'bad':'default'}/>
           <GoogleStat label="Clients" value={entitled?n(clients?.total):'—'} hint={entitled?'To give access to':'Client workspaces need the Agency module'} href={entitled?'/agency/clients':undefined}/>
         </GoogleStatGrid>}
-        <div className="g-callout" data-testid="agency-roles"><h3>Roles</h3><ul className="list-disc">{Object.values(ROLE_WORDS).map(w=><li key={w}>{w}</li>)}</ul><p className="mt-2">Members sign in with their own ConstructHUB login; they need no plan of their own. A member given specific clients sees only those clients’ locations — unassigned locations need All clients.</p></div>
+        <div className="g-callout" data-testid="agency-roles"><h2>Roles</h2><ul className="list-disc">{Object.values(ROLE_WORDS).map(w=><li key={w}>{w}</li>)}</ul><p className="mt-2">Members sign in with their own ConstructHUB login; they need no plan of their own. A member given specific clients sees only those clients’ locations — unassigned locations need All clients.</p></div>
         {owner?<fieldset disabled={busy} className="space-y-3" data-testid="agency-member-form"><legend className="font-medium">Add or change a member</legend>
           <Input ref={memberRef} aria-label="Member email" placeholder="Email of a registered ConstructHUB user" value={email} onChange={e=>setEmail(e.target.value)}/>
           <label className="flex flex-wrap items-center gap-2">Role <select className={selectClass} aria-label="Member role" value={role} onChange={e=>setRole(e.target.value)}>{['admin','manager','viewer'].map(r=><option key={r}>{r}</option>)}</select><span className="g-text-2">{ROLE_WORDS[role]}</span></label>

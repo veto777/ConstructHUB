@@ -141,7 +141,9 @@ function GoogleAdsIcon({ className }: { className?: string }) {
 
 type BadgeType = "new" | "hot" | "best";
 /** testId overrides the title-derived test id when two items share a title. `locked`: a tool the account lacks, linked to its landing page. */
-type NavChild = { title: string; url: string; icon: any; badge?: BadgeType; subChildren?: NavChild[]; testId?: string; locked?: boolean };
+type NavChild = { title: string; url: string; icon: any; badge?: BadgeType; subChildren?: NavChild[]; testId?: string; locked?: boolean;
+  /** Platform admins only (the page's API answers 403 to everyone else) — never in a customer's menu. */
+  adminOnly?: boolean };
 
 /** Pages of the modules only some plans include; the page itself shows the plan_required card. */
 const MODULE_BY_URL: Record<string, ModuleKey> = {
@@ -208,6 +210,8 @@ function FeatureBadge({ type, label }: { type: BadgeType; label: string }) {
  */
 const APP_HIDDEN_URLS = new Set(["/master-class", "/reinstatement", "/google-ads-guide"]);
 const shownHere = (item: { url: string }) => !inNativeApp() || !APP_HIDDEN_URLS.has(item.url);
+/** Hides the platform-admin pages (e.g. the shared permit refresh schedules) from everyone else's menus. */
+const shownTo = (isPlatformAdmin: boolean) => (item: { adminOnly?: boolean }) => isPlatformAdmin || !item.adminOnly;
 
 const permitsGroup: NavGroup = {
   label: "Permits & Databases",
@@ -218,7 +222,7 @@ const permitsGroup: NavGroup = {
     { title: "Search Permits", url: "/search", icon: Search },
     { title: "Database Directory", url: "/databases", icon: Database },
     { title: "Property Records", url: "/property", icon: Building },
-    { title: "Scrape Schedules", url: "/schedules", icon: Clock },
+    { title: "Scrape Schedules", url: "/schedules", icon: Clock, adminOnly: true },
     { title: "Search History", url: "/history", icon: FileText },
     { title: "Permit Alerts", url: "/permit-alerts", icon: Bell, badge: "new" as BadgeType },
   ],
@@ -333,8 +337,9 @@ function CollapsibleNavGroup({ group, planBadgeFor = () => null }: { group: NavG
           <ChevronRight className={`ml-auto h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
         </SidebarMenuButton>
         {group.landingUrl && !inNativeApp() && (
-          <Link href={group.landingUrl} className="p-1.5 rounded-md hover:bg-sidebar-accent transition-colors mr-1" data-testid={`link-nav-${group.label.toLowerCase().replace(/\s+/g, "-")}-landing`}>
-            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+          <Link href={group.landingUrl} className="p-1.5 rounded-md hover:bg-sidebar-accent transition-colors mr-1" data-testid={`link-nav-${group.label.toLowerCase().replace(/\s+/g, "-")}-landing`}
+            aria-label={`About ${group.label}`}>
+            <ExternalLink className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
           </Link>
         )}
       </div>
@@ -380,7 +385,7 @@ function CollapsibleNavGroup({ group, planBadgeFor = () => null }: { group: NavG
 }
 
 /** The same lists, for the tool shell's "All tools" drawer (components/seo-tool/layout.tsx) — the sidebar itself is unchanged. */
-export const APP_NAV = { permitsGroup, googleGroups, googleReviewsItem, yelpReviewsItem, standaloneItems, pricingGroup, shownHere };
+export const APP_NAV = { permitsGroup, googleGroups, googleReviewsItem, yelpReviewsItem, standaloneItems, pricingGroup, shownHere, shownTo };
 
 /** A tool the account lacks (owner, 2026-10-10): a lock, and the entry opens the tool's landing page, not the tool. */
 function LockedBadge({ label }: { label: string }) {
@@ -451,7 +456,7 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
   const lockedTools: NavChild[] = [];
   /** The group with only the tools the account has; null when it has none of them (they are all in "More tools"). */
   const kept = (group: NavGroup): NavGroup | null => {
-    const children = group.children.filter(shownHere).filter((c) => { if (locked(c.url)) { lockedTools.push(c); return false; } return true; });
+    const children = group.children.filter(shownHere).filter(shownTo(user?.isPlatformAdmin === true)).filter((c) => { if (locked(c.url)) { lockedTools.push(c); return false; } return true; });
     return children.length ? { ...group, children } : null;
   };
   const keptPermits = kept(permitsGroup);

@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { AppPage, PageHeader, Section, Notice } from "@/components/app-ui";
 import { useAgencyFilter } from "@/components/agency-workspace";
-import { GbpConnection } from "@/components/gbp-connection";
+import { useGoogleConnection } from "@/components/gbp-connection";
+import { GbpPrerequisite } from "@/components/gbp-prerequisite";
 import { guardErrorMessage } from "@/components/profile-guard";
 import { ListingPreview } from "@/components/listing-editor/preview";
 import { Button } from "@/components/ui/button";
@@ -57,26 +58,28 @@ export default function ListingEditorPage() {
   const [locationParam, setLocationParam] = useUrlParam("location");
   const linked = locations.filter((l) => l.gbpLocationName);
   const chosen = linked.find((l) => String(l.id) === locationParam);
+  const { data: connection } = useGoogleConnection();
+  const stateOf = (id: number) => connection?.locations.find((l) => l.id === id)?.state;
   return (
     <AppPage width="wide" testId="page-listing-editor" className="pb-24 sm:pb-10">
       <PageHeader icon={PenLine} title="Listing editor" description="Edit what Google shows for a linked location and save it straight to your Business Profile." back={{ href: "/locations", label: "Locations" }} />
       {error && <Notice tone="danger" testId="notice-locations-error">Unable to load locations. Reload the page.</Notice>}
+      {!chosen && <GbpPrerequisite tool="listing-editor" />}
       {!chosen && <Section title="How this works" contentClassName="text-sm" testId="listing-editor-how"><ol className="list-decimal space-y-1 pl-5">
         <li>Choose a location that is linked to its Google Business Profile; the form loads the live listing from Google.</li>
         <li>Edit the fields. Rules are checked as you type, and “What Google will see” shows the result beside the form.</li>
         <li>Choose Save to Google. Only the changed fields are sent, and Google’s answer is shown beside each one.</li>
       </ol></Section>}
-      <Section title="Profile to edit" icon={Store} description="Only locations linked to a Google Business Profile listing can be edited here.">
+      {(linked.length > 0 || isLoading) && <Section title="Profile to edit" icon={Store} description="Only locations linked to a Google Business Profile listing can be edited here.">
         <label className="block text-sm">
           <span className="sr-only">Location</span>
           <select className={select} aria-label="Location" value={chosen ? String(chosen.id) : ""} onChange={(e) => setLocationParam(e.target.value || null)} data-testid="select-listing-location">
             <option value="">{isLoading ? "Loading locations…" : "Choose a linked location"}</option>
-            {linked.map((l) => <option key={l.id} value={l.id}>{l.businessName}{l.city ? ` — ${l.city}${l.state ? `, ${l.state}` : ""}` : ""}</option>)}
+            {linked.map((l) => <option key={l.id} value={l.id}>{l.businessName}{l.city ? ` — ${l.city}${l.state ? `, ${l.state}` : ""}` : ""}{stateOf(l.id) === "needs_reconnect" ? " — needs reconnect" : ""}</option>)}
           </select>
         </label>
-        {!isLoading && !error && !linked.length && <p className="mt-3 text-sm text-muted-foreground" data-testid="text-no-linked-locations">No locations are linked to Google yet. Connect your Google account, then use <strong>Link &amp; sync</strong> in <Link href="/locations" className="text-primary underline">Locations</Link>.</p>}
-      </Section>
-      {!chosen ? <GbpConnection context="locations" /> : <Editor key={chosen.id} location={chosen} others={linked.filter((l) => l.id !== chosen.id)} />}
+      </Section>}
+      {!chosen ? null : <Editor key={chosen.id} location={chosen} others={linked.filter((l) => l.id !== chosen.id)} />}
     </AppPage>
   );
 }
