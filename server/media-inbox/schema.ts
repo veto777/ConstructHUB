@@ -36,6 +36,8 @@ ALTER TABLE media_messages ADD COLUMN IF NOT EXISTS next_link text, ADD COLUMN I
 -- What kind of organisation a vetted Backlinks directory is (ai.ts classifySites), so each gets the right first email.
 ALTER TABLE backlink_sources ADD COLUMN IF NOT EXISTS partner_class text, ADD COLUMN IF NOT EXISTS partner_class_at timestamptz,
  ADD COLUMN IF NOT EXISTS partner_name text;
+-- The admin's own notes on a company (owner, 2026-10-15); read by the AI when it drafts a reply from the admin page.
+ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS notes text;
 CREATE TABLE IF NOT EXISTS media_inbox_state (
  mailbox text PRIMARY KEY, uid_validity text, last_uid bigint NOT NULL DEFAULT 0,
  last_pass_at timestamptz, last_pass_error text

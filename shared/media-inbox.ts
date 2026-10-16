@@ -50,6 +50,8 @@ export type MediaPartner = {
   addedTo: string | null;
   lastMessageAt: string | null;
   messages: number;
+  /** The admin's own notes on this company (never sent). */
+  notes: string | null;
 };
 
 export type MediaMessage = {
