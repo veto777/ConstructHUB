@@ -46,7 +46,7 @@ function generateContractText(data: any) {
       },
       {
         heading: "6. EARLY TERMINATION AND PENALTIES",
-        content: `If Client terminates this Agreement prior to the expiration of the Minimum Term for any reason other than Provider's material breach, Client shall be liable for and agrees to immediately pay:\n\n(a) ALL remaining monthly payments due for the balance of the Minimum Term ("Early Termination Fee"). For example, if Client cancels after 2 months, Client owes the remaining 4 months (${monthlyStr} × 4 = $${((data.monthlyPrice / 100) * 4).toLocaleString()}).\n\n(b) Any outstanding balances, late fees, or unpaid invoices.\n\n(c) Reasonable collection costs and legal fees incurred to enforce this provision.\n\nClient authorizes Provider to charge the Early Termination Fee to the payment method on file. If the payment method on file is declined, Client agrees to remit payment within ten (10) business days of written notice.\n\nIF CLIENT FAILS TO PAY THE EARLY TERMINATION FEE, THE UNPAID BALANCE MAY BE REFERRED TO A THIRD-PARTY COLLECTIONS AGENCY AND/OR REPORTED TO CREDIT BUREAUS. CLIENT AGREES THAT SUCH ACTIONS ARE A REASONABLE AND NECESSARY REMEDY.`
+        content: `If Client terminates this Agreement prior to the expiration of the Minimum Term for any reason other than Provider's material breach, Client shall be liable for and agrees to immediately pay:\n\n(a) Fifty percent (50%) of the remaining monthly payments due for the balance of the Minimum Term ("Early Termination Fee"). For example, if Client cancels after 2 months, 4 months remain, and Client owes half of them (${monthlyStr} × 4 × 50% = $${((data.monthlyPrice / 100) * 2).toLocaleString()}).\n\n(b) Any outstanding balances, late fees, or unpaid invoices.\n\n(c) Reasonable collection costs and legal fees incurred to enforce this provision.\n\nClient authorizes Provider to charge the Early Termination Fee to the payment method on file. If the payment method on file is declined, Client agrees to remit payment within ten (10) business days of written notice.\n\nIF CLIENT FAILS TO PAY THE EARLY TERMINATION FEE, THE UNPAID BALANCE MAY BE REFERRED TO A THIRD-PARTY COLLECTIONS AGENCY AND/OR REPORTED TO CREDIT BUREAUS. CLIENT AGREES THAT SUCH ACTIONS ARE A REASONABLE AND NECESSARY REMEDY.`
       },
       {
         heading: "7. COLLECTIONS AND ENFORCEMENT",
@@ -416,7 +416,7 @@ export default function ContractSignPage() {
                     data-testid="checkbox-agree-terms"
                   />
                   <label htmlFor="agreedTerms" className="text-sm leading-relaxed cursor-pointer">
-                    I understand that early cancellation will result in <strong>immediate payment of all remaining months</strong>, and that unpaid balances may be referred to <strong>collections</strong> and reported to credit bureaus.
+                    I understand that early cancellation will result in <strong>immediate payment of 50% of the remaining months</strong>, and that unpaid balances may be referred to <strong>collections</strong> and reported to credit bureaus.
                   </label>
                 </div>
 
