@@ -64,7 +64,7 @@ function QueueSheet({ row, onClose }: { row: QueueRow | null; onClose: () => voi
   const changed = f.company !== row.company || f.toEmail !== row.toEmail || f.kind !== row.kind;
   return (
     <Sheet open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="sheet-queue">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl" onInteractOutside={(e) => e.preventDefault()} data-testid="sheet-queue">
         <SheetHeader>
           <SheetTitle>{row.company}</SheetTitle>
           <SheetDescription>{[row.domain, KIND_LABEL(row.kind), `from ${row.source}`, row.status === "sent" ? `sent ${ago(row.sentAt)}` : `queued ${ago(row.queuedAt)}`].join(" · ")}</SheetDescription>
@@ -84,9 +84,9 @@ function QueueSheet({ row, onClose }: { row: QueueRow | null; onClose: () => voi
           </div>
           <div>
             <div className="mb-1 font-medium">{row.status === "sent" ? "The email sent" : "The email that will be sent"}</div>
-            <div className="rounded-lg border p-3">
-              <div className="font-medium">{row.email.subject}</div>
-              <pre className="mt-2 whitespace-pre-wrap break-words font-sans text-xs">{row.email.body}</pre>
+            <div className="rounded-lg border border-l-4 border-l-blue-600 bg-blue-50 p-3 dark:bg-blue-950/40">
+              <div className="font-semibold">{row.email.subject}</div>
+              <pre className="mt-2 whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground">{row.email.body}</pre>
               <p className="mt-2 text-xs text-muted-foreground">{SIGNATURE_NOTE}{changed ? " Save to see the email with your changes." : ""}</p>
             </div>
           </div>
