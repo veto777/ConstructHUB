@@ -244,6 +244,7 @@ export const HELP_ROUTES: readonly HelpRouteRow[] = [
   {"key":"posts-photos.filenames-and-photo-details","route":"/gbp-content","group":"Google Business","parent":"posts-photos"},
   {"key":"posts-photos.photos-by-category","route":"/gbp-content","group":"Google Business","parent":"posts-photos"},
   {"key":"posts-photos.updates-events-and-offers","route":"/gbp-content","group":"Google Business","parent":"posts-photos"},
+  {"key":"press-releases","route":"/press-releases","group":"Tools"},
   {"key":"profile-guard","route":"/locations","group":"Google Business"},
   {"key":"property-records","route":"/property","group":"Permits & Databases"},
   {"key":"ranking-grid","route":"/ranking-grid","group":"Google Business"},

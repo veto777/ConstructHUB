@@ -2,28 +2,39 @@
  * West Virginia. Checked live 2026-10-15.
  *
  *   Live license searches (no CAPTCHA):
- *     WV State Fire Marshal electrician licenses: the public Licensee Search's own JSON read endpoint
- *       (sfm-permit-public.wvoasis.gov; robots.txt absent), by first and last name or license number
- *     WV Division of Labor certified plumbers and HVAC technicians: the "Current Certified …" searches linked from
- *       labor.wv.gov/database-search (www.wvlabor.com/new_searches; the server answers 500 for every missing file,
- *       robots.txt included, so it publishes no robots rules), by name or certificate number
+ *     WV State Fire Marshal licenses: the public Licensee Search's own JSON read endpoint
+ *       (sfm-permit-public.wvoasis.gov/publicdata/LicenseeSearch, linked from firemarshal.wv.gov's Regulatory and
+ *       Licensing Division page; robots.txt 404), by first and last name or license number. Its rows are mostly
+ *       electricians (journeyman, master, low voltage) but also fire protection workers, home inspectors, building code
+ *       officials, blasters and pyrotechnicians (license types as published, e.g. "JOURNEYMAN,ELECTRICIAN").
  *   Bulk:
  *     wv-oic-evs  WV Offices of the Insurance Commissioner Employer Violator System: employers in default on workers'
  *                 compensation money owed (barred from state licenses and permits until paid), every business by
  *                 first letter (www.wvinsurance.gov/EVS; robots.txt absent). Companies only; owner names are not kept.
+ *     wv-purchasing-debarred  NOT REGISTERED since 2026-10-15 (see `blocked`: the Division's current host disallows
+ *                 every robot, and the legacy host would be a side door). Was: WV Purchasing Division debarred vendors: "vendors who are currently debarred from doing
+ *                 business with the State of West Virginia" under W. Va. Code §5A-3-33c and 33d (one HTML table:
+ *                 Vendor Name, Vendor Address, Debarment Date, Debarment Period, Debarment Scope), linked from the
+ *                 Purchasing Division's site www.state.wv.us/admin/purchase (robots.txt there disallows only /scripts,
+ *                 /admin/purchase/awards/ and a pharmacy-council folder). Companies only: named people and rows
+ *                 "… Individually and as …" are left out.
  *
- * None of these publish a street address or phone; electricians and plumbers/HVAC give city and state only.
+ * None of these publish a street address or phone for a person; electricians give city and state only.
+ *
+ * Not searched any more (2026-10-15): the Division of Labor "Current Certified Plumbers / HVAC Technicians" lists
+ * (www.wvlabor.com/new_searches, linked from labor.wv.gov/database-search). www.wvlabor.com answers robots.txt with
+ * HTTP 500 ("The page cannot be displayed because an internal server error has occurred."), which RFC 9309 and
+ * ../http.ts read as a refusal of the whole host, so it is listed under `blocked`.
  */
 import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
-import { politeFetch, rethrowIfBlocked, sleep } from "../http";
-import { withNote } from "../notes";
+import { politeFetch, politeText, rethrowIfBlocked, sleep } from "../http";
 import { looksLikeBusiness } from "./lib/business-name";
 import { clean, type BulkHit, type BulkSource } from "../bulk";
 import type { IdQuery } from "../identifiers";
 import { normLicense } from "../identifiers";
 import { tokens } from "../licenses";
 import type { LiveLicenseSearch, StatePack } from "./types";
-import { anyDate, dmyDate, hasAllWords, htmlPerson, htmlText } from "./lib/g3-common";
+import { dmyDate, hasAllWords, htmlText } from "./lib/g3-common";
 
 // ── State Fire Marshal electricians ──────────────────────────────────────────────────────────────────────────
 const SFM_PAGE = "https://sfm-permit-public.wvoasis.gov/publicdata/LicenseeSearch";
@@ -75,74 +86,6 @@ const SFM: LiveLicenseSearch = {
     return sfmHits(await sfmRead({ LicenseNumber: q.value.trim() }), "license").filter((h) => normLicense(h.licenseNumber) === normLicense(q.value));
   },
 };
-
-// ── Division of Labor plumbers and HVAC technicians ──────────────────────────────────────────────────────────
-const WVDOL_PAGE = "https://labor.wv.gov/database-search";
-const WVDOL = "http://www.wvlabor.com/new_searches";
-type DolList = { results: string; label: string; type: (cls: string | null) => string };
-const PLUMBERS: DolList = { results: "plumber_RESULTS.cfm", label: "WV Division of Labor certified plumbers", type: (c) => (c ? `${c} Plumber` : "Plumber") };
-const HVAC: DolList = { results: "HVAC_RESULTS.cfm", label: "WV Division of Labor certified HVAC technicians", type: (c) => (c ? `HVAC ${c}` : "HVAC") };
-
-/** Rows of one results page: number, name, city, state, county, classification, expiration. */
-export function parseWvDol(html: string, list: DolList, matchedOn: LicenseHit["matchedOn"]): { total: number; hits: LicenseHit[] } {
-  const total = Number(html.match(/Records \d+ to \d+ of (\d+) Records/)?.[1] ?? NaN);
-  const hits: LicenseHit[] = [];
-  for (const m of Array.from(html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g))) {
-    const raw = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)).map((c) => c[1]);
-    const cells = raw.map((c) => htmlText(c));
-    if (cells.length !== 7 || !/^(PL|HVAC)\d+/.test(cells[0] ?? "")) continue;
-    const [no, , city, st, county, cls, exp] = cells;
-    const who = htmlPerson(raw[1]); // a <br> between two names stays a list (round 6, decision 3)
-    hits.push({
-      state: "WV", source: list.label, sourceUrl: WVDOL_PAGE, businessName: null, licenseNumber: no,
-      licenseType: list.type(cls),
-      specialty: null, status: null, principal: who,
-      city: [city, st].filter(Boolean).join(", ") || (county ? `${county} County` : null), expires: anyDate(exp), matchedOn,
-      address: null, phone: null, people: who ? [{ name: who, role: "Certificate holder" }] : [], holder: "individual",
-    });
-  }
-  if (!Number.isFinite(total)) throw new Error(`${list.label}: unexpected page`);
-  return { total, hits };
-}
-
-async function dolPage(list: DolList, params: { wvnumber?: string; contractor_name?: string }, page: number): Promise<string> {
-  const q = new URLSearchParams({ ...(page > 1 ? { PageNum_WVNUMBER: String(page) } : {}), wvnumber: params.wvnumber ?? "", contractor_name: params.contractor_name ?? "", city_name: "", County: "", Submit3: "Search" });
-  const res = await politeFetch(`${WVDOL}/${list.results}?${q}`, {}, { minDelayMs: 2000 });
-  if (!res.ok) throw new Error(`${list.label} returned HTTP ${res.status}`);
-  return res.text();
-}
-
-const PER_PAGE = 24;
-const MAX_PAGES = 10;
-
-/** A person: the form matches part of the name, so the rarer of the first and last word is searched and every page read. */
-async function searchDol(list: DolList, name: string): Promise<LicenseHit[]> {
-  const w = tokens(name).filter((x) => x.length >= 2);
-  if (w.length < 2) return [];
-  const tries = Array.from(new Set([w[w.length - 1], w[0]]));
-  let best: { word: string; first: ReturnType<typeof parseWvDol> } | null = null;
-  for (const word of tries) {
-    const first = parseWvDol(await dolPage(list, { contractor_name: word }, 1), list, "principal");
-    if (!best || first.total < best.first.total) best = { word, first };
-    if (best.first.total <= PER_PAGE * MAX_PAGES) break;
-  }
-  const hits = [...best!.first.hits];
-  const all = Math.ceil(best!.first.total / PER_PAGE);
-  const pages = Math.min(MAX_PAGES, all);
-  for (let p = 2; p <= pages; p++) hits.push(...parseWvDol(await dolPage(list, { contractor_name: best!.word }, p), list, "principal").hits);
-  const found = hits.filter((h) => hasAllWords(name, h.principal));
-  // The list matches part of a name; past MAX_PAGES pages of the rarer word the rest is not read, and the report says so.
-  return all > pages ? withNote(found, `read the first ${pages * PER_PAGE} of ${best!.first.total} certificates containing "${best!.word}"; the rest were not checked`) : found;
-}
-
-const dolSearch = (list: DolList): LiveLicenseSearch => ({
-  source: list.label, sourceUrl: WVDOL_PAGE, kinds: ["person"],
-  search: async (name, kind) => (kind === "person" ? searchDol(list, name) : []), // certificates are held by people
-  searchBy: async (q) => {
-    if (q.type !== "license" || !normLicense(q.value)) return null; // only certificate numbers are searchable
-    return parseWvDol(await dolPage(list, { wvnumber: q.value.trim().toUpperCase() }, 1), list, "license").hits.filter((h) => normLicense(h.licenseNumber) === normLicense(q.value));
-  },
-});
 
 // ── Insurance Commissioner Employer Violator System ──────────────────────────────────────────────────────────
 const EVS = "https://www.wvinsurance.gov/EVS";
@@ -198,21 +141,83 @@ async function* evsLoader(): AsyncIterable<BulkHit> {
   }
 }
 
+// ── Purchasing Division debarred vendors ─────────────────────────────────────────────────────────────────────
+const DEBAR = "https://www.state.wv.us/admin/purchase/debar.html";
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+
+/** "June 10, 2022" / "April 20,2021" → YYYY-MM-DD (every date of a cell, in order); anything else is skipped. */
+export function longDates(v: string | null | undefined): string[] {
+  return Array.from((v ?? "").matchAll(/\b([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})\b/g)).flatMap((m) => {
+    const mo = MONTHS.indexOf(m[1].toLowerCase());
+    return mo >= 0 && Number(m[3]) >= 1900 ? [`${m[3]}-${String(mo + 1).padStart(2, "0")}-${m[2].padStart(2, "0")}`] : [];
+  });
+}
+
+export type WvDebarRow = { name: string; city: string | null; dates: string | null; period: string | null; scope: string | null };
+
+/** The table rows (header row skipped). A page without the table's header is an error, not "no debarments". */
+export function parseWvDebar(html: string): WvDebarRow[] {
+  if (!/Vendor Name[\s\S]{0,200}Vendor Address[\s\S]{0,200}Debarment Date/i.test(html)) throw new Error("WV Purchasing debarred vendors: unexpected page");
+  const out: WvDebarRow[] = [];
+  for (const m of Array.from(html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi))) {
+    const raw = Array.from(m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)).map((c) => c[1]);
+    if (raw.length < 5) continue;
+    const name = htmlText(raw[0]);
+    if (!name || /^vendor name$/i.test(name)) continue;
+    // The first "City, ST 12345" line of the address cell (some rows list two addresses).
+    const lines = raw[1].split(/<br\s*\/?>|<\/p>/i).map((l) => htmlText(l) ?? "");
+    const at = lines.map((l) => l.match(/^(.+?),\s*([A-Z]{2})\s+\d{5}(?:-\d{4})?$/)).find(Boolean);
+    out.push({ name, city: at ? `${at[1]}, ${at[2]}` : null, dates: htmlText(raw[2]), period: htmlText(raw[3]), scope: htmlText(raw[4]) });
+  }
+  return out;
+}
+
+/**
+ * The rows about a business. The list names people too ("Andrew P. Nichols", "May Baqai Individually and as Notice
+ * of Process Recipient for Planet Cellular Inc."): a row is kept only when its name reads as a business and does not
+ * name someone "Individually" (companies only, FCRA).
+ */
+export const wvDebarBusinesses = (rows: WvDebarRow[]) => rows.filter((r) => !/\bindividually\b/i.test(r.name) && looksLikeBusiness(r.name));
+
+/** One row as a report hit. Every row is current: the page lists "vendors who are currently debarred". */
+export function wvDebarHit(r: WvDebarRow): EnforcementHit {
+  const [first, ...later] = longDates(r.dates);
+  return {
+    state: "WV", source: "WV Purchasing Division debarred vendors", sourceUrl: DEBAR, category: "debarment",
+    name: r.name, id: null, date: first ?? null, endDate: null,
+    status: `Debarred from doing business with the State of West Virginia${r.period ? ` (debarment period: ${r.period})` : ""}`,
+    city: r.city,
+    detail: [r.scope ? `Scope: ${r.scope}` : null, later.length ? `updated ${later.join(", ")}` : null].filter(Boolean).join("; ") || null,
+    amount: null, adverse: true,
+  };
+}
+
+async function* wvDebarLoader(): AsyncIterable<BulkHit> {
+  const html = await politeText(DEBAR, {}, { minDelayMs: 1500 });
+  if (!/currently debarred/i.test(html)) throw new Error("WV Purchasing debarred vendors: unexpected page");
+  for (const r of wvDebarBusinesses(parseWvDebar(html))) yield { kind: "enforcement", hit: wvDebarHit(r), business: r.name, person: null };
+}
+
 const BULK: BulkSource[] = [
   // 2,647 rows (business, city, masked FEIN) on 2026-10-15.
   { id: "wv-oic-evs", state: "WV", label: "WV Employer Violator System (workers' comp default)", pageUrl: EVS, everyHours: 24 * 7, minRows: 1_500, load: evsLoader, companiesOnly: true, category: "debarment",
     // Row shape 1: individuals are left out since 2026-10-15 (2,646 → 1,721 rows), so a shape-0 load is not a baseline.
     rowShape: 1 },
+  // wv-purchasing-debarred is not registered (coordinator, 2026-10-15; see `blocked`). wvDebarLoader is kept, unused;
+  // its stored rows are deleted at boot (bulk.ts RETIRED_BULK_SOURCES).
 ];
+/** Kept for its tests and a possible return (not registered): the Division's debarred-vendor list as bulk rows. */
+export const wvDebarredLoader = wvDebarLoader;
 
 export const pack: StatePack = {
   state: "WV",
   checked: "2026-10-15",
-  liveLicenses: [SFM, dolSearch(PLUMBERS), dolSearch(HVAC)],
+  liveLicenses: [SFM],
   bulk: BULK,
   blocked: [
-    "WV Contractor Licensing Board license search and board actions (wvclboard.wv.gov/verify, /about/actions.asp): robots.txt Disallow: /",
+    "WV Contractor Licensing Board license search and board actions (wvclboard.wv.gov/verify, linked as \"Contractor License Search\" from labor.wv.gov/database-search; /about/actions.asp): robots.txt \"User-agent: * / Disallow: /\" (re-checked 2026-10-15; http:// and www. redirect to the same file)",
+    "WV Division of Labor certified plumbers, HVAC technicians, manufactured-housing licensees, elevator and amusement-ride inspectors and registered service companies (www.wvlabor.com/new_searches/*.cfm, linked from labor.wv.gov/database-search): robots.txt answers HTTP 500 (2026-10-15), read as a refusal of the host (RFC 9309); https:// does not connect",
+    "WV Purchasing Division debarred vendors (purchasing.wv.gov, and the same list on the Division's legacy host www.state.wv.us/admin/purchase/debar.html; was wv-purchasing-debarred): purchasing.wv.gov's robots.txt is \"User-Agent: * / Disallow: /\", and reading the same list from the legacy host would be a side door around that refusal (coordinator's decision, 2026-10-15)",
     "WV Secretary of State business search (apps.sos.wv.gov/business/corporations): the form carries bot-trap fields, treated as an anti-bot measure; bulk data is a paid subscription",
-    "WV Division of Labor manufactured-housing search (mfghsgRESULTS.cfm): returns no records for any name tried",
   ],
 };

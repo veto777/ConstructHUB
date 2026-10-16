@@ -1,0 +1,2841 @@
+{
+ "note": "Golden subjects, taken from each state's published data by script/research-acceptance/pick.ts; picked once and kept (--repick to pick again).",
+ "states": [
+  {
+   "state": "AL",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No usable record of a business holding an active license found in: Alabama Licensing Board for General Contractors (search failed: licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read); Alabama Onsite Wastewater Board installers",
+     "blocked": [
+      "Home Builders Licensure Board license search (alhobv7prod.glsuite.us, GL Suite): robots.txt disallows every path and the page answers 403",
+      "Home Builders Licensure Board disciplinary actions (hblb.alabama.gov/disciplinary-actions/): scanned-image PDFs kept 90 days (rechecked 2026-10-15: September-2026-Disciplinary-Actions.pdf is an image with no text layer); the unlicensed-builder prosecution PDFs name individuals (FCRA: companies only)",
+      "Electrical Contractors Board license search (alecb-search.kalmservices.net): every search needs a Cloudflare Turnstile token",
+      "Electrical Contractors Board disciplinary actions for FY2025 to today and the signed settlement agreements (aecb.alabama.gov): scanned-image PDFs with no text layer (FY2021-FY2024 and the 2010-2020 lists are read above)",
+      "Plumbers and Gas Fitters Examining Board lookup (alpgfb.igovsolution.net): a verification-code (CAPTCHA) field on every search",
+      "Board of Heating, Air Conditioning and Refrigeration Contractors (hacr.alabama.gov): no public license lookup, only the iGovSolution licensee login"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "name": "Home Pro Construction LLC",
+     "kind": "company",
+     "source": "Alabama Electrical Contractors Board disciplinary actions",
+     "sourceId": "al-aecb-discipline",
+     "from": "bulk file al-aecb-discipline, loaded 2026-10-15",
+     "recordId": "ECB 2023-021",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Alabama Electrical Contractors Board disciplinary actions",
+      "id": "ECB 2023-021",
+      "name": "Home Pro Construction LLC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "null": true,
+     "reason": "No usable record of an individual license holder found in: Alabama Licensing Board for General Contractors; Alabama Onsite Wastewater Board installers (search failed: licensesearch.alabama.gov: robots.txt answered HTTP 500; no automated requests until it can be read)",
+     "blocked": [
+      "Home Builders Licensure Board license search (alhobv7prod.glsuite.us, GL Suite): robots.txt disallows every path and the page answers 403",
+      "Home Builders Licensure Board disciplinary actions (hblb.alabama.gov/disciplinary-actions/): scanned-image PDFs kept 90 days (rechecked 2026-10-15: September-2026-Disciplinary-Actions.pdf is an image with no text layer); the unlicensed-builder prosecution PDFs name individuals (FCRA: companies only)",
+      "Electrical Contractors Board license search (alecb-search.kalmservices.net): every search needs a Cloudflare Turnstile token",
+      "Electrical Contractors Board disciplinary actions for FY2025 to today and the signed settlement agreements (aecb.alabama.gov): scanned-image PDFs with no text layer (FY2021-FY2024 and the 2010-2020 lists are read above)",
+      "Plumbers and Gas Fitters Examining Board lookup (alpgfb.igovsolution.net): a verification-code (CAPTCHA) field on every search",
+      "Board of Heating, Air Conditioning and Refrigeration Contractors (hacr.alabama.gov): no public license lookup, only the iGovSolution licensee login"
+     ]
+    }
+   ]
+  },
+  {
+   "state": "AK",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No registered source publishes a business holding an active license for AK",
+     "blocked": [
+      "CBPL professional-license search, business-license search and download files (www.commerce.alaska.gov/cbp and commerce.alaska.gov), which hold construction contractor registrations, electrical/mechanical administrator licenses and business licenses: HTTP 403 with a DataDome CAPTCHA page (geo.captcha-delivery.com) on robots.txt and on every page (rechecked 2026-10-15)",
+      "DCCED map server business-license layer (maps.commerce.alaska.gov/server/rest/services/Economics_Related/Business_Licenses/MapServer/2), used until 2026-10-15: robots.txt now answers HTTP 403 with the DataDome CAPTCHA page, so the research code refuses the host; the same data's ArcGIS Online item (owner DCRAOpenData) points at that host",
+      "DOLWD Mechanical Inspection certificates of fitness (electricians, plumbers; labor.alaska.gov/lss/mihome.htm, plumbing_electrical.htm, mi-faq.html): no public lookup or list published (rechecked 2026-10-15)",
+      "DOLWD Wage and Hour public-construction debarment list (labor.alaska.gov/lss/debarments.htm, 'last updated: November 6, 2025'): live and readable, but its table lists no company today, so nothing to search or verify",
+      "DOT&PF 'Suspended Contractors' link (dot.alaska.gov/procurement/warrant_manual/): points to the federal EPLS (now SAM.gov), not a state list",
+      "ArcGIS Online 'The Alaska General Contractors 2023 Layer' (AKDOT, services.arcgis.com/r4A0V7UzH9fcLVvv): one polyline layer 'AGC_FIGURES Events', no description and no license fields; not a license register"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: AK original enforcement",
+     "blocked": [
+      "CBPL professional-license search, business-license search and download files (www.commerce.alaska.gov/cbp and commerce.alaska.gov), which hold construction contractor registrations, electrical/mechanical administrator licenses and business licenses: HTTP 403 with a DataDome CAPTCHA page (geo.captcha-delivery.com) on robots.txt and on every page (rechecked 2026-10-15)",
+      "DCCED map server business-license layer (maps.commerce.alaska.gov/server/rest/services/Economics_Related/Business_Licenses/MapServer/2), used until 2026-10-15: robots.txt now answers HTTP 403 with the DataDome CAPTCHA page, so the research code refuses the host; the same data's ArcGIS Online item (owner DCRAOpenData) points at that host",
+      "DOLWD Mechanical Inspection certificates of fitness (electricians, plumbers; labor.alaska.gov/lss/mihome.htm, plumbing_electrical.htm, mi-faq.html): no public lookup or list published (rechecked 2026-10-15)",
+      "DOLWD Wage and Hour public-construction debarment list (labor.alaska.gov/lss/debarments.htm, 'last updated: November 6, 2025'): live and readable, but its table lists no company today, so nothing to search or verify",
+      "DOT&PF 'Suspended Contractors' link (dot.alaska.gov/procurement/warrant_manual/): points to the federal EPLS (now SAM.gov), not a state list",
+      "ArcGIS Online 'The Alaska General Contractors 2023 Layer' (AKDOT, services.arcgis.com/r4A0V7UzH9fcLVvv): one polyline layer 'AGC_FIGURES Events', no description and no license fields; not a license register"
+     ]
+    },
+    {
+     "role": "person",
+     "null": true,
+     "reason": "No registered source publishes an individual license holder for AK",
+     "blocked": [
+      "CBPL professional-license search, business-license search and download files (www.commerce.alaska.gov/cbp and commerce.alaska.gov), which hold construction contractor registrations, electrical/mechanical administrator licenses and business licenses: HTTP 403 with a DataDome CAPTCHA page (geo.captcha-delivery.com) on robots.txt and on every page (rechecked 2026-10-15)",
+      "DCCED map server business-license layer (maps.commerce.alaska.gov/server/rest/services/Economics_Related/Business_Licenses/MapServer/2), used until 2026-10-15: robots.txt now answers HTTP 403 with the DataDome CAPTCHA page, so the research code refuses the host; the same data's ArcGIS Online item (owner DCRAOpenData) points at that host",
+      "DOLWD Mechanical Inspection certificates of fitness (electricians, plumbers; labor.alaska.gov/lss/mihome.htm, plumbing_electrical.htm, mi-faq.html): no public lookup or list published (rechecked 2026-10-15)",
+      "DOLWD Wage and Hour public-construction debarment list (labor.alaska.gov/lss/debarments.htm, 'last updated: November 6, 2025'): live and readable, but its table lists no company today, so nothing to search or verify",
+      "DOT&PF 'Suspended Contractors' link (dot.alaska.gov/procurement/warrant_manual/): points to the federal EPLS (now SAM.gov), not a state list",
+      "ArcGIS Online 'The Alaska General Contractors 2023 Layer' (AKDOT, services.arcgis.com/r4A0V7UzH9fcLVvv): one polyline layer 'AGC_FIGURES Events', no description and no license fields; not a license register"
+     ]
+    }
+   ]
+  },
+  {
+   "state": "AZ",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "Construction Management Services, LLC",
+     "kind": "company",
+     "source": "Arizona Registrar of Contractors licenses",
+     "sourceId": "https://azroc.my.site.com/AZRoc/s/contractor-search",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "ROC 333995",
+     "expected": {
+      "kind": "license",
+      "source": "Arizona Registrar of Contractors licenses",
+      "licenseNumber": "ROC 333995",
+      "businessName": "Construction Management Services, LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: az-tucson-contractors (discipline); Arizona Registrar of Contractors complaints; AZ original enforcement",
+     "blocked": [
+      "roc.az.gov / azroc.gov posting lists (active contractor lists, new licenses, discipline CSVs): every path, robots.txt included, answers a Cloudflare JS challenge (HTTP 403)",
+      "Arizona Corporation Commission eCorp (ecorp.azcc.gov): robots.txt disallows every path"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "Craig Miles Smith",
+     "kind": "person",
+     "source": "Arizona Registrar of Contractors licenses",
+     "sourceId": "https://azroc.my.site.com/AZRoc/s/contractor-search",
+     "from": "live lookup, search \"Smith\"",
+     "recordId": "ROC 336057",
+     "expected": {
+      "kind": "license",
+      "source": "Arizona Registrar of Contractors licenses",
+      "licenseNumber": "ROC 336057",
+      "businessName": "Craig Miles Smith",
+      "person": "Craig Miles Smith",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "AR",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "API GROUP LIFE SAFETY USA LLC",
+     "kind": "company",
+     "source": "Arkansas Fire Protection Licensing Board: licensed sprinkler companies",
+     "sourceId": "ar-fire-sprinkler",
+     "from": "bulk file ar-fire-sprinkler, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
+     "recordId": "FSS-224B3",
+     "expected": {
+      "kind": "license",
+      "source": "Arkansas Fire Protection Licensing Board: licensed sprinkler companies",
+      "licenseNumber": "FSS-224B3",
+      "businessName": "API GROUP LIFE SAFETY USA LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: ar-electrical-roster (discipline); ar-hvacr-roster (discipline); ar-fire-sprinkler (discipline); ar-fire-portable (discipline); AR original enforcement",
+     "blocked": [
+      "Contractors Licensing Board search (aclb2.arkansas.gov/clbsearch.php, linked from the board's 'Find a Licensed Contractor' page): the server never answered on 2026-10-15 (connection timed out from tower1 and vb11); retried 2026-10-15 06:46 and 06:47 UTC from tower1 and vb11, robots.txt and the search page both timed out after 30 s. The board publishes no downloadable roster",
+      "Contractors Licensing Board hearings / findings of fact (labor.arkansas.gov hearings-finding-of-fact): scanned-image PDFs with no text layer",
+      "Electrical and HVAC/R rosters: business rows carry no business name, so only people are searchable there"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "TEX ATEN",
+     "kind": "person",
+     "source": "Arkansas Board of Electrical Examiners roster",
+     "sourceId": "ar-electrical-roster",
+     "from": "bulk file ar-electrical-roster, loaded 2026-10-15",
+     "recordId": "LM-0698",
+     "expected": {
+      "kind": "license",
+      "source": "Arkansas Board of Electrical Examiners roster",
+      "licenseNumber": "LM-0698",
+      "businessName": null,
+      "person": "TEX ATEN",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "CA",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "MC CUNE JOHN CONSTRUCTION",
+     "kind": "company",
+     "source": "California CSLB contractor licenses",
+     "sourceId": "ca-cslb",
+     "from": "bulk file ca-cslb, loaded 2026-10-15",
+     "recordId": "640124",
+     "expected": {
+      "kind": "license",
+      "source": "California CSLB contractor licenses",
+      "licenseNumber": "640124",
+      "businessName": "MC CUNE JOHN CONSTRUCTION",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "NEXTGEN ENERGY SOLUTIONS INC",
+     "kind": "company",
+     "source": "California CSLB revoked licenses (monthly lists)",
+     "sourceId": "ca-cslb-revoked",
+     "from": "bulk file ca-cslb-revoked, loaded 2026-10-15",
+     "recordId": "1095228",
+     "expected": {
+      "kind": "enforcement",
+      "source": "California CSLB revoked licenses (monthly lists)",
+      "id": "1095228",
+      "name": "NEXTGEN ENERGY SOLUTIONS INC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "SERGEY MAKUSHIN",
+     "kind": "person",
+     "source": "California CSLB contractor licenses",
+     "sourceId": "ca-cslb",
+     "from": "bulk file ca-cslb, loaded 2026-10-15",
+     "recordId": "1037587",
+     "expected": {
+      "kind": "license",
+      "source": "California CSLB contractor licenses",
+      "licenseNumber": "1037587",
+      "businessName": "MAKUSHIN PLUMBING",
+      "person": "SERGEY MAKUSHIN",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "CO",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "A American Electric, L.L.C.",
+     "kind": "company",
+     "source": "Colorado DORA licenses (electrical, plumbing, water well)",
+     "sourceId": "https://data.colorado.gov/d/7s5z-vewr",
+     "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 5502",
+     "recordId": "5502",
+     "expected": {
+      "kind": "license",
+      "source": "Colorado DORA licenses (electrical, plumbing, water well)",
+      "licenseNumber": "5502",
+      "businessName": "A American Electric, L.L.C.",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "Wyatt Austin Kriplin",
+     "kind": "person",
+     "source": "Colorado DORA licenses (electrical, plumbing, water well)",
+     "sourceId": "https://data.colorado.gov/d/7s5z-vewr",
+     "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, row 9974116",
+     "recordId": "9974116",
+     "expected": {
+      "kind": "license",
+      "source": "Colorado DORA licenses (electrical, plumbing, water well)",
+      "licenseNumber": "9974116",
+      "businessName": null,
+      "person": "Wyatt Austin Kriplin",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Eagle Electric Co.",
+     "kind": "company",
+     "source": "Colorado DORA discipline of electrical, plumbing and water well contractors",
+     "sourceId": "https://data.colorado.gov/d/7s5z-vewr",
+     "from": "Socrata dataset https://data.colorado.gov/d/7s5z-vewr, search \"Electric\"",
+     "recordId": "1999-3999000360",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Colorado DORA discipline of electrical, plumbing and water well contractors",
+      "id": "1999-3999000360",
+      "name": "Eagle Electric Co.",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "CT",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "SEAWOLF CONTRACTORS LLC",
+     "kind": "company",
+     "source": "Connecticut DCP licenses and credentials (home improvement and trades)",
+     "sourceId": "https://data.ct.gov/d/ngch-56tr",
+     "from": "Socrata dataset https://data.ct.gov/d/ngch-56tr, row HIC.0669016",
+     "recordId": "HIC.0669016",
+     "expected": {
+      "kind": "license",
+      "source": "Connecticut DCP licenses and credentials (home improvement and trades)",
+      "licenseNumber": "HIC.0669016",
+      "businessName": "SEAWOLF CONTRACTORS LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "SCD Services, LLC",
+     "kind": "company",
+     "source": "Connecticut Department of Labor debarment list",
+     "sourceId": "ct-dol-debarment",
+     "from": "bulk file ct-dol-debarment, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "Connecticut Department of Labor debarment list",
+      "id": null,
+      "name": "SCD Services, LLC",
+      "category": "debarment"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "ROBERT W SALTSMAN",
+     "kind": "person",
+     "source": "Connecticut DCP licenses and credentials (home improvement and trades)",
+     "sourceId": "https://data.ct.gov/d/ngch-56tr",
+     "from": "Socrata dataset https://data.ct.gov/d/ngch-56tr, row FRP.0041183-F1",
+     "recordId": "FRP.0041183-F1",
+     "expected": {
+      "kind": "license",
+      "source": "Connecticut DCP licenses and credentials (home improvement and trades)",
+      "licenseNumber": "FRP.0041183-F1",
+      "businessName": null,
+      "person": "ROBERT W SALTSMAN",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "DE",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "DURHAM PLUMBING SERVICE, LLC",
+     "kind": "company",
+     "source": "Delaware Division of Revenue contractor business licenses",
+     "sourceId": "https://data.delaware.gov/d/5zy2-grhr",
+     "from": "Socrata dataset https://data.delaware.gov/d/5zy2-grhr, row 2017600660 (the publisher lists no status: a list of current licenses)",
+     "recordId": "2017600660",
+     "expected": {
+      "kind": "license",
+      "source": "Delaware Division of Revenue contractor business licenses",
+      "licenseNumber": "2017600660",
+      "businessName": "DURHAM PLUMBING SERVICE, LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: de-dol-wpfa-violators; de-dol-pw-debarment; DE original enforcement",
+     "blocked": [
+      "Delaware Division of Corporations entity search (icis.corp.delaware.gov): CAPTCHA on the search",
+      "Delaware DPR disciplinary actions (data.delaware.gov dz6p-akeq): names individual licensees only (no business), so it can't be searched for companies",
+      "Delaware court records: no court dataset on data.delaware.gov"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "IRENE LIBERTA",
+     "kind": "person",
+     "source": "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
+     "sourceId": "https://data.delaware.gov/d/pjnv-eaih",
+     "from": "Socrata dataset https://data.delaware.gov/d/pjnv-eaih, row TH-0020989",
+     "recordId": "TH-0020989",
+     "expected": {
+      "kind": "license",
+      "source": "Delaware Division of Professional Regulation (electrical, plumbing/HVACR)",
+      "licenseNumber": "TH-0020989",
+      "businessName": null,
+      "person": "IRENE LIBERTA",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "El Salvador Painting LLC",
+     "kind": "company",
+     "source": "Delaware Department of Labor Workplace Fraud Act violators",
+     "sourceId": "de-dol-wpfa-violators",
+     "from": "bulk file de-dol-wpfa-violators, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "Delaware Department of Labor Workplace Fraud Act violators",
+      "id": null,
+      "name": "El Salvador Painting LLC",
+      "category": "wage"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "ACH 1, INC.",
+     "kind": "company",
+     "source": "Delaware Department of Labor prevailing wage debarment list",
+     "sourceId": "de-dol-pw-debarment",
+     "from": "bulk file de-dol-pw-debarment, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "Delaware Department of Labor prevailing wage debarment list",
+      "id": null,
+      "name": "ACH 1, INC.",
+      "category": "debarment"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "DC",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "RENEWAL BY ANDERSEN LLC.",
+     "kind": "company",
+     "source": "DC DLCP basic business licenses (construction)",
+     "sourceId": "dc-bbl",
+     "from": "bulk file dc-bbl, loaded 2026-10-15",
+     "recordId": "420324000174",
+     "expected": {
+      "kind": "license",
+      "source": "DC DLCP basic business licenses (construction)",
+      "licenseNumber": "420324000174",
+      "businessName": "RENEWAL BY ANDERSEN LLC.",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "District Services Management, LLC.",
+     "kind": "company",
+     "source": "DC OCP excluded parties list",
+     "sourceId": "dc-ocp-excluded",
+     "from": "bulk file dc-ocp-excluded, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "DC OCP excluded parties list",
+      "id": null,
+      "name": "District Services Management, LLC.",
+      "category": "debarment"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "RAUL A GODOY",
+     "kind": "person",
+     "source": "DC DLCP basic business licenses (construction)",
+     "sourceId": "dc-bbl",
+     "from": "bulk file dc-bbl, loaded 2026-10-15",
+     "recordId": "64001137",
+     "expected": {
+      "kind": "license",
+      "source": "DC DLCP basic business licenses (construction)",
+      "licenseNumber": "64001137",
+      "businessName": "PRONTO",
+      "person": "RAUL A GODOY",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "FL",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "COASTAL CONTRACTING & RESTORATION LLC",
+     "kind": "company",
+     "source": "Florida DBPR construction licenses (CILB)",
+     "sourceId": "fl-cilb",
+     "from": "bulk file fl-cilb, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "license",
+      "source": "Florida DBPR construction licenses (CILB)",
+      "licenseNumber": null,
+      "businessName": "COASTAL CONTRACTING & RESTORATION LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "HONEYCUTT PRESSURE WASHING",
+     "kind": "company",
+     "source": "Florida DBPR complaints and discipline (construction and electrical)",
+     "sourceId": "fl-dbpr-complaints",
+     "from": "bulk file fl-dbpr-complaints, loaded 2026-10-15",
+     "recordId": "2015042566",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Florida DBPR complaints and discipline (construction and electrical)",
+      "id": "2015042566",
+      "name": "HONEYCUTT PRESSURE WASHING",
+      "category": "complaint"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "JAMES ALEXANDER GREENWAY",
+     "kind": "person",
+     "source": "Florida DBPR construction licenses (CILB)",
+     "sourceId": "fl-cilb",
+     "from": "bulk file fl-cilb, loaded 2026-10-15",
+     "recordId": "CBC1267676",
+     "expected": {
+      "kind": "license",
+      "source": "Florida DBPR construction licenses (CILB)",
+      "licenseNumber": "CBC1267676",
+      "businessName": "CASTLE OAK BUILDERS INC",
+      "person": "JAMES ALEXANDER GREENWAY",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "GA",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "Marion Environmental, Inc.",
+     "kind": "company",
+     "source": "Georgia EPD licensed asbestos abatement firms",
+     "sourceId": "ga-epd-asbestos-firms",
+     "from": "bulk file ga-epd-asbestos-firms, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
+     "recordId": null,
+     "expected": {
+      "kind": "license",
+      "source": "Georgia EPD licensed asbestos abatement firms",
+      "licenseNumber": null,
+      "businessName": "Marion Environmental, Inc.",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "MRJ Construction, Inc",
+     "kind": "company",
+     "source": "Georgia EPD enforcement orders",
+     "sourceId": "Georgia EPD enforcement orders",
+     "from": "live search \"Construction\"",
+     "recordId": "EPD-WP-9566",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Georgia EPD enforcement orders",
+      "id": "EPD-WP-9566",
+      "name": "MRJ Construction, Inc",
+      "category": "environmental"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "John Smith",
+     "kind": "person",
+     "source": "Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications",
+     "sourceId": "https://www.gaswcc.org/esc-search.php",
+     "from": "live lookup, search \"John Smith\"",
+     "recordId": "0000049311",
+     "expected": {
+      "kind": "license",
+      "source": "Georgia Soil and Water Conservation Commission erosion and sedimentation control certifications",
+      "licenseNumber": "0000049311",
+      "businessName": null,
+      "person": "John Smith",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "HI",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "DMC PAINTING AND MAINTENANCE LLC",
+     "kind": "company",
+     "source": "Hawaii PVL current licenses (contractors, electricians and plumbers, engineers and architects)",
+     "sourceId": "hi-pvl-licenses",
+     "from": "bulk file hi-pvl-licenses, loaded 2026-10-15",
+     "recordId": "CT-29801-0",
+     "expected": {
+      "kind": "license",
+      "source": "Hawaii Contractors License Board licenses",
+      "licenseNumber": "CT-29801-0",
+      "businessName": "DMC PAINTING AND MAINTENANCE LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Joshua’s Electrical Services LLC",
+     "kind": "company",
+     "source": "Hawaii DCCA disciplinary actions (construction boards)",
+     "sourceId": "hi-dcca-discipline",
+     "from": "bulk file hi-dcca-discipline, loaded 2026-10-15",
+     "recordId": "CLB 2026-0071-L",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Hawaii DCCA disciplinary actions (construction boards)",
+      "id": "CLB 2026-0071-L",
+      "name": "Joshua’s Electrical Services LLC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "GERALD R INGALLS",
+     "kind": "person",
+     "source": "Hawaii PVL current licenses (contractors, electricians and plumbers, engineers and architects)",
+     "sourceId": "hi-pvl-licenses",
+     "from": "bulk file hi-pvl-licenses, loaded 2026-10-15",
+     "recordId": "CT-13484-0",
+     "expected": {
+      "kind": "license",
+      "source": "Hawaii Contractors License Board licenses",
+      "licenseNumber": "CT-13484-0",
+      "businessName": null,
+      "person": "GERALD R INGALLS",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "ID",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No registered source publishes a business holding an active license for ID",
+     "blocked": [
+      "DOPL eDOPL license search and Public License List Search (edopl.idaho.gov/OnlineServices/?link=PubSearch): robots.txt is 'User-agent: *' / 'Disallow: /' (rechecked 2026-10-15); this covers contractor registration, electrical, plumbing, HVAC and public works contractor licenses and their discipline",
+      "DOPL website (dopl.idaho.gov; robots.txt 'Disallow:' empty): the Contractors (/con/), Electrical (/ele/), Plumbing (/plb/), HVAC (/hvac/) and Public Works (/pwc/) board pages link only to eDOPL; the site's only discipline pages are for other boards (Accountancy /boa/boa-discipline/, Shorthand Reporters /sre/sre-disciplinary-actions/) (checked 2026-10-15)",
+      "data.idaho.gov: a data-governance site (AI readiness, data literacy, policies), not a dataset catalog; an ArcGIS Online search for Idaho contractor/licensee/electrician/plumber items found no license register (checked 2026-10-15)",
+      "Idaho Attorney General consumer protection (ag.idaho.gov): contractor settlements (assurances of voluntary compliance) are announced as newsroom press releases only, with no list or dataset (checked 2026-10-15)"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: Idaho Secretary of State business entities; ID original enforcement",
+     "blocked": [
+      "DOPL eDOPL license search and Public License List Search (edopl.idaho.gov/OnlineServices/?link=PubSearch): robots.txt is 'User-agent: *' / 'Disallow: /' (rechecked 2026-10-15); this covers contractor registration, electrical, plumbing, HVAC and public works contractor licenses and their discipline",
+      "DOPL website (dopl.idaho.gov; robots.txt 'Disallow:' empty): the Contractors (/con/), Electrical (/ele/), Plumbing (/plb/), HVAC (/hvac/) and Public Works (/pwc/) board pages link only to eDOPL; the site's only discipline pages are for other boards (Accountancy /boa/boa-discipline/, Shorthand Reporters /sre/sre-disciplinary-actions/) (checked 2026-10-15)",
+      "data.idaho.gov: a data-governance site (AI readiness, data literacy, policies), not a dataset catalog; an ArcGIS Online search for Idaho contractor/licensee/electrician/plumber items found no license register (checked 2026-10-15)",
+      "Idaho Attorney General consumer protection (ag.idaho.gov): contractor settlements (assurances of voluntary compliance) are announced as newsroom press releases only, with no list or dataset (checked 2026-10-15)"
+     ]
+    },
+    {
+     "role": "person",
+     "null": true,
+     "reason": "No registered source publishes an individual license holder for ID",
+     "blocked": [
+      "DOPL eDOPL license search and Public License List Search (edopl.idaho.gov/OnlineServices/?link=PubSearch): robots.txt is 'User-agent: *' / 'Disallow: /' (rechecked 2026-10-15); this covers contractor registration, electrical, plumbing, HVAC and public works contractor licenses and their discipline",
+      "DOPL website (dopl.idaho.gov; robots.txt 'Disallow:' empty): the Contractors (/con/), Electrical (/ele/), Plumbing (/plb/), HVAC (/hvac/) and Public Works (/pwc/) board pages link only to eDOPL; the site's only discipline pages are for other boards (Accountancy /boa/boa-discipline/, Shorthand Reporters /sre/sre-disciplinary-actions/) (checked 2026-10-15)",
+      "data.idaho.gov: a data-governance site (AI readiness, data literacy, policies), not a dataset catalog; an ArcGIS Online search for Idaho contractor/licensee/electrician/plumber items found no license register (checked 2026-10-15)",
+      "Idaho Attorney General consumer protection (ag.idaho.gov): contractor settlements (assurances of voluntary compliance) are announced as newsroom press releases only, with no list or dataset (checked 2026-10-15)"
+     ]
+    }
+   ]
+  },
+  {
+   "state": "IL",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "WHITE ROOFING MANAGEMENT GROUP, LLC",
+     "kind": "company",
+     "source": "Illinois IDFPR roofing contractor licenses",
+     "sourceId": "https://data.illinois.gov/d/pzzh-kp68",
+     "from": "Socrata dataset https://data.illinois.gov/d/pzzh-kp68, row 104021115",
+     "recordId": "104021115",
+     "expected": {
+      "kind": "license",
+      "source": "Illinois IDFPR roofing contractor licenses",
+      "licenseNumber": "104021115",
+      "businessName": "WHITE ROOFING MANAGEMENT GROUP, LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "KEHRER BROS CONSTRUCTION INC",
+     "kind": "company",
+     "source": "Illinois IDFPR discipline (roofing contractors, design firms, home inspectors)",
+     "sourceId": "Illinois IDFPR discipline (roofing contractors, design firms, home inspectors)",
+     "from": "live search \"Construction\"",
+     "recordId": "2015006984",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Illinois IDFPR discipline (roofing contractors, design firms, home inspectors)",
+      "id": "2015006984",
+      "name": "KEHRER BROS CONSTRUCTION INC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "TYLER M HARPER",
+     "kind": "person",
+     "source": "Illinois IDFPR roofing contractor licenses",
+     "sourceId": "https://data.illinois.gov/d/pzzh-kp68",
+     "from": "Socrata dataset https://data.illinois.gov/d/pzzh-kp68, row 104020096",
+     "recordId": "104020096",
+     "expected": {
+      "kind": "license",
+      "source": "Illinois IDFPR roofing contractor licenses",
+      "licenseNumber": "104020096",
+      "businessName": "TYLER M HARPER",
+      "person": "TYLER M HARPER",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "IN",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "CREATIVE SIGN RESOURCES",
+     "kind": "company",
+     "source": "Indianapolis contractor licenses (Business and Neighborhood Services)",
+     "sourceId": "in-indy",
+     "from": "bulk file in-indy, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
+     "recordId": "C6558900",
+     "expected": {
+      "kind": "license",
+      "source": "Indianapolis contractor licenses (Business and Neighborhood Services)",
+      "licenseNumber": "C6558900",
+      "businessName": "CREATIVE SIGN RESOURCES",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: in-indy (discipline); IN original enforcement",
+     "blocked": [
+      "Professional Licensing Agency Search and Verify (mylicense.in.gov/EVerification), re-checked 2026-10-15: robots.txt has content-signal comments only (no rules), the search form's Recaptcha1 field is an empty hidden input and a Plumbing Commission search answers (Plumbing Contractor, Journeyman Plumber, Plumbing Corporation with its related plumbing contractor, asbestos and lead contractors); not used because the site carries the IN.gov portal header and the IN.gov Terms of Use (in.gov/core/terms_of_use.html) say: \"the viewing, printing, or downloading of any content ... from the Portal grants you only a limited, nonexclusive license for use solely by you for your own personal use, and not for republication, distribution, ... sale, preparation of derivative works or other use. No part of any content ... may be reproduced in any form or incorporated into any information retrieval system, electronic or mechanical, other than for your personal use (not for resale or redistribution)\" and bar using the Portal to \"exploit any information ... for advertising or commercial purposes\"",
+      "PLA licensee list download (in.gov/pla/license/download-license-files), re-checked 2026-10-15: sold through the IN.gov portal, \"$150 for the first record ... $10 for each additional 1,000 records\"",
+      "PLA Discipline Search (in.gov/ai/appfiles/pla-litigation → in.gov/apps/pla/litigation/advancedsearch.aspx): \"disciplinary actions taken against individual licensees\", searched by first and last name or license number only (no business name), so no company search (FCRA: companies only); IN.gov Terms of Use as above",
+      "PLA Indiana Active Licenses Map (in.gov/pla/data/indiana-active-licenses-map): counts per county only, no names",
+      "Secretary of State INBiz bulk business data: paid ($9,500) and needs an INBiz account",
+      "Indiana Data Hub (hub.mph.in.gov), re-checked 2026-10-15: its search finds no dataset for \"plumbing\" or \"contractor\" (robots.txt disallows /api/)"
+     ]
+    },
+    {
+     "role": "person",
+     "null": true,
+     "reason": "No usable record of an individual license holder found in: in-indy",
+     "blocked": [
+      "Professional Licensing Agency Search and Verify (mylicense.in.gov/EVerification), re-checked 2026-10-15: robots.txt has content-signal comments only (no rules), the search form's Recaptcha1 field is an empty hidden input and a Plumbing Commission search answers (Plumbing Contractor, Journeyman Plumber, Plumbing Corporation with its related plumbing contractor, asbestos and lead contractors); not used because the site carries the IN.gov portal header and the IN.gov Terms of Use (in.gov/core/terms_of_use.html) say: \"the viewing, printing, or downloading of any content ... from the Portal grants you only a limited, nonexclusive license for use solely by you for your own personal use, and not for republication, distribution, ... sale, preparation of derivative works or other use. No part of any content ... may be reproduced in any form or incorporated into any information retrieval system, electronic or mechanical, other than for your personal use (not for resale or redistribution)\" and bar using the Portal to \"exploit any information ... for advertising or commercial purposes\"",
+      "PLA licensee list download (in.gov/pla/license/download-license-files), re-checked 2026-10-15: sold through the IN.gov portal, \"$150 for the first record ... $10 for each additional 1,000 records\"",
+      "PLA Discipline Search (in.gov/ai/appfiles/pla-litigation → in.gov/apps/pla/litigation/advancedsearch.aspx): \"disciplinary actions taken against individual licensees\", searched by first and last name or license number only (no business name), so no company search (FCRA: companies only); IN.gov Terms of Use as above",
+      "PLA Indiana Active Licenses Map (in.gov/pla/data/indiana-active-licenses-map): counts per county only, no names",
+      "Secretary of State INBiz bulk business data: paid ($9,500) and needs an INBiz account",
+      "Indiana Data Hub (hub.mph.in.gov), re-checked 2026-10-15: its search finds no dataset for \"plumbing\" or \"contractor\" (robots.txt disallows /api/)"
+     ]
+    }
+   ]
+  },
+  {
+   "state": "IA",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "CENTRAL WESTERN FABRICATORS",
+     "kind": "company",
+     "source": "Iowa DIAL construction contractor registrations",
+     "sourceId": "ia-contractors",
+     "from": "bulk file ia-contractors, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
+     "recordId": "C112937",
+     "expected": {
+      "kind": "license",
+      "source": "Iowa DIAL construction contractor registrations",
+      "licenseNumber": "C112937",
+      "businessName": "CENTRAL WESTERN FABRICATORS",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: ia-sos-active; ia-contractors (discipline); ia-asbestos (discipline); ia-asbestos-permits (discipline); IA original enforcement",
+     "blocked": [
+      "Iowa Plumbing & Mechanical Systems Board (amanda-portal.idph.state.ia.us/adpereh): AWS WAF challenge and reCAPTCHA on the public search",
+      "Iowa Workforce Development labor portal contractor search (laborportal.iwd.iowa.gov): a JavaScript app with no documented public endpoint; the Data Hub file above carries the same registrations",
+      "Iowa electrical license detail pages show a 'Disciplines' section that reads 'No Discipline or Board Actions' even on revoked licenses, so it is not used as discipline data",
+      "Iowa Secretary of State inactive/dissolved entities: no free bulk file (dataset 554 lists active entities only)"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "NATHAN HOPLEY",
+     "kind": "person",
+     "source": "Iowa DIAL construction contractor registrations",
+     "sourceId": "ia-contractors",
+     "from": "bulk file ia-contractors, loaded 2026-10-15",
+     "recordId": "C134461",
+     "expected": {
+      "kind": "license",
+      "source": "Iowa DIAL construction contractor registrations",
+      "licenseNumber": "C134461",
+      "businessName": "INTERIOR TRIM SOLUTIONS LLC",
+      "person": "NATHAN HOPLEY",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "KS",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "TK Elevator Corporation",
+     "kind": "company",
+     "source": "Kansas State Fire Marshal licensed elevator contractors",
+     "sourceId": "ks-elevator-contractors",
+     "from": "bulk file ks-elevator-contractors, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
+     "recordId": null,
+     "expected": {
+      "kind": "license",
+      "source": "Kansas State Fire Marshal licensed elevator contractors",
+      "licenseNumber": null,
+      "businessName": "TK Elevator Corporation",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: ks-elevator-contractors (discipline); ks-elevator-mechanics (discipline); KS original enforcement",
+     "blocked": [
+      "Kansas Board of Technical Professions verification (licensing.ks.gov): searchable, but the site prohibits any commercial use of its lists (K.S.A. 45-220(c)); not used in paid reports",
+      "Kansas Attorney General roofing contractor registration directory (ag.ks.gov): HTTP 403 (Akamai) to our declared crawler",
+      "KDHE licensed asbestos abatement contractors and lead activity firms (kdhe.ks.gov DocumentCenter PDFs): HTTP 403 to our declared crawler",
+      "Kansas Secretary of State business entity search: robots.txt disallows /eforms/BusinessEntity/Search.aspx and the page serves an AWS WAF CAPTCHA"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "Maureen Booth",
+     "kind": "person",
+     "source": "Kansas State Fire Marshal licensed elevator contractors",
+     "sourceId": "ks-elevator-contractors",
+     "from": "bulk file ks-elevator-contractors, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "license",
+      "source": "Kansas State Fire Marshal licensed elevator contractors",
+      "licenseNumber": null,
+      "businessName": "Metro Elevator Kansas City, Inc.",
+      "person": "Maureen Booth",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "KY",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "Stewart Richey Construction, Inc",
+     "kind": "company",
+     "source": "Kentucky Department of Housing, Buildings and Construction",
+     "sourceId": "https://dhbc.ky.gov/Search/HBC_List_Licensees.aspx",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "RL641462",
+     "expected": {
+      "kind": "license",
+      "source": "Kentucky Department of Housing, Buildings and Construction",
+      "licenseNumber": "RL641462",
+      "businessName": "Stewart Richey Construction, Inc",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: ky-louisville-contractors (discipline); KY original enforcement"
+    },
+    {
+     "role": "person",
+     "name": "Harrison E Durham-Smith",
+     "kind": "person",
+     "source": "Kentucky Department of Housing, Buildings and Construction",
+     "sourceId": "https://dhbc.ky.gov/Search/HBC_List_Licensees.aspx",
+     "from": "live lookup, search \"Smith\"",
+     "recordId": "ME67081",
+     "expected": {
+      "kind": "license",
+      "source": "Kentucky Department of Housing, Buildings and Construction",
+      "licenseNumber": "ME67081",
+      "businessName": null,
+      "person": "Harrison E Durham-Smith",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "LA",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "09 Construction Services, LLC",
+     "kind": "company",
+     "source": "Louisiana State Licensing Board for Contractors",
+     "sourceId": "https://arlspublic.lslbc.louisiana.gov/Public/DetailedSearch/ByName",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "CL.68755",
+     "expected": {
+      "kind": "license",
+      "source": "Louisiana State Licensing Board for Contractors",
+      "licenseNumber": "CL.68755",
+      "businessName": "09 Construction Services, LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Griffith Electrical LLC",
+     "kind": "company",
+     "source": "Louisiana State Licensing Board for Contractors violations",
+     "sourceId": "la-lslbc-violations",
+     "from": "bulk file la-lslbc-violations, loaded 2026-10-15",
+     "recordId": "2018-886",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Louisiana State Licensing Board for Contractors violations",
+      "id": "2018-886",
+      "name": "Griffith Electrical LLC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "JONATHAN SQUARE",
+     "kind": "person",
+     "source": "New Orleans occupational business licenses (contractors)",
+     "sourceId": "la-new-orleans-contractors",
+     "from": "bulk file la-new-orleans-contractors, loaded 2026-10-15",
+     "recordId": "102801113",
+     "expected": {
+      "kind": "license",
+      "source": "New Orleans occupational business licenses",
+      "licenseNumber": "102801113",
+      "businessName": "JAY'S",
+      "person": "JONATHAN SQUARE",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "ME",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No usable record of a business holding an active license found in: Maine DEP licensed asbestos abatement contractors and consultants; Maine DEP certified underground storage tank installers and inspectors",
+     "blocked": [
+      "OPOR license search, licensee list download and licensee discipline search (www.pfr.maine.gov/ALMSOnline/ALMSQuery; the electricians', plumbers' and fuel boards' \"Find a Licensee\", \"Download a List of Licensees\" and \"Search Licensee Discipline\" links all open it): robots.txt (checked 2026-10-15) has \"Disallow: /ALMSOnline/ALMSQuery/SearchResults.aspx\", \"Disallow: /ALMSOnline/ALMSQuery/ExportToCSV.aspx\", \"Disallow: /ALMSOnline/ALMSQuery/ShowDetail.aspx\" and \"Disallow: /ALMSOnline/ALMSQuery/ShowCaseDetail.aspx\", so neither the search, the CSV export nor the case details can be used",
+      "www.maine.gov/cgi-bin/online/licensing (InforME license lookups): robots.txt on www.maine.gov has \"Disallow: /cgi-bin/\"",
+      "Secretary of State corporate search (icrs.informe.org): did not answer (no response within 25 s, 2026-10-15)",
+      "Electricians' Examining Board, Plumbers' Examining Board and Maine Fuel Board pages (www.maine.gov/pfr/professionallicensing/professions/…): publish no licensee lists or disciplinary action lists of their own; every list link goes to ALMSQuery (above)",
+      "data.maine.gov: redirects to www.socrata.com (HTTP 404); no Maine open-data catalog to search"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: ME original enforcement",
+     "blocked": [
+      "OPOR license search, licensee list download and licensee discipline search (www.pfr.maine.gov/ALMSOnline/ALMSQuery; the electricians', plumbers' and fuel boards' \"Find a Licensee\", \"Download a List of Licensees\" and \"Search Licensee Discipline\" links all open it): robots.txt (checked 2026-10-15) has \"Disallow: /ALMSOnline/ALMSQuery/SearchResults.aspx\", \"Disallow: /ALMSOnline/ALMSQuery/ExportToCSV.aspx\", \"Disallow: /ALMSOnline/ALMSQuery/ShowDetail.aspx\" and \"Disallow: /ALMSOnline/ALMSQuery/ShowCaseDetail.aspx\", so neither the search, the CSV export nor the case details can be used",
+      "www.maine.gov/cgi-bin/online/licensing (InforME license lookups): robots.txt on www.maine.gov has \"Disallow: /cgi-bin/\"",
+      "Secretary of State corporate search (icrs.informe.org): did not answer (no response within 25 s, 2026-10-15)",
+      "Electricians' Examining Board, Plumbers' Examining Board and Maine Fuel Board pages (www.maine.gov/pfr/professionallicensing/professions/…): publish no licensee lists or disciplinary action lists of their own; every list link goes to ALMSQuery (above)",
+      "data.maine.gov: redirects to www.socrata.com (HTTP 404); no Maine open-data catalog to search"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "Scott Smith",
+     "kind": "person",
+     "source": "Maine DEP certified underground storage tank installers and inspectors",
+     "sourceId": "https://www.maine.gov/dep/waste/busti/certifiedlist.html",
+     "from": "live lookup, search \"Smith\"",
+     "recordId": null,
+     "expected": {
+      "kind": "license",
+      "source": "Maine DEP certified underground storage tank installers and inspectors",
+      "licenseNumber": null,
+      "businessName": "Hall & Smith Energy LLC",
+      "person": "Scott Smith",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "company",
+     "name": "Acadia Contractors LLC",
+     "kind": "company",
+     "source": "Maine DEP licensed asbestos abatement contractors and consultants",
+     "sourceId": "https://www.maine.gov/dep/waste/asbestos/asbestoscontractors.html",
+     "from": "live lookup, search \"Contractors\" (the publisher lists no status: a list of current licenses)",
+     "recordId": null,
+     "expected": {
+      "kind": "license",
+      "source": "Maine DEP licensed asbestos abatement contractors and consultants",
+      "licenseNumber": null,
+      "businessName": "Acadia Contractors LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "MD",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "VC Homes LLC",
+     "kind": "company",
+     "source": "Montgomery County building contractor licenses",
+     "sourceId": "https://data.montgomerycountymd.gov/d/c7hs-c9qq",
+     "from": "Socrata dataset https://data.montgomerycountymd.gov/d/c7hs-c9qq, row BC232328 (the publisher lists no status: a list of current licenses)",
+     "recordId": "BC232328",
+     "expected": {
+      "kind": "license",
+      "source": "Montgomery County building contractor licenses",
+      "licenseNumber": "BC232328",
+      "businessName": "VC Homes LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Val Construction Co., Inc.",
+     "kind": "company",
+     "source": "Maryland Board of Public Works debarments",
+     "sourceId": "md-bpw-debarments",
+     "from": "bulk file md-bpw-debarments, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "Maryland Board of Public Works debarments",
+      "id": null,
+      "name": "Val Construction Co., Inc.",
+      "category": "debarment"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "INC. A. R. DESIGN GROUP",
+     "kind": "person",
+     "source": "Montgomery County building contractor licenses",
+     "sourceId": "https://data.montgomerycountymd.gov/d/c7hs-c9qq",
+     "from": "Socrata dataset https://data.montgomerycountymd.gov/d/c7hs-c9qq, row BC3760",
+     "recordId": "BC3760",
+     "expected": {
+      "kind": "license",
+      "source": "Montgomery County building contractor licenses",
+      "licenseNumber": "BC3760",
+      "businessName": "A. R. DESIGN GROUP, INC.",
+      "person": "INC. A. R. DESIGN GROUP",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "MA",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "100 Percent Construction Inc",
+     "kind": "company",
+     "source": "Massachusetts Home Improvement Contractor registry (OCABR)",
+     "sourceId": "https://contractorhub.mass.gov/s/hic-contractor-search",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "215560",
+     "expected": {
+      "kind": "license",
+      "source": "Massachusetts Home Improvement Contractor registry (OCABR)",
+      "licenseNumber": "215560",
+      "businessName": "100 Percent Construction Inc",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "99 NORTH RENOVATIONS & CONSTRUCTION LLC.",
+     "kind": "company",
+     "source": "Massachusetts HIC hearing decisions, Guaranty Fund claims and arbitration awards (OCABR)",
+     "sourceId": "Massachusetts HIC hearing decisions, Guaranty Fund claims and arbitration awards (OCABR)",
+     "from": "live search \"Construction\"",
+     "recordId": "2017-209",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Massachusetts HIC hearing decisions (OCABR)",
+      "id": "2017-209",
+      "name": "99 NORTH RENOVATIONS & CONSTRUCTION LLC.",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "CRAIG R MANCHESTER",
+     "kind": "person",
+     "source": "Massachusetts OPSI licenses (construction supervisors, pipefitters, refrigeration, sprinkler, elevator, hoisting)",
+     "sourceId": "ma-opsi",
+     "from": "bulk file ma-opsi, loaded 2026-10-15",
+     "recordId": "CS-101811",
+     "expected": {
+      "kind": "license",
+      "source": "Massachusetts OPSI licenses (construction supervisors, pipefitters, refrigeration, sprinkler, elevator, hoisting)",
+      "licenseNumber": "CS-101811",
+      "businessName": null,
+      "person": "CRAIG R MANCHESTER",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "MI",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "S AND R SEPTIC TANK AND GRAVEL PRODUCTS",
+     "kind": "company",
+     "source": "Michigan LARA licenses (builders and trades)",
+     "sourceId": "mi-lara",
+     "from": "bulk file mi-lara, loaded 2026-10-15 (the publisher lists no status: a list of current licenses)",
+     "recordId": "2104041371",
+     "expected": {
+      "kind": "license",
+      "source": "Michigan LARA licenses (builders and trades)",
+      "licenseNumber": "2104041371",
+      "businessName": "S AND R SEPTIC TANK AND GRAVEL PRODUCTS",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: mi-lara (discipline); MI original enforcement",
+     "blocked": [
+      "michigan.gov (LARA BCC pages, final orders, Corporations Division): Akamai returns 403 Access Denied to our bot, not used",
+      "data.michigan.gov: no license, enforcement or business-entity dataset (only performance measures)",
+      "LARA Architect and Engineer licensee exports (aca-prod.accela.com/LARA): the search answers with a server error page for these two types, left out",
+      "LARA disciplinary actions: published only on michigan.gov (blocked above); the Accela export carries no discipline"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "Harold Tod Huseby",
+     "kind": "person",
+     "source": "Michigan LARA licenses (builders and trades)",
+     "sourceId": "mi-lara",
+     "from": "bulk file mi-lara, loaded 2026-10-15",
+     "recordId": "2101193702",
+     "expected": {
+      "kind": "license",
+      "source": "Michigan LARA licenses (builders and trades)",
+      "licenseNumber": "2101193702",
+      "businessName": null,
+      "person": "Harold Tod Huseby",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "MN",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "SHAW ACQUISITION CORPORATION",
+     "kind": "company",
+     "source": "Minnesota DLI licenses and registrations",
+     "sourceId": "mn-dli",
+     "from": "bulk file mn-dli, loaded 2026-10-15",
+     "recordId": "BC435601",
+     "expected": {
+      "kind": "license",
+      "source": "Minnesota DLI licenses and registrations",
+      "licenseNumber": "BC435601",
+      "businessName": "SHAW ACQUISITION CORPORATION",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "ED BROWN PLUMBING LLC",
+     "kind": "company",
+     "source": "Minnesota DLI licenses flagged with an enforcement action",
+     "sourceId": "mn-dli-flagged",
+     "from": "bulk file mn-dli-flagged, loaded 2026-10-15",
+     "recordId": "PC646990",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Minnesota DLI licenses flagged with an enforcement action",
+      "id": "PC646990",
+      "name": "ED BROWN PLUMBING LLC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "CHRISTOPHER E LEWIS",
+     "kind": "person",
+     "source": "Minnesota DLI licenses and registrations",
+     "sourceId": "mn-dli",
+     "from": "bulk file mn-dli, loaded 2026-10-15",
+     "recordId": "RT748925",
+     "expected": {
+      "kind": "license",
+      "source": "Minnesota DLI licenses and registrations",
+      "licenseNumber": "RT748925",
+      "businessName": null,
+      "person": "CHRISTOPHER E LEWIS",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "MS",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No usable record of a business holding an active license found in: Mississippi State Board of Contractors (search failed: search.msboc.us answered with a bot challenge page; no automated requests to it for this run)",
+     "blocked": [
+      "MSBOC Excel export of every license (search.msboc.us ViewExcel): works, but carries no classification, expiration or qualifying party, so the live search with detail pages is used instead"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "name": "QUIN-CO, INC.",
+     "kind": "company",
+     "source": "Mississippi State Board of Contractors revoked and suspended licenses",
+     "sourceId": "ms-msboc-revoked-suspended",
+     "from": "bulk file ms-msboc-revoked-suspended, loaded 2026-10-15",
+     "recordId": "12137-MC",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Mississippi State Board of Contractors revoked and suspended licenses",
+      "id": "12137-MC",
+      "name": "QUIN-CO, INC.",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "null": true,
+     "reason": "No usable record of an individual license holder found in: Mississippi State Board of Contractors (search failed: search.msboc.us denied access earlier (a bot challenge page); no further requests for now)",
+     "blocked": [
+      "MSBOC Excel export of every license (search.msboc.us ViewExcel): works, but carries no classification, expiration or qualifying party, so the live search with detail pages is used instead"
+     ]
+    }
+   ]
+  },
+  {
+   "state": "MO",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "ACS ARCHITECTURAL CONSTRUCTION SERVICES, INC.",
+     "kind": "company",
+     "source": "Missouri MO PRO licensee search",
+     "sourceId": "https://mopro.mo.gov/license/s/license-search",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "2024000314",
+     "expected": {
+      "kind": "license",
+      "source": "Missouri MO PRO licensee search",
+      "licenseNumber": "2024000314",
+      "businessName": "ACS ARCHITECTURAL CONSTRUCTION SERVICES, INC.",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: mo-kansas-city-contractors (discipline); MO original enforcement",
+     "blocked": [
+      "Missouri Division of Labor Standards contractor debarment list (labor.mo.gov/contractor-debarment-list): reads 'No contractors debarred at this time' on 2026-10-15, nothing to search",
+      "Missouri Secretary of State business entities: no free bulk file or open API (the online search is per entity)",
+      "MO PRO downloadable listings (electrical contractors; architects, engineers, land surveyors, landscape architects): the files are served from modpr.file.force.com, whose robots.txt disallows all paths for every agent but Googlebot (checked 2026-10-15), so they are not downloaded; the live licensee search covers these licenses",
+      "MO PRO downloadable listings hold active licenses only; non-active licenses and discipline status come from the live licensee search"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "Mike Ulmer",
+     "kind": "person",
+     "source": "Missouri registered onsite wastewater treatment system installers",
+     "sourceId": "https://data.mo.gov/d/nfxa-cq5r",
+     "from": "Socrata dataset https://data.mo.gov/d/nfxa-cq5r, row 32867",
+     "recordId": "32867",
+     "expected": {
+      "kind": "license",
+      "source": "Missouri registered onsite wastewater treatment system installers",
+      "licenseNumber": "32867",
+      "businessName": "Ulmer Excavating",
+      "person": "Mike Ulmer",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "MT",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "SILO ESPRESSO",
+     "kind": "company",
+     "source": "Montana DEQ licensed septic tank pumpers",
+     "sourceId": "mt-deq-septic-pumpers",
+     "from": "bulk file mt-deq-septic-pumpers, loaded 2026-10-15",
+     "recordId": "S-1213",
+     "expected": {
+      "kind": "license",
+      "source": "Montana DEQ licensed septic tank pumpers",
+      "licenseNumber": "S-1213",
+      "businessName": "SILO ESPRESSO",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: mt-deq-asbestos (discipline); mt-deq-septic-pumpers (discipline); MT original enforcement",
+     "blocked": [
+      "DLI Employment Standards licensee lookup and licensee list download (ebizws.mt.gov/PUBLICPORTAL and ERD_PUBLICPORTAL; construction contractor, electrical, plumbing and other trade licenses, and the Electrical and Plumbers boards' 'Licensee Mailing Lists'): re-checked 2026-10-15, the F5 firewall answers 'Request Rejected' ('The requested URL was rejected. Please consult with your administrator.') to every request, robots.txt included",
+      "DLI construction contractor registration lookup (erdcontractors.mt.gov/ICCROnlineSearch/registrationlookup.jsp, linked from erd.dli.mt.gov): 2026-10-15 the server resets the connection after the request (robots.txt included)",
+      "DLI professional licensing and Building Codes on Accela (ebiz.mt.gov/pol and /bcb → aca-prod.accela.com): the license search links go to the rejected ebizws portal; Accela's own licensee lookup was not used, being a side door to the same refused data",
+      "DLI data dashboards (erd.dli.mt.gov/data-dashboards/professional-licensing, IndependentContractors; Tableau on tableau-ext.mt.gov): application and certificate counts, no licensee names",
+      "Montana Data Portal (data.mt.gov) 'License Information' (Tableau DS-LicenseInformation): descriptions of license types and requirements, not licensees",
+      "DEQ 'List of Montana Asbestos Companies' (deq.mt.gov/cleanupandrec/Programs/asbestos): a voluntary directory of companies that employ accredited people and asked to be listed, not a license; not used as one",
+      "Electrical and Plumbers boards (boards.bsd.dli.mt.gov): discipline only through the rejected licensee lookup; board meeting documents (boardmeetings.dli.mt.gov) are agendas and minutes, not a discipline list",
+      "Secretary of State business search (biz.sosmt.gov): Cloudflare security check (HTTP 403)",
+      "DLI prevailing-wage debarment list (erd.dli.mt.gov/labor-standards/public-contracts-prevailing-wage-law/debarment): live 2026-10-15, lists 'None'",
+      "State Procurement (doa.mt.gov/SPSD) debarred vendors: no state list today; the agency resources page points to SAM.gov and the DLI list above",
+      "DEQ enforcement: annual summary reports only, no case-level list"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "TRAVIS IVERSON",
+     "kind": "person",
+     "source": "Montana DEQ asbestos accreditations",
+     "sourceId": "mt-deq-asbestos",
+     "from": "bulk file mt-deq-asbestos, loaded 2026-10-15",
+     "recordId": "MTA-6837-CS",
+     "expected": {
+      "kind": "license",
+      "source": "Montana DEQ asbestos accreditations",
+      "licenseNumber": "MTA-6837-CS",
+      "businessName": null,
+      "person": "TRAVIS IVERSON",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "NE",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "C & C CONSTRUCTION, LLC",
+     "kind": "company",
+     "source": "Nebraska DOL contractor registrations",
+     "sourceId": "https://dol.nebraska.gov/conreg/Search",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "50237-26",
+     "expected": {
+      "kind": "license",
+      "source": "Nebraska DOL contractor registrations",
+      "licenseNumber": "50237-26",
+      "businessName": "C & C CONSTRUCTION, LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Nelson & Sons Construction LLC",
+     "kind": "company",
+     "source": "Nebraska DOL contractors with unpaid Employee Classification Act fines",
+     "sourceId": "ne-eca-unpaid",
+     "from": "bulk file ne-eca-unpaid, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "Nebraska DOL contractors with unpaid Employee Classification Act fines",
+      "id": null,
+      "name": "Nelson & Sons Construction LLC",
+      "category": "wage"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "MICHAEL JOHNSON",
+     "kind": "person",
+     "source": "Nebraska State Electrical Division licenses",
+     "sourceId": "https://nesedprod-search.state-reg-central.tylerapp.com",
+     "from": "live lookup, search \"Michael Johnson\"",
+     "recordId": "A 59041",
+     "expected": {
+      "kind": "license",
+      "source": "Nebraska State Electrical Division licenses",
+      "licenseNumber": "A 59041",
+      "businessName": null,
+      "person": "MICHAEL JOHNSON",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "NV",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "CONSTRUCTION DEVELOPMENT SERVICES INC",
+     "kind": "company",
+     "source": "Nevada State Contractors Board licenses",
+     "sourceId": "https://app.nvcontractorsboard.com/Clients/NVSCB/Public/ContractorLicenseSearch/ContractorLicenseSearch.aspx",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "0022791",
+     "expected": {
+      "kind": "license",
+      "source": "Nevada State Contractors Board licenses",
+      "licenseNumber": "0022791",
+      "businessName": "CONSTRUCTION DEVELOPMENT SERVICES INC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "NEXTEK CONSTRUCTION INC",
+     "kind": "company",
+     "source": "Nevada State Contractors Board disciplinary and board actions (2001 to today)",
+     "sourceId": "nv-nscb-discipline",
+     "from": "bulk file nv-nscb-discipline, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "Nevada State Contractors Board disciplinary and board actions",
+      "id": null,
+      "name": "NEXTEK CONSTRUCTION INC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "JOHN DAVID FIELD",
+     "kind": "person",
+     "source": "City of Las Vegas contractor business licenses",
+     "sourceId": "nv-las-vegas-contractors",
+     "from": "bulk file nv-las-vegas-contractors, loaded 2026-10-15",
+     "recordId": "3000004452",
+     "expected": {
+      "kind": "license",
+      "source": "City of Las Vegas business licenses",
+      "licenseNumber": "3000004452",
+      "businessName": "BUCKEYE DRYWALL & PAINT LLC",
+      "person": "JOHN DAVID FIELD",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "NH",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No registered source publishes a business holding an active license for NH",
+     "blocked": [
+      "OPLC license lookup and board pages (www.oplc.nh.gov/license-lookup, www.oplc.nh.gov/electricians-board, forms.nh.gov/licenseverification): HTTP 403 \"Access Denied\" (Akamai, \"You don't have permission to access … on this server\") to our bot on 2026-10-15, robots.txt included, so no lookup, roster or board disciplinary decisions can be read",
+      "NH open data (data.nh.gov): HTTP 403 to our bot on 2026-10-15; its datasets were not looked for through another host",
+      "Every other nh.gov host tried on 2026-10-15 (www.nh.gov, www.des.nh.gov, www.doj.nh.gov, www.courts.nh.gov, www.dol.nh.gov, www.nhes.nh.gov, www.revenue.nh.gov, www.sos.nh.gov, quickstart.sos.nh.gov business search): HTTP 403 to our bot; sos.nh.gov answered HTTP 503"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: NH original enforcement",
+     "blocked": [
+      "OPLC license lookup and board pages (www.oplc.nh.gov/license-lookup, www.oplc.nh.gov/electricians-board, forms.nh.gov/licenseverification): HTTP 403 \"Access Denied\" (Akamai, \"You don't have permission to access … on this server\") to our bot on 2026-10-15, robots.txt included, so no lookup, roster or board disciplinary decisions can be read",
+      "NH open data (data.nh.gov): HTTP 403 to our bot on 2026-10-15; its datasets were not looked for through another host",
+      "Every other nh.gov host tried on 2026-10-15 (www.nh.gov, www.des.nh.gov, www.doj.nh.gov, www.courts.nh.gov, www.dol.nh.gov, www.nhes.nh.gov, www.revenue.nh.gov, www.sos.nh.gov, quickstart.sos.nh.gov business search): HTTP 403 to our bot; sos.nh.gov answered HTTP 503"
+     ]
+    },
+    {
+     "role": "person",
+     "null": true,
+     "reason": "No registered source publishes an individual license holder for NH",
+     "blocked": [
+      "OPLC license lookup and board pages (www.oplc.nh.gov/license-lookup, www.oplc.nh.gov/electricians-board, forms.nh.gov/licenseverification): HTTP 403 \"Access Denied\" (Akamai, \"You don't have permission to access … on this server\") to our bot on 2026-10-15, robots.txt included, so no lookup, roster or board disciplinary decisions can be read",
+      "NH open data (data.nh.gov): HTTP 403 to our bot on 2026-10-15; its datasets were not looked for through another host",
+      "Every other nh.gov host tried on 2026-10-15 (www.nh.gov, www.des.nh.gov, www.doj.nh.gov, www.courts.nh.gov, www.dol.nh.gov, www.nhes.nh.gov, www.revenue.nh.gov, www.sos.nh.gov, quickstart.sos.nh.gov business search): HTTP 403 to our bot; sos.nh.gov answered HTTP 503"
+     ]
+    }
+   ]
+  },
+  {
+   "state": "NJ",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "REVELARE KITCHENS LLC",
+     "kind": "company",
+     "source": "New Jersey home improvement contractor registrations (Division of Consumer Affairs)",
+     "sourceId": "nj-hic",
+     "from": "bulk file nj-hic, loaded 2026-10-15",
+     "recordId": "13VH11387900",
+     "expected": {
+      "kind": "license",
+      "source": "New Jersey home improvement contractor registrations",
+      "licenseNumber": "13VH11387900",
+      "businessName": "REVELARE KITCHENS LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Restore Electric LLCRESTORE ELECTRIC L.L.C.",
+     "kind": "company",
+     "source": "New Jersey DOL prevailing-wage debarments",
+     "sourceId": "nj-debarments",
+     "from": "bulk file nj-debarments, loaded 2026-10-15",
+     "recordId": "729079",
+     "expected": {
+      "kind": "enforcement",
+      "source": "New Jersey DOL prevailing-wage debarments",
+      "id": "729079",
+      "name": "Restore Electric LLCRESTORE ELECTRIC L.L.C.",
+      "category": "debarment"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "Carl R Dolente",
+     "kind": "person",
+     "source": "New Jersey electrical, plumbing, HVACR and elevator licenses (Division of Consumer Affairs)",
+     "sourceId": "nj-trades",
+     "from": "bulk file nj-trades, loaded 2026-10-15",
+     "recordId": "34FA00072400",
+     "expected": {
+      "kind": "license",
+      "source": "New Jersey electrical, plumbing, HVACR and elevator licenses",
+      "licenseNumber": "34FA00072400",
+      "businessName": null,
+      "person": "Carl R Dolente",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "NM",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No usable record of a business holding an active license found in: New Mexico RLD home inspector and landscape architect licenses",
+     "blocked": [
+      "Construction Industries Division contractor / journeyman license search (public.psiexams.com/search.jsp, PSI, linked from rld.nm.gov's Verify a License page): the search form requires a CAPTCHA (\"Enter Captcha\", simplecaptcha.jpg; re-checked 2026-10-15). The results pages it posts to are not called directly (that would get around the CAPTCHA)",
+      "Workforce Solutions public works contractor registry (dws.state.nm.us): the site's firewall answers every request, robots.txt included, with \"Request Rejected\" (re-checked 2026-10-15)",
+      "CID disciplinary actions: rld.nm.gov's Enforcement Actions page lists every board's actions but links CID only to its home page; CID's Investigation and Enforcement and Unlicensed Violations pages publish no list (only the Recycled Metals program has a Disciplinary Actions page). Checked 2026-10-15",
+      "CID/MHD permit portal (nmrld.my.site.com/MHD/s/public-permit-search, /public-violation-search \"Search Notice\"): permit and notice searches, not a license lookup; not used",
+      "NM General Services Department debarment and suspension notices (generalservices.state.nm.us/state-purchasing/debarment-notices): \"THERE ARE NO SUSPENDED OR DEBARRED FIRMS AT THIS TIME\" (2026-10-15)",
+      "NM state open-data portal: none found (data.nm.gov and opendata.nm.gov do not resolve, 2026-10-15)"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: New Mexico Secretary of State business entities; NM original enforcement",
+     "blocked": [
+      "Construction Industries Division contractor / journeyman license search (public.psiexams.com/search.jsp, PSI, linked from rld.nm.gov's Verify a License page): the search form requires a CAPTCHA (\"Enter Captcha\", simplecaptcha.jpg; re-checked 2026-10-15). The results pages it posts to are not called directly (that would get around the CAPTCHA)",
+      "Workforce Solutions public works contractor registry (dws.state.nm.us): the site's firewall answers every request, robots.txt included, with \"Request Rejected\" (re-checked 2026-10-15)",
+      "CID disciplinary actions: rld.nm.gov's Enforcement Actions page lists every board's actions but links CID only to its home page; CID's Investigation and Enforcement and Unlicensed Violations pages publish no list (only the Recycled Metals program has a Disciplinary Actions page). Checked 2026-10-15",
+      "CID/MHD permit portal (nmrld.my.site.com/MHD/s/public-permit-search, /public-violation-search \"Search Notice\"): permit and notice searches, not a license lookup; not used",
+      "NM General Services Department debarment and suspension notices (generalservices.state.nm.us/state-purchasing/debarment-notices): \"THERE ARE NO SUSPENDED OR DEBARRED FIRMS AT THIS TIME\" (2026-10-15)",
+      "NM state open-data portal: none found (data.nm.gov and opendata.nm.gov do not resolve, 2026-10-15)"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "Joshua A. Reed-Smith",
+     "kind": "person",
+     "source": "New Mexico RLD home inspector and landscape architect licenses",
+     "sourceId": "https://nmrldlpi.my.site.com/bcd/s/rld-public-search?language=en_US",
+     "from": "live lookup, search \"Smith\"",
+     "recordId": "HI0136",
+     "expected": {
+      "kind": "license",
+      "source": "New Mexico RLD home inspector and landscape architect licenses",
+      "licenseNumber": "HI0136",
+      "businessName": null,
+      "person": "Joshua A. Reed-Smith",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "NY",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "Pro Sitework Inc.",
+     "kind": "company",
+     "source": "New York DOL contractor registry (public work)",
+     "sourceId": "https://data.ny.gov/d/i4jv-zkey",
+     "from": "Socrata dataset https://data.ny.gov/d/i4jv-zkey, row 26-64O7O-CR",
+     "recordId": "26-64O7O-CR",
+     "expected": {
+      "kind": "license",
+      "source": "New York DOL contractor registry (public work)",
+      "licenseNumber": "26-64O7O-CR",
+      "businessName": "Pro Sitework Inc.",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Jaid Construction, Inc.",
+     "kind": "company",
+     "source": "New York State non-responsible entities (Executive Order 192)",
+     "sourceId": "https://data.ny.gov/d/jhxt-dfv6",
+     "from": "Socrata dataset https://data.ny.gov/d/jhxt-dfv6, search \"Construction\"",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "New York State non-responsible entities (Executive Order 192)",
+      "id": null,
+      "name": "Jaid Construction, Inc., 94-43 120th St., 1st Floor, South Richmond Hill, NY 11419-1305",
+      "category": "debarment"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "Ian Bednar",
+     "kind": "person",
+     "source": "New York DOL elevator mechanic and inspector licenses",
+     "sourceId": "https://data.ny.gov/d/cxfs-ya8e",
+     "from": "Socrata dataset https://data.ny.gov/d/cxfs-ya8e, row 25-6LCUY-SHEL",
+     "recordId": "25-6LCUY-SHEL",
+     "expected": {
+      "kind": "license",
+      "source": "New York DOL elevator mechanic and inspector licenses",
+      "licenseNumber": "25-6LCUY-SHEL",
+      "businessName": null,
+      "person": "Ian Bednar",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "NC",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "M.B. Haynes Corporation, T/A",
+     "kind": "company",
+     "source": "NC Licensing Board for General Contractors",
+     "sourceId": "https://portal.nclbgc.org/Public/Search",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "L.01245",
+     "expected": {
+      "kind": "license",
+      "source": "NC Licensing Board for General Contractors",
+      "licenseNumber": "L.01245",
+      "businessName": "M.B. Haynes Corporation, T/A",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: NC Licensing Board for General Contractors: disciplinary actions; NC original enforcement",
+     "blocked": [
+      "nclbgc.org (the board's main site, including its disciplinary news): Cloudflare challenge on every page; the portal.nclbgc.org search is used instead",
+      "NCBEEC public matters (/Public/_ShowAccountPublicMatters/): endpoint exists but no populated example was found to verify its layout, so it isn't searched",
+      "NC Secretary of State business registration: bulk data is a paid subscription and the SOS bars automated searching of its online tools",
+      "NC Industrial Commission (workers' comp penalties, stop-work): no published list of penalized or noncompliant employers"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "John B. Smith",
+     "kind": "person",
+     "source": "NC Board of Examiners of Electrical Contractors",
+     "sourceId": "https://arls-public.ncbeec.org/Public/Search",
+     "from": "live lookup, search \"John Smith\"",
+     "recordId": "I.08556",
+     "expected": {
+      "kind": "license",
+      "source": "NC Board of Examiners of Electrical Contractors",
+      "licenseNumber": "I.08556",
+      "businessName": "John B. Smith",
+      "person": "John B. Smith",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Hi-Tech Irrigation Service, Inc.",
+     "kind": "company",
+     "source": "NC Irrigation Contractors' Licensing Board disciplinary actions",
+     "sourceId": "nc-iclb-discipline",
+     "from": "bulk file nc-iclb-discipline, loaded 2026-10-16",
+     "recordId": "U13-032",
+     "expected": {
+      "kind": "enforcement",
+      "source": "NC Irrigation Contractors' Licensing Board disciplinary actions",
+      "id": "U13-032",
+      "name": "Hi-Tech Irrigation Service, Inc.",
+      "category": "discipline"
+     },
+     "picked": "2026-10-16"
+    },
+    {
+     "role": "enforcement",
+     "name": "Cox Lawn, LLC",
+     "kind": "company",
+     "source": "NC Landscape Contractors' Licensing Board enforcement actions",
+     "sourceId": "nc-lclb-enforcement",
+     "from": "bulk file nc-lclb-enforcement, loaded 2026-10-16",
+     "recordId": "22.158.U",
+     "expected": {
+      "kind": "enforcement",
+      "source": "NC Landscape Contractors' Licensing Board enforcement actions",
+      "id": "22.158.U",
+      "name": "Cox Lawn, LLC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-16"
+    }
+   ]
+  },
+  {
+   "state": "ND",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "2 NUTZ CONSTRUCTION",
+     "kind": "company",
+     "source": "North Dakota Secretary of State contractor licenses",
+     "sourceId": "https://firststop.sos.nd.gov/search/contractor",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "35011",
+     "expected": {
+      "kind": "license",
+      "source": "North Dakota Secretary of State contractor licenses",
+      "licenseNumber": "35011",
+      "businessName": "2 NUTZ CONSTRUCTION",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: North Dakota Secretary of State business entity status; ND original enforcement",
+     "blocked": [
+      "ND Secretary of State bulk lists: contractor and business lists are sold through 'Data List Requests'; only registered agents and lobbyists are free",
+      "ND Secretary of State contractor search takes a name or SOS control number only, so contractor licenses can't be searched by license number",
+      "ND State Electrical Board contractor search returns name, business and city only (no license number or dates)"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "AUSTIN SMITH",
+     "kind": "person",
+     "source": "North Dakota State Electrical Board",
+     "sourceId": "https://www.ndseb.com/search-1/lookup-a-licensedorregistered-electrician/",
+     "from": "live lookup, search \"Smith\"",
+     "recordId": "A 16547",
+     "expected": {
+      "kind": "license",
+      "source": "North Dakota State Electrical Board electricians",
+      "licenseNumber": "A 16547",
+      "businessName": null,
+      "person": "AUSTIN SMITH",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Tri City Building Services",
+     "kind": "company",
+     "source": "North Dakota Attorney General cease and desist orders (unlicensed contractors)",
+     "sourceId": "nd-ag-cease-desist",
+     "from": "bulk file nd-ag-cease-desist, loaded 2026-10-16",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "North Dakota Attorney General cease and desist orders (unlicensed contractors)",
+      "id": null,
+      "name": "Tri City Building Services",
+      "category": "discipline"
+     },
+     "picked": "2026-10-16"
+    }
+   ]
+  },
+  {
+   "state": "OH",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "M C SERVICES INC",
+     "kind": "company",
+     "source": "Ohio Construction Industry Licensing Board contractor licenses",
+     "sourceId": "oh-ocilb",
+     "from": "bulk file oh-ocilb, loaded 2026-10-15",
+     "recordId": "EL.19185",
+     "expected": {
+      "kind": "license",
+      "source": "Ohio Construction Industry Licensing Board contractor licenses",
+      "licenseNumber": "EL.19185",
+      "businessName": "M C SERVICES INC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "ANTHONY PATRICK",
+     "kind": "person",
+     "source": "Ohio Construction Industry Licensing Board contractor licenses",
+     "sourceId": "oh-ocilb",
+     "from": "bulk file oh-ocilb, loaded 2026-10-15",
+     "recordId": "EL.35300",
+     "expected": {
+      "kind": "license",
+      "source": "Ohio Construction Industry Licensing Board contractor licenses",
+      "licenseNumber": "EL.35300",
+      "businessName": "TNT ELECTRIC",
+      "person": "ANTHONY PATRICK",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Pave-Way Construction Company",
+     "kind": "company",
+     "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+     "sourceId": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+     "from": "live search \"Construction\"",
+     "recordId": "10000082",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Ohio Attorney General Public Inspection File (consumer-law court rulings)",
+      "id": "10000082",
+      "name": "Pave-Way Construction Company",
+      "category": "court_case"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "OK",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "DIVERSIFIED CONSTRUCTION SOLUTIONS",
+     "kind": "company",
+     "source": "Oklahoma Construction Industries Board roofing contractor registrations",
+     "sourceId": "ok-cib-roofing",
+     "from": "bulk file ok-cib-roofing, loaded 2026-10-15",
+     "recordId": "80004199",
+     "expected": {
+      "kind": "license",
+      "source": "Oklahoma Construction Industries Board roofing contractor registrations",
+      "licenseNumber": "80004199",
+      "businessName": "DIVERSIFIED CONSTRUCTION SOLUTIONS",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: ok-cib-roofing (discipline); ok-odol-alarm-companies (discipline); ok-odol-alarm-individuals (discipline); OK original enforcement",
+     "blocked": [
+      "CIB electrical, plumbing and mechanical license search (cibverify.ok.gov GL Suite licensee search, still the link on oklahoma.gov/cib 'Are they licensed?'): answered HTTP 503 with Retry-After 3600 for over an hour early on 2026-10-15 (tower1 and vb11); retried 2026-10-15 06:47Z and 06:53Z: port 443 refused the connection from tower1 and vb11, and plain http answered HTTP 503. The board's newer verify.cib.hbesystems.com app searches roofing and CEUs only",
+      "CIB disciplinary actions: the board's site (oklahoma.gov/cib) publishes no list or file of orders",
+      "data.ok.gov: no CIB, contractor, debarment or business-entity dataset newer than 2019"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "RANDY E HOLT",
+     "kind": "person",
+     "source": "Oklahoma Construction Industries Board roofing contractor registrations",
+     "sourceId": "ok-cib-roofing",
+     "from": "bulk file ok-cib-roofing, loaded 2026-10-15",
+     "recordId": "80007235",
+     "expected": {
+      "kind": "license",
+      "source": "Oklahoma Construction Industries Board roofing contractor registrations",
+      "licenseNumber": "80007235",
+      "businessName": "HOLT CONSTRUCTION",
+      "person": "RANDY E HOLT",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "OR",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "GREEN GARDEN LLC",
+     "kind": "company",
+     "source": "Oregon Construction Contractors Board (active licenses)",
+     "sourceId": "https://data.oregon.gov/d/g77e-6bhs",
+     "from": "Socrata dataset https://data.oregon.gov/d/g77e-6bhs, row 263475 (the publisher lists no status: a list of current licenses)",
+     "recordId": "263475",
+     "expected": {
+      "kind": "license",
+      "source": "Oregon Construction Contractors Board (active licenses)",
+      "licenseNumber": "263475",
+      "businessName": "GREEN GARDEN LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Tovar Flooring, LLC",
+     "kind": "company",
+     "source": "Oregon BOLI prevailing wage: ineligible contractors and case closure letters",
+     "sourceId": "or-boli-pwr",
+     "from": "bulk file or-boli-pwr, loaded 2026-10-15",
+     "recordId": "25-1344",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Oregon BOLI prevailing-wage case closure letters",
+      "id": "25-1344",
+      "name": "Tovar Flooring, LLC",
+      "category": "wage"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "MICHAEL S WIGGINS",
+     "kind": "person",
+     "source": "Oregon Building Codes Division trade licenses",
+     "sourceId": "https://data.oregon.gov/d/vhbr-cuaq",
+     "from": "Socrata dataset https://data.oregon.gov/d/vhbr-cuaq, row 6130CL2",
+     "recordId": "6130CL2",
+     "expected": {
+      "kind": "license",
+      "source": "Oregon Building Codes Division trade licenses",
+      "licenseNumber": "6130CL2",
+      "businessName": null,
+      "person": "MICHAEL S WIGGINS",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "PA",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "Design Professional",
+     "kind": "company",
+     "source": "Philadelphia L&I trade licenses",
+     "sourceId": "pa-philadelphia",
+     "from": "bulk file pa-philadelphia, loaded 2026-10-15",
+     "recordId": "055740",
+     "expected": {
+      "kind": "license",
+      "source": "Philadelphia L&I trade licenses",
+      "licenseNumber": "055740",
+      "businessName": "Design Professional",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "ETC Contracting, LLC",
+     "kind": "company",
+     "source": "Pennsylvania L&I Prevailing Wage Act debarments",
+     "sourceId": "pa-dli-debarments",
+     "from": "bulk file pa-dli-debarments, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "Pennsylvania L&I Prevailing Wage Act debarments",
+      "id": null,
+      "name": "ETC Contracting, LLC",
+      "category": "debarment"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "MICHAEL SCHEB",
+     "kind": "person",
+     "source": "Philadelphia L&I trade licenses",
+     "sourceId": "pa-philadelphia",
+     "from": "bulk file pa-philadelphia, loaded 2026-10-15",
+     "recordId": "26036",
+     "expected": {
+      "kind": "license",
+      "source": "Philadelphia L&I trade licenses",
+      "licenseNumber": "26036",
+      "businessName": null,
+      "person": "MICHAEL SCHEB",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "RI",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "C THREE ARCHITECTURE AND DESIGN, P.C.",
+     "kind": "company",
+     "source": "Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",
+     "sourceId": "ri-dbr-rosters",
+     "from": "bulk file ri-dbr-rosters, loaded 2026-10-15",
+     "recordId": "ARC.0021083-COA",
+     "expected": {
+      "kind": "license",
+      "source": "Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",
+      "licenseNumber": "ARC.0021083-COA",
+      "businessName": "C THREE ARCHITECTURE AND DESIGN, P.C.",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "PETRUCCI CONSTRUCTION CO INC",
+     "kind": "company",
+     "source": "Rhode Island DLT Professional Regulation violations",
+     "sourceId": "Rhode Island DLT Professional Regulation violations",
+     "from": "live search \"Construction\"",
+     "recordId": "6586",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Rhode Island DLT Professional Regulation violations",
+      "id": "6586",
+      "name": "PETRUCCI CONSTRUCTION CO INC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "Michael Lawlor",
+     "kind": "person",
+     "source": "Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",
+     "sourceId": "ri-dbr-rosters",
+     "from": "bulk file ri-dbr-rosters, loaded 2026-10-15",
+     "recordId": "PE.0012314",
+     "expected": {
+      "kind": "license",
+      "source": "Rhode Island DBR rosters (architects, engineers, land surveyors, landscape architects, solar retailers)",
+      "licenseNumber": "PE.0012314",
+      "businessName": null,
+      "person": "Michael Lawlor",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "SC",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No registered source publishes a business holding an active license for SC",
+     "blocked": [
+      "SC DES environmental enforcement action reports (the monthly PDFs linked from des.sc.gov \"Environmental Enforcement Actions\"; was sc-des-enforcement): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\" (coordinator's decision, 2026-10-15)",
+      "SC LLR licensee lookup (verify.llronline.com/LicLookup/Contractors/Contractor.aspx?div=69 for the Contractor's Licensing Board's general and mechanical contractors, Resbu/Resbu.aspx?div=46 for the Residential Builders Commission, BurgFire for burglar/fire/sprinkler): a g-recaptcha widget on every search form, the Find button hidden until it is solved; rechecked 2026-10-15",
+      "SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 and 46, /OnlineVerificationBulk): eservice.llr.sc.gov/robots.txt is \"User-agent: * / Disallow: /\"; rechecked 2026-10-15",
+      "SC Contractor's Licensing Board meeting minutes (llr.sc.gov/clb/minutes, robots-allowed PDFs): disciplinary hearings are listed by case number only (\"In accordance with Board confidentiality statutes, the hearing was closed\"), no respondent named; checked the 2026-07-30 minutes",
+      "SC LLR license rosters: sold by mailed request ($10 check per roster with a signed Family Privacy Protection Act statement, llr.sc.gov/AboutUs/MediaCenter/pidocs/Statement_Compliance.pdf, linked as 'Licensee List Request' from llr.sc.gov/clb); needs the owner",
+      "SC DES Asbestos Contractors and Consultants Search (apps.des.sc.gov/AsbestosContractorsAndConsultants, with free CSV exports /CSV and /CSV/<type>: ~200 contractors, ~870 consultants and air samplers on 2026-10-15) and the UST Class I/II certified contractors PDF (des.sc.gov List_of_Certified_Contractors_August2026.pdf): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\"",
+      "SCDOT prequalified prime contractors (apps.scdot.org/powerbiexport, a free CSV export refreshed daily, ~425 firms on 2026-10-15): not used, because scdot.org/disclaimer.html says \"You may not modify, publish, transmit, display, participate in the transfer or sale, create derivative works or in any way exploit, any of the content, in whole or in part, without the express written permission of SCDOT\"",
+      "SC Secretary of State business entities (businessfilings.sc.gov/BusinessFiling/Entity/Search): g-recaptcha on the search form; rechecked 2026-10-15",
+      "SC DES ArcGIS hub: private (and on a des.sc.gov service, under the same terms)",
+      "SC Workers' Compensation Commission and SC Materials Management Office: no published list of penalized employers or debarred vendors (decisions are single PDFs)"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: SC original enforcement",
+     "blocked": [
+      "SC DES environmental enforcement action reports (the monthly PDFs linked from des.sc.gov \"Environmental Enforcement Actions\"; was sc-des-enforcement): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\" (coordinator's decision, 2026-10-15)",
+      "SC LLR licensee lookup (verify.llronline.com/LicLookup/Contractors/Contractor.aspx?div=69 for the Contractor's Licensing Board's general and mechanical contractors, Resbu/Resbu.aspx?div=46 for the Residential Builders Commission, BurgFire for burglar/fire/sprinkler): a g-recaptcha widget on every search form, the Find button hidden until it is solved; rechecked 2026-10-15",
+      "SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 and 46, /OnlineVerificationBulk): eservice.llr.sc.gov/robots.txt is \"User-agent: * / Disallow: /\"; rechecked 2026-10-15",
+      "SC Contractor's Licensing Board meeting minutes (llr.sc.gov/clb/minutes, robots-allowed PDFs): disciplinary hearings are listed by case number only (\"In accordance with Board confidentiality statutes, the hearing was closed\"), no respondent named; checked the 2026-07-30 minutes",
+      "SC LLR license rosters: sold by mailed request ($10 check per roster with a signed Family Privacy Protection Act statement, llr.sc.gov/AboutUs/MediaCenter/pidocs/Statement_Compliance.pdf, linked as 'Licensee List Request' from llr.sc.gov/clb); needs the owner",
+      "SC DES Asbestos Contractors and Consultants Search (apps.des.sc.gov/AsbestosContractorsAndConsultants, with free CSV exports /CSV and /CSV/<type>: ~200 contractors, ~870 consultants and air samplers on 2026-10-15) and the UST Class I/II certified contractors PDF (des.sc.gov List_of_Certified_Contractors_August2026.pdf): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\"",
+      "SCDOT prequalified prime contractors (apps.scdot.org/powerbiexport, a free CSV export refreshed daily, ~425 firms on 2026-10-15): not used, because scdot.org/disclaimer.html says \"You may not modify, publish, transmit, display, participate in the transfer or sale, create derivative works or in any way exploit, any of the content, in whole or in part, without the express written permission of SCDOT\"",
+      "SC Secretary of State business entities (businessfilings.sc.gov/BusinessFiling/Entity/Search): g-recaptcha on the search form; rechecked 2026-10-15",
+      "SC DES ArcGIS hub: private (and on a des.sc.gov service, under the same terms)",
+      "SC Workers' Compensation Commission and SC Materials Management Office: no published list of penalized employers or debarred vendors (decisions are single PDFs)"
+     ]
+    },
+    {
+     "role": "person",
+     "null": true,
+     "reason": "No registered source publishes an individual license holder for SC",
+     "blocked": [
+      "SC DES environmental enforcement action reports (the monthly PDFs linked from des.sc.gov \"Environmental Enforcement Actions\"; was sc-des-enforcement): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\" (coordinator's decision, 2026-10-15)",
+      "SC LLR licensee lookup (verify.llronline.com/LicLookup/Contractors/Contractor.aspx?div=69 for the Contractor's Licensing Board's general and mechanical contractors, Resbu/Resbu.aspx?div=46 for the Residential Builders Commission, BurgFire for burglar/fire/sprinkler): a g-recaptcha widget on every search form, the Find button hidden until it is solved; rechecked 2026-10-15",
+      "SC LLR board orders and bulk verification (eservice.llr.sc.gov/PublicOrdersWeb/?divisionId=69 and 46, /OnlineVerificationBulk): eservice.llr.sc.gov/robots.txt is \"User-agent: * / Disallow: /\"; rechecked 2026-10-15",
+      "SC Contractor's Licensing Board meeting minutes (llr.sc.gov/clb/minutes, robots-allowed PDFs): disciplinary hearings are listed by case number only (\"In accordance with Board confidentiality statutes, the hearing was closed\"), no respondent named; checked the 2026-07-30 minutes",
+      "SC LLR license rosters: sold by mailed request ($10 check per roster with a signed Family Privacy Protection Act statement, llr.sc.gov/AboutUs/MediaCenter/pidocs/Statement_Compliance.pdf, linked as 'Licensee List Request' from llr.sc.gov/clb); needs the owner",
+      "SC DES Asbestos Contractors and Consultants Search (apps.des.sc.gov/AsbestosContractorsAndConsultants, with free CSV exports /CSV and /CSV/<type>: ~200 contractors, ~870 consultants and air samplers on 2026-10-15) and the UST Class I/II certified contractors PDF (des.sc.gov List_of_Certified_Contractors_August2026.pdf): not used, because des.sc.gov's Website Accessibility and Policies page says \"You may not: (1) reproduce, adapt, modify, distribute, publicly perform or display, transmit, or otherwise copy or use any part of this site except as specifically permitted by SCDES in writing\"",
+      "SCDOT prequalified prime contractors (apps.scdot.org/powerbiexport, a free CSV export refreshed daily, ~425 firms on 2026-10-15): not used, because scdot.org/disclaimer.html says \"You may not modify, publish, transmit, display, participate in the transfer or sale, create derivative works or in any way exploit, any of the content, in whole or in part, without the express written permission of SCDOT\"",
+      "SC Secretary of State business entities (businessfilings.sc.gov/BusinessFiling/Entity/Search): g-recaptcha on the search form; rechecked 2026-10-15",
+      "SC DES ArcGIS hub: private (and on a des.sc.gov service, under the same terms)",
+      "SC Workers' Compensation Commission and SC Materials Management Office: no published list of penalized employers or debarred vendors (decisions are single PDFs)"
+     ]
+    }
+   ]
+  },
+  {
+   "state": "SD",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No usable record of a business holding an active license found in: sd-plumbers; sd-specialty; sd-septic",
+     "blocked": [
+      "South Dakota Electrical Commission license portal (sdec.portalus.thentiacloud.net, Thentia; electrical contractors and electricians): re-checked 2026-10-15, robots.txt 'User-agent: * / Disallow: /'. dlr.sd.gov/electrical publishes no licensee or contractor list",
+      "SD Plumbing Commission: no company list; its PLUMBING CONTRACTOR and SEWER AND WATER CONTRACTOR licenses are issued to people and are in the lists above (dlr.sd.gov/plumbing/consumer_info.aspx, re-checked 2026-10-15)",
+      "Department of Revenue contractor's excise tax licenses: no public list or lookup (dor.sd.gov/businesses/taxes/contractors-excise-tax; the tax license application at apps.sd.gov/rv23cedar is an account system)",
+      "Electrical and Plumbing commission discipline: only meeting documents on boardsandcommissions.sd.gov (BoardID=35, 77), no discipline list",
+      "South Dakota Secretary of State business search (sosenterprise.sd.gov): reCAPTCHA",
+      "SD Plumbing Commission lists carry no license numbers, addresses or phones, so they can't be searched by those"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "name": "BLACK HILLS AUTOMOTIVE TECHNICIANS INC",
+     "kind": "company",
+     "source": "South Dakota Department of Revenue business tax delinquent report",
+     "sourceId": "sd-dor-tax-delinquent",
+     "from": "bulk file sd-dor-tax-delinquent, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "South Dakota Department of Revenue business tax delinquent report",
+      "id": null,
+      "name": "BLACK HILLS AUTOMOTIVE TECHNICIANS INC",
+      "category": "tax_lien"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "DAVID W WOODRING",
+     "kind": "person",
+     "source": "South Dakota Plumbing Commission licensed plumbers",
+     "sourceId": "sd-plumbers",
+     "from": "bulk file sd-plumbers, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "license",
+      "source": "South Dakota Plumbing Commission licensed plumbers",
+      "licenseNumber": null,
+      "businessName": null,
+      "person": "DAVID W WOODRING",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "TN",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "W & W CONSTRUCTION",
+     "kind": "company",
+     "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+     "sourceId": "https://search.cloud.commerce.tn.gov/",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "40187",
+     "expected": {
+      "kind": "license",
+      "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+      "licenseNumber": "40187",
+      "businessName": "W & W CONSTRUCTION",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Robert Lowe d/b/a Robert's Ice",
+     "kind": "company",
+     "source": "TDEC enforcement cases",
+     "sourceId": "tn-tdec-enforcement",
+     "from": "bulk file tn-tdec-enforcement, loaded 2026-10-15",
+     "recordId": "APC08-0152",
+     "expected": {
+      "kind": "enforcement",
+      "source": "TDEC enforcement cases (Department of Environment and Conservation)",
+      "id": "APC08-0152",
+      "name": "Robert Lowe d/b/a Robert's Ice",
+      "category": "environmental"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "JOHN H SMITH JR",
+     "kind": "person",
+     "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+     "sourceId": "https://search.cloud.commerce.tn.gov/",
+     "from": "live lookup, search \"John Smith\"",
+     "recordId": "56358",
+     "expected": {
+      "kind": "license",
+      "source": "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)",
+      "licenseNumber": "56358",
+      "businessName": null,
+      "person": "JOHN H SMITH JR",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "TX",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "DFW HOME SERVICES LLC",
+     "kind": "company",
+     "source": "Texas State Board of Plumbing Examiners licensees",
+     "sourceId": "tx-tsbpe",
+     "from": "bulk file tx-tsbpe, loaded 2026-10-15",
+     "recordId": "36161",
+     "expected": {
+      "kind": "license",
+      "source": "Texas State Board of Plumbing Examiners licensees",
+      "licenseNumber": "36161",
+      "businessName": "DFW HOME SERVICES LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "PLUS 1 CONSTRUCTION SERVICES LLC",
+     "kind": "company",
+     "source": "TCEQ administrative orders",
+     "sourceId": "TCEQ administrative orders",
+     "from": "live search \"Construction\"",
+     "recordId": "2024-0788-MLM-E",
+     "expected": {
+      "kind": "enforcement",
+      "source": "TCEQ administrative orders",
+      "id": "2024-0788-MLM-E",
+      "name": "PLUS 1 CONSTRUCTION SERVICES LLC",
+      "category": "environmental"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "GEARY D. WINEGEART",
+     "kind": "person",
+     "source": "Texas State Board of Plumbing Examiners licensees",
+     "sourceId": "tx-tsbpe",
+     "from": "bulk file tx-tsbpe, loaded 2026-10-15",
+     "recordId": "44434",
+     "expected": {
+      "kind": "license",
+      "source": "Texas State Board of Plumbing Examiners licensees",
+      "licenseNumber": "44434",
+      "businessName": null,
+      "person": "GEARY D. WINEGEART",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "UT",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "Crestline Construction LLC",
+     "kind": "company",
+     "source": "Utah DOPL Construction Business Registry (active, opted-in licensees only)",
+     "sourceId": "https://services.commerce.utah.gov/cbr/",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "14228966-5501",
+     "expected": {
+      "kind": "license",
+      "source": "Utah DOPL Construction Business Registry (active, opted-in licensees only)",
+      "licenseNumber": "14228966-5501",
+      "businessName": "Crestline Construction LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Rudy's Construction LLC",
+     "kind": "company",
+     "source": "Utah DOPL agency and disciplinary actions",
+     "sourceId": "Utah DOPL agency and disciplinary actions",
+     "from": "live search \"Construction\"",
+     "recordId": "Citation 47214",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Utah DOPL agency and disciplinary actions",
+      "id": "Citation 47214",
+      "name": "Rudy's Construction LLC",
+      "category": "discipline"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "Ashton David Smith",
+     "kind": "person",
+     "source": "Utah DOPL Construction Business Registry (active, opted-in licensees only)",
+     "sourceId": "https://services.commerce.utah.gov/cbr/",
+     "from": "live lookup, search \"Smith\"",
+     "recordId": "12769819-5505",
+     "expected": {
+      "kind": "license",
+      "source": "Utah DOPL Construction Business Registry (active, opted-in licensees only)",
+      "licenseNumber": "12769819-5505",
+      "businessName": null,
+      "person": "Ashton David Smith",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "VT",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "LeBlanc Custom Homes LLC",
+     "kind": "company",
+     "source": "Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
+     "sourceId": "vt-opr-rosters",
+     "from": "bulk file vt-opr-rosters, loaded 2026-10-15",
+     "recordId": "174.0000251",
+     "expected": {
+      "kind": "license",
+      "source": "Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
+      "licenseNumber": "174.0000251",
+      "businessName": "LeBlanc Custom Homes LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: vt-opr-rosters (discipline); VT original enforcement",
+     "blocked": [
+      "Secretary of State business search (bizfilings.vermont.gov): an Angular app over api.bizfilings.vermont.gov; not built yet (the path tried led to the account login)",
+      "OPR conduct decisions (Zoho Creator search) and monthly discipline reports (PDF): almost all are against individual licensees, which reports don't search for enforcement (companies only)"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "Michael R Hall",
+     "kind": "person",
+     "source": "Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
+     "sourceId": "vt-opr-rosters",
+     "from": "bulk file vt-opr-rosters, loaded 2026-10-15",
+     "recordId": "003.0002959",
+     "expected": {
+      "kind": "license",
+      "source": "Vermont Office of Professional Regulation rosters (residential contractors, architects, engineers, surveyors, well drillers)",
+      "licenseNumber": "003.0002959",
+      "businessName": null,
+      "person": "Michael R Hall",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "VA",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "MICHAEL C HALL",
+     "kind": "company",
+     "source": "Virginia DPOR Board for Contractors licenses (contractors and tradesmen)",
+     "sourceId": "va-dpor-contractors",
+     "from": "bulk file va-dpor-contractors, loaded 2026-10-15",
+     "recordId": "2705018557",
+     "expected": {
+      "kind": "license",
+      "source": "Virginia DPOR Board for Contractors licenses (contractors and tradesmen)",
+      "licenseNumber": "2705018557",
+      "businessName": "MICHAEL C HALL",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: va-dpor-contractors (discipline); va-dpor-apelscidla (discipline); va-dpor-alhi (discipline); va-norfolk-contractors (discipline); VA original enforcement",
+     "blocked": [
+      "DPOR License Lookup (dporweb.dpor.virginia.gov/LicenseLookup), which also carries board orders: reCAPTCHA on the search",
+      "DPOR disciplinary orders: no list or download; published only per licensee in the CAPTCHA lookup and in board minutes on Town Hall (PDF)",
+      "eVA Inactive Vendor List (DGS debarred/enjoined contractors, logi.cgieva.com Report9020): robots.txt Disallow: /",
+      "SCC business entities on data.virginia.gov (corporation, llc-limited-liability-company): robots.txt disallows /api/ and /datastore/* (checked 2026-10-15), so the datastore search is not used; the datasets' .xlsx downloads are allowed but not loaded yet",
+      "SCC Clerk's Information System bulk data: paid subscription ($1,000/month per the SCC page); only the dated open-data copies are used",
+      "data.virginia.gov SCC Lien Details: no debtor names, only filing numbers"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "SHANE W PULLER",
+     "kind": "person",
+     "source": "Virginia DPOR Board for Contractors licenses (contractors and tradesmen)",
+     "sourceId": "va-dpor-contractors",
+     "from": "bulk file va-dpor-contractors, loaded 2026-10-15",
+     "recordId": "2710022902",
+     "expected": {
+      "kind": "license",
+      "source": "Virginia DPOR Board for Contractors licenses (contractors and tradesmen)",
+      "licenseNumber": "2710022902",
+      "businessName": null,
+      "person": "SHANE W PULLER",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "WA",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "A-1 REGLAZING LLC",
+     "kind": "company",
+     "source": "Washington L&I contractor licenses",
+     "sourceId": "https://data.wa.gov/d/m8qx-ubtq",
+     "from": "Socrata dataset https://data.wa.gov/d/m8qx-ubtq, row A1REGRL774ON",
+     "recordId": "A1REGRL774ON",
+     "expected": {
+      "kind": "license",
+      "source": "Washington L&I contractor licenses",
+      "licenseNumber": "A1REGRL774ON",
+      "businessName": "A-1 REGLAZING LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "name": "Tacoma Architectural Metals, LLC",
+     "kind": "company",
+     "source": "Washington L&I debarred contractors (public works)",
+     "sourceId": "wa-lni-debarred",
+     "from": "bulk file wa-lni-debarred, loaded 2026-10-15",
+     "recordId": "TACOMAM944DG",
+     "expected": {
+      "kind": "enforcement",
+      "source": "Washington L&I debarred contractors (public works)",
+      "id": "TACOMAM944DG",
+      "name": "Tacoma Architectural Metals, LLC",
+      "category": "debarment"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "JEFFREY DAVID JEWETT",
+     "kind": "person",
+     "source": "Washington L&I contractor licenses",
+     "sourceId": "https://data.wa.gov/d/m8qx-ubtq",
+     "from": "Socrata dataset https://data.wa.gov/d/m8qx-ubtq, row 5THSTS*782MF",
+     "recordId": "5THSTS*782MF",
+     "expected": {
+      "kind": "license",
+      "source": "Washington L&I contractor licenses",
+      "licenseNumber": "5THSTS*782MF",
+      "businessName": "5TH STREET",
+      "person": "JEFFREY DAVID JEWETT",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "WV",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No usable record of a business holding an active license found in: WV State Fire Marshal electrician licenses",
+     "blocked": [
+      "WV Contractor Licensing Board license search and board actions (wvclboard.wv.gov/verify, linked as \"Contractor License Search\" from labor.wv.gov/database-search; /about/actions.asp): robots.txt \"User-agent: * / Disallow: /\" (re-checked 2026-10-15; http:// and www. redirect to the same file)",
+      "WV Division of Labor certified plumbers, HVAC technicians, manufactured-housing licensees, elevator and amusement-ride inspectors and registered service companies (www.wvlabor.com/new_searches/*.cfm, linked from labor.wv.gov/database-search): robots.txt answers HTTP 500 (2026-10-15), read as a refusal of the host (RFC 9309); https:// does not connect",
+      "WV Purchasing Division debarred vendors (purchasing.wv.gov, and the same list on the Division's legacy host www.state.wv.us/admin/purchase/debar.html; was wv-purchasing-debarred): purchasing.wv.gov's robots.txt is \"User-Agent: * / Disallow: /\", and reading the same list from the legacy host would be a side door around that refusal (coordinator's decision, 2026-10-15)",
+      "WV Secretary of State business search (apps.sos.wv.gov/business/corporations): the form carries bot-trap fields, treated as an anti-bot measure; bulk data is a paid subscription"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "name": "PRO MED ANALYSIS LLC",
+     "kind": "company",
+     "source": "WV Employer Violator System (workers' comp default)",
+     "sourceId": "wv-oic-evs",
+     "from": "bulk file wv-oic-evs, loaded 2026-10-15",
+     "recordId": null,
+     "expected": {
+      "kind": "enforcement",
+      "source": "WV Insurance Commissioner Employer Violator System (workers' comp default)",
+      "id": null,
+      "name": "PRO MED ANALYSIS LLC",
+      "category": "debarment"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "person",
+     "name": "JOHN SMITH JR",
+     "kind": "person",
+     "source": "WV State Fire Marshal electrician licenses",
+     "sourceId": "https://sfm-permit-public.wvoasis.gov/publicdata/LicenseeSearch",
+     "from": "live lookup, search \"John Smith\"",
+     "recordId": "LV4768JSRENC0725",
+     "expected": {
+      "kind": "license",
+      "source": "WV State Fire Marshal electrician licenses",
+      "licenseNumber": "LV4768JSRENC0725",
+      "businessName": null,
+      "person": "JOHN SMITH JR",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  },
+  {
+   "state": "WI",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "null": true,
+     "reason": "No registered source publishes a business holding an active license for WI",
+     "blocked": [
+      "Wisconsin DNR drilling and pump-installing service directories (dnr.wisconsin.gov/topic/Wells/Contacts.html, .xlsx; was wi-dnr-wells): not used, because DNR's Acceptable Use Policy (dnr.wisconsin.gov/legal/acceptableuse, read 2026-10-15) says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Department of Natural Resources webpages and linked agency webpages. ... For copy or use of information on the department website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "Wisconsin DHS certified lead and asbestos companies (www.dhs.wisconsin.gov/lead/hire-a-contractor.htm and /asbestos/contractors.htm, .xlsx; was wi-dhs-abatement): not used, because those pages' Policies link is the Wisconsin.gov Legal/Acceptable Use page (www.wisconsin.gov/Pages/Policies.aspx, read 2026-10-15), which says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Wisconsin.gov and linked agency Webpages. ... For copy or use of information on the State of Wisconsin website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "WisDOT debarred, suspended and ineligible contractors (wisconsindot.gov/hccidocs/debar.pdf) and the WI DOA debarment list: not used, because WisDOT's Acceptable Use Policy (wisconsindot.gov/Pages/global-footer/Acceptable-use-policy.aspx, read 2026-10-15) says \"This website, and the pages and material available on it, are for the noncommercial use of the general public\", and DOA's pages carry the Wisconsin.gov terms quoted above",
+      "DSPS credential lookup (license.wi.gov, the LicensE platform): Cloudflare blocks our bot (\"Sorry, you have been blocked\"); dwelling contractors, qualifiers, plumbers, electricians and HVAC are not searchable",
+      "DSPS old lookup and Reports of Decisions (online.drl.wi.gov): 403 with a CAPTCHA page",
+      "DSPS Credential/License List Purchasing (dspslicenselist.wi.gov): a paid list service, and the host does not resolve from here",
+      "Department of Revenue delinquent taxpayer list: its data service (ww2.revenue.wi.gov) has robots.txt Disallow: /",
+      "DWD worker-misclassification stop-work orders: no published list found"
+     ]
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: WI original enforcement",
+     "blocked": [
+      "Wisconsin DNR drilling and pump-installing service directories (dnr.wisconsin.gov/topic/Wells/Contacts.html, .xlsx; was wi-dnr-wells): not used, because DNR's Acceptable Use Policy (dnr.wisconsin.gov/legal/acceptableuse, read 2026-10-15) says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Department of Natural Resources webpages and linked agency webpages. ... For copy or use of information on the department website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "Wisconsin DHS certified lead and asbestos companies (www.dhs.wisconsin.gov/lead/hire-a-contractor.htm and /asbestos/contractors.htm, .xlsx; was wi-dhs-abatement): not used, because those pages' Policies link is the Wisconsin.gov Legal/Acceptable Use page (www.wisconsin.gov/Pages/Policies.aspx, read 2026-10-15), which says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Wisconsin.gov and linked agency Webpages. ... For copy or use of information on the State of Wisconsin website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "WisDOT debarred, suspended and ineligible contractors (wisconsindot.gov/hccidocs/debar.pdf) and the WI DOA debarment list: not used, because WisDOT's Acceptable Use Policy (wisconsindot.gov/Pages/global-footer/Acceptable-use-policy.aspx, read 2026-10-15) says \"This website, and the pages and material available on it, are for the noncommercial use of the general public\", and DOA's pages carry the Wisconsin.gov terms quoted above",
+      "DSPS credential lookup (license.wi.gov, the LicensE platform): Cloudflare blocks our bot (\"Sorry, you have been blocked\"); dwelling contractors, qualifiers, plumbers, electricians and HVAC are not searchable",
+      "DSPS old lookup and Reports of Decisions (online.drl.wi.gov): 403 with a CAPTCHA page",
+      "DSPS Credential/License List Purchasing (dspslicenselist.wi.gov): a paid list service, and the host does not resolve from here",
+      "Department of Revenue delinquent taxpayer list: its data service (ww2.revenue.wi.gov) has robots.txt Disallow: /",
+      "DWD worker-misclassification stop-work orders: no published list found"
+     ]
+    },
+    {
+     "role": "person",
+     "null": true,
+     "reason": "No registered source publishes an individual license holder for WI",
+     "blocked": [
+      "Wisconsin DNR drilling and pump-installing service directories (dnr.wisconsin.gov/topic/Wells/Contacts.html, .xlsx; was wi-dnr-wells): not used, because DNR's Acceptable Use Policy (dnr.wisconsin.gov/legal/acceptableuse, read 2026-10-15) says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Department of Natural Resources webpages and linked agency webpages. ... For copy or use of information on the department website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "Wisconsin DHS certified lead and asbestos companies (www.dhs.wisconsin.gov/lead/hire-a-contractor.htm and /asbestos/contractors.htm, .xlsx; was wi-dhs-abatement): not used, because those pages' Policies link is the Wisconsin.gov Legal/Acceptable Use page (www.wisconsin.gov/Pages/Policies.aspx, read 2026-10-15), which says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Wisconsin.gov and linked agency Webpages. ... For copy or use of information on the State of Wisconsin website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+      "WisDOT debarred, suspended and ineligible contractors (wisconsindot.gov/hccidocs/debar.pdf) and the WI DOA debarment list: not used, because WisDOT's Acceptable Use Policy (wisconsindot.gov/Pages/global-footer/Acceptable-use-policy.aspx, read 2026-10-15) says \"This website, and the pages and material available on it, are for the noncommercial use of the general public\", and DOA's pages carry the Wisconsin.gov terms quoted above",
+      "DSPS credential lookup (license.wi.gov, the LicensE platform): Cloudflare blocks our bot (\"Sorry, you have been blocked\"); dwelling contractors, qualifiers, plumbers, electricians and HVAC are not searchable",
+      "DSPS old lookup and Reports of Decisions (online.drl.wi.gov): 403 with a CAPTCHA page",
+      "DSPS Credential/License List Purchasing (dspslicenselist.wi.gov): a paid list service, and the host does not resolve from here",
+      "Department of Revenue delinquent taxpayer list: its data service (ww2.revenue.wi.gov) has robots.txt Disallow: /",
+      "DWD worker-misclassification stop-work orders: no published list found"
+     ]
+    }
+   ]
+  },
+  {
+   "state": "WY",
+   "picked": "2026-10-15",
+   "subjects": [
+    {
+     "role": "company",
+     "name": "4Square Construction LLC",
+     "kind": "company",
+     "source": "Wyoming Fire Prevention & Electrical Safety licenses",
+     "sourceId": "https://wyelectrician.imagetrendlicense.com/lms/public/portal#/lookup",
+     "from": "live lookup, search \"Construction\"",
+     "recordId": "C-10447",
+     "expected": {
+      "kind": "license",
+      "source": "Wyoming Fire Prevention & Electrical Safety licenses",
+      "licenseNumber": "C-10447",
+      "businessName": "4Square Construction LLC",
+      "matchedOn": "business"
+     },
+     "picked": "2026-10-15"
+    },
+    {
+     "role": "enforcement",
+     "null": true,
+     "reason": "No usable record of a company with an enforcement or discipline record found in: WY original enforcement",
+     "blocked": [
+      "Secretary of State business search (wyobiz.wyo.gov): a JavaScript bot challenge on every page",
+      "Electrical licensing complaints: hidden by the portal (hide_complaints)"
+     ]
+    },
+    {
+     "role": "person",
+     "name": "Joshua Hauser-Smith",
+     "kind": "person",
+     "source": "Wyoming Fire Prevention & Electrical Safety licenses",
+     "sourceId": "https://wyelectrician.imagetrendlicense.com/lms/public/portal#/lookup",
+     "from": "live lookup, search \"Smith\"",
+     "recordId": "A-43593",
+     "expected": {
+      "kind": "license",
+      "source": "Wyoming Fire Prevention & Electrical Safety licenses",
+      "licenseNumber": "A-43593",
+      "businessName": null,
+      "person": "Joshua Hauser-Smith",
+      "matchedOn": "principal"
+     },
+     "picked": "2026-10-15"
+    }
+   ]
+  }
+ ]
+}

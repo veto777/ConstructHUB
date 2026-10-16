@@ -12,7 +12,7 @@ import { looksLikeBusiness } from "./states/lib/business-name";
 import { addressMatch, addressMatches } from "./identifiers";
 import { csvRows, rowKeys, shortfall } from "./bulk";
 import { disciplineRecord, privateHit, reportHit } from "./privacy";
-import { PortalBlockedError, fetchWithDeadline, politeFetch, resetHostState, rethrowIfBlocked, robotsAllowed, withRun } from "./http";
+import { PortalBlockedError, fetchWithDeadline, politeFetch, resetHostState, rethrowIfBlocked, robotsAllowed, setRobotsRetryMs, withRun } from "./http";
 import { politeFetch as permitFetch, retryAfterMs as permitRetryAfter } from "../scrapers/polite-fetch";
 import { LicenseSet, crossReference, licenseKey, searchById, searchCustomerIds, type LicenseFinder } from "./xref";
 import { liveFinder, namesMatch } from "./runner";
@@ -124,6 +124,7 @@ describe("decisions 1 and 2: holder privacy and no discipline on a license", () 
 describe("decision 6: robots.txt and access", () => {
   const robots = (status: number, body = "", type = "text/plain") => new Response(body, { status, headers: { "content-type": type } });
   it("2xx parses; 4xx and a plain app page allow; 5xx, a network failure or a challenge page disallow", async () => {
+    setRobotsRetryMs([0, 0]); // a 5xx or a network failure is read again first (A12); still failing, it disallows
     const answers: Record<string, () => Response> = {
       "a.test": () => robots(200, "User-agent: *\nDisallow: /private"),
       "b.test": () => robots(404), "c.test": () => robots(410),

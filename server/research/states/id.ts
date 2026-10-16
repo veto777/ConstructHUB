@@ -1,5 +1,5 @@
 /**
- * Idaho. Checked live 2026-10-15.
+ * Idaho. Checked live 2026-10-15 (rechecked the same day for license sources: none found usable).
  *
  *   ID Secretary of State business entities: the Secretary of State's public business search (sosbiz.idaho.gov,
  *     its JSON API; robots.txt allows it), with status and standing as published (Active-Existing, Inactive-Forfeited,
@@ -7,7 +7,9 @@
  *
  * Idaho's contractor registration and its electrical, plumbing, HVAC and public-works licenses are all kept by DOPL in
  * eDOPL (edopl.idaho.gov), whose robots.txt disallows every path, including its public license search and its
- * exportable "Public License List Search". Nothing there is used; see `blocked`.
+ * exportable "Public License List Search" (robots.txt: "User-agent: *" / "Disallow: /"). DOPL's own site
+ * (dopl.idaho.gov, robots.txt allows all) links every board's lookup to eDOPL and publishes no discipline list for the
+ * Contractors, Electrical, Plumbing, HVAC or Public Works boards. Nothing there is used; see `blocked`.
  */
 import type { EnforcementHit } from "@shared/research-reports";
 import { politeFetch } from "../http";
@@ -70,6 +72,9 @@ export const pack: StatePack = {
   checked: "2026-10-15",
   liveEnforcement,
   blocked: [
-    "DOPL eDOPL license search and Public License List Search (edopl.idaho.gov): robots.txt disallows every path; this covers contractor registration, electrical, plumbing, HVAC and public works contractor licenses and their discipline",
+    "DOPL eDOPL license search and Public License List Search (edopl.idaho.gov/OnlineServices/?link=PubSearch): robots.txt is 'User-agent: *' / 'Disallow: /' (rechecked 2026-10-15); this covers contractor registration, electrical, plumbing, HVAC and public works contractor licenses and their discipline",
+    "DOPL website (dopl.idaho.gov; robots.txt 'Disallow:' empty): the Contractors (/con/), Electrical (/ele/), Plumbing (/plb/), HVAC (/hvac/) and Public Works (/pwc/) board pages link only to eDOPL; the site's only discipline pages are for other boards (Accountancy /boa/boa-discipline/, Shorthand Reporters /sre/sre-disciplinary-actions/) (checked 2026-10-15)",
+    "data.idaho.gov: a data-governance site (AI readiness, data literacy, policies), not a dataset catalog; an ArcGIS Online search for Idaho contractor/licensee/electrician/plumber items found no license register (checked 2026-10-15)",
+    "Idaho Attorney General consumer protection (ag.idaho.gov): contractor settlements (assurances of voluntary compliance) are announced as newsroom press releases only, with no list or dataset (checked 2026-10-15)",
   ],
 };

@@ -1,6 +1,10 @@
 /**
  * Wisconsin, checked live 2026-10-15.
  *
+ * NO SOURCE IS REGISTERED (A13, 2026-10-15): the two files below sit under terms that limit their material to
+ * "the noncommercial use of the general public" (DNR's Acceptable Use Policy; DHS pages link the Wisconsin.gov one),
+ * so they are listed under `blocked`. The loaders are kept, unused.
+ *
  *   wi-dnr-wells   DNR drilling and pump-installing service directories (dnr.wisconsin.gov/topic/Wells/Contacts.html,
  *                  .xlsx, "Updated <date>" on each): licensed well drillers, pump installers and heat-exchange drillers,
  *                  people and businesses, listed under every county they serve (one hit per license and directory).
@@ -142,11 +146,13 @@ async function* dhsLoader(): AsyncIterable<BulkHit> {
 export const pack: StatePack = {
   state: "WI",
   checked: "2026-10-15",
-  bulk: [
-    { id: "wi-dnr-wells", state: "WI", label: "Wisconsin DNR licensed well drillers and pump installers", pageUrl: DNR_PAGE, everyHours: 24 * 7, minRows: 1_350, load: dnrLoader },
-    { id: "wi-dhs-abatement", state: "WI", label: "Wisconsin DHS certified lead and asbestos companies", pageUrl: DHS_LEAD_PAGE, everyHours: 24 * 7, minRows: 1_750, load: dhsLoader },
-  ],
+  // wi-dnr-wells and wi-dhs-abatement are not registered (A13, 2026-10-15): both sites' terms limit their material to
+  // noncommercial use (see `blocked`). The loaders are kept, unused; stored rows are deleted at boot (RETIRED_BULK_SOURCES).
+  bulk: [],
   blocked: [
+    "Wisconsin DNR drilling and pump-installing service directories (dnr.wisconsin.gov/topic/Wells/Contacts.html, .xlsx; was wi-dnr-wells): not used, because DNR's Acceptable Use Policy (dnr.wisconsin.gov/legal/acceptableuse, read 2026-10-15) says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Department of Natural Resources webpages and linked agency webpages. ... For copy or use of information on the department website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+    "Wisconsin DHS certified lead and asbestos companies (www.dhs.wisconsin.gov/lead/hire-a-contractor.htm and /asbestos/contractors.htm, .xlsx; was wi-dhs-abatement): not used, because those pages' Policies link is the Wisconsin.gov Legal/Acceptable Use page (www.wisconsin.gov/Pages/Policies.aspx, read 2026-10-15), which says \"The material is for the noncommercial use of the general public. The fair use guidelines of the U.S. copyright statutes apply to all material on the Wisconsin.gov and linked agency Webpages. ... For copy or use of information on the State of Wisconsin website that is outside of the fair use provisions of copyright law, please seek permission from the individual listed as responsible for the page\"",
+    "WisDOT debarred, suspended and ineligible contractors (wisconsindot.gov/hccidocs/debar.pdf) and the WI DOA debarment list: not used, because WisDOT's Acceptable Use Policy (wisconsindot.gov/Pages/global-footer/Acceptable-use-policy.aspx, read 2026-10-15) says \"This website, and the pages and material available on it, are for the noncommercial use of the general public\", and DOA's pages carry the Wisconsin.gov terms quoted above",
     "DSPS credential lookup (license.wi.gov, the LicensE platform): Cloudflare blocks our bot (\"Sorry, you have been blocked\"); dwelling contractors, qualifiers, plumbers, electricians and HVAC are not searchable",
     "DSPS old lookup and Reports of Decisions (online.drl.wi.gov): 403 with a CAPTCHA page",
     "DSPS Credential/License List Purchasing (dspslicenselist.wi.gov): a paid list service, and the host does not resolve from here",

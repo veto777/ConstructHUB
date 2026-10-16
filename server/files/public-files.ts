@@ -45,6 +45,9 @@ export const PUBLIC_FILE_RULES: readonly Rule[] = [
   // uploadToR2(…, fileName) only accepts /^[A-Za-z0-9-]+\.jpg$/ (r2.ts).
   { folder: "media", subfolder: (s) => new RegExp(`^${UUID}$`).test(s), filename: (f) => /^[A-Za-z0-9-]{1,200}\.jpg$/.test(f) },
   { folder: "social", subfolder: (s) => /^[a-f0-9]{32}$/.test(s), filename: (f) => /^media\.(?:jpg|png|webp|mp4|mov)$/.test(f) },
+  // Press release photos (server/press/routes.ts uploadToR2(…, "press/photos", ext)) go out with the release.
+  // press/inbox/ (inbound wire mail attachments) is private: platform admins read it via /api/admin/press/attachments.
+  { folder: "press", subfolder: exact("photos"), filename: (f) => UUID_FILE.test(f) },
 ];
 
 const cleanSegment = (s: unknown): s is string =>

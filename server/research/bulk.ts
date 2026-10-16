@@ -343,6 +343,45 @@ export async function purgeLegacyKeys(sources: BulkSource[], log = (m: string) =
   return { scanned, purged, bySource };
 }
 
+/**
+ * Sources taken out of the registry whose stored rows production still held on 2026-10-15 (acceptance run): MO's two
+ * DPR download files (replaced by the live MO PRO search) and Pittsburgh PLI (robots.txt disallows its API); and on
+ * the coordinator's terms decisions (A13): SC DES enforcement (des.sc.gov's terms bar republishing) and WV Purchasing
+ * debarments (purchasing.wv.gov disallows robots; the legacy host is a side door), and Wisconsin's DNR well-driller
+ * and DHS abatement files (noncommercial-use terms). No search
+ * reads them (every read is by a registered source's id), so they are deleted. Named one by one, never "whatever isn't
+ * registered", so a source switched off by configuration keeps its rows.
+ */
+export const RETIRED_BULK_SOURCES: readonly string[] = ["mo-dpr-ae", "mo-dpr-electrical", "pa-pittsburgh", "sc-des-enforcement", "wv-purchasing-debarred", "wi-dnr-wells", "wi-dhs-abatement"];
+
+/**
+ * Deletes the stored rows and the load record of each retired source that is not registered, in batches of 5,000 rows
+ * (no table copy; autovacuum reclaims the space). Nothing to delete: null, so it costs one query a boot.
+ */
+export async function dropRetiredSources(registered: BulkSource[], log = (m: string) => console.log(`[research-bulk] ${m}`)): Promise<Record<string, number> | null> {
+  await bulkSchemaReady();
+  const live = new Set(registered.map((s) => s.id));
+  const ids = RETIRED_BULK_SOURCES.filter((id) => !live.has(id));
+  const { rows: found } = await pool.query(`SELECT id FROM research_bulk_sources WHERE id = ANY($1::text[])`, [ids]);
+  const { rows: orphans } = await pool.query(`SELECT DISTINCT source AS id FROM research_bulk_rows WHERE source = ANY($1::text[])`, [ids]);
+  const todo = Array.from(new Set([...found, ...orphans].map((r) => r.id as string)));
+  if (!todo.length) return null;
+  const out: Record<string, number> = {};
+  for (const id of todo) {
+    let n = 0;
+    for (;;) {
+      const r = await pool.query(`DELETE FROM research_bulk_rows WHERE ctid = ANY(ARRAY(SELECT ctid FROM research_bulk_rows WHERE source = $1 LIMIT 5000))`, [id]);
+      if (!r.rowCount) break;
+      n += r.rowCount;
+      await sleep(20);
+    }
+    await pool.query(`DELETE FROM research_bulk_sources WHERE id = $1`, [id]);
+    out[id] = n;
+  }
+  log(`deleted the stored rows of retired sources: ${JSON.stringify(out)}`);
+  return out;
+}
+
 export type BulkStatus = { loaded: boolean; rows: number; loadedAt: string | null; error: string | null; keyVersion: number };
 
 export async function sourceStatus(id: string): Promise<BulkStatus> {

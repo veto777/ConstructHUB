@@ -185,15 +185,12 @@ describe("coverage claims (decision 11)", () => {
   });
 });
 
-describe("robots.txt switches CourtListener off (HARD RULE 2)", () => {
-  it("the federal docket search is reported as not searched by ConstructHUB and makes no request", async () => {
-    const { searchCompanyRecords, COURTLISTENER_ALLOWED } = await import("./records");
-    expect(COURTLISTENER_ALLOWED).toBe(false);
-    const calls: string[] = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (u) => { calls.push(String(u)); throw new Error("offline"); });
-    const r = await searchCompanyRecords("Acme Builders", []);
-    expect(r.sources.find((x) => /CourtListener/.test(x.source))).toMatchObject({ searched: false, note: expect.stringMatching(/^Not searched by ConstructHUB: courtlistener\.com's robots\.txt/) });
-    expect(calls.some((u) => /courtlistener/.test(u))).toBe(false);
+describe("CourtListener is searched again (OWNER ORDER 2026-10-15)", () => {
+  it("is on, and only its REST API skips robots.txt", async () => {
+    const { COURTLISTENER_ALLOWED } = await import("./records");
+    const { ROBOTS_OWNER_EXEMPT } = await import("./http");
+    expect(COURTLISTENER_ALLOWED).toBe(true);
+    expect(ROBOTS_OWNER_EXEMPT).toEqual(["https://www.courtlistener.com/api/rest/"]);
   });
 });
 

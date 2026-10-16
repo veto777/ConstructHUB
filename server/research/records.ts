@@ -3,9 +3,9 @@
  * complaints would make the report a background check; shared/research-reports.ts RESEARCH_NOT_FCRA):
  *
  *   - State attorney general consumer complaints, from official open data (WA statewide and current; OR 2017–2019).
- *   - Federal court dockets naming the company, nationwide (CourtListener's RECAP archive, free API): NOT SEARCHED since
- *     2026-10-15. courtlistener.com's robots.txt says "User-agent: *  Disallow: /" (only named search engines get other
- *     rules), so under HARD RULE 2 the search is off (COURTLISTENER_ALLOWED). The code stays for when that changes.
+ *   - Federal court dockets naming the company, nationwide (CourtListener's RECAP archive, REST API v4). Owner order
+ *     2026-10-15: searched again, through the API only, with the owner's own CourtListener account (COURTLISTENER_TOKEN);
+ *     see COURTLISTENER_ALLOWED and http.ts ROBOTS_OWNER_EXEMPT.
  *   - Federal OSHA inspections of the company's establishments, nationwide (U.S. DOL API v4, needs DOL_API_KEY; the key
  *     goes in the query string, `like` is case-sensitive, no match is HTTP 204).
  *
@@ -18,7 +18,7 @@ import { nameClause, sodaRows, tokens } from "./licenses";
 import { BULK_LIMIT, searchBulk } from "./bulk";
 import { allBulkSourcesFor as bulkSourcesFor, hasStateCourtSearch, nationwideBulkSources, packComplaintSourcesFor, searchPackEnforcement } from "./registry";
 import { searchStateEnforcement } from "./state-records";
-import { capNote, noteOf, withNote, type Noted } from "./notes";
+import { capNote, failureNote, noteOf, type Noted, withNote } from "./notes";
 
 const MAX_COMPLAINTS = 1000;
 const MAX_CASE_PAGES = 10; // 20 dockets a page
@@ -83,11 +83,12 @@ export async function searchComplaints(src: ComplaintSource, name: string): Prom
 }
 
 /**
- * CourtListener's robots.txt disallows every path for unnamed agents ("Be conservative; Block everything", read
- * 2026-10-15), so its search is not run (HARD RULE 2: never get around a robots.txt Disallow). Flip only when its
- * robots.txt allows our agent; http.ts would refuse the requests anyway.
+ * OWNER ORDER 2026-10-15: CourtListener's federal dockets are searched again. Its robots.txt disallows unnamed agents,
+ * but the owner (with legal advice: the court records are public and the API is offered for programmatic use) signed
+ * up for an account himself and ordered the search back on. Only the REST API is used (http.ts ROBOTS_OWNER_EXEMPT
+ * covers /api/rest/ and nothing else), with the account's token when COURTLISTENER_TOKEN is set, at the published rate.
  */
-export const COURTLISTENER_ALLOWED = false;
+export const COURTLISTENER_ALLOWED = true;
 export const COURTLISTENER_BLOCKED_NOTE = "Not searched by ConstructHUB: courtlistener.com's robots.txt disallows automated access for all but named search engines (checked 2026-10-15)";
 
 // ── Federal court dockets (CourtListener) ────────────────────────────────────────────────────────────────────────
@@ -207,7 +208,7 @@ export async function searchEnforcement(name: string, states: string[]): Promise
         const capped = found.length >= BULK_LIMIT ? ` (${capNote(BULK_LIMIT, null, "index matches")})` : "";
         sources.push({ source: src.label, scope: `${state}, file of ${status.loadedAt?.slice(0, 10)}`, searched: true, note: `${mine.length} record(s)${capped}`, category });
       } catch (err: any) {
-        sources.push({ source: src.label, scope: state, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category });
+        sources.push({ source: src.label, scope: state, searched: false, note: failureNote(err), category });
       }
     }
   }
@@ -221,7 +222,7 @@ export async function searchEnforcement(name: string, states: string[]): Promise
       const capped = found.length >= BULK_LIMIT ? ` (${capNote(BULK_LIMIT, null, "index matches")})` : "";
       sources.push({ source: src.label, scope: `All states, file of ${status.loadedAt?.slice(0, 10)}`, searched: true, note: `${mine.length} record(s)${capped}`, category: "enforcement" });
     } catch (err: any) {
-      sources.push({ source: src.label, scope: "All states", searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category: "enforcement" });
+      sources.push({ source: src.label, scope: "All states", searched: false, note: failureNote(err), category: "enforcement" });
     }
   }
   // Licensing-board enforcement on the license itself (CSLB suspensions, bonds) rides in the license files.
@@ -249,7 +250,7 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
         complaints.push(...hits);
         sources.push({ source: src.source, scope: src.scope, searched: true, note: `${hits.length} complaint(s)${noteOf(hits) ? ` (${noteOf(hits)})` : ""}`, category: "complaints" });
       } catch (err: any) {
-        sources.push({ source: src.source, scope: src.scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category: "complaints" });
+        sources.push({ source: src.source, scope: src.scope, searched: false, note: failureNote(err), category: "complaints" });
       }
     }
   }
@@ -262,7 +263,7 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
     sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: true,
       note: r.total > MAX_CASE_PAGES * 20 ? `${courtCases.length} case(s): the newest ${MAX_CASE_PAGES * 20} of ${r.total} matches were checked` : `${courtCases.length} case(s)`, category: "federal_court" });
   } catch (err: any) {
-    sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}`, category: "federal_court" });
+    sources.push({ source: "Federal court dockets (CourtListener)", scope: "All U.S. federal courts", searched: false, note: failureNote(err), category: "federal_court" });
   }
   let osha: OshaHit[] = [];
   try {
@@ -271,7 +272,7 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
   } catch (err: any) {
     const msg = String(err?.message ?? err);
     sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: false,
-      note: msg === "not configured" ? "Not searched yet" : `Could not search: ${msg.slice(0, 200)}`, category: "osha" });
+      note: msg === "not configured" ? "Not searched yet" : failureNote(err), category: "osha" });
   }
   const enforcement = await searchEnforcement(name, states);
   sources.push(...enforcement.sources);

@@ -135,6 +135,8 @@ const AdminCodeApiPage = lazyPage(() => import("@/pages/admin-code-api"));
 const AdminIssuesPage = lazyPage(() => import("@/pages/admin-issues"));
 const AdminBacklinksPage = lazyPage(() => import("@/pages/admin-backlinks"));
 const AdminPartnershipsPage = lazyPage(() => import("@/pages/admin-partnerships"));
+const AdminPressPage = lazyPage(() => import("@/pages/admin-press"));
+const PressReleasesPage = lazyPage(() => import("@/pages/press-releases"));
 const AdminTicketsPage = lazyPage(() => import("@/pages/admin-tickets"));
 const AdminReferralsPage = lazyPage(() => import("@/pages/admin-referrals"));
 const AdminYoutubePage = lazyPage(() => import("@/pages/admin-youtube"));
@@ -304,6 +306,8 @@ function DashboardRouter() {
       <Route path="/compliance/research/coverage" component={ResearchCoveragePage} />
       <Route path="/compliance/research" component={ResearchOrderPage} />
       <Route path="/compliance/research/orders/:id" component={ResearchOrderStatusPage} />
+      {/* The Press Wire (owner, 2026-10-15): packages, the writer, each release's status, live link and report. */}
+      <Route path="/press-releases" component={PressReleasesPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={GoogleAdsPage} />
       <Route path="/google-ads/traffic" component={GoogleAdsPage} />
@@ -359,6 +363,8 @@ function DashboardRouter() {
       <Route path="/admin/issues" component={AdminIssuesPage} />
       <Route path="/admin/backlinks" component={AdminBacklinksPage} />
       <Route path="/admin/partnerships" component={AdminPartnershipsPage} />
+      {/* Platform admins: the Press Wire desk — releases, the pressrelease@ mailbox, setup (the API answers 403 to anyone else). */}
+      <Route path="/admin/press" component={AdminPressPage} />
       <Route path="/admin/listings"><Redirect to={"/admin/directories" + window.location.search} /></Route>
       <Route path="/admin/directories" component={AdminDirectoriesPage} />
       <Route path="/admin/tickets" component={AdminTicketsPage} />
@@ -567,7 +573,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/directories": "Directory Sync", "/admin/directories": "Directory Sync — admin", "/social-media": "Social Media", "/social-media/calendar": "Social calendar", "/social-media/compose": "New social post", "/social-media/posts": "Social posts", "/social-media/analytics": "Social analytics", "/social-media/inbox": "Social inbox", "/social-media/accounts": "Social accounts", "/social-media/auto": "Social auto mode", "/social-media/guides": "Social guides",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan", "/site-scan/history": "Site Scan history",
   "/seo": "SEO Suite", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/mentions": "SEO mentions", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitor gap",
-  "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/compliance": "Compliance Dept", "/google-business": "Google Business",
+  "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/compliance": "Compliance Dept", "/press-releases": "Press Releases", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
   "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews", "/google-reviews/reviews": "Google reviews", "/google-reviews/profiles": "Review profiles & links", "/google-reviews/settings": "Review settings",

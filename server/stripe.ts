@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
 import { appReturnBaseUrl } from "./site-context";
 import { registerResearchRoutes, fulfilResearchCheckout } from "./research/routes";
+import { fulfilPressCheckout, registerPressRoutes } from "./press/routes";
 import { SEO_CREDIT_PACKS, isSeoCreditPack, creditUsd } from "@shared/seo-credits";
 import { fulfilSeoCredits } from "./seo/credits";
 import { applySeoCreditEvent, type ReversalStripe } from "./seo/credit-reversals";
@@ -254,6 +255,8 @@ async function applyOneTimeCheckout(session: Stripe.Checkout.Session, userId: nu
   await fulfilSeoCredits(session, userId, eventId);
   // A research report order (server/research): marked paid once, then the research bot runs it.
   await fulfilResearchCheckout(session, userId);
+  // A press release package (server/press): credits marked paid once; the releases themselves follow in the app.
+  await fulfilPressCheckout(session, userId);
   const result = await fulfilOneTimePurchase(session, userId);
   if (!result.fulfilled && result.reason === "unpaid") {
     console.log(`[billing] checkout ${session.id} (user ${userId}) completed ${session.payment_status}: nothing granted until Stripe reports it paid.`);
@@ -280,6 +283,11 @@ export function registerStripeRoutes(app: Express) {
   });
   // Permit & License Research Reports (owner, 2026-10-14): paid up front, researched by the bot (server/research).
   registerResearchRoutes(app, {
+    getOrCreateCustomer: (userId, email) => getOrCreateCustomer(userId, email),
+    sendStripeError,
+  });
+  // Press Releases (owner, 2026-10-15): three packages paid up front, written and sent by the press module (server/press).
+  registerPressRoutes(app, {
     getOrCreateCustomer: (userId, email) => getOrCreateCustomer(userId, email),
     sendStripeError,
   });

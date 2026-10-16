@@ -7,6 +7,7 @@ import { pool } from "../db";
 import { reportHit } from "./privacy";
 import { ALL_BULK_SOURCES } from "./registry";
 import { localityOf } from "./identifiers";
+import { licenseRef } from "./xref";
 import { looksLikeBusiness, personNameForm } from "./states/lib/business-name";
 import { REPORT_SNAPSHOT_VERSION } from "@shared/research-reports";
 import type {
@@ -97,20 +98,46 @@ const legacyComplaint = (c: ComplaintHit): ComplaintHit => (c.address ? { ...c, 
 /** A phone or address as compared in relationship prose: digits of a phone, letters and digits of an address. */
 const contactKey = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]+/g, "");
 
+/** Where the next tie in relationship prose starts ("; " then one of the forms xref.ts writes). */
+const NEXT_TIE = /; (?=(?:possible match \(address\): )?(?:same (?:phone|address) as |lists the same license number as |matched by the |held by |a record of )|[^;]*? is named on both )/;
+
+/** One of the subject's own records as relationship prose names it (xref.ts licenseRef), with the contacts the report shows on it. */
+export type ShownRef = { ref: string; shown: Set<string> };
+
 /**
- * Relationship prose as shown (round 6, decision 4). "same phone as license 123, (813) 555-0100" and "same address as
- * license 123, 123 Main St, Tampa FL" name a phone or street of one of the subject's records: kept only when that value
- * is one the report shows on the subject's own records (`shown`), else the value is left out ("same address as license
- * 123"). For a person subject the value is always left out. What the customer gave ("matched by the phone you gave
- * (…)") is the customer's own and stays.
+ * Relationship prose as shown (round 6, decision 4; round 7, finding 2). "same phone as license 123, (813) 555-0100" and
+ * "same address as license EC 03136, 123 Main St, Omaha NE" name a phone or street of one of the subject's own records.
+ * The explanation is rebuilt from those records: the reference must be one of them, written in full (`refs`, from
+ * licenseRef, so a license number with spaces is read whole), and the value is kept only when the report shows it on
+ * that record and the subject is not a person. Otherwise the value is left out ("same address as license EC 03136"),
+ * and when the reference can't be read safely the explanation names no record or value ("same address as another of
+ * the subject's records"). Ties inside an enforcement record's explanation ("a record of X, which is tied to this
+ * name: same phone as …") are read the same way. What the customer gave ("matched by the phone you gave (…)") is the
+ * customer's own and stays.
  */
-export function shownVia(via: string | null | undefined, shown: Set<string>, person: boolean): string | null | undefined {
+export function shownVia(via: string | null | undefined, refs: ShownRef[], person: boolean): string | null | undefined {
   if (!via) return via;
-  return via.split("; ").map((part) => {
-    const m = part.match(/^((?:possible match \(address\): )?same (?:phone|address) as (?:license \S+|the .+? record for .+?)), (.+)$/);
-    if (!m) return part;
-    return !person && shown.has(contactKey(m[2])) ? part : m[1];
-  }).join("; ");
+  const byLength = [...refs].sort((a, b) => b.ref.length - a.ref.length);
+  const tie = /same (phone|address) as /g;
+  let out = "", at = 0;
+  for (let m = tie.exec(via); m; m = tie.exec(via)) {
+    const from = m.index + m[0].length;
+    out += via.slice(at, from);
+    const next = via.slice(from).search(NEXT_TIE);
+    const end = next < 0 ? via.length : from + next;
+    const rest = via.slice(from, end);
+    const own = byLength.find((r) => rest === r.ref || rest.startsWith(`${r.ref}, `));
+    if (own) {
+      const value = rest.slice(own.ref.length + 2);
+      out += value && !person && own.shown.has(contactKey(value)) ? rest : own.ref;
+    } else {
+      // No ", " → no value to leave out; anything else can't be split into record and value safely.
+      out += rest.includes(", ") ? "another of the subject's records" : rest;
+    }
+    at = end;
+    tie.lastIndex = end;
+  }
+  return out + via.slice(at);
 }
 
 /** A phone or street in the cross-reference's notes ("address 123 Main St (on license 1) is shared by…"), left out. */
@@ -157,9 +184,10 @@ export function shownReport(r: ResearchReport | null): ResearchReport | null {
   const subjects = r.subjects.map((s): ResearchSubjectReport => {
     const person = s.kind === "person";
     const licenses = s.licenses.map((h) => show(h, s.kind));
-    // The phones and streets the report shows on the subject's own records: the only ones relationship prose may name.
-    const shown = new Set(licenses.flatMap((h) => [h.phone, h.address]).filter((v): v is string => !!v).map(contactKey));
-    const via = <T extends { relatedVia?: string | null }>(h: T): T => (h.relatedVia ? { ...h, relatedVia: shownVia(h.relatedVia, shown, person) } : h);
+    // Each of the subject's own records as relationship prose names it, with the phone and street the report shows on
+    // it: the only values the prose may name (round 7, finding 2).
+    const refs: ShownRef[] = s.licenses.map((h, i) => ({ ref: licenseRef(h), shown: new Set([licenses[i].phone, licenses[i].address].filter((v): v is string => !!v).map(contactKey)) }));
+    const via = <T extends { relatedVia?: string | null }>(h: T): T => (h.relatedVia ? { ...h, relatedVia: shownVia(h.relatedVia, refs, person) } : h);
     const out: ResearchSubjectReport = {
       ...s,
       licenses: licenses.map(via),

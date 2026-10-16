@@ -31,14 +31,14 @@ import {
 } from "@shared/research-reports";
 import { SITE_ORIGIN as SITE } from "@shared/seo";
 import { nameSearchable, searchLicenses, searchLicensesBy, type LicenseSource } from "./licenses";
-import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy, sourceStatus, purgeLegacyKeys, type BulkSource, type StoredHit } from "./bulk";
+import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy, sourceStatus, purgeLegacyKeys, dropRetiredSources, type BulkSource, type StoredHit } from "./bulk";
 import { SAM_SOURCE_ID } from "./sam";
 import { setKnowledgeFact } from "../hub/knowledge";
 import type { LiveLicenseSearch } from "./states/types";
 import { crossReference, enforcementKey, LicenseSet, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
 import { companyNamed, onePersonField, personMatches } from "./licenses";
 import { ALL_BULK_SOURCES, nationwideBulkSources, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
-import { capNote, noteOf } from "./notes";
+import { capNote, failureNote, noteOf } from "./notes";
 import { disciplineRecord, privateHit, reportHit } from "./privacy";
 import { guard, guardBrowser, noteResponse, politeFetch, refuseChallengeBody, releaseHost, withRun, type Turn } from "./http";
 import { researchTransport, type ResearchTransport } from "../scrapers/research-transport";
@@ -384,7 +384,7 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
           for (const h of r.hits) own.add(h);
           licenseSources.push({ state, source: f.label, searched: r.searched, note: r.note });
         } catch (err: any) {
-          licenseSources.push({ state, source: f.label, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+          licenseSources.push({ state, source: f.label, searched: false, note: failureNote(err) });
         }
       };
       // The bulk files first, then the "no statewide GC license" note, then the live sources (the report's order).
@@ -530,7 +530,9 @@ async function noteResearchFacts(): Promise<void> {
  * RESEARCH_BULK say. Small page-range batches, no table copy; a database without the table only gets it created.
  */
 export function startLegacyKeyPurge(delayMs = 60_000): void {
-  const t = setTimeout(() => void purgeLegacyKeys(ALL_BULK_SOURCES).then((r) => { if (r) console.log(`[research-bulk] legacy key purge: ${JSON.stringify(r)}`); })
+  // First the rows of retired sources (nothing reads them; acceptance run, 2026-10-15), then the key purge.
+  const t = setTimeout(() => void dropRetiredSources(ALL_BULK_SOURCES).catch((err) => console.error("[research-bulk] retired sources:", err))
+    .then(() => purgeLegacyKeys(ALL_BULK_SOURCES)).then((r) => { if (r) console.log(`[research-bulk] legacy key purge: ${JSON.stringify(r)}`); })
     .catch((err) => console.error("[research-bulk] legacy key purge:", err)), delayMs);
   t.unref?.();
   registerWorker("research legacy key purge", () => clearTimeout(t));

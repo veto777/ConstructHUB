@@ -35,12 +35,12 @@ describe("decision 1: true/false only from a clean outcome; any other negation i
 });
 
 describe("decision 2: a person report keeps recognized standing phrases only", () => {
-  it("drops trailing text, keeps a published date", () => {
-    expect(standingStatus("Active with civil penalty of $500")).toEqual({ status: "Active", moved: "with civil penalty of $500" });
-    expect(standingStatus("Active after restitution")).toEqual({ status: "Active", moved: "after restitution" });
+  it("trailing text leaves no standing (round 7, finding 3); a published date stays", () => {
+    expect(standingStatus("Active with civil penalty of $500")).toEqual({ status: null, moved: "Active with civil penalty of $500" });
+    expect(standingStatus("Active after restitution")).toEqual({ status: null, moved: "Active after restitution" });
     expect(standingStatus("Active since 01/02/2020")).toEqual({ status: "Active since 01/02/2020", moved: null });
     expect(standingStatus("Expired 2024-05-01")).toEqual({ status: "Expired 2024-05-01", moved: null });
-    expect(reportHit(lic({ holder: "business", status: "Active with civil penalty of $500" }), "person").status).toBe("Active");
+    expect(reportHit(lic({ holder: "business", status: "Active with civil penalty of $500" }), "person").status).toBeNull();
   });
   it("the Applicant exception is only the one wording a source writes", () => {
     expect(standingStatus("Applicant: an application is on file with DBPR (not a license)").status).toBe("Applicant: an application is on file with DBPR (not a license)");
@@ -100,6 +100,7 @@ describe("decision 11: OSHA and SAM.gov only when the running server has them", 
     expect(runtimeRecordsPhrase({ osha: false, samExclusions: false })).toBe("");
     expect(runtimeRecordsPhrase({ osha: true })).toBe(", and OSHA inspections (federal)");
     expect(runtimeRecordsPhrase({ osha: true, samExclusions: true })).toBe(", federal exclusions and debarments (SAM.gov), and OSHA inspections (federal)");
+    expect(runtimeRecordsPhrase({ osha: false, federalCourts: true })).toBe(", and federal court cases");
   });
   it("Hub names OSHA only with the key", () => {
     setKnowledgeFact("samExclusions", true); setKnowledgeFact("samExclusions", false); // re-render now

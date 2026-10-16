@@ -12,7 +12,7 @@
  */
 import type { LicenseHit } from "@shared/research-reports";
 import { politeFetch } from "../http";
-import { tokens } from "../licenses";
+import { personMatches, tokens } from "../licenses";
 import { normLicense, type IdQuery } from "../identifiers";
 import { usDate } from "../bulk";
 import { aspxFields, cookiesOf, flipName, htmlPerson, isPersonName, text } from "./lib/g4-html";
@@ -109,14 +109,30 @@ const toHit = (r: KyRow, matchedOn: LicenseHit["matchedOn"]): LicenseHit => {
   };
 };
 
+/**
+ * The name as the lookup takes it. For a person the search finds "Harrison Durham-Smith" but nothing for "Harrison E
+ * Durham-Smith" (acceptance run, 2026-10-15): the site lists "Durham-Smith, Harrison E" and doesn't match a middle
+ * initial typed between the names. So a person's query leaves out single-letter initials and a generational suffix
+ * (JR, SR, II…); every result is still checked against the full name, initial included (personMatches).
+ */
+export function kyQuery(name: string, kind: "person" | "company"): string {
+  const q = name.replace(/[^A-Za-z0-9&' .,-]/g, " ").replace(/\s+/g, " ").trim();
+  if (kind === "company") return q.slice(0, 80);
+  const words = q.replace(/[.,]/g, " ").split(/\s+/).filter((w) => w.length > 1 && !/^(?:jr|sr|ii|iii|iv)$/i.test(w));
+  return (words.length ? words.join(" ") : q).slice(0, 80);
+}
+
 export async function searchKyHbc(name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
-  const q = name.replace(/[^A-Za-z0-9&' .,-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  const q = kyQuery(name, kind);
   if (q.length < 2) return [];
   const want = tokens(name);
   const words = (v: string | null) => { const have = new Set(tokens(v ?? "")); return want.every((w) => have.has(w)); };
-  const { rows, note } = await kyRows(q);
+  let { rows, note } = await kyRows(q);
+  // A middle name the site doesn't hold ("John David Field" vs "Field, John D") finds nothing: try first and last only.
+  const parts = q.split(" ");
+  if (kind === "person" && !rows.length && parts.length > 2) ({ rows, note } = await kyRows(`${parts[0]} ${parts[parts.length - 1]}`));
   return withNote(rows.map((r) => toHit(r, kind === "company" ? "business" : "principal"))
-    .filter((h) => (kind === "company" ? words(h.businessName) : words(h.principal))), note);
+    .filter((h) => (kind === "company" ? words(h.businessName) : personMatches(name, h.principal))), note);
 }
 
 /** By license number (the search's License Number field, 10 characters at most). No phone or address is published. */

@@ -134,6 +134,36 @@ export async function decide(thread: ThreadMessage[], env: NodeJS.ProcessEnv = p
   throw new Error(`Every AI provider failed — ${errors.join(" · ")}`);
 }
 
+const DRAFT_SYSTEM = `You draft an email reply for an admin of the ConstructHUB Media Team (media@constructhub.us) to review, edit and send.
+The team builds relationships with directories, article sites, news media and link publishers.
+
+Facts you may use (never invent anything else — no customer counts, revenue, prices, names, dates or features):
+${FACTS}
+
+LAWS:
+${MEDIA_INBOX_LAWS.map((l, i) => `${i + 1}. ${l.law}`).join("\n")}
+
+Write like a regular person: short, plain, specific to their last email. Under ${MEDIA_INBOX_PARAMETERS.maxReplyWords} words.
+Start with a greeting by their first name when you know it. End with "Best regards," and nothing after it (the signature is added).
+Follow the admin's instructions and use the admin's notes about this company. Never agree to pay, sign or a fixed meeting time
+unless the instructions say so. If they asked whether they are talking to an AI or a person, do not answer that question and
+never claim to be a person: the admin answers it.
+Return JSON only: {"reply": string}`;
+
+/** A reply for an admin to review and send from the Partnerships page (our API first). Nothing is sent here. */
+export async function draftReply(thread: ThreadMessage[], o: { notes?: string | null; instructions?: string | null } = {}, env: NodeJS.ProcessEnv = process.env): Promise<{ reply: string; provider: string }> {
+  const user = [
+    o.notes?.trim() ? `ADMIN'S NOTES ABOUT THIS COMPANY:\n${o.notes.trim()}` : null,
+    o.instructions?.trim() ? `ADMIN'S INSTRUCTIONS FOR THIS REPLY:\n${o.instructions.trim()}` : null,
+    thread.length ? `The thread, oldest first. Write our next email.\n\n${threadPrompt(thread)}` : "No emails yet. Write a short first email.",
+  ].filter(Boolean).join("\n\n");
+  return askJson(user, DRAFT_SYSTEM, (j) => {
+    const reply = str(j.reply, 4000);
+    if (!reply) throw new Error("The model returned no reply");
+    return { reply };
+  }, env);
+}
+
 const NEXT_STEP_SYSTEM = `You read automatic replies (auto-responders) that companies sent to the ConstructHUB Media Team after we asked
 about a listings, content or news partnership. We are a software company: we want a free partnership, a partner or agency
 program, API or bulk-upload access, or a way to submit editorial content. We are not buying advertising.

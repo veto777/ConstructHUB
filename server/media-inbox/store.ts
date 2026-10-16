@@ -238,16 +238,17 @@ export async function listPartners(status?: string) {
     id: x.id, company: x.company, domain: x.domain, kind: x.kind, status: x.status, contactName: x.contact_name, contactEmail: x.contact_email,
     summary: x.summary, agreement: x.agreement, toFinalize: x.to_finalize, costTerms: x.cost_terms, ownerQuestion: x.owner_question,
     agreedAt: x.agreed_at ? new Date(x.agreed_at).toISOString() : null, addedTo: x.added_to,
-    lastMessageAt: x.last_message_at ? new Date(x.last_message_at).toISOString() : null, messages: x.messages,
+    lastMessageAt: x.last_message_at ? new Date(x.last_message_at).toISOString() : null, messages: x.messages, notes: x.notes ?? null,
   }));
 }
 
-export async function listMessages(f: { status?: string; direction?: string; partnerId?: number; limit: number; offset: number }) {
+export async function listMessages(f: { status?: string; direction?: string; partnerId?: number; partnerStatus?: string; limit: number; offset: number }) {
   const r = await db().query(
     `SELECT m.*, p.company, count(*) OVER()::int AS total FROM media_messages m LEFT JOIN media_partners p ON p.id = m.partner_id
       WHERE ($1::text IS NULL OR m.status = $1) AND ($2::text IS NULL OR m.direction = $2) AND ($3::int IS NULL OR m.partner_id = $3)
+        AND ($6::text IS NULL OR p.status = $6)
       ORDER BY m.received_at DESC, m.id DESC LIMIT $4 OFFSET $5`,
-    [f.status ?? null, f.direction ?? null, f.partnerId ?? null, f.limit, f.offset]);
+    [f.status ?? null, f.direction ?? null, f.partnerId ?? null, f.limit, f.offset, f.partnerStatus ?? null]);
   return {
     total: Number(r.rows[0]?.total ?? 0),
     rows: r.rows.map((x) => ({
@@ -262,14 +263,43 @@ export async function getPartner(id: number): Promise<PartnerRow | null> {
   return r.rows[0] ? partnerRow(r.rows[0]) : null;
 }
 
-export async function updatePartner(id: number, f: { status?: string; kind?: string; toFinalize?: string | null; ownerQuestion?: string | null; domain?: string | null }) {
+export async function updatePartner(id: number, f: { status?: string; kind?: string; toFinalize?: string | null; ownerQuestion?: string | null; domain?: string | null; notes?: string | null }) {
   await db().query(
     `UPDATE media_partners SET status = COALESCE($2, status), kind = COALESCE($3, kind),
        to_finalize = CASE WHEN $4::boolean THEN $5 ELSE to_finalize END, owner_question = CASE WHEN $6::boolean THEN $7 ELSE owner_question END,
-       domain = CASE WHEN $8::boolean THEN $9 ELSE domain END,
+       domain = CASE WHEN $8::boolean THEN $9 ELSE domain END, notes = CASE WHEN $10::boolean THEN $11 ELSE notes END,
        agreed_at = CASE WHEN $2 IN ('agreed','finalized') AND agreed_at IS NULL THEN now() ELSE agreed_at END, updated_at = now() WHERE id = $1`,
     [id, f.status ?? null, f.kind ?? null, f.toFinalize !== undefined, f.toFinalize ?? null, f.ownerQuestion !== undefined, f.ownerQuestion ?? null,
-      f.domain !== undefined, f.domain ?? null]);
+      f.domain !== undefined, f.domain ?? null, f.notes !== undefined, f.notes ?? null]);
+}
+
+/** Every email with one company, oldest first (what the AI reads when drafting a reply from the admin page). */
+export async function partnerThread(partnerId: number) {
+  const r = await db().query(
+    `SELECT direction, from_email, received_at, subject, body FROM media_messages WHERE partner_id = $1 ORDER BY received_at, id`, [partnerId]);
+  return r.rows.map((x) => ({ direction: x.direction as "in" | "out", from: x.from_email as string, at: new Date(x.received_at).toISOString(), subject: x.subject as string, body: x.body as string }));
+}
+
+export type ReplyTarget = { id: number; direction: "in" | "out"; messageId: string; threadKey: string | null; to: string; cc: string | null; subject: string; references: string[] };
+
+/** The email an admin's reply answers: the company's latest one from them, else our latest one (a nudge in that thread). */
+export async function replyTarget(partnerId: number): Promise<ReplyTarget | null> {
+  const r = await db().query(
+    `SELECT id, direction, message_id, thread_key, from_email, to_email, cc, subject, references_ids FROM media_messages
+      WHERE partner_id = $1 AND (direction = 'out' OR status <> 'automated') ORDER BY (direction = 'in') DESC, received_at DESC, id DESC LIMIT 1`, [partnerId]);
+  const x = r.rows[0];
+  if (!x) return null;
+  return {
+    id: x.id, direction: x.direction, messageId: x.message_id, threadKey: x.thread_key, to: x.direction === "in" ? x.from_email : x.to_email, cc: x.cc,
+    subject: x.subject, references: String(x.references_ids ?? "").split(/\s+/).filter(Boolean),
+  };
+}
+
+/** An admin answered the company by hand: its waiting emails are done. */
+export async function markPartnerAnswered(partnerId: number, replyId: number) {
+  await db().query(
+    `UPDATE media_messages SET status = 'replied', reply_id = COALESCE(reply_id, $2), reason = concat_ws(' · ', reason, 'Answered by an admin')
+      WHERE partner_id = $1 AND direction = 'in' AND status IN ('new','needs_owner','failed')`, [partnerId, replyId]);
 }
 
 export async function markHandled(id: number) {
@@ -424,6 +454,14 @@ export async function nextQueued(limit: number) {
 
 export async function finishQueued(id: number, status: "sent" | "skipped", reason: string | null) {
   await db().query(`UPDATE media_outreach_queue SET status = $2, reason = $3, sent_at = CASE WHEN $2 = 'sent' THEN now() END WHERE id = $1`, [id, status, reason]);
+}
+
+/** Did a delivery-failure notice name this address? (bounce notices are stored as automated mail) */
+export async function hasBounced(email: string): Promise<boolean> {
+  const r = await db().query(
+    `SELECT 1 FROM media_messages WHERE direction = 'in' AND (from_email ILIKE 'mailer-daemon@%' OR from_email ILIKE 'postmaster@%')
+       AND position(lower($1) IN lower(body)) > 0 LIMIT 1`, [email]);
+  return Boolean(r.rows[0]);
 }
 
 export async function queueCounts() {

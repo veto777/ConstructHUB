@@ -6,8 +6,8 @@
  */
 import { useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
-import { formatDistanceToNowStrict } from "date-fns";
-import { Handshake, Inbox, Loader2, Lock, Mail, Play, Scale, Send } from "lucide-react";
+import { format, formatDistanceToNowStrict } from "date-fns";
+import { Handshake, Inbox, Loader2, Lock, Mail, MessageSquare, Play, Scale, Send, Sparkles, StickyNote } from "lucide-react";
 import {
   MEDIA_INBOX_LAWS, MEDIA_INBOX_PARAMETERS, MEDIA_MESSAGE_STATUS_LABELS, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_KIND_LABELS, MEDIA_PARTNER_STATUSES, MEDIA_PARTNER_STATUS_LABELS,
   type MediaMessage, type MediaMessageStatus, type MediaPartner, type MediaPartnerKind, type MediaPartnerStatus,
@@ -38,6 +38,8 @@ const MESSAGE_TONE: Record<MediaMessageStatus, PillTone> = { new: "info", replie
 const PAGE = 50;
 const n = (v: number | undefined) => (v ?? 0).toLocaleString("en-US");
 const ago = (iso: string | null) => (iso ? `${formatDistanceToNowStrict(new Date(iso))} ago` : "—");
+/** "Oct 15, 2026, 12:37 AM (9 hours ago)": when an email was received or sent, in the viewer's time zone. */
+const when = (iso: string) => `${format(new Date(iso), "MMM d, yyyy, h:mm a")} (${ago(iso)})`;
 const getJson = async <T,>(url: string): Promise<T> => (await apiRequest("GET", url)).json();
 const refresh = () => queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/admin/media-inbox") });
 
@@ -87,18 +89,23 @@ function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onCl
             <Textarea rows={3} value={toFinalize ?? partner.toFinalize ?? ""} onChange={(e) => setToFinalize(e.target.value)} data-testid="input-partner-finalize" />
             {toFinalize !== null && <Button size="sm" className="mt-2" disabled={save.isPending} onClick={() => save.mutate({ toFinalize: toFinalize.trim() || null })}>Save</Button>}
           </div>
+          <NotesBox partner={partner} />
           <div>
-            <div className="mb-2 font-medium">Emails ({msgs?.total ?? 0})</div>
-            <div className="space-y-2">{(msgs?.rows ?? []).map((m) => <MessageCard key={m.id} m={m} />)}</div>
+            <div className="mb-2 flex items-center gap-2 font-medium"><MessageSquare className="h-4 w-4" aria-hidden="true" />Conversation ({msgs?.total ?? 0})</div>
+            {/* Oldest first, like a mail thread; the newest is open. */}
+            <div className="space-y-2" data-testid="list-partner-thread">
+              {[...(msgs?.rows ?? [])].reverse().map((m, i, all) => <MessageCard key={m.id} m={m} defaultOpen={i === all.length - 1} />)}
+            </div>
           </div>
+          <ReplyBox partner={partner} />
         </div>
       </SheetContent>
     </Sheet>
   );
 }
 
-function MessageCard({ m }: { m: MediaMessage }) {
-  const [open, setOpen] = useState(false);
+function MessageCard({ m, defaultOpen = false, onOpenCompany }: { m: MediaMessage; defaultOpen?: boolean; onOpenCompany?: () => void }) {
+  const [open, setOpen] = useState(defaultOpen);
   const { toast } = useToast();
   const handled = useMutation({
     mutationFn: async () => apiRequest("POST", `/api/admin/media-inbox/messages/${m.id}/handled`, {}),
@@ -111,16 +118,75 @@ function MessageCard({ m }: { m: MediaMessage }) {
         <div className="min-w-0 flex-1">
           <div className="truncate font-medium">{m.subject || "(no subject)"}</div>
           <div className="truncate text-xs text-muted-foreground">
-            {m.direction === "out" ? `To ${m.toEmail}` : `From ${m.fromName ? `${m.fromName} <${m.fromEmail}>` : m.fromEmail}`}{m.company ? ` · ${m.company}` : ""} · {ago(m.receivedAt)}
+            {m.direction === "out" ? `To ${m.toEmail}` : `From ${m.fromName ? `${m.fromName} <${m.fromEmail}>` : m.fromEmail}`}{m.company ? ` · ${m.company}` : ""}
           </div>
+          <div className="text-xs text-muted-foreground" data-testid={`text-media-message-when-${m.id}`}>{m.direction === "out" ? "Sent" : "Received"} {when(m.receivedAt)}</div>
           {m.reason && m.direction === "in" && <div className="mt-0.5 text-xs text-muted-foreground">{m.reason}</div>}
         </div>
         {m.direction === "in" && <StatusPill tone={MESSAGE_TONE[m.status]}>{MEDIA_MESSAGE_STATUS_LABELS[m.status]}</StatusPill>}
       </button>
       {open && <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/50 p-2 font-sans text-xs">{m.body}</pre>}
-      {open && m.direction === "in" && (m.status === "needs_owner" || m.status === "failed") && (
-        <Button size="sm" variant="outline" className="mt-2" disabled={handled.isPending} onClick={() => handled.mutate()}>Mark handled</Button>
+      {open && (onOpenCompany || (m.direction === "in" && (m.status === "needs_owner" || m.status === "failed"))) && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {onOpenCompany && <Button size="sm" onClick={onOpenCompany} data-testid={`button-open-conversation-${m.id}`}><MessageSquare className="mr-2 h-4 w-4" />Open conversation & reply</Button>}
+          {m.direction === "in" && (m.status === "needs_owner" || m.status === "failed") && (
+            <Button size="sm" variant="outline" disabled={handled.isPending} onClick={() => handled.mutate()}>Mark handled</Button>
+          )}
+        </div>
       )}
+    </div>
+  );
+}
+
+/** The admin's own notes on a company: never sent, but the AI reads them when it drafts a reply. */
+function NotesBox({ partner }: { partner: MediaPartner }) {
+  const { toast } = useToast();
+  const [notes, setNotes] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/admin/media-inbox/partners/${partner.id}`, { notes: notes?.trim() || null })).json(),
+    onSuccess: () => { toast({ title: "Notes saved" }); setNotes(null); void refresh(); },
+    onError: (e) => toast({ title: "Could not save", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  return (
+    <div>
+      <div className="mb-1 flex items-center gap-2 font-medium"><StickyNote className="h-4 w-4" aria-hidden="true" />Notes</div>
+      <Textarea rows={3} placeholder="Anything to remember about this company. Only you see these; the AI uses them when it writes a draft." value={notes ?? partner.notes ?? ""} onChange={(e) => setNotes(e.target.value)} data-testid="input-partner-notes" />
+      {notes !== null && <Button size="sm" className="mt-2" disabled={save.isPending} onClick={() => save.mutate()} data-testid="button-save-partner-notes">Save notes</Button>}
+    </div>
+  );
+}
+
+/** Reply from media@ under the company's last email; "Write with AI" fills the box for the admin to edit first. */
+function ReplyBox({ partner }: { partner: MediaPartner }) {
+  const { toast } = useToast();
+  const [f, setF] = useState({ to: "", subject: "", body: "", instructions: "" });
+  const draft = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/admin/media-inbox/partners/${partner.id}/draft`, f.instructions.trim() ? { instructions: f.instructions.trim() } : {})).json(),
+    onSuccess: (r: { body: string; to: string; subject: string }) => setF((cur) => ({ ...cur, body: r.body, to: cur.to || r.to, subject: cur.subject || r.subject })),
+    onError: (e) => toast({ title: "No draft", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const send = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/admin/media-inbox/partners/${partner.id}/reply`, { to: f.to, subject: f.subject, body: f.body })).json(),
+    onSuccess: () => { toast({ title: `Sent to ${f.to}` }); setF({ to: "", subject: "", body: "", instructions: "" }); void refresh(); },
+    onError: (e) => toast({ title: "Not sent", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  // To and subject start from the last email (filled by the first draft, or typed).
+  const ready = f.to.trim() && f.subject.trim() && f.body.trim();
+  return (
+    <div className="space-y-2 rounded-lg border p-3" data-testid="box-partner-reply">
+      <div className="flex items-center gap-2 font-medium"><Send className="h-4 w-4" aria-hidden="true" />Reply</div>
+      <div className="flex gap-2">
+        <Input placeholder="Tell the AI what to say (optional), e.g. “say yes to the call, ask for their pricing”" value={f.instructions} onChange={(e) => setF({ ...f, instructions: e.target.value })} data-testid="input-reply-instructions" />
+        <Button type="button" variant="outline" disabled={draft.isPending} onClick={() => draft.mutate()} data-testid="button-reply-ai">
+          {draft.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}Write with AI
+        </Button>
+      </div>
+      <Input placeholder="To" type="email" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} data-testid="input-reply-to" />
+      <Input placeholder="Subject" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} data-testid="input-reply-subject" />
+      <Textarea rows={8} placeholder="Your reply (Leah Peterson's Construct HUB Media Team signature is added)" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} data-testid="input-reply-body" />
+      <Button disabled={send.isPending || !ready} onClick={() => send.mutate()} data-testid="button-reply-send">
+        {send.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}Send from media@
+      </Button>
     </div>
   );
 }
@@ -158,7 +224,7 @@ export default function AdminPartnershipsPage() {
   useDocumentTitle("Partnerships");
   const { toast } = useToast();
   const [partnerTab, setPartnerTab] = useState<"all" | MediaPartnerStatus>("all");
-  const [mailTab, setMailTab] = useState<"all" | "out" | "in" | "needs_owner">("all");
+  const [mailTab, setMailTab] = useState<"all" | "out" | "in" | "needs_owner" | "declined">("all");
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<number | null>(null);
 
@@ -168,6 +234,7 @@ export default function AdminPartnershipsPage() {
   const mp = new URLSearchParams({ limit: String(PAGE), offset: String(page * PAGE) });
   if (mailTab === "out" || mailTab === "in") mp.set("direction", mailTab);
   if (mailTab === "needs_owner") mp.set("status", "needs_owner");
+  if (mailTab === "declined") mp.set("partnerStatus", "declined");
   const msgsUrl = `/api/admin/media-inbox/messages?${mp}`;
   const { data: msgs } = useQuery<MessagesPayload>({ queryKey: [msgsUrl], queryFn: () => getJson(msgsUrl), enabled: !!s, placeholderData: keepPreviousData });
   const run = useMutation({
@@ -175,7 +242,9 @@ export default function AdminPartnershipsPage() {
     onSuccess: (r: any) => { toast({ title: r.ok ? `Checked: ${r.read ?? 0} new, ${r.replied ?? 0} replied, ${r.held ?? 0} waiting for you` : "Not run", description: r.skipped }); void refresh(); },
     onError: (e) => toast({ title: "Could not run", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const open = useMemo(() => partners?.find((p) => p.id === openId) ?? null, [partners, openId]);
+  // A company opened from the email list may sit outside the current tab: look it up in the full list.
+  const { data: allPartners } = useQuery<MediaPartner[]>({ queryKey: ["/api/admin/media-inbox/partners"], queryFn: () => getJson("/api/admin/media-inbox/partners"), enabled: !!s && openId !== null });
+  const open = useMemo(() => partners?.find((p) => p.id === openId) ?? allPartners?.find((p) => p.id === openId) ?? null, [partners, allPartners, openId]);
 
   if (isLoading && !s) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading" /></div>;
   if (!s) {
@@ -234,12 +303,13 @@ export default function AdminPartnershipsPage() {
                 badges={<StatusPill tone={PARTNER_TONE[p.status]}>{MEDIA_PARTNER_STATUS_LABELS[p.status]}</StatusPill>}
                 meta={[
                   p.domain && p.domain !== p.company ? p.domain : null,
+                  p.contactEmail,
                   MEDIA_PARTNER_KIND_LABELS[p.kind],
                   `${p.messages} emails`,
                   `last ${ago(p.lastMessageAt)}`,
                   p.addedTo ? `in the ${p.addedTo.toLowerCase()}` : null,
                 ]}
-                line={p.status === "agreed" && p.toFinalize ? `To finalize: ${p.toFinalize}` : p.ownerQuestion ? `Your call: ${p.ownerQuestion}` : undefined}
+                line={p.status === "agreed" && p.toFinalize ? `To finalize: ${p.toFinalize}` : p.status === "declined" ? `Why closed: ${p.summary ?? p.ownerQuestion ?? "no reason recorded — open it to read the emails"}` : p.ownerQuestion ? `Your call: ${p.ownerQuestion}` : undefined}
               />
             ))}
           </GoogleList>
@@ -255,10 +325,11 @@ export default function AdminPartnershipsPage() {
               <TabsTrigger value="out" data-testid="tab-media-sent">Sent ({n(s.sent)})</TabsTrigger>
               <TabsTrigger value="in">Received ({n(received)})</TabsTrigger>
               <TabsTrigger value="needs_owner">Waiting for you ({n(s.counts.needs_owner)})</TabsTrigger>
+              <TabsTrigger value="declined" data-testid="tab-media-declined">Declined</TabsTrigger>
             </TabsList>
           </Tabs>
           <div className="space-y-2" data-testid="list-media-messages">
-            {(msgs?.rows ?? []).map((m) => <MessageCard key={m.id} m={m} />)}
+            {(msgs?.rows ?? []).map((m) => <MessageCard key={m.id} m={m} onOpenCompany={m.partnerId ? () => setOpenId(m.partnerId) : undefined} />)}
             {msgs && !msgs.rows.length && <div className="g-callout" data-testid="empty-media-messages"><h3>No emails here yet</h3><p>Sent and received mail shows up as the inbox is checked (every {s.intervalMin} minutes) or when you send one below.</p></div>}
           </div>
           {pages > 1 && (

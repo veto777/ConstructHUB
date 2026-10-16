@@ -1,6 +1,18 @@
 /**
  * Tennessee. Checked live 2026-10-15.
  *
+ *   Live:
+ *     TN Commerce & Insurance licenses  The Department of Commerce & Insurance "Verify" license search
+ *                          (verify.tn.gov → search.cloud.commerce.tn.gov; a Tyler app whose page calls its own public JSON
+ *                          endpoint portal/search with the form's fields; robots.txt absent (404), no CAPTCHA on the
+ *                          search form today: its configuration's reCaptcha is null). Kept to the Board for Licensing
+ *                          Contractors' boards: contractors and limited licensed plumbers, limited licensed electricians,
+ *                          home improvement. By organization name, by an individual licensee's last and first name, or by
+ *                          license number; every status the boards list. The search names the license holder only (no
+ *                          qualifying agents or owners on an organization's license), so a person is found by their own
+ *                          license (limited licensed electricians and plumbers, individual contractors). Holder: the
+ *                          search's own Entity Types value ("Organization" / "Individual").
+ *
  *   Bulk:
  *     tn-tdec-enforcement  TDEC Enforcement Dataviewer (dataviewers.tdec.tn.gov, Oracle APEX app 999001; robots.txt
  *                          absent): every enforcement case's respondents (page 700) joined with the cases (page 710)
@@ -20,14 +32,20 @@
  * The division column is TDEC's own code (APC, WPC, UST, SWM, DWS, …); the dataviewer doesn't spell them out, so the
  * report shows the code.
  */
-import type { EnforcementHit } from "@shared/research-reports";
+import type { EnforcementHit, LicenseHit } from "@shared/research-reports";
+import { companyNamed, entityHolder, personMatches } from "../licenses";
+import { flipPerson } from "../person-name";
+import { normLicense, type IdQuery } from "../identifiers";
+import { withNote } from "../notes";
+import { postJson } from "./lib/g8-common";
+import { splitName } from "./lib/g2-aspnet";
 import { fetchWithDeadline, rateLimitHost, rethrowIfBlocked } from "../http";
 import { adverseFrom } from "../adverse";
 import { clean, csvRecords, usDate, type BulkHit, type BulkSource } from "../bulk";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { StatePack } from "./types";
+import type { LiveLicenseSearch, StatePack } from "./types";
 import { fromFile } from "./lib/g3-common";
 import { pdfText, textLines } from "./lib/a3-pdf";
 import { download } from "../bulk";
@@ -233,6 +251,90 @@ async function* darLoader(): AsyncIterable<BulkHit> {
   }
 }
 
+
+// ── Department of Commerce & Insurance "Verify" license search (search.cloud.commerce.tn.gov, live) ──────────────
+const VERIFY_PAGE = "https://search.cloud.commerce.tn.gov/";
+const VERIFY_API = "https://search.cloud.commerce.tn.gov/api/rs/api/endpoints/v1/portal/search";
+const VERIFY_SOURCE = "TN Commerce & Insurance licenses (contractors, home improvement, limited licensed electricians and plumbers)";
+/** The search's own Boards filter values (portal/search/configuration, 2026-10-15; the electricians' label has two spaces). */
+export const VERIFY_BOARDS = ["Contractors and Ltd Licensed Plumbers", "Contractors:  Limited Licensed Electricians", "Home Improvement"];
+const VERIFY_ROWS = 50;
+const VERIFY_PAGES = 2;
+
+/** One result card as the search answers it (portal/search results[]). */
+export type VerifyCard = { id: string; title: string | null; subtitle: string | null; details?: { label: string | null; values: (string | null)[] | null }[] | null };
+
+/**
+ * One card as a license hit, or null when it carries no license number (an application, not a license).
+ * The card's "License Details" values are unlabeled; their order was checked against the same record's labeled
+ * details page (portal/search/<id>/details: License number and type, Status, Expiration Date): license group, license
+ * type, license number, status, expiration date. "Primary Contact Information" puts the street first (kept out: city
+ * and ZIP only) and "CITY, State ZIP" fourth. The card's subtitle is the search's own Entity Types filter value
+ * ("Organization" or "Individual").
+ */
+export function verifyHit(c: VerifyCard, matchedOn: LicenseHit["matchedOn"]): LicenseHit | null {
+  const lic = c.details?.find((d) => d.label === "License Details")?.values ?? [];
+  const contact = c.details?.find((d) => d.label === "Primary Contact Information")?.values ?? [];
+  const number = clean(lic[2]);
+  if (!number) return null;
+  const holder = entityHolder(c.subtitle, { business: /^Organization$/, individual: /^Individual$/ });
+  const name = clean(c.title);
+  const person = holder === "individual" ? flipPerson(name) : null;
+  const expires = /^\d{2}\/\d{2}\/\d{4}$/.test(lic[4] ?? "") ? usDate(lic[4]!) : null;
+  return {
+    state: "TN", source: VERIFY_SOURCE, sourceUrl: `${VERIFY_PAGE}search/${encodeURIComponent(c.id)}/detail`,
+    businessName: holder === "individual" ? null : name, licenseNumber: number, licenseType: clean(lic[1]) ?? clean(lic[0]),
+    specialty: null, status: clean(lic[3]), principal: person, city: clean(contact[3]), expires, matchedOn,
+    address: null, phone: null, people: person ? [{ name: person, role: null }] : [],
+    holder,
+  };
+}
+
+/** One search (the page's own form request), the contractor boards only, up to VERIFY_PAGES pages of results. */
+async function verifySearch(values: Record<string, string>, keep: (c: VerifyCard) => boolean): Promise<{ cards: VerifyCard[]; more: boolean }> {
+  const out: VerifyCard[] = [];
+  let more = false;
+  for (let page = 0; page < VERIFY_PAGES; page++) {
+    const r = await postJson<{ resultCount?: number; results?: VerifyCard[] | null }>(VERIFY_API, {
+      appliedFilters: VERIFY_BOARDS.map((b) => `board:${b}`).join(","), highlight: "true",
+      formRequest: { metadata: null, values }, lookupString: null, rows: VERIFY_ROWS, start: page * VERIFY_ROWS, type: "credential",
+    }, "TN Commerce & Insurance license search", 1200);
+    const rows = r.results ?? [];
+    const kept = rows.filter(keep);
+    out.push(...kept);
+    // The search ranks its results; when the last page read still had matches and the search has more, say so.
+    more = (r.resultCount ?? 0) > (page + 1) * VERIFY_ROWS && kept.length > 0;
+    if (!more || rows.length < VERIFY_ROWS) break;
+  }
+  return { cards: out, more };
+}
+
+async function searchVerify(name: string, kind: "person" | "company"): Promise<LicenseHit[]> {
+  if (kind === "company") {
+    const { cards, more } = await verifySearch({ organizationName: name.trim() }, (c) => companyNamed(name, c.title));
+    const hits = cards.map((c) => verifyHit(c, "business")).filter((h): h is LicenseHit => !!h);
+    return withNote(hits, more ? `read the first ${VERIFY_PAGES * VERIFY_ROWS} ranked results; the search had more` : null);
+  }
+  const parts = splitName(name);
+  if (!parts) return [];
+  const { cards, more } = await verifySearch({ lastName: parts.last, firstName: parts.first }, (c) => c.subtitle === "Individual" && personMatches(name, flipPerson(c.title)));
+  const hits = cards.map((c) => verifyHit(c, "principal")).filter((h): h is LicenseHit => !!h);
+  return withNote(hits, more ? `read the first ${VERIFY_PAGES * VERIFY_ROWS} ranked results; the search had more` : null);
+}
+
+/** The search takes a license number (its License Number field); not phones or addresses. */
+async function searchVerifyBy(q: IdQuery): Promise<LicenseHit[] | null> {
+  if (q.type !== "license") return null;
+  const want = normLicense(q.value);
+  if (!want || !/^\d+$/.test(want)) return null; // the boards' license numbers are digits only
+  const { cards } = await verifySearch({ licenseNumber: want }, (c) => normLicense(c.details?.find((d) => d.label === "License Details")?.values?.[2] ?? null) === want);
+  return cards.map((c) => verifyHit(c, "license")).filter((h): h is LicenseHit => !!h);
+}
+
+const liveLicenses: LiveLicenseSearch[] = [
+  { source: VERIFY_SOURCE, sourceUrl: VERIFY_PAGE, search: searchVerify, searchBy: searchVerifyBy },
+];
+
 const BULK: BulkSource[] = [
   // 7,800 respondent rows on 2026-10-15, 5,308 of them organizations.
   { id: "tn-tdec-enforcement", state: "TN", label: "TDEC enforcement cases", pageUrl: TDEC_PAGE, everyHours: 24 * 7, minRows: 3_700, load: tdecLoader, companiesOnly: true, category: "environmental" },
@@ -245,9 +347,10 @@ const BULK: BulkSource[] = [
 export const pack: StatePack = {
   state: "TN",
   checked: "2026-10-15",
+  liveLicenses,
   bulk: BULK,
   blocked: [
-    "TN Department of Commerce & Insurance license search (search.cloud.commerce.tn.gov: contractors, home improvement, electricians, plumbers): the public search runs reCAPTCHA",
+    "TN Commerce & Insurance Verify (search.cloud.commerce.tn.gov), re-checked 2026-10-15: the search runs without a CAPTCHA (its search configuration's reCaptcha is null) and is used above; it publishes no qualifying agents or owners on an organization's license, and no disciplinary history",
     "TN Secretary of State business search (tnbear.tn.gov): connection timed out from our server on 2026-10-15; retried 2026-10-15 06:56 and 06:58 UTC from tower1 and vb11: TCP connect still times out (robots.txt unreachable too)",
     "TN Secretary of State business entity search (tncab.tnsos.gov, the newer TNCaB system): the search page runs reCAPTCHA and Cloudflare Turnstile",
     "TDEC asbestos and lead-based paint accreditations (dataviewers app 35001): searchable only through form posts, no list download found",

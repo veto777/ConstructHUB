@@ -17,7 +17,7 @@ import { nameClause, sodaRows } from "./licenses";
 import { decodeEntities } from "./bulk-sources";
 import { clean, usDate } from "./bulk";
 import { adverseFrom } from "./adverse";
-import { capNote, noteOf, withNote, type Noted } from "./notes";
+import { capNote, failureNote, noteOf, type Noted, withNote } from "./notes";
 
 type Row = Record<string, unknown>;
 const s = (v: unknown): string | null => clean(v == null ? null : String(v));
@@ -32,6 +32,8 @@ const usd = (n: number | null) => (n == null ? null : `$${n.toLocaleString("en-U
 
 export type SodaEnforcement = {
   state: string; source: string; scope: string; datasetUrl: string; url: string; nameFields: string[]; order?: string;
+  /** A SoQL condition every row must also meet (which rows of a shared dataset are the records). */
+  filter?: string;
   toHit: (r: Row) => Omit<EnforcementHit, "state" | "source" | "sourceUrl">;
 };
 
@@ -171,7 +173,7 @@ const MAX_ROWS = 500;
 
 /** One open-data enforcement dataset, searched by every word of the name, kept to rows that really name it. */
 export async function searchSodaEnforcement(src: SodaEnforcement, name: string, matches: (n: string | null) => boolean): Promise<Noted<EnforcementHit>> {
-  const rows = await sodaRows(src.url, nameClause(src.nameFields, name), MAX_ROWS, src.source, src.order);
+  const rows = await sodaRows(src.url, nameClause(src.nameFields, name) + (src.filter ? ` AND (${src.filter})` : ""), MAX_ROWS, src.source, src.order);
   // A full page means there may be more rows than were read: the report says so.
   return withNote(rows.map((r) => ({ state: src.state, source: src.source, sourceUrl: src.datasetUrl, ...src.toHit(r) })).filter((h) => matches(h.name)), rows.length >= MAX_ROWS ? capNote(MAX_ROWS, null, "records read") : null);
 }
@@ -185,7 +187,7 @@ export async function searchStateEnforcement(name: string, state: string, matche
       hits.push(...found);
       sources.push({ source: src.source, scope: src.scope, searched: true, note: `${found.length} record(s)${noteOf(found) ? ` (${noteOf(found)})` : ""}` });
     } catch (err: any) {
-      sources.push({ source: src.source, scope: src.scope, searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+      sources.push({ source: src.source, scope: src.scope, searched: false, note: failureNote(err) });
     }
   }
   if (state === "TX") {
@@ -194,7 +196,7 @@ export async function searchStateEnforcement(name: string, state: string, matche
       hits.push(...found);
       sources.push({ source: "Texas TDLR administrative orders", scope: "Electrical, A/C, elevator, water well and other TDLR trades", searched: true, note: `${found.length} order(s)` });
     } catch (err: any) {
-      sources.push({ source: "Texas TDLR administrative orders", scope: "TDLR trades", searched: false, note: `Could not search: ${String(err?.message ?? err).slice(0, 200)}` });
+      sources.push({ source: "Texas TDLR administrative orders", scope: "TDLR trades", searched: false, note: failureNote(err) });
     }
   }
   return { hits, sources };

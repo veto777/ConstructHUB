@@ -16,6 +16,8 @@ import {
   PLANS, PLAN_KEYS, ADDONS, ADDON_MAX_QUANTITY, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, SALES_THRESHOLD_CENTS,
   GBP_REINSTATEMENT_CENTS, RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS, gridCreditCost,
 } from "@shared/plans";
+import { PRESS_PROGRAM_PAID, PRESS_RELEASE_PRICE_CENTS } from "@shared/press";
+import { pressOutletCounts } from "../press/outlets";
 import {
   pricingKnowledge, joinNames, planNamesWhere, formatUsd, TRIAL_LABEL, SALES_REP_LABEL, SALES_THRESHOLD_LABEL,
   SALES_HREF, PROTECTED_SITE_PLANS, COMPETITOR_INTEL_PLANS, TEXTING_PLANS, CRM_SEATS_LINE, TEXTING_EITHER_LINE, CLIENT_NUMBER_INCLUDED_PLANS,
@@ -72,6 +74,12 @@ export function knowledgeTokens(): Record<string, string> {
     GBP_REINSTATEMENT_PRICE: formatUsd(GBP_REINSTATEMENT_CENTS),
     RESEARCH_STANDARD_PRICE: formatUsd(RESEARCH_STANDARD_CENTS),
     RESEARCH_EXTENDED_PRICE: formatUsd(RESEARCH_EXTENDED_CENTS),
+    PRESS_WIRE_PRICE: formatUsd(PRESS_RELEASE_PRICE_CENTS.budget),
+    PRESS_PREMIUM_PRICE: formatUsd(PRESS_RELEASE_PRICE_CENTS.premium),
+    PRESS_PROGRAM_WIRE_PRICE: formatUsd(PRESS_RELEASE_PRICE_CENTS.budget * PRESS_PROGRAM_PAID),
+    PRESS_PROGRAM_PREMIUM_PRICE: formatUsd(PRESS_RELEASE_PRICE_CENTS.premium * PRESS_PROGRAM_PAID),
+    PRESS_BUDGET_OUTLETS: pressOutletCounts().budget.toLocaleString("en-US"),
+    PRESS_PREMIUM_OUTLETS: pressOutletCounts().premium.toLocaleString("en-US"),
     // Named only once the running server has loaded the SAM.gov file (A9; setKnowledgeFact).
     // OSHA only when this server holds the Labor Department key (round 5, decision 11); the env is fixed for the process.
     RESEARCH_OSHA: process.env.DOL_API_KEY ? " For a company it also searches OSHA inspections (federal), with their violations and penalties; if the Labor Department's data service is down when a report runs, the report says OSHA was not searched." : "",
@@ -263,7 +271,8 @@ export function dollarAmounts(text: string): number[] {
  * launch price exists any more.
  */
 export function priceBookCents(): Set<number> {
-  const cents = new Set<number>([SALES_THRESHOLD_CENTS, GBP_REINSTATEMENT_CENTS, RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS]);
+  const cents = new Set<number>([SALES_THRESHOLD_CENTS, GBP_REINSTATEMENT_CENTS, RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS,
+    PRESS_RELEASE_PRICE_CENTS.budget, PRESS_RELEASE_PRICE_CENTS.premium, PRESS_RELEASE_PRICE_CENTS.budget * PRESS_PROGRAM_PAID, PRESS_RELEASE_PRICE_CENTS.premium * PRESS_PROGRAM_PAID]);
   for (const key of PLAN_KEYS) { cents.add(PLANS[key].monthlyCents); cents.add(PLANS[key].annualCents); }
   for (const addon of Object.values(ADDONS)) {
     cents.add(addon.monthlyCents); cents.add(addon.annualCents);
