@@ -89,51 +89,119 @@ const COLUMN_KEYS = [
 ] as const;
 
 /**
+ * Version of the derivation code (shared/hover-takeoff.ts extraction + rules). Stored as
+ * raw_payload.takeoffDerivation; bump it when the extraction changes so the back-fill re-derives every row once.
+ */
+export const TAKEOFF_DERIVATION = 2;
+
+/** The columns the back-fill reads — never the whole row. */
+const backfillColumns = {
+  id: crmMeasurements.id, orgId: crmMeasurements.orgId, rawPayload: crmMeasurements.rawPayload,
+  squaresMilli: crmMeasurements.squaresMilli, roofAreaSfMilli: crmMeasurements.roofAreaSfMilli,
+  wallAreaSfMilli: crmMeasurements.wallAreaSfMilli, ridgeLfMilli: crmMeasurements.ridgeLfMilli,
+  hipLfMilli: crmMeasurements.hipLfMilli, valleyLfMilli: crmMeasurements.valleyLfMilli,
+  eaveLfMilli: crmMeasurements.eaveLfMilli, rakeLfMilli: crmMeasurements.rakeLfMilli,
+  perimeterLfMilli: crmMeasurements.perimeterLfMilli, predominantPitch: crmMeasurements.predominantPitch,
+  stories: crmMeasurements.stories, facetCount: crmMeasurements.facetCount, wasteSuggestionBps: crmMeasurements.wasteSuggestionBps,
+};
+type BackfillRow = Pick<MeasurementRow, keyof typeof backfillColumns>;
+
+/**
  * Re-derive one HOVER row from its stored full_json (else its stored takeoff under the current rules):
- * raw_payload.takeoff + .summary and the numeric columns.
- * Returns "updated", "unchanged" (nothing written) or "skipped" (no full_json / nothing in it).
- * The raw_payload write is a jsonb merge of the two keys only, so concurrent writers (PDF, share, photos) keep theirs.
+ * raw_payload.takeoff + .summary + .takeoffDerivation and the numeric columns.
+ * Returns "updated", "unchanged" (nothing written) or "skipped" (nothing to derive from — only the derivation
+ * marker is stamped, so the next back-fill does not look at the row again).
+ * The raw_payload write is a jsonb merge of those keys only, so concurrent writers (PDF, share, photos) keep theirs.
  */
 export async function applyHoverTakeoff(
-  row: MeasurementRow, rules: TakeoffRules, dryRun = false,
+  row: BackfillRow, rules: TakeoffRules, dryRun = false,
 ): Promise<"updated" | "unchanged" | "skipped"> {
   const raw = (row.rawPayload ?? {}) as any;
   const takeoff = takeoffOfRow(row, rules);
-  if (!takeoff) return "skipped";
+  if (!takeoff) {
+    if (!dryRun && raw.takeoffDerivation !== TAKEOFF_DERIVATION) {
+      await db.update(crmMeasurements).set({
+        rawPayload: sql`coalesce(${crmMeasurements.rawPayload}, '{}'::jsonb) || ${JSON.stringify({ takeoffDerivation: TAKEOFF_DERIVATION })}::jsonb`,
+      }).where(eq(crmMeasurements.id, row.id));
+    }
+    return "skipped";
+  }
   const cols = takeoffColumns(takeoff);
   const summary = takeoffSummary(takeoff);
   const same = COLUMN_KEYS.every((k) => (row as any)[k] === (cols as any)[k])
     && stableJson(raw.takeoff ?? null) === stableJson(takeoff)
     && stableJson(raw.summary ?? null) === stableJson(summary);
-  if (same) return "unchanged";
-  if (dryRun) return "updated";
+  if (same && raw.takeoffDerivation === TAKEOFF_DERIVATION) return "unchanged";
+  if (dryRun) return same ? "unchanged" : "updated";
   await db.update(crmMeasurements).set({
-    ...cols,
-    rawPayload: sql`coalesce(${crmMeasurements.rawPayload}, '{}'::jsonb) || ${JSON.stringify({ takeoff, summary })}::jsonb`,
-    updatedAt: new Date(),
+    ...(same ? {} : { ...cols, updatedAt: new Date() }),
+    rawPayload: sql`coalesce(${crmMeasurements.rawPayload}, '{}'::jsonb) || ${JSON.stringify(
+      same ? { takeoffDerivation: TAKEOFF_DERIVATION } : { takeoff, summary, takeoffDerivation: TAKEOFF_DERIVATION },
+    )}::jsonb`,
   } as any).where(eq(crmMeasurements.id, row.id));
-  return "updated";
+  return same ? "unchanged" : "updated";
 }
 
 export interface TakeoffBackfillReport { checked: number; updated: number; unchanged: number; skipped: number }
 
+const BACKFILL_PAGE = 100;
+
 /**
- * Idempotent back-fill of every HOVER measurement (one org, or every org when orgId is omitted) from the
- * full_json already stored — no HOVER calls. Run by every sync and by scripts/backfill-hover-takeoffs.ts.
- * A second run reports updated: 0.
+ * Idempotent back-fill of HOVER measurements (one org, or every org when orgId is omitted) from what is already
+ * stored — no HOVER calls. By default only STALE rows are read: a different derivation version, or a stored
+ * takeoff made under other rules than the org's current ones (so a sync with nothing new reads nothing).
+ * `all` checks every row. Rows are read a page at a time (keyset on id), only the needed columns.
+ * Run by every sync and after a rules change (both via queueHoverTakeoffBackfill), and by
+ * scripts/backfill-hover-takeoffs.ts. A second run reports updated: 0.
  */
-export async function backfillHoverTakeoffs(orgId?: string, opts: { dryRun?: boolean } = {}): Promise<TakeoffBackfillReport> {
-  const where = [eq(crmMeasurements.provider, "hover"), sql`(${crmMeasurements.rawPayload} ? 'fullJson' or ${crmMeasurements.rawPayload} ? 'takeoff')`];
-  if (orgId) where.push(eq(crmMeasurements.orgId, orgId));
-  const rows = await db.select().from(crmMeasurements).where(and(...where));
-  const rulesByOrg = new Map<string, TakeoffRules>();
-  const report: TakeoffBackfillReport = { checked: rows.length, updated: 0, unchanged: 0, skipped: 0 };
-  for (const r of rows) {
-    if (!rulesByOrg.has(r.orgId)) rulesByOrg.set(r.orgId, await readTakeoffRules(r.orgId));
-    const outcome = await applyHoverTakeoff(r, rulesByOrg.get(r.orgId)!, opts.dryRun === true);
-    report[outcome]++;
+export async function backfillHoverTakeoffs(
+  orgId?: string, opts: { dryRun?: boolean; all?: boolean } = {},
+): Promise<TakeoffBackfillReport> {
+  const report: TakeoffBackfillReport = { checked: 0, updated: 0, unchanged: 0, skipped: 0 };
+  const orgIds = orgId
+    ? [orgId]
+    : (await db.selectDistinct({ orgId: crmMeasurements.orgId }).from(crmMeasurements)
+      .where(eq(crmMeasurements.provider, "hover"))).map((r) => r.orgId);
+  for (const org of orgIds) {
+    const rules = await readTakeoffRules(org);
+    const raw = crmMeasurements.rawPayload;
+    const stale = sql`(coalesce(${raw} ->> 'takeoffDerivation', '') <> ${String(TAKEOFF_DERIVATION)}
+      or (${raw} -> 'takeoff' is not null and jsonb_typeof(${raw} -> 'takeoff') = 'object'
+          and (${raw} -> 'takeoff' -> 'rules') is distinct from ${JSON.stringify(rules)}::jsonb))`;
+    let after = "";
+    for (;;) {
+      const where = [
+        eq(crmMeasurements.orgId, org),
+        eq(crmMeasurements.provider, "hover"),
+        sql`(${raw} ? 'fullJson' or ${raw} ? 'takeoff')`,
+        sql`${crmMeasurements.id} > ${after}`,
+      ];
+      if (!opts.all) where.push(stale);
+      const rows = await db.select(backfillColumns).from(crmMeasurements)
+        .where(and(...where)).orderBy(crmMeasurements.id).limit(BACKFILL_PAGE);
+      for (const r of rows) {
+        report.checked++;
+        report[await applyHoverTakeoff(r, rules, opts.dryRun === true)]++;
+      }
+      if (rows.length < BACKFILL_PAGE) break;
+      after = rows[rows.length - 1].id;
+    }
   }
   return report;
+}
+
+/** One back-fill at a time per org, in this process (the sync and a rules change can ask at once). */
+const takeoffChains = new Map<string, Promise<unknown>>();
+
+/** Queue a stale-rows back-fill for an org behind any running one; resolves with its report. */
+export function queueHoverTakeoffBackfill(orgId: string): Promise<TakeoffBackfillReport> {
+  const run = (takeoffChains.get(orgId) ?? Promise.resolve()).catch(() => {}).then(() => backfillHoverTakeoffs(orgId));
+  takeoffChains.set(orgId, run);
+  void run.then(
+    () => { if (takeoffChains.get(orgId) === run) takeoffChains.delete(orgId); },
+    () => { if (takeoffChains.get(orgId) === run) takeoffChains.delete(orgId); },
+  );
+  return run;
 }
 
 // ── Auto project ────────────────────────────────────────────────────────────

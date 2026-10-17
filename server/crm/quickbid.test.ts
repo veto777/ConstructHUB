@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import pg from "pg";
-import { inferSqftMetric, quickBidLine } from "./quickbid-math";
+import { inferSqftMetric, quickBidLine, quickBidLineDescription } from "./quickbid-math";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
 const DATABASE_URL =
@@ -25,6 +25,23 @@ async function api(path: string, opts: RequestInit = {}, cookie?: string) {
   const body = await res.json().catch(() => null);
   return { status: res.status, body, cookie: setCookie?.split(";")[0] ?? cookie };
 }
+
+describe("quickBidLineDescription (HOVER takeoff label)", () => {
+  it("labels a takeoff quote with the TAKEOFF waste %, not the stale measurement column", () => {
+    // The column says 0 (stale); the takeoff applied 5%.
+    expect(quickBidLineDescription({
+      sqftMilli: 2_303_000, metric: "roof", provider: "hover", wasteBps: 0, rateCentsPerSqft: 450,
+      quote: { areaSqft: 2303, quantitySqft: 2418, wastePct: 5 },
+    })).toBe("2,303 sq ft roof area from the hover report + 5% waste = 2,418 sq ft × $4.50/sq ft");
+    expect(quickBidLineDescription({
+      sqftMilli: 0, metric: "siding", provider: "hover", wasteBps: 1000, rateCentsPerSqft: 450,
+      quote: { areaSqft: 2169, quantitySqft: 2200, wastePct: 5 },
+    })).toBe("2,169 sq ft siding area from the hover report, rounded up to 2,200 sq ft × $4.50/sq ft");
+    expect(quickBidLineDescription({
+      sqftMilli: 2_210_000, metric: "siding", provider: "manual", wasteBps: 1200, rateCentsPerSqft: 450,
+    })).toBe("2,210 sq ft siding area from the manual report + 12% waste × $4.50/sq ft");
+  });
+});
 
 describe("quickBidLine (pure math)", () => {
   it("rate × sqft, cents-exact", () => {

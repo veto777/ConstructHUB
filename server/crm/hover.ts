@@ -84,7 +84,8 @@ import {
   type TakeoffRules,
 } from "@shared/hover-takeoff";
 import {
-  readTakeoffRules, writeTakeoffRules, backfillHoverTakeoffs, ensureHoverProject, rankedTakeoffRows, storedFullJson,
+  readTakeoffRules, writeTakeoffRules, queueHoverTakeoffBackfill, ensureHoverProject, rankedTakeoffRows, storedFullJson,
+  TAKEOFF_DERIVATION,
 } from "./hover-file";
 import { isIP } from "net";
 import { lookup as dnsLookup } from "dns/promises";
@@ -1130,6 +1131,8 @@ async function mergeMeasurementRaw(measurementId: string, patch: Record<string, 
 const HOVER_PDF_MAX_BYTES = 25 * 1024 * 1024;
 /** One PDF download (all hops, headers and body) must finish within this. */
 const HOVER_PDF_TIMEOUT_MS = 60_000;
+/** A full_json body larger than this is refused (real documents are tens of KB). */
+const HOVER_FULL_JSON_MAX_BYTES = 10 * 1024 * 1024;
 /** A job whose PDF could not be fetched is retried after this long, not on every sync. */
 const HOVER_PDF_RETRY_MS = 7 * 24 * 3600_000;
 
@@ -1372,7 +1375,7 @@ export function fetchHoverMeasurementPdfNow(
  */
 export type HoverFullJsonResult = { kind: "ok"; json: any } | { kind: "unavailable" } | { kind: "transient"; reason: string };
 
-async function fetchHoverFullJson(parsed: ParsedHoverJob, auth: Record<string, string>, fetchFn: FetchFn): Promise<HoverFullJsonResult> {
+export async function fetchHoverFullJson(parsed: ParsedHoverJob, auth: Record<string, string>, fetchFn: FetchFn): Promise<HoverFullJsonResult> {
   if (!parsed.measurementsJsonUrl) return { kind: "unavailable" };
   const { apiBase } = hoverBases();
   const url = /[?&]version=full_json\b/.test(parsed.measurementsJsonUrl)
@@ -1389,8 +1392,14 @@ async function fetchHoverFullJson(parsed: ParsedHoverJob, auth: Record<string, s
   if (m.status === 429) throw new HoverRateLimitError(hoverRetryAfterMs(m.headers?.get?.("retry-after")));
   if (m.status >= 500 || m.status === 401 || m.status === 408) return { kind: "transient", reason: `HTTP ${m.status}` };
   if (!m.ok) return { kind: "unavailable" };
+  // Streamed with a cap like the PDF: a body past it is not a measurement document.
+  let body: Buffer | null;
+  try { body = await readCapped(m, HOVER_FULL_JSON_MAX_BYTES); } catch (e: any) {
+    return { kind: "transient", reason: String(e?.message || e).slice(0, 120) };
+  }
+  if (!body) return { kind: "unavailable" };
   let json: any;
-  try { json = await m.json(); } catch { return { kind: "transient", reason: "body is not JSON" }; }
+  try { json = JSON.parse(body.toString("utf8")); } catch { return { kind: "transient", reason: "body is not JSON" }; }
   return json && typeof json === "object" && !Array.isArray(json) ? { kind: "ok", json } : { kind: "unavailable" };
 }
 
@@ -1480,7 +1489,7 @@ async function ingestHoverJobInner(
               const takeoff = extractHoverTakeoff(got.json, await readTakeoffRules(orgId));
               await db.update(crmMeasurements).set({ ...takeoffColumns(takeoff), updatedAt: new Date() } as any)
                 .where(eq(crmMeasurements.id, existing.id));
-              await mergeMeasurementRaw(existing.id, { takeoff, summary: takeoffSummary(takeoff) });
+              await mergeMeasurementRaw(existing.id, { takeoff, summary: takeoffSummary(takeoff), takeoffDerivation: TAKEOFF_DERIVATION });
             }
           }
           if (!adoptedCustomerId) {
@@ -1603,6 +1612,7 @@ async function ingestHoverJobInner(
         ...(linked.staffContact ? { staffContact: true } : {}),
         summary,
         takeoff,
+        takeoffDerivation: TAKEOFF_DERIVATION,
         photoCount: parsed.photoUrls.length,
         fullJson: trimJson(fullJson),
         ...(got.kind === "ok" ? {} : hoverFullJsonRetry(got.kind, 1)),
@@ -1939,7 +1949,7 @@ export async function runHoverSync(orgId: string): Promise<HoverSyncRunReport> {
   }
   // Takeoffs re-derived from the stored full_json (no HOVER calls; unchanged rows are not written).
   try {
-    report.takeoffsUpdated = (await backfillHoverTakeoffs(orgId)).updated;
+    report.takeoffsUpdated = (await queueHoverTakeoffBackfill(orgId)).updated;
   } catch (e: any) {
     console.error(`[hover] takeoff back-fill for org ${orgId} failed:`, String(e?.message || e).slice(0, 160));
   }
@@ -2063,8 +2073,11 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
       return res.status(400).json({ message: "Siding rounding must be a whole number of sq ft between 1 and 1000." });
     }
     const rules = await writeTakeoffRules(ctx.org.id, normalizeTakeoffRules({ roofWastePct: pct, sidingRoundUpTo: inc }));
-    const backfill = await backfillHoverTakeoffs(ctx.org.id);
-    res.json({ ok: true, takeoffRules: rules, updated: backfill.updated });
+    // The cards, symbols and Quick Bid apply the current rules on read already; the stored copies (columns,
+    // raw_payload.takeoff) follow in the background on the org's back-fill chain — the request never waits for it.
+    void queueHoverTakeoffBackfill(ctx.org.id).catch((e: any) =>
+      console.error(`[hover] takeoff back-fill after a rules change failed:`, String(e?.message || e).slice(0, 160)));
+    res.json({ ok: true, takeoffRules: rules, recalculating: true });
   });
 
   /** 302 to HOVER's authorize page. redirect_uri is always OUR callback. */
@@ -2442,7 +2455,10 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     const [m] = await db.select().from(crmMeasurements)
       .where(and(eq(crmMeasurements.orgId, ctx.org.id), eq(crmMeasurements.id, req.params.id), eq(crmMeasurements.provider, "hover")))
       .limit(1);
-    if (!m) return res.status(404).json({ message: "HOVER measurement not found" });
+    // Same visibility as the takeoff/report card: a seat that can't see the record gets a 404, no fetch, no id.
+    if (!m || !(await objectPolicy(ctx).filter("measurements", [m])).length) {
+      return res.status(404).json({ message: "HOVER measurement not found" });
+    }
     try {
       const r = await fetchHoverMeasurementPdfNow(ctx.org.id, m);
       if (!r.attachmentId) return res.status(404).json({ message: r.message ?? "HOVER has no measurement report for this job yet." });

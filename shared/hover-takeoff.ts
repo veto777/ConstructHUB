@@ -588,7 +588,7 @@ export function takeoffQuantityForLine(
   const name = String(line.name ?? "").toLowerCase();
   const pick = (v: number | null, basis: string): TakeoffFill | null =>
     v === null || !Number.isFinite(v) ? null : { quantity: round2(v), basis };
-  const roofy = /roof|shingle|underlay|felt|ice\s*(and|&)?\s*water|decking|sheathing|tear\s*-?off|re-?roof/.test(name);
+  const roofy = /roof|shingle|underlay|felt|ice[\s-]*(and|&)?[\s-]*water|ice[\s-]*shield|ridge[\s-]*cap|hip[\s-]*cap|decking|sheathing|tear\s*-?off|re-?roof/.test(name);
 
   switch (unit) {
     case "sf":
@@ -614,7 +614,9 @@ export function takeoffQuantityForLine(
       if (/step\s*flash/.test(name)) return pick(L.stepFlashing, "step flashing");
       if (/flash/.test(name)) return pick(L.flashing, "flashing");
       if (/rake/.test(name)) return pick(L.rakes, "rakes");
-      if (/gutter|eave|fascia/.test(name)) return pick(L.eaves, "eaves");
+      if (/gutter|eave/.test(name)) return pick(L.eaves, "eaves");
+      // Fascia runs along the eaves AND the rakes (a bare "Fascia" line); "eave fascia" / "rake fascia" match above.
+      if (/fascia/.test(name)) return pick(L.dripEdge, "fascia (eaves + rakes)");
       if (/outside\s*corner/.test(name)) return pick(t.reference.corners.outsideLf, "outside corners");
       if (/inside\s*corner/.test(name)) return pick(t.reference.corners.insideLf, "inside corners");
       if (/starter/.test(name) && /siding/.test(name)) return pick(t.reference.trim.levelStarterLf, "siding starter");
