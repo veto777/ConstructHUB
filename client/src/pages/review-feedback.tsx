@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ReviewPhotoChooser, type ChosenPhoto } from "@/components/review-photo-chooser";
 import {
   Star, Loader2, Copy, ExternalLink, CheckCircle2,
   ThumbsUp, ThumbsDown, MessageSquare, DollarSign, Camera, Download,
@@ -117,6 +118,8 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
   const [copyError, setCopyError] = useState(false);
   const reviewBox = useRef<HTMLTextAreaElement>(null);
   const [photosDownloaded, setPhotosDownloaded] = useState(false);
+  // Photos the homeowner picked from their own project photos (only offered when the contractor attached none).
+  const [chosenPhotos, setChosenPhotos] = useState<ChosenPhoto[] | null>(null);
   // "Skip Photos" is a real choice: without it the photo reminder reopened on every Google click.
   const [photosSkipped, setPhotosSkipped] = useState(false);
   const [showCopyWarning, setShowCopyWarning] = useState(false);
@@ -361,7 +364,7 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
   };
 
   type PhotoItem = { url: string; originalName?: string } | string;
-  const photoItems: PhotoItem[] = reviewData?.photos || [];
+  const photoItems: PhotoItem[] = chosenPhotos ?? reviewData?.photos ?? [];
   const hasPhotos = photoItems.length > 0;
   const photosPending = hasPhotos && !photosDownloaded && !photosSkipped;
   const getPhotoUrl = (p: PhotoItem) => typeof p === "string" ? p : p.url;
@@ -972,6 +975,8 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
               {generatedReview && (
                 <div className="space-y-4">
                   <p className="text-sm font-bold text-center">Follow these steps to leave your review:</p>
+
+                  {!hasPhotos && <ReviewPhotoChooser token={token} companyName={companyName} onChosen={setChosenPhotos} />}
 
                   {hasPhotos && (
                     <div className={`p-4 rounded-xl border-2 transition-all ${

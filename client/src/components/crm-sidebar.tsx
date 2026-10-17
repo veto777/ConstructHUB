@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
   Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, Plus, ChevronDown, Inbox, Phone, LayoutGrid, ArrowUpRight,
   CalendarDays,
-  Camera, PlayCircle, type LucideIcon,
+  Camera, Images, PlayCircle, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { marketingUrl } from "@/lib/site";
@@ -63,6 +63,9 @@ const NAV: {
   // JobCam: every member shoots (field crews included) — no permission gate; the API scopes by project visibility.
   { title: "JobCam", url: "/crm/jobcam", icon: Camera, testid: "link-portal-nav-jobcam",
     active: (l: string) => l.startsWith("/crm/jobcam") || /^\/crm\/projects\/[^/]+\/jobcam/.test(l) },
+  // Photos: every project photo across the jobs (server/crm/photo-library.ts scopes the rows).
+  { title: "Photos", url: "/crm/photos", icon: Images, testid: "link-portal-nav-photos",
+    active: (l: string) => l.startsWith("/crm/photos") },
   // Offered to the seats that write estimates or may see prices; a price-blind crew reaches the
   // estimate on one of their own jobs from the job page (scope lines, no money).
   { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "link-portal-nav-estimates",

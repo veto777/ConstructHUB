@@ -1,5 +1,7 @@
 import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-workspace";
 import { GoogleReport } from "@/components/profile-guard";
+import { CrmReviewPhotos, useReviewHandoff, type ReviewCrmPhoto } from "@/components/crm-photo-sources";
+import type { CrmPhotoClient } from "@/lib/crm-photos";
 import { AiReplySettings } from "@/components/ai-review-replies";
 import { GoogleSurface, GoogleAvatar, GoogleStarRow, GooglePill, GoogleAiOverview, relativeTime } from "@/components/google";
 import { GbpConnection } from "@/components/gbp-connection";
@@ -143,6 +145,24 @@ export default function GoogleReviewsPage() {
   const [messageMode, setMessageMode] = useState<"description" | "personal">("description");
   const [attachedPhotos, setAttachedPhotos] = useState<{ url: string; originalName: string; size: number }[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  // CRM link (components/crm-photo-sources.tsx): the picked client and the ticked CRM project photos.
+  const [crmClient, setCrmClient] = useState<CrmPhotoClient | null>(null);
+  const [crmPhotos, setCrmPhotos] = useState<ReviewCrmPhoto[]>([]);
+  const [crmPickerOpen, setCrmPickerOpen] = useState(false);
+  const pickCrmClient = (c: CrmPhotoClient | null) => {
+    setCrmClient(c);
+    if (!c) return;
+    setClientName(c.name);
+    if (c.email) setClientEmail(c.email);
+    if (c.phone) setClientPhone(c.phone);
+    if (c.address) setClientAddress(c.address);
+  };
+  // "Use in a review request" on the CRM Photos page lands here with the photos (and client) preattached.
+  useReviewHandoff(({ customer, photos }) => {
+    pickCrmClient(customer);
+    setCrmPhotos(photos);
+    setCreateOpen(true);
+  });
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [mediaPickerFolders, setMediaPickerFolders] = useState<{id: number; name: string}[]>([]);
   const [mediaPickerFolderId, setMediaPickerFolderId] = useState<number | null>(null);
@@ -231,7 +251,7 @@ export default function GoogleReviewsPage() {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    if (attachedPhotos.length + files.length > 30) {
+    if (attachedPhotos.length + crmPhotos.length + files.length > 30) {
       toast({ title: "Too many photos", description: "Maximum 30 photos per review request.", variant: "destructive" });
       return;
     }
@@ -297,7 +317,7 @@ export default function GoogleReviewsPage() {
 
   const attachFromMediaLibrary = () => {
     const selectedPhotos = mediaPickerPhotos.filter(p => mediaPickerSelected.has(p.id));
-    const remaining = 30 - attachedPhotos.length;
+    const remaining = 30 - attachedPhotos.length - crmPhotos.length;
     const toAttach = selectedPhotos.slice(0, remaining).map(p => ({ url: p.url, originalName: p.name, size: p.size || 0 }));
     setAttachedPhotos(prev => [...prev, ...toAttach]);
     setShowMediaPicker(false);
@@ -319,6 +339,8 @@ export default function GoogleReviewsPage() {
         projectDescription: messageMode === "description" ? (projectDescription || undefined) : undefined,
         personalMessage: messageMode === "personal" ? (personalMessage || undefined) : undefined,
         photos: attachedPhotos.map(p => ({ url: p.url, originalName: p.originalName })),
+        crmCustomerId: crmClient?.id,
+        crmPhotoIds: crmPhotos.length ? crmPhotos.map(p => p.id) : undefined,
         emailTheme,
         bccEmail: bccEmail.trim() || undefined,
         scheduledFor,
@@ -356,6 +378,8 @@ export default function GoogleReviewsPage() {
       setPersonalMessage("");
       setMessageMode("description");
       setAttachedPhotos([]);
+      setCrmClient(null);
+      setCrmPhotos([]);
       setEmailTheme("navy-orange");
       setBccEmail("");
       setScheduleEnabled(false);
@@ -1353,6 +1377,9 @@ export default function GoogleReviewsPage() {
               </div>
             )}
 
+            <CrmReviewPhotos client={crmClient} onClient={pickCrmClient} crmPhotos={crmPhotos} onCrmPhotos={setCrmPhotos}
+              room={30 - attachedPhotos.length - crmPhotos.length} pickerOpen={crmPickerOpen} onPickerOpen={setCrmPickerOpen} />
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="clientName">Client name *</Label>
@@ -1464,7 +1491,7 @@ export default function GoogleReviewsPage() {
                     <p className="absolute bottom-0 left-0 right-0 truncate bg-black/60 px-1 text-[9px] text-white">{photo.originalName}</p>
                   </div>
                 ))}
-                {attachedPhotos.length < 30 && (
+                {attachedPhotos.length + crmPhotos.length < 30 && (
                   <label
                     className={`flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors hover:border-primary ${uploadingPhotos ? "pointer-events-none opacity-50" : ""}`}
                     data-testid="button-add-photos"
@@ -1487,7 +1514,7 @@ export default function GoogleReviewsPage() {
                     />
                   </label>
                 )}
-                {attachedPhotos.length < 30 && (
+                {attachedPhotos.length + crmPhotos.length < 30 && (
                   <button
                     type="button"
                     onClick={openMediaPicker}
@@ -1499,8 +1526,8 @@ export default function GoogleReviewsPage() {
                   </button>
                 )}
               </div>
-              {attachedPhotos.length > 0 && (
-                <p className="text-xs text-muted-foreground">{attachedPhotos.length}/30 photos attached</p>
+              {attachedPhotos.length + crmPhotos.length > 0 && (
+                <p className="text-xs text-muted-foreground">{attachedPhotos.length + crmPhotos.length}/30 photos attached</p>
               )}
             </div>
 
@@ -1521,6 +1548,16 @@ export default function GoogleReviewsPage() {
                     </div>
                   ) : !mediaPickerFolderId ? (
                     <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => { setShowMediaPicker(false); setCrmPickerOpen(true); }}
+                        className="flex w-full items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                        data-testid="media-source-crm-photos"
+                      >
+                        <FolderOpen className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                        CRM project photos <span className="text-xs text-muted-foreground">— by job and stage</span>
+                        <ChevronDown className="ml-auto h-3 w-3 -rotate-90 text-muted-foreground" aria-hidden="true" />
+                      </button>
                       <p className="text-xs text-muted-foreground">Select a folder to browse photos.</p>
                       {mediaPickerFolders.length === 0 ? (
                         <div className="py-6 text-center text-muted-foreground">

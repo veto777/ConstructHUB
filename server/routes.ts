@@ -17,6 +17,7 @@ import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { presentListing } from "./competitor-analysis";
 import { rateLimit, actorKey, takeBudget } from "./growth-limits";
+import { registerCrmPhotoPlatformRoutes, registerReviewProjectPhotoRoutes, resolveReviewCrmLink, reviewPhotoUrl } from "./crm/photo-library";
 import { ownedBy } from "./ownership";
 import { buildExclusionList } from "./click-guard-exclusions";
 import { GOOGLE_ADS_GUIDE_SECTIONS, GOOGLE_ADS_GUIDE_ORDER } from "./google-ads-guide-content";
@@ -1342,6 +1343,16 @@ export async function registerRoutes(
       fail500(res, "POST /api/photos/upload failed:", err);
     }
   });
+
+  // CRM project photos -> the Photo Optimizer staging and the Media library, and the review page's
+  // token-scoped project photos (server/crm/photo-library.ts).
+  registerCrmPhotoPlatformRoutes(app, getDevUser, (f) => {
+    if (uploadedFiles.size >= 200) return null;
+    const fileId = randomUUID().slice(0, 12);
+    uploadedFiles.set(fileId, { createdAt: Date.now(), originalName: f.originalName, path: f.path, mimetype: f.mimetype });
+    return fileId;
+  });
+  registerReviewProjectPhotoRoutes(app);
 
   app.post("/api/photos/auto-enhance", async (req, res) => {
     try {
@@ -5380,6 +5391,12 @@ function main() {
         req.body.primaryReviewUrl ?? templatePrimaryUrl, googleProfileUrl, otherReviewLinks,
       );
 
+      // Picked CRM client / ticked CRM photos (server/crm/photo-library.ts); a hand-typed request has neither.
+      const crmLink = await resolveReviewCrmLink(req, res, getDevUser, req.body);
+      if (!crmLink) return;
+      const uploadedPhotos = Array.isArray(photos) ? photos : [];
+      if (uploadedPhotos.length + (crmLink.photos?.length ?? 0) > 30) return res.status(400).json({ message: "Maximum 30 photos per review request." });
+
       const token = randomUUID();
       const isScheduled = scheduledFor && new Date(scheduledFor) > new Date();
       const scheduledDate = isScheduled ? new Date(scheduledFor) : null;
@@ -5396,7 +5413,10 @@ function main() {
         primaryReviewUrl,
         projectDescription: projectDescription || templateDesc || null,
         personalMessage: personalMessage || null,
-        photos: photos || [],
+        photos: [...uploadedPhotos, ...(crmLink.photos ?? []).map((p) => ({ url: reviewPhotoUrl(token, p.attachmentId), originalName: p.originalName }))],
+        crmOrgId: crmLink.crmOrgId ?? null,
+        crmCustomerId: crmLink.crmCustomerId ?? null,
+        crmPhotoIds: (crmLink.photos ?? []).map((p) => p.attachmentId),
         token,
         status: isScheduled ? "scheduled" : "sent",
         emailTheme: emailTheme || "navy-orange",

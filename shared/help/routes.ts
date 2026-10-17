@@ -148,6 +148,7 @@ export const HELP_ROUTES: readonly HelpRouteRow[] = [
   {"key":"crm-payment-record","route":"/crm/clients","group":"CRM"},
   {"key":"crm-payment-reverse","route":"/crm/clients","group":"CRM"},
   {"key":"crm-payments","route":"/crm/payments","group":"CRM"},
+  {"key":"crm-photos","route":"/crm/photos","group":"CRM"},
   {"key":"crm-pipeline","route":"/crm/pipeline","group":"CRM"},
   {"key":"crm-pipeline-move","route":"/crm/pipeline","group":"CRM"},
   {"key":"crm-price-floor","route":"/crm/settings","group":"CRM"},

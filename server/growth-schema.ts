@@ -32,6 +32,11 @@ export async function ensureGrowthSchema() {
     DELETE FROM growth_budgets WHERE created_at < now() - interval '62 days';
     ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS google_link_opened boolean NOT NULL DEFAULT false;
     ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS google_link_opened_at timestamp;
+    -- Review requests linked to a CRM client and its project photos (server/crm/photo-library.ts).
+    ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS crm_org_id varchar;
+    ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS crm_customer_id varchar;
+    ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS crm_photo_ids jsonb NOT NULL DEFAULT '[]'::jsonb;
+    ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS client_photo_ids jsonb;
     ALTER TABLE competitor_scans ADD COLUMN IF NOT EXISTS error_message text;
     ALTER TABLE ranking_grid_scans ADD COLUMN IF NOT EXISTS user_id integer;
     CREATE INDEX IF NOT EXISTS ranking_grid_owner_idx ON ranking_grid_scans(user_id);

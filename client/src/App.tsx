@@ -168,6 +168,7 @@ const AccountDeletePage = lazyPage(() => import("@/pages/account-delete"));
 const SupportPage = lazyPage(() => import("@/pages/support"));
 const CrmIntegrationsPage = lazyPage(() => import("@/pages/crm-integrations"));
 const CrmReportsPage = lazyPage(() => import("@/pages/crm-reports"));
+const CrmPhotosPage = lazyPage(() => import("@/pages/crm-photos"));
 const CrmMigratePage = lazyPage(() => import("@/pages/crm-migrate"));
 const CrmAdminPage = lazyPage(() => import("@/pages/crm-admin"));
 const PublicEstimatePage = lazyPage(() => import("@/pages/public-estimate"));
@@ -667,6 +668,7 @@ function PortalRouter() {
       <Route path="/account/delete" component={AccountDeletePage} />
       <Route path="/crm/integrations" component={CrmIntegrationsPage} />
       <Route path="/crm/reports" component={CrmReportsPage} />
+      <Route path="/crm/photos" component={CrmPhotosPage} />
       <Route path="/crm/migrate" component={CrmMigratePage} />
       <Route path="/crm/admin" component={CrmAdminPage} />
       {/* Platform-wide console at the short URL too — every user and org

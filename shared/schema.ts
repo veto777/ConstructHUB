@@ -811,6 +811,13 @@ export const reviewRequests = pgTable("review_requests", {
   // form came first; escalationAlertedAt once the owner alert went out (server/review-escalation.ts).
   privateFeedbackAt: timestamp("private_feedback_at"),
   escalationAlertedAt: timestamp("escalation_alerted_at"),
+  // CRM link (server/crm/photo-library.ts): the CRM client this request was sent to (picked in the composer), the CRM
+  // photos the contractor attached (an allow-list the token photo route serves), and the photos the HOMEOWNER chose
+  // on the review page when the contractor attached none (null = never chosen). Server-set only.
+  crmOrgId: varchar("crm_org_id"),
+  crmCustomerId: varchar("crm_customer_id"),
+  crmPhotoIds: jsonb("crm_photo_ids").notNull().default([]),
+  clientPhotoIds: jsonb("client_photo_ids"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

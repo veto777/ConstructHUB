@@ -237,6 +237,12 @@ const ROUTES: RouteRow[] = [
   R("POST", "/api/crm/attachments", { any: ["manageCustomers", "manageJobs"] }, { body: { kind: "photo" }, effect: true }),
   R("DELETE", "/api/crm/attachments/:id", { any: ["manageCustomers", "manageJobs"] }, { path: (t) => `/api/crm/attachments/${t.attachment}`, effect: true, scoped: true }),
   R("GET", "/api/crm/attachments/:id/file", null, { path: (t) => `/api/crm/attachments/${t.attachment}/file`, scoped: true }),
+  // The photo library (server/crm/photo-library.ts): every member reads it; rows follow the client's visibility.
+  R("GET", "/api/crm/photos", null),
+  R("GET", "/api/crm/photos/jobs", null),
+  R("GET", "/api/crm/photos/clients", null),
+  R("GET", "/api/crm/photos/download.zip", null, { path: (t) => `/api/crm/photos/download.zip?ids=${t.attachment}`, scoped: true }),
+  R("GET", "/api/crm/photos/:id/thumb", null, { path: (t) => `/api/crm/photos/${t.attachment}/thumb`, scoped: true }),
 
   // projects, jobs, schedule
   R("GET", "/api/crm/projects", null),
@@ -577,6 +583,7 @@ describe.each([
       `/api/crm/jobs?projectId=${theirs.project}`, `/api/crm/appointments?projectId=${theirs.project}`,
       `/api/crm/measurements?projectId=${theirs.project}`, `/api/crm/jobcam/media?projectId=${theirs.project}`,
       `/api/crm/attachments?kind=photo&refId=${theirs.customer}`,
+      `/api/crm/photos?customerId=${theirs.customer}`, `/api/crm/photos/jobs?projectId=${theirs.project}`,
     ]) {
       const res = await call("GET", p);
       if (res.status !== 404) leaks.push(`GET ${p} → ${res.status} ${res.text.slice(0, 120)}`);
@@ -594,7 +601,7 @@ describe.each([
       "/api/crm/customers", "/api/crm/customers?paged=1", `/api/crm/customers?q=${tag}`, "/api/crm/projects", "/api/crm/jobs",
       "/api/crm/estimates", "/api/crm/estimates?status=sent,viewed", "/api/crm/schedule", "/api/crm/appointments",
       "/api/crm/activity", "/api/crm/follow-ups", "/api/crm/attention", "/api/crm/measurements", "/api/crm/reports",
-      "/api/crm/attachments", "/api/crm/jobcam/media", "/api/crm/jobcam/projects", `/api/crm/jobcam/media?q=${tag}`,
+      "/api/crm/attachments", "/api/crm/photos?limit=120", "/api/crm/photos/jobs", "/api/crm/photos/clients", "/api/crm/jobcam/media", "/api/crm/jobcam/projects", `/api/crm/jobcam/media?q=${tag}`,
       "/api/crm/invoices", "/api/crm/payments", "/api/crm/inbox", "/api/crm/notifications",
       "/api/crm/customers/export.csv", "/api/crm/stats", "/api/crm/team-activity",
     ];

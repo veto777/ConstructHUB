@@ -680,6 +680,8 @@ export async function ensureCrmSchema(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS crm_attachments_org_idx ON crm_attachments (org_id);
     CREATE INDEX IF NOT EXISTS crm_attachments_ref_idx ON crm_attachments (kind, ref_id);
+    -- The photo library (server/crm/photo-library.ts) lists an org's photos newest first.
+    CREATE INDEX IF NOT EXISTS crm_attachments_org_kind_created_idx ON crm_attachments (org_id, kind, created_at DESC);
     CREATE INDEX IF NOT EXISTS crm_client_comments_customer_idx ON crm_client_comments (customer_id);
     CREATE INDEX IF NOT EXISTS crm_client_comments_org_idx ON crm_client_comments (org_id);
     -- Additive columns, after the CREATE: they used to sit in the "additive columns" block above, which

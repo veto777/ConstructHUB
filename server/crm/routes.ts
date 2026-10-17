@@ -44,6 +44,7 @@ import { registerCrmMigrateRoutes } from "./migrate";
 import { registerCrmDiscountRoutes } from "./discounts";
 import { registerCrmTaxHooks } from "./tax";
 import { registerCrmAttachmentRoutes } from "./attachments";
+import { registerCrmPhotoLibraryRoutes } from "./photo-library";
 import { registerCrmReceiptRoutes } from "./receipts";
 import { registerCrmQuickBidRoutes } from "./quickbid";
 import { registerCrmMessageRoutes } from "./messages";
@@ -391,6 +392,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmDiscountRoutes(app, getDevUser);
   // Client portal v2: pamphlet/estimate/photo attachments + homeowner comments.
   registerCrmAttachmentRoutes(app, getDevUser);
+  // The photo library: every project photo of the org, by job and stage (server/crm/photo-library.ts).
+  registerCrmPhotoLibraryRoutes(app, getDevUser);
   // Receipts-to-date: preview + one-click send; auto-emailed after payments.
   registerCrmReceiptRoutes(app, getDevUser);
   // Quick Bid: per-sqft SKUs priced from the client's latest measurement report.

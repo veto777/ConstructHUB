@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { AppPage, PageHeader, Section, Notice } from "@/components/app-ui";
 import { GoogleSurface } from "@/components/google";
+import { CrmOptimizerSource, type OptimizerCrmFile } from "@/components/crm-photo-sources";
 import {
   Select,
   SelectContent,
@@ -926,6 +927,17 @@ export default function PhotosPage() {
       name: file.name,
     }));
     setUploadedFiles(prev => [...prev, ...newFiles]);
+  };
+
+  // CRM project photos arrive already staged on the server (POST /api/photos/from-crm): the server id is known, so
+  // uploadSingleFile never re-uploads them and the empty File is only a name holder.
+  const addCrmFiles = (files: OptimizerCrmFile[]) => {
+    if (!files.length) return;
+    const added: UploadedFile[] = files.map(f => ({
+      id: `crm-${f.serverId}`, file: new File([], f.originalName, { type: "image/jpeg" }), preview: f.previewUrl, name: f.originalName,
+    }));
+    setUploadedFiles(prev => [...prev, ...added]);
+    setServerFileMap(prev => ({ ...prev, ...Object.fromEntries(added.map((a, i) => [a.id, files[i].serverId])) }));
   };
 
   const removeFile = (id: string) => {
@@ -2258,7 +2270,7 @@ export default function PhotosPage() {
             <p className="text-sm text-muted-foreground">
               Drag and drop photos here, or
             </p>
-            <div className="flex items-center justify-center gap-2 mt-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
               <Button
                 size="sm"
                 variant="outline"
@@ -2288,6 +2300,7 @@ export default function PhotosPage() {
                 <Camera className="h-3.5 w-3.5 mr-1.5" />
                 Camera
               </Button>
+              <CrmOptimizerSource remaining={10 - uploadedFiles.length} onFiles={addCrmFiles} enabled={!!me} />
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground/60">JPG, JPEG, PNG accepted</p>

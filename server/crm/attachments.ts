@@ -173,6 +173,15 @@ export async function storeGeneratedPdf(args: {
   return storeGeneratedFile({ ...args, mime: "application/pdf", ext: "pdf" });
 }
 
+/** The on-disk path of a stored attachment, or null when the row's key would
+ *  escape the storage directory or the file is gone. Readers outside this file
+ *  (the photo library, server/crm/photo-library.ts) resolve through this only. */
+export function storedFilePath(att: { storagePath: string }): string | null {
+  const abs = path.resolve(STORAGE_DIR, att.storagePath);
+  if (!abs.startsWith(path.resolve(STORAGE_DIR) + path.sep) || !fs.existsSync(abs)) return null;
+  return abs;
+}
+
 /** Remove a stored file — callers first prove no row references it. */
 async function unlinkStored(storagePath: string) {
   const abs = path.resolve(STORAGE_DIR, storagePath);

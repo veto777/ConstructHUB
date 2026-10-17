@@ -63,6 +63,7 @@ export { default as e_crm_payment_link } from "./crm/crm-payment-link";
 export { default as e_crm_payment_methods } from "./crm/crm-payment-methods";
 export { default as e_crm_payment_record } from "./crm/crm-payment-record";
 export { default as e_crm_payment_reverse } from "./crm/crm-payment-reverse";
+export { default as e_crm_photos } from "./crm/crm-photos";
 export { default as e_crm_pipeline_move } from "./crm/crm-pipeline-move";
 export { default as e_crm_price_floor } from "./crm/crm-price-floor";
 export { default as e_crm_pricebook_add } from "./crm/crm-pricebook-add";

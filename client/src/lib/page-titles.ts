@@ -178,6 +178,7 @@ export const CRM_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/account/delete": "Delete account",
   "/crm/integrations": "Integrations",
   "/crm/reports": "Reports",
+  "/crm/photos": "Photos",
   "/crm/migrate": "Import",
   "/crm/admin": "Platform admin",
   "/admin": "Platform admin",

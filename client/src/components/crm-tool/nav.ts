@@ -8,7 +8,7 @@
  * a section the seat cannot use is not offered.
  */
 import {
-  BookOpen, Blocks, Building2, CalendarDays, Camera, CreditCard, FileText, Inbox, KanbanSquare, LayoutDashboard,
+  BookOpen, Blocks, Building2, CalendarDays, Camera, CreditCard, FileText, Images, Inbox, KanbanSquare, LayoutDashboard,
   ReceiptText, Ruler, Settings, ShieldCheck, Users,
 } from "lucide-react";
 import type { ToolDef, ToolNavCtx, ToolShellConfig } from "@/components/tool/shell";
@@ -30,6 +30,8 @@ const SECTIONS: (ToolDef & Gate)[] = [
   { key: "schedule", label: "Schedule", icon: CalendarDays, path: "/crm/schedule", to: fixed("/crm/schedule"), groups: [] },
   // Every member shoots (field crews included): no gate; the API scopes by project visibility.
   { key: "jobcam", label: "JobCam", icon: Camera, path: "/crm/jobcam", match: isJobcam, to: fixed("/crm/jobcam"), groups: [] },
+  // Every project photo across the jobs; the API scopes rows like the client pages.
+  { key: "photos", label: "Photos", icon: Images, path: "/crm/photos", to: fixed("/crm/photos"), groups: [] },
   { key: "estimates", label: "Estimates", icon: FileText, path: "/crm/estimates", to: fixed("/crm/estimates"), anyOf: CRM_ESTIMATES_MENU,
     groups: [{ key: "views", items: [
       { key: "all", label: "All estimates", to: fixed("/crm/estimates") },
