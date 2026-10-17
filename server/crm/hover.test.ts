@@ -887,6 +887,14 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     expect(hover.verifyHoverSignature({ ...base, signature256: sig256, signatureSha1: null, hmacSecret: "wrong" })).toBe(false);
     // A signature over a DIFFERENT path must not verify.
     expect(hover.verifyHoverSignature({ ...base, path: "/api/other", signature256: sig256, signatureSha1: null, hmacSecret: secret })).toBe(false);
+    // HOVER's Ruby signer uses the bare media type and may leave Content-MD5 blank.
+    const bare = hover.hoverCanonicalString("application/json", body, RECEIVER_PATH, date);
+    const sigBare = `sha256=42:${createHmac("sha256", secret).update(bare).digest("base64")}`;
+    expect(hover.verifyHoverSignature({ ...base, contentType: "application/json; charset=utf-8", signature256: sigBare, signatureSha1: null, hmacSecret: secret })).toBe(true);
+    const blankMd5 = ["application/json", "", RECEIVER_PATH, date].join(",");
+    const sigBlank = `sha1=42:${createHmac("sha1", secret).update(blankMd5).digest("base64")}`;
+    expect(hover.verifyHoverSignature({ ...base, signature256: null, signatureSha1: sigBlank, hmacSecret: secret })).toBe(true);
+    expect(hover.verifyHoverSignature({ ...base, signature256: null, signatureSha1: sigBlank, hmacSecret: "wrong" })).toBe(false);
     expect(hover.hoverWebhookIdFromHeaders(sig256, null)).toBe("42");
     expect(hover.hoverWebhookIdFromHeaders(null, sig1)).toBe("42");
     expect(hover.hoverWebhookIdFromHeaders(null, null)).toBeNull();

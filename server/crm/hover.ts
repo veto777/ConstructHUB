@@ -315,25 +315,39 @@ const eqSafe = (a: string, b: string) => {
  * the webhook id ("sha256=12345:<sig>") — that id selects WHICH org's secret
  * verifies the payload. sha256 is preferred; the legacy sha1 header is a
  * accepted fallback (HOVER sends both).
+ *
+ * HOVER's reference implementation (Ruby) signs request.content_type, which is
+ * the bare media type ("application/json", parameters stripped), and the docs
+ * say Content-MD5 is the header value or blank when absent while the sample
+ * code hashes the body itself. A receiver that only tries one reading 401s the
+ * real thing (live 2026-10-17: the verification event was refused), so every
+ * documented reading is tried. Each one still needs the per-webhook secret.
  */
 export function verifyHoverSignature(args: {
   signature256: string | null;
   signatureSha1: string | null;
   contentType: string;
+  contentMd5?: string | null;
   rawBody: Buffer;
   path: string;
   date: string;
   webhookId: string;
   hmacSecret: string;
 }): boolean {
-  const canonical = hoverCanonicalString(args.contentType, args.rawBody, args.path, args.date);
-  if (args.signature256) {
-    const expected = `sha256=${args.webhookId}:${createHmac("sha256", args.hmacSecret).update(canonical).digest("base64")}`;
-    if (eqSafe(args.signature256, expected)) return true;
-  }
-  if (args.signatureSha1) {
-    const expected = `sha1=${args.webhookId}:${createHmac("sha1", args.hmacSecret).update(canonical).digest("base64")}`;
-    if (eqSafe(args.signatureSha1, expected)) return true;
+  const types = [...new Set([args.contentType, args.contentType.split(";")[0].trim()])];
+  const md5s = [...new Set([args.contentMd5 ?? null, md5b64(args.rawBody), ""].filter((m): m is string => m !== null))];
+  for (const type of types) {
+    for (const md5 of md5s) {
+      const canonical = [type, md5, args.path, args.date].join(",");
+      if (args.signature256) {
+        const expected = `sha256=${args.webhookId}:${createHmac("sha256", args.hmacSecret).update(canonical).digest("base64")}`;
+        if (eqSafe(args.signature256, expected)) return true;
+      }
+      if (args.signatureSha1) {
+        const expected = `sha1=${args.webhookId}:${createHmac("sha1", args.hmacSecret).update(canonical).digest("base64")}`;
+        if (eqSafe(args.signatureSha1, expected)) return true;
+      }
+    }
   }
   return false;
 }
@@ -1466,8 +1480,22 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     const rawBody = Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.from(JSON.stringify(req.body ?? {}));
     const sig256 = req.headers["hover-signature-256"] as string | undefined;
     const sig1 = req.headers["hover-signature"] as string | undefined;
-    const webhookId = hoverWebhookIdFromHeaders(sig256, sig1);
-    if (!webhookId) return res.status(401).json({ message: "Unsigned webhook" });
+    const evt = req.body ?? {};
+    // The verification handshake is the one event that is safe to act on
+    // unsigned: all it does is hand HOVER back a code with OUR token, and a
+    // forged code verifies nothing. HOVER calls signatures best-effort, so the
+    // handshake may arrive without one; its body names the webhook id.
+    const isHandshake = evt.event === "webhook-verification-code" && Boolean(evt.code);
+    const webhookId = hoverWebhookIdFromHeaders(sig256, sig1)
+      ?? (isHandshake && /^\d+$/.test(String(evt.webhook_id ?? "")) ? String(evt.webhook_id) : null);
+    const refuse = (message: string) => {
+      // Header NAMES and shapes only — never values that could carry a signature.
+      console.warn(`[hover] webhook ${message}: event=${String(evt.event ?? "").slice(0, 40)} id=${webhookId ?? "-"} ` +
+        `sig256=${sig256 ? "yes" : "no"} sig1=${sig1 ? "yes" : "no"} md5=${req.headers["content-md5"] ? "yes" : "no"} ` +
+        `date=${req.headers.date ? "yes" : "no"} type=${String(req.headers["content-type"] || "").slice(0, 60)}`);
+      return res.status(401).json({ message });
+    };
+    if (!webhookId) return refuse("Unsigned webhook");
 
     // HOVER fires the verification-code event immediately on registration —
     // it can race our own persistence of the brand-new webhook row, so retry
@@ -1484,24 +1512,24 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     }
     const conn = (org?.customFields as any)?.hover as HoverConn | undefined;
     const hmacSecret = conn?.webhook?.hmacSecretEnc ? decryptHoverSecret(conn.webhook.hmacSecretEnc) : null;
-    if (!org || !conn || !hmacSecret) return res.status(401).json({ message: "Unknown webhook" });
+    if (!org || !conn || !hmacSecret) return refuse("Unknown webhook");
 
     const ok = verifyHoverSignature({
       signature256: sig256 ?? null,
       signatureSha1: sig1 ?? null,
       contentType: String(req.headers["content-type"] || ""),
+      contentMd5: req.headers["content-md5"] ? String(req.headers["content-md5"]) : null,
       rawBody,
       path: req.path,
       date: String(req.headers.date || ""),
       webhookId,
       hmacSecret,
     });
-    if (!ok) return res.status(401).json({ message: "Bad signature" });
-
-    const evt = req.body ?? {};
+    if (!ok && !isHandshake) return refuse("Bad signature");
+    if (!ok) console.warn(`[hover] webhook handshake for ${webhookId} arrived unsigned or unverifiable — verifying anyway`);
 
     // 1) The verification handshake — activate the webhook at HOVER.
-    if (evt.event === "webhook-verification-code" && evt.code) {
+    if (isHandshake) {
       try {
         const { apiBase } = hoverBases();
         const token = await getHoverAccessToken(org.id);
