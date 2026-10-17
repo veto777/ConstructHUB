@@ -36,6 +36,8 @@ import {
 import { logTeamActivity, projectStageLabel } from "./stats";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
+import { loadActorDirectory, estimateEventActor } from "./actors";
+import { actorLabel } from "@shared/crm-actor";
 import { estimateDefaultsFromOrg, estimateDocText, depositFromBps } from "./doc-defaults";
 import { queueCrmEvent, queueProjectStageChange, customerEventPayload, projectEventPayload } from "./integrations";
 import {
@@ -1382,6 +1384,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .orderBy(desc(crmEstimateEvents.createdAt)).limit(100);
     const [cust] = await db.select().from(crmCustomers)
       .where(eq(crmCustomers.id, e.customerId)).limit(1);
+    // History names who did each step: the member ("Veto Smith (Owner)"),
+    // the client by name, or the automatic source — never the stored id.
+    const dir = await loadActorDirectory(ctx.org.id);
     res.json({
       estimate: presentEstimate(e, ctx),
       items: items.map((i) => presentEstimateItem(i, ctx)),
@@ -1389,6 +1394,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       // redaction the engagement endpoint applies (portal.ts redactIpPrefix).
       events: events.map((ev) => ({
         ...ev,
+        actor: estimateEventActor(ev.actor, dir, cust?.displayName ?? null),
+        actorName: actorLabel(estimateEventActor(ev.actor, dir, cust?.displayName ?? null)),
         // Event payloads can contain totalCents even when the document's
         // monetary fields are hidden from this role.
         meta: ctx.permissions.seePrices ? ev.meta : null,

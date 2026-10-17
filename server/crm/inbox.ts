@@ -26,6 +26,8 @@ import {
 } from "@shared/schema";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
+import { loadActorDirectory } from "./actors";
+import { actorLabel, clientActor } from "@shared/crm-actor";
 import { requireClient, allow as rateAllow } from "./client-auth";
 import { sendWithFallback } from "../email";
 
@@ -129,7 +131,12 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
     const msgs = await db.select().from(crmClientComments)
       .where(and(eq(crmClientComments.orgId, ctx.org.id), eq(crmClientComments.customerId, cust.id)))
       .orderBy(desc(crmClientComments.createdAt)).limit(500);
-    const members = await db.select().from(crmMembers).where(eq(crmMembers.orgId, ctx.org.id));
+    // Names for every author (any status; the owner reads "Name (Owner)").
+    const dir = await loadActorDirectory(ctx.org.id);
+    const memberLabel = (id: string) => {
+      const a = dir.member(id);
+      return a ? actorLabel(a) : "Former team member";
+    };
     const refs = await estimateRefs(ctx.org.id, [...new Set(msgs.map((m) => m.estimateId).filter(Boolean))] as string[]);
 
     res.json({
@@ -138,12 +145,11 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
         id: m.id,
         body: m.body,
         fromClient: !m.authorMemberId,
-        authorName: m.authorMemberId
-          ? (() => { const a = members.find((x) => x.id === m.authorMemberId); return (a?.displayName || a?.email) ?? "Team"; })()
-          : cust.displayName,
-        toMemberName: m.toMemberId
-          ? (() => { const t = members.find((x) => x.id === m.toMemberId); return t ? (t.displayName || t.email) : null; })()
-          : null,
+        author: m.authorMemberId
+          ? dir.member(m.authorMemberId) ?? { kind: "member" as const, name: "Former team member", recorded: true }
+          : clientActor(cust.displayName),
+        authorName: m.authorMemberId ? memberLabel(m.authorMemberId) : actorLabel(clientActor(cust.displayName)),
+        toMemberName: m.toMemberId ? memberLabel(m.toMemberId) : null,
         estimateNumber: m.estimateId ? refs.get(m.estimateId) ?? null : null,
         createdAt: m.createdAt,
         readAt: m.readAt,

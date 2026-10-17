@@ -1,6 +1,7 @@
 import { governmentLinkNotice } from "@shared/government-links";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { ActorName } from "@/components/crm-actor-name";
 import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -607,6 +608,7 @@ export default function CrmProjectPage() {
                       <div className="min-w-0">
                         <div className="text-xs text-muted-foreground">
                           {day(l.logDate)}{l.weather ? ` · ${l.weather}` : ""}{l.crewCount ? ` · ${l.crewCount} crew` : ""}
+                          {l.author && l.author.recorded !== false && <> · <ActorName actor={l.author} /></>}
                         </div>
                         <div className="text-sm mt-1 whitespace-pre-wrap">{l.workCompleted}</div>
                       </div>

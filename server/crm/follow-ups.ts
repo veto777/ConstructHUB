@@ -24,6 +24,7 @@ import {
 import { and, desc, eq, isNull, inArray, or } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { logTeamActivity } from "./stats";
+import { logActivity } from "./activity";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg } from "./divisions";
 import { objectPolicy } from "./object-access";
 
@@ -225,6 +226,13 @@ export function registerCrmFollowUpRoutes(app: Express, getDevUser: GetUser): vo
         type: "followUp",
         title: `followed up with ${cust.displayName}`,
         link: `/crm/clients/${cust.id}`,
+      });
+    }
+    // The client's own Activity names who changed the follow-up.
+    if (parsed.data.markDone || parsed.data.cadenceDays !== undefined) {
+      logActivity(ctx, "followup.updated", {
+        entityType: "customer", entityId: cust.id, customerId: cust.id,
+        meta: { done: !!parsed.data.markDone, ...(parsed.data.cadenceDays !== undefined ? { cadenceDays: parsed.data.cadenceDays } : {}) },
       });
     }
     res.json({

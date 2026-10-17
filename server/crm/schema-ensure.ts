@@ -694,6 +694,11 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS author_member_id varchar;
     ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS estimate_id varchar;
     ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS to_member_id varchar;
+    -- Who added the file (actor attribution): a team member, or a label for client/system sources
+    -- ("Carley Geiss", "HOVER import", "System"). Both null on rows from before this was recorded.
+    ALTER TABLE crm_attachments ADD COLUMN IF NOT EXISTS uploaded_by_member_id varchar;
+    ALTER TABLE crm_attachments ADD COLUMN IF NOT EXISTS uploaded_by_label text;
+    ALTER TABLE crm_attachments ADD COLUMN IF NOT EXISTS uploaded_by_kind text;
   `);
 
   // ── Client 360: contractor notes + financing click log ───────────────────

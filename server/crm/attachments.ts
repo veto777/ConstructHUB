@@ -61,6 +61,9 @@ import { requireDocSession } from "./portal";
 import { sendWithFallback } from "../email";
 import { ESTIMATE_DEFAULT_KIND, fileKeyOf, lockStoragePath } from "./estimate-default-files";
 import { portalBaseUrl } from "../site-context";
+import { logActivity, recordActivity } from "./activity";
+import { loadActorDirectory } from "./actors";
+import { uploadLabelActor, type CrmActor } from "@shared/crm-actor";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -133,10 +136,35 @@ async function storeFile(
   };
 }
 
+/** Who added a file — a member id, or a label for a non-member source. */
+export type AttachmentUploader = {
+  /** The team member who added it (null for client / system sources). */
+  uploadedByMemberId?: string | null;
+  /** "HOVER import", "System", the client's name… Defaults to "System" when no member is given. */
+  uploadedByLabel?: string | null;
+  /** member | client | system. Defaults to member with a member id, else system. */
+  uploadedByKind?: "member" | "client" | "system" | null;
+};
+
+/** The uploader columns for a generated file: a member, else the label, else "System". */
+export function generatedUploader(args: AttachmentUploader): {
+  uploadedByMemberId: string | null; uploadedByLabel: string | null; uploadedByKind: string;
+} {
+  const memberId = args.uploadedByMemberId ?? null;
+  const label = String(args.uploadedByLabel ?? "").trim().slice(0, 200) || null;
+  return {
+    uploadedByMemberId: memberId,
+    uploadedByLabel: label ?? (memberId ? null : "System"),
+    uploadedByKind: args.uploadedByKind ?? (memberId ? "member" : "system"),
+  };
+}
+
 /**
  * Persist a SERVER-GENERATED PDF (the signed contract) through the same
  * storage as uploads — same directory, same containment rule, same gated
  * reads. kind is 'contract', refId the estimate id; the row is the record.
+ * The uploader defaults to "System"; a caller that knows better says so
+ * (HOVER imports pass uploadedByLabel "HOVER import").
  */
 export async function storeGeneratedFile(args: {
   orgId: string;
@@ -146,7 +174,7 @@ export async function storeGeneratedFile(args: {
   buffer: Buffer;
   mime: string;
   ext: string;
-}): Promise<typeof crmAttachments.$inferSelect> {
+} & AttachmentUploader): Promise<typeof crmAttachments.$inferSelect> {
   const storagePath = `${args.orgId}/${randomUUID()}.${args.ext}`;
   const abs = path.join(STORAGE_DIR, storagePath);
   await fs.promises.mkdir(path.dirname(abs), { recursive: true });
@@ -159,6 +187,7 @@ export async function storeGeneratedFile(args: {
     mime: args.mime,
     sizeBytes: args.buffer.length,
     storagePath,
+    ...generatedUploader(args),
   }).returning();
   return row;
 }
@@ -169,7 +198,7 @@ export async function storeGeneratedPdf(args: {
   refId: string | null;
   fileName: string;
   buffer: Buffer;
-}): Promise<typeof crmAttachments.$inferSelect> {
+} & AttachmentUploader): Promise<typeof crmAttachments.$inferSelect> {
   return storeGeneratedFile({ ...args, mime: "application/pdf", ext: "pdf" });
 }
 
@@ -210,7 +239,7 @@ function streamAttachment(res: any, att: typeof crmAttachments.$inferSelect, inl
   fs.createReadStream(abs).pipe(res);
 }
 
-const present = (a: typeof crmAttachments.$inferSelect, url: string) => ({
+const present = (a: typeof crmAttachments.$inferSelect, url: string, uploadedBy: CrmActor | null = null) => ({
   id: a.id,
   kind: a.kind,
   refId: a.refId,
@@ -223,7 +252,49 @@ const present = (a: typeof crmAttachments.$inferSelect, url: string) => ({
   fileKey: fileKeyOf(a.storagePath),
   url: `${url}/${a.id}/file`,
   downloadUrl: `${url}/${a.id}/file`,
+  // Who added it, by name (null on rows from before uploads were attributed).
+  uploadedBy,
 });
+
+/** A stored row's uploader as an actor: the member, else the label, else null (not recorded). */
+export function storedUploader(
+  a: { uploadedByMemberId?: string | null; uploadedByLabel?: string | null; uploadedByKind?: string | null },
+  member: (id: string) => CrmActor | null,
+): CrmActor | null {
+  if (a.uploadedByMemberId) {
+    const m = member(a.uploadedByMemberId);
+    if (m) return m;
+  }
+  if (a.uploadedByLabel) return uploadLabelActor(a.uploadedByLabel, a.uploadedByKind);
+  return null;
+}
+
+/** What an attachment row is, for the activity-log meta (file names only — never storage keys). */
+function attachmentMeta(a: typeof crmAttachments.$inferSelect, extra: Record<string, unknown> = {}) {
+  // The stage tag is a photo-only convention — a PDF named "progress--x.pdf" keeps its name.
+  const stage = a.kind !== "photo" ? null
+    : a.fileName.startsWith("progress--") ? "progress" : a.fileName.startsWith("finished--") ? "finished" : null;
+  return {
+    kind: a.kind,
+    // The parent (customer / estimate id) — lets the audit feed gate a row
+    // for a restricted seat even after the attachment itself is deleted.
+    refId: a.refId,
+    fileName: stage ? a.fileName.slice(stage.length + 2) : a.fileName,
+    stage,
+    ...extra,
+  };
+}
+
+/** The client and document number an attachment hangs off, for the log row. */
+async function attachmentContext(a: typeof crmAttachments.$inferSelect): Promise<{ customerId: string | null; number: string | null }> {
+  if ((a.kind === "photo" || a.kind === "measurement") && a.refId) return { customerId: a.refId, number: null };
+  if ((a.kind === "estimate" || a.kind === "contract") && a.refId) {
+    const [est] = await db.select({ customerId: crmEstimates.customerId, number: crmEstimates.number })
+      .from(crmEstimates).where(and(eq(crmEstimates.id, a.refId), eq(crmEstimates.orgId, a.orgId))).limit(1);
+    return { customerId: est?.customerId ?? null, number: est?.number ?? null };
+  }
+  return { customerId: null, number: null };
+}
 
 /**
  * Who owns this client's communication? The person assigned to the job:
@@ -354,7 +425,9 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       .where(and(...conds))
       .orderBy(desc(crmAttachments.createdAt))
       .limit(500);
-    res.json((await objectPolicy(ctx).filter("attachments", rows)).map((a) => present(a, "/api/crm/attachments")));
+    const dir = await loadActorDirectory(ctx.org.id);
+    res.json((await objectPolicy(ctx).filter("attachments", rows))
+      .map((a) => present(a, "/api/crm/attachments", storedUploader(a, dir.member))));
   });
 
   app.post("/api/crm/attachments", singleFile("file"), async (req: any, res) => {
@@ -415,8 +488,15 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       }
     }
 
-    const [row] = await db.insert(crmAttachments).values(values).returning();
-    res.status(201).json(present(row, "/api/crm/attachments"));
+    const [row] = await db.insert(crmAttachments)
+      .values({ ...values, uploadedByMemberId: ctx.member.id, uploadedByLabel: null, uploadedByKind: "member" }).returning();
+    const where = await attachmentContext(row);
+    logActivity(ctx, "attachment.added", {
+      entityType: "attachment", entityId: row.id, customerId: where.customerId,
+      meta: attachmentMeta(row, { number: where.number }),
+    });
+    const dir = await loadActorDirectory(ctx.org.id);
+    res.status(201).json(present(row, "/api/crm/attachments", storedUploader(row, dir.member)));
   });
 
   app.delete("/api/crm/attachments/:id", async (req: any, res) => {
@@ -452,6 +532,11 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     });
     if (!orphaned) return res.status(404).json({ message: "Attachment not found" });
     if (orphaned.unlink) await unlinkStored(att.storagePath);
+    const where = await attachmentContext(att);
+    logActivity(ctx, "attachment.deleted", {
+      entityType: "attachment", entityId: att.id, customerId: where.customerId,
+      meta: attachmentMeta(att, { number: where.number }),
+    });
     res.json({ ok: true });
   });
 
@@ -491,9 +576,13 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
           eq(crmAttachments.storagePath, src.storagePath)));
       if (on) {
         if (existing.length) return { on: true, defaultId: existing[0].id, changed: false, unlink: false };
+        // The library row is the same file: it keeps whoever ORIGINALLY added
+        // it; who put it in the set is the activity-log row below.
         const [row] = await tx.insert(crmAttachments).values({
           orgId: ctx.org.id, kind: ESTIMATE_DEFAULT_KIND, refId: null,
           fileName: src.fileName, mime: src.mime, sizeBytes: src.sizeBytes, storagePath: src.storagePath,
+          uploadedByMemberId: src.uploadedByMemberId ?? null, uploadedByLabel: src.uploadedByLabel ?? null,
+          uploadedByKind: src.uploadedByKind ?? null,
         }).returning();
         return { on: true, defaultId: row.id, changed: true, unlink: false };
       }
@@ -508,6 +597,11 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     if (result.unlink) await unlinkStored(src.storagePath);
     if (result.changed) {
       console.log(`[crm] member ${ctx.member.id} ${on ? "added" : "removed"} "${src.fileName}" ${on ? "to" : "from"} future estimates (org ${ctx.org.id})`);
+      const where = await attachmentContext(src);
+      logActivity(ctx, on ? "attachment.default_on" : "attachment.default_off", {
+        entityType: "attachment", entityId: result.defaultId ?? src.id, customerId: where.customerId,
+        meta: attachmentMeta(src, { number: where.number }),
+      });
     }
     res.json({ on: result.on, defaultId: result.defaultId });
   });
@@ -546,14 +640,26 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
           eq(crmAttachments.refId, est.id), eq(crmAttachments.storagePath, src.storagePath)))
         .limit(1);
       if (dup) return { row: dup, created: false };
+      // A copy of a library file keeps its ORIGINAL uploader; who attached it
+      // here is the activity-log row below ("attachment.attached").
       const [row] = await tx.insert(crmAttachments).values({
         orgId: ctx.org.id, kind: "estimate", refId: est.id,
         fileName: src.fileName, mime: src.mime, sizeBytes: src.sizeBytes, storagePath: src.storagePath,
+        uploadedByMemberId: src.uploadedByMemberId ?? null, uploadedByLabel: src.uploadedByLabel ?? null,
+        uploadedByKind: src.uploadedByKind ?? null,
       }).returning();
       return { row, created: true };
     });
     if (!out) return res.status(404).json({ message: "Library file not found" });
-    res.status(out.created ? 201 : 200).json(present(out.row, "/api/crm/attachments"));
+    if (out.created) {
+      const where = await attachmentContext(out.row);
+      logActivity(ctx, "attachment.attached", {
+        entityType: "attachment", entityId: out.row.id, customerId: where.customerId,
+        meta: attachmentMeta(out.row, { number: where.number, fromLibrary: true }),
+      });
+    }
+    const dir = await loadActorDirectory(ctx.org.id);
+    res.status(out.created ? 201 : 200).json(present(out.row, "/api/crm/attachments", storedUploader(out.row, dir.member)));
   });
 
   app.get("/api/crm/attachments/:id/file", async (req: any, res) => {
@@ -644,7 +750,15 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     const values = await storeFile(file, PHOTO_MIMES, cust.orgId, "photo", customerId);
     if (!values) return res.status(415).json({ message: "JPEG, PNG or HEIC photos only" });
 
-    const [row] = await db.insert(crmAttachments).values(values).returning();
+    // The client did it: their name is the uploader (refId already links the customer).
+    const clientName = String(cust.displayName ?? "").trim() || "Client";
+    const [row] = await db.insert(crmAttachments)
+      .values({ ...values, uploadedByMemberId: null, uploadedByLabel: clientName.slice(0, 200), uploadedByKind: "client" }).returning();
+    recordActivity({
+      orgId: cust.orgId, actorLabel: "client", action: "attachment.added",
+      entityType: "attachment", entityId: row.id, customerId,
+      meta: attachmentMeta(row, { byClient: true }),
+    });
     res.status(201).json({
       id: row.id,
       fileName: row.fileName,

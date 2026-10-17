@@ -974,7 +974,7 @@ export async function importHoverJobPhotos(
       if (!buffer.length || buffer.length > 15 * 1024 * 1024) { failed++; continue; }
       await storeGeneratedFile({
         orgId, kind: "photo", refId: customerId, fileName, buffer,
-        mime, ext: mime === "image/png" ? "png" : "jpg",
+        mime, ext: mime === "image/png" ? "png" : "jpg", uploadedByLabel: "HOVER import",
       });
       have.add(fileName);
       stored++;
@@ -1300,7 +1300,7 @@ async function attachHoverMeasurementPdf(args: {
       // Another process (or a concurrent request) stored it while we were downloading: reuse theirs.
       const theirs = await existingPdf(tx);
       if (theirs) return theirs;
-      const att = await storeGeneratedPdf({ orgId: args.orgId, kind: "measurement", refId: args.customerId, fileName, buffer: pdf });
+      const att = await storeGeneratedPdf({ orgId: args.orgId, kind: "measurement", refId: args.customerId, fileName, buffer: pdf, uploadedByLabel: "HOVER import", uploadedByKind: "system" });
       return att.id;
     });
     await mergeMeasurementRaw(args.measurementId, {
@@ -1624,6 +1624,7 @@ async function ingestHoverJobInner(
   } catch (e: any) {
     // The PDF is a nice-to-have; the measurement row already stands.
     console.error(`[hover] PDF fetch for job ${jobId} failed:`, String(e?.message || e).slice(0, 200));
+    }
   }
 
   // The project this capture belongs to — an existing one at the address, else a NEW lead project, so the
