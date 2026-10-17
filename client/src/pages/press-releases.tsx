@@ -621,7 +621,7 @@ export default function PressReleasesPage() {
           hint={totalCredits > 0 ? PRESS_TIERS.filter((t) => credits[t] > 0).map((t) => `${credits[t]} ${tierWord(t)}`).join(" · ") : "Pick a package to start"} href={totalCredits > 0 ? undefined : "#packages"} />
         <Stat label="Releases live" value={data ? n(live) : "…"} hint={sent > 0 ? `of ${n(sent)} sent to the wire` : "None sent yet"} testId="press-live" />
         <Stat label="Next autopilot draft" value={!data ? "…" : autopilot?.nextDraftOn ? draftDay(autopilot.nextDraftOn) : autopilot?.enabled ? "Paused" : "Off"} testId="press-next-draft"
-          hint={autopilot?.enabled ? (autopilot.nextDraftOn ? `Day ${autopilot.dayOfMonth} of each month` : "Paused: no credit left") : "Turn it on under Story ideas"} />
+          hint={autopilot?.enabled ? (autopilot.nextDraftOn ? `Day ${autopilot.dayOfMonth} of each month` : "Paused: no credit left") : "Turn it on beside Story ideas"} />
         <Stat label="Reach" value={reachTier && data ? `${n(data.outletCounts[reachTier])}` : "None yet"} testId="press-reach-stat"
           hint={reachTier ? `outlets on ${tierWord(reachTier)}, the tier you have credits for` : "Outlets depend on the package"} />
       </StatGrid>

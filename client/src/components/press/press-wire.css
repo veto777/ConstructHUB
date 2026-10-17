@@ -1,6 +1,7 @@
 /* Page-local editorial layout. Orange follows the existing sidebar brand token,
    while paper, ink, borders and all secondary surfaces follow the active theme. */
 .press-wire {
+  --font-display: 'Fraunces', 'Source Serif 4', Georgia, serif;
   --wire-orange: hsl(var(--sidebar-primary));
   --wire-ink: hsl(222 38% 14%);
   --primary: var(--sidebar-primary);
