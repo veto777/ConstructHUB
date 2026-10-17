@@ -54,6 +54,7 @@ export { default as e_crm_jobcam_tags } from "./crm/crm-jobcam-tags";
 export { default as e_crm_jobcam_timeline } from "./crm/crm-jobcam-timeline";
 export { default as e_crm_jobcam_upload } from "./crm/crm-jobcam-upload";
 export { default as e_crm_lead_new } from "./crm/crm-lead-new";
+export { default as e_crm_leads } from "./crm/crm-leads";
 export { default as e_crm_message_send } from "./crm/crm-message-send";
 export { default as e_crm_migrate_assisted } from "./crm/crm-migrate-assisted";
 export { default as e_crm_migrate } from "./crm/crm-migrate";

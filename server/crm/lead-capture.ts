@@ -25,6 +25,7 @@ import {
   crmCustomers,
   crmLeadSources,
   crmNotificationChannel,
+  crmLeads,
 } from "@shared/schema";
 import { notifyMembers } from "./notify";
 import { queueCrmEvent, customerEventPayload } from "./integrations";
@@ -39,7 +40,7 @@ type GetUser = (req: any, res: any) => any;
 const esc = (s?: string | null) =>
   String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
 
-const clientIp = (req: any) =>
+export const clientIp = (req: any) =>
   String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "")
     .split(",")[0].trim().slice(0, 60);
 
@@ -49,13 +50,13 @@ const IP_LIMIT = 10;
 
 // ── Token ───────────────────────────────────────────────────────────────────
 
-function leadTokenOf(org: typeof crmOrgs.$inferSelect): string | null {
+export function leadTokenOf(org: typeof crmOrgs.$inferSelect): string | null {
   const cf = (org.customFields ?? {}) as Record<string, any>;
   return typeof cf.leadCaptureToken === "string" && cf.leadCaptureToken ? cf.leadCaptureToken : null;
 }
 
 /** Mint (or rotate) the org's token; returns the raw token. */
-async function mintLeadToken(orgId: string): Promise<string> {
+export async function mintLeadToken(orgId: string): Promise<string> {
   const token = `${orgId}.${randomBytes(24).toString("hex")}`;
   const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, orgId)).limit(1);
   const cf = { ...((org?.customFields ?? {}) as Record<string, any>) };
@@ -69,7 +70,7 @@ async function mintLeadToken(orgId: string): Promise<string> {
 }
 
 /** Resolve a presented token to its org, or null. Never leaks which part failed. */
-async function orgForLeadToken(token: string): Promise<typeof crmOrgs.$inferSelect | null> {
+export async function orgForLeadToken(token: string): Promise<typeof crmOrgs.$inferSelect | null> {
   const dot = token.indexOf(".");
   if (dot < 1) return null;
   const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, token.slice(0, dot))).limit(1);
@@ -101,7 +102,7 @@ const leadSchema = z.object({
 });
 
 /** The per-org "Website" lead source, created on first use. */
-async function websiteLeadSourceId(orgId: string): Promise<string> {
+export async function websiteLeadSourceId(orgId: string): Promise<string> {
   const [existing] = await db.select().from(crmLeadSources)
     .where(and(eq(crmLeadSources.orgId, orgId), sql`lower(${crmLeadSources.name}) = 'website'`))
     .limit(1);
@@ -111,7 +112,7 @@ async function websiteLeadSourceId(orgId: string): Promise<string> {
 }
 
 /** The member a website lead belongs to: the org owner's seat. */
-async function orgOwnerMember(org: typeof crmOrgs.$inferSelect) {
+export async function orgOwnerMember(org: typeof crmOrgs.$inferSelect) {
   const members = await db.select().from(crmMembers)
     .where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active")));
   return (
@@ -126,10 +127,13 @@ async function orgOwnerMember(org: typeof crmOrgs.$inferSelect) {
  * when that is a different person. Gated by the org's 'leadReceived'
  * notificationPref (default ON). Best-effort — a dead SMTP never loses a lead.
  */
-async function notifyLeadReceived(
+export async function notifyLeadReceived(
   org: typeof crmOrgs.$inferSelect,
   owner: typeof crmMembers.$inferSelect | null,
   lead: { id: string; name: string; email?: string | null; phone?: string | null; message?: string | null },
+  // A synced website form (server/crm/leads.ts) opens the lead on /crm/leads and says which site it came from;
+  // the hosted form keeps its original wording and opens the client it created.
+  opts: { link?: string; via?: string; waiting?: string } = {},
 ) {
   if (!["inApp","email","sms"].some((c) => crmNotificationChannel(org.customFields, "leadReceived", c as any))) return;
 
@@ -138,7 +142,7 @@ async function notifyLeadReceived(
     org, pref: "leadReceived",
     title: `New website lead — ${lead.name}`,
     body: [lead.email, lead.phone].filter(Boolean).join(" · ") || null,
-    link: `/crm/clients/${lead.id}`,
+    link: opts.link ?? `/crm/clients/${lead.id}`,
   });
   if (!crmNotificationChannel(org.customFields, "leadReceived", "email")) return;
 
@@ -156,10 +160,10 @@ async function notifyLeadReceived(
     to: [...recipients].join(","),
     subject: `🌐 New website lead — ${lead.name}`,
     html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">` +
-      `<p><strong>${esc(lead.name)}</strong> just sent a message through your website lead form.</p>` +
+      `<p><strong>${esc(lead.name)}</strong> just sent a message through ${esc(opts.via ?? "your website lead form")}.</p>` +
       (contact ? `<p>${contact}</p>` : "") +
       (lead.message ? `<p style="white-space:pre-wrap">${esc(lead.message)}</p>` : "") +
-      `<p>The lead is waiting in Clients, tagged <strong>website-lead</strong>.</p></div>`,
+      (opts.waiting ? `<p>${esc(opts.waiting)}</p>` : `<p>The lead is waiting in Clients, tagged <strong>website-lead</strong>.</p>`) + `</div>`,
   } as any).catch((e: any) => console.error("[crm] lead notify failed:", e?.message || e));
 }
 
@@ -243,6 +247,13 @@ export function registerCrmLeadCaptureRoutes(app: Express, getDevUser: GetUser):
       portalToken: randomBytes(24).toString("hex"),
     }).returning();
     queueCrmEvent(org.id, "customer.created", { ...customerEventPayload(created), source: "website_lead" });
+    // The same lead on /crm/leads, already linked to the client it made. Never loses the client if it fails.
+    await db.insert(crmLeads).values({
+      orgId: org.id, source: "website_form", sourceLabel: "ConstructHUB form",
+      name, email: email || null, phone: phone || null, addressLine1: address || null, message: message || null,
+      fields: Object.fromEntries(Object.entries({ name, email, phone, address, message }).filter(([, v]) => !!v)) as Record<string, string>,
+      status: "new", customerId: created.id,
+    }).catch((e: any) => console.error("[crm] website lead row failed:", e?.message || e));
 
     // The bell item opens this lead, not the whole client list.
     notifyLeadReceived(org, owner, { id: created.id, name, email, phone, message })

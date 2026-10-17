@@ -137,6 +137,7 @@ export const HELP_ROUTES: readonly HelpRouteRow[] = [
   {"key":"crm-jobcam-timeline","route":"/crm/jobcam","group":"CRM"},
   {"key":"crm-jobcam-upload","route":"/crm/jobcam","group":"CRM"},
   {"key":"crm-lead-new","route":"/crm/pipeline","group":"CRM"},
+  {"key":"crm-leads","route":"/crm/leads","group":"CRM"},
   {"key":"crm-message-send","route":"/crm","group":"CRM"},
   {"key":"crm-messages","route":"/crm/inbox","group":"CRM"},
   {"key":"crm-migrate","route":"/crm/migrate","group":"CRM"},

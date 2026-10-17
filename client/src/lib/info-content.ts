@@ -88,6 +88,16 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     ],
   },
 
+  leads: {
+    title: "Leads",
+    body: [
+      "Every request for work lands here, wherever it came from: the forms on your own website, the ConstructHUB form, and calls your Call Assistant answered.",
+      "A lead is not a client yet. Call them back, mark them Contacted, and turn them into a client when the job is real. If the person is already one of your clients, the lead shows who.",
+      "To sync your website forms, copy the script under Connect your lead sources and paste it on the page with your form, right before </body>. Nothing about your form changes.",
+      "Example: a homeowner in Columbus, OH fills in the contact form on your site at 9 pm. In the morning the lead is under New with their phone, address and message.",
+    ],
+  },
+
   clients: {
     title: "Clients",
     body: [

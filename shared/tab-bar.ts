@@ -50,6 +50,7 @@ export const CRM_TAB_OPTIONS: readonly TabOption[] = [
   { key: "schedule", label: "Schedule", href: "/crm/schedule" },
   { key: "inbox", label: "Inbox", href: "/crm/inbox", perm: "manageCustomers" },
   { key: "clients", label: "Clients", href: "/crm/clients" },
+  { key: "leads", label: "Leads", href: "/crm/leads", perm: "manageCustomers" },
   { key: "pipeline", label: "Pipeline", href: "/crm/pipeline", match: ["/crm/projects"] },
   { key: "jobcam", label: "JobCam", href: "/crm/jobcam" },
   { key: "estimates", label: "Estimates", href: "/crm/estimates", anyOf: ["manageEstimates", "seePrices"] },

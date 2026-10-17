@@ -405,6 +405,13 @@ const ROUTES: RouteRow[] = [
   R("DELETE", "/api/crm/webhooks/:id", "manageIntegrations", { path: () => `/api/crm/webhooks/${none}` }),
   R("GET", "/api/crm/integrations/lead-capture", "manageIntegrations", { effect: true }),
   R("POST", "/api/crm/integrations/lead-capture/rotate", "manageIntegrations", { effect: true }),
+  // Leads (server/crm/leads.ts). /connect mints the lead-capture token for a seat that may manage integrations.
+  R("GET", "/api/crm/leads", "manageCustomers"),
+  R("GET", "/api/crm/leads/connect", "manageCustomers", { effect: true }),
+  R("GET", "/api/crm/leads/:id", "manageCustomers", { path: () => `/api/crm/leads/${none}` }),
+  R("PATCH", "/api/crm/leads/:id", "manageCustomers", { path: () => `/api/crm/leads/${none}`, body: { status: "nope" } }),
+  R("POST", "/api/crm/leads/:id/convert", "manageCustomers", { path: () => `/api/crm/leads/${none}/convert`, body: { addToPipeline: "x" } }),
+  R("POST", "/api/crm/leads/import", "owner", { body: { nope: true } }),
   R("GET", "/api/crm/integrations/hover/status", "manageIntegrations"),
   R("GET", "/api/crm/integrations/hover/connect", "manageIntegrations", { effect: true }),
   R("GET", "/api/crm/integrations/hover/oauth/callback", "manageIntegrations", { effect: true }),

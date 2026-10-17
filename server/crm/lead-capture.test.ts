@@ -52,6 +52,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await q(`delete from crm_customers where org_id = $1 and display_name like $2`, [ORG_ID, `${RUN} %`]);
+  // The hosted form also files each submission on the Leads list (server/crm/leads.ts).
+  await q(`delete from crm_leads where org_id = $1 and name like $2`, [ORG_ID, `${RUN} %`]);
   await pool.end();
 });
 

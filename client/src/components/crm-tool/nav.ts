@@ -8,7 +8,7 @@
  * a section the seat cannot use is not offered.
  */
 import {
-  BookOpen, Blocks, Building2, CalendarDays, Camera, CreditCard, FileText, Images, Inbox, KanbanSquare, LayoutDashboard,
+  BookOpen, Blocks, Building2, CalendarDays, Camera, CreditCard, FileText, Images, Inbox, KanbanSquare, LayoutDashboard, Magnet,
   ReceiptText, Ruler, Settings, ShieldCheck, Users,
 } from "lucide-react";
 import type { ToolDef, ToolNavCtx, ToolShellConfig } from "@/components/tool/shell";
@@ -23,6 +23,8 @@ const fixed = (to: string) => (_c: ToolNavCtx) => to;
 const SECTIONS: (ToolDef & Gate)[] = [
   { key: "home", label: "Home", icon: LayoutDashboard, path: "/crm", paths: ["/", "/crm/home"], to: fixed("/crm"), groups: [] },
   { key: "clients", label: "Clients", icon: Users, path: "/crm/clients", to: fixed("/crm/clients"), groups: [] },
+  // Every inquiry from every intake (website forms, the hosted form, Call Assistant); gated like its API.
+  { key: "leads", label: "Leads", icon: Magnet, path: "/crm/leads", to: fixed("/crm/leads"), groups: [], perm: "manageCustomers" },
   // Gated like the inbox API (server/crm/inbox.ts: manageCustomers).
   { key: "messages", label: "Messages", icon: Inbox, path: "/crm/inbox", to: fixed("/crm/inbox"), groups: [], perm: "manageCustomers" },
   { key: "pipeline", label: "Pipeline", icon: KanbanSquare, path: "/crm/pipeline", paths: ["/crm/projects"],

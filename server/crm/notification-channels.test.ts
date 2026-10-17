@@ -254,6 +254,7 @@ describe("notification channel matrix (dev server)", () => {
       await q(`delete from crm_customers where id = any($1)`, [customerIds]);
       // Website leads come back as { ok: true } — no id — so they go by name.
       await q(`delete from crm_customers where display_name like $1`, [`Vitest NC ${stamp} Lead %`]);
+      await q(`delete from crm_leads where name like $1`, [`Vitest NC ${stamp} Lead %`]);
     } finally {
       await pool.end();
     }

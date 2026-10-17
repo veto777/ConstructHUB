@@ -26,6 +26,7 @@ import { appForLink, pushSoon } from "../apns";
 import type { OrgVoiceContext } from "./org-profile";
 import type { VoiceProfile } from "@shared/voice-profile";
 import { adoptHoverMeasurementsForProject } from "../crm/hover-share";
+import { recordCallAssistantLead } from "../crm/leads";
 
 /**
  * The state for a call's client/project: the profile's default state, else the one state every service-area
@@ -265,6 +266,13 @@ async function deliverLeadLocked(args: Parameters<typeof deliverLead>[0]): Promi
   }
 
   const alreadyDelivered = !!call.leadDeliveredAt;
+
+  // The same lead on the CRM's Leads list (/crm/leads), one row per call; the end report tops it up.
+  // recordCallAssistantLead never throws, so the call flow cannot break over it.
+  await recordCallAssistantLead({
+    orgId: org.id, callId: call.id, customerId: customer.id, numberLabel: args.numberLabel ?? null,
+    facts, state, summary: call.summary ?? null,
+  });
 
   // The end report for a lead delivered mid-call (before the city, summary and duration existed): fill in this
   // call's own project and the audit row. Only empty fields, the raw slot address and the generated name change.

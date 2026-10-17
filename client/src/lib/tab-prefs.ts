@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Home, Phone, Star, MapPin, Camera, Grid3X3, ShieldCheck, Fingerprint, PhoneCall, ScanSearch, Megaphone, Search,
   Building, Globe, Users, Settings, LayoutDashboard, CalendarDays, Inbox, KanbanSquare, FileText, FilePlus2,
-  ReceiptText, BookOpen, CreditCard, Building2, BarChart3, type LucideIcon,
+  ReceiptText, BookOpen, CreditCard, Building2, BarChart3, Magnet, type LucideIcon,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -30,7 +30,7 @@ export const PLATFORM_TAB_ICONS: Record<string, LucideIcon> = {
 export const CRM_TAB_ICONS: Record<string, LucideIcon> = {
   home: LayoutDashboard, schedule: CalendarDays, inbox: Inbox, clients: Users, pipeline: KanbanSquare, estimates: FileText,
   "new-estimate": FilePlus2, invoices: ReceiptText, pricebook: BookOpen, payments: CreditCard, team: Building2, reports: BarChart3,
-  jobcam: Camera,
+  jobcam: Camera, leads: Magnet,
 };
 
 /** Of the tabs shown, the one for this page: the longest matching path wins ("New estimate" over "Estimates"). */

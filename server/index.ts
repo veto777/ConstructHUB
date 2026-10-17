@@ -56,6 +56,10 @@ app.use(CLIENT_ERROR_PATH, express.json({ limit: CLIENT_ERROR_BODY_LIMIT }));
 // A person's own report (/report-issue): text plus an optional screenshot (≤ 5 MB), capped before the big parser below.
 import { USER_REPORT_PATH, USER_REPORT_BODY_LIMIT } from "./ops/user-reports";
 app.use(USER_REPORT_PATH, express.json({ limit: USER_REPORT_BODY_LIMIT }));
+// The form-sync script's beacons (server/crm/leads.ts): CORS for any site, then the raw body capped at 32 KB in
+// whatever type it came (sendBeacon sends text/plain), before the big parsers below can read it.
+import { registerFormSyncBodyParser } from "./crm/leads";
+registerFormSyncBodyParser(app);
 app.use("/api/ads", express.json({ limit: "512kb" }));
 // Bounded JSON for the GBP posts queue, the SEO suite and mail alerts (review w3-r2 L2): every field is zod-bounded
 // afterwards, but the catch-all below would parse 50 MB into memory first. Sized to the largest valid body: SEO lists

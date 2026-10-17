@@ -154,6 +154,7 @@ const CrmSchedulePage = lazyPage(() => import("@/pages/crm-schedule"));
 const CrmInboxPage = lazyPage(() => import("@/pages/crm-inbox"));
 const CrmCallAssistantPage = lazyPage(() => import("@/pages/crm-call-assistant"));
 const CrmClientsPage = lazyPage(() => import("@/pages/crm-clients"));
+const CrmLeadsPage = lazyPage(() => import("@/pages/crm-leads"));
 const CrmClientPage = lazyPage(() => import("@/pages/crm-client"));
 const CrmPaymentsPage = lazyPage(() => import("@/pages/crm-payments"));
 const CrmEstimatesPage = lazyPage(() => import("@/pages/crm-estimates"));
@@ -647,6 +648,7 @@ function PortalRouter() {
       <Route path="/crm/home" component={CrmHomePage} />
       <Route path="/crm/clients" component={CrmClientsPage} />
       <Route path="/crm/clients/:id" component={CrmClientPage} />
+      <Route path="/crm/leads" component={CrmLeadsPage} />
       <Route path="/crm/schedule" component={CrmSchedulePage} />
       <Route path="/crm/inbox" component={CrmInboxPage} />
       {/* The Call Assistant lives on the platform, not in the CRM (owner, 2026-10-02): old CRM links and
@@ -903,6 +905,7 @@ function AppContent() {
     if (location.startsWith("/crm/jobcam/capture")) return <Suspense fallback={null}><JobcamCapturePage /></Suspense>;
     const section =
       location.startsWith("/crm/clients") ? "Clients" :
+      location.startsWith("/crm/leads") ? "Leads" :
       location.startsWith("/crm/schedule") ? "Schedule" :
       location.startsWith("/crm/inbox") ? "Messages" :
       location.startsWith("/crm/call-assistant") ? "Call Assistant" :

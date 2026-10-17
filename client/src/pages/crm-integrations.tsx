@@ -369,7 +369,7 @@ export default function CrmIntegrationsPage() {
             icon={Magnet}
             title="Lead capture"
             infoKey="lead-capture"
-            description="Embed this form on your website — every submission lands in Clients tagged website-lead, and the owner gets an email."
+            description="Embed this form on your website — every submission lands in Clients tagged website-lead and on the Leads page, and the owner gets an email. To sync the forms your site already has, see Leads."
           />
         </CardHeader>
         <CardContent className="space-y-4">
@@ -422,7 +422,7 @@ export default function CrmIntegrationsPage() {
                     confirmAction({
                       id: "rotate-lead-token",
                       title: "Rotate the lead form link?",
-                      description: "You get a new link and embed code. Every embedded copy and shared link of the old form stops working straight away. This can't be undone — the old link can't be brought back, so the form has to be re-embedded wherever it is used.",
+                      description: "You get a new link and embed code. Every embedded copy and shared link of the old form stops working straight away, and so does the website form script on the Leads page (paste the new one). This can't be undone — the old link can't be brought back, so the form has to be re-embedded wherever it is used.",
                       confirmLabel: "Rotate link",
                       onConfirm: () => rotateLeadToken.mutate(),
                     });

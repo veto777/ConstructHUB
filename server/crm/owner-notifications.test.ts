@@ -228,6 +228,7 @@ describe("owner notifications (dev server)", () => {
       await q(`delete from crm_client_tokens where email like 'vitest.ownotif.%'`);
       await q(`delete from crm_customers where id = any($1)`, [customerIds]);
       await q(`delete from crm_customers where display_name like $1`, [`Vitest Lead ${stamp}%`]);
+      await q(`delete from crm_leads where name like $1`, [`Vitest Lead ${stamp}%`]);
       await q(`delete from crm_members where email like 'vitest.ownotif.%'`);
       await q(`delete from users where email like 'vitest.ownotif.%'`);
     } finally {

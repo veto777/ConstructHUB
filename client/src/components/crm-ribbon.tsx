@@ -3,7 +3,7 @@ import {
   LayoutDashboard, CalendarDays, Inbox, Users, MoreHorizontal,
   KanbanSquare, BookOpen, CreditCard, Building2, Settings, Sun, Moon,
   ShieldCheck, FileText, FilePlus2, ReceiptText, Blocks, Plus, ChevronRight, Phone, LayoutGrid, ArrowUpRight, Trash2, SlidersHorizontal,
-  type LucideIcon,
+  Magnet, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { marketingUrl } from "@/lib/site";
@@ -43,6 +43,10 @@ const MORE_LINKS: {
   active: (l: string) => boolean;
 }[] = [
   // No Call Assistant: it lives on the platform, not in the CRM (owner, 2026-10-02).
+  // Leads sits right after Clients (a bottom tab) in every CRM menu.
+  { title: "Leads", url: "/crm/leads", icon: Magnet, testid: "ribbon-more-leads",
+    infoKey: "leads", perm: "manageCustomers",
+    active: (l) => l.startsWith("/crm/leads") },
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "ribbon-more-pipeline",
     infoKey: "pipeline",
     active: (l) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },

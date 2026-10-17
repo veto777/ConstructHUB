@@ -29,6 +29,7 @@ import { registerCrmPaymentRoutes } from "./payments";
 import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
 import { registerCrmIntegrationRoutes } from "./integrations";
 import { registerCrmLeadCaptureRoutes } from "./lead-capture";
+import { registerCrmLeadRoutes } from "./leads";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
 import { registerCrmReportRoutes } from "./reports";
 import { registerCrmHoverRoutes } from "./hover";
@@ -365,6 +366,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmIntegrationRoutes(app);
   // Lead capture: embeddable website form -> crm_customers + owner email.
   registerCrmLeadCaptureRoutes(app, getDevUser);
+  // Leads: the form-sync script + the one Leads list every intake writes to.
+  registerCrmLeadRoutes(app, getDevUser);
   registerCrmPriceBookRoutes(app, getDevUser);
   registerCrmMeasurementRoutes(app, getDevUser);
   // Measurement report imports (HOVER upload/paste + provider webhook).

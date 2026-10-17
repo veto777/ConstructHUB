@@ -161,6 +161,7 @@ export const CRM_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/crm/home": "Home",
   "/crm/clients": "Clients",
   "/crm/clients/:id": "Client",
+  "/crm/leads": "Leads",
   "/crm/schedule": "Schedule",
   "/crm/inbox": "Messages",
   "/crm/pipeline": "Pipeline",

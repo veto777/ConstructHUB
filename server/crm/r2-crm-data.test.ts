@@ -328,6 +328,8 @@ describe("r2-crm-data against the dev server", () => {
     expect(n).toBeGreaterThan(0);
 
     const del = await api(`/api/crm/customers/${lead.id}?force=1`, { method: "DELETE" }, cookie);
+    // The hosted form also files the submission on the Leads list; it outlives the client, so the fixture removes it.
+    await q(`delete from crm_leads where org_id = $1 and name = $2`, [orgId, name]);
     expect(del.status).toBe(200);
     expect(await bell()).toBe(0);
   });

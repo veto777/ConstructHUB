@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
   Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, Plus, ChevronDown, Inbox, Phone, LayoutGrid, ArrowUpRight,
   CalendarDays,
-  Camera, Images, PlayCircle, type LucideIcon,
+  Camera, Images, PlayCircle, Magnet, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { marketingUrl } from "@/lib/site";
@@ -49,6 +49,10 @@ const NAV: {
     active: (l: string) => l === "/" || l === "/crm" || l === "/crm/home" },
   { title: "Clients", url: "/crm/clients", icon: Users, testid: "link-portal-nav-clients",
     active: (l: string) => l.startsWith("/crm/clients") },
+  // Every inquiry from every intake in one list; gated like its API (server/crm/leads.ts: manageCustomers).
+  { title: "Leads", url: "/crm/leads", icon: Magnet, testid: "link-portal-nav-leads",
+    perm: "manageCustomers",
+    active: (l: string) => l.startsWith("/crm/leads") },
   // Gated like the inbox API (server/crm/inbox.ts: manageCustomers) — field crews and subs got a dead link (audit lane 5).
   { title: "Messages", url: "/crm/inbox", icon: Inbox, testid: "link-portal-nav-messages",
     perm: "manageCustomers",

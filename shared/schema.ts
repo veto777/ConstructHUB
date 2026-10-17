@@ -1847,6 +1847,44 @@ export const crmCustomers = pgTable("crm_customers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+/**
+ * Leads: every inquiry from every intake in one list (/crm/leads), before or after it becomes a client.
+ * Mirror of LEADS_DDL in server/crm/leads.ts (created on boot, never drizzle-kit push).
+ * source: website_form (the hosted ConstructHUB form) | form_sync (the script on the contractor's own site) |
+ * call_assistant | import | manual. external_id is the dedupe key of a source that has one (a call id, an import row).
+ */
+export const CRM_LEAD_LIST_STATUSES = ["new", "contacted", "converted", "archived", "spam"] as const;
+export type CrmLeadStatus = (typeof CRM_LEAD_LIST_STATUSES)[number];
+export const CRM_LEAD_SOURCES = ["website_form", "form_sync", "call_assistant", "import", "manual"] as const;
+export type CrmLeadSource = (typeof CRM_LEAD_SOURCES)[number];
+
+export const crmLeads = pgTable("crm_leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  source: text("source").notNull(),
+  sourceLabel: text("source_label"),
+  name: text("name"),
+  email: text("email"),
+  phone: text("phone"),
+  addressLine1: text("address_line1"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  service: text("service"),
+  message: text("message"),
+  pageUrl: text("page_url"),
+  fields: jsonb("fields").$type<Record<string, string>>(),
+  status: text("status").notNull().default("new"),
+  customerId: varchar("customer_id"),
+  externalId: text("external_id"),
+  receivedAt: timestamp("received_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("crm_leads_org_source_external_uq").on(t.orgId, t.source, t.externalId).where(sql`${t.externalId} IS NOT NULL`),
+]);
+export type CrmLead = typeof crmLeads.$inferSelect;
+
 export const crmProjects = pgTable("crm_projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull(),
