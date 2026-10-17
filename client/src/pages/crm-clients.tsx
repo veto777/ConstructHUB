@@ -163,6 +163,7 @@ export default function CrmClientsPage() {
       }
       for (const k of Object.keys(body)) if (body[k] === "") body[k] = null;
       if (!body.displayName) throw new Error("A client name is required.");
+      if (!body.addressLine1) throw new Error("Enter the client's address.");
       if (body.email && !EMAIL_RE.test(body.email)) throw new Error("Enter a valid email address.");
       return (await apiRequest("POST", `/api/crm/customers${force ? "?force=1" : ""}`, body)).json();
     },
@@ -235,8 +236,8 @@ export default function CrmClientsPage() {
                     onChange={(e) => { setForm({ ...form, phone: e.target.value }); setDupes(null); }} />
                 </div>
                 <div>
-                  <Label htmlFor="c-addr">Service address</Label>
-                  <Input id="c-addr" value={form.addressLine1} maxLength={200}
+                  <Label htmlFor="c-addr">Service address *</Label>
+                  <Input id="c-addr" data-testid="input-client-address" value={form.addressLine1} maxLength={200} autoComplete="street-address"
                     onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} />
                 </div>
                 <div>
@@ -445,7 +446,12 @@ export default function CrmClientsPage() {
                         <MapPin className="h-3 w-3 shrink-0" />
                         <span className="truncate min-w-0">{[c.addressLine1, c.city, c.state].filter(Boolean).join(", ")}</span>
                       </div>
-                    ) : <span className="text-muted-foreground">—</span>}
+                    ) : (
+                      <Link href={`/crm/clients/${c.id}`}>
+                        <span className="text-sm font-medium text-amber-700 dark:text-amber-400 hover:underline cursor-pointer"
+                          data-testid={`client-needs-address-${c.id}`}>Add address</span>
+                      </Link>
+                    )}
                   </td>
                   <td className={`${crmTable.td} hidden sm:table-cell`}>
                     {c.bidStatus && BID_PILL[c.bidStatus] ? (

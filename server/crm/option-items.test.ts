@@ -70,7 +70,7 @@ const line = (name: string, qtyMilli: number, cents: number, taxable = true) => 
 async function estimateFixture(run: string) {
   const cust = await api("/api/crm/customers", {
     method: "POST",
-    body: JSON.stringify({ displayName: `Vitest optit ${run}`, email: `vitest.optit.${run}@example.com` }),
+    body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest optit ${run}`, email: `vitest.optit.${run}@example.com` }),
   }, cookie);
   expect(cust.status).toBe(201);
   const est = await api("/api/crm/estimates", {

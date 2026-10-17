@@ -137,7 +137,7 @@ describe("POST /api/crm/messages against the dev server", () => {
     const r = await api("/api/crm/customers", {
       method: "POST",
       body: JSON.stringify({
-        displayName: `Vitest QM ${run}`,
+        addressLine1: "100 Test St", displayName: `Vitest QM ${run}`,
         email: email ? `vitest.qm.${run}@example.com` : undefined,
       }),
     }, cookie);

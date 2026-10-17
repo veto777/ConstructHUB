@@ -77,7 +77,7 @@ const line = (name: string, qtyMilli: number, cents: number, extra: Record<strin
 async function customerFixture(run: string): Promise<string> {
   const cust = await api("/api/crm/customers", {
     method: "POST",
-    body: JSON.stringify({ displayName: `Vitest estedit ${run}`, email: `vitest.estedit.${run}@example.com` }),
+    body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest estedit ${run}`, email: `vitest.estedit.${run}@example.com` }),
   }, cookie);
   expect(cust.status).toBe(201);
   return cust.body.id as string;

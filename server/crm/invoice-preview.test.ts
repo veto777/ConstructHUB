@@ -45,7 +45,7 @@ beforeAll(async () => {
   }
   orgName = me.body.org.name;
   const cust = await post("/api/crm/customers", {
-    displayName: `R2-r3 Preview Client ${stamp}`,
+    addressLine1: "100 Test St", displayName: `R2-r3 Preview Client ${stamp}`,
     email: `r2-r3-preview-${stamp}@example.com`,
   });
   expect(cust.status).toBe(201);

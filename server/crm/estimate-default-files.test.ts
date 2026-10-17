@@ -83,7 +83,7 @@ describe("estimate attachments — auto-attach library (dev server)", () => {
     }
     cookie = me.cookie;
     const c = await post("/api/crm/customers", {
-      displayName: "Vitest AutoAttach", email: `vitest.autoattach.${Date.now().toString(36)}@example.com`,
+      addressLine1: "100 Test St", displayName: "Vitest AutoAttach", email: `vitest.autoattach.${Date.now().toString(36)}@example.com`,
     }, cookie);
     expect(c.status).toBe(201);
     customerId = c.body.id;

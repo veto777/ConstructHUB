@@ -5,7 +5,7 @@ import { gotoCrm, grantClientSession } from './helpers';
 import { randomUUID } from 'node:crypto';
 
 test('partial and full refunds remain visible on invoices and receipts', async ({ page, crmOrgId }) => {
-  const c = await page.request.post('/api/crm/customers', { data: { displayName: 'Refund fixture' } });
+  const c = await page.request.post('/api/crm/customers', { data: { addressLine1: "100 Test St", displayName: 'Refund fixture' } });
   expect(c.ok()).toBeTruthy();
   const customer = await c.json();
   const r = await page.request.post('/api/crm/invoices', { data: { customerId: customer.id, title: 'Refund fixture', taxRateBps: 0, items: [{ kind: 'labor', name: 'Labor', quantityMilli: 1000, unitPriceCents: 1000 }] } });

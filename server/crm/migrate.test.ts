@@ -231,7 +231,7 @@ describe("migrate endpoints (dev server)", () => {
     const seed = await fetch(`${BASE}/api/crm/customers`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ displayName: name, email }),
+      body: JSON.stringify({ addressLine1: "100 Test St", displayName: name, email }),
     });
     expect(seed.status).toBe(201);
 
@@ -270,7 +270,7 @@ describe("migrate endpoints (dev server)", () => {
     const seed = await fetch(`${BASE}/api/crm/customers`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ displayName: `Migrate Phone ${stamp}`, phone: `(${phone.slice(0, 3)}) ${phone.slice(3, 6)}-${phone.slice(6)}` }),
+      body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Migrate Phone ${stamp}`, phone: `(${phone.slice(0, 3)}) ${phone.slice(3, 6)}-${phone.slice(6)}` }),
     });
     expect(seed.status).toBe(201);
 
@@ -293,7 +293,7 @@ describe("migrate endpoints (dev server)", () => {
     const seed = await fetch(`${BASE}/api/crm/customers`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ displayName: `Migrate Est Client ${stamp}`, email }),
+      body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Migrate Est Client ${stamp}`, email }),
     });
     expect(seed.status).toBe(201);
 

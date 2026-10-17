@@ -19,7 +19,7 @@ test.describe("mobile estimate builder (/crm/estimates/new)", () => {
 
     // Seed through the real API: one client and two flat-price price-book items.
     const custR = await page.request.post("/api/crm/customers", {
-      data: { displayName: `E2E Mobile ${stamp}`, email: `e2e-${stamp}@example.com` },
+      data: { addressLine1: "100 Test St", displayName: `E2E Mobile ${stamp}`, email: `e2e-${stamp}@example.com` },
     });
     if (!custR.ok()) throw new Error(`create customer: ${custR.status()} ${await custR.text()}`);
     const customer = await custR.json();

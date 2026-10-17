@@ -137,7 +137,7 @@ describe("signed contract on approval (dev server)", () => {
       const r = await api("/api/crm/customers", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ displayName: name, email }),
+        body: JSON.stringify({ addressLine1: "100 Test St", displayName: name, email }),
       }, cookie);
       expect(r.status).toBe(201);
       return r.body.id as string;

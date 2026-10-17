@@ -61,10 +61,11 @@ function NewLeadDialog({
   // Existing client: searched server-side — the plain list is the newest 500.
   const [customer, setCustomer] = useState<PickOption | null>(null);
   const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerAddress, setNewCustomerAddress] = useState("");
   const [value, setValue] = useState("");
   const valueError = canSeePrices ? moneyError(value) : null;
 
-  const reset = () => { setName(""); setMode("new"); setCustomer(null); setNewCustomerName(""); setValue(""); };
+  const reset = () => { setName(""); setMode("new"); setCustomer(null); setNewCustomerName(""); setNewCustomerAddress(""); setValue(""); };
 
   const create = useMutation({
     mutationFn: async () => {
@@ -72,10 +73,12 @@ function NewLeadDialog({
       if (mode === "new") {
         const c = await (await apiRequest("POST", "/api/crm/customers", {
           displayName: newCustomerName.trim(),
+          addressLine1: newCustomerAddress.trim(),
         })).json();
         custId = c.id;
       }
       const body: any = { customerId: custId, name: name.trim(), status: firstStage };
+      if (mode === "new") body.addressLine1 = newCustomerAddress.trim();
       const cents = canSeePrices ? parseDollarInput(value) : null;
       if (cents !== null && !Number.isNaN(cents)) body.contractValueCents = cents;
       return (await apiRequest("POST", "/api/crm/projects", body)).json();
@@ -94,7 +97,7 @@ function NewLeadDialog({
     }),
   });
 
-  const ready = name.trim() && (mode === "existing" ? customer : newCustomerName.trim()) && !valueError;
+  const ready = name.trim() && (mode === "existing" ? customer : newCustomerName.trim() && newCustomerAddress.trim()) && !valueError;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
@@ -119,6 +122,9 @@ function NewLeadDialog({
               <Label htmlFor="lead-customer-name">Client name</Label>
               <Input id="lead-customer-name" data-testid="input-lead-customer-name" value={newCustomerName}
                 onChange={(e) => setNewCustomerName(e.target.value)} placeholder="Jane Smith" maxLength={200} />
+              <Label htmlFor="lead-customer-address" className="mt-3 block">Client address</Label>
+              <Input id="lead-customer-address" data-testid="input-lead-customer-address" value={newCustomerAddress}
+                onChange={(e) => setNewCustomerAddress(e.target.value)} placeholder="123 Main St, Columbus, OH" maxLength={200} autoComplete="street-address" />
             </div>
           ) : (
             <div>

@@ -369,7 +369,7 @@ describe("SMS compliance against the dev server", () => {
     const cust = await api("/api/crm/customers", {
       method: "POST",
       body: JSON.stringify({
-        displayName: `Vitest Compliance ${run}`,
+        addressLine1: "100 Test St", displayName: `Vitest Compliance ${run}`,
         email: `vitest.compliance.${run}@example.com`,
         ...(withPhone ? { phone: uniquePhone() } : {}),
       }),

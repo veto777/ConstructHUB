@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => switchOrg(page, ORGS.aspire));
 async function makeClientWithInvoice(page: Page): Promise<{ customerId: string; invoiceId: string; email: string }> {
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const cust = await page.request.post("/api/crm/customers", {
-    data: { displayName: `E2E Pay ${stamp}`, email: `e2e-pay-${stamp}@example.com` },
+    data: { addressLine1: "100 Test St", displayName: `E2E Pay ${stamp}`, email: `e2e-pay-${stamp}@example.com` },
   });
   if (!cust.ok()) throw new Error(`create customer: ${cust.status()} ${await cust.text()}`);
   const customer = await cust.json();
@@ -101,7 +101,7 @@ test.describe("client page = the HUB", () => {
     const guards = watchPage(page);
     const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const cust = await page.request.post("/api/crm/customers", {
-      data: { displayName: `E2E Appt ${stamp}`, email: `e2e-appt-${stamp}@example.com` },
+      data: { addressLine1: "100 Test St", displayName: `E2E Appt ${stamp}`, email: `e2e-appt-${stamp}@example.com` },
     });
     const customer = await cust.json();
 

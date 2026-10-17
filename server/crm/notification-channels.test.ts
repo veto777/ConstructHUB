@@ -167,7 +167,7 @@ describe("notification channel matrix (dev server)", () => {
   async function makeCustomer(label: string) {
     const r = await api(
       "/api/crm/customers",
-      { method: "POST", body: JSON.stringify({ displayName: `Vitest NC ${stamp} ${label}`, email: `vitest.nc.${stamp}.${label}@example.com` }) },
+      { method: "POST", body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest NC ${stamp} ${label}`, email: `vitest.nc.${stamp}.${label}@example.com` }) },
       cookie,
     );
     expect(r.status).toBe(201);
@@ -453,7 +453,7 @@ describe("notification channel matrix (dev server)", () => {
       const lead = await api(`/api/public/leads/${token}`, {
         method: "POST",
         headers: { "x-forwarded-for": ip },
-        body: JSON.stringify({ name, phone: "555-0100", message: "roof leak" }),
+        body: JSON.stringify({ name, address: "100 Test St", phone: "555-0100", message: "roof leak" }),
       });
       expect(lead.status).toBe(201);
 
@@ -473,7 +473,7 @@ describe("notification channel matrix (dev server)", () => {
       const lead = await api(`/api/public/leads/${token}`, {
         method: "POST",
         headers: { "x-forwarded-for": ip.replace(/\d+$/, "99") },
-        body: JSON.stringify({ name, phone: "555-0100", message: "siding" }),
+        body: JSON.stringify({ name, address: "100 Test St", phone: "555-0100", message: "siding" }),
       });
       expect(lead.status).toBe(201);
 

@@ -144,7 +144,7 @@ describe("CRM webhook events fire from their real code paths", () => {
   let customerId = "", projectId = "";
 
   it("customer.created and customer.updated (signed; the portal token never ships)", async () => {
-    const created = await call("/api/crm/customers", { displayName: "Hook Client", email: `hook-${randomUUID()}@example.invalid` });
+    const created = await call("/api/crm/customers", { addressLine1: "100 Test St", displayName: "Hook Client", email: `hook-${randomUUID()}@example.invalid` });
     expect(created.status).toBe(201);
     customerId = created.data.id;
     const d = await delivered("customer.created", (x) => x.customerId === customerId);
@@ -278,7 +278,7 @@ describe("CRM webhook events fire from their real code paths", () => {
   it("only subscribed events are sent, and a failing endpoint is retried three times and logged on the webhook", async () => {
     await pool.query("UPDATE crm_webhooks SET events=$2, failure_count=0 WHERE id=$1", [hookId, ["project.created"]]);
     const n = deliveries.length;
-    await call("/api/crm/customers", { displayName: "Unsubscribed", email: `hook-${randomUUID()}@example.invalid` });
+    await call("/api/crm/customers", { addressLine1: "100 Test St", displayName: "Unsubscribed", email: `hook-${randomUUID()}@example.invalid` });
     await settle();
     expect(deliveries.length).toBe(n);
 

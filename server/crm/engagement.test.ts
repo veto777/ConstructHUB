@@ -154,7 +154,7 @@ describe("expiry + engagement against the dev server", () => {
     const run = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
     const cust = await api("/api/crm/customers", {
       method: "POST",
-      body: JSON.stringify({ displayName: `Vitest Engage ${run}`, email: `vitest.eng.${run}@example.com` }),
+      body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest Engage ${run}`, email: `vitest.eng.${run}@example.com` }),
     }, cookie);
     expect(cust.status).toBe(201);
     const est = await api("/api/crm/estimates", {

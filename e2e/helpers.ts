@@ -245,7 +245,7 @@ export async function makeEstimate(
 ): Promise<{ customerId: string; estimateId: string; token: string }> {
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const cust = await page.request.post("/api/crm/customers", {
-    data: { displayName: opts.name ?? `E2E Public ${stamp}`, email: `e2e-${stamp}@example.com` },
+    data: { addressLine1: "100 Test St", displayName: opts.name ?? `E2E Public ${stamp}`, email: `e2e-${stamp}@example.com` },
   });
   if (!cust.ok()) throw new Error(`create customer: ${cust.status()} ${await cust.text()}`);
   const customer = await cust.json();

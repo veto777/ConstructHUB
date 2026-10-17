@@ -65,7 +65,7 @@ beforeAll(async () => {
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const cust = await api("/api/crm/customers", {
     method: "POST",
-    body: JSON.stringify({ displayName: `Intel Test ${stamp}`, email: `intel-${stamp}@example.com` }),
+    body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Intel Test ${stamp}`, email: `intel-${stamp}@example.com` }),
   });
   expect(cust.status).toBe(201);
   customerId = cust.body.id;

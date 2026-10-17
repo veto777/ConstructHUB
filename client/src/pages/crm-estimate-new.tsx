@@ -177,7 +177,7 @@ export default function CrmEstimateNewPage() {
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [showNew, setShowNew] = useState(false);
-  const [nc, setNc] = useState({ name: "", email: "", phone: "" });
+  const [nc, setNc] = useState({ name: "", email: "", phone: "", address: "" });
   const [dupes, setDupes] = useState<CustomerLite[]>([]);
   const [creating, setCreating] = useState(false);
 
@@ -206,6 +206,7 @@ export default function CrmEstimateNewPage() {
           displayName: nc.name.trim(),
           email: nc.email.trim() || null,
           phone: nc.phone.trim() || null,
+          addressLine1: nc.address.trim() || null,
         }),
       });
       const j = await r.json().catch(() => ({}));
@@ -427,7 +428,7 @@ export default function CrmEstimateNewPage() {
     setDone(null); setStep(1); setCustomer(null); setLines([]);
     setQInput(""); setItemInput(""); setTitle(""); setIntro(""); setDivisionId("");
     setShowNew(false); setDupes([]);
-    setNc({ name: "", email: "", phone: "" });
+    setNc({ name: "", email: "", phone: "", address: "" });
   };
 
   // ── Done ──────────────────────────────────────────────────────────────────
@@ -563,7 +564,9 @@ export default function CrmEstimateNewPage() {
                   className="h-12 text-base" value={nc.email} onChange={(e) => setNc({ ...nc, email: e.target.value })} />
                 <Input data-testid="input-new-client-phone" placeholder="Phone" aria-label="Phone" type="tel" inputMode="tel"
                   className="h-12 text-base" value={nc.phone} onChange={(e) => setNc({ ...nc, phone: e.target.value })} />
-                <Button className="w-full h-12" disabled={!nc.name.trim() || creating}
+                <Input data-testid="input-new-client-address" placeholder="Address *" aria-label="Address" autoComplete="street-address"
+                  className="h-12 text-base" value={nc.address} maxLength={200} onChange={(e) => setNc({ ...nc, address: e.target.value })} />
+                <Button className="w-full h-12" disabled={!nc.name.trim() || !nc.address.trim() || creating}
                   onClick={createClient} data-testid="button-create-client">
                   {creating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
                   Create & use this client

@@ -91,7 +91,7 @@ const leadSchema = z.object({
   email: z.string().trim().email("Enter a valid email address").max(200, "Email is too long (200 characters max)").nullish(),
   phone: z.string().trim().max(40, "Phone number is too long (40 characters max)").nullish(),
   message: z.string().trim().max(5000, "Message is too long (5,000 characters max)").nullish(),
-  address: z.string().trim().max(300, "Address is too long (300 characters max)").nullish(),
+  address: z.string({ required_error: "Add the address of the job", invalid_type_error: "Add the address of the job" }).trim().min(1, "Add the address of the job").max(300, "Address is too long (300 characters max)"),
   // Honeypot: invisible to humans, irresistible to bots. Must come back empty.
   website: z.string().max(300).nullish(),
 }).refine((d) => !!(d.email || d.phone), {

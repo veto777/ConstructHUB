@@ -37,7 +37,10 @@ async function api(path: string, opts: RequestInit = {}, headers: Record<string,
   return { status: res.status, body };
 }
 
-const postLead = (token: string, data: any, headers: Record<string, string> = {}) =>
+// A per-run source IP keeps this file's submissions out of the loopback
+// rate-limit bucket that other suites (and earlier runs) share on the dev server.
+const RUN_IP = `10.79.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}`;
+const postLead = (token: string, data: any, headers: Record<string, string> = { "x-forwarded-for": RUN_IP }) =>
   api(`/api/public/leads/${token}`, { method: "POST", body: JSON.stringify(data) }, headers);
 
 let ORG_ID = "";
@@ -83,10 +86,10 @@ describe("manage endpoints (token lifecycle)", () => {
     expect(rotated.status).toBe(200);
     expect(rotated.body.token).not.toBe(old);
 
-    const stale = await postLead(old, { name: name("stale"), phone: "555-0100", website: "" });
+    const stale = await postLead(old, { address: "100 Test St", name: name("stale"), phone: "555-0100", website: "" });
     expect(stale.status).toBe(404);
 
-    const fresh = await postLead(rotated.body.token, { name: name("fresh"), phone: "555-0100", website: "" });
+    const fresh = await postLead(rotated.body.token, { address: "100 Test St", name: name("fresh"), phone: "555-0100", website: "" });
     expect(fresh.status).toBe(201);
     const rows = await q(`select id from crm_customers where org_id = $1 and display_name = $2`,
       [ORG_ID, name("fresh")]);
@@ -143,7 +146,7 @@ describe("public intake", () => {
 
   it("a filled honeypot gets the same 201 — and creates nothing", async () => {
     const token = await getToken();
-    const res = await postLead(token, { name: name("bot"), email: "bot@example.com", website: "http://spam.example" });
+    const res = await postLead(token, { address: "100 Test St", name: name("bot"), email: "bot@example.com", website: "http://spam.example" });
     expect(res.status).toBe(201);
     expect(res.body).toEqual({ ok: true });
     const rows = await q(`select id from crm_customers where org_id = $1 and display_name = $2`,
@@ -154,7 +157,7 @@ describe("public intake", () => {
   it("rejects an unknown token with 404 on both the header and the submit", async () => {
     const bogus = `${ORG_ID}.deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef`;
     expect((await api(`/api/public/leads/${bogus}`)).status).toBe(404);
-    expect((await postLead(bogus, { name: name("ghost"), phone: "555-0100" })).status).toBe(404);
+    expect((await postLead(bogus, { address: "100 Test St", name: name("ghost"), phone: "555-0100" })).status).toBe(404);
     const rows = await q(`select id from crm_customers where org_id = $1 and display_name = $2`,
       [ORG_ID, name("ghost")]);
     expect(rows.length).toBe(0);
@@ -162,13 +165,45 @@ describe("public intake", () => {
 
   it("a missing name is a 400, never a customer", async () => {
     const token = await getToken();
-    const res = await postLead(token, { name: "  ", email: "x@example.com" });
+    const res = await postLead(token, { address: "100 Test St", name: "  ", email: "x@example.com" });
     expect(res.status).toBe(400);
+  });
+
+  it("a lead with no address (missing or blank) is a 400 asking for it, never a customer", async () => {
+    const token = await getToken();
+    for (const address of ["", "   "]) {
+      const res = await postLead(token, { name: name("noaddr"), phone: "555-0100", address });
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe("Add the address of the job");
+    }
+    // No address key at all is refused too. (Its message is zod's generic
+    // "Required" until the schema gives the field a required_error.)
+    const missing = await postLead(token, { name: name("noaddr"), phone: "555-0100" });
+    expect(missing.status).toBe(400);
+    expect(missing.body.issues?.[0]?.path).toEqual(["address"]);
+    const rows = await q(`select id from crm_customers where org_id = $1 and display_name = $2`,
+      [ORG_ID, name("noaddr")]);
+    expect(rows.length).toBe(0);
+  });
+
+  it("the client-side rule matches: a CRM client create without an address, or a PATCH clearing it, is 400", async () => {
+    const msg = "Enter the client's address.";
+    const create = await api("/api/crm/customers", { method: "POST", body: JSON.stringify({ displayName: name("crm noaddr") }) });
+    expect(create.status).toBe(400);
+    expect(create.body.message).toBe(msg);
+
+    const made = await api("/api/crm/customers?force=1", {
+      method: "POST", body: JSON.stringify({ displayName: name("crm addr"), addressLine1: "100 Test St" }),
+    });
+    expect(made.status).toBe(201);
+    const cleared = await api(`/api/crm/customers/${made.body.id}`, { method: "PATCH", body: JSON.stringify({ addressLine1: "" }) });
+    expect(cleared.status).toBe(400);
+    expect(cleared.body.message).toBe(msg);
   });
 
   it("a lead with no email and no phone is a 400 with a readable reason, never a customer", async () => {
     const token = await getToken();
-    const res = await postLead(token, { name: name("unreachable"), message: "Call me maybe" });
+    const res = await postLead(token, { address: "100 Test St", name: name("unreachable"), message: "Call me maybe" });
     expect(res.status).toBe(400);
     expect(res.body.message).toBe("Add an email or phone so we can reach you");
     const rows = await q(`select id from crm_customers where org_id = $1 and display_name = $2`,
@@ -178,7 +213,7 @@ describe("public intake", () => {
 
   it("an overlong phone explains itself instead of 'Invalid submission'", async () => {
     const token = await getToken();
-    const res = await postLead(token, { name: name("longphone"), phone: "5".repeat(60) });
+    const res = await postLead(token, { address: "100 Test St", name: name("longphone"), phone: "5".repeat(60) });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/phone number is too long/i);
   });
@@ -197,7 +232,7 @@ describe("public intake", () => {
 
     const token = await getToken();
     const ip = `10.78.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}`;
-    const res = await postLead(token, { name: name("linked"), phone: "555-0101" }, { "x-forwarded-for": ip });
+    const res = await postLead(token, { address: "100 Test St", name: name("linked"), phone: "555-0101" }, { "x-forwarded-for": ip });
     expect(res.status).toBe(201);
     const [lead] = await q<{ id: string }>(`select id from crm_customers where org_id = $1 and display_name = $2`,
       [ORG_ID, name("linked")]);
@@ -222,10 +257,10 @@ describe("public intake", () => {
     const ff = { "x-forwarded-for": ip };
 
     for (let i = 1; i <= 10; i++) {
-      const res = await postLead(token, { name: name(`flood ${i}`), phone: "555-0100" }, ff);
+      const res = await postLead(token, { address: "100 Test St", name: name(`flood ${i}`), phone: "555-0100" }, ff);
       expect(res.status).toBe(201);
     }
-    const eleventh = await postLead(token, { name: name("flood 11"), phone: "555-0100" }, ff);
+    const eleventh = await postLead(token, { address: "100 Test St", name: name("flood 11"), phone: "555-0100" }, ff);
     expect(eleventh.status).toBe(201);
     expect(eleventh.body).toEqual({ ok: true });
 

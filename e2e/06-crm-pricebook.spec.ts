@@ -127,7 +127,7 @@ test.describe("price-floor lock", { tag: "@serial" }, () => {
 
       // ── Below-floor pricing: the owner is exempt, a non-owner gets 422. ──
       const cust = await page.request.post("/api/crm/customers", {
-        data: { displayName: `E2E Floor ${stamp}` },
+        data: { addressLine1: "100 Test St", displayName: `E2E Floor ${stamp}` },
       });
       expect(cust.status()).toBe(201);
       const customerId = (await cust.json()).id;

@@ -19,7 +19,7 @@ test.describe("receipts", () => {
 
     // ── Setup through the real API: customer → $1,000 invoice → $400 payment.
     const custRes = await page.request.post("/api/crm/customers", {
-      data: { displayName: `E2E Receipt ${stamp}`, email },
+      data: { addressLine1: "100 Test St", displayName: `E2E Receipt ${stamp}`, email },
     });
     if (!custRes.ok()) throw new Error(`create customer: ${custRes.status()} ${await custRes.text()}`);
     const customer = await custRes.json();

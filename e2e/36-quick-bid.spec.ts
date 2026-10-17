@@ -47,7 +47,7 @@ test.describe("Quick Bid", () => {
 
     // ── Throwaway client + ready HOVER report + two per-sqft SKUs ────────
     const cust = await page.request.post("/api/crm/customers", {
-      data: { displayName: `E2E QuickBid ${STAMP}`, email: EMAIL },
+      data: { addressLine1: "100 Test St", displayName: `E2E QuickBid ${STAMP}`, email: EMAIL },
     });
     expect(cust.status()).toBe(201);
     customerId = (await cust.json()).id;
@@ -73,7 +73,7 @@ test.describe("Quick Bid", () => {
 
     // ── A client WITHOUT a report: the button stays honestly disabled ────
     const bare = await page.request.post("/api/crm/customers", {
-      data: { displayName: `E2E QuickBid Bare ${STAMP}` },
+      data: { addressLine1: "100 Test St", displayName: `E2E QuickBid Bare ${STAMP}` },
     });
     const bareId = (await bare.json()).id;
     await gotoCrm(page, `/crm/clients/${bareId}`);

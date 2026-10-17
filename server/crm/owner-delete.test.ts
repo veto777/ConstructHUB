@@ -56,7 +56,7 @@ const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6
 
 async function makeCustomer(cookie: string | undefined, name: string) {
   const r = await post("/api/crm/customers", {
-    displayName: name, email: `vitest.del.${stamp}.${name.replace(/\W+/g, "").toLowerCase()}@example.com`,
+    addressLine1: "100 Test St", displayName: name, email: `vitest.del.${stamp}.${name.replace(/\W+/g, "").toLowerCase()}@example.com`,
   }, cookie);
   expect(r.status).toBe(201);
   return r.body.id as string;

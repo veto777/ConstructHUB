@@ -235,7 +235,7 @@ describe("reminders + reengagement alerts against the dev server", () => {
     const cust = await api("/api/crm/customers", {
       method: "POST",
       body: JSON.stringify({
-        displayName: `Vitest SMS ${run}`,
+        addressLine1: "100 Test St", displayName: `Vitest SMS ${run}`,
         email: `vitest.sms.${run}@example.com`,
         // Unique per customer — the CRM refuses duplicate phones (409).
         phone: `+1 555 ${String(Math.floor(1000000 + Math.random() * 8999999))}`,
@@ -293,7 +293,7 @@ describe("reminders + reengagement alerts against the dev server", () => {
   it("reminder is refused for drafts and answered estimates", async () => {
     const run = `${Date.now()}`;
     const cust = await api("/api/crm/customers", {
-      method: "POST", body: JSON.stringify({ displayName: `Vitest SMS Draft ${run}`, email: `vitest.sms.d.${run}@example.com` }),
+      method: "POST", body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest SMS Draft ${run}`, email: `vitest.sms.d.${run}@example.com` }),
     }, cookie);
     const draft = await api("/api/crm/estimates", {
       method: "POST",

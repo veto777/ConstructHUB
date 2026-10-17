@@ -62,6 +62,7 @@ test("public form: submit -> success -> lead visible in /crm/clients", async ({ 
   await page.getByTestId("input-lead-name").fill(leadName);
   await page.getByTestId("input-lead-email").fill(`e2e-lead-${stamp}@example.com`);
   await page.getByTestId("input-lead-phone").fill("555-0188");
+  await page.getByTestId("input-lead-address").fill("100 Test St");
   await page.getByTestId("textarea-lead-message").fill("E2E: two bathrooms and a kitchen.");
   await page.getByTestId("button-lead-submit").click();
   await expect(page.getByTestId("text-lead-success")).toBeVisible();

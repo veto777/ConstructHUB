@@ -121,7 +121,7 @@ describe.skipIf(!lane)("document defaults through the CRM routes (lane Postgres)
     expect((await call("/api/crm/me")).status).toBe(200);
     orgId = (await pool.query("SELECT id FROM crm_orgs WHERE owner_user_id=$1", [userId])).rows[0].id;
     expect((await settings("v1")).status).toBe(200);
-    const c = await call("/api/crm/customers", { displayName: "Docdef Client", email: `docdef-${randomUUID()}@example.invalid` });
+    const c = await call("/api/crm/customers", { addressLine1: "100 Test St", displayName: "Docdef Client", email: `docdef-${randomUUID()}@example.invalid` });
     expect(c.status).toBe(201);
     customerId = c.data.id;
   });

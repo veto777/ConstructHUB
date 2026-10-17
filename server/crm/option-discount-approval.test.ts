@@ -69,7 +69,7 @@ const post = (path: string, body: unknown, c = cookie) => api(path, { method: "P
 /** One sent estimate ($20,000 at 7%) with scopes A/B and the given offer. */
 async function setUp(tag: string, opts: { offerBps: number; depositCents?: number | null; withScopes?: boolean }) {
   const run = `${tag}${Date.now().toString(36)}`;
-  const cust = await post("/api/crm/customers", { displayName: `Vitest optdisc ${run}`, email: `vitest.optdisc.${run}@example.com` });
+  const cust = await post("/api/crm/customers", { addressLine1: "100 Test St", displayName: `Vitest optdisc ${run}`, email: `vitest.optdisc.${run}@example.com` });
   expect(cust.status).toBe(201);
   const customerId = cust.body.id as string;
   const est = await post("/api/crm/estimates", {

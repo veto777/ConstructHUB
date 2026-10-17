@@ -69,7 +69,7 @@ beforeAll(async () => {
 async function projectFixture(run: number, label: string) {
   const cust = await api("/api/crm/customers", {
     method: "POST",
-    body: JSON.stringify({ displayName: `Vitest ${label} ${run}`, email: `vitest.${label}.${run}@example.com` }),
+    body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest ${label} ${run}`, email: `vitest.${label}.${run}@example.com` }),
   }, cookie);
   expect(cust.status).toBe(201);
   const proj = await api("/api/crm/projects", {
