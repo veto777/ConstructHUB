@@ -29,3 +29,26 @@ describe("a windowed source that fails is retried in the same pass (CSLB, 2026-1
     expect(lines[0]).toMatch(/cslb-like: load failed/);
   });
 });
+
+describe("a slow CSLB connection is dropped early (2026-10-17)", () => {
+  it("destroys a response below the rate after the sample, and leaves a fast one alone", async () => {
+    const { PassThrough } = await import("node:stream");
+    const { dropIfSlow, SlowDownloadError } = await import("./bulk-sources");
+    vi.useFakeTimers();
+    const slow = new PassThrough(), fast = new PassThrough();
+    const errors: unknown[] = [];
+    slow.on("error", (e) => errors.push(e)); fast.on("error", (e) => errors.push(e));
+    slow.resume(); fast.resume();
+    dropIfSlow(slow, { afterMs: 15_000, minBytesPerSec: 700 * 1024 });
+    const stopFast = dropIfSlow(fast, { afterMs: 15_000, minBytesPerSec: 700 * 1024 });
+    slow.write(Buffer.alloc(2 * 1024 * 1024));          // 2 MB in 15 s: ~137 KB/s
+    fast.write(Buffer.alloc(15 * 1024 * 1024));         // 15 MB in 15 s: 1 MB/s
+    await vi.advanceTimersByTimeAsync(15_001);
+    expect(slow.destroyed).toBe(true);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toBeInstanceOf(SlowDownloadError);
+    expect(String((errors[0] as Error).message)).toMatch(/slow connection \(137 KB\/s in the first 15 s\)/);
+    expect(fast.destroyed).toBe(false);
+    stopFast(); fast.destroy();
+  });
+});

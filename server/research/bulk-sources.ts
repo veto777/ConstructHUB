@@ -26,6 +26,7 @@
 import { flipPerson, personText } from "./person-name";
 import { execFile, spawn } from "node:child_process";
 import type { IncomingMessage } from "node:http";
+import type { Readable } from "node:stream";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -807,23 +808,54 @@ async function cslbNotAFile(url: string, res: IncomingMessage): Promise<string> 
   const start = head.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
   return `CSLB sent ${res.headers["content-type"] ?? "no file"} (HTTP ${res.statusCode}, ${head.length >= 64 * 1024 ? "64 KB+" : `${head.length} bytes`}${start ? `: "${start}"` : ""})`;
 }
+/** A download dropped for its speed: tried again at once on a new connection. */
+export class SlowDownloadError extends Error {}
+
+/**
+ * Drops a response whose first `afterMs` came in below `minBytesPerSec`. CSLB serves each connection from a fast or a
+ * slow server (2026-10-17, minutes apart on vb11: 138 KB/s, then 1 MB/s; curl and Node alike) and ends every download
+ * at about 150 s, so a slow connection can never finish PersonnelData (~86 MB): it is cheaper to reconnect.
+ */
+export function dropIfSlow(res: Readable, opts: { afterMs: number; minBytesPerSec: number }): () => void {
+  let bytes = 0;
+  const count = (c: Buffer) => { bytes += c.length; };
+  res.on("data", count);
+  const timer = setTimeout(() => {
+    res.off("data", count);
+    const rate = bytes / (opts.afterMs / 1000);
+    if (rate < opts.minBytesPerSec) res.destroy(new SlowDownloadError(`slow connection (${Math.round(rate / 1024)} KB/s in the first ${opts.afterMs / 1000} s)`));
+  }, opts.afterMs);
+  (timer as { unref?: () => void }).unref?.();
+  return () => { clearTimeout(timer); res.off("data", count); };
+}
+
+/** ~86 MB in the ~150 s CSLB allows, with room: 700 KB/s. */
+const CSLB_MIN_RATE = 700 * 1024;
+const CSLB_SLOW_TRIES = 8;
+
 async function cslbFile(file: "MasterLicenseData" | "PersonnelData"): Promise<string> {
   const url = `https://www.cslb.ca.gov/OnlineServices/DataPortal/DownLoadFile.ashx?fName=${file}&type=C`;
   let last: unknown;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // Up to 3 failed tries, plus up to CSLB_SLOW_TRIES connections dropped for their speed (15 s each).
+  for (let failed = 0, slow = 0; failed < 3 && slow <= CSLB_SLOW_TRIES; ) {
     // Past the window a retry only gets cut off again: stop, and the previous load stays.
-    if (attempt > 0 && !cslbWindowOpen()) throw new Error(`CSLB download window (09–13 UTC) closed after ${attempt} try(s): ${String((last as any)?.message ?? last)}`);
+    if ((failed > 0 || slow > 0) && !cslbWindowOpen()) throw new Error(`CSLB download window (09–13 UTC) closed after ${failed + slow} try(s): ${String((last as any)?.message ?? last)}`);
     try {
       await rateLimitHost(url, 2000);
       const res = await plainRequest(url, { timeoutMs: 10 * 60_000 });
       if (!/text\/csv/i.test(String(res.headers["content-type"] ?? ""))) throw new Error(await cslbNotAFile(url, res));
-      return await saveResponse(res);
+      // saveResponse pipes the body to its file before the speed counter starts listening.
+      const saving = saveResponse(res);
+      const stop = dropIfSlow(res, { afterMs: 15_000, minBytesPerSec: CSLB_MIN_RATE });
+      try { return await saving; } finally { stop(); }
     } catch (err) {
       // An access denial (401/403, robots.txt, a cooldown too long) is never retried (round 2, decision 6).
       rethrowIfBlocked(err);
       last = err;
+      if (err instanceof SlowDownloadError) { slow++; await new Promise((r) => setTimeout(r, 10_000)); continue; }
+      failed++;
       // 5, then 10 minutes: on 2026-10-16 CSLB sent an empty answer for at least 6 minutes (09:39–09:46 UTC).
-      await new Promise((r) => setTimeout(r, 5 * 60_000 * (attempt + 1)));
+      if (failed < 3) await new Promise((r) => setTimeout(r, 5 * 60_000 * failed));
     }
   }
   throw last;
