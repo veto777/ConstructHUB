@@ -7,7 +7,7 @@ import { AiReplySettings } from "@/components/ai-review-replies";
 import { GoogleSurface, GoogleAvatar, GoogleStarRow, GooglePill, GoogleAiOverview, relativeTime } from "@/components/google";
 import { GbpConnection } from "@/components/gbp-connection";
 import { SamplePreview, showSample } from "@/components/sample-preview";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { inNativeApp } from "@/lib/app-shell";
@@ -1301,16 +1301,22 @@ export default function GoogleReviewsPage() {
 
       {/* ── Send review request ─────────────────────────────────────────── */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto overflow-x-hidden sm:max-w-2xl [&>*]:min-w-0" data-testid="modal-send-review">
-          <DialogHeader>
-            <DialogTitle>Send review request</DialogTitle>
-            <DialogDescription>
-              Your client opens a short public page — no account needed — and rates the job privately from 1 to 10. Every client is heard: at or above your threshold they're invited to review on your primary destination; below it, they can send you private improvement notes and you are alerted at once.
+        {/* A header, scrolling numbered cards, and a Send bar that stays in view; full screen on a phone.
+            min-w-0 on every child keeps long client details from widening the dialog past its edge. */}
+        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl [&>*]:min-w-0 max-sm:left-0 max-sm:top-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0" data-testid="modal-send-review">
+          <DialogHeader className="shrink-0 space-y-1 border-b bg-blue-50 px-4 py-3 pr-12 sm:py-4 text-left dark:bg-blue-950/40 sm:px-6">
+            <DialogTitle className="flex items-center gap-2.5 text-lg font-bold">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white"><Star className="h-4 w-4" aria-hidden="true" /></span>
+              Send review request
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed max-sm:text-xs">
+              Your client rates the job privately from 1 to 10 — no account needed. <span className="font-semibold text-foreground">High scores</span> are invited to review you on Google; <span className="font-semibold text-foreground">low scores</span> come to you privately and you are alerted at once.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-5">
+          <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain bg-muted/50 px-3 py-4 sm:px-6 sm:py-5 [&_label]:font-semibold" data-testid="send-review-body">
+            <SendStep n={1} tone="blue" title="Google Business Profile" hint="Where happy clients are sent to leave their review.">
             <div className="space-y-2">
-              <Label htmlFor="select-gmb-profile">Google Business Profile *</Label>
+              <Label htmlFor="select-gmb-profile" className="sr-only">Google Business Profile *</Label>
               {templates.length > 0 ? (
                 <>
                   <Select value={selectedTemplateId} onValueChange={(val) => {
@@ -1395,11 +1401,13 @@ export default function GoogleReviewsPage() {
                 </div>
               </div>
             )}
+            </SendStep>
 
+            <SendStep n={2} tone="emerald" title="Client & job photos" hint="Pick a CRM client to fill everything in, or type the details by hand.">
             <CrmReviewPhotos client={crmClient} onClient={pickCrmClient} crmPhotos={crmPhotos} onCrmPhotos={setCrmPhotos}
               room={Math.min(30 - attachedPhotos.length, PICK_MAX) - crmPhotos.length} pickerOpen={crmPickerOpen} onPickerOpen={setCrmPickerOpen} />
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="clientName">Client name *</Label>
                 <Input
@@ -1443,9 +1451,11 @@ export default function GoogleReviewsPage() {
                 />
               </div>
             </div>
+            </SendStep>
 
+            <SendStep n={3} tone="violet" title="Message" hint="Describe the job, or write your own note to the client.">
             <div className="space-y-2">
-              <div className="mb-1 flex items-center gap-2">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setMessageMode("description")}
@@ -1492,9 +1502,11 @@ export default function GoogleReviewsPage() {
               )}
             </div>
 
+            </SendStep>
+
+            <SendStep n={4} tone="amber" title="Extra photos" hint="Optional: upload your own or add from your Media Library. Clients can download them for their review.">
             <div className="space-y-2">
-              <Label>Project photos (optional)</Label>
-              <p className="text-xs text-muted-foreground">Attach up to 30 photos — clients can download them to include with their Google review.</p>
+              <Label className="sr-only">Project photos (optional)</Label>
               <div className="flex flex-wrap gap-2">
                 {attachedPhotos.map((photo, i) => (
                   <div key={i} className="group relative h-20 w-20 overflow-hidden rounded-lg border">
@@ -1549,6 +1561,7 @@ export default function GoogleReviewsPage() {
                 <p className="text-xs text-muted-foreground">{attachedPhotos.length + crmPhotos.length}/30 photos attached</p>
               )}
             </div>
+            </SendStep>
 
             {showMediaPicker && (
               <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50" onClick={() => setShowMediaPicker(false)}>
@@ -1653,8 +1666,10 @@ export default function GoogleReviewsPage() {
               </div>
             )}
 
+            <SendStep n={5} tone="slate" title="Delivery" hint="Email look, BCC, and send now or later.">
+            <div className="space-y-4">
             <Collapsible>
-              <CollapsibleTrigger className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <CollapsibleTrigger className="inline-flex items-center gap-1 text-sm font-semibold text-foreground hover:text-primary">
                 <ChevronDown className="h-4 w-4" aria-hidden="true" />Email appearance and deliverability
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3 space-y-5">
@@ -1782,10 +1797,6 @@ export default function GoogleReviewsPage() {
               </CollapsibleContent>
             </Collapsible>
 
-            <Notice tone="info">
-              Every client is asked for a rating and heard. A client at or above your threshold is invited to review on your primary destination (usually Google); below it, they can send you private improvement notes and you are alerted at once.
-            </Notice>
-
             <div className="space-y-3">
               <label className="flex cursor-pointer items-center gap-2" data-testid="checkbox-schedule-toggle">
                 <input
@@ -1794,7 +1805,7 @@ export default function GoogleReviewsPage() {
                   onChange={e => setScheduleEnabled(e.target.checked)}
                 />
                 <CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                <span className="text-sm font-medium">Schedule for later</span>
+                <span className="text-sm font-semibold">Schedule for later</span>
               </label>
 
               {scheduleEnabled && (
@@ -1855,6 +1866,10 @@ export default function GoogleReviewsPage() {
               )}
             </div>
 
+            </div>
+            </SendStep>
+          </div>
+          <div className="shrink-0 space-y-2 border-t bg-background px-4 py-3 sm:px-6 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {!hasGoogleUrl && !selectedTemplateId && clientName && clientEmail && (
               <p className="flex items-center gap-1 text-xs text-destructive">
                 <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1863,7 +1878,7 @@ export default function GoogleReviewsPage() {
             )}
 
             <Button
-              className="w-full"
+              className="h-11 w-full text-base font-semibold"
               onClick={() => createMutation.mutate()}
               disabled={!canSend || createMutation.isPending || (scheduleEnabled && (!scheduleDate || !scheduleTime))}
               data-testid="button-send-review-request"
@@ -2064,6 +2079,32 @@ export default function GoogleReviewsPage() {
         </DialogContent>
       </Dialog>
     </AppPage></GoogleSurface>
+  );
+}
+
+/** One numbered white card of the send-review dialog; each step gets its own color so the form reads at a glance. */
+const STEP_TONES = {
+  blue: ["bg-blue-600", "border-t-blue-500"],
+  emerald: ["bg-emerald-600", "border-t-emerald-500"],
+  violet: ["bg-violet-600", "border-t-violet-500"],
+  amber: ["bg-amber-500", "border-t-amber-400"],
+  slate: ["bg-slate-600", "border-t-slate-400"],
+} as const;
+function SendStep({ n, tone, title, hint, children }: {
+  n: number; tone: keyof typeof STEP_TONES; title: string; hint?: string; children: ReactNode;
+}) {
+  const [badge, edge] = STEP_TONES[tone];
+  return (
+    <section className={`rounded-xl border border-t-[3px] bg-card p-4 shadow-sm sm:p-5 ${edge}`} data-testid={`send-step-${n}`}>
+      <div className="mb-3 flex items-start gap-3">
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${badge}`} aria-hidden="true">{n}</span>
+        <div className="min-w-0">
+          <h3 className="text-base font-bold leading-7">{title}</h3>
+          {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
   );
 }
 

@@ -163,13 +163,13 @@ export function CrmReviewPhotos({ client, onClient, crmPhotos, onCrmPhotos, room
   const short = crmPhotos.length > 0 && crmPhotos.length < Math.min(PICK_MIN, client?.photoCount ?? PICK_MIN);
 
   return (
-    <div className="space-y-3 rounded-lg border bg-muted/20 p-3" data-testid="section-review-crm">
+    <div className="space-y-3 rounded-lg border bg-muted/30 p-3" data-testid="section-review-crm">
       <div className="space-y-1.5">
-        <Label className="flex items-center gap-1.5"><UserRound className="h-3.5 w-3.5" aria-hidden="true" />Select client (optional)</Label>
+        <Label className="flex items-center gap-1.5 font-semibold"><UserRound className="h-3.5 w-3.5" aria-hidden="true" />Select client (optional)</Label>
         {client ? (
           <div className="flex items-center justify-between gap-2 rounded-md border bg-background px-3 py-2" data-testid="selected-review-client">
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{client.name}</p>
+              <p className="truncate text-sm font-bold">{client.name}</p>
               <p className="truncate text-xs text-muted-foreground">{[client.email, client.phone, client.address].filter(Boolean).join(" · ") || "No contact details on file"}</p>
             </div>
             <Button type="button" variant="ghost" size="sm" onClick={() => { onClient(null); onCrmPhotos([]); }} data-testid="button-clear-review-client">
@@ -210,7 +210,7 @@ export function CrmReviewPhotos({ client, onClient, crmPhotos, onCrmPhotos, room
       {client && (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-medium">{client.name}'s job photos — pick {PICK_MIN}–{PICK_MAX} to send</p>
+            <p className="text-sm font-semibold">{client.name}'s job photos — <span className="text-emerald-700 dark:text-emerald-400">pick {PICK_MIN}–{PICK_MAX} to send</span></p>
             <span className={`text-xs ${short ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`} data-testid="text-review-crm-count">
               {crmPhotos.length} of {PICK_MIN}–{PICK_MAX} picked
             </span>
