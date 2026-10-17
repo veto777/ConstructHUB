@@ -2466,6 +2466,9 @@ export const CRM_PB_UNITS = [
 /** Formula symbols the evaluator understands, plus per-item custom placeholders. */
 export const CRM_PB_SYMBOLS = [
   "QTY", "SQUARES", "LF", "SF", "EA", "PITCH", "STORIES", "WASTE", "COST", "PRICE", "HOURS",
+  // From a HOVER takeoff (shared/hover-takeoff.ts takeoffSymbols): siding quote ft² (rounded up), roof quote
+  // ft² and squares (with waste), window + door counts, window united inches.
+  "SIDING_SF", "ROOF_SF", "ROOF_SQ", "WINDOWS", "DOORS", "UI",
 ] as const;
 
 export const crmPbCategories = pgTable("crm_pb_categories", {

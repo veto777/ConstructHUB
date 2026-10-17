@@ -29,6 +29,8 @@ import { estimateDefaultsFromOrg } from "./doc-defaults";
 import { inferSqftMetric, quickBidLine, type SqftMetric } from "./quickbid-math";
 import { nextDocNumber } from "./doc-number";
 import { attachDefaultFilesToEstimate } from "./estimate-default-files";
+import { readTakeoffRules, takeoffOfRow } from "./hover-file";
+import type { HoverTakeoff } from "@shared/hover-takeoff";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -41,12 +43,25 @@ export { inferSqftMetric, quickBidLine } from "./quickbid-math";
 function lineDescription(args: {
   sqftMilli: number; metric: SqftMetric; provider: string;
   wasteBps: number | null; rateCentsPerSqft: number;
+  /** HOVER takeoff quote quantity (already rounded / with waste), when the report has one. */
+  quoteSqft?: number | null;
 }): string {
-  const sqft = (args.sqftMilli / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 });
-  const waste = args.wasteBps ? ` + ${(args.wasteBps / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}% waste` : "";
+  const f = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 1 });
+  const sqft = f(args.sqftMilli / 1000);
   const rate = (args.rateCentsPerSqft / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  if (args.quoteSqft != null) {
+    const how = args.metric === "roof"
+      ? ` + ${(args.wasteBps ?? 0) / 100}% waste = ${f(args.quoteSqft)} sq ft`
+      : `, rounded up to ${f(args.quoteSqft)} sq ft`;
+    return `${sqft} sq ft ${args.metric} area from the ${args.provider} report${how} × $${rate}/sq ft`;
+  }
+  const waste = args.wasteBps ? ` + ${(args.wasteBps / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}% waste` : "";
   return `${sqft} sq ft ${args.metric} area from the ${args.provider} report${waste} × $${rate}/sq ft`;
 }
+
+/** A HOVER report's quote quantity for a metric: siding rounded up, roof with waste (shared/hover-takeoff.ts). */
+const takeoffQuote = (t: HoverTakeoff | null, metric: SqftMetric) =>
+  (metric === "roof" ? t?.roof.quantitySqft : t?.siding.quantitySqft) ?? null;
 
 export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): void {
   async function ctxFor(req: any, res: any, perm?: any): Promise<OrgContext | null> {
@@ -93,6 +108,10 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
       });
     }
 
+    // HOVER reports carry a takeoff: the owner's rules (siding rounded up to 100, roof + 5% waste) are the
+    // quote quantity, applied once — the report's waste % is NOT stacked on top of it.
+    const takeoff = m.provider === "hover" ? takeoffOfRow(m, await readTakeoffRules(ctx.org.id)) : null;
+
     const items = await db.select().from(crmPbItems)
       .where(and(eq(crmPbItems.orgId, ctx.org.id), inArray(crmPbItems.id, p.data.itemIds)));
     const byId = new Map(items.map((i) => [i.id, i]));
@@ -125,9 +144,10 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
           message: `The latest ${m.provider} report for this client has no ${metric} square footage, so "${item.name}" can't be priced from it.`,
         });
       }
-      const { quantityMilli, lineTotalCents } = quickBidLine({
-        rateCentsPerSqft: item.rateCentsPerSqft, sqftMilli, wasteBps: m.wasteSuggestionBps,
-      });
+      const quote = takeoffQuote(takeoff, metric);
+      const { quantityMilli, lineTotalCents } = quote !== null
+        ? quickBidLine({ rateCentsPerSqft: item.rateCentsPerSqft, sqftMilli: Math.round(quote * 1000), wasteBps: 0 })
+        : quickBidLine({ rateCentsPerSqft: item.rateCentsPerSqft, sqftMilli, wasteBps: m.wasteSuggestionBps });
       lines.push({ item, metric, quantityMilli, lineTotalCents });
     }
 
@@ -167,6 +187,7 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
         sqftMilli: (l.metric === "roof" ? m.roofAreaSfMilli : m.wallAreaSfMilli) ?? 0,
         metric: l.metric, provider: m.provider,
         wasteBps: m.wasteSuggestionBps, rateCentsPerSqft: l.item.rateCentsPerSqft ?? 0,
+        quoteSqft: takeoffQuote(takeoff, l.metric),
       }),
       quantityMilli: l.quantityMilli, unit: "sf",
       unitPriceCents: l.item.rateCentsPerSqft ?? 0,

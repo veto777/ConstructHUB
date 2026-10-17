@@ -46,6 +46,13 @@ async function api(path: string, opts: RequestInit = {}) {
 // ── The HOVER stub ──────────────────────────────────────────────────────────
 
 const PDF_BYTES = Buffer.from("%PDF-1.4 stub hover measurements pdf");
+const PREMIUM_PDF = Buffer.from("%PDF-1.7 stub hover PRO PREMIUM measurements pdf");
+const STORAGE_PDF = Buffer.from("%PDF-1.7 stub hover measurements pdf from storage");
+/** A REAL HOVER full_json (version 2), anonymised (address, ids, image ids replaced). */
+const V2_FULL_JSON = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "__fixtures__", "hover-full-json-v2.anon.json"), "utf8"));
+/** A second origin standing in for HOVER's file storage (the PDF redirect target) — it rejects a bearer, like S3. */
+const STORAGE_PORT = STUB_PORT + 3;
+const STORAGE = `http://127.0.0.1:${STORAGE_PORT}`;
 
 const FULL_JSON = {
   roof: { total_roof_area_sqft: 2874.5, predominant_pitch: "6/12", waste_percent: 12 },
@@ -75,6 +82,28 @@ function stubJob(id: number, email: string | null) {
     ...(id === 9001
       ? { machete_blob: { OptInFeature: { designProUrl: `https://hover.to/3d/${id}` } } }
       : {}),
+  };
+}
+
+/** A v3 job carrying real-shaped models[]: a FAILED model first, then the completed one whose deliverables we read. */
+function stubJobV2(
+  id: number, modelId: number,
+  contact: { name?: string; email?: string; phone?: string } | null,
+  location: { line1: string; city?: string; state?: string; zip: string },
+) {
+  const m = (mid: number) => `${STUB}/api/v3/models/${mid}/artifacts`;
+  return {
+    id,
+    name: `Takeoff job ${id}`,
+    contact: contact ?? {},
+    address: { location_line_1: location.line1, city: location.city ?? "Testville", region: location.state ?? "WA", postal_code: location.zip },
+    models: [
+      { id: modelId - 1000, state: "failed", artifacts: { measurements: { pdf: `${m(modelId - 1000)}/measurements.pdf` } } },
+      {
+        id: modelId, state: "completed",
+        artifacts: { measurements: { pdf: `${m(modelId)}/measurements.pdf`, full_json: `${m(modelId)}/measurements.json?version=full_json` } },
+      },
+    ],
   };
 }
 
@@ -141,6 +170,10 @@ const stub = {
   /** HOVER job shares (GET /api/v1/job_shares?current_user_id=601). */
   jobShares: [] as any[],
   failPhotos: false,
+  /** Every request the stub served (the back-fill must not add any). */
+  requests: 0,
+  premiumHits: [] as { modelId: string; auth: boolean }[],
+  storage: null as http.Server | null,
   nextWebhookId: 55501,
   currentRefreshToken: "rt-1",
   accessCounter: 0,
@@ -175,6 +208,7 @@ async function fireVerificationEvent(wh: StubWebhook) {
 
 function startStub(): Promise<void> {
   stub.server = http.createServer(async (req, res) => {
+    stub.requests++;
     const url = new URL(req.url || "/", STUB);
     const chunks: Buffer[] = [];
     for await (const c of req) chunks.push(c as Buffer);
@@ -309,9 +343,39 @@ function startStub(): Promise<void> {
       return res.end(Buffer.from("ffd8ffe0 stub", "hex"));
     }
 
+    // ── Model deliverables (full_json v2, the premium PDF, the documented PDF → storage redirect) ──
+    if (/^\/api\/v3\/models\/\d+\/artifacts\/measurements\.json$/.test(url.pathname)) {
+      if (url.searchParams.get("version") !== "full_json") return json(200, { note: "summary variant" });
+      return json(200, V2_FULL_JSON);
+    }
+    const prem = /^\/api\/v1\/models\/(\d+)\/pro_premium_measurements$/.exec(url.pathname);
+    if (prem) {
+      stub.premiumHits.push({ modelId: prem[1], auth: !!req.headers.authorization });
+      if (!req.headers.authorization) return json(401, { error: "unauthorized" });
+      if (prem[1] === "77002") return json(404, { error: "no premium report for this model" });
+      res.writeHead(200, { "content-type": "application/pdf" });
+      return res.end(PREMIUM_PDF);
+    }
+    const docPdf = /^\/api\/v3\/models\/(\d+)\/artifacts\/measurements\.pdf$/.exec(url.pathname);
+    if (docPdf) {
+      res.writeHead(302, { location: `${STORAGE}/files/${docPdf[1]}.pdf?X-Amz-Signature=stub` });
+      return res.end();
+    }
+
     json(404, { error: `stub: no route ${req.method} ${url.pathname}` });
   });
-  return new Promise((resolve) => stub.server!.listen(STUB_PORT, "127.0.0.1", resolve));
+  stub.storage = http.createServer((req, res) => {
+    stub.requests++;
+    if (req.headers.authorization) {
+      res.writeHead(400, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ error: "Only one auth mechanism allowed" }));
+    }
+    res.writeHead(200, { "content-type": "application/pdf" });
+    res.end(STORAGE_PDF);
+  });
+  return new Promise((resolve) => stub.server!.listen(STUB_PORT, "127.0.0.1", () => {
+    stub.storage!.listen(STORAGE_PORT, "127.0.0.1", resolve);
+  }));
 }
 
 // ── The suite ───────────────────────────────────────────────────────────────
@@ -352,6 +416,10 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
       'twin2@example.com', 'twin-new@example.com', 'fresh-face@example.com',
       'different-9004@example.com', 'noname-9010@example.com', 'conc-9011@example.com',
       'flaky-9012@example.com', 'adopt-9015@example.com')`, [orgId]);
+    // Auto-created HOVER projects (takeoff tests) go before their customers.
+    await q(`update crm_measurements set project_id = null where org_id = $1 and external_id like 'hover:%'`, [orgId]);
+    await q(`delete from crm_projects where org_id = $1 and custom_fields ->> 'hoverAutoCreated' = 'true'`, [orgId]);
+    await q(`delete from crm_customers where org_id = $1 and email = 'takeoff-9100@example.com'`, [orgId]);
     // Staff-scrubbed customers carry no email — sweep by the flow's marker.
     await q(`delete from crm_customers where org_id = $1 and custom_fields ->> 'hoverAutoCreated' = 'true'`, [orgId]);
     await q(`delete from crm_members where org_id = $1 and email = 'staff-scrub@example.com'`, [orgId]);
@@ -363,6 +431,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     }
     try { fs.unlinkSync(STUB_FILE); } catch {}
     await new Promise((r) => stub.server?.close(r));
+    await new Promise((r) => stub.storage?.close(r));
     await pool.end();
   });
 
@@ -882,6 +951,203 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     expect(m.length).toBe(1);
     expect(m[0].customer_id).toBe(custs[0].id);
     expect((m[0].raw_payload as any).adoptedVia).toBe("created");
+  });
+
+  // ── The complete file: takeoff + premium PDF + auto project (real full_json v2) ─────────
+
+  const m9100 = async () => (await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9100'`, [orgId]))[0];
+
+  it("v2 job → takeoff columns, the premium PDF and a lead project: one complete file, never duplicated", async () => {
+    stub.extraJobs.set(9100, stubJobV2(9100, 77001,
+      { name: "Tess Takeoff", email: "takeoff-9100@example.com" },
+      { line1: "100 Example Lane", zip: "98000" }));
+    await fireCompleted(9100);
+
+    const m = await m9100();
+    expect(m).toBeTruthy();
+    // Measured values in the columns (the quote quantities live in raw_payload.takeoff).
+    expect(m.squares_milli).toBe(23030);
+    expect(m.roof_area_sf_milli).toBe(2303000);
+    expect(m.wall_area_sf_milli).toBe(2169000);
+    expect(m.perimeter_lf_milli).toBe(268420);      // drip edge = rakes + eaves
+    expect(m.eave_lf_milli).toBe(121670);
+    expect(m.rake_lf_milli).toBe(146750);
+    expect(m.valley_lf_milli).toBe(37920);
+    expect(m.ridge_lf_milli).toBe(80330);
+    expect(m.predominant_pitch).toBe("8/12");
+    expect(m.stories).toBe(2);
+    expect(m.facet_count).toBe(7);
+    expect(m.waste_suggestion_bps).toBe(500);
+    const raw = m.raw_payload as any;
+    expect(raw.hoverModelId).toBe("77001");           // the COMPLETED model, not the failed one listed first
+    expect(raw.takeoff.siding).toMatchObject({ areaSqft: 2169, quantitySqft: 2200 });
+    expect(raw.takeoff.roof).toMatchObject({ areaSqft: 2303, wastePct: 5, quantitySqft: 2418, squares: 24.18 });
+    expect(raw.takeoff.counts).toEqual({ windows: 9, doors: 4, windowGroups: 8 });
+    expect(raw.summary).toMatchObject({ roofSqft: 2303, sidingSqft: 2169, windowsCount: 9, stories: 2, pitch: "8/12" });
+
+    // The PREMIUM PDF, fetched with the bearer, stored as the gated measurement attachment.
+    expect(raw.pdfSource).toBe("pro_premium");
+    expect(stub.premiumHits).toContainEqual({ modelId: "77001", auth: true });
+    const dl = await fetch(`${BASE}/api/crm/attachments/${raw.pdfAttachmentId}/file`);
+    expect(dl.status).toBe(200);
+    expect(Buffer.from(await dl.arrayBuffer()).equals(PREMIUM_PDF)).toBe(true);
+
+    // A lead project at the job's address, linked.
+    expect(m.project_id).toBeTruthy();
+    const [p] = await q<any>(`select * from crm_projects where id = $1`, [m.project_id]);
+    expect(p.status).toBe("lead");
+    expect(p.customer_id).toBe(m.customer_id);
+    expect(p.name).toBe("Takeoff job 9100 — 100 Example Lane");
+    expect(p.address_line1).toBe("100 Example Lane");
+    expect(p.number).toMatch(/^P-\d+$/);
+    expect((p.custom_fields as any).hoverJobId).toBe("9100");
+    expect(raw.autoProjectId).toBe(p.id);
+
+    // Redelivery: still one measurement, one project, one PDF.
+    await fireCompleted(9100);
+    await hover.ingestHoverJob(orgId, "9100");
+    expect((await q<any>(`select id from crm_measurements where org_id = $1 and external_id = 'hover:9100'`, [orgId])).length).toBe(1);
+    expect((await q<any>(`select id from crm_projects where org_id = $1 and customer_id = $2`, [orgId, m.customer_id])).length).toBe(1);
+    expect((await q<any>(`select id from crm_attachments where org_id = $1 and file_name = 'hover-measurements-9100.pdf'`, [orgId])).length).toBe(1);
+  });
+
+  it("a second capture at the address joins that project; ensureHoverProject is idempotent and race-safe", async () => {
+    stub.extraJobs.set(9101, stubJobV2(9101, 77002,
+      { name: "Tess Takeoff", email: "takeoff-9100@example.com" },
+      { line1: "100 EXAMPLE lane.", zip: "98000-1234" }));
+    await fireCompleted(9101);
+    const first = await m9100();
+    const [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9101'`, [orgId]);
+    expect(m.customer_id).toBe(first.customer_id);
+    expect(m.project_id).toBe(first.project_id);
+    // No premium report for this model → the documented PDF, whose storage redirect got NO bearer.
+    expect((m.raw_payload as any).pdfSource).toBe("measurements");
+    const dl = await fetch(`${BASE}/api/crm/attachments/${(m.raw_payload as any).pdfAttachmentId}/file`);
+    expect(Buffer.from(await dl.arrayBuffer()).equals(STORAGE_PDF)).toBe(true);
+
+    const file = await import("./hover-file");
+    expect(await file.ensureHoverProject(orgId, m.id)).toEqual({ projectId: first.project_id, created: false });
+    // Unlink both and race two ensures: one project still.
+    await q(`update crm_measurements set project_id = null where id = any($1)`, [[m.id, first.id]]);
+    const [a, b] = await Promise.all([file.ensureHoverProject(orgId, first.id), file.ensureHoverProject(orgId, m.id)]);
+    expect(a.projectId).toBe(first.project_id);
+    expect(b.projectId).toBe(first.project_id);
+    expect(a.created || b.created).toBe(false);
+    expect((await q<any>(`select id from crm_projects where org_id = $1 and customer_id = $2`, [orgId, m.customer_id])).length).toBe(1);
+  });
+
+  it("ambiguous and staff-ordered captures never get a project", async () => {
+    for (const job of ["9005", "9013", "9014"]) {
+      const [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = $2`, [orgId, `hover:${job}`]);
+      expect(m.project_id).toBeNull();
+      expect((await q<any>(`select id from crm_projects where org_id = $1 and customer_id = $2`, [orgId, m.customer_id])).length).toBe(0);
+    }
+    const file = await import("./hover-file");
+    const [amb] = await q<any>(`select id from crm_measurements where org_id = $1 and external_id = 'hover:9005'`, [orgId]);
+    expect((await file.ensureHoverProject(orgId, amb.id)).reason).toBe("ambiguous match");
+    const [staff] = await q<any>(`select id from crm_measurements where org_id = $1 and external_id = 'hover:9013'`, [orgId]);
+    expect((await file.ensureHoverProject(orgId, staff.id)).reason).toBe("staff-ordered capture");
+  });
+
+  it("takeoff routes, estimate symbols and getCustomerTakeoff carry the quote quantities", async () => {
+    const m = await m9100();
+    const byCustomer = await api(`/api/crm/customers/${m.customer_id}/takeoff`);
+    expect(byCustomer.status).toBe(200);
+    const t = byCustomer.body.takeoff;
+    expect(t.siding.quantitySqft).toBe(2200);
+    expect(t.roof.quantitySqft).toBe(2418);
+    expect(t.roof.squares).toBe(24.18);
+    expect(t.footprint).toEqual({ areaSqft: 1615, perimeterFt: 188.67, stories: 2 });
+    expect(t.totals).toEqual({ windowsAreaSqft: 126, windowsUnitedInches: 808, doorsAreaSqft: 181 });
+    expect(t.source.pdfUrl).toMatch(/^\/api\/crm\/attachments\/.+\/file$/);
+    expect(byCustomer.body.others.length).toBe(1);   // the second capture
+    const byProject = await api(`/api/crm/projects/${m.project_id}/takeoff`);
+    expect(byProject.body.takeoff.siding.quantitySqft).toBe(2200);
+    expect(JSON.stringify(byProject.body)).not.toMatch(/Cents|price/i);
+
+    const sym = await api(`/api/crm/measurements/${m.id}/symbols`);
+    expect(sym.body.symbols).toMatchObject({
+      SQUARES: 23.03, WASTE: 5, SIDING_SF: 2200, ROOF_SF: 2418, ROOF_SQ: 24.18, WINDOWS: 9, DOORS: 4, UI: 808,
+    });
+
+    const file = await import("./hover-file");
+    const best = await file.getCustomerTakeoff(orgId, m.customer_id, { addressLine1: "100 Example Lane", postalCode: "98000" });
+    expect(best?.siding.quantitySqft).toBe(2200);
+    expect(["9100", "9101"]).toContain(best?.source?.hoverJobId);
+    expect(await file.getCustomerTakeoff(orgId, "00000000-0000-0000-0000-000000000000")).toBeNull();
+  });
+
+  it("back-fill re-derives every row from the stored full_json with ZERO HOVER calls, and is idempotent", async () => {
+    const m = await m9100();
+    await q(`update crm_measurements set squares_milli = null, wall_area_sf_milli = null, perimeter_lf_milli = null,
+      raw_payload = raw_payload - 'takeoff' - 'summary' where id = $1`, [m.id]);
+    const file = await import("./hover-file");
+    const calls = stub.requests;
+    const r1 = await file.backfillHoverTakeoffs(orgId);
+    expect(r1.updated).toBeGreaterThanOrEqual(1);
+    const back = await m9100();
+    expect(back.squares_milli).toBe(23030);
+    expect(back.wall_area_sf_milli).toBe(2169000);
+    expect(back.perimeter_lf_milli).toBe(268420);
+    expect((back.raw_payload as any).takeoff.siding.quantitySqft).toBe(2200);
+    expect((back.raw_payload as any).pdfAttachmentId).toBe((m.raw_payload as any).pdfAttachmentId); // other keys kept
+    const r2 = await file.backfillHoverTakeoffs(orgId);
+    expect(r2.updated).toBe(0);
+    expect(r2.unchanged).toBe(r1.updated + r1.unchanged);
+    expect(stub.requests).toBe(calls);
+  });
+
+  it("takeoff rules are org settings: saving re-derives the takeoffs; 5% roof waste is the floor", async () => {
+    const m = await m9100();
+    const save = await api("/api/crm/integrations/hover/takeoff-rules", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ roofWastePct: 10, sidingRoundUpTo: 25 }),
+    });
+    expect(save.status).toBe(200);
+    expect(save.body.takeoffRules).toEqual({ roofWastePct: 10, sidingRoundUpTo: 25 });
+    let t = (await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body.takeoff;
+    expect(t.roof.quantitySqft).toBe(2533);
+    expect(t.siding.quantitySqft).toBe(2175);
+    expect((await m9100()).waste_suggestion_bps).toBe(1000);
+    expect((await api("/api/crm/integrations/hover/status")).body.takeoffRules).toEqual({ roofWastePct: 10, sidingRoundUpTo: 25 });
+    const low = await api("/api/crm/integrations/hover/takeoff-rules", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ roofWastePct: 3, sidingRoundUpTo: 100 }),
+    });
+    expect(low.status).toBe(400);
+    await api("/api/crm/integrations/hover/takeoff-rules", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ roofWastePct: 5, sidingRoundUpTo: 100 }),
+    });
+    t = (await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body.takeoff;
+    expect(t.roof.quantitySqft).toBe(2418);
+    expect(t.siding.quantitySqft).toBe(2200);
+  });
+
+  it("report viewer: every report is listed for the picker; the PDF opens inline; a missing one is fetched on demand", async () => {
+    const m = await m9100();
+    const listed = (await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body;
+    expect(listed.takeoffs.map((x: any) => x.source.hoverJobId).sort()).toEqual(["9100", "9101"]);
+
+    const attId = (m.raw_payload as any).pdfAttachmentId;
+    const inline = await fetch(`${BASE}/api/crm/attachments/${attId}/file?inline=1`);
+    expect(inline.status).toBe(200);
+    expect(inline.headers.get("content-type")).toContain("application/pdf");
+    expect(inline.headers.get("content-disposition")).toMatch(/^inline;/);
+    const dl = await fetch(`${BASE}/api/crm/attachments/${attId}/file`);
+    expect(dl.headers.get("content-disposition")).toMatch(/^attachment;/);
+
+    // Drop the stored PDF: the card offers "Fetch report from HOVER", which stores it again.
+    await q(`delete from crm_attachments where id = $1`, [attId]);
+    await q(`update crm_measurements set raw_payload = raw_payload - 'pdfAttachmentId' - 'pdfSource' where id = $1`, [m.id]);
+    expect((await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body.takeoffs
+      .find((x: any) => x.source.hoverJobId === "9100").source.pdfUrl).toBeNull();
+    const hits = stub.premiumHits.length;
+    const fetched = await api(`/api/crm/measurements/${m.id}/hover-pdf`, { method: "POST" });
+    expect(fetched.status).toBe(200);
+    expect(fetched.body.pdfUrl).toBe(`/api/crm/attachments/${fetched.body.attachmentId}/file`);
+    expect(stub.premiumHits.length).toBe(hits + 1);
+    const again = await api(`/api/crm/measurements/${m.id}/hover-pdf`, { method: "POST" });
+    expect(again.body.attachmentId).toBe(fetched.body.attachmentId);   // stored once, no second HOVER call
+    expect(stub.premiumHits.length).toBe(hits + 1);
+    expect((await api(`/api/crm/measurements/00000000-0000-0000-0000-000000000000/hover-pdf`, { method: "POST" })).status).toBe(404);
   });
 
   it("disconnect deletes the HOVER webhook and wipes the stored tokens", async () => {

@@ -189,7 +189,11 @@ async function unlinkStored(storagePath: string) {
   await fs.promises.unlink(abs).catch(() => {});
 }
 
-function streamAttachment(res: any, att: typeof crmAttachments.$inferSelect, inline: boolean) {
+/**
+ * `inline` shows an image in place; `pdfInline` (the contractor's own file route only — the in-app HOVER report
+ * viewer uses ?inline=1) lets a PDF render inline too. Everything else downloads.
+ */
+function streamAttachment(res: any, att: typeof crmAttachments.$inferSelect, inline: boolean, pdfInline = false) {
   // storagePath is written by storeFile only (orgId/uuid.ext) — resolve and
   // confirm containment anyway so a hand-edited row can never escape the dir.
   const abs = path.resolve(STORAGE_DIR, att.storagePath);
@@ -200,8 +204,9 @@ function streamAttachment(res: any, att: typeof crmAttachments.$inferSelect, inl
   res.setHeader("Content-Length", String(att.sizeBytes));
   res.setHeader(
     "Content-Disposition",
-    `${inline && att.mime.startsWith("image/") ? "inline" : "attachment"}; filename="${safeName(att.fileName)}"`,
+    `${inline && (att.mime.startsWith("image/") || (pdfInline && att.mime === "application/pdf")) ? "inline" : "attachment"}; filename="${safeName(att.fileName)}"`,
   );
+  res.setHeader("X-Content-Type-Options", "nosniff");
   fs.createReadStream(abs).pipe(res);
 }
 
@@ -562,7 +567,7 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       .where(and(eq(crmAttachments.id, req.params.id), eq(crmAttachments.orgId, ctx.org.id)))
       .limit(1);
     if (!att) return res.status(404).json({ message: "Attachment not found" });
-    streamAttachment(res, att, req.query.inline === "1");
+    streamAttachment(res, att, req.query.inline === "1", true);
   });
 
   // ── Contractor: client comments (client detail page) ──────────────────────

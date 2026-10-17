@@ -330,8 +330,14 @@ const ROUTES: RouteRow[] = [
   // HOVER 3D share links (server/crm/hover.ts): paste/clear need manageEstimates; the model lists follow the record.
   R("PUT", "/api/crm/measurements/:id/hover-share", "manageEstimates", { path: (t) => `/api/crm/measurements/${t.measurement}/hover-share`, body: { url: 1 }, scoped: true }),
   R("DELETE", "/api/crm/measurements/:id/hover-share", "manageEstimates", { path: (t) => `/api/crm/measurements/${t.measurement}/hover-share`, effect: true, scoped: true }),
+  // "Fetch report from HOVER": anyone who can see the measurement (it only reads from HOVER).
+  R("POST", "/api/crm/measurements/:id/hover-pdf", null, { path: (t) => `/api/crm/measurements/${t.measurement}/hover-pdf`, effect: true, scoped: true }),
   R("GET", "/api/crm/projects/:id/hover-models", null, { path: (t) => `/api/crm/projects/${t.project}/hover-models`, scoped: true }),
   R("GET", "/api/crm/estimates/:id/hover-models", null, { path: (t) => `/api/crm/estimates/${t.estimate}/hover-models`, scoped: true }),
+  // HOVER takeoff (measurements only, no money) follows the record like the 3D lists.
+  R("GET", "/api/crm/customers/:id/takeoff", null, { path: (t) => `/api/crm/customers/${t.customer}/takeoff`, scoped: true }),
+  R("GET", "/api/crm/projects/:id/takeoff", null, { path: (t) => `/api/crm/projects/${t.project}/takeoff`, scoped: true }),
+  R("GET", "/api/crm/estimates/:id/takeoff", null, { path: (t) => `/api/crm/estimates/${t.estimate}/takeoff`, scoped: true }),
   R("POST", "/api/crm/reports/upload", "manageCustomers", { body: {} }),
   R("POST", "/api/crm/reports/:id/confirm", "manageCustomers", { path: (t) => `/api/crm/reports/${t.measurement}/confirm`, effect: true, scoped: true }),
   R("GET", "/api/crm/reports", null),
@@ -411,6 +417,7 @@ const ROUTES: RouteRow[] = [
   R("POST", "/api/crm/integrations/hover/register-webhook", "manageIntegrations", { effect: true }),
   R("POST", "/api/crm/integrations/hover/sync", "manageIntegrations", { effect: true }),
   R("POST", "/api/crm/integrations/hover/schedule", "manageIntegrations", { effect: true }),
+  R("PUT", "/api/crm/integrations/hover/takeoff-rules", "manageIntegrations", { body: { roofWastePct: "x" } }),
   R("POST", "/api/crm/integrations/hover/disconnect", "manageIntegrations", { effect: true }),
   R("GET", "/api/crm/sms/status", null),
   R("PUT", "/api/crm/sms/sender", "manageIntegrations", { effect: true }),

@@ -1,5 +1,7 @@
 import { HelpButton } from "@/components/help-button";
 import { useEffect, useMemo, useState } from "react";
+import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
+import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -281,6 +283,22 @@ export default function CrmEstimateNewPage() {
 
   const setLine = (key: string, patch: Partial<CartLine>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+
+  // "Fill from HOVER": cart lines whose unit + name match a takeoff number take that quantity
+  // (siding sf rounded up to 100, roof sf/sq + waste, window/door counts, united inches, roof lengths).
+  const fillFromHover = (t: HoverTakeoff) => {
+    let filled = 0;
+    const next = lines.map((l) => {
+      const f = takeoffQuantityForLine({ name: l.name, unit: l.unit }, t);
+      if (!f) return l;
+      filled++;
+      return { ...l, qtyText: String(f.quantity) };
+    });
+    setLines(next);
+    toast(filled
+      ? { title: `Filled ${filled} line${filled === 1 ? "" : "s"} from HOVER`, description: "Check the quantities before you send." }
+      : { title: "No line matched the HOVER takeoff", description: "Add price-book items priced per sf, sq, lf, each (windows, doors) or UI, then fill again." });
+  };
 
   // ── Step 3: review + send ─────────────────────────────────────────────────
   const [title, setTitle] = useState(restored?.title ?? "");
@@ -723,6 +741,9 @@ export default function CrmEstimateNewPage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* The client's HOVER takeoff (renders nothing without one) — "Fill from HOVER" sets the cart's quantities. */}
+          <HoverTakeoffCard customerId={customer.id} onFill={fillFromHover} fillDisabled={!lines.length} />
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

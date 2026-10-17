@@ -276,7 +276,7 @@ describe("DB: name matching, project linking, shares, refresh lock, 429", () => 
     expect((await hover.ingestHoverJob(orgId, "7005", fake.fetchFn)).matchedVia).toBeNull();
   });
 
-  it("ingest links the project at the job's address, else the single open project", async () => {
+  it("ingest links the project at the job's address, else creates a lead project there (owner 2026-10-17)", async () => {
     const c = await customer("Pat Project", { email: "pat-3d@example.com", line1: "10 Main St", zip: "30310" });
     const atAddr = await project(c, "lead", "20 Side St", "30310");
     await project(c, "estimating", null, null); // inherits 10 Main St
@@ -289,7 +289,14 @@ describe("DB: name matching, project linking, shares, refresh lock, 429", () => 
     const only = await project(c2, "approved", "2 B St", "30311");
     await project(c2, "paid", "3 C St", "30311");
     fake.st.jobs.set("7011", job(7011, { email: "solo-3d@example.com" }, "99 Unrelated Rd", "30311"));
-    expect((await hover.ingestHoverJob(orgId, "7011", fake.fetchFn)).projectId).toBe(only);
+    // No project at 99 Unrelated Rd: the capture gets its own lead project instead of joining the open one elsewhere.
+    const r11 = await hover.ingestHoverJob(orgId, "7011", fake.fetchFn);
+    expect(r11.projectId).toBeTruthy();
+    expect(r11.projectId).not.toBe(only);
+    const [auto] = await q(`select * from crm_projects where id = $1`, [r11.projectId]);
+    expect(auto.status).toBe("lead");
+    expect(auto.address_line1).toBe("99 Unrelated Rd");
+    expect(auto.custom_fields.hoverJobId).toBe("7011");
   });
 
   it("a project created later adopts the customer's unlinked HOVER captures at its address; back-fill is idempotent", async () => {
@@ -298,6 +305,11 @@ describe("DB: name matching, project linking, shares, refresh lock, 429", () => 
     fake.st.jobs.set("7021", job(7021, { email: "later-3d@example.com" }, "41 Other Ln", "30320"));
     await hover.ingestHoverJob(orgId, "7020", fake.fetchFn);
     await hover.ingestHoverJob(orgId, "7021", fake.fetchFn);
+    // Each capture got its own lead project at its address; drop them to exercise adoption of unlinked rows.
+    const autos = await q(`select id from crm_projects where org_id = $1 and customer_id = $2 and custom_fields ->> 'hoverAutoCreated' = 'true'`, [orgId, c]);
+    expect(autos.length).toBe(2);
+    await q(`update crm_measurements set project_id = null where org_id = $1 and customer_id = $2`, [orgId, c]);
+    await q(`delete from crm_projects where org_id = $1 and customer_id = $2`, [orgId, c]);
     expect((await measurement(7020)).project_id).toBeNull();
 
     const [p] = await q(`insert into crm_projects (org_id, customer_id, name, status) values ($1,$2,'Late','lead') returning *`, [orgId, c]);

@@ -19,6 +19,7 @@ import {
 } from "@/components/crm-ui";
 import { confirmAction } from "@/components/confirm-dialog";
 import { AdminSetupNote } from "@/hooks/use-platform-admin";
+import { DEFAULT_TAKEOFF_RULES, ROOF_WASTE_CHOICES, SIDING_ROUND_CHOICES, type TakeoffRules } from "@shared/hover-takeoff";
 
 /**
  * Integrations hub — every connection and API in one directory. HOVER lives
@@ -188,6 +189,19 @@ export default function CrmIntegrationsPage() {
     onError: (e: any) => toast({ title: "Could not save schedule", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
+  // Takeoff rules: roof waste % (never below 5) and the siding round-up increment. Saving re-derives every
+  // stored HOVER takeoff on the server, so cards and "Fill from HOVER" follow immediately.
+  const hoverTakeoffRules = useMutation({
+    mutationFn: async (rules: TakeoffRules) =>
+      (await apiRequest("PUT", "/api/crm/integrations/hover/takeoff-rules", rules)).json(),
+    onSuccess: () => {
+      hoverInvalidate();
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).endsWith("/takeoff") });
+      toast({ title: "Measurement rules saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save the rules", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
   const hoverDisconnect = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/crm/integrations/hover/disconnect", {})).json(),
     onSuccess: () => {
@@ -329,6 +343,44 @@ export default function CrmIntegrationsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {/* How HOVER measurements become estimate quantities. */}
+              {(() => {
+                const rules: TakeoffRules = hoverStatus.takeoffRules ?? DEFAULT_TAKEOFF_RULES;
+                return (
+                  <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="hover-takeoff-rules">
+                    <span className="text-muted-foreground">Roof waste</span>
+                    <Select
+                      value={String(rules.roofWastePct)}
+                      onValueChange={(v) => hoverTakeoffRules.mutate({ ...rules, roofWastePct: Number(v) })}
+                      disabled={hoverTakeoffRules.isPending}
+                    >
+                      <SelectTrigger className="h-8 w-36 text-xs" aria-label="Roof waste" data-testid="select-hover-roof-waste">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[...new Set([...ROOF_WASTE_CHOICES, rules.roofWastePct])].sort((a, b) => a - b).map((p) => (
+                          <SelectItem key={p} value={String(p)}>+{p}%{p === 5 ? " (minimum)" : ""}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="text-muted-foreground">Siding rounds up to</span>
+                    <Select
+                      value={String(rules.sidingRoundUpTo)}
+                      onValueChange={(v) => hoverTakeoffRules.mutate({ ...rules, sidingRoundUpTo: Number(v) })}
+                      disabled={hoverTakeoffRules.isPending}
+                    >
+                      <SelectTrigger className="h-8 w-36 text-xs" aria-label="Siding rounding" data-testid="select-hover-siding-round">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[...new Set([...SIDING_ROUND_CHOICES, rules.sidingRoundUpTo])].sort((a, b) => a - b).map((n) => (
+                          <SelectItem key={n} value={String(n)}>{n === 1 ? "no rounding" : `next ${n} sq ft`}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })()}
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => hoverSync.mutate()}
                   disabled={hoverSync.isPending} data-testid="button-hover-sync">

@@ -38,6 +38,7 @@ import { EstimateAttach, CustomerPhotos, CustomerComments, OrgPamphlets } from "
 import { EstimateDefaultFiles } from "@/components/estimate-attachments-card";
 import { JobcamPanel } from "@/components/jobcam/project-panel";
 import { CustomerMeasurements } from "@/components/client-measurements";
+import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
 import { TakePaymentDialog, invoiceDueCents } from "@/components/crm-take-payment";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
@@ -1213,6 +1214,9 @@ export default function CrmClientPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* The HOVER report's details, imported (renders nothing without a HOVER capture). */}
+      {id && <HoverTakeoffCard customerId={id} />}
 
       {/* Payments — see what this client owes and what they've paid, and take
           a payment (online link or manual record) without leaving the page. */}

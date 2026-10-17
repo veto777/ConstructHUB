@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { JobcamPanel } from "@/components/jobcam/project-panel";
 import { Hover3DCard } from "@/components/hover-3d-card";
+import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
@@ -334,6 +335,7 @@ export default function CrmProjectPage() {
       )}
 
       {/* HOVER 3D model + the homeowner share link (renders nothing when the client has no HOVER capture). */}
+      {id && <HoverTakeoffCard projectId={id} />}
       {id && <Hover3DCard projectId={id} />}
 
       <Tabs value={tab} onValueChange={setTab}>
