@@ -39,6 +39,9 @@ import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-quer
 import { useToast } from "@/hooks/use-toast";
 import { HelpButton } from "@/components/help-button";
 import type { County, PermitDatabase } from "@shared/schema";
+
+const DIRECTORY_SIGN_IN = "directory:sign-in";
+const DIRECTORY_PLAN = "directory:plan";
 import { useEffect } from "react";
 
 const PAGE_SIZE = 25;
@@ -144,12 +147,15 @@ export default function DatabasesPage() {
     queryKey: ["/api/databases", queryParams],
     queryFn: async () => {
       const res = await fetch(`/api/databases?${queryParams}`);
+      // The directory needs an account with a plan (server/platform-access.ts); only the counts are public.
+      if (res.status === 401 || res.status === 402) throw new Error(res.status === 401 ? DIRECTORY_SIGN_IN : DIRECTORY_PLAN);
       if (!res.ok) throw new Error("Failed to fetch databases");
       return res.json();
     },
     placeholderData: keepPreviousData,
   });
 
+  const gate = error?.message === DIRECTORY_SIGN_IN ? "sign-in" : error?.message === DIRECTORY_PLAN ? "plan" : null;
   const databases = result?.databases ?? [];
   const totalResults = result?.total ?? 0;
   const totalPages = Math.ceil(totalResults / PAGE_SIZE);
@@ -210,7 +216,7 @@ export default function DatabasesPage() {
         </GoogleStatGrid>
       )}
 
-      {countiesError && <Notice tone="danger">County filters are unavailable. <Button onClick={() => void retryCounties()}>Retry</Button></Notice>}
+      {countiesError && !gate && <Notice tone="danger">County filters are unavailable. <Button onClick={() => void retryCounties()}>Retry</Button></Notice>}
       {countsError && <Notice tone="danger">Directory counts are unavailable. <Button onClick={() => void retryCounts()}>Retry</Button></Notice>}
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Jurisdiction type" data-testid="filter-jurisdiction-type">
@@ -287,6 +293,12 @@ export default function DatabasesPage() {
             <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
+      ) : gate === "sign-in" ? (
+        <EmptyState icon={Database} title="Sign in to browse the permit directory" description="The directory of permit portals is part of a ConstructHUB plan."
+          action={<Button asChild><a href={`/auth?next=${encodeURIComponent("/databases")}`} data-testid="link-directory-sign-in">Sign in</a></Button>} />
+      ) : gate === "plan" ? (
+        <EmptyState icon={Database} title="Choose a plan to browse the permit directory" description="Your plan's tools open as soon as it starts."
+          action={<Button asChild><a href="/pricing" data-testid="link-directory-pricing">See plans</a></Button>} />
       ) : error ? (
         <EmptyState icon={Database} title="Could not load the permit directory" description="Directory data is unavailable. Try again." action={<Button onClick={() => void refetch()}>Retry</Button>} />
       ) : databases.length === 0 ? (

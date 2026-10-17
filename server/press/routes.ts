@@ -132,10 +132,12 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
     } catch (err) { logError("[press] overview:", err); res.status(500).json({ message: "Could not load your press releases" }); }
   });
 
+  // Signed in only (owner, 2026-10-16: no scraping); the API paywall (server/platform-access.ts) adds the plan check.
   app.get("/api/press/outlets", (req, res) => {
+    if (!getUser(req, res)) return;
     const tier = tierSchema.safeParse(req.query.tier);
     if (!tier.success) return res.status(400).json({ message: "tier must be budget, national or premium" });
-    res.set("Cache-Control", "public, max-age=86400");
+    res.set("Cache-Control", "private, max-age=86400");
     res.json({ tier: tier.data, outlets: loadOutlets()[tier.data] });
   });
 

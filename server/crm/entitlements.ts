@@ -20,6 +20,7 @@
  * JobCam works with the included storage, and every other CRM route answers
  * 402 crm_plan_required (server/crm/tenancy.ts JOBCAM_SHELL_PATHS).
  */
+import { forgetPlatformAccess } from "../platform-access-cache";
 import { pool } from "../db";
 import { ACCESS_STATUSES } from "../../shared/plans";
 import {
@@ -119,6 +120,8 @@ const TTL_MS = 30_000;
 const cache = new Map<number, { at: number; ent: CrmEntitlements }>();
 export function forgetCrmEntitlements(userId?: number | null) {
   if (userId) cache.delete(userId); else cache.clear();
+  // The CRM counts toward the API paywall's "has anything" (server/platform-access.ts).
+  forgetPlatformAccess(userId || undefined);
 }
 
 export async function getCrmEntitlements(userId: number | null | undefined, opts: { fresh?: boolean } = {}): Promise<CrmEntitlements> {

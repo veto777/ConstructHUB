@@ -1,3 +1,4 @@
+import { forgetPlatformAccess } from "./platform-access-cache";
 import type Stripe from "stripe";
 import type { Express, Request, Response } from "express";
 import { db, pool } from "./db";
@@ -446,6 +447,7 @@ export function registerStripeRoutes(app: Express) {
       });
       // The plan (and its locks) changed in place: the dashboard rebuilds on the next load.
       forgetDashboard(user.id);
+      forgetPlatformAccess(user.id);
       res.json(changed);
     } catch (err: any) {
       sendStripeError(res, err);
@@ -484,6 +486,7 @@ export function registerStripeRoutes(app: Express) {
       });
       // Add-ons change allowances (texts, sites): the dashboard rebuilds on the next load.
       forgetDashboard(user.id);
+      forgetPlatformAccess(user.id);
       res.json(changed);
     } catch (err: any) {
       sendStripeError(res, err);
@@ -1066,6 +1069,8 @@ export function registerStripeRoutes(app: Express) {
 
       // Whatever the event changed (plan, status, renewal, invoices), the dashboard rebuilds.
       forgetDashboard(eventUserId);
+      // The API paywall decides again (an unknown account: every cached answer).
+      forgetPlatformAccess(eventUserId ?? undefined);
       if (event.id && eventUserId) {
         await attributeBillingEvent(event.id, eventUserId).catch((e: any) => console.error("[billing] could not attribute event:", e?.message || e));
       }

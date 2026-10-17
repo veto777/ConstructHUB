@@ -22,6 +22,7 @@
  * cycle is left as paid, and the next invoice bills the new price. Never a
  * mid-cycle charge or credit (docs/pricing/README.md → "À la carte").
  */
+import { forgetPlatformAccess } from "../platform-access-cache";
 import type Stripe from "stripe";
 import type { Express, Request, Response } from "express";
 import { pool } from "../db";
@@ -166,6 +167,7 @@ export async function applyAlacarteSubscription(sub: Stripe.Subscription, hintUs
     ],
   );
   forgetDashboard(userId);
+  forgetPlatformAccess(userId);
   return userId;
 }
 
@@ -175,7 +177,7 @@ export async function endAlacarteSubscription(sub: Stripe.Subscription): Promise
   const { rows: [row] } = await pool.query(
     `UPDATE alacarte_subscriptions SET status = 'canceled', cancel_at_period_end = NULL, updated_at = now()
       WHERE stripe_subscription_id = $1 RETURNING user_id`, [sub.id]);
-  if (row?.user_id) forgetDashboard(row.user_id);
+  if (row?.user_id) { forgetDashboard(row.user_id); forgetPlatformAccess(row.user_id); }
   return row?.user_id ?? null;
 }
 

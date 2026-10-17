@@ -28,6 +28,7 @@
  * passphrase wall applies where it is configured). Writes also need an Origin
  * that is ours (server/hub/access.ts originOk), like the dashboard's writes.
  */
+import { forgetPlatformAccess } from "./platform-access-cache";
 import type { Express, Request, Response } from "express";
 import { pool } from "./db";
 import { ACCESS_GRANTS_DDL } from "./access-grants-schema";
@@ -227,6 +228,7 @@ export async function accountById(userId: number, now = new Date()): Promise<Acc
 /** Everything that may have kept the account's old answer: the next read rebuilds. */
 export function forgetAccess(userId: number): void {
   forgetDashboard(userId);
+  forgetPlatformAccess(userId);
   forgetOwnerPlan(userId);
   clearSmsEntitlementCache();
 }

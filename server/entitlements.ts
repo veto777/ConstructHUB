@@ -42,6 +42,7 @@
  * quotas) works the same with or without a plan. `plan` and `accessPlan` stay
  * null without one; `allowances` and `modules` carry what was bought.
  */
+import { forgetPlatformAccess } from "./platform-access-cache";
 import type { Request, Response, NextFunction } from "express";
 import { pool } from "./db";
 import { isPlatformAdminEmail } from "./admin";
@@ -561,6 +562,7 @@ export async function redeemTrialCode(userId: number, code: { id: number; trialD
     }
     await c.query("COMMIT");
     forgetDashboard(userId);
+    forgetPlatformAccess(userId);
     return { trialEnd: end, unlimited };
   } catch (e) {
     await c.query("ROLLBACK").catch(() => {});
@@ -621,7 +623,7 @@ export async function endRevokedTrial(code: { id: number; redeemedByUserId: numb
       outcome = "shortened";
     }
     await c.query("COMMIT");
-    if (outcome !== "unchanged") forgetDashboard(userId);
+    if (outcome !== "unchanged") { forgetDashboard(userId); forgetPlatformAccess(userId); }
     return outcome;
   } catch (e) {
     await c.query("ROLLBACK").catch(() => {});

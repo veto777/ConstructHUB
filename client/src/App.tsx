@@ -461,7 +461,6 @@ function withRibbon(Page: ComponentType<any>): ComponentType<any> {
 const Ribboned = {
   DatabasesPage: withRibbon(DatabasesPage),
   PropertyPage: withRibbon(PropertyPage),
-  PhotosPage: withRibbon(PhotosPage),
   GoogleAdsPage: withRibbon(GoogleAdsPage),
   AdsManagerPage: withRibbon(AdsManagerPage),
   GoogleAdsGuideSectionPage: withRibbon(GoogleAdsGuideSectionPage),
@@ -481,7 +480,8 @@ function PublicRouter() {
       <Route path="/invite/:code" component={InvitePage} />
       <Route path="/databases" component={Ribboned.DatabasesPage} />
       <Route path="/property" component={Ribboned.PropertyPage} />
-      <Route path="/photos" component={Ribboned.PhotosPage} />
+      {/* The Photo Optimizer's API needs an account with a plan (server/platform-access.ts): signed out, its landing page. */}
+      <Route path="/photos">{() => <FeatureAdLanding slug="media" />}</Route>
       <Route path="/pricing" component={PricingPage} />
       {/* Signed-out visitors get the free public scan; the full tool needs an account. */}
       <Route path="/site-scan" component={FreeSiteScanPage} />

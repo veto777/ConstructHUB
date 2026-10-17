@@ -59,6 +59,7 @@
  * Internal, never in copy: the service costs ConstructHUB about 20 cents a
  * minute (the SignalWire AI agent); every tier and the overage sit above it.
  */
+import { forgetPlatformAccess } from "../platform-access-cache";
 import type Stripe from "stripe";
 import type { Express, Request, Response } from "express";
 import { randomUUID } from "node:crypto";
@@ -904,6 +905,7 @@ export function registerCallAssistantBillingRoutes(app: Express, deps: CallAssis
         }
       });
       forgetDashboard(user.id);
+      forgetPlatformAccess(user.id);
       res.json(result);
     } catch (err: any) {
       deps.sendStripeError(res, err);

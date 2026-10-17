@@ -45,6 +45,7 @@ import { registerTutorialMediaRoutes } from "./tutorials/media";
 import { registerTutorialFixtures } from "./tutorials/fixtures";
 import { processPhoto, generateFileName, analyzePhoto } from "./photo-processor";
 import { registerStripeRoutes } from "./stripe";
+import { platformAccessGate, requirePlatformAccess } from "./platform-access";
 import { registerTrackingRoutes } from "./tracking-script";
 import { registerAdsConsultantRoutes } from "./ads-consultant";
 import { registerHubRoutes } from "./hub";
@@ -195,6 +196,11 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // The API paywall (server/platform-access.ts): a signed-in account with nothing on the platform reaches only the
+  // sign-in, buying, account, help and public-link paths. Before every router, so no feature route is missed.
+  app.use(platformAccessGate);
+  // The photo and AI tools used to answer signed-out visitors: they need an account with platform access.
+  app.use(["/api/photos", "/api/media/geocode", "/api/gmb/review-response"], requirePlatformAccess);
   app.use(["/api/photos", "/api/gmb/review-response", "/api/review/:token/generate-review"], (req, res, next) => {
     if (req.method !== "POST") return next();
     return growthCostLimit(req, res, next);
@@ -619,15 +625,17 @@ export async function registerRoutes(
 
   // Every county in the permit directory; the app sidebar footer's "Counties" total
   // (/api/databases/counts is its "Directory entries" sibling).
-  app.get("/api/counties", async (_req, res) => {
+  // The directory itself needs an account with platform access (owner, 2026-10-16: no scraping); only
+  // /api/databases/counts stays public for the marketing pages.
+  app.get("/api/counties", requirePlatformAccess, async (_req, res) => {
     const counties = await storage.getCounties();
     res.json(counties);
   });
 
   // The permit directory. ?filtered=true = the Databases page's paged, filterable list;
   // ?searchable=true[&stateCode=] = the live-searchable portals (Search page picker and
-  // count); no query = the full directory.
-  app.get("/api/databases", async (req, res) => {
+  // count; every state at once for platform admins only); no query = the directory 100 rows a page.
+  app.get("/api/databases", requirePlatformAccess, async (req, res) => {
     try {
       if (req.query.filtered === "true") {
         const text = (v: unknown) => typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : undefined;
@@ -674,6 +682,9 @@ export async function registerRoutes(
           return res.status(400).json({ message: "stateCode must be a two-letter state code" });
         }
         const stateCode = typeof rawState === "string" ? rawState.trim().toUpperCase() : null;
+        // Every state at once is the admins' Schedules picker (/api/scrape-schedules is admin-only); anyone else
+        // asks for one state, as the Search page does.
+        if (!stateCode && !isAdmin(req.user)) return res.status(400).json({ message: "stateCode is required" });
         const stateCountyIds = stateCode
           ? new Set((await storage.getCounties()).filter(c => c.stateCode === stateCode).map(c => c.id))
           : null;
@@ -682,8 +693,12 @@ export async function registerRoutes(
           .sort((a, b) => a.name.localeCompare(b.name));
         res.json(databases.map(governmentPermitForDisplay));
       } else {
-        const databases = await storage.getDatabases();
-        res.json(databases.map(governmentPermitForDisplay));
+        // No mode: the directory a page at a time (?page=1&limit=100, 100 at most) — never the whole ~14 MB at once.
+        const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? ""), 10) || 100));
+        const page = Math.max(1, parseInt(String(req.query.page ?? ""), 10) || 1);
+        const databases = (await storage.getDatabases()).sort((a, b) => a.id - b.id);
+        res.setHeader("X-Total-Count", String(databases.length));
+        res.json(databases.slice((page - 1) * limit, page * limit).map(governmentPermitForDisplay));
       }
     } catch (err) {
       logError("Error listing permit databases:", err);
@@ -710,7 +725,7 @@ export async function registerRoutes(
   // the headline can never disagree. Centroids come from server/data/jurisdiction-coords.json
   // (public US Census Gazetteer); an unmatched jurisdiction has null coords (no dot),
   // never an invented one. Cached in memory (the directory is static after boot).
-  app.get("/api/permits/map", async (_req, res) => {
+  app.get("/api/permits/map", requirePlatformAccess, async (_req, res) => {
     try {
       const now = Date.now();
       if (!permitMapCache || now - permitMapCache.at > PERMIT_MAP_TTL_MS) {
@@ -762,7 +777,8 @@ export async function registerRoutes(
         };
         permitMapCache = { at: now, payload };
       }
-      res.setHeader("Cache-Control", "public, max-age=600");
+      // private: the payload is for this signed-in account, never a shared cache.
+      res.setHeader("Cache-Control", "private, max-age=600");
       res.json(permitMapCache.payload);
     } catch (err) {
       logError("Error building permit map:", err);
@@ -771,8 +787,8 @@ export async function registerRoutes(
   });
 
   // One county's permit portals (display link fields) — a county drill-down.
-  app.get("/api/databases/county/:countyId", async (req, res) => {
-    const countyId = parseInt(req.params.countyId);
+  app.get("/api/databases/county/:countyId", requirePlatformAccess, async (req, res) => {
+    const countyId = parseInt(String(req.params.countyId));
     const databases = await storage.getDatabasesByCounty(countyId);
     res.json(databases.map(governmentPermitForDisplay));
   });
