@@ -9,7 +9,7 @@ import {
 } from "@shared/press";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { AppPage, Notice, PageHeader, Section, Stat, StatGrid, StatusPill, appTable, appTableCards } from "@/components/app-ui";
+import { AppPage, Notice, Section, Stat, StatGrid, StatusPill, appTable, appTableCards } from "@/components/app-ui";
 import type { PillTone } from "@/components/crm-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { PressAutomationSettings, PressStatusStrip, ReleaseAutomationBadges, WriterSendControl } from "@/components/press/press-automation";
+import { HelpButton } from "@/components/help-button";
 import "@/components/press/press-wire.css";
 
 type Overview = {
@@ -613,11 +614,26 @@ export default function PressReleasesPage() {
 
   return (
     <AppPage width="wide" className="press-wire" testId="page-press-releases">
-      <PageHeader
-        title="Press Releases"
-        icon={Newspaper}
-        description="Your news on the national wire: written for you, reviewed by editors, reported back to you."
-      />
+      <header className="wire-page-masthead" data-testid="press-masthead">
+        <div className="wire-page-dateline">
+          <span>{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</span>
+          <span className="wire-page-dateline-name">ConstructHUB Press Wire</span>
+        </div>
+        <div className="wire-page-title-row">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <h1>Press <span>Releases.</span></h1>
+              <HelpButton k="press-releases" />
+            </div>
+            <p>Your news on the national wire: written for you, reviewed by editors, reported back to you.</p>
+          </div>
+          <dl className="wire-page-ticker" aria-label="Your press account">
+            <div><dt>Credits</dt><dd>{data ? n(totalCredits) : "…"}</dd></div>
+            <div><dt>Live</dt><dd>{data ? n(live) : "…"}</dd></div>
+            <div><dt>Autopilot</dt><dd className={autopilot?.enabled ? "is-on" : undefined}>{!data ? "…" : autopilot?.enabled ? "On" : "Off"}</dd></div>
+          </dl>
+        </div>
+      </header>
       {error && <Notice tone="danger" title="Could not load">{apiErrorMessage(error)}</Notice>}
 
       <section className="wire-hero" aria-labelledby="wire-headline">
