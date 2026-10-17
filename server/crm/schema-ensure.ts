@@ -720,6 +720,29 @@ export async function ensureCrmSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS crm_customer_notes_org_idx ON crm_customer_notes (org_id);
     CREATE INDEX IF NOT EXISTS crm_finance_clicks_customer_idx ON crm_finance_clicks (customer_id);
     CREATE INDEX IF NOT EXISTS crm_finance_clicks_org_idx ON crm_finance_clicks (org_id);
+
+    -- Client self-estimate: the "call them about it" task + the interest trail index.
+    CREATE TABLE IF NOT EXISTS crm_tasks (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      customer_id varchar,
+      estimate_id varchar,
+      related_estimate_id varchar,
+      division_id varchar,
+      assigned_member_id varchar,
+      source text NOT NULL,
+      title text NOT NULL,
+      body text,
+      due_at timestamp,
+      done_at timestamp,
+      done_by_member_id varchar,
+      meta jsonb,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS crm_tasks_org_open_idx ON crm_tasks (org_id) WHERE done_at IS NULL;
+    CREATE INDEX IF NOT EXISTS crm_tasks_customer_idx ON crm_tasks (customer_id);
+    CREATE INDEX IF NOT EXISTS crm_estimate_events_interest_idx ON crm_estimate_events (estimate_id, type)
+      WHERE type LIKE 'interest\\_%';
   `);
 
   // ── Accountability: org-wide activity log (who did what, when) ───────────

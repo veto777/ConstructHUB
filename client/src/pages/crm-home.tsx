@@ -30,6 +30,7 @@ import { HelpButton } from "@/components/help-button";
 import { ClientSearchPicker } from "@/components/crm-search-picker";
 import { DivisionBadge, useActiveDivision } from "@/components/crm-division-switcher";
 import { divisionLabel } from "@shared/divisions";
+import { Calculator } from "lucide-react";
 
 interface Step {
   key: string;
@@ -132,6 +133,12 @@ export default function CrmHomePage() {
   const canManageCustomers = me?.permissions?.manageCustomers === true;
   const [followUpsOpen, setFollowUpsOpen] = useState(false);
 
+  // Self-estimate price requests: mark the "call them" task done.
+  const taskMut = useMutation({
+    mutationFn: async (taskId: string) => (await apiRequest("PATCH", `/api/crm/tasks/${taskId}`, { done: true })).json(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/attention"] }),
+    onError: (e: any) => toast({ title: "Could not update the task", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const followUpMut = useMutation({
     mutationFn: async ({ customerId, ...body }: { customerId: string; cadenceDays?: 7 | 14 | null; markDone?: boolean }) =>
       (await apiRequest("PATCH", `/api/crm/customers/${customerId}/follow-up`, body)).json(),
@@ -381,7 +388,8 @@ export default function CrmHomePage() {
           <CardContent className="space-y-4">
             {attentionError ? (
               <p className="text-sm text-destructive">Couldn't load the follow-up list — check your connection and refresh the page.</p>
-            ) : (attention?.followUpsDue?.length ?? 0) + (attention?.newLeads?.length ?? 0) + (attention?.leadsNeedingEstimate?.length ?? 0) === 0 ? (
+            ) : (attention?.followUpsDue?.length ?? 0) + (attention?.newLeads?.length ?? 0) + (attention?.leadsNeedingEstimate?.length ?? 0)
+              + (attention?.priceRequests?.length ?? 0) + (attention?.exploringClients?.length ?? 0) === 0 ? (
               <EmptyState
                 compact
                 icon={CheckCircle2}
@@ -390,6 +398,44 @@ export default function CrmHomePage() {
               />
             ) : (
               <>
+                {(attention?.priceRequests?.length ?? 0) > 0 && (
+                  <section className="space-y-1.5" data-testid="section-price-requests">
+                    <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <Calculator className="h-3 w-3" /> Asked for a price online
+                    </div>
+                    {attention.priceRequests.map((t: any) => (
+                      <div key={t.id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+                        data-testid={`price-request-${t.id}`}>
+                        <Link href={t.relatedEstimateId ? `/crm/estimates/${t.relatedEstimateId}` : `/crm/clients/${t.customerId}`} className="min-w-0">
+                          <div className="text-sm font-medium truncate hover:underline">{t.title}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {t.assignedName ? `For ${t.assignedName} · ` : ""}draft estimate ready to review
+                          </div>
+                        </Link>
+                        <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" disabled={taskMut.isPending}
+                          onClick={() => taskMut.mutate(t.id)} data-testid={`button-task-done-${t.id}`}>
+                          Done
+                        </Button>
+                      </div>
+                    ))}
+                  </section>
+                )}
+                {(attention?.exploringClients?.length ?? 0) > 0 && (
+                  <section className="space-y-1.5" data-testid="section-exploring-clients">
+                    <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <Sparkles className="h-3 w-3" /> Exploring other work
+                    </div>
+                    {attention.exploringClients.map((c: any) => (
+                      <Link key={c.customerId} href={`/crm/clients/${c.customerId}`}>
+                        <div className="rounded-lg border px-3 py-2.5 hover:bg-accent transition-colors cursor-pointer"
+                          data-testid={`exploring-${c.customerId}`}>
+                          <div className="text-sm font-medium truncate">{c.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{c.text}</div>
+                        </div>
+                      </Link>
+                    ))}
+                  </section>
+                )}
                 {(attention?.followUpsDue?.length ?? 0) > 0 && (
                   <section className="space-y-1.5" data-testid="section-follow-ups-due">
                     <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">

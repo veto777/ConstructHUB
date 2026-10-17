@@ -21,6 +21,7 @@ const SampleDocsTable = lazySample(() => import("@/components/crm-sample-preview
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
 
 /**
  * The Documents Center — one org-wide list for estimates and one for invoices,
@@ -185,6 +186,8 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const allowed = !cfg.needsPrices || me?.permissions?.seePrices === true;
   const canReceipt = cfg.hasDueColumn === true && me?.permissions?.manageInvoices === true;
+  // Self-estimate interest badges (estimate writers only — the API refuses the rest).
+  const interest = useClientInterest(kind === "estimates" && me?.permissions?.manageEstimates === true);
   const { toast } = useToast();
 
   // Hard delete is OWNER-only (the server enforces it; the button simply
@@ -592,6 +595,9 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
                   </td>
                   <td className={cn(crmTable.td, "hidden md:table-cell max-w-[260px] truncate")}>
                     {r.title}
+                    {interest?.byEstimate[r.id] && (
+                      <div className="mt-0.5"><InterestBadge compact summary={interest.byEstimate[r.id]} testId={`badge-interest-${r.id}`} /></div>
+                    )}
                   </td>
                   <td className={cn(crmTable.td, "hidden sm:table-cell")}>{statusPill}</td>
                   <td className={cn(crmTable.tdRight, "whitespace-nowrap")}>

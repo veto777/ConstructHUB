@@ -164,6 +164,11 @@ export function activityText(row: {
       case "pricebook.adjusted": return `adjusted price book ${m.field === "cost" ? "costs" : "prices"} on ${m.count ?? "several"} material${m.count === 1 ? "" : "s"}${m.percent != null ? ` by ${m.percent > 0 ? "+" : ""}${m.percent}%` : ""}`;
       case "pricebook.floor_lock": return `turned the price-floor lock ${m.enabled ? "on" : "off"}`;
       case "discount.updated": return `updated discount offers on estimate ${m.number ?? ""}`.trim();
+      case "self_estimate.requested":
+        return `asked for a price online${Array.isArray(m.trades) && m.trades.length ? ` (${m.trades.join(" + ")})` : ""}${m.lowCents != null && m.highCents != null ? ` — ballpark ${money(m.lowCents)}–${money(m.highCents)}` : ""}${m.number ? ` — draft estimate ${m.number} created` : ""}`;
+      case "self_estimate.settings_updated": return `updated the client self-estimate prices${m.division ? ` (${m.division === "org" ? "no division" : "a division"})` : ""}`;
+      case "task.done": return `marked a task done${m.title ? `: ${String(m.title).slice(0, 120)}` : ""}`;
+      case "task.reopened": return `reopened a task${m.title ? `: ${String(m.title).slice(0, 120)}` : ""}`;
       case "payment.recorded":
         return `recorded payment ${money(m.amountCents)}${m.method ? ` via ${m.method}` : ""}${m.number ? ` on invoice ${m.number}` : ""}`;
       case "payment.reversed":

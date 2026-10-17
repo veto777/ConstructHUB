@@ -46,6 +46,7 @@ import { AppointmentForm, type Appointment } from "@/components/crm-appointment-
 import { InfoTip } from "@/components/info-tip";
 import { HelpButton } from "@/components/help-button";
 import { confirmAction } from "@/components/confirm-dialog";
+import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -504,6 +505,7 @@ export default function CrmClientPage() {
   const [, setLocation] = useLocation();
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  const interestMap = useClientInterest(!!id && me?.permissions?.manageEstimates === true, { customerId: id });
   const canEstimate = me?.permissions?.manageEstimates === true;
   const canSeePrices = me?.permissions?.seePrices === true;
   const canInvoice = me?.permissions?.manageInvoices === true;
@@ -981,6 +983,9 @@ export default function CrmClientPage() {
                   {/* The client-page walkthrough (quick actions). Static key: this title is not a CrmPageHeader. */}
                   <HelpButton k="crm-client-quick-actions" videoOnly />
                 </div>
+                {interestMap?.byCustomer[c.id] && (
+                  <div className="mt-1"><InterestBadge summary={interestMap.byCustomer[c.id]} testId="badge-client-interest-page" /></div>
+                )}
                 {c.companyName && c.companyName !== c.displayName && (
                   <div className="text-sm text-muted-foreground mt-0.5">{c.companyName}</div>
                 )}

@@ -43,6 +43,7 @@ import { registerDivisionWorkspaceRoutes } from "./division-workspaces";
 import { registerCrmAdminRoutes } from "./admin";
 import { registerCrmMigrateRoutes } from "./migrate";
 import { registerCrmDiscountRoutes } from "./discounts";
+import { registerCrmSelfEstimateRoutes } from "./self-estimate";
 import { registerCrmTaxHooks } from "./tax";
 import { registerCrmAttachmentRoutes } from "./attachments";
 import { registerCrmPhotoLibraryRoutes } from "./photo-library";
@@ -392,6 +393,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmMigrateRoutes(app, getDevUser);
   // Optional client-selected discount offers on estimates.
   registerCrmDiscountRoutes(app, getDevUser);
+  // Client self-estimate: "Curious what a roof would cost?" — interest tracking + price requests.
+  registerCrmSelfEstimateRoutes(app, getDevUser);
   // Client portal v2: pamphlet/estimate/photo attachments + homeowner comments.
   registerCrmAttachmentRoutes(app, getDevUser);
   // The photo library: every project photo of the org, by job and stage (server/crm/photo-library.ts).

@@ -50,6 +50,7 @@ import {
 import { clientPortalBaseUrl, portalBaseUrl } from "../site-context";
 import { sendWithFallback } from "../email";
 import { isOutboundMessageNote } from "./messages";
+import { INTEREST_EVENT_TYPES, interestEventText } from "@shared/self-estimate";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -357,7 +358,11 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
             .where(and(
               eq(crmEstimateEvents.orgId, orgId),
               inArray(crmEstimateEvents.estimateId, estIds),
-              inArray(crmEstimateEvents.type, ["sent", "viewed", "approved", "declined"]),
+              inArray(crmEstimateEvents.type, [
+                "sent", "viewed", "approved", "declined",
+                // Self-estimate interest (seeing a prompt card is not interest — not listed).
+                ...INTEREST_EVENT_TYPES.filter((t) => t !== "interest_prompt_viewed"),
+              ]),
             ))
             .orderBy(desc(crmEstimateEvents.createdAt)).limit(200)
         : Promise.resolve([]),
@@ -415,6 +420,9 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
         : e.type === "forward_detected" ? `Estimate ${ref} link opened on a second device — likely forwarded`
         : e.type === "options_selected" ? `Client selected their scopes on estimate ${ref}`
         : e.type === "extended" ? `Estimate ${ref} expiry extended`
+        : e.type.startsWith("interest_")
+          // Ballpark amounts are prices: a price-blind seat reads the sentence without them.
+          ? interestEventText(e.type, ctx.permissions.seePrices ? meta : { ...meta, lowCents: null, highCents: null }, ref)
         : null;
       if (!text) continue;
       entries.push({

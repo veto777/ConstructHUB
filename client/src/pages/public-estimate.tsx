@@ -19,6 +19,7 @@ import { DocGateChallenge } from "@/components/doc-gate";
 import { EstimateAttachments } from "@/components/client-uploads";
 import { orgThemeStyle } from "@/lib/org-theme";
 import { Home3DCard } from "@/components/hover-3d-card";
+import { SelfEstimatePrompts, estimateTransport } from "@/components/self-estimate";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -331,6 +332,15 @@ export default function PublicEstimatePage() {
   const { data: payInfo } = useQuery<any>({
     queryKey: [`/api/public/estimates/${token}/pay-info`],
     enabled: !!data && !data?.preview,
+    retry: false,
+  });
+
+  // "Curious what a roof replacement would cost?" — trades the division offers
+  // that aren't on this bid (server/crm/self-estimate.ts). Same gate as the
+  // document; a preview grant reads it read-only.
+  const { data: selfEstimate } = useQuery<any>({
+    queryKey: [`/api/public/estimates/${token}/self-estimate${previewGrant ? `?preview=${encodeURIComponent(previewGrant)}` : ""}`],
+    enabled: !!data,
     retry: false,
   });
 
@@ -1125,6 +1135,12 @@ export default function PublicEstimatePage() {
               )}
             </div>
           </div>
+        )}
+
+        {/* Upsell: price the trades that aren't on this bid. Interest is tracked; nothing is bought here. */}
+        {selfEstimate?.enabled && (
+          <SelfEstimatePrompts offer={selfEstimate} transport={estimateTransport(token!)} scope={token!}
+            preview={!!preview || !!selfEstimate.preview} />
         )}
 
         {/* "Your home in 3D" — only with a live HOVER share link for this client (server/crm/hover-share.ts). */}

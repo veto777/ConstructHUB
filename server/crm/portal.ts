@@ -160,7 +160,7 @@ function mintPreviewGrant(kind: PreviewDoc, docId: string): string {
   return `${exp}.${sig}`;
 }
 
-function previewGrantValid(kind: PreviewDoc, docId: string, grant: string): boolean {
+export function previewGrantValid(kind: PreviewDoc, docId: string, grant: string): boolean {
   const secret = previewSecret();
   if (!secret) return false;
   const m = /^(\d{10,16})\.([0-9a-f]{32})$/.exec(grant);
