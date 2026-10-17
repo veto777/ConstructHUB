@@ -19,6 +19,7 @@ import { DocGateChallenge } from "@/components/doc-gate";
 import { EstimateAttachments } from "@/components/client-uploads";
 import { orgThemeStyle } from "@/lib/org-theme";
 import { Home3DCard } from "@/components/hover-3d-card";
+import { SelfEstimatePrompts, estimateTransport } from "@/components/self-estimate";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -334,6 +335,15 @@ export default function PublicEstimatePage() {
     retry: false,
   });
 
+  // "Curious what a roof replacement would cost?" — trades the division offers
+  // that aren't on this bid (server/crm/self-estimate.ts). Same gate as the
+  // document; a preview grant reads it read-only.
+  const { data: selfEstimate } = useQuery<any>({
+    queryKey: [`/api/public/estimates/${token}/self-estimate${previewGrant ? `?preview=${encodeURIComponent(previewGrant)}` : ""}`],
+    enabled: !!data,
+    retry: false,
+  });
+
   const respond = useMutation({
     mutationFn: async (decision: "approve" | "decline") => {
       const r = await fetch(`/api/public/estimates/${token}/respond`, {
@@ -451,7 +461,7 @@ export default function PublicEstimatePage() {
     );
   }
 
-  const { estimate: e, items, company, customer, options, preview, discountOffers, salesRep, answerBlock, home3d } = data;
+  const { estimate: e, items, company, customer, options, preview, discountOffers, salesRep, answerBlock, home3d, viewer3d } = data;
   const settled = done ?? (e.approvedAt ? "approved" : e.declinedAt ? "declined" : null);
   const expired = e.expiresAt && new Date(e.expiresAt).getTime() < Date.now();
   // The server says this estimate can't be answered (a draft that was never
@@ -1127,8 +1137,16 @@ export default function PublicEstimatePage() {
           </div>
         )}
 
-        {/* "Your home in 3D" — only with a live HOVER share link for this client (server/crm/hover-share.ts). */}
-        <Home3DCard home3d={home3d} companyName={company?.name} />
+        {/* Upsell: price the trades that aren't on this bid. Interest is tracked; nothing is bought here. */}
+        {selfEstimate?.enabled && (
+          <SelfEstimatePrompts offer={selfEstimate} transport={estimateTransport(token!)} scope={token!}
+            preview={!!preview || !!selfEstimate.preview} />
+        )}
+
+        {/* "Your home in 3D" — the in-app viewer for this estimate's customer (server/crm/hover-model3d.ts); the HOVER
+            design studio shows inside it only with a live share link. */}
+        <Home3DCard home3d={home3d} companyName={company?.name}
+          viewer={viewer3d && token ? { kind: "estimate", token, preview: previewGrant } : null} />
 
         {/* Footer facts — job address, expiry, warranty, contact card, T&C link. */}
         {/* Who to talk to — the client should never wonder who their person is. */}

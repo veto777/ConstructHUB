@@ -27,9 +27,11 @@ import Stripe from "stripe";
 import { z } from "zod";
 import { db } from "../db";
 import {
-  crmPaymentAccounts, crmPayments, crmEstimates, crmInvoices, crmCustomers, crmOrgs,
+  crmActivityLog, crmPaymentAccounts, crmPayments, crmEstimates, crmInvoices, crmCustomers, crmOrgs,
 } from "@shared/schema";
 import { and, eq, isNull, desc, sql, inArray } from "drizzle-orm";
+import { loadActorDirectory } from "./actors";
+import { clientActor, systemActor, UNRECORDED_TEAM_ACTOR, type CrmActor } from "@shared/crm-actor";
 import { requireOrg, requirePermission } from "./tenancy";
 import { requireDocSession } from "./portal";
 import { amountDueCents } from "@shared/estimate-totals";
@@ -373,8 +375,26 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const custName = new Map(custs.map((c) => [c.id, c.name]));
     const invNumber = new Map(invs.map((i) => [i.id, i.number]));
     const estNumber = new Map(ests.map((e) => [e.id, e.number]));
+    // Who: a Stripe payment is the client's; a manual one names whoever
+    // recorded it (the activity log's "payment.recorded" row) — never guessed.
+    const manualIds = visible.filter((p) => p.provider === "manual").map((p) => p.id);
+    const dir = await loadActorDirectory(ctx.org.id);
+    const recorded = manualIds.length
+      ? await db.select().from(crmActivityLog).where(and(
+          eq(crmActivityLog.orgId, ctx.org.id), eq(crmActivityLog.action, "payment.recorded"),
+          inArray(crmActivityLog.entityId, manualIds)))
+      : [];
+    const actorOf = (p: (typeof visible)[number]): CrmActor => {
+      if (p.provider === "stripe") return clientActor(custName.get(p.customerId) ?? null);
+      if (p.provider === "manual") {
+        const r = recorded.find((x) => x.entityId === p.id);
+        return r ? dir.logActor(r, custName.get(p.customerId) ?? null) : UNRECORDED_TEAM_ACTOR;
+      }
+      return systemActor(p.provider);
+    };
     res.json(visible.map((p) => ({
       ...p,
+      actor: actorOf(p),
       customerName: custName.get(p.customerId) ?? null,
       invoiceNumber: p.invoiceId ? invNumber.get(p.invoiceId) ?? null : null,
       estimateNumber: p.estimateId ? estNumber.get(p.estimateId) ?? null : null,

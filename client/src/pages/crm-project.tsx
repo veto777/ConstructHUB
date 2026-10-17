@@ -1,6 +1,7 @@
 import { governmentLinkNotice } from "@shared/government-links";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { ActorName } from "@/components/crm-actor-name";
 import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import { JobcamPanel } from "@/components/jobcam/project-panel";
 import { Hover3DCard } from "@/components/hover-3d-card";
+import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
@@ -334,6 +336,7 @@ export default function CrmProjectPage() {
       )}
 
       {/* HOVER 3D model + the homeowner share link (renders nothing when the client has no HOVER capture). */}
+      {id && <HoverTakeoffCard projectId={id} />}
       {id && <Hover3DCard projectId={id} />}
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -605,6 +608,7 @@ export default function CrmProjectPage() {
                       <div className="min-w-0">
                         <div className="text-xs text-muted-foreground">
                           {day(l.logDate)}{l.weather ? ` · ${l.weather}` : ""}{l.crewCount ? ` · ${l.crewCount} crew` : ""}
+                          {l.author && l.author.recorded !== false && <> · <ActorName actor={l.author} /></>}
                         </div>
                         <div className="text-sm mt-1 whitespace-pre-wrap">{l.workCompleted}</div>
                       </div>

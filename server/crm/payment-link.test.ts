@@ -42,7 +42,7 @@ beforeAll(async () => {
 async function makeInvoice(run: number) {
   const cust = await api("/api/crm/customers", {
     method: "POST",
-    body: JSON.stringify({ displayName: `PayLink Client ${run}`, email: `paylink.${run}@example.com` }),
+    body: JSON.stringify({ addressLine1: "100 Test St", displayName: `PayLink Client ${run}`, email: `paylink.${run}@example.com` }),
   }, cookie);
   expect(cust.status).toBe(201);
 
@@ -134,7 +134,7 @@ describe("contractor take-a-payment endpoints", () => {
     const run = Date.now();
     const cust = await api("/api/crm/customers", {
       method: "POST",
-      body: JSON.stringify({ displayName: `PayLink Est ${run}`, email: `paylink-est.${run}@example.com` }),
+      body: JSON.stringify({ addressLine1: "100 Test St", displayName: `PayLink Est ${run}`, email: `paylink-est.${run}@example.com` }),
     }, cookie);
     expect(cust.status).toBe(201);
 

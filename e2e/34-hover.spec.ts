@@ -296,10 +296,13 @@ test.describe("HOVER integration @serial", () => {
     await gotoCrm(page, "/?client=1");
     await page.getByTestId("portal-nav-reports").click();
     await expect(page.getByTestId("section-reports")).toBeVisible();
+    // "View in 3D" opens the in-app viewer on this page — never a HOVER link (hover.to/3d needs a HOVER login).
     const portal3d = page.getByTestId(`client-report-3d-${measurementId}`);
     await expect(portal3d).toBeVisible();
-    await expect(portal3d).toHaveAttribute("href", "https://hover.to/3d/9001");
-    await expect(portal3d).toHaveAttribute("target", "_blank");
+    await expect(portal3d).not.toHaveAttribute("href", /hover\.to/);
+    await portal3d.click();
+    await expect(page.getByTestId("dialog-hover-3d")).toBeVisible();
+    await page.keyboard.press("Escape");
     const pdf = page.getByTestId(`client-report-pdf-${measurementId}`);
     await expect(pdf).toBeVisible();
     // The PDF downloads through the session-gated attachment route.

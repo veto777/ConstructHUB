@@ -86,7 +86,7 @@ test.describe("divisions", { tag: "@serial" }, () => {
     const division = await div.json();
 
     const cust = await page.request.post("/api/crm/customers", {
-      data: { displayName: `E2E Div Client ${stamp}`, email: `e2e-div-${stamp}@example.com` },
+      data: { addressLine1: "100 Test St", displayName: `E2E Div Client ${stamp}`, email: `e2e-div-${stamp}@example.com` },
     });
     const customer = await cust.json();
     const proj = await page.request.post("/api/crm/projects", {
@@ -134,7 +134,7 @@ test.describe("divisions", { tag: "@serial" }, () => {
     // unassigned commons — under STRICT scoping a scoped member loses these).
     const mk = async (divisionId: string | null, tag: string) => {
       const cust = await page.request.post("/api/crm/customers", {
-        data: { displayName: `E2E scope ${tag} ${stamp}`, email: `e2e-scope-${tag}-${stamp}@example.com` },
+        data: { addressLine1: "100 Test St", displayName: `E2E scope ${tag} ${stamp}`, email: `e2e-scope-${tag}-${stamp}@example.com` },
       });
       const customer = await cust.json();
       const proj = await page.request.post("/api/crm/projects", {

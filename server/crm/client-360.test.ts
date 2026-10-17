@@ -90,7 +90,7 @@ describe("client 360 (dev server)", () => {
     const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const mk = async (name: string) => {
       const r = await post("/api/crm/customers", {
-        displayName: name,
+        addressLine1: "100 Test St", displayName: name,
         email: `vitest.c360.${stamp}.${name.endsWith("B") ? "b" : "a"}@example.com`,
       }, cookie);
       expect(r.status).toBe(201);
@@ -115,6 +115,31 @@ describe("client 360 (dev server)", () => {
     await q(`update crm_orgs set custom_fields = null where id = $1`, [orgId]);
     await q(`delete from crm_customers where id = any($1)`, [[custA, custB]]);
     await pool.end();
+  });
+
+  // ── Address is required ──────────────────────────────────────────────────
+
+  it("every client has an address: a create without one is 400, and an edit can't clear it", async () => {
+    const msg = "Enter the client's address.";
+    const name = `Vitest C360 NoAddr ${Date.now().toString(36)}`;
+    for (const extra of [{}, { addressLine1: "   " }]) {
+      const r = await post("/api/crm/customers", { displayName: name, ...extra }, cookie);
+      expect(r.status).toBe(400);
+      expect(r.body.message).toBe(msg);
+    }
+    expect((await q(`select id from crm_customers where org_id = $1 and display_name = $2`, [orgId, name])).length).toBe(0);
+
+    for (const addressLine1 of ["", null]) {
+      const r = await api(`/api/crm/customers/${custA}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ addressLine1 }),
+      }, cookie);
+      expect(r.status).toBe(400);
+      expect(r.body.message).toBe(msg);
+    }
+    const [row] = await q<{ address_line1: string }>(`select address_line1 from crm_customers where id = $1`, [custA]);
+    expect(row.address_line1).toBe("100 Test St");
   });
 
   // ── Notes ────────────────────────────────────────────────────────────────
@@ -184,7 +209,7 @@ describe("client 360 (dev server)", () => {
 
     const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const cust = await post("/api/crm/customers", {
-      displayName: `Vitest C360 Gate ${stamp}`,
+      addressLine1: "100 Test St", displayName: `Vitest C360 Gate ${stamp}`,
       email: `vitest.c360.gate.${stamp}@example.com`,
     }, ac);
     expect(cust.status).toBe(201);
@@ -277,10 +302,17 @@ describe("client 360 (dev server)", () => {
     const entries = tl.body as any[];
     const texts = entries.map((e) => e.text);
 
-    expect(texts.some((t: string) => t === `Estimate ${estNumber} sent to the client`)).toBe(true);
-    expect(texts.some((t: string) => t === `Client opened estimate ${estNumber} · stayed 4m 12s`)).toBe(true);
-    expect(texts.some((t: string) => t.includes("Sent a message from the portal"))).toBe(true);
-    expect(texts.some((t: string) => t === "Applied for financing via Acme Finance")).toBe(true);
+    // Every line names who did it: the sending member (the dev member is the
+    // owner → "… (Owner)"), and the client by their name for client actions.
+    expect(texts.some((t: string) => /\(Owner\) sent estimate /.test(t) || t.startsWith("Owner sent estimate ")
+      ? t.endsWith(`estimate ${estNumber} to the client`) : false)).toBe(true);
+    expect(texts.some((t: string) => t === `Vitest C360 A opened estimate ${estNumber} · stayed 4m 12s`)).toBe(true);
+    expect(texts.some((t: string) => t.startsWith("Vitest C360 A sent a message from the portal"))).toBe(true);
+    expect(texts.some((t: string) => t === "Vitest C360 A applied for financing via Acme Finance")).toBe(true);
+    for (const e of entries) {
+      expect(e.actor?.name).toBeTruthy();
+      expect(e.text).not.toMatch(/^(Your team|A team member|Client )/);
+    }
 
     // Newest-first across every source.
     const ats = entries.map((e) => new Date(e.at).getTime());

@@ -33,6 +33,7 @@ import { registerCrmLeadRoutes } from "./leads";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
 import { registerCrmReportRoutes } from "./reports";
 import { registerCrmHoverRoutes } from "./hover";
+import { registerHoverModel3dRoutes } from "./hover-model3d";
 import { registerCrmClientAuthRoutes, allow as rateAllow } from "./client-auth";
 import { sendSms, normalizePhone } from "./sms";
 import { registerCrmClient360Routes } from "./notes-timeline";
@@ -44,6 +45,7 @@ import { registerDivisionWorkspaceRoutes } from "./division-workspaces";
 import { registerCrmAdminRoutes } from "./admin";
 import { registerCrmMigrateRoutes } from "./migrate";
 import { registerCrmDiscountRoutes } from "./discounts";
+import { registerCrmSelfEstimateRoutes } from "./self-estimate";
 import { registerCrmTaxHooks } from "./tax";
 import { registerCrmAttachmentRoutes } from "./attachments";
 import { registerCrmPhotoLibraryRoutes } from "./photo-library";
@@ -375,6 +377,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   // HOVER integration: OAuth connect, webhook registration/handshake,
   // HMAC-verified event receiver and completed-job ingest.
   registerCrmHoverRoutes(app, getDevUser);
+  // In-app 3D viewer data: HOVER XML export → mesh, proxied wireframes (contractor, portal, public estimate).
+  registerHoverModel3dRoutes(app, getDevUser);
   // The homeowner client portal takes no contractor session at all.
   registerCrmClientAuthRoutes(app);
   // Client 360: notes, timeline, financing clicks, portal preview. BEFORE the
@@ -395,6 +399,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmMigrateRoutes(app, getDevUser);
   // Optional client-selected discount offers on estimates.
   registerCrmDiscountRoutes(app, getDevUser);
+  // Client self-estimate: "Curious what a roof would cost?" — interest tracking + price requests.
+  registerCrmSelfEstimateRoutes(app, getDevUser);
   // Client portal v2: pamphlet/estimate/photo attachments + homeowner comments.
   registerCrmAttachmentRoutes(app, getDevUser);
   // The photo library: every project photo of the org, by job and stage (server/crm/photo-library.ts).

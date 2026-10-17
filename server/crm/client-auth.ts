@@ -35,6 +35,7 @@ import { financingLinksOf, getPrimaryFinancing } from "./financing";
 import { logEvent } from "./entities";
 import { themePayload } from "@shared/theme-colors";
 import { clientShareView } from "./hover-share";
+import { viewer3dOffered } from "./hover-model3d-offer";
 
 const COOKIE_NAME = "crm_client";
 const TOKEN_TTL_MS = 30 * 60 * 1000; // magic link: 30 minutes
@@ -583,6 +584,8 @@ export function registerCrmClientAuthRoutes(app: Express): void {
           // live — hover.to/3d/<id> needs a HOVER login, so it is never sent)
           // and the measurement PDF (session-gated attachment route).
           home3d: clientShareView(raw),
+          // The in-app 3D viewer (/api/client/measurements/:id/model3d) — no HOVER login needed.
+          viewer3d: viewer3dOffered(r),
           pdfDownloadUrl: raw.pdfAttachmentId
             ? `/api/client/attachments/${raw.pdfAttachmentId}/download`
             : null,

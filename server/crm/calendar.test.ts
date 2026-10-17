@@ -173,7 +173,7 @@ describe("calendar feed (dev server)", () => {
 
     const cust = await api("/api/crm/customers", {
       method: "POST",
-      body: JSON.stringify({ displayName: customerName }),
+      body: JSON.stringify({ addressLine1: "100 Test St", displayName: customerName }),
     });
     expect(cust.status).toBe(201);
     customerId = cust.body.id;

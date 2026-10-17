@@ -33,6 +33,8 @@ import { requireCrmFeature, emitCrmEvent, queueCrmEvent, webhookUrlIsSafe } from
 import { invoiceDefaultsFromOrg } from "./doc-defaults";
 import { autoSendPaymentReceipt } from "./receipts";
 import { logActivity } from "./activity";
+import { loadActorDirectory } from "./actors";
+import { actorLabel, UNRECORDED_TEAM_ACTOR } from "@shared/crm-actor";
 import { sendWithFallback } from "../email";
 import { textOrgOwners } from "./sms";
 import { notifyMembers } from "./notify";
@@ -121,16 +123,19 @@ async function notifyPaymentRecorded(
   const via = METHOD_LABELS[method] ?? method;
   const who = cust?.displayName ?? "a client";
   const doc = inv.number ?? "an invoice";
+  // Who recorded it, by name ("Veto Smith (Owner)") — a manual entry is a person's word.
+  const recorder = actorMemberId ? (await loadActorDirectory(org.id)).member(actorMemberId) : null;
+  const by = recorder ? ` — recorded by ${actorLabel(recorder)}` : "";
 
   // Money landing is worth a buzz in the pocket — opt-in per org. The bell
   // never depends on there being an email inbox.
   await notifyMembers({
     org, pref: "paymentReceived",
-    title: `${amount} received via ${via} from ${who} for invoice ${doc}`,
+    title: `${amount} received via ${via} from ${who} for invoice ${doc}${by}`,
     excludeMemberIds: actorMemberId ? [actorMemberId] : [],
     smsHandled: true,
   });
-  const texts = await textOrgOwners(org, `${org.name}: ${amount} received via ${via} from ${who} for invoice ${doc}.`, "paymentReceived");
+  const texts = await textOrgOwners(org, `${org.name}: ${amount} received via ${via} from ${who} for invoice ${doc}${by}.`, "paymentReceived");
 
   // Email when the channel is on — or when the owner text was skipped because
   // the month's text allowance is spent.
@@ -140,7 +145,7 @@ async function notifyPaymentRecorded(
       subject: `Payment received — ${amount} via ${via} from ${who} for invoice ${inv.number ?? ""}`.trim(),
       html: `<p><strong>${amount}</strong> received via <strong>${via}</strong> from ${who}` +
             ` for invoice <strong>${doc}</strong>${inv.title ? ` (${inv.title})` : ""}.</p>` +
-            `<p>Recorded manually in ConstructHub CRM.</p>`,
+            `<p>Recorded manually in ConstructHub CRM${recorder ? ` by <strong>${actorLabel(recorder).replace(/[&<>"]/g, "")}</strong>` : ""}.</p>`,
     } as any);
   }
 }
@@ -1118,7 +1123,14 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const rows = await db.select().from(crmDailyLogs)
       .where(and(eq(crmDailyLogs.orgId, ctx.org.id), eq(crmDailyLogs.projectId, proj.id)))
       .orderBy(desc(crmDailyLogs.logDate)).limit(400);
-    res.json(rows);
+    // Each log names who filed it (the owner as "Name (Owner)").
+    const dir = await loadActorDirectory(ctx.org.id);
+    res.json(rows.map((r) => {
+      const author = r.authorMemberId
+        ? dir.member(r.authorMemberId) ?? { kind: "member" as const, name: "Former team member", recorded: true }
+        : UNRECORDED_TEAM_ACTOR;
+      return { ...r, author, authorName: author.recorded === false ? null : actorLabel(author) };
+    }));
   });
 
   app.post("/api/crm/projects/:id/daily-logs", async (req: any, res) => {

@@ -215,7 +215,7 @@ describe("division workspaces (dev server)", () => {
 
     // One full set per division, created in All divisions with explicit picks.
     const set = async (tag: string, divisionId: string | null, state: string | null) => {
-      const c = await api("POST", "/api/crm/customers", { displayName: `Vitest ${tag} ${run}`, state, ...(divisionId ? { divisionId } : {}) }, "all");
+      const c = await api("POST", "/api/crm/customers", { addressLine1: "100 Test St", displayName: `Vitest ${tag} ${run}`, state, ...(divisionId ? { divisionId } : {}) }, "all");
       expect(c.status).toBe(201);
       const p = await api("POST", "/api/crm/projects", { customerId: c.json.id, name: `Vitest ${tag} job`, ...(divisionId ? { divisionId } : {}) }, "all");
       expect(p.status).toBe(201);
@@ -299,7 +299,7 @@ describe("division workspaces (dev server)", () => {
 
   it("new clients, projects and estimates default to the active division", async () => {
     if (!up) return;
-    const c = await api("POST", "/api/crm/customers", { displayName: `Vitest new FL ${run}` }, ids.fl);
+    const c = await api("POST", "/api/crm/customers", { addressLine1: "100 Test St", displayName: `Vitest new FL ${run}` }, ids.fl);
     expect(c.status).toBe(201);
     expect(c.json.divisionId).toBe(ids.fl);
     const p = await api("POST", "/api/crm/projects", { customerId: c.json.id, name: "New FL job" }, ids.fl);
@@ -314,7 +314,7 @@ describe("division workspaces (dev server)", () => {
     expect(fl).toContain(c.json.id);
     expect(listIds((await api("GET", "/api/crm/customers", undefined, ids.wa)).json)).not.toContain(c.json.id);
     // In All divisions nothing is defaulted.
-    const any = await api("POST", "/api/crm/customers", { displayName: `Vitest new all ${run}` }, "all");
+    const any = await api("POST", "/api/crm/customers", { addressLine1: "100 Test St", displayName: `Vitest new all ${run}` }, "all");
     expect(any.json.divisionId).toBeNull();
     ids.newFlC = c.json.id; ids.newFlP = p.json.id; ids.newFlE = e.json.id; ids.newAllC = any.json.id;
   });

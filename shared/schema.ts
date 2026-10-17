@@ -1434,6 +1434,14 @@ export const crmAttachments = pgTable("crm_attachments", {
   mime: text("mime").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
   storagePath: text("storage_path").notNull(),
+  // Actor attribution: the team member who added the file, or (client portal /
+  // HOVER import / generated documents) a label naming the source. Both null on
+  // rows from before uploads were attributed — never guessed (notes-timeline.ts).
+  uploadedByMemberId: varchar("uploaded_by_member_id"),
+  uploadedByLabel: text("uploaded_by_label"),
+  // Who KIND of uploader: member | client | system — stored at write time so a
+  // client named "Stripe" never reads as the Stripe source.
+  uploadedByKind: text("uploaded_by_kind"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1512,6 +1520,34 @@ export const crmFinanceClicks = pgTable("crm_finance_clicks", {
 });
 
 export type CrmFinanceClick = typeof crmFinanceClicks.$inferSelect;
+
+// crm_tasks: a to-do for one member, created by the system — today only by a
+// client's "Send this to my contractor" from the self-estimate tool
+// (server/crm/self-estimate.ts): "call them about the roof price they built".
+// Shows on Home → Needs attention until someone marks it done.
+export const crmTasks = pgTable("crm_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  customerId: varchar("customer_id"),
+  estimateId: varchar("estimate_id"),
+  // The draft estimate the request generated, when there is one.
+  relatedEstimateId: varchar("related_estimate_id"),
+  divisionId: varchar("division_id"),
+  assignedMemberId: varchar("assigned_member_id"),
+  source: text("source").notNull(), // 'self_estimate_request'
+  // The client's submission key: one task (and one draft) per submission,
+  // unique per anchor estimate — a retried/double-tapped request is a no-op.
+  idempotencyKey: text("idempotency_key"),
+  title: text("title").notNull(),
+  body: text("body"),
+  dueAt: timestamp("due_at"),
+  doneAt: timestamp("done_at"),
+  doneByMemberId: varchar("done_by_member_id"),
+  meta: jsonb("meta"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type CrmTask = typeof crmTasks.$inferSelect;
 
 // ── Roles & permissions ─────────────────────────────────────────────────────
 // Housecall Pro ships three fixed roles and no custom fields; we ship six
@@ -2504,6 +2540,9 @@ export const CRM_PB_UNITS = [
 /** Formula symbols the evaluator understands, plus per-item custom placeholders. */
 export const CRM_PB_SYMBOLS = [
   "QTY", "SQUARES", "LF", "SF", "EA", "PITCH", "STORIES", "WASTE", "COST", "PRICE", "HOURS",
+  // From a HOVER takeoff (shared/hover-takeoff.ts takeoffSymbols): siding quote ft² (rounded up), roof quote
+  // ft² and squares (with waste), window + door counts, window united inches.
+  "SIDING_SF", "ROOF_SF", "ROOF_SQ", "WINDOWS", "DOORS", "UI",
 ] as const;
 
 export const crmPbCategories = pgTable("crm_pb_categories", {

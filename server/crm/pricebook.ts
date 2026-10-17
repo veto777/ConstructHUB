@@ -26,6 +26,8 @@ import {
   evalFormula, validateFormula, formulaSymbols, unknownSymbols, unknownSymbolMessage, FormulaError,
 } from "./formula";
 import { priceFloorLockOf } from "./price-floor";
+import { readTakeoffRules, takeoffOfRow } from "./hover-file";
+import { takeoffSymbols } from "@shared/hover-takeoff";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -1043,6 +1045,11 @@ export function registerCrmMeasurementRoutes(app: Express, getDevUser: GetUser):
     put("PITCH", pitchRise);
     put("STORIES", m.stories ?? undefined);
     put("WASTE", m.wasteSuggestionBps != null ? m.wasteSuggestionBps / 100 : undefined);
+    // A HOVER takeoff adds the quote quantities (siding rounded up, roof with waste, roof squares with waste,
+    // window/door counts, window united inches) — shared/hover-takeoff.ts takeoffSymbols.
+    if (m.provider === "hover") {
+      Object.assign(symbols, takeoffSymbols(takeoffOfRow(m, await readTakeoffRules(ctx.org.id))));
+    }
     res.json({ symbols, measurementId: m.id, provider: m.provider });
   });
 }

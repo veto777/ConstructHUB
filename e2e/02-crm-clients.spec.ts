@@ -28,6 +28,7 @@ test.describe("/crm/clients", () => {
     await page.getByTestId("button-new-client").click();
     await page.getByTestId("input-client-name").fill(name);
     await page.getByTestId("input-client-email").fill(`e2e-${stamp}@example.com`);
+    await page.getByTestId("input-client-address").fill("100 Test St");
     await page.getByTestId("button-save-client").click();
     await expect(page.getByText("Client created", { exact: true })).toBeVisible();
     // New client appears and its row navigates to the detail page.

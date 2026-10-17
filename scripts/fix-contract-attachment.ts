@@ -72,7 +72,7 @@ async function main() {
     await db.insert(s.crmAttachments).values({
       orgId: ORG_ID, kind: "contract", refId: EST_ID,
       fileName: `contract-${est.number}.pdf`, mime: "application/pdf",
-      sizeBytes: pdf.length, storagePath,
+      sizeBytes: pdf.length, storagePath, uploadedByLabel: "System", uploadedByKind: "system",
     });
     console.log(`✓ created contract attachment (${pdf.length} bytes) at ${storagePath}`);
   }

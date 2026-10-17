@@ -46,6 +46,13 @@ async function api(path: string, opts: RequestInit = {}) {
 // ── The HOVER stub ──────────────────────────────────────────────────────────
 
 const PDF_BYTES = Buffer.from("%PDF-1.4 stub hover measurements pdf");
+const PREMIUM_PDF = Buffer.from("%PDF-1.7 stub hover PRO PREMIUM measurements pdf");
+const STORAGE_PDF = Buffer.from("%PDF-1.7 stub hover measurements pdf from storage");
+/** A REAL HOVER full_json (version 2), anonymised (address, ids, image ids replaced). */
+const V2_FULL_JSON = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "__fixtures__", "hover-full-json-v2.anon.json"), "utf8"));
+/** A second origin standing in for HOVER's file storage (the PDF redirect target) — it rejects a bearer, like S3. */
+const STORAGE_PORT = STUB_PORT + 3;
+const STORAGE = `http://127.0.0.1:${STORAGE_PORT}`;
 
 const FULL_JSON = {
   roof: { total_roof_area_sqft: 2874.5, predominant_pitch: "6/12", waste_percent: 12 },
@@ -75,6 +82,28 @@ function stubJob(id: number, email: string | null) {
     ...(id === 9001
       ? { machete_blob: { OptInFeature: { designProUrl: `https://hover.to/3d/${id}` } } }
       : {}),
+  };
+}
+
+/** A v3 job carrying real-shaped models[]: a FAILED model first, then the completed one whose deliverables we read. */
+function stubJobV2(
+  id: number, modelId: number,
+  contact: { name?: string; email?: string; phone?: string } | null,
+  location: { line1: string; city?: string; state?: string; zip: string },
+) {
+  const m = (mid: number) => `${STUB}/api/v3/models/${mid}/artifacts`;
+  return {
+    id,
+    name: `Takeoff job ${id}`,
+    contact: contact ?? {},
+    address: { location_line_1: location.line1, city: location.city ?? "Testville", region: location.state ?? "WA", postal_code: location.zip },
+    models: [
+      { id: modelId - 1000, state: "failed", artifacts: { measurements: { pdf: `${m(modelId - 1000)}/measurements.pdf` } } },
+      {
+        id: modelId, state: "completed",
+        artifacts: { measurements: { pdf: `${m(modelId)}/measurements.pdf`, full_json: `${m(modelId)}/measurements.json?version=full_json` } },
+      },
+    ],
   };
 }
 
@@ -141,6 +170,12 @@ const stub = {
   /** HOVER job shares (GET /api/v1/job_shares?current_user_id=601). */
   jobShares: [] as any[],
   failPhotos: false,
+  /** full_json answers 503 while true (the transient-failure retry test). */
+  failFullJson: false,
+  /** Every request the stub served (the back-fill must not add any). */
+  requests: 0,
+  premiumHits: [] as { modelId: string; auth: boolean }[],
+  storage: null as http.Server | null,
   nextWebhookId: 55501,
   currentRefreshToken: "rt-1",
   accessCounter: 0,
@@ -175,6 +210,7 @@ async function fireVerificationEvent(wh: StubWebhook) {
 
 function startStub(): Promise<void> {
   stub.server = http.createServer(async (req, res) => {
+    stub.requests++;
     const url = new URL(req.url || "/", STUB);
     const chunks: Buffer[] = [];
     for await (const c of req) chunks.push(c as Buffer);
@@ -309,9 +345,40 @@ function startStub(): Promise<void> {
       return res.end(Buffer.from("ffd8ffe0 stub", "hex"));
     }
 
+    // ── Model deliverables (full_json v2, the premium PDF, the documented PDF → storage redirect) ──
+    if (/^\/api\/v3\/models\/\d+\/artifacts\/measurements\.json$/.test(url.pathname)) {
+      if (stub.failFullJson) return json(503, { error: "temporarily unavailable" });
+      if (url.searchParams.get("version") !== "full_json") return json(200, { note: "summary variant" });
+      return json(200, V2_FULL_JSON);
+    }
+    const prem = /^\/api\/v1\/models\/(\d+)\/pro_premium_measurements$/.exec(url.pathname);
+    if (prem) {
+      stub.premiumHits.push({ modelId: prem[1], auth: !!req.headers.authorization });
+      if (!req.headers.authorization) return json(401, { error: "unauthorized" });
+      if (prem[1] === "77002") return json(404, { error: "no premium report for this model" });
+      res.writeHead(200, { "content-type": "application/pdf" });
+      return res.end(PREMIUM_PDF);
+    }
+    const docPdf = /^\/api\/v3\/models\/(\d+)\/artifacts\/measurements\.pdf$/.exec(url.pathname);
+    if (docPdf) {
+      res.writeHead(302, { location: `${STORAGE}/files/${docPdf[1]}.pdf?X-Amz-Signature=stub` });
+      return res.end();
+    }
+
     json(404, { error: `stub: no route ${req.method} ${url.pathname}` });
   });
-  return new Promise((resolve) => stub.server!.listen(STUB_PORT, "127.0.0.1", resolve));
+  stub.storage = http.createServer((req, res) => {
+    stub.requests++;
+    if (req.headers.authorization) {
+      res.writeHead(400, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ error: "Only one auth mechanism allowed" }));
+    }
+    res.writeHead(200, { "content-type": "application/pdf" });
+    res.end(STORAGE_PDF);
+  });
+  return new Promise((resolve) => stub.server!.listen(STUB_PORT, "127.0.0.1", () => {
+    stub.storage!.listen(STORAGE_PORT, "127.0.0.1", resolve);
+  }));
 }
 
 // ── The suite ───────────────────────────────────────────────────────────────
@@ -352,6 +419,11 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
       'twin2@example.com', 'twin-new@example.com', 'fresh-face@example.com',
       'different-9004@example.com', 'noname-9010@example.com', 'conc-9011@example.com',
       'flaky-9012@example.com', 'adopt-9015@example.com')`, [orgId]);
+    // Auto-created HOVER projects (takeoff tests) go before their customers.
+    await q(`update crm_measurements set project_id = null where org_id = $1 and external_id like 'hover:%'`, [orgId]);
+    await q(`delete from crm_projects where org_id = $1 and custom_fields ->> 'hoverAutoCreated' = 'true'`, [orgId]);
+    await q(`delete from crm_projects where org_id = $1 and customer_id in (select id from crm_customers where org_id = $1 and email = 'takeoff-9100@example.com')`, [orgId]);
+    await q(`delete from crm_customers where org_id = $1 and email = 'takeoff-9100@example.com'`, [orgId]);
     // Staff-scrubbed customers carry no email — sweep by the flow's marker.
     await q(`delete from crm_customers where org_id = $1 and custom_fields ->> 'hoverAutoCreated' = 'true'`, [orgId]);
     await q(`delete from crm_members where org_id = $1 and email = 'staff-scrub@example.com'`, [orgId]);
@@ -363,6 +435,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     }
     try { fs.unlinkSync(STUB_FILE); } catch {}
     await new Promise((r) => stub.server?.close(r));
+    await new Promise((r) => stub.storage?.close(r));
     await pool.end();
   });
 
@@ -882,6 +955,415 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     expect(m.length).toBe(1);
     expect(m[0].customer_id).toBe(custs[0].id);
     expect((m[0].raw_payload as any).adoptedVia).toBe("created");
+  });
+
+  // ── The complete file: takeoff + premium PDF + auto project (real full_json v2) ─────────
+
+  /** Poll (≤ 10 s) for something the server does in the background. */
+  const until = async (check: () => Promise<boolean>) => {
+    for (let i = 0; i < 100; i++) {
+      if (await check()) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error("timed out waiting for the background back-fill");
+  };
+
+  const m9100 = async () => (await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9100'`, [orgId]))[0];
+
+  it("v2 job → takeoff columns, the premium PDF and a lead project: one complete file, never duplicated", async () => {
+    stub.extraJobs.set(9100, stubJobV2(9100, 77001,
+      { name: "Tess Takeoff", email: "takeoff-9100@example.com" },
+      { line1: "100 Example Lane", zip: "98000" }));
+    await fireCompleted(9100);
+
+    const m = await m9100();
+    expect(m).toBeTruthy();
+    // Measured values in the columns (the quote quantities live in raw_payload.takeoff).
+    expect(m.squares_milli).toBe(23030);
+    expect(m.roof_area_sf_milli).toBe(2303000);
+    expect(m.wall_area_sf_milli).toBe(2169000);
+    expect(m.perimeter_lf_milli).toBe(268420);      // drip edge = rakes + eaves
+    expect(m.eave_lf_milli).toBe(121670);
+    expect(m.rake_lf_milli).toBe(146750);
+    expect(m.valley_lf_milli).toBe(37920);
+    expect(m.ridge_lf_milli).toBe(80330);
+    expect(m.predominant_pitch).toBe("8/12");
+    expect(m.stories).toBe(2);
+    expect(m.facet_count).toBe(7);
+    expect(m.waste_suggestion_bps).toBe(500);
+    const raw = m.raw_payload as any;
+    expect(raw.hoverModelId).toBe("77001");           // the COMPLETED model, not the failed one listed first
+    expect(raw.takeoff.siding).toMatchObject({ areaSqft: 2169, quantitySqft: 2200 });
+    expect(raw.takeoff.roof).toMatchObject({ areaSqft: 2303, wastePct: 5, quantitySqft: 2418, squares: 24.18 });
+    expect(raw.takeoff.counts).toEqual({ windows: 9, doors: 4, windowGroups: 8 });
+    expect(raw.summary).toMatchObject({ roofSqft: 2303, sidingSqft: 2169, windowsCount: 9, stories: 2, pitch: "8/12" });
+
+    // The PREMIUM PDF, fetched with the bearer, stored as the gated measurement attachment.
+    expect(raw.pdfSource).toBe("pro_premium");
+    expect(stub.premiumHits).toContainEqual({ modelId: "77001", auth: true });
+    const dl = await fetch(`${BASE}/api/crm/attachments/${raw.pdfAttachmentId}/file`);
+    expect(dl.status).toBe(200);
+    expect(Buffer.from(await dl.arrayBuffer()).equals(PREMIUM_PDF)).toBe(true);
+
+    // A lead project at the job's address, linked.
+    expect(m.project_id).toBeTruthy();
+    const [p] = await q<any>(`select * from crm_projects where id = $1`, [m.project_id]);
+    expect(p.status).toBe("lead");
+    expect(p.customer_id).toBe(m.customer_id);
+    expect(p.name).toBe("Takeoff job 9100 — 100 Example Lane");
+    expect(p.address_line1).toBe("100 Example Lane");
+    expect(p.number).toMatch(/^P-\d+$/);
+    expect((p.custom_fields as any).hoverJobId).toBe("9100");
+    expect(raw.autoProjectId).toBe(p.id);
+
+    // Redelivery: still one measurement, one project, one PDF.
+    await fireCompleted(9100);
+    await hover.ingestHoverJob(orgId, "9100");
+    expect((await q<any>(`select id from crm_measurements where org_id = $1 and external_id = 'hover:9100'`, [orgId])).length).toBe(1);
+    expect((await q<any>(`select id from crm_projects where org_id = $1 and customer_id = $2`, [orgId, m.customer_id])).length).toBe(1);
+    expect((await q<any>(`select id from crm_attachments where org_id = $1 and file_name = 'hover-measurements-9100.pdf'`, [orgId])).length).toBe(1);
+  });
+
+  it("a second capture at the address joins that project; ensureHoverProject is idempotent and race-safe", async () => {
+    stub.extraJobs.set(9101, stubJobV2(9101, 77002,
+      { name: "Tess Takeoff", email: "takeoff-9100@example.com" },
+      { line1: "100 EXAMPLE lane.", zip: "98000-1234" }));
+    await fireCompleted(9101);
+    const first = await m9100();
+    const [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9101'`, [orgId]);
+    expect(m.customer_id).toBe(first.customer_id);
+    expect(m.project_id).toBe(first.project_id);
+    // No premium report for this model → the documented PDF, whose storage redirect got NO bearer.
+    expect((m.raw_payload as any).pdfSource).toBe("measurements");
+    const dl = await fetch(`${BASE}/api/crm/attachments/${(m.raw_payload as any).pdfAttachmentId}/file`);
+    expect(Buffer.from(await dl.arrayBuffer()).equals(STORAGE_PDF)).toBe(true);
+
+    const file = await import("./hover-file");
+    expect(await file.ensureHoverProject(orgId, m.id)).toEqual({ projectId: first.project_id, created: false });
+    // Unlink both and race two ensures: one project still.
+    await q(`update crm_measurements set project_id = null where id = any($1)`, [[m.id, first.id]]);
+    const [a, b] = await Promise.all([file.ensureHoverProject(orgId, first.id), file.ensureHoverProject(orgId, m.id)]);
+    expect(a.projectId).toBe(first.project_id);
+    expect(b.projectId).toBe(first.project_id);
+    expect(a.created || b.created).toBe(false);
+    expect((await q<any>(`select id from crm_projects where org_id = $1 and customer_id = $2`, [orgId, m.customer_id])).length).toBe(1);
+  });
+
+  it("ambiguous and staff-ordered captures never get a project", async () => {
+    for (const job of ["9005", "9013", "9014"]) {
+      const [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = $2`, [orgId, `hover:${job}`]);
+      expect(m.project_id).toBeNull();
+      expect((await q<any>(`select id from crm_projects where org_id = $1 and customer_id = $2`, [orgId, m.customer_id])).length).toBe(0);
+    }
+    const file = await import("./hover-file");
+    const [amb] = await q<any>(`select id from crm_measurements where org_id = $1 and external_id = 'hover:9005'`, [orgId]);
+    expect((await file.ensureHoverProject(orgId, amb.id)).reason).toBe("ambiguous match");
+    const [staff] = await q<any>(`select id from crm_measurements where org_id = $1 and external_id = 'hover:9013'`, [orgId]);
+    expect((await file.ensureHoverProject(orgId, staff.id)).reason).toBe("staff-ordered capture");
+  });
+
+  it("takeoff routes, estimate symbols and getCustomerTakeoff carry the quote quantities", async () => {
+    const m = await m9100();
+    const byCustomer = await api(`/api/crm/customers/${m.customer_id}/takeoff`);
+    expect(byCustomer.status).toBe(200);
+    const t = byCustomer.body.takeoff;
+    expect(t.siding.quantitySqft).toBe(2200);
+    expect(t.roof.quantitySqft).toBe(2418);
+    expect(t.roof.squares).toBe(24.18);
+    expect(t.footprint).toEqual({ areaSqft: 1615, perimeterFt: 188.67, stories: 2 });
+    expect(t.totals).toEqual({ windowsAreaSqft: 126, windowsUnitedInches: 808, doorsAreaSqft: 181 });
+    expect(t.source.pdfUrl).toMatch(/^\/api\/crm\/attachments\/.+\/file$/);
+    expect(byCustomer.body.others.length).toBe(1);   // the second capture
+    const byProject = await api(`/api/crm/projects/${m.project_id}/takeoff`);
+    expect(byProject.body.takeoff.siding.quantitySqft).toBe(2200);
+    expect(JSON.stringify(byProject.body)).not.toMatch(/Cents|price/i);
+
+    const sym = await api(`/api/crm/measurements/${m.id}/symbols`);
+    expect(sym.body.symbols).toMatchObject({
+      SQUARES: 23.03, WASTE: 5, SIDING_SF: 2200, ROOF_SF: 2418, ROOF_SQ: 24.18, WINDOWS: 9, DOORS: 4, UI: 808,
+    });
+
+    const file = await import("./hover-file");
+    const best = await file.getCustomerTakeoff(orgId, m.customer_id, { addressLine1: "100 Example Lane", postalCode: "98000" });
+    expect(best?.siding.quantitySqft).toBe(2200);
+    expect(["9100", "9101"]).toContain(best?.source?.hoverJobId);
+    expect(await file.getCustomerTakeoff(orgId, "00000000-0000-0000-0000-000000000000")).toBeNull();
+  });
+
+  it("back-fill re-derives every row from the stored full_json with ZERO HOVER calls, and is idempotent", async () => {
+    const m = await m9100();
+    await q(`update crm_measurements set squares_milli = null, wall_area_sf_milli = null, perimeter_lf_milli = null,
+      raw_payload = raw_payload - 'takeoff' - 'summary' - 'takeoffDerivation' where id = $1`, [m.id]);
+    const file = await import("./hover-file");
+    const calls = stub.requests;
+    const r1 = await file.backfillHoverTakeoffs(orgId);
+    expect(r1.updated).toBeGreaterThanOrEqual(1);
+    const back = await m9100();
+    expect(back.squares_milli).toBe(23030);
+    expect(back.wall_area_sf_milli).toBe(2169000);
+    expect(back.perimeter_lf_milli).toBe(268420);
+    expect((back.raw_payload as any).takeoff.siding.quantitySqft).toBe(2200);
+    expect((back.raw_payload as any).pdfAttachmentId).toBe((m.raw_payload as any).pdfAttachmentId); // other keys kept
+    expect((back.raw_payload as any).takeoffDerivation).toBe(file.TAKEOFF_DERIVATION);
+    // Nothing stale is left: the next (sync) back-fill reads no rows at all.
+    const r2 = await file.backfillHoverTakeoffs(orgId);
+    expect(r2).toEqual({ checked: 0, updated: 0, unchanged: 0, skipped: 0 });
+    // A full check (--all) finds every row current.
+    const r3 = await file.backfillHoverTakeoffs(orgId, { all: true });
+    expect(r3.updated).toBe(0);
+    expect(r3.unchanged).toBeGreaterThanOrEqual(r1.updated);
+    expect(r3.checked).toBe(r3.unchanged + r3.skipped);
+    expect(stub.requests).toBe(calls);
+
+    // Paging: 205 stale rows (more than two 100-row pages) are all visited, then none.
+    await q(`insert into crm_measurements (org_id, provider, status, external_id, raw_payload)
+      select $1, 'hover', 'ready', 'hover:bulk-' || g, jsonb_build_object('importSource', 'hover', 'takeoff', $2::jsonb)
+      from generate_series(1, 205) g`, [orgId, JSON.stringify((back.raw_payload as any).takeoff)]);
+    try {
+      const bulk = await file.backfillHoverTakeoffs(orgId);
+      expect(bulk.checked).toBe(205);
+      expect(bulk.updated).toBe(205);   // their columns were empty
+      const [one] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:bulk-77'`, [orgId]);
+      expect(one.wall_area_sf_milli).toBe(2169000);
+      expect((await file.backfillHoverTakeoffs(orgId)).checked).toBe(0);
+    } finally {
+      await q(`delete from crm_measurements where org_id = $1 and external_id like 'hover:bulk-%'`, [orgId]);
+    }
+  });
+
+  it("takeoff rules are org settings: saving re-derives the takeoffs; 5% roof waste is the floor", async () => {
+    const m = await m9100();
+    // A capture whose document is not kept (only its stored takeoff) must follow rule changes too.
+    await q(`update crm_measurements set raw_payload = raw_payload - 'fullJson' where org_id = $1 and external_id = 'hover:9101'`, [orgId]);
+    const save = await api("/api/crm/integrations/hover/takeoff-rules", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ roofWastePct: 10, sidingRoundUpTo: 25 }),
+    });
+    expect(save.status).toBe(200);
+    expect(save.body).toEqual({ ok: true, takeoffRules: { roofWastePct: 10, sidingRoundUpTo: 25 }, recalculating: true });
+    // The cards apply the new rules on read at once …
+    let t = (await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body.takeoff;
+    expect(t.roof.quantitySqft).toBe(2533);
+    expect(t.siding.quantitySqft).toBe(2175);
+    // … and the stored copies follow from the background back-fill.
+    const row9101 = async () => (await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9101'`, [orgId]))[0];
+    await until(async () => (await m9100()).waste_suggestion_bps === 1000 && (await row9101()).waste_suggestion_bps === 1000);
+    const noDoc = await row9101();
+    expect(noDoc.raw_payload.fullJson).toBeUndefined();
+    expect(noDoc.raw_payload.takeoff.roof.quantitySqft).toBe(2533);
+    expect(noDoc.raw_payload.takeoff.siding.quantitySqft).toBe(2175);
+    expect(noDoc.waste_suggestion_bps).toBe(1000);
+    expect((await api("/api/crm/integrations/hover/status")).body.takeoffRules).toEqual({ roofWastePct: 10, sidingRoundUpTo: 25 });
+    const low = await api("/api/crm/integrations/hover/takeoff-rules", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ roofWastePct: 3, sidingRoundUpTo: 100 }),
+    });
+    expect(low.status).toBe(400);
+    await api("/api/crm/integrations/hover/takeoff-rules", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ roofWastePct: 5, sidingRoundUpTo: 100 }),
+    });
+    await until(async () => (await row9101()).waste_suggestion_bps === 500 && (await m9100()).waste_suggestion_bps === 500);
+    t = (await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body.takeoff;
+    expect(t.roof.quantitySqft).toBe(2418);
+    expect(t.siding.quantitySqft).toBe(2200);
+    const [back] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9101'`, [orgId]);
+    expect(back.raw_payload.takeoff.roof.quantitySqft).toBe(2418);
+    expect(back.waste_suggestion_bps).toBe(500);
+  });
+
+  // ── Review fixes: full_json retries, trimmed rows, PDF store across processes, auto-project retry ──
+
+  it("a transient full_json failure schedules a retry (never a permanent exclusion), then the takeoff lands", async () => {
+    stub.failFullJson = true;
+    stub.extraJobs.set(9110, stubJobV2(9110, 77010, { name: "Tia Transient", email: "takeoff-9100@example.com" }, { line1: "110 Example Lane", zip: "98000" }));
+    try {
+      await hover.ingestHoverJob(orgId, "9110");
+    } finally {
+      stub.failFullJson = false;
+    }
+    let [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9110'`, [orgId]);
+    expect(m.raw_payload.takeoff).toBeNull();
+    expect(m.raw_payload.fullJsonFailures).toBe(1);
+    const wait = Date.parse(m.raw_payload.fullJsonRetryAt) - Date.now();
+    expect(wait).toBeGreaterThan(30 * 60_000);
+    expect(wait).toBeLessThanOrEqual(3600_000);
+    // Before the retry time nothing is fetched; after it, the next delivery fetches and derives.
+    await hover.ingestHoverJob(orgId, "9110");
+    [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9110'`, [orgId]);
+    expect(m.raw_payload.takeoff).toBeNull();
+    await q(`update crm_measurements set raw_payload = raw_payload || '{"fullJsonRetryAt":"2000-01-01T00:00:00.000Z"}'::jsonb where id = $1`, [m.id]);
+    await hover.ingestHoverJob(orgId, "9110");
+    [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9110'`, [orgId]);
+    expect(m.raw_payload.takeoff.siding.quantitySqft).toBe(2200);
+    expect(m.wall_area_sf_milli).toBe(2169000);
+    expect(m.raw_payload.fullJsonFailures).toBe(0);
+  });
+
+  it("a row holding only the {trimmed:true} stand-in is re-fetched and gets its takeoff", async () => {
+    const [m0] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9110'`, [orgId]);
+    await q(`update crm_measurements set squares_milli = null, wall_area_sf_milli = null,
+      raw_payload = (raw_payload - 'takeoff' - 'summary') || '{"fullJson":{"trimmed":true,"bytes":400000}}'::jsonb where id = $1`, [m0.id]);
+    await hover.ingestHoverJob(orgId, "9110");
+    const [m] = await q<any>(`select * from crm_measurements where id = $1`, [m0.id]);
+    expect(m.raw_payload.fullJson.trimmed).toBeUndefined();
+    expect(m.raw_payload.takeoff.roof.quantitySqft).toBe(2418);
+    expect(m.squares_milli).toBe(23030);
+  });
+
+  it("the PDF is stored once even when two processes fetch it at the same moment", async () => {
+    const [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9110'`, [orgId]);
+    await q(`delete from crm_attachments where org_id = $1 and file_name = 'hover-measurements-9110.pdf'`, [orgId]);
+    await q(`update crm_measurements set raw_payload = raw_payload - 'pdfAttachmentId' - 'pdfCheckedAt' where id = $1`, [m.id]);
+    const [row] = await q<any>(`select * from crm_measurements where id = $1`, [m.id]);
+    // This vitest process and the dev server are two processes with separate in-memory chains.
+    const [a, b] = await Promise.all([
+      hover.fetchHoverMeasurementPdfNow(orgId, {
+        ...row, rawPayload: row.raw_payload, customerId: row.customer_id, externalId: row.external_id,
+      } as any),
+      api(`/api/crm/measurements/${m.id}/hover-pdf`, { method: "POST" }),
+    ]);
+    const atts = await q<any>(`select id from crm_attachments where org_id = $1 and file_name = 'hover-measurements-9110.pdf'`, [orgId]);
+    expect(atts.length).toBe(1);
+    expect(a.attachmentId).toBe(atts[0].id);
+    expect(b.body.attachmentId).toBe(atts[0].id);
+  });
+
+  it("a capture whose auto-project step never finished is retried on the next delivery; historical rows are not", async () => {
+    const [cust] = await q<any>(`select id from crm_customers where org_id = $1 and email = 'takeoff-9100@example.com'`, [orgId]);
+    // As if the process died right after the insert: flag set, no project. A historical row has no flag.
+    stub.extraJobs.set(9120, stubJobV2(9120, 77020, null, { line1: "120 Crash Ct", zip: "98000" }));
+    stub.extraJobs.set(9121, stubJobV2(9121, 77021, null, { line1: "121 Old Rd", zip: "98000" }));
+    const quiet = { importSource: "hover", photosSyncedAt: new Date().toISOString(), pdfCheckedAt: new Date().toISOString(), fullJsonRetryAt: "2999-01-01T00:00:00.000Z" };
+    const [crashed] = await q<any>(`insert into crm_measurements (org_id, customer_id, provider, status, external_id, address_line1, postal_code, raw_payload)
+      values ($1, $2, 'hover', 'ready', 'hover:9120', '120 Crash Ct', '98000', $3) returning id`,
+      [orgId, cust.id, JSON.stringify({ ...quiet, hoverJobId: "9120", needsAutoProject: true })]);
+    const [historical] = await q<any>(`insert into crm_measurements (org_id, customer_id, provider, status, external_id, address_line1, postal_code, raw_payload)
+      values ($1, $2, 'hover', 'ready', 'hover:9121', '121 Old Rd', '98000', $3) returning id`,
+      [orgId, cust.id, JSON.stringify({ ...quiet, hoverJobId: "9121" })]);
+    await hover.ingestHoverJob(orgId, "9120");
+    await hover.ingestHoverJob(orgId, "9121");
+    const [c] = await q<any>(`select * from crm_measurements where id = $1`, [crashed.id]);
+    expect(c.project_id).toBeTruthy();
+    expect(c.raw_payload.needsAutoProject).toBe(false);
+    const [p] = await q<any>(`select * from crm_projects where id = $1`, [c.project_id]);
+    expect(p.address_line1).toBe("120 Crash Ct");
+    const [h] = await q<any>(`select * from crm_measurements where id = $1`, [historical.id]);
+    expect(h.project_id).toBeNull();
+  });
+
+  it("unit: SSRF policy — only HOVER and its signed storage, https, every redirect hop checked, size-capped", async () => {
+    const api0 = "https://hover.to/api";
+    const ok = (u: string) => hover.hoverFetchUrlAllowed(u, api0, true);
+    expect(ok("https://hover.to/api/v1/models/1/pro_premium_measurements")).toBe(true);
+    expect(ok("https://hover-prod.s3.us-west-2.amazonaws.com/f.pdf?X-Amz-Signature=x")).toBe(true);
+    expect(ok("https://d1.cloudfront.net/f.pdf")).toBe(true);
+    expect(ok("http://hover-prod.s3.amazonaws.com/f.pdf")).toBe(false);          // not https
+    expect(ok("https://hover-prod.s3.amazonaws.com:8443/f.pdf")).toBe(false);    // odd port
+    expect(ok("https://evil.example/f.pdf")).toBe(false);
+    expect(ok("https://hover.to.evil.example/f.pdf")).toBe(false);
+    expect(ok("https://169.254.169.254/latest/meta-data")).toBe(false);
+    expect(ok("https://user:pw@hover.to/api/x")).toBe(false);
+    expect(ok("http://127.0.0.1:9/x")).toBe(false);
+    // Outside production a loopback stub API admits its loopback storage sibling — never in production.
+    expect(hover.hoverFetchUrlAllowed("http://127.0.0.1:9/x", "http://127.0.0.1:8/api", false)).toBe(true);
+    expect(hover.hoverFetchUrlAllowed("http://127.0.0.1:9/x", "http://127.0.0.1:8/api", true)).toBe(false);
+
+    const seen: string[] = [];
+    const pdf = Buffer.from("%PDF-1.7 x");
+    const fake = (routes: Record<string, () => Response>) => (async (url: any) => {
+      seen.push(String(url));
+      const r = routes[String(url)];
+      return r ? r() : new Response("nope", { status: 404 });
+    }) as any;
+    const redirect = (to: string) => () => new Response(null, { status: 302, headers: { location: to } });
+    // A redirect to the metadata service / a private address / a foreign host / plain http is never followed.
+    for (const target of ["https://169.254.169.254/latest/meta-data", "https://10.0.0.5/f.pdf", "https://evil.example/f.pdf", "http://hover.to/api/f.pdf"]) {
+      seen.length = 0;
+      const out = await hover.fetchHoverPdf(fake({ "https://hover.to/api/a": redirect(target) }), "https://hover.to/api/a", {}, api0);
+      expect(out).toBeNull();
+      expect(seen).toEqual(["https://hover.to/api/a"]);
+    }
+    // More than 3 redirects: refused. Three are fine.
+    const loop: Record<string, () => Response> = {};
+    for (let i = 0; i < 6; i++) loop[`https://hover.to/api/r${i}`] = redirect(`https://hover.to/api/r${i + 1}`);
+    loop["https://hover.to/api/r6"] = () => new Response(pdf, { status: 200 });
+    expect(await hover.fetchHoverPdf(fake(loop), "https://hover.to/api/r0", {}, api0)).toBeNull();
+    const three: Record<string, () => Response> = {};
+    for (let i = 0; i < 3; i++) three[`https://hover.to/api/t${i}`] = redirect(`https://hover.to/api/t${i + 1}`);
+    three["https://hover.to/api/t3"] = () => new Response(pdf, { status: 200 });
+    expect((await hover.fetchHoverPdf(fake(three), "https://hover.to/api/t0", {}, api0))?.equals(pdf)).toBe(true);
+    // Size cap: declared too big, and streamed past the cap without a length.
+    const big = () => new Response("x", { status: 200, headers: { "content-length": String(26 * 1024 * 1024) } });
+    expect(await hover.fetchHoverPdf(fake({ "https://hover.to/api/big": big }), "https://hover.to/api/big", {}, api0)).toBeNull();
+    const chunk = new Uint8Array(1024 * 1024);
+    let sent = 0;
+    const stream = () => new Response(new ReadableStream({
+      pull(c) { if (sent++ > 40) c.close(); else c.enqueue(chunk); },
+    }), { status: 200 });
+    expect(await hover.fetchHoverPdf(fake({ "https://hover.to/api/stream": stream }), "https://hover.to/api/stream", {}, api0)).toBeNull();
+    expect(sent).toBeLessThan(40);   // stopped reading at the cap
+  });
+
+  it("unit: the full_json body is streamed with a size cap; 5xx/bad JSON are transient, 404 is unavailable", async () => {
+    const url = `${STUB}/api/v3/models/1/artifacts/measurements.json?version=full_json`;
+    const parsed = { measurementsJsonUrl: url } as any;
+    const reply = (r: () => Response) => (async () => r()) as any;
+    let sent = 0;
+    const huge = () => new Response(new ReadableStream({
+      pull(c) { if (sent++ > 40) c.close(); else c.enqueue(new Uint8Array(1024 * 1024).fill(32)); },
+    }), { status: 200 });
+    expect(await hover.fetchHoverFullJson(parsed, {}, reply(huge))).toEqual({ kind: "unavailable" });
+    expect(sent).toBeLessThan(20);   // stopped at the 10 MB cap
+    const declared = () => new Response("{}", { status: 200, headers: { "content-length": String(50 * 1024 * 1024) } });
+    expect(await hover.fetchHoverFullJson(parsed, {}, reply(declared))).toEqual({ kind: "unavailable" });
+    expect((await hover.fetchHoverFullJson(parsed, {}, reply(() => new Response("oops", { status: 502 })))).kind).toBe("transient");
+    expect((await hover.fetchHoverFullJson(parsed, {}, reply(() => new Response("<html>", { status: 200 })))).kind).toBe("transient");
+    expect(await hover.fetchHoverFullJson(parsed, {}, reply(() => new Response("{}", { status: 404 })))).toEqual({ kind: "unavailable" });
+    const ok = await hover.fetchHoverFullJson(parsed, {}, reply(() => new Response(JSON.stringify(V2_FULL_JSON), { status: 200 })));
+    expect(ok.kind).toBe("ok");
+    // A payload link outside HOVER's hosts is never fetched.
+    expect(await hover.fetchHoverFullJson({ measurementsJsonUrl: "https://evil.example/m.json" } as any, {}, reply(() => { throw new Error("fetched"); }))).toEqual({ kind: "unavailable" });
+  });
+
+  it("unit: full_json retry backoff and the needs-fetch rule", () => {
+    const now = Date.parse("2026-10-17T00:00:00.000Z");
+    expect(hover.hoverFullJsonRetry("transient", 1, now)).toEqual({ fullJsonRetryAt: "2026-10-17T01:00:00.000Z", fullJsonFailures: 1 });
+    expect(hover.hoverFullJsonRetry("transient", 3, now).fullJsonRetryAt).toBe("2026-10-17T04:00:00.000Z");
+    expect(hover.hoverFullJsonRetry("transient", 12, now).fullJsonRetryAt).toBe("2026-10-18T00:00:00.000Z");
+    expect(hover.hoverFullJsonRetry("unavailable", 1, now).fullJsonRetryAt).toBe("2026-10-24T00:00:00.000Z");
+    expect(hover.hoverNeedsFullJson({}, now)).toBe(true);
+    expect(hover.hoverNeedsFullJson({ fullJson: { trimmed: true } }, now)).toBe(true);
+    expect(hover.hoverNeedsFullJson({ fullJson: { version: 2 } }, now)).toBe(false);
+    expect(hover.hoverNeedsFullJson({ fullJsonRetryAt: "2026-10-17T01:00:00.000Z" }, now)).toBe(false);
+    expect(hover.hoverNeedsFullJson({ fullJsonRetryAt: "2026-10-16T23:00:00.000Z" }, now)).toBe(true);
+  });
+
+
+  it("report viewer: every report is listed for the picker; the PDF opens inline; a missing one is fetched on demand", async () => {
+    const m = await m9100();
+    const listed = (await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body;
+    expect(listed.takeoffs.map((x: any) => x.source.hoverJobId).sort()).toEqual(expect.arrayContaining(["9100", "9101"]));
+
+    const attId = (m.raw_payload as any).pdfAttachmentId;
+    const inline = await fetch(`${BASE}/api/crm/attachments/${attId}/file?inline=1`);
+    expect(inline.status).toBe(200);
+    expect(inline.headers.get("content-type")).toContain("application/pdf");
+    expect(inline.headers.get("content-disposition")).toMatch(/^inline;/);
+    const dl = await fetch(`${BASE}/api/crm/attachments/${attId}/file`);
+    expect(dl.headers.get("content-disposition")).toMatch(/^attachment;/);
+
+    // Drop the stored PDF: the card offers "Fetch report from HOVER", which stores it again.
+    await q(`delete from crm_attachments where id = $1`, [attId]);
+    await q(`update crm_measurements set raw_payload = raw_payload - 'pdfAttachmentId' - 'pdfSource' where id = $1`, [m.id]);
+    expect((await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body.takeoffs
+      .find((x: any) => x.source.hoverJobId === "9100").source.pdfUrl).toBeNull();
+    const hits = stub.premiumHits.length;
+    const fetched = await api(`/api/crm/measurements/${m.id}/hover-pdf`, { method: "POST" });
+    expect(fetched.status).toBe(200);
+    expect(fetched.body.pdfUrl).toBe(`/api/crm/attachments/${fetched.body.attachmentId}/file`);
+    expect(stub.premiumHits.length).toBe(hits + 1);
+    const again = await api(`/api/crm/measurements/${m.id}/hover-pdf`, { method: "POST" });
+    expect(again.body.attachmentId).toBe(fetched.body.attachmentId);   // stored once, no second HOVER call
+    expect(stub.premiumHits.length).toBe(hits + 1);
+    expect((await api(`/api/crm/measurements/00000000-0000-0000-0000-000000000000/hover-pdf`, { method: "POST" })).status).toBe(404);
   });
 
   it("disconnect deletes the HOVER webhook and wipes the stored tokens", async () => {

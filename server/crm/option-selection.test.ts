@@ -74,7 +74,7 @@ afterAll(async () => {
 async function makeCustomer(tag: string) {
   const r = await api("/api/crm/customers", {
     method: "POST",
-    body: JSON.stringify({ displayName: `Vitest optsel ${tag}`, email: `vitest.optsel.${tag}@example.com` }),
+    body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest optsel ${tag}`, email: `vitest.optsel.${tag}@example.com` }),
   }, cookie);
   expect(r.status).toBe(201);
   return r.body.id as string;

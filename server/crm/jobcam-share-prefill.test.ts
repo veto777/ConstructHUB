@@ -84,7 +84,7 @@ describe("GET /api/crm/customers/:id feeds the share dialog (dev server)", () =>
     const run = Date.now().toString(36);
     const email = `vitest.jcshare.${run}@example.com`;
     const made = await fetch(`${BASE}/api/crm/customers`, {
-      method: "POST", headers, body: JSON.stringify({ displayName: `Vitest jcshare ${run}`, email }),
+      method: "POST", headers, body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest jcshare ${run}`, email }),
     });
     expect(made.status).toBe(201);
     const { id } = await made.json();

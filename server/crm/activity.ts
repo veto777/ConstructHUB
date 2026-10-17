@@ -15,11 +15,17 @@ import { divisionScopeOf } from "./divisions";
  * actor_label is a snapshot taken at write time (member display name,
  * "client" or "system") so history survives renames and removals. meta
  * carries field names and amounts only — never passwords or tokens.
+ *
+ * On read every row is named through the actor directory (actors.ts): the
+ * member's CURRENT name with the owner labelled "Name (Owner)", the client's
+ * name for "client" rows, the source for automatic rows — never an id.
  */
 import type { Express } from "express";
 import { db } from "../db";
-import { crmActivityLog, crmCustomers, crmMembers, type CrmActivityLogRow } from "@shared/schema";
+import { crmActivityLog, crmAttachments, crmCustomers, crmMembers, type CrmActivityLogRow } from "@shared/schema";
 import { and, desc, eq } from "drizzle-orm";
+import { loadActorDirectory, type ActorDirectory } from "./actors";
+import { actorLabel, type CrmActor } from "@shared/crm-actor";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import {
   CRM_PERMISSION_LABELS, CRM_MEMBER_FIELD_LABELS, CRM_CUSTOMER_FIELD_LABELS, crmFieldLabel,
@@ -96,12 +102,44 @@ export function logActivity(
 
 // ── Human text for the audit surfaces (pure) ────────────────────────────────
 
-/** "Dave updated estimate E-1847" — the sentence the two audit UIs render. */
+/** A photo's stage as words: "a project photo (in progress)". */
+function photoNoun(m: Record<string, any>): string {
+  if (m.stage === "progress") return "a project photo (in progress)";
+  if (m.stage === "finished") return "a project photo (finished)";
+  return "a photo";
+}
+
+/** The file an attachment row is about, as words (file names only). */
+function attachmentAdded(m: Record<string, any>): string {
+  const name = m.fileName ? ` — ${m.fileName}` : "";
+  switch (m.kind) {
+    case "photo": return m.byClient ? `shared a photo${name}` : `added ${photoNoun(m)}${name}`;
+    case "estimate": return `attached ${m.fileName ?? "a file"} to estimate ${m.number ?? ""}`.trim();
+    case "pamphlet": return `added ${m.fileName ?? "a file"} to the company files`;
+    case "estimate_default": return `added ${m.fileName ?? "a file"} to the files for all future estimates`;
+    default: return `added a file${name}`;
+  }
+}
+
+function attachmentDeleted(m: Record<string, any>): string {
+  const name = m.fileName ? ` — ${m.fileName}` : "";
+  switch (m.kind) {
+    case "photo": return `deleted ${photoNoun(m)}${name}`;
+    case "estimate": return `removed ${m.fileName ?? "a file"} from estimate ${m.number ?? ""}`.trim();
+    case "pamphlet": return `deleted the company file ${m.fileName ?? ""}`.trim();
+    case "estimate_default": return `removed ${m.fileName ?? "a file"} from the files for all future estimates`;
+    default: return `deleted a file${name}`;
+  }
+}
+
+/** "Dave updated estimate E-1847" — the sentence the two audit UIs render.
+ *  `actor` (resolved by the directory) names the row; without it the
+ *  write-time snapshot label is used. */
 export function activityText(row: {
   actorLabel: string;
   action: string;
   meta?: unknown;
-}): string {
+}, actor?: CrmActor | null): string {
   const m = (row.meta ?? {}) as Record<string, any>;
   // Field keys are stored as written (hourlyCostCents); a person reads labels ("cost rate").
   const labelled = (labels: Record<string, string>) => {
@@ -164,12 +202,29 @@ export function activityText(row: {
       case "pricebook.adjusted": return `adjusted price book ${m.field === "cost" ? "costs" : "prices"} on ${m.count ?? "several"} material${m.count === 1 ? "" : "s"}${m.percent != null ? ` by ${m.percent > 0 ? "+" : ""}${m.percent}%` : ""}`;
       case "pricebook.floor_lock": return `turned the price-floor lock ${m.enabled ? "on" : "off"}`;
       case "discount.updated": return `updated discount offers on estimate ${m.number ?? ""}`.trim();
+      case "self_estimate.requested":
+        return `asked for a price online${Array.isArray(m.trades) && m.trades.length ? ` (${m.trades.join(" + ")})` : ""}${m.lowCents != null && m.highCents != null ? ` — ballpark ${money(m.lowCents)}–${money(m.highCents)}` : ""}${m.number ? ` — draft estimate ${m.number} created` : ""}`;
+      case "self_estimate.settings_updated": return `updated the client self-estimate prices${m.division ? ` (${m.division === "org" ? "no division" : "a division"})` : ""}`;
+      case "task.done": return `marked a task done${m.title ? `: ${String(m.title).slice(0, 120)}` : ""}`;
+      case "task.reopened": return `reopened a task${m.title ? `: ${String(m.title).slice(0, 120)}` : ""}`;
       case "payment.recorded":
         return `recorded payment ${money(m.amountCents)}${m.method ? ` via ${m.method}` : ""}${m.number ? ` on invoice ${m.number}` : ""}`;
       case "payment.reversed":
         return `reversed a ${money(m.amountCents)} payment${m.number ? ` on invoice ${m.number}` : ""}${m.reason ? ` — ${String(m.reason).slice(0, 140)}` : ""}`;
       case "payment.link.created":
         return `created a ${money(m.amountCents)} payment link for ${m.number ? `${m.kind === "estimate" ? "estimate" : "invoice"} ${m.number}` : "a client"}`;
+      case "attachment.added": return attachmentAdded(m);
+      case "attachment.deleted": return attachmentDeleted(m);
+      case "attachment.attached": return `attached ${m.fileName ?? "a file"} to estimate ${m.number ?? ""} from the library`;
+      case "attachment.auto_attached": return `added ${m.fileName ?? "a file"} to estimate ${m.number ?? ""} (set to attach to every new estimate)`;
+      case "attachment.default_on": return `set ${m.fileName ?? "a file"} to attach to all future estimates`;
+      case "attachment.default_off": return `stopped attaching ${m.fileName ?? "a file"} to future estimates`;
+      case "followup.updated": {
+        const parts: string[] = [];
+        if (m.done) parts.push("marked a follow-up done");
+        if ("cadenceDays" in m) parts.push(m.cadenceDays === 7 ? "set follow-ups to weekly" : m.cadenceDays === 14 ? "set follow-ups to every two weeks" : "turned follow-up reminders off");
+        return parts.join(" and ") || "updated follow-ups";
+      }
       case "jobcam.media.added": return `added ${media()} to JobCam`;
       case "jobcam.media.deleted": return `deleted ${media()} from JobCam`;
       case "jobcam.media.shown_to_client": return `showed ${media()} to the client`;
@@ -199,7 +254,8 @@ export function activityText(row: {
       default: return row.action.replace(/[._]+/g, " ");
     }
   })();
-  return `${row.actorLabel} ${verb}`.replace(/\s{2,}/g, " ").trim();
+  const who = actor ? actorLabel(actor) : row.actorLabel;
+  return `${who} ${verb}`.replace(/\s{2,}/g, " ").trim();
 }
 
 /** Meta without its amounts — what a price-blind seat's audit sentences are built from. */
@@ -211,16 +267,55 @@ function withoutMoney(meta: unknown): Record<string, unknown> {
   return m;
 }
 
-/** The shape the client-360 timeline and the team-page dropdown both render. */
-function present(row: CrmActivityLogRow, hideMoney = false) {
+/** The shape the client-360 timeline and the team-page dropdown both render.
+ *  `actor` is the named actor ({ kind, name, isOwner }); `text` the full
+ *  sentence; `action_text` the sentence without the actor (for a bold name). */
+export function presentActivity(row: CrmActivityLogRow, dir: ActorDirectory, hideMoney = false, clientName?: string | null) {
+  const actor = dir.logActor(row, clientName);
+  const base = hideMoney ? { ...row, meta: withoutMoney(row.meta) } : row;
+  const text = activityText(base, actor);
+  const lead = actorLabel(actor);
   return {
     id: `act-${row.id}`,
     kind: "audit" as const,
     action: row.action,
-    actor: row.actorLabel,
-    text: activityText(hideMoney ? { ...row, meta: withoutMoney(row.meta) } : row),
+    entityType: row.entityType,
+    entityId: row.entityId,
+    actor,
+    text,
+    actionText: text.startsWith(lead) ? text.slice(lead.length).trim() : text,
     at: (row.createdAt ?? new Date()).toISOString(),
   };
+}
+
+
+/**
+ * Restricted-seat visibility of an attachment log row whose attachment no
+ * longer exists (deleted): the parent recorded in meta.refId / customerId,
+ * mirroring object-access's attachment rule (estimate files and contracts
+ * need seePrices + the estimate; photos/measurements the customer; org
+ * collateral is visible to every seat).
+ */
+export async function deletedAttachmentVisible(
+  ctx: OrgContext,
+  access: { visible: (kind: ObjectKind, id: string) => Promise<boolean> },
+  r: { entityId: string | null; customerId: string | null; meta: unknown },
+): Promise<boolean> {
+  const m = (r.meta ?? {}) as Record<string, any>;
+  // The attachment still exists → its own check (already failed) is final.
+  if (r.entityId && await attachmentExists(ctx.org.id, r.entityId)) return false;
+  if (m.kind === "pamphlet" || m.kind === "estimate_default") return true;
+  if (m.kind === "estimate" || m.kind === "contract") {
+    return !!ctx.permissions.seePrices && typeof m.refId === "string" && access.visible("estimates", m.refId);
+  }
+  const customerId = (typeof m.refId === "string" && m.refId) || r.customerId;
+  return !!customerId && access.visible("customers", customerId);
+}
+
+async function attachmentExists(orgId: string, id: string): Promise<boolean> {
+  const [row] = await db.select({ id: crmAttachments.id }).from(crmAttachments)
+    .where(and(eq(crmAttachments.orgId, orgId), eq(crmAttachments.id, id))).limit(1);
+  return !!row;
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────────
@@ -234,23 +329,35 @@ export function registerCrmActivityRoutes(app: Express, getDevUser: GetUser): vo
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageJobs")) return;
 
-    const [cust] = await db.select({ id: crmCustomers.id }).from(crmCustomers)
+    const [cust] = await db.select({ id: crmCustomers.id, displayName: crmCustomers.displayName }).from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.id))).limit(1);
     if (!cust) return res.status(404).json({ message: "Customer not found" });
 
     // "Dave recorded payment $2,000.00" reads without the amount for a price-blind seat.
     const hideMoney = !ctx.permissions.seePrices;
     const rows = await db.select().from(crmActivityLog)
+      // Every row, attachment adds included: the durable "who uploaded" record
+      // must survive the file's deletion. The client page drops an add only
+      // when its attachment line is actually in the timeline
+      // (dedupeCarriedAudit, shared/crm-actor.ts).
       .where(and(eq(crmActivityLog.orgId, ctx.org.id), eq(crmActivityLog.customerId, cust.id)))
       .orderBy(desc(crmActivityLog.createdAt)).limit(100);
+    const dir = await loadActorDirectory(ctx.org.id);
+    const show = (r: CrmActivityLogRow) => presentActivity(r, dir, hideMoney, cust.displayName);
     if (divisionScopeOf(ctx) || !ctx.permissions.viewAllJobs) {
       const access = objectPolicy(ctx);
-      const types: Record<string, ObjectKind> = { customer: "customers", project: "projects", estimate: "estimates", invoice: "invoices", payment: "payments" };
+      const types: Record<string, ObjectKind> = { customer: "customers", project: "projects", estimate: "estimates", invoice: "invoices", payment: "payments", attachment: "attachments" };
       const visible = [];
-      for (const r of rows) if (r.entityId && types[r.entityType ?? ""] && await access.visible(types[r.entityType!], r.entityId)) visible.push(r);
-      return res.json(visible.map((r) => present(r, hideMoney)));
+      for (const r of rows) {
+        if (!r.entityId || !types[r.entityType ?? ""]) continue;
+        if (await access.visible(types[r.entityType!], r.entityId)) { visible.push(r); continue; }
+        // A deleted attachment has no row left to check: gate by the parent
+        // the log row recorded, with the same rules attachments use.
+        if (r.entityType === "attachment" && await deletedAttachmentVisible(ctx, access, r)) visible.push(r);
+      }
+      return res.json(visible.map(show));
     }
-    res.json(rows.map((r) => present(r, hideMoney)));
+    res.json(rows.map(show));
   });
 
   /** Everything one person did, newest first, sign-ins included. Owner role only. */
@@ -266,6 +373,7 @@ export function registerCrmActivityRoutes(app: Express, getDevUser: GetUser): vo
     const rows = await db.select().from(crmActivityLog)
       .where(and(eq(crmActivityLog.orgId, ctx.org.id), eq(crmActivityLog.actorMemberId, req.params.id)))
       .orderBy(desc(crmActivityLog.createdAt)).limit(200);
-    res.json(rows.map((r) => present(r)));
+    const dir = await loadActorDirectory(ctx.org.id);
+    res.json(rows.map((r) => presentActivity(r, dir)));
   });
 }

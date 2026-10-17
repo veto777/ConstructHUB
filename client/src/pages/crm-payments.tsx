@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { brandIcon } from "@/components/brand-icon";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { ActorName } from "@/components/crm-actor-name";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -454,6 +455,9 @@ export default function CrmPaymentsPage() {
                     {p.refundedCents > 0 && <span>{money(p.refundedCents)} refunded · </span>}
                     {new Date(p.createdAt).toLocaleString()}
                     {p.note ? ` · ${p.note}` : ""}
+                    {p.actor && p.actor.recorded !== false && (
+                      <> · {p.provider === "manual" ? "recorded by " : "paid by "}<ActorName actor={p.actor} /></>
+                    )}
                   </div>
                   {p.status === "reversed" && p.failureReason && (
                     <div className="text-xs text-muted-foreground mt-0.5" data-testid={`payment-reversed-${p.id}`}>

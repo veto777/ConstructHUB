@@ -185,6 +185,13 @@ const ROUTES: RouteRow[] = [
   R("PATCH", "/api/crm/org", "manageSettings", { body: { email: "not-an-email" } }),
   R("POST", "/api/crm/org/logo", "manageSettings", { effect: true }),
   R("PUT", "/api/crm/org/price-floor-lock", "owner", { body: {} }),
+  // Client self-estimate: estimators set their own products + prices (server/crm/self-estimate.ts).
+  R("GET", "/api/crm/self-estimate/config", { any: ["manageSettings", "manageEstimates"] }),
+  R("PUT", "/api/crm/self-estimate/config", { any: ["manageSettings", "manageEstimates"] }, { body: {} }),
+  R("GET", "/api/crm/self-estimate/interest", "manageEstimates"),
+  // Tasks: own tasks for every member; the handler scopes rows (404 for a task the seat can't see).
+  R("GET", "/api/crm/tasks", null),
+  R("PATCH", "/api/crm/tasks/:id", null, { path: () => `/api/crm/tasks/${none}`, body: {} }),
   R("GET", "/api/crm/members", null),
   R("PATCH", "/api/crm/members/:id", "manageTeam", { path: () => `/api/crm/members/${other}`, body: { role: "not-a-role" } }),
   R("DELETE", "/api/crm/members/:id", "manageTeam", { path: () => `/api/crm/members/${other}`, effect: true }),
@@ -330,8 +337,17 @@ const ROUTES: RouteRow[] = [
   // HOVER 3D share links (server/crm/hover.ts): paste/clear need manageEstimates; the model lists follow the record.
   R("PUT", "/api/crm/measurements/:id/hover-share", "manageEstimates", { path: (t) => `/api/crm/measurements/${t.measurement}/hover-share`, body: { url: 1 }, scoped: true }),
   R("DELETE", "/api/crm/measurements/:id/hover-share", "manageEstimates", { path: (t) => `/api/crm/measurements/${t.measurement}/hover-share`, effect: true, scoped: true }),
+  // "Fetch report from HOVER": anyone who can see the measurement (it only reads from HOVER).
+  R("POST", "/api/crm/measurements/:id/hover-pdf", null, { path: (t) => `/api/crm/measurements/${t.measurement}/hover-pdf`, effect: true, scoped: true }),
   R("GET", "/api/crm/projects/:id/hover-models", null, { path: (t) => `/api/crm/projects/${t.project}/hover-models`, scoped: true }),
   R("GET", "/api/crm/estimates/:id/hover-models", null, { path: (t) => `/api/crm/estimates/${t.estimate}/hover-models`, scoped: true }),
+  // HOVER takeoff (measurements only, no money) follows the record like the 3D lists.
+  R("GET", "/api/crm/customers/:id/takeoff", null, { path: (t) => `/api/crm/customers/${t.customer}/takeoff`, scoped: true }),
+  R("GET", "/api/crm/projects/:id/takeoff", null, { path: (t) => `/api/crm/projects/${t.project}/takeoff`, scoped: true }),
+  R("GET", "/api/crm/estimates/:id/takeoff", null, { path: (t) => `/api/crm/estimates/${t.estimate}/takeoff`, scoped: true }),
+  // In-app 3D viewer (server/crm/hover-model3d.ts): viewing follows the measurement record, like the model lists.
+  R("GET", "/api/crm/measurements/:id/model3d", null, { path: (t) => `/api/crm/measurements/${t.measurement}/model3d`, scoped: true }),
+  R("GET", "/api/crm/measurements/:id/wireframes/:view", null, { path: (t) => `/api/crm/measurements/${t.measurement}/wireframes/front`, scoped: true }),
   R("POST", "/api/crm/reports/upload", "manageCustomers", { body: {} }),
   R("POST", "/api/crm/reports/:id/confirm", "manageCustomers", { path: (t) => `/api/crm/reports/${t.measurement}/confirm`, effect: true, scoped: true }),
   R("GET", "/api/crm/reports", null),
@@ -418,6 +434,7 @@ const ROUTES: RouteRow[] = [
   R("POST", "/api/crm/integrations/hover/register-webhook", "manageIntegrations", { effect: true }),
   R("POST", "/api/crm/integrations/hover/sync", "manageIntegrations", { effect: true }),
   R("POST", "/api/crm/integrations/hover/schedule", "manageIntegrations", { effect: true }),
+  R("PUT", "/api/crm/integrations/hover/takeoff-rules", "manageIntegrations", { body: { roofWastePct: "x" } }),
   R("POST", "/api/crm/integrations/hover/disconnect", "manageIntegrations", { effect: true }),
   R("GET", "/api/crm/sms/status", null),
   R("PUT", "/api/crm/sms/sender", "manageIntegrations", { effect: true }),

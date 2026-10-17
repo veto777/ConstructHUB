@@ -36,6 +36,8 @@ import {
 import { logTeamActivity, projectStageLabel } from "./stats";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
+import { loadActorDirectory, estimateEventActor } from "./actors";
+import { actorLabel } from "@shared/crm-actor";
 import { estimateDefaultsFromOrg, estimateDocText, depositFromBps } from "./doc-defaults";
 import { queueCrmEvent, queueProjectStageChange, customerEventPayload, projectEventPayload } from "./integrations";
 import {
@@ -280,6 +282,19 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
     signatureName: e.signatureName, expiresAt: e.expiresAt,
     // Derived: out, unanswered and past its expiry date (see estimateIsExpired).
     expired: estimateIsExpired(e),
+    // A draft the client requested from the online self-estimate (server/crm/self-estimate.ts):
+    // where it came from, and the discounts they CLAIMED (unverified). Ballpark amounts are prices.
+    selfEstimate: (() => {
+      const se = (e.customFields as any)?.selfEstimate;
+      if (!se || typeof se !== "object") return undefined;
+      return {
+        fromEstimateId: se.fromEstimateId ?? null, fromNumber: se.fromNumber ?? null,
+        requestedAt: se.requestedAt ?? null, note: se.note ?? null,
+        claimedDiscounts: Array.isArray(se.claimedDiscounts)
+          ? se.claimedDiscounts.map((d: any) => ({ code: d.code, label: d.label, verified: false })) : [],
+        ballpark: ctx.permissions.seePrices ? se.ballpark ?? null : undefined,
+      };
+    })(),
     createdAt: e.createdAt, updatedAt: e.updatedAt,
   };
 }
@@ -400,6 +415,9 @@ const customerSchema = z.object({
   // workspace it was created in). Checked against the org's divisions.
   divisionId: z.string().max(64).nullable().optional(),
 });
+
+/** Every client has an address: creating one needs it, and an edit can't clear it. */
+export const CUSTOMER_ADDRESS_REQUIRED = "Enter the client's address.";
 
 const CUSTOMER_FIELD_LABELS: Record<string, string> = {
   divisionId: "Division",
@@ -597,6 +615,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (!parsed.success) {
       return res.status(400).json({ message: customerIssueMessage(parsed.error.issues), issues: parsed.error.issues });
     }
+    // Every client has an address (owner rule 2026-10-17).
+    if (!parsed.data.addressLine1?.trim()) {
+      return res.status(400).json({ message: CUSTOMER_ADDRESS_REQUIRED });
+    }
 
     // Dedupe. Leap admits it cannot merge customer records or move a job between
     // them ("the answer is no, not currently"), so their users accumulate
@@ -707,6 +729,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const parsed = customerSchema.partial().safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: customerIssueMessage(parsed.error.issues), issues: parsed.error.issues });
+    }
+    if ("addressLine1" in parsed.data && !parsed.data.addressLine1?.trim()) {
+      return res.status(400).json({ message: CUSTOMER_ADDRESS_REQUIRED });
     }
     const [before] = await db.select().from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.id))).limit(1);
@@ -1382,6 +1407,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .orderBy(desc(crmEstimateEvents.createdAt)).limit(100);
     const [cust] = await db.select().from(crmCustomers)
       .where(eq(crmCustomers.id, e.customerId)).limit(1);
+    // History names who did each step: the member ("Veto Smith (Owner)"),
+    // the client by name, or the automatic source — never the stored id.
+    const dir = await loadActorDirectory(ctx.org.id);
     res.json({
       estimate: presentEstimate(e, ctx),
       items: items.map((i) => presentEstimateItem(i, ctx)),
@@ -1389,6 +1417,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       // redaction the engagement endpoint applies (portal.ts redactIpPrefix).
       events: events.map((ev) => ({
         ...ev,
+        actor: estimateEventActor(ev.actor, dir, cust?.displayName ?? null),
+        actorName: actorLabel(estimateEventActor(ev.actor, dir, cust?.displayName ?? null)),
         // Event payloads can contain totalCents even when the document's
         // monetary fields are hidden from this role.
         meta: ctx.permissions.seePrices ? ev.meta : null,

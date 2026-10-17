@@ -31,6 +31,7 @@ import express from "express";
 import crypto from "crypto";
 import { z } from "zod";
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql, arrayContains, type SQL } from "drizzle-orm";
+import { actorLabel, memberActor } from "@shared/crm-actor";
 import { db } from "../db";
 import { crmCustomers, crmMembers, crmProjects, jobcamMedia, jobcamTags, jobcamUploads, JOBCAM_MEDIA_KINDS } from "@shared/schema";
 import type { JobcamMedia } from "@shared/schema";
@@ -117,13 +118,15 @@ export function projectSummary(p: typeof crmProjects.$inferSelect) {
   return { id: p.id, name: p.name, number: p.number, address };
 }
 
-/** `publicView`: a guest on a share link sees a crew member's display name, never their email address. */
+/** `publicView`: a guest on a share link sees a crew member's display name, never their email address.
+ *  The team's own view names everyone the CRM way (shared/crm-actor.ts): the owner as "Name (Owner)",
+ *  an unnamed member by their email's local part — any status, so a disabled seat keeps its name. */
 export async function membersMap(orgId: string, publicView = false) {
-  const rows = await db.select({ id: crmMembers.id, displayName: crmMembers.displayName, email: crmMembers.email })
+  const rows = await db.select({ id: crmMembers.id, displayName: crmMembers.displayName, email: crmMembers.email, role: crmMembers.role })
     .from(crmMembers).where(eq(crmMembers.orgId, orgId));
   const out = new Map<string, { id: string; name: string }>();
   for (const m of rows) {
-    const name = publicUploaderName(m.displayName, m.email, publicView);
+    const name = publicView ? publicUploaderName(m.displayName, m.email, true) : actorLabel(memberActor(m));
     if (name) out.set(m.id, { id: m.id, name });
   }
   return out;

@@ -151,7 +151,7 @@ describe("owner notifications (dev server)", () => {
     const custEmail = `vitest.ownotif.cust.${stamp}.${label}@example.com`;
     const cust = await api(
       "/api/crm/customers",
-      { method: "POST", body: JSON.stringify({ displayName: `Vitest Ownotif ${stamp} ${label}`, email: custEmail }) },
+      { method: "POST", body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest Ownotif ${stamp} ${label}`, email: custEmail }) },
       cookie,
     );
     expect(cust.status).toBe(201);
@@ -378,7 +378,7 @@ describe("owner notifications (dev server)", () => {
     const leadA = await api(`/api/public/leads/${token}`, {
       method: "POST",
       headers: { "x-forwarded-for": ipA },
-      body: JSON.stringify({ name: `Vitest Lead ${stamp} A`, phone: "555-0100", message: "roof leak" }),
+      body: JSON.stringify({ name: `Vitest Lead ${stamp} A`, address: "100 Test St", phone: "555-0100", message: "roof leak" }),
     });
     expect(leadA.status).toBe(201);
 
@@ -393,7 +393,7 @@ describe("owner notifications (dev server)", () => {
       const leadB = await api(`/api/public/leads/${token}`, {
         method: "POST",
         headers: { "x-forwarded-for": ipA.replace(/\d+$/, "99") },
-        body: JSON.stringify({ name: `Vitest Lead ${stamp} B`, phone: "555-0100", message: "siding" }),
+        body: JSON.stringify({ name: `Vitest Lead ${stamp} B`, address: "100 Test St", phone: "555-0100", message: "siding" }),
       });
       expect(leadB.status).toBe(201);
       await sleep(1200);

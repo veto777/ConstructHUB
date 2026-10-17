@@ -38,6 +38,7 @@ import { EstimateAttach, CustomerPhotos, CustomerComments, OrgPamphlets } from "
 import { EstimateDefaultFiles } from "@/components/estimate-attachments-card";
 import { JobcamPanel } from "@/components/jobcam/project-panel";
 import { CustomerMeasurements } from "@/components/client-measurements";
+import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
 import { TakePaymentDialog, invoiceDueCents } from "@/components/crm-take-payment";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
@@ -46,6 +47,7 @@ import { AppointmentForm, type Appointment } from "@/components/crm-appointment-
 import { InfoTip } from "@/components/info-tip";
 import { HelpButton } from "@/components/help-button";
 import { confirmAction } from "@/components/confirm-dialog";
+import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -504,6 +506,7 @@ export default function CrmClientPage() {
   const [, setLocation] = useLocation();
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  const interestMap = useClientInterest(!!id && me?.permissions?.manageEstimates === true, { customerId: id });
   const canEstimate = me?.permissions?.manageEstimates === true;
   const canSeePrices = me?.permissions?.seePrices === true;
   const canInvoice = me?.permissions?.manageInvoices === true;
@@ -981,6 +984,9 @@ export default function CrmClientPage() {
                   {/* The client-page walkthrough (quick actions). Static key: this title is not a CrmPageHeader. */}
                   <HelpButton k="crm-client-quick-actions" videoOnly />
                 </div>
+                {interestMap?.byCustomer[c.id] && (
+                  <div className="mt-1"><InterestBadge summary={interestMap.byCustomer[c.id]} testId="badge-client-interest-page" /></div>
+                )}
                 {c.companyName && c.companyName !== c.displayName && (
                   <div className="text-sm text-muted-foreground mt-0.5">{c.companyName}</div>
                 )}
@@ -1213,6 +1219,9 @@ export default function CrmClientPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* The HOVER report's details, imported (renders nothing without a HOVER capture). */}
+      {id && <HoverTakeoffCard customerId={id} />}
 
       {/* Payments — see what this client owes and what they've paid, and take
           a payment (online link or manual record) without leaving the page. */}

@@ -258,7 +258,7 @@ describe("backup routes (dev server)", () => {
     // One fixture client (with an hcpId) so the export has a findable row.
     const cust = await api("/api/crm/customers", {
       method: "POST",
-      body: JSON.stringify({ displayName: customerName, email: `vitest.backup.cust.${stamp}@example.com` }),
+      body: JSON.stringify({ addressLine1: "100 Test St", displayName: customerName, email: `vitest.backup.cust.${stamp}@example.com` }),
     }, cookie);
     expect(cust.status).toBe(201);
     customerId = cust.body.id;

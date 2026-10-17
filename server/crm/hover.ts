@@ -79,6 +79,17 @@ import {
   projectAddressKey, shareIsLive, type HoverShare,
 } from "./hover-share";
 import { crmEstimates, crmProjects } from "@shared/schema";
+import {
+  extractHoverTakeoff, takeoffColumns, takeoffSummary, normalizeTakeoffRules, compactHoverFullJson,
+  type TakeoffRules,
+} from "@shared/hover-takeoff";
+import {
+  readTakeoffRules, writeTakeoffRules, queueHoverTakeoffBackfill, ensureHoverProject, rankedTakeoffRows, storedFullJson,
+  TAKEOFF_DERIVATION,
+} from "./hover-file";
+import { isIP } from "net";
+import { lookup as dnsLookup } from "dns/promises";
+import { isPrivateIp } from "./integrations";
 
 export { normalizeHoverAddress, normalizePersonName } from "./hover-share";
 
@@ -92,7 +103,7 @@ const hoverFx = () => providerFixture<HoverFixture>("hover");
 const hoverClientId = () => hoverFx()?.clientId ?? process.env.HOVER_CLIENT_ID;
 const hoverClientSecret = () => hoverFx()?.clientSecret ?? process.env.HOVER_CLIENT_SECRET;
 
-function hoverBases(): { oauthBase: string; apiBase: string } {
+export function hoverBases(): { oauthBase: string; apiBase: string } {
   const fx = hoverFx();
   if (fx) return { oauthBase: fx.oauthBase, apiBase: fx.apiBase };
   let oauthBase = (process.env.HOVER_OAUTH_BASE || "https://hover.to").replace(/\/+$/, "");
@@ -169,6 +180,8 @@ export interface HoverSyncReport {
   sharesFound?: number;
   sharesError?: string | null;
   projectsLinked?: number;
+  /** HOVER measurements whose takeoff was re-derived from the stored full_json this run. */
+  takeoffsUpdated?: number;
   /** HOVER 429s that paused the run, and completed jobs left for the next run (not errors). */
   rateLimitPauses?: number;
   deferred?: number;
@@ -666,37 +679,13 @@ export interface HoverSummary {
 }
 
 /**
- * The numbers estimating actually consumes, out of HOVER's full_json
- * measurements (the rich variant behind ?version=full_json). Every field is
- * independently optional and looked up at several plausible paths — the
- * full_json document is large and versioned, so extraction is tolerant by
- * design and the raw document is kept (trimmed) for re-derivation.
+ * The compact summary (raw_payload.summary) out of HOVER's full_json. A thin view over the takeoff
+ * extraction in shared/hover-takeoff.ts, which reads the REAL version-2 paths (summary.area.total.siding,
+ * summary.roof.roof_facets.area, footprint.stories, openings.windows[] …) and keeps the older flat paths as
+ * fallbacks. Kept for callers of the old shape.
  */
-export function summarizeHoverMeasurements(fullJson: any): HoverSummary {
-  const j = fullJson ?? {};
-  const roofSqft =
-    num(pick(j, ["roof.total_roof_area_sqft", "roof.total_area_sqft", "summary.roof_area_sqft", "roof_area_sqft", "areas.roof_facets_sqft"])) ??
-    null;
-  const sidingSqft =
-    num(pick(j, ["siding.total_siding_area_sqft", "siding.total_area_sqft", "summary.siding_area_sqft", "siding_area_sqft", "areas.walls_sqft"])) ??
-    null;
-  const windowsCount =
-    num(pick(j, ["openings.windows", "windows.count", "summary.windows", "windows_count", "openings.windows_count"])) ??
-    null;
-  const stories =
-    num(pick(j, ["property.stories", "summary.stories", "stories", "building.stories"])) ?? null;
-  const pitch = pick(j, ["roof.predominant_pitch", "predominant_pitch", "roof.pitch", "pitch"]);
-  const wastePct =
-    num(pick(j, ["waste.suggested_percent", "waste.percent", "waste_factor", "roof.waste_percent", "wastePercent"])) ??
-    null;
-  return {
-    roofSqft,
-    sidingSqft,
-    windowsCount: windowsCount === null ? null : Math.round(windowsCount),
-    stories: stories === null ? null : Math.round(stories),
-    pitch: pitch ? pitch.replace(/\s+/g, "") : null,
-    wasteBps: wastePct === null ? null : Math.round(wastePct * 100),
-  };
+export function summarizeHoverMeasurements(fullJson: any, rules?: TakeoffRules): HoverSummary {
+  return takeoffSummary(extractHoverTakeoff(fullJson, rules));
 }
 
 export interface ParsedHoverJob {
@@ -707,20 +696,35 @@ export interface ParsedHoverJob {
   model3dUrl: string | null;
   measurementsJsonUrl: string | null;
   pdfUrl: string | null;
+  /** The job's primary model (first completed one, else the first): its id is what HOVER's
+   *  per-model deliverables (/api/v3/models/<id>/artifacts/measurements.pdf, the premium PDF) take. */
+  primaryModelId: string | null;
   photoUrls: string[];
   /** The job LABEL ("Karmy", "123 Pine remodel") — in practice usually the
    *  client's name; used as a display-name fallback, never for matching. */
   jobName: string | null;
 }
 
+/** The model whose deliverables we read: the first COMPLETED model with an id, else the first with an id. */
+function primaryHoverModel(job: any): any | null {
+  const models: any[] = Array.isArray(job?.models) ? job.models : Array.isArray(job?.job?.models) ? job.job.models : [];
+  const withId = models.filter((m) => m && (typeof m.id === "number" || (typeof m.id === "string" && m.id)));
+  return withId.find((m) => String(m.state ?? "").toLowerCase() === "completed") ?? withId[0] ?? null;
+}
+
 export function parseHoverJob(job: any): ParsedHoverJob {
   const urls = new Set<string>();
   collectUrls(job, urls);
   const all = [...urls];
+  const model = primaryHoverModel(job);
+  const art = model?.artifacts?.measurements;
+  const str = (v: unknown) => (typeof v === "string" && /^https?:\/\//i.test(v) ? v : null);
 
   const measurementsJsonUrl =
+    str(art?.full_json) ?? str(art?.json) ??
     all.find((u) => /measurements\.json/i.test(u)) ?? null;
   const pdfUrl =
+    str(art?.pdf) ??
     all.find((u) => /measurements?[^\s"']*\.pdf(\?|$)/i.test(u)) ??
     all.find((u) => /\.pdf(\?|$)/i.test(u)) ??
     null;
@@ -756,6 +760,7 @@ export function parseHoverJob(job: any): ParsedHoverJob {
     model3dUrl,
     measurementsJsonUrl,
     pdfUrl,
+    primaryModelId: model ? String(model.id) : null,
     photoUrls,
     jobName: pick(job, ["name", "job.name", "job_name"]),
   };
@@ -772,6 +777,11 @@ function trimJson(value: unknown): unknown {
   try {
     const s = JSON.stringify(value);
     if (s.length <= FULL_JSON_CAP) return value;
+    // Too big to keep whole: keep the compact derivation copy (everything the takeoff reads), so the takeoff can
+    // always be re-derived; only a document whose compact copy is STILL too big becomes the stand-in.
+    const compact = compactHoverFullJson(value);
+    const c = JSON.stringify(compact);
+    if (c.length <= FULL_JSON_CAP) return compact;
     return { trimmed: true, bytes: s.length };
   } catch {
     return null;
@@ -823,13 +833,18 @@ async function matchHoverCustomer(
     if (hit) return { customer: hit, via: "email" };
   }
   if (phone && digits(phone).length >= 7) {
+    // Same number with or without the US "+1" ("+13607397583" = "3607397583").
+    const key = phoneKey(phone);
+    const stored = sql`regexp_replace(coalesce(${crmCustomers.phone}, ''), '[^0-9]', '', 'g')`;
     const [hit] = await db
       .select()
       .from(crmCustomers)
       .where(and(
         eq(crmCustomers.orgId, orgId),
         isNull(crmCustomers.archivedAt),
-        sql`regexp_replace(${crmCustomers.phone}, '[^0-9]', '', 'g') = ${digits(phone)}`,
+        key.length === 10
+          ? sql`(${stored} = ${key} OR ${stored} = ${"1" + key})`
+          : sql`${stored} = ${key}`,
       ))
       .limit(1);
     if (hit) return { customer: hit, via: "phone" };
@@ -886,6 +901,13 @@ export async function matchHoverCustomerByName(
  */
 /** True when the job's contact is one of the org's own people — a capture
  *  ordered by staff must never attach the property to the staff member. */
+/** Digits only, with a leading US country code dropped: "+1 (360) 739-7583" and
+ *  "3607397583" are the same number. */
+export function phoneKey(phone?: string | null): string {
+  const d = String(phone ?? "").replace(/\D/g, "");
+  return d.length === 11 && d.startsWith("1") ? d.slice(1) : d;
+}
+
 async function isOrgMemberContact(
   orgId: string, email?: string | null, phone?: string | null,
 ): Promise<boolean> {
@@ -903,14 +925,17 @@ async function matchOrgMemberContactFields(
   orgId: string, email?: string | null, phone?: string | null,
 ): Promise<{ email: boolean; phone: boolean }> {
   const em = (email ?? "").trim().toLowerCase();
-  const ph = String(phone ?? "").replace(/\D/g, "");
+  const ph = phoneKey(phone);
   const result = { email: false, phone: false };
   if (!em && !ph) return result;
   const members = await db.select().from(crmMembers)
     .where(and(eq(crmMembers.orgId, orgId), eq(crmMembers.status, "active")));
-  for (const m of members) {
-    if (em && (m.email ?? "").toLowerCase() === em) result.email = true;
-    if (ph && ph.length >= 7 && String(m.phone ?? "").replace(/\D/g, "") === ph) result.phone = true;
+  // The company's own phone/email count as staff too (a capture ordered from the office).
+  const [org] = await db.select({ email: crmOrgs.email, phone: crmOrgs.phone }).from(crmOrgs)
+    .where(eq(crmOrgs.id, orgId)).limit(1);
+  for (const m of [...members, ...(org ? [org] : [])]) {
+    if (em && (m.email ?? "").trim().toLowerCase() === em) result.email = true;
+    if (ph && ph.length >= 7 && phoneKey(m.phone) === ph) result.phone = true;
   }
   return result;
 }
@@ -965,7 +990,7 @@ export async function importHoverJobPhotos(
       if (!buffer.length || buffer.length > 15 * 1024 * 1024) { failed++; continue; }
       await storeGeneratedFile({
         orgId, kind: "photo", refId: customerId, fileName, buffer,
-        mime, ext: mime === "image/png" ? "png" : "jpg",
+        mime, ext: mime === "image/png" ? "png" : "jpg", uploadedByLabel: "HOVER import",
       });
       have.add(fileName);
       stored++;
@@ -996,6 +1021,8 @@ async function linkOrCreateHoverCustomer(
   matchedVia: HoverMatchedVia;
   ambiguous: boolean;
   customerCreated: boolean;
+  /** The client was created from a capture ordered by the org's own staff (address only, no homeowner). */
+  staffContact: boolean;
 }> {
   let customer: typeof crmCustomers.$inferSelect | null = null;
   let matchedVia: HoverMatchedVia = null;
@@ -1023,6 +1050,7 @@ async function linkOrCreateHoverCustomer(
   }
 
   let customerCreated = false;
+  let staffCreated = false;
   if (!customer && (c.name || c.email || c.phone || c.addressLine1 || jobName)) {
     // Scrub ONLY the fields that actually match staff contacts: a capture
     // ordered with a staff email but the homeowner's phone keeps the phone.
@@ -1059,9 +1087,10 @@ async function linkOrCreateHoverCustomer(
       } as any)
       .returning();
     customerCreated = true;
+    staffCreated = staffContact;
     queueCrmEvent(orgId, "customer.created", { ...customerEventPayload(customer), source: "hover" });
   }
-  return { customer, matchedVia, ambiguous, customerCreated };
+  return { customer, matchedVia, ambiguous, customerCreated, staffContact: staffCreated };
 }
 
 export type HoverMatchedVia = "email" | "phone" | "address" | "name" | null;
@@ -1111,6 +1140,319 @@ async function mergeMeasurementRaw(measurementId: string, patch: Record<string, 
   }).where(eq(crmMeasurements.id, measurementId));
 }
 
+// ── The measurement PDF ─────────────────────────────────────────────────────
+
+/** PDFs larger than this are not stored (HOVER's premium report for a big house is a few MB). */
+const HOVER_PDF_MAX_BYTES = 25 * 1024 * 1024;
+/** One PDF download (all hops, headers and body) must finish within this. */
+const HOVER_PDF_TIMEOUT_MS = 60_000;
+/** A full_json body larger than this is refused (real documents are tens of KB). */
+const HOVER_FULL_JSON_MAX_BYTES = 10 * 1024 * 1024;
+/** A job whose PDF could not be fetched is retried after this long, not on every sync. */
+const HOVER_PDF_RETRY_MS = 7 * 24 * 3600_000;
+
+/**
+ * Hosts a HOVER artifact URL (from a job payload, or a redirect) may point at: HOVER itself and the signed
+ * storage it redirects downloads to (S3 / CloudFront). Anything else is never fetched.
+ */
+const HOVER_FETCH_HOSTS = [/^hover\.to$/, /\.hover\.to$/, /\.amazonaws\.com$/, /\.cloudfront\.net$/];
+const isLoopbackHost = (h: string) => /^(127\.\d{1,3}\.\d{1,3}\.\d{1,3}|localhost|\[?::1\]?)$/i.test(h);
+
+/**
+ * SSRF policy for every URL we fetch for HOVER (artifact links from a payload and every redirect hop):
+ * https on the default port to an allowlisted host, no credentials in the URL. The configured API origin
+ * (HOVER_API_BASE / the tutorial stand-in) is always allowed; outside production a LOOPBACK test stub API also
+ * admits loopback siblings (the stub's storage server). The resolved-address check is hoverHostIsPublic.
+ */
+export function hoverFetchUrlAllowed(url: string, apiBase: string, production = process.env.NODE_ENV === "production"): boolean {
+  let u: URL;
+  try { u = new URL(url); } catch { return false; }
+  if (u.username || u.password) return false;
+  if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+  let api: URL | null = null;
+  try { api = new URL(apiBase); } catch { /* none */ }
+  if (api && u.origin === api.origin) return true;
+  const host = u.hostname.toLowerCase();
+  if (!production && api && isLoopbackHost(api.hostname) && isLoopbackHost(host)) return true;
+  if (u.protocol !== "https:" || (u.port && u.port !== "443")) return false;
+  return HOVER_FETCH_HOSTS.some((r) => r.test(host));
+}
+
+/** Every address the host resolves to is public (no private, loopback, link-local or metadata address). */
+async function hoverHostIsPublic(url: string, apiBase: string): Promise<boolean> {
+  const u = new URL(url);
+  let api: URL | null = null;
+  try { api = new URL(apiBase); } catch { /* none */ }
+  // The configured API origin and (outside production) the loopback test stub are trusted configuration.
+  if (api && (u.origin === api.origin || (process.env.NODE_ENV !== "production" && isLoopbackHost(api.hostname) && isLoopbackHost(u.hostname)))) return true;
+  const host = u.hostname.replace(/^\[|\]$/g, "");
+  if (isIP(host)) return !isPrivateIp(host);
+  try {
+    const addrs = await dnsLookup(host, { all: true, verbatim: true });
+    return addrs.length > 0 && addrs.every((a) => !isPrivateIp(a.address));
+  } catch {
+    return false;
+  }
+}
+
+/** Read a body, giving up (null) as soon as it passes `cap` bytes. */
+async function readCapped(res: Response, cap: number): Promise<Buffer | null> {
+  const declared = Number(res.headers?.get?.("content-length"));
+  if (Number.isFinite(declared) && declared > cap) {
+    await res.body?.cancel?.().catch(() => {});
+    return null;
+  }
+  if (!res.body || typeof (res.body as any).getReader !== "function") {
+    const b = Buffer.from(await res.arrayBuffer());
+    return b.length > cap ? null : b;
+  }
+  const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > cap) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
+}
+
+/**
+ * Where a job's measurement PDF can come from, best first:
+ *   1. the PREMIUM measurements PDF the owner downloads from the HOVER app,
+ *      GET /api/v1/models/<modelId>/pro_premium_measurements (undocumented; answers application/pdf);
+ *   2. the documented deliverable, GET /api/v3/models/<modelId>/artifacts/measurements.pdf
+ *      (developers.hover.to/reference/get-measurements-pdf — a redirect to the stored file);
+ *   3. whatever .pdf link the job payload itself carries.
+ */
+export function hoverPdfCandidates(apiBase: string, modelId: string | null, payloadPdfUrl: string | null): string[] {
+  const out: string[] = [];
+  if (modelId && /^\d+$/.test(modelId)) {
+    out.push(`${apiBase}/v1/models/${modelId}/pro_premium_measurements`);
+    out.push(`${apiBase}/v3/models/${modelId}/artifacts/measurements.pdf`);
+  }
+  if (payloadPdfUrl && !out.includes(payloadPdfUrl)) out.push(payloadPdfUrl);
+  return out;
+}
+
+/**
+ * GET one PDF candidate. Redirects are followed by hand (at most 3), and EVERY hop is checked first: the
+ * allowlist (hoverFetchUrlAllowed) and the resolved addresses (hoverHostIsPublic). The bearer goes only to
+ * HOVER's API origin, never to the storage host it redirects to (a presigned link carries its own auth).
+ * One timeout covers the whole download; the body is read with a size cap. Only a body that starts with
+ * %PDF- counts. A 429 that outlasts the backoff raises HoverRateLimitError.
+ */
+export async function fetchHoverPdf(
+  fetchFn: FetchFn, url: string, auth: Record<string, string>, apiBase: string,
+): Promise<Buffer | null> {
+  const apiOrigin = (() => { try { return new URL(apiBase).origin; } catch { return ""; } })();
+  const signal = AbortSignal.timeout(HOVER_PDF_TIMEOUT_MS);
+  let cur = url;
+  for (let hop = 0; hop <= 3; hop++) {
+    if (!hoverFetchUrlAllowed(cur, apiBase) || !(await hoverHostIsPublic(cur, apiBase))) {
+      console.error(`[hover] refused to fetch a PDF from ${(() => { try { return new URL(cur).host; } catch { return "?"; } })()}`);
+      return null;
+    }
+    const u = new URL(cur);
+    const isApi = u.origin === apiOrigin || /^https:\/\/hover\.to$/i.test(u.origin);
+    const res = await hoverFetchWithBackoff(fetchFn, cur, { headers: isApi ? auth : {}, redirect: "manual", signal });
+    if (res.status === 429) throw new HoverRateLimitError(hoverRetryAfterMs(res.headers?.get?.("retry-after")));
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers?.get?.("location");
+      await res.body?.cancel?.().catch(() => {});
+      if (!loc) return null;
+      cur = new URL(loc, cur).toString();
+      continue;
+    }
+    if (!res.ok) {
+      await res.body?.cancel?.().catch(() => {});
+      return null;
+    }
+    const buffer = await readCapped(res, HOVER_PDF_MAX_BYTES);
+    if (!buffer?.length) return null;
+    return buffer.subarray(0, 5).toString("latin1") === "%PDF-" ? buffer : null;
+  }
+  return null;
+}
+
+/**
+ * Store the job's measurement PDF as the gated measurement attachment (kind "measurement", refId = client),
+ * exactly once even across processes: the store runs under a Postgres advisory lock on the job and re-checks
+ * for the job's file inside it (nothing is written to disk unless this call inserts the row). Stamps
+ * pdfAttachmentId (+ pdfSource), or pdfCheckedAt when no candidate produced a PDF. Rate limits propagate.
+ */
+async function attachHoverMeasurementPdf(args: {
+  orgId: string; jobId: string; measurementId: string; customerId: string | null;
+  modelId: string | null; payloadPdfUrl: string | null; auth: Record<string, string>; fetchFn: FetchFn;
+}): Promise<string | null> {
+  const fileName = `hover-measurements-${args.jobId}.pdf`;
+  const existingPdf = async (exec: Pick<typeof db, "select"> = db) => {
+    const [have] = await exec.select({ id: crmAttachments.id }).from(crmAttachments)
+      .where(and(eq(crmAttachments.orgId, args.orgId), eq(crmAttachments.kind, "measurement"), eq(crmAttachments.fileName, fileName)))
+      .limit(1);
+    return have?.id ?? null;
+  };
+  const have = await existingPdf();
+  if (have) {
+    await mergeMeasurementRaw(args.measurementId, { pdfAttachmentId: have });
+    return have;
+  }
+  const { apiBase } = hoverBases();
+  for (const url of hoverPdfCandidates(apiBase, args.modelId, args.payloadPdfUrl)) {
+    let buffer: Buffer | null = null;
+    try {
+      buffer = await fetchHoverPdf(args.fetchFn, url, args.auth, apiBase);
+    } catch (e: any) {
+      if (e instanceof HoverRateLimitError) throw e;
+      console.error(`[hover] PDF ${url.replace(/^https?:\/\/[^/]+/, "")} for job ${args.jobId} failed:`, String(e?.message || e).slice(0, 160));
+    }
+    if (!buffer) continue;
+    const pdf = buffer;
+    const attId = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`hover-pdf:${args.orgId}:${args.jobId}`}))`);
+      // Another process (or a concurrent request) stored it while we were downloading: reuse theirs.
+      const theirs = await existingPdf(tx);
+      if (theirs) return theirs;
+      const att = await storeGeneratedPdf({ orgId: args.orgId, kind: "measurement", refId: args.customerId, fileName, buffer: pdf, uploadedByLabel: "HOVER import", uploadedByKind: "system" });
+      return att.id;
+    });
+    await mergeMeasurementRaw(args.measurementId, {
+      pdfAttachmentId: attId,
+      pdfSource: /pro_premium_measurements/.test(url) ? "pro_premium" : /artifacts\/measurements\.pdf/.test(url) ? "measurements" : "payload",
+    });
+    return attId;
+  }
+  await mergeMeasurementRaw(args.measurementId, { pdfCheckedAt: new Date().toISOString() });
+  return null;
+}
+
+/**
+ * On-demand PDF fetch for one HOVER measurement ("Fetch report from HOVER"). Serialized with that job's ingest
+ * (same chain), reuses an already-stored PDF, and only calls HOVER for the job detail when the model id is not
+ * stored yet. Rate limits propagate as HoverRateLimitError.
+ */
+export function fetchHoverMeasurementPdfNow(
+  orgId: string, m: typeof crmMeasurements.$inferSelect, fetchFn: FetchFn = fetch,
+): Promise<{ attachmentId: string | null; message?: string }> {
+  const raw0 = (m.rawPayload ?? {}) as any;
+  const jobId = String(raw0.hoverJobId ?? (m.externalId ?? "").replace(/^hover:/, ""));
+  if (!jobId) return Promise.resolve({ attachmentId: null, message: "This measurement has no HOVER job." });
+  const key = `${orgId}:${jobId}`;
+  const run = (ingestChains.get(key) ?? Promise.resolve()).catch(() => {}).then(async () => {
+    const [cur] = await db.select().from(crmMeasurements).where(eq(crmMeasurements.id, m.id)).limit(1);
+    const raw = (cur?.rawPayload ?? {}) as any;
+    if (raw.pdfAttachmentId) {
+      const [att] = await db.select({ id: crmAttachments.id }).from(crmAttachments)
+        .where(and(eq(crmAttachments.orgId, orgId), eq(crmAttachments.id, String(raw.pdfAttachmentId)))).limit(1);
+      if (att) return { attachmentId: att.id };
+    }
+    if (!(await readHoverConn(orgId))) {
+      return { attachmentId: null, message: "Connect HOVER in Integrations to fetch the report." };
+    }
+    const token = await getHoverAccessToken(orgId, fetchFn);
+    const auth = { authorization: `Bearer ${token}` };
+    let modelId: string | null = raw.hoverModelId ? String(raw.hoverModelId) : null;
+    let payloadPdfUrl: string | null = null;
+    if (!modelId) {
+      const { apiBase } = hoverBases();
+      const det = await hoverFetchWithBackoff(fetchFn, `${apiBase}/v3/jobs/${encodeURIComponent(jobId)}`, { headers: auth });
+      if (det.status === 429) throw new HoverRateLimitError(hoverRetryAfterMs(det.headers?.get?.("retry-after")));
+      if (det.ok) {
+        const parsed = parseHoverJob(await det.json());
+        modelId = parsed.primaryModelId;
+        payloadPdfUrl = parsed.pdfUrl;
+        if (modelId) await mergeMeasurementRaw(m.id, { hoverModelId: modelId });
+      }
+    }
+    const attachmentId = await attachHoverMeasurementPdf({
+      orgId, jobId, measurementId: m.id, customerId: cur?.customerId ?? m.customerId ?? null,
+      modelId, payloadPdfUrl, auth, fetchFn,
+    });
+    return { attachmentId };
+  });
+  ingestChains.set(key, run);
+  void run.then(
+    () => { if (ingestChains.get(key) === run) ingestChains.delete(key); },
+    () => { if (ingestChains.get(key) === run) ingestChains.delete(key); },
+  );
+  return run;
+}
+
+/**
+ * The job's full_json. "unavailable" = HOVER answered that there is none (no link, 4xx, a non-object body, or a
+ * link outside HOVER's hosts); "transient" = it may work next time (network error, timeout, 5xx, 401, a body
+ * that is not JSON). 429 raises HoverRateLimitError.
+ */
+export type HoverFullJsonResult = { kind: "ok"; json: any } | { kind: "unavailable" } | { kind: "transient"; reason: string };
+
+export async function fetchHoverFullJson(parsed: ParsedHoverJob, auth: Record<string, string>, fetchFn: FetchFn): Promise<HoverFullJsonResult> {
+  if (!parsed.measurementsJsonUrl) return { kind: "unavailable" };
+  const { apiBase } = hoverBases();
+  const url = /[?&]version=full_json\b/.test(parsed.measurementsJsonUrl)
+    ? parsed.measurementsJsonUrl
+    : `${parsed.measurementsJsonUrl}${parsed.measurementsJsonUrl.includes("?") ? "&" : "?"}version=full_json`;
+  // The link comes from the payload: same SSRF policy as the PDF (and the bearer only to HOVER).
+  if (!hoverFetchUrlAllowed(url, apiBase) || !(await hoverHostIsPublic(url, apiBase))) return { kind: "unavailable" };
+  let m: Response;
+  try {
+    m = await hoverFetchWithBackoff(fetchFn, url, { headers: auth, signal: AbortSignal.timeout(HOVER_PDF_TIMEOUT_MS) });
+  } catch (e: any) {
+    return { kind: "transient", reason: String(e?.message || e).slice(0, 120) };
+  }
+  if (m.status === 429) throw new HoverRateLimitError(hoverRetryAfterMs(m.headers?.get?.("retry-after")));
+  if (m.status >= 500 || m.status === 401 || m.status === 408) return { kind: "transient", reason: `HTTP ${m.status}` };
+  if (!m.ok) return { kind: "unavailable" };
+  // Streamed with a cap like the PDF: a body past it is not a measurement document.
+  let body: Buffer | null;
+  try { body = await readCapped(m, HOVER_FULL_JSON_MAX_BYTES); } catch (e: any) {
+    return { kind: "transient", reason: String(e?.message || e).slice(0, 120) };
+  }
+  if (!body) return { kind: "unavailable" };
+  let json: any;
+  try { json = JSON.parse(body.toString("utf8")); } catch { return { kind: "transient", reason: "body is not JSON" }; }
+  return json && typeof json === "object" && !Array.isArray(json) ? { kind: "ok", json } : { kind: "unavailable" };
+}
+
+/**
+ * When to try full_json again after a failed fetch: a transient failure backs off 1 h, 2 h, 4 h … capped at
+ * 24 h; HOVER saying there is none waits a week. Never a permanent exclusion.
+ */
+export function hoverFullJsonRetry(kind: "unavailable" | "transient", failures: number, now: number = Date.now()): { fullJsonRetryAt: string; fullJsonFailures: number } {
+  const n = Math.max(1, failures);
+  const wait = kind === "unavailable" ? 7 * 24 * 3600_000 : Math.min(24, 2 ** (n - 1)) * 3600_000;
+  return { fullJsonRetryAt: new Date(now + wait).toISOString(), fullJsonFailures: n };
+}
+
+/** A row needs its full_json (re)fetched: none usable is stored (absent, or the {trimmed:true} stand-in) and no retry is pending. */
+export function hoverNeedsFullJson(raw: any, now: number = Date.now()): boolean {
+  if (storedFullJson(raw)) return false;
+  const at = raw?.fullJsonRetryAt ? Date.parse(raw.fullJsonRetryAt) : NaN;
+  return !Number.isFinite(at) || now >= at;
+}
+
+/**
+ * The auto-project step for one capture (ensureHoverProject), clearing raw_payload.needsAutoProject once it ran
+ * to a decision. It stays set when it threw or the row has no client yet, so a later delivery/sync retries it.
+ */
+async function runAutoProject(
+  orgId: string, measurementId: string, jobId: string,
+  opts: { ambiguous?: boolean; staffContact?: boolean; jobName?: string | null },
+): Promise<string | null> {
+  try {
+    const r = await ensureHoverProject(orgId, measurementId, opts);
+    if (r.reason !== "no client") await mergeMeasurementRaw(measurementId, { needsAutoProject: false });
+    return r.projectId;
+  } catch (e: any) {
+    console.error(`[hover] project for job ${jobId} failed (will retry):`, String(e?.message || e).slice(0, 160));
+    return null;
+  }
+}
+
 async function ingestHoverJobInner(
   orgId: string, jobId: string, fetchFn: FetchFn = fetch,
 ): Promise<HoverIngestResult> {
@@ -1121,16 +1463,26 @@ async function ingestHoverJobInner(
     .where(and(eq(crmMeasurements.orgId, orgId), eq(crmMeasurements.externalId, externalId)))
     .limit(1);
   if (existing) {
-    // Two catch-up jobs on already-ingested measurements:
+    // Catch-up jobs on already-ingested measurements:
     //  - ADOPT: a row that never linked to a client gets one now (match or
     //    create) — the contractor should never open the portal to a hole.
     //  - PHOTOS: top up capture photos; a stamp keeps the 6-hourly sync from
     //    re-fetching every job's detail payload forever.
+    //  - PDF: a row without its measurement PDF gets it (retried weekly when HOVER has none).
+    //  - TAKEOFF: a row without stored full_json gets it once (rows that have it are re-derived by the
+    //    back-fill with no HOVER call at all).
+    const raw0 = (existing.rawPayload ?? {}) as any;
     let adoptedCustomerId = existing.customerId;
     let adoptedCreated = false;
-    const photosSyncedAt = (existing.rawPayload as any)?.photosSyncedAt;
+    /** Set when THIS run adopted a client for the row: a first-time file, so it may get a new project. */
+    let adoption: { ambiguous: boolean; staffContact: boolean; jobName: string | null } | null = null;
+    const photosSyncedAt = raw0.photosSyncedAt;
     const fresh = photosSyncedAt && Date.now() - new Date(photosSyncedAt).getTime() < 7 * 24 * 3600_000;
-    if (!existing.customerId || !fresh) {
+    const pdfChecked = raw0.pdfCheckedAt && Date.now() - new Date(raw0.pdfCheckedAt).getTime() < HOVER_PDF_RETRY_MS;
+    const needsPdf = !raw0.pdfAttachmentId && !pdfChecked;
+    // No usable full_json (absent, or the old {trimmed:true} stand-in) and no retry pending.
+    const needsJson = hoverNeedsFullJson(raw0);
+    if (!existing.customerId || !fresh || needsPdf || needsJson) {
       try {
         const token0 = await getHoverAccessToken(orgId, fetchFn);
         const { apiBase: base0 } = hoverBases();
@@ -1139,24 +1491,52 @@ async function ingestHoverJobInner(
         if (det0.status === 429) throw new HoverRateLimitError(hoverRetryAfterMs(det0.headers?.get?.("retry-after")));
         if (det0.ok) {
           const job0 = (await det0.json()) as any;
+          const parsed0 = parseHoverJob(job0);
+          if (parsed0.primaryModelId && !raw0.hoverModelId) {
+            await mergeMeasurementRaw(existing.id, { hoverModelId: parsed0.primaryModelId, hoverJobName: parsed0.jobName });
+          }
+          if (needsJson) {
+            const got = await fetchHoverFullJson(parsed0, auth0, fetchFn);
+            await mergeMeasurementRaw(existing.id, got.kind === "ok"
+              ? { fullJson: trimJson(got.json), fullJsonRetryAt: null, fullJsonFailures: 0 }
+              : hoverFullJsonRetry(got.kind, (Number(raw0.fullJsonFailures) || 0) + 1));
+            if (got.kind === "ok") {
+              const takeoff = extractHoverTakeoff(got.json, await readTakeoffRules(orgId));
+              await db.update(crmMeasurements).set({ ...takeoffColumns(takeoff), updatedAt: new Date() } as any)
+                .where(eq(crmMeasurements.id, existing.id));
+              await mergeMeasurementRaw(existing.id, { takeoff, summary: takeoffSummary(takeoff), takeoffDerivation: TAKEOFF_DERIVATION });
+            }
+          }
           if (!adoptedCustomerId) {
-            const parsed0 = parseHoverJob(job0);
             const linked0 = await linkOrCreateHoverCustomer(orgId, jobId, parsed0.contact, parsed0.jobName);
             if (linked0.customer) {
               adoptedCustomerId = linked0.customer.id;
               adoptedCreated = linked0.customerCreated;
-              await db.update(crmMeasurements).set({
-                customerId: adoptedCustomerId,
-                rawPayload: {
-                  ...((existing.rawPayload as object) ?? {}),
-                  adoptedVia: linked0.matchedVia ?? (linked0.customerCreated ? "created" : null),
-                  adoptedAt: new Date().toISOString(),
-                } as any,
-                updatedAt: new Date(),
-              }).where(eq(crmMeasurements.id, existing.id));
+              await db.update(crmMeasurements).set({ customerId: adoptedCustomerId, updatedAt: new Date() })
+                .where(eq(crmMeasurements.id, existing.id));
+              await mergeMeasurementRaw(existing.id, {
+                adoptedVia: linked0.matchedVia ?? (linked0.customerCreated ? "created" : null),
+                adoptedAt: new Date().toISOString(),
+                ...(linked0.staffContact ? { staffContact: true } : {}),
+                // A first-time file: its auto-project step is pending until it runs to a decision.
+                needsAutoProject: true,
+              });
+              adoption = { ambiguous: linked0.ambiguous, staffContact: linked0.staffContact, jobName: parsed0.jobName };
+              // A PDF stored before the row had a client belongs to the client now.
+              if (raw0.pdfAttachmentId) {
+                await db.update(crmAttachments).set({ refId: adoptedCustomerId })
+                  .where(and(eq(crmAttachments.orgId, orgId), eq(crmAttachments.id, String(raw0.pdfAttachmentId)), isNull(crmAttachments.refId)));
+              }
             }
           }
-          if (adoptedCustomerId) {
+          if (needsPdf) {
+            await attachHoverMeasurementPdf({
+              orgId, jobId, measurementId: existing.id, customerId: adoptedCustomerId,
+              modelId: parsed0.primaryModelId ?? raw0.hoverModelId ?? null, payloadPdfUrl: parsed0.pdfUrl,
+              auth: auth0, fetchFn,
+            });
+          }
+          if (adoptedCustomerId && (!fresh || !existing.customerId)) {
             const photos = await importHoverJobPhotos(orgId, jobId, adoptedCustomerId, job0, auth0, fetchFn);
             // Stamp only a COMPLETE import — a partial one retries next sync.
             if (photos.complete) {
@@ -1171,9 +1551,19 @@ async function ingestHoverJobInner(
       }
     }
     // A row that has a client but no project yet gets one (address match, else the client's single open project).
+    // A row that only now got its client is a first-time file and may get a NEW project; other existing rows
+    // never do here — that would flood an established pipeline with old captures
+    // (scripts/backfill-hover-takeoffs.ts --create-projects does it deliberately).
+    // needsAutoProject (set at insert / adoption) keeps a capture whose project step failed or crashed in line
+    // for a retry on every later delivery or sync, until the step runs to a decision.
     let projectId = existing.projectId ?? null;
+    const pendingAuto = raw0.needsAutoProject === true || !!adoption;
     if (!projectId && adoptedCustomerId) {
-      projectId = await linkMeasurementToProject(orgId, existing.id).catch(() => null);
+      projectId = pendingAuto
+        ? await runAutoProject(orgId, existing.id, jobId, adoption ?? { jobName: raw0.hoverJobName ?? null })
+        : await linkMeasurementToProject(orgId, existing.id).catch(() => null);
+    } else if (projectId && raw0.needsAutoProject === true) {
+      await mergeMeasurementRaw(existing.id, { needsAutoProject: false });
     }
     return {
       measurementId: existing.id, customerId: adoptedCustomerId, created: false, duplicate: true,
@@ -1191,14 +1581,12 @@ async function ingestHoverJobInner(
   const job = (await det.json()) as any;
   const parsed = parseHoverJob(job);
 
-  // The rich measurements variant (roof/siding sqft, openings, waste factors).
-  let fullJson: any = null;
-  if (parsed.measurementsJsonUrl) {
-    const sep = parsed.measurementsJsonUrl.includes("?") ? "&" : "?";
-    const m = await fetchFn(`${parsed.measurementsJsonUrl}${sep}version=full_json`, { headers: auth }).catch(() => null);
-    if (m?.ok) fullJson = await m.json().catch(() => null);
-  }
-  const summary = summarizeHoverMeasurements(fullJson);
+  // The rich measurements variant (version 2: summary.area.total.siding, summary.roof.*, openings.*, footprint).
+  // A failure is not final: hoverFullJsonRetry schedules the next try (transient → hours, none → a week).
+  const got = await fetchHoverFullJson(parsed, auth, fetchFn);
+  const fullJson = got.kind === "ok" ? got.json : null;
+  const takeoff = extractHoverTakeoff(fullJson, await readTakeoffRules(orgId));
+  const summary = takeoffSummary(takeoff);
 
   // Customer attach: the SERVICE ADDRESS is ground truth and runs FIRST —
   // HOVER captures are usually ordered by the contractor's own crew, so the
@@ -1225,57 +1613,50 @@ async function ingestHoverJobInner(
       city: c.city ?? null,
       state: c.state ?? null,
       postalCode: c.postalCode ?? null,
-      squaresMilli: summary.roofSqft === null ? null : milli(summary.roofSqft / 100),
-      roofAreaSfMilli: milli(summary.roofSqft),
-      wallAreaSfMilli: milli(summary.sidingSqft),
-      predominantPitch: summary.pitch ?? null,
-      stories: summary.stories ?? null,
-      wasteSuggestionBps: summary.wasteBps ?? null,
+      // Measured values (no waste, no rounding); the quote quantities are in rawPayload.takeoff.
+      ...takeoffColumns(takeoff),
       reportUrl: parsed.model3dUrl ?? parsed.pdfUrl ?? null,
       rawPayload: {
         importSource: "hover",
         hoverJobId: jobId,
+        hoverModelId: parsed.primaryModelId,
+        hoverJobName: parsed.jobName,
         model3dUrl: parsed.model3dUrl,
         matchedVia,
         ...(ambiguous ? { hoverAmbiguous: true } : {}),
+        ...(linked.staffContact ? { staffContact: true } : {}),
         summary,
+        takeoff,
+        takeoffDerivation: TAKEOFF_DERIVATION,
         photoCount: parsed.photoUrls.length,
         fullJson: trimJson(fullJson),
+        ...(got.kind === "ok" ? {} : hoverFullJsonRetry(got.kind, 1)),
+        // Cleared once the auto-project step has run to a decision (retried by later deliveries/syncs if not).
+        needsAutoProject: true,
       },
       completedAt: new Date(),
     } as any)
     .returning();
 
-  // The measurement PDF lands in the same gated storage as every other file
-  // (kind "measurement", refId = customer id) — downloads go through the
-  // session-gated attachment routes, never a public URL.
-  if (parsed.pdfUrl) {
-    try {
-      // Bearer only for HOVER API urls; presigned/CDN links carry their own auth.
-      const needsAuth = parsed.pdfUrl.startsWith(apiBase) || /hover\.to\/api\//i.test(parsed.pdfUrl);
-      const pdfRes = await fetchFn(parsed.pdfUrl, needsAuth ? { headers: auth } : {});
-      if (pdfRes.ok) {
-        const buffer = Buffer.from(await pdfRes.arrayBuffer());
-        if (buffer.length > 0 && buffer.length <= 25 * 1024 * 1024) {
-          const att = await storeGeneratedPdf({
-            orgId,
-            kind: "measurement",
-            refId: customer?.id ?? null,
-            fileName: `hover-measurements-${jobId}.pdf`,
-            buffer,
-          });
-          await mergeMeasurementRaw(row.id, { pdfAttachmentId: att.id });
-        }
-      }
-    } catch (e: any) {
-      // The PDF is a nice-to-have; the measurement row already stands.
-      console.error(`[hover] PDF fetch for job ${jobId} failed:`, String(e?.message || e).slice(0, 200));
-    }
+  // The measurement PDF (HOVER's premium report first) lands in the same gated storage as every other file
+  // (kind "measurement", refId = customer id) — downloads go through the session-gated attachment routes,
+  // never a public URL. A rate limit here leaves it to the next sync's catch-up (no pdfCheckedAt stamp).
+  try {
+    await attachHoverMeasurementPdf({
+      orgId, jobId, measurementId: row.id, customerId: customer?.id ?? null,
+      modelId: parsed.primaryModelId, payloadPdfUrl: parsed.pdfUrl, auth, fetchFn,
+    });
+  } catch (e: any) {
+    // The PDF is a nice-to-have; the measurement row already stands.
+    console.error(`[hover] PDF fetch for job ${jobId} failed:`, String(e?.message || e).slice(0, 200));
   }
 
-  // The project this capture belongs to, and the homeowner share link if one already exists at HOVER.
+  // The project this capture belongs to — an existing one at the address, else a NEW lead project, so the
+  // capture is a complete file (never for an ambiguous or staff-ordered match) — and the homeowner share link.
   let projectId: string | null = null;
-  if (customer?.id) projectId = await linkMeasurementToProject(orgId, row.id).catch(() => null);
+  if (customer?.id) {
+    projectId = await runAutoProject(orgId, row.id, jobId, { ambiguous, staffContact: linked.staffContact, jobName: parsed.jobName });
+  }
   try {
     const idx = await cachedHoverShareIndex(orgId, fetchFn);
     const share = pickJobShare(idx.shares, jobId);
@@ -1434,6 +1815,8 @@ export type HoverSyncRunReport = {
   sharesError?: string | null;
   /** HOVER measurements newly linked to a project by the back-fill. */
   projectsLinked?: number;
+  /** HOVER measurements whose takeoff was re-derived from the stored full_json this run. */
+  takeoffsUpdated?: number;
   /** Times HOVER rate-limited the run (each one paused it), and completed jobs left for the next run when the
    *  limit outlasted the pauses. Neither is an error. */
   rateLimitPauses?: number;
@@ -1579,6 +1962,12 @@ export async function runHoverSync(orgId: string): Promise<HoverSyncRunReport> {
   } catch (e: any) {
     console.error(`[hover] project back-fill for org ${orgId} failed:`, String(e?.message || e).slice(0, 160));
   }
+  // Takeoffs re-derived from the stored full_json (no HOVER calls; unchanged rows are not written).
+  try {
+    report.takeoffsUpdated = (await queueHoverTakeoffBackfill(orgId)).updated;
+  } catch (e: any) {
+    console.error(`[hover] takeoff back-fill for org ${orgId} failed:`, String(e?.message || e).slice(0, 160));
+  }
   const lastSyncReport: HoverSyncReport = { ...report, at: new Date().toISOString() };
   await writeHoverConn(orgId, {
     lastSyncAt: lastSyncReport.at,
@@ -1679,7 +2068,31 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
       needsReconnect: hoverConnNeedsReconnect(conn),
       lastSyncReport: conn?.lastSyncReport ?? null,
       syncEveryHours: Number(conn?.syncEveryHours) || 6,
+      takeoffRules: await readTakeoffRules(ctx.org.id),
     });
+  });
+
+  /**
+   * The org's takeoff rules (roof waste %, siding round-up increment). Saving re-derives every stored HOVER
+   * takeoff from its full_json right away (no HOVER calls), so the cards and "Fill from HOVER" follow at once.
+   */
+  app.put("/api/crm/integrations/hover/takeoff-rules", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "manageIntegrations");
+    if (!ctx) return;
+    const pct = Number(req.body?.roofWastePct);
+    const inc = Number(req.body?.sidingRoundUpTo);
+    if (!Number.isFinite(pct) || pct < 5 || pct > 50) {
+      return res.status(400).json({ message: "Roof waste must be between 5% and 50%." });
+    }
+    if (!Number.isInteger(inc) || inc < 1 || inc > 1000) {
+      return res.status(400).json({ message: "Siding rounding must be a whole number of sq ft between 1 and 1000." });
+    }
+    const rules = await writeTakeoffRules(ctx.org.id, normalizeTakeoffRules({ roofWastePct: pct, sidingRoundUpTo: inc }));
+    // The cards, symbols and Quick Bid apply the current rules on read already; the stored copies (columns,
+    // raw_payload.takeoff) follow in the background on the org's back-fill chain — the request never waits for it.
+    void queueHoverTakeoffBackfill(ctx.org.id).catch((e: any) =>
+      console.error(`[hover] takeoff back-fill after a rules change failed:`, String(e?.message || e).slice(0, 160)));
+    res.json({ ok: true, takeoffRules: rules, recalculating: true });
   });
 
   /** 302 to HOVER's authorize page. redirect_uri is always OUR callback. */
@@ -2033,6 +2446,82 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     const visible = await objectPolicy(ctx).filter("measurements", rows);
     const ranked = rankHoverMeasurements(visible, { projectId: est.projectId ?? null, addressKey });
     res.json({ models: ranked.map(presentModel) });
+  });
+
+  // ── Takeoff (HOVER measurements as quote quantities) ──────────────────────
+  // The best capture first, ranked like the 3D cards; measurements only (no money), visible captures only.
+
+  const takeoffsFor = async (ctx: any, customerId: string, scope: { projectId?: string | null; addressKey?: string | null }) => {
+    const rows = await hoverMeasurementsForCustomer(ctx.org.id, customerId);
+    const visible = await objectPolicy(ctx).filter("measurements", rows);
+    const takeoffs = await rankedTakeoffRows(ctx.org.id, customerId, { ...scope, rows: visible.filter((m) => m.status === "ready") });
+    // `takeoffs` = every report (best first) for the card's picker; `others` kept for older callers.
+    return { takeoff: takeoffs[0] ?? null, takeoffs, others: takeoffs.slice(1).map((t) => t.source) };
+  };
+
+  /**
+   * "Fetch report from HOVER": pull the measurement PDF for one HOVER measurement now (premium report first,
+   * then the documented deliverable), store it as the gated attachment, and return its id. Anyone who can see
+   * the measurement may trigger it (it only reads from HOVER). HOVER's 429 → 429 with retryAfterSeconds.
+   */
+  app.post("/api/crm/measurements/:id/hover-pdf", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    const [m] = await db.select().from(crmMeasurements)
+      .where(and(eq(crmMeasurements.orgId, ctx.org.id), eq(crmMeasurements.id, req.params.id), eq(crmMeasurements.provider, "hover")))
+      .limit(1);
+    // Same visibility as the takeoff/report card: a seat that can't see the record gets a 404, no fetch, no id.
+    if (!m || !(await objectPolicy(ctx).filter("measurements", [m])).length) {
+      return res.status(404).json({ message: "HOVER measurement not found" });
+    }
+    try {
+      const r = await fetchHoverMeasurementPdfNow(ctx.org.id, m);
+      if (!r.attachmentId) return res.status(404).json({ message: r.message ?? "HOVER has no measurement report for this job yet." });
+      res.json({ ok: true, attachmentId: r.attachmentId, pdfUrl: `/api/crm/attachments/${r.attachmentId}/file` });
+    } catch (e: any) {
+      if (e instanceof HoverRateLimitError) {
+        return res.status(429).json({ message: "HOVER is busy — try again in a moment.", retryAfterSeconds: Math.ceil(e.retryAfterMs / 1000) });
+      }
+      if (hoverReconnectNeeded(e)) return res.status(409).json({ message: HOVER_RECONNECT_MESSAGE });
+      res.status(502).json({ message: `Could not fetch the report from HOVER: ${String(e?.message || e).slice(0, 160)}` });
+    }
+  });
+
+  app.get("/api/crm/customers/:id/takeoff", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    const [c] = await db.select().from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.id))).limit(1);
+    if (!c) return res.status(404).json({ message: "Customer not found" });
+    res.json(await takeoffsFor(ctx, c.id, { addressKey: normalizeHoverAddress(c.addressLine1, c.postalCode) }));
+  });
+
+  app.get("/api/crm/projects/:id/takeoff", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    const [p] = await db.select().from(crmProjects)
+      .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, req.params.id))).limit(1);
+    if (!p) return res.status(404).json({ message: "Project not found" });
+    const [c] = await db.select().from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, p.customerId))).limit(1);
+    res.json(await takeoffsFor(ctx, p.customerId, { projectId: p.id, addressKey: projectAddressKey(p, c ?? null) }));
+  });
+
+  app.get("/api/crm/estimates/:id/takeoff", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    const [est] = await db.select().from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
+    if (!est) return res.status(404).json({ message: "Estimate not found" });
+    const [c] = await db.select().from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, est.customerId))).limit(1);
+    let addressKey = normalizeHoverAddress(c?.addressLine1, c?.postalCode);
+    if (est.projectId) {
+      const [p] = await db.select().from(crmProjects)
+        .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, est.projectId))).limit(1);
+      if (p) addressKey = projectAddressKey(p, c ?? null);
+    }
+    res.json(await takeoffsFor(ctx, est.customerId, { projectId: est.projectId ?? null, addressKey }));
   });
 
   /**

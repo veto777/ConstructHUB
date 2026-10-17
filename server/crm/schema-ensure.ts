@@ -695,6 +695,11 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS author_member_id varchar;
     ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS estimate_id varchar;
     ALTER TABLE crm_client_comments ADD COLUMN IF NOT EXISTS to_member_id varchar;
+    -- Who added the file (actor attribution): a team member, or a label for client/system sources
+    -- ("Carley Geiss", "HOVER import", "System"). Both null on rows from before this was recorded.
+    ALTER TABLE crm_attachments ADD COLUMN IF NOT EXISTS uploaded_by_member_id varchar;
+    ALTER TABLE crm_attachments ADD COLUMN IF NOT EXISTS uploaded_by_label text;
+    ALTER TABLE crm_attachments ADD COLUMN IF NOT EXISTS uploaded_by_kind text;
   `);
 
   // ── Client 360: contractor notes + financing click log ───────────────────
@@ -721,6 +726,32 @@ export async function ensureCrmSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS crm_customer_notes_org_idx ON crm_customer_notes (org_id);
     CREATE INDEX IF NOT EXISTS crm_finance_clicks_customer_idx ON crm_finance_clicks (customer_id);
     CREATE INDEX IF NOT EXISTS crm_finance_clicks_org_idx ON crm_finance_clicks (org_id);
+
+    -- Client self-estimate: the "call them about it" task + the interest trail index.
+    CREATE TABLE IF NOT EXISTS crm_tasks (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      customer_id varchar,
+      estimate_id varchar,
+      related_estimate_id varchar,
+      division_id varchar,
+      assigned_member_id varchar,
+      source text NOT NULL,
+      title text NOT NULL,
+      body text,
+      due_at timestamp,
+      done_at timestamp,
+      done_by_member_id varchar,
+      meta jsonb,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS crm_tasks_org_open_idx ON crm_tasks (org_id) WHERE done_at IS NULL;
+    CREATE INDEX IF NOT EXISTS crm_tasks_customer_idx ON crm_tasks (customer_id);
+    ALTER TABLE crm_tasks ADD COLUMN IF NOT EXISTS idempotency_key text;
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_tasks_idempotency_uq ON crm_tasks (org_id, estimate_id, idempotency_key)
+      WHERE idempotency_key IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS crm_estimate_events_interest_idx ON crm_estimate_events (estimate_id, type)
+      WHERE type LIKE 'interest\\_%';
   `);
 
   // ── Accountability: org-wide activity log (who did what, when) ───────────

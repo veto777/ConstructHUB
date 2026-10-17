@@ -37,7 +37,7 @@ describe("GET /api/crm/projects/:id (the project page's fallback)", () => {
 
   beforeAll(async () => {
     const stamp = `project-detail-${Date.now().toString(36)}`;
-    const c = await api("/api/crm/customers", { method: "POST", body: JSON.stringify({ displayName: stamp }) });
+    const c = await api("/api/crm/customers", { method: "POST", body: JSON.stringify({ addressLine1: "100 Test St", displayName: stamp }) });
     expect(c.status).toBe(201);
     customerId = c.body.id;
     const p = await api("/api/crm/projects", { method: "POST", body: JSON.stringify({ customerId, name: stamp }) });

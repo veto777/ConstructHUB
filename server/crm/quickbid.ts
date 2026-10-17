@@ -26,27 +26,29 @@ import { divisionScopeOf } from "./divisions";
 import { resolveEstimateTaxRate } from "./tax";
 import { logEvent, presentEstimate, presentEstimateItem, recalcEstimate } from "./entities";
 import { estimateDefaultsFromOrg } from "./doc-defaults";
-import { inferSqftMetric, quickBidLine, type SqftMetric } from "./quickbid-math";
+import { inferSqftMetric, quickBidLine, quickBidLineDescription, type SqftMetric } from "./quickbid-math";
 import { nextDocNumber } from "./doc-number";
 import { attachDefaultFilesToEstimate } from "./estimate-default-files";
+import { readTakeoffRules, takeoffOfRow } from "./hover-file";
+import type { HoverTakeoff } from "@shared/hover-takeoff";
 
 type GetUser = (req: any, res: any) => any;
 
 const token = () => randomBytes(24).toString("hex");
 
 export type { SqftMetric } from "./quickbid-math";
-export { inferSqftMetric, quickBidLine } from "./quickbid-math";
+export { inferSqftMetric, quickBidLine, quickBidLineDescription } from "./quickbid-math";
 
-/** "2,210 sq ft siding area from the hover report + 12% waste × $4.50/sq ft" */
-function lineDescription(args: {
-  sqftMilli: number; metric: SqftMetric; provider: string;
-  wasteBps: number | null; rateCentsPerSqft: number;
-}): string {
-  const sqft = (args.sqftMilli / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 });
-  const waste = args.wasteBps ? ` + ${(args.wasteBps / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}% waste` : "";
-  const rate = (args.rateCentsPerSqft / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
-  return `${sqft} sq ft ${args.metric} area from the ${args.provider} report${waste} × $${rate}/sq ft`;
-}
+
+/** A HOVER report's quote quantity for a metric: siding rounded up, roof with waste (shared/hover-takeoff.ts). */
+const takeoffQuote = (t: HoverTakeoff | null, metric: SqftMetric) =>
+  (metric === "roof" ? t?.roof.quantitySqft : t?.siding.quantitySqft) ?? null;
+/** The takeoff's own numbers for the line label (null without a takeoff quote). */
+const takeoffQuoteDetail = (t: HoverTakeoff | null, metric: SqftMetric) => {
+  const area = metric === "roof" ? t?.roof.areaSqft : t?.siding.areaSqft;
+  const qty = takeoffQuote(t, metric);
+  return t && area != null && qty !== null ? { areaSqft: area, quantitySqft: qty, wastePct: t.roof.wastePct } : null;
+};
 
 export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): void {
   async function ctxFor(req: any, res: any, perm?: any): Promise<OrgContext | null> {
@@ -93,6 +95,10 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
       });
     }
 
+    // HOVER reports carry a takeoff: the owner's rules (siding rounded up to 100, roof + 5% waste) are the
+    // quote quantity, applied once — the report's waste % is NOT stacked on top of it.
+    const takeoff = m.provider === "hover" ? takeoffOfRow(m, await readTakeoffRules(ctx.org.id)) : null;
+
     const items = await db.select().from(crmPbItems)
       .where(and(eq(crmPbItems.orgId, ctx.org.id), inArray(crmPbItems.id, p.data.itemIds)));
     const byId = new Map(items.map((i) => [i.id, i]));
@@ -125,9 +131,10 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
           message: `The latest ${m.provider} report for this client has no ${metric} square footage, so "${item.name}" can't be priced from it.`,
         });
       }
-      const { quantityMilli, lineTotalCents } = quickBidLine({
-        rateCentsPerSqft: item.rateCentsPerSqft, sqftMilli, wasteBps: m.wasteSuggestionBps,
-      });
+      const quote = takeoffQuote(takeoff, metric);
+      const { quantityMilli, lineTotalCents } = quote !== null
+        ? quickBidLine({ rateCentsPerSqft: item.rateCentsPerSqft, sqftMilli: Math.round(quote * 1000), wasteBps: 0 })
+        : quickBidLine({ rateCentsPerSqft: item.rateCentsPerSqft, sqftMilli, wasteBps: m.wasteSuggestionBps });
       lines.push({ item, metric, quantityMilli, lineTotalCents });
     }
 
@@ -163,10 +170,11 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
     await db.insert(crmEstimateItems).values(lines.map((l, idx) => ({
       orgId: ctx.org.id, estimateId: est.id, sortOrder: idx,
       kind: "labor", name: l.item.name,
-      description: lineDescription({
+      description: quickBidLineDescription({
         sqftMilli: (l.metric === "roof" ? m.roofAreaSfMilli : m.wallAreaSfMilli) ?? 0,
         metric: l.metric, provider: m.provider,
         wasteBps: m.wasteSuggestionBps, rateCentsPerSqft: l.item.rateCentsPerSqft ?? 0,
+        quote: takeoffQuoteDetail(takeoff, l.metric),
       }),
       quantityMilli: l.quantityMilli, unit: "sf",
       unitPriceCents: l.item.rateCentsPerSqft ?? 0,

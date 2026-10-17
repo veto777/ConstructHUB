@@ -1,5 +1,7 @@
 import { HelpButton } from "@/components/help-button";
 import { useEffect, useMemo, useState } from "react";
+import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
+import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -175,7 +177,7 @@ export default function CrmEstimateNewPage() {
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [showNew, setShowNew] = useState(false);
-  const [nc, setNc] = useState({ name: "", email: "", phone: "" });
+  const [nc, setNc] = useState({ name: "", email: "", phone: "", address: "" });
   const [dupes, setDupes] = useState<CustomerLite[]>([]);
   const [creating, setCreating] = useState(false);
 
@@ -204,6 +206,7 @@ export default function CrmEstimateNewPage() {
           displayName: nc.name.trim(),
           email: nc.email.trim() || null,
           phone: nc.phone.trim() || null,
+          addressLine1: nc.address.trim() || null,
         }),
       });
       const j = await r.json().catch(() => ({}));
@@ -281,6 +284,22 @@ export default function CrmEstimateNewPage() {
 
   const setLine = (key: string, patch: Partial<CartLine>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+
+  // "Fill from HOVER": cart lines whose unit + name match a takeoff number take that quantity
+  // (siding sf rounded up to 100, roof sf/sq + waste, window/door counts, united inches, roof lengths).
+  const fillFromHover = (t: HoverTakeoff) => {
+    let filled = 0;
+    const next = lines.map((l) => {
+      const f = takeoffQuantityForLine({ name: l.name, unit: l.unit }, t);
+      if (!f) return l;
+      filled++;
+      return { ...l, qtyText: String(f.quantity) };
+    });
+    setLines(next);
+    toast(filled
+      ? { title: `Filled ${filled} line${filled === 1 ? "" : "s"} from HOVER`, description: "Check the quantities before you send." }
+      : { title: "No line matched the HOVER takeoff", description: "Add price-book items priced per sf, sq, lf, each (windows, doors) or UI, then fill again." });
+  };
 
   // ── Step 3: review + send ─────────────────────────────────────────────────
   const [title, setTitle] = useState(restored?.title ?? "");
@@ -409,7 +428,7 @@ export default function CrmEstimateNewPage() {
     setDone(null); setStep(1); setCustomer(null); setLines([]);
     setQInput(""); setItemInput(""); setTitle(""); setIntro(""); setDivisionId("");
     setShowNew(false); setDupes([]);
-    setNc({ name: "", email: "", phone: "" });
+    setNc({ name: "", email: "", phone: "", address: "" });
   };
 
   // ── Done ──────────────────────────────────────────────────────────────────
@@ -545,7 +564,9 @@ export default function CrmEstimateNewPage() {
                   className="h-12 text-base" value={nc.email} onChange={(e) => setNc({ ...nc, email: e.target.value })} />
                 <Input data-testid="input-new-client-phone" placeholder="Phone" aria-label="Phone" type="tel" inputMode="tel"
                   className="h-12 text-base" value={nc.phone} onChange={(e) => setNc({ ...nc, phone: e.target.value })} />
-                <Button className="w-full h-12" disabled={!nc.name.trim() || creating}
+                <Input data-testid="input-new-client-address" placeholder="Address *" aria-label="Address" autoComplete="street-address"
+                  className="h-12 text-base" value={nc.address} maxLength={200} onChange={(e) => setNc({ ...nc, address: e.target.value })} />
+                <Button className="w-full h-12" disabled={!nc.name.trim() || !nc.address.trim() || creating}
                   onClick={createClient} data-testid="button-create-client">
                   {creating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
                   Create & use this client
@@ -723,6 +744,9 @@ export default function CrmEstimateNewPage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* The client's HOVER takeoff (renders nothing without one) — "Fill from HOVER" sets the cart's quantities. */}
+          <HoverTakeoffCard customerId={customer.id} onFill={fillFromHover} fillDisabled={!lines.length} />
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

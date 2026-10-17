@@ -24,8 +24,10 @@ import {
 import { and, desc, eq, isNull, inArray, or } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { logTeamActivity } from "./stats";
+import { logActivity } from "./activity";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg } from "./divisions";
 import { objectPolicy } from "./object-access";
+import { attentionTasksFor, interestFor } from "./self-estimate";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -227,6 +229,13 @@ export function registerCrmFollowUpRoutes(app: Express, getDevUser: GetUser): vo
         link: `/crm/clients/${cust.id}`,
       });
     }
+    // The client's own Activity names who changed the follow-up.
+    if (parsed.data.markDone || parsed.data.cadenceDays !== undefined) {
+      logActivity(ctx, "followup.updated", {
+        entityType: "customer", entityId: cust.id, customerId: cust.id,
+        meta: { done: !!parsed.data.markDone, ...(parsed.data.cadenceDays !== undefined ? { cadenceDays: parsed.data.cadenceDays } : {}) },
+      });
+    }
     res.json({
       id: row.id,
       followUpCadenceDays: row.followUpCadenceDays,
@@ -250,6 +259,26 @@ export function registerCrmFollowUpRoutes(app: Express, getDevUser: GetUser): vo
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
     const { followUpsDue, newLeads, leadsNeedingEstimate } = await crmAttentionFor(ctx);
-    res.json({ followUpsDue, newLeads, leadsNeedingEstimate });
+    // Client self-estimate: open "call them about the price they built" tasks,
+    // and clients who explored other trades in the last two weeks without
+    // asking yet (sales intel — estimate writers only, like engagement).
+    const priceRequests = await attentionTasksFor(ctx, 10).catch(() => []);
+    let exploringClients: { customerId: string; name: string; text: string | null; lastAt: string | null }[] = [];
+    if (ctx.permissions.manageEstimates) {
+      const interest = await interestFor(ctx).catch(() => null);
+      const cutoff = Date.now() - 14 * DAY;
+      const recent = Object.entries(interest?.byCustomer ?? {})
+        .filter(([, s]) => !s.requested && s.lastAt && new Date(s.lastAt).getTime() >= cutoff)
+        .sort((a, b) => String(b[1].lastAt).localeCompare(String(a[1].lastAt)))
+        .slice(0, 10);
+      const ids = recent.map(([id]) => id);
+      const names = ids.length
+        ? await db.select({ id: crmCustomers.id, name: crmCustomers.displayName }).from(crmCustomers)
+          .where(and(eq(crmCustomers.orgId, ctx.org.id), inArray(crmCustomers.id, ids)))
+        : [];
+      const nameOf = new Map(names.map((n) => [n.id, n.name]));
+      exploringClients = recent.map(([id, s]) => ({ customerId: id, name: nameOf.get(id) ?? "Client", text: s.text, lastAt: s.lastAt }));
+    }
+    res.json({ followUpsDue, newLeads, leadsNeedingEstimate, priceRequests, exploringClients });
   });
 }

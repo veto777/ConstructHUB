@@ -7,7 +7,7 @@ let clientName: string;
 let url: string;
 test.beforeEach(async ({ page, crmOrgId }) => {
   clientName = `E2E detail ${crmOrgId}`;
-  const response = await page.request.post("/api/crm/customers", { data: { displayName: clientName } });
+  const response = await page.request.post("/api/crm/customers", { data: { addressLine1: "100 Test St", displayName: clientName } });
   expect(response.status()).toBe(201);
   clientId = (await response.json()).id;
   url = `/crm/clients/${clientId}`;

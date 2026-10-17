@@ -13,7 +13,7 @@ import { q } from "./db";
 async function makeCustomer(page: any, name: string): Promise<string> {
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const r = await page.request.post("/api/crm/customers", {
-    data: { displayName: `${name} ${stamp}`, email: `e2e-inbox-${stamp}@example.com` },
+    data: { addressLine1: "100 Test St", displayName: `${name} ${stamp}`, email: `e2e-inbox-${stamp}@example.com` },
   });
   if (!r.ok()) throw new Error(`create customer: ${r.status()} ${await r.text()}`);
   return (await r.json()).id;

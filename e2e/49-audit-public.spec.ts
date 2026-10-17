@@ -5,7 +5,7 @@ import { q } from "./db";
 test("public change order: sign, reload, and refuse a second response", async ({ page }) => {
   await switchOrg(page, ORGS.alpine);
   const guards = watchPage(page);
-  const customer = await (await page.request.post("/api/crm/customers", { data: { displayName: "Audit public CO", email: "audit-co@example.invalid" } })).json();
+  const customer = await (await page.request.post("/api/crm/customers", { data: { addressLine1: "100 Test St", displayName: "Audit public CO", email: "audit-co@example.invalid" } })).json();
   const project = await (await page.request.post("/api/crm/projects", { data: { customerId: customer.id, name: "Audit change order project" } })).json();
   let co: any;
   try {

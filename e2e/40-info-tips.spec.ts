@@ -30,7 +30,7 @@ test.afterAll(async () => {
 async function makeCustomer(page: Page): Promise<string> {
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const r = await page.request.post("/api/crm/customers", {
-    data: { displayName: `E2E InfoTip ${stamp}`, email: `e2e-infotip-${stamp}@example.com` },
+    data: { addressLine1: "100 Test St", displayName: `E2E InfoTip ${stamp}`, email: `e2e-infotip-${stamp}@example.com` },
   });
   expect(r.status()).toBe(201);
   return (await r.json()).id;

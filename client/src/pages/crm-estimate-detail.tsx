@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { ActorName } from "@/components/crm-actor-name";
 import { Link, useLocation, useRoute } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,12 +21,15 @@ import { EstimateDiscounts } from "@/components/crm-discounts";
 import { EstimateAttachmentsCard } from "@/components/estimate-attachments-card";
 import { HelpButton } from "@/components/help-button";
 import { Hover3DCard } from "@/components/hover-3d-card";
+import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
+import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff";
 import { money } from "@/lib/estimate-math";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, CheckCircle2, ClipboardCopy, Clock, Eye, FileText, Loader2,
   Pencil, Plus, Save, Send, Trash2, XCircle,
 } from "lucide-react";
+import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
 
 /**
  * Estimate detail — the missing edit surface. Every estimate (draft or SENT)
@@ -108,6 +112,7 @@ export default function CrmEstimateDetailPage() {
   const { toast } = useToast();
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  const interestMap = useClientInterest(!!id && me?.permissions?.manageEstimates === true, { estimateId: id });
   const canEdit = me?.permissions?.manageEstimates === true && me?.permissions?.seePrices === true;
   // A price-blind seat (a field crew on their own job) reads the scope — items and quantities — and no
   // money: the API leaves every amount out, so the price columns and the totals are not drawn at all
@@ -293,6 +298,23 @@ export default function CrmEstimateDetailPage() {
   const setLine = (idx: number, patch: Partial<EditLine>) =>
     setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
 
+  // "Fill from HOVER": every line whose unit + name match a takeoff number (siding sf rounded up, roof sf/sq
+  // with waste, window/door counts, united inches, roof lengths) gets that quantity; the rest stay as typed.
+  const fillFromHover = (t: HoverTakeoff) => {
+    let filled = 0;
+    const next = lines.map((l) => {
+      if (l.kind === "discount") return l;
+      const f = takeoffQuantityForLine({ name: l.name, unit: l.unit }, t);
+      if (!f) return l;
+      filled++;
+      return { ...l, qtyText: String(f.quantity) };
+    });
+    setLines(next);
+    toast(filled
+      ? { title: `Filled ${filled} line${filled === 1 ? "" : "s"} from HOVER`, description: "Check the quantities, then save." }
+      : { title: "No line matched the HOVER takeoff", description: "Lines fill by unit: sf (siding or roof), sq, lf (ridge, valley, rake, eave, drip edge, flashing), ea (windows, doors) or UI." });
+  };
+
   // Auto-enter edit mode on ?edit=1 — a fresh draft from the builder OR the
   // "Edit" button on a client's page. Sent estimates are editable too (only a
   // signed/approved estimate is locked), so this no longer excludes sent ones.
@@ -342,6 +364,14 @@ export default function CrmEstimateDetailPage() {
             {e.number} · {e.title}
             {/* "expired" is derived server-side (out, unanswered, past its date). */}
             <StatusPill tone={statusTone(e.expired ? "expired" : e.status)}>{e.expired ? "expired" : e.status}</StatusPill>
+            <InterestBadge summary={interestMap?.byEstimate[e.id]} />
+            {e.selfEstimate && (
+              <StatusPill tone="neutral" data-testid="pill-self-estimate">
+                {`Client self-estimate${e.selfEstimate.fromNumber ? ` from ${e.selfEstimate.fromNumber}` : ""}`}
+                {e.selfEstimate.claimedDiscounts?.length
+                  ? ` · claimed ${e.selfEstimate.claimedDiscounts.map((d: any) => d.label).join(", ")} (verify)` : ""}
+              </StatusPill>
+            )}
           </span>
         }
         subtitle={
@@ -443,6 +473,9 @@ export default function CrmEstimateDetailPage() {
           </button>
         )}
       </div>
+
+      {/* HOVER takeoff above the editor while editing, so "Fill from HOVER" sits next to the lines. */}
+      {editing && id && <HoverTakeoffCard estimateId={id} onFill={fillFromHover} />}
 
       {editing ? (
         /* ── Edit mode ────────────────────────────────────────────────────── */
@@ -771,6 +804,7 @@ export default function CrmEstimateDetailPage() {
       <EstimateAttachmentsCard estimateId={e.id} />
 
       {/* HOVER 3D model for this estimate's client (renders nothing without a HOVER capture). */}
+      {!editing && id && <HoverTakeoffCard estimateId={id} />}
       {id && <Hover3DCard estimateId={id} />}
 
       {/* Events trail — created/sent/viewed/updated, newest first. */}
@@ -782,7 +816,10 @@ export default function CrmEstimateDetailPage() {
           <CardContent className="space-y-1.5 text-xs text-muted-foreground" data-testid="events-trail">
             {events.slice(0, 20).map((ev: any) => (
               <div key={ev.id} className="flex justify-between gap-3" data-testid={`event-${ev.type}`}>
-                <span className="capitalize">{String(ev.type).replace(/_/g, " ")}</span>
+                <span>
+                  <span className="capitalize">{String(ev.type).replace(/_/g, " ")}</span>
+                  {ev.actor && ev.actor.recorded !== false && <> · by <ActorName actor={ev.actor} /></>}
+                </span>
                 <span>{dayTime(ev.createdAt)}</span>
               </div>
             ))}

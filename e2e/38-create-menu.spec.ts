@@ -73,7 +73,7 @@ test.describe("create menu + quick message", () => {
     const guards = watchPage(page);
     const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const cust = await page.request.post("/api/crm/customers", {
-      data: { displayName: `E2E QM ${stamp}`, email: `e2e-qm-${stamp}@example.com` },
+      data: { addressLine1: "100 Test St", displayName: `E2E QM ${stamp}`, email: `e2e-qm-${stamp}@example.com` },
     });
     expect(cust.ok()).toBeTruthy();
     const customer = await cust.json();

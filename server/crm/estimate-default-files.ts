@@ -19,7 +19,7 @@
 import { createHash } from "crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
-import { crmAttachments } from "@shared/schema";
+import { crmActivityLog, crmAttachments, crmEstimates } from "@shared/schema";
 
 export const ESTIMATE_DEFAULT_KIND = "estimate_default";
 
@@ -65,9 +65,20 @@ export async function attachDefaultFilesToEstimate(orgId: string, estimateId: st
         return true;
       });
       if (!rows.length) return 0;
-      await tx.insert(crmAttachments).values(rows.map((d) => ({
+      // Each copy keeps the file's ORIGINAL uploader; the attaching itself is
+      // logged below as the "Auto-attach" source (nobody picked it by hand).
+      const made = await tx.insert(crmAttachments).values(rows.map((d) => ({
         orgId, kind: "estimate", refId: estimateId,
         fileName: d.fileName, mime: d.mime, sizeBytes: d.sizeBytes, storagePath: d.storagePath,
+        uploadedByMemberId: d.uploadedByMemberId ?? null, uploadedByLabel: d.uploadedByLabel ?? null,
+        uploadedByKind: d.uploadedByKind ?? null,
+      }))).returning({ id: crmAttachments.id, fileName: crmAttachments.fileName });
+      const [est] = await tx.select({ customerId: crmEstimates.customerId, number: crmEstimates.number })
+        .from(crmEstimates).where(and(eq(crmEstimates.id, estimateId), eq(crmEstimates.orgId, orgId))).limit(1);
+      await tx.insert(crmActivityLog).values(made.map((m) => ({
+        orgId, actorMemberId: null, actorLabel: "Auto-attach", action: "attachment.auto_attached",
+        entityType: "attachment", entityId: m.id, customerId: est?.customerId ?? null,
+        meta: { kind: "estimate", fileName: m.fileName, number: est?.number ?? null, refId: estimateId },
       })));
       return rows.length;
     });

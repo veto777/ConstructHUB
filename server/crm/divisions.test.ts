@@ -210,7 +210,7 @@ describe("division list scoping (dev server)", () => {
 
       const mkDocSet = async (divisionId: string | null, tag: string) => {
         const cust = await api("/api/crm/customers", {
-          method: "POST", body: JSON.stringify({ displayName: `Vitest ${tag} ${run}`, email: `vitest.${tag}.${run}@example.com` }),
+          method: "POST", body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest ${tag} ${run}`, email: `vitest.${tag}.${run}@example.com` }),
         }, cookie);
         const proj = await api("/api/crm/projects", {
           method: "POST",

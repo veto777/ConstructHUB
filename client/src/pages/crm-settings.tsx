@@ -22,6 +22,7 @@ import { apiIssueMessage } from "@/lib/api-issue-message";
 import { marketingUrl } from "@/lib/site";
 import { inNativeApp } from "@/lib/app-shell";
 import { AppPushCard } from "@/components/app-push-card";
+import { SelfEstimateSettingsCard } from "@/components/crm-self-estimate-settings";
 import {
   Settings, Building2, FileText, Bell, CreditCard, Blocks,
   Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud, Plus,
@@ -1080,6 +1081,9 @@ export default function CrmSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Client self-estimate (per-division products + prices) ─────── */}
+      <SelfEstimateSettingsCard />
 
       {/* ── SMS (SignalWire) ───────────────────────────────────────────── */}
       <Card data-testid="card-sms" id="sms" className="scroll-mt-4">
