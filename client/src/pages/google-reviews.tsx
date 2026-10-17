@@ -1,6 +1,7 @@
 import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-workspace";
 import { GoogleReport } from "@/components/profile-guard";
 import { CrmReviewPhotos, useReviewHandoff, type ReviewCrmPhoto } from "@/components/crm-photo-sources";
+import { ReviewPipeline, PIPELINE_KEY, type PipelineItem } from "@/components/review-pipeline";
 import type { CrmPhotoClient } from "@/lib/crm-photos";
 import { AiReplySettings } from "@/components/ai-review-replies";
 import { GoogleSurface, GoogleAvatar, GoogleStarRow, GooglePill, GoogleAiOverview, relativeTime } from "@/components/google";
@@ -369,6 +370,7 @@ export default function GoogleReviewsPage() {
           : data?.message || `Feedback request emailed to ${clientEmail}`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/list"] });
+      queryClient.invalidateQueries({ queryKey: PIPELINE_KEY });
       setCreateOpen(false);
       setClientName("");
       setClientEmail("");
@@ -569,6 +571,16 @@ export default function GoogleReviewsPage() {
     return <StatusPill tone="neutral" data-testid={`badge-status-${review.id}`}>Pending</StatusPill>;
   };
 
+  // "Prepare request" on a won job (components/review-pipeline.tsx): the client, the job and their photos, prefilled.
+  const prepareFromPipeline = (it: PipelineItem) => {
+    openSendDialog();
+    setClientName(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
+    pickCrmClient(it.customer);
+    setCrmPhotos([]);
+    setProjectDescription(it.description);
+    setMessageMode("description");
+  };
+
   const hasGoogleUrl = !!((user?.googleProfileUrl || templates.find((t: any) => String(t.id) === selectedTemplateId)?.googleProfileUrl));
   const canSend = !!(clientName && clientEmail && hasGoogleUrl);
   // The "i" beside the title: the feature's own entry on the first view, each other view's section (shared/help/registry.ts).
@@ -599,6 +611,8 @@ export default function GoogleReviewsPage() {
               <Stat label="Caught privately" testId="stat-caught-privately" tone="warn" value={caughtPrivatelyCount(reviews)} hint="came to you privately" />
               <Stat label="Awaiting response" testId="stat-pending" value={reviews.filter((r: any) => r.status === "sent" && !r.unsubscribed).length} />
             </StatGrid>
+
+            <ReviewPipeline onPrepare={prepareFromPipeline} />
 
             <Section title="Sent requests">
               {!isLoading && reviews.length > 0 && (

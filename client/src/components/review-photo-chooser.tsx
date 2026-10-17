@@ -14,7 +14,9 @@ import { Button } from "@/components/ui/button";
 type Offered = { id: string; stage: "progress" | "finished" | null; thumbUrl: string; url: string };
 export type ChosenPhoto = { url: string; originalName: string };
 
-const MAX = 30;
+// 5–10 photos (owner rule); the server takes at most 10 (HOMEOWNER_PICK_MAX).
+const MIN = 5;
+const MAX = 10;
 
 export function ReviewPhotoChooser({ token, companyName, onChosen }: {
   token: string; companyName: string; onChosen: (photos: ChosenPhoto[]) => void;
@@ -34,6 +36,8 @@ export function ReviewPhotoChooser({ token, companyName, onChosen }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   if (!data?.available || !data.photos.length) return null;
+  // At least 5, or every photo when the job has fewer.
+  const need = Math.min(MIN, data.photos.length);
 
   const toggle = (id: string) => setPicked((prev) => {
     const next = new Set(prev);
@@ -65,7 +69,7 @@ export function ReviewPhotoChooser({ token, companyName, onChosen }: {
         <p className="text-sm font-semibold">Add photos of your project (optional)</p>
       </div>
       <p className="mb-3 pl-11 text-xs leading-relaxed text-muted-foreground">
-        These are the photos {companyName} has of your project. Tap the ones you'd like to download and add to your review.
+        These are the photos {companyName} has of your project. Tap {Math.min(MIN, data.photos.length) === data.photos.length ? "the ones" : `${Math.min(MIN, data.photos.length)} to ${Math.min(MAX, data.photos.length)}`} you'd like to download and add to your review.
       </p>
       <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4" data-testid="grid-choose-project-photos">
         {data.photos.map((p) => {
@@ -82,9 +86,9 @@ export function ReviewPhotoChooser({ token, companyName, onChosen }: {
         })}
       </div>
       {error && <p className="mb-2 text-xs text-red-600" role="alert">{error}</p>}
-      <Button className="w-full" variant="outline" onClick={save} disabled={!picked.size || busy} data-testid="button-use-chosen-photos">
+      <Button className="w-full" variant="outline" onClick={save} disabled={picked.size < need || busy} data-testid="button-use-chosen-photos">
         {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {picked.size ? `Use ${picked.size} photo${picked.size === 1 ? "" : "s"}` : "Tap photos to choose"}
+        {picked.size >= need ? `Use ${picked.size} photo${picked.size === 1 ? "" : "s"}` : picked.size ? `Pick ${need - picked.size} more` : "Tap photos to choose"}
       </Button>
     </div>
   );

@@ -17,6 +17,7 @@ import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { presentListing } from "./competitor-analysis";
 import { rateLimit, actorKey, takeBudget } from "./growth-limits";
+import { registerReviewPipelineRoutes } from "./crm/review-pipeline";
 import { registerCrmPhotoPlatformRoutes, registerReviewProjectPhotoRoutes, resolveReviewCrmLink, reviewPhotoUrl } from "./crm/photo-library";
 import { ownedBy } from "./ownership";
 import { buildExclusionList } from "./click-guard-exclusions";
@@ -1353,6 +1354,8 @@ export async function registerRoutes(
     return fileId;
   });
   registerReviewProjectPhotoRoutes(app);
+  // Google Reviews "Ready to ask": every won-job CRM client not asked yet (server/crm/review-pipeline.ts).
+  registerReviewPipelineRoutes(app, getDevUser);
 
   app.post("/api/photos/auto-enhance", async (req, res) => {
     try {

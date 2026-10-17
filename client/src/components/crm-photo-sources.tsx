@@ -87,6 +87,10 @@ export function CrmOptimizerSource({ remaining, onFiles, enabled = true }: {
 
 // ── Review-request composer ─────────────────────────────────────────────────
 
+/** How many job photos go with a review request: 5 to 10 (fewer only when the job has fewer). */
+export const PICK_MIN = 5;
+export const PICK_MAX = 10;
+
 export type ReviewCrmPhoto = { id: string; thumbUrl: string; fileName: string };
 
 /** The ?crmPhotos=&crmCustomer= hand-off from the CRM Photos page ("Use in a review request"). */
@@ -150,11 +154,13 @@ export function CrmReviewPhotos({ client, onClient, crmPhotos, onCrmPhotos, room
     retry: false,
   });
   const selected = new Map(crmPhotos.map((p) => [p.id, p as unknown as CrmPhoto]));
-  const max = crmPhotos.length + Math.max(0, room);
+  // The client's own job photos: pick 5–10 (owner rule), never past the request's room.
+  const max = Math.min(crmPhotos.length + Math.max(0, room), PICK_MAX);
   const toggle = (p: CrmPhoto) => {
     if (selected.has(p.id)) onCrmPhotos(crmPhotos.filter((x) => x.id !== p.id));
-    else if (room > 0) onCrmPhotos([...crmPhotos, { id: p.id, thumbUrl: p.thumbUrl, fileName: p.fileName }]);
+    else if (room > 0 && crmPhotos.length < PICK_MAX) onCrmPhotos([...crmPhotos, { id: p.id, thumbUrl: p.thumbUrl, fileName: p.fileName }]);
   };
+  const short = crmPhotos.length > 0 && crmPhotos.length < PICK_MIN && (client?.photoCount ?? 0) >= PICK_MIN;
 
   return (
     <div className="space-y-3 rounded-lg border bg-muted/20 p-3" data-testid="section-review-crm">
@@ -204,8 +210,10 @@ export function CrmReviewPhotos({ client, onClient, crmPhotos, onCrmPhotos, room
       {client && (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-medium">{client.name}'s project photos — tick the ones to send</p>
-            <span className="text-xs text-muted-foreground" data-testid="text-review-crm-count">{crmPhotos.length} ticked</span>
+            <p className="text-xs font-medium">{client.name}'s job photos — pick {PICK_MIN}–{PICK_MAX} to send</p>
+            <span className={`text-xs ${short ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`} data-testid="text-review-crm-count">
+              {crmPhotos.length} of {PICK_MIN}–{PICK_MAX} picked
+            </span>
           </div>
           <StageTabs value={stage} onChange={setStage} facets={facets} testPrefix="tab-review-stage" />
           <CrmPhotoGrid params={{ customerId: client.id, stage }} selected={selected} onToggle={toggle} max={max} dense showClient={false}
@@ -213,7 +221,7 @@ export function CrmReviewPhotos({ client, onClient, crmPhotos, onCrmPhotos, room
             emptyText="No photos on this client yet. Leave it empty and your client can pick from their own project photos later, if any are added." />
           {crmPhotos.length === 0 && (
             <p className="text-xs text-muted-foreground" data-testid="text-review-homeowner-choice">
-              Attach none and your client can choose from their own project photos on the review page.
+              Pick none and your client chooses {PICK_MIN}–{PICK_MAX} of their own job photos on the review page.
             </p>
           )}
         </div>

@@ -752,6 +752,17 @@ export async function ensureCrmSchema(): Promise<void> {
       WHERE idempotency_key IS NOT NULL;
     CREATE INDEX IF NOT EXISTS crm_estimate_events_interest_idx ON crm_estimate_events (estimate_id, type)
       WHERE type LIKE 'interest\\_%';
+
+    -- Review pipeline (server/crm/review-pipeline.ts): the won-job clients the owner set aside ("Not now").
+    CREATE TABLE IF NOT EXISTS crm_review_pipeline (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      customer_id varchar NOT NULL,
+      dismissed_at timestamp NOT NULL DEFAULT now(),
+      dismissed_by_member_id varchar
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_review_pipeline_customer_uq ON crm_review_pipeline (org_id, customer_id);
+    CREATE INDEX IF NOT EXISTS review_requests_crm_customer_idx ON review_requests (crm_org_id, crm_customer_id);
   `);
 
   // ── Accountability: org-wide activity log (who did what, when) ───────────

@@ -191,6 +191,8 @@ export function activityText(row: {
       case "customer.created": return "created this client";
       case "customer.updated": return `updated client details${labelled(CRM_CUSTOMER_FIELD_LABELS)}`;
       case "customer.deleted": return "deleted this client";
+      case "review_pipeline.dismissed": return "set this client aside in the review pipeline (Not now)";
+      case "review_pipeline.restored": return "put this client back in the review pipeline";
       case "member.updated": return memberChange();
       case "member.removed": return `removed ${m.name ?? "a member"} from the team`;
       case "settings.updated": return `updated company settings${labelled(m.labels && typeof m.labels === "object" ? m.labels : {})}`;

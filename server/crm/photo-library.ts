@@ -628,6 +628,7 @@ export async function resolveReviewCrmLink(req: any, res: any, getUser: GetUser,
   return { crmOrgId: ctx.org.id, crmCustomerId: customerId, photos };
 }
 
+export const HOMEOWNER_PICK_MAX = 10;
 export const reviewPhotoUrl = (token: string, attachmentId: string) => `/api/review/${encodeURIComponent(token)}/photos/${attachmentId}`;
 
 type ReviewRow = typeof reviewRequests.$inferSelect;
@@ -689,8 +690,9 @@ export function registerReviewProjectPhotoRoutes(app: Express): void {
   });
 
   app.post("/api/review/:token/project-photos", chooseLimit, async (req: any, res) => {
-    const parsed = z.object({ ids: z.array(z.string().min(1).max(64)).max(30) }).safeParse(req.body ?? {});
-    if (!parsed.success) return res.status(400).json({ message: "Choose up to 30 photos." });
+    // The homeowner picks up to 10 (the owner's 5–10 rule; fewer is fine when the job has fewer).
+    const parsed = z.object({ ids: z.array(z.string().min(1).max(64)).max(HOMEOWNER_PICK_MAX) }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: `Choose up to ${HOMEOWNER_PICK_MAX} photos.` });
     const r = await reviewByToken(String(req.params.token));
     if (!r) return res.status(404).json({ message: "Not found" });
     if (!homeownerMayChoose(r)) return res.status(409).json({ message: "This request already has its photos." });
