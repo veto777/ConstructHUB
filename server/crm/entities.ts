@@ -282,6 +282,19 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
     signatureName: e.signatureName, expiresAt: e.expiresAt,
     // Derived: out, unanswered and past its expiry date (see estimateIsExpired).
     expired: estimateIsExpired(e),
+    // A draft the client requested from the online self-estimate (server/crm/self-estimate.ts):
+    // where it came from, and the discounts they CLAIMED (unverified). Ballpark amounts are prices.
+    selfEstimate: (() => {
+      const se = (e.customFields as any)?.selfEstimate;
+      if (!se || typeof se !== "object") return undefined;
+      return {
+        fromEstimateId: se.fromEstimateId ?? null, fromNumber: se.fromNumber ?? null,
+        requestedAt: se.requestedAt ?? null, note: se.note ?? null,
+        claimedDiscounts: Array.isArray(se.claimedDiscounts)
+          ? se.claimedDiscounts.map((d: any) => ({ code: d.code, label: d.label, verified: false })) : [],
+        ballpark: ctx.permissions.seePrices ? se.ballpark ?? null : undefined,
+      };
+    })(),
     createdAt: e.createdAt, updatedAt: e.updatedAt,
   };
 }

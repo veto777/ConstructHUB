@@ -61,6 +61,7 @@ import {
   actorLabel, actorSentence, clientActor, systemActor, uploadLabelActor,
   UNRECORDED_ACTOR, UNRECORDED_TEAM_ACTOR, type CrmActor,
 } from "@shared/crm-actor";
+import { INTEREST_EVENT_TYPES, interestEventText } from "@shared/self-estimate";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -505,7 +506,11 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
             .where(and(
               eq(crmEstimateEvents.orgId, orgId),
               inArray(crmEstimateEvents.estimateId, estIds),
-              inArray(crmEstimateEvents.type, ["sent", "viewed", "approved", "declined"]),
+              inArray(crmEstimateEvents.type, [
+                "sent", "viewed", "approved", "declined",
+                // Self-estimate interest (seeing a prompt card is not interest — not listed).
+                ...INTEREST_EVENT_TYPES.filter((t) => t !== "interest_prompt_viewed"),
+              ]),
             ))
             .orderBy(desc(crmEstimateEvents.createdAt)).limit(200)
         : Promise.resolve([]),
@@ -581,7 +586,14 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       const meta = (e.meta ?? {}) as Record<string, any>;
       // Every type is EXPLICIT — an unmapped type is skipped, never mislabeled
       // (unknown types used to fall through to "declined").
-      const line = estimateEventText(e.type, ref, estimateEventActor(e.actor, dir, clientName), meta);
+      // Self-estimate interest events are the client's; ballpark amounts are prices, so a price-blind
+      // seat reads the sentence without them.
+      const interest = e.type.startsWith("interest_")
+        ? interestEventText(e.type, ctx.permissions.seePrices ? meta : { ...meta, lowCents: null, highCents: null }, ref)
+        : null;
+      const line = e.type.startsWith("interest_")
+        ? (interest ? said(client, interest.replace(/^Client /, "")) : null)
+        : estimateEventText(e.type, ref, estimateEventActor(e.actor, dir, clientName), meta);
       if (!line) continue;
       entries.push({
         id: `ev-${e.id}`, kind: "estimate_event", verb: e.type, ...line, ref,

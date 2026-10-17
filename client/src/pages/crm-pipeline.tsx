@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { ClientSearchPicker, type PickOption } from "@/components/crm-search-picker";
 import { parseDollarInput, dollarInputError } from "@/lib/dollar-input";
 import { cn } from "@/lib/utils";
+import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "" : `$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -255,6 +256,8 @@ export default function CrmPipelinePage() {
   const { data, isLoading, isError } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
   const canMove = me?.permissions?.manageJobs === true;
   const canSeePrices = me?.permissions?.seePrices === true;
+  // Clients who explored other trades with the self-estimate tool.
+  const interest = useClientInterest(me?.permissions?.manageEstimates === true);
   // Tall columns collapse: the first few cards show, the rest sit behind an
   // explicit "Show more". MUST be declared before the loading early-returns —
   // a hook after a conditional return crashes the tree when data arrives.
@@ -401,6 +404,9 @@ export default function CrmPipelinePage() {
                               <span className="text-sm font-semibold tabular-nums">{money(p.contractValueCents)}</span>
                             )}
                           </div>
+                          {p.customerId && interest?.byCustomer[p.customerId] && (
+                            <InterestBadge compact summary={interest.byCustomer[p.customerId]} testId={`badge-interest-project-${p.id}`} />
+                          )}
                           {p.trades?.length ? (
                             <div className="flex flex-wrap gap-1">
                               {p.trades.slice(0, 3).map((t: string) => (

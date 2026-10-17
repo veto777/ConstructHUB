@@ -23,6 +23,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { orgThemeStyle } from "@/lib/org-theme";
 import { Home3DCard } from "@/components/hover-3d-card";
 import { View3DButton } from "@/components/hover-3d-dialog";
+import { SelfEstimatePrompts, portalTransport, type SelfEstimateOffer } from "@/components/self-estimate";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -260,6 +261,15 @@ function Dashboard({ data }: { data: any }) {
     queryKey: ["/api/client/contracts"],
     retry: false,
   });
+  // Self-estimate prompts for trades not on any of the client's bids (per covered account).
+  const { data: selfEst } = useQuery<{ offers: (SelfEstimateOffer & { customerId: string })[]; preview?: boolean }>({
+    queryKey: ["/api/client/self-estimate"],
+    retry: false,
+  });
+  const selfEstimateBlock = (selfEst?.offers ?? []).map((o) => (
+    <SelfEstimatePrompts key={o.customerId} offer={o} transport={portalTransport(o.customerId)}
+      scope={`portal-${o.customerId}`} preview={preview || selfEst?.preview === true} />
+  ));
   const pdfByEstimate = new Map<string, any>(
     (contractPdfs?.contracts ?? []).map((p: any) => [p.estimateId, p]),
   );
@@ -638,17 +648,18 @@ function Dashboard({ data }: { data: any }) {
     home: (
       <>
         {needsAction}
+        {selfEstimateBlock}
         {/* Financing — clicks are recorded before the lender link opens. */}
         <PortalFinancing financing={financing} preview={preview} />
         {/* From <company> — org pamphlets (brochures, warranties) */}
         <PortalPamphlets pamphlets={pamphlets} />
-        {!actionCount && !financing?.length && !pamphlets?.length && (
+        {!actionCount && !financing?.length && !pamphlets?.length && !selfEstimateBlock.length && (
           <Card><EmptyState compact icon={LayoutDashboard} title="You're all caught up"
             description="Estimates, invoices and contracts live in the menu. Anything needing your action shows up here." /></Card>
         )}
       </>
     ),
-    estimates: estimatesSection,
+    estimates: <>{estimatesSection}{selfEstimateBlock}</>,
     invoices: invoicesSection,
     contracts: contractsSection,
     reports: reportsSection,

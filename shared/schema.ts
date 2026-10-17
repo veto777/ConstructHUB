@@ -1521,6 +1521,34 @@ export const crmFinanceClicks = pgTable("crm_finance_clicks", {
 
 export type CrmFinanceClick = typeof crmFinanceClicks.$inferSelect;
 
+// crm_tasks: a to-do for one member, created by the system — today only by a
+// client's "Send this to my contractor" from the self-estimate tool
+// (server/crm/self-estimate.ts): "call them about the roof price they built".
+// Shows on Home → Needs attention until someone marks it done.
+export const crmTasks = pgTable("crm_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  customerId: varchar("customer_id"),
+  estimateId: varchar("estimate_id"),
+  // The draft estimate the request generated, when there is one.
+  relatedEstimateId: varchar("related_estimate_id"),
+  divisionId: varchar("division_id"),
+  assignedMemberId: varchar("assigned_member_id"),
+  source: text("source").notNull(), // 'self_estimate_request'
+  // The client's submission key: one task (and one draft) per submission,
+  // unique per anchor estimate — a retried/double-tapped request is a no-op.
+  idempotencyKey: text("idempotency_key"),
+  title: text("title").notNull(),
+  body: text("body"),
+  dueAt: timestamp("due_at"),
+  doneAt: timestamp("done_at"),
+  doneByMemberId: varchar("done_by_member_id"),
+  meta: jsonb("meta"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type CrmTask = typeof crmTasks.$inferSelect;
+
 // ── Roles & permissions ─────────────────────────────────────────────────────
 // Housecall Pro ships three fixed roles and no custom fields; we ship six
 // construction-shaped roles PLUS per-seat overrides, because a lead carpenter

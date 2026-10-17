@@ -25,13 +25,14 @@ import {
 } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, SectionTitle, crmTable } from "@/components/crm-ui";
 import { confirmAction } from "@/components/confirm-dialog";
+import { SelfEstimateSettingsCard } from "@/components/crm-self-estimate-settings";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const cents = (v: string) => Math.round((parseFloat(v) || 0) * 100);
 const dollars = (c?: number | null) => (c === null || c === undefined ? "" : (c / 100).toString());
 
-const TABS = ["items", "materials", "labor", "formula"] as const;
+const TABS = ["items", "materials", "labor", "formula", "self-estimate"] as const;
 const FALLBACK_UNITS = ["ea", "sq", "sf", "lf", "hr", "job"];
 
 /**
@@ -462,6 +463,9 @@ export default function CrmPriceBookPage() {
           <TabsTrigger value="materials"><Wrench className="h-4 w-4 mr-1" /> Materials</TabsTrigger>
           <TabsTrigger value="labor"><Percent className="h-4 w-4 mr-1" /> Labor</TabsTrigger>
           <TabsTrigger value="formula"><Calculator className="h-4 w-4 mr-1" /> Formulas</TabsTrigger>
+          {(me?.permissions?.manageEstimates || me?.permissions?.manageSettings) && (
+            <TabsTrigger value="self-estimate" data-testid="tab-self-estimate"><Calculator className="h-4 w-4 mr-1" /> Client self-estimate</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="items" className="mt-4 space-y-3">
@@ -789,6 +793,11 @@ export default function CrmPriceBookPage() {
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="self-estimate" className="mt-4">
+          {/* Estimators set the products + prices clients can price themselves (per division). */}
+          <SelfEstimateSettingsCard />
         </TabsContent>
 
         <TabsContent value="formula" className="mt-4">

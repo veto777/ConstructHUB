@@ -185,6 +185,13 @@ const ROUTES: RouteRow[] = [
   R("PATCH", "/api/crm/org", "manageSettings", { body: { email: "not-an-email" } }),
   R("POST", "/api/crm/org/logo", "manageSettings", { effect: true }),
   R("PUT", "/api/crm/org/price-floor-lock", "owner", { body: {} }),
+  // Client self-estimate: estimators set their own products + prices (server/crm/self-estimate.ts).
+  R("GET", "/api/crm/self-estimate/config", { any: ["manageSettings", "manageEstimates"] }),
+  R("PUT", "/api/crm/self-estimate/config", { any: ["manageSettings", "manageEstimates"] }, { body: {} }),
+  R("GET", "/api/crm/self-estimate/interest", "manageEstimates"),
+  // Tasks: own tasks for every member; the handler scopes rows (404 for a task the seat can't see).
+  R("GET", "/api/crm/tasks", null),
+  R("PATCH", "/api/crm/tasks/:id", null, { path: () => `/api/crm/tasks/${none}`, body: {} }),
   R("GET", "/api/crm/members", null),
   R("PATCH", "/api/crm/members/:id", "manageTeam", { path: () => `/api/crm/members/${other}`, body: { role: "not-a-role" } }),
   R("DELETE", "/api/crm/members/:id", "manageTeam", { path: () => `/api/crm/members/${other}`, effect: true }),

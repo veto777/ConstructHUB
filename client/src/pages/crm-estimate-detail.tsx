@@ -29,6 +29,7 @@ import {
   ArrowLeft, CheckCircle2, ClipboardCopy, Clock, Eye, FileText, Loader2,
   Pencil, Plus, Save, Send, Trash2, XCircle,
 } from "lucide-react";
+import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
 
 /**
  * Estimate detail — the missing edit surface. Every estimate (draft or SENT)
@@ -111,6 +112,7 @@ export default function CrmEstimateDetailPage() {
   const { toast } = useToast();
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  const interestMap = useClientInterest(!!id && me?.permissions?.manageEstimates === true, { estimateId: id });
   const canEdit = me?.permissions?.manageEstimates === true && me?.permissions?.seePrices === true;
   // A price-blind seat (a field crew on their own job) reads the scope — items and quantities — and no
   // money: the API leaves every amount out, so the price columns and the totals are not drawn at all
@@ -362,6 +364,14 @@ export default function CrmEstimateDetailPage() {
             {e.number} · {e.title}
             {/* "expired" is derived server-side (out, unanswered, past its date). */}
             <StatusPill tone={statusTone(e.expired ? "expired" : e.status)}>{e.expired ? "expired" : e.status}</StatusPill>
+            <InterestBadge summary={interestMap?.byEstimate[e.id]} />
+            {e.selfEstimate && (
+              <StatusPill tone="neutral" data-testid="pill-self-estimate">
+                {`Client self-estimate${e.selfEstimate.fromNumber ? ` from ${e.selfEstimate.fromNumber}` : ""}`}
+                {e.selfEstimate.claimedDiscounts?.length
+                  ? ` · claimed ${e.selfEstimate.claimedDiscounts.map((d: any) => d.label).join(", ")} (verify)` : ""}
+              </StatusPill>
+            )}
           </span>
         }
         subtitle={
