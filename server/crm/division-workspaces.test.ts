@@ -108,6 +108,15 @@ describe("this-month window (pure)", () => {
     expect(ws.monthStartIn(new Date("2026-10-01T03:00:00Z"), "America/Los_Angeles").toISOString()).toBe("2026-09-01T07:00:00.000Z");
     expect(ws.monthStartIn(new Date("2026-10-17T12:00:00Z"), "Not/AZone").toISOString()).toBe("2026-10-01T00:00:00.000Z");
   });
+
+  it("the year starts at local midnight on Jan 1 (revenue 'this year')", () => {
+    // Jan 1 00:00 PST = 08:00 UTC; New York (EST) = 05:00 UTC.
+    expect(ws.yearStartIn(new Date("2026-10-17T12:00:00Z"), "America/Los_Angeles").toISOString()).toBe("2026-01-01T08:00:00.000Z");
+    expect(ws.yearStartIn(new Date("2026-10-17T12:00:00Z"), "America/New_York").toISOString()).toBe("2026-01-01T05:00:00.000Z");
+    // 2026-01-01 03:00 UTC is still 2025 in Los Angeles.
+    expect(ws.yearStartIn(new Date("2026-01-01T03:00:00Z"), "America/Los_Angeles").toISOString()).toBe("2025-01-01T08:00:00.000Z");
+    expect(ws.yearStartIn(new Date("2026-03-05T12:00:00Z"), null).toISOString()).toBe("2026-01-01T00:00:00.000Z");
+  });
 });
 
 describe("sort-unassigned suggestions (pure, real links only)", () => {

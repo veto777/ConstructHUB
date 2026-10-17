@@ -27,7 +27,8 @@ import { divisionLabel } from "@shared/divisions";
 
 type Kpi = { count: number; totalCents?: number };
 type Kpis = {
-  openEstimates: Kpi; wonThisMonth: Kpi; invoicedThisMonth: Kpi; collectedThisMonth: Kpi;
+  openEstimates: Kpi; wonThisMonth: Kpi; wonLastMonth: Kpi; wonThisYear: Kpi; wonAllTime: Kpi;
+  invoicedThisMonth: Kpi; collectedThisMonth: Kpi;
   outstanding: Kpi; activeProjects: Kpi; clients: { count: number };
   records: { customers: number; projects: number; estimates: number; invoices: number };
 };
@@ -53,15 +54,46 @@ const money = (c?: number) =>
 
 const KPI_ROWS: { key: keyof Omit<Kpis, "clients" | "records">; label: string }[] = [
   { key: "openEstimates", label: "Open estimates" },
-  { key: "wonThisMonth", label: "Won this month" },
   { key: "invoicedThisMonth", label: "Invoiced this month" },
   { key: "collectedThisMonth", label: "Collected this month" },
   { key: "outstanding", label: "Outstanding (open invoices)" },
   { key: "activeProjects", label: "Active projects" },
 ];
 
+// Revenue = won (signed) contracts at their approved amount — its own block at the top of every card.
+const REVENUE_ROWS: { key: "wonThisMonth" | "wonLastMonth" | "wonThisYear" | "wonAllTime"; label: string }[] = [
+  { key: "wonThisMonth", label: "This month" },
+  { key: "wonLastMonth", label: "Last month" },
+  { key: "wonThisYear", label: "This year" },
+  { key: "wonAllTime", label: "All time" },
+];
+
+function RevenueBlock({ k, testId }: { k: Kpis; testId: string }) {
+  return (
+    <div className="rounded-md border bg-background/70 p-2.5" data-testid={`${testId}-revenue`}>
+      <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Revenue — won contracts</div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+        {REVENUE_ROWS.map((r) => (
+          <div key={r.key} className="flex items-baseline justify-between gap-2">
+            <dt className="text-muted-foreground">{r.label}</dt>
+            <dd className="tabular-nums text-right" data-testid={`${testId}-${r.key}`}>
+              {/* A price-blind seat gets counts only. */}
+              {money(k[r.key]?.totalCents) != null && <span className="font-semibold">{money(k[r.key].totalCents)}</span>}
+              <span className={money(k[r.key]?.totalCents) != null ? "text-muted-foreground" : "font-semibold"}>
+                {money(k[r.key]?.totalCents) != null ? " · " : ""}{(k[r.key]?.count ?? 0).toLocaleString()} won
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function KpiList({ k, testId }: { k: Kpis; testId: string }) {
   return (
+    <>
+    <RevenueBlock k={k} testId={testId} />
     <dl className="space-y-1.5 text-sm" data-testid={testId}>
       {KPI_ROWS.map((r) => (
         <div key={r.key} className="flex items-baseline justify-between gap-3">
@@ -77,6 +109,7 @@ function KpiList({ k, testId }: { k: Kpis; testId: string }) {
         <dd className="font-semibold tabular-nums" data-testid={`${testId}-clients`}>{k.clients.count.toLocaleString()}</dd>
       </div>
     </dl>
+    </>
   );
 }
 
