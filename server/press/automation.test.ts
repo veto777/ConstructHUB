@@ -218,6 +218,21 @@ describe("autopilot", () => {
     expect((await store.getOrder(orderId))!.credits_used).toBe(0);
   });
 
+  it("a pass that died mid-draft is taken over after 30 minutes, without a second draft", async () => {
+    const u = await seededAccount();
+    await paidOrder(u);
+    const now = new Date();
+    expect((await runAutopilotFor(u, now)).outcome).toBe("drafted");
+    // Simulate a crash right after the draft row was made: the run stays 'drafting'.
+    await pool.query(`UPDATE press_autopilot_runs SET outcome='drafting' WHERE user_id=$1 AND month=$2`, [u, monthKey(now)]);
+    expect((await runAutopilotFor(u, now)).outcome).toBe("already"); // still fresh: another pass may be writing
+    await pool.query(`UPDATE press_autopilot_runs SET updated_at=now() - interval '31 minutes' WHERE user_id=$1 AND month=$2`, [u, monthKey(now)]);
+    await pool.query(`DELETE FROM press_idea_marks WHERE user_id=$1`, [u]).catch(() => {});
+    const again = await runAutopilotFor(u, now);
+    expect(again.outcome).toBe("drafted");
+    expect(await countReleases(u)).toBe(1); // the orphan draft was replaced, not doubled
+  });
+
   it("skips when a release went out recently, when there is no idea, and before the chosen day", async () => {
     const u = await seededAccount();
     await paidOrder(u);

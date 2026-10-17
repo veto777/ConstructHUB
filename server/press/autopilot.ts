@@ -48,9 +48,11 @@ async function noteResult(userId: number, result: string): Promise<void> {
   await pool.query(`UPDATE press_autopilot SET last_checked_at=now(), last_result=$2 WHERE user_id=$1`, [userId, result]);
 }
 async function monthClaimed(userId: number, month: string): Promise<boolean> {
-  const { rows } = await pool.query(`SELECT outcome, attempts FROM press_autopilot_runs WHERE user_id=$1 AND month=$2`, [userId, month]);
+  const { rows } = await pool.query(`SELECT outcome, attempts, updated_at < now() - interval '30 minutes' AS stale FROM press_autopilot_runs WHERE user_id=$1 AND month=$2`, [userId, month]);
   const r = rows[0];
-  return !!r && (r.outcome !== "failed" || r.attempts >= MAX_ATTEMPTS);
+  if (!r) return false;
+  if (r.outcome === "drafting" && r.stale) return r.attempts >= MAX_ATTEMPTS; // a pass that died mid-draft
+  return r.outcome !== "failed" || r.attempts >= MAX_ATTEMPTS;
 }
 
 /**
@@ -124,25 +126,30 @@ export async function runAutopilotFor(userId: number, now = new Date()): Promise
     await noteResult(userId, `Waiting: your last release went out on ${shortDate(new Date(last))}. Releases go about a month apart.`);
     return { outcome: "too_recent" };
   }
+  if (!autopilotDeps.writerReady()) { await noteResult(userId, `Waiting: the writer is not available right now; it tries again later.`); return { outcome: "no_writer" }; }
   const ideas = await findIdeas(userId, { now });
   if (!ideas.length) { await noteResult(userId, `Skipped ${day}: no story idea in your account data this month.`); return { outcome: "no_idea" }; }
   const prefill = await loadPrefill(userId);
   const pick = ideas.map((idea) => ({ idea, input: inputFromIdea(idea, prefill) })).find((x) => pressInputSchema.safeParse(x.input).success);
   if (!pick) { await noteResult(userId, `Skipped ${day}: add your company name, city, state and a media contact email (write one release by hand and they are kept).`); return { outcome: "missing_details" }; }
 
-  if (!autopilotDeps.writerReady()) { await noteResult(userId, `Waiting: the writer is not available right now; it tries again later.`); return { outcome: "no_writer" }; }
 
   // The claim: one row per user per month. A second pass (or a second process) finds it and stops here.
   const { rows: claimed } = await pool.query(
     `INSERT INTO press_autopilot_runs (user_id, month, outcome, idea_key) VALUES ($1,$2,'drafting',$3)
      ON CONFLICT (user_id, month) DO UPDATE SET outcome='drafting', attempts=press_autopilot_runs.attempts+1, idea_key=EXCLUDED.idea_key, error=NULL, updated_at=now()
-       WHERE press_autopilot_runs.outcome='failed' AND press_autopilot_runs.attempts < ${MAX_ATTEMPTS}
-     RETURNING attempts`,
-    [userId, month, pick.idea.key],
+       WHERE press_autopilot_runs.attempts < $4 AND (press_autopilot_runs.outcome='failed'
+         OR (press_autopilot_runs.outcome='drafting' AND press_autopilot_runs.updated_at < now() - interval '30 minutes'))
+     RETURNING attempts, release_id AS orphan`,
+    [userId, month, pick.idea.key, MAX_ATTEMPTS],
   );
   if (!claimed.length) return { outcome: "already" };
+  // A draft left by a pass that died is removed while it is still untouched, then written again.
+  if (claimed[0].orphan) await pool.query(`DELETE FROM press_releases WHERE id=$1 AND user_id=$2 AND status='draft' AND order_id IS NULL`, [claimed[0].orphan, userId]);
 
   const row = await store.createRelease(userId, tier, pick.input);
+  // Recorded at once, so a crash from here on leaves a draft the next pass can find.
+  await pool.query(`UPDATE press_autopilot_runs SET release_id=$3 WHERE user_id=$1 AND month=$2`, [userId, month, row.id]);
   try {
     const drafted = await writeDraft(row);
     await markIdea(userId, pick.idea.key, "used", row.id);
