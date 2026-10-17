@@ -313,7 +313,7 @@ describe("POST /api/public/form-sync/:token", () => {
 describe("the hosted form writes a Leads row too", () => {
   it("creates the client as before and a website_form lead linked to it", async () => {
     const tok = await token();
-    const res = await api(`/api/public/leads/${tok}`, { method: "POST", headers: { "x-forwarded-for": ip() }, body: JSON.stringify({ name: `${RUN} hosted`, phone: "614-555-0123", message: `${RUN} hosted`, website: "" }) });
+    const res = await api(`/api/public/leads/${tok}`, { method: "POST", headers: { "x-forwarded-for": ip() }, body: JSON.stringify({ name: `${RUN} hosted`, phone: "614-555-0123", address: "100 Test St", message: `${RUN} hosted`, website: "" }) });
     expect(res.status).toBe(201);
     const [lead] = await leadsByMarker(`${RUN} hosted`);
     expect(lead.source).toBe("website_form");
