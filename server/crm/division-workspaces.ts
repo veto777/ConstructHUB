@@ -25,7 +25,7 @@ import {
   crmDivisions, crmMembers, crmCustomers, crmProjects, crmEstimates, crmInvoices, crmPayments,
   type CrmDivision,
 } from "@shared/schema";
-import { and, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { divisionLabel, normalizeUsState, sortDivisions } from "@shared/divisions";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { canSwitchDivision, divisionMapsForOrg, pinnedDivisionOf, type DivisionMaps } from "./divisions";
@@ -50,6 +50,18 @@ function tzOffsetMs(at: Date, timeZone: string): number {
   return asUtc - Math.floor(at.getTime() / 1000) * 1000;
 }
 
+/** The instant the calendar YEAR began in `timeZone`: step back month starts until January. */
+export function yearStartIn(now: Date, timeZone: string | null | undefined): Date {
+  let start = monthStartIn(now, timeZone);
+  for (let i = 0; i < 12; i++) {
+    const month = Number(new Intl.DateTimeFormat("en-US", { timeZone: timeZone || "UTC", month: "numeric" })
+      .formatToParts(start).find((p) => p.type === "month")?.value ?? 1);
+    if (month === 1) break;
+    start = monthStartIn(new Date(start.getTime() - 1), timeZone);
+  }
+  return start;
+}
+
 /** The instant the current calendar month began in `timeZone` (UTC on an unknown zone). */
 export function monthStartIn(now: Date, timeZone: string | null | undefined): Date {
   const tz = timeZone || "UTC";
@@ -71,6 +83,10 @@ export type Kpi = { count: number; totalCents?: number };
 export type DivisionKpis = {
   openEstimates: Kpi;
   wonThisMonth: Kpi;
+  /** Revenue = won (signed/approved) contracts, at the approved amount. */
+  wonLastMonth: Kpi;
+  wonThisYear: Kpi;
+  wonAllTime: Kpi;
   invoicedThisMonth: Kpi;
   collectedThisMonth: Kpi;
   outstanding: Kpi;
@@ -86,12 +102,13 @@ const NOT_ISSUED_INVOICE = new Set(["draft", "void"]);
 
 const emptyKpis = (): DivisionKpis => ({
   openEstimates: { count: 0, totalCents: 0 }, wonThisMonth: { count: 0, totalCents: 0 },
+  wonLastMonth: { count: 0, totalCents: 0 }, wonThisYear: { count: 0, totalCents: 0 }, wonAllTime: { count: 0, totalCents: 0 },
   invoicedThisMonth: { count: 0, totalCents: 0 }, collectedThisMonth: { count: 0, totalCents: 0 },
   outstanding: { count: 0, totalCents: 0 }, activeProjects: { count: 0, totalCents: 0 },
   clients: { count: 0 }, records: { customers: 0, projects: 0, estimates: 0, invoices: 0 },
 });
 const add = (k: Kpi, cents: number) => { k.count += 1; k.totalCents = (k.totalCents ?? 0) + cents; };
-const MONEY_KEYS = ["openEstimates", "wonThisMonth", "invoicedThisMonth", "collectedThisMonth", "outstanding", "activeProjects"] as const;
+const MONEY_KEYS = ["openEstimates", "wonThisMonth", "wonLastMonth", "wonThisYear", "wonAllTime", "invoicedThisMonth", "collectedThisMonth", "outstanding", "activeProjects"] as const;
 
 /** Drop the dollar totals for a seat without "See prices" (counts stay). */
 function countOnly(k: DivisionKpis): DivisionKpis {
@@ -122,6 +139,8 @@ export async function divisionOverviewFor(ctx: OrgContext, now = new Date()) {
   const orgId = ctx.org.id;
   const { divisions, bucket } = await bucketerFor(orgId);
   const since = monthStartIn(now, ctx.org.timezone);
+  const lastMonth = monthStartIn(new Date(since.getTime() - 1), ctx.org.timezone);
+  const yearStart = yearStartIn(now, ctx.org.timezone);
   const per = new Map<string, DivisionKpis>([[UNASSIGNED, emptyKpis()], ...divisions.map((d) => [d.id, emptyKpis()] as [string, DivisionKpis])]);
   const at = (k: string) => per.get(k)!;
 
@@ -129,7 +148,13 @@ export async function divisionOverviewFor(ctx: OrgContext, now = new Date()) {
     const k = at(await bucket("estimates", e));
     k.records.estimates += 1;
     if (OPEN_ESTIMATE.has(e.status)) add(k.openEstimates, e.totalCents ?? 0);
-    if (e.status === "approved" && e.approvedAt && e.approvedAt >= since) add(k.wonThisMonth, e.approvedTotalCents ?? e.totalCents ?? 0);
+    if (e.status === "approved") {
+      const won = e.approvedTotalCents ?? e.totalCents ?? 0;
+      add(k.wonAllTime, won);
+      if (e.approvedAt && e.approvedAt >= yearStart) add(k.wonThisYear, won);
+      if (e.approvedAt && e.approvedAt >= since) add(k.wonThisMonth, won);
+      else if (e.approvedAt && e.approvedAt >= lastMonth) add(k.wonLastMonth, won);
+    }
   }
   for (const p of await db.select().from(crmProjects).where(eq(crmProjects.orgId, orgId))) {
     const k = at(await bucket("projects", p));
@@ -165,6 +190,7 @@ export async function divisionOverviewFor(ctx: OrgContext, now = new Date()) {
   const show = (k: DivisionKpis) => (ctx.permissions.seePrices ? k : countOnly(k));
   return {
     monthStart: since.toISOString(),
+    yearStart: yearStart.toISOString(),
     activeDivisionId: ctx.activeDivisionId ?? null,
     divisions: divisions.map((d) => ({
       id: d.id, name: d.name, code: d.code, city: d.city, state: d.state,
@@ -249,7 +275,8 @@ export function suggestDivisions(input: {
     out.push({
       kind: "project", id: p.id, label: [p.number, p.name].filter(Boolean).join(" · "), customerId: p.customerId,
       customerName: c?.displayName ?? null, state: c?.state ?? p.state,
-      ...pick([latestProjectDivision.get(p.customerId), "customer_project"], [stateMatch(c?.state), "customer_state"], [stateMatch(p.state), "project_state"]),
+      // The project's OWN address first: a client with a FL job and a WA job gets each in its own division.
+      ...pick([latestProjectDivision.get(p.customerId), "customer_project"], [stateMatch(p.state), "project_state"], [stateMatch(c?.state), "customer_state"]),
     });
   }
   for (const e of input.estimates) {
@@ -260,8 +287,8 @@ export function suggestDivisions(input: {
     out.push({
       kind: "estimate", id: e.id, label: [e.number, e.title].filter(Boolean).join(" · ") || "Estimate", customerId: e.customerId,
       customerName: c?.displayName ?? null, state: c?.state ?? p?.state ?? null,
-      ...pick([projDiv, "project"], [latestProjectDivision.get(e.customerId), "customer_project"],
-        [stateMatch(c?.state), "customer_state"], [stateMatch(p?.state), "project_state"]),
+      ...pick([projDiv, "project"], [stateMatch(p?.state), "project_state"], [latestProjectDivision.get(e.customerId), "customer_project"],
+        [stateMatch(c?.state), "customer_state"]),
     });
   }
   return out;
@@ -281,7 +308,11 @@ export async function unassignedPreviewFor(orgId: string) {
   for (const i of invoices) if (await bucket("invoices", i) === UNASSIGNED) invoicesUnassigned += 1;
 
   // The client's state comes from EVERY address we hold for them (record, projects, HOVER, website forms).
-  const addressStates = await customerAddressStates(orgId, customers, projects);
+  const relevant = new Set<string>(unassigned.customers);
+  for (const p of projects) if (unassigned.projects.has(p.id)) relevant.add(p.customerId);
+  for (const e of estimates) if (unassigned.estimates.has(e.id)) relevant.add(e.customerId);
+  const addressStates = await customerAddressStates(orgId, customers.filter((c) => relevant.has(c.id)),
+    projects.filter((p) => relevant.has(p.customerId)));
   const located = customers.map((c) => ({ ...c, state: addressStates.get(c.id)?.state ?? c.state }));
   const records = suggestDivisions({ divisions, customers: located, projects, estimates, unassigned });
   const zero = () => ({ customers: 0, projects: 0, estimates: 0 });
@@ -328,7 +359,9 @@ export async function applyUnassignedSuggestions(orgId: string, onlyDivisionIds:
             // Only rows still without a (live) division — never overwrite a pick made since the preview.
             const done = await tx.update(t).set({ divisionId, updatedAt: new Date() } as any)
               .where(and(eq(t.orgId, orgId), inArray(t.id, ids.slice(i, i + 500)),
-                or(isNull(t.divisionId), notInArray(t.divisionId, known))))
+                // Still without a LIVE division at write time — a division created and picked since the
+                // preview counts (checked against the table, not the preview's list).
+                or(isNull(t.divisionId), sql`not exists (select 1 from ${crmDivisions} d where d.id = ${t.divisionId} and d.org_id = ${orgId})`)))
               .returning({ id: t.id });
             counts[`${kind}s` as keyof typeof counts] += done.length;
             const l = label.get(divisionId) ?? divisionId;
@@ -342,10 +375,21 @@ export async function applyUnassignedSuggestions(orgId: string, onlyDivisionIds:
 }
 
 /** Hourly: every org with divisions gets its new unassigned records placed by address, logged as System. */
+/** Cheap gate for the hourly sort: does the org have ANY client/project/estimate without a live division? */
+async function hasDivisionlessRows(orgId: string): Promise<boolean> {
+  const r: any = await db.execute(sql`select exists (
+      select 1 from ${crmCustomers} x where x.org_id = ${orgId} and (x.division_id is null or not exists (select 1 from ${crmDivisions} d where d.id = x.division_id))
+      union all select 1 from ${crmProjects} x where x.org_id = ${orgId} and (x.division_id is null or not exists (select 1 from ${crmDivisions} d where d.id = x.division_id))
+      union all select 1 from ${crmEstimates} x where x.org_id = ${orgId} and (x.division_id is null or not exists (select 1 from ${crmDivisions} d where d.id = x.division_id))
+    ) as any`);
+  return Boolean((r.rows ?? r)[0]?.any);
+}
+
 export async function runAutoDivisionSort(): Promise<void> {
   const orgs = await db.selectDistinct({ orgId: crmDivisions.orgId }).from(crmDivisions);
   for (const { orgId } of orgs) {
     try {
+      if (!(await hasDivisionlessRows(orgId))) continue;
       const out = await applyUnassignedSuggestions(orgId);
       const moved = out.counts.customers + out.counts.projects + out.counts.estimates;
       if (moved) {
