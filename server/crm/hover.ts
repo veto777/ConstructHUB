@@ -92,7 +92,7 @@ const hoverFx = () => providerFixture<HoverFixture>("hover");
 const hoverClientId = () => hoverFx()?.clientId ?? process.env.HOVER_CLIENT_ID;
 const hoverClientSecret = () => hoverFx()?.clientSecret ?? process.env.HOVER_CLIENT_SECRET;
 
-function hoverBases(): { oauthBase: string; apiBase: string } {
+export function hoverBases(): { oauthBase: string; apiBase: string } {
   const fx = hoverFx();
   if (fx) return { oauthBase: fx.oauthBase, apiBase: fx.apiBase };
   let oauthBase = (process.env.HOVER_OAUTH_BASE || "https://hover.to").replace(/\/+$/, "");

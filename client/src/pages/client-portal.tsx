@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { orgThemeStyle } from "@/lib/org-theme";
 import { Home3DCard } from "@/components/hover-3d-card";
+import { View3DButton } from "@/components/hover-3d-dialog";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -557,9 +558,14 @@ function Dashboard({ data }: { data: any }) {
   const reportsSection = (
     <section className="space-y-3" data-testid="section-reports">
       <SectionTitle icon={Ruler} title="Measurement reports" infoKey="portal-reports" />
-      {/* "Your home in 3D" — only when a report carries a live HOVER share link. */}
-      <Home3DCard home3d={reports.find((r: any) => r.home3d)?.home3d}
-        companyName={reports.find((r: any) => r.home3d)?.orgName} />
+      {/* "Your home in 3D" — the in-app viewer, when the server offers one for a report (viewer3d). */}
+      {(() => {
+        const r3d = reports.find((r: any) => r.viewer3d);
+        return (
+          <Home3DCard home3d={r3d?.home3d} companyName={r3d?.orgName}
+            viewer={r3d ? { kind: "portal", measurementId: r3d.id } : null} />
+        );
+      })()}
       {!reports.length ? (
         <Card><EmptyState compact icon={Ruler} title="No measurement reports yet"
           description="Roof or property measurement reports your contractor files for you appear here." /></Card>
@@ -601,15 +607,11 @@ function Dashboard({ data }: { data: any }) {
                   </td>
                   <td className={crmTable.tdRight}>
                     <div className="flex flex-col items-end gap-1">
-                      {/* The homeowner 3D share link opens in a NEW TAB, not an
-                          iframe — HOVER ships the viewer as a standalone page.
-                          Only a live https://hover.to/shared/<token> link is
-                          ever sent here (server/crm/hover-share.ts). */}
-                      {r.home3d?.url && (
-                        <a href={r.home3d.url} target="_blank" rel="noopener noreferrer"
-                          className="font-medium text-primary hover:underline" data-testid={`client-report-3d-${r.id}`}>
-                          Explore in 3D
-                        </a>
+                      {/* The in-app 3D viewer (server/crm/hover-model3d.ts) — the client
+                          stays on this page and never needs a HOVER login. */}
+                      {r.viewer3d && (
+                        <View3DButton source={{ kind: "portal", measurementId: r.id }} variant="link" label="View in 3D"
+                          title="Your home in 3D" className="h-auto p-0 font-medium" testid={`client-report-3d-${r.id}`} />
                       )}
                       {r.pdfDownloadUrl && (
                         <a href={r.pdfDownloadUrl} className="font-medium text-primary hover:underline" data-testid={`client-report-pdf-${r.id}`}>

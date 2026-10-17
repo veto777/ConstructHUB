@@ -8,7 +8,8 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Box, Download, Ruler } from "lucide-react";
+import { Download, ExternalLink, Ruler } from "lucide-react";
+import { View3DButton } from "@/components/hover-3d-dialog";
 import { EmptyState, SectionTitle, StatusPill } from "@/components/crm-ui";
 
 const fmt = (n?: number | null) =>
@@ -57,19 +58,18 @@ export function CustomerMeasurements({ customerId }: { customerId: string }) {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {m.share?.live && (
-                  <a href={m.share.url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                    data-testid={`measurement-share-${m.id}`}>
-                    <Box className="h-3.5 w-3.5" /> Homeowner 3D link
-                  </a>
+                {/* The in-app viewer: the 3D model, HOVER's wireframes and (with a live share link) the design
+                    studio — all inside ConstructHUB, no HOVER login. */}
+                {m.provider === "hover" && m.hoverJobId && (
+                  <View3DButton source={{ kind: "crm", measurementId: m.id }} variant="outline" className="h-7 px-2.5 text-xs"
+                    testid={`measurement-view3d-${m.id}`} />
                 )}
-                {/* hover.to/3d/<id> needs the contractor's HOVER login — never a client link. */}
+                {/* hover.to/3d/<id> needs the contractor's HOVER login — a small secondary link, never a client link. */}
                 {m.model3dUrl && (
                   <a href={m.model3dUrl} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
                     data-testid={`measurement-3d-${m.id}`}>
-                    <Box className="h-3.5 w-3.5" /> Open in HOVER (your login)
+                    Open in HOVER <ExternalLink className="h-3 w-3" />
                   </a>
                 )}
                 {m.pdfUrl && (

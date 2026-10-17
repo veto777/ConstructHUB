@@ -32,6 +32,7 @@ import { registerCrmLeadCaptureRoutes } from "./lead-capture";
 import { registerCrmPriceBookRoutes, registerCrmMeasurementRoutes } from "./pricebook";
 import { registerCrmReportRoutes } from "./reports";
 import { registerCrmHoverRoutes } from "./hover";
+import { registerHoverModel3dRoutes } from "./hover-model3d";
 import { registerCrmClientAuthRoutes, allow as rateAllow } from "./client-auth";
 import { sendSms, normalizePhone } from "./sms";
 import { registerCrmClient360Routes } from "./notes-timeline";
@@ -372,6 +373,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   // HOVER integration: OAuth connect, webhook registration/handshake,
   // HMAC-verified event receiver and completed-job ingest.
   registerCrmHoverRoutes(app, getDevUser);
+  // In-app 3D viewer data: HOVER XML export → mesh, proxied wireframes (contractor, portal, public estimate).
+  registerHoverModel3dRoutes(app, getDevUser);
   // The homeowner client portal takes no contractor session at all.
   registerCrmClientAuthRoutes(app);
   // Client 360: notes, timeline, financing clicks, portal preview. BEFORE the

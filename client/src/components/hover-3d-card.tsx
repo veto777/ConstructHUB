@@ -4,11 +4,11 @@
  *   Hover3DCard — contractor side (project page, estimate page). Lists the client's HOVER captures for the scope
  *     (GET /api/crm/projects/:id/hover-models or /api/crm/estimates/:id/hover-models — the scope's own project and
  *     address first), shows how each one was linked, the homeowner share link (found at HOVER on sync, or pasted
- *     here), and the contractor's own "Open in HOVER" link, which needs their HOVER login.
- *   Home3DCard — client side (public estimate, client portal). Renders ONLY a live share link
- *     (https://hover.to/shared/<token>); the server never sends anything else to a client.
- *
- * Both open HOVER in a new tab, never an iframe: HOVER ships its viewer as a standalone page.
+ *     here), "View 3D model" (the in-app viewer, hover-3d-dialog.tsx) and a small secondary "Open in HOVER" link
+ *     (hover.to/3d/<job>, needs the contractor's HOVER login).
+ *   Home3DCard — client side (public estimate, client portal). Opens the same in-app viewer through the client-scoped
+ *     routes; the HOVER design studio (the share link https://hover.to/shared/<token>, which HOVER allows in an
+ *     iframe) shows inside it only while a live share exists. Nothing here sends a client to HOVER.
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -20,6 +20,7 @@ import { SectionTitle, StatusPill } from "@/components/crm-ui";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { apiIssueMessage } from "@/lib/api-issue-message";
+import { View3DButton, type Viewer3DSource } from "@/components/hover-3d-dialog";
 
 export interface Home3D {
   url: string;
@@ -68,28 +69,30 @@ function Thumb({ src, alt }: { src: string | null; alt: string }) {
 
 // ── Client side ─────────────────────────────────────────────────────────────
 
-/** "Your home in 3D" — renders nothing unless a valid, unexpired share link exists. */
-export function Home3DCard({ home3d, companyName }: { home3d: Home3D | null | undefined; companyName?: string | null }) {
-  if (!home3d || !isShareUrl(home3d.url) || !isLive(home3d.expiresAt)) return null;
+/**
+ * "Your home in 3D" — opens the in-app viewer (no HOVER login, never leaves the page). Renders only when the server
+ * offered a viewer for this client (`viewer`); the HOVER design-studio tab appears inside only with a live share link.
+ */
+export function Home3DCard({ home3d, viewer, companyName }: {
+  home3d: Home3D | null | undefined; viewer: Viewer3DSource | null | undefined; companyName?: string | null;
+}) {
+  if (!viewer) return null;
+  const share = home3d && isShareUrl(home3d.url) && isLive(home3d.expiresAt) ? home3d : null;
   return (
     <Card data-testid="card-home-3d">
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
-        <Thumb src={home3d.imageUrl} alt="3D model of your home" />
+        <Thumb src={share?.imageUrl ?? null} alt="3D model of your home" />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex items-center gap-2 font-semibold">
             <Box className="h-4 w-4 text-muted-foreground" /> Your home in 3D
           </div>
           <p className="text-sm text-muted-foreground">
             {companyName ? `${companyName} measured your home with HOVER.` : "Your home was measured with HOVER."}{" "}
-            Spin the model and try colors and materials on it.
+            Spin the model, see each roof and wall measurement, and try colors on it.
           </p>
-          {home3d.expiresAt && (
-            <p className="text-xs text-muted-foreground">Link available until {day(home3d.expiresAt)}.</p>
-          )}
         </div>
-        <a href={home3d.url} target="_blank" rel="noopener noreferrer" className="shrink-0" data-testid="link-home-3d">
-          <Button><ExternalLink className="mr-2 h-4 w-4" /> Explore in 3D &amp; try designs</Button>
-        </a>
+        <View3DButton source={viewer} size="default" label="View your home in 3D" title="Your home in 3D"
+          className="shrink-0" testid="link-home-3d" />
       </CardContent>
     </Card>
   );
@@ -173,14 +176,17 @@ function HoverModelRow({ model: m, queryKey }: { model: HoverModel; queryKey: st
             {live && share!.expiresAt && <span>until {day(share!.expiresAt)}</span>}
           </div>
           <div className="flex flex-wrap gap-2 pt-1">
+            {m.hoverJobId && (
+              <View3DButton source={{ kind: "crm", measurementId: m.id }} testid={`hover-model-view3d-${m.id}`} />
+            )}
             {live && (
-              <a href={share!.url} target="_blank" rel="noopener noreferrer" data-testid={`hover-model-share-${m.id}`}>
-                <Button size="sm"><ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Explore in 3D &amp; try designs</Button>
-              </a>
+              <View3DButton source={{ kind: "crm", measurementId: m.id }} variant="outline" initialTab="studio"
+                label="Design studio" testid={`hover-model-share-${m.id}`} />
             )}
             {m.hoverAppUrl && (
-              <a href={m.hoverAppUrl} target="_blank" rel="noopener noreferrer" data-testid={`hover-model-app-${m.id}`}>
-                <Button size="sm" variant="outline"><Box className="mr-1.5 h-3.5 w-3.5" /> Open in HOVER (your login)</Button>
+              <a href={m.hoverAppUrl} target="_blank" rel="noopener noreferrer" data-testid={`hover-model-app-${m.id}`}
+                className="inline-flex items-center gap-1 self-center px-1 text-xs text-muted-foreground hover:text-foreground hover:underline">
+                Open in HOVER <ExternalLink className="h-3 w-3" />
               </a>
             )}
             {share && (
