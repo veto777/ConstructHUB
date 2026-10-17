@@ -1527,6 +1527,9 @@ export const crmTasks = pgTable("crm_tasks", {
   divisionId: varchar("division_id"),
   assignedMemberId: varchar("assigned_member_id"),
   source: text("source").notNull(), // 'self_estimate_request'
+  // The client's submission key: one task (and one draft) per submission,
+  // unique per anchor estimate — a retried/double-tapped request is a no-op.
+  idempotencyKey: text("idempotency_key"),
   title: text("title").notNull(),
   body: text("body"),
   dueAt: timestamp("due_at"),

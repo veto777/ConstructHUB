@@ -531,9 +531,18 @@ export function computeBallpark(
   const claimed = priced.discounts.filter((d) => wanted.has(d.code) && d.percentBps > 0);
   const discountBps = Math.min(10_000, claimed.reduce((sum, d) => sum + d.percentBps, 0));
   const discountCents = Math.round((subtotalCents * discountBps) / 10_000);
-  const discounts: BallparkDiscount[] = claimed.map((d) => ({
-    ...d, amountCents: Math.round((subtotalCents * d.percentBps) / 10_000), verified: false as const,
-  }));
+  // Per-discount amounts always add up to the discount actually applied: when
+  // the claimed percentages exceed the 100% cap they are scaled down
+  // proportionally (largest remainder keeps the cents exact).
+  const rawBps = claimed.reduce((sum, d) => sum + d.percentBps, 0);
+  const exact = claimed.map((d) => (rawBps ? (discountCents * d.percentBps) / rawBps : 0));
+  const amounts = exact.map(Math.floor);
+  let left = discountCents - amounts.reduce((a, b) => a + b, 0);
+  for (const i of exact.map((x, i) => [x - Math.floor(x), i] as const).sort((a, b) => b[0] - a[0]).map(([, i]) => i)) {
+    if (left <= 0) break;
+    amounts[i]++; left--;
+  }
+  const discounts: BallparkDiscount[] = claimed.map((d, i) => ({ ...d, amountCents: amounts[i], verified: false as const }));
   const totalCents = Math.max(0, subtotalCents - discountCents);
   const rangeBps = Math.max(0, Math.min(5_000, priced.rangeBps));
   const hasNumber = lines.length > 0 && totalCents > 0;
@@ -543,6 +552,25 @@ export function computeBallpark(
     highCents: hasNumber ? Math.ceil((totalCents * (10_000 + rangeBps)) / 10_000 / DOLLARS_100) * DOLLARS_100 : null,
     rangeBps,
   };
+}
+
+/**
+ * The largest job the online tool will price or write to an estimate. Inputs
+ * are validated individually, but their product (a huge "house size" × a
+ * large factor × a large price) could still overflow the integer money and
+ * quantity columns — such a request is refused, never truncated.
+ */
+export const SELF_ESTIMATE_MAX_CENTS = 1_000_000_000; // $10,000,000
+export const SELF_ESTIMATE_MAX_QUANTITY = 1_000_000;
+export function ballparkWithinLimits(bp: Ballpark): boolean {
+  const okCents = (c: number | null) => c === null || (Number.isFinite(c) && Math.abs(c) <= SELF_ESTIMATE_MAX_CENTS);
+  const okQty = (q: number) => Number.isFinite(q) && q >= 0 && q <= SELF_ESTIMATE_MAX_QUANTITY;
+  if (![bp.subtotalCents, bp.totalCents, bp.discountCents, bp.lowCents, bp.highCents].every(okCents)) return false;
+  for (const l of bp.lines) {
+    if (!okQty(l.quantity) || !okCents(l.amountCents) || !okCents(l.totalCents) || !okCents(l.minimumAdjustmentCents)) return false;
+    for (const x of l.extras) if (!okQty(x.quantity) || !okCents(x.amountCents)) return false;
+  }
+  return true;
 }
 
 // ── Interest (contractor side) ──────────────────────────────────────────────

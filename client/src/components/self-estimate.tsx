@@ -186,7 +186,14 @@ function SelfEstimateDialog({ offer, transport, sessionKey, preview, initialTrad
     if (on) track("trade_opened", { trades: [t] });
   };
 
+  // One key per submission: a retry or double tap of "Send" reuses it and the
+  // server returns the first result; new answers (a new result step) get a new key.
+  const newKey = () => `s${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`.slice(0, 40);
+  const submissionKey = useRef(newKey());
+  const sending = useRef(false);
+
   const showResult = async () => {
+    submissionKey.current = newKey();
     if (codes.length) track("discounts_claimed", { trades: chosen, discountCodes: codes });
     setStep("result");
     setError(null);
@@ -201,13 +208,16 @@ function SelfEstimateDialog({ offer, transport, sessionKey, preview, initialTrad
   };
 
   const send = async () => {
+    // Synchronous guard: a second tap before React re-renders never sends twice.
+    if (sending.current) return;
+    sending.current = true;
     setBusy(true); setError(null);
     try {
-      await transport("request", { selection, sessionKey, note: note.trim() || undefined });
+      await transport("request", { selection, sessionKey, submissionKey: submissionKey.current, note: note.trim() || undefined });
       setDone("sent");
     } catch (e: any) {
       setError(String(e?.message ?? e));
-    } finally { setBusy(false); }
+    } finally { setBusy(false); sending.current = false; }
   };
   const justLooking = () => {
     track("just_looking", { trades: chosen });

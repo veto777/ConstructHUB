@@ -43,13 +43,13 @@ import { db, pool } from "../db";
 import {
   crmCustomers, crmEstimates, crmEstimateItems, crmEstimateOptions, crmEstimateEvents, crmEstimateDiscounts,
   crmOrgs, crmMembers, crmProjects, crmDivisions, crmPbItems, crmTasks,
-  crmNotificationChannel,
+  crmNotificationChannel, crmEffectivePermissions,
 } from "@shared/schema";
 import { and, asc, desc, eq, gte, inArray, isNull, isNotNull, like, sql } from "drizzle-orm";
 import {
   SELF_ESTIMATE_TRADES, SELF_ESTIMATE_TRADE_META, NO_DIVISION_KEY, INTEREST_EVENT_TYPES,
   selfEstimateDivisionConfigSchema, selfEstimateSelectionSchema, divisionConfigOf, detectBidTrades,
-  computeBallpark, summarizeInterest, interestBadgeText,
+  computeBallpark, summarizeInterest, interestBadgeText, ballparkWithinLimits,
   type SelfEstimateTrade, type PricedSelfEstimate, type PricedTrade, type OfferedDiscount,
   type NormalizedDivisionConfig, type MeasuredQuantities, type SelfEstimateSelection, type Ballpark,
   type InterestSummary,
@@ -57,9 +57,9 @@ import {
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { allow as rateAllow, requireClient, resolveClientCustomerIds } from "./client-auth";
 import { previewGrantValid } from "./portal";
-import { logEvent, recalcEstimate } from "./entities";
+import { logEvent, estimateTotals } from "./entities";
 import { nextDocNumber } from "./doc-number";
-import { estimateDefaultsFromOrg } from "./doc-defaults";
+import { estimateDefaultsFromOrg, depositFromBps } from "./doc-defaults";
 import { resolveEstimateTaxRate } from "./tax";
 import { attachDefaultFilesToEstimate } from "./estimate-default-files";
 import { resolveEstimateDivision, divisionScopeOf, pinnedDivisionOf, companyBranding } from "./divisions";
@@ -201,10 +201,18 @@ async function tradesOnBid(a: Anchor): Promise<Set<SelfEstimateTrade>> {
   return detectBidTrades(texts);
 }
 
+/** The job's address: the estimate's project site when it has one, else the customer's. */
+async function jobAddressOf(a: Anchor): Promise<{ addressLine1: string | null; postalCode: string | null }> {
+  if (a.est.projectId) {
+    const [p] = await db.select({ addressLine1: crmProjects.addressLine1, postalCode: crmProjects.postalCode })
+      .from(crmProjects).where(and(eq(crmProjects.orgId, a.org.id), eq(crmProjects.id, a.est.projectId))).limit(1);
+    if (p?.addressLine1?.trim()) return { addressLine1: p.addressLine1, postalCode: p.postalCode };
+  }
+  return { addressLine1: a.cust.addressLine1, postalCode: a.cust.postalCode };
+}
+
 async function measuredFor(a: Anchor): Promise<MeasuredQuantities> {
-  const takeoff = await getCustomerTakeoff(a.org.id, a.cust.id, {
-    addressLine1: a.cust.addressLine1, postalCode: a.cust.postalCode,
-  }).catch(() => null);
+  const takeoff = await getCustomerTakeoff(a.org.id, a.cust.id, await jobAddressOf(a)).catch(() => null);
   return measuredFromTakeoff(takeoff);
 }
 
@@ -299,6 +307,8 @@ export async function logInterest(
 const requestBodySchema = z.object({
   selection: selfEstimateSelectionSchema,
   sessionKey: sessionKeySchema,
+  /** Client-generated per submission: a retry or double tap returns the first result. */
+  submissionKey: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
   note: z.string().trim().max(1000).optional(),
 }).strip();
 
@@ -342,6 +352,24 @@ export function draftLinesFor(bp: Ballpark, selection: SelfEstimateSelection, pr
   return lines;
 }
 
+/** Neutral one-line text for a price request task. Amounts only for seats that see prices. */
+export function taskBodyText(meta: any, seePrices: boolean): string {
+  const m = meta ?? {};
+  const range = seePrices && m.lowCents != null && m.highCents != null ? `${dollars(m.lowCents)}–${dollars(m.highCents)}` : null;
+  return [
+    range ? `Their ballpark: ${range}.` : m.priced ? "They built a ballpark online." : "They asked for a price on work that isn't priced online.",
+    Array.isArray(m.discountLabels) && m.discountLabels.length ? `Claimed (verify): ${m.discountLabels.join(", ")}.` : null,
+    m.note ? `Note: ${String(m.note).slice(0, 500)}` : null,
+    m.draftNumber ? `Draft ${m.draftNumber} is ready to review — nothing was sent to the client.` : null,
+  ].filter(Boolean).join(" ");
+}
+
+/** Header-safe single line (no CR/LF/tab/line separators). */
+const LINE_BREAKS = new RegExp(`[\\r\\n\\t${String.fromCharCode(0x2028, 0x2029)}]+`, "g");
+export const oneLine = (s: string) => s.replace(LINE_BREAKS, " ").replace(/\s{2,}/g, " ").trim();
+
+const TOO_BIG = "That's bigger than we can price online — send us a note and we'll measure and quote it.";
+
 async function createRequest(a: Anchor, body: z.infer<typeof requestBodySchema>, req: any) {
   const { priced } = await pricedConfigFor(a.org, a.divisionKey);
   const onBid = await tradesOnBid(a);
@@ -352,20 +380,40 @@ async function createRequest(a: Anchor, body: z.infer<typeof requestBodySchema>,
   const offeredTrades = new Set(priced.trades.map((t) => t.trade));
   const chosen = body.selection.trades.map((t) => t.trade).filter((t) => offeredTrades.has(t));
   if (!chosen.length) return { error: 400 as const, message: "Pick a trade we offer to send a request." };
+  if (!ballparkWithinLimits(bp)) return { error: 400 as const, message: TOO_BIG };
   const labels = [...new Set(chosen)].map((t) => SELF_ESTIMATE_TRADE_META[t].label);
   const rep = await repOf(a);
   const tax = await resolveEstimateTaxRate(a.org.id, { customerId: a.cust.id, projectId: a.est.projectId });
+  const lines = draftLinesFor(bp, body.selection, priced);
+  const totals = estimateTotals(lines.map((l) => ({ ...l, taxable: true })), tax.bps);
+  if (!ballparkWithinLimits({ ...bp, subtotalCents: totals.subtotalCents, totalCents: totals.totalCents })) {
+    return { error: 400 as const, message: TOO_BIG };
+  }
+  const claimedLabels = bp.discounts.map((d) => d.label);
 
-  // The DRAFT. Never sent: status draft, no sentAt — the estimator reviews it.
-  const draft = await db.transaction(async (tx) => {
+  // ONE transaction: draft + lines + discount offers + totals + task + interest
+  // event. A failure leaves nothing behind; a retry with the same submission
+  // key finds the first result under the lock and returns it (the partial
+  // unique index on crm_tasks is the backstop).
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`se-req:${a.est.id}:${body.submissionKey}`}))`);
+    const [prior] = await tx.select().from(crmTasks).where(and(
+      eq(crmTasks.orgId, a.org.id), eq(crmTasks.estimateId, a.est.id), eq(crmTasks.idempotencyKey, body.submissionKey),
+    )).limit(1);
+    if (prior) return { duplicate: true as const, ballpark: ((prior.meta as any)?.ballpark ?? bp) as Ballpark };
+
     const number = await nextDocNumber(tx, "E", a.org.id);
-    const [row] = await tx.insert(crmEstimates).values({
+    const defaults = estimateDefaultsFromOrg(a.org);
+    const [draft] = await tx.insert(crmEstimates).values({
       orgId: a.org.id, customerId: a.cust.id, projectId: a.est.projectId,
       number, title: `${labels.join(" + ")} estimate`.slice(0, 200),
       introText: null, termsText: a.org.termsAndConditions ?? null,
-      ...estimateDefaultsFromOrg(a.org),
+      ...defaults,
       taxRateBps: tax.bps, publicToken: randomBytes(24).toString("hex"),
       status: "draft",
+      subtotalCents: totals.subtotalCents, discountCents: totals.discountCents,
+      taxCents: totals.taxCents, totalCents: totals.totalCents,
+      depositCents: defaults.depositBps != null ? depositFromBps(totals.totalCents, defaults.depositBps) : null,
       createdByMemberId: rep?.id ?? a.est.createdByMemberId ?? null,
       // The request stays in the original estimate's division.
       divisionId: a.divisionId,
@@ -383,84 +431,102 @@ async function createRequest(a: Anchor, body: z.infer<typeof requestBodySchema>,
         taxSource: { source: tax.source, bps: tax.bps, matchedCity: tax.matchedCity ?? null },
       },
     } as any).returning();
-    return row;
+    if (lines.length) {
+      await tx.insert(crmEstimateItems).values(lines.map((l, idx) => ({
+        orgId: a.org.id, estimateId: draft.id, sortOrder: idx, kind: l.kind, name: l.name, description: l.description,
+        quantityMilli: l.quantityMilli, unit: l.unit, unitPriceCents: l.unitPriceCents, taxable: true, hiddenFromClient: false,
+      })) as any);
+    }
+    if (bp.discounts.length) {
+      await tx.insert(crmEstimateDiscounts).values(bp.discounts.map((d, idx) => ({
+        orgId: a.org.id, estimateId: draft.id, code: d.code, label: d.label, percentBps: d.percentBps,
+        conditions: `Claimed by the client online — NOT verified yet.${d.conditions ? ` ${d.conditions}` : ""}`.slice(0, 1000),
+        enabled: true, sortOrder: idx,
+      })) as any);
+    }
+    const taskMeta = {
+      trades: chosen, draftNumber: number, lowCents: bp.lowCents, highCents: bp.highCents,
+      priced: bp.lines.length > 0, discountLabels: claimedLabels, note: body.note ?? null, ballpark: bp,
+    };
+    const [task] = await tx.insert(crmTasks).values({
+      orgId: a.org.id, customerId: a.cust.id, estimateId: a.est.id, relatedEstimateId: draft.id,
+      divisionId: a.divisionId, assignedMemberId: rep?.id ?? null, source: "self_estimate_request",
+      idempotencyKey: body.submissionKey,
+      title: oneLine(`Call ${a.cust.displayName} about a ${labels.join(" + ").toLowerCase()} price`).slice(0, 300),
+      // Stored WITHOUT amounts; readers get taskBodyText rendered for their own seat.
+      body: taskBodyText(taskMeta, false).slice(0, 2000),
+      dueAt: new Date(Date.now() + 24 * 3600_000),
+      meta: taskMeta,
+    } as any).returning();
+    const ip = clientIp(req) || null;
+    const ua = String(req.headers["user-agent"] || "").slice(0, 300) || null;
+    await tx.insert(crmEstimateEvents).values([
+      {
+        orgId: a.org.id, estimateId: draft.id, type: "created", actor: "client", ip, userAgent: ua,
+        meta: { selfEstimate: true, from: a.est.number ?? a.est.id, trades: chosen },
+      },
+      {
+        orgId: a.org.id, estimateId: a.est.id, type: "interest_request_sent", actor: "client", ip, userAgent: ua,
+        meta: {
+          sessionKey: body.sessionKey, trades: [...new Set(chosen)].sort(), dedupeKey: task.id,
+          surface: a.surface, customerId: a.cust.id,
+          inputs: body.selection, lowCents: bp.lowCents, highCents: bp.highCents, totalCents: bp.totalCents,
+          discounts: bp.discounts.map((d) => d.code), note: body.note ?? null,
+          draftEstimateId: draft.id, draftNumber: number, taskId: task.id,
+        },
+      },
+    ] as any);
+    return { duplicate: false as const, ballpark: bp, draft, draftNumber: number };
   });
-  const lines = draftLinesFor(bp, body.selection, priced);
-  if (lines.length) {
-    await db.insert(crmEstimateItems).values(lines.map((l, idx) => ({
-      orgId: a.org.id, estimateId: draft.id, sortOrder: idx, kind: l.kind, name: l.name, description: l.description,
-      quantityMilli: l.quantityMilli, unit: l.unit, unitPriceCents: l.unitPriceCents, taxable: true, hiddenFromClient: false,
-    })) as any);
-  }
-  if (bp.discounts.length) {
-    await db.insert(crmEstimateDiscounts).values(bp.discounts.map((d, idx) => ({
-      orgId: a.org.id, estimateId: draft.id, code: d.code, label: d.label, percentBps: d.percentBps,
-      conditions: `Claimed by the client online — NOT verified yet.${d.conditions ? ` ${d.conditions}` : ""}`.slice(0, 1000),
-      enabled: true, sortOrder: idx,
-    })) as any);
-  }
+  const repName = rep ? rep.displayName || rep.email : null;
+  if (result.duplicate) return { ok: true as const, ballpark: result.ballpark, repName, duplicate: true };
+  const { draft, draftNumber } = result;
+
+  // ── After commit: best-effort side effects (they never undo the request) ──
   await attachDefaultFilesToEstimate(a.org.id, draft.id).catch(() => 0);
-  const fresh = await recalcEstimate(a.org.id, draft.id);
-  const draftNumber = fresh?.number ?? draft.number;
-  await logEvent(a.org.id, draft.id, "created", "client", req, {
-    selfEstimate: true, from: a.est.number ?? a.est.id, trades: chosen,
-  });
-
-  const range = bp.lowCents !== null && bp.highCents !== null ? `${dollars(bp.lowCents)}–${dollars(bp.highCents)}` : null;
-  const [task] = await db.insert(crmTasks).values({
-    orgId: a.org.id, customerId: a.cust.id, estimateId: a.est.id, relatedEstimateId: draft.id,
-    divisionId: a.divisionId, assignedMemberId: rep?.id ?? null, source: "self_estimate_request",
-    title: `Call ${a.cust.displayName} about a ${labels.join(" + ").toLowerCase()} price`.slice(0, 300),
-    body: [
-      range ? `Their ballpark: ${range}.` : "They asked for a price on work that isn't priced online.",
-      bp.discounts.length ? `Claimed (verify): ${bp.discounts.map((d) => d.label).join(", ")}.` : null,
-      body.note ? `Note: ${body.note}` : null,
-      `Draft ${draftNumber} is ready to review — nothing was sent to the client.`,
-    ].filter(Boolean).join(" ").slice(0, 2000),
-    dueAt: new Date(Date.now() + 24 * 3600_000),
-    meta: { trades: chosen, draftNumber, lowCents: bp.lowCents, highCents: bp.highCents },
-  } as any).returning();
-
-  await logInterest(a, "interest_request_sent", req, {
-    sessionKey: body.sessionKey, trades: chosen, dedupeKey: task.id,
-    inputs: body.selection, lowCents: bp.lowCents, highCents: bp.highCents, totalCents: bp.totalCents,
-    discounts: bp.discounts.map((d) => d.code), note: body.note ?? null,
-    draftEstimateId: draft.id, draftNumber, taskId: task.id,
-  });
   recordActivity({
     orgId: a.org.id, actorLabel: "client", action: "self_estimate.requested",
     entityType: "estimate", entityId: draft.id, customerId: a.cust.id,
     meta: { number: draftNumber, from: a.est.number ?? null, trades: labels, lowCents: bp.lowCents, highCents: bp.highCents },
   });
 
-  // Tell the rep (+ owners) on the channels the org chose for client messages.
-  const title = `${a.cust.displayName} asked for a ${labels.join(" + ").toLowerCase()} price${range ? ` (ballpark ${range})` : ""}`;
+  // Tell the rep (+ owners). In-app titles carry no amounts (the bell is not
+  // price-gated); the range goes only to email recipients whose seat sees prices.
+  const name = oneLine(a.cust.displayName);
+  const what = labels.join(" + ").toLowerCase();
   await notifyMembers({
     org: a.org, pref: "clientComments", type: "selfEstimateRequest",
-    title, body: `Draft ${draftNumber} was created for you to review — it has not been sent.`,
+    title: `${name} asked for a ${what} price`,
+    body: `Draft ${draftNumber} was created for you to review — it has not been sent.`,
     link: `/crm/estimates/${draft.id}`,
     extraMemberIds: rep ? [rep.id] : [],
   });
   if (crmNotificationChannel(a.org.customFields, "clientComments", "email")) {
     const owners = await db.select().from(crmMembers)
       .where(and(eq(crmMembers.orgId, a.org.id), eq(crmMembers.status, "active"), eq(crmMembers.role, "owner")));
-    const to = new Set<string>([...(rep?.email ? [rep.email] : []), ...owners.map((o) => o.email).filter(Boolean) as string[]]);
-    if (to.size) {
-      const link = `${portalBaseUrl(req)}/crm/estimates/${draft.id}`;
+    const recipients = [...owners, ...(rep && !owners.some((o) => o.id === rep.id) ? [rep] : [])].filter((m) => m.email);
+    const range = bp.lowCents !== null && bp.highCents !== null ? `${dollars(bp.lowCents)}–${dollars(bp.highCents)}` : null;
+    const link = `${portalBaseUrl(req)}/crm/estimates/${draft.id}`;
+    for (const seesPrices of [true, false]) {
+      const to = recipients
+        .filter((m) => crmEffectivePermissions(m.role, m.permissions).seePrices === seesPrices)
+        .map((m) => m.email as string);
+      if (!to.length) continue;
+      const showRange = seesPrices ? range : null;
       await sendWithFallback({
-        to: [...to].join(","),
-        subject: title,
+        to: [...new Set(to)].join(","),
+        subject: oneLine(`${name} asked for a ${what} price${showRange ? ` (ballpark ${showRange})` : ""}`).slice(0, 200),
         html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-          <p><strong>${esc(a.cust.displayName)}</strong> built their own ${esc(labels.join(" + ").toLowerCase())} estimate online and asked you for a price.</p>
-          ${range ? `<p>Their ballpark: <strong>${esc(range)}</strong> (from your ${esc(a.divisionKey === NO_DIVISION_KEY ? "" : "division's ")}self-estimate prices).</p>` : ""}
-          ${bp.discounts.length ? `<p>Discounts they claimed (to be verified): ${esc(bp.discounts.map((d) => d.label).join(", "))}</p>` : ""}
+          <p><strong>${esc(name)}</strong> built their own ${esc(what)} estimate online and asked you for a price.</p>
+          ${showRange ? `<p>Their ballpark: <strong>${esc(showRange)}</strong> (from your ${esc(a.divisionKey === NO_DIVISION_KEY ? "" : "division's ")}self-estimate prices).</p>` : ""}
+          ${claimedLabels.length ? `<p>Discounts they claimed (to be verified): ${esc(claimedLabels.join(", "))}</p>` : ""}
           ${body.note ? `<p>Their note: ${esc(body.note)}</p>` : ""}
           <p><a href="${esc(link)}">Review draft ${esc(draftNumber ?? "")}</a> — nothing was sent to the client.</p>
         </div>`,
       } as any).catch((e: any) => console.error("[crm] self-estimate email failed:", e?.message || e));
     }
   }
-  return { ok: true as const, ballpark: bp, repName: rep ? rep.displayName || rep.email : null };
+  return { ok: true as const, ballpark: bp, repName, duplicate: false };
 }
 
 // ── Interest summaries (contractor side) ────────────────────────────────────
@@ -504,7 +570,23 @@ export async function interestFor(ctx: OrgContext, filter: { customerId?: string
 
 // ── Tasks ───────────────────────────────────────────────────────────────────
 
-/** Open tasks this seat should see: its own, plus (seats that see all jobs) the visible clients' unassigned/others'. */
+/**
+ * Can this seat see (and act on) a task? The task's parent — its estimate,
+ * else its customer — must be visible to the seat under the object policy
+ * (division pin/workspace + own-work rules) AND the seat must be the assignee
+ * or an estimate writer. Being the assignee alone is never enough: a rep later
+ * pinned to FL does not keep reading or completing WA tasks.
+ */
+export async function taskVisible(
+  ctx: OrgContext, t: typeof crmTasks.$inferSelect, policy: ReturnType<typeof objectPolicy> = objectPolicy(ctx),
+): Promise<boolean> {
+  if (t.assignedMemberId !== ctx.member.id && !ctx.permissions.manageEstimates) return false;
+  if (t.estimateId) return policy.visible("estimates", t.estimateId);
+  if (t.customerId) return policy.visible("customers", t.customerId);
+  return false;
+}
+
+/** Open tasks this seat may see, due first. */
 export async function visibleOpenTasks(ctx: OrgContext, limit = 50) {
   const rows = await db.select().from(crmTasks)
     .where(and(eq(crmTasks.orgId, ctx.org.id), isNull(crmTasks.doneAt)))
@@ -513,14 +595,13 @@ export async function visibleOpenTasks(ctx: OrgContext, limit = 50) {
   const out: (typeof rows) = [];
   for (const t of rows) {
     if (out.length >= limit) break;
-    if (t.assignedMemberId === ctx.member.id) { out.push(t); continue; }
-    if (!ctx.permissions.manageEstimates) continue;
-    if (t.estimateId ? await policy.visible("estimates", t.estimateId) : t.customerId ? await policy.visible("customers", t.customerId) : false) out.push(t);
+    if (await taskVisible(ctx, t, policy)) out.push(t);
   }
   return out;
 }
 
-async function presentTasks(orgId: string, rows: (typeof crmTasks.$inferSelect)[]) {
+async function presentTasks(ctx: OrgContext, rows: (typeof crmTasks.$inferSelect)[]) {
+  const orgId = ctx.org.id;
   const custIds = [...new Set(rows.map((r) => r.customerId).filter(Boolean))] as string[];
   const memberIds = [...new Set(rows.map((r) => r.assignedMemberId).filter(Boolean))] as string[];
   const custs = custIds.length ? await db.select({ id: crmCustomers.id, name: crmCustomers.displayName }).from(crmCustomers)
@@ -530,7 +611,10 @@ async function presentTasks(orgId: string, rows: (typeof crmTasks.$inferSelect)[
   const cName = new Map(custs.map((c) => [c.id, c.name]));
   const mName = new Map(members.map((m) => [m.id, m.name || m.email]));
   return rows.map((t) => ({
-    id: t.id, title: t.title, body: t.body, source: t.source,
+    id: t.id, title: t.title,
+    // Rendered per seat from structured fields — amounts only with "See prices".
+    body: taskBodyText(t.meta, ctx.permissions.seePrices),
+    source: t.source,
     customerId: t.customerId, customerName: t.customerId ? cName.get(t.customerId) ?? null : null,
     estimateId: t.estimateId, relatedEstimateId: t.relatedEstimateId,
     assignedMemberId: t.assignedMemberId, assignedName: t.assignedMemberId ? mName.get(t.assignedMemberId) ?? null : null,
@@ -540,7 +624,7 @@ async function presentTasks(orgId: string, rows: (typeof crmTasks.$inferSelect)[
 }
 
 export async function attentionTasksFor(ctx: OrgContext, cap = 10) {
-  return presentTasks(ctx.org.id, await visibleOpenTasks(ctx, cap));
+  return presentTasks(ctx, await visibleOpenTasks(ctx, cap));
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────────
@@ -672,7 +756,7 @@ export function registerCrmSelfEstimateRoutes(app: Express, getDevUser: GetUser)
   app.get("/api/crm/tasks", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
-    res.json({ tasks: await presentTasks(ctx.org.id, await visibleOpenTasks(ctx, 100)) });
+    res.json({ tasks: await presentTasks(ctx, await visibleOpenTasks(ctx, 100)) });
   });
 
   app.patch("/api/crm/tasks/:id", async (req: any, res) => {
@@ -682,10 +766,7 @@ export function registerCrmSelfEstimateRoutes(app: Express, getDevUser: GetUser)
     if (!p.success) return res.status(400).json({ message: "Send { done: true | false }" });
     const [t] = await db.select().from(crmTasks)
       .where(and(eq(crmTasks.orgId, ctx.org.id), eq(crmTasks.id, String(req.params.id)))).limit(1);
-    const policy = objectPolicy(ctx);
-    const canSee = t && (t.assignedMemberId === ctx.member.id || (ctx.permissions.manageEstimates
-      && (t.estimateId ? await policy.visible("estimates", t.estimateId) : t.customerId ? await policy.visible("customers", t.customerId) : false)));
-    if (!t || !canSee) return res.status(404).json({ message: "Task not found" });
+    if (!t || !(await taskVisible(ctx, t))) return res.status(404).json({ message: "Task not found" });
     const [row] = await db.update(crmTasks).set(p.data.done
       ? { doneAt: new Date(), doneByMemberId: ctx.member.id }
       : { doneAt: null, doneByMemberId: null })
@@ -693,7 +774,7 @@ export function registerCrmSelfEstimateRoutes(app: Express, getDevUser: GetUser)
     logActivity(ctx, p.data.done ? "task.done" : "task.reopened", {
       entityType: "task", entityId: t.id, customerId: t.customerId, meta: { title: t.title },
     });
-    res.json({ task: (await presentTasks(ctx.org.id, [row]))[0] });
+    res.json({ task: (await presentTasks(ctx, [row]))[0] });
   });
 
   // ── Public estimate page (token + email-gated session) ────────────────────
@@ -774,6 +855,7 @@ export function registerCrmSelfEstimateRoutes(app: Express, getDevUser: GetUser)
     const offer = await offerFor(a);
     if (!offer.enabled) return res.status(409).json({ message: "Online estimates aren't available right now." });
     const bp = computeBallpark(offer.config, offer.measured, p.data.selection);
+    if (!ballparkWithinLimits(bp)) return res.status(400).json({ message: TOO_BIG });
     const trades = p.data.selection.trades.map((t) => t.trade).filter((t) => offer.config.trades.some((x) => x.trade === t));
     if (trades.length) {
       await logInterest(a, "interest_ballpark_shown", req, {
@@ -795,7 +877,7 @@ export function registerCrmSelfEstimateRoutes(app: Express, getDevUser: GetUser)
     if (!offer.enabled) return res.status(409).json({ message: "Online estimates aren't available right now." });
     const r = await createRequest(a, p.data, req);
     if ("error" in r) return res.status(r.error).json({ message: r.message });
-    res.json({ ok: true, ballpark: r.ballpark, repName: r.repName });
+    res.json({ ok: true, ballpark: r.ballpark, repName: r.repName, duplicate: r.duplicate || undefined });
   }
 
   app.post("/api/public/estimates/:token/self-estimate/event", async (req: any, res) => {

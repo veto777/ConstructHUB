@@ -52,13 +52,14 @@ export async function getCustomerTakeoff(
     .orderBy(desc(crmMeasurements.createdAt)).limit(20);
   const withTakeoff = rows.filter((r) => asTakeoff((r.rawPayload as any)?.takeoff));
   if (!withTakeoff.length) return null;
-  // The report for THIS address when the customer has several houses.
+  // The report for THIS address. When an address is known and no report
+  // matches it, the answer is "not measured" — never another property's
+  // numbers (a customer with a rental and a home has two takeoffs).
   const norm = (s?: string | null) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const match = opts.addressLine1
-    ? withTakeoff.find((r) => norm(r.addressLine1) === norm(opts.addressLine1)
-      && (!opts.postalCode || !r.postalCode || norm(r.postalCode) === norm(opts.postalCode)))
-    : undefined;
-  return asTakeoff(((match ?? withTakeoff[0]).rawPayload as any).takeoff);
+  if (!norm(opts.addressLine1)) return asTakeoff((withTakeoff[0].rawPayload as any).takeoff);
+  const match = withTakeoff.find((r) => norm(r.addressLine1) === norm(opts.addressLine1)
+    && (!opts.postalCode || !r.postalCode || norm(r.postalCode) === norm(opts.postalCode)));
+  return match ? asTakeoff((match.rawPayload as any).takeoff) : null;
 }
 
 /** The takeoff in the units the ballpark math prices from. */

@@ -741,6 +741,9 @@ export async function ensureCrmSchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS crm_tasks_org_open_idx ON crm_tasks (org_id) WHERE done_at IS NULL;
     CREATE INDEX IF NOT EXISTS crm_tasks_customer_idx ON crm_tasks (customer_id);
+    ALTER TABLE crm_tasks ADD COLUMN IF NOT EXISTS idempotency_key text;
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_tasks_idempotency_uq ON crm_tasks (org_id, estimate_id, idempotency_key)
+      WHERE idempotency_key IS NOT NULL;
     CREATE INDEX IF NOT EXISTS crm_estimate_events_interest_idx ON crm_estimate_events (estimate_id, type)
       WHERE type LIKE 'interest\\_%';
   `);

@@ -13,16 +13,16 @@ import { createHash, randomBytes, randomUUID } from "crypto";
 import pg from "pg";
 import {
   computeBallpark, detectBidTrades, divisionConfigOf, normalizeDivisionConfig, summarizeInterest, interestBadgeText,
-  selfEstimateSelectionSchema, selfEstimateDivisionConfigSchema, starterTradeConfig, NO_MEASUREMENTS,
+  selfEstimateSelectionSchema, selfEstimateDivisionConfigSchema, starterTradeConfig, NO_MEASUREMENTS, ballparkWithinLimits,
   type PricedSelfEstimate, type MeasuredQuantities, type PricedTrade,
 } from "@shared/self-estimate";
 
 process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_module_import";
 process.env.DATABASE_URL ||= "postgres://localhost:5432/unused_no_queries_run";
 
-let pbUnitPriceFor: any, draftLinesFor: any, discountSourceOf: any, measuredFromTakeoff: any;
+let pbUnitPriceFor: any, draftLinesFor: any, discountSourceOf: any, measuredFromTakeoff: any, oneLine: any, taskBodyText: any;
 beforeAll(async () => {
-  ({ pbUnitPriceFor, draftLinesFor, discountSourceOf } = await import("./self-estimate"));
+  ({ pbUnitPriceFor, draftLinesFor, discountSourceOf, oneLine, taskBodyText } = await import("./self-estimate"));
   ({ measuredFromTakeoff } = await import("./self-estimate-measurements"));
 });
 
@@ -141,6 +141,46 @@ describe("ballpark math (pure)", () => {
     expect(bp.discountBps).toBe(10_000);
     expect(bp.totalCents).toBe(0);
     expect(bp.lowCents).toBeNull();
+    // Per-discount amounts are scaled to the cap and add up to the applied discount.
+    expect(bp.discounts.map((d) => d.amountCents)).toEqual([420_000, 420_000]);
+    expect(bp.discounts.reduce((s, d) => s + d.amountCents, 0)).toBe(bp.discountCents);
+  });
+
+  it("per-discount amounts always sum to the applied discount (odd cents)", () => {
+    const odd = { ...PRICED, discounts: [
+      { code: "a", label: "A", percentBps: 7000, conditions: null },
+      { code: "b", label: "B", percentBps: 4000, conditions: null },
+      { code: "c", label: "C", percentBps: 333, conditions: null },
+    ] };
+    const sel = selfEstimateSelectionSchema.parse({ trades: [{ trade: "siding", productId: "hardie-lap", clientSize: 1237 }], discountCodes: ["a", "b", "c"] });
+    const bp = computeBallpark(odd, NO_MEASUREMENTS, sel);
+    expect(bp.discountBps).toBe(10_000);
+    expect(bp.discounts.reduce((s, d) => s + d.amountCents, 0)).toBe(bp.discountCents);
+    const fine = computeBallpark({ ...odd, discounts: odd.discounts.slice(1) }, NO_MEASUREMENTS, { ...sel, discountCodes: ["b", "c"] });
+    expect(fine.discounts.reduce((s, d) => s + d.amountCents, 0)).toBe(fine.discountCents);
+  });
+
+  it("sizes that would overflow the money/quantity columns are refused, not truncated", () => {
+    const huge = { ...PRICED, trades: PRICED.trades.map((t) => (t.trade === "roofing"
+      ? { ...t, houseSqftFactorBps: 100_000, products: [P("gaf-hdz", "GAF HDZ", 100_000_000)] } : t)) };
+    const bp = computeBallpark(huge, NO_MEASUREMENTS, selfEstimateSelectionSchema.parse({
+      trades: [{ trade: "roofing", productId: "gaf-hdz", clientSize: 100_000, clientSizeKind: "house" }],
+    }));
+    expect(bp.totalCents).toBeGreaterThan(2_147_483_647);
+    expect(ballparkWithinLimits(bp)).toBe(false);
+    const normal = computeBallpark(PRICED, measuredFromTakeoff(TAKEOFF), selfEstimateSelectionSchema.parse({ trades: [{ trade: "roofing", productId: "gaf-hdz" }] }));
+    expect(ballparkWithinLimits(normal)).toBe(true);
+  });
+
+  it("names in email subjects are single-line", () => {
+    expect(oneLine("Ann\r\nBcc: evil@example.com x")).toBe("Ann Bcc: evil@example.com x");
+  });
+
+  it("task text carries amounts only for seats that see prices", () => {
+    const meta = { lowCents: 950_000, highCents: 1_180_000, priced: true, discountLabels: ["Military discount"], draftNumber: "E-9" };
+    expect(taskBodyText(meta, true)).toContain("$9,500–$11,800");
+    expect(taskBodyText(meta, false)).not.toMatch(/\$|\d{3},\d{3}/);
+    expect(taskBodyText(meta, false)).toContain("Military discount");
   });
 
   it("an unpriced product gives NO number — 'Request a price'", () => {
@@ -465,12 +505,23 @@ describe("self-estimate against the dev server", () => {
   it("'Send this to my contractor' → a DRAFT in the FL division, a task for the rep, a notification", async () => {
     if (!serverUp) return;
     const cookie = await clientCookie([custA]);
-    const r = await api("POST", `/api/public/estimates/${tokA}/self-estimate/request`, {
+    const reqBody = {
       selection: { trades: [{ trade: "roofing", productId: "gaf-hdz" }, { trade: "windows", productId: "pgt", count: 6 }], discountCodes: ["military"] },
-      sessionKey, note: "Thinking about doing the roof next spring",
-    }, cookie);
-    expect(r.status).toBe(200);
+      sessionKey, submissionKey: `sub${randomBytes(6).toString("hex")}`, note: "Thinking about doing the roof next spring",
+    };
+    // No submission key → refused (idempotency is mandatory).
+    expect((await api("POST", `/api/public/estimates/${tokA}/self-estimate/request`, { ...reqBody, submissionKey: undefined }, cookie)).status).toBe(400);
+    // A double tap: two concurrent sends + a retry with the same key → ONE draft, ONE task.
+    const [r, r2] = await Promise.all([
+      api("POST", `/api/public/estimates/${tokA}/self-estimate/request`, reqBody, cookie),
+      api("POST", `/api/public/estimates/${tokA}/self-estimate/request`, reqBody, cookie),
+    ]);
+    const r3 = await api("POST", `/api/public/estimates/${tokA}/self-estimate/request`, reqBody, cookie);
+    expect([r.status, r2.status, r3.status]).toEqual([200, 200, 200]);
     expect(r.body.ok).toBe(true);
+    expect([r.body.duplicate, r2.body.duplicate].filter(Boolean)).toHaveLength(1);
+    expect(r3.body.duplicate).toBe(true);
+    expect(r3.body.ballpark.totalCents).toBe(r.body.ballpark.totalCents);
     const { rows: drafts } = await pool.query(
       "select * from crm_estimates where org_id=$1 and custom_fields->'selfEstimate'->>'fromEstimateId' = $2", [org, estA]);
     expect(drafts.length).toBe(1);
@@ -495,7 +546,102 @@ describe("self-estimate against the dev server", () => {
     const { rows: notes } = await pool.query("select member_id from crm_notifications where org_id=$1 and type='selfEstimateRequest'", [org]);
     expect(notes.map((n) => n.member_id).sort()).toEqual([me, rep].sort());
     const { rows: ev } = await pool.query("select meta from crm_estimate_events where estimate_id=$1 and type='interest_request_sent'", [estA]);
+    expect(ev).toHaveLength(1);
     expect(ev[0].meta.draftEstimateId).toBe(d.id);
+    // Totals were written in the same transaction (no separate recalc step).
+    expect(d.subtotal_cents).toBe(1_088_100 + 570_000);
+    // The stored task text carries no amounts.
+    expect(tasks[0].body).not.toMatch(/\$/);
+  });
+
+  it("refuses a request whose numbers would overflow, and writes nothing", async () => {
+    if (!serverUp) return;
+    const got = await api("GET", `/api/crm/self-estimate/config?division=${fl}`);
+    const cfg = got.body.config;
+    delete cfg.saved;
+    cfg.trades.roofing.products[2].unitPriceCents = 100_000_000; // Flat roof at the max allowed unit price
+    expect((await api("PUT", "/api/crm/self-estimate/config", { divisionKey: fl, config: cfg })).status).toBe(200);
+    const cookie = await clientCookie([custB]); // custB has no measurements → the client's own size
+    const sel = { trades: [{ trade: "roofing", productId: "flat-roof", clientSize: 100_000 }] };
+    const q = await api("POST", `/api/public/estimates/${tokB}/self-estimate/quote`, { selection: sel, sessionKey }, cookie);
+    expect(q.status).toBe(400);
+    const r = await api("POST", `/api/public/estimates/${tokB}/self-estimate/request`, {
+      selection: sel, sessionKey, submissionKey: `sub${randomBytes(6).toString("hex")}`,
+    }, cookie);
+    expect(r.status).toBe(400);
+    const { rows } = await pool.query("select id from crm_estimates where org_id=$1 and custom_fields->'selfEstimate'->>'fromEstimateId' = $2", [org, estB]);
+    expect(rows).toHaveLength(0);
+    cfg.trades.roofing.products[2].unitPriceCents = null;
+    expect((await api("PUT", "/api/crm/self-estimate/config", { divisionKey: fl, config: cfg })).status).toBe(200);
+  });
+
+  it("measurements of another property are never used", async () => {
+    if (!serverUp) return;
+    // An estimate for Ann's OTHER property (a project at a different address): not measured.
+    const proj = randomUUID(), est2 = randomUUID(), tok2 = randomBytes(24).toString("hex");
+    await pool.query("insert into crm_projects(id,org_id,customer_id,name,status,address_line1,postal_code,division_id) values ($1,$2,$3,'Rental','lead','9 Other Rd','33602',$4)", [proj, org, custA, fl]);
+    await pool.query(`insert into crm_estimates(id,org_id,customer_id,project_id,public_token,number,title,status,created_by_member_id,sent_at,division_id)
+                      values ($1,$2,$3,$4,$5,$6,'Siding replacement','sent',$7,now(),$8)`, [est2, org, custA, proj, tok2, `${tag}-SE-4`, rep, fl]);
+    await pool.query("insert into crm_estimate_items(org_id,estimate_id,name,quantity_milli,unit,unit_price_cents) values ($1,$2,'Vinyl siding',1000,'sf',1)", [org, est2]);
+    const cookie = await clientCookie([custA]);
+    const other = await api("GET", `/api/public/estimates/${tok2}/self-estimate`, undefined, cookie);
+    expect(other.body.enabled).toBe(true);
+    expect(other.body.measured.roofSqft).toBeNull();
+    expect(other.body.hasMeasurements).toBe(false);
+    // The home estimate (customer address = the measured address) still uses them.
+    expect((await api("GET", `/api/public/estimates/${tokA}/self-estimate`, undefined, cookie)).body.measured.roofSqft).toBe(2418);
+    // The portal anchors on the latest sent estimate — take the rental back out for the portal test below.
+    await pool.query("delete from crm_estimate_items where estimate_id=$1", [est2]);
+    await pool.query("delete from crm_estimates where id=$1", [est2]);
+  });
+
+  it("tasks: a seat pinned to FL never reads or completes a WA task, even as its assignee", async () => {
+    if (!serverUp) return;
+    const waTask = randomUUID(), flTask = randomUUID();
+    await pool.query(`insert into crm_tasks(id,org_id,customer_id,estimate_id,division_id,assigned_member_id,source,title,meta)
+                      values ($1,$2,$3,$4,$5,$6,'self_estimate_request','WA call',$7),($8,$2,$3,$9,$10,$6,'self_estimate_request','FL call',$7)`,
+      [waTask, org, custA, estWa, wa, me, JSON.stringify({ lowCents: 7111100, highCents: 7111200, priced: true }), flTask, estA, fl]);
+    try {
+      await pool.query("update crm_members set role='sales', division_id=$2 where id=$1", [me, fl]);
+      const list = await api("GET", "/api/crm/tasks");
+      expect(list.status).toBe(200);
+      const ids = list.body.tasks.map((t: any) => t.id);
+      expect(ids).toContain(flTask);
+      expect(ids).not.toContain(waTask);
+      expect((await api("PATCH", `/api/crm/tasks/${waTask}`, { done: true })).status).toBe(404);
+      const { rows } = await pool.query("select done_at from crm_tasks where id=$1", [waTask]);
+      expect(rows[0].done_at).toBeNull();
+      const att = await api("GET", "/api/crm/attention");
+      expect(att.body.priceRequests.map((t: any) => t.id)).not.toContain(waTask);
+    } finally {
+      await pool.query("update crm_members set role='owner', division_id=null, permissions=null where id=$1", [me]);
+    }
+  });
+
+  it("price-blind seats get task text, attention rows and draft details without amounts", async () => {
+    if (!serverUp) return;
+    try {
+      await pool.query(`update crm_members set permissions='{"seePrices": false}'::jsonb where id=$1`, [me]);
+      const list = await api("GET", "/api/crm/tasks");
+      expect(list.status).toBe(200);
+      expect(list.body.tasks.length).toBeGreaterThan(0);
+      expect(JSON.stringify(list.body)).not.toMatch(/\$|7111|9,5|11,8/);
+      const att = await api("GET", "/api/crm/attention");
+      expect(JSON.stringify(att.body.priceRequests)).not.toMatch(/\$/);
+      const { rows } = await pool.query("select id from crm_estimates where org_id=$1 and custom_fields->'selfEstimate'->>'fromEstimateId' = $2", [org, estA]);
+      const est = await api("GET", `/api/crm/estimates/${rows[0].id}`);
+      expect(est.status).toBe(200);
+      const se = (est.body.estimate ?? est.body).selfEstimate;
+      expect(se).toBeTruthy();
+      expect(se.ballpark).toBeUndefined();
+    } finally {
+      await pool.query("update crm_members set permissions=null where id=$1", [me]);
+    }
+    const { rows } = await pool.query("select id from crm_estimates where org_id=$1 and custom_fields->'selfEstimate'->>'fromEstimateId' = $2", [org, estA]);
+    const est = await api("GET", `/api/crm/estimates/${rows[0].id}`);
+    expect((est.body.estimate ?? est.body).selfEstimate.ballpark.lowCents).toBe(1_460_000);
+    const list = await api("GET", "/api/crm/tasks");
+    expect(JSON.stringify(list.body)).toMatch(/Their ballpark: \$/);
   });
 
   it("the contractor sees the interest badge, the timeline rows and the task on Home", async () => {

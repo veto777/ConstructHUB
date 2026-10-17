@@ -290,7 +290,7 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
         requestedAt: se.requestedAt ?? null, note: se.note ?? null,
         claimedDiscounts: Array.isArray(se.claimedDiscounts)
           ? se.claimedDiscounts.map((d: any) => ({ code: d.code, label: d.label, verified: false })) : [],
-        ballpark: money ? se.ballpark ?? null : undefined,
+        ballpark: ctx.permissions.seePrices ? se.ballpark ?? null : undefined,
       };
     })(),
     createdAt: e.createdAt, updatedAt: e.updatedAt,
