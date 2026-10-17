@@ -22,7 +22,7 @@ const { actorDirectoryOf } = await import("./actors");
 const { activityText } = await import("./activity");
 const {
   memberDisplayName, memberActor, clientActor, systemActor, actorLabel, uploadLabelActor, logLabelActor,
-  UNRECORDED_TEAM_ACTOR, UNRECORDED_ACTOR,
+  UNRECORDED_TEAM_ACTOR, UNRECORDED_ACTOR, dedupeCarriedAudit,
 } = await import("@shared/crm-actor");
 
 const dir = actorDirectoryOf([
@@ -92,6 +92,11 @@ describe("timeline sentences", () => {
     const staged = photoTimelineText("progress--IMG_1.jpg", UNRECORDED_TEAM_ACTOR);
     expect(staged.text).toBe("Added by your team (uploader not recorded): a project photo (in progress) — IMG_1.jpg");
     expect(photoTimelineText("IMG_2.jpg", UNRECORDED_ACTOR).text).toBe("Photo added (uploader not recorded) — IMG_2.jpg");
+    // Neutral, but the stage tag still labels the photo.
+    expect(photoTimelineText("progress--IMG_3.jpg", UNRECORDED_ACTOR).text)
+      .toBe("Project photo (in progress) added (uploader not recorded) — IMG_3.jpg");
+    expect(photoTimelineText("finished--IMG_4.jpg", UNRECORDED_ACTOR).text)
+      .toBe("Project photo (finished) added (uploader not recorded) — IMG_4.jpg");
   });
 
   it("resolveAttachmentActor uses real evidence only", () => {
@@ -105,10 +110,11 @@ describe("timeline sentences", () => {
     // 3. kinds only one code path makes; a HOVER name only with the HOVER job on file
     expect(resolveAttachmentActor({ kind: "contract", fileName: "c.pdf" }, { member: m }).name).toBe("System");
     expect(resolveAttachmentActor({ kind: "measurement", fileName: "m.pdf" }, { member: m }).name).toBe("HOVER import");
-    expect(resolveAttachmentActor({ kind: "photo", fileName: "hover-77-1.jpg" }, { member: m, hoverJobIds: new Set(["77"]) }).name).toBe("HOVER import");
-    expect(resolveAttachmentActor({ kind: "photo", fileName: "hover-77-1.jpg" }, { member: m, hoverJobIds: new Set() })).toBe(UNRECORDED_ACTOR);
+    // A file name is never proof: the portal keeps the client's own file name,
+    // so "hover-77-1.jpg" or "progress--a.jpg" could be the client's upload.
+    expect(resolveAttachmentActor({ kind: "photo", fileName: "hover-77-1.jpg" }, { member: m })).toBe(UNRECORDED_ACTOR);
     // 4. still unknown
-    expect(resolveAttachmentActor({ kind: "photo", fileName: "progress--a.jpg" }, { member: m })).toBe(UNRECORDED_TEAM_ACTOR);
+    expect(resolveAttachmentActor({ kind: "photo", fileName: "progress--a.jpg" }, { member: m })).toBe(UNRECORDED_ACTOR);
     expect(resolveAttachmentActor({ kind: "estimate", fileName: "x.pdf" }, { member: m })).toBe(UNRECORDED_TEAM_ACTOR);
     expect(resolveAttachmentActor({ kind: "photo", fileName: "IMG_9.jpg" }, { member: m })).toBe(UNRECORDED_ACTOR);
     // a member id that no longer resolves never shows as an id
@@ -155,6 +161,21 @@ describe("timeline sentences", () => {
       commentTimelineText({ body: "hi", authorMemberId: "m-owner" }, owner),
     ];
     for (const l of lines) expect(l).not.toMatch(/Your team|A team member|m-gabe|m-owner/);
+  });
+});
+
+describe("client page: audit ↔ timeline dedupe", () => {
+  it("drops an attachment add only when the timeline shows that attachment", () => {
+    const audit = [
+      { id: "act-1", action: "attachment.added", entityId: "a1" },   // still on the timeline
+      { id: "act-2", action: "attachment.added", entityId: "a2" },   // file deleted → not on the timeline
+      { id: "act-3", action: "attachment.deleted", entityId: "a2" },
+      { id: "act-4", action: "attachment.attached", entityId: "a3" }, // on the timeline
+      { id: "act-5", action: "estimate.created", entityId: "a1" },    // not a carried action
+    ];
+    const kept = dedupeCarriedAudit([{ id: "att-a1" }, { id: "att-a3" }, { id: "ev-9" }], audit).map((a) => a.id);
+    expect(kept).toEqual(["act-2", "act-3", "act-5"]);
+    expect(dedupeCarriedAudit([], audit)).toHaveLength(5);
   });
 });
 
