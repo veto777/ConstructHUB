@@ -8,19 +8,19 @@
  * Unassigned records and the tool that sorts them. Each division tab shows that
  * division's numbers and details and opens its workspace.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
-import { ArrowRight, Building2, Inbox, Layers, Loader2, Sparkles, Wand2 } from "lucide-react";
+import { ArrowRight, Layers, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { SegmentedTabsList } from "@/components/tool";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SectionTitle, StatusPill, EmptyState, ErrorCard } from "@/components/crm-ui";
+import { SectionTitle, EmptyState, ErrorCard } from "@/components/crm-ui";
 import { confirmAction } from "@/components/confirm-dialog";
 import { CrmDivisionsManager } from "@/components/crm-divisions-manager";
-import { divisionTone, resetCrmData, switchDivisionWorkspace, useActiveDivision } from "@/components/crm-division-switcher";
+import { resetCrmData, switchDivisionWorkspace, useActiveDivision } from "@/components/crm-division-switcher";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { divisionLabel } from "@shared/divisions";
@@ -52,64 +52,91 @@ type Preview = {
 const money = (c?: number) =>
   c == null ? null : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
-const KPI_ROWS: { key: keyof Omit<Kpis, "clients" | "records">; label: string }[] = [
-  { key: "openEstimates", label: "Open estimates" },
-  { key: "invoicedThisMonth", label: "Invoiced this month" },
-  { key: "collectedThisMonth", label: "Collected this month" },
-  { key: "outstanding", label: "Outstanding (open invoices)" },
-  { key: "activeProjects", label: "Active projects" },
+type KpiKey = keyof Omit<Kpis, "clients" | "records">;
+
+/** One comparison table: rows are metrics in three groups, columns are divisions. Plain and neutral on purpose. */
+const KPI_GROUPS: { title: string; rows: { key: KpiKey | "clients"; label: string }[] }[] = [
+  { title: "Revenue (won contracts)", rows: [
+    { key: "wonThisMonth", label: "This month" },
+    { key: "wonLastMonth", label: "Last month" },
+    { key: "wonThisYear", label: "This year" },
+    { key: "wonAllTime", label: "All time" },
+  ] },
+  { title: "Pipeline", rows: [
+    { key: "openEstimates", label: "Open estimates" },
+    { key: "activeProjects", label: "Active projects" },
+  ] },
+  { title: "Cash", rows: [
+    { key: "invoicedThisMonth", label: "Invoiced this month" },
+    { key: "collectedThisMonth", label: "Collected this month" },
+    { key: "outstanding", label: "Outstanding invoices" },
+  ] },
+  { title: "Clients", rows: [{ key: "clients", label: "Active clients" }] },
 ];
 
-// Revenue = won (signed) contracts at their approved amount — its own block at the top of every card.
-const REVENUE_ROWS: { key: "wonThisMonth" | "wonLastMonth" | "wonThisYear" | "wonAllTime"; label: string }[] = [
-  { key: "wonThisMonth", label: "This month" },
-  { key: "wonLastMonth", label: "Last month" },
-  { key: "wonThisYear", label: "This year" },
-  { key: "wonAllTime", label: "All time" },
-];
+type KpiColumn = { id: string; title: string; subtitle?: string | null; k: Kpis; emphasis?: boolean; action?: ReactNode };
 
-function RevenueBlock({ k, testId }: { k: Kpis; testId: string }) {
+function KpiCell({ k, rowKey }: { k: Kpis; rowKey: KpiKey | "clients" }) {
+  // Counts-only rows keep the amount column's right edge (an empty count slot beside them).
+  const spacer = <span className="ml-2 inline-block w-8" aria-hidden="true" />;
+  if (rowKey === "clients") return <span className="whitespace-nowrap"><span className="font-medium">{k.clients.count.toLocaleString()}</span>{spacer}</span>;
+  const v = k[rowKey];
+  const amount = money(v?.totalCents);
+  // A price-blind seat gets counts only.
+  if (amount == null) return <span className="whitespace-nowrap"><span className="font-medium">{(v?.count ?? 0).toLocaleString()}</span>{spacer}</span>;
   return (
-    <div className="rounded-md border bg-background/70 p-2.5" data-testid={`${testId}-revenue`}>
-      <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Revenue — won contracts</div>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-        {REVENUE_ROWS.map((r) => (
-          <div key={r.key} className="flex items-baseline justify-between gap-2">
-            <dt className="text-muted-foreground">{r.label}</dt>
-            <dd className="tabular-nums text-right" data-testid={`${testId}-${r.key}`}>
-              {/* A price-blind seat gets counts only. */}
-              {money(k[r.key]?.totalCents) != null && <span className="font-semibold">{money(k[r.key].totalCents)}</span>}
-              <span className={money(k[r.key]?.totalCents) != null ? "text-muted-foreground" : "font-semibold"}>
-                {money(k[r.key]?.totalCents) != null ? " · " : ""}{(k[r.key]?.count ?? 0).toLocaleString()} won
-              </span>
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
+    <span className="whitespace-nowrap">
+      <span className="font-medium">{amount}</span>
+      <span className="ml-2 inline-block w-8 text-right text-xs text-muted-foreground">{(v?.count ?? 0).toLocaleString()}</span>
+    </span>
   );
 }
 
-function KpiList({ k, testId }: { k: Kpis; testId: string }) {
+function KpiTable({ columns, testId }: { columns: KpiColumn[]; testId: string }) {
   return (
-    <>
-    <RevenueBlock k={k} testId={testId} />
-    <dl className="space-y-1.5 text-sm" data-testid={testId}>
-      {KPI_ROWS.map((r) => (
-        <div key={r.key} className="flex items-baseline justify-between gap-3">
-          <dt className="text-muted-foreground">{r.label}</dt>
-          <dd className="tabular-nums text-right" data-testid={`${testId}-${r.key}`}>
-            <span className="font-semibold">{k[r.key].count.toLocaleString()}</span>
-            {k[r.key].totalCents != null && <span className="text-muted-foreground"> · {money(k[r.key].totalCents)}</span>}
-          </dd>
-        </div>
-      ))}
-      <div className="flex items-baseline justify-between gap-3">
-        <dt className="text-muted-foreground">Clients</dt>
-        <dd className="font-semibold tabular-nums" data-testid={`${testId}-clients`}>{k.clients.count.toLocaleString()}</dd>
-      </div>
-    </dl>
-    </>
+    <div className="overflow-x-auto rounded-lg border bg-card" data-testid={testId}>
+      <table className="w-full text-sm tabular-nums" style={{ minWidth: 200 + columns.length * 150 }}>
+        <thead>
+          <tr className="border-b">
+            <th className="sticky left-0 z-10 w-52 min-w-52 bg-card px-4 py-3 text-left font-medium text-muted-foreground" />
+            {columns.map((c) => (
+              <th key={c.id} className={`whitespace-nowrap px-4 py-3 text-right align-bottom font-medium ${c.emphasis ? "bg-muted/40" : ""}`}>
+                <div className="text-foreground">{c.title}</div>
+                {c.subtitle && <div className="text-xs font-normal text-muted-foreground">{c.subtitle}</div>}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        {KPI_GROUPS.map((g) => (
+          <tbody key={g.title} className="border-b last:border-b-0">
+            <tr>
+              <th colSpan={columns.length + 1} className="whitespace-nowrap px-4 pb-1 pt-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {g.title}
+              </th>
+            </tr>
+            {g.rows.map((r) => (
+              <tr key={r.key} className="hover:bg-muted/30">
+                <td className="sticky left-0 z-10 whitespace-nowrap bg-card px-4 py-1.5 text-muted-foreground">{r.label}</td>
+                {columns.map((c) => (
+                  <td key={c.id} className={`px-4 py-1.5 text-right ${c.emphasis ? "bg-muted/40" : ""}`} data-testid={`${testId}-${c.id}-${r.key}`}>
+                    <KpiCell k={c.k} rowKey={r.key} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr><td colSpan={columns.length + 1} className="h-2" /></tr>
+          </tbody>
+        ))}
+        {columns.some((c) => c.action) && (
+          <tfoot>
+            <tr className="border-t">
+              <td className="px-4 py-3" />
+              {columns.map((c) => <td key={c.id} className={`px-4 py-3 text-right ${c.emphasis ? "bg-muted/40" : ""}`}>{c.action}</td>)}
+            </tr>
+          </tfoot>
+        )}
+      </table>
+    </div>
   );
 }
 
@@ -155,7 +182,6 @@ export function CrmDivisionsTab() {
             <TabsTrigger value="overview" data-testid="tab-division-overview">All divisions — Overview</TabsTrigger>
             {divisions.map((d) => (
               <TabsTrigger key={d.id} value={d.code} data-testid={`tab-division-${d.code}`}>
-                <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${divisionTone(divisions, d.id).dot}`} aria-hidden="true" />
                 {divisionLabel(d)}
               </TabsTrigger>
             ))}
@@ -171,64 +197,28 @@ export function CrmDivisionsTab() {
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Each card is one division's own dashboard. “This month” is since{" "}
+                  Each column is one division on its own; only the last column adds them up. Amounts show the number of
+                  records beside them. “This month” is since{" "}
                   {new Date(overview.data.monthStart).toLocaleDateString("en-US", { month: "long", day: "numeric" })}.
                 </p>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="grid-division-cards">
-                  {overview.data.divisions.map((d) => {
-                    const tone = divisionTone(divisions, d.id);
-                    return (
-                      <Card key={d.id} className={`border-2 ${tone.soft}`} data-testid={`card-division-${d.code}`}>
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 font-semibold">
-                                <span className={`h-2.5 w-2.5 rounded-full ${tone.dot}`} aria-hidden="true" />
-                                {d.label}
-                                {d.isHeadquarters && <StatusPill tone="info">HQ</StatusPill>}
-                              </div>
-                              <div className="text-xs text-muted-foreground truncate">{[d.name, d.city, d.state].filter(Boolean).join(" · ")}</div>
-                            </div>
-                            {activeId === d.id && <StatusPill tone="success">You are here</StatusPill>}
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <KpiList k={d.kpis} testId={`kpis-${d.code}`} />
-                          <Button size="sm" className="w-full" onClick={() => void open(d.id)} data-testid={`button-open-division-${d.code}`}>
-                            Open {d.code} workspace <ArrowRight className="ml-1 h-4 w-4" />
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                  <Card className="border-dashed" data-testid="card-division-unassigned">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center gap-2 font-semibold"><Inbox className="h-4 w-4" /> Unassigned</div>
-                      <div className="text-xs text-muted-foreground">No address on file anywhere yet — visible only in All divisions.</div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2 text-sm" data-testid="unassigned-records">
-                        {(["customers", "projects", "estimates", "invoices"] as const).map((r) => (
-                          <div key={r} className="rounded-md bg-muted/50 px-2 py-1.5">
-                            <div className="text-xs text-muted-foreground capitalize">{r === "customers" ? "clients" : r}</div>
-                            <div className="font-semibold tabular-nums" data-testid={`unassigned-count-${r}`}>{overview.data!.unassigned.records[r].toLocaleString()}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <KpiList k={overview.data.unassigned} testId="kpis-unassigned" />
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card data-testid="card-company-total">
-                  <CardHeader className="pb-2">
-                    <SectionTitle icon={Building2} title="Company total — all divisions plus unassigned"
-                      description="The one place divisions are added together. Every card above is its own division." />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-x-8 sm:grid-cols-2"><KpiList k={overview.data.companyTotal} testId="kpis-company-total" /></div>
-                  </CardContent>
-                </Card>
+                <KpiTable testId="table-division-overview" columns={[
+                  ...overview.data.divisions.map((d) => ({
+                    id: d.code, title: d.label,
+                    subtitle: [d.isHeadquarters ? "HQ" : null, activeId === d.id ? "You are here" : null].filter(Boolean).join(" · ") || null,
+                    k: d.kpis,
+                    action: (
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => void open(d.id)} data-testid={`button-open-division-${d.code}`}>
+                        Open <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                      </Button>
+                    ),
+                  })),
+                  {
+                    id: "unassigned", title: "Unassigned",
+                    subtitle: `${overview.data.unassigned.records.customers.toLocaleString()} clients · ${overview.data.unassigned.records.estimates.toLocaleString()} estimates`,
+                    k: overview.data.unassigned,
+                  },
+                  { id: "total", title: "Company total", subtitle: "All columns added", k: overview.data.companyTotal, emphasis: true },
+                ]} />
 
                 {canManage && <SortUnassigned onDone={() => overview.refetch()} />}
               </>
@@ -240,21 +230,19 @@ export function CrmDivisionsTab() {
             const card = overview.data?.divisions.find((x) => x.id === d.id);
             return (
               <TabsContent key={d.id} value={d.code} className="mt-4 space-y-4" data-testid={`panel-division-${d.code}`}>
-                <Card className={`border-2 ${divisionTone(divisions, d.id).soft}`}>
-                  <CardHeader className="pb-2">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <SectionTitle icon={Layers} title={`${divisionLabel(d)} — dashboard`}
-                        description={`${d.name}${d.city || d.state ? ` · ${[d.city, d.state].filter(Boolean).join(", ")}` : ""}. Only this division's estimates, invoices, projects and payments.`} />
-                      <Button onClick={() => void open(d.id)} data-testid={`button-open-workspace-tab-${d.code}`}>
-                        {activeId === d.id ? "Go to this division's dashboard" : `Open ${d.code} workspace`} <ArrowRight className="ml-1 h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {card ? <div className="grid gap-x-8 sm:grid-cols-2"><KpiList k={card.kpis} testId={`tab-kpis-${d.code}`} /></div>
-                      : canReport ? <div className="text-sm text-muted-foreground">Loading…</div> : null}
-                  </CardContent>
-                </Card>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold">{divisionLabel(d)}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {[d.name, [d.city, d.state].filter(Boolean).join(", ")].filter(Boolean).join(" · ")} — only this division's estimates, invoices, projects and payments.
+                    </p>
+                  </div>
+                  <Button onClick={() => void open(d.id)} data-testid={`button-open-workspace-tab-${d.code}`}>
+                    {activeId === d.id ? "Go to this division's dashboard" : `Open ${d.code} workspace`} <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+                {card ? <KpiTable testId={`table-division-${d.code}`} columns={[{ id: d.code, title: divisionLabel(d), k: card.kpis }]} />
+                  : canReport ? <div className="text-sm text-muted-foreground">Loading…</div> : null}
                 {canManage && <CrmDivisionsManager onlyId={d.id} title={`${divisionLabel(d)} — details`} />}
               </TabsContent>
             );
