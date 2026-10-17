@@ -35,7 +35,7 @@ const SAMPLES = [
   {
     key: "sample-martinez",
     name: "Daniel & Rosa Martinez", firstName: "Daniel", lastName: "Martinez",
-    phone: "(509) 555-0142", city: "Spokane", state: "WA", address: "1420 Birchwood Dr",
+    phone: "(509) 555-0142", city: "Spokane", state: "WA", address: "1420 Demo Birch Ln",
     title: "Siding remodel — James Hardie primed + exterior paint",
     items: [
       { name: "Siding Remodel - James Hardie Primed + Exterior Paint", qty: 1, price: 4125000 },
@@ -55,7 +55,7 @@ const SAMPLES = [
   {
     key: "sample-obrien",
     name: "Pat & Linda O'Brien", firstName: "Pat", lastName: "O'Brien",
-    phone: "(509) 555-0191", city: "Spokane Valley", state: "WA", address: "277 Mountain View Rd",
+    phone: "(509) 555-0191", city: "Spokane", state: "WA", address: "277 Demo Valley Rd",
     title: "Siding + paint bundle",
     items: [
       { name: "Siding Remodel - Color +", qty: 1, price: 2270000 },
