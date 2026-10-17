@@ -37,5 +37,8 @@ export async function writeDraft(row: store.ReleaseRow, notes?: string): Promise
   const t: PressReleaseText = want && row.text ? await draftDeps.reviseRelease(row.input, row.text, want, row.tier) : await draftDeps.draftRelease(row.input, row.tier);
   if (!t.dateline) t.dateline = datelineFor(row.input.city, row.input.state);
   const issues = checkRelease(t, row.input);
-  return store.updateRelease(row.id, { text: t, issues });
+  // Guarded on an editable status: a draft approved (or auto-sent) while the writer was busy keeps what was approved.
+  const upd = await store.updateEditable(row.id, { text: t, issues });
+  if (!upd) throw new store.NotEditableError();
+  return upd;
 }

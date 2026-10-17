@@ -127,6 +127,8 @@ ALTER TABLE press_releases ADD COLUMN IF NOT EXISTS send_for_me boolean NOT NULL
 ALTER TABLE press_releases ADD COLUMN IF NOT EXISTS send_at timestamptz;
 ALTER TABLE press_releases ADD COLUMN IF NOT EXISTS send_hash text;
 ALTER TABLE press_releases ADD COLUMN IF NOT EXISTS send_note text;
+-- What was approved (store.ts releaseHash): submitReady sends only a release whose text still matches it.
+ALTER TABLE press_releases ADD COLUMN IF NOT EXISTS approved_hash text;
 CREATE INDEX IF NOT EXISTS press_releases_send_at_idx ON press_releases (send_at) WHERE send_at IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS press_share_settings (

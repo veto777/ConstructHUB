@@ -1,5 +1,6 @@
 /** press_orders / press_releases / press_messages / press_inbox_state (schema.ts): plain SQL on the shared pool. */
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import type { PoolClient } from "pg";
 import { pool } from "../db";
 import {
   PRESS_CREDIT_MONTHS, type PressGuidelineIssue, type PressOrderView, type PressPackageKey, type PressReleaseInput, type PressReleaseStatus, type PressReleaseText, type PressReleaseView, type PressReport, type PressTier, pressOrderName, pressPackage,
@@ -14,7 +15,7 @@ export type ReleaseRow = {
   text: PressReleaseText | null; issues: PressGuidelineIssue[]; wire_notes: string | null; wire_message_id: string | null; live_url: string | null;
   report: PressReport | null; scheduled_for: string | null; created_at: Date; updated_at: Date; submitted_at: Date | null; live_at: Date | null;
   reported_at: Date | null; attempts: number; last_error: string | null;
-  send_for_me: boolean; send_at: Date | null; send_hash: string | null; send_note: string | null;
+  send_for_me: boolean; send_at: Date | null; send_hash: string | null; send_note: string | null; approved_hash: string | null;
 };
 export type ShareRow = { release_id: number; target_key: string; kind: "social" | "gbp"; label: string; status: "pending" | "queued" | "failed" | "skipped"; detail: string | null; ref: string | null; created_at: Date };
 export type MessageRow = {
@@ -100,23 +101,28 @@ export async function spendCredit(releaseId: number, userId: number, tier: Press
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const { rows } = await client.query<OrderRow>(
-      `SELECT * FROM press_orders WHERE user_id=$1 AND tier=$2 AND status='paid' AND credits_used < credits AND (expires_at IS NULL OR expires_at > now())
-       ORDER BY expires_at NULLS LAST, id LIMIT 1 FOR UPDATE`,
-      [userId, tier],
-    );
-    const order = rows[0];
-    if (!order) { await client.query("ROLLBACK"); return false; }
-    await client.query(`UPDATE press_orders SET credits_used = credits_used + 1 WHERE id=$1`, [order.id]);
-    await client.query(`UPDATE press_releases SET order_id=$2, updated_at=now() WHERE id=$1`, [releaseId, order.id]);
-    await client.query("COMMIT");
-    return true;
+    const ok = await spendCreditWith(client, releaseId, userId, tier);
+    await client.query(ok ? "COMMIT" : "ROLLBACK");
+    return ok;
   } catch (e) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw e;
   } finally {
     client.release();
   }
+}
+/** The same inside a transaction the caller holds (approve.ts): the order row is locked until it commits. */
+export async function spendCreditWith(client: PoolClient, releaseId: number, userId: number, tier: PressTier): Promise<boolean> {
+  const { rows } = await client.query<OrderRow>(
+    `SELECT * FROM press_orders WHERE user_id=$1 AND tier=$2 AND status='paid' AND credits_used < credits AND (expires_at IS NULL OR expires_at > now())
+     ORDER BY expires_at NULLS LAST, id LIMIT 1 FOR UPDATE`,
+    [userId, tier],
+  );
+  const order = rows[0];
+  if (!order) return false;
+  await client.query(`UPDATE press_orders SET credits_used = credits_used + 1 WHERE id=$1`, [order.id]);
+  await client.query(`UPDATE press_releases SET order_id=$2, updated_at=now() WHERE id=$1`, [releaseId, order.id]);
+  return true;
 }
 /** A cancelled release gives its credit back to the order it took it from. */
 export async function refundCredit(releaseId: number): Promise<void> {
@@ -172,7 +178,7 @@ export async function updateRelease(id: number, patch: Partial<{
   input: PressReleaseInput; text: PressReleaseText | null; issues: PressGuidelineIssue[]; status: PressReleaseStatus; tier: PressTier; wire_notes: string | null;
   wire_message_id: string | null; live_url: string | null; report: PressReport | null; scheduled_for: string | null; submitted_at: Date | null; live_at: Date | null;
   reported_at: Date | null; attempts: number; last_error: string | null;
-  send_for_me: boolean; send_at: Date | null; send_hash: string | null; send_note: string | null;
+  send_for_me: boolean; send_at: Date | null; send_hash: string | null; send_note: string | null; approved_hash: string | null;
 }>): Promise<ReleaseRow> {
   const sets: string[] = ["updated_at=now()"]; const vals: unknown[] = [id];
   for (const [k, v] of Object.entries(patch)) {
@@ -181,6 +187,29 @@ export async function updateRelease(id: number, patch: Partial<{
   }
   const { rows } = await pool.query<ReleaseRow>(`UPDATE press_releases SET ${sets.join(", ")} WHERE id=$1 RETURNING *`, vals);
   return rows[0];
+}
+/** Keys sorted at every level: Postgres jsonb and zod each order keys their own way. */
+const stable = (v: any): any => Array.isArray(v) ? v.map(stable) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, stable(v[k])])) : v;
+/** What a release says: its facts, its text and its tier. Scheduling and approval record it; sending compares it. */
+export const releaseHash = (r: Pick<ReleaseRow, "input" | "text" | "tier">) => createHash("sha256").update(JSON.stringify(stable({ input: r.input, text: r.text, tier: r.tier }))).digest("hex");
+
+/** A write refused because the release was approved (or sent) meanwhile; routes answer 409. */
+export class NotEditableError extends Error { constructor() { super("This release was already approved"); } }
+/** Statuses whose text and facts the customer (or the writer) may still change. */
+export const EDITABLE = ["draft", "changes_requested"] as const;
+/**
+ * updateRelease, but only while the release is still editable: the row lock of this UPDATE and the FOR UPDATE in
+ * approve.ts serialize an edit against an approval, so an edit never lands on an approved release. Null when the
+ * release had moved on (the caller answers 409).
+ */
+export async function updateEditable(id: number, patch: Parameters<typeof updateRelease>[1]): Promise<ReleaseRow | null> {
+  const sets: string[] = ["updated_at=now()"]; const vals: unknown[] = [id];
+  for (const [k, v] of Object.entries(patch)) {
+    vals.push(k === "input" || k === "text" || k === "issues" || k === "report" ? (v == null ? null : JSON.stringify(v)) : v);
+    sets.push(`${k}=$${vals.length}`);
+  }
+  const { rows } = await pool.query<ReleaseRow>(`UPDATE press_releases SET ${sets.join(", ")} WHERE id=$1 AND status IN ('draft','changes_requested') RETURNING *`, vals);
+  return rows[0] ?? null;
 }
 /** The customer's last live release, for the one-a-month pacing note. */
 export async function lastSubmittedAt(userId: number): Promise<Date | null> {

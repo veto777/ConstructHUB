@@ -11,7 +11,7 @@
  * own path: the guideline check, the credit and the wire queue are unchanged. A blocking issue, no credit, or an
  * edit after scheduling means it is not sent, and the customer is told why.
  */
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { pool } from "../db";
 import { notifyUser } from "../account-events";
 import { PRESS_PATH, type PressGuidelineIssue } from "@shared/press";
@@ -94,10 +94,8 @@ const base = () => process.env.APP_URL || "https://constructhub.us";
 
 // ---- scheduling ------------------------------------------------------------------------------------------------
 
-/** What was approved for sending: the text and the facts. A release edited since no longer matches. */
-/** Keys sorted at every level: Postgres jsonb and zod each order keys their own way. */
-const stable = (v: any): any => Array.isArray(v) ? v.map(stable) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, stable(v[k])])) : v;
-export const releaseHash = (r: Pick<store.ReleaseRow, "input" | "text" | "tier">) => createHash("sha256").update(JSON.stringify(stable({ input: r.input, text: r.text, tier: r.tier }))).digest("hex");
+/** What was scheduled: the text and the facts (store.ts). A release edited since no longer matches. */
+export const releaseHash = store.releaseHash;
 
 const issueWords = (issues: PressGuidelineIssue[]) => issues.filter((i) => i.blocking).map((i) => `${i.rule}: ${i.detail}`).join(" ");
 
@@ -120,7 +118,9 @@ export async function scheduleSend(row: store.ReleaseRow, opts: { now?: Date; no
   if (!row.order_id && credits[row.tier] < 1) return { scheduled: false, why: "no_credit", message: "Sending it needs a release credit. Pick a package first." };
   const tz = await userTimeZone(row.user_id);
   const sendAt = sendAtFor(now, tz);
-  const upd = await store.updateRelease(row.id, { issues, send_for_me: true, send_at: sendAt, send_hash: releaseHash(row), send_note: null });
+  // Guarded: a release approved meanwhile is not scheduled. An edit after this is caught by the hash at send time.
+  const upd = await store.updateEditable(row.id, { issues, send_for_me: true, send_at: sendAt, send_hash: releaseHash(row), send_note: null });
+  if (!upd) return { scheduled: false, why: "state", message: "This release was already approved" };
   if (opts.notify !== false) {
     const when = sendWords(sendAt, tz);
     const hold = holdPath(holdToken(row.id, sendAt));
@@ -147,32 +147,32 @@ export async function holdSend(releaseId: number, opts: { userId?: number; sendA
 
 export type SendOutcome = { id: number; outcome: "sent" | "lost_race" | "edited" | "guidelines" | "no_credit" | "error"; message?: string };
 
-async function notSent(row: store.ReleaseRow, note: string, outcome: SendOutcome["outcome"]): Promise<SendOutcome> {
-  await store.updateRelease(row.id, { send_for_me: false, send_note: note });
+async function tell(row: store.ReleaseRow, note: string): Promise<void> {
   const link = `${PRESS_PATH}?release=${row.id}`;
   await sendDeps.notify(row.user_id, "press.needs_fix", { title: "Your press release did not go out", body: note, link, actionUrl: link, actionLabel: "Open the draft", severity: "warning" }).catch(() => undefined);
-  return { id: row.id, outcome, message: note };
 }
 
-/** One release whose time has come. Safe to call from many passes at once: one of them claims it. */
+/**
+ * One release whose time has come. The claim, the hash check on the locked row, the guideline check, the credit and
+ * the 'ready' status are one transaction (approve.ts), so many passes at once send it once, and an edit or a rewrite
+ * either lands first (and stops the send) or finds it approved (and is refused with 409).
+ */
 export async function sendOne(id: number, sendAt: Date): Promise<SendOutcome> {
-  const { rows: [row] } = await pool.query<store.ReleaseRow>(
-    `UPDATE press_releases SET send_at=NULL, updated_at=now() WHERE id=$1 AND send_at=$2 AND status='draft' RETURNING *`,
-    [id, sendAt],
-  );
-  if (!row) return { id, outcome: "lost_race" };
-  if (!row.send_hash || row.send_hash !== releaseHash(row)) return notSent(row, "It was changed after it was scheduled, so it was not sent. Read it and approve it, or turn on Send it for me again.", "edited");
   try {
-    const out = await approveRelease(row, row.user_id, { kick: false });
+    const out = await approveRelease(id, { kick: false, auto: { sendAt, note: (why) => why.startsWith("It ") ? why : `It was not sent: ${why}` } });
     if (out.ok) {
-      await store.updateRelease(row.id, { send_note: "Sent for you." });
+      await store.updateRelease(id, { send_note: "Sent for you." });
       return { id, outcome: "sent" };
     }
-    if (out.code === "guidelines") return notSent(row, `It was not sent: ${issueWords(out.issues ?? [])}`, "guidelines");
-    if (out.code === "no_credit") return notSent(row, "It was not sent: no release credit is left. Pick a package, then approve it.", "no_credit");
-    return notSent(row, `It was not sent: ${out.message}`, "error");
+    if (out.code === "lost_race" || out.code === "not_found") return { id, outcome: "lost_race" };
+    const outcome: SendOutcome["outcome"] = out.code === "edited" ? "edited" : out.code === "guidelines" ? "guidelines" : out.code === "no_credit" ? "no_credit" : "error";
+    const note = out.code === "guidelines" ? `It was not sent: ${issueWords(out.issues ?? [])}` : out.code === "no_credit" ? "It was not sent: no release credit is left. Pick a package, then approve it." : out.code === "edited" ? out.message : `It was not sent: ${out.message}`;
+    if (out.row) { if (note !== out.message) await store.updateRelease(id, { send_note: note }); await tell(out.row, note); }
+    return { id, outcome, message: note };
   } catch (e: any) {
-    return notSent(row, "It was not sent because of an error on our side. Approve it when you are ready.", "error");
+    // Rolled back: the schedule is untouched and the next pass tries again.
+    console.error(`[press] auto-send ${id}: ${e?.message ?? e}`);
+    return { id, outcome: "error", message: String(e?.message ?? e) };
   }
 }
 

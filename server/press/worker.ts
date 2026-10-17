@@ -29,6 +29,7 @@ import { readWireReply, releaseAsText, reviseRelease } from "./writer";
 import { checkRelease } from "./guidelines";
 import { runAutopilot } from "./autopilot";
 import { sendDue } from "./send";
+import { notifyUser } from "../account-events";
 import { shareWhenLive } from "./share";
 import { logError } from "../ops/log";
 
@@ -39,7 +40,7 @@ export const pressWorkerConfig = (env: NodeJS.ProcessEnv = process.env) => ({
   submitMinutes: num(env.PRESS_SUBMIT_EVERY_MIN, 15),
   autopilotMinutes: num(env.PRESS_AUTOPILOT_EVERY_MIN, 60),
 });
-export const workerDeps = { fetchSince, sendMail, readWireReply, reviseRelease };
+export const workerDeps = { fetchSince, sendMail, readWireReply, reviseRelease, notify: notifyUser };
 
 const CODE_RE = /CH-PR-[0-9A-F]{6}/i;
 const siteBase = () => `https://${PRIMARY_DOMAIN}`;
@@ -88,10 +89,20 @@ export async function submitReady(): Promise<{ sent: number; held: number; faile
     out.held = ready.length;
     return out;
   }
-  for (const r of ready) {
+  for (let r of ready) {
     if (!r.text) { await store.updateRelease(r.id, { last_error: "No text to send" }); out.failed++; continue; }
-    const claimed = await store.updateRelease(r.id, { status: "queued", last_error: null });
-    if (claimed.status !== "queued") continue;
+    // Claimed in one UPDATE that also re-reads the row: only a release still 'ready' is taken.
+    const { rows: [claimed] } = await pool.query<store.ReleaseRow>(`UPDATE press_releases SET status='queued', last_error=NULL, updated_at=now() WHERE id=$1 AND status='ready' RETURNING *`, [r.id]);
+    if (!claimed) continue;
+    // Only the text that was approved goes to the wire. Rows approved before approved_hash existed carry none.
+    if (claimed.approved_hash && claimed.approved_hash !== store.releaseHash(claimed)) {
+      console.error(`[press] submit ${claimed.code} refused: the text changed after it was approved`);
+      await store.updateRelease(claimed.id, { status: "draft", last_error: "Not sent: it changed after it was approved. Read it and approve it again (no extra credit)." });
+      await workerDeps.notify(claimed.user_id, "press.needs_fix", { title: "Your press release was not sent", body: "It changed after it was approved, so the wire was not sent a version you had not checked. Read it and approve it again; no extra credit is used.", link: `${PRESS_PATH}?release=${claimed.id}`, actionUrl: `${PRESS_PATH}?release=${claimed.id}`, actionLabel: "Open the release", severity: "warning" }).catch(() => undefined);
+      out.failed++;
+      continue;
+    }
+    r = claimed;
     try {
       const { subject, body } = submissionMail(r);
       // OWNER LAW 2026-10-15 (server/outbound-guard.ts): nothing to the wire may give a bot away. Hard tells only: the

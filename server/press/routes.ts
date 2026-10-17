@@ -86,6 +86,8 @@ const own = async (req: Request, res: Response, getUser: GetUser) => {
 /** A release as the page shows it, with where it was shared. */
 const viewOf = async (r: store.ReleaseRow) => store.releaseView(r, (await store.sharesFor([r.id])).get(r.id) ?? []);
 
+const ALREADY_APPROVED = "This release was already approved";
+
 const setup = () => ({ ai: pressAiConfigured(), mailbox: mailboxConfigured(), wire: wireConfigured(), photos: r2Configured() });
 
 export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser = defaultGetUser) {
@@ -206,10 +208,13 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       const input = (body.data.input as PressReleaseInput | undefined) ?? row.input;
       const txt = body.data.text === undefined ? row.text : body.data.text;
       const issues = txt ? checkRelease(txt, input) : [];
-      // An edit stops a scheduled "Send it for me": what goes out is only ever what was scheduled.
+      // An edit stops a scheduled "Send it for me": what goes out is only ever what was scheduled. The write is
+      // guarded on an editable status (approve.ts holds the row lock while it approves), so it never lands on an
+      // approved release.
       const changed = releaseHash({ input, text: txt, tier: row.tier }) !== releaseHash(row);
-      const stop = row.send_at && changed ? { send_at: null, send_for_me: false, send_note: "You edited it, so it will not go out on its own. Approve it, or turn on Send it for me again." } : {};
-      const upd = await store.updateRelease(row.id, { input, text: txt, issues, ...stop });
+      const stop = changed ? { send_at: null, send_for_me: false, ...(row.send_at ? { send_note: "You edited it, so it will not go out on its own. Approve it, or turn on Send it for me again." } : {}) } : {};
+      const upd = await store.updateEditable(row.id, { input, text: txt, issues, ...stop });
+      if (!upd) return res.status(409).json({ message: ALREADY_APPROVED });
       res.json(await viewOf(upd));
     } catch (err) { logError("[press] edit release:", err); res.status(500).json({ message: "Could not save" }); }
   });
@@ -231,8 +236,13 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
           const key = await uploadToR2(f.buffer, f.mimetype, "press/photos", ext);
           photos.push({ key, url: getR2Url(key), caption: "" });
         }
-        const upd = await store.updateRelease(row.id, { input: { ...row.input, photos } });
-        res.json(store.releaseView(upd));
+        const upd = await store.updateEditable(row.id, {
+          input: { ...row.input, photos },
+          // New photos change what would be sent: a scheduled send stops, with the reason.
+          send_at: null, send_for_me: false, ...(row.send_at ? { send_note: "Photos were added, so it will not go out on its own. Approve it, or turn Send it for me on again." } : {}),
+        });
+        if (!upd) return res.status(409).json({ message: ALREADY_APPROVED });
+        res.json(await viewOf(upd));
       } catch (e) { logError("[press] photo upload:", e); res.status(500).json({ message: "Could not store the photo" }); }
     });
   });
@@ -245,10 +255,14 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       if (!["draft", "changes_requested"].includes(row.status)) return res.status(409).json({ message: "This release has already been sent" });
       if (!pressAiConfigured()) return res.status(503).json({ message: "The writer is not available right now. Please try again shortly." });
       const notes = z.object({ notes: text(2000).optional() }).safeParse(req.body ?? {});
-      let upd = await writeDraft(row, notes.success ? notes.data.notes : undefined);
-      if (row.send_at) upd = await store.updateRelease(row.id, { send_at: null, send_for_me: false, send_note: "Rewritten, so it will not go out on its own. Approve it, or turn on Send it for me again." });
+      // A rewrite stops a scheduled send BEFORE the writer starts, so no pass can send the old text meanwhile.
+      if (row.send_at && !(await store.updateEditable(row.id, { send_at: null, send_for_me: false, send_note: "Rewritten, so it will not go out on its own. Approve it, or turn on Send it for me again." }))) {
+        return res.status(409).json({ message: ALREADY_APPROVED });
+      }
+      const upd = await writeDraft((await store.getRelease(row.id)) ?? row, notes.success ? notes.data.notes : undefined);
       res.json(await viewOf(upd));
-    } catch (err: any) { logError("[press] draft:", err); res.status(502).json({ message: `The writer could not finish: ${String(err?.message ?? err).slice(0, 200)}` }); }
+    } catch (err: any) {
+      if (err instanceof store.NotEditableError) return res.status(409).json({ message: ALREADY_APPROVED }); logError("[press] draft:", err); res.status(502).json({ message: `The writer could not finish: ${String(err?.message ?? err).slice(0, 200)}` }); }
   });
 
   app.post("/api/press/releases/:id/approve", async (req, res) => {
@@ -256,7 +270,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       const found = await own(req, res, getUser);
       if (!found) return;
       const { user, row } = found;
-      const out = await approveRelease(row, user.id);
+      const out = await approveRelease(row.id, { userId: user.id });
       if (!out.ok) return res.status(out.status).json({ ...(out.code && out.code !== "state" && out.code !== "no_text" ? { code: out.code } : {}), message: out.message, ...(out.issues ? { issues: out.issues } : {}) });
       res.json(await viewOf(out.row));
     } catch (err) { logError("[press] approve:", err); res.status(500).json({ message: "Could not approve the release" }); }
@@ -434,7 +448,8 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
     const row = id.success ? await store.getRelease(id.data) : null;
     if (!row) return res.status(404).json({ message: "Not found" });
     if (!row.text) return res.status(400).json({ message: "No text" });
-    await store.updateRelease(row.id, { status: "ready", last_error: null });
+    // A platform admin resends what the release says now: that is what is approved for the wire.
+    await store.updateRelease(row.id, { status: "ready", last_error: null, approved_hash: store.releaseHash(row) });
     res.json(await runPressPass({ inbox: false }));
   });
   app.post("/api/admin/press/messages/:id/handled", async (req, res) => {
