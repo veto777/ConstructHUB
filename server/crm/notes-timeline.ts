@@ -8,7 +8,11 @@ import { objectPolicy, canShareWholeClientPortal } from "./object-access";
  *   - Activity timeline (GET /api/crm/customers/:id/timeline): one merged,
  *     newest-first feed of estimate events (sent/viewed/approved/declined),
  *     engagement sessions ("opened estimate E-101 · stayed 4m 12s"), payments,
- *     portal comments, attachment uploads and financing clicks.
+ *     portal comments, attachment uploads and financing clicks. EVERY entry
+ *     names who did it (`actor`, shared/crm-actor.ts): the member by name
+ *     ("Veto Smith (Owner)" for the owner), the client by name, or the
+ *     automatic source ("HOVER import", "Stripe", "System"). A historic row
+ *     with nothing recorded is said so — never guessed.
  *   - Financing click tracking (POST /api/client/financing-click): recorded
  *     BEFORE the portal opens the lender link, attributed to the session
  *     customer whose org actually offers that exact link. The org is emailed,
@@ -24,6 +28,7 @@ import type { Express } from "express";
 import { z } from "zod";
 import { db } from "../db";
 import {
+  crmActivityLog,
   crmAttachments,
   crmClientComments,
   crmCustomerNotes,
@@ -33,6 +38,7 @@ import {
   crmEngagementSessions,
   crmFinanceClicks,
   crmInvoices,
+  crmMeasurements,
   crmMembers,
   crmOrgs,
   crmPayments,
@@ -49,7 +55,12 @@ import {
 } from "./client-auth";
 import { clientPortalBaseUrl, portalBaseUrl } from "../site-context";
 import { sendWithFallback } from "../email";
-import { isOutboundMessageNote } from "./messages";
+import { isOutboundMessageNote, OUTBOUND_MESSAGE_PREFIX } from "./messages";
+import { loadActorDirectory, estimateEventActor } from "./actors";
+import {
+  actorLabel, actorSentence, clientActor, systemActor, uploadLabelActor,
+  UNRECORDED_ACTOR, UNRECORDED_TEAM_ACTOR, type CrmActor,
+} from "@shared/crm-actor";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -77,7 +88,13 @@ export type TimelineEntry = {
   id: string;
   kind: "estimate_event" | "engagement" | "payment" | "comment" | "attachment" | "finance_click" | "message";
   verb: string;
+  /** Who did it, by name — never an id. recorded:false = nothing recorded who (historic). */
+  actor: CrmActor;
+  /** The full sentence, actor first ("Gabe Varnadore added a project photo …"). */
   text: string;
+  /** The sentence without the actor — the UI bolds the name in front of it. Equal to
+   *  `text` when the actor is not recorded (the sentence then says so itself). */
+  actionText: string;
   ref: string | null;          // document ref (E-101, INV-204) where relevant
   at: string;                  // ISO timestamp
   durationSecs?: number | null;
@@ -104,35 +121,163 @@ export function formatDurationSecs(secs: number): string {
 
 const quote = (body: string) => `“${body.length > 80 ? `${body.slice(0, 80)}…` : body}”`;
 
-/**
- * One thread message on the timeline. crm_client_comments is two-way:
- * authorMemberId null = the client wrote it from the portal; set = a team
- * member's reply — which must never read as the client's message.
- */
-export function commentTimelineText(
-  c: { body: string; authorMemberId: string | null },
-  viewerMemberId: string | null,
-  authorName: string | null,
-): string {
-  if (!c.authorMemberId) return `Sent a message from the portal — ${quote(c.body)}`;
-  const who = c.authorMemberId === viewerMemberId ? "You" : authorName?.trim() || "A team member";
-  return `${who} replied — ${quote(c.body)}`;
+/** An entry's actor + sentence, built the one way: "<actor> <rest>". */
+export function said(actor: CrmActor, rest: string): { actor: CrmActor; text: string; actionText: string } {
+  const text = actorSentence(actor, rest);
+  return { actor, text, actionText: rest };
+}
+
+/** A historic entry whose sentence states that nobody recorded who did it. */
+function unrecorded(actor: CrmActor, sentence: string): { actor: CrmActor; text: string; actionText: string } {
+  return { actor, text: sentence, actionText: sentence };
 }
 
 /**
- * Who put a photo on the client's shelf, read from the stored name (there is
- * no uploader column): the CRM upload always tags a stage ("progress--" /
- * "finished--"), HOVER imports are "hover-<job>-<image>.jpg", and the client
- * portal stores the homeowner's own file name untouched.
+ * One thread message on the timeline. crm_client_comments is two-way:
+ * authorMemberId null = the client wrote it from the portal; set = a team
+ * member's reply — which must never read as the client's message. `actor`
+ * is the client (by name) or the replying member (by name).
  */
-export function photoTimelineText(fileName: string): string {
-  const stage = fileName.startsWith("progress--") ? "progress" : fileName.startsWith("finished--") ? "finished" : null;
-  if (stage) {
-    const label = stage === "finished" ? "finished" : "in progress";
-    return `Your team added a project photo (${label}) — ${fileName.slice(stage.length + 2)}`;
+export function commentTimelineText(
+  c: { body: string; authorMemberId: string | null },
+  actor: CrmActor,
+): string {
+  if (!c.authorMemberId) return actorSentence(actor, `sent a message from the portal — ${quote(c.body)}`);
+  return actorSentence(actor, `replied — ${quote(c.body)}`);
+}
+
+const HOVER_PHOTO_RE = /^hover-(.+)-([^-]+)\.jpg$/i;
+
+/** The stage tag the CRM upload route stores in front of the name. */
+export function photoStage(fileName: string): "progress" | "finished" | null {
+  return fileName.startsWith("progress--") ? "progress" : fileName.startsWith("finished--") ? "finished" : null;
+}
+
+/**
+ * Who added an attachment — from REAL evidence only, in this order:
+ *   1. the row's own uploader columns (every insert path since 2026-10-17);
+ *   2. a crm_activity_log row for the same attachment id;
+ *   3. the kind / name only one code path can produce: 'contract' PDFs are
+ *      minted by the system, 'measurement' PDFs only by the HOVER import,
+ *      and a "hover-<job>-<image>.jpg" photo is a HOVER import when that
+ *      HOVER job is on file for this client (crm_measurements);
+ *   4. still unknown: the stage tag ("progress--") / an estimate, pamphlet or
+ *      library file can only come from the team's CRM upload → "your team
+ *      (uploader not recorded)"; anything else → not recorded at all.
+ * Never a guess from a bare file name.
+ */
+export function resolveAttachmentActor(
+  att: { kind: string; fileName: string; uploadedByMemberId?: string | null; uploadedByLabel?: string | null },
+  ev: {
+    member: (id: string) => CrmActor | null;
+    /** The activity-log actor recorded for this attachment's upload, if any. */
+    logged?: CrmActor | null;
+    /** HOVER job ids on file for this client. */
+    hoverJobIds?: Set<string>;
+  },
+): CrmActor {
+  if (att.uploadedByMemberId) {
+    const m = ev.member(att.uploadedByMemberId);
+    if (m) return m;
+    if (ev.logged) return ev.logged;
+    return { kind: "member", name: "Former team member", recorded: true };
   }
-  if (/^hover-[^-]+-.+\.jpg$/i.test(fileName)) return `HOVER photo imported — ${fileName}`;
-  return `Client shared a photo — ${fileName}`;
+  if (att.uploadedByLabel) return uploadLabelActor(att.uploadedByLabel);
+  if (ev.logged) return ev.logged;
+  if (att.kind === "contract") return systemActor("System");
+  if (att.kind === "measurement") return systemActor("HOVER import");
+  if (att.kind === "photo") {
+    const hv = HOVER_PHOTO_RE.exec(att.fileName);
+    if (hv && ev.hoverJobIds?.has(hv[1])) return systemActor("HOVER import");
+    if (photoStage(att.fileName)) return UNRECORDED_TEAM_ACTOR;
+    return UNRECORDED_ACTOR;
+  }
+  if (att.kind === "estimate" || att.kind === "pamphlet" || att.kind === "estimate_default") return UNRECORDED_TEAM_ACTOR;
+  return UNRECORDED_ACTOR;
+}
+
+/**
+ * A photo on the client's shelf, named by its uploader: "Gabe Varnadore
+ * added a project photo (in progress) — IMG_3305.jpeg", "Carley Geiss shared
+ * a photo — IMG_0042.jpg", "HOVER import added a photo — hover-1-2.jpg".
+ */
+export function photoTimelineText(fileName: string, actor: CrmActor): { actor: CrmActor; text: string; actionText: string } {
+  const stage = photoStage(fileName);
+  const name = stage ? fileName.slice(stage.length + 2) : fileName;
+  const noun = stage ? `a project photo (${stage === "finished" ? "finished" : "in progress"})` : "a photo";
+  if (actor.recorded === false) {
+    return actor.kind === "member"
+      ? unrecorded(actor, `Added by your team (uploader not recorded): ${noun} — ${name}`)
+      : unrecorded(actor, `Photo added (uploader not recorded) — ${name}`);
+  }
+  if (actor.kind === "client") return said(actor, `shared a photo — ${name}`);
+  return said(actor, `added ${noun} — ${name}`);
+}
+
+/**
+ * A file on one of the client's estimates. `attacher` is who put it on this
+ * estimate (the library / auto-attach log row), `uploader` who added the file
+ * in the first place — named too when they differ.
+ */
+export function estimateFileTimelineText(
+  fileName: string, ref: string | null, attacher: CrmActor, uploader: CrmActor | null,
+): { actor: CrmActor; text: string; actionText: string } {
+  const on = `estimate ${ref ?? ""}`.trim();
+  if (attacher.recorded === false) {
+    return unrecorded(attacher, `Added by your team (uploader not recorded): ${fileName} on ${on}`);
+  }
+  const by = uploader && uploader.recorded !== false && actorLabel(uploader) !== actorLabel(attacher)
+    ? ` (uploaded by ${actorLabel(uploader)})` : "";
+  return said(attacher, `attached ${fileName} to ${on}${by}`);
+}
+
+export { estimateEventActor };
+
+/** One estimate event as a named sentence; null = a type the timeline does not show. */
+export function estimateEventText(
+  type: string, ref: string | null, actor: CrmActor, meta: Record<string, any> = {},
+): { actor: CrmActor; text: string; actionText: string } | null {
+  const est = `estimate ${ref ?? ""}`.trim();
+  if (actor.recorded === false) {
+    const passive =
+      type === "sent" ? `Estimate ${ref} sent to the client (sender not recorded)`
+      : type === "extended" ? `Estimate ${ref} expiry extended (not recorded who)`
+      : null;
+    return passive ? unrecorded(actor, passive) : null;
+  }
+  switch (type) {
+    case "sent": return said(actor, `sent ${est} to the client`);
+    case "viewed": return said(actor, `opened ${est}`);
+    case "approved": return said(actor, `approved (signed) ${est}`);
+    case "declined": return said(actor, `declined ${est}`);
+    case "shared": return said(actor, `shared ${est} with ${meta.sharedWith ?? "someone"}`);
+    case "access_denied": return said(actor, `was blocked from ${est} — typed ${meta.attemptedEmail ?? "an unknown email"}`);
+    case "forward_detected": return said(actor, `opened the ${est} link on a second device — likely forwarded`);
+    case "options_selected": return said(actor, `selected their scopes on ${est}`);
+    case "extended": return said(actor, `extended the expiry of ${est}`);
+    default: return null;
+  }
+}
+
+/** An outbound quick-message note ('Message sent via email to joe@…: "…"'), named. */
+export function messageTimelineText(body: string, actor: CrmActor): { actor: CrmActor; text: string; actionText: string } {
+  const rest = body.startsWith(OUTBOUND_MESSAGE_PREFIX) ? body.slice(OUTBOUND_MESSAGE_PREFIX.length) : body;
+  if (actor.recorded === false) return unrecorded(actor, `${body} (sender not recorded)`);
+  return said(actor, `sent a message via ${rest}`);
+}
+
+/** A payment line, named: Stripe payments are the client's, manual ones whoever recorded them. */
+export function paymentTimelineText(
+  p: { provider: string; amountCents: number; method: string | null; status: string },
+  actor: CrmActor,
+): { actor: CrmActor; text: string; actionText: string } {
+  const amount = money(p.amountCents);
+  const via = p.method ? ` via ${p.method}` : "";
+  const status = p.status !== "succeeded" ? ` (${p.status})` : "";
+  if (actor.recorded === false) return unrecorded(actor, `Payment of ${amount} recorded${via}${status} (not recorded who)`);
+  if (p.provider === "stripe") return said(actor, `paid ${amount}${via} through Stripe${status}`);
+  if (actor.kind === "member") return said(actor, `recorded a payment of ${amount}${via}${status}`);
+  return said(actor, `recorded a payment of ${amount}${via}${status}`);
 }
 
 /** Email the org owner(s) when a client taps a financing link. */
@@ -208,16 +353,16 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
     if (!(await loadCustomer(req, res, ctx))) return;
 
     const rows = await db
-      .select({
-        note: crmCustomerNotes,
-        authorName: crmMembers.displayName,
-        authorEmail: crmMembers.email,
-      })
+      .select({ note: crmCustomerNotes })
       .from(crmCustomerNotes)
-      .leftJoin(crmMembers, eq(crmMembers.id, crmCustomerNotes.authorMemberId))
       .where(and(eq(crmCustomerNotes.orgId, ctx.org.id), eq(crmCustomerNotes.customerId, req.params.id)))
       .orderBy(desc(crmCustomerNotes.createdAt))
       .limit(200);
+    const dir = await loadActorDirectory(ctx.org.id);
+    // A note with no author is an imported one: nothing recorded who wrote it.
+    const authorOf = (id: string | null): CrmActor => (id
+      ? dir.member(id) ?? { kind: "member", name: "Former team member", recorded: true }
+      : { ...UNRECORDED_ACTOR, name: "Author not recorded" });
     // The owner's payment-reversal note states the amount; it is not shown to a price-blind seat.
     const shown = ctx.permissions.seePrices
       ? rows
@@ -227,7 +372,8 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
         id: r.note.id,
         body: r.note.body,
         authorMemberId: r.note.authorMemberId,
-        authorName: r.authorName || r.authorEmail || null,
+        author: authorOf(r.note.authorMemberId),
+        authorName: actorLabel(authorOf(r.note.authorMemberId)),
         createdAt: r.note.createdAt,
       })),
     );
@@ -253,11 +399,13 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
         body: parsed.data.body,
       })
       .returning();
+    const author = (await loadActorDirectory(ctx.org.id)).member(ctx.member.id);
     res.status(201).json({
       id: row.id,
       body: row.body,
       authorMemberId: row.authorMemberId,
-      authorName: ctx.member.displayName || ctx.member.email || null,
+      author,
+      authorName: author ? actorLabel(author) : null,
       createdAt: row.createdAt,
     });
   });
@@ -396,6 +544,34 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
         .orderBy(desc(crmFinanceClicks.createdAt)).limit(100),
     ]);
 
+    // ── Who did it: names for every source (one member query, plus the
+    // activity-log rows that recorded attachment uploads / manual payments).
+    const dir = await loadActorDirectory(orgId);
+    const [custRow] = await db.select({ displayName: crmCustomers.displayName }).from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, orgId), eq(crmCustomers.id, customerId))).limit(1);
+    const clientName = custRow?.displayName ?? null;
+    const client = clientActor(clientName);
+    const attIds = [...photos, ...estimateAtts].map((a) => a.id);
+    const payIds = payments.map((p) => p.id);
+    const loggedRows = attIds.length || payIds.length
+      ? await db.select().from(crmActivityLog)
+          .where(and(
+            eq(crmActivityLog.orgId, orgId),
+            inArray(crmActivityLog.entityId, [...attIds, ...payIds]),
+            inArray(crmActivityLog.action, ["attachment.added", "attachment.attached", "attachment.auto_attached", "payment.recorded"]),
+          ))
+      : [];
+    const loggedBy = (entityId: string, actions: string[]): CrmActor | null => {
+      const r = loggedRows.find((x) => x.entityId === entityId && actions.includes(x.action));
+      return r ? dir.logActor(r, clientName) : null;
+    };
+    const hoverJobIds = new Set(
+      (photos.some((a) => a.fileName.startsWith("hover-"))
+        ? await db.select({ externalId: crmMeasurements.externalId }).from(crmMeasurements)
+            .where(and(eq(crmMeasurements.orgId, orgId), eq(crmMeasurements.customerId, customerId), eq(crmMeasurements.provider, "hover")))
+        : []).map((m) => m.externalId).filter(Boolean) as string[],
+    );
+
     const entries: TimelineEntry[] = [];
 
     for (const e of events) {
@@ -405,32 +581,23 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       const meta = (e.meta ?? {}) as Record<string, any>;
       // Every type is EXPLICIT — an unmapped type is skipped, never mislabeled
       // (unknown types used to fall through to "declined").
-      const text =
-        e.type === "sent" ? `Estimate ${ref} sent to the client`
-        : e.type === "viewed" ? `Client opened estimate ${ref}`
-        : e.type === "approved" ? `Client approved (signed) estimate ${ref}`
-        : e.type === "declined" ? `Client declined estimate ${ref}`
-        : e.type === "shared" ? `Client shared estimate ${ref} with ${meta.sharedWith ?? "someone"}`
-        : e.type === "access_denied" ? `Blocked access attempt on estimate ${ref} — typed ${meta.attemptedEmail ?? "an unknown email"}`
-        : e.type === "forward_detected" ? `Estimate ${ref} link opened on a second device — likely forwarded`
-        : e.type === "options_selected" ? `Client selected their scopes on estimate ${ref}`
-        : e.type === "extended" ? `Estimate ${ref} expiry extended`
-        : null;
-      if (!text) continue;
+      const line = estimateEventText(e.type, ref, estimateEventActor(e.actor, dir, clientName), meta);
+      if (!line) continue;
       entries.push({
-        id: `ev-${e.id}`, kind: "estimate_event", verb: e.type, text, ref,
+        id: `ev-${e.id}`, kind: "estimate_event", verb: e.type, ...line, ref,
         at: (e.createdAt ?? new Date()).toISOString(),
       });
     }
 
     // Engagement rows are org-wide; keep only this customer's documents.
+    // The public page is the client's — the visit reads as theirs.
     for (const s of sessions) {
       const doc = s.docType === "estimate" ? estById.get(s.docId) : invById.get(s.docId);
       if (!doc) continue;
       const ref = refOf(doc);
       entries.push({
         id: `eng-${s.id}`, kind: "engagement", verb: "opened",
-        text: `Client opened ${s.docType} ${ref} · stayed ${formatDurationSecs(s.durationSecs ?? 0)}`,
+        ...said(client, `opened ${s.docType} ${ref} · stayed ${formatDurationSecs(s.durationSecs ?? 0)}`),
         ref,
         at: (s.startedAt ?? new Date()).toISOString(),
         durationSecs: s.durationSecs ?? 0,
@@ -442,57 +609,68 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
     for (const p of ctx.permissions.seePrices ? await access.filter("payments", payments) : []) {
       const ref = (p.invoiceId ? invById.get(p.invoiceId)?.number : null)
         ?? (p.estimateId ? refOf(estById.get(p.estimateId)) : null);
+      // Stripe = the client paid online; manual = whoever recorded it (the
+      // activity log names them); any other provider is that source.
+      const actor = p.provider === "stripe" ? client
+        : p.provider === "manual" ? loggedBy(p.id, ["payment.recorded"]) ?? UNRECORDED_TEAM_ACTOR
+        : systemActor(p.provider);
       entries.push({
         id: `pay-${p.id}`, kind: "payment", verb: "payment",
-        text: `Payment of ${money(p.amountCents)} recorded${p.method ? ` via ${p.method}` : ""}${p.status !== "succeeded" ? ` (${p.status})` : ""}`,
+        ...paymentTimelineText(p, actor),
         ref,
         at: (p.paidAt ?? p.createdAt ?? new Date()).toISOString(),
         amountCents: p.amountCents,
       });
     }
 
-    const visibleComments = await access.filter("client-comments", comments);
-    const replierIds = [...new Set(visibleComments.map((c) => c.authorMemberId).filter(Boolean))] as string[];
-    const repliers = replierIds.length
-      ? await db.select({ id: crmMembers.id, displayName: crmMembers.displayName, email: crmMembers.email })
-          .from(crmMembers)
-          .where(and(eq(crmMembers.orgId, orgId), inArray(crmMembers.id, replierIds)))
-      : [];
-    const replierName = new Map(repliers.map((m) => [m.id, m.displayName || m.email || null]));
-    for (const c of visibleComments) {
+    for (const c of await access.filter("client-comments", comments)) {
+      const actor = c.authorMemberId
+        ? dir.member(c.authorMemberId) ?? { kind: "member" as const, name: "Former team member", recorded: true }
+        : client;
+      const text = commentTimelineText(c, actor);
       entries.push({
         id: `com-${c.id}`, kind: "comment", verb: c.authorMemberId ? "reply" : "comment",
-        text: commentTimelineText(c, ctx.member.id, c.authorMemberId ? replierName.get(c.authorMemberId) ?? null : null),
+        actor, text, actionText: text.slice(actorLabel(actor).length).trim(),
         ref: null,
         at: (c.createdAt ?? new Date()).toISOString(),
       });
     }
 
-    // Outbound quick messages (Create menu → Message). The note body already
-    // reads as the timeline sentence: 'Message sent via email to joe@…: "…"'.
+    // Outbound quick messages (Create menu → Message). The note body reads
+    // 'Message sent via email to joe@…: "…"'; its author sent it.
     for (const n of notes) {
       if (!isOutboundMessageNote(n.body)) continue;
+      const actor = n.authorMemberId
+        ? dir.member(n.authorMemberId) ?? { kind: "member" as const, name: "Former team member", recorded: true }
+        : UNRECORDED_TEAM_ACTOR;
       entries.push({
         id: `msg-${n.id}`, kind: "message", verb: "message",
-        text: n.body,
+        ...messageTimelineText(n.body, actor),
         ref: null,
         at: (n.createdAt ?? new Date()).toISOString(),
       });
     }
 
     for (const a of photos) {
+      const actor = resolveAttachmentActor(a, {
+        member: dir.member, logged: loggedBy(a.id, ["attachment.added"]), hoverJobIds,
+      });
       entries.push({
         id: `att-${a.id}`, kind: "attachment", verb: "attachment",
-        text: photoTimelineText(a.fileName),
+        ...photoTimelineText(a.fileName, actor),
         ref: null,
         at: (a.createdAt ?? new Date()).toISOString(),
       });
     }
     for (const a of estimateAtts) {
       const ref = refOf(estById.get(a.refId ?? ""));
+      const uploader = resolveAttachmentActor(a, { member: dir.member, logged: loggedBy(a.id, ["attachment.added"]) });
+      // Library / auto-attach copies keep the original uploader; the log row
+      // says who (or what) put the file on THIS estimate.
+      const attacher = loggedBy(a.id, ["attachment.attached", "attachment.auto_attached"]) ?? uploader;
       entries.push({
         id: `att-${a.id}`, kind: "attachment", verb: "attachment",
-        text: `File attached to estimate ${ref} — ${a.fileName}`,
+        ...estimateFileTimelineText(a.fileName, ref, attacher, uploader),
         ref,
         at: (a.createdAt ?? new Date()).toISOString(),
       });
@@ -501,7 +679,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
     for (const f of clicks) {
       entries.push({
         id: `fin-${f.id}`, kind: "finance_click", verb: "finance_click",
-        text: `Applied for financing via ${f.label}`,
+        ...said(client, `applied for financing via ${f.label}`),
         ref: null,
         at: (f.createdAt ?? new Date()).toISOString(),
       });

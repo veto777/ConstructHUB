@@ -23,6 +23,8 @@ import { and, desc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { objectPolicy } from "./object-access";
 import { divisionScopeOf } from "./divisions";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import { loadActorDirectory } from "./actors";
+import { actorLabel, clientActor, logLabelActor, UNRECORDED_TEAM_ACTOR, type CrmActor } from "@shared/crm-actor";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -165,8 +167,12 @@ async function crmStatsNumbers(ctx: OrgContext) {
   };
 }
 
-/** One Team Activity row: "<actor> <text>", linking into the CRM. */
-export type CrmTeamActivityItem = { id: string; at: string; actor: string; text: string; link: string | null };
+/** One Team Activity row: "<actor> <text>", linking into the CRM. `actor` is
+ *  the display label ("Veto Smith (Owner)", "Gabe Varnadore", the client's
+ *  name); `actorInfo` the structured actor (kind / isOwner) for a badge. */
+export type CrmTeamActivityItem = {
+  id: string; at: string; actor: string; actorInfo: CrmActor; text: string; link: string | null;
+};
 
 /**
  * The /api/crm/team-activity feed for an org context, newest first, at most
@@ -176,12 +182,9 @@ export type CrmTeamActivityItem = { id: string; at: string; actor: string; text:
 export async function crmTeamActivityFor(ctx: OrgContext, limit: number): Promise<CrmTeamActivityItem[]> {
   const orgId = ctx.org.id;
 
-  const members = await db.select().from(crmMembers).where(eq(crmMembers.orgId, orgId));
-  const memberName = (id: string | null | undefined): string | null => {
-    if (!id) return null;
-    const m = members.find((x) => x.id === id);
-    return m ? (m.displayName || m.email || null) : null;
-  };
+  // Names (any status — a disabled seat still shows its name; the owner reads "Name (Owner)").
+  const dir = await loadActorDirectory(orgId);
+  const named = (a: CrmActor) => ({ actor: actorLabel(a), actorInfo: a });
 
   const access = objectPolicy(ctx);
   const restricted = divisionScopeOf(ctx) || !ctx.permissions.viewAllJobs;
@@ -198,10 +201,13 @@ export async function crmTeamActivityFor(ctx: OrgContext, limit: number): Promis
       const ref = /^\/crm\/(clients|projects|estimates)\/([^/?]+)/.exec(r.link ?? "");
       if (!ref || !await access.visible(ref[1] === "clients" ? "customers" : ref[1] as "projects" | "estimates", ref[2])) continue;
     }
+    const actor = dir.member(r.memberId)
+      ?? (r.memberId ? { kind: "member" as const, name: r.actorLabel?.trim() || "Former team member", recorded: true }
+        : r.actorLabel ? logLabelActor(r.actorLabel) : UNRECORDED_TEAM_ACTOR);
     items.push({
       id: `a:${r.id}`,
       at: (r.createdAt ?? new Date()).toISOString(),
-      actor: memberName(r.memberId) ?? r.actorLabel ?? "Someone",
+      ...named(actor),
       text: r.title,
       link: r.link,
     });
@@ -236,22 +242,28 @@ export async function crmTeamActivityFor(ctx: OrgContext, limit: number): Promis
   for (const e of events) {
     if (restricted && !await access.visible("estimates", e.estimateId)) continue;
     const ref = e.estNumber ? `estimate ${e.estNumber}` : "an estimate";
-    const member = memberName(e.actor);
+    const client = named(clientActor(e.custName));
     const link = `/crm/clients/${e.customerId}`;
     const at = (e.createdAt ?? new Date()).toISOString();
     // The team feed carries the wins and the touches; security noise
     // (denied gates, forward detection) stays on the client timeline.
     if (e.type === "sent") {
-      items.push({ id: `e:${e.id}`, at, actor: member ?? "A teammate", text: `sent ${ref} to ${e.custName}`, link });
+      // The sender is the member id the event recorded; an event without
+      // one says so instead of a vague "A teammate".
+      const isMemberId = !!e.actor && !["client", "visitor", "system"].includes(e.actor);
+      const sender = dir.member(e.actor) ?? (isMemberId ? { kind: "member" as const, name: "Former team member", recorded: true } : null);
+      items.push(sender
+        ? { id: `e:${e.id}`, at, ...named(sender), text: `sent ${ref} to ${e.custName}`, link }
+        : { id: `e:${e.id}`, at, ...named(UNRECORDED_TEAM_ACTOR), text: `sent ${ref} to ${e.custName} (sender not recorded)`, link });
     } else if (e.type === "viewed") {
-      items.push({ id: `e:${e.id}`, at, actor: e.custName, text: `opened ${ref}`, link });
+      items.push({ id: `e:${e.id}`, at, ...client, text: `opened ${ref}`, link });
     } else if (e.type === "approved") {
-      items.push({ id: `e:${e.id}`, at, actor: e.custName, text: `approved (signed) ${ref} 🎉`, link });
+      items.push({ id: `e:${e.id}`, at, ...client, text: `approved (signed) ${ref} 🎉`, link });
     } else if (e.type === "declined") {
-      items.push({ id: `e:${e.id}`, at, actor: e.custName, text: `declined ${ref}`, link });
+      items.push({ id: `e:${e.id}`, at, ...client, text: `declined ${ref}`, link });
     } else if (e.type === "shared") {
       const w = (e.meta as any)?.sharedWith;
-      items.push({ id: `e:${e.id}`, at, actor: e.custName, text: `shared ${ref}${w ? ` with ${w}` : ""}`, link });
+      items.push({ id: `e:${e.id}`, at, ...client, text: `shared ${ref}${w ? ` with ${w}` : ""}`, link });
     }
   }
 
@@ -276,7 +288,7 @@ export async function crmTeamActivityFor(ctx: OrgContext, limit: number): Promis
     items.push({
       id: `p:${p.id}`,
       at: (p.createdAt ?? new Date()).toISOString(),
-      actor: p.custName,
+      ...named(clientActor(p.custName)),
       text: `paid ${money(p.amountCents)}${p.method ? ` by ${p.method.toUpperCase()}` : ""}`,
       link: `/crm/clients/${p.customerId}`,
     });

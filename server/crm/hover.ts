@@ -965,7 +965,7 @@ export async function importHoverJobPhotos(
       if (!buffer.length || buffer.length > 15 * 1024 * 1024) { failed++; continue; }
       await storeGeneratedFile({
         orgId, kind: "photo", refId: customerId, fileName, buffer,
-        mime, ext: mime === "image/png" ? "png" : "jpg",
+        mime, ext: mime === "image/png" ? "png" : "jpg", uploadedByLabel: "HOVER import",
       });
       have.add(fileName);
       stored++;
@@ -1261,7 +1261,7 @@ async function ingestHoverJobInner(
             orgId,
             kind: "measurement",
             refId: customer?.id ?? null,
-            fileName: `hover-measurements-${jobId}.pdf`,
+            fileName: `hover-measurements-${jobId}.pdf`, uploadedByLabel: "HOVER import",
             buffer,
           });
           await mergeMeasurementRaw(row.id, { pdfAttachmentId: att.id });

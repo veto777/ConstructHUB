@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { ActorName } from "@/components/crm-actor-name";
 import { Link, useLocation, useRoute } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -782,7 +783,10 @@ export default function CrmEstimateDetailPage() {
           <CardContent className="space-y-1.5 text-xs text-muted-foreground" data-testid="events-trail">
             {events.slice(0, 20).map((ev: any) => (
               <div key={ev.id} className="flex justify-between gap-3" data-testid={`event-${ev.type}`}>
-                <span className="capitalize">{String(ev.type).replace(/_/g, " ")}</span>
+                <span>
+                  <span className="capitalize">{String(ev.type).replace(/_/g, " ")}</span>
+                  {ev.actor && ev.actor.recorded !== false && <> · by <ActorName actor={ev.actor} /></>}
+                </span>
                 <span>{dayTime(ev.createdAt)}</span>
               </div>
             ))}

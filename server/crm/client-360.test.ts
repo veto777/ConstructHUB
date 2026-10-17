@@ -277,10 +277,17 @@ describe("client 360 (dev server)", () => {
     const entries = tl.body as any[];
     const texts = entries.map((e) => e.text);
 
-    expect(texts.some((t: string) => t === `Estimate ${estNumber} sent to the client`)).toBe(true);
-    expect(texts.some((t: string) => t === `Client opened estimate ${estNumber} · stayed 4m 12s`)).toBe(true);
-    expect(texts.some((t: string) => t.includes("Sent a message from the portal"))).toBe(true);
-    expect(texts.some((t: string) => t === "Applied for financing via Acme Finance")).toBe(true);
+    // Every line names who did it: the sending member (the dev member is the
+    // owner → "… (Owner)"), and the client by their name for client actions.
+    expect(texts.some((t: string) => /\(Owner\) sent estimate /.test(t) || t.startsWith("Owner sent estimate ")
+      ? t.endsWith(`estimate ${estNumber} to the client`) : false)).toBe(true);
+    expect(texts.some((t: string) => t === `Vitest C360 A opened estimate ${estNumber} · stayed 4m 12s`)).toBe(true);
+    expect(texts.some((t: string) => t.startsWith("Vitest C360 A sent a message from the portal"))).toBe(true);
+    expect(texts.some((t: string) => t === "Vitest C360 A applied for financing via Acme Finance")).toBe(true);
+    for (const e of entries) {
+      expect(e.actor?.name).toBeTruthy();
+      expect(e.text).not.toMatch(/^(Your team|A team member|Client )/);
+    }
 
     // Newest-first across every source.
     const ats = entries.map((e) => new Date(e.at).getTime());

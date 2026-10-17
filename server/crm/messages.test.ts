@@ -162,7 +162,9 @@ describe("POST /api/crm/messages against the dev server", () => {
     const entry = tl.body.find((e: any) => e.id === `msg-${r.body.noteId}`);
     expect(entry).toBeTruthy();
     expect(entry.kind).toBe("message");
-    expect(entry.text).toContain("Message sent via email");
+    // Named by who sent it (the dev member is the owner): "<Name> (Owner) sent a message via email …".
+    expect(entry.text).toContain("sent a message via email");
+    expect(entry.actor).toMatchObject({ kind: "member", isOwner: true });
     expect(entry.text).toContain("the dumpster arrives Friday");
 
     // …and the note row is the marker format.

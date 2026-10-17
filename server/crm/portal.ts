@@ -36,6 +36,7 @@ import {
   ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend, estimateExpiryOnExtend,
 } from "./entities";
 import { notifyOrgOwners } from "./owner-notify";
+import { actorLabel, memberActor } from "@shared/crm-actor";
 import { emitCrmEvent, queueCrmEvent, queueProjectStageChange } from "./integrations";
 import { estimateDocText, invoiceDocText } from "./doc-defaults";
 import { recordActivity, logActivity } from "./activity";
@@ -525,7 +526,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       pref: "estimateSent",
       excludeEmails: [ctx.member.email],
       excludeMemberIds: [ctx.member.id],
-      subject: `📤 Bid sent to ${cust.displayName}${est.number ? ` — ${est.number}` : ""}`,
+      subject: `📤 Bid sent to ${cust.displayName}${est.number ? ` — ${est.number}` : ""} by ${actorLabel(memberActor(ctx.member))}`,
       bodyHtml:
         `<p><strong>${esc(ctx.member.displayName || from)}</strong> sent estimate ` +
         `<strong>${esc(est.number ?? "")}</strong> for <strong>${money(est.totalCents)}</strong> ` +

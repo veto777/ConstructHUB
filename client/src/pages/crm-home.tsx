@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { ActorName } from "@/components/crm-actor-name";
+import type { CrmActor } from "@shared/crm-actor";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,7 +60,7 @@ const STEP_ICON: Record<string, any> = {
   team: Users,
 };
 
-type ActivityItem = { id: string; at: string; actor: string; text: string; link: string | null };
+type ActivityItem = { id: string; at: string; actor: string; actorInfo?: CrmActor; text: string; link: string | null };
 
 function timeAgo(iso: string): string {
   const sec = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -495,7 +497,9 @@ export default function CrmHomePage() {
                   const row = (
                     <div className="flex items-start justify-between gap-3 rounded-lg px-3 py-2 hover:bg-accent transition-colors cursor-pointer">
                       <div className="min-w-0 text-sm leading-snug">
-                        <span className="font-medium">{a.actor}</span>{" "}
+                        {a.actorInfo && a.actorInfo.recorded !== false
+                          ? <ActorName actor={a.actorInfo} />
+                          : <span className="font-medium">{a.actor}</span>}{" "}
                         <span className="text-muted-foreground">{a.text}</span>
                       </div>
                       <span className="text-[11px] text-muted-foreground shrink-0 mt-0.5">{timeAgo(a.at)}</span>

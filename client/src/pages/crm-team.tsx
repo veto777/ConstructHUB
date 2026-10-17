@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { CRM_PERMISSION_LABELS } from "@shared/crm-access";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { ActorLine } from "@/components/crm-actor-name";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -175,7 +176,7 @@ function MemberActivity({ memberId }: { memberId: string }) {
             rows.map((r: any) => (
               <div key={r.id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-1.5"
                 data-testid={`row-activity-${r.id}`}>
-                <span className="text-sm truncate">{r.text}</span>
+                <span className="text-sm truncate"><ActorLine actor={r.actor} actionText={r.actionText} text={r.text} /></span>
                 <span className="text-xs text-muted-foreground whitespace-nowrap">
                   {new Date(r.at).toLocaleString()}
                 </span>

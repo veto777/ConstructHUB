@@ -19,6 +19,7 @@
 import { useRef, useState } from "react";
 import { inNativeApp } from "@/lib/app-shell";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { ActorName, ActorLine } from "@/components/crm-actor-name";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -147,7 +148,7 @@ export function CustomerNotes({ customerId, canManage, meMemberId, meRole }: {
                 <>
                   <p className="text-sm whitespace-pre-wrap">{n.body}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span>{n.authorName ?? "Team"} · {when(n.createdAt)}</span>
+                    <span>{n.author && n.author.recorded !== false ? <ActorName actor={n.author} /> : (n.authorName ?? "Author not recorded")} · {when(n.createdAt)}</span>
                     {canManage && canModify(n) && (
                       <span className="flex gap-1">
                         <Button size="sm" variant="ghost" className="h-7 text-xs"
@@ -220,7 +221,7 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
         <SectionTitle
           icon={Activity}
           title="Activity"
-          description="Every send, open, visit, payment, message and change — newest first."
+          description="Every send, open, visit, payment, message and change — who did it, newest first."
           infoKey="client-timeline"
         />
       </CardHeader>
@@ -238,7 +239,7 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
                   <Icon className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm">{e.text}</div>
+                  <div className="text-sm"><ActorLine actor={e.actor} actionText={e.actionText} text={e.text} /></div>
                   <div className="text-xs text-muted-foreground">{when(e.at)}</div>
                 </div>
               </div>
