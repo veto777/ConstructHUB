@@ -616,7 +616,6 @@ export default function PressReleasesPage() {
         <p className="text-xs text-muted-foreground">Availability varies by package. Distribution is not a guarantee of editorial coverage.</p>
       </section>
 
-      <PressStatusStrip />
       <div className="wire-stats">
       <StatGrid cols={4} className="sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Credits left" value={data ? n(totalCredits) : "…"} testId="press-credits"
@@ -640,6 +639,7 @@ export default function PressReleasesPage() {
             { label: "Report", value: data ? `${active.filter((r) => r.status === "reported").length} delivered` : "Loading…" },
           ].map((step, i) => <li key={step.label}><span className="wire-step-index" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span><div><h3>{step.label}</h3><p>{step.value}</p></div>{i < 4 && <ArrowRight className="wire-flow-arrow h-4 w-4" aria-hidden="true" />}</li>)}
         </ol>
+        <PressStatusStrip />
         <div className="wire-engine-body">
           <Section title="Story ideas" icon={Lightbulb} description="Found in your account. Every fact is yours." testId="press-ideas-section" className="wire-ideas-panel">
             {ideas.isError ? <Notice tone="danger" title="Could not load story ideas">{apiErrorMessage(ideas.error)}</Notice> : <Ideas ideas={ideas.data?.ideas ?? []} loading={ideas.isLoading} onDraft={(i) => openNew({ newsType: i.newsType, details: i.detailsDraft, ideaKey: i.key })} />}

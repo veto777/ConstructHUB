@@ -67,14 +67,15 @@ export function PressStatusStrip() {
   const scheduled = overview.data.releases.filter((r) => r.sendAt).sort((a, b) => a.sendAt!.localeCompare(b.sendAt!))[0];
   const places = (share.data?.chosen.social.length ?? 0) + (share.data?.chosen.gbp.length ?? 0);
   return (
-    <Section title="How your releases run" testId="press-status-strip" contentClassName="p-2 pt-1 sm:p-3 sm:pt-2">
+    <div className="mb-6 border-b py-4" data-testid="press-status-strip">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">On autopilot for this account</p>
       <ol className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-4">
         <Step n={1} label="Next idea" value={idea ? idea.title : "No idea found yet"} target="press-ideas-section" testId="press-strip-idea" />
         <Step n={2} label="Monthly draft" value={ap.enabled ? (ap.nextDraftOn ? (ap.nextDraftOn === new Date().toISOString().slice(0, 10) ? "Draft today" : `Draft on ${dayWords(ap.nextDraftOn)}`) : "Paused: no credit") : "Off"} target="press-autopilot" testId="press-strip-draft" />
         <Step n={3} label="Goes out" value={scheduled ? `Goes out ${sendTimeWords(scheduled.sendAt!)}` : ap.sendForMe ? "2 business days after the draft" : "You approve it"} target={scheduled ? `press-release-${scheduled.id}` : "press-send-for-me"} testId="press-strip-send" />
         <Step n={4} label="When live" value={places ? `Shares to ${places} place${places === 1 ? "" : "s"}` : "Not shared anywhere"} target="press-sharing" testId="press-strip-share" />
       </ol>
-    </Section>
+    </div>
   );
 }
 
