@@ -10,6 +10,9 @@
  *                    credit); report → the report, with the wire's attachments, is emailed to the customer.
  *                    Anything a program should not decide (a question, an unmatched email) waits for the owner.
  * One process at a time (a Postgres advisory lock). Nothing is charged twice: a resend after changes reuses the credit.
+ *
+ * Autopilot (autopilot.ts) runs on its own pass, every PRESS_AUTOPILOT_EVERY_MIN (default 60) minutes and once at
+ * boot: each opted-in account whose day of the month has come gets at most one draft that month, for its approval.
  */
 import { registerWorker, workerInterval } from "../workers";
 import { BotTellError, assertNoBotTell } from "../outbound-guard";
@@ -21,6 +24,7 @@ import { fetchSince, mailboxConfig, mailboxConfigured, sendMail, wireConfigured,
 import * as store from "./store";
 import { readWireReply, releaseAsText, reviseRelease } from "./writer";
 import { checkRelease } from "./guidelines";
+import { runAutopilot } from "./autopilot";
 import { logError } from "../ops/log";
 
 const num = (v: string | undefined, d: number) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : d; };
@@ -28,6 +32,7 @@ export const pressWorkerConfig = (env: NodeJS.ProcessEnv = process.env) => ({
   enabled: env.PRESS_WORKER_ENABLED !== "false",
   inboxHours: num(env.PRESS_INBOX_POLL_HOURS, 24),
   submitMinutes: num(env.PRESS_SUBMIT_EVERY_MIN, 15),
+  autopilotMinutes: num(env.PRESS_AUTOPILOT_EVERY_MIN, 60),
 });
 export const workerDeps = { fetchSince, sendMail, readWireReply, reviseRelease };
 
@@ -272,11 +277,15 @@ export function startPressWorker(env: NodeJS.ProcessEnv = process.env) {
   if (!cfg.enabled) return;
   handles.forEach((h) => h.stop()); handles = [];
   // Registered with the shutdown registry (server/workers.ts): stopped before the pool closes.
-  const boot = setTimeout(() => void runPressPass({ inbox: true }).catch((e) => logError("[press] boot pass:", e)), 90_000);
+  const boot = setTimeout(() => {
+    void runPressPass({ inbox: true }).catch((e) => logError("[press] boot pass:", e));
+    void runAutopilot().catch((e) => logError("[press] boot autopilot pass:", e));
+  }, 90_000);
   boot.unref();
   const unregisterBoot = registerWorker("press boot pass", () => clearTimeout(boot));
   handles.push({ stop: () => { clearTimeout(boot); unregisterBoot(); } });
   handles.push(workerInterval("press submit pass", () => runPressPass({ inbox: false }).catch((e) => logError("[press] submit pass:", e)), cfg.submitMinutes * 60_000));
+  handles.push(workerInterval("press autopilot pass", () => runAutopilot().catch((e) => logError("[press] autopilot pass:", e)), cfg.autopilotMinutes * 60_000));
   handles.push(workerInterval("press inbox pass", () => runPressPass({ inbox: true }).catch((e) => logError("[press] inbox pass:", e)), cfg.inboxHours * 3_600_000));
-  console.log(`[press] worker: submissions every ${cfg.submitMinutes} min, inbox every ${cfg.inboxHours} h (${mailboxConfigured() ? mailboxConfig().user : "mailbox not configured"}; wire ${wireConfigured() ? "set" : "not set"})`);
+  console.log(`[press] worker: submissions every ${cfg.submitMinutes} min, inbox every ${cfg.inboxHours} h, autopilot every ${cfg.autopilotMinutes} min (${mailboxConfigured() ? mailboxConfig().user : "mailbox not configured"}; wire ${wireConfigured() ? "set" : "not set"})`);
 }

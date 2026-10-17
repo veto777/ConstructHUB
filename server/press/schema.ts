@@ -5,6 +5,9 @@
  *   press_releases     one row per release: the customer's input, the AI's text, the wire's answers, the report
  *   press_messages     every email in and out of the pressrelease@ mailbox, tied to a release when the code matches
  *   press_inbox_state  the IMAP cursor (same shape as media_inbox_state)
+ *   press_idea_marks   story ideas (ideas.ts) a customer dismissed or already turned into a release, per user
+ *   press_autopilot    the monthly draft setting (autopilot.ts): on/off and the day of the month
+ *   press_autopilot_runs  one row per user per month: the claim that keeps autopilot to one draft a month
  */
 export const PRESS_DDL = `
 CREATE TABLE IF NOT EXISTS press_orders (
@@ -82,6 +85,37 @@ ALTER TABLE press_releases ADD CONSTRAINT press_releases_tier_check CHECK (tier 
 CREATE TABLE IF NOT EXISTS press_inbox_state (
   mailbox text PRIMARY KEY, uid_validity text, last_uid bigint NOT NULL DEFAULT 0,
   last_pass_at timestamptz, last_pass_error text
+);
+
+CREATE TABLE IF NOT EXISTS press_idea_marks (
+  user_id integer NOT NULL,
+  idea_key text NOT NULL,
+  mark text NOT NULL CHECK (mark IN ('dismissed','used')),
+  release_id integer REFERENCES press_releases(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, idea_key)
+);
+
+CREATE TABLE IF NOT EXISTS press_autopilot (
+  user_id integer PRIMARY KEY,
+  enabled boolean NOT NULL DEFAULT false,
+  day_of_month integer NOT NULL DEFAULT 1 CHECK (day_of_month BETWEEN 1 AND 28),
+  last_checked_at timestamptz,
+  last_result text,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS press_autopilot_runs (
+  user_id integer NOT NULL,
+  month text NOT NULL,
+  outcome text NOT NULL CHECK (outcome IN ('drafting','drafted','failed')),
+  release_id integer REFERENCES press_releases(id) ON DELETE SET NULL,
+  idea_key text,
+  attempts integer NOT NULL DEFAULT 1,
+  error text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, month)
 );
 `;
 

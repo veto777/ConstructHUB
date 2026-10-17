@@ -10,6 +10,10 @@
  *   POST  /api/press/releases/:id/draft {notes?}      the AI writes (or revises to the notes)
  *   POST  /api/press/releases/:id/approve             spends the credit, queues it for the wire
  *   POST  /api/press/releases/:id/cancel              before it is sent; the credit comes back
+ *   GET   /api/press/prefill                          the writer's company/contact fields from the account (ideas.ts)
+ *   GET   /api/press/ideas                            up to 5 story ideas from the account's own data (ideas.ts)
+ *   POST  /api/press/ideas/:key/dismiss               hides an idea for this user
+ *   GET   /api/press/autopilot · PUT {enabled, dayOfMonth}   the monthly draft setting (autopilot.ts)
  * Platform admins (requirePlatformAdmin):
  *   GET   /api/admin/press/summary · GET /api/admin/press/releases?status · GET /api/admin/press/messages?status
  *   POST  /api/admin/press/run {inbox?}               a pass now
@@ -30,15 +34,18 @@ import { sendWithFallback } from "../email";
 import { escapeHtml, firstZodMessage } from "../route-guards";
 import { getFromR2, getR2Url, r2Configured, uploadToR2 } from "../r2";
 import {
-  PRESS_CHECKOUT_TYPE, PRESS_NEWS_TYPES, PRESS_PACKAGES, PRESS_PATH, PRESS_RECOMMENDED_GAP_DAYS, PRESS_RELEASE_STATUSES, PRESS_TIERS,
-  PRESS_TIER_LABEL, pressOrderName, pressPackage, pressPackagePrice, type PressReleaseInput, type PressReleaseText, type PressTier,
+  PRESS_AUTOPILOT_MAX_DAY, PRESS_CHECKOUT_TYPE, PRESS_PACKAGES, PRESS_PATH, PRESS_RECOMMENDED_GAP_DAYS, PRESS_RELEASE_STATUSES, PRESS_TIERS,
+  PRESS_TIER_LABEL, pressOrderName, pressPackage, pressPackagePrice, type PressReleaseInput, type PressTier,
 } from "@shared/press";
 import { checkRelease, hasBlockingIssue } from "./guidelines";
+import { pressInputSchema, writeDraft } from "./draft";
+import { findIdeas, loadPrefill, markIdea } from "./ideas";
+import { autopilotView, saveSettings } from "./autopilot";
 import { loadOutlets } from "./outlets";
 import { mailboxConfig, mailboxConfigured, wireConfigured } from "./mailbox";
 import * as store from "./store";
 import { pressWorkerConfig, runPressPass } from "./worker";
-import { datelineFor, draftRelease, pressAiConfigured, reviseRelease } from "./writer";
+import { pressAiConfigured } from "./writer";
 import { logError } from "../ops/log";
 
 type Deps = { getOrCreateCustomer: (userId: number, email: string) => Promise<string>; sendStripeError: (res: Response, err: unknown) => void };
@@ -54,22 +61,7 @@ const defaultGetUser: GetUser = (req, res) => {
 const idParam = z.coerce.number().int().positive().max(2_147_483_647);
 const tierSchema = z.enum(PRESS_TIERS as [PressTier, ...PressTier[]]);
 const text = (max: number) => z.string().trim().max(max);
-const inputSchema = z.object({
-  newsType: z.enum(PRESS_NEWS_TYPES.map((t) => t.key) as [string, ...string[]]),
-  companyName: text(120).min(2, "Company name is required"),
-  website: text(300).refine((v) => !v || /^https?:\/\/\S+$/i.test(v), "Website must start with http:// or https://"),
-  city: text(80).min(2, "City is required"),
-  state: text(40).min(2, "State is required"),
-  contactName: text(120).min(2, "Media contact name is required"),
-  contactEmail: text(200).email("A valid media contact email is required"),
-  contactPhone: text(40),
-  details: text(6000).min(80, "Tell us what happened in at least a few sentences (80 characters or more)"),
-  spokesperson: text(120),
-  spokespersonTitle: text(120),
-  quoteNotes: text(2000),
-  about: text(3000),
-  photos: z.array(z.object({ key: text(300), url: text(500), caption: text(200) })).max(6).default([]),
-}).strict();
+const inputSchema = pressInputSchema;
 const textSchema = z.object({
   headline: text(200).min(10), subheadline: text(300), dateline: text(120), body: text(20_000).min(100), boilerplate: text(2000), mediaContact: text(1000),
 }).strict();
@@ -118,7 +110,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
     try {
       const user = getUser(req, res);
       if (!user) return;
-      const [orders, releases, credits, last] = await Promise.all([store.listOrders(user.id), store.listReleases(user.id), store.creditsLeft(user.id), store.lastSubmittedAt(user.id)]);
+      const [orders, releases, credits, last, autopilot] = await Promise.all([store.listOrders(user.id), store.listReleases(user.id), store.creditsLeft(user.id), store.lastSubmittedAt(user.id), autopilotView(user.id)]);
       const outlets = loadOutlets();
       res.json({
         packages: PRESS_PACKAGES,
@@ -128,6 +120,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
         outletCounts: { budget: outlets.budget.length, national: outlets.national.length, premium: outlets.premium.length },
         setup: setup(),
         pacing: { lastSubmittedAt: last ? new Date(last).toISOString() : null, recommendedGapDays: PRESS_RECOMMENDED_GAP_DAYS },
+        autopilot,
       });
     } catch (err) { logError("[press] overview:", err); res.status(500).json({ message: "Could not load your press releases" }); }
   });
@@ -176,11 +169,13 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
     try {
       const user = getUser(req, res);
       if (!user) return;
-      const body = z.object({ tier: tierSchema, input: inputSchema }).safeParse(req.body ?? {});
+      const body = z.object({ tier: tierSchema, input: inputSchema, ideaKey: text(200).optional() }).safeParse(req.body ?? {});
       if (!body.success) return res.status(400).json({ message: firstZodMessage(body.error) });
       const credits = await store.creditsLeft(user.id);
       if (credits[body.data.tier] < 1) return res.status(402).json({ code: "no_credit", message: `You have no ${PRESS_TIER_LABEL[body.data.tier]} release credit left. Pick a package first.` });
       const row = await store.createRelease(user.id, body.data.tier, body.data.input as PressReleaseInput);
+      // A release started from a story idea uses it up: it leaves the list and autopilot never drafts it again.
+      if (body.data.ideaKey) await markIdea(user.id, body.data.ideaKey, "used", row.id);
       res.json(store.releaseView(row));
     } catch (err) { logError("[press] create release:", err); res.status(500).json({ message: "Could not start the release" }); }
   });
@@ -237,11 +232,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       if (!["draft", "changes_requested"].includes(row.status)) return res.status(409).json({ message: "This release has already been sent" });
       if (!pressAiConfigured()) return res.status(503).json({ message: "The writer is not available right now. Please try again shortly." });
       const notes = z.object({ notes: text(2000).optional() }).safeParse(req.body ?? {});
-      const want = notes.success ? notes.data.notes?.trim() : "";
-      const t: PressReleaseText = want && row.text ? await reviseRelease(row.input, row.text, want, row.tier) : await draftRelease(row.input, row.tier);
-      if (!t.dateline) t.dateline = datelineFor(row.input.city, row.input.state);
-      const issues = checkRelease(t, row.input);
-      const upd = await store.updateRelease(row.id, { text: t, issues });
+      const upd = await writeDraft(row, notes.success ? notes.data.notes : undefined);
       res.json(store.releaseView(upd));
     } catch (err: any) { logError("[press] draft:", err); res.status(502).json({ message: `The writer could not finish: ${String(err?.message ?? err).slice(0, 200)}` }); }
   });
@@ -274,6 +265,58 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       if (row.order_id) await store.refundCredit(row.id);
       res.json(store.releaseView(await store.updateRelease(row.id, { status: "cancelled" })));
     } catch (err) { logError("[press] cancel:", err); res.status(500).json({ message: "Could not cancel" }); }
+  });
+
+  // ---- automation (ideas.ts, autopilot.ts) ------------------------------------------------------------------
+
+  app.get("/api/press/prefill", async (req, res) => {
+    try {
+      const user = getUser(req, res);
+      if (!user) return;
+      res.json(await loadPrefill(user.id));
+    } catch (err) { logError("[press] prefill:", err); res.status(500).json({ message: "Could not read your account details" }); }
+  });
+
+  app.get("/api/press/ideas", async (req, res) => {
+    try {
+      const user = getUser(req, res);
+      if (!user) return;
+      res.json({ ideas: await findIdeas(user.id) });
+    } catch (err) { logError("[press] ideas:", err); res.status(500).json({ message: "Could not look for story ideas" }); }
+  });
+
+  app.post("/api/press/ideas/:key/dismiss", async (req, res) => {
+    try {
+      const user = getUser(req, res);
+      if (!user) return;
+      const key = z.string().trim().min(1).max(200).regex(/^[a-z]+:[A-Za-z0-9:_-]+$/).safeParse(req.params.key);
+      if (!key.success) return res.status(400).json({ message: "Bad idea" });
+      await markIdea(user.id, key.data, "dismissed");
+      res.json({ ok: true });
+    } catch (err) { logError("[press] dismiss idea:", err); res.status(500).json({ message: "Could not dismiss the idea" }); }
+  });
+
+  app.get("/api/press/autopilot", async (req, res) => {
+    try {
+      const user = getUser(req, res);
+      if (!user) return;
+      res.json(await autopilotView(user.id));
+    } catch (err) { logError("[press] autopilot:", err); res.status(500).json({ message: "Could not read the autopilot setting" }); }
+  });
+
+  app.put("/api/press/autopilot", async (req, res) => {
+    try {
+      const user = getUser(req, res);
+      if (!user) return;
+      const body = z.object({ enabled: z.boolean(), dayOfMonth: z.number().int().min(1).max(PRESS_AUTOPILOT_MAX_DAY) }).strict().safeParse(req.body ?? {});
+      if (!body.success) return res.status(400).json({ message: `Pick a day from 1 to ${PRESS_AUTOPILOT_MAX_DAY}` });
+      if (body.data.enabled) {
+        const credits = await store.creditsLeft(user.id);
+        if (!PRESS_TIERS.some((t) => credits[t] > 0)) return res.status(402).json({ code: "no_credit", message: "Autopilot needs a release credit. Pick a package first." });
+      }
+      await saveSettings(user.id, body.data);
+      res.json(await autopilotView(user.id));
+    } catch (err) { logError("[press] save autopilot:", err); res.status(500).json({ message: "Could not save the autopilot setting" }); }
   });
 
   // ---- admin ------------------------------------------------------------------------------------------------

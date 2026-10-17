@@ -33,6 +33,8 @@ export const NOTIFICATION_KINDS = {
   "seo.links_change": { label: "Sites linking to you were lost or gained", inApp: true, email: true },
   "seo.grid_change": { label: "Local grid: your area clearly got better or worse", inApp: true, email: true },
   "seo.mention_new": { label: "A new page mentions your business", inApp: true, email: true },
+  // Press autopilot (server/press/autopilot.ts): the monthly draft waits for the customer's approval.
+  "press.autopilot_draft": { label: "Your monthly press release draft is ready to review", inApp: true, email: true },
   "sitescan.regressed": { label: "Site Scan score dropped or new critical issue", inApp: true, email: false },
   // Platform admins only (server/ops/app-review-watch.ts): bell + iPhone push; email stays off unless switched on.
   "ops.app_review": { label: "iPhone app review status changed (admins)", inApp: true, email: false },

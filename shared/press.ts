@@ -50,18 +50,18 @@ export const PRESS_TIER_LABEL: Record<PressTier, string> = { budget: "Standard",
 export const PRESS_WIRE_TIER_NAME: Record<PressTier, string> = { budget: "Budget", national: "National", premium: "Premium" };
 
 /** Each tier's card: only what the wire's sheets and its 2026-10-16 email say. */
-export type PressTierInfo = { tier: PressTier; tagline: string; flashy: string; pickups: string | null; perks: string[] };
+export type PressTierInfo = { tier: PressTier; tagline: string; pickups: string | null; perks: string[] };
 export const PRESS_TIER_INFO: Record<PressTier, PressTierInfo> = {
   budget: {
-    tier: "budget", tagline: "Your news on the wire, online and regional", flashy: "START HERE", pickups: "350–500",
+    tier: "budget", tagline: "Your news on the wire, online and regional", pickups: "350–500",
     perks: ["330+ named outlets: Yahoo Finance, Yahoo News, Digital Journal, StreetInsider, regional papers and radio", "Typically 350–500 sites run it"],
   },
   national: {
-    tier: "national", tagline: "The nation's newsrooms, wire services and business press", flashy: "MOST POPULAR", pickups: "450–700",
+    tier: "national", tagline: "The nation's newsrooms, wire services and business press", pickups: "450–700",
     perks: ["5,000+ newsrooms: the Associated Press, Reuters, Dow Jones, Bloomberg Radio, CNBC, Fox News Channel, USA Today", "Major newspapers: The New York Times, The Wall Street Journal, The Washington Post, Los Angeles Times", "Finance sites and terminals: Yahoo Finance, MarketWatch, Morningstar, FactSet, Refinitiv", "Typically 450–700 sites run it"],
   },
   premium: {
-    tier: "premium", tagline: "Everything in National, plus the biggest business and TV desks", flashy: "MOST REACH", pickups: null,
+    tier: "premium", tagline: "Everything in National, plus the biggest business and TV desks", pickups: null,
     perks: ["Everything in National", "Adds Business Insider, Markets Insider, CNN.com and CNN Money, Benzinga Pro", "Adds the ABC, CBS and NBC television network desks and Bloomberg Television", "Adds more local daily papers, and media targeting"],
   },
 };
@@ -213,6 +213,36 @@ export const PRESS_HEADLINE_OUTLETS: Record<PressTier, string[]> = {
   national: ["Associated Press", "Reuters", "Dow Jones", "Bloomberg", "CNBC", "Fox News Channel", "USA Today", "MarketWatch", "Morningstar", "Yahoo Finance", "Google News", "The New York Times", "The Wall Street Journal", "The Washington Post", "Los Angeles Times", "Chicago Tribune", "The Boston Globe", "FactSet", "Refinitiv", "Nasdaq", "NYSE", "ACCESS Newswire"],
   premium: ["Business Insider", "Markets Insider", "CNN.com", "CNN Money", "ABC Television Network", "CBS Television Network", "NBC Television Network", "Bloomberg Television", "Benzinga Pro", "Associated Press", "Reuters", "USA Today", "The New York Times", "The Wall Street Journal", "ACCESS Newswire"],
 };
+
+/** A story idea found in the account's own data (server/press/ideas.ts). Every fact is a stored value, never a guess. */
+export type PressIdea = {
+  key: string;
+  newsType: PressNewsType;
+  title: string;
+  /** Why it is news, in one line. */
+  why: string;
+  /** The exact data points the idea rests on. */
+  facts: string[];
+  /** A 2–4 sentence starter for "What happened?", built only from `facts`. */
+  detailsDraft: string;
+};
+
+/** The writer's fields filled from the account (GET /api/press/prefill): only stored values; a missing one is absent. */
+export type PressPrefillField = "companyName" | "website" | "city" | "state" | "contactName" | "contactEmail" | "contactPhone" | "about";
+export const PRESS_PREFILL_FIELDS: readonly PressPrefillField[] = ["companyName", "website", "city", "state", "contactName", "contactEmail", "contactPhone", "about"];
+export type PressPrefillSource = "last_release" | "crm" | "business_profile" | "profile";
+export type PressPrefill = { values: Partial<Record<PressPrefillField, string>>; sources: Partial<Record<PressPrefillField, PressPrefillSource>> };
+
+/** Autopilot (server/press/autopilot.ts): one draft a month for the customer to approve. It never sends or spends a credit. */
+export type PressAutopilotView = {
+  enabled: boolean;
+  dayOfMonth: number;
+  /** "2026-11-05": the next day the worker will try to draft, or null when it is off. */
+  nextDraftOn: string | null;
+  lastResult: string | null;
+  lastCheckedAt: string | null;
+};
+export const PRESS_AUTOPILOT_MAX_DAY = 28;
 
 export const PRESS_PATH = "/press-releases";
 export const PRESS_MAILBOX = "pressrelease@constructhub.us";
