@@ -28,7 +28,7 @@ import {
  * review) and the Media library every tool reads. Server: server/crm/photo-library.ts.
  */
 const OPTIMIZER_MAX = 10;
-const REVIEW_MAX = 30;
+const REVIEW_MAX = 10;
 const MEDIA_MAX = 60;
 const ZIP_MAX = 100;
 

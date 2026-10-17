@@ -1,6 +1,6 @@
 import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-workspace";
 import { GoogleReport } from "@/components/profile-guard";
-import { CrmReviewPhotos, useReviewHandoff, type ReviewCrmPhoto } from "@/components/crm-photo-sources";
+import { CrmReviewPhotos, PICK_MAX, PICK_MIN, useReviewHandoff, type ReviewCrmPhoto } from "@/components/crm-photo-sources";
 import { ReviewPipeline, PIPELINE_KEY, type PipelineItem } from "@/components/review-pipeline";
 import type { CrmPhotoClient } from "@/lib/crm-photos";
 import { AiReplySettings } from "@/components/ai-review-replies";
@@ -576,13 +576,18 @@ export default function GoogleReviewsPage() {
     openSendDialog();
     setClientName(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     pickCrmClient(it.customer);
+    // A fresh draft: nothing from an earlier client's request rides along.
     setCrmPhotos([]);
+    setAttachedPhotos([]);
+    setPersonalMessage("");
     setProjectDescription(it.description);
     setMessageMode("description");
   };
 
   const hasGoogleUrl = !!((user?.googleProfileUrl || templates.find((t: any) => String(t.id) === selectedTemplateId)?.googleProfileUrl));
-  const canSend = !!(clientName && clientEmail && hasGoogleUrl);
+  // Job photos go 5–10 (or none: the homeowner picks); fewer than 5 only when the client has fewer.
+  const crmShort = crmPhotos.length > 0 && crmPhotos.length < Math.min(PICK_MIN, crmClient?.photoCount ?? PICK_MIN);
+  const canSend = !!(clientName && clientEmail && hasGoogleUrl) && !crmShort;
   // The "i" beside the title: the feature's own entry on the first view, each other view's section (shared/help/registry.ts).
   const helpKey = view === "requests" ? "google-reviews" : `google-reviews.${view}`;
 
@@ -1392,7 +1397,7 @@ export default function GoogleReviewsPage() {
             )}
 
             <CrmReviewPhotos client={crmClient} onClient={pickCrmClient} crmPhotos={crmPhotos} onCrmPhotos={setCrmPhotos}
-              room={30 - attachedPhotos.length - crmPhotos.length} pickerOpen={crmPickerOpen} onPickerOpen={setCrmPickerOpen} />
+              room={Math.min(30 - attachedPhotos.length, PICK_MAX) - crmPhotos.length} pickerOpen={crmPickerOpen} onPickerOpen={setCrmPickerOpen} />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">

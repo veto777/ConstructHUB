@@ -80,7 +80,7 @@ export async function fetchCrmJson<T>(url: string): Promise<T> {
 export const optimizerHref = (ids: string[]) => marketingUrl(`/photos?crmPhotos=${ids.slice(0, 10).join(",")}`);
 /** The Google Reviews request composer with these CRM photos attached (and the client picked, if one). */
 export const reviewRequestHref = (ids: string[], customerId?: string | null) =>
-  marketingUrl(`/google-reviews?crmPhotos=${ids.slice(0, 30).join(",")}${customerId ? `&crmCustomer=${encodeURIComponent(customerId)}` : ""}`);
+  marketingUrl(`/google-reviews?crmPhotos=${ids.slice(0, 10).join(",")}${customerId ? `&crmCustomer=${encodeURIComponent(customerId)}` : ""}`);
 
 /** The ?crmPhotos= hand-off a platform page was opened with (ids only — the server re-checks every one). */
 export function handoffIds(search: string = typeof window === "undefined" ? "" : window.location.search): string[] {

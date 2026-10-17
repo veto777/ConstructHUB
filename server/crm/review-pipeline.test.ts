@@ -56,7 +56,7 @@ async function job(orgId: string, customerId: string, opts: { status: string; ti
     [orgId, customerId, projectId, String(Math.floor(Math.random() * 1e6)), opts.title, opts.status, opts.total, String(opts.daysAgo), ownerMember]);
 }
 
-let owner: number, other: number, outsider: number;
+let owner: number, other: number, outsider: number, crew: number;
 let orgA: string, orgB: string;
 const C: Record<string, string> = {};
 
@@ -89,6 +89,9 @@ beforeAll(async () => {
   C.otherOrg = await customer(orgB, "Other Org Won", "o@example.invalid");
   await job(orgB, C.otherOrg, { status: "approved", title: "Roof", total: 100, daysAgo: 1 });
   orgA = await org(owner);
+  crew = await user({ platform: true });
+  await pool.query("INSERT INTO crm_members(id,org_id,user_id,email,role,status) VALUES(gen_random_uuid(),$1,$2,$3,'field','active')",
+    [orgA, crew, `crew-${randomUUID().slice(0, 8)}@example.invalid`]);
 
   C.finished = await customer(orgA, "Ash Finished", "ash@example.invalid");
   await job(orgA, C.finished, { status: "approved", title: "Hardie lap siding", total: 2_000_000, daysAgo: 40, project: "complete" });
@@ -157,6 +160,11 @@ describe("review pipeline", () => {
   it("refuses another org's client and accounts with no CRM team", async () => {
     expect((await call(owner, `/api/reviews/pipeline/${C.otherOrg}/dismiss`, "POST")).status).toBe(404);
     expect((await call(outsider, "/api/reviews/pipeline")).status).toBe(404);
+  });
+
+  it("a field seat (no client or job rights, price-blind) can neither read nor change the list", async () => {
+    expect((await call(crew, "/api/reviews/pipeline")).status).toBe(403);
+    expect((await call(crew, `/api/reviews/pipeline/${C.recent}/dismiss`, "POST")).status).toBe(403);
   });
 
   it("describes the jobs without generic titles or repeats", () => {

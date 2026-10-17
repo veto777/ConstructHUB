@@ -606,13 +606,17 @@ export function registerCrmPhotoPlatformRoutes(app: Express, getDevUser: GetUser
  * the CRM team and able to see the client / every photo; responds and returns
  * null when not. Photo entries become token URLs once the token exists.
  */
+/** The most job photos a review request carries, picked by the contractor or the homeowner (owner rule: 5–10). */
+export const HOMEOWNER_PICK_MAX = 10;
+
 export async function resolveReviewCrmLink(req: any, res: any, getUser: GetUser, body: any): Promise<{
   crmOrgId?: string; crmCustomerId?: string | null; photos?: { attachmentId: string; originalName: string }[];
 } | null> {
   const customerId = typeof body?.crmCustomerId === "string" && body.crmCustomerId ? body.crmCustomerId.slice(0, 64) : null;
   const rawIds = Array.isArray(body?.crmPhotoIds) ? body.crmPhotoIds.filter((x: unknown) => typeof x === "string" && x).map((x: string) => x.slice(0, 64)) : [];
   if (!customerId && !rawIds.length) return {};
-  if (rawIds.length > 30) { res.status(400).json({ message: "Maximum 30 photos per review request." }); return null; }
+  // Job photos go 5–10 per request (owner rule); the composer holds the minimum, the server the maximum.
+  if (rawIds.length > HOMEOWNER_PICK_MAX) { res.status(400).json({ message: `Pick up to ${HOMEOWNER_PICK_MAX} job photos per review request.` }); return null; }
   const ctx = await photoCtx(req, res, getUser);
   if (!ctx) return null;
   if (customerId && !await objectPolicy(ctx).visible("customers", customerId)) {
@@ -628,7 +632,6 @@ export async function resolveReviewCrmLink(req: any, res: any, getUser: GetUser,
   return { crmOrgId: ctx.org.id, crmCustomerId: customerId, photos };
 }
 
-export const HOMEOWNER_PICK_MAX = 10;
 export const reviewPhotoUrl = (token: string, attachmentId: string) => `/api/review/${encodeURIComponent(token)}/photos/${attachmentId}`;
 
 type ReviewRow = typeof reviewRequests.$inferSelect;

@@ -23,7 +23,8 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, pool } from "../db";
 import { crmCustomers, crmEstimates, crmProjects, crmReviewPipeline } from "@shared/schema";
 import { objectPolicy } from "./object-access";
-import { photoCtx } from "./photo-library";
+import { EXPORT_PERMS, photoCtx } from "./photo-library";
+import type { OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
 import { requirePlatformAccess } from "../platform-access";
 import { normalizeRecipient } from "../review-suppression";
@@ -31,6 +32,7 @@ import { logError } from "../ops/log";
 
 type GetUser = (req: any, res: any) => any;
 type Customer = typeof crmCustomers.$inferSelect;
+type Estimate = typeof crmEstimates.$inferSelect;
 
 /** Project statuses that mean the work is done: the best moment to ask. */
 const DONE = new Set(["complete", "invoiced", "paid"]);
@@ -66,20 +68,20 @@ export function describeJobs(jobs: Pick<PipelineJob, "title">[]): string {
   return out.slice(0, 3).join(" · ");
 }
 
-export async function buildReviewPipeline(ctx: Parameters<typeof objectPolicy>[0], userId: number): Promise<{
+export async function buildReviewPipeline(ctx: OrgContext, userId: number): Promise<{
   ready: PipelineItem[]; dismissed: PipelineItem[]; askedCount: number;
 }> {
   const orgId = ctx.org.id;
-  const won = await db.select({
-    id: crmEstimates.id, customerId: crmEstimates.customerId, projectId: crmEstimates.projectId, number: crmEstimates.number,
-    title: crmEstimates.title, approvedAt: crmEstimates.approvedAt, totalCents: crmEstimates.totalCents, approvedTotalCents: crmEstimates.approvedTotalCents,
-  }).from(crmEstimates).where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.status, "approved")));
+  const policy = objectPolicy(ctx);
+  // Each won estimate passes the estimate policy itself (division, assignment), not only its client.
+  const won = await policy.filter("estimates", await db.select().from(crmEstimates)
+    .where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.status, "approved")))) as Estimate[];
   if (!won.length) return { ready: [], dismissed: [], askedCount: 0 };
 
   const ids = [...new Set(won.map((e) => e.customerId))];
   const customers = await db.select().from(crmCustomers)
     .where(and(eq(crmCustomers.orgId, orgId), inArray(crmCustomers.id, ids), isNull(crmCustomers.archivedAt)));
-  const visible = await objectPolicy(ctx).filter("customers", customers) as Customer[];
+  const visible = await policy.filter("customers", customers) as Customer[];
   if (!visible.length) return { ready: [], dismissed: [], askedCount: 0 };
   const visibleIds = visible.map((c) => c.id);
 
@@ -123,7 +125,8 @@ export async function buildReviewPipeline(ctx: Parameters<typeof objectPolicy>[0
     const status = stages.find((x) => DONE.has(x)) ?? stages[0] ?? null;
     const jobs: PipelineJob[] = list.map((e) => ({
       estimateId: e.id, number: e.number, title: e.title, wonAt: e.approvedAt?.toISOString() ?? null,
-      totalCents: e.approvedTotalCents ?? e.totalCents ?? 0,
+      // Price-blind seats (field crews) get no contract values.
+      totalCents: ctx.permissions.seePrices ? e.approvedTotalCents ?? e.totalCents ?? 0 : 0,
     }));
     const pc = photoCount.get(c.id);
     const email = c.email?.trim() || null;
@@ -149,11 +152,18 @@ export async function buildReviewPipeline(ctx: Parameters<typeof objectPolicy>[0
   return { ready, dismissed, askedCount: askedIds.size };
 }
 
+/** Asking won clients for reviews is client/job work: the same rights as sending their photos (EXPORT_PERMS). */
+function mayAsk(res: any, ctx: OrgContext): boolean {
+  if (EXPORT_PERMS.some((p) => ctx.permissions[p])) return true;
+  res.status(403).json({ message: "Requires permission: manageJobs or manageCustomers" });
+  return false;
+}
+
 export function registerReviewPipelineRoutes(app: Express, getUser: GetUser): void {
   app.get("/api/reviews/pipeline", requirePlatformAccess, async (req: any, res) => {
     try {
       const ctx = await photoCtx(req, res, getUser);
-      if (!ctx) return;
+      if (!ctx || !mayAsk(res, ctx)) return;
       res.json(await buildReviewPipeline(ctx, getUser(req, res).id));
     } catch (err) {
       logError("review pipeline", err);
@@ -164,7 +174,7 @@ export function registerReviewPipelineRoutes(app: Express, getUser: GetUser): vo
   const setDismissed = (on: boolean) => async (req: any, res: any) => {
     try {
       const ctx = await photoCtx(req, res, getUser);
-      if (!ctx) return;
+      if (!ctx || !mayAsk(res, ctx)) return;
       const customerId = String(req.params.customerId).slice(0, 64);
       if (!await objectPolicy(ctx).visible("customers", customerId)) return res.status(404).json({ message: "Client not found" });
       if (on) {

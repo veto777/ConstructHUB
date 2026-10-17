@@ -118,7 +118,7 @@ export function useReviewHandoff(onArrive: (h: { customer: CrmPhotoClient | null
         // Photos from several jobs (no single client): keep them by id; thumbnails come from the gated thumb route.
         for (const id of ids) if (!photos.some((p) => p.id === id)) photos.push({ id, thumbUrl: `/api/crm/photos/${id}/thumb`, fileName: "CRM photo" });
       } catch { /* not on a CRM team in this session: nothing to attach */ }
-      onArrive({ customer, photos: photos.slice(0, 30) });
+      onArrive({ customer, photos: photos.slice(0, PICK_MAX) });
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }
@@ -160,7 +160,7 @@ export function CrmReviewPhotos({ client, onClient, crmPhotos, onCrmPhotos, room
     if (selected.has(p.id)) onCrmPhotos(crmPhotos.filter((x) => x.id !== p.id));
     else if (room > 0 && crmPhotos.length < PICK_MAX) onCrmPhotos([...crmPhotos, { id: p.id, thumbUrl: p.thumbUrl, fileName: p.fileName }]);
   };
-  const short = crmPhotos.length > 0 && crmPhotos.length < PICK_MIN && (client?.photoCount ?? 0) >= PICK_MIN;
+  const short = crmPhotos.length > 0 && crmPhotos.length < Math.min(PICK_MIN, client?.photoCount ?? PICK_MIN);
 
   return (
     <div className="space-y-3 rounded-lg border bg-muted/20 p-3" data-testid="section-review-crm">
