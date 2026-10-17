@@ -13,6 +13,7 @@ import { GoogleList, GoogleListRow, GooglePill, GoogleSectionHeader, GoogleStat,
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { landingPreviewPath } from "@shared/feature-pages";
 import { ExternalLink, LayoutGrid, Lock } from "lucide-react";
 import { DashLink, FOCUS_RING } from "@/components/dashboard/dash-link";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
@@ -99,7 +100,7 @@ export default function AdminFeaturePagesPage() {
                     title={row.title}
                     badges={<span className={`g-chip g-chip--sm !normal-case ${status.className}`} title={status.title}>{status.label}</span>}
                     meta={[
-                      <Link key="public" href={row.path} data-testid={`link-admin-feature-public-${row.key}`}>{row.path}</Link>,
+                      <Link key="public" href={landingPreviewPath(row.path)} data-testid={`link-admin-feature-public-${row.key}`}>{row.path}</Link>,
                       row.app ? (
                         <DashLink key="app" href={row.app.href} surface={row.app.surface} className="inline-flex items-center gap-1" data-testid={`link-admin-feature-app-${row.key}`}>
                           {row.app.surface === "portal" ? `CRM ${row.app.href}` : row.app.href}

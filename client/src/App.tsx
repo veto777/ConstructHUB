@@ -1,6 +1,8 @@
 import { SocialLinks } from "@/components/social-links";
 import { PaymentNeededBanner } from "@/components/payment-needed-banner";
 import { NotificationBell } from "@/components/account-security";
+import { AdminLandingLink } from "@/components/admin-landing-link";
+import { CALL_ASSISTANT_INTRO_PREVIEW_PATH } from "@shared/feature-pages";
 import { RecentAuthModal } from "@/components/recent-auth";
 import { Switch, Route, useLocation, Link, Redirect } from "wouter";
 import { Suspense, useEffect, type ComponentType } from "react";
@@ -515,6 +517,7 @@ function PublicRouter() {
       <Route path="/ip-tracker/platforms" component={Ribboned.IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/call-assistant" component={CallAssistantLandingPage} />
+      <Route path={CALL_ASSISTANT_INTRO_PREVIEW_PATH}><Redirect to="/call-assistant" /></Route>
       <Route path="/features" component={FeaturesCataloguePage} />
       {/* Google Ads landing doors: the same pages, reached only from an ad (server/ads-landing.ts). */}
       <Route path="/googleads-features" component={FeaturesCataloguePage} />
@@ -969,6 +972,17 @@ function AppContent() {
     );
   }
 
+  // The Call Assistant's intro page as the public sees it (signed in, /call-assistant is its dashboard): the
+  // admins' landing-page icon opens it here (components/admin-landing-link.tsx).
+  if (location === CALL_ASSISTANT_INTRO_PREVIEW_PATH) {
+    return (
+      <>
+        <CallAssistantLandingPage />
+        <HubWidget surface="marketing" signedIn />
+      </>
+    );
+  }
+
   if (location.startsWith("/contract/sign/")) {
     // Rendered through a Route so the page's useParams() gets :token (a bare
     // <ContractSignPage /> outside any Route saw {} and showed "Not Found").
@@ -994,7 +1008,7 @@ function AppContent() {
   // The app's own controls (top right) and the footer: the same in the normal layout and in a tool shell.
   const controls = (
     <>
-              <RecentAuthModal /><NotificationBell />
+              <RecentAuthModal /><AdminLandingLink location={location} /><NotificationBell />
               <Link href="/settings" data-testid="link-header-settings" aria-label="Settings"
                 className="inline-flex items-center justify-center rounded-md h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
                 <Settings className="h-4 w-4" />
@@ -1089,7 +1103,7 @@ function AppContent() {
 }
 
 /** Marketing and sales pages: never inside the iPhone apps (they sell nothing). */
-const APP_SALES_PATHS = ["/pricing", "/googleads-features", "/googleads-crm", "/googleads-pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/compliance/research", "/contract", "/call-assistant-pricing", "/crm-app", "/google-ads-guide"];
+const APP_SALES_PATHS = ["/pricing", "/googleads-features", "/googleads-crm", "/googleads-pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/compliance/research", "/contract", "/call-assistant-pricing", "/call-assistant/intro", "/crm-app", "/google-ads-guide"];
 
 function App() {
   return (

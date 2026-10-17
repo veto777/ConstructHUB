@@ -155,3 +155,53 @@ export const FEATURE_CATALOGUE: readonly FeatureCatalogueEntry[] = (() => {
 
 /** Pages written and checked (status "ready") — the ones in the sitemap. */
 export const READY_FEATURE_PAGES: readonly FeaturePage[] = FEATURE_PAGES.filter((p) => p.status === "ready");
+
+/** The Call Assistant's hand-built intro page for signed-in visitors (signed in, /call-assistant is its dashboard). */
+export const CALL_ASSISTANT_INTRO_PREVIEW_PATH = "/call-assistant/intro";
+
+/**
+ * Where a signed-in visitor sees a public intro page as the public sees it. Every template page renders the
+ * same signed in; /call-assistant is the dashboard when signed in, so its page is previewed at its own path.
+ */
+export function landingPreviewPath(path: string): string {
+  return path === "/call-assistant" ? CALL_ASSISTANT_INTRO_PREVIEW_PATH : path;
+}
+
+/**
+ * App pages that belong to a feature but aren't its `app.href` (each page is described in that feature's own
+ * copy): sidebar tools that would otherwise show "no landing page" on the admins' icon.
+ */
+const APP_PAGE_ALIASES: readonly { href: string; key: string }[] = [
+  { href: "/databases", key: "permits" }, { href: "/history", key: "permits" }, { href: "/permit-alerts", key: "permits" },
+  { href: "/listing-editor", key: "gbp" }, { href: "/directories", key: "gbp" },
+  { href: "/gbp-photos", key: "gbpContent" },
+  { href: "/gmb-monitor", key: "profileGuard" },
+  { href: "/media-library", key: "media" },
+  { href: "/google-ads-guide", key: "guides" }, { href: "/lsa-guide", key: "guides" }, { href: "/google-ad-fraud", key: "guides" },
+];
+
+/** One intro page for an app page (the admins' "see the landing page" icon). */
+export type AppLandingPage = { key: string; title: string; path: string; preview: string; status: FeatureCatalogueEntry["status"] };
+
+/**
+ * The public intro page(s) for an app page, from each feature's own `app.href`: the entries whose href is the
+ * page or a parent of it (/seo/keywords → SEO Suite), longest href first, so a sub-page gets its own feature's
+ * page. Several features can share one app page (/locations: Google Business Profile and Profile Watch), so
+ * every entry at the best match is returned. The dashboard ("/") matches only itself. Portal (CRM host)
+ * features are left out: this app's frame never shows those pages. Empty when no intro page exists yet.
+ */
+export function landingPagesForAppPath(pathname: string): AppLandingPage[] {
+  const path = pathname.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  const byKey = new Map(FEATURE_CATALOGUE.map((e) => [e.key, e]));
+  const doors = [
+    ...FEATURE_CATALOGUE.filter((e) => e.app?.surface === "app").map((e) => ({ href: e.app.href, entry: e })),
+    ...APP_PAGE_ALIASES.flatMap((a) => { const entry = byKey.get(a.key); return entry ? [{ href: a.href, entry }] : []; }),
+  ];
+  const matches = doors.filter(({ href }) => (href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`)));
+  if (!matches.length) return [];
+  const best = Math.max(...matches.map((m) => m.href.length));
+  const seen = new Set<string>();
+  return matches
+    .filter((m) => m.href.length === best && !seen.has(m.entry.key) && seen.add(m.entry.key))
+    .map(({ entry: e }) => ({ key: e.key, title: e.title, path: e.path, preview: landingPreviewPath(e.path), status: e.status }));
+}

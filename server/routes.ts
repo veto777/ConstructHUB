@@ -9,7 +9,8 @@ import { lookupPoint as lookupGridPoint, gridEstimateUsd } from "./seo/grid";
 import { withBudget, SeoBudgetError } from "./seo/budget";
 const gridRound6 = (n: number) => Math.round(n * 1e6) / 1e6;
 import { getEntitlements, requirePlan, requireModule, hasModule, usersWithModule, sendModuleRequired, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN, accessPlanName } from "./entitlements";
-import { PAYMENT_NEEDED_STATUSES, PLANS, fitsLimit } from "@shared/plans";
+import { formatUsd } from "@shared/plan-copy";
+import { GBP_REINSTATEMENT_CENTS, PAYMENT_NEEDED_STATUSES, PLANS, fitsLimit, reinstatementPriceCents } from "@shared/plans";
 import { isSalesOnly, sendTalkToSales, salesInquirySubject } from "./catalog";
 import { startResearchWorker } from "./research/runner";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
@@ -3637,13 +3638,37 @@ export async function registerRoutes(
     }
   });
 
+  // What one reinstatement case costs the visitor: half the standard rate on Unlimited (shared/plans.ts
+  // reinstatementPriceCents; owner, 2026-10-16), from the account's own plan, never a platform admin's top-plan access.
+  const reinstatementQuote = async (req: any) => {
+    const userId: number | undefined = req.user?.id;
+    const plan = userId ? (await getEntitlements(userId)).plan : null;
+    const cents = reinstatementPriceCents(plan);
+    return { cents, standardCents: GBP_REINSTATEMENT_CENTS, halfPrice: cents < GBP_REINSTATEMENT_CENTS, planName: plan ? PLANS[plan].name : null };
+  };
+  app.get("/api/reinstatement/price", async (req, res) => {
+    try {
+      res.setHeader("Cache-Control", "private, no-store");
+      res.json(await reinstatementQuote(req));
+    } catch (err: any) {
+      logError("Reinstatement price failed:", err);
+      res.status(500).json({ message: "Could not load the price." });
+    }
+  });
+
   // The GBP Reinstatement page's request form (/reinstatement): validates the fields
-  // and emails the request to our own support inbox (reply-to the requester). No DB row.
+  // and emails the request to our own support inbox (reply-to the requester), with the
+  // price this account pays, so the case is billed at it. No DB row.
   app.post("/api/reinstatement/request", reinstatementLimit, async (req, res) => {
     try {
       const parsed = reinstatementInput.safeParse(req.body ?? {});
       if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
       const { name, email, businessName, websiteUrl, businessAddress, businessType, multipleLocations, problemDescription } = parsed.data;
+      const quote = await reinstatementQuote(req);
+      const accountId: number | undefined = (req as any).user?.id;
+      const priceLine = quote.halfPrice
+        ? `${formatUsd(quote.cents)} — half price on the ${quote.planName} plan (standard ${formatUsd(quote.standardCents)})`
+        : `${formatUsd(quote.cents)} (standard rate${quote.planName ? `, ${quote.planName} plan` : accountId ? ", no active plan" : ", not signed in"})`;
 
       await sendWithFallback({
         from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
@@ -3659,6 +3684,8 @@ export async function registerRoutes(
           <p><strong>Address:</strong> ${escapeHtml(businessAddress)}</p>
           <p><strong>Type:</strong> ${escapeHtml(businessType)}</p>
           <p><strong>Multiple Locations:</strong> ${escapeHtml(multipleLocations || "Not specified")}</p>
+          <p><strong>Account:</strong> ${accountId ? `#${accountId}` : "Not signed in"}</p>
+          <p><strong>Price to bill:</strong> ${escapeHtml(priceLine)}</p>
           <p><strong>Problem:</strong></p>
           <p>${escapeBlock(problemDescription)}</p>
         `,

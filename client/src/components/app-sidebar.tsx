@@ -278,6 +278,9 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "Social Media", url: "/social-media", icon: Megaphone, logoComponent: SocialMediaIcon },
   { title: "Site Scan", url: "/site-scan", icon: Search, logoComponent: SiteScanIcon },
   { title: "SEO Suite", url: "/seo", icon: TrendingUp, logoComponent: SeoIcon, badge: "new" },
+  // The Press Wire (owner, 2026-10-15): packages of press releases, written by the AI and sent to the wire.
+  // Sold beside Call Assistant and SEO Suite, never tucked in Admin (owner, 2026-10-16).
+  { title: "Press Releases", url: "/press-releases", icon: Newspaper, badge: "hot" },
   { title: "Cloudflare", url: "/cloudflare", icon: Cloud, logoComponent: CloudflareIcon },
   { title: "Search Console", url: "/search-console", icon: Search, logoComponent: SearchConsoleIcon },
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },
@@ -287,8 +290,6 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   // JobCam is a CRM page (portal host); the owner wants it reachable from here too (2026-10-15: "add jobcam
   // here on the side since we want jobcam to be here and in CRM section"). crmPath → a plain link to the portal.
   { title: "JobCam", url: "/crm/jobcam", crmPath: "/crm/jobcam", icon: Camera, landingUrl: "/features/jobcam", badge: "new" },
-  // The Press Wire (owner, 2026-10-15): packages of press releases, written by the AI and sent to the wire.
-  { title: "Press Releases", url: "/press-releases", icon: Newspaper, badge: "hot" },
   { title: "Master Class", url: "/master-class", icon: GraduationCap, logo: masterclassLogo, landingUrl: "/features/master-class" },
 ];
 

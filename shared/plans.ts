@@ -757,6 +757,12 @@ export function moduleName(module: AnyModuleKey): string {
 export const TRIAL_DAYS = 1;
 /** GBP Reinstatement service, per project (one price for the page, the cards and the Hub assistant). */
 export const GBP_REINSTATEMENT_CENTS = 99_900; // owner, 2026-10-14: "reprice with $999" (was $599)
+/** Plans whose GBP reinstatement help is half the standard rate (Unlimited's bullet; owner, 2026-10-16: "apply the half price"). */
+export const REINSTATEMENT_HALF_PRICE_PLANS: ReadonlySet<PlanKey> = new Set<PlanKey>(["agency"]);
+/** What one reinstatement case costs an account on `plan` (null: no plan): half on Unlimited, else the standard rate. */
+export function reinstatementPriceCents(plan: PlanKey | null | undefined): number {
+  return plan && REINSTATEMENT_HALF_PRICE_PLANS.has(plan) ? Math.round(GBP_REINSTATEMENT_CENTS / 2) : GBP_REINSTATEMENT_CENTS;
+}
 /**
  * Permit & License Research Reports (owner, 2026-10-14: "charge $500-1000 for these types of reports", paid up front,
  * non-refundable). Standard: one name in one state. Extended: up to RESEARCH_EXTENDED_MAX_NAMES names in up to

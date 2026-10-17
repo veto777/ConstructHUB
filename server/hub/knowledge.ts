@@ -14,7 +14,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import {
   PLANS, PLAN_KEYS, ADDONS, ADDON_MAX_QUANTITY, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, SALES_THRESHOLD_CENTS,
-  GBP_REINSTATEMENT_CENTS, RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS, gridCreditCost,
+  GBP_REINSTATEMENT_CENTS, reinstatementPriceCents, RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS, gridCreditCost,
 } from "@shared/plans";
 import { PRESS_PROGRAM_PAID, PRESS_RELEASE_PRICE_CENTS } from "@shared/press";
 import { pressOutletCounts } from "../press/outlets";
@@ -271,7 +271,7 @@ export function dollarAmounts(text: string): number[] {
  * launch price exists any more.
  */
 export function priceBookCents(): Set<number> {
-  const cents = new Set<number>([SALES_THRESHOLD_CENTS, GBP_REINSTATEMENT_CENTS, RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS,
+  const cents = new Set<number>([SALES_THRESHOLD_CENTS, GBP_REINSTATEMENT_CENTS, reinstatementPriceCents("agency"), RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS,
     PRESS_RELEASE_PRICE_CENTS.budget, PRESS_RELEASE_PRICE_CENTS.premium, PRESS_RELEASE_PRICE_CENTS.budget * PRESS_PROGRAM_PAID, PRESS_RELEASE_PRICE_CENTS.premium * PRESS_PROGRAM_PAID]);
   for (const key of PLAN_KEYS) { cents.add(PLANS[key].monthlyCents); cents.add(PLANS[key].annualCents); }
   for (const addon of Object.values(ADDONS)) {

@@ -37,7 +37,8 @@ describe("tool access", () => {
       else expect(rule.landing, url).toBe("/call-assistant");
     }
     // /crm/jobcam: a CRM page on the portal host (the sidebar links there, 2026-10-15); the CRM gates it itself.
-    const free = ["/yelp", "/databases", "/reinstatement", "/compliance", "/google-ad-fraud", "/google-ads-guide", "/lsa-guide", "/lsa-leads", "/master-class", "/crm/jobcam"];
+    // /press-releases: open on every plan; each release package is bought on its own (shared/press.ts).
+    const free = ["/yelp", "/databases", "/reinstatement", "/compliance", "/google-ad-fraud", "/google-ads-guide", "/lsa-guide", "/lsa-leads", "/master-class", "/crm/jobcam", "/press-releases"];
     for (const url of SIDEBAR_URLS) expect(!!toolRuleFor(url) || free.includes(url), url).toBe(true);
     expect(toolRuleFor("/seo/keywords")).toBe(TOOL_RULES["/seo"]);
     expect(toolRuleFor("/pricing#add-ons")).toBeUndefined();

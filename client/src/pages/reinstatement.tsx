@@ -60,6 +60,10 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function ReinstatementPage() {
   const { toast } = useToast();
   const { data: user } = useQuery<any>({queryKey:["/api/auth/me"]});
+  // The account's own price (half the standard rate on Unlimited; server/routes.ts /api/reinstatement/price).
+  const { data: quote } = useQuery<{ cents: number; standardCents: number; halfPrice: boolean; planName: string | null }>({
+    queryKey: ["/api/reinstatement/price"], enabled: !!user,
+  });
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -193,7 +197,7 @@ export default function ReinstatementPage() {
   // Google's format (owner, 2026-10-07): quiet title, number tiles, a hairline section for the form.
   if (user) return <GoogleSurface page><AppPage width="narrow" testId="page-reinstatement">
     <GoogleSectionHeader as="h1" titleTestId="text-reinstatement-title" title="Profile reinstatement" description="Request help with a suspended Google Business Profile." flush/>
-    <div data-testid="reinstatement-facts"><div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(16rem,1fr))]"><GoogleStat label="Flat project rate" value={formatUsd(GBP_REINSTATEMENT_CENTS)} testId="card-reinstatement-pricing"/><GoogleStat label="Initial review" value="1–2 days" hint="Business days"/></div></div>
+    <div data-testid="reinstatement-facts"><div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(16rem,1fr))]"><GoogleStat label={quote?.halfPrice ? "Your project rate" : "Flat project rate"} value={formatUsd(quote?.cents ?? GBP_REINSTATEMENT_CENTS)} hint={quote?.halfPrice ? `Half price on ${quote.planName} (standard ${formatUsd(quote.standardCents)})` : undefined} testId="card-reinstatement-pricing"/><GoogleStat label="Initial review" value="1–2 days" hint="Business days"/></div></div>
     <p className="text-xs text-muted-foreground" data-testid="text-reinstatement-terms">Non-refundable. Google alone decides whether a profile is reinstated, so nothing is guaranteed.</p>
     <div className="g-card space-y-2" data-testid="reinstatement-how"><h2 className="g-card__title g-card__title--md">How this works</h2><ol className="list-decimal space-y-1 pl-5 text-sm">
       <li>Fill in the form below with what happened to the profile and send it.</li>

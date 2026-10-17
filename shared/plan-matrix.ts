@@ -18,7 +18,7 @@
  * plan-comparison-table.tsx and the markdown generator agree on this).
  */
 import {
-  PLANS, PLAN_KEYS, ADDONS, COMING_MODULES, GBP_REINSTATEMENT_CENTS, isUnlimited, gridCreditCost,
+  PLANS, PLAN_KEYS, ADDONS, COMING_MODULES, GBP_REINSTATEMENT_CENTS, reinstatementPriceCents, isUnlimited, gridCreditCost,
   type ModuleKey, type Plan, type PlanKey,
 } from "./plans";
 import {
@@ -188,7 +188,7 @@ export function businessToolsMatrix(): PlanMatrixSection[] {
     { key: "masterClass", label: `Master Class course${masterClassPriceNote() ? ` ${masterClassPriceNote()}` : ""}`, cell: (p) => moduleCell(p, "masterClass") },
     {
       key: "gbpReinstatement", label: "GBP reinstatement help / project",
-      cell: (p) => (p.key === "agency" ? `${usd(GBP_REINSTATEMENT_CENTS / 2)} — half price` : usd(GBP_REINSTATEMENT_CENTS)),
+      cell: (p) => (reinstatementPriceCents(p.key) < GBP_REINSTATEMENT_CENTS ? `${usd(reinstatementPriceCents(p.key))} — half price` : usd(GBP_REINSTATEMENT_CENTS)),
     },
     {
       key: "newProductSeats", label: NEW_PRODUCT_LABEL,

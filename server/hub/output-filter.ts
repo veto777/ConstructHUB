@@ -13,7 +13,7 @@
  * Pure: no DB, no request, no model.
  */
 import {
-  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS,
+  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, REINSTATEMENT_HALF_PRICE_PLANS, reinstatementPriceCents, SALES_THRESHOLD_CENTS, TRIAL_DAYS,
   CALL_ASSISTANT_TIERS, CALL_ASSISTANT_ANNUAL_MONTHS, CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE, type PlanKey,
 } from "@shared/plans";
 import { ALACARTE, ALACARTE_KEYS, ALACARTE_LINKED, ALACARTE_ADDON_ONLY, alacartePriceCents } from "@shared/alacarte";
@@ -368,7 +368,7 @@ const BOTH_ALL = /\b(both|all( of them| three| four)?)\b[^.$]{0,25}\$|\$[^.]{0,2
 const ADDON_CUE = /\b(add-?ons?|addon|extra (agency |crm |team )?(locations?|seats?|protected websites?|websites?)|additional (locations?|seats?|websites?)|per[- ]location|each (additional |extra )?location|for locations|locations? (above|over|\d)|texting number|texts|setup fee|one-time|scan pack|audit pack|citation audits?|competitor scans?|per seat|protected websites?|reinstatement|per project|bands?|call assistant|call minutes?|per minute|extra .{0,30}number|seo data|data credit)\b/i;
 /** Add-on, band and service amounts (never a plan's own price), the Call Assistant's tiers, extra number and overage among them. */
 const ADDON_CENTS: ReadonlySet<number> = (() => {
-  const cents = new Set<number>([GBP_REINSTATEMENT_CENTS]);
+  const cents = new Set<number>([GBP_REINSTATEMENT_CENTS, ...[...REINSTATEMENT_HALF_PRICE_PLANS].map(reinstatementPriceCents)]);
   for (const addon of Object.values(ADDONS)) {
     cents.add(addon.monthlyCents); cents.add(addon.annualCents);
     if (addon.setupCents) cents.add(addon.setupCents);
@@ -480,7 +480,7 @@ const CA_BINDERS: readonly CaBinder[] = [
   caBinder(String.raw`(?:the )?CRM(?: (?:Basic|Essentials|Max))?(?: plans?| subscriptions?| seats?)?`, (_n, cents) => CRM_CENTS.has(cents)),
   caBinder(
     String.raw`extra (?:agency |crm )?(?:locations?|seats?|protected websites?|websites?)|additional (?:locations?|seats?|websites?)|locations?|seats?|protected websites?|websites?|(?:client )?texting numbers?|(?:the )?setup fee|competitor scan packs?|scan packs?|competitor scans?|reinstatement`,
-    (_n, cents) => ADDON_PRICE_CENTS.has(cents) || cents === GBP_REINSTATEMENT_CENTS),
+    (_n, cents) => ADDON_PRICE_CENTS.has(cents) || cents === GBP_REINSTATEMENT_CENTS || cents === reinstatementPriceCents("agency")),
   caBinder(String.raw`(?:extra|additional|another|second) (?:call assistant |local |phone )?numbers?|(?:local |phone )?numbers?`, (_n, cents) => CA_NUMBER_CENTS.has(cents)),
 ];
 /** The positions (of the "$") of the amounts in `sentence` that sit in another product's clause, at that product's price. */
