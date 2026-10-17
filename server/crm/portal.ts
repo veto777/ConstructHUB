@@ -696,7 +696,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // contractor's login-only hover.to/3d viewer is never sent to the client).
     const home3d = await clientHome3dForEstimate(est).catch(() => null);
     // The in-app 3D viewer for the same customer (/api/public/estimates/:token/model3d) — no HOVER login needed.
-    const viewer3d = !!(await viewerMeasurementForEstimate(est).catch(() => null));
+    const viewer3d = !!(await viewerMeasurementForEstimate(est, { offeredOnly: true }).catch(() => null));
     res.json({
       ...view,
       home3d,

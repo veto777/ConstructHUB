@@ -8,6 +8,8 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
+import fs from "fs";
+import path from "path";
 
 process.env.DATABASE_URL ??= "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev";
 process.env.STRIPE_SECRET_KEY ??= "sk_test_vitest_stub";
@@ -49,6 +51,7 @@ function fakeHover() {
     calls: [] as { path: string; auth: string | null; host: string; url: string }[],
     jobs: new Map<string, any>(),
     xml: new Map<string, { status: number; body?: string; retryAfter?: string }>(),
+    wf: new Map<string, () => Response>(),
   };
   const json = (code: number, body: any, headers: Record<string, string> = {}) =>
     new Response(JSON.stringify(body), { status: code, headers: { "content-type": "application/json", ...headers } });
@@ -64,11 +67,14 @@ function fakeHover() {
       expect(u.searchParams.get("version")).toBe("v2");
       const r = st.xml.get(xml[1]) ?? { status: 404 };
       if (r.status !== 200) return json(r.status, { error: "x" }, r.retryAfter ? { "retry-after": r.retryAfter } : {});
-      return new Response(r.body ?? SYNTH_XML, { status: 200, headers: { "content-type": "application/xml" } });
+      // Live HOVER serves the export as application/octet-stream (verified 2026-10-17) — never rely on an XML type.
+      return new Response(r.body ?? SYNTH_XML, { status: 200, headers: { "content-type": "application/octet-stream" } });
     }
     const wf = /^\/api\/v3\/models\/(\d+)\/artifacts\/wireframe_(\w+)\.png$/.exec(u.pathname);
     if (wf) {
       const key = `${wf[2]}:${u.searchParams.get("version")}`;
+      const override = st.wf.get(key);
+      if (override) return override();
       if (key === "front:url") return new Response(PNG, { status: 200, headers: { "content-type": "image/png" } });
       if (key === "back:url") return new Response(null, { status: 302, headers: { location: "https://storage.hover.test/signed/back.png?sig=1" } });
       if (key === "right:url") return new Response(null, { status: 302, headers: { location: "https://169.254.169.254/latest/meta-data" } });
@@ -76,7 +82,13 @@ function fakeHover() {
       if (key === "roof:pitches") return new Response("<html>not an image</html>", { status: 200, headers: { "content-type": "image/png" } });
       return json(404, {});
     }
-    if (u.host === "storage.hover.test") return new Response(PNG, { status: 200, headers: { "content-type": "image/png" } });
+    if (u.host === "storage.hover.test") {
+      const chain = /^\/chain\/(\d+)$/.exec(u.pathname);
+      if (chain && Number(chain[1]) > 0) return new Response(null, { status: 302, headers: { location: `/chain/${Number(chain[1]) - 1}` } });
+      if (u.pathname === "/to-metadata") return new Response(null, { status: 302, headers: { location: "http://169.254.169.254/latest/meta-data" } });
+      if (u.pathname === "/to-internal") return new Response(null, { status: 302, headers: { location: "https://internal.hover.test/x.png" } });
+      return new Response(PNG, { status: 200, headers: { "content-type": "image/png" } });
+    }
     throw new Error(`fake hover: unexpected ${u.host}${u.pathname}`);
   }) as typeof fetch;
   return { st, fetchFn };
@@ -138,6 +150,8 @@ describe("DB: model3d + wireframe loaders", () => {
 
   beforeAll(async () => {
     hover.setHoverBackoffSleep(async () => {});
+    // Test DNS: storage.hover.test is a public address, internal.hover.test a private one. Nothing else resolves.
+    m3d.setModel3dDnsLookup(async (h) => (h === "storage.hover.test" ? ["93.184.216.34"] : h === "internal.hover.test" ? ["10.0.0.5"] : []));
     orgId = (await q(`insert into crm_orgs (name, owner_user_id) values ('HOVER model3d Vitest Org', 1) returning id`))[0].id;
     orgB = (await q(`insert into crm_orgs (name, owner_user_id) values ('HOVER model3d Vitest Org B (not connected)', 1) returning id`))[0].id;
     hover.clearHoverTokenCache(orgId);
@@ -151,6 +165,7 @@ describe("DB: model3d + wireframe loaders", () => {
 
   afterAll(async () => {
     hover.setHoverBackoffSleep(null);
+    m3d.setModel3dDnsLookup(null);
     for (const o of [orgId, orgB].filter(Boolean)) {
       for (const t of ["crm_attachments", "crm_measurements", "crm_estimates", "crm_projects", "crm_customers"]) {
         await q(`delete from ${t} where org_id = $1`, [o]);
@@ -217,12 +232,34 @@ describe("DB: model3d + wireframe loaders", () => {
     const r = await m3d.loadModel3d(m, { fetchFn: fake.fetchFn, refresh: true });
     expect(r.status).toBe("ready");
     expect((await rawOf(m.id)).model3d.reason).toBeNull();
+
+    // A second refresh replaces the mesh and removes the superseded cache row + file (no orphans).
+    const first = (await rawOf(m.id)).model3d.meshAttachmentId;
+    const [firstAtt] = await q(`select storage_path from crm_attachments where id = $1`, [first]);
+    const firstFile = path.join(process.cwd(), "tmp", "crm-attachments", firstAtt.storage_path);
+    expect(fs.existsSync(firstFile)).toBe(true);
+    expect((await m3d.loadModel3d(m, { fetchFn: fake.fetchFn, refresh: true })).status).toBe("ready");
+    const second = (await rawOf(m.id)).model3d.meshAttachmentId;
+    expect(second).not.toBe(first);
+    expect(await q(`select id from crm_attachments where id = $1`, [first])).toHaveLength(0);
+    expect(fs.existsSync(firstFile)).toBe(false);
+    // A definitive refusal later drops the stale mesh too.
+    fake.st.xml.set("558", { status: 404 });
+    expect((await m3d.loadModel3d(m, { fetchFn: fake.fetchFn, refresh: true })).status).toBe("unavailable");
+    expect(await q(`select id from crm_attachments where id = $1`, [second])).toHaveLength(0);
+    expect((await rawOf(m.id)).model3d.meshAttachmentId).toBeNull();
   });
 
-  it("403 → hover_refused; a deliverable without an XML export → no_xml_export without asking for it", async () => {
+  it("403/400 → reported but NOT remembered; a deliverable without an XML export → no_xml_export without asking for it", async () => {
     const m1 = await measurement({ raw: { model3d: { modelId: "559" } } });
     fake.st.xml.set("559", { status: 403 });
     expect(await m3d.loadModel3d(m1, { fetchFn: fake.fetchFn })).toEqual({ status: "unavailable", reason: "hover_refused" });
+    expect((await rawOf(m1.id)).model3d.status).toBeUndefined();
+    fake.st.xml.set("559", { status: 400 });
+    expect(await m3d.loadModel3d(m1, { fetchFn: fake.fetchFn })).toEqual({ status: "unavailable", reason: "no_xml_export" });
+    expect((await rawOf(m1.id)).model3d.status).toBeUndefined();
+    fake.st.xml.set("559", { status: 200 });
+    expect((await m3d.loadModel3d(m1, { fetchFn: fake.fetchFn })).status).toBe("ready"); // the blip passed
 
     const m2 = await measurement({ jobId: 9105 });
     fake.st.jobs.set("9105", job(9105, [{ id: 560, state: "complete", artifacts: { measurements: { pdf: "https://hover.to/api/v3/models/560/artifacts/measurements.pdf" } } }]));
@@ -237,13 +274,41 @@ describe("DB: model3d + wireframe loaders", () => {
     expect(await m3d.loadModel3d(m4, { fetchFn: fake.fetchFn })).toEqual({ status: "unavailable", reason: "hover_not_found" });
   });
 
-  it("an export without geometry → empty_geometry; garbage → bad_export", async () => {
+  it("an export without geometry → empty_geometry (remembered); garbage → bad_export (not remembered)", async () => {
     const m1 = await measurement({ raw: { model3d: { modelId: "561" } } });
     fake.st.xml.set("561", { status: 200, body: "<DATA_EXPORT><STRUCTURES/></DATA_EXPORT>" });
     expect(await m3d.loadModel3d(m1, { fetchFn: fake.fetchFn })).toEqual({ status: "unavailable", reason: "empty_geometry" });
+    expect((await rawOf(m1.id)).model3d.status).toBe("unavailable");
     const m2 = await measurement({ raw: { model3d: { modelId: "562" } } });
     fake.st.xml.set("562", { status: 200, body: "<html>login</html>" });
     expect(await m3d.loadModel3d(m2, { fetchFn: fake.fetchFn })).toEqual({ status: "unavailable", reason: "bad_export" });
+    expect((await rawOf(m2.id)).model3d.status).toBeUndefined();
+  });
+
+  it("bodies are read with a byte counter: an over-cap stream is cut off without trusting content-length", async () => {
+    let pulled = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      pull(c) { pulled++; c.enqueue(new Uint8Array(1024)); },
+    });
+    expect(await m3d.readCapped(new Response(endless), 10 * 1024)).toBeNull();
+    expect(pulled).toBeLessThan(20); // stopped right after the cap, not at the end of the stream
+    expect(await m3d.readCapped(new Response("x".repeat(100), { headers: { "content-length": "999999" } }), 1000)).toBeNull();
+    expect((await m3d.readCapped(new Response("hello"), 1000))!.toString()).toBe("hello");
+  });
+
+  it("address vetting for third-party hops", async () => {
+    for (const ip of ["127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0",
+      "224.0.0.1", "::1", "fd00::1", "fe80::1", "::ffff:10.0.0.1", "::ffff:127.0.0.1", "garbage"]) {
+      expect(m3d.isPrivateAddress(ip), ip).toBe(true);
+    }
+    for (const ip of ["93.184.216.34", "8.8.8.8", "2606:4700::1111", "::ffff:8.8.8.8"]) expect(m3d.isPrivateAddress(ip), ip).toBe(false);
+    expect(await m3d.publicHttpsTarget(new URL("https://storage.hover.test/a.png"))).toBe(true);
+    expect(await m3d.publicHttpsTarget(new URL("https://internal.hover.test/a.png"))).toBe(false); // resolves private
+    expect(await m3d.publicHttpsTarget(new URL("https://unresolvable.hover.test/a.png"))).toBe(false);
+    expect(await m3d.publicHttpsTarget(new URL("http://storage.hover.test/a.png"))).toBe(false);
+    expect(await m3d.publicHttpsTarget(new URL("https://169.254.169.254/latest"))).toBe(false);
+    expect(await m3d.publicHttpsTarget(new URL("https://[::1]/x"))).toBe(false);
+    expect(await m3d.publicHttpsTarget(new URL("https://u:p@storage.hover.test/x"))).toBe(false);
   });
 
   it("429 that persists → rate_limited with Retry-After, never cached", async () => {
@@ -265,7 +330,7 @@ describe("DB: model3d + wireframe loaders", () => {
     expect(fake.st.calls.length).toBe(n0); // no token of another org was ever used
   });
 
-  it("wireframes: streamed + cached; signed redirects / JSON urls followed WITHOUT our token; missing ones remembered", async () => {
+  it("wireframes: streamed + cached; signed redirects / JSON urls followed WITHOUT our token; only 404/422 remembered", async () => {
     const m = await measurement({ raw: { model3d: { modelId: "570" } } });
     const front = await m3d.loadWireframe(m, "front", { fetchFn: fake.fetchFn });
     expect(front.status).toBe("ready");
@@ -280,35 +345,86 @@ describe("DB: model3d + wireframe loaders", () => {
     expect(storage).toHaveLength(2);
     expect(storage.every((c) => c.auth === null)).toBe(true);
 
+    // 404 → remembered.
     expect(await m3d.loadWireframe(m, "left", { fetchFn: fake.fetchFn })).toEqual({ status: "unavailable", reason: "hover_not_found" });
-    // A redirect to an IP literal (cloud metadata, internal hosts) is never followed.
+    // A redirect to an IP literal (cloud metadata) is never followed — and not remembered.
     expect(await m3d.loadWireframe(m, "right", { fetchFn: fake.fetchFn })).toEqual({ status: "unavailable", reason: "hover_not_found" });
     expect(fake.st.calls.some((c) => c.host.startsWith("169.254"))).toBe(false);
+    // Not an image → not remembered.
     expect(await m3d.loadWireframe(m, "roof-pitches", { fetchFn: fake.fetchFn })).toEqual({ status: "unavailable", reason: "hover_not_found" });
     const n1 = fake.st.calls.length;
     await m3d.loadWireframe(m, "left", { fetchFn: fake.fetchFn });
     expect(fake.st.calls.length).toBe(n1);
     const raw = await rawOf(m.id);
-    expect(Object.keys(raw.model3d.wireframes).sort()).toEqual(["back", "front", "left", "right", "roof-areas", "roof-pitches"]);
+    expect(Object.keys(raw.model3d.wireframes).sort()).toEqual(["back", "front", "left", "roof-areas"]);
     expect(raw.model3d.wireframes.left).toMatchObject({ missing: true });
     // The top view is HOVER's roof wireframe, version=top.
     await m3d.loadWireframe(m, "top", { fetchFn: fake.fetchFn });
     const top = fake.st.calls.filter((c) => c.path === "/api/v3/models/570/artifacts/wireframe_roof.png" && c.url.includes("version=top")).length;
     expect(top).toBeGreaterThan(0);
+
+    // A cached file that vanished is re-fetched and the superseded cache row is removed (no orphans).
+    const oldId = raw.model3d.wireframes.front.attachmentId;
+    const [oldAtt] = await q(`select storage_path from crm_attachments where id = $1`, [oldId]);
+    fs.rmSync(path.join(process.cwd(), "tmp", "crm-attachments", oldAtt.storage_path));
+    expect((await m3d.loadWireframe(m, "front", { fetchFn: fake.fetchFn })).status).toBe("ready");
+    expect(await q(`select id from crm_attachments where id = $1`, [oldId])).toHaveLength(0);
+    expect((await rawOf(m.id)).model3d.wireframes.front.attachmentId).not.toBe(oldId);
   });
 
-  it("what clients are offered: a live share, or a model not known to be unavailable; only their own customer's", async () => {
+  it("redirect chains: every hop vetted by hand (https, public DNS), ≤3 hops; transient refusals are not remembered", async () => {
+    const m = await measurement({ raw: { model3d: { modelId: "571" } } });
+    const to = (loc: string) => () => new Response(null, { status: 302, headers: { location: loc } });
+    const storageCalls = () => fake.st.calls.filter((c) => c.host === "storage.hover.test").length;
+
+    // A vetted first hop that redirects on to http://169.254.169.254 — the second hop is refused.
+    fake.st.wf.set("front:url", to("https://storage.hover.test/to-metadata"));
+    expect((await m3d.loadWireframe(m, "front", { fetchFn: fake.fetchFn })).status).toBe("unavailable");
+    expect(fake.st.calls.some((c) => c.host.startsWith("169.254"))).toBe(false);
+    // …or on to a name that RESOLVES to a private address.
+    fake.st.wf.set("back:url", to("https://storage.hover.test/to-internal"));
+    expect((await m3d.loadWireframe(m, "back", { fetchFn: fake.fetchFn })).status).toBe("unavailable");
+    expect(fake.st.calls.some((c) => c.host === "internal.hover.test")).toBe(false);
+    // Two storage hops are fine; a longer chain is cut off after the hop limit.
+    fake.st.wf.set("left:url", to("https://storage.hover.test/chain/1"));
+    expect((await m3d.loadWireframe(m, "left", { fetchFn: fake.fetchFn })).status).toBe("ready");
+    const s0 = storageCalls();
+    fake.st.wf.set("right:url", to("https://storage.hover.test/chain/5"));
+    expect((await m3d.loadWireframe(m, "right", { fetchFn: fake.fetchFn })).status).toBe("unavailable");
+    expect(storageCalls() - s0).toBe(3);
+    // JSON without a url, and a 403, are reported but never remembered.
+    fake.st.wf.set("roof:top", () => new Response(JSON.stringify({ nope: 1 }), { headers: { "content-type": "application/json" } }));
+    expect((await m3d.loadWireframe(m, "top", { fetchFn: fake.fetchFn })).status).toBe("unavailable");
+    fake.st.wf.set("roof:lengths", () => new Response("{}", { status: 403, headers: { "content-type": "application/json" } }));
+    expect((await m3d.loadWireframe(m, "roof-lengths", { fetchFn: fake.fetchFn })).status).toBe("unavailable");
+    expect(Object.keys((await rawOf(m.id)).model3d.wireframes ?? {})).toEqual(["left"]);
+    // The blip passes: roof lengths straight from HOVER as image/png (the live shape).
+    fake.st.wf.set("roof:lengths", () => new Response(PNG, { status: 200, headers: { "content-type": "image/png" } }));
+    expect((await m3d.loadWireframe(m, "roof-lengths", { fetchFn: fake.fetchFn })).status).toBe("ready");
+    fake.st.wf.clear();
+  });
+
+  it("what clients are offered vs. what they may open: availability expires; authorization never depends on it", async () => {
     const live = { url: "https://hover.to/shared/liveShareAAAA", token: "liveShareAAAA", expiresAt: new Date(Date.now() + 86400_000).toISOString(), source: "manual" };
+    const nowIso = new Date().toISOString();
+    const oldIso = new Date(Date.now() - m3d.UNAVAILABLE_TTL_MS - 1000).toISOString();
     expect(m3d.viewer3dOffered({ provider: "hover", rawPayload: { hoverJobId: "1" } } as any)).toBe(true);
-    expect(m3d.viewer3dOffered({ provider: "hover", rawPayload: { hoverJobId: "1", model3d: { status: "unavailable" } } } as any)).toBe(false);
-    expect(m3d.viewer3dOffered({ provider: "hover", rawPayload: { hoverJobId: "1", model3d: { status: "unavailable" }, share: live } } as any)).toBe(true);
-    expect(m3d.viewer3dOffered({ provider: "hover", rawPayload: { hoverJobId: "1", model3d: { status: "unavailable", wireframes: { front: { attachmentId: "x" } } } } } as any)).toBe(true);
+    expect(m3d.viewer3dOffered({ provider: "hover", rawPayload: { hoverJobId: "1", model3d: { status: "unavailable", checkedAt: nowIso } } } as any)).toBe(false);
+    expect(m3d.viewer3dOffered({ provider: "hover", rawPayload: { hoverJobId: "1", model3d: { status: "unavailable", checkedAt: oldIso } } } as any)).toBe(true);
+    expect(m3d.viewer3dOffered({ provider: "hover", rawPayload: { hoverJobId: "1", model3d: { status: "unavailable", checkedAt: nowIso }, share: live } } as any)).toBe(true);
+    expect(m3d.viewer3dOffered({ provider: "hover", rawPayload: { hoverJobId: "1", model3d: { status: "unavailable", checkedAt: nowIso, wireframes: { front: { attachmentId: "x" } } } } } as any)).toBe(true);
     expect(m3d.viewer3dOffered({ provider: "manual", rawPayload: { hoverJobId: "1" } } as any)).toBe(false);
+    expect(m3d.viewer3dAuthorized({ provider: "hover", status: "ready", rawPayload: { hoverJobId: "1", model3d: { status: "unavailable", checkedAt: nowIso } } } as any)).toBe(true);
+    expect(m3d.viewer3dAuthorized({ provider: "hover", status: "draft", rawPayload: { hoverJobId: "1" } } as any)).toBe(false);
+    expect(m3d.viewer3dAuthorized({ provider: "other", status: "ready", rawPayload: { hoverJobId: "1" } } as any)).toBe(false);
 
     const lone = (await q(`insert into crm_customers (org_id, display_name, portal_token) values ($1,'Lone', md5(random()::text)) returning id`, [orgId]))[0].id;
-    await measurement({ customer: lone, raw: { model3d: { status: "unavailable", reason: "no_xml_export", checkedAt: new Date().toISOString() } } });
-    expect(await m3d.viewerMeasurementForEstimate({ orgId, customerId: lone })).toBeNull();
+    const noMesh = await measurement({ customer: lone, raw: { model3d: { status: "unavailable", reason: "no_xml_export", checkedAt: nowIso } } });
+    // The card is not offered, but the viewer routes still reach the capture (its wireframes may exist).
+    expect(await m3d.viewerMeasurementForEstimate({ orgId, customerId: lone }, { offeredOnly: true })).toBeNull();
+    expect((await m3d.viewerMeasurementForEstimate({ orgId, customerId: lone }))?.id).toBe(noMesh.id);
     const withShare = await measurement({ customer: lone, raw: { share: live } });
+    expect((await m3d.viewerMeasurementForEstimate({ orgId, customerId: lone }, { offeredOnly: true }))?.id).toBe(withShare.id);
     expect((await m3d.viewerMeasurementForEstimate({ orgId, customerId: lone }))?.id).toBe(withShare.id);
     expect(await m3d.viewerMeasurementForEstimate({ orgId, customerId: otherCust })).toBeNull();
     expect(await m3d.viewerMeasurementForEstimate({ orgId: orgB, customerId: lone })).toBeNull();

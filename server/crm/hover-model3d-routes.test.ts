@@ -78,14 +78,14 @@ function startStub(): Promise<void> {
     const xml = /^\/api\/v3\/models\/(\d+)\/artifacts\/cad_export\.xml$/.exec(u.pathname);
     if (xml) {
       if (xml[1] === String(MODEL.ready) || xml[1] === String(MODEL.other)) {
-        res.writeHead(200, { "content-type": "application/xml" });
+        res.writeHead(200, { "content-type": "application/octet-stream" }); // what live HOVER sends
         return res.end(XML);
       }
       if (xml[1] === String(MODEL.limited)) return json(429, { error: "slow down" }, { "retry-after": "9" });
       return json(404, { error: "not found" });
     }
     const wf = /^\/api\/v3\/models\/(\d+)\/artifacts\/wireframe_(\w+)\.png$/.exec(u.pathname);
-    if (wf && wf[1] === String(MODEL.ready) && wf[2] === "front") {
+    if (wf && ((wf[1] === String(MODEL.ready) && wf[2] === "front") || (wf[1] === String(MODEL.missing) && wf[2] === "roof" && u.searchParams.get("version") === "lengths"))) {
       res.writeHead(200, { "content-type": "image/png" });
       return res.end(PNG);
     }
@@ -256,11 +256,21 @@ describe("HOVER 3D viewer routes (dev server + HOVER stub)", () => {
       expect((await api(`/api/client/measurements/${m.manual}/model3d`, sessA)).status).toBe(404);
     });
 
-    it("a capture with no 3D export is not offered — until a live share link gives the design studio", async () => {
-      // m.missing is now known-unavailable (contractor test above) and has no share.
-      expect((await api(`/api/client/measurements/${m.missing}/model3d`, sessB)).status).toBe(404);
+    it("a capture with no 3D export: no card, but the client's own routes answer honestly (and wireframes still flow)", async () => {
+      // m.missing is now known-unavailable (contractor test above) and has no share. Authorization is not availability:
+      // the client still reaches their own capture and gets the fallback status, never a 404.
+      const own = await api(`/api/client/measurements/${m.missing}/model3d`, sessB);
+      expect(own.status).toBe(200);
+      expect(own.body).toMatchObject({ status: "unavailable", reason: "no_xml_export", share: null });
       const docsB = await api(`/api/client/documents`, sessB);
       expect(docsB.body.reports.find((r: any) => r.id === m.missing).viewer3d).toBe(false);
+      // HOVER has roof lengths for it (the live shape: image/png, no redirect) — the wireframe route serves it, and
+      // with a wireframe cached the card comes back.
+      const wf = await api(`/api/client/measurements/${m.missing}/wireframes/roof-lengths`, sessB);
+      expect(wf.status).toBe(200);
+      expect(wf.ct).toBe("image/png");
+      expect((await api(`/api/client/documents`, sessB)).body.reports.find((x: any) => x.id === m.missing).viewer3d).toBe(true);
+      expect((await api(`/api/client/measurements/${m.missing}/wireframes/front`, sessB)).status).toBe(404);
       await q(`update crm_measurements set raw_payload = raw_payload || $2::jsonb where id = $1`, [m.missing, JSON.stringify({
         share: { url: "https://hover.to/shared/vitestShareBBBB", token: "vitestShareBBBB", expiresAt: new Date(Date.now() + 86400_000).toISOString(), source: "manual" },
       })]);
