@@ -52,7 +52,7 @@ let cookie: string | undefined;
 async function makeCustomer(run: string, email = `vitest.rcpt.${run}@example.com`) {
   const cust = await api("/api/crm/customers", {
     method: "POST",
-    body: JSON.stringify({ displayName: `Vitest Receipt ${run}`, email }),
+    body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest Receipt ${run}`, email }),
   }, cookie);
   expect(cust.status).toBe(201);
   return cust.body;

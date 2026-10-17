@@ -138,7 +138,7 @@ describe("price-floor lock (dev server)", () => {
       expect(mat.status).toBe(201);
 
       const cust = await api("/api/crm/customers", {
-        method: "POST", body: JSON.stringify({ displayName: `Vitest Floor ${run}` }),
+        method: "POST", body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest Floor ${run}` }),
       }, cookie);
       expect(cust.status).toBe(201);
       const customerId = cust.body.id as string;

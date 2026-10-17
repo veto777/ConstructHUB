@@ -256,7 +256,7 @@ describe("inbox gates + reply throttle (Aspire org)", () => {
     const cust = await api("/api/crm/customers", {
       method: "POST",
       body: JSON.stringify({
-        displayName: `Inbox Gate ${suffix}`,
+        addressLine1: "100 Test St", displayName: `Inbox Gate ${suffix}`,
         email: `inbox-gate-${suffix}@example.com`,
       }),
     }, ac);
@@ -322,7 +322,7 @@ describe("inbox gates + reply throttle (Aspire org)", () => {
       const cust = await api("/api/crm/customers", {
         method: "POST",
         body: JSON.stringify({
-          displayName: `Inbox Flood ${suffix}`,
+          addressLine1: "100 Test St", displayName: `Inbox Flood ${suffix}`,
           email: `inbox-flood-cust-${suffix}@example.com`,
         }),
       }, sw.cookie);

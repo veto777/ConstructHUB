@@ -139,8 +139,8 @@ export default function PublicLeadFormPage() {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="lead-address">Address</Label>
-                  <Input id="lead-address" maxLength={300} data-testid="input-lead-address" {...errorProps("address")}
+                  <Label htmlFor="lead-address">Address *</Label>
+                  <Input id="lead-address" required autoComplete="street-address" maxLength={300} data-testid="input-lead-address" {...errorProps("address")}
                     value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
                   {fieldError("address")}
                 </div>

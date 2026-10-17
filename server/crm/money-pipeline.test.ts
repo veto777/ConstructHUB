@@ -66,7 +66,7 @@ describe("money pipeline", () => {
     const cust = await api("/api/crm/customers", {
       method: "POST",
       body: JSON.stringify({
-        displayName: `Vitest Client ${run}`,
+        addressLine1: "100 Test St", displayName: `Vitest Client ${run}`,
         email: `vitest.${run}@example.com`,
         phone: `(941) 555-${String(run % 10000).padStart(4, "0")}`,
         city: "Sarasota", state: "FL",
@@ -172,7 +172,7 @@ describe("money pipeline", () => {
     const run = Date.now();
     const cust = await api("/api/crm/customers", {
       method: "POST",
-      body: JSON.stringify({ displayName: `Vitest CO ${run}`, email: `vitest.co.${run}@example.com` }),
+      body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest CO ${run}`, email: `vitest.co.${run}@example.com` }),
     }, cookie);
     const proj = await api("/api/crm/projects", {
       method: "POST",

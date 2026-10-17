@@ -91,7 +91,7 @@ describe("client portal v2 — attachments + comments (dev server)", () => {
       const r = await api("/api/crm/customers", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ displayName: name, email: `vitest.portal.${stamp}.${name.endsWith("B") ? "b" : "a"}@example.com` }),
+        body: JSON.stringify({ addressLine1: "100 Test St", displayName: name, email: `vitest.portal.${stamp}.${name.endsWith("B") ? "b" : "a"}@example.com` }),
       }, cookie);
       expect(r.status).toBe(201);
       return r.body.id as string;

@@ -165,7 +165,7 @@ function ClientFields({ form, setForm, idPrefix, showNote }: {
           onChange={(e) => setForm({ ...form, phone: e.target.value })} />
       </div>
       <div className="sm:col-span-2">
-        <Label htmlFor={`${idPrefix}-addr`}>Address</Label>
+        <Label htmlFor={`${idPrefix}-addr`}>Address *</Label>
         <Input id={`${idPrefix}-addr`} data-testid={`input-${idPrefix}-addr`} value={form.addressLine1}
           maxLength={200}
           onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} />
@@ -216,6 +216,7 @@ function clientBody(form: typeof EMPTY_CLIENT, nameRequired: string) {
     notes: form.note.trim() || null,
   };
   if (!body.displayName) throw new Error(nameRequired);
+  if (!body.addressLine1) throw new Error("Enter the client's address.");
   if (body.email && !EMAIL_RE.test(body.email)) throw new Error("Enter a valid email address.");
   return body;
 }
@@ -249,7 +250,7 @@ function CustomerDialog({ open, onOpenChange, onNavigate }: {
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setDupe(null); }}>
       <DialogContent data-testid="dialog-create-customer">
-        <DialogHeader><DialogTitle>New client</DialogTitle><DialogDescription>Add a client to your CRM. Only the name is required.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>New client</DialogTitle><DialogDescription>Add a client to your CRM. The name and address are required.</DialogDescription></DialogHeader>
         <ClientFields form={form} setForm={setForm} idPrefix="customer" />
         {dupe && (
           <DupeError error={dupe}

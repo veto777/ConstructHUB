@@ -38,7 +38,7 @@ const created: string[] = [];
 
 async function mkCustomer(label: string, email?: string) {
   const r = await post("/api/crm/customers", {
-    displayName: `R2-r3 ${label} ${stamp}`,
+    addressLine1: "100 Test St", displayName: `R2-r3 ${label} ${stamp}`,
     ...(email ? { email } : {}),
   });
   expect(r.status).toBe(201);

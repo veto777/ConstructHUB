@@ -74,7 +74,7 @@ describe("POST /api/crm/quick-bid (dev server)", () => {
 
       const cust = await api("/api/crm/customers", {
         method: "POST",
-        body: JSON.stringify({ displayName: `Vitest QB ${run}`, email: `vitest-qb-${run}@example.com` }),
+        body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest QB ${run}`, email: `vitest-qb-${run}@example.com` }),
       }, cookie);
       expect(cust.status).toBe(201);
       customerId = cust.body.id;

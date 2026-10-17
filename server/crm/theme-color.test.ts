@@ -207,7 +207,7 @@ describe("org theme over the API (dev server)", () => {
       // A throwaway estimate → its public payload carries the resolved theme.
       const cust = await api("/api/crm/customers", {
         method: "POST",
-        body: JSON.stringify({ displayName: `Vitest theme ${run}`, email: `vitest.theme.${run}@example.com` }),
+        body: JSON.stringify({ addressLine1: "100 Test St", displayName: `Vitest theme ${run}`, email: `vitest.theme.${run}@example.com` }),
       }, cookie);
       expect(cust.status).toBe(201);
       const est = await api("/api/crm/estimates", {

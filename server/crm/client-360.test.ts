@@ -90,7 +90,7 @@ describe("client 360 (dev server)", () => {
     const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const mk = async (name: string) => {
       const r = await post("/api/crm/customers", {
-        displayName: name,
+        addressLine1: "100 Test St", displayName: name,
         email: `vitest.c360.${stamp}.${name.endsWith("B") ? "b" : "a"}@example.com`,
       }, cookie);
       expect(r.status).toBe(201);
@@ -115,6 +115,31 @@ describe("client 360 (dev server)", () => {
     await q(`update crm_orgs set custom_fields = null where id = $1`, [orgId]);
     await q(`delete from crm_customers where id = any($1)`, [[custA, custB]]);
     await pool.end();
+  });
+
+  // ── Address is required ──────────────────────────────────────────────────
+
+  it("every client has an address: a create without one is 400, and an edit can't clear it", async () => {
+    const msg = "Enter the client's address.";
+    const name = `Vitest C360 NoAddr ${Date.now().toString(36)}`;
+    for (const extra of [{}, { addressLine1: "   " }]) {
+      const r = await post("/api/crm/customers", { displayName: name, ...extra }, cookie);
+      expect(r.status).toBe(400);
+      expect(r.body.message).toBe(msg);
+    }
+    expect((await q(`select id from crm_customers where org_id = $1 and display_name = $2`, [orgId, name])).length).toBe(0);
+
+    for (const addressLine1 of ["", null]) {
+      const r = await api(`/api/crm/customers/${custA}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ addressLine1 }),
+      }, cookie);
+      expect(r.status).toBe(400);
+      expect(r.body.message).toBe(msg);
+    }
+    const [row] = await q<{ address_line1: string }>(`select address_line1 from crm_customers where id = $1`, [custA]);
+    expect(row.address_line1).toBe("100 Test St");
   });
 
   // ── Notes ────────────────────────────────────────────────────────────────
@@ -184,7 +209,7 @@ describe("client 360 (dev server)", () => {
 
     const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const cust = await post("/api/crm/customers", {
-      displayName: `Vitest C360 Gate ${stamp}`,
+      addressLine1: "100 Test St", displayName: `Vitest C360 Gate ${stamp}`,
       email: `vitest.c360.gate.${stamp}@example.com`,
     }, ac);
     expect(cust.status).toBe(201);

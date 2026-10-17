@@ -823,13 +823,18 @@ async function matchHoverCustomer(
     if (hit) return { customer: hit, via: "email" };
   }
   if (phone && digits(phone).length >= 7) {
+    // Same number with or without the US "+1" ("+13607397583" = "3607397583").
+    const key = phoneKey(phone);
+    const stored = sql`regexp_replace(coalesce(${crmCustomers.phone}, ''), '[^0-9]', '', 'g')`;
     const [hit] = await db
       .select()
       .from(crmCustomers)
       .where(and(
         eq(crmCustomers.orgId, orgId),
         isNull(crmCustomers.archivedAt),
-        sql`regexp_replace(${crmCustomers.phone}, '[^0-9]', '', 'g') = ${digits(phone)}`,
+        key.length === 10
+          ? sql`(${stored} = ${key} OR ${stored} = ${"1" + key})`
+          : sql`${stored} = ${key}`,
       ))
       .limit(1);
     if (hit) return { customer: hit, via: "phone" };
@@ -886,6 +891,13 @@ export async function matchHoverCustomerByName(
  */
 /** True when the job's contact is one of the org's own people — a capture
  *  ordered by staff must never attach the property to the staff member. */
+/** Digits only, with a leading US country code dropped: "+1 (360) 739-7583" and
+ *  "3607397583" are the same number. */
+export function phoneKey(phone?: string | null): string {
+  const d = String(phone ?? "").replace(/\D/g, "");
+  return d.length === 11 && d.startsWith("1") ? d.slice(1) : d;
+}
+
 async function isOrgMemberContact(
   orgId: string, email?: string | null, phone?: string | null,
 ): Promise<boolean> {
@@ -903,14 +915,17 @@ async function matchOrgMemberContactFields(
   orgId: string, email?: string | null, phone?: string | null,
 ): Promise<{ email: boolean; phone: boolean }> {
   const em = (email ?? "").trim().toLowerCase();
-  const ph = String(phone ?? "").replace(/\D/g, "");
+  const ph = phoneKey(phone);
   const result = { email: false, phone: false };
   if (!em && !ph) return result;
   const members = await db.select().from(crmMembers)
     .where(and(eq(crmMembers.orgId, orgId), eq(crmMembers.status, "active")));
-  for (const m of members) {
-    if (em && (m.email ?? "").toLowerCase() === em) result.email = true;
-    if (ph && ph.length >= 7 && String(m.phone ?? "").replace(/\D/g, "") === ph) result.phone = true;
+  // The company's own phone/email count as staff too (a capture ordered from the office).
+  const [org] = await db.select({ email: crmOrgs.email, phone: crmOrgs.phone }).from(crmOrgs)
+    .where(eq(crmOrgs.id, orgId)).limit(1);
+  for (const m of [...members, ...(org ? [org] : [])]) {
+    if (em && (m.email ?? "").trim().toLowerCase() === em) result.email = true;
+    if (ph && ph.length >= 7 && phoneKey(m.phone) === ph) result.phone = true;
   }
   return result;
 }

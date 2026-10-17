@@ -50,7 +50,7 @@ let orgId = "";
 async function makeCustomer(label: string, extra: Record<string, unknown> = {}) {
   const slug = `${RUN}.${label}`.replace(/\W+/g, "").toLowerCase();
   const r = await send("POST", "/api/crm/customers?force=1", {
-    displayName: `${RUN} ${label}`, email: `${slug}@example.com`, ...extra,
+    addressLine1: "100 Test St", displayName: `${RUN} ${label}`, email: `${slug}@example.com`, ...extra,
   }, cookie);
   expect(r.status).toBe(201);
   return r.body as { id: string; createdAt: string };
@@ -264,7 +264,7 @@ describe("r2-crm-data against the dev server", () => {
   });
 
   it("customer 400s name the field; PATCH audits only real changes", async () => {
-    const bad = await send("POST", "/api/crm/customers", { displayName: `${RUN} bad`, email: "nope" }, cookie);
+    const bad = await send("POST", "/api/crm/customers", { addressLine1: "100 Test St", displayName: `${RUN} bad`, email: "nope" }, cookie);
     expect(bad.status).toBe(400);
     expect(bad.body.message).toBe("Enter a valid email address.");
     expect(Array.isArray(bad.body.issues)).toBe(true);
@@ -311,7 +311,7 @@ describe("r2-crm-data against the dev server", () => {
     expect(lc.status).toBe(200);
     const name = `${RUN} lead`;
     const posted = await send("POST", `/api/public/leads/${lc.body.token}`, {
-      name, email: `${RUN.replace(/\W+/g, "").toLowerCase()}.lead@example.com`, message: "R2 bell cleanup",
+      name, address: "100 Test St", email: `${RUN.replace(/\W+/g, "").toLowerCase()}.lead@example.com`, message: "R2 bell cleanup",
     });
     expect(posted.status).toBe(201);
     let lead: any = null;

@@ -73,7 +73,7 @@ const line = (name: string, cents: number, extra: Record<string, unknown> = {}) 
 async function customer(tag: string, extra: Record<string, unknown> = {}): Promise<string> {
   const r = await api("/api/crm/customers?force=1", {
     method: "POST",
-    body: JSON.stringify({ displayName: `FIX-c13 ${tag} ${run}`, email: `fix-c13.${tag}.${run}@example.com`, ...extra }),
+    body: JSON.stringify({ addressLine1: "100 Test St", displayName: `FIX-c13 ${tag} ${run}`, email: `fix-c13.${tag}.${run}@example.com`, ...extra }),
   }, cookie);
   expect(r.status).toBe(201);
   customers.push(r.body.id);

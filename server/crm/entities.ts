@@ -401,6 +401,9 @@ const customerSchema = z.object({
   divisionId: z.string().max(64).nullable().optional(),
 });
 
+/** Every client has an address: creating one needs it, and an edit can't clear it. */
+export const CUSTOMER_ADDRESS_REQUIRED = "Enter the client's address.";
+
 const CUSTOMER_FIELD_LABELS: Record<string, string> = {
   divisionId: "Division",
   displayName: "Client name", firstName: "First name", lastName: "Last name",
@@ -597,6 +600,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     if (!parsed.success) {
       return res.status(400).json({ message: customerIssueMessage(parsed.error.issues), issues: parsed.error.issues });
     }
+    // Every client has an address (owner rule 2026-10-17).
+    if (!parsed.data.addressLine1?.trim()) {
+      return res.status(400).json({ message: CUSTOMER_ADDRESS_REQUIRED });
+    }
 
     // Dedupe. Leap admits it cannot merge customer records or move a job between
     // them ("the answer is no, not currently"), so their users accumulate
@@ -707,6 +714,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const parsed = customerSchema.partial().safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: customerIssueMessage(parsed.error.issues), issues: parsed.error.issues });
+    }
+    if ("addressLine1" in parsed.data && !parsed.data.addressLine1?.trim()) {
+      return res.status(400).json({ message: CUSTOMER_ADDRESS_REQUIRED });
     }
     const [before] = await db.select().from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.id))).limit(1);
