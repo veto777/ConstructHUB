@@ -1624,7 +1624,6 @@ async function ingestHoverJobInner(
   } catch (e: any) {
     // The PDF is a nice-to-have; the measurement row already stands.
     console.error(`[hover] PDF fetch for job ${jobId} failed:`, String(e?.message || e).slice(0, 200));
-    }
   }
 
   // The project this capture belongs to — an existing one at the address, else a NEW lead project, so the

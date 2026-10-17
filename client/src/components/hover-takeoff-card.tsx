@@ -13,6 +13,7 @@
  * Slots: `onFill` (estimate editors) adds "Fill from HOVER"; `renderModel3dAction` lets the in-app 3D viewer put
  * its "View 3D model" button in the header (without it the card links to the contractor's HOVER viewer).
  */
+import { View3DButton } from "@/components/hover-3d-dialog";
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Download, ExternalLink, FileText, Loader2, Ruler, Wand2 } from "lucide-react";
@@ -135,11 +136,17 @@ export function HoverTakeoffCard({
               Fetch report from HOVER
             </Button>
           )}
-          {renderModel3dAction ? renderModel3dAction(t) : s?.hoverAppUrl && (
-            <a href={s.hoverAppUrl} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-primary hover:underline" data-testid="link-takeoff-3d">
-              <ExternalLink className="h-3.5 w-3.5" /> 3D in HOVER
-            </a>
+          {renderModel3dAction ? renderModel3dAction(t) : s?.measurementId && (
+            // The model opens inside ConstructHUB; HOVER's own viewer stays a small secondary link.
+            <>
+              <View3DButton source={{ kind: "crm", measurementId: s.measurementId }} variant="outline" testid="button-takeoff-view3d" />
+              {s.hoverAppUrl && (
+                <a href={s.hoverAppUrl} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline" data-testid="link-takeoff-3d">
+                  <ExternalLink className="h-3 w-3" /> Open in HOVER
+                </a>
+              )}
+            </>
           )}
           {onFill && (
             <Button size="sm" variant="outline" onClick={() => onFill(t)} disabled={fillDisabled} data-testid="button-fill-from-hover">
