@@ -547,6 +547,31 @@ function Timeline({ releases, onOpen }: { releases: PressReleaseView[]; onOpen: 
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 
+/** The top 10 headline outlets of National and of Premium (shared/press.ts order), each named once and tagged with the lowest package that has it, on a slow loop. */
+const CAROUSEL_OUTLETS: { name: string; tier: "premium" | "national" }[] = (() => {
+  const seen = new Set<string>(), out: { name: string; tier: "premium" | "national" }[] = [];
+  for (const tier of ["national", "premium"] as const)
+    for (const name of PRESS_HEADLINE_OUTLETS[tier].filter((o) => o !== "ACCESS Newswire").slice(0, 10))
+      if (!seen.has(name)) { seen.add(name); out.push({ name, tier }); }
+  return out;
+})();
+
+function OutletCarousel() {
+  // Rendered twice for a seamless loop; the copy is hidden from screen readers.
+  const row = (copy: boolean) => (
+    <ul className="wire-carousel-row" aria-hidden={copy || undefined}>
+      {CAROUSEL_OUTLETS.map((o) => (
+        <li key={o.name}><span className="wire-carousel-name">{o.name}</span><span className="wire-carousel-tier">{PRESS_TIER_LABEL[o.tier]}</span></li>
+      ))}
+    </ul>
+  );
+  return (
+    <div className="wire-carousel" data-testid="press-outlet-carousel">
+      <div className="wire-carousel-track">{row(false)}{row(true)}</div>
+    </div>
+  );
+}
+
 export default function PressReleasesPage() {
   const { toast } = useToast();
   const { data, isLoading, error } = useQuery<Overview>({ queryKey: ["/api/press/overview"], queryFn: () => getJson("/api/press/overview"), refetchInterval: 30_000 });
@@ -612,7 +637,7 @@ export default function PressReleasesPage() {
 
       <section className="wire-proof" aria-label="Distribution outlets">
         <p className="wire-eyebrow">On the distribution list</p>
-        <div>{[...PRESS_HEADLINE_OUTLETS.national.slice(0, 3), PRESS_HEADLINE_OUTLETS.budget[0], PRESS_HEADLINE_OUTLETS.national[11]].map((outlet) => <span key={outlet}>{outlet}</span>)}</div>
+        <OutletCarousel />
         <p className="text-xs text-muted-foreground">Availability varies by package. Distribution is not a guarantee of editorial coverage.</p>
       </section>
 
