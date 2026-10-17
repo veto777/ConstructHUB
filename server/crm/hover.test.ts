@@ -170,6 +170,8 @@ const stub = {
   /** HOVER job shares (GET /api/v1/job_shares?current_user_id=601). */
   jobShares: [] as any[],
   failPhotos: false,
+  /** full_json answers 503 while true (the transient-failure retry test). */
+  failFullJson: false,
   /** Every request the stub served (the back-fill must not add any). */
   requests: 0,
   premiumHits: [] as { modelId: string; auth: boolean }[],
@@ -345,6 +347,7 @@ function startStub(): Promise<void> {
 
     // ── Model deliverables (full_json v2, the premium PDF, the documented PDF → storage redirect) ──
     if (/^\/api\/v3\/models\/\d+\/artifacts\/measurements\.json$/.test(url.pathname)) {
+      if (stub.failFullJson) return json(503, { error: "temporarily unavailable" });
       if (url.searchParams.get("version") !== "full_json") return json(200, { note: "summary variant" });
       return json(200, V2_FULL_JSON);
     }
@@ -419,6 +422,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     // Auto-created HOVER projects (takeoff tests) go before their customers.
     await q(`update crm_measurements set project_id = null where org_id = $1 and external_id like 'hover:%'`, [orgId]);
     await q(`delete from crm_projects where org_id = $1 and custom_fields ->> 'hoverAutoCreated' = 'true'`, [orgId]);
+    await q(`delete from crm_projects where org_id = $1 and customer_id in (select id from crm_customers where org_id = $1 and email = 'takeoff-9100@example.com')`, [orgId]);
     await q(`delete from crm_customers where org_id = $1 and email = 'takeoff-9100@example.com'`, [orgId]);
     // Staff-scrubbed customers carry no email — sweep by the flow's marker.
     await q(`delete from crm_customers where org_id = $1 and custom_fields ->> 'hoverAutoCreated' = 'true'`, [orgId]);
@@ -1099,6 +1103,8 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
 
   it("takeoff rules are org settings: saving re-derives the takeoffs; 5% roof waste is the floor", async () => {
     const m = await m9100();
+    // A capture whose document is not kept (only its stored takeoff) must follow rule changes too.
+    await q(`update crm_measurements set raw_payload = raw_payload - 'fullJson' where org_id = $1 and external_id = 'hover:9101'`, [orgId]);
     const save = await api("/api/crm/integrations/hover/takeoff-rules", {
       method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ roofWastePct: 10, sidingRoundUpTo: 25 }),
     });
@@ -1108,6 +1114,11 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     expect(t.roof.quantitySqft).toBe(2533);
     expect(t.siding.quantitySqft).toBe(2175);
     expect((await m9100()).waste_suggestion_bps).toBe(1000);
+    const [noDoc] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9101'`, [orgId]);
+    expect(noDoc.raw_payload.fullJson).toBeUndefined();
+    expect(noDoc.raw_payload.takeoff.roof.quantitySqft).toBe(2533);
+    expect(noDoc.raw_payload.takeoff.siding.quantitySqft).toBe(2175);
+    expect(noDoc.waste_suggestion_bps).toBe(1000);
     expect((await api("/api/crm/integrations/hover/status")).body.takeoffRules).toEqual({ roofWastePct: 10, sidingRoundUpTo: 25 });
     const low = await api("/api/crm/integrations/hover/takeoff-rules", {
       method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ roofWastePct: 3, sidingRoundUpTo: 100 }),
@@ -1119,12 +1130,162 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     t = (await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body.takeoff;
     expect(t.roof.quantitySqft).toBe(2418);
     expect(t.siding.quantitySqft).toBe(2200);
+    const [back] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9101'`, [orgId]);
+    expect(back.raw_payload.takeoff.roof.quantitySqft).toBe(2418);
+    expect(back.waste_suggestion_bps).toBe(500);
   });
+
+  // ── Review fixes: full_json retries, trimmed rows, PDF store across processes, auto-project retry ──
+
+  it("a transient full_json failure schedules a retry (never a permanent exclusion), then the takeoff lands", async () => {
+    stub.failFullJson = true;
+    stub.extraJobs.set(9110, stubJobV2(9110, 77010, { name: "Tia Transient", email: "takeoff-9100@example.com" }, { line1: "110 Example Lane", zip: "98000" }));
+    try {
+      await hover.ingestHoverJob(orgId, "9110");
+    } finally {
+      stub.failFullJson = false;
+    }
+    let [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9110'`, [orgId]);
+    expect(m.raw_payload.takeoff).toBeNull();
+    expect(m.raw_payload.fullJsonFailures).toBe(1);
+    const wait = Date.parse(m.raw_payload.fullJsonRetryAt) - Date.now();
+    expect(wait).toBeGreaterThan(30 * 60_000);
+    expect(wait).toBeLessThanOrEqual(3600_000);
+    // Before the retry time nothing is fetched; after it, the next delivery fetches and derives.
+    await hover.ingestHoverJob(orgId, "9110");
+    [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9110'`, [orgId]);
+    expect(m.raw_payload.takeoff).toBeNull();
+    await q(`update crm_measurements set raw_payload = raw_payload || '{"fullJsonRetryAt":"2000-01-01T00:00:00.000Z"}'::jsonb where id = $1`, [m.id]);
+    await hover.ingestHoverJob(orgId, "9110");
+    [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9110'`, [orgId]);
+    expect(m.raw_payload.takeoff.siding.quantitySqft).toBe(2200);
+    expect(m.wall_area_sf_milli).toBe(2169000);
+    expect(m.raw_payload.fullJsonFailures).toBe(0);
+  });
+
+  it("a row holding only the {trimmed:true} stand-in is re-fetched and gets its takeoff", async () => {
+    const [m0] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9110'`, [orgId]);
+    await q(`update crm_measurements set squares_milli = null, wall_area_sf_milli = null,
+      raw_payload = (raw_payload - 'takeoff' - 'summary') || '{"fullJson":{"trimmed":true,"bytes":400000}}'::jsonb where id = $1`, [m0.id]);
+    await hover.ingestHoverJob(orgId, "9110");
+    const [m] = await q<any>(`select * from crm_measurements where id = $1`, [m0.id]);
+    expect(m.raw_payload.fullJson.trimmed).toBeUndefined();
+    expect(m.raw_payload.takeoff.roof.quantitySqft).toBe(2418);
+    expect(m.squares_milli).toBe(23030);
+  });
+
+  it("the PDF is stored once even when two processes fetch it at the same moment", async () => {
+    const [m] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9110'`, [orgId]);
+    await q(`delete from crm_attachments where org_id = $1 and file_name = 'hover-measurements-9110.pdf'`, [orgId]);
+    await q(`update crm_measurements set raw_payload = raw_payload - 'pdfAttachmentId' - 'pdfCheckedAt' where id = $1`, [m.id]);
+    const [row] = await q<any>(`select * from crm_measurements where id = $1`, [m.id]);
+    // This vitest process and the dev server are two processes with separate in-memory chains.
+    const [a, b] = await Promise.all([
+      hover.fetchHoverMeasurementPdfNow(orgId, {
+        ...row, rawPayload: row.raw_payload, customerId: row.customer_id, externalId: row.external_id,
+      } as any),
+      api(`/api/crm/measurements/${m.id}/hover-pdf`, { method: "POST" }),
+    ]);
+    const atts = await q<any>(`select id from crm_attachments where org_id = $1 and file_name = 'hover-measurements-9110.pdf'`, [orgId]);
+    expect(atts.length).toBe(1);
+    expect(a.attachmentId).toBe(atts[0].id);
+    expect(b.body.attachmentId).toBe(atts[0].id);
+  });
+
+  it("a capture whose auto-project step never finished is retried on the next delivery; historical rows are not", async () => {
+    const [cust] = await q<any>(`select id from crm_customers where org_id = $1 and email = 'takeoff-9100@example.com'`, [orgId]);
+    // As if the process died right after the insert: flag set, no project. A historical row has no flag.
+    stub.extraJobs.set(9120, stubJobV2(9120, 77020, null, { line1: "120 Crash Ct", zip: "98000" }));
+    stub.extraJobs.set(9121, stubJobV2(9121, 77021, null, { line1: "121 Old Rd", zip: "98000" }));
+    const quiet = { importSource: "hover", photosSyncedAt: new Date().toISOString(), pdfCheckedAt: new Date().toISOString(), fullJsonRetryAt: "2999-01-01T00:00:00.000Z" };
+    const [crashed] = await q<any>(`insert into crm_measurements (org_id, customer_id, provider, status, external_id, address_line1, postal_code, raw_payload)
+      values ($1, $2, 'hover', 'ready', 'hover:9120', '120 Crash Ct', '98000', $3) returning id`,
+      [orgId, cust.id, JSON.stringify({ ...quiet, hoverJobId: "9120", needsAutoProject: true })]);
+    const [historical] = await q<any>(`insert into crm_measurements (org_id, customer_id, provider, status, external_id, address_line1, postal_code, raw_payload)
+      values ($1, $2, 'hover', 'ready', 'hover:9121', '121 Old Rd', '98000', $3) returning id`,
+      [orgId, cust.id, JSON.stringify({ ...quiet, hoverJobId: "9121" })]);
+    await hover.ingestHoverJob(orgId, "9120");
+    await hover.ingestHoverJob(orgId, "9121");
+    const [c] = await q<any>(`select * from crm_measurements where id = $1`, [crashed.id]);
+    expect(c.project_id).toBeTruthy();
+    expect(c.raw_payload.needsAutoProject).toBe(false);
+    const [p] = await q<any>(`select * from crm_projects where id = $1`, [c.project_id]);
+    expect(p.address_line1).toBe("120 Crash Ct");
+    const [h] = await q<any>(`select * from crm_measurements where id = $1`, [historical.id]);
+    expect(h.project_id).toBeNull();
+  });
+
+  it("unit: SSRF policy — only HOVER and its signed storage, https, every redirect hop checked, size-capped", async () => {
+    const api0 = "https://hover.to/api";
+    const ok = (u: string) => hover.hoverFetchUrlAllowed(u, api0, true);
+    expect(ok("https://hover.to/api/v1/models/1/pro_premium_measurements")).toBe(true);
+    expect(ok("https://hover-prod.s3.us-west-2.amazonaws.com/f.pdf?X-Amz-Signature=x")).toBe(true);
+    expect(ok("https://d1.cloudfront.net/f.pdf")).toBe(true);
+    expect(ok("http://hover-prod.s3.amazonaws.com/f.pdf")).toBe(false);          // not https
+    expect(ok("https://hover-prod.s3.amazonaws.com:8443/f.pdf")).toBe(false);    // odd port
+    expect(ok("https://evil.example/f.pdf")).toBe(false);
+    expect(ok("https://hover.to.evil.example/f.pdf")).toBe(false);
+    expect(ok("https://169.254.169.254/latest/meta-data")).toBe(false);
+    expect(ok("https://user:pw@hover.to/api/x")).toBe(false);
+    expect(ok("http://127.0.0.1:9/x")).toBe(false);
+    // Outside production a loopback stub API admits its loopback storage sibling — never in production.
+    expect(hover.hoverFetchUrlAllowed("http://127.0.0.1:9/x", "http://127.0.0.1:8/api", false)).toBe(true);
+    expect(hover.hoverFetchUrlAllowed("http://127.0.0.1:9/x", "http://127.0.0.1:8/api", true)).toBe(false);
+
+    const seen: string[] = [];
+    const pdf = Buffer.from("%PDF-1.7 x");
+    const fake = (routes: Record<string, () => Response>) => (async (url: any) => {
+      seen.push(String(url));
+      const r = routes[String(url)];
+      return r ? r() : new Response("nope", { status: 404 });
+    }) as any;
+    const redirect = (to: string) => () => new Response(null, { status: 302, headers: { location: to } });
+    // A redirect to the metadata service / a private address / a foreign host / plain http is never followed.
+    for (const target of ["https://169.254.169.254/latest/meta-data", "https://10.0.0.5/f.pdf", "https://evil.example/f.pdf", "http://hover.to/api/f.pdf"]) {
+      seen.length = 0;
+      const out = await hover.fetchHoverPdf(fake({ "https://hover.to/api/a": redirect(target) }), "https://hover.to/api/a", {}, api0);
+      expect(out).toBeNull();
+      expect(seen).toEqual(["https://hover.to/api/a"]);
+    }
+    // More than 3 redirects: refused. Three are fine.
+    const loop: Record<string, () => Response> = {};
+    for (let i = 0; i < 6; i++) loop[`https://hover.to/api/r${i}`] = redirect(`https://hover.to/api/r${i + 1}`);
+    loop["https://hover.to/api/r6"] = () => new Response(pdf, { status: 200 });
+    expect(await hover.fetchHoverPdf(fake(loop), "https://hover.to/api/r0", {}, api0)).toBeNull();
+    const three: Record<string, () => Response> = {};
+    for (let i = 0; i < 3; i++) three[`https://hover.to/api/t${i}`] = redirect(`https://hover.to/api/t${i + 1}`);
+    three["https://hover.to/api/t3"] = () => new Response(pdf, { status: 200 });
+    expect((await hover.fetchHoverPdf(fake(three), "https://hover.to/api/t0", {}, api0))?.equals(pdf)).toBe(true);
+    // Size cap: declared too big, and streamed past the cap without a length.
+    const big = () => new Response("x", { status: 200, headers: { "content-length": String(26 * 1024 * 1024) } });
+    expect(await hover.fetchHoverPdf(fake({ "https://hover.to/api/big": big }), "https://hover.to/api/big", {}, api0)).toBeNull();
+    const chunk = new Uint8Array(1024 * 1024);
+    let sent = 0;
+    const stream = () => new Response(new ReadableStream({
+      pull(c) { if (sent++ > 40) c.close(); else c.enqueue(chunk); },
+    }), { status: 200 });
+    expect(await hover.fetchHoverPdf(fake({ "https://hover.to/api/stream": stream }), "https://hover.to/api/stream", {}, api0)).toBeNull();
+    expect(sent).toBeLessThan(40);   // stopped reading at the cap
+  });
+
+  it("unit: full_json retry backoff and the needs-fetch rule", () => {
+    const now = Date.parse("2026-10-17T00:00:00.000Z");
+    expect(hover.hoverFullJsonRetry("transient", 1, now)).toEqual({ fullJsonRetryAt: "2026-10-17T01:00:00.000Z", fullJsonFailures: 1 });
+    expect(hover.hoverFullJsonRetry("transient", 3, now).fullJsonRetryAt).toBe("2026-10-17T04:00:00.000Z");
+    expect(hover.hoverFullJsonRetry("transient", 12, now).fullJsonRetryAt).toBe("2026-10-18T00:00:00.000Z");
+    expect(hover.hoverFullJsonRetry("unavailable", 1, now).fullJsonRetryAt).toBe("2026-10-24T00:00:00.000Z");
+    expect(hover.hoverNeedsFullJson({}, now)).toBe(true);
+    expect(hover.hoverNeedsFullJson({ fullJson: { trimmed: true } }, now)).toBe(true);
+    expect(hover.hoverNeedsFullJson({ fullJson: { version: 2 } }, now)).toBe(false);
+    expect(hover.hoverNeedsFullJson({ fullJsonRetryAt: "2026-10-17T01:00:00.000Z" }, now)).toBe(false);
+    expect(hover.hoverNeedsFullJson({ fullJsonRetryAt: "2026-10-16T23:00:00.000Z" }, now)).toBe(true);
+  });
+
 
   it("report viewer: every report is listed for the picker; the PDF opens inline; a missing one is fetched on demand", async () => {
     const m = await m9100();
     const listed = (await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body;
-    expect(listed.takeoffs.map((x: any) => x.source.hoverJobId).sort()).toEqual(["9100", "9101"]);
+    expect(listed.takeoffs.map((x: any) => x.source.hoverJobId).sort()).toEqual(expect.arrayContaining(["9100", "9101"]));
 
     const attId = (m.raw_payload as any).pdfAttachmentId;
     const inline = await fetch(`${BASE}/api/crm/attachments/${attId}/file?inline=1`);

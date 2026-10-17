@@ -17,7 +17,7 @@ import { db } from "../db";
 import { crmCustomers, crmMeasurements, crmOrgs, crmProjects } from "@shared/schema";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import {
-  extractHoverTakeoff, normalizeTakeoffRules, takeoffColumns, takeoffSummary, DEFAULT_TAKEOFF_RULES,
+  extractHoverTakeoff, normalizeTakeoffRules, takeoffColumns, takeoffSummary, reapplyTakeoffRules, DEFAULT_TAKEOFF_RULES,
   type HoverTakeoff, type TakeoffRules,
 } from "@shared/hover-takeoff";
 import {
@@ -49,19 +49,28 @@ export async function writeTakeoffRules(orgId: string, rules: TakeoffRules): Pro
 
 // ── Takeoff on a measurement row ────────────────────────────────────────────
 
-/** The stored full_json, when it is the real document (not the {trimmed:true} stand-in). */
-function storedFullJson(raw: any): any | null {
+/** The stored full_json (whole, or its compact derivation copy), when it is usable — not the {trimmed:true} stand-in. */
+export function storedFullJson(raw: any): any | null {
   const fj = raw?.fullJson;
   return fj && typeof fj === "object" && fj.trimmed !== true ? fj : null;
 }
 
-/** The takeoff for a row under `rules`: re-derived from the stored full_json, else the stored takeoff. */
+/** A stored takeoff of the current shape, or null. */
+function storedTakeoff(raw: any): HoverTakeoff | null {
+  const t = raw?.takeoff;
+  return t && typeof t === "object" && t.version === 1 ? (t as HoverTakeoff) : null;
+}
+
+/**
+ * The takeoff for a row under `rules`: re-derived from the stored full_json; else the stored takeoff with the
+ * CURRENT rules re-applied to its measured values (a row whose document was not kept still follows rule changes).
+ */
 export function takeoffOfRow(row: Pick<MeasurementRow, "rawPayload">, rules: TakeoffRules): HoverTakeoff | null {
   const raw = (row.rawPayload ?? {}) as any;
   const fj = storedFullJson(raw);
   if (fj) return extractHoverTakeoff(fj, rules);
-  const stored = raw.takeoff;
-  return stored && typeof stored === "object" && stored.version === 1 ? (stored as HoverTakeoff) : null;
+  const stored = storedTakeoff(raw);
+  return stored ? reapplyTakeoffRules(stored, rules) : null;
 }
 
 /** Key-order-independent JSON (jsonb hands keys back in its own order). */
@@ -80,7 +89,8 @@ const COLUMN_KEYS = [
 ] as const;
 
 /**
- * Re-derive one HOVER row from its stored full_json: raw_payload.takeoff + .summary and the numeric columns.
+ * Re-derive one HOVER row from its stored full_json (else its stored takeoff under the current rules):
+ * raw_payload.takeoff + .summary and the numeric columns.
  * Returns "updated", "unchanged" (nothing written) or "skipped" (no full_json / nothing in it).
  * The raw_payload write is a jsonb merge of the two keys only, so concurrent writers (PDF, share, photos) keep theirs.
  */
@@ -88,9 +98,7 @@ export async function applyHoverTakeoff(
   row: MeasurementRow, rules: TakeoffRules, dryRun = false,
 ): Promise<"updated" | "unchanged" | "skipped"> {
   const raw = (row.rawPayload ?? {}) as any;
-  const fj = storedFullJson(raw);
-  if (!fj) return "skipped";
-  const takeoff = extractHoverTakeoff(fj, rules);
+  const takeoff = takeoffOfRow(row, rules);
   if (!takeoff) return "skipped";
   const cols = takeoffColumns(takeoff);
   const summary = takeoffSummary(takeoff);
@@ -115,7 +123,7 @@ export interface TakeoffBackfillReport { checked: number; updated: number; uncha
  * A second run reports updated: 0.
  */
 export async function backfillHoverTakeoffs(orgId?: string, opts: { dryRun?: boolean } = {}): Promise<TakeoffBackfillReport> {
-  const where = [eq(crmMeasurements.provider, "hover"), sql`${crmMeasurements.rawPayload} ? 'fullJson'`];
+  const where = [eq(crmMeasurements.provider, "hover"), sql`(${crmMeasurements.rawPayload} ? 'fullJson' or ${crmMeasurements.rawPayload} ? 'takeoff')`];
   if (orgId) where.push(eq(crmMeasurements.orgId, orgId));
   const rows = await db.select().from(crmMeasurements).where(and(...where));
   const rulesByOrg = new Map<string, TakeoffRules>();

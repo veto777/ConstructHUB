@@ -147,6 +147,8 @@ export interface HoverTakeoff {
     predominantPitch: string | null;
     /** summary.roof.waste_factor.area verbatim. */
     hoverWasteTable: Record<string, number> | null;
+    /** An explicit waste % in the document itself (older shapes only); it can raise the rule, never lower it. */
+    hoverSuggestedPct?: number | null;
     wasteCrossCheck: RoofQuote["crossCheck"];
     lengths: {
       ridges: number | null; hips: number | null; ridgesHips: number | null;
@@ -435,6 +437,7 @@ export function extractHoverTakeoff(fullJson: unknown, rulesIn?: Partial<Takeoff
       pitch,
       predominantPitch: predominant,
       hoverWasteTable,
+      hoverSuggestedPct: suggestedPct,
       wasteCrossCheck: rq.crossCheck,
       lengths,
     },
@@ -445,6 +448,58 @@ export function extractHoverTakeoff(fullJson: unknown, rulesIn?: Partial<Takeoff
     counts,
     totals,
     reference,
+  };
+}
+
+/**
+ * Re-apply (possibly changed) org rules to a STORED takeoff — for rows whose measurement document is not kept.
+ * Only the quote quantities depend on the rules; the measured values stay as they are.
+ */
+export function reapplyTakeoffRules(t: HoverTakeoff, rulesIn?: Partial<TakeoffRules> | null): HoverTakeoff {
+  const rules = normalizeTakeoffRules({ ...DEFAULT_TAKEOFF_RULES, ...(rulesIn ?? {}) });
+  const rq = roofQuote(t.roof.areaSqft, rules, t.roof.hoverWasteTable, t.roof.hoverSuggestedPct ?? null);
+  return {
+    ...t,
+    rules,
+    siding: { ...t.siding, quantitySqft: sidingQuoteSqft(t.siding.areaSqft, rules) },
+    roof: { ...t.roof, wastePct: rq.wastePct, quantitySqft: rq.quantitySqft, squares: rq.squares, wasteCrossCheck: rq.crossCheck },
+  };
+}
+
+/**
+ * The part of a full_json document the takeoff reads, for documents too big to keep whole: drops the bulky
+ * per-facade lists, soffit segments, wireframes and captured images, keeps everything extractHoverTakeoff uses
+ * (extracting the compact document gives the same takeoff — tested).
+ */
+export function compactHoverFullJson(fullJson: unknown): unknown {
+  const j: any = fullJson && typeof fullJson === "object" ? fullJson : null;
+  if (!j) return fullJson;
+  const sides: Record<string, { total: unknown }> = {};
+  const src = j.elevations?.sides;
+  if (src && typeof src === "object") for (const [k, v] of Object.entries(src as Record<string, any>)) sides[k] = { total: v?.total };
+  const pick = (o: any, keys: string[]) => {
+    if (!o || typeof o !== "object") return o;
+    const out: any = {};
+    for (const k of keys) if (o[k] !== undefined) out[k] = o[k];
+    return out;
+  };
+  return {
+    compact: true,
+    version: j.version,
+    summary: j.summary,
+    roof: j.roof && typeof j.roof === "object"
+      ? { ...pick(j.roof, ["area", "pitch", "measurements", "total_roof_area_sqft", "total_area_sqft", "predominant_pitch", "waste_percent"]),
+          ...(Array.isArray(j.roof.facets) ? { facets: j.roof.facets.map((f: any) => ({ facet: f?.facet })) } : {}),
+          ...(typeof j.roof.pitch === "string" ? { pitch: j.roof.pitch } : {}) }
+      : j.roof,
+    openings: j.openings,
+    footprint: j.footprint,
+    elevations: Object.keys(sides).length ? { sides } : undefined,
+    // Older flat shapes.
+    siding: j.siding, property: j.property, waste: j.waste, areas: j.areas, windows: j.windows,
+    stories: j.stories, pitch: j.pitch, predominant_pitch: j.predominant_pitch, building: j.building,
+    waste_factor: j.waste_factor, wastePercent: j.wastePercent, roof_area_sqft: j.roof_area_sqft,
+    siding_area_sqft: j.siding_area_sqft, windows_count: j.windows_count,
   };
 }
 

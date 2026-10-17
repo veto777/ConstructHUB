@@ -9,7 +9,7 @@ import fs from "fs";
 import path from "path";
 import {
   extractHoverTakeoff, roundUpTo, sidingQuoteSqft, roofQuote, normalizeTakeoffRules, takeoffColumns,
-  takeoffQuantityForLine, takeoffSymbols, parseWidthHeight, DEFAULT_TAKEOFF_RULES,
+  takeoffQuantityForLine, takeoffSymbols, parseWidthHeight, DEFAULT_TAKEOFF_RULES, reapplyTakeoffRules, compactHoverFullJson,
 } from "@shared/hover-takeoff";
 
 const FIXTURE = JSON.parse(
@@ -136,6 +136,26 @@ describe("quote rules", () => {
     const t = extractHoverTakeoff(FIXTURE, { roofWastePct: 10, sidingRoundUpTo: 50 })!;
     expect(t.roof.quantitySqft).toBe(2533);
     expect(t.siding.quantitySqft).toBe(2200);
+  });
+
+  it("a stored takeoff follows rule changes (no document kept): quantities recomputed from measured values", () => {
+    const stored = extractHoverTakeoff(FIXTURE)!;
+    const ten = reapplyTakeoffRules(stored, { roofWastePct: 10, sidingRoundUpTo: 25 });
+    expect(ten.rules).toEqual({ roofWastePct: 10, sidingRoundUpTo: 25 });
+    expect(ten.roof.quantitySqft).toBe(2533);
+    expect(ten.roof.squares).toBe(25.33);
+    expect(ten.siding.quantitySqft).toBe(2175);
+    expect(ten.roof.areaSqft).toBe(2303);
+    expect(reapplyTakeoffRules(ten, DEFAULT_TAKEOFF_RULES)).toEqual(stored);
+  });
+
+  it("the compact derivation copy of a big document gives exactly the same takeoff", () => {
+    const compact = compactHoverFullJson(FIXTURE);
+    expect(JSON.stringify(compact).length).toBeLessThan(JSON.stringify(FIXTURE).length / 2);
+    expect(JSON.parse(JSON.stringify(compact)).wireframes).toBeUndefined();
+    expect(extractHoverTakeoff(JSON.parse(JSON.stringify(compact)))).toEqual(extractHoverTakeoff(FIXTURE));
+    const old = { roof: { total_roof_area_sqft: 2874.5, predominant_pitch: "6/12", waste_percent: 12 }, siding: { total_siding_area_sqft: 2210 }, openings: { windows: 14 }, property: { stories: 2 } };
+    expect(extractHoverTakeoff(JSON.parse(JSON.stringify(compactHoverFullJson(old))))).toEqual(extractHoverTakeoff(old));
   });
 
   it("width × height parsing", () => {
