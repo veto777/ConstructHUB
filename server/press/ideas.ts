@@ -65,7 +65,13 @@ async function voiceProfile(orgId: string, db: Q): Promise<any | null> {
 
 export async function loadPrefill(userId: number, db: Q = pool): Promise<PressPrefill> {
   const out: PressPrefill = { values: {}, sources: {} };
+  // One company only: once a source names the company, a source naming a different company adds nothing
+  // (an agency's business profile must not lend its website or phone to the owner's own release).
+  const same = (x: string) => x.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim()
+    .replace(/(?:\s+(?:llc|inc|corp|ltd|pllc))+$/, "").replace(/\s+/g, "");
   const take = (source: PressPrefillSource, vals: Partial<Record<PressPrefillField, string>>) => {
+    const name = clean(vals.companyName);
+    if (name && out.values.companyName && same(name) !== same(out.values.companyName)) return;
     for (const f of PRESS_PREFILL_FIELDS) {
       const v = f === "website" ? httpUrl(vals[f]) : clean(vals[f]);
       if (v && !out.values[f]) { out.values[f] = v; out.sources[f] = source; }

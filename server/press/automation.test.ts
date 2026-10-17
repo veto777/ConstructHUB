@@ -1,6 +1,6 @@
 /**
  * The press automation against a real database (the lane's dev DB, as worker.test.ts): story ideas are built only
- * from stored rows, the writer's prefill takes each field from the first source that has it, and autopilot drafts at
+ * from stored rows, the writer's prefill takes each field from the first source that has it (one company only), and autopilot drafts at
  * most once a month, skips when it should, and never moves a release past "draft" or spends a credit.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
@@ -124,26 +124,28 @@ describe("story ideas", () => {
 });
 
 describe("prefill", () => {
-  it("takes each field from the last release, then the CRM org, then the business profile, then the profile", async () => {
+  it("takes the last release, then the CRM org, then the business profile, then the profile, for one company only", async () => {
     const u = await newUser({ company: "Profile Co", name: "Profile Person" });
     // Profile only.
     let p = await loadPrefill(u);
     expect(p.values).toEqual({ companyName: "Profile Co", contactName: "Profile Person", contactEmail: `${tag}-${users.length - 1}@press.test` });
     expect(p.sources.companyName).toBe("profile");
 
-    // A business profile fills what it has; the profile keeps the rest.
-    await pool.query(`INSERT INTO business_locations (user_id, business_name, city, state, phone, website, description) VALUES ($1,'Location Co','Dayton','OH','(937) 555-0100','not-a-url','From Google.')`, [u]);
+    // A business profile for the same company fills what it has; the profile keeps the rest.
+    await pool.query(`INSERT INTO business_locations (user_id, business_name, city, state, phone, website, description) VALUES ($1,'Profile Co LLC','Dayton','OH','(937) 555-0100','not-a-url','From Google.')`, [u]);
     p = await loadPrefill(u);
-    expect(p.values).toMatchObject({ companyName: "Location Co", city: "Dayton", contactPhone: "(937) 555-0100", about: "From Google.", contactName: "Profile Person" });
+    expect(p.values).toMatchObject({ companyName: "Profile Co LLC", city: "Dayton", contactPhone: "(937) 555-0100", about: "From Google.", contactName: "Profile Person" });
     expect(p.values.website).toBeUndefined(); // a stored value that is not a web address is left out
     expect(p.sources).toMatchObject({ companyName: "business_profile", contactName: "profile" });
 
-    // The CRM org beats the business profile.
+    // The CRM org names a different company: it wins, and nothing from the other company is mixed in.
     const org = await newOrg(u, { name: "CRM Co", city: "Columbus", state: "OH", email: "office@crm.example", website: "https://crm.example" });
     await pool.query(`INSERT INTO crm_members (org_id, user_id, email, role, status, display_name) VALUES ($1,$2,$3,'owner','active','Crm Owner')`, [org, u, `${tag}-pf@press.test`]);
     p = await loadPrefill(u);
-    expect(p.values).toMatchObject({ companyName: "CRM Co", city: "Columbus", state: "OH", website: "https://crm.example", contactEmail: "office@crm.example", contactName: "Crm Owner", contactPhone: "(937) 555-0100", about: "From Google." });
-    expect(p.sources).toMatchObject({ companyName: "crm", contactPhone: "business_profile" });
+    expect(p.values).toMatchObject({ companyName: "CRM Co", city: "Columbus", state: "OH", website: "https://crm.example", contactEmail: "office@crm.example", contactName: "Crm Owner" });
+    expect(p.values.contactPhone).toBeUndefined(); // the business profile is another company's
+    expect(p.values.about).toBeUndefined();
+    expect(p.sources.companyName).toBe("crm");
 
     // The last release beats everything.
     const r = await store.createRelease(u, "budget", fullInput());
