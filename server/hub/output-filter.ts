@@ -480,7 +480,7 @@ const CA_BINDERS: readonly CaBinder[] = [
   caBinder(String.raw`(?:the )?CRM(?: (?:Basic|Essentials|Max))?(?: plans?| subscriptions?| seats?)?`, (_n, cents) => CRM_CENTS.has(cents)),
   caBinder(
     String.raw`extra (?:agency |crm )?(?:locations?|seats?|protected websites?|websites?)|additional (?:locations?|seats?|websites?)|locations?|seats?|protected websites?|websites?|(?:client )?texting numbers?|(?:the )?setup fee|competitor scan packs?|scan packs?|competitor scans?|reinstatement`,
-    (_n, cents) => ADDON_PRICE_CENTS.has(cents) || cents === GBP_REINSTATEMENT_CENTS || cents === reinstatementPriceCents("agency")),
+    (_n, cents) => ADDON_PRICE_CENTS.has(cents) || cents === GBP_REINSTATEMENT_CENTS || [...REINSTATEMENT_HALF_PRICE_PLANS].some((p) => cents === reinstatementPriceCents(p))),
   caBinder(String.raw`(?:extra|additional|another|second) (?:call assistant |local |phone )?numbers?|(?:local |phone )?numbers?`, (_n, cents) => CA_NUMBER_CENTS.has(cents)),
 ];
 /** The positions (of the "$") of the amounts in `sentence` that sit in another product's clause, at that product's price. */

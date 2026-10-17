@@ -72,6 +72,7 @@ export function knowledgeTokens(): Record<string, string> {
     GRID_CREDIT_COSTS: [3, 5, 7, 9, 11, 13, 15].map((n) => `${n}x${n} = ${gridCreditCost(n)}`).join(", "),
     ADDON_MAX_QUANTITY: String(ADDON_MAX_QUANTITY),
     GBP_REINSTATEMENT_PRICE: formatUsd(GBP_REINSTATEMENT_CENTS),
+    GBP_REINSTATEMENT_UNLIMITED_PRICE: formatUsd(reinstatementPriceCents("agency")),
     RESEARCH_STANDARD_PRICE: formatUsd(RESEARCH_STANDARD_CENTS),
     RESEARCH_EXTENDED_PRICE: formatUsd(RESEARCH_EXTENDED_CENTS),
     PRESS_WIRE_PRICE: formatUsd(PRESS_RELEASE_PRICE_CENTS.budget),

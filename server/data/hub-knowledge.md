@@ -486,7 +486,7 @@ For a suspended Google Business Profile. Go to **Reinstatement** in the sidebar 
 3. **Fix and comply:** guidance on the changes and documents needed.
 4. **Appeal and reinstate:** they write and submit the evidence-based appeal and keep you updated.
 
-The price is {{GBP_REINSTATEMENT_PRICE}} per project, also shown on the Reinstatement page. Common suspension causes: keyword stuffing in the business name, virtual-office or PO-box addresses, duplicate listings, suspicious review patterns, and wrong service areas or categories. Google alone decides whether a profile is reinstated, so no outcome is guaranteed.
+The price is {{GBP_REINSTATEMENT_PRICE}} per project, also shown on the Reinstatement page. On the Unlimited plan it is half that, {{GBP_REINSTATEMENT_UNLIMITED_PRICE}} per project. Common suspension causes: keyword stuffing in the business name, virtual-office or PO-box addresses, duplicate listings, suspicious review patterns, and wrong service areas or categories. Google alone decides whether a profile is reinstated, so no outcome is guaranteed.
 
 ### Compliance Dept and Permit & License Research Reports
 
