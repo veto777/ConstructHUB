@@ -64,7 +64,7 @@ export function countryName(value: string | null | undefined): string | null {
   return ISO_COUNTRIES[value.toUpperCase()] ?? value;
 }
 
-/** "Bellingham, US" → "Bellingham, United States" — converts trailing/standalone country codes in a geo label. */
+/** "Columbus, US" → "Columbus, United States" — converts trailing/standalone country codes in a geo label. */
 export function geoLabel(name: string): string {
   return name
     .split(", ")

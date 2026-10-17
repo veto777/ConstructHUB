@@ -145,7 +145,7 @@ export function ServiceAreaSection({ value, onChange, disabled }: SectionProps<S
       </div>
 
       <StringListEditor id="spoken-areas" label="Areas the assistant names out loud" values={value.spokenAreas} onChange={(v) => set("spokenAreas", v)} disabled={disabled}
-        testid="list-spoken-areas" placeholder="Bellingham to Tacoma" max={60}
+        testid="list-spoken-areas" placeholder="Dayton to Cincinnati" max={60}
         hint='Your words for the area, e.g. "the Puget Sound area" — said when a caller asks "do you come out to…". Counties above decide; this is how it sounds.' />
 
       <div className="grid gap-4 sm:grid-cols-2">

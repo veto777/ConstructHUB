@@ -313,7 +313,7 @@ export default function SeoAiPage() {
           <form className="min-w-0 rounded-xl border p-3 sm:p-4" style={card} onSubmit={(e) => { e.preventDefault(); if (ready) ask.mutate(prompt.trim()); }} data-testid="form-ai-ask">
             <Heading className="!mb-0">Ask the assistants</Heading>
             <label className="mt-2 block text-[13px]"><span className="g-text-2">The question a customer would ask</span>
-              <textarea className="g-input mt-1 min-h-[72px] w-full py-2" value={prompt} maxLength={300} onChange={(e) => setPrompt(e.target.value)} placeholder="Who are the best siding contractors in Bellingham, WA? Name specific companies." data-testid="textarea-ai-prompt" />
+              <textarea className="g-input mt-1 min-h-[72px] w-full py-2" value={prompt} maxLength={300} onChange={(e) => setPrompt(e.target.value)} placeholder="Who are the best siding contractors in Columbus, OH? Name specific companies." data-testid="textarea-ai-prompt" />
             </label>
             {d.suggestions.length > 0 && <p className="g-text-2 mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">From your tracked keywords: {d.suggestions.map((s) => <button key={s} type="button" className="g-pill g-pill--sm !h-auto !min-h-11 !py-1 text-left" style={{ whiteSpace: "normal" }} onClick={() => setPrompt(s)}>{s}</button>)}</p>}
             <fieldset className="mt-3"><legend className="g-text-2 text-[13px]">Ask</legend>

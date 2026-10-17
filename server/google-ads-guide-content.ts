@@ -196,8 +196,8 @@ export const GOOGLE_ADS_GUIDE_SECTIONS: Record<string, GuideSection> = {
       { type: "list", items: [
         "\"Roofing company Seattle WA free estimate\"",
         "\"Emergency plumber near me 24 hour\"",
-        "\"Licensed HVAC contractor Bellingham WA\"",
-        "\"Siding installation Whatcom County\"",
+        "\"Licensed HVAC contractor Columbus OH\"",
+        "\"Siding installation Franklin County\"",
         "[roof leak repair Seattle same day]",
         "\"Commercial roofing contractor [city name]\"",
         "\"Foundation repair estimate [city name]\"",

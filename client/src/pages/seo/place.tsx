@@ -45,7 +45,7 @@ export const placeParams = (place: SeoPlace | null | undefined) => (place ? { pl
 /** The request-body field for a place. */
 export const placeBody = (place: SeoPlace | null | undefined) => (place ? { placeCode: place.code } : {});
 
-/** "Bellingham, Washington" / "the United States": where the numbers are for, in a sentence. */
+/** "Columbus, Ohio" / "the United States": where the numbers are for, in a sentence. */
 export const placeWords = (place: SeoPlace | null | undefined, country = "the United States") => (place ? place.label : country);
 
 /** The picker as the pages show it: a chip with the place, or a box to type one (only for the United States). */

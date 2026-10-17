@@ -20,7 +20,7 @@ import { ActiveFilter, COMPACT_TABLE, FIG, type AuditParams, type Foreign } from
 type Item = { keywordId: number; keyword: string; volume: number | null; position: number | null; checkedOn: string | null; device: string | null; place: string | null; to: string; from: string; fromTitle: string | null; context: string; pair: string };
 type Data = { jobId: string; scannedAt: string | null; checkedOn: string | null; linksMeasured: boolean; targets: number; boilerplate: number; notRanking: number; notCrawled: number; notUsable: number; tooShort: number; aliasesCut?: number; cutPages: number; items: Item[]; more: number };
 const plural = (n: number, one: string, many: string) => `${fmtNum(n)} ${n === 1 ? one : many}`;
-/** "position 8 on desktop, Oct 1, Bellingham, WA" — what a position rests on. */
+/** "position 8 on desktop, Oct 1, Columbus, OH" — what a position rests on. */
 const rankBasis = (i: Item) => [i.device, i.checkedOn ? fmtDate(i.checkedOn) : null, i.place].filter(Boolean).join(", ");
 const bare = (h: string) => h.toLowerCase().replace(/^www\./, "");
 const nameOf = (u: string, domain: string) => { try { const x = new URL(u); const path = (x.pathname + x.search) || "/"; return bare(x.hostname) === bare(domain) ? path : `${x.hostname}${path}`; } catch { return u; } };

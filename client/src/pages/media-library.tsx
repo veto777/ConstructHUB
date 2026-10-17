@@ -485,7 +485,7 @@ export default function MediaLibraryPage() {
                   <Input
                     value={newFolderAddress}
                     onChange={e => { setNewFolderAddress(e.target.value); setGeocodedResult(null); }}
-                    placeholder="e.g. 123 Main St, Bellingham, WA 98225"
+                    placeholder="e.g. 123 Main St, Columbus, OH 43215"
                     className="flex-1"
                     data-testid="input-folder-address"
                   />

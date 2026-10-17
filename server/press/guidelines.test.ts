@@ -3,14 +3,14 @@ import { checkRelease, hasBlockingIssue, outsideQuotes } from "./guidelines";
 import { PRESS_PACKAGES, PRESS_PROGRAM_CREDITS, PRESS_RELEASE_PRICE_CENTS, PRESS_TIERS, PRESS_WIRE_RATE_CENTS, pressPackagePrice, pressWireRateCents } from "@shared/press";
 import type { PressReleaseText } from "@shared/press";
 
-const input = { companyName: "Ridgeline Roofing", contactEmail: "dana@ridgeline.example", details: "We added a second repair crew on November 1 after storm repair requests doubled.", quoteNotes: "", about: "Roofing since 2014 in Whatcom County." };
+const input = { companyName: "Ridgeline Roofing", contactEmail: "dana@ridgeline.example", details: "We added a second repair crew on November 1 after storm repair requests doubled.", quoteNotes: "", about: "Roofing since 2014 in Franklin County." };
 const good: PressReleaseText = {
-  headline: "Ridgeline Roofing Adds a Second Repair Crew in Whatcom County",
-  subheadline: "The Bellingham roofer answers a year of storm damage with a dedicated repair team",
-  dateline: "BELLINGHAM, WA / October 15, 2026 /",
+  headline: "Ridgeline Roofing Adds a Second Repair Crew in Franklin County",
+  subheadline: "The Columbus roofer answers a year of storm damage with a dedicated repair team",
+  dateline: "COLUMBUS, OH / October 15, 2026 /",
   body: Array(6).fill("Ridgeline Roofing today announced a second full-time crew dedicated to roof repairs and storm response, starting November 1. Repair requests more than doubled after the February and September wind storms, and homeowners were waiting up to three weeks for a leak repair. The company expects the new crew to bring that wait to under five business days. “Nobody with a leak wants to hear three weeks,” said Dana Ortiz, owner of Ridgeline Roofing. “We built this crew so a homeowner gets a tarp the same day.”").join("\n\n"),
-  boilerplate: "About Ridgeline Roofing\nRidgeline Roofing is a residential roofing contractor in Bellingham, Washington, founded in 2014.",
-  mediaContact: "Dana Ortiz\nRidgeline Roofing\ndana@ridgeline.example\n(360) 555-0142",
+  boilerplate: "About Ridgeline Roofing\nRidgeline Roofing is a residential roofing contractor in Columbus, Ohio, founded in 2014.",
+  mediaContact: "Dana Ortiz\nRidgeline Roofing\ndana@ridgeline.example\n(614) 555-0142",
 };
 
 describe("press guidelines", () => {
@@ -39,7 +39,7 @@ describe("press guidelines", () => {
   it("needs the source near the top and a contact email", () => {
     const noName = checkRelease({ ...good, headline: "A Second Repair Crew Starts in November", subheadline: "", body: good.body.replace(/Ridgeline Roofing/g, "The company") }, input);
     expect(noName.some((i) => i.rule === "Clear source attribution" && i.blocking)).toBe(true);
-    const noEmail = checkRelease({ ...good, mediaContact: "Dana Ortiz\n(360) 555-0142" }, { ...input, contactEmail: "" });
+    const noEmail = checkRelease({ ...good, mediaContact: "Dana Ortiz\n(614) 555-0142" }, { ...input, contactEmail: "" });
     expect(noEmail.some((i) => i.rule === "Valid media contact" && i.blocking)).toBe(true);
   });
 

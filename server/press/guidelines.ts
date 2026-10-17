@@ -16,7 +16,7 @@ export const WRITING_RULES = `You write press releases for distribution on a nat
 FORMAT (AP style)
 - Headline: the news in one plain sentence, under 100 characters, title case, no exclamation marks, no questions, no all-caps words. The company's name appears in the headline or the first sentence.
 - Subheadline: one sentence that adds the second most important fact.
-- Dateline: "CITY, STATE / Month Day, Year /" (the state spelled out in AP style, e.g. "BELLINGHAM, WA / October 15, 2026 /"). The body starts right after it on the same line.
+- Dateline: "CITY, STATE / Month Day, Year /" (the state spelled out in AP style, e.g. "COLUMBUS, OH / October 15, 2026 /"). The body starts right after it on the same line.
 - Body: 350 to 550 words, 5 to 8 short paragraphs. First paragraph answers who, what, where, when and why. Third person throughout.
 - Quotes: one or two, attributed in full ("said Jane Doe, owner of Doe Roofing"). Quotes are the ONLY place first person ("we", "I", "our") and direct address ("you") may appear. Quotes may not be invented facts: they express the spokesperson's view of the news given.
 - Boilerplate: a final "About <Company>" paragraph of 60 to 100 words: what the company does, where it works, how long it has been in business, and its website.

@@ -50,7 +50,7 @@ type Cell = { service: string; town: string; keyword: string; volume: number | n
 type Data = { domain: string; locationCode?: number; languageCode?: string; fetchedAt: string; services: string[]; towns: string[]; cells: Cell[]; summary: { cells: number; gaps: number | null; gapVolume: number | null; weak: number | null; strong: number | null; unknown: number | null }; missing: string[] };
 type Saved = { services: string[]; towns: string[] } | null;
 const MAX_SERVICES = 12, MAX_TOWNS = 15, MAX_CELLS = 150;
-/** One per line. A comma inside a line is part of it ("Bellingham, WA" is one town). */
+/** One per line. A comma inside a line is part of it ("Columbus, OH" is one town). */
 const parse = (text: string) => [...new Set(text.split(/\n/).map((s) => s.toLowerCase().replace(/,/g, " ").replace(/\s+/g, " ").trim()).filter((s) => s.length >= 2))];
 const MAX_CHARS = 80, MAX_WORDS = 10;
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
@@ -189,7 +189,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
           <textarea className="g-input mt-1 min-h-[120px] w-full py-2" value={services} onChange={(e) => setServices(e.target.value)} placeholder={"siding contractor\nroof repair\nwindow replacement\ngutters"} data-testid="textarea-planner-services" />
         </label>
         <label className="block text-[13px]"><span className="g-text-2">Towns you serve — one per line (up to {MAX_TOWNS})</span>
-          <textarea className="g-input mt-1 min-h-[120px] w-full py-2" value={towns} onChange={(e) => setTowns(e.target.value)} placeholder={"bellingham\nlynden\nferndale\nmount vernon"} data-testid="textarea-planner-towns" />
+          <textarea className="g-input mt-1 min-h-[120px] w-full py-2" value={towns} onChange={(e) => setTowns(e.target.value)} placeholder={"columbus\ndublin\nwesterville\ngrove city"} data-testid="textarea-planner-towns" />
         </label>
         <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
           <Button type="submit" disabled={!draftS.length || !draftT.length || tooMany || !!tooLong} data-testid="button-planner-prepare">Build the table{cells ? ` — ${cells} search${cells === 1 ? "" : "es"}` : ""}</Button>
@@ -204,7 +204,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
       {last.isError && !asked && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="planner-last-error">Couldn't load the services and towns you used last time ({apiErrorMessage(last.error)}). <button type="button" className="g-link" onClick={() => void last.refetch()}>Try again</button> — or type them in.</p>}
       {asked && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved table…</p>}
       {asked && saved.isError && <div className="g-callout" role="alert"><h2>Couldn't check for a saved table</h2><p>{apiErrorMessage(saved.error)} Nothing has been charged.</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
-      {!asked && <Empty testId="planner-intro"><h2>Which service, in which town, needs a page?</h2><p>List what you do and where you do it. For every pairing — "roof repair lynden", "siding ferndale" — you get how often it is searched and where the keyword database has {site.domain} ranking for it. Red cells are searches people make for which the database has no ranking for you in its first 100.</p></Empty>}
+      {!asked && <Empty testId="planner-intro"><h2>Which service, in which town, needs a page?</h2><p>List what you do and where you do it. For every pairing — "roof repair dublin", "siding westerville" — you get how often it is searched and where the keyword database has {site.domain} ranking for it. Red cells are searches people make for which the database has no ranking for you in its first 100.</p></Empty>}
       {asked && saved.isSuccess && !d && (
         <Empty testId="planner-not-run">
           <h2>{askedCells} search{askedCells === 1 ? "" : "es"} ready to check</h2>

@@ -105,7 +105,7 @@ export function BuyNumberWizard({ minDays, mock, onBought, onCancel }: {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="voice-number-city">City <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Input id="voice-number-city" placeholder="Bellingham" maxLength={60} value={city} onChange={(e) => setCity(e.target.value)} data-testid="input-voice-number-city" />
+                <Input id="voice-number-city" placeholder="Columbus" maxLength={60} value={city} onChange={(e) => setCity(e.target.value)} data-testid="input-voice-number-city" />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -172,11 +172,11 @@ export function BuyNumberWizard({ minDays, mock, onBought, onCancel }: {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="voice-number-location">Location</Label>
-                <Input id="voice-number-location" maxLength={120} placeholder="Bellingham, WA" value={location} onChange={(e) => setLocation(e.target.value)} data-testid="input-voice-number-location" />
+                <Input id="voice-number-location" maxLength={120} placeholder="Columbus, OH" value={location} onChange={(e) => setLocation(e.target.value)} data-testid="input-voice-number-location" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="voice-number-forward">Line you'll forward <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Input id="voice-number-forward" inputMode="tel" placeholder="(360) 555-0199" value={forwardingFrom} onChange={(e) => setForwardingFrom(e.target.value)} data-testid="input-voice-number-forwarding-from" />
+                <Input id="voice-number-forward" inputMode="tel" placeholder="(614) 555-0199" value={forwardingFrom} onChange={(e) => setForwardingFrom(e.target.value)} data-testid="input-voice-number-forwarding-from" />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">

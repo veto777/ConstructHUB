@@ -7,7 +7,7 @@ const entry: HelpDraft = {
   whatItDoes: "Ask a question the way a customer would, to any of the three AI assistants with their web search on. Each answer shows whether it named your business, named it first, and which websites it used; answers are kept and summed up month by month. A second box, “Where AI answers already use a website”, checks which searches Google’s AI answers or ChatGPT already use any website for.",
   howToUse: [
     "Pick the site and, the first time, type your business name exactly as on Google; an answer names a business, not a web address.",
-    "Type the question a customer would ask (“best siding contractors in Bellingham, WA”), tick the assistants and press Ask. The button shows the usual price, the most it can cost is set aside while it runs, and an answer can take a minute.",
+    "Type the question a customer would ask (“best siding contractors in Columbus, OH”), tick the assistants and press Ask. The button shows the usual price, the most it can cost is set aside while it runs, and an answer can take a minute.",
     "Read each assistant’s answer and the sources it used; earlier answers to the same question are kept under it.",
     "Use the narrowing links (newest answers, named the business, used the website, named it first) to list the saved answers that match.",
     "Type a site in “Where AI answers already use a website”, choose the AI and press Check; Look it up buys a fresh list at the price on the button.",

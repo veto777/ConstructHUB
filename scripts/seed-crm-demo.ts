@@ -399,8 +399,8 @@ async function main() {
   }
   await ensureDivision({
     code: "WA", name: "Aspire Interiors — Washington", isHeadquarters: true,
-    email: "hq@aspireinteriors.co", phone: "(360) 555-0142",
-    addressLine1: "2211 Meridian St", city: "Bellingham", state: "WA", postalCode: "98225",
+    email: "hq@aspireinteriors.co", phone: "(509) 555-0142",
+    addressLine1: "2211 Demo Riverside Ave", city: "Spokane", state: "WA", postalCode: "99201",
     licenseNumber: "ASPIRII881JD", licenseState: "WA",
   });
   const flDivision = await ensureDivision({

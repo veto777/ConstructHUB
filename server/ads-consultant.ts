@@ -50,7 +50,7 @@ NEVER use Broad Match keywords. Google's default setting designed to spend money
 
 Always use Phrase Match ("keywords in quotes") or Exact Match ([keywords in brackets]).
 
-Use long-tail keywords: "Roofing company Seattle WA free estimate," "Emergency plumber near me 24 hour," "Licensed HVAC contractor Bellingham WA." Less competition, lower CPC, higher conversion.
+Use long-tail keywords: "Roofing company Seattle WA free estimate," "Emergency plumber near me 24 hour," "Licensed HVAC contractor Columbus OH." Less competition, lower CPC, higher conversion.
 
 Build negative keyword list BEFORE launching: Jobs, hiring, salary, career, training, school, DIY, how to, tutorial, free, cheap, discount, Reddit, YouTube, forum, wholesale, materials, supplies, Home Depot, Lowe's.
 

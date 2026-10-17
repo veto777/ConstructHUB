@@ -119,7 +119,7 @@ async function main() {
   for (const table of ["crm_members", "crm_divisions"])
     await q(`update ${table} set email = replace(email, '@aspireinteriors.co', '@aspireinteriors.example.com') where org_id = $1 and email like '%@aspireinteriors.co'`, [orgId]);
   // ── Divisions: one per demo state, every address invented (batch D, 2026-10-08) ─────────────────
-  // The base seed's two divisions read like a real business ("2211 Meridian St, Bellingham, WA" as
+  // The base seed's two divisions read like a real business ("2211 Demo Riverside Ave, Spokane, WA" as
   // headquarters, "1847 Main Street, Sarasota"). The demo company works in Florida, New York and
   // Texas, so: Florida — Sarasota is the headquarters; the Washington row BECOMES New York — Albany
   // (same row, same id: nothing points at a division that is gone); Texas — Austin is added. Street

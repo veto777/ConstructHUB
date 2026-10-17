@@ -316,7 +316,7 @@ export default function SeoLocalGridPage() {
               <p className="g-text-2 mb-3 text-[13px]">The grid is centred on your Google Business listing, and that listing is what we look for at every point. Search by name and town.{pin ? " Scans made with the listing you have now stay in the history, but are not compared with scans of a different one." : ""}</p>
               <form className="flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); if (query.trim().length >= 2) locate.mutate({ siteId: site.id, text: query.trim() }); }}>
                 <label className="min-w-0 flex-1 sm:max-w-xl"><span className="sr-only">Business name and town</span>
-                  <input className="g-input w-full" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Alpine Exteriors Bellingham WA" data-testid="input-grid-locate" autoComplete="off" />
+                  <input className="g-input w-full" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ridgeline Roofing Columbus OH" data-testid="input-grid-locate" autoComplete="off" />
                 </label>
                 <Button type="submit" disabled={locate.isPending || query.trim().length < 2 || !configured || !can(holds?.gridLocate ?? prices?.gridLocate)} data-testid="button-grid-locate">
                   {locate.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Searching…</> : `Search Google Maps${!hideSeoPrices() && prices?.gridLocate != null ? ` — about ${money(prices.gridLocate)}` : ""}`}

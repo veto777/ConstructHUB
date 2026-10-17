@@ -12,8 +12,8 @@ import type { Inbound } from "./mailbox";
 import type { PressReleaseInput, PressReleaseText } from "@shared/press";
 
 const OWNER = 1;
-const input: PressReleaseInput = { newsType: "expansion", companyName: "Vitest Roofing", website: "https://vitest.example", city: "Bellingham", state: "WA", contactName: "Pat Vitest", contactEmail: "pat@vitest.example", contactPhone: "(360) 555-0100", details: "Vitest Roofing added a second repair crew on November 1 after a year of storm work doubled repair requests across Whatcom County.", spokesperson: "Pat Vitest", spokespersonTitle: "Owner", quoteNotes: "", about: "Roofing since 2014.", photos: [] };
-const text: PressReleaseText = { headline: "Vitest Roofing Adds a Second Repair Crew", subheadline: "", dateline: "BELLINGHAM, WA / October 15, 2026 /", body: "Vitest Roofing today announced a second repair crew.", boilerplate: "About Vitest Roofing\nA roofer.", mediaContact: "Pat Vitest\npat@vitest.example" };
+const input: PressReleaseInput = { newsType: "expansion", companyName: "Vitest Roofing", website: "https://vitest.example", city: "Columbus", state: "WA", contactName: "Pat Vitest", contactEmail: "pat@vitest.example", contactPhone: "(360) 555-0100", details: "Vitest Roofing added a second repair crew on November 1 after a year of storm work doubled repair requests across Franklin County.", spokesperson: "Pat Vitest", spokespersonTitle: "Owner", quoteNotes: "", about: "Roofing since 2014.", photos: [] };
+const text: PressReleaseText = { headline: "Vitest Roofing Adds a Second Repair Crew", subheadline: "", dateline: "COLUMBUS, OH / October 15, 2026 /", body: "Vitest Roofing today announced a second repair crew.", boilerplate: "About Vitest Roofing\nA roofer.", mediaContact: "Pat Vitest\npat@vitest.example" };
 
 const sent: { to: string; subject: string; body: string; attachments?: { filename: string }[] }[] = [];
 let inbox: Inbound[] = [];
