@@ -143,6 +143,8 @@ export type EntitlementsInfo = {
   planName: string | null;
   isPlatformAdmin: boolean;
   grantEndsAt: string | null;
+  /** A failed payment paused the plan (Settings → Billing fixes it). */
+  paymentNeeded?: boolean;
   allowances: PlanLimits | null;
   modules: Record<ModuleKey, boolean>;
   /** Add-on modules that are on (every one for platform admins). */
