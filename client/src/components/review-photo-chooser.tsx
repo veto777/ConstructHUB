@@ -36,8 +36,8 @@ export function ReviewPhotoChooser({ token, companyName, onChosen }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   if (!data?.available || !data.photos.length) return null;
-  // At least 5, or every photo when the job has fewer.
-  const need = Math.min(MIN, data.photos.length);
+  // At least 5 when the job has 5 or more; a smaller job takes any of its photos.
+  const need = data.photos.length >= MIN ? MIN : 1;
 
   const toggle = (id: string) => setPicked((prev) => {
     const next = new Set(prev);
@@ -69,7 +69,7 @@ export function ReviewPhotoChooser({ token, companyName, onChosen }: {
         <p className="text-sm font-semibold">Add photos of your project (optional)</p>
       </div>
       <p className="mb-3 pl-11 text-xs leading-relaxed text-muted-foreground">
-        These are the photos {companyName} has of your project. Tap {Math.min(MIN, data.photos.length) === data.photos.length ? "the ones" : `${Math.min(MIN, data.photos.length)} to ${Math.min(MAX, data.photos.length)}`} you'd like to download and add to your review.
+        These are the photos {companyName} has of your project. Tap {data.photos.length >= MIN ? `${MIN} to ${Math.min(MAX, data.photos.length)}` : "the ones"} you'd like to download and add to your review.
       </p>
       <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4" data-testid="grid-choose-project-photos">
         {data.photos.map((p) => {

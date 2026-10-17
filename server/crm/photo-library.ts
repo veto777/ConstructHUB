@@ -608,6 +608,7 @@ export function registerCrmPhotoPlatformRoutes(app: Express, getDevUser: GetUser
  */
 /** The most job photos a review request carries, picked by the contractor or the homeowner (owner rule: 5–10). */
 export const HOMEOWNER_PICK_MAX = 10;
+export const HOMEOWNER_PICK_MIN = 5;
 
 export async function resolveReviewCrmLink(req: any, res: any, getUser: GetUser, body: any): Promise<{
   crmOrgId?: string; crmCustomerId?: string | null; photos?: { attachmentId: string; originalName: string }[];
@@ -702,6 +703,7 @@ export function registerReviewProjectPhotoRoutes(app: Express): void {
     const allowed = new Map((await customerPhotos(r)).map((a) => [a.id, a]));
     const ids = [...new Set(parsed.data.ids)];
     if (ids.some((id) => !allowed.has(id))) return res.status(404).json({ message: "Photo not found" });
+    if (ids.length && allowed.size >= HOMEOWNER_PICK_MIN && ids.length < HOMEOWNER_PICK_MIN) return res.status(400).json({ message: `Choose at least ${HOMEOWNER_PICK_MIN} photos.` });
     const photos = ids.map((id, i) => {
       const name = safeZipName(classifyPhoto(allowed.get(id)!.fileName).displayName).replace(/\.[^.]+$/, "");
       return { url: reviewPhotoUrl(r.token, id), originalName: `${name || `photo-${i + 1}`}.jpg` };
