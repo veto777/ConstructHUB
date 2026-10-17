@@ -237,6 +237,9 @@ const ROUTES: RouteRow[] = [
   R("POST", "/api/crm/attachments", { any: ["manageCustomers", "manageJobs"] }, { body: { kind: "photo" }, effect: true }),
   R("DELETE", "/api/crm/attachments/:id", { any: ["manageCustomers", "manageJobs"] }, { path: (t) => `/api/crm/attachments/${t.attachment}`, effect: true, scoped: true }),
   R("GET", "/api/crm/attachments/:id/file", null, { path: (t) => `/api/crm/attachments/${t.attachment}/file`, scoped: true }),
+  // "Add to all future estimates" library (estimate-default-files.ts): manageCustomers.
+  R("POST", "/api/crm/attachments/:id/estimate-default", "manageCustomers", { path: (t) => `/api/crm/attachments/${t.attachment}/estimate-default`, body: { on: false }, scoped: true }),
+  R("POST", "/api/crm/estimates/:id/attachments/from-library", "manageCustomers", { path: (t) => `/api/crm/estimates/${t.estimate}/attachments/from-library`, body: {}, scoped: true }),
   // The photo library (server/crm/photo-library.ts): every member reads it; rows follow the client's visibility.
   R("GET", "/api/crm/photos", null),
   R("GET", "/api/crm/photos/jobs", null),
