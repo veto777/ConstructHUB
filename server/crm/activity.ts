@@ -23,7 +23,7 @@ import { divisionScopeOf } from "./divisions";
 import type { Express } from "express";
 import { db } from "../db";
 import { crmActivityLog, crmAttachments, crmCustomers, crmMembers, type CrmActivityLogRow } from "@shared/schema";
-import { and, desc, eq, notInArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { loadActorDirectory, type ActorDirectory } from "./actors";
 import { actorLabel, type CrmActor } from "@shared/crm-actor";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
@@ -274,6 +274,8 @@ export function presentActivity(row: CrmActivityLogRow, dir: ActorDirectory, hid
     id: `act-${row.id}`,
     kind: "audit" as const,
     action: row.action,
+    entityType: row.entityType,
+    entityId: row.entityId,
     actor,
     text,
     actionText: text.startsWith(lead) ? text.slice(lead.length).trim() : text,
@@ -281,9 +283,6 @@ export function presentActivity(row: CrmActivityLogRow, dir: ActorDirectory, hid
   };
 }
 
-/** Attachment adds the client-360 timeline already shows (with the uploader's
- *  name) — kept out of the folded-in audit feed so a photo is one line, not two. */
-export const TIMELINE_CARRIED_ACTIONS = ["attachment.added", "attachment.attached", "attachment.auto_attached"];
 
 /**
  * Restricted-seat visibility of an attachment log row whose attachment no
@@ -332,10 +331,11 @@ export function registerCrmActivityRoutes(app: Express, getDevUser: GetUser): vo
     // "Dave recorded payment $2,000.00" reads without the amount for a price-blind seat.
     const hideMoney = !ctx.permissions.seePrices;
     const rows = await db.select().from(crmActivityLog)
-      .where(and(
-        eq(crmActivityLog.orgId, ctx.org.id), eq(crmActivityLog.customerId, cust.id),
-        notInArray(crmActivityLog.action, TIMELINE_CARRIED_ACTIONS),
-      ))
+      // Every row, attachment adds included: the durable "who uploaded" record
+      // must survive the file's deletion. The client page drops an add only
+      // when its attachment line is actually in the timeline
+      // (dedupeCarriedAudit, shared/crm-actor.ts).
+      .where(and(eq(crmActivityLog.orgId, ctx.org.id), eq(crmActivityLog.customerId, cust.id)))
       .orderBy(desc(crmActivityLog.createdAt)).limit(100);
     const dir = await loadActorDirectory(ctx.org.id);
     const show = (r: CrmActivityLogRow) => presentActivity(r, dir, hideMoney, cust.displayName);

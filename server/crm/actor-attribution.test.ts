@@ -171,12 +171,14 @@ describe("actor attribution (dev server)", () => {
     const line = (tl.body as any[]).find((x) => x.id === `att-${lib.body.id}`);
     expect(line.text).toMatch(new RegExp(`^${ownerLabel.replace(/[()]/g, "\\$&")} attached vitest-actor-warranty\\.pdf to estimate `));
 
-    // The client Activity audit feed shows the delete by name, not the add (the timeline carries adds).
+    // The client Activity audit feed shows the delete by name; adds stay in the feed too
+    // (the durable record) and the page dedupes them against the timeline.
     const act = await api(`/api/crm/customers/${custId}/activity`, {}, cookie);
     const texts = (act.body as any[]).map((a) => a.text);
     const e2Number = (await q(`select number from crm_estimates where id = $1`, [e2]))[0].number;
     expect(texts).toContain(`${ownerLabel} removed vitest-actor-warranty.pdf from estimate ${e2Number}`);
-    expect((act.body as any[]).some((a) => a.action === "attachment.added")).toBe(false);
+    const addRow = (act.body as any[]).find((a) => a.action === "attachment.added" && a.entityId === f.body.id);
+    expect(addRow).toMatchObject({ entityType: "attachment", actor: { kind: "member", isOwner: true } });
 
     // Estimate history names the actor of each event.
     const det = await api(`/api/crm/estimates/${e2}`, {}, cookie);
@@ -255,6 +257,29 @@ describe("actor attribution (dev server)", () => {
     expect((tl.body as any[]).find((x) => x.id === `att-${row.id}`).text).toBe("HOVER import added a photo — hover-vitestjob-img1.jpg");
   });
 
+  it("upload then delete: the audit add survives and is not deduped away", async () => {
+    const { dedupeCarriedAudit } = await import("@shared/crm-actor");
+    const r = await upload("/api/crm/attachments", { name: "gone.jpg", type: "image/jpeg", data: JPEG },
+      { kind: "photo", refId: custId, stage: "finished" }, cookie);
+    expect(r.status).toBe(201);
+    attIds.push(r.body.id);
+    await logOf(r.body.id, "attachment.added");
+    expect((await api(`/api/crm/attachments/${r.body.id}`, { method: "DELETE" }, cookie)).status).toBe(200);
+    await logOf(r.body.id, "attachment.deleted");
+    const tl = await api(`/api/crm/customers/${custId}/timeline`, {}, cookie);
+    const act = await api(`/api/crm/customers/${custId}/activity`, {}, cookie);
+    expect((tl.body as any[]).some((e) => e.id === `att-${r.body.id}`)).toBe(false);
+    const kept = dedupeCarriedAudit(tl.body as any[], act.body as any[]).filter((a: any) => a.entityId === r.body.id);
+    expect(kept.map((a: any) => a.text)).toEqual(expect.arrayContaining([
+      `${ownerLabel} added a project photo (finished) — gone.jpg`,
+      `${ownerLabel} deleted a project photo (finished) — gone.jpg`,
+    ]));
+    // A photo still on the timeline is NOT doubled by its audit add.
+    const first = (tl.body as any[]).find((e) => e.kind === "attachment");
+    if (first) expect(dedupeCarriedAudit(tl.body as any[], act.body as any[])
+      .some((a: any) => a.action === "attachment.added" && `att-${a.entityId}` === first.id)).toBe(false);
+  });
+
   it("historic rows with no uploader are never guessed", async () => {
     const ins = async (fileName: string) =>
       (await q(`insert into crm_attachments (org_id, kind, ref_id, file_name, mime, size_bytes, storage_path, created_at)
@@ -270,7 +295,8 @@ describe("actor attribution (dev server)", () => {
 
     const tl = await api(`/api/crm/customers/${custId}/timeline`, {}, cookie);
     const by = (id: string) => (tl.body as any[]).find((x) => x.id === `att-${id}`);
-    expect(by(staged).text).toBe("Added by your team (uploader not recorded): a project photo (in progress) — old.jpg");
+    // A stage-tagged or hover-named file is NOT proof of who uploaded it (the portal keeps client file names).
+    expect(by(staged).text).toBe("Project photo (in progress) added (uploader not recorded) — old.jpg");
     expect(by(staged).actor.recorded).toBe(false);
     expect(by(bare).text).toBe("Photo added (uploader not recorded) — IMG_old.jpg");
     expect(by(hoverNoJob).text).toBe("Photo added (uploader not recorded) — hover-nojob-1.jpg");

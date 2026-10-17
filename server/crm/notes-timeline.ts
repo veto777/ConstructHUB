@@ -38,7 +38,6 @@ import {
   crmEngagementSessions,
   crmFinanceClicks,
   crmInvoices,
-  crmMeasurements,
   crmMembers,
   crmOrgs,
   crmPayments,
@@ -146,8 +145,6 @@ export function commentTimelineText(
   return actorSentence(actor, `replied — ${quote(c.body)}`);
 }
 
-const HOVER_PHOTO_RE = /^hover-(.+)-([^-]+)\.jpg$/i;
-
 /** The stage tag the CRM upload route stores in front of the name. */
 export function photoStage(fileName: string): "progress" | "finished" | null {
   return fileName.startsWith("progress--") ? "progress" : fileName.startsWith("finished--") ? "finished" : null;
@@ -157,14 +154,14 @@ export function photoStage(fileName: string): "progress" | "finished" | null {
  * Who added an attachment — from REAL evidence only, in this order:
  *   1. the row's own uploader columns (every insert path since 2026-10-17);
  *   2. a crm_activity_log row for the same attachment id;
- *   3. the kind / name only one code path can produce: 'contract' PDFs are
- *      minted by the system, 'measurement' PDFs only by the HOVER import,
- *      and a "hover-<job>-<image>.jpg" photo is a HOVER import when that
- *      HOVER job is on file for this client (crm_measurements);
- *   4. still unknown: the stage tag ("progress--") / an estimate, pamphlet or
- *      library file can only come from the team's CRM upload → "your team
- *      (uploader not recorded)"; anything else → not recorded at all.
- * Never a guess from a bare file name.
+ *   3. the KIND, which only server code sets: 'contract' PDFs are minted by
+ *      the system, 'measurement' PDFs only by the HOVER import; estimate,
+ *      pamphlet and library files only come from the team's CRM routes →
+ *      "your team (uploader not recorded)";
+ *   4. a photo with neither → not recorded at all. The FILE NAME is never
+ *      evidence: the client portal keeps the homeowner's own file name, so a
+ *      client can upload "progress--x.jpg" or "hover-1-2.jpg" themselves.
+ *      (The stage tag may still label the photo in progress / finished.)
  */
 export function resolveAttachmentActor(
   att: { kind: string; fileName: string; uploadedByMemberId?: string | null; uploadedByLabel?: string | null; uploadedByKind?: string | null },
@@ -172,8 +169,6 @@ export function resolveAttachmentActor(
     member: (id: string) => CrmActor | null;
     /** The activity-log actor recorded for this attachment's upload, if any. */
     logged?: CrmActor | null;
-    /** HOVER job ids on file for this client. */
-    hoverJobIds?: Set<string>;
   },
 ): CrmActor {
   if (att.uploadedByMemberId) {
@@ -186,12 +181,7 @@ export function resolveAttachmentActor(
   if (ev.logged) return ev.logged;
   if (att.kind === "contract") return systemActor("System");
   if (att.kind === "measurement") return systemActor("HOVER import");
-  if (att.kind === "photo") {
-    const hv = HOVER_PHOTO_RE.exec(att.fileName);
-    if (hv && ev.hoverJobIds?.has(hv[1])) return systemActor("HOVER import");
-    if (photoStage(att.fileName)) return UNRECORDED_TEAM_ACTOR;
-    return UNRECORDED_ACTOR;
-  }
+  if (att.kind === "photo") return UNRECORDED_ACTOR;
   if (att.kind === "estimate" || att.kind === "pamphlet" || att.kind === "estimate_default") return UNRECORDED_TEAM_ACTOR;
   return UNRECORDED_ACTOR;
 }
@@ -206,9 +196,11 @@ export function photoTimelineText(fileName: string, actor: CrmActor): { actor: C
   const name = stage ? fileName.slice(stage.length + 2) : fileName;
   const noun = stage ? `a project photo (${stage === "finished" ? "finished" : "in progress"})` : "a photo";
   if (actor.recorded === false) {
-    return actor.kind === "member"
-      ? unrecorded(actor, `Added by your team (uploader not recorded): ${noun} — ${name}`)
-      : unrecorded(actor, `Photo added (uploader not recorded) — ${name}`);
+    if (actor.kind === "member") return unrecorded(actor, `Added by your team (uploader not recorded): ${noun} — ${name}`);
+    // Neutral: nothing recorded who. The stage tag only labels the photo.
+    return unrecorded(actor, stage
+      ? `Project photo (${stage === "finished" ? "finished" : "in progress"}) added (uploader not recorded) — ${name}`
+      : `Photo added (uploader not recorded) — ${name}`);
   }
   if (actor.kind === "client") return said(actor, `shared a photo — ${name}`);
   return said(actor, `added ${noun} — ${name}`);
@@ -565,12 +557,6 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       const r = loggedRows.find((x) => x.entityId === entityId && actions.includes(x.action));
       return r ? dir.logActor(r, clientName) : null;
     };
-    const hoverJobIds = new Set(
-      (photos.some((a) => a.fileName.startsWith("hover-"))
-        ? await db.select({ externalId: crmMeasurements.externalId }).from(crmMeasurements)
-            .where(and(eq(crmMeasurements.orgId, orgId), eq(crmMeasurements.customerId, customerId), eq(crmMeasurements.provider, "hover")))
-        : []).map((m) => m.externalId).filter(Boolean) as string[],
-    );
 
     const entries: TimelineEntry[] = [];
 
@@ -653,7 +639,7 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
 
     for (const a of photos) {
       const actor = resolveAttachmentActor(a, {
-        member: dir.member, logged: loggedBy(a.id, ["attachment.added"]), hoverJobIds,
+        member: dir.member, logged: loggedBy(a.id, ["attachment.added"]),
       });
       entries.push({
         id: `att-${a.id}`, kind: "attachment", verb: "attachment",

@@ -30,6 +30,25 @@ export interface CrmActor {
   recorded?: boolean;
 }
 
+/** Audit actions whose line the client timeline already carries (as `att-<id>`). */
+export const TIMELINE_CARRIED_ACTIONS = ["attachment.added", "attachment.attached", "attachment.auto_attached"] as const;
+
+/**
+ * The client page folds the audit feed into the timeline. An attachment add
+ * is dropped from the audit side ONLY when the timeline actually has that
+ * attachment's line — after the file is deleted (or when the timeline does
+ * not show that kind) the audit row is the record of who uploaded it.
+ */
+export function dedupeCarriedAudit<T extends { action?: string; entityId?: string | null }>(
+  timeline: { id: string }[], audit: T[],
+): T[] {
+  const shown = new Set(timeline.map((e) => e.id));
+  return audit.filter((a) => !(
+    (TIMELINE_CARRIED_ACTIONS as readonly string[]).includes(a.action ?? "")
+    && a.entityId && shown.has(`att-${a.entityId}`)
+  ));
+}
+
 /** The owner's name when none is set anywhere. */
 export const OWNER_FALLBACK_NAME = "Owner";
 

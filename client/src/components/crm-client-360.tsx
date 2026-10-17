@@ -20,6 +20,7 @@ import { useRef, useState } from "react";
 import { inNativeApp } from "@/lib/app-shell";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ActorName, ActorLine } from "@/components/crm-actor-name";
+import { dedupeCarriedAudit } from "@shared/crm-actor";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -210,7 +211,8 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
     retry: false,
     enabled: me?.permissions?.manageJobs === true,
   });
-  const merged = [...(entries ?? []), ...(audit ?? [])]
+  // An upload is one line: the audit add is dropped only when the timeline shows that file.
+  const merged = [...(entries ?? []), ...dedupeCarriedAudit(entries ?? [], audit ?? [])]
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   const shown = merged.slice(0, STEPS[stepIdx]);
   const hiddenCount = merged.length - shown.length;
