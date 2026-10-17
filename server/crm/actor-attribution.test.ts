@@ -78,7 +78,7 @@ describe("actor attribution (dev server)", () => {
     expect(m.role).toBe("owner");
     const name = (m.display_name || m.udn || "").trim();
     ownerLabel = name && !name.includes("@") ? `${name} (Owner)` : "Owner";
-    const c = await post("/api/crm/customers", { displayName: custName, email: `vitest.actor.${Date.now()}@example.com` }, cookie);
+    const c = await post("/api/crm/customers", { displayName: custName, addressLine1: "100 Test St", email: `vitest.actor.${Date.now()}@example.com` }, cookie);
     expect(c.status).toBe(201);
     custId = c.body.id;
   });
