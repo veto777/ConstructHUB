@@ -210,6 +210,29 @@ export function verifyHoverState(state: string): string | null {
   return a.length === b.length && timingSafeEqual(a, b) ? orgId : null;
 }
 
+// ── Webhook URL key ─────────────────────────────────────────────────────────
+//
+// HOVER signs webhook events only for integrations it has enrolled (its docs
+// call signature verification best-effort, opt-in by email), so in practice
+// events arrive UNSIGNED — the live handshake on 2026-10-17 did. The URL we
+// register therefore carries a per-org key (?k=<orgId>.<hmac>): an event with
+// a valid key is from whoever holds our registered URL, i.e. HOVER. It names
+// the org, and the body is only ever a trigger — ingest re-fetches the job
+// from HOVER with that org's own token, so nothing in it is trusted.
+
+export function mintHoverWebhookKey(orgId: string): string {
+  const sig = createHmac("sha256", stateSecret()).update(`hover-webhook:${orgId}`).digest("hex").slice(0, 32);
+  return `${orgId}.${sig}`;
+}
+
+export function verifyHoverWebhookKey(key: string): string | null {
+  const m = /^([0-9a-fA-F-]{36})\.([0-9a-f]{32})$/.exec(key);
+  if (!m) return null;
+  const a = Buffer.from(key);
+  const b = Buffer.from(mintHoverWebhookKey(m[1]));
+  return a.length === b.length && timingSafeEqual(a, b) ? m[1] : null;
+}
+
 // ── Access tokens (2h, in-memory cache; refresh tokens rotate) ──────────────
 
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
@@ -407,8 +430,15 @@ export async function ensureHoverWebhook(
   }
 
   const conn = await readHoverConn(orgId);
-  for (const w of list.filter((w) => w && w.url === url)) {
+  const endpoint = (u: unknown) => String(u ?? "").split("?")[0];
+  for (const w of list.filter((w) => w && endpoint(w.url) === endpoint(url))) {
     const wId = String(w.id);
+    if (w.url !== url) {
+      // Our own endpoint registered under an older URL (before the ?k= key) —
+      // replace it. Another integration's URL never matches the endpoint.
+      await fetchFn(`${apiBase}/v2/webhooks/${w.id}`, { method: "DELETE", headers: auth }).catch(() => {});
+      continue;
+    }
     const held = conn?.webhook?.id === wId ? conn.webhook : null;
     if (w.verified_at && held?.hmacSecretEnc) {
       // Already live and we hold its secret — nothing to do.
@@ -1287,7 +1317,8 @@ export function startHoverScheduler(): void {
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
-const webhookPath = (req: any) => `${oauthBaseUrl(req)}/api/crm/integrations/hover/webhook`;
+const webhookPath = (req: any, orgId: string) =>
+  `${oauthBaseUrl(req)}/api/crm/integrations/hover/webhook?k=${mintHoverWebhookKey(orgId)}`;
 const callbackUrl = (req: any) => `${oauthBaseUrl(req)}/api/crm/integrations/hover/oauth/callback`;
 
 const clientIp = (req: any) =>
@@ -1389,7 +1420,7 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     });
 
     // Register with THIS exchange's access token — no refresh consumed.
-    await ensureHoverWebhook(ctx.org.id, webhookPath(req), String(tok.access_token)).catch(
+    await ensureHoverWebhook(ctx.org.id, webhookPath(req, ctx.org.id), String(tok.access_token)).catch(
       (e: any) => console.error("[hover] webhook registration failed:", String(e?.message || e).slice(0, 200)),
     );
 
@@ -1403,7 +1434,7 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     const conn = await readHoverConn(ctx.org.id);
     if (!conn) return res.status(409).json({ message: "Connect HOVER first." });
     try {
-      const result = await ensureHoverWebhook(ctx.org.id, webhookPath(req));
+      const result = await ensureHoverWebhook(ctx.org.id, webhookPath(req, ctx.org.id));
       res.json({ ok: result.state !== "error", ...result });
     } catch (e: any) {
       res.status(502).json({ message: `HOVER webhook registration failed: ${String(e?.message || e).slice(0, 200)}` });
@@ -1495,7 +1526,8 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
         `date=${req.headers.date ? "yes" : "no"} type=${String(req.headers["content-type"] || "").slice(0, 60)}`);
       return res.status(401).json({ message });
     };
-    if (!webhookId) return refuse("Unsigned webhook");
+    const keyOrgId = verifyHoverWebhookKey(String(req.query?.k ?? ""));
+    if (!webhookId && !keyOrgId) return refuse("Unsigned webhook");
 
     // HOVER fires the verification-code event immediately on registration —
     // it can race our own persistence of the brand-new webhook row, so retry
@@ -1505,16 +1537,18 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
       [org] = await db
         .select()
         .from(crmOrgs)
-        .where(sql`${crmOrgs.customFields} -> 'hover' -> 'webhook' ->> 'id' = ${webhookId}`)
+        .where(keyOrgId
+          ? eq(crmOrgs.id, keyOrgId)
+          : sql`${crmOrgs.customFields} -> 'hover' -> 'webhook' ->> 'id' = ${webhookId}`)
         .limit(1);
-      if (org) break;
+      if (org && (!isHandshake || !webhookId || (org.customFields as any)?.hover?.webhook?.id === webhookId)) break;
       await new Promise((r) => setTimeout(r, 250));
     }
     const conn = (org?.customFields as any)?.hover as HoverConn | undefined;
-    const hmacSecret = conn?.webhook?.hmacSecretEnc ? decryptHoverSecret(conn.webhook.hmacSecretEnc) : null;
-    if (!org || !conn || !hmacSecret) return refuse("Unknown webhook");
+    if (!org || !conn?.refreshTokenEnc) return refuse("Unknown webhook");
+    const hmacSecret = conn.webhook?.hmacSecretEnc ? decryptHoverSecret(conn.webhook.hmacSecretEnc) : null;
 
-    const ok = verifyHoverSignature({
+    const signed = Boolean(webhookId && hmacSecret && (sig256 || sig1) && verifyHoverSignature({
       signature256: sig256 ?? null,
       signatureSha1: sig1 ?? null,
       contentType: String(req.headers["content-type"] || ""),
@@ -1522,11 +1556,15 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
       rawBody,
       path: req.path,
       date: String(req.headers.date || ""),
-      webhookId,
-      hmacSecret,
-    });
-    if (!ok && !isHandshake) return refuse("Bad signature");
-    if (!ok) console.warn(`[hover] webhook handshake for ${webhookId} arrived unsigned or unverifiable — verifying anyway`);
+      webhookId: webhookId!,
+      hmacSecret: hmacSecret!,
+    }));
+    // A present-but-wrong signature is refused even with a valid key.
+    if ((sig256 || sig1) && !signed && !isHandshake) return refuse("Bad signature");
+    if (!signed && !keyOrgId && !isHandshake) return refuse("Bad signature");
+    if (!signed && !keyOrgId) {
+      console.warn(`[hover] webhook handshake for ${webhookId} arrived unsigned — verifying anyway`);
+    }
 
     // 1) The verification handshake — activate the webhook at HOVER.
     if (isHandshake) {

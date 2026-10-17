@@ -391,7 +391,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     // Registration used the nested schema with content_type json.
     expect(stub.registrationBodies.length).toBe(1);
     expect(stub.registrationBodies[0]).toEqual({
-      webhook: { url: `${BASE}${RECEIVER_PATH}`, content_type: "json" },
+      webhook: { url: `${BASE}${RECEIVER_PATH}?k=${hover.mintHoverWebhookKey(orgId)}`, content_type: "json" },
     });
   });
 
@@ -429,6 +429,22 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     const alien = sign(body, 999999, "secret-alien");
     const unknown = await api(RECEIVER_PATH, { method: "POST", headers: alien, body });
     expect(unknown.status).toBe(401);
+
+    // HOVER sends events UNSIGNED unless the integration enrolled in signing:
+    // the per-org ?k= key on the registered URL is what admits them.
+    const other = JSON.stringify({ event: "job-photo-uploaded", job_id: 9001 });
+    const k = hover.mintHoverWebhookKey(orgId);
+    const keyed = await api(`${RECEIVER_PATH}?k=${k}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: other,
+    });
+    expect(keyed.status).toBe(200);
+    const badKey = await api(`${RECEIVER_PATH}?k=${k.slice(0, -1)}${k.endsWith("a") ? "b" : "a"}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: other,
+    });
+    expect(badKey.status).toBe(401);
+    // A valid key never excuses a forged signature.
+    const keyedForged = await api(`${RECEIVER_PATH}?k=${k}`, { method: "POST", headers: badHeaders, body: other });
+    expect(keyedForged.status).toBe(401);
   });
 
   it("completed event → customer + measurement + gated PDF, mapped from the v3 fixture", async () => {
@@ -898,6 +914,17 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     expect(hover.hoverWebhookIdFromHeaders(sig256, null)).toBe("42");
     expect(hover.hoverWebhookIdFromHeaders(null, sig1)).toBe("42");
     expect(hover.hoverWebhookIdFromHeaders(null, null)).toBeNull();
+  });
+
+  it("unit: webhook URL key names its org and rejects tampering", () => {
+    const org = "1e3050c1-3cfd-4d9b-ba5a-1c19ce074897";
+    const key = hover.mintHoverWebhookKey(org);
+    expect(hover.verifyHoverWebhookKey(key)).toBe(org);
+    expect(hover.verifyHoverWebhookKey(key.slice(0, -1) + (key.endsWith("a") ? "b" : "a"))).toBeNull();
+    // Another org's key never verifies as this org.
+    const other = "2e3050c1-3cfd-4d9b-ba5a-1c19ce074897";
+    expect(hover.verifyHoverWebhookKey(`${other}.${key.split(".")[1]}`)).toBeNull();
+    expect(hover.verifyHoverWebhookKey("")).toBeNull();
   });
 
   it("unit: OAuth state grant round-trips and rejects tampering", () => {
