@@ -138,6 +138,23 @@ describe("quote rules", () => {
     expect(t.siding.quantitySqft).toBe(2200);
   });
 
+  it("roofing underlayment names take the roof quantity, never the siding one; fascia runs eaves + rakes", () => {
+    const t = extractHoverTakeoff(FIXTURE)!;
+    for (const name of [
+      "Ice-water shield", "Ice & water shield", "Ice and Water", "Ice-and-water barrier", "ice shield",
+      "Synthetic underlayment", "#30 felt", "Roof decking", "OSB sheathing", "Tear-off", "Architectural shingles",
+    ]) {
+      expect(takeoffQuantityForLine({ name, unit: "sf" }, t)?.quantity, name).toBe(2418);
+    }
+    expect(takeoffQuantityForLine({ name: "Ice-water shield", unit: "sq" }, t)?.quantity).toBe(24.18);
+    expect(takeoffQuantityForLine({ name: "Vinyl siding", unit: "sf" }, t)?.quantity).toBe(2200);
+    expect(takeoffQuantityForLine({ name: "Fascia", unit: "lf" }, t)?.quantity).toBe(268.42);
+    expect(takeoffQuantityForLine({ name: "Aluminum fascia wrap", unit: "lf" }, t)?.quantity).toBe(268.42);
+    expect(takeoffQuantityForLine({ name: "Eave fascia", unit: "lf" }, t)?.quantity).toBe(121.67);
+    expect(takeoffQuantityForLine({ name: "Gutters", unit: "lf" }, t)?.quantity).toBe(121.67);
+    expect(takeoffQuantityForLine({ name: "Rake fascia", unit: "lf" }, t)?.quantity).toBe(146.75);
+  });
+
   it("a stored takeoff follows rule changes (no document kept): quantities recomputed from measured values", () => {
     const stored = extractHoverTakeoff(FIXTURE)!;
     const ten = reapplyTakeoffRules(stored, { roofWastePct: 10, sidingRoundUpTo: 25 });

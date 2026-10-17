@@ -959,6 +959,15 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
 
   // ── The complete file: takeoff + premium PDF + auto project (real full_json v2) ─────────
 
+  /** Poll (≤ 10 s) for something the server does in the background. */
+  const until = async (check: () => Promise<boolean>) => {
+    for (let i = 0; i < 100; i++) {
+      if (await check()) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error("timed out waiting for the background back-fill");
+  };
+
   const m9100 = async () => (await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9100'`, [orgId]))[0];
 
   it("v2 job → takeoff columns, the premium PDF and a lead project: one complete file, never duplicated", async () => {
@@ -1084,7 +1093,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
   it("back-fill re-derives every row from the stored full_json with ZERO HOVER calls, and is idempotent", async () => {
     const m = await m9100();
     await q(`update crm_measurements set squares_milli = null, wall_area_sf_milli = null, perimeter_lf_milli = null,
-      raw_payload = raw_payload - 'takeoff' - 'summary' where id = $1`, [m.id]);
+      raw_payload = raw_payload - 'takeoff' - 'summary' - 'takeoffDerivation' where id = $1`, [m.id]);
     const file = await import("./hover-file");
     const calls = stub.requests;
     const r1 = await file.backfillHoverTakeoffs(orgId);
@@ -1095,10 +1104,31 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     expect(back.perimeter_lf_milli).toBe(268420);
     expect((back.raw_payload as any).takeoff.siding.quantitySqft).toBe(2200);
     expect((back.raw_payload as any).pdfAttachmentId).toBe((m.raw_payload as any).pdfAttachmentId); // other keys kept
+    expect((back.raw_payload as any).takeoffDerivation).toBe(file.TAKEOFF_DERIVATION);
+    // Nothing stale is left: the next (sync) back-fill reads no rows at all.
     const r2 = await file.backfillHoverTakeoffs(orgId);
-    expect(r2.updated).toBe(0);
-    expect(r2.unchanged).toBe(r1.updated + r1.unchanged);
+    expect(r2).toEqual({ checked: 0, updated: 0, unchanged: 0, skipped: 0 });
+    // A full check (--all) finds every row current.
+    const r3 = await file.backfillHoverTakeoffs(orgId, { all: true });
+    expect(r3.updated).toBe(0);
+    expect(r3.unchanged).toBeGreaterThanOrEqual(r1.updated);
+    expect(r3.checked).toBe(r3.unchanged + r3.skipped);
     expect(stub.requests).toBe(calls);
+
+    // Paging: 205 stale rows (more than two 100-row pages) are all visited, then none.
+    await q(`insert into crm_measurements (org_id, provider, status, external_id, raw_payload)
+      select $1, 'hover', 'ready', 'hover:bulk-' || g, jsonb_build_object('importSource', 'hover', 'takeoff', $2::jsonb)
+      from generate_series(1, 205) g`, [orgId, JSON.stringify((back.raw_payload as any).takeoff)]);
+    try {
+      const bulk = await file.backfillHoverTakeoffs(orgId);
+      expect(bulk.checked).toBe(205);
+      expect(bulk.updated).toBe(205);   // their columns were empty
+      const [one] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:bulk-77'`, [orgId]);
+      expect(one.wall_area_sf_milli).toBe(2169000);
+      expect((await file.backfillHoverTakeoffs(orgId)).checked).toBe(0);
+    } finally {
+      await q(`delete from crm_measurements where org_id = $1 and external_id like 'hover:bulk-%'`, [orgId]);
+    }
   });
 
   it("takeoff rules are org settings: saving re-derives the takeoffs; 5% roof waste is the floor", async () => {
@@ -1109,12 +1139,15 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
       method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ roofWastePct: 10, sidingRoundUpTo: 25 }),
     });
     expect(save.status).toBe(200);
-    expect(save.body.takeoffRules).toEqual({ roofWastePct: 10, sidingRoundUpTo: 25 });
+    expect(save.body).toEqual({ ok: true, takeoffRules: { roofWastePct: 10, sidingRoundUpTo: 25 }, recalculating: true });
+    // The cards apply the new rules on read at once …
     let t = (await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body.takeoff;
     expect(t.roof.quantitySqft).toBe(2533);
     expect(t.siding.quantitySqft).toBe(2175);
-    expect((await m9100()).waste_suggestion_bps).toBe(1000);
-    const [noDoc] = await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9101'`, [orgId]);
+    // … and the stored copies follow from the background back-fill.
+    const row9101 = async () => (await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9101'`, [orgId]))[0];
+    await until(async () => (await m9100()).waste_suggestion_bps === 1000 && (await row9101()).waste_suggestion_bps === 1000);
+    const noDoc = await row9101();
     expect(noDoc.raw_payload.fullJson).toBeUndefined();
     expect(noDoc.raw_payload.takeoff.roof.quantitySqft).toBe(2533);
     expect(noDoc.raw_payload.takeoff.siding.quantitySqft).toBe(2175);
@@ -1127,6 +1160,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     await api("/api/crm/integrations/hover/takeoff-rules", {
       method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ roofWastePct: 5, sidingRoundUpTo: 100 }),
     });
+    await until(async () => (await row9101()).waste_suggestion_bps === 500 && (await m9100()).waste_suggestion_bps === 500);
     t = (await api(`/api/crm/customers/${m.customer_id}/takeoff`)).body.takeoff;
     expect(t.roof.quantitySqft).toBe(2418);
     expect(t.siding.quantitySqft).toBe(2200);
@@ -1266,6 +1300,27 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     }), { status: 200 });
     expect(await hover.fetchHoverPdf(fake({ "https://hover.to/api/stream": stream }), "https://hover.to/api/stream", {}, api0)).toBeNull();
     expect(sent).toBeLessThan(40);   // stopped reading at the cap
+  });
+
+  it("unit: the full_json body is streamed with a size cap; 5xx/bad JSON are transient, 404 is unavailable", async () => {
+    const url = `${STUB}/api/v3/models/1/artifacts/measurements.json?version=full_json`;
+    const parsed = { measurementsJsonUrl: url } as any;
+    const reply = (r: () => Response) => (async () => r()) as any;
+    let sent = 0;
+    const huge = () => new Response(new ReadableStream({
+      pull(c) { if (sent++ > 40) c.close(); else c.enqueue(new Uint8Array(1024 * 1024).fill(32)); },
+    }), { status: 200 });
+    expect(await hover.fetchHoverFullJson(parsed, {}, reply(huge))).toEqual({ kind: "unavailable" });
+    expect(sent).toBeLessThan(20);   // stopped at the 10 MB cap
+    const declared = () => new Response("{}", { status: 200, headers: { "content-length": String(50 * 1024 * 1024) } });
+    expect(await hover.fetchHoverFullJson(parsed, {}, reply(declared))).toEqual({ kind: "unavailable" });
+    expect((await hover.fetchHoverFullJson(parsed, {}, reply(() => new Response("oops", { status: 502 })))).kind).toBe("transient");
+    expect((await hover.fetchHoverFullJson(parsed, {}, reply(() => new Response("<html>", { status: 200 })))).kind).toBe("transient");
+    expect(await hover.fetchHoverFullJson(parsed, {}, reply(() => new Response("{}", { status: 404 })))).toEqual({ kind: "unavailable" });
+    const ok = await hover.fetchHoverFullJson(parsed, {}, reply(() => new Response(JSON.stringify(V2_FULL_JSON), { status: 200 })));
+    expect(ok.kind).toBe("ok");
+    // A payload link outside HOVER's hosts is never fetched.
+    expect(await hover.fetchHoverFullJson({ measurementsJsonUrl: "https://evil.example/m.json" } as any, {}, reply(() => { throw new Error("fetched"); }))).toEqual({ kind: "unavailable" });
   });
 
   it("unit: full_json retry backoff and the needs-fetch rule", () => {

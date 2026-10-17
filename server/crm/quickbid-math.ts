@@ -7,6 +7,31 @@
 export type SqftMetric = "roof" | "siding";
 
 /**
+ * "2,210 sq ft siding area from the hover report + 12% waste × $4.50/sq ft".
+ * With a HOVER takeoff quote the label comes from the TAKEOFF (its measured area, its waste %, its quantity),
+ * never from the measurement columns, which can lag behind a rules change.
+ */
+export function quickBidLineDescription(args: {
+  sqftMilli: number; metric: SqftMetric; provider: string;
+  wasteBps: number | null; rateCentsPerSqft: number;
+  /** HOVER takeoff quote (already rounded / with waste), when the report has one. */
+  quote?: { areaSqft: number; quantitySqft: number; wastePct: number } | null;
+}): string {
+  const f = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 1 });
+  const rate = (args.rateCentsPerSqft / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  if (args.quote) {
+    const q = args.quote;
+    const how = args.metric === "roof"
+      ? ` + ${q.wastePct.toLocaleString("en-US", { maximumFractionDigits: 2 })}% waste = ${f(q.quantitySqft)} sq ft`
+      : `, rounded up to ${f(q.quantitySqft)} sq ft`;
+    return `${f(q.areaSqft)} sq ft ${args.metric} area from the ${args.provider} report${how} × $${rate}/sq ft`;
+  }
+  const sqft = f(args.sqftMilli / 1000);
+  const waste = args.wasteBps ? ` + ${(args.wasteBps / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}% waste` : "";
+  return `${sqft} sq ft ${args.metric} area from the ${args.provider} report${waste} × $${rate}/sq ft`;
+}
+
+/**
  * Which measurement metric an item prices against when the row doesn't say.
  * Anything roof-flavoured prices roof area; everything else on an exterior
  * report is wall/siding area.
