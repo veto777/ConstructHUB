@@ -50,7 +50,11 @@ export async function prodHealth(resultsDir: string): Promise<number> {
 
   let runtime: unknown = null, runtimeError: string | null = null;
   try {
-    const res = await fetch("https://constructhub.us/api/research-reports/coverage-runtime", { headers: { Accept: "application/json" } });
+    // A browser user agent naming the check, as the deploy script's: the crawler firewall (server/bot-firewall.ts)
+    // refuses Node's own with 403 since 2026-10-16.
+    const res = await fetch("https://constructhub.us/api/research-reports/coverage-runtime", {
+      headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) ConstructHUB-research-acceptance" },
+    });
     runtime = res.ok ? await res.json() : null;
     if (!res.ok) runtimeError = `HTTP ${res.status}`;
   } catch (err: any) { runtimeError = String(err?.message ?? err); }
