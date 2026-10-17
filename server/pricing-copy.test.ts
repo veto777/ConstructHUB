@@ -15,7 +15,7 @@ import {
 } from "@shared/plan-copy";
 import { CALL_ASSISTANT_TIERS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_OVERAGE_RATES, CALL_ASSISTANT_ANNUAL_MONTHS } from "@shared/plans";
 import { ALACARTE_KEYS, alacartePriceCents } from "@shared/alacarte";
-import { PRESS_PACKAGES, pressPackagePrice } from "@shared/press";
+import { PRESS_PACKAGES, PRESS_TIERS, pressPackagePrice } from "@shared/press";
 import { SPAM_STRIKES_TO_BLOCK } from "./voice/spam";
 import { COURSE_BUNDLE } from "./catalog";
 import { FORWARDING_ADVICE } from "./voice/numbers";
@@ -299,7 +299,7 @@ describe("AI assistant prompts use the price book", () => {
       ...ALACARTE_KEYS.flatMap((k) => [alacartePriceCents(k, "standalone", "year"), alacartePriceCents(k, "addon", "year")]),
       // Press Releases packages (owner, 2026-10-15: "fully automated", "picks a package out of 3"): bought online at
       // their listed price, the one one-off product above the threshold that is not quoted by a rep.
-      ...PRESS_PACKAGES.flatMap((p) => [pressPackagePrice(p, "budget"), pressPackagePrice(p, "premium")]),
+      ...PRESS_PACKAGES.flatMap((p) => PRESS_TIERS.map((t) => pressPackagePrice(p, t))),
       SALES_THRESHOLD_CENTS,
     ]);
     const text = HUB_TEXT;

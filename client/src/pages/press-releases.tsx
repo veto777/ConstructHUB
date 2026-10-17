@@ -9,8 +9,8 @@ import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowRight, CheckCircle2, Clock, FileText, Flame, Globe2, Image as ImageIcon, Loader2, Newspaper, Radio, Rocket, Send, Sparkles, Star, Trophy, Tv, XCircle, Zap } from "lucide-react";
 import {
-  PRESS_HEADLINE_OUTLETS, PRESS_NEWS_TYPES, PRESS_PACKAGES, PRESS_PROGRAM_CREDITS, PRESS_PROGRAM_FREE, PRESS_PROGRAM_PAID, PRESS_STATUS_HELP, PRESS_STATUS_LABELS,
-  pressPackagePrice, type PressGuidelineIssue, type PressOrderView, type PressPackage, type PressReleaseInput, type PressReleaseStatus, type PressReleaseText, type PressReleaseView, type PressTier,
+  PRESS_HEADLINE_OUTLETS, PRESS_NEWS_TYPES, PRESS_PACKAGES, PRESS_TIERS, PRESS_TIER_INFO, PRESS_TIER_LABEL, PRESS_WIRE_TIER_NAME, pressPackage, PRESS_PROGRAM_CREDITS, PRESS_PROGRAM_FREE, PRESS_PROGRAM_PAID, PRESS_STATUS_HELP, PRESS_STATUS_LABELS,
+  pressPackagePrice, type PressGuidelineIssue, type PressPackageKey, type PressOrderView, type PressPackage, type PressReleaseInput, type PressReleaseStatus, type PressReleaseText, type PressReleaseView, type PressTier,
 } from "@shared/press";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -36,7 +36,7 @@ const usd = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minim
 const n = (v: number) => v.toLocaleString("en-US");
 const getJson = async <T,>(url: string): Promise<T> => (await apiRequest("GET", url)).json();
 const refresh = () => queryClient.invalidateQueries({ queryKey: ["/api/press/overview"] });
-const tierWord = (t: PressTier) => (t === "premium" ? "Premium" : "Wire");
+const tierWord = (t: PressTier) => PRESS_TIER_LABEL[t];
 
 const STATUS_TONE: Record<PressReleaseStatus, string> = {
   draft: "bg-slate-100 text-slate-700", ready: "bg-amber-100 text-amber-800", queued: "bg-amber-100 text-amber-800", submitted: "bg-blue-100 text-blue-800",
@@ -78,9 +78,9 @@ function Hero({ counts }: { counts: Record<PressTier, number> }) {
         <p className="mt-3 max-w-2xl text-base text-white/90 sm:text-lg">Tell us what happened. The writer turns it into a wire-ready press release, we send it to the wire, and the live link and distribution report land in your inbox.</p>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { v: `${n(counts.premium)}+`, l: "Premium outlets", i: Tv },
-            { v: `${n(counts.budget)}+`, l: "Wire outlets", i: Radio },
-            { v: "AP · Bloomberg · Reuters", l: "On the Premium wire", i: Globe2 },
+            { v: `${n(counts.premium)}+`, l: "Premium newsrooms", i: Tv },
+            { v: `${n(counts.national)}+`, l: "National newsrooms", i: Radio },
+            { v: "AP · Reuters · Dow Jones", l: "From National up", i: Globe2 },
             { v: "Yahoo Finance", l: "On every release", i: Newspaper },
           ].map((s) => (
             <div key={s.l} className="rounded-xl bg-white/10 p-3 backdrop-blur">
@@ -97,34 +97,38 @@ function Hero({ counts }: { counts: Record<PressTier, number> }) {
 }
 
 function Packages({ credits, onBuy, buying }: { credits: Record<PressTier, number>; onBuy: (key: string, tier: PressTier) => void; buying: string | null }) {
-  const [programTier, setProgramTier] = useState<PressTier>("budget");
+  const [qty, setQty] = useState<Record<PressTier, PressPackageKey>>({ budget: "single", national: "single", premium: "single" });
+  const icons = { budget: Zap, national: Trophy, premium: Rocket } as const;
   return (
     <div className="grid gap-4 md:grid-cols-3" data-testid="press-packages">
-      {PRESS_PACKAGES.map((p, i) => {
-        const tier: PressTier = p.tier === "choose" ? programTier : p.tier;
-        const price = pressPackagePrice(p, tier);
-        const hot = p.key === "program_12";
+      {PRESS_TIERS.map((tier) => {
+        const info = PRESS_TIER_INFO[tier];
+        const pkg = pressPackage(qty[tier])!;
+        const price = pressPackagePrice(pkg, tier);
+        const hot = tier === "national";
+        const Icon = icons[tier];
+        const busy = buying === `${tier}:${pkg.key}`;
         return (
-          <div key={p.key} className={`relative flex flex-col rounded-2xl border-2 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${hot ? "border-orange-500 bg-gradient-to-b from-orange-50 to-white dark:from-orange-950/40 dark:to-background" : "border-border bg-card"}`} data-testid={`press-package-${p.key}`}>
-            <div className={`absolute -top-3 left-4 rounded-full px-3 py-0.5 text-[11px] font-black uppercase tracking-widest text-white ${hot ? "bg-orange-600" : i === 1 ? "bg-indigo-600" : "bg-slate-700"}`}>{p.flashy}</div>
-            <div className="mt-2 flex items-center gap-2 text-lg font-black">{i === 0 ? <Zap className="h-5 w-5 text-amber-500" aria-hidden="true" /> : i === 1 ? <Trophy className="h-5 w-5 text-indigo-500" aria-hidden="true" /> : <Rocket className="h-5 w-5 text-orange-600" aria-hidden="true" />}{p.name}</div>
-            <div className="text-sm text-muted-foreground">{p.tagline}</div>
-            <div className="mt-3 text-3xl font-black">{usd(price)}{p.credits > 1 && <span className="ml-2 text-sm font-semibold text-muted-foreground">for {p.credits} releases</span>}</div>
-            {p.credits > 1 && <div className="text-xs font-semibold text-emerald-700">{usd(Math.round(price / p.credits))} a release · {PRESS_PROGRAM_FREE} free</div>}
-            {p.tier === "choose" && (
-              <div className="mt-3 flex gap-2" role="radiogroup" aria-label="Program tier">
-                {(["budget", "premium"] as PressTier[]).map((t) => (
-                  <button key={t} type="button" role="radio" aria-checked={programTier === t} onClick={() => setProgramTier(t)} className={`flex-1 rounded-lg border px-2 py-1.5 text-sm font-semibold ${programTier === t ? "border-orange-600 bg-orange-600 text-white" : "border-border"}`} data-testid={`press-program-${t}`}>{tierWord(t)}</button>
-                ))}
-              </div>
-            )}
+          <div key={tier} className={`relative flex flex-col rounded-2xl border-2 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${hot ? "border-orange-500 bg-gradient-to-b from-orange-50 to-white dark:from-orange-950/40 dark:to-background" : "border-border bg-card"}`} data-testid={`press-package-${tier}`}>
+            <div className={`absolute -top-3 left-4 rounded-full px-3 py-0.5 text-[11px] font-black uppercase tracking-widest text-white ${hot ? "bg-orange-600" : tier === "premium" ? "bg-indigo-600" : "bg-slate-700"}`}>{info.flashy}</div>
+            <div className="mt-2 flex items-center gap-2 text-lg font-black"><Icon className={`h-5 w-5 ${tier === "budget" ? "text-amber-500" : tier === "national" ? "text-orange-600" : "text-indigo-500"}`} aria-hidden="true" />{PRESS_TIER_LABEL[tier]}</div>
+            <div className="text-sm text-muted-foreground">{info.tagline}</div>
+            <div className="mt-3 flex gap-2" role="radiogroup" aria-label={`${PRESS_TIER_LABEL[tier]}: how many releases`}>
+              {PRESS_PACKAGES.map((p) => (
+                <button key={p.key} type="button" role="radio" aria-checked={qty[tier] === p.key} onClick={() => setQty((q) => ({ ...q, [tier]: p.key }))} className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold ${qty[tier] === p.key ? "border-orange-600 bg-orange-600 text-white" : "border-border"}`} data-testid={`press-qty-${tier}-${p.key}`}>
+                  {p.key === "single" ? "1 release" : `${PRESS_PROGRAM_PAID} + ${PRESS_PROGRAM_FREE} free`}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 text-3xl font-black">{usd(price)}{pkg.credits > 1 && <span className="ml-2 text-sm font-semibold text-muted-foreground">for {pkg.credits} releases</span>}</div>
+            {pkg.credits > 1 ? <div className="text-xs font-semibold text-emerald-700">{usd(Math.round(price / pkg.credits))} a release · one a month for a year</div> : <div className="text-xs text-muted-foreground">or {usd(pressPackagePrice(pressPackage("program_12")!, tier))} for {PRESS_PROGRAM_CREDITS} ({PRESS_PROGRAM_FREE} free)</div>}
             <ul className="mt-4 flex-1 space-y-2 text-sm">
-              {p.perks.map((perk) => <li key={perk} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />{perk}</li>)}
+              {info.perks.map((perk) => <li key={perk} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />{perk}</li>)}
             </ul>
-            <Button className={`mt-5 w-full font-bold ${hot ? "bg-orange-600 hover:bg-orange-700" : ""}`} onClick={() => onBuy(p.key, tier)} disabled={buying !== null} data-testid={`press-buy-${p.key}`}>
-              {buying === p.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Get {p.name} <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" /></>}
+            <Button className={`mt-5 w-full font-bold ${hot ? "bg-orange-600 hover:bg-orange-700" : ""}`} onClick={() => onBuy(pkg.key, tier)} disabled={buying !== null} data-testid={`press-buy-${tier}`}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Get {PRESS_TIER_LABEL[tier]}{pkg.credits > 1 ? " program" : ""} <ArrowRight className="ml-1 h-4 w-4" aria-hidden="true" /></>}
             </Button>
-            {credits[tier] > 0 && p.credits === 1 && <div className="mt-2 text-center text-xs text-muted-foreground">You have {credits[tier]} {tierWord(tier)} credit{credits[tier] > 1 ? "s" : ""} left</div>}
+            {credits[tier] > 0 && <div className="mt-2 text-center text-xs text-muted-foreground">You have {credits[tier]} {PRESS_TIER_LABEL[tier]} credit{credits[tier] > 1 ? "s" : ""} left</div>}
           </div>
         );
       })}
@@ -141,8 +145,8 @@ function OutletsDialog({ tier, onClose }: { tier: PressTier | null; onClose: () 
     <Dialog open={!!tier} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{tier === "premium" ? "Premium" : "Wire"} distribution: every outlet</DialogTitle>
-          <DialogDescription>The wire's 2026 U.S. {tier === "premium" ? "Premium" : "Budget"} list, as published. Some publications exercise editorial discretion over what they post.</DialogDescription>
+          <DialogTitle>{tier ? tierWord(tier) : ""} distribution: every outlet</DialogTitle>
+          <DialogDescription>The wire's 2026 U.S. {tier ? PRESS_WIRE_TIER_NAME[tier] : ""} list, as published. Some publications exercise editorial discretion over what they post.</DialogDescription>
         </DialogHeader>
         <Input placeholder="Search outlets" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search outlets" />
         <div className="max-h-[55vh] overflow-y-auto rounded-md border p-2 text-sm">
@@ -160,17 +164,18 @@ function OutletsDialog({ tier, onClose }: { tier: PressTier | null; onClose: () 
 
 function Reach({ counts, onOpen }: { counts: Record<PressTier, number>; onOpen: (t: PressTier) => void }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2" data-testid="press-reach">
-      {(["premium", "budget"] as PressTier[]).map((t) => (
-        <div key={t} className={`rounded-2xl p-5 text-white ${t === "premium" ? "bg-gradient-to-br from-indigo-700 to-violet-900" : "bg-gradient-to-br from-slate-700 to-slate-900"}`}>
+    <div className="grid gap-4 lg:grid-cols-3" data-testid="press-reach">
+      {(["premium", "national", "budget"] as PressTier[]).map((t) => (
+        <div key={t} className={`flex flex-col rounded-2xl p-5 text-white ${t === "premium" ? "bg-gradient-to-br from-indigo-700 to-violet-900" : t === "national" ? "bg-gradient-to-br from-orange-600 to-rose-800" : "bg-gradient-to-br from-slate-700 to-slate-900"}`}>
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold uppercase tracking-widest text-white/70">{tierWord(t)} distribution</div>
             <div className="text-2xl font-black">{n(counts[t])}+ outlets</div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          {PRESS_TIER_INFO[t].pickups && <div className="mt-1 text-xs text-white/75">Typically {PRESS_TIER_INFO[t].pickups} sites run each release</div>}
+          <div className="mt-3 flex flex-1 flex-wrap content-start gap-1.5">
             {PRESS_HEADLINE_OUTLETS[t].map((o) => <span key={o} className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">{o}</span>)}
           </div>
-          <Button variant="secondary" size="sm" className="mt-4" onClick={() => onOpen(t)} data-testid={`press-outlets-${t}`}>See every outlet</Button>
+          <Button variant="secondary" size="sm" className="mt-4 self-start" onClick={() => onOpen(t)} data-testid={`press-outlets-${t}`}>See every outlet</Button>
         </div>
       ))}
     </div>
@@ -211,7 +216,7 @@ function Field({ label, children, hint }: { label: string; children: React.React
 function Writer({ release, credits, setup, onClose }: { release: PressReleaseView | null; credits: Record<PressTier, number>; setup: Overview["setup"]; onClose: () => void }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [tier, setTier] = useState<PressTier>(release?.tier ?? (credits.premium > 0 && credits.budget === 0 ? "premium" : "budget"));
+  const [tier, setTier] = useState<PressTier>(release?.tier ?? (PRESS_TIERS.find((t) => credits[t] > 0) ?? "budget"));
   const [input, setInput] = useState<PressReleaseInput>(release?.input ?? EMPTY_INPUT);
   const [text, setText] = useState<PressReleaseText | null>(release?.text ?? null);
   const [notes, setNotes] = useState("");
@@ -297,7 +302,7 @@ function Writer({ release, credits, setup, onClose }: { release: PressReleaseVie
           <div className="space-y-3">
             {!row && (
               <div className="flex gap-2" role="radiogroup" aria-label="Distribution">
-                {(["budget", "premium"] as PressTier[]).map((t) => (
+                {PRESS_TIERS.map((t) => (
                   <button key={t} type="button" role="radio" aria-checked={tier === t} onClick={() => setTier(t)} className={`flex-1 rounded-lg border px-3 py-2 text-left text-sm ${tier === t ? "border-orange-600 bg-orange-50 dark:bg-orange-950/40" : "border-border"}`} data-testid={`press-writer-tier-${t}`}>
                     <div className="font-bold">{tierWord(t)}</div>
                     <div className="text-xs text-muted-foreground">{credits[t]} credit{credits[t] === 1 ? "" : "s"} left</div>
@@ -469,7 +474,7 @@ export default function PressReleasesPage() {
     onError: (e: any) => { setBuying(null); toast({ title: "Couldn't open checkout", description: apiErrorMessage(e), variant: "destructive" }); },
   });
 
-  const credits = data?.credits ?? { budget: 0, premium: 0 };
+  const credits = data?.credits ?? { budget: 0, national: 0, premium: 0 };
   const totalCredits = credits.budget + credits.premium;
   const last = data?.pacing.lastSubmittedAt ? new Date(data.pacing.lastSubmittedAt) : null;
   const daysSince = last ? Math.floor((Date.now() - last.getTime()) / 86_400_000) : null;
@@ -487,15 +492,15 @@ export default function PressReleasesPage() {
       />
       {error && <Notice tone="danger" title="Could not load">{apiErrorMessage(error)}</Notice>}
       <div className="space-y-8">
-        <Hero counts={data?.outletCounts ?? { budget: 336, premium: 5221 }} />
+        <Hero counts={data?.outletCounts ?? { budget: 336, national: 5019, premium: 5221 }} />
 
         <Section id="packages" title="Pick a package" description={`Every release is written to the wire's editorial guidelines, sent with your photos, and reported back. Buy ${PRESS_PROGRAM_PAID} and get ${PRESS_PROGRAM_CREDITS}.`} icon={Rocket}>
           <Packages credits={credits} onBuy={(key, tier) => buy.mutate({ key, tier })} buying={buying} />
           <p className="mt-3 text-xs text-muted-foreground">Credits are good for 12 months. One release a month is the cadence that keeps a company in the news; the program schedules it. A release the editors refuse for breaking the content rules is not refunded by the wire, which is why the writer checks every draft against those rules before you approve it.</p>
         </Section>
 
-        <Section title="Where it runs" description="The wire's published U.S. distribution lists. Some publications exercise editorial discretion over what they post." icon={Globe2}>
-          <Reach counts={data?.outletCounts ?? { budget: 336, premium: 5221 }} onOpen={setOutletsTier} />
+        <Section title="Where it runs" description="The wire's published U.S. distribution lists: the newsrooms each release is sent to. Sites that actually run it are fewer; some publications exercise editorial discretion over what they post." icon={Globe2}>
+          <Reach counts={data?.outletCounts ?? { budget: 336, national: 5019, premium: 5221 }} onOpen={setOutletsTier} />
         </Section>
 
         <Section

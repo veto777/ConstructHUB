@@ -3,20 +3,38 @@
  * the news, the AI writes the release to the wire's content guidelines, we send it to the wire, read the wire's
  * answers from the pressrelease@ mailbox and email the customer the live link and the distribution report.
  *
- * Pricing (owner): double what the wire charges per release; buy 12 and get 2 free; one release a month for the best
- * results. The wire's 2026-10-15 quote: Budget $365.25 a release (the 40-release bundle, 25% off), Premium $903.75
- * (its $1,205 rate less the same 25%). A bigger bundle (35–55% off) lowers OUR cost, never the customer's price.
+ * The three packages are the wire's three distribution tiers (its 2026-10-16 answer): Budget $475, National $865 and
+ * Premium $1,205 a release at list, less the bundle discount (40 releases 25%, 80 35%, 120 45%, 200 55%); tiers can be
+ * mixed inside one bundle. Pricing (owner): double what the wire charges per release at the 40-release rate; buy 12 and
+ * get 2 free; one release a month for the best results. A bigger bundle lowers OUR cost, never the customer's price.
  *
- * The distributor is never named as our supplier: on the page it is one outlet among the rest (owner).
+ * The distributor is never named as our supplier: on the page it is one outlet among the rest (owner). Customers see
+ * the tiers as Standard / National / Premium; the wire's own names (Budget / National / Premium) are used only in
+ * the submission email (PRESS_WIRE_TIER_NAME).
  */
 
-export type PressTier = "budget" | "premium";
-export const PRESS_TIERS: readonly PressTier[] = ["budget", "premium"];
+export type PressTier = "budget" | "national" | "premium";
+export const PRESS_TIERS: readonly PressTier[] = ["budget", "national", "premium"];
 
-/** What the wire charges us per release (its 40-release bundle rate, 25% off), in cents. */
-export const PRESS_WIRE_RATE_CENTS: Record<PressTier, number> = { budget: 36_525, premium: 90_375 };
+/** The wire's list price per release (2026-10-16), in cents. */
+export const PRESS_LIST_RATE_CENTS: Record<PressTier, number> = { budget: 47_500, national: 86_500, premium: 120_500 };
+/** The wire's bundle discounts by bundle size (2026-10-15/16). */
+export const PRESS_BUNDLE_DISCOUNTS: readonly { releases: number; percentOff: number }[] = [
+  { releases: 40, percentOff: 25 }, { releases: 80, percentOff: 35 }, { releases: 120, percentOff: 45 }, { releases: 200, percentOff: 55 },
+];
+/** What the wire charges per release at a bundle size, in cents (rounded to the cent). */
+export const pressWireRateCents = (tier: PressTier, bundle = 40): number => {
+  const d = PRESS_BUNDLE_DISCOUNTS.find((b) => b.releases === bundle)?.percentOff ?? 0;
+  return Math.round((PRESS_LIST_RATE_CENTS[tier] * (100 - d)) / 100);
+};
+/** What the wire charges us per release at the 40-release rate: $356.25 / $648.75 / $903.75. */
+export const PRESS_WIRE_RATE_CENTS: Record<PressTier, number> = {
+  budget: pressWireRateCents("budget"), national: pressWireRateCents("national"), premium: pressWireRateCents("premium"),
+};
 /** What a customer pays per release: double the wire's rate (owner). */
-export const PRESS_RELEASE_PRICE_CENTS: Record<PressTier, number> = { budget: PRESS_WIRE_RATE_CENTS.budget * 2, premium: PRESS_WIRE_RATE_CENTS.premium * 2 };
+export const PRESS_RELEASE_PRICE_CENTS: Record<PressTier, number> = {
+  budget: PRESS_WIRE_RATE_CENTS.budget * 2, national: PRESS_WIRE_RATE_CENTS.national * 2, premium: PRESS_WIRE_RATE_CENTS.premium * 2,
+};
 
 export const PRESS_PROGRAM_PAID = 12;
 export const PRESS_PROGRAM_FREE = 2;
@@ -26,56 +44,41 @@ export const PRESS_CREDIT_MONTHS = 12;
 /** One release a month gets the best results (owner): the program schedules one per calendar month. */
 export const PRESS_RECOMMENDED_GAP_DAYS = 28;
 
-export type PressPackageKey = "wire_release" | "premium_release" | "program_12";
-export type PressPackage = {
-  key: PressPackageKey;
-  name: string;
-  tagline: string;
-  /** Fixed tier, or the buyer chooses one at checkout. */
-  tier: PressTier | "choose";
-  credits: number;
-  /** Price in cents for a fixed tier, or per tier when the buyer chooses. */
-  priceCents: Record<PressTier, number>;
-  perks: string[];
-  flashy: string;
+/** The tier as the customer sees it. */
+export const PRESS_TIER_LABEL: Record<PressTier, string> = { budget: "Standard", national: "National", premium: "Premium" };
+/** The tier as the wire names it (the submission email only). */
+export const PRESS_WIRE_TIER_NAME: Record<PressTier, string> = { budget: "Budget", national: "National", premium: "Premium" };
+
+/** Each tier's card: only what the wire's sheets and its 2026-10-16 email say. */
+export type PressTierInfo = { tier: PressTier; tagline: string; flashy: string; pickups: string | null; perks: string[] };
+export const PRESS_TIER_INFO: Record<PressTier, PressTierInfo> = {
+  budget: {
+    tier: "budget", tagline: "Your news on the wire, online and regional", flashy: "START HERE", pickups: "350–500",
+    perks: ["330+ named outlets: Yahoo Finance, Yahoo News, Digital Journal, StreetInsider, regional papers and radio", "Typically 350–500 sites run it"],
+  },
+  national: {
+    tier: "national", tagline: "The nation's newsrooms, wire services and business press", flashy: "MOST POPULAR", pickups: "450–700",
+    perks: ["5,000+ newsrooms: the Associated Press, Reuters, Dow Jones, Bloomberg Radio, CNBC, Fox News Channel, USA Today", "Major newspapers: The New York Times, The Wall Street Journal, The Washington Post, Los Angeles Times", "Finance sites and terminals: Yahoo Finance, MarketWatch, Morningstar, FactSet, Refinitiv", "Typically 450–700 sites run it"],
+  },
+  premium: {
+    tier: "premium", tagline: "Everything in National, plus the biggest business and TV desks", flashy: "MOST REACH", pickups: null,
+    perks: ["Everything in National", "Adds Business Insider, Markets Insider, CNN.com and CNN Money, Benzinga Pro", "Adds the ABC, CBS and NBC television network desks and Bloomberg Television", "Adds more local daily papers, and media targeting"],
+  },
 };
 
+/** How many releases a purchase is: one, or the 12-month program (pay for 12, get 14). */
+export type PressPackageKey = "single" | "program_12";
+export type PressPackage = { key: PressPackageKey; name: string; credits: number; paidReleases: number };
 export const PRESS_PACKAGES: readonly PressPackage[] = [
-  {
-    key: "wire_release",
-    name: "Wire Release",
-    tagline: "One release on the national wire",
-    tier: "budget",
-    credits: 1,
-    priceCents: { budget: PRESS_RELEASE_PRICE_CENTS.budget, premium: PRESS_RELEASE_PRICE_CENTS.budget },
-    perks: ["Written for you by the AI to the wire's editorial rules", "Yahoo Finance, Yahoo News, Digital Journal and 300+ outlets", "Editorial review before it goes out", "Live link and distribution report emailed to you"],
-    flashy: "START HERE",
-  },
-  {
-    key: "premium_release",
-    name: "Premium Release",
-    tagline: "One release on the premium wire",
-    tier: "premium",
-    credits: 1,
-    priceCents: { budget: PRESS_RELEASE_PRICE_CENTS.premium, premium: PRESS_RELEASE_PRICE_CENTS.premium },
-    perks: ["Everything in Wire Release", "5,000+ outlets: AP, Bloomberg, Reuters, MarketWatch, USA Today, Business Insider, Google News", "Major newspapers: The New York Times, The Wall Street Journal, The Washington Post, Los Angeles Times", "Financial data providers: Dow Jones, FactSet, Refinitiv, Benzinga"],
-    flashy: "MOST REACH",
-  },
-  {
-    key: "program_12",
-    name: "12-Month Program",
-    tagline: `One release a month for a year, ${PRESS_PROGRAM_FREE} on us`,
-    tier: "choose",
-    credits: PRESS_PROGRAM_CREDITS,
-    priceCents: { budget: PRESS_RELEASE_PRICE_CENTS.budget * PRESS_PROGRAM_PAID, premium: PRESS_RELEASE_PRICE_CENTS.premium * PRESS_PROGRAM_PAID },
-    perks: [`Pay for ${PRESS_PROGRAM_PAID} releases, get ${PRESS_PROGRAM_CREDITS}`, "One a month keeps your company in the news all year (the cadence that works best)", "Pick Wire or Premium for the whole program", `Credits are good for ${PRESS_CREDIT_MONTHS} months`],
-    flashy: "BEST VALUE",
-  },
+  { key: "single", name: "One release", credits: 1, paidReleases: 1 },
+  { key: "program_12", name: "12-Month Program", credits: PRESS_PROGRAM_CREDITS, paidReleases: PRESS_PROGRAM_PAID },
 ];
 
 export const pressPackage = (key: string): PressPackage | undefined => PRESS_PACKAGES.find((p) => p.key === key);
-export const pressPackagePrice = (p: PressPackage, tier: PressTier): number => p.priceCents[p.tier === "choose" ? tier : p.tier];
-export const pressPackageTier = (p: PressPackage, chosen: PressTier): PressTier => (p.tier === "choose" ? chosen : p.tier);
+export const pressPackagePrice = (p: PressPackage, tier: PressTier): number => PRESS_RELEASE_PRICE_CENTS[tier] * p.paidReleases;
+/** "National · 12-Month Program" — an order's name on the receipt and in the app. */
+export const pressOrderName = (p: PressPackage | undefined, tier: PressTier): string =>
+  `${PRESS_TIER_LABEL[tier]} · ${p?.key === "program_12" ? `12-Month Program (${PRESS_PROGRAM_CREDITS} releases)` : "1 release"}`;
 
 export const PRESS_CHECKOUT_TYPE = "press_package";
 
@@ -197,16 +200,18 @@ export type PressReport = {
   receivedAt: string;
 };
 
-/** The wire's outlet lists, as its 2026 U.S. Budget and U.S. Premium sheets name them (server/data/press-outlets.json). */
-export type PressOutlets = { budget: string[]; premium: string[] };
+/** The wire's outlet lists, as its 2026 U.S. Budget, National and Premium sheets name them (server/data/press-outlets.json).
+ *  and its U.S. National sheet (2026-10-16). */
+export type PressOutlets = Record<PressTier, string[]>;
 
 /**
  * The headline outlets per tier, exactly as the wire's sheets show them (logos on the Premium sheet's first pages;
  * named in the Budget sheet). The wire itself is listed as one distributor among the rest (owner, 2026-10-15).
  */
 export const PRESS_HEADLINE_OUTLETS: Record<PressTier, string[]> = {
-  budget: ["Yahoo Finance", "Yahoo News", "Digital Journal", "International Business Times", "AZ Central", "Boston Herald", "Star Tribune", "Pittsburgh Post-Gazette", "The Buffalo News", "StreetInsider", "Daily Herald", "RFD TV", "ACCESS Newswire"],
-  premium: ["Associated Press", "Bloomberg", "Reuters", "MarketWatch", "USA Today", "Business Insider", "Markets Insider", "CNN Business", "Google News", "Yahoo Finance", "The New York Times", "The Wall Street Journal", "The Washington Post", "Los Angeles Times", "Chicago Tribune", "The Boston Globe", "Houston Chronicle", "The Denver Post", "Dow Jones", "FactSet", "Refinitiv", "Benzinga", "Morningstar", "Seeking Alpha", "ACCESS Newswire"],
+  budget: ["Yahoo Finance", "Yahoo News", "Digital Journal", "StreetInsider", "International Business Times", "AZ Central", "Boston Herald", "Star Tribune", "Pittsburgh Post-Gazette", "The Buffalo News", "Daily Herald", "RFD TV", "ACCESS Newswire"],
+  national: ["Associated Press", "Reuters", "Dow Jones", "Bloomberg", "CNBC", "Fox News Channel", "USA Today", "MarketWatch", "Morningstar", "Yahoo Finance", "Google News", "The New York Times", "The Wall Street Journal", "The Washington Post", "Los Angeles Times", "Chicago Tribune", "The Boston Globe", "FactSet", "Refinitiv", "Nasdaq", "NYSE", "ACCESS Newswire"],
+  premium: ["Business Insider", "Markets Insider", "CNN.com", "CNN Money", "ABC Television Network", "CBS Television Network", "NBC Television Network", "Bloomberg Television", "Benzinga Pro", "Associated Press", "Reuters", "USA Today", "The New York Times", "The Wall Street Journal", "ACCESS Newswire"],
 };
 
 export const PRESS_PATH = "/press-releases";

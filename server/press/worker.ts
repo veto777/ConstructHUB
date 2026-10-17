@@ -16,7 +16,7 @@ import { BotTellError, assertNoBotTell } from "../outbound-guard";
 import { pool } from "../db";
 import { getFromR2, isR2Key } from "../r2";
 import { PRIMARY_DOMAIN } from "../site-context";
-import { PRESS_PATH, PRESS_STATUS_LABELS, type PressReport, type PressTier } from "@shared/press";
+import { PRESS_TIER_LABEL, PRESS_WIRE_TIER_NAME, PRESS_PATH, PRESS_STATUS_LABELS, type PressReport, type PressTier } from "@shared/press";
 import { fetchSince, mailboxConfig, mailboxConfigured, sendMail, wireConfigured, type Inbound, type OutgoingAttachment } from "./mailbox";
 import * as store from "./store";
 import { readWireReply, releaseAsText, reviseRelease } from "./writer";
@@ -34,7 +34,7 @@ export const workerDeps = { fetchSince, sendMail, readWireReply, reviseRelease }
 const CODE_RE = /CH-PR-[0-9A-F]{6}/i;
 const siteBase = () => `https://${PRIMARY_DOMAIN}`;
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const tierName = (t: PressTier) => (t === "premium" ? "Premium" : "Wire");
+const tierName = (t: PressTier) => PRESS_TIER_LABEL[t];
 
 async function r2Buffer(key: string): Promise<Buffer | null> {
   try {
@@ -51,7 +51,7 @@ export function submissionMail(r: store.ReleaseRow): { subject: string; body: st
   const t = r.text!;
   const i = r.input;
   const body = [
-    `Please distribute the press release below on the ${tierName(r.tier)} ${r.tier === "premium" ? "(Premium)" : "(Budget)"} U.S. distribution.`,
+    `Please distribute the press release below on the U.S. ${PRESS_WIRE_TIER_NAME[r.tier]} distribution.`,
     `Reference: ${r.code} — please keep this reference in the subject of every reply (approval, requested changes, live link and the distribution report).`,
     ``,
     `Company: ${i.companyName}`,

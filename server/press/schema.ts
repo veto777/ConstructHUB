@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS press_orders (
   user_id integer NOT NULL,
   email text NOT NULL,
   package_key text NOT NULL,
-  tier text NOT NULL CHECK (tier IN ('budget','premium')),
+  tier text NOT NULL,
   credits integer NOT NULL,
   credits_used integer NOT NULL DEFAULT 0,
   amount_cents integer NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS press_releases (
   id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id integer NOT NULL,
   order_id integer REFERENCES press_orders(id) ON DELETE SET NULL,
-  tier text NOT NULL CHECK (tier IN ('budget','premium')),
+  tier text NOT NULL,
   status text NOT NULL DEFAULT 'draft',
   code text NOT NULL UNIQUE,
   input jsonb NOT NULL,
@@ -72,6 +72,12 @@ CREATE TABLE IF NOT EXISTS press_messages (
 );
 CREATE INDEX IF NOT EXISTS press_messages_release_idx ON press_messages (release_id, received_at);
 CREATE INDEX IF NOT EXISTS press_messages_status_idx ON press_messages (status, received_at);
+
+-- Three tiers since 2026-10-16 (the wire's Budget / National / Premium): the tier check is replaced, never stacked.
+ALTER TABLE press_orders DROP CONSTRAINT IF EXISTS press_orders_tier_check;
+ALTER TABLE press_orders ADD CONSTRAINT press_orders_tier_check CHECK (tier IN ('budget','national','premium'));
+ALTER TABLE press_releases DROP CONSTRAINT IF EXISTS press_releases_tier_check;
+ALTER TABLE press_releases ADD CONSTRAINT press_releases_tier_check CHECK (tier IN ('budget','national','premium'));
 
 CREATE TABLE IF NOT EXISTS press_inbox_state (
   mailbox text PRIMARY KEY, uid_validity text, last_uid bigint NOT NULL DEFAULT 0,
