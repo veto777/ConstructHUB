@@ -188,7 +188,15 @@ export type PressReleaseView = {
   liveAt: string | null;
   reportedAt: string | null;
   scheduledFor: string | null;
+  /** "Send it for me" (server/press/send.ts): on for this release, and when it goes out unless held or edited. */
+  sendForMe: boolean;
+  sendAt: string | null;
+  /** Why an automatic send did not happen, or that it was held, in plain words. */
+  sendNote: string | null;
+  /** Where the live release was shared (server/press/share.ts). */
+  shares: PressShareView[];
 };
+export type PressShareView = { kind: "social" | "gbp"; label: string; status: "pending" | "queued" | "failed" | "skipped"; detail: string | null };
 
 export type PressReport = {
   summary: string;
@@ -241,7 +249,20 @@ export type PressAutopilotView = {
   nextDraftOn: string | null;
   lastResult: string | null;
   lastCheckedAt: string | null;
+  /** "Send it for me": a clean autopilot draft goes out 2 business days later at 10:00 unless held or edited. */
+  sendForMe: boolean;
 };
+
+/** One place a live release can be shared to (GET /api/press/share). */
+export type PressShareOption = { key: string; label: string; ok: boolean; reason: string | null };
+export type PressShareSettingsView = {
+  social: { connected: boolean; reason: string | null; options: (PressShareOption & { destination: unknown })[] };
+  gbp: { allowed: boolean; reason: string | null; options: (PressShareOption & { locationId: number })[] };
+  /** What is chosen now: destination keys and location ids. */
+  chosen: { social: string[]; gbp: number[] };
+};
+/** The text every share uses: deterministic, never written by AI. */
+export const PRESS_SHARE_LINE = "Our news is on the wire today.";
 export const PRESS_AUTOPILOT_MAX_DAY = 28;
 
 export const PRESS_PATH = "/press-releases";

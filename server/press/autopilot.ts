@@ -6,7 +6,8 @@
  * creates a release in "draft", lets the writer draft it through the same code path as the Write button (draft.ts,
  * so the same guideline checks run), and puts a notification in the bell (and email, per the user's settings).
  *
- * It NEVER approves, submits or spends a credit: the release stays a draft until the customer presses Approve.
+ * It NEVER approves, submits or spends a credit itself: the release stays a draft until the customer presses Approve,
+ * or, with "Send it for me" on (send_for_me), until the scheduled time in send.ts runs the same approve path.
  * It skips the month (and tries again on the next pass, which costs nothing) when there is no idea, no credit left,
  * or a release went out within PRESS_RECOMMENDED_GAP_DAYS. One draft per user per month: press_autopilot_runs is
  * keyed (user_id, month) and the claim is taken before the draft is written; a failed draft is retried at most
@@ -18,12 +19,13 @@ import { PRESS_PATH, PRESS_RECOMMENDED_GAP_DAYS, PRESS_TIERS, type PressAutopilo
 import { pressInputSchema, writeDraft } from "./draft";
 import { findIdeas, loadPrefill, markIdea } from "./ideas";
 import * as store from "./store";
+import { scheduleSend } from "./send";
 import { pressAiConfigured } from "./writer";
 
 export const MAX_ATTEMPTS = 3;
-export const autopilotDeps = { notify: notifyUser, writerReady: () => pressAiConfigured() };
+export const autopilotDeps = { notify: notifyUser, scheduleSend: (row: store.ReleaseRow) => scheduleSend(row), writerReady: () => pressAiConfigured() };
 
-type Settings = { enabled: boolean; dayOfMonth: number; lastCheckedAt: Date | null; lastResult: string | null };
+type Settings = { enabled: boolean; dayOfMonth: number; sendForMe: boolean; lastCheckedAt: Date | null; lastResult: string | null };
 
 const pad = (v: number) => String(v).padStart(2, "0");
 /** "2026-10" in UTC. */
@@ -34,14 +36,14 @@ const startOfDay = (d: Date) => utcDay(d.getUTCFullYear(), d.getUTCMonth(), d.ge
 const shortDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 export async function getSettings(userId: number): Promise<Settings> {
-  const { rows: [r] } = await pool.query(`SELECT enabled, day_of_month, last_checked_at, last_result FROM press_autopilot WHERE user_id=$1`, [userId]);
-  return r ? { enabled: r.enabled, dayOfMonth: r.day_of_month, lastCheckedAt: r.last_checked_at, lastResult: r.last_result } : { enabled: false, dayOfMonth: 1, lastCheckedAt: null, lastResult: null };
+  const { rows: [r] } = await pool.query(`SELECT enabled, day_of_month, send_for_me, last_checked_at, last_result FROM press_autopilot WHERE user_id=$1`, [userId]);
+  return r ? { enabled: r.enabled, dayOfMonth: r.day_of_month, sendForMe: !!r.send_for_me, lastCheckedAt: r.last_checked_at, lastResult: r.last_result } : { enabled: false, dayOfMonth: 1, sendForMe: false, lastCheckedAt: null, lastResult: null };
 }
-export async function saveSettings(userId: number, s: { enabled: boolean; dayOfMonth: number }): Promise<void> {
+export async function saveSettings(userId: number, s: { enabled: boolean; dayOfMonth: number; sendForMe?: boolean }): Promise<void> {
   await pool.query(
-    `INSERT INTO press_autopilot (user_id, enabled, day_of_month) VALUES ($1,$2,$3)
-     ON CONFLICT (user_id) DO UPDATE SET enabled=EXCLUDED.enabled, day_of_month=EXCLUDED.day_of_month, updated_at=now()`,
-    [userId, s.enabled, s.dayOfMonth],
+    `INSERT INTO press_autopilot (user_id, enabled, day_of_month, send_for_me) VALUES ($1,$2,$3,COALESCE($4,false))
+     ON CONFLICT (user_id) DO UPDATE SET enabled=EXCLUDED.enabled, day_of_month=EXCLUDED.day_of_month, send_for_me=COALESCE($4, press_autopilot.send_for_me), updated_at=now()`,
+    [userId, s.enabled, s.dayOfMonth, s.sendForMe ?? null],
   );
 }
 async function noteResult(userId: number, result: string): Promise<void> {
@@ -80,7 +82,7 @@ export async function autopilotView(userId: number, now = new Date()): Promise<P
   const [s, credits, last, done] = await Promise.all([getSettings(userId), store.creditsLeft(userId), store.lastSubmittedAt(userId), monthClaimed(userId, monthKey(now))]);
   const hasCredit = PRESS_TIERS.some((t) => credits[t] > 0);
   return {
-    enabled: s.enabled, dayOfMonth: s.dayOfMonth,
+    enabled: s.enabled, dayOfMonth: s.dayOfMonth, sendForMe: s.sendForMe,
     nextDraftOn: nextDraftOn(s, now, { monthDone: done, hasCredit, lastSubmittedAt: last ? new Date(last) : null }),
     lastResult: s.lastResult, lastCheckedAt: s.lastCheckedAt ? new Date(s.lastCheckedAt).toISOString() : null,
   };
@@ -161,6 +163,9 @@ export async function runAutopilotFor(userId: number, now = new Date()): Promise
       body: `"${headline}", written from: ${pick.idea.title}. Read it, change anything, then approve it. Nothing is sent and no credit is used until you do.`,
       link: `${PRESS_PATH}?release=${row.id}`, actionUrl: `${PRESS_PATH}?release=${row.id}`, actionLabel: "Review the draft",
     }).catch((e: any) => console.error(`[press] autopilot notify ${userId}: ${e?.message ?? e}`));
+    // "Send it for me" (send.ts): a clean draft is scheduled and the customer is told when; one with a blocking
+    // issue is not, and the customer is told what to fix. Either way nothing is sent here.
+    if (s.sendForMe) await autopilotDeps.scheduleSend(drafted).catch((e: any) => console.error(`[press] autopilot schedule ${userId}: ${e?.message ?? e}`));
     return { outcome: "drafted", releaseId: row.id };
   } catch (e: any) {
     const error = String(e?.message ?? e).slice(0, 300);

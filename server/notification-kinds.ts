@@ -35,6 +35,9 @@ export const NOTIFICATION_KINDS = {
   "seo.mention_new": { label: "A new page mentions your business", inApp: true, email: true },
   // Press autopilot (server/press/autopilot.ts): the monthly draft waits for the customer's approval.
   "press.autopilot_draft": { label: "Your monthly press release draft is ready to review", inApp: true, email: true },
+  // "Send it for me" (server/press/send.ts): when it goes out, with the Hold link; and when it cannot go out.
+  "press.send_scheduled": { label: "A press release is scheduled to go out for you", inApp: true, email: true },
+  "press.needs_fix": { label: "A press release needs a fix before it can go out", inApp: true, email: true },
   "sitescan.regressed": { label: "Site Scan score dropped or new critical issue", inApp: true, email: false },
   // Platform admins only (server/ops/app-review-watch.ts): bell + iPhone push; email stays off unless switched on.
   "ops.app_review": { label: "iPhone app review status changed (admins)", inApp: true, email: false },

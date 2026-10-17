@@ -35,6 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { PressAutomationSettings, PressStatusStrip, ReleaseAutomationBadges, WriterSendControl } from "@/components/press/press-automation";
 
 type Overview = {
   packages: PressPackage[];
@@ -396,6 +397,7 @@ function Writer({ release, seed, credits, setup, onClose }: { release: PressRele
                   </div>
                 ) : <ReleasePreview text={text} />}
                 <Issues issues={row?.issues ?? []} />
+                <WriterSendControl release={row} />
                 {editable && (
                   <div className="space-y-2 rounded-lg border p-3">
                     <div className="text-sm font-medium">Want it different?</div>
@@ -543,6 +545,7 @@ function Timeline({ releases, onOpen }: { releases: PressReleaseView[]; onOpen: 
           <StatusPill tone={STATUS_TONE[r.status]} title={PRESS_STATUS_HELP[r.status]}>{PRESS_STATUS_LABELS[r.status]}</StatusPill>
           {r.liveUrl && <a className="text-xs font-medium underline underline-offset-2" href={r.liveUrl} target="_blank" rel="noreferrer">Read it</a>}
           {r.status === "changes_requested" && <StatusPill tone="danger">Action needed</StatusPill>}
+          <ReleaseAutomationBadges release={r} />
         </li>
       ))}
     </ul>
@@ -600,6 +603,7 @@ export default function PressReleasesPage() {
       />
       {error && <Notice tone="danger" title="Could not load">{apiErrorMessage(error)}</Notice>}
 
+      <PressStatusStrip />
       <StatGrid cols={4}>
         <Stat label="Credits left" value={data ? n(totalCredits) : "…"} testId="press-credits"
           hint={totalCredits > 0 ? PRESS_TIERS.filter((t) => credits[t] > 0).map((t) => `${credits[t]} ${tierWord(t)}`).join(" · ") : "Pick a package to start"} href={totalCredits > 0 ? undefined : "#packages"} />
@@ -613,6 +617,7 @@ export default function PressReleasesPage() {
       <Section title="Story ideas" icon={Lightbulb} description="News found in your own account data. Each fact is shown as stored; nothing is made up." testId="press-ideas-section">
         <Ideas ideas={ideas.data?.ideas ?? []} loading={ideas.isLoading} onDraft={(i) => openNew({ newsType: i.newsType, details: i.detailsDraft, ideaKey: i.key })} />
         {autopilot && (totalCredits > 0 || autopilot.enabled) && <Autopilot view={autopilot} />}
+        <PressAutomationSettings />
       </Section>
 
       <Section

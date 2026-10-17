@@ -11,6 +11,9 @@
  *                    Anything a program should not decide (a question, an unmatched email) waits for the owner.
  * One process at a time (a Postgres advisory lock). Nothing is charged twice: a resend after changes reuses the credit.
  *
+ * Before step 1, sendDue (send.ts) approves every "Send it for me" release whose time has come, through the Approve
+ * button's own path. Whenever a release turns live, shareWhenLive (share.ts) queues its social and Google posts once.
+ *
  * Autopilot (autopilot.ts) runs on its own pass, every PRESS_AUTOPILOT_EVERY_MIN (default 60) minutes and once at
  * boot: each opted-in account whose day of the month has come gets at most one draft that month, for its approval.
  */
@@ -25,6 +28,8 @@ import * as store from "./store";
 import { readWireReply, releaseAsText, reviseRelease } from "./writer";
 import { checkRelease } from "./guidelines";
 import { runAutopilot } from "./autopilot";
+import { sendDue } from "./send";
+import { shareWhenLive } from "./share";
 import { logError } from "../ops/log";
 
 const num = (v: string | undefined, d: number) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : d; };
@@ -190,6 +195,7 @@ export async function applyReplies(): Promise<{ applied: number; held: number; f
       if (reading.kind === "live" || (reading.kind === "approved" && reading.liveUrl)) {
         const url = reading.liveUrl ?? r.live_url;
         const upd = await store.updateRelease(r.id, { status: r.status === "reported" ? "reported" : "live", live_url: url, live_at: r.live_at ?? new Date(), wire_notes: null, last_error: null });
+        await shareWhenLive(upd.id);
         await emailCustomer(upd, `Your press release is live: ${headline}`, [
           `Good news. "${headline}" has been distributed on the ${tierName(r.tier)} wire.`,
           url ? `Read it here: ${url}` : "The wire confirmed distribution; the live link will follow in your report.",
@@ -223,6 +229,7 @@ export async function applyReplies(): Promise<{ applied: number; held: number; f
           receivedAt: new Date(m.received_at).toISOString(),
         };
         const upd = await store.updateRelease(r.id, { status: "reported", report, reported_at: new Date(), live_url: r.live_url ?? reading.liveUrl, last_error: null });
+        if (upd.live_url) await shareWhenLive(upd.id);
         const files: OutgoingAttachment[] = [];
         for (const a of m.attachments.slice(0, 5)) {
           const key = a.url.replace(/^\/api\/files\//, "");
@@ -253,12 +260,14 @@ export async function applyReplies(): Promise<{ applied: number; held: number; f
 }
 
 const LOCK = 7172;
-export async function runPressPass(opts: { inbox: boolean } = { inbox: true }): Promise<{ ok: boolean; skipped?: string; submitted?: Awaited<ReturnType<typeof submitReady>>; inbox?: Awaited<ReturnType<typeof readInbox>>; replies?: Awaited<ReturnType<typeof applyReplies>>; error?: string }> {
+export async function runPressPass(opts: { inbox: boolean } = { inbox: true }): Promise<{ ok: boolean; skipped?: string; sent?: number; submitted?: Awaited<ReturnType<typeof submitReady>>; inbox?: Awaited<ReturnType<typeof readInbox>>; replies?: Awaited<ReturnType<typeof applyReplies>>; error?: string }> {
   const client = await pool.connect();
   try {
     const { rows } = await client.query<{ ok: boolean }>(`SELECT pg_try_advisory_lock($1) AS ok`, [LOCK]);
     if (!rows[0]?.ok) return { ok: false, skipped: "A pass is already running" };
     try {
+      // "Send it for me" (send.ts): releases whose time has come are approved first, so they go out in this pass.
+      const sent = await sendDue().catch((e) => { logError("[press] send due:", e); return []; });
       const submitted = await submitReady();
       let inbox: Awaited<ReturnType<typeof readInbox>> | undefined;
       let error: string | undefined;
@@ -266,7 +275,7 @@ export async function runPressPass(opts: { inbox: boolean } = { inbox: true }): 
         try { inbox = await readInbox(); } catch (e: any) { error = String(e?.message ?? e).slice(0, 300); console.error(`[press] inbox: ${error}`); }
       }
       const replies = await applyReplies();
-      return { ok: true, submitted, inbox, replies, ...(error ? { error } : {}) };
+      return { ok: true, sent: sent.filter((x) => x.outcome === "sent").length, submitted, inbox, replies, ...(error ? { error } : {}) };
     } finally { await client.query(`SELECT pg_advisory_unlock($1)`, [LOCK]); }
   } finally { client.release(); }
 }

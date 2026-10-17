@@ -14,7 +14,9 @@ export type ReleaseRow = {
   text: PressReleaseText | null; issues: PressGuidelineIssue[]; wire_notes: string | null; wire_message_id: string | null; live_url: string | null;
   report: PressReport | null; scheduled_for: string | null; created_at: Date; updated_at: Date; submitted_at: Date | null; live_at: Date | null;
   reported_at: Date | null; attempts: number; last_error: string | null;
+  send_for_me: boolean; send_at: Date | null; send_hash: string | null; send_note: string | null;
 };
+export type ShareRow = { release_id: number; target_key: string; kind: "social" | "gbp"; label: string; status: "pending" | "queued" | "failed" | "skipped"; detail: string | null; ref: string | null; created_at: Date };
 export type MessageRow = {
   id: number; message_id: string; thread_key: string | null; direction: "in" | "out"; release_id: number | null; from_email: string; from_name: string | null;
   to_email: string | null; subject: string; body: string; attachments: { name: string; url: string; contentType: string; size: number }[]; kind: string | null;
@@ -27,11 +29,21 @@ export const orderView = (r: OrderRow): PressOrderView => ({
   id: r.id, packageKey: r.package_key, packageName: pressOrderName(pressPackage(r.package_key), r.tier), tier: r.tier, credits: r.credits, creditsUsed: r.credits_used,
   creditsLeft: Math.max(0, r.credits - r.credits_used), amountCents: r.amount_cents, status: r.status, createdAt: iso(r.created_at)!, paidAt: iso(r.paid_at), expiresAt: iso(r.expires_at),
 });
-export const releaseView = (r: ReleaseRow): PressReleaseView => ({
+export const releaseView = (r: ReleaseRow, shares: ShareRow[] = []): PressReleaseView => ({
   id: r.id, orderId: r.order_id, tier: r.tier, status: r.status, code: r.code, input: r.input, text: r.text, issues: r.issues ?? [], wireNotes: r.wire_notes,
   liveUrl: r.live_url, report: r.report, createdAt: iso(r.created_at)!, updatedAt: iso(r.updated_at)!, submittedAt: iso(r.submitted_at), liveAt: iso(r.live_at),
   reportedAt: iso(r.reported_at), scheduledFor: r.scheduled_for ? String(r.scheduled_for).slice(0, 10) : null,
+  sendForMe: !!r.send_for_me, sendAt: iso(r.send_at), sendNote: r.send_note ?? null,
+  shares: shares.map((s) => ({ kind: s.kind, label: s.label, status: s.status, detail: s.detail })),
 });
+/** Where each release was shared (share.ts), by release id. */
+export async function sharesFor(releaseIds: number[]): Promise<Map<number, ShareRow[]>> {
+  const out = new Map<number, ShareRow[]>();
+  if (!releaseIds.length) return out;
+  const { rows } = await pool.query<ShareRow>(`SELECT * FROM press_shares WHERE release_id = ANY($1) ORDER BY created_at, target_key`, [releaseIds]);
+  for (const r of rows) out.set(r.release_id, [...(out.get(r.release_id) ?? []), r]);
+  return out;
+}
 
 // ---- orders -------------------------------------------------------------------------------------------------
 
@@ -160,6 +172,7 @@ export async function updateRelease(id: number, patch: Partial<{
   input: PressReleaseInput; text: PressReleaseText | null; issues: PressGuidelineIssue[]; status: PressReleaseStatus; tier: PressTier; wire_notes: string | null;
   wire_message_id: string | null; live_url: string | null; report: PressReport | null; scheduled_for: string | null; submitted_at: Date | null; live_at: Date | null;
   reported_at: Date | null; attempts: number; last_error: string | null;
+  send_for_me: boolean; send_at: Date | null; send_hash: string | null; send_note: string | null;
 }>): Promise<ReleaseRow> {
   const sets: string[] = ["updated_at=now()"]; const vals: unknown[] = [id];
   for (const [k, v] of Object.entries(patch)) {

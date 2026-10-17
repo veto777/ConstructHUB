@@ -13,7 +13,11 @@
  *   GET   /api/press/prefill                          the writer's company/contact fields from the account (ideas.ts)
  *   GET   /api/press/ideas                            up to 5 story ideas from the account's own data (ideas.ts)
  *   POST  /api/press/ideas/:key/dismiss               hides an idea for this user
- *   GET   /api/press/autopilot · PUT {enabled, dayOfMonth}   the monthly draft setting (autopilot.ts)
+ *   GET   /api/press/autopilot · PUT {enabled, dayOfMonth, sendForMe?}   the monthly draft setting (autopilot.ts)
+ *   POST  /api/press/releases/:id/send-for-me {on}    schedule a clean draft to go out (send.ts), or stop it
+ *   POST  /api/press/releases/:id/hold                stop a scheduled send
+ *   GET   /api/press/share · PUT {social, gbp}        where a live release is shared (share.ts)
+ *   GET   /api/public/press-hold?t= · POST {t}        the email's one-click Hold link: GET confirms, POST holds
  * Platform admins (requirePlatformAdmin):
  *   GET   /api/admin/press/summary · GET /api/admin/press/releases?status · GET /api/admin/press/messages?status
  *   POST  /api/admin/press/run {inbox?}               a pass now
@@ -22,7 +26,7 @@
  *   POST  /api/admin/press/messages/:id/handled
  * The webhook side is fulfilPressCheckout (server/stripe.ts applyOneTimeCheckout).
  */
-import type { Express, Request, Response } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import type Stripe from "stripe";
 import multer from "multer";
 import { z } from "zod";
@@ -37,10 +41,13 @@ import {
   PRESS_AUTOPILOT_MAX_DAY, PRESS_CHECKOUT_TYPE, PRESS_PACKAGES, PRESS_PATH, PRESS_RECOMMENDED_GAP_DAYS, PRESS_RELEASE_STATUSES, PRESS_TIERS,
   PRESS_TIER_LABEL, pressOrderName, pressPackage, pressPackagePrice, type PressReleaseInput, type PressTier,
 } from "@shared/press";
-import { checkRelease, hasBlockingIssue } from "./guidelines";
+import { checkRelease } from "./guidelines";
+import { approveRelease } from "./approve";
 import { pressInputSchema, writeDraft } from "./draft";
 import { findIdeas, loadPrefill, markIdea } from "./ideas";
 import { autopilotView, saveSettings } from "./autopilot";
+import { holdSend, releaseHash, scheduleSend, verifyHoldToken } from "./send";
+import { ShareSettingsError, saveShareSettings, shareSettings, shareWhenLive } from "./share";
 import { loadOutlets } from "./outlets";
 import { mailboxConfig, mailboxConfigured, wireConfigured } from "./mailbox";
 import * as store from "./store";
@@ -75,6 +82,9 @@ const own = async (req: Request, res: Response, getUser: GetUser) => {
   if (!row || row.user_id !== user.id) { res.status(404).json({ message: "Release not found" }); return null; }
   return { user, row };
 };
+
+/** A release as the page shows it, with where it was shared. */
+const viewOf = async (r: store.ReleaseRow) => store.releaseView(r, (await store.sharesFor([r.id])).get(r.id) ?? []);
 
 const setup = () => ({ ai: pressAiConfigured(), mailbox: mailboxConfigured(), wire: wireConfigured(), photos: r2Configured() });
 
@@ -116,7 +126,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
         packages: PRESS_PACKAGES,
         credits,
         orders: orders.map(store.orderView),
-        releases: releases.map(store.releaseView),
+        releases: await (async () => { const sh = await store.sharesFor(releases.map((r) => r.id)); return releases.map((r) => store.releaseView(r, sh.get(r.id) ?? [])); })(),
         outletCounts: { budget: outlets.budget.length, national: outlets.national.length, premium: outlets.premium.length },
         setup: setup(),
         pacing: { lastSubmittedAt: last ? new Date(last).toISOString() : null, recommendedGapDays: PRESS_RECOMMENDED_GAP_DAYS },
@@ -182,7 +192,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
 
   app.get("/api/press/releases/:id", async (req, res) => {
     const found = await own(req, res, getUser);
-    if (found) res.json(store.releaseView(found.row));
+    if (found) res.json(await viewOf(found.row));
   });
 
   app.patch("/api/press/releases/:id", async (req, res) => {
@@ -196,8 +206,11 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       const input = (body.data.input as PressReleaseInput | undefined) ?? row.input;
       const txt = body.data.text === undefined ? row.text : body.data.text;
       const issues = txt ? checkRelease(txt, input) : [];
-      const upd = await store.updateRelease(row.id, { input, text: txt, issues });
-      res.json(store.releaseView(upd));
+      // An edit stops a scheduled "Send it for me": what goes out is only ever what was scheduled.
+      const changed = releaseHash({ input, text: txt, tier: row.tier }) !== releaseHash(row);
+      const stop = row.send_at && changed ? { send_at: null, send_for_me: false, send_note: "You edited it, so it will not go out on its own. Approve it, or turn on Send it for me again." } : {};
+      const upd = await store.updateRelease(row.id, { input, text: txt, issues, ...stop });
+      res.json(await viewOf(upd));
     } catch (err) { logError("[press] edit release:", err); res.status(500).json({ message: "Could not save" }); }
   });
 
@@ -232,8 +245,9 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       if (!["draft", "changes_requested"].includes(row.status)) return res.status(409).json({ message: "This release has already been sent" });
       if (!pressAiConfigured()) return res.status(503).json({ message: "The writer is not available right now. Please try again shortly." });
       const notes = z.object({ notes: text(2000).optional() }).safeParse(req.body ?? {});
-      const upd = await writeDraft(row, notes.success ? notes.data.notes : undefined);
-      res.json(store.releaseView(upd));
+      let upd = await writeDraft(row, notes.success ? notes.data.notes : undefined);
+      if (row.send_at) upd = await store.updateRelease(row.id, { send_at: null, send_for_me: false, send_note: "Rewritten, so it will not go out on its own. Approve it, or turn on Send it for me again." });
+      res.json(await viewOf(upd));
     } catch (err: any) { logError("[press] draft:", err); res.status(502).json({ message: `The writer could not finish: ${String(err?.message ?? err).slice(0, 200)}` }); }
   });
 
@@ -242,17 +256,9 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       const found = await own(req, res, getUser);
       if (!found) return;
       const { user, row } = found;
-      if (!["draft", "changes_requested"].includes(row.status)) return res.status(409).json({ message: "This release is already on its way" });
-      if (!row.text) return res.status(400).json({ message: "Write the release first" });
-      const issues = checkRelease(row.text, row.input);
-      if (hasBlockingIssue(issues)) { await store.updateRelease(row.id, { issues }); return res.status(409).json({ code: "guidelines", message: "Fix the flagged guideline problems first; the wire's editors would refuse it.", issues }); }
-      // A resend after requested changes keeps its credit; a first approval takes one.
-      if (!row.order_id && !(await store.spendCredit(row.id, user.id, row.tier))) {
-        return res.status(402).json({ code: "no_credit", message: `No ${PRESS_TIER_LABEL[row.tier]} credit left. Pick a package to send it.` });
-      }
-      const upd = await store.updateRelease(row.id, { status: "ready", issues, last_error: null });
-      void runPressPass({ inbox: false }).catch((e) => logError("[press] pass after approve:", e));
-      res.json(store.releaseView(upd));
+      const out = await approveRelease(row, user.id);
+      if (!out.ok) return res.status(out.status).json({ ...(out.code && out.code !== "state" && out.code !== "no_text" ? { code: out.code } : {}), message: out.message, ...(out.issues ? { issues: out.issues } : {}) });
+      res.json(await viewOf(out.row));
     } catch (err) { logError("[press] approve:", err); res.status(500).json({ message: "Could not approve the release" }); }
   });
 
@@ -263,7 +269,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       const { row } = found;
       if (!["draft", "ready", "changes_requested"].includes(row.status)) return res.status(409).json({ message: "A release that reached the wire cannot be cancelled here" });
       if (row.order_id) await store.refundCredit(row.id);
-      res.json(store.releaseView(await store.updateRelease(row.id, { status: "cancelled" })));
+      res.json(await viewOf(await store.updateRelease(row.id, { status: "cancelled", send_at: null, send_for_me: false })));
     } catch (err) { logError("[press] cancel:", err); res.status(500).json({ message: "Could not cancel" }); }
   });
 
@@ -308,15 +314,84 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
     try {
       const user = getUser(req, res);
       if (!user) return;
-      const body = z.object({ enabled: z.boolean(), dayOfMonth: z.number().int().min(1).max(PRESS_AUTOPILOT_MAX_DAY) }).strict().safeParse(req.body ?? {});
+      const body = z.object({ enabled: z.boolean(), dayOfMonth: z.number().int().min(1).max(PRESS_AUTOPILOT_MAX_DAY), sendForMe: z.boolean().optional() }).strict().safeParse(req.body ?? {});
       if (!body.success) return res.status(400).json({ message: `Pick a day from 1 to ${PRESS_AUTOPILOT_MAX_DAY}` });
-      if (body.data.enabled) {
+      if (body.data.enabled || body.data.sendForMe) {
         const credits = await store.creditsLeft(user.id);
-        if (!PRESS_TIERS.some((t) => credits[t] > 0)) return res.status(402).json({ code: "no_credit", message: "Autopilot needs a release credit. Pick a package first." });
+        if (!PRESS_TIERS.some((t) => credits[t] > 0)) return res.status(402).json({ code: "no_credit", message: body.data.sendForMe ? "Send it for me needs a release credit. Pick a package first." : "Autopilot needs a release credit. Pick a package first." });
       }
       await saveSettings(user.id, body.data);
       res.json(await autopilotView(user.id));
     } catch (err) { logError("[press] save autopilot:", err); res.status(500).json({ message: "Could not save the autopilot setting" }); }
+  });
+
+  // ---- send it for me (send.ts) ------------------------------------------------------------------------------
+
+  app.post("/api/press/releases/:id/send-for-me", async (req, res) => {
+    try {
+      const found = await own(req, res, getUser);
+      if (!found) return;
+      const on = z.object({ on: z.boolean() }).safeParse(req.body ?? {});
+      if (!on.success) return res.status(400).json({ message: "on must be true or false" });
+      if (!on.data.on) { await holdSend(found.row.id, { userId: found.user.id }); return res.json(await viewOf((await store.getRelease(found.row.id))!)); }
+      const out = await scheduleSend(found.row);
+      if (!out.scheduled) return res.status(out.why === "no_credit" ? 402 : 409).json({ code: out.why, message: out.message, ...(out.issues ? { issues: out.issues } : {}) });
+      res.json(await viewOf(out.row));
+    } catch (err) { logError("[press] send for me:", err); res.status(500).json({ message: "Could not schedule it" }); }
+  });
+
+  app.post("/api/press/releases/:id/hold", async (req, res) => {
+    try {
+      const found = await own(req, res, getUser);
+      if (!found) return;
+      await holdSend(found.row.id, { userId: found.user.id });
+      res.json(await viewOf((await store.getRelease(found.row.id))!));
+    } catch (err) { logError("[press] hold:", err); res.status(500).json({ message: "Could not hold it" }); }
+  });
+
+  // The one-click Hold link from the bell and the email: no sign-in, a signed token that expires at the send time.
+  // GET only shows a confirm button (mail scanners open links); POST holds.
+  const holdPage = (title: string, body: string, form?: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)} | ConstructHUB</title>
+<style>body{font-family:system-ui,sans-serif;background:#f6f7f9;color:#111827;margin:0;padding:48px 16px}main{max-width:480px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px}h1{font-size:20px;margin:0 0 8px}p{font-size:15px;line-height:1.5;color:#374151}button{font:inherit;font-weight:600;background:#1a73e8;color:#fff;border:0;border-radius:8px;padding:10px 16px;cursor:pointer}a{color:#1a73e8}</style></head>
+<body><main><h1>${escapeHtml(title)}</h1><p>${body}</p>${form ?? ""}<p><a href="${PRESS_PATH}">Open Press Releases</a></p></main></body></html>`;
+  app.get("/api/public/press-hold", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const t = String(req.query.t ?? "");
+    const tok = verifyHoldToken(t);
+    const row = tok ? await store.getRelease(tok.releaseId) : null;
+    if (!tok || !row) return res.status(410).type("html").send(holdPage("This link has expired", "The send time has passed or the link is not valid. Open Press Releases to see the release."));
+    if (!row.send_at) return res.type("html").send(holdPage("Nothing to hold", "This release is not scheduled to go out on its own any more."));
+    res.type("html").send(holdPage("Hold this press release?", `&ldquo;${escapeHtml(row.text?.headline ?? row.code)}&rdquo; is scheduled to go to the wire. Holding it keeps it as a draft; nothing is sent and no credit is used until you approve it.`,
+      `<form method="post" action="/api/public/press-hold"><input type="hidden" name="t" value="${escapeHtml(t)}"><button type="submit">Hold it</button></form>`));
+  });
+  app.post("/api/public/press-hold", express.urlencoded({ extended: false, limit: "4kb" }), rateLimit("press-hold", 30, 10), async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const tok = verifyHoldToken(String(req.body?.t ?? ""));
+    if (!tok) return res.status(410).type("html").send(holdPage("This link has expired", "The send time has passed or the link is not valid. Open Press Releases to see the release."));
+    const held = await holdSend(tok.releaseId, { sendAt: tok.sendAt });
+    res.type("html").send(held ? holdPage("Held", "It will not go out on its own. It stays a draft until you approve it.") : holdPage("Nothing to hold", "This release is not scheduled to go out on its own any more."));
+  });
+
+  // ---- auto-share when live (share.ts) ----------------------------------------------------------------------
+
+  app.get("/api/press/share", async (req, res) => {
+    try {
+      const user = getUser(req, res);
+      if (!user) return;
+      res.json(await shareSettings(user.id));
+    } catch (err) { logError("[press] share settings:", err); res.status(500).json({ message: "Could not read where releases are shared" }); }
+  });
+  app.put("/api/press/share", async (req, res) => {
+    try {
+      const user = getUser(req, res);
+      if (!user) return;
+      const body = z.object({ social: z.array(z.string().max(500)).max(20), gbp: z.array(z.number().int().positive()).max(50) }).strict().safeParse(req.body ?? {});
+      if (!body.success) return res.status(400).json({ message: "Choose up to 20 social accounts and 50 Google profiles" });
+      res.json(await saveShareSettings(user.id, body.data));
+    } catch (err) {
+      if (err instanceof ShareSettingsError) return res.status(err.status).json({ message: err.message });
+      logError("[press] save share settings:", err); res.status(500).json({ message: "Could not save where releases are shared" });
+    }
   });
 
   // ---- admin ------------------------------------------------------------------------------------------------
@@ -349,7 +424,9 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
     if (!id.success || !body.success) return res.status(400).json({ message: "A release id and a live URL are required" });
     const row = await store.getRelease(id.data);
     if (!row) return res.status(404).json({ message: "Not found" });
-    res.json(store.releaseView(await store.updateRelease(row.id, { status: row.status === "reported" ? "reported" : "live", live_url: body.data.url, live_at: row.live_at ?? new Date(), last_error: null })));
+    const upd = await store.updateRelease(row.id, { status: row.status === "reported" ? "reported" : "live", live_url: body.data.url, live_at: row.live_at ?? new Date(), last_error: null });
+    await shareWhenLive(upd.id);
+    res.json(await viewOf(upd));
   });
   app.post("/api/admin/press/releases/:id/resend", async (req, res) => {
     if (!(await requirePlatformAdmin(req, res, getUser))) return;

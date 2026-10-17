@@ -8,6 +8,9 @@
  *   press_idea_marks   story ideas (ideas.ts) a customer dismissed or already turned into a release, per user
  *   press_autopilot    the monthly draft setting (autopilot.ts): on/off and the day of the month
  *   press_autopilot_runs  one row per user per month: the claim that keeps autopilot to one draft a month
+ *   press_share_settings  where a live release is shared (share.ts): social destinations and Google Business Profiles
+ *   press_shares       one row per release per place it was shared: the claim that makes sharing happen once
+ * press_releases.send_* and press_autopilot.send_for_me hold "Send it for me" (send.ts).
  */
 export const PRESS_DDL = `
 CREATE TABLE IF NOT EXISTS press_orders (
@@ -116,6 +119,33 @@ CREATE TABLE IF NOT EXISTS press_autopilot_runs (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, month)
+);
+
+-- "Send it for me" (send.ts): a clean draft goes out at send_at unless the customer holds or edits it.
+ALTER TABLE press_autopilot ADD COLUMN IF NOT EXISTS send_for_me boolean NOT NULL DEFAULT false;
+ALTER TABLE press_releases ADD COLUMN IF NOT EXISTS send_for_me boolean NOT NULL DEFAULT false;
+ALTER TABLE press_releases ADD COLUMN IF NOT EXISTS send_at timestamptz;
+ALTER TABLE press_releases ADD COLUMN IF NOT EXISTS send_hash text;
+ALTER TABLE press_releases ADD COLUMN IF NOT EXISTS send_note text;
+CREATE INDEX IF NOT EXISTS press_releases_send_at_idx ON press_releases (send_at) WHERE send_at IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS press_share_settings (
+  user_id integer PRIMARY KEY,
+  destinations jsonb NOT NULL DEFAULT '[]'::jsonb,
+  location_ids integer[] NOT NULL DEFAULT '{}',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS press_shares (
+  release_id integer NOT NULL REFERENCES press_releases(id) ON DELETE CASCADE,
+  target_key text NOT NULL,
+  kind text NOT NULL CHECK (kind IN ('social','gbp')),
+  label text NOT NULL,
+  status text NOT NULL CHECK (status IN ('pending','queued','failed','skipped')),
+  detail text,
+  ref text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (release_id, target_key)
 );
 `;
 
