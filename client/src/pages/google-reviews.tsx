@@ -1301,7 +1301,7 @@ export default function GoogleReviewsPage() {
 
       {/* ── Send review request ─────────────────────────────────────────── */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl" data-testid="modal-send-review">
+        <DialogContent className="max-h-[85vh] overflow-y-auto overflow-x-hidden sm:max-w-2xl [&>*]:min-w-0" data-testid="modal-send-review">
           <DialogHeader>
             <DialogTitle>Send review request</DialogTitle>
             <DialogDescription>
