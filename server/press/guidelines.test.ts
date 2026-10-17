@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { checkRelease, hasBlockingIssue, outsideQuotes } from "./guidelines";
-import { PRESS_PACKAGES, PRESS_PROGRAM_CREDITS, PRESS_RELEASE_PRICE_CENTS, PRESS_WIRE_RATE_CENTS, pressPackagePrice } from "@shared/press";
+import { PRESS_PACKAGES, PRESS_PROGRAM_CREDITS, PRESS_RELEASE_PRICE_CENTS, PRESS_TIERS, PRESS_WIRE_RATE_CENTS, pressPackagePrice, pressWireRateCents } from "@shared/press";
 import type { PressReleaseText } from "@shared/press";
 
 const input = { companyName: "Ridgeline Roofing", contactEmail: "dana@ridgeline.example", details: "We added a second repair crew on November 1 after storm repair requests doubled.", quoteNotes: "", about: "Roofing since 2014 in Whatcom County." };
@@ -58,14 +58,18 @@ describe("press guidelines", () => {
   });
 });
 
-describe("press prices (owner, 2026-10-15)", () => {
-  it("charges double the wire's rate; the program pays for 12 and gets 14", () => {
-    expect(PRESS_RELEASE_PRICE_CENTS.budget).toBe(PRESS_WIRE_RATE_CENTS.budget * 2);
-    expect(PRESS_RELEASE_PRICE_CENTS.premium).toBe(PRESS_WIRE_RATE_CENTS.premium * 2);
+describe("press prices (owner, 2026-10-15; the wire's tiers and correction, 2026-10-16)", () => {
+  it("the wire's per-release rates match its quote at every bundle size", () => {
+    expect(PRESS_WIRE_RATE_CENTS).toEqual({ budget: 35_625, national: 64_875, premium: 90_375 });
+    expect([40, 80, 120, 200].map((b) => pressWireRateCents("budget", b))).toEqual([35_625, 30_875, 26_125, 21_375]);
+    expect([40, 80, 120, 200].map((b) => pressWireRateCents("national", b))).toEqual([64_875, 56_225, 47_575, 38_925]);
+    expect(pressWireRateCents("budget", 40) * 40).toBe(1_425_000);
+  });
+  it("charges double the 40-release rate; the program pays for 12 and gets 14", () => {
+    expect(PRESS_RELEASE_PRICE_CENTS).toEqual({ budget: 71_250, national: 129_750, premium: 180_750 });
     const program = PRESS_PACKAGES.find((p) => p.key === "program_12")!;
     expect(program.credits).toBe(PRESS_PROGRAM_CREDITS);
-    expect(pressPackagePrice(program, "budget")).toBe(PRESS_RELEASE_PRICE_CENTS.budget * 12);
-    expect(pressPackagePrice(program, "premium")).toBe(PRESS_RELEASE_PRICE_CENTS.premium * 12);
-    expect(PRESS_PACKAGES.length).toBe(3);
+    for (const t of PRESS_TIERS) expect(pressPackagePrice(program, t)).toBe(PRESS_RELEASE_PRICE_CENTS[t] * 12);
+    expect(PRESS_TIERS.length).toBe(3);
   });
 });

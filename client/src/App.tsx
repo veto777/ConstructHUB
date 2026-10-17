@@ -36,6 +36,7 @@ import PricingPage from "@/pages/pricing";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
 import { FeaturesCataloguePage, FeaturePageRoute, FeatureAdLanding, LegacyLanding } from "@/pages/features";
 import { ToolRouteGate } from "@/components/tool-route-gate";
+import { PlatformPlanGate } from "@/components/platform-plan-gate";
 import { CrmLogo } from "@/components/crm-logo";
 import { isPortal, isClientPortal, marketingUrl, portalUrl } from "@/lib/site";
 import HomePage from "@/pages/home";
@@ -1005,6 +1006,16 @@ function AppContent() {
   if (location === "/crm-terms") return <CrmTermsPage />;
   if (location === "/crm-privacy") return <CrmPrivacyPage />;
 
+  // No plan yet (not even a trial): Pricing and the feature landing pages only (components/platform-plan-gate.tsx).
+  return (
+    <PlatformPlanGate location={location} gated={<><PublicRouter /><HubWidget surface="marketing" signedIn /></>}>
+      <PlatformShell location={location} showAdsChat={showAdsChat} />
+    </PlatformPlanGate>
+  );
+}
+
+/** The signed-in growth platform: sidebar, header, tool shells, footer. */
+function PlatformShell({ location, showAdsChat }: { location: string; showAdsChat: boolean }) {
   // The app's own controls (top right) and the footer: the same in the normal layout and in a tool shell.
   const controls = (
     <>

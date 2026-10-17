@@ -2,7 +2,7 @@
 import { randomBytes } from "node:crypto";
 import { pool } from "../db";
 import {
-  PRESS_CREDIT_MONTHS, type PressGuidelineIssue, type PressOrderView, type PressPackageKey, type PressReleaseInput, type PressReleaseStatus, type PressReleaseText, type PressReleaseView, type PressReport, type PressTier, pressPackage,
+  PRESS_CREDIT_MONTHS, type PressGuidelineIssue, type PressOrderView, type PressPackageKey, type PressReleaseInput, type PressReleaseStatus, type PressReleaseText, type PressReleaseView, type PressReport, type PressTier, pressOrderName, pressPackage,
 } from "@shared/press";
 
 export type OrderRow = {
@@ -24,7 +24,7 @@ export type MessageRow = {
 const iso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null);
 
 export const orderView = (r: OrderRow): PressOrderView => ({
-  id: r.id, packageKey: r.package_key, packageName: pressPackage(r.package_key)?.name ?? r.package_key, tier: r.tier, credits: r.credits, creditsUsed: r.credits_used,
+  id: r.id, packageKey: r.package_key, packageName: pressOrderName(pressPackage(r.package_key), r.tier), tier: r.tier, credits: r.credits, creditsUsed: r.credits_used,
   creditsLeft: Math.max(0, r.credits - r.credits_used), amountCents: r.amount_cents, status: r.status, createdAt: iso(r.created_at)!, paidAt: iso(r.paid_at), expiresAt: iso(r.expires_at),
 });
 export const releaseView = (r: ReleaseRow): PressReleaseView => ({
@@ -75,7 +75,7 @@ export async function creditsLeft(userId: number): Promise<Record<PressTier, num
     `SELECT tier, COALESCE(SUM(credits - credits_used),0)::text AS left FROM press_orders WHERE user_id=$1 AND status='paid' AND (expires_at IS NULL OR expires_at > now()) GROUP BY tier`,
     [userId],
   );
-  const out: Record<PressTier, number> = { budget: 0, premium: 0 };
+  const out: Record<PressTier, number> = { budget: 0, national: 0, premium: 0 };
   for (const r of rows) out[r.tier] = Number(r.left);
   return out;
 }

@@ -1,8 +1,8 @@
 /**
  * Press Releases API (shared/press.ts). Signed-in account:
  *   GET   /api/press/overview                         packages, credits, orders, releases, setup state, pacing
- *   GET   /api/press/outlets?tier=budget|premium      the wire's outlet list for the tier (public lists, from the sheets)
- *   POST  /api/press/orders {packageKey, tier?}       an order + Stripe Checkout (one-off) → {url}
+ *   GET   /api/press/outlets?tier=budget|national|premium   the wire's outlet list for the tier (public lists, from the sheets)
+ *   POST  /api/press/orders {tier, packageKey}        an order + Stripe Checkout (one-off) → {url}; packageKey single | program_12
  *   POST  /api/press/releases {tier, input}           a new release (needs a credit of that tier left)
  *   GET   /api/press/releases/:id
  *   PATCH /api/press/releases/:id {input?, text?}     edits; the guideline check runs again
@@ -31,7 +31,7 @@ import { escapeHtml, firstZodMessage } from "../route-guards";
 import { getFromR2, getR2Url, r2Configured, uploadToR2 } from "../r2";
 import {
   PRESS_CHECKOUT_TYPE, PRESS_NEWS_TYPES, PRESS_PACKAGES, PRESS_PATH, PRESS_RECOMMENDED_GAP_DAYS, PRESS_RELEASE_STATUSES, PRESS_TIERS,
-  pressPackage, pressPackagePrice, pressPackageTier, type PressReleaseInput, type PressReleaseText, type PressTier,
+  PRESS_TIER_LABEL, pressOrderName, pressPackage, pressPackagePrice, type PressReleaseInput, type PressReleaseText, type PressTier,
 } from "@shared/press";
 import { checkRelease, hasBlockingIssue } from "./guidelines";
 import { loadOutlets } from "./outlets";
@@ -125,7 +125,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
         credits,
         orders: orders.map(store.orderView),
         releases: releases.map(store.releaseView),
-        outletCounts: { budget: outlets.budget.length, premium: outlets.premium.length },
+        outletCounts: { budget: outlets.budget.length, national: outlets.national.length, premium: outlets.premium.length },
         setup: setup(),
         pacing: { lastSubmittedAt: last ? new Date(last).toISOString() : null, recommendedGapDays: PRESS_RECOMMENDED_GAP_DAYS },
       });
@@ -134,7 +134,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
 
   app.get("/api/press/outlets", (req, res) => {
     const tier = tierSchema.safeParse(req.query.tier);
-    if (!tier.success) return res.status(400).json({ message: "tier must be budget or premium" });
+    if (!tier.success) return res.status(400).json({ message: "tier must be budget, national or premium" });
     res.set("Cache-Control", "public, max-age=86400");
     res.json({ tier: tier.data, outlets: loadOutlets()[tier.data] });
   });
@@ -143,11 +143,10 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
     try {
       const user = getUser(req, res);
       if (!user) return;
-      const body = z.object({ packageKey: z.string(), tier: tierSchema.optional() }).safeParse(req.body ?? {});
+      const body = z.object({ packageKey: z.string(), tier: tierSchema }).safeParse(req.body ?? {});
       const pkg = body.success ? pressPackage(body.data.packageKey) : undefined;
-      if (!body.success || !pkg) return res.status(400).json({ message: "Pick one of the three packages" });
-      if (pkg.tier === "choose" && !body.data.tier) return res.status(400).json({ message: "Choose Wire or Premium for the program" });
-      const tier = pressPackageTier(pkg, body.data.tier ?? "budget");
+      if (!body.success || !pkg) return res.status(400).json({ message: "Pick Standard, National or Premium, and one release or the 12-month program" });
+      const tier = body.data.tier;
       const amount = pressPackagePrice(pkg, tier);
       const order = await store.createOrder({ userId: user.id, email: user.email, packageKey: pkg.key, tier, credits: pkg.credits, amountCents: amount });
       const customer = await deps.getOrCreateCustomer(user.id, user.email);
@@ -157,14 +156,14 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
         line_items: [{
           price_data: {
             currency: "usd", unit_amount: amount,
-            product_data: { name: `Press Releases — ${pkg.name}${pkg.tier === "choose" ? ` (${tier === "premium" ? "Premium" : "Wire"})` : ""}`, description: `${pkg.credits} press release${pkg.credits > 1 ? "s" : ""} on the ${tier === "premium" ? "Premium" : "Wire"} distribution, written by ConstructHUB to the wire's guidelines. Credits are good for 12 months.`.slice(0, 500) },
+            product_data: { name: `Press Releases — ${pressOrderName(pkg, tier)}`, description: `${pkg.credits} press release${pkg.credits > 1 ? "s" : ""} on the ${PRESS_TIER_LABEL[tier]} distribution, written by ConstructHUB to the wire's guidelines. Credits are good for 12 months.`.slice(0, 500) },
           },
           quantity: 1,
         }],
         success_url: `${appReturnBaseUrl(req)}${PRESS_PATH}?paid=${order.id}`,
         cancel_url: `${appReturnBaseUrl(req)}${PRESS_PATH}?canceled=1`,
         metadata: { userId: String(user.id), type: PRESS_CHECKOUT_TYPE, pressOrderId: String(order.id), tier },
-        payment_intent_data: { description: `ConstructHUB press releases #${order.id} (${pkg.name})`, metadata: { pressOrderId: String(order.id) } },
+        payment_intent_data: { description: `ConstructHUB press releases #${order.id} (${pressOrderName(pkg, tier)})`, metadata: { pressOrderId: String(order.id) } },
       });
       await store.setCheckoutSession(order.id, session.id);
       res.json({ url: session.url, orderId: order.id });
@@ -178,7 +177,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       const body = z.object({ tier: tierSchema, input: inputSchema }).safeParse(req.body ?? {});
       if (!body.success) return res.status(400).json({ message: firstZodMessage(body.error) });
       const credits = await store.creditsLeft(user.id);
-      if (credits[body.data.tier] < 1) return res.status(402).json({ code: "no_credit", message: `You have no ${body.data.tier === "premium" ? "Premium" : "Wire"} release credit left. Pick a package first.` });
+      if (credits[body.data.tier] < 1) return res.status(402).json({ code: "no_credit", message: `You have no ${PRESS_TIER_LABEL[body.data.tier]} release credit left. Pick a package first.` });
       const row = await store.createRelease(user.id, body.data.tier, body.data.input as PressReleaseInput);
       res.json(store.releaseView(row));
     } catch (err) { logError("[press] create release:", err); res.status(500).json({ message: "Could not start the release" }); }
@@ -256,7 +255,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       if (hasBlockingIssue(issues)) { await store.updateRelease(row.id, { issues }); return res.status(409).json({ code: "guidelines", message: "Fix the flagged guideline problems first; the wire's editors would refuse it.", issues }); }
       // A resend after requested changes keeps its credit; a first approval takes one.
       if (!row.order_id && !(await store.spendCredit(row.id, user.id, row.tier))) {
-        return res.status(402).json({ code: "no_credit", message: `No ${row.tier === "premium" ? "Premium" : "Wire"} credit left. Pick a package to send it.` });
+        return res.status(402).json({ code: "no_credit", message: `No ${PRESS_TIER_LABEL[row.tier]} credit left. Pick a package to send it.` });
       }
       const upd = await store.updateRelease(row.id, { status: "ready", issues, last_error: null });
       void runPressPass({ inbox: false }).catch((e) => logError("[press] pass after approve:", e));
@@ -340,7 +339,7 @@ export async function fulfilPressCheckout(session: Stripe.Checkout.Session, _use
   console.log(`[press] order ${id} paid: ${order.credits} ${order.tier} credit(s)`);
   await sendWithFallback({
     from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`, to: process.env.SMTP_EMAIL, replyTo: order.email,
-    subject: `Press package sold #${id}: ${pressPackage(order.package_key)?.name ?? order.package_key} (${order.tier})`,
+    subject: `Press package sold #${id}: ${pressOrderName(pressPackage(order.package_key), order.tier)}`,
     html: `<p>${escapeHtml(order.email)} bought ${order.credits} ${escapeHtml(order.tier)} release credit(s) for $${(order.amount_cents / 100).toLocaleString("en-US")}.</p>`,
   }).catch(() => undefined);
 }

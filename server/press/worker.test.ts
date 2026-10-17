@@ -36,7 +36,7 @@ describe("press pipeline", () => {
     // A clean lane: what an interrupted earlier run may have left (unmatched emails carry no release id).
     await pool.query("DELETE FROM press_messages WHERE message_id LIKE '%@wire.test>' OR message_id LIKE '<out-%@test>'");
     await pool.query("DELETE FROM press_inbox_state WHERE mailbox IN ('', 'press@test')");
-    const o = await store.createOrder({ userId: OWNER, email: "owner@test", packageKey: "program_12", tier: "budget", credits: 14, amountCents: 1_168_800 });
+    const o = await store.createOrder({ userId: OWNER, email: "owner@test", packageKey: "program_12", tier: "budget", credits: 14, amountCents: 855_000 });
     orderId = o.id;
   });
   afterAll(async () => {

@@ -131,7 +131,8 @@ echo "port closed for about $(( $(date +%s) - restart_began ))s (drain + stop + 
   [ \"\$code\" = 401 ] || { echo \"DEPLOY BROKEN: /api/crm/me -> \$code (want 401)\" >&2; exit 1; }
   echo 'local :8110/api/crm/me -> 401 (CRM module up)'
 "
-code=$(curl -s -o /dev/null -w '%{http_code}' https://constructhub.us/)
+# A browser user agent: the crawler firewall (server/bot-firewall.ts) refuses curl's own.
+code=$(curl -s -o /dev/null -A 'Mozilla/5.0 (X11; Linux x86_64) ConstructHUB-deploy-check' -w '%{http_code}' https://constructhub.us/)
 [ "$code" = 200 ] || { echo "DEPLOY BROKEN: https://constructhub.us -> $code (want 200)" >&2; exit 1; }
 echo "public https://constructhub.us -> 200"
 echo "deploy OK"

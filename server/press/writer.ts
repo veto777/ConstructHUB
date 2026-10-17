@@ -47,7 +47,7 @@ export const datelineFor = (city: string, state: string, d = new Date()) => `${c
 function factsPrompt(input: PressReleaseInput, tier: PressTier): string {
   const newsType = PRESS_NEWS_TYPES.find((t) => t.key === input.newsType)?.label ?? input.newsType;
   return [
-    `Distribution tier: ${tier === "premium" ? "Premium (national news sites, major newspapers, financial data providers)" : "Budget (Yahoo Finance, Yahoo News, Digital Journal, regional news and radio)"}.`,
+    `Distribution tier: ${tier === "premium" ? "Premium (national news sites, major newspapers, financial data providers)" : tier === "national" ? "National (the Associated Press, Morningstar, Yahoo Finance and regional news)" : "Budget (Yahoo Finance, Yahoo News, Digital Journal, regional news and radio)"}.`,
     `Kind of news: ${newsType}`,
     `Company: ${input.companyName}`,
     `Website: ${input.website || "(none given)"}`,

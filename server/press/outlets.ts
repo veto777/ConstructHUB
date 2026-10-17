@@ -9,7 +9,8 @@ export function loadOutlets(): PressOutlets {
   if (cache) return cache;
   const here = import.meta.dirname || __dirname;
   const file = [path.join(here, "data", "press-outlets.json"), path.join(here, "..", "data", "press-outlets.json")].find((p) => fs.existsSync(p));
-  cache = file ? (JSON.parse(fs.readFileSync(file, "utf8")) as PressOutlets) : { budget: [], premium: [] };
+  const raw = file ? (JSON.parse(fs.readFileSync(file, "utf8")) as Partial<PressOutlets>) : {};
+  cache = { budget: raw.budget ?? [], national: raw.national ?? [], premium: raw.premium ?? [] };
   return cache;
 }
-export const pressOutletCounts = () => { const o = loadOutlets(); return { budget: o.budget.length, premium: o.premium.length }; };
+export const pressOutletCounts = () => { const o = loadOutlets(); return { budget: o.budget.length, national: o.national.length, premium: o.premium.length }; };

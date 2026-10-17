@@ -132,3 +132,24 @@ export function lockedFeatureSlug(url: string): string | null {
   const m = landing ? /^\/features\/([a-z0-9-]+)$/.exec(landing) : null;
   return m ? m[1] : null;
 }
+
+/**
+ * Does the account have anything on the platform at all: a plan (a trial counts), a tool bought on its own, an
+ * add-on, the CRM, or a seat in another owner's workspace? An account with none of these sees only Pricing and the
+ * feature landing pages (owner, 2026-10-16: "they are not even supposed to see the features other than the landing
+ * page until the account is at least at trial phase … send them to pricing"). components/platform-plan-gate.tsx
+ * applies it. A paused plan (payment failed) still counts, so its owner can reach Billing and fix the card.
+ * undefined = can't tell yet, which never locks anyone out.
+ */
+export function hasAnyAccess(ctx: ToolAccessContext): boolean | undefined {
+  const ent = ctx.entitlements;
+  if (!ent) return undefined;
+  if (ent.isPlatformAdmin || ent.plan || ent.accessPlan || ent.paymentNeeded || ctx.agencyMember || ctx.crmActive) return true;
+  let unknown = ctx.crmActive === undefined;
+  for (const rule of Object.values(TOOL_RULES)) {
+    const has = rule.has(ent, ctx);
+    if (has) return true;
+    if (has === undefined) unknown = true;
+  }
+  return unknown ? undefined : false;
+}

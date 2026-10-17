@@ -12,6 +12,9 @@ import { createServer } from "http";
 const app = express();
 registerAppPurchaseGuard(app);
 app.set("trust proxy", 1);
+// Only Google crawls; other bots, scrapers and bulk pullers are refused before anything else runs (server/bot-firewall.ts).
+import { botFirewall } from "./bot-firewall";
+app.use(botFirewall);
 // backlink.constructhub.us is the address of the admin Backlinks tool; it lives on the main site so sign-in,
 // admin access and the database are production's own.
 app.use((req, res, next) => {

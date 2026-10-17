@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 // à la carte items already laid over the plan (shared/alacarte.ts). Pure + source guards.
 import fs from "fs";
 import path from "path";
-import { TOOL_RULES, toolAccess, lockedLanding, lockedFeatureSlug, toolRuleFor, type ToolAccessContext } from "../client/src/lib/tool-access";
+import { TOOL_RULES, hasAnyAccess, toolAccess, lockedLanding, lockedFeatureSlug, toolRuleFor, type ToolAccessContext } from "../client/src/lib/tool-access";
 import type { EntitlementsInfo } from "../client/src/lib/pricing-display";
 import { PLANS, NO_PLAN_MODULES } from "@shared/plans";
 import { STANDALONE_BASE_LIMITS, applyAlacarteGrants, type AlacarteKey } from "@shared/alacarte";
@@ -115,5 +115,28 @@ describe("the sidebar", () => {
     // The iPhone apps: a locked entry goes to the tool (its page says it is not on the account), never a sales page.
     expect(src).toContain("url: inNativeApp() ? item.url : lockedLanding(item.url)");
     expect(src).toContain('data-testid="group-more-tools"');
+  });
+});
+
+// The platform paywall (components/platform-plan-gate.tsx; owner, 2026-10-16): no plan, not even a trial, = Pricing only.
+describe("platform paywall", () => {
+  it("an account with nothing is gated; a plan, a trial, an item, the CRM, a team seat or admin gets in", () => {
+    expect(hasAnyAccess(ctx(ent()))).toBe(false);
+    expect(hasAnyAccess(ctx(onPlan("pro")))).toBe(true);
+    for (const key of ["site_scan", "gbp", "seo_basic", "ads_manager"] as AlacarteKey[]) expect(hasAnyAccess(ctx(onItems(key))), key).toBe(true);
+    expect(hasAnyAccess(ctx(ent(), { crmActive: true }))).toBe(true);
+    expect(hasAnyAccess(ctx(ent(), { agencyMember: true }))).toBe(true);
+    expect(hasAnyAccess(ctx(ent({ isPlatformAdmin: true })))).toBe(true);
+    expect(hasAnyAccess(ctx(ent({ paymentNeeded: true })))).toBe(true);
+  });
+  it("never locks on can't-tell-yet", () => {
+    expect(hasAnyAccess(ctx(undefined))).toBeUndefined();
+    expect(hasAnyAccess(ctx(ent(), { crmActive: undefined }))).toBeUndefined();
+    expect(hasAnyAccess(ctx(ent(), { agencyWorkspace: undefined }))).toBeUndefined();
+  });
+  it("the shell routes every signed-in platform page through the gate", () => {
+    const app = read("client/src/App.tsx");
+    expect(app).toContain("<PlatformPlanGate location={location}");
+    expect(read("client/src/components/platform-plan-gate.tsx")).toContain('<Redirect to="/pricing" replace />');
   });
 });

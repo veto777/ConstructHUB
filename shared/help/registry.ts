@@ -780,9 +780,9 @@ const entries: Draft[] = [
   {
     key: "press-releases", group: "Tools", route: "/press-releases", title: "Press Releases",
     whatItIs: "Press releases on the national newswire, written for you from a few sentences about your news.",
-    whatItDoes: "You pick a package (one Wire release, one Premium release, or the 12-month program: pay for 12, get 14), tell the writer what happened and add photos. It drafts the release to the wire's editorial guidelines and checks it against them; you read it, change anything, and approve. The release goes to the wire's editors; when it is live you get the link by email, and the distribution report (where it ran, views, clicks) follows the same way.",
+    whatItDoes: "You pick a package: Standard, National or Premium distribution, as one release or the 12-month program (pay for 12, get 14), tell the writer what happened and add photos. It drafts the release to the wire's editorial guidelines and checks it against them; you read it, change anything, and approve. The release goes to the wire's editors; when it is live you get the link by email, and the distribution report (where it ran, views, clicks) follows the same way.",
     howToUse: [
-      "Sidebar → Press Releases → pick a package and pay (credits are good for 12 months).",
+      "Sidebar → Press Releases → pick Standard, National or Premium, choose one release or the 12-month program, and pay (credits are good for 12 months).",
       "Write a release: choose the kind of news, fill in the company, the facts, who is quoted and the media contact, and add photos.",
       "Press Write it. Read the draft; use Rewrite with a note, or edit the text yourself.",
       "Fix anything the guideline check flags in red, then Approve & send. One credit is used.",
