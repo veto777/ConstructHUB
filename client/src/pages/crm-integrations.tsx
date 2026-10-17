@@ -298,9 +298,12 @@ export default function CrmIntegrationsPage() {
                   {" · "}{hoverStatus.lastSyncReport.attachedByEmail} matched by email
                   {" · "}{hoverStatus.lastSyncReport.attachedByPhone} by phone
                   {" · "}{hoverStatus.lastSyncReport.attachedByAddress} by address
+                  {hoverStatus.lastSyncReport.attachedByName ? ` · ${hoverStatus.lastSyncReport.attachedByName} by name` : ""}
                   {" · "}{hoverStatus.lastSyncReport.created} created
                   {hoverStatus.lastSyncReport.ambiguous ? ` · ${hoverStatus.lastSyncReport.ambiguous} ambiguous` : ""}
                   {hoverStatus.lastSyncReport.errors?.length ? ` · ${hoverStatus.lastSyncReport.errors.length} errors` : ""}
+                  {typeof hoverStatus.lastSyncReport.sharesFound === "number" ? ` · ${hoverStatus.lastSyncReport.sharesFound} homeowner 3D links` : ""}
+                  {hoverStatus.lastSyncReport.deferred ? ` · ${hoverStatus.lastSyncReport.deferred} left for the next sync (HOVER rate limit)` : ""}
                 </p>
               )}
               {/* New jobs, measurements and photos flow in on their own —

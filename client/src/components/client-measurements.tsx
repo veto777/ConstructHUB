@@ -51,17 +51,25 @@ export function CustomerMeasurements({ customerId }: { customerId: string }) {
                 <div className="text-xs text-muted-foreground">
                   {[m.addressLine1, m.city, m.state].filter(Boolean).join(", ") || "—"}
                   {m.date ? ` · ${new Date(m.date).toLocaleDateString()}` : ""}
-                  {m.matchedVia === "address" && (
-                    <span data-testid={`measurement-matchedvia-${m.id}`}> · matched by address</span>
+                  {["address", "email", "phone", "name"].includes(m.matchedVia) && (
+                    <span data-testid={`measurement-matchedvia-${m.id}`}> · matched by {m.matchedVia}</span>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                {m.share?.live && (
+                  <a href={m.share.url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                    data-testid={`measurement-share-${m.id}`}>
+                    <Box className="h-3.5 w-3.5" /> Homeowner 3D link
+                  </a>
+                )}
+                {/* hover.to/3d/<id> needs the contractor's HOVER login — never a client link. */}
                 {m.model3dUrl && (
                   <a href={m.model3dUrl} target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                     data-testid={`measurement-3d-${m.id}`}>
-                    <Box className="h-3.5 w-3.5" /> 3D model
+                    <Box className="h-3.5 w-3.5" /> Open in HOVER (your login)
                   </a>
                 )}
                 {m.pdfUrl && (

@@ -44,6 +44,7 @@ import {
 import { priceFloorViolation } from "./price-floor";
 import { nextDocNumber as allocateDocNumber } from "./doc-number";
 import { attachDefaultFilesToEstimate } from "./estimate-default-files";
+import { adoptHoverMeasurementsForProject } from "./hover-share";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -942,6 +943,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       return inserted;
     });
     queueCrmEvent(ctx.org.id, "project.created", projectEventPayload(row));
+    // The client's HOVER captures at this address (and their 3D model) belong to the new project.
+    await adoptHoverMeasurementsForProject(row);
     res.status(201).json(presentProject(row, ctx));
   });
 

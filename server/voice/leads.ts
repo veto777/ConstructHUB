@@ -25,6 +25,7 @@ import { sendWithFallback } from "../email";
 import { appForLink, pushSoon } from "../apns";
 import type { OrgVoiceContext } from "./org-profile";
 import type { VoiceProfile } from "@shared/voice-profile";
+import { adoptHoverMeasurementsForProject } from "../crm/hover-share";
 
 /**
  * The state for a call's client/project: the profile's default state, else the one state every service-area
@@ -258,6 +259,7 @@ async function deliverLeadLocked(args: Parameters<typeof deliverLead>[0]): Promi
       return row;
     });
     queueCrmEvent(org.id, "project.created", { ...projectEventPayload(project), source: "call_assistant" });
+    await adoptHoverMeasurementsForProject(project);
     projectId = project.id;
     call.projectId = projectId;
   }

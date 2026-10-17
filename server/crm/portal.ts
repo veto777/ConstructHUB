@@ -52,6 +52,7 @@ import { buildContractPdf, contractAdminRecipients, contractFileName } from "./c
 import type { CrmNotificationPref } from "@shared/schema";
 import { resolveOrgTheme, themePayload } from "@shared/theme-colors";
 import { logError } from "../ops/log";
+import { clientHome3dForEstimate } from "./hover-share";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -690,8 +691,12 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // page renders read-only with this notice.
     const answerBlock = current.approvedAt || current.declinedAt
       ? null : await estimateAnswerBlock(current, view.company.name);
+    // "Your home in 3D": a live HOVER share link for THIS estimate's customer only (null otherwise; the
+    // contractor's login-only hover.to/3d viewer is never sent to the client).
+    const home3d = await clientHome3dForEstimate(est).catch(() => null);
     res.json({
       ...view,
+      home3d,
       preview: preview || undefined, // read-only: the page hides approve/pay
       answerBlock: answerBlock ?? undefined,
       salesRep,

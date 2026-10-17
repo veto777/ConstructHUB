@@ -138,6 +138,8 @@ const stub = {
   registrationBodies: [] as any[],
   verifiedCodes: [] as string[],
   extraJobs: new Map<number, any>(),
+  /** HOVER job shares (GET /api/v1/job_shares?current_user_id=601). */
+  jobShares: [] as any[],
   failPhotos: false,
   nextWebhookId: 55501,
   currentRefreshToken: "rt-1",
@@ -263,6 +265,14 @@ function startStub(): Promise<void> {
     }
 
     // ── Jobs + artifacts ─────────────────────────────────────────────────
+    // ── Users + job shares (the homeowner 3D links) ─────────────────────
+    if (url.pathname === "/api/v2/users") {
+      return json(200, { pagination: { total_pages: 1 }, results: [{ id: 601, email: "owner@example.com" }] });
+    }
+    if (url.pathname === "/api/v1/job_shares") {
+      if (url.searchParams.get("current_user_id") !== "601") return json(200, { job_shares: [] });
+      return json(200, { job_shares: stub.jobShares, meta: { pagination: { next_page: null } } });
+    }
     if (url.pathname === "/api/v2/jobs") {
       return json(200, {
         results: [
@@ -526,6 +536,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     expect(res.body.attachedByAddress).toBe(1);
     expect(res.body.attachedByEmail).toBe(0);
     expect(res.body.attachedByPhone).toBe(0);
+    expect(res.body.attachedByName).toBe(0);
     expect(res.body.created).toBe(0);
     expect(res.body.ambiguous).toBe(0);
     expect(res.body.errors).toEqual([]);
@@ -549,6 +560,76 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("HOVER integration 
     expect(status.lastSyncReport?.attachedByAddress).toBe(1);
     expect(status.lastSyncReport?.scanned).toBe(3);
     expect(status.lastSyncReport?.at).toBeTruthy();
+  });
+
+  // ── Homeowner 3D share links ────────────────────────────────────────────
+
+  it("sync picks up the HOVER share for a job; the contractor can paste (strictly validated) and clear one", async () => {
+    const m9001 = (await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9001'`, [orgId]))[0];
+    const m9002 = (await q<any>(`select * from crm_measurements where org_id = $1 and external_id = 'hover:9002'`, [orgId]))[0];
+    stub.jobShares = [{
+      id: 777, job_id: 9002, user_id: 601, token: "stubShareTok9002", expired: false,
+      expires_at: new Date(Date.now() + 30 * 86400_000).toISOString(),
+      url: "https://hover.to/shared/stubShareTok9002",
+      image_url: "https://hover.to/api/v1/job_shares/777/image.png?share_token=stubShareTok9002",
+    }];
+    const sync = await api("/api/crm/integrations/hover/sync", { method: "POST" });
+    expect(sync.status).toBe(200);
+    expect(sync.body.sharesFound).toBe(1);
+    const after = (await q<any>(`select raw_payload from crm_measurements where id = $1`, [m9002.id]))[0];
+    expect(after.raw_payload.share.url).toBe("https://hover.to/shared/stubShareTok9002");
+    expect(after.raw_payload.share.source).toBe("hover-api");
+
+    // Paste: only https://hover.to/shared/<token>.
+    const put = (url: unknown) => api(`/api/crm/measurements/${m9001.id}/hover-share`, {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }),
+    });
+    for (const bad of ["https://hover.to/3d/9001", "https://evil.com/shared/abcdefghij", "http://hover.to/shared/abcdefghij",
+      "https://hover.to/shared/abcdefghij?redirect=https://evil.com", "not a url", 42]) {
+      expect((await put(bad)).status).toBe(400);
+    }
+    const ok = await put("https://hover.to/shared/pastedToken9001");
+    expect(ok.status).toBe(200);
+    expect(ok.body.share.source).toBe("manual");
+    let list = (await api(`/api/crm/customers/${m9001.customer_id}/measurements`)).body.measurements;
+    expect(list.find((x: any) => x.id === m9001.id).share).toMatchObject({ url: "https://hover.to/shared/pastedToken9001", live: true });
+
+    // A sync that lists nothing for 9001 keeps the pasted link.
+    await api("/api/crm/integrations/hover/sync", { method: "POST" });
+    list = (await api(`/api/crm/customers/${m9001.customer_id}/measurements`)).body.measurements;
+    expect(list.find((x: any) => x.id === m9001.id).share?.url).toBe("https://hover.to/shared/pastedToken9001");
+
+    const del = await api(`/api/crm/measurements/${m9001.id}/hover-share`, { method: "DELETE" });
+    expect(del.status).toBe(200);
+    list = (await api(`/api/crm/customers/${m9001.customer_id}/measurements`)).body.measurements;
+    expect(list.find((x: any) => x.id === m9001.id).share).toBeNull();
+    // Unknown measurement → 404, never a write elsewhere.
+    expect((await api(`/api/crm/measurements/00000000-0000-0000-0000-000000000000/hover-share`, { method: "DELETE" })).status).toBe(404);
+    stub.jobShares = [];
+  });
+
+  it("estimate + project 3D routes list the client's HOVER captures with the contractor-only HOVER link", async () => {
+    const cust = (await q<any>(`select id from crm_customers where org_id = $1 and email = 'hover-vitest@example.com'`, [orgId]))[0];
+    const [proj] = await q<any>(
+      `insert into crm_projects (org_id, customer_id, name, status, address_line1, postal_code) values ($1,$2,'HOVER vitest project','lead','123 Pine St','98101') returning id`,
+      [orgId, cust.id]);
+    const [est] = await q<any>(
+      `insert into crm_estimates (org_id, customer_id, project_id, title, public_token) values ($1,$2,$3,'HOVER vitest estimate', md5(random()::text)) returning id`,
+      [orgId, cust.id, proj.id]);
+    try {
+      const byProject = await api(`/api/crm/projects/${proj.id}/hover-models`);
+      expect(byProject.status).toBe(200);
+      expect(byProject.body.models.length).toBeGreaterThanOrEqual(2);
+      const top = byProject.body.models[0];
+      expect(top.hoverAppUrl).toMatch(/^https:\/\/hover\.to\/3d\/\d+$/);
+      const byEstimate = await api(`/api/crm/estimates/${est.id}/hover-models`);
+      expect(byEstimate.status).toBe(200);
+      expect(byEstimate.body.models.map((m: any) => m.id)).toEqual(byProject.body.models.map((m: any) => m.id));
+    } finally {
+      await q(`delete from crm_estimates where id = $1`, [est.id]);
+      await q(`update crm_measurements set project_id = null where project_id = $1`, [proj.id]);
+      await q(`delete from crm_projects where id = $1`, [proj.id]);
+    }
   });
 
   // ── Address matching (confidence rules) ─────────────────────────────────

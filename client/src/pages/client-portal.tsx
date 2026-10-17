@@ -21,6 +21,7 @@ import { CrmLogo } from "@/components/crm-logo";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { orgThemeStyle } from "@/lib/org-theme";
+import { Home3DCard } from "@/components/hover-3d-card";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -556,6 +557,9 @@ function Dashboard({ data }: { data: any }) {
   const reportsSection = (
     <section className="space-y-3" data-testid="section-reports">
       <SectionTitle icon={Ruler} title="Measurement reports" infoKey="portal-reports" />
+      {/* "Your home in 3D" — only when a report carries a live HOVER share link. */}
+      <Home3DCard home3d={reports.find((r: any) => r.home3d)?.home3d}
+        companyName={reports.find((r: any) => r.home3d)?.orgName} />
       {!reports.length ? (
         <Card><EmptyState compact icon={Ruler} title="No measurement reports yet"
           description="Roof or property measurement reports your contractor files for you appear here." /></Card>
@@ -597,16 +601,14 @@ function Dashboard({ data }: { data: any }) {
                   </td>
                   <td className={crmTable.tdRight}>
                     <div className="flex flex-col items-end gap-1">
-                      {/* The 3D viewer opens in a NEW TAB, not an iframe:
-                          hover.to/3d/<jobId> currently sends no
-                          X-Frame-Options / frame-ancestors (checked
-                          2026-08), but HOVER ships the viewer as a
-                          standalone page — iframing adds nothing and any
-                          future XFO change would break it silently. */}
-                      {r.model3dUrl && (
-                        <a href={r.model3dUrl} target="_blank" rel="noopener noreferrer"
+                      {/* The homeowner 3D share link opens in a NEW TAB, not an
+                          iframe — HOVER ships the viewer as a standalone page.
+                          Only a live https://hover.to/shared/<token> link is
+                          ever sent here (server/crm/hover-share.ts). */}
+                      {r.home3d?.url && (
+                        <a href={r.home3d.url} target="_blank" rel="noopener noreferrer"
                           className="font-medium text-primary hover:underline" data-testid={`client-report-3d-${r.id}`}>
-                          View 3D model
+                          Explore in 3D
                         </a>
                       )}
                       {r.pdfDownloadUrl && (

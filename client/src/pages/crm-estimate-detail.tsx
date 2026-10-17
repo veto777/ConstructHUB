@@ -19,6 +19,7 @@ import {
 import { EstimateDiscounts } from "@/components/crm-discounts";
 import { EstimateAttachmentsCard } from "@/components/estimate-attachments-card";
 import { HelpButton } from "@/components/help-button";
+import { Hover3DCard } from "@/components/hover-3d-card";
 import { money } from "@/lib/estimate-math";
 import { cn } from "@/lib/utils";
 import {
@@ -768,6 +769,9 @@ export default function CrmEstimateDetailPage() {
 
       {/* Attachments — files on this estimate + "Add to all future estimates" (self-contained). */}
       <EstimateAttachmentsCard estimateId={e.id} />
+
+      {/* HOVER 3D model for this estimate's client (renders nothing without a HOVER capture). */}
+      {id && <Hover3DCard estimateId={id} />}
 
       {/* Events trail — created/sent/viewed/updated, newest first. */}
       {events.length > 0 && (

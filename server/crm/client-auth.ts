@@ -34,6 +34,7 @@ import { clientPortalBaseUrl, portalBaseUrl } from "../site-context";
 import { financingLinksOf, getPrimaryFinancing } from "./financing";
 import { logEvent } from "./entities";
 import { themePayload } from "@shared/theme-colors";
+import { clientShareView } from "./hover-share";
 
 const COOKIE_NAME = "crm_client";
 const TOKEN_TTL_MS = 30 * 60 * 1000; // magic link: 30 minutes
@@ -578,9 +579,10 @@ export function registerCrmClientAuthRoutes(app: Express): void {
           wastePercent: r.wasteSuggestionBps === null ? null : r.wasteSuggestionBps / 100,
           orgName: orgName.get(r.orgId) ?? null,
           downloadUrl: hasSource ? `/api/client/reports/${r.id}/download` : null,
-          // HOVER-ingested rows: the interactive 3D model and the measurement
-          // PDF (downloaded through the session-gated attachment route).
-          model3dUrl: raw.model3dUrl ?? null,
+          // HOVER-ingested rows: the homeowner 3D share link (only while it is
+          // live — hover.to/3d/<id> needs a HOVER login, so it is never sent)
+          // and the measurement PDF (session-gated attachment route).
+          home3d: clientShareView(raw),
           pdfDownloadUrl: raw.pdfAttachmentId
             ? `/api/client/attachments/${raw.pdfAttachmentId}/download`
             : null,

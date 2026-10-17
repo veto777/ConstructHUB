@@ -18,6 +18,7 @@ import { PrintLockdown } from "@/components/print-lockdown";
 import { DocGateChallenge } from "@/components/doc-gate";
 import { EstimateAttachments } from "@/components/client-uploads";
 import { orgThemeStyle } from "@/lib/org-theme";
+import { Home3DCard } from "@/components/hover-3d-card";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -450,7 +451,7 @@ export default function PublicEstimatePage() {
     );
   }
 
-  const { estimate: e, items, company, customer, options, preview, discountOffers, salesRep, answerBlock } = data;
+  const { estimate: e, items, company, customer, options, preview, discountOffers, salesRep, answerBlock, home3d } = data;
   const settled = done ?? (e.approvedAt ? "approved" : e.declinedAt ? "declined" : null);
   const expired = e.expiresAt && new Date(e.expiresAt).getTime() < Date.now();
   // The server says this estimate can't be answered (a draft that was never
@@ -1125,6 +1126,9 @@ export default function PublicEstimatePage() {
             </div>
           </div>
         )}
+
+        {/* "Your home in 3D" — only with a live HOVER share link for this client (server/crm/hover-share.ts). */}
+        <Home3DCard home3d={home3d} companyName={company?.name} />
 
         {/* Footer facts — job address, expiry, warranty, contact card, T&C link. */}
         {/* Who to talk to — the client should never wonder who their person is. */}

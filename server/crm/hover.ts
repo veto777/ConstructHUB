@@ -36,6 +36,12 @@ import { objectPolicy } from "./object-access";
  *      (machete_blob.OptInFeature.designProUrl, of the form
  *      https://hover.to/3d/<jobId>) as rawPayload.model3dUrl.
  *
+ *   5. Projects + homeowner 3D (server/crm/hover-share.ts): after address → email → phone, a unique full-name
+ *      match attaches too; the measurement is linked to the customer's project at the job's address (else their
+ *      single open project), and the job's HOVER share link (https://hover.to/shared/<token>, the only 3D link a
+ *      homeowner can open) is stored as rawPayload.share — found via GET /api/v1/job_shares per org user on every
+ *      sync, or pasted by the contractor. hover.to/3d/<jobId> needs a HOVER login and is never sent to a client.
+ *
  * Tokens: access tokens live 2h and are cached in memory per org; refresh
  * tokens are indefinite but ROTATE on every refresh — the new one is always
  * persisted before the access token is used.
@@ -67,6 +73,14 @@ import { oauthBaseUrl } from "../site-context";
 import { recordFailure } from "../ops/issues";
 import { providerFixture, type HoverFixture } from "../tutorials/fixtures";
 import { workerInterval } from "../workers";
+import {
+  normalizeHoverAddress, normalizePersonName, customerNameKeys, pickJobShare, mergeShare, parseHoverShareUrl,
+  linkMeasurementToProject, backfillHoverProjectLinks, hoverMeasurementsForCustomer, rankHoverMeasurements,
+  projectAddressKey, shareIsLive, type HoverShare,
+} from "./hover-share";
+import { crmEstimates, crmProjects } from "@shared/schema";
+
+export { normalizeHoverAddress, normalizePersonName } from "./hover-share";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -143,12 +157,21 @@ export interface HoverSyncReport {
   attachedByEmail: number;
   attachedByPhone: number;
   attachedByAddress: number;
+  /** Attached by the contact's full name (exactly one non-staff customer had it). */
+  attachedByName: number;
   created: number;
   ambiguous: number;
   duplicates: number;
   errors: string[];
   /** True when the 80-page cap cut the jobs walk short — older jobs were NOT scanned. */
   truncated: boolean;
+  /** HOVER share links stored this run, and HOVER measurements newly linked to a project. */
+  sharesFound?: number;
+  sharesError?: string | null;
+  projectsLinked?: number;
+  /** HOVER 429s that paused the run, and completed jobs left for the next run (not errors). */
+  rateLimitPauses?: number;
+  deferred?: number;
   at: string;
 }
 
@@ -176,14 +199,28 @@ async function readHoverConn(orgId: string): Promise<HoverConn | null> {
   return conn && typeof conn.refreshTokenEnc === "string" ? (conn as HoverConn) : null;
 }
 
-/** Merge a patch into custom_fields->'hover' (null deletes the whole block). */
+/**
+ * Merge a patch into custom_fields->'hover' (null deletes the whole block) as ONE atomic jsonb merge, never
+ * read-modify-write: a rotated refresh token must not be overwritten by a concurrent write that read the org a
+ * moment earlier (that would put the already-used, now-invalid refresh token back and break the connection for
+ * good). Same idiom as backups.ts stampBackup.
+ */
 async function writeHoverConn(orgId: string, patch: Partial<HoverConn> | null): Promise<void> {
-  const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, orgId)).limit(1);
-  if (!org) return;
-  const base = { ...((org.customFields as Record<string, unknown> | null) ?? {}) };
-  if (patch === null) delete base.hover;
-  else base.hover = { ...((base.hover as object | undefined) ?? {}), ...patch };
-  await db.update(crmOrgs).set({ customFields: base, updatedAt: new Date() }).where(eq(crmOrgs.id, orgId));
+  if (patch === null) {
+    await db.update(crmOrgs).set({
+      customFields: sql`coalesce(${crmOrgs.customFields}, '{}'::jsonb) - 'hover'`,
+      updatedAt: new Date(),
+    }).where(eq(crmOrgs.id, orgId));
+    return;
+  }
+  await db.update(crmOrgs).set({
+    customFields: sql`jsonb_set(
+      coalesce(${crmOrgs.customFields}, '{}'::jsonb),
+      '{hover}',
+      coalesce(${crmOrgs.customFields} -> 'hover', '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb
+    )`,
+    updatedAt: new Date(),
+  }).where(eq(crmOrgs.id, orgId));
 }
 
 // ── OAuth state grant (CSRF), same idiom as the portal-preview grant ────────
@@ -279,6 +316,27 @@ export class HoverReconnectError extends Error {
 export async function getHoverAccessToken(orgId: string, fetchFn: FetchFn = fetch): Promise<string> {
   const cached = tokenCache.get(orgId);
   if (cached && Date.now() < cached.expiresAt - 60_000) return cached.token;
+  // One refresh per org at a time. HOVER rotates the refresh token on every use, so two callers refreshing at once
+  // (the webhook, the auto-sync and the Sync button all land here) would both send the SAME refresh token: the
+  // loser gets 400 invalid_grant, which flagged the connection "reconnect needed" although the winner had just
+  // stored a good token (and a provider with refresh-token reuse detection revokes the whole grant on that replay).
+  // Everyone waiting shares the one in-flight refresh instead.
+  const inFlight = refreshInFlight.get(orgId);
+  if (inFlight) return inFlight;
+  const run = refreshHoverAccessToken(orgId, fetchFn);
+  refreshInFlight.set(orgId, run);
+  try {
+    return await run;
+  } finally {
+    if (refreshInFlight.get(orgId) === run) refreshInFlight.delete(orgId);
+  }
+}
+
+const refreshInFlight = new Map<string, Promise<string>>();
+
+async function refreshHoverAccessToken(orgId: string, fetchFn: FetchFn, retried = false): Promise<string> {
+  const cached = tokenCache.get(orgId);
+  if (cached && Date.now() < cached.expiresAt - 60_000) return cached.token;
 
   const conn = await readHoverConn(orgId);
   if (!conn) throw new Error("HOVER is not connected for this organization");
@@ -297,6 +355,12 @@ export async function getHoverAccessToken(orgId: string, fetchFn: FetchFn = fetc
     }),
   });
   if (!res.ok) {
+    if (hoverSignInExpired(res.status) && !retried) {
+      // Another process (a second app instance) may have rotated the token while we were asking. If the stored
+      // token is no longer the one we sent, try once more with it before declaring the sign-in dead.
+      const latest = await readHoverConn(orgId);
+      if (latest && latest.refreshTokenEnc !== conn.refreshTokenEnc) return refreshHoverAccessToken(orgId, fetchFn, true);
+    }
     if (hoverSignInExpired(res.status)) {
       // HOVER no longer accepts this sign-in (first confirmed in production 2026-10-07: 400 on every refresh since
       // 2026-08-11). Nothing we retry can change that — record it once and stop until the customer reconnects.
@@ -386,12 +450,57 @@ export function hoverWebhookIdFromHeaders(sig256: unknown, sig1: unknown): strin
 
 // ── HOVER API helpers ───────────────────────────────────────────────────────
 
+// ── Rate limits (HOVER answers 429) ─────────────────────────────────────────
+
+/** HOVER kept answering 429 after our in-call retries — the caller should pause, not count a failure. */
+export class HoverRateLimitError extends Error {
+  constructor(public retryAfterMs: number) {
+    super(`HOVER rate limit (429) — retry in ${Math.round(retryAfterMs / 1000)}s`);
+    this.name = "HoverRateLimitError";
+  }
+}
+
+const RETRY_AFTER_DEFAULT_MS = 10_000;
+const RETRY_AFTER_MAX_MS = 120_000;
+
+/** Retry-After as milliseconds: delta-seconds or an HTTP date; default 10 s; clamped to 1 s–2 min. */
+export function hoverRetryAfterMs(header: string | null | undefined, now: number = Date.now()): number {
+  const h = String(header ?? "").trim();
+  let ms = RETRY_AFTER_DEFAULT_MS;
+  if (/^\d+(\.\d+)?$/.test(h)) ms = Number(h) * 1000;
+  else if (h) {
+    const t = Date.parse(h);
+    if (Number.isFinite(t)) ms = t - now;
+  }
+  return Math.min(RETRY_AFTER_MAX_MS, Math.max(1000, ms));
+}
+
+/** Test seam: how the backoff waits (tests swap in a no-op). */
+let backoffSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+export function setHoverBackoffSleep(fn: ((ms: number) => Promise<void>) | null): void {
+  backoffSleep = fn ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+}
+
+/**
+ * fetch() that honours HOVER's 429: wait Retry-After and try again, up to `retries` times. Still 429 after that →
+ * the 429 response is returned (callers that need it raise HoverRateLimitError).
+ */
+export async function hoverFetchWithBackoff(
+  fetchFn: FetchFn, url: string, init: RequestInit, retries = 3,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetchFn(url, init);
+    if (res.status !== 429 || attempt >= retries) return res;
+    await backoffSleep(hoverRetryAfterMs(res.headers?.get?.("retry-after")));
+  }
+}
+
 async function hoverApi(
   orgId: string, method: string, apiPath: string, body?: unknown, fetchFn: FetchFn = fetch,
 ): Promise<{ status: number; json: any }> {
   const token = await getHoverAccessToken(orgId, fetchFn);
   const { apiBase } = hoverBases();
-  const res = await fetchFn(`${apiBase}${apiPath}`, {
+  const res = await hoverFetchWithBackoff(fetchFn, `${apiBase}${apiPath}`, {
     method,
     headers: {
       authorization: `Bearer ${token}`,
@@ -670,24 +779,6 @@ function trimJson(value: unknown): unknown {
 }
 
 /**
- * Canonical service-address key: lowercase line1 with punctuation and extra
- * whitespace stripped, plus the 5-digit zip. The SAME normalization runs on
- * the job's address and on each candidate customer's address, so formatting
- * differences ("123 PINE st." / "123 Pine St", "98101-1234" / "98101") never
- * decide a match. Null when either side is too thin to trust.
- */
-export function normalizeHoverAddress(line1?: string | null, zip?: string | null): string | null {
-  const line = String(line1 ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const zip5 = String(zip ?? "").replace(/\D/g, "").slice(0, 5);
-  if (!line || zip5.length !== 5) return null;
-  return `${line}|${zip5}`;
-}
-
-/**
  * Address fallback after email/phone dedupe fails. Candidates are narrowed in
  * SQL by 5-digit zip, then compared with the exact normalized key in JS.
  * Confidence rules: exactly one customer at the address → attach; two or
@@ -744,6 +835,42 @@ async function matchHoverCustomer(
     if (hit) return { customer: hit, via: "phone" };
   }
   return null;
+}
+
+/**
+ * Last-resort match by the contact's FULL name (first + last, case/accents/punctuation/spacing ignored), after
+ * address → email → phone found nothing. Attaches only when EXACTLY ONE non-archived, non-staff customer carries
+ * that name; two or more is ambiguous and falls through to the existing create path. A contact whose name is an
+ * active org member's never matches (a capture ordered by staff carries the staff member's name).
+ */
+export async function matchHoverCustomerByName(
+  orgId: string, name?: string | null,
+): Promise<typeof crmCustomers.$inferSelect | null> {
+  const key = normalizePersonName(name);
+  if (!key) return null;
+  const members = await db.select().from(crmMembers)
+    .where(and(eq(crmMembers.orgId, orgId), eq(crmMembers.status, "active")));
+  if (members.some((m) => normalizePersonName(m.displayName) === key)) return null;
+  const staffEmails = new Set(members.map((m) => (m.email ?? "").trim().toLowerCase()).filter(Boolean));
+  const staffPhones = new Set(members.map((m) => digits(String(m.phone ?? ""))).filter((p) => p.length >= 7));
+  // Narrow in SQL by the last word (only [a-z0-9] after normalization, so it is safe inside ILIKE), then compare
+  // the exact key in JS against both the display name and first + last.
+  const lastWord = key.split(" ").pop()!;
+  const like = `%${lastWord}%`;
+  const candidates = await db.select().from(crmCustomers)
+    .where(and(
+      eq(crmCustomers.orgId, orgId),
+      isNull(crmCustomers.archivedAt),
+      // Punctuation stripped on the SQL side too, so "O'Brien" is found by "obrien".
+      sql`(regexp_replace(lower(coalesce(${crmCustomers.displayName}, '')), '[^a-z0-9]', '', 'g') like ${like}
+        or regexp_replace(lower(coalesce(${crmCustomers.lastName}, '')), '[^a-z0-9]', '', 'g') like ${like})`,
+    ))
+    .limit(500);
+  const hits = candidates.filter((c) =>
+    customerNameKeys(c).has(key)
+    && !staffEmails.has((c.email ?? "").trim().toLowerCase())
+    && !staffPhones.has(digits(String(c.phone ?? ""))));
+  return hits.length === 1 ? hits[0] : null;
 }
 
 /**
@@ -866,12 +993,12 @@ async function linkOrCreateHoverCustomer(
   jobName: string | null,
 ): Promise<{
   customer: typeof crmCustomers.$inferSelect | null;
-  matchedVia: "email" | "phone" | "address" | null;
+  matchedVia: HoverMatchedVia;
   ambiguous: boolean;
   customerCreated: boolean;
 }> {
   let customer: typeof crmCustomers.$inferSelect | null = null;
-  let matchedVia: "email" | "phone" | "address" | null = null;
+  let matchedVia: HoverMatchedVia = null;
   let ambiguous = false;
   const byAddress = await matchHoverCustomerByAddress(orgId, c.addressLine1, c.postalCode);
   if (byAddress.matches.length === 1) {
@@ -886,6 +1013,12 @@ async function linkOrCreateHoverCustomer(
     if (byContact && !(await isOrgMemberContact(orgId, c.email, c.phone))) {
       customer = byContact.customer;
       matchedVia = byContact.via;
+    } else if (!byContact) {
+      const byName = await matchHoverCustomerByName(orgId, c.name);
+      if (byName) {
+        customer = byName;
+        matchedVia = "name";
+      }
     }
   }
 
@@ -931,9 +1064,12 @@ async function linkOrCreateHoverCustomer(
   return { customer, matchedVia, ambiguous, customerCreated };
 }
 
+export type HoverMatchedVia = "email" | "phone" | "address" | "name" | null;
+
 export interface HoverIngestResult {
   measurementId: string; customerId: string | null; created: boolean; duplicate?: boolean;
-  matchedVia: "email" | "phone" | "address" | null; ambiguous: boolean; customerCreated: boolean;
+  matchedVia: HoverMatchedVia; ambiguous: boolean; customerCreated: boolean;
+  projectId?: string | null;
 }
 
 // ── Per-job ingest serialization ────────────────────────────────────────────
@@ -999,7 +1135,8 @@ async function ingestHoverJobInner(
         const token0 = await getHoverAccessToken(orgId, fetchFn);
         const { apiBase: base0 } = hoverBases();
         const auth0 = { authorization: `Bearer ${token0}` };
-        const det0 = await fetchFn(`${base0}/v3/jobs/${encodeURIComponent(jobId)}`, { headers: auth0 });
+        const det0 = await hoverFetchWithBackoff(fetchFn, `${base0}/v3/jobs/${encodeURIComponent(jobId)}`, { headers: auth0 });
+        if (det0.status === 429) throw new HoverRateLimitError(hoverRetryAfterMs(det0.headers?.get?.("retry-after")));
         if (det0.ok) {
           const job0 = (await det0.json()) as any;
           if (!adoptedCustomerId) {
@@ -1028,12 +1165,19 @@ async function ingestHoverJobInner(
           }
         }
       } catch (e: any) {
+        // A rate limit goes up to the sync loop (it pauses); anything else only skips this catch-up.
+        if (e instanceof HoverRateLimitError) throw e;
         console.error(`[hover] catch-up for job ${jobId} failed:`, String(e?.message || e).slice(0, 120));
       }
     }
+    // A row that has a client but no project yet gets one (address match, else the client's single open project).
+    let projectId = existing.projectId ?? null;
+    if (!projectId && adoptedCustomerId) {
+      projectId = await linkMeasurementToProject(orgId, existing.id).catch(() => null);
+    }
     return {
       measurementId: existing.id, customerId: adoptedCustomerId, created: false, duplicate: true,
-      matchedVia: null, ambiguous: false, customerCreated: adoptedCreated,
+      matchedVia: null, ambiguous: false, customerCreated: adoptedCreated, projectId,
     };
   }
 
@@ -1041,7 +1185,8 @@ async function ingestHoverJobInner(
   const { apiBase } = hoverBases();
   const auth = { authorization: `Bearer ${token}` };
 
-  const det = await fetchFn(`${apiBase}/v3/jobs/${encodeURIComponent(jobId)}`, { headers: auth });
+  const det = await hoverFetchWithBackoff(fetchFn, `${apiBase}/v3/jobs/${encodeURIComponent(jobId)}`, { headers: auth });
+  if (det.status === 429) throw new HoverRateLimitError(hoverRetryAfterMs(det.headers?.get?.("retry-after")));
   if (!det.ok) throw new Error(`HOVER job ${jobId} fetch failed: ${det.status}`);
   const job = (await det.json()) as any;
   const parsed = parseHoverJob(job);
@@ -1128,6 +1273,17 @@ async function ingestHoverJobInner(
     }
   }
 
+  // The project this capture belongs to, and the homeowner share link if one already exists at HOVER.
+  let projectId: string | null = null;
+  if (customer?.id) projectId = await linkMeasurementToProject(orgId, row.id).catch(() => null);
+  try {
+    const idx = await cachedHoverShareIndex(orgId, fetchFn);
+    const share = pickJobShare(idx.shares, jobId);
+    if (share) await setMeasurementShare(row.id, share);
+  } catch (e: any) {
+    console.error(`[hover] share lookup for job ${jobId} failed:`, String(e?.message || e).slice(0, 120));
+  }
+
   if (customer?.id) {
     try {
       const photos = await importHoverJobPhotos(orgId, jobId, customer.id, job, auth, fetchFn);
@@ -1145,21 +1301,149 @@ async function ingestHoverJobInner(
 
   return {
     measurementId: row.id, customerId: customer?.id ?? null, created: true, duplicate: false,
-    matchedVia, ambiguous, customerCreated,
+    matchedVia, ambiguous, customerCreated, projectId,
   };
+}
+
+// ── HOVER share links (homeowner-openable 3D) ───────────────────────────────
+
+/** Every job share HOVER lists for the org's users, and whether the listing was complete. */
+export interface HoverShareIndex { shares: any[]; complete: boolean; error: string | null }
+
+const HOVER_USERS_PAGE_CAP = 10;
+const HOVER_SHARES_PAGE_CAP = 20;
+
+const listOf = (j: any, ...keys: string[]): any[] => {
+  if (Array.isArray(j)) return j;
+  for (const k of keys) if (Array.isArray(j?.[k])) return j[k];
+  return [];
+};
+
+/**
+ * List the org's job shares. HOVER scopes the list to ONE user (current_user_id is required —
+ * developers.hover.to/reference/list-job-share-links), so we list the org's users (GET /api/v2/users,
+ * reference/list-users) and then each user's shares. Read-only: nothing is created at HOVER (creating a share by
+ * API is documented for INTERIOR jobs only, so exterior shares come from the HOVER app's Share button).
+ */
+export async function loadHoverJobShares(orgId: string, fetchFn: FetchFn = fetch): Promise<HoverShareIndex> {
+  const userIds: string[] = [];
+  let complete = true;
+  for (let page = 1; page <= HOVER_USERS_PAGE_CAP; page++) {
+    const r = await hoverApi(orgId, "GET", `/v2/users?page=${page}&per_page=100`, undefined, fetchFn);
+    if (r.status !== 200) {
+      if (page === 1) return { shares: [], complete: false, error: `users list failed (${r.status})` };
+      complete = false;
+      break;
+    }
+    const users = listOf(r.json, "results", "users");
+    for (const u of users) if (u?.id != null) userIds.push(String(u.id));
+    const total = Number(r.json?.pagination?.total_pages);
+    const more = Number.isFinite(total) && total > 0 ? page < total : users.length >= 100;
+    if (!users.length || !more) break;
+    if (page === HOVER_USERS_PAGE_CAP) complete = false;
+  }
+  const shares: any[] = [];
+  let error: string | null = null;
+  for (const uid of [...new Set(userIds)]) {
+    for (let page = 1; page <= HOVER_SHARES_PAGE_CAP; page++) {
+      const r = await hoverApi(orgId, "GET",
+        `/v1/job_shares?current_user_id=${encodeURIComponent(uid)}${page > 1 ? `&page=${page}` : ""}`, undefined, fetchFn);
+      if (r.status !== 200) {
+        complete = false;
+        error ??= `job shares list failed (${r.status})`;
+        break;
+      }
+      shares.push(...listOf(r.json, "job_shares", "results"));
+      const next = Number(r.json?.meta?.pagination?.next_page ?? r.json?.pagination?.next_page);
+      if (!Number.isFinite(next) || next <= page) break;
+      if (page === HOVER_SHARES_PAGE_CAP) complete = false;
+    }
+  }
+  return { shares, complete, error };
+}
+
+/** The share index, cached per org for a few minutes so a burst of webhook ingests lists HOVER's shares once. */
+const shareIndexCache = new Map<string, { at: number; promise: Promise<HoverShareIndex> }>();
+const SHARE_INDEX_TTL_MS = 10 * 60 * 1000;
+
+export function cachedHoverShareIndex(orgId: string, fetchFn: FetchFn = fetch, fresh = false): Promise<HoverShareIndex> {
+  const hit = shareIndexCache.get(orgId);
+  if (!fresh && hit && Date.now() - hit.at < SHARE_INDEX_TTL_MS) return hit.promise;
+  const promise = loadHoverJobShares(orgId, fetchFn);
+  shareIndexCache.set(orgId, { at: Date.now(), promise });
+  promise.catch(() => { if (shareIndexCache.get(orgId)?.promise === promise) shareIndexCache.delete(orgId); });
+  return promise;
+}
+
+/** Drop the cached share index (tests, and after a manual paste so the next sync re-reads HOVER). */
+export function clearHoverShareCache(orgId?: string): void {
+  if (orgId) shareIndexCache.delete(orgId);
+  else shareIndexCache.clear();
+}
+
+/** Write (or with null remove) raw_payload.share atomically — never a stale whole-payload rewrite. */
+export async function setMeasurementShare(measurementId: string, share: HoverShare | null): Promise<void> {
+  await db.update(crmMeasurements).set({
+    rawPayload: share
+      ? sql`jsonb_set(coalesce(${crmMeasurements.rawPayload}, '{}'::jsonb), '{share}', ${JSON.stringify(share)}::jsonb)`
+      : sql`coalesce(${crmMeasurements.rawPayload}, '{}'::jsonb) - 'share'`,
+    updatedAt: new Date(),
+  }).where(eq(crmMeasurements.id, measurementId));
+}
+
+/**
+ * Re-read HOVER's shares and store the best one on every HOVER measurement of the org. A live pasted link is kept;
+ * a stored API share HOVER no longer lists is removed only when the listing came back complete.
+ * Returns how many measurements now carry a live share.
+ */
+export async function refreshHoverShares(orgId: string, fetchFn: FetchFn = fetch): Promise<{ live: number; error: string | null }> {
+  const idx = await cachedHoverShareIndex(orgId, fetchFn, true);
+  if (!idx.complete && !idx.shares.length) return { live: 0, error: idx.error };
+  const rows = await db.select({
+    id: crmMeasurements.id,
+    externalId: crmMeasurements.externalId,
+    share: sql<HoverShare | null>`${crmMeasurements.rawPayload} -> 'share'`,
+  }).from(crmMeasurements)
+    .where(and(eq(crmMeasurements.orgId, orgId), eq(crmMeasurements.provider, "hover")));
+  let live = 0;
+  for (const r of rows) {
+    const jobId = /^hover:(.+)$/.exec(r.externalId ?? "")?.[1];
+    if (!jobId) continue;
+    const listed = pickJobShare(idx.shares, jobId);
+    const stored = r.share && typeof r.share === "object" ? r.share : null;
+    const next = listed || idx.complete ? mergeShare(stored, listed) : stored;
+    const same = (next?.url ?? null) === (stored?.url ?? null)
+      && (next?.expiresAt ?? null) === (stored?.expiresAt ?? null)
+      && (next?.imageUrl ?? null) === (stored?.imageUrl ?? null);
+    if (!same) await setMeasurementShare(r.id, next);
+    if (shareIsLive(next)) live++;
+  }
+  return { live, error: idx.error };
 }
 
 // ── Sync (manual button + auto-schedule) ────────────────────────────────────
 
 export type HoverSyncRunReport = {
   scanned: number; attachedByEmail: number; attachedByPhone: number; attachedByAddress: number;
+  attachedByName: number;
   created: number; ambiguous: number; duplicates: number; errors: string[];
   /** True when the 80-page cap cut the jobs walk short — older jobs were NOT scanned. */
   truncated: boolean;
+  /** Measurements carrying a live homeowner share link after this run, and why the share listing fell short. */
+  sharesFound?: number;
+  sharesError?: string | null;
+  /** HOVER measurements newly linked to a project by the back-fill. */
+  projectsLinked?: number;
+  /** Times HOVER rate-limited the run (each one paused it), and completed jobs left for the next run when the
+   *  limit outlasted the pauses. Neither is an error. */
+  rateLimitPauses?: number;
+  deferred?: number;
 };
 
 /** HOVER paginates the jobs list 25/page (per_page is ignored). */
 export const HOVER_JOBS_PAGE_SIZE = 25;
+/** How many rate-limit pauses one sync run takes before leaving the rest for the next run. */
+export const HOVER_SYNC_MAX_RATE_PAUSES = 6;
 /** Hard cap on the page walk so a huge job history can't hang a sync. */
 export const HOVER_SYNC_MAX_PAGES = 80;
 
@@ -1240,14 +1524,18 @@ export async function runHoverSync(orgId: string): Promise<HoverSyncRunReport> {
   const { jobs } = walk;
   const report: HoverSyncRunReport = {
     scanned: jobs.length,
-    attachedByEmail: 0, attachedByPhone: 0, attachedByAddress: 0,
+    attachedByEmail: 0, attachedByPhone: 0, attachedByAddress: 0, attachedByName: 0,
     created: 0, ambiguous: 0, duplicates: 0, errors: [],
     truncated: walk.truncated,
   };
-  for (const j of jobs) {
-    const state = String(j?.state ?? j?.status ?? "").toLowerCase();
+  report.rateLimitPauses = 0;
+  report.deferred = 0;
+  const completed = jobs.filter((j) => (j?.id ?? j?.job_id)
+    && String(j?.state ?? j?.status ?? "").toLowerCase().startsWith("complete"));
+  let pausesLeft = HOVER_SYNC_MAX_RATE_PAUSES;
+  for (let i = 0; i < completed.length; i++) {
+    const j = completed[i];
     const id = j?.id ?? j?.job_id;
-    if (!id || !state.startsWith("complete")) continue;
     try {
       const r = await ingestHoverJob(orgId, String(id));
       if (r.duplicate) report.duplicates++;
@@ -1255,11 +1543,41 @@ export async function runHoverSync(orgId: string): Promise<HoverSyncRunReport> {
       else if (r.matchedVia === "email") report.attachedByEmail++;
       else if (r.matchedVia === "phone") report.attachedByPhone++;
       else if (r.matchedVia === "address") report.attachedByAddress++;
+      else if (r.matchedVia === "name") report.attachedByName++;
       else if (r.customerCreated) report.created++;
     } catch (e: any) {
+      if (e instanceof HoverRateLimitError) {
+        // HOVER asked us to slow down: pause for what it said, then resume with the SAME job. When the limit
+        // outlasts our pauses, stop here — the remaining jobs are picked up by the next run, not failed.
+        if (pausesLeft > 0) {
+          pausesLeft--;
+          report.rateLimitPauses++;
+          console.log(`[hover] sync org ${orgId}: rate-limited at job ${id}, pausing ${Math.round(e.retryAfterMs / 1000)}s`);
+          await backoffSleep(e.retryAfterMs);
+          i--;
+          continue;
+        }
+        report.deferred = completed.length - i;
+        console.log(`[hover] sync org ${orgId}: still rate-limited, ${report.deferred} jobs left for the next run`);
+        break;
+      }
       report.errors.push(`job ${id}: ${String(e?.message || e).slice(0, 120)}`);
       console.error(`[hover] sync ingest job ${id} failed:`, String(e?.message || e).slice(0, 200));
     }
+  }
+  // Homeowner share links, then the project back-fill (idempotent; rows with no fitting project stay unlinked).
+  // Neither may fail the sync: the jobs themselves already landed.
+  try {
+    const shares = await refreshHoverShares(orgId);
+    report.sharesFound = shares.live;
+    report.sharesError = shares.error;
+  } catch (e: any) {
+    report.sharesError = String(e?.message || e).slice(0, 160);
+  }
+  try {
+    report.projectsLinked = (await backfillHoverProjectLinks(orgId)).linked;
+  } catch (e: any) {
+    console.error(`[hover] project back-fill for org ${orgId} failed:`, String(e?.message || e).slice(0, 160));
   }
   const lastSyncReport: HoverSyncReport = { ...report, at: new Date().toISOString() };
   await writeHoverConn(orgId, {
@@ -1455,11 +1773,16 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     if (!ctx) return;
     const conn = await readHoverConn(ctx.org.id);
     if (!conn) return res.status(409).json({ message: "Connect HOVER first." });
+    // One sync per org at a time — the auto-sync and a second click share HOVER's rotating sign-in.
+    if (hoverSyncRunning.has(ctx.org.id)) return res.status(409).json({ message: "A HOVER sync is already running — try again in a minute." });
+    hoverSyncRunning.add(ctx.org.id);
     try {
       const report = await runHoverSync(ctx.org.id);
       res.json({ ok: true, ...report });
     } catch {
       res.status(502).json({ message: "Could not list HOVER jobs." });
+    } finally {
+      hoverSyncRunning.delete(ctx.org.id);
     }
   });
 
@@ -1649,11 +1972,115 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
           pitch: r.predominantPitch,
           wastePercent: r.wasteSuggestionBps === null ? null : r.wasteSuggestionBps / 100,
           hoverJobId: raw.hoverJobId ?? null,
-          matchedVia: raw.matchedVia ?? null,
+          matchedVia: raw.matchedVia ?? raw.adoptedVia ?? null,
           model3dUrl: raw.model3dUrl ?? null,
+          projectId: r.projectId ?? null,
+          share: presentShare(raw.share),
           pdfUrl: raw.pdfAttachmentId ? `/api/crm/attachments/${raw.pdfAttachmentId}/file` : null,
         };
       }),
     });
   });
+
+  // ── 3D models on projects and estimates (contractor side) ─────────────────
+  // /:id params on projects/estimates/measurements are visibility-checked by authorizeObjectRequest.
+
+  /** One HOVER measurement as the Hover3DCard shows it to the contractor. */
+  const presentModel = (m: typeof crmMeasurements.$inferSelect) => {
+    const raw = (m.rawPayload ?? {}) as any;
+    return {
+      id: m.id,
+      hoverJobId: raw.hoverJobId ?? null,
+      date: m.completedAt ?? m.createdAt,
+      addressLine1: m.addressLine1, city: m.city, state: m.state, postalCode: m.postalCode,
+      customerId: m.customerId, projectId: m.projectId,
+      matchedVia: raw.matchedVia ?? raw.adoptedVia ?? null,
+      // The contractor's own HOVER viewer (needs their HOVER login) — never shown to a client.
+      hoverAppUrl: typeof raw.model3dUrl === "string" && /^https:\/\/hover\.to\/3d\/\d+$/.test(raw.model3dUrl) ? raw.model3dUrl : null,
+      share: presentShare(raw.share),
+    };
+  };
+
+  app.get("/api/crm/projects/:id/hover-models", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    const [p] = await db.select().from(crmProjects)
+      .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, req.params.id))).limit(1);
+    if (!p) return res.status(404).json({ message: "Project not found" });
+    const [c] = await db.select().from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, p.customerId))).limit(1);
+    const rows = await hoverMeasurementsForCustomer(ctx.org.id, p.customerId);
+    const visible = await objectPolicy(ctx).filter("measurements", rows);
+    const ranked = rankHoverMeasurements(visible, { projectId: p.id, addressKey: projectAddressKey(p, c ?? null) });
+    res.json({ models: ranked.map(presentModel) });
+  });
+
+  app.get("/api/crm/estimates/:id/hover-models", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    const [est] = await db.select().from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
+    if (!est) return res.status(404).json({ message: "Estimate not found" });
+    const [c] = await db.select().from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, est.customerId))).limit(1);
+    let addressKey = normalizeHoverAddress(c?.addressLine1, c?.postalCode);
+    if (est.projectId) {
+      const [p] = await db.select().from(crmProjects)
+        .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, est.projectId))).limit(1);
+      if (p) addressKey = projectAddressKey(p, c ?? null);
+    }
+    const rows = await hoverMeasurementsForCustomer(ctx.org.id, est.customerId);
+    const visible = await objectPolicy(ctx).filter("measurements", rows);
+    const ranked = rankHoverMeasurements(visible, { projectId: est.projectId ?? null, addressKey });
+    res.json({ models: ranked.map(presentModel) });
+  });
+
+  /**
+   * Paste the homeowner share link for a HOVER measurement. Only https://hover.to/shared/<token> is accepted
+   * (parseHoverShareUrl: exact host, no other path or query) — and it is only stored, never fetched.
+   */
+  app.put("/api/crm/measurements/:id/hover-share", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "manageEstimates");
+    if (!ctx) return;
+    const parsed = parseHoverShareUrl(req.body?.url);
+    if (!parsed) {
+      return res.status(400).json({ message: "Paste the share link from HOVER — it looks like https://hover.to/shared/…" });
+    }
+    const [m] = await db.select({ id: crmMeasurements.id }).from(crmMeasurements)
+      .where(and(eq(crmMeasurements.orgId, ctx.org.id), eq(crmMeasurements.id, req.params.id), eq(crmMeasurements.provider, "hover")))
+      .limit(1);
+    if (!m) return res.status(404).json({ message: "HOVER measurement not found" });
+    const share: HoverShare = {
+      url: parsed.url, token: parsed.token, imageUrl: null, videoUrl: null,
+      // HOVER shares expire (45 days by default) but a pasted link carries no date; the next sync fills it in when
+      // HOVER lists this share.
+      expiresAt: null, source: "manual", jobShareId: null, savedAt: new Date().toISOString(),
+    };
+    await setMeasurementShare(m.id, share);
+    res.json({ ok: true, share: presentShare(share) });
+  });
+
+  app.delete("/api/crm/measurements/:id/hover-share", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "manageEstimates");
+    if (!ctx) return;
+    const [m] = await db.select({ id: crmMeasurements.id }).from(crmMeasurements)
+      .where(and(eq(crmMeasurements.orgId, ctx.org.id), eq(crmMeasurements.id, req.params.id), eq(crmMeasurements.provider, "hover")))
+      .limit(1);
+    if (!m) return res.status(404).json({ message: "HOVER measurement not found" });
+    await setMeasurementShare(m.id, null);
+    res.json({ ok: true });
+  });
+}
+
+/** A stored share as the contractor UI sees it (null when none or malformed). */
+function presentShare(share: any) {
+  const parsed = parseHoverShareUrl(share?.url);
+  if (!parsed) return null;
+  return {
+    url: parsed.url,
+    imageUrl: typeof share.imageUrl === "string" ? share.imageUrl : null,
+    expiresAt: share.expiresAt ?? null,
+    source: share.source === "manual" ? "manual" : "hover-api",
+    live: shareIsLive(share),
+  };
 }
