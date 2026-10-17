@@ -55,7 +55,7 @@ test.describe("/crm/settings — Calendar card", () => {
     // with summary = project — customer and the arrival window as dtend.
     const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const cust = await page.request.post("/api/crm/customers", {
-      data: { displayName: `E2E Cal ${stamp}` },
+      data: { addressLine1: "100 Test St", displayName: `E2E Cal ${stamp}` },
     });
     expect(cust.ok()).toBeTruthy();
     const customer = await cust.json();

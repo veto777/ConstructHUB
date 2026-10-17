@@ -237,7 +237,7 @@ export default function CrmClientsPage() {
                 </div>
                 <div>
                   <Label htmlFor="c-addr">Service address *</Label>
-                  <Input id="c-addr" value={form.addressLine1} maxLength={200}
+                  <Input id="c-addr" data-testid="input-client-address" value={form.addressLine1} maxLength={200} autoComplete="street-address"
                     onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} />
                 </div>
                 <div>

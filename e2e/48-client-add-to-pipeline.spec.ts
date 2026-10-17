@@ -26,7 +26,7 @@ test.describe("client page → Add to pipeline", () => {
     const customerName = `E2E Pipe ${stamp}`;
     const projectName = `E2E Pipe Project ${stamp}`;
 
-    const cust = await page.request.post("/api/crm/customers", { data: { displayName: customerName } });
+    const cust = await page.request.post("/api/crm/customers", { data: { addressLine1: "100 Test St", displayName: customerName } });
     expect(cust.status()).toBe(201);
     const customer = await cust.json();
     let projectId = "";
