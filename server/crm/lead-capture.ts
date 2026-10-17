@@ -41,8 +41,9 @@ const esc = (s?: string | null) =>
   String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
 
 export const clientIp = (req: any) =>
-  String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "")
-    .split(",")[0].trim().slice(0, 60);
+  // Cloudflare sets cf-connecting-ip itself; the left-most X-Forwarded-For is whatever the
+  // sender wrote, so it is never trusted (req.ip already honours "trust proxy" = 1 hop).
+  String(req.headers["cf-connecting-ip"] || req.ip || "").split(",")[0].trim().slice(0, 60);
 
 // 10 leads per IP per 15 minutes — generous for a real person refreshing,
 // a wall for a script. Shares the client-auth fixed-window buckets.

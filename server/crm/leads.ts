@@ -598,18 +598,35 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     if (body.addToPipeline && !ctx.permissions.manageJobs) return res.status(403).json({ message: "Requires permission: manageJobs" });
     const [lead] = await db.select().from(crmLeads).where(and(eq(crmLeads.orgId, ctx.org.id), eq(crmLeads.id, String(req.params.id)))).limit(1);
     if (!lead) return res.status(404).json({ message: "Lead not found" });
+    // A second click or a retry must not make a second client.
+    if (lead.status === "converted" && lead.customerId) {
+      const [existing] = await db.select().from(crmCustomers)
+        .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, lead.customerId))).limit(1);
+      if (existing) return res.json({ lead, customer: existing, createdClient: false, projectId: null });
+    }
+    // Claim the lead before creating anything: of two concurrent converts only one gets the row.
+    const [claimed] = await db.update(crmLeads).set({ status: "converting", updatedAt: new Date() })
+      .where(and(eq(crmLeads.orgId, ctx.org.id), eq(crmLeads.id, lead.id), sql`${crmLeads.status} <> 'converting'`))
+      .returning({ id: crmLeads.id });
+    if (!claimed) return res.status(409).json({ message: "This lead is already being converted." });
+    const release = () => db.update(crmLeads).set({ status: lead.status, updatedAt: new Date() })
+      .where(and(eq(crmLeads.id, lead.id), eq(crmLeads.status, "converting"))).catch(() => {});
 
     let customer: typeof crmCustomers.$inferSelect | undefined;
     let createdClient = false;
-    if (body.customerId) {
+    let project: typeof crmProjects.$inferSelect | null = null;
+    // A lead already matched to a client links to it instead of making a duplicate.
+    const linkTo = body.customerId ?? lead.customerId ?? null;
+    try {
+    if (linkTo) {
       [customer] = await db.select().from(crmCustomers)
-        .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, body.customerId))).limit(1);
-      if (!customer) return res.status(400).json({ message: "Client not found in this organization" });
+        .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, linkTo))).limit(1);
+      if (!customer) { await release(); return res.status(400).json({ message: "Client not found in this organization" }); }
     } else {
       const addressLine1 = body.addressLine1 || lead.addressLine1;
-      if (!addressLine1) return res.status(400).json({ message: "Enter the client's address." });
+      if (!addressLine1) { await release(); return res.status(400).json({ message: "Enter the client's address." }); }
       const displayName = (body.name || lead.name || lead.email || lead.phone || "").trim().slice(0, 200);
-      if (!displayName) return res.status(400).json({ message: "Enter the client's name." });
+      if (!displayName) { await release(); return res.status(400).json({ message: "Enter the client's name." }); }
       const leadSourceId = lead.source === "call_assistant" ? await leadSourceIdNamed(ctx.org.id, "Call Assistant")
         : lead.source === "form_sync" || lead.source === "website_form" ? await websiteLeadSourceId(ctx.org.id) : null;
       const notes = [lead.service ? `Service: ${lead.service}` : null, lead.message, lead.pageUrl ? `Sent from ${lead.pageUrl}` : null]
@@ -626,7 +643,6 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
       queueCrmEvent(ctx.org.id, "customer.created", { ...customerEventPayload(customer), source: `lead_${lead.source}` });
     }
 
-    let project: typeof crmProjects.$inferSelect | null = null;
     if (body.addToPipeline) {
       const c = customer!;
       project = await db.transaction(async (tx) => {
@@ -641,6 +657,12 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
       });
       queueCrmEvent(ctx.org.id, "project.created", projectEventPayload(project));
       await adoptHoverMeasurementsForProject(project);
+    }
+    } catch (e) {
+      // Keep the client already made: a retry links to it instead of creating another.
+      if (customer) await db.update(crmLeads).set({ customerId: customer.id }).where(eq(crmLeads.id, lead.id)).catch(() => {});
+      await release();
+      throw e;
     }
 
     const [updated] = await db.update(crmLeads).set({ status: "converted", customerId: customer!.id, updatedAt: new Date() })

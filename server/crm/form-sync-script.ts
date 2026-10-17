@@ -25,7 +25,7 @@
  */
 
 /** Field names the script and the server never keep. */
-export const SENSITIVE_FIELD_SOURCE = "pass|card|cc-|cvv|cvc|ssn|social|token|csrf|captcha|recaptcha|g-recaptcha|honeypot|nonce";
+export const SENSITIVE_FIELD_SOURCE = "pass|card|cc[-_]?(?:num|no|exp)|^cc$|cc-|cvv|cvc|cv2|cvn|security[-_]?code|expir|routing|account[-_]?(?:num|no)|iban|ssn|social|token|csrf|captcha|recaptcha|g-recaptcha|honeypot|nonce";
 
 /** The same rule, shorter: "captcha" already covers recaptcha and g-recaptcha. */
 const SCRIPT_SENSITIVE = SENSITIVE_FIELD_SOURCE.replace("|recaptcha|g-recaptcha", "");

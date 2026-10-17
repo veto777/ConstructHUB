@@ -70,6 +70,12 @@ describe("sensitive fields and honeypots", () => {
     const many = sanitizeFields(Object.fromEntries(Array.from({ length: 80 }, (_, i) => [`f${i}`, "v"])));
     expect(Object.keys(many).length).toBe(60);
     expect(SENSITIVE_FIELD.test("cf-turnstile-captcha")).toBe(true);
+    // Payment-form spellings without "card" in them.
+    for (const k of ["cc_number", "ccnum", "ccNo", "cc_exp", "cc", "cv2", "cvn", "security_code", "securityCode", "expiry", "routing_number", "account_number", "iban"])
+      expect(SENSITIVE_FIELD.test(k), k).toBe(true);
+    // ...without catching ordinary lead fields.
+    for (const k of ["success", "accent", "address", "message", "service", "phone", "email", "zip", "city"])
+      expect(SENSITIVE_FIELD.test(k), k).toBe(false);
   });
 
   it("treats a filled company_url or website as a bot", () => {
@@ -133,9 +139,9 @@ function runScript(opts: { origin?: string } = {}) {
 }
 
 describe("form-sync.js", () => {
-  it("is plain JavaScript under 4 KB with the endpoint and the token reader", () => {
+  it("is plain JavaScript under 5 KB with the endpoint and the token reader", () => {
     const js = formSyncScript("https://portal.constructhub.us");
-    expect(Buffer.byteLength(js)).toBeLessThan(4096);
+    expect(Buffer.byteLength(js)).toBeLessThan(5120);
     expect(js).toContain("https://portal.constructhub.us/api/public/form-sync/");
     expect(js).toContain('d.addEventListener("submit"');
     expect(js).not.toContain("preventDefault");
@@ -355,6 +361,11 @@ describe("CRM API", () => {
     expect(project.status).toBe("lead");
     await q(`update crm_projects set name = name || ' ' || $2 where id = $1`, [ok.body.projectId, RUN]);
     await q(`update crm_customers set notes = coalesce(notes, '') || ' ' || $2 where id = $1`, [ok.body.customer.id, RUN]);
+    // A second click returns the same client instead of making another.
+    const again = await api(`/api/crm/leads/${lead.id}/convert`, { method: "POST", body: JSON.stringify({ addressLine1: "22 Pine Ave" }) });
+    expect(again.status).toBe(200);
+    expect(again.body.createdClient).toBe(false);
+    expect(again.body.customer.id).toBe(ok.body.customer.id);
   });
 
   it("convert links an existing client without an address", async () => {
