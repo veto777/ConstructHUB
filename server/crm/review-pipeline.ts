@@ -17,6 +17,8 @@
  *   GET    /api/reviews/pipeline                 the list
  *   POST   /api/reviews/pipeline/:customerId/dismiss   "Not now"
  *   DELETE /api/reviews/pipeline/:customerId/dismiss   back into the list
+ *   POST   /api/reviews/pipeline/:customerId/hide       never ask this client (the send route refuses them)
+ *   DELETE /api/reviews/pipeline/:customerId/hide       allow asking again
  */
 import type { Express } from "express";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -69,20 +71,20 @@ export function describeJobs(jobs: Pick<PipelineJob, "title">[]): string {
 }
 
 export async function buildReviewPipeline(ctx: OrgContext, userId: number): Promise<{
-  ready: PipelineItem[]; dismissed: PipelineItem[]; askedCount: number;
+  ready: PipelineItem[]; dismissed: PipelineItem[]; hidden: PipelineItem[]; askedCount: number;
 }> {
   const orgId = ctx.org.id;
   const policy = objectPolicy(ctx);
   // Each won estimate passes the estimate policy itself (division, assignment), not only its client.
   const won = await policy.filter("estimates", await db.select().from(crmEstimates)
     .where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.status, "approved")))) as Estimate[];
-  if (!won.length) return { ready: [], dismissed: [], askedCount: 0 };
+  if (!won.length) return { ready: [], dismissed: [], hidden: [], askedCount: 0 };
 
   const ids = [...new Set(won.map((e) => e.customerId))];
   const customers = await db.select().from(crmCustomers)
     .where(and(eq(crmCustomers.orgId, orgId), inArray(crmCustomers.id, ids), isNull(crmCustomers.archivedAt)));
   const visible = await policy.filter("customers", customers) as Customer[];
-  if (!visible.length) return { ready: [], dismissed: [], askedCount: 0 };
+  if (!visible.length) return { ready: [], dismissed: [], hidden: [], askedCount: 0 };
   const visibleIds = visible.map((c) => c.id);
 
   const [projects, photos, asked, dismissals, suppressed] = await Promise.all([
@@ -107,6 +109,7 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
   const photoCount = new Map(photos.rows.map((r) => [r.ref_id, { n: Number(r.n), finished: Number(r.finished) }]));
   const askedIds = new Set(asked.rows.map((r) => r.id));
   const dismissedAt = new Map(dismissals.map((d) => [d.customerId, d.dismissedAt]));
+  const hiddenIds = new Set(dismissals.filter((d) => d.kind === "hidden").map((d) => d.customerId));
   const unsub = new Set(suppressed.rows.map((r) => r.email));
 
   const jobsBy = new Map<string, typeof won>();
@@ -114,8 +117,9 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
 
   const ready: PipelineItem[] = [];
   const dismissed: PipelineItem[] = [];
+  const hidden: PipelineItem[] = [];
   for (const c of visible) {
-    if (askedIds.has(c.id)) continue;
+    if (askedIds.has(c.id) && !hiddenIds.has(c.id)) continue;
     // A won estimate whose job was then cancelled is not a job to ask about.
     const list = (jobsBy.get(c.id) ?? [])
       .filter((e) => !e.projectId || projectStatus.get(e.projectId) !== "cancelled")
@@ -142,14 +146,30 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
       unsubscribed: !!email && unsub.has(normalizeRecipient(email)),
       dismissedAt: dismissedAt.get(c.id)?.toISOString() ?? null,
     };
-    (item.dismissedAt ? dismissed : ready).push(item);
+    (hiddenIds.has(c.id) ? hidden : item.dismissedAt ? dismissed : ready).push(item);
   }
   // Finished jobs first (the moment to ask), then the most recently won.
   const order = (a: PipelineItem, b: PipelineItem) =>
     Number(b.jobFinished) - Number(a.jobFinished) || (b.wonAt ?? "").localeCompare(a.wonAt ?? "");
   ready.sort(order);
   dismissed.sort((a, b) => (b.dismissedAt ?? "").localeCompare(a.dismissedAt ?? ""));
-  return { ready, dismissed, askedCount: askedIds.size };
+  hidden.sort((a, b) => a.customer.name.localeCompare(b.customer.name));
+  return { ready, dismissed, hidden, askedCount: [...askedIds].filter((id) => !hiddenIds.has(id)).length };
+}
+
+/**
+ * True when the send route must refuse: the linked CRM client is hidden, or the email belongs to a hidden client of
+ * a CRM team this user is on (a request typed by hand to a hidden client's address is refused too).
+ */
+export async function hiddenFromReviews(userId: number, crmOrgId: string | null | undefined, crmCustomerId: string | null | undefined, email: string): Promise<boolean> {
+  const { rows } = await pool.query(
+    `select 1 from crm_review_pipeline p join crm_customers c on c.id = p.customer_id and c.org_id = p.org_id
+      where p.kind = 'hidden' and (
+        (p.org_id = $2 and p.customer_id = $3)
+        or (coalesce(c.email, '') <> '' and lower(trim(c.email)) = lower(trim($4))
+            and p.org_id in (select m.org_id from crm_members m where m.user_id = $1 and m.status = 'active')))
+      limit 1`, [userId, crmOrgId ?? null, crmCustomerId ?? null, email]);
+  return rows.length > 0;
 }
 
 /** Asking won clients for reviews is client/job work: the same rights as sending their photos (EXPORT_PERMS). */
@@ -171,28 +191,32 @@ export function registerReviewPipelineRoutes(app: Express, getUser: GetUser): vo
     }
   });
 
-  const setDismissed = (on: boolean) => async (req: any, res: any) => {
+  /** Not now / Put back ("dismissed") and Hide / Unhide ("hidden"); one row per client, the latest choice wins. */
+  const setState = (kind: "dismissed" | "hidden", on: boolean) => async (req: any, res: any) => {
     try {
       const ctx = await photoCtx(req, res, getUser);
       if (!ctx || !mayAsk(res, ctx)) return;
       const customerId = String(req.params.customerId).slice(0, 64);
       if (!await objectPolicy(ctx).visible("customers", customerId)) return res.status(404).json({ message: "Client not found" });
       if (on) {
-        await db.insert(crmReviewPipeline).values({ orgId: ctx.org.id, customerId, dismissedByMemberId: ctx.member.id })
+        await db.insert(crmReviewPipeline).values({ orgId: ctx.org.id, customerId, dismissedByMemberId: ctx.member.id, kind })
           .onConflictDoUpdate({
             target: [crmReviewPipeline.orgId, crmReviewPipeline.customerId],
-            set: { dismissedAt: sql`now()`, dismissedByMemberId: ctx.member.id },
+            set: { dismissedAt: sql`now()`, dismissedByMemberId: ctx.member.id, kind },
           });
       } else {
-        await db.delete(crmReviewPipeline).where(and(eq(crmReviewPipeline.orgId, ctx.org.id), eq(crmReviewPipeline.customerId, customerId)));
+        await db.delete(crmReviewPipeline).where(and(eq(crmReviewPipeline.orgId, ctx.org.id), eq(crmReviewPipeline.customerId, customerId), eq(crmReviewPipeline.kind, kind)));
       }
-      logActivity(ctx, on ? "review_pipeline.dismissed" : "review_pipeline.restored", { entityType: "customer", entityId: customerId, customerId });
+      const action = kind === "hidden" ? (on ? "review_pipeline.hidden" : "review_pipeline.unhidden") : (on ? "review_pipeline.dismissed" : "review_pipeline.restored");
+      logActivity(ctx, action, { entityType: "customer", entityId: customerId, customerId });
       res.json({ ok: true });
     } catch (err) {
       logError("review pipeline dismiss", err);
       res.status(500).json({ message: "Could not update the review pipeline." });
     }
   };
-  app.post("/api/reviews/pipeline/:customerId/dismiss", requirePlatformAccess, setDismissed(true));
-  app.delete("/api/reviews/pipeline/:customerId/dismiss", requirePlatformAccess, setDismissed(false));
+  app.post("/api/reviews/pipeline/:customerId/dismiss", requirePlatformAccess, setState("dismissed", true));
+  app.delete("/api/reviews/pipeline/:customerId/dismiss", requirePlatformAccess, setState("dismissed", false));
+  app.post("/api/reviews/pipeline/:customerId/hide", requirePlatformAccess, setState("hidden", true));
+  app.delete("/api/reviews/pipeline/:customerId/hide", requirePlatformAccess, setState("hidden", false));
 }

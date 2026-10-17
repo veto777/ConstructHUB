@@ -762,6 +762,7 @@ export async function ensureCrmSchema(): Promise<void> {
       dismissed_by_member_id varchar
     );
     CREATE UNIQUE INDEX IF NOT EXISTS crm_review_pipeline_customer_uq ON crm_review_pipeline (org_id, customer_id);
+    ALTER TABLE crm_review_pipeline ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'dismissed';
     CREATE INDEX IF NOT EXISTS review_requests_crm_customer_idx ON review_requests (crm_org_id, crm_customer_id);
   `);
 

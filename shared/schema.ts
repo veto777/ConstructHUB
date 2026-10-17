@@ -1525,7 +1525,7 @@ export type CrmFinanceClick = typeof crmFinanceClicks.$inferSelect;
 // client's "Send this to my contractor" from the self-estimate tool
 // (server/crm/self-estimate.ts): "call them about the roof price they built".
 // Shows on Home → Needs attention until someone marks it done.
-// Review pipeline (server/crm/review-pipeline.ts): won-job clients the owner set aside with "Not now".
+// Review pipeline (server/crm/review-pipeline.ts): won-job clients the owner set aside ("Not now") or hid for good.
 // The pipeline itself is derived from won estimates; this is its only stored state.
 export const crmReviewPipeline = pgTable("crm_review_pipeline", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1533,6 +1533,8 @@ export const crmReviewPipeline = pgTable("crm_review_pipeline", {
   customerId: varchar("customer_id").notNull(),
   dismissedAt: timestamp("dismissed_at").notNull().defaultNow(),
   dismissedByMemberId: varchar("dismissed_by_member_id"),
+  // "dismissed" = Not now (back with Put back); "hidden" = never ask this client (POST /api/reviews/create refuses them).
+  kind: text("kind").notNull().default("dismissed"),
 }, (t) => [uniqueIndex("crm_review_pipeline_customer_uq").on(t.orgId, t.customerId)]);
 
 export const crmTasks = pgTable("crm_tasks", {

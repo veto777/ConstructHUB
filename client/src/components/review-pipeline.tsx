@@ -7,9 +7,14 @@
  */
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Camera, Loader2, Send } from "lucide-react";
+import { Camera, EyeOff, Loader2, Search, Send } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Section, StatusPill } from "@/components/app-ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmPhotoClient } from "@/lib/crm-photos";
@@ -26,10 +31,39 @@ export type PipelineItem = {
   unsubscribed: boolean;
   dismissedAt: string | null;
 };
-type Pipeline = { ready: PipelineItem[]; dismissed: PipelineItem[]; askedCount: number };
+type Pipeline = { ready: PipelineItem[]; dismissed: PipelineItem[]; hidden: PipelineItem[]; askedCount: number };
 
 export const PIPELINE_KEY = ["/api/reviews/pipeline"];
-const PAGE = 8;
+// Collapsed to a few rows; the dropdown shows 10–100 (remembered per browser).
+const COLLAPSED = 5;
+const SIZES = [10, 25, 50, 100] as const;
+const SIZE_KEY = "review-pipeline-size";
+// Filters (pure, on the loaded list): what state the job is in, and the trade read from the job titles.
+const STATUS_FILTERS = [
+  ["all", "All won jobs"], ["finished", "Finished jobs"], ["underway", "Not finished yet"],
+  ["photos", "Has job photos"], ["nophotos", "No job photos"], ["noemail", "Missing email"],
+] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number][0];
+const TRADES = [
+  ["siding", "Siding", /siding|hardie|lap|shingle|vinyl|panel/i], ["roofing", "Roofing", /roof|gaf|hdz|metal/i],
+  ["windows", "Windows", /window|pgt|silverlite|cws/i], ["doors", "Doors", /door/i], ["paint", "Paint", /paint/i],
+] as const;
+export function matchesPipeline(it: PipelineItem, f: { q: string; status: StatusFilter; trade: string }): boolean {
+  const text = [it.customer.name, it.customer.email, it.customer.address, it.description, ...it.jobs.map((j) => j.title)].filter(Boolean).join(" ").toLowerCase();
+  if (f.q && !f.q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => text.includes(w))) return false;
+  const photos = it.customer.photoCount;
+  if (f.status === "finished" && !it.jobFinished) return false;
+  if (f.status === "underway" && it.jobFinished) return false;
+  if (f.status === "photos" && !photos) return false;
+  if (f.status === "nophotos" && photos) return false;
+  if (f.status === "noemail" && !it.needsEmail) return false;
+  const trade = TRADES.find((t) => t[0] === f.trade);
+  return !trade || it.jobs.some((j) => trade[2].test(j.title));
+}
+
+function savedSize(): number {
+  try { const n = Number(localStorage.getItem(SIZE_KEY)); return (SIZES as readonly number[]).includes(n) ? n : COLLAPSED; } catch { return COLLAPSED; }
+}
 
 const STAGE: Record<string, string> = {
   scheduled: "Scheduled", in_progress: "In progress", waiting_on_trades: "In progress",
@@ -40,54 +74,103 @@ const money = (cents: number) => `$${Math.round(cents / 100).toLocaleString()}`;
 
 export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) => void }) {
   const { toast } = useToast();
-  const [showAll, setShowAll] = useState(false);
+  const [size, setSizeState] = useState(savedSize);
+  const setSize = (n: number) => { setSizeState(n); try { localStorage.setItem(SIZE_KEY, String(n)); } catch { /* private window */ } };
   const [showDismissed, setShowDismissed] = useState(false);
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [trade, setTrade] = useState("all");
   const { data, isLoading, error } = useQuery<Pipeline, Error>({
     queryKey: PIPELINE_KEY,
     queryFn: async () => {
       const r = await fetch("/api/reviews/pipeline", { credentials: "include" });
-      if (r.status === 404 || r.status === 402 || r.status === 403) return { ready: [], dismissed: [], askedCount: 0 };
+      if (r.status === 404 || r.status === 402 || r.status === 403) return { ready: [], dismissed: [], hidden: [], askedCount: 0 };
       if (!r.ok) throw new Error("Couldn't load your won jobs — refresh to try again.");
       return r.json();
     },
     retry: false,
   });
+  const [showHidden, setShowHidden] = useState(false);
+  const [confirmHide, setConfirmHide] = useState<PipelineItem | null>(null);
   const dismiss = useMutation({
-    mutationFn: async ({ id, on }: { id: string; on: boolean }) => apiRequest(on ? "POST" : "DELETE", `/api/reviews/pipeline/${id}/dismiss`),
+    mutationFn: async ({ id, on, kind = "dismiss" }: { id: string; on: boolean; kind?: "dismiss" | "hide" }) =>
+      apiRequest(on ? "POST" : "DELETE", `/api/reviews/pipeline/${id}/${kind}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PIPELINE_KEY }),
     onError: (e) => toast({ title: "Couldn't update the list", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   if (isLoading) return null;
   if (error) return <p className="text-sm text-destructive" role="alert" data-testid="text-pipeline-error">{error.message}</p>;
-  if (!data || (!data.ready.length && !data.dismissed.length)) return null;
+  if (!data || (!data.ready.length && !data.dismissed.length && !data.hidden.length)) return null;
 
-  const rows = showAll ? data.ready : data.ready.slice(0, PAGE);
+  const filtering = !!q.trim() || status !== "all" || trade !== "all";
+  const matched = filtering ? data.ready.filter((it) => matchesPipeline(it, { q: q.trim(), status, trade })) : data.ready;
+  const rows = matched.slice(0, size);
   return (
     <Section
       title={<span>Ready to ask <span className="font-normal text-muted-foreground">· {data.ready.length}</span></span>}
       description="Every CRM client with a won job who hasn't been asked for a review yet. Finished jobs first."
       flush testId="section-review-pipeline">
-      {data.ready.length ? (
+      {data.ready.length > COLLAPSED && (
+        <div className="flex flex-wrap items-center gap-2 border-b px-4 pb-3 sm:px-6" data-testid="pipeline-filters">
+          <div className="relative min-w-[12rem] flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, job or address" aria-label="Search won jobs"
+              className="h-8 pl-8 text-sm" data-testid="input-pipeline-search" />
+          </div>
+          <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
+            <SelectTrigger className="h-8 w-auto gap-1 text-sm" aria-label="Filter by job status" data-testid="select-pipeline-status"><SelectValue /></SelectTrigger>
+            <SelectContent>{STATUS_FILTERS.map(([k, label]) => <SelectItem key={k} value={k}>{label}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={trade} onValueChange={setTrade}>
+            <SelectTrigger className="h-8 w-auto gap-1 text-sm" aria-label="Filter by trade" data-testid="select-pipeline-trade"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All trades</SelectItem>
+              {TRADES.map(([k, label]) => <SelectItem key={k} value={k}>{label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {filtering && (
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => { setQ(""); setStatus("all"); setTrade("all"); }}
+              data-testid="button-pipeline-clear-filters">Clear</Button>
+          )}
+        </div>
+      )}
+      {data.ready.length && !matched.length ? (
+        <p className="px-4 py-6 text-center text-sm text-muted-foreground sm:px-6" data-testid="text-pipeline-no-match">No won jobs match these filters.</p>
+      ) : data.ready.length ? (
         <ul className="divide-y" data-testid="list-review-pipeline">
           {rows.map((it) => <Row key={it.customer.id} it={it} onPrepare={onPrepare}
             busy={dismiss.isPending && dismiss.variables?.id === it.customer.id}
-            onDismiss={() => dismiss.mutate({ id: it.customer.id, on: true })} />)}
+            onDismiss={() => dismiss.mutate({ id: it.customer.id, on: true })} onHide={() => setConfirmHide(it)} />)}
         </ul>
       ) : (
         <p className="px-4 py-6 text-center text-sm text-muted-foreground sm:px-6">Every won job has been asked. New wins show up here automatically.</p>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-xs text-muted-foreground sm:px-6">
         <span>{data.askedCount} won-job client{data.askedCount === 1 ? "" : "s"} already asked</span>
-        <span className="flex gap-3">
-          {data.ready.length > PAGE && (
-            <button type="button" className="font-medium text-foreground hover:underline" onClick={() => setShowAll(!showAll)} data-testid="button-pipeline-show-all">
-              {showAll ? "Show fewer" : `Show all ${data.ready.length}`}
-            </button>
+        <span className="flex items-center gap-3">
+          {matched.length > COLLAPSED && (
+            <label className="flex items-center gap-1.5">
+              <span>Showing {rows.length} of {matched.length} ·</span>
+              <Select value={String(size)} onValueChange={(v) => setSize(Number(v))}>
+                <SelectTrigger className="h-7 w-auto gap-1 px-2 text-xs" aria-label="How many to show" data-testid="select-pipeline-size">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={String(COLLAPSED)}>Show {COLLAPSED}</SelectItem>
+                  {SIZES.map((n) => <SelectItem key={n} value={String(n)}>Show {n}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
           )}
           {data.dismissed.length > 0 && (
             <button type="button" className="hover:underline" onClick={() => setShowDismissed(!showDismissed)} data-testid="button-pipeline-dismissed">
-              {showDismissed ? "Hide" : "Show"} {data.dismissed.length} set aside
+              {showDismissed ? "Close" : "Show"} {data.dismissed.length} set aside
+            </button>
+          )}
+          {data.hidden.length > 0 && (
+            <button type="button" className="hover:underline" onClick={() => setShowHidden(!showHidden)} data-testid="button-pipeline-hidden">
+              {showHidden ? "Close" : "Show"} {data.hidden.length} hidden
             </button>
           )}
         </span>
@@ -103,37 +186,75 @@ export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) 
           ))}
         </ul>
       )}
+      {showHidden && data.hidden.length > 0 && (
+        <ul className="divide-y border-t bg-muted/30" data-testid="list-review-pipeline-hidden">
+          {data.hidden.map((it) => (
+            <li key={it.customer.id} className="flex items-center justify-between gap-3 px-4 py-2 sm:px-6">
+              <span className="flex min-w-0 items-center gap-2 text-sm">
+                <EyeOff className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="truncate">{it.customer.name}<span className="text-muted-foreground"> · never asked for a review</span></span>
+              </span>
+              <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => dismiss.mutate({ id: it.customer.id, on: false, kind: "hide" })}
+                data-testid={`button-pipeline-unhide-${it.customer.id}`}>Unhide</Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <AlertDialog open={!!confirmHide} onOpenChange={(o) => { if (!o) setConfirmHide(null); }}>
+        <AlertDialogContent data-testid="dialog-pipeline-hide">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hide {confirmHide?.customer.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They leave this list for good and no review request, reminder or scheduled send will go to them, even one typed by hand.
+              You can unhide them later from "hidden" at the bottom of this list.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction data-testid="button-pipeline-hide-confirm" onClick={() => {
+              if (confirmHide) dismiss.mutate({ id: confirmHide.customer.id, on: true, kind: "hide" });
+              setConfirmHide(null);
+            }}>Hide client</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Section>
   );
 }
 
-function Row({ it, onPrepare, onDismiss, busy }: { it: PipelineItem; onPrepare: (it: PipelineItem) => void; onDismiss: () => void; busy: boolean }) {
+function Row({ it, onPrepare, onDismiss, onHide, busy }: {
+  it: PipelineItem; onPrepare: (it: PipelineItem) => void; onDismiss: () => void; onHide: () => void; busy: boolean;
+}) {
   const total = it.jobs.reduce((s, j) => s + j.totalCents, 0);
   const stage = it.projectStatus ? STAGE[it.projectStatus] ?? null : null;
   const blocked = it.unsubscribed;
+  const photos = it.customer.photoCount;
   return (
-    <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:px-6" data-testid={`row-pipeline-${it.customer.id}`}>
+    <li className="flex items-center gap-3 px-4 py-2 sm:px-6" data-testid={`row-pipeline-${it.customer.id}`}>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate font-medium">{it.customer.name}</span>
-          {stage && <StatusPill tone={it.jobFinished ? "success" : "neutral"}>{stage}</StatusPill>}
-          {it.needsEmail && <StatusPill tone="warning">No email on file</StatusPill>}
-          {it.unsubscribed && <StatusPill tone="neutral">Unsubscribed</StatusPill>}
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 truncate text-sm font-medium md:max-w-[45%] md:shrink-0">{it.customer.name}</span>
+          {stage && <StatusPill tone={it.jobFinished ? "success" : "neutral"} className="shrink-0">{stage}</StatusPill>}
+          {it.needsEmail && <StatusPill tone="warning" className="shrink-0">No email</StatusPill>}
+          {it.unsubscribed && <StatusPill tone="neutral" className="shrink-0">Unsubscribed</StatusPill>}
+          <span className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline">{it.description || "Won job"}</span>
         </div>
-        <p className="truncate text-sm text-muted-foreground">
-          {[it.description || "Won job", total ? money(total) : null, it.wonAt ? `won ${day(it.wonAt)}` : null].filter(Boolean).join(" · ")}
-        </p>
-        <p className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Camera className="h-3 w-3" aria-hidden="true" />
-          {it.customer.photoCount ? `${it.customer.photoCount} job photo${it.customer.photoCount === 1 ? "" : "s"}${it.finishedPhotoCount ? ` · ${it.finishedPhotoCount} finished` : ""}` : "No job photos yet"}
+        <p className="truncate text-xs text-muted-foreground">
+          <span className="md:hidden">{it.description || "Won job"} · </span>
+          {[total ? money(total) : null, it.wonAt ? `won ${day(it.wonAt)}` : null].filter(Boolean).join(" · ")}
+          <span className="inline-flex items-center gap-1 pl-2 align-middle"><Camera className="h-3 w-3" aria-hidden="true" />{photos || "no"} photo{photos === 1 ? "" : "s"}</span>
         </p>
       </div>
-      <div className="flex shrink-0 gap-2">
-        <Button size="sm" variant="ghost" onClick={onDismiss} disabled={busy} data-testid={`button-pipeline-dismiss-${it.customer.id}`}>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-muted-foreground" onClick={onHide} disabled={busy}
+          title="Never ask this client for a review" data-testid={`button-pipeline-hide-${it.customer.id}`}>
+          <EyeOff className="h-3.5 w-3.5 sm:mr-1" aria-hidden="true" /><span className="hidden sm:inline">Hide</span>
+        </Button>
+        <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={onDismiss} disabled={busy} data-testid={`button-pipeline-dismiss-${it.customer.id}`}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Not now"}
         </Button>
-        <Button size="sm" onClick={() => onPrepare(it)} disabled={blocked} data-testid={`button-pipeline-prepare-${it.customer.id}`}>
-          <Send className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Prepare request
+        <Button size="sm" className="h-8 px-3 text-xs" onClick={() => onPrepare(it)} disabled={blocked} data-testid={`button-pipeline-prepare-${it.customer.id}`}>
+          <Send className="mr-1 h-3.5 w-3.5" aria-hidden="true" /><span className="hidden sm:inline">Prepare request</span><span className="sm:hidden">Prepare</span>
         </Button>
       </div>
     </li>

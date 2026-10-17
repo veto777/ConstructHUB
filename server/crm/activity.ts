@@ -193,6 +193,8 @@ export function activityText(row: {
       case "customer.deleted": return "deleted this client";
       case "review_pipeline.dismissed": return "set this client aside in the review pipeline (Not now)";
       case "review_pipeline.restored": return "put this client back in the review pipeline";
+      case "review_pipeline.hidden": return "hid this client from review requests";
+      case "review_pipeline.unhidden": return "allowed review requests to this client again";
       case "member.updated": return memberChange();
       case "member.removed": return `removed ${m.name ?? "a member"} from the team`;
       case "settings.updated": return `updated company settings${labelled(m.labels && typeof m.labels === "object" ? m.labels : {})}`;

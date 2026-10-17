@@ -17,7 +17,7 @@ import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { presentListing } from "./competitor-analysis";
 import { rateLimit, actorKey, takeBudget } from "./growth-limits";
-import { registerReviewPipelineRoutes } from "./crm/review-pipeline";
+import { hiddenFromReviews, registerReviewPipelineRoutes } from "./crm/review-pipeline";
 import { registerCrmPhotoPlatformRoutes, registerReviewProjectPhotoRoutes, resolveReviewCrmLink, reviewPhotoUrl } from "./crm/photo-library";
 import { ownedBy } from "./ownership";
 import { buildExclusionList } from "./click-guard-exclusions";
@@ -5397,6 +5397,10 @@ function main() {
       // Picked CRM client / ticked CRM photos (server/crm/photo-library.ts); a hand-typed request has neither.
       const crmLink = await resolveReviewCrmLink(req, res, getDevUser, req.body);
       if (!crmLink) return;
+      // Hidden in the review pipeline ("never ask this client"): refused whether picked from the CRM or typed by hand.
+      if (await hiddenFromReviews(user.id, crmLink.crmOrgId, crmLink.crmCustomerId, String(clientEmail))) {
+        return res.status(409).json({ message: "This client is hidden from review requests. Unhide them under Ready to ask to send one." });
+      }
       const uploadedPhotos = Array.isArray(photos) ? photos : [];
       if (uploadedPhotos.length + (crmLink.photos?.length ?? 0) > 30) return res.status(400).json({ message: "Maximum 30 photos per review request." });
 
@@ -5801,6 +5805,7 @@ function main() {
       if (!request) return res.status(404).json({ message: "Not found" });
 
       if (request.unsubscribed || await isReviewSuppressed(request.userId, request.clientEmail)) return res.status(409).json({ message: "This customer unsubscribed from this review request." });
+      if (await hiddenFromReviews(request.userId, request.crmOrgId, request.crmCustomerId, request.clientEmail)) return res.status(409).json({ message: "This client is hidden from review requests." });
 
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
       const companyLogoUrl = fullUser?.companyLogoUrl || null;
@@ -6390,6 +6395,11 @@ function main() {
           }
 
           if (await isReviewSuppressed(request.userId, request.clientEmail)) continue;
+          // Hidden in the review pipeline after the request went out: no more reminders.
+          if (await hiddenFromReviews(request.userId, request.crmOrgId, request.crmCustomerId, request.clientEmail)) {
+            await storage.updateReviewRequest(request.id, { nextReminderAt: null });
+            continue;
+          }
           await sendReviewReminderEmail(
             request.clientEmail,
             request.clientName,
@@ -6440,6 +6450,11 @@ function main() {
           const baseUrl = canonicalAppOrigin();
 
           if (await isReviewSuppressed(request.userId, request.clientEmail)) continue;
+          // Hidden in the review pipeline after it was scheduled: never sent.
+          if (await hiddenFromReviews(request.userId, request.crmOrgId, request.crmCustomerId, request.clientEmail)) {
+            await storage.updateReviewRequest(request.id, { status: "suppressed", scheduledFor: null });
+            continue;
+          }
           await sendReviewRequestEmail(
             request.clientEmail,
             request.clientName,

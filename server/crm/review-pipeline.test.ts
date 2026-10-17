@@ -157,6 +157,27 @@ describe("review pipeline", () => {
     expect(log.rows.map((x) => x.action)).toEqual(["review_pipeline.dismissed", "review_pipeline.restored"]);
   });
 
+  it("hide takes a client out for good and the send gate refuses them by link or by email", async () => {
+    const { hiddenFromReviews } = await import("./review-pipeline");
+    expect(await hiddenFromReviews(owner, orgA, C.finished, "ash@example.invalid")).toBe(false);
+    expect((await call(owner, `/api/reviews/pipeline/${C.finished}/hide`, "POST")).status).toBe(200);
+    let r = await call(owner, "/api/reviews/pipeline");
+    expect(r.data.ready.map((i: any) => i.customer.name)).toEqual(["Birch Recent"]);
+    expect(r.data.hidden.map((i: any) => i.customer.name)).toEqual(["Ash Finished"]);
+    expect(r.data.dismissed).toEqual([]);
+    expect(await hiddenFromReviews(owner, orgA, C.finished, "x@example.invalid")).toBe(true);
+    expect(await hiddenFromReviews(owner, null, null, " ASH@example.invalid")).toBe(true);
+    expect(await hiddenFromReviews(other, null, null, "ash@example.invalid")).toBe(false);
+    // Put back (dismiss DELETE) does not unhide; Unhide does.
+    expect((await call(owner, `/api/reviews/pipeline/${C.finished}/dismiss`, "DELETE")).status).toBe(200);
+    expect((await call(owner, "/api/reviews/pipeline")).data.hidden).toHaveLength(1);
+    expect((await call(owner, `/api/reviews/pipeline/${C.finished}/hide`, "DELETE")).status).toBe(200);
+    r = await call(owner, "/api/reviews/pipeline");
+    expect(r.data.hidden).toEqual([]);
+    expect(r.data.ready).toHaveLength(2);
+    expect(await hiddenFromReviews(owner, null, null, "ash@example.invalid")).toBe(false);
+  });
+
   it("refuses another org's client and accounts with no CRM team", async () => {
     expect((await call(owner, `/api/reviews/pipeline/${C.otherOrg}/dismiss`, "POST")).status).toBe(404);
     expect((await call(outsider, "/api/reviews/pipeline")).status).toBe(404);
