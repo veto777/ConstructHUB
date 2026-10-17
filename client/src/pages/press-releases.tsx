@@ -1,26 +1,10 @@
-/**
- * /press-releases — the ConstructHUB Press Wire (shared/press.ts). Calm, like the rest of the app (owner, 2026-10-17:
- * "this looks like ai slop! ... fix it and give it some automation but match the rest of the site"; this replaces the
- * 2026-10-15 "make it loud and flashy" version). Built only from the page kit (components/app-ui.tsx) and shadcn.
- *
- *   header      one primary action: Write a release
- *   numbers     credits left, releases live, the next autopilot draft, the reach of the tier you have credits for
- *   ideas       story ideas from the account's own data (GET /api/press/ideas), "Draft it" opens the writer filled in;
- *               the autopilot switch (one draft a month, for approval: PUT /api/press/autopilot)
- *   releases    each release's status, live link and report; empty: the five steps and a sample
- *   packages    Standard / National / Premium, one release or the 12-month program
- *   where       each tier's outlet count and headline outlets, and the full list in a dialog
- *
- * The writer fills company and contact fields from the account (GET /api/press/prefill). Every number and outlet name
- * on this page comes from the wire's own 2026 sheets (server/data/press-outlets.json), the price book (shared/press.ts)
- * or the account's own data. Nothing is invented.
- */
+/** Press Wire: editorial product surface; account and writer flows remain API-backed. */
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Check, CheckCircle2, Clock, FileText, Globe2, Image as ImageIcon, Info, Lightbulb, Loader2, Newspaper, Package, Send, XCircle } from "lucide-react";
+import { ArrowRight, ExternalLink, AlertTriangle, Check, CheckCircle2, Clock, FileText, Globe2, Image as ImageIcon, Info, Lightbulb, Loader2, Newspaper, Package, Send, XCircle } from "lucide-react";
 import {
-  PRESS_AUTOPILOT_MAX_DAY, PRESS_HEADLINE_OUTLETS, PRESS_NEWS_TYPES, PRESS_PACKAGES, PRESS_TIERS, PRESS_TIER_INFO, PRESS_TIER_LABEL, PRESS_WIRE_TIER_NAME, pressPackage, PRESS_PROGRAM_CREDITS, PRESS_PROGRAM_FREE, PRESS_PROGRAM_PAID, PRESS_STATUS_HELP, PRESS_STATUS_LABELS,
+  PRESS_CREDIT_MONTHS, PRESS_AUTOPILOT_MAX_DAY, PRESS_HEADLINE_OUTLETS, PRESS_NEWS_TYPES, PRESS_PACKAGES, PRESS_TIERS, PRESS_TIER_INFO, PRESS_TIER_LABEL, PRESS_WIRE_TIER_NAME, pressPackage, PRESS_PROGRAM_CREDITS, PRESS_PROGRAM_FREE, PRESS_PROGRAM_PAID, PRESS_STATUS_HELP, PRESS_STATUS_LABELS,
   pressPackagePrice, type PressAutopilotView, type PressGuidelineIssue, type PressIdea, type PressPackageKey, type PressOrderView, type PressPackage, type PressPrefill, type PressPrefillField, type PressReleaseInput, type PressReleaseStatus, type PressReleaseText, type PressReleaseView, type PressTier,
 } from "@shared/press";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -35,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import "@/components/press/press-wire.css";
 
 type Overview = {
   packages: PressPackage[];
@@ -82,11 +67,19 @@ function Packages({ credits, onBuy, buying }: { credits: Record<PressTier, numbe
   const [qty, setQty] = useState<PressPackageKey>("single");
   const pkg = pressPackage(qty)!;
   return (
-    <div className="space-y-4">
-      <div className="inline-flex rounded-lg border p-0.5" role="radiogroup" aria-label="How many releases">
+    <div className="space-y-6">
+      <div className="wire-segment inline-flex rounded-lg border p-1" role="radiogroup" aria-label="How many releases">
         {PRESS_PACKAGES.map((p) => (
-          <button key={p.key} type="button" role="radio" aria-checked={qty === p.key} onClick={() => setQty(p.key)}
-            className={cn("rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", qty === p.key ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+          <button key={p.key} type="button" role="radio" aria-checked={qty === p.key} tabIndex={qty === p.key ? 0 : -1} onClick={() => setQty(p.key)}
+            onKeyDown={(event) => {
+              if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+              event.preventDefault();
+              const current = PRESS_PACKAGES.findIndex((item) => item.key === qty);
+              const next = event.key === "Home" ? 0 : event.key === "End" ? PRESS_PACKAGES.length - 1 : (current + (event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1) + PRESS_PACKAGES.length) % PRESS_PACKAGES.length;
+              setQty(PRESS_PACKAGES[next].key);
+              (event.currentTarget.parentElement?.children[next] as HTMLButtonElement | undefined)?.focus();
+            }}
+            className={cn("rounded-md px-3 py-1.5 text-sm font-medium motion-safe:transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", qty === p.key ? "bg-foreground text-background shadow-sm" : "text-muted-foreground hover:text-foreground")}
             data-testid={`press-qty-${p.key}`}>
             {p.key === "single" ? "1 release" : `${PRESS_PROGRAM_PAID} + ${PRESS_PROGRAM_FREE} free`}
           </button>
@@ -99,15 +92,15 @@ function Packages({ credits, onBuy, buying }: { credits: Record<PressTier, numbe
           const popular = tier === "national";
           const busy = buying === `${tier}:${pkg.key}`;
           return (
-            <div key={tier} className={cn("flex flex-col rounded-xl border bg-card p-4 sm:p-5", popular && "border-primary")} data-testid={`press-package-${tier}`}>
+            <div key={tier} className={cn("wire-package flex min-w-0 flex-col rounded-xl border bg-card p-5 lg:p-7", popular && "wire-package-featured")} data-testid={`press-package-${tier}`}>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-base font-semibold">{PRESS_TIER_LABEL[tier]}</h3>
-                {popular && <Badge variant="secondary" className="font-medium">Most popular</Badge>}
+                {popular && <Badge variant="outline" className="wire-featured-label">National reach</Badge>}
               </div>
-              <p className="mt-0.5 text-sm text-muted-foreground">{info.tagline}</p>
-              <div className="mt-4 text-2xl font-semibold tabular-nums tracking-tight">
+              <p className="mt-3 min-h-10 text-sm text-muted-foreground">{info.tagline}</p>
+              <div className="mt-6 text-4xl font-semibold tabular-nums tracking-tighter lg:text-[2.75rem]">
                 {usd(price)}
-                {pkg.credits > 1 && <span className="ml-1.5 text-sm font-normal text-muted-foreground">for {pkg.credits} releases</span>}
+                {pkg.credits > 1 && <span className="mt-2 block text-sm font-normal tracking-normal text-muted-foreground">for {pkg.credits} releases</span>}
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {pkg.credits > 1 ? `${usd(Math.round(price / pkg.credits))} a release, one a month for a year` : `or ${usd(pressPackagePrice(pressPackage("program_12")!, tier))} for ${PRESS_PROGRAM_CREDITS} (${PRESS_PROGRAM_FREE} free)`}
@@ -115,7 +108,7 @@ function Packages({ credits, onBuy, buying }: { credits: Record<PressTier, numbe
               <ul className="mt-4 flex-1 space-y-2 border-t pt-4 text-sm">
                 {info.perks.map((perk) => <li key={perk} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" /><span>{perk}</span></li>)}
               </ul>
-              <Button className="mt-5 w-full" variant={popular ? "default" : "outline"} onClick={() => onBuy(pkg.key, tier)} disabled={buying !== null} data-testid={`press-buy-${tier}`}>
+              <Button className={cn("mt-7 h-11 w-full", popular && "wire-primary")} variant={popular ? "default" : "outline"} onClick={() => onBuy(pkg.key, tier)} disabled={buying !== null} data-testid={`press-buy-${tier}`}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : `Buy ${PRESS_TIER_LABEL[tier]}${pkg.credits > 1 ? " program" : ""}`}
               </Button>
               {credits[tier] > 0 && <p className="mt-2 text-center text-xs text-muted-foreground">You have {credits[tier]} {PRESS_TIER_LABEL[tier]} credit{credits[tier] > 1 ? "s" : ""} left</p>}
@@ -170,7 +163,7 @@ function Reach({ counts, onOpen }: { counts: Record<PressTier, number> | null; o
                 <span className="tabular-nums">{counts ? `${n(counts[t])} outlets` : "…"}</span>
                 {PRESS_TIER_INFO[t].pickups && <div className="text-xs text-muted-foreground">Typically {PRESS_TIER_INFO[t].pickups} sites run it</div>}
               </td>
-              <td className={cn(appTable.td, appTableCards.td, "text-muted-foreground")}>{PRESS_HEADLINE_OUTLETS[t].join(", ")}</td>
+              <td className={cn(appTable.td, appTableCards.td, "text-muted-foreground")}>{PRESS_HEADLINE_OUTLETS[t].slice(0, 6).join(", ")}<span className="mt-1 block text-xs">+ {PRESS_HEADLINE_OUTLETS[t].length - 6} more headline outlets</span></td>
               <td className={cn(appTable.td, appTableCards.td, "sm:text-right")}>
                 <Button variant="outline" size="sm" onClick={() => onOpen(t)} data-testid={`press-outlets-${t}`}>See every outlet</Button>
               </td>
@@ -184,14 +177,15 @@ function Reach({ counts, onOpen }: { counts: Record<PressTier, number> | null; o
 
 /* ── The release itself ───────────────────────────────────────────────────── */
 
-function ReleasePreview({ text }: { text: PressReleaseText }) {
+function ReleasePreview({ text, compact = false }: { text: PressReleaseText; compact?: boolean }) {
   return (
-    <article className="rounded-lg border bg-background p-4 text-sm leading-relaxed sm:p-5" data-testid="press-preview">
-      <h3 className="text-base font-semibold leading-snug">{text.headline}</h3>
+    <article className={cn("wire-preview rounded-lg border bg-card p-5 text-sm leading-relaxed sm:p-7", compact && "wire-preview-compact")} data-testid="press-preview">
+      <div className="wire-masthead"><span>ConstructHUB <strong>Press Wire</strong></span><span>{compact ? "Sample release" : "Press release"}</span></div>
+      <h3 className="font-display text-2xl font-semibold leading-tight">{text.headline}</h3>
       {text.subheadline && <p className="mt-1 text-muted-foreground">{text.subheadline}</p>}
-      <div className="mt-3 whitespace-pre-wrap"><span className="font-medium">{text.dateline}</span> {text.body}</div>
-      {text.boilerplate && <div className="mt-3 whitespace-pre-wrap border-t pt-3 text-muted-foreground">{text.boilerplate}</div>}
-      {text.mediaContact && <div className="mt-3 whitespace-pre-wrap text-muted-foreground"><span className="font-medium text-foreground">Media contact</span>{"\n"}{text.mediaContact}</div>}
+      <div className="mt-3 whitespace-pre-wrap"><span className="font-medium">{text.dateline}</span> {compact ? text.body.split("\n\n")[0] : text.body}</div>
+      {!compact && text.boilerplate && <div className="mt-3 whitespace-pre-wrap border-t pt-3 text-muted-foreground">{text.boilerplate}</div>}
+      {!compact && text.mediaContact && <div className="mt-3 whitespace-pre-wrap text-muted-foreground"><span className="font-medium text-foreground">Media contact</span>{"\n"}{text.mediaContact}</div>}
     </article>
   );
 }
@@ -487,8 +481,8 @@ function Autopilot({ view }: { view: PressAutopilotView }) {
     onError: (e: any) => toast({ title: "Not saved", description: apiErrorMessage(e), variant: "destructive" }),
   });
   return (
-    <div className="mt-4 space-y-2 border-t pt-4" data-testid="press-autopilot">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="wire-autopilot space-y-4 rounded-xl border bg-muted/40 p-5" data-testid="press-autopilot">
+      <div className="flex flex-col gap-5">
         <label className="flex items-start gap-3">
           <Switch checked={view.enabled} onCheckedChange={(enabled) => save.mutate({ enabled, dayOfMonth: view.dayOfMonth })} disabled={save.isPending} aria-label="Draft one release a month for me" data-testid="press-autopilot-switch" />
           <span className="text-sm">
@@ -520,28 +514,28 @@ const STEPS = ["Pick a package", "Tell us what happened (and add photos)", "Read
 function Timeline({ releases, onOpen }: { releases: PressReleaseView[]; onOpen: (r: PressReleaseView) => void }) {
   if (!releases.length) {
     return (
-      <div className="grid gap-5 lg:grid-cols-[1fr_1.3fr]" data-testid="press-releases-empty">
-        <div>
-          <div className="text-sm font-medium">No releases yet</div>
-          <p className="mt-1 text-sm text-muted-foreground">The sample shows what the writer makes from a few sentences. Yours uses your company, your facts and your quote; nothing is invented.</p>
-          <ol className="mt-4 space-y-2 text-sm">
-            {STEPS.map((s, i) => <li key={s} className="flex gap-2.5"><span className="w-4 shrink-0 text-right tabular-nums text-muted-foreground">{i + 1}.</span><span>{s}</span></li>)}
-          </ol>
+      <div className="wire-empty" data-testid="press-releases-empty">
+        <FileText className="h-8 w-8 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div><h3 className="font-semibold">Your first story starts here.</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Write a release or draft one from a story idea. Review the text before it goes to the wire.</p>
+          <details className="mt-3 text-sm"><summary className="cursor-pointer">How publishing works</summary>
+            <ol className="mt-3 space-y-2">{STEPS.map((s, i) => <li key={s}>{i + 1}. {s}</li>)}</ol>
+          </details>
         </div>
-        <div className="min-w-0"><div className="mb-1.5 text-xs font-medium text-muted-foreground">Sample release</div><ReleasePreview text={SAMPLE} /></div>
       </div>
     );
   }
   return (
-    <ul className="divide-y rounded-lg border" data-testid="press-releases-list">
+    <ul className="divide-y border-y" data-testid="press-releases-list">
       {releases.map((r) => (
-        <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 hover:bg-muted/40">
-          <button type="button" className="min-w-0 flex-1 basis-56 text-left" onClick={() => onOpen(r)} data-testid={`press-release-${r.id}`}>
-            <div className="truncate text-sm font-medium">{r.text?.headline ?? `${r.input.companyName}: ${PRESS_NEWS_TYPES.find((t) => t.key === r.input.newsType)?.label ?? "release"}`}</div>
+        <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-3 px-2 py-5 hover:bg-muted/40">
+          <button type="button" className="min-w-0 flex-1 basis-56 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onOpen(r)} data-testid={`press-release-${r.id}`}>
+            <div className="break-words text-base font-semibold">{r.text?.headline ?? `${r.input.companyName}: ${PRESS_NEWS_TYPES.find((t) => t.key === r.input.newsType)?.label ?? "release"}`}</div>
             <div className="text-xs text-muted-foreground">{r.code} · {tierWord(r.tier)} · {day(r.updatedAt, true)}{r.liveAt ? ` · live ${day(r.liveAt)}` : ""}</div>
           </button>
+          {/* Integration point: per-release automation badges. */}
           <StatusPill tone={STATUS_TONE[r.status]} title={PRESS_STATUS_HELP[r.status]}>{PRESS_STATUS_LABELS[r.status]}</StatusPill>
-          {r.liveUrl && <a className="text-xs font-medium underline underline-offset-2" href={r.liveUrl} target="_blank" rel="noreferrer">Read it</a>}
+          {r.liveUrl && <a className="inline-flex items-center gap-1 rounded-sm text-sm font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring" href={r.liveUrl} target="_blank" rel="noreferrer">Read release <ExternalLink className="h-3.5 w-3.5" /></a>}
           {r.status === "changes_requested" && <StatusPill tone="danger">Action needed</StatusPill>}
         </li>
       ))}
@@ -591,31 +585,72 @@ export default function PressReleasesPage() {
   const openNew = (seed: Seed | null = null) => setWriter({ open: true, release: null, seed });
 
   return (
-    <AppPage width="wide" testId="page-press-releases">
+    <AppPage width="wide" className="press-wire" testId="page-press-releases">
       <PageHeader
         title="Press Releases"
         icon={Newspaper}
         description="Your news on the national wire: written for you, reviewed by editors, reported back to you."
-        actions={<Button onClick={() => openNew()} disabled={isLoading} data-testid="press-new">Write a release</Button>}
       />
       {error && <Notice tone="danger" title="Could not load">{apiErrorMessage(error)}</Notice>}
 
-      <StatGrid cols={4}>
+      <section className="wire-hero" aria-labelledby="wire-headline">
+        <div className="wire-hero-copy">
+          <p className="wire-eyebrow">Your company. National news.</p>
+          <h2 id="wire-headline">Good work<br />deserves<br /><span>the headlines.</span></h2>
+          <p className="wire-hero-description">Take your company’s next chapter to the national newsrooms. We write the release. You approve it. The wire takes it from there.</p>
+          <Button className="wire-hero-cta" onClick={() => openNew()} disabled={!data} data-testid="press-new">Write a release <ArrowRight className="ml-3 h-4 w-4" /></Button>
+          <a className="wire-package-link" href="#packages">Compare distribution packages <ArrowRight className="h-4 w-4" /></a>
+        </div>
+        <div className="wire-hero-paper">
+          <div className="wire-preview-label"><span>From your business to the wire</span><Newspaper className="h-4 w-4" /></div>
+          <ReleasePreview text={SAMPLE} compact />
+          <p className="mt-4 text-xs text-muted-foreground">An example of the finished release. Your draft uses your facts, your company and your voice.</p>
+        </div>
+      </section>
+
+      <section className="wire-proof" aria-label="Distribution outlets">
+        <p className="wire-eyebrow">On the distribution list</p>
+        <div>{[...PRESS_HEADLINE_OUTLETS.national.slice(0, 3), PRESS_HEADLINE_OUTLETS.budget[0], PRESS_HEADLINE_OUTLETS.national[11]].map((outlet) => <span key={outlet}>{outlet}</span>)}</div>
+        <p className="text-xs text-muted-foreground">Availability varies by package. Distribution is not a guarantee of editorial coverage.</p>
+      </section>
+
+      {/* Integration point: press-automation account status strip. */}
+      <div className="wire-stats">
+      <StatGrid cols={4} className="sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Credits left" value={data ? n(totalCredits) : "…"} testId="press-credits"
           hint={totalCredits > 0 ? PRESS_TIERS.filter((t) => credits[t] > 0).map((t) => `${credits[t]} ${tierWord(t)}`).join(" · ") : "Pick a package to start"} href={totalCredits > 0 ? undefined : "#packages"} />
         <Stat label="Releases live" value={data ? n(live) : "…"} hint={sent > 0 ? `of ${n(sent)} sent to the wire` : "None sent yet"} testId="press-live" />
-        <Stat label="Next autopilot draft" value={autopilot?.nextDraftOn ? draftDay(autopilot.nextDraftOn) : "Off"} testId="press-next-draft"
+        <Stat label="Next autopilot draft" value={!data ? "…" : autopilot?.nextDraftOn ? draftDay(autopilot.nextDraftOn) : autopilot?.enabled ? "Paused" : "Off"} testId="press-next-draft"
           hint={autopilot?.enabled ? (autopilot.nextDraftOn ? `Day ${autopilot.dayOfMonth} of each month` : "Paused: no credit left") : "Turn it on under Story ideas"} />
         <Stat label="Reach" value={reachTier && data ? `${n(data.outletCounts[reachTier])}` : "None yet"} testId="press-reach-stat"
           hint={reachTier ? `outlets on ${tierWord(reachTier)}, the tier you have credits for` : "Outlets depend on the package"} />
       </StatGrid>
+      </div>
 
-      <Section title="Story ideas" icon={Lightbulb} description="News found in your own account data. Each fact is shown as stored; nothing is made up." testId="press-ideas-section">
-        <Ideas ideas={ideas.data?.ideas ?? []} loading={ideas.isLoading} onDraft={(i) => openNew({ newsType: i.newsType, details: i.detailsDraft, ideaKey: i.key })} />
-        {autopilot && (totalCredits > 0 || autopilot.enabled) && <Autopilot view={autopilot} />}
-      </Section>
+      <section className="wire-engine" aria-labelledby="wire-engine-heading">
+        <div className="wire-section-heading"><div><p className="wire-eyebrow">A publishing rhythm</p><h2 id="wire-engine-heading">The next story is already taking shape.</h2></div><p>Ideas from your account. A draft each month.<br />You always have the final word.</p></div>
+        <ol className="wire-flow" aria-label="Your publishing workflow">
+          {[
+            { label: "Story idea", value: ideas.data ? `${n(ideas.data.ideas.length)} available` : "Checking account…" },
+            { label: "Draft", value: data ? `${active.filter((r) => r.status === "draft").length} in progress` : "Loading…" },
+            { label: "You approve", value: data ? `${active.filter((r) => (r.status === "draft" && !!r.text) || r.status === "changes_requested").length} to review` : "Loading…" },
+            { label: "On the wire", value: data ? `${n(sent)} sent` : "Loading…" },
+            { label: "Report", value: data ? `${active.filter((r) => r.status === "reported").length} delivered` : "Loading…" },
+          ].map((step, i) => <li key={step.label}><span className="wire-step-index" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span><div><h3>{step.label}</h3><p>{step.value}</p></div>{i < 4 && <ArrowRight className="wire-flow-arrow h-4 w-4" aria-hidden="true" />}</li>)}
+        </ol>
+        <div className="wire-engine-body">
+          <Section title="Story ideas" icon={Lightbulb} description="Found in your account. Every fact is yours." testId="press-ideas-section" className="wire-ideas-panel">
+            {ideas.isError ? <Notice tone="danger" title="Could not load story ideas">{apiErrorMessage(ideas.error)}</Notice> : <Ideas ideas={ideas.data?.ideas ?? []} loading={ideas.isLoading} onDraft={(i) => openNew({ newsType: i.newsType, details: i.detailsDraft, ideaKey: i.key })} />}
+          </Section>
+          <aside className="min-w-0">
+            {/* Integration point: press-automation settings; retain these account controls. */}
+            {autopilot ? <Autopilot view={autopilot} /> : <p className="p-5 text-sm text-muted-foreground">{error ? "Automation settings unavailable." : "Loading automation settings…"}</p>}
+          </aside>
+        </div>
+      </section>
 
       <Section
+        className="wire-open-section"
         title="Your releases"
         icon={Clock}
         description={daysSince != null && daysSince < (data?.pacing.recommendedGapDays ?? 28) && totalCredits > 0 ? `Last one went out ${daysSince} day${daysSince === 1 ? "" : "s"} ago. For the best results, space releases about a month apart.` : "Each release's status, its live link and its report. Click one to open it."}
@@ -624,12 +659,12 @@ export default function PressReleasesPage() {
         {isLoading ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div> : <Timeline releases={active} onOpen={(r) => setWriter({ open: true, release: r, seed: null })} />}
       </Section>
 
-      <Section id="packages" title="Packages" icon={Package} description={`Every release is written to the wire's editorial guidelines, sent with your photos, and reported back. Buy ${PRESS_PROGRAM_PAID} and get ${PRESS_PROGRAM_CREDITS}.`}>
+      <Section className="wire-pricing wire-open-section" id="packages" title="Choose your reach" icon={Package} description={`Every release is written to the wire's editorial guidelines, sent with your photos, and reported back. Buy ${PRESS_PROGRAM_PAID} and get ${PRESS_PROGRAM_CREDITS}.`}>
         <Packages credits={credits} onBuy={(key, tier) => buy.mutate({ key, tier })} buying={buying} />
-        <p className="mt-4 text-xs text-muted-foreground">Credits are good for 12 months. One release a month keeps a company in the news. The wire does not refund a release its editors refuse for breaking the content rules, so the writer checks every draft against those rules before you approve it.</p>
+        <p className="mt-4 text-xs text-muted-foreground">Credits are good for {PRESS_CREDIT_MONTHS} months. One release a month keeps a company in the news. The wire does not refund a release its editors refuse for breaking the content rules, so the writer checks every draft against those rules before you approve it.</p>
       </Section>
 
-      <Section title="Where it runs" icon={Globe2} description="The wire's published U.S. lists: the newsrooms each release is sent to. Fewer sites actually run it; some publications choose what they post.">
+      <Section className="wire-distribution wire-open-section" title="Where it runs" icon={Globe2} description="The wire's published U.S. lists: the newsrooms each release is sent to. Fewer sites actually run it; some publications choose what they post.">
         <Reach counts={data?.outletCounts ?? null} onOpen={setOutletsTier} />
       </Section>
 
