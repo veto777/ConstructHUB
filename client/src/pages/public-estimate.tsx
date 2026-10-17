@@ -451,7 +451,7 @@ export default function PublicEstimatePage() {
     );
   }
 
-  const { estimate: e, items, company, customer, options, preview, discountOffers, salesRep, answerBlock, home3d } = data;
+  const { estimate: e, items, company, customer, options, preview, discountOffers, salesRep, answerBlock, home3d, viewer3d } = data;
   const settled = done ?? (e.approvedAt ? "approved" : e.declinedAt ? "declined" : null);
   const expired = e.expiresAt && new Date(e.expiresAt).getTime() < Date.now();
   // The server says this estimate can't be answered (a draft that was never
@@ -1127,8 +1127,10 @@ export default function PublicEstimatePage() {
           </div>
         )}
 
-        {/* "Your home in 3D" — only with a live HOVER share link for this client (server/crm/hover-share.ts). */}
-        <Home3DCard home3d={home3d} companyName={company?.name} />
+        {/* "Your home in 3D" — the in-app viewer for this estimate's customer (server/crm/hover-model3d.ts); the HOVER
+            design studio shows inside it only with a live share link. */}
+        <Home3DCard home3d={home3d} companyName={company?.name}
+          viewer={viewer3d && token ? { kind: "estimate", token, preview: previewGrant } : null} />
 
         {/* Footer facts — job address, expiry, warranty, contact card, T&C link. */}
         {/* Who to talk to — the client should never wonder who their person is. */}

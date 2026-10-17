@@ -54,6 +54,7 @@ import type { CrmNotificationPref } from "@shared/schema";
 import { resolveOrgTheme, themePayload } from "@shared/theme-colors";
 import { logError } from "../ops/log";
 import { clientHome3dForEstimate } from "./hover-share";
+import { viewerMeasurementForEstimate } from "./hover-model3d-offer";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -161,7 +162,7 @@ function mintPreviewGrant(kind: PreviewDoc, docId: string): string {
   return `${exp}.${sig}`;
 }
 
-function previewGrantValid(kind: PreviewDoc, docId: string, grant: string): boolean {
+export function previewGrantValid(kind: PreviewDoc, docId: string, grant: string): boolean {
   const secret = previewSecret();
   if (!secret) return false;
   const m = /^(\d{10,16})\.([0-9a-f]{32})$/.exec(grant);
@@ -695,9 +696,12 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // "Your home in 3D": a live HOVER share link for THIS estimate's customer only (null otherwise; the
     // contractor's login-only hover.to/3d viewer is never sent to the client).
     const home3d = await clientHome3dForEstimate(est).catch(() => null);
+    // The in-app 3D viewer for the same customer (/api/public/estimates/:token/model3d) — no HOVER login needed.
+    const viewer3d = !!(await viewerMeasurementForEstimate(est, { offeredOnly: true }).catch(() => null));
     res.json({
       ...view,
       home3d,
+      viewer3d,
       preview: preview || undefined, // read-only: the page hides approve/pay
       answerBlock: answerBlock ?? undefined,
       salesRep,

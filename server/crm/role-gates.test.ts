@@ -338,6 +338,9 @@ const ROUTES: RouteRow[] = [
   R("GET", "/api/crm/customers/:id/takeoff", null, { path: (t) => `/api/crm/customers/${t.customer}/takeoff`, scoped: true }),
   R("GET", "/api/crm/projects/:id/takeoff", null, { path: (t) => `/api/crm/projects/${t.project}/takeoff`, scoped: true }),
   R("GET", "/api/crm/estimates/:id/takeoff", null, { path: (t) => `/api/crm/estimates/${t.estimate}/takeoff`, scoped: true }),
+  // In-app 3D viewer (server/crm/hover-model3d.ts): viewing follows the measurement record, like the model lists.
+  R("GET", "/api/crm/measurements/:id/model3d", null, { path: (t) => `/api/crm/measurements/${t.measurement}/model3d`, scoped: true }),
+  R("GET", "/api/crm/measurements/:id/wireframes/:view", null, { path: (t) => `/api/crm/measurements/${t.measurement}/wireframes/front`, scoped: true }),
   R("POST", "/api/crm/reports/upload", "manageCustomers", { body: {} }),
   R("POST", "/api/crm/reports/:id/confirm", "manageCustomers", { path: (t) => `/api/crm/reports/${t.measurement}/confirm`, effect: true, scoped: true }),
   R("GET", "/api/crm/reports", null),
