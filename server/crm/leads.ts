@@ -15,6 +15,7 @@
  * A form-sync lead never edits a client. It is matched to one (email, or phone on its last 10 digits) and linked;
  * "Convert" on the Leads page is the only thing that creates a client from it.
  */
+import { divisionIdForAddress } from "./customer-address-state";
 import express, { type Express } from "express";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -634,7 +635,10 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
       [customer] = await db.insert(crmCustomers).values({
         orgId: ctx.org.id, displayName, email: lead.email, phone: lead.phone,
         addressLine1, city: body.city ?? lead.city, state: body.state ?? lead.state, postalCode: body.postalCode ?? lead.postalCode,
-        notes, leadSourceId, ownerMemberId: ctx.member.id, divisionId: divisionScopeOf(ctx),
+        notes, leadSourceId, ownerMemberId: ctx.member.id,
+        divisionId: divisionScopeOf(ctx) ?? await divisionIdForAddress(ctx.org.id, {
+          addressLine1, city: body.city ?? lead.city, state: body.state ?? lead.state, postalCode: body.postalCode ?? lead.postalCode,
+        }).catch(() => null),
         tags: lead.source === "form_sync" || lead.source === "website_form" ? ["website-lead"] : null,
         portalToken: randomBytes(24).toString("hex"),
       }).returning();

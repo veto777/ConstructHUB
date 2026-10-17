@@ -46,6 +46,7 @@ import {
 import { priceFloorViolation } from "./price-floor";
 import { nextDocNumber as allocateDocNumber } from "./doc-number";
 import { attachDefaultFilesToEstimate } from "./estimate-default-files";
+import { divisionIdForAddress } from "./customer-address-state";
 import { adoptHoverMeasurementsForProject } from "./hover-share";
 
 type GetUser = (req: any, res: any) => any;
@@ -649,8 +650,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     // The client portal is created WITH the customer — that's the requirement.
     // A client created inside a division workspace belongs to that division
     // (explicitly — the owner has no division of his own to infer it from).
+    // Outside a workspace, the client's address decides (the one division covering its state).
     const [row] = await db.insert(crmCustomers).values({
-      ...parsed.data, divisionId: parsed.data.divisionId ?? divisionScopeOf(ctx),
+      ...parsed.data,
+      divisionId: parsed.data.divisionId ?? divisionScopeOf(ctx) ?? await divisionIdForAddress(ctx.org.id, parsed.data as any).catch(() => null),
       orgId: ctx.org.id, ownerMemberId: ctx.member.id, portalToken: token(),
     } as any).returning();
     logActivity(ctx, "customer.created", {

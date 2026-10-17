@@ -171,7 +171,7 @@ export function CrmDivisionsTab() {
                   <Card className="border-dashed" data-testid="card-division-unassigned">
                     <CardHeader className="pb-2">
                       <div className="flex items-center gap-2 font-semibold"><Inbox className="h-4 w-4" /> Unassigned</div>
-                      <div className="text-xs text-muted-foreground">In no division yet — visible only in All divisions.</div>
+                      <div className="text-xs text-muted-foreground">No address on file anywhere yet — visible only in All divisions.</div>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div className="grid grid-cols-2 gap-2 text-sm" data-testid="unassigned-records">
@@ -269,8 +269,8 @@ function SortUnassigned({ onDone }: { onDone: () => void }) {
   return (
     <Card data-testid="card-sort-unassigned">
       <CardHeader className="pb-2">
-        <SectionTitle icon={Wand2} title="Sort unassigned records"
-          description="Suggests a division for each unassigned client, project and estimate from real links only: its project's division, else the client's most recent project's division, else the client's service-address state when it matches exactly one division. Nothing is changed until you apply." />
+        <SectionTitle icon={Wand2} title="Sorted by address automatically"
+          description="Every hour, each unassigned client, project and estimate goes to the division that covers its address — the client record, its projects, HOVER captures and website form submissions — or to its project's division. New clients are placed the moment they're created. What's left below has no address anywhere: assign it by hand, or sort now." />
       </CardHeader>
       <CardContent className="space-y-3">
         {!show ? (

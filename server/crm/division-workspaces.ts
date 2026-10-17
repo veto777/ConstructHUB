@@ -30,7 +30,9 @@ import { divisionLabel, normalizeUsState, sortDivisions } from "@shared/division
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { canSwitchDivision, divisionMapsForOrg, pinnedDivisionOf, type DivisionMaps } from "./divisions";
 import { objectDivision, type ObjectKind } from "./object-access";
-import { logActivity } from "./activity";
+import { logActivity, recordActivity } from "./activity";
+import { customerAddressStates } from "./customer-address-state";
+import { workerInterval } from "../workers";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -190,7 +192,7 @@ export type UnassignedRecord = {
 export const SUGGESTION_REASON_TEXT: Record<SuggestionReason, string> = {
   project: "its project's division",
   customer_project: "the client's most recent project's division",
-  customer_state: "the client's service-address state",
+  customer_state: "the client's address (client record, projects, HOVER or website forms)",
   project_state: "the project's address state",
 };
 
@@ -278,7 +280,10 @@ export async function unassignedPreviewFor(orgId: string) {
   let invoicesUnassigned = 0;
   for (const i of invoices) if (await bucket("invoices", i) === UNASSIGNED) invoicesUnassigned += 1;
 
-  const records = suggestDivisions({ divisions, customers, projects, estimates, unassigned });
+  // The client's state comes from EVERY address we hold for them (record, projects, HOVER, website forms).
+  const addressStates = await customerAddressStates(orgId, customers, projects);
+  const located = customers.map((c) => ({ ...c, state: addressStates.get(c.id)?.state ?? c.state }));
+  const records = suggestDivisions({ divisions, customers: located, projects, estimates, unassigned });
   const zero = () => ({ customers: 0, projects: 0, estimates: 0 });
   const plural = { customer: "customers", project: "projects", estimate: "estimates" } as const;
   const byDivision: Record<string, ReturnType<typeof zero>> = Object.fromEntries(divisions.map((d) => [d.id, zero()]));
@@ -297,6 +302,70 @@ export async function unassignedPreviewFor(orgId: string) {
   };
 }
 
+
+/**
+ * Put every unassigned record that HAS an address-backed suggestion into that division. Never overwrites a
+ * division someone picked; records with no address anywhere stay Unassigned. Shared by the Overview's
+ * "Sort" button, the hourly auto-sort and new-client creation.
+ */
+export async function applyUnassignedSuggestions(orgId: string, onlyDivisionIds: string[] | null = null) {
+  const preview = await unassignedPreviewFor(orgId);
+  const only = onlyDivisionIds ? new Set(onlyDivisionIds) : null;
+  const chosen = preview.records.filter((r) => r.suggestedDivisionId && (!only || only.has(r.suggestedDivisionId)));
+  const tables = { customer: crmCustomers, project: crmProjects, estimate: crmEstimates } as const;
+  const known = preview.divisions.map((d) => d.id);
+  const counts = { customers: 0, projects: 0, estimates: 0 };
+  const byDivision: Record<string, number> = {};
+  const label = new Map(preview.divisions.map((d) => [d.id, d.label]));
+  if (chosen.length) {
+    await db.transaction(async (tx) => {
+      for (const kind of ["customer", "project", "estimate"] as const) {
+        const t = tables[kind];
+        const groups = new Map<string, string[]>();
+        for (const r of chosen) if (r.kind === kind) groups.set(r.suggestedDivisionId!, [...(groups.get(r.suggestedDivisionId!) ?? []), r.id]);
+        for (const [divisionId, ids] of groups) {
+          for (let i = 0; i < ids.length; i += 500) {
+            // Only rows still without a (live) division — never overwrite a pick made since the preview.
+            const done = await tx.update(t).set({ divisionId, updatedAt: new Date() } as any)
+              .where(and(eq(t.orgId, orgId), inArray(t.id, ids.slice(i, i + 500)),
+                or(isNull(t.divisionId), notInArray(t.divisionId, known))))
+              .returning({ id: t.id });
+            counts[`${kind}s` as keyof typeof counts] += done.length;
+            const l = label.get(divisionId) ?? divisionId;
+            byDivision[l] = (byDivision[l] ?? 0) + done.length;
+          }
+        }
+      }
+    });
+  }
+  return { counts, byDivision, leftUnassigned: preview.records.length - chosen.length };
+}
+
+/** Hourly: every org with divisions gets its new unassigned records placed by address, logged as System. */
+export async function runAutoDivisionSort(): Promise<void> {
+  const orgs = await db.selectDistinct({ orgId: crmDivisions.orgId }).from(crmDivisions);
+  for (const { orgId } of orgs) {
+    try {
+      const out = await applyUnassignedSuggestions(orgId);
+      const moved = out.counts.customers + out.counts.projects + out.counts.estimates;
+      if (moved) {
+        recordActivity({ orgId, actorLabel: "System", action: "divisions.unassigned_sorted",
+          entityType: "division", meta: { ...out.counts, byDivision: out.byDivision, automatic: true } });
+        console.log(`[divisions] auto-sorted org ${orgId}: ${JSON.stringify(out.byDivision)}`);
+      }
+    } catch (e: any) {
+      console.error(`[divisions] auto-sort org ${orgId} failed:`, String(e?.message || e).slice(0, 200));
+    }
+  }
+}
+
+let autoSortStarted = false;
+export function startAutoDivisionSort(): void {
+  if (autoSortStarted || process.env.CRM_AUTO_DIVISION_SORT === "0") return;
+  autoSortStarted = true;
+  workerInterval("Division auto-sort", () => runAutoDivisionSort(), 60 * 60 * 1000, { firstAfterMs: 2 * 60 * 1000 });
+}
+
 // ── Routes ──────────────────────────────────────────────────────────────────
 
 const workspaceBody = z.object({ workspace: z.string().min(1).max(64) });
@@ -308,6 +377,7 @@ const assignBody = z.object({
 });
 
 export function registerDivisionWorkspaceRoutes(app: Express, getDevUser: GetUser): void {
+  startAutoDivisionSort();
   async function ctxFor(req: any, res: any): Promise<OrgContext | null> {
     const user = getDevUser(req, res);
     if (!user) return null;
@@ -365,35 +435,9 @@ export function registerDivisionWorkspaceRoutes(app: Express, getDevUser: GetUse
     if (!requirePermission(res, ctx, "manageSettings") || !crossDivision(res, ctx)) return;
     const parsed = applyBody.safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "divisionIds must be a list of division ids" });
-    const preview = await unassignedPreviewFor(ctx.org.id);
-    const only = parsed.data.divisionIds ? new Set(parsed.data.divisionIds) : null;
-    const chosen = preview.records.filter((r) => r.suggestedDivisionId && (!only || only.has(r.suggestedDivisionId)));
-    const tables = { customer: crmCustomers, project: crmProjects, estimate: crmEstimates } as const;
-    const known = preview.divisions.map((d) => d.id);
-    const counts = { customers: 0, projects: 0, estimates: 0 };
-    const byDivision: Record<string, number> = {};
-    const label = new Map(preview.divisions.map((d) => [d.id, d.label]));
-    await db.transaction(async (tx) => {
-      for (const kind of ["customer", "project", "estimate"] as const) {
-        const t = tables[kind];
-        const groups = new Map<string, string[]>();
-        for (const r of chosen) if (r.kind === kind) groups.set(r.suggestedDivisionId!, [...(groups.get(r.suggestedDivisionId!) ?? []), r.id]);
-        for (const [divisionId, ids] of groups) {
-          for (let i = 0; i < ids.length; i += 500) {
-            // Only rows still without a (live) division — never overwrite a pick made since the preview.
-            const done = await tx.update(t).set({ divisionId, updatedAt: new Date() } as any)
-              .where(and(eq(t.orgId, ctx.org.id), inArray(t.id, ids.slice(i, i + 500)),
-                or(isNull(t.divisionId), notInArray(t.divisionId, known))))
-              .returning({ id: t.id });
-            counts[`${kind}s` as keyof typeof counts] += done.length;
-            const l = label.get(divisionId) ?? divisionId;
-            byDivision[l] = (byDivision[l] ?? 0) + done.length;
-          }
-        }
-      }
-    });
-    logActivity(ctx, "divisions.unassigned_sorted", { entityType: "division", meta: { ...counts, byDivision } });
-    res.json({ ok: true, ...counts, byDivision, leftUnassigned: preview.records.length - chosen.length });
+    const out = await applyUnassignedSuggestions(ctx.org.id, parsed.data.divisionIds ?? null);
+    logActivity(ctx, "divisions.unassigned_sorted", { entityType: "division", meta: { ...out.counts, byDivision: out.byDivision } });
+    res.json({ ok: true, ...out.counts, byDivision: out.byDivision, leftUnassigned: out.leftUnassigned });
   });
 
   // One record into a division by hand (the records the sort could not place).

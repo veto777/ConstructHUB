@@ -232,8 +232,10 @@ describe("division workspaces (dev server)", () => {
     };
     await set("wa", ids.wa, "WA");
     await set("fl", ids.fl, "FL");
-    // Unassigned: a Florida client (service address) and an Illinois one.
-    await set("un", null, "Florida");
+    // Unassigned: a Florida client (service address) and an Illinois one. A client CREATED with a Florida
+    // address is placed in FL at once now, so "un" is a legacy record: created without a state, then given one.
+    await set("un", null, null);
+    await pool.query("update crm_customers set state = 'Florida' where id = $1", [ids.unC]);
     await set("il", null, "IL");
   }, 120_000);
 
@@ -250,6 +252,14 @@ describe("division workspaces (dev server)", () => {
   }, 60_000);
 
   const listIds = (body: any, key?: string) => (key ? body[key] : body).map((r: any) => r.id ?? r.doc?.id);
+
+  it("a client created in All divisions with an address lands in that address's division", async () => {
+    if (!up) return expect.fail(`dev server not reachable at ${BASE}`);
+    const c = await api("POST", "/api/crm/customers", { addressLine1: "5590 Example Rd", city: "Bellingham", postalCode: "98226", displayName: `Vitest addr ${run}` }, "all");
+    expect(c.status).toBe(201);
+    expect(c.json.divisionId).toBe(ids.wa);
+    await pool.query("delete from crm_customers where id = $1", [c.json.id]);
+  });
 
   it("inside FL the owner sees only FL — estimates, projects, invoices, clients, stats; All restores everything", async () => {
     if (!up) return expect.fail(`dev server not reachable at ${BASE}`);

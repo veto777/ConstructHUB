@@ -15,6 +15,7 @@
  * rate-limited requests get the exact same 201 { ok: true } as a real lead —
  * the response can never be an oracle for whether a submission "worked".
  */
+import { divisionIdForAddress } from "./customer-address-state";
 import type { Express } from "express";
 import { randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";
@@ -241,6 +242,8 @@ export function registerCrmLeadCaptureRoutes(app: Express, getDevUser: GetUser):
       email: email || null,
       phone: phone || null,
       addressLine1: address || null,
+      // The address the visitor typed decides the division (when it names a state a division covers).
+      divisionId: address ? await divisionIdForAddress(org.id, { addressLine1: address }).catch(() => null) : null,
       notes: message || null,
       leadSourceId,
       ownerMemberId: owner?.id ?? null,
