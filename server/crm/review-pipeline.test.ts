@@ -168,6 +168,13 @@ describe("review pipeline", () => {
     expect(await hiddenFromReviews(owner, orgA, C.finished, "x@example.invalid")).toBe(true);
     expect(await hiddenFromReviews(owner, null, null, " ASH@example.invalid")).toBe(true);
     expect(await hiddenFromReviews(other, null, null, "ash@example.invalid")).toBe(false);
+    // Not now never overwrites a Hide.
+    expect((await call(owner, `/api/reviews/pipeline/${C.finished}/dismiss`, "POST")).status).toBe(200);
+    expect((await call(owner, "/api/reviews/pipeline")).data.hidden).toHaveLength(1);
+    // Still listed (for Unhide) once no won job qualifies.
+    await pool.query("UPDATE crm_estimates SET status='cancelled' WHERE org_id=$1 AND customer_id=$2", [orgA, C.finished]);
+    expect((await call(owner, "/api/reviews/pipeline")).data.hidden.map((i: any) => i.customer.name)).toEqual(["Ash Finished"]);
+    await pool.query("UPDATE crm_estimates SET status='approved' WHERE org_id=$1 AND customer_id=$2", [orgA, C.finished]);
     // Put back (dismiss DELETE) does not unhide; Unhide does.
     expect((await call(owner, `/api/reviews/pipeline/${C.finished}/dismiss`, "DELETE")).status).toBe(200);
     expect((await call(owner, "/api/reviews/pipeline")).data.hidden).toHaveLength(1);

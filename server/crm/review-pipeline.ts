@@ -78,9 +78,11 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
   // Each won estimate passes the estimate policy itself (division, assignment), not only its client.
   const won = await policy.filter("estimates", await db.select().from(crmEstimates)
     .where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.status, "approved")))) as Estimate[];
-  if (!won.length) return { ready: [], dismissed: [], hidden: [], askedCount: 0 };
-
-  const ids = [...new Set(won.map((e) => e.customerId))];
+  // Hidden clients load whether or not a won job still qualifies, so Unhide is always reachable.
+  const hiddenRows = await db.select({ customerId: crmReviewPipeline.customerId }).from(crmReviewPipeline)
+    .where(and(eq(crmReviewPipeline.orgId, orgId), eq(crmReviewPipeline.kind, "hidden")));
+  const ids = [...new Set([...won.map((e) => e.customerId), ...hiddenRows.map((h) => h.customerId)])];
+  if (!ids.length) return { ready: [], dismissed: [], hidden: [], askedCount: 0 };
   const customers = await db.select().from(crmCustomers)
     .where(and(eq(crmCustomers.orgId, orgId), inArray(crmCustomers.id, ids), isNull(crmCustomers.archivedAt)));
   const visible = await policy.filter("customers", customers) as Customer[];
@@ -153,6 +155,19 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
     Number(b.jobFinished) - Number(a.jobFinished) || (b.wonAt ?? "").localeCompare(a.wonAt ?? "");
   ready.sort(order);
   dismissed.sort((a, b) => (b.dismissedAt ?? "").localeCompare(a.dismissedAt ?? ""));
+  // A hidden client stays listed (so it can be unhidden) even when no won job qualifies any more.
+  const listed = new Set(hidden.map((h) => h.customer.id));
+  for (const id of hiddenIds) {
+    if (listed.has(id)) continue;
+    const c = visible.find((x) => x.id === id);
+    if (!c) continue;
+    const email = c.email?.trim() || null;
+    hidden.push({
+      customer: { id: c.id, name: c.displayName, email, phone: c.phone || null, address: addressOf(c), photoCount: photoCount.get(c.id)?.n ?? 0 },
+      jobs: [], wonAt: null, projectStatus: null, jobFinished: false, finishedPhotoCount: 0, description: "",
+      needsEmail: !email, unsubscribed: false, dismissedAt: dismissedAt.get(c.id)?.toISOString() ?? null,
+    });
+  }
   hidden.sort((a, b) => a.customer.name.localeCompare(b.customer.name));
   return { ready, dismissed, hidden, askedCount: [...askedIds].filter((id) => !hiddenIds.has(id)).length };
 }
@@ -203,6 +218,8 @@ export function registerReviewPipelineRoutes(app: Express, getUser: GetUser): vo
           .onConflictDoUpdate({
             target: [crmReviewPipeline.orgId, crmReviewPipeline.customerId],
             set: { dismissedAt: sql`now()`, dismissedByMemberId: ctx.member.id, kind },
+            // Not now never overwrites a Hide (a stale list or a retry); only Unhide clears it.
+            ...(kind === "dismissed" ? { setWhere: sql`${crmReviewPipeline.kind} <> 'hidden'` } : {}),
           });
       } else {
         await db.delete(crmReviewPipeline).where(and(eq(crmReviewPipeline.orgId, ctx.org.id), eq(crmReviewPipeline.customerId, customerId), eq(crmReviewPipeline.kind, kind)));

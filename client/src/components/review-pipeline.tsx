@@ -111,7 +111,7 @@ export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) 
       title={<span>Ready to ask <span className="font-normal text-muted-foreground">· {data.ready.length}</span></span>}
       description="Every CRM client with a won job who hasn't been asked for a review yet. Finished jobs first."
       flush testId="section-review-pipeline">
-      {data.ready.length > COLLAPSED && (
+      {(data.ready.length > COLLAPSED || filtering) && (
         <div className="flex flex-wrap items-center gap-2 border-b px-4 pb-3 sm:px-6" data-testid="pipeline-filters">
           <div className="relative min-w-[12rem] flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
