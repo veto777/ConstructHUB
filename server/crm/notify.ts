@@ -14,6 +14,7 @@ import {
 } from "@shared/schema";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg } from "./tenancy";
+import { objectPolicy, linkedObject } from "./object-access";
 import { sendSms, normalizePhone, resolveSmsSender } from "./sms";
 import { appForLink, pushSoon } from "../apns";
 
@@ -97,6 +98,21 @@ export function registerCrmNotificationRoutes(app: Express, getDevUser: GetUser)
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || "30")) || 30));
+    // Inside one division workspace the bell shows only that division's news
+    // (plus org-level notices with no record link) — list AND unread count.
+    if (ctx.activeDivisionId) {
+      const access = objectPolicy(ctx);
+      const inWorkspace = async (n: { link: string | null }) => {
+        const ref = linkedObject(n.link);
+        return !ref || await access.visible(ref.kind, ref.id);
+      };
+      const recent = await db.select().from(crmNotifications)
+        .where(and(eq(crmNotifications.orgId, ctx.org.id), eq(crmNotifications.memberId, ctx.member.id)))
+        .orderBy(desc(crmNotifications.createdAt)).limit(500);
+      const kept: typeof recent = [];
+      for (const n of recent) if (await inWorkspace(n)) kept.push(n);
+      return res.json({ unread: kept.filter((n) => !n.readAt).length, notifications: kept.slice(0, limit) });
+    }
     const rows = await db.select().from(crmNotifications)
       .where(and(eq(crmNotifications.orgId, ctx.org.id), eq(crmNotifications.memberId, ctx.member.id)))
       .orderBy(desc(crmNotifications.createdAt)).limit(limit);

@@ -546,6 +546,11 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS approved_total_cents integer;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS selected_discounts jsonb;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS division_id varchar;
+    -- Division workspaces: the member's remembered workspace and a client's own division.
+    ALTER TABLE crm_members ADD COLUMN IF NOT EXISTS active_division_id varchar;
+    ALTER TABLE crm_customers ADD COLUMN IF NOT EXISTS division_id varchar;
+    CREATE INDEX IF NOT EXISTS crm_customers_division_idx ON crm_customers (division_id);
+    CREATE INDEX IF NOT EXISTS crm_estimates_division_idx ON crm_estimates (division_id);
     -- Document defaults snapshot (server/crm/doc-defaults.ts).
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS footer_text text;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS warranty_text text;

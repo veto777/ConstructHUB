@@ -10,6 +10,7 @@ import { inNativeApp } from "@/lib/app-shell";
 import { CrmLogo } from "@/components/crm-logo";
 import { StandingGator } from "@/components/mascot";
 import { CrmCreateMenu } from "@/components/crm-create-menu";
+import { CrmDivisionSwitcher } from "@/components/crm-division-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -155,6 +156,11 @@ export function CrmSidebar() {
           {/* The mascot stands beside the mark on every ConstructHUB sidebar; gone with the rail. */}
           <StandingGator height={56} className="ml-auto shrink-0 -my-1 group-data-[collapsible=icon]:hidden" />
         </Link>
+
+        {/* Division workspace (owner / division-less admins); hidden on the icon rail. */}
+        <div className="group-data-[collapsible=icon]:hidden">
+          <CrmDivisionSwitcher variant="sidebar" />
+        </div>
 
         {/* The global Create menu — estimate, invoice, lead, message, client. */}
         <CrmCreateMenu

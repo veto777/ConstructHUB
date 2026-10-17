@@ -59,7 +59,7 @@ async function followUpsForOrg(ctx: OrgContext): Promise<FollowUpRow[]> {
       isNull(crmCustomers.archivedAt),
     ));
 
-  const scope = divisionScopeOf(ctx.member);
+  const scope = divisionScopeOf(ctx);
   let maps: Awaited<ReturnType<typeof divisionMapsForOrg>> | null = null;
   if (scope) maps = await divisionMapsForOrg(ctx.org.id);
 
@@ -132,7 +132,7 @@ export async function crmAttentionFor(ctx: OrgContext, { cap = 10, rowLimit = 20
 
   // "Assigned" is the object policy's definition (project manager, sales rep,
   // or on the crew of one of the project's jobs) — not the PM column alone.
-  const scope = divisionScopeOf(ctx.member);
+  const scope = divisionScopeOf(ctx);
   const own = ctx.permissions.viewAllJobs
     ? null
     : new Set((await objectPolicy(ctx).filter("projects", rows)).map((p) => p.id));

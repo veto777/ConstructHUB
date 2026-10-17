@@ -22,7 +22,7 @@ export function canManageJobcam(ctx: OrgContext): boolean {
 
 /** null = every project in the org (an unscoped seat with viewAllJobs); else the allowed ids. */
 export async function visibleProjectIds(ctx: OrgContext): Promise<string[] | null> {
-  if (ctx.permissions.viewAllJobs && !divisionScopeOf(ctx.member)) return null;
+  if (ctx.permissions.viewAllJobs && !divisionScopeOf(ctx)) return null;
   const rows = await db.select().from(crmProjects).where(eq(crmProjects.orgId, ctx.org.id));
   const allowed = await objectPolicy(ctx).filter("projects", rows);
   return allowed.map((p) => p.id);

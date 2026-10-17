@@ -21,13 +21,14 @@ import { inNativeApp } from "@/lib/app-shell";
 import {
   Users, Building2, UserCircle, ShieldCheck, Mail, Loader2, Trash2,
   Copy, AlertTriangle, Plus, Check, ArrowRight, RefreshCw, KeyRound, History,
-  CalendarDays, Unplug,
+  CalendarDays, Unplug, Layers,
 } from "lucide-react";
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, roleTone,
 } from "@/components/crm-ui";
 import { InfoTip } from "@/components/info-tip";
 import { confirmAction } from "@/components/confirm-dialog";
+import { CrmDivisionsTab } from "@/components/crm-divisions-tab";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type PermissionMap = Record<string, boolean>;
@@ -114,6 +115,7 @@ interface MeResponse {
   roles: string[];
   permissionKeys: string[];
   roleDefaults: Record<string, PermissionMap>;
+  divisionWorkspace?: { activeDivisionId: string | null; canSwitch: boolean; pinnedDivisionId: string | null };
 }
 
 interface Invitation {
@@ -306,14 +308,14 @@ export default function CrmTeamPage() {
   const initialTab = (() => {
     if (typeof window === "undefined") return "profile";
     const t = new URLSearchParams(window.location.search).get("tab");
-    return t === "company" || t === "team" || t === "profile" ? t : "profile";
+    return t === "company" || t === "team" || t === "profile" || t === "divisions" ? t : "profile";
   })();
   const [tab, setTab] = useState(initialTab);
   // The CRM menu's Profile / Company / Team links change only ?tab= on this page: follow them.
   const search = useSearch();
   useEffect(() => {
     const t = new URLSearchParams(search).get("tab");
-    setTab(t === "company" || t === "team" ? t : "profile");
+    setTab(t === "company" || t === "team" || t === "divisions" ? t : "profile");
   }, [search]);
 
   // Switching tabs also rewrites ?tab= so the URL, the banner and a page
@@ -588,7 +590,18 @@ export default function CrmTeamPage() {
           <TabsTrigger value="team" data-testid="tab-team">
             <ShieldCheck className="h-4 w-4 mr-2" /> Team
           </TabsTrigger>
+          {/* Division workspaces: the owner and division-less admins (a pinned seat never switches). */}
+          {me.divisionWorkspace?.canSwitch && (
+            <TabsTrigger value="divisions" data-testid="tab-divisions">
+              <Layers className="h-4 w-4 mr-2" /> Divisions
+            </TabsTrigger>
+          )}
         </TabsList>
+
+        {/* ── Divisions ──────────────────────────────────────────────────── */}
+        <TabsContent value="divisions" className="mt-4">
+          {tab === "divisions" && <CrmDivisionsTab />}
+        </TabsContent>
 
         {/* ── My profile ─────────────────────────────────────────────────── */}
         <TabsContent value="profile" className="mt-4">

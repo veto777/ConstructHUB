@@ -5,12 +5,15 @@ import { installClientErrorReporting } from "./lib/report-client-errors";
 import "./index.css";
 import { inNativeApp } from "./lib/app-shell";
 import { startAdsDoorRecorder } from "./lib/ads-door-recorder";
+import { installDivisionFetch } from "./lib/division-workspace";
 
 // Inside the iPhone apps: mark <html class="in-app"> before the first render (lib/app-shell.ts).
 inNativeApp();
 
 // Uncaught errors and unhandled rejections reach the issue desk (/admin/issues).
 installClientErrorReporting();
+// The CRM pages' raw fetch("/api/crm/…") calls carry the division workspace too (lib/division-workspace.ts).
+installDivisionFetch();
 void startAdsDoorRecorder();
 
 const container = document.getElementById("root")!;

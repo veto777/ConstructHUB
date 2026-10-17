@@ -198,6 +198,13 @@ const ROUTES: RouteRow[] = [
   R("POST", "/api/crm/divisions", "manageSettings", { body: {} }),
   R("PATCH", "/api/crm/divisions/:id", "manageSettings", { path: () => `/api/crm/divisions/${none}`, body: {} }),
   R("DELETE", "/api/crm/divisions/:id", "manageSettings", { path: () => `/api/crm/divisions/${none}` }),
+  // Division workspaces (division-workspaces.ts): any unpinned seat remembers its pick; the
+  // cross-division overview and the sorter need every division's work in view.
+  R("PUT", "/api/crm/divisions/workspace", null, { body: {} }),
+  R("GET", "/api/crm/divisions/overview", { all: ["seeReporting", "viewAllJobs"] }),
+  R("GET", "/api/crm/divisions/unassigned", { all: ["manageSettings", "viewAllJobs"] }),
+  R("POST", "/api/crm/divisions/unassigned/apply", { all: ["manageSettings", "viewAllJobs"] }, { effect: true }),
+  R("POST", "/api/crm/divisions/assign", { all: ["manageSettings", "viewAllJobs"] }, { body: {} }),
   R("GET", "/api/crm/lead-sources", null),
   R("POST", "/api/crm/lead-sources", "manageSettings", { body: {} }),
   R("GET", "/api/crm/backups/settings", "owner"),

@@ -22,6 +22,7 @@ import {
 } from "@shared/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import { divisionScopeOf } from "./divisions";
 import { resolveEstimateTaxRate } from "./tax";
 import { logEvent, presentEstimate, presentEstimateItem, recalcEstimate } from "./entities";
 import { estimateDefaultsFromOrg } from "./doc-defaults";
@@ -149,6 +150,8 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
         // Settings → Estimate & invoice defaults, snapshotted (doc-defaults.ts).
         ...estimateDefaultsFromOrg(ctx.org),
         taxRateBps: tax.bps, publicToken: token(), createdByMemberId: ctx.member.id,
+        // Lands in the division workspace it was made in (null = All divisions).
+        divisionId: divisionScopeOf(ctx),
         customFields: {
           quickBid: { measurementId: m.id, provider: m.provider, itemIds: p.data.itemIds },
           taxSource: { source: tax.source, bps: tax.bps, matchedCity: tax.matchedCity ?? null },

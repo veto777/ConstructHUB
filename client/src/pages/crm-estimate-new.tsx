@@ -18,6 +18,8 @@ import {
 import { InitialAvatar } from "@/components/crm-ui";
 import { InfoTip } from "@/components/info-tip";
 import { cn } from "@/lib/utils";
+import { useActiveDivision } from "@/components/crm-division-switcher";
+import { divisionLabel } from "@shared/divisions";
 
 /**
  * The fast path: a three-step, one-handed estimate builder for the contractor
@@ -326,6 +328,8 @@ export default function CrmEstimateNewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Inside a division workspace a new estimate lands in that division (the server defaults to it).
+  const { active: activeDivision } = useActiveDivision();
   // Letterhead pick — only surfaces when the org actually runs divisions.
   const { data: divisions } = useQuery<any[]>({
     queryKey: ["/api/crm/divisions"],
@@ -848,9 +852,9 @@ export default function CrmEstimateNewPage() {
                     data-testid="select-division"
                     aria-label="Division"
                   >
-                    <option value="">Auto — from the project</option>
+                    <option value="">{activeDivision ? `This workspace — ${divisionLabel(activeDivision)}` : "Auto — from the project"}</option>
                     {divisions!.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}{d.code ? ` (${d.code})` : ""}</option>
+                      <option key={d.id} value={d.id}>{divisionLabel(d)}</option>
                     ))}
                   </select>
                 </div>

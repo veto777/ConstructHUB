@@ -396,9 +396,13 @@ const customerSchema = z.object({
   notes: z.string().max(20000).nullable().optional(),
   tags: z.array(z.string().max(40)).max(30).nullable().optional(),
   customFields: z.record(z.any()).nullable().optional(),
+  // The client's own division (Divisions → "Sort unassigned records", or the
+  // workspace it was created in). Checked against the org's divisions.
+  divisionId: z.string().max(64).nullable().optional(),
 });
 
 const CUSTOMER_FIELD_LABELS: Record<string, string> = {
+  divisionId: "Division",
   displayName: "Client name", firstName: "First name", lastName: "Last name",
   companyName: "Company name", email: "Email", phone: "Phone", altPhone: "Alternate phone",
   addressLine1: "Address", addressLine2: "Address line 2", city: "City", state: "State",
@@ -617,9 +621,15 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       }
     }
 
+    if (parsed.data.divisionId && !(await getDivision(ctx.org.id, parsed.data.divisionId))) {
+      return res.status(400).json({ message: "Division not found in this organization" });
+    }
     // The client portal is created WITH the customer — that's the requirement.
+    // A client created inside a division workspace belongs to that division
+    // (explicitly — the owner has no division of his own to infer it from).
     const [row] = await db.insert(crmCustomers).values({
-      ...parsed.data, orgId: ctx.org.id, ownerMemberId: ctx.member.id, portalToken: token(),
+      ...parsed.data, divisionId: parsed.data.divisionId ?? divisionScopeOf(ctx),
+      orgId: ctx.org.id, ownerMemberId: ctx.member.id, portalToken: token(),
     } as any).returning();
     logActivity(ctx, "customer.created", {
       entityType: "customer", entityId: row.id, customerId: row.id,
@@ -701,6 +711,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const [before] = await db.select().from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.id))).limit(1);
     if (!before) return res.status(404).json({ message: "Customer not found" });
+    if (parsed.data.divisionId && !(await getDivision(ctx.org.id, parsed.data.divisionId))) {
+      return res.status(400).json({ message: "Division not found in this organization" });
+    }
     const [row] = await db.update(crmCustomers)
       .set({ ...parsed.data, updatedAt: new Date() } as any)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, req.params.id)))
@@ -891,7 +904,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     }
     // A division-scoped member sees ONLY their division's projects — the
     // unassigned commons stay with owners and division-less members (STRICT).
-    const divScope = divisionScopeOf(ctx.member);
+    const divScope = divisionScopeOf(ctx);
     if (divScope) {
       where.push(eq(crmProjects.divisionId, divScope));
     }
@@ -938,7 +951,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     const row = await db.transaction(async (tx) => {
       const number = await nextDocNumber(tx, crmProjects, ctx.org.id, "P");
       const [inserted] = await tx.insert(crmProjects).values({
-        ...parsed.data, divisionId: parsed.data.divisionId ?? divisionScopeOf(ctx.member), orgId: ctx.org.id, number,
+        ...parsed.data, divisionId: parsed.data.divisionId ?? divisionScopeOf(ctx), orgId: ctx.org.id, number,
       } as any).returning();
       return inserted;
     });
@@ -1018,7 +1031,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       ? rows
       : rows.filter((j) => (j.assignedMemberIds || []).includes(ctx.member.id));
     // Division scoping follows the job's project.
-    const divScope = divisionScopeOf(ctx.member);
+    const divScope = divisionScopeOf(ctx);
     if (divScope) {
       const maps = await divisionMapsForOrg(ctx.org.id);
       visible = visible.filter((j) => divisionVisible(divScope, maps.byProject.get(j.projectId) ?? null));
@@ -1144,7 +1157,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       eq(crmCustomers.orgId, ctx.org.id),
     );
 
-    const divScope = divisionScopeOf(ctx.member);
+    const divScope = divisionScopeOf(ctx);
     let rows: { doc: typeof crmEstimates.$inferSelect; customerName: string | null }[];
     let filtered: number;
     let total: number;
@@ -1199,7 +1212,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       if (req.query.customerId) where.push(eq(crmInvoices.customerId, String(req.query.customerId)));
       let rows = await db.select().from(crmInvoices).where(and(...where))
         .orderBy(desc(crmInvoices.createdAt)).limit(500);
-      const divScope = divisionScopeOf(ctx.member);
+      const divScope = divisionScopeOf(ctx);
       if (divScope) {
         const maps = await divisionMapsForOrg(ctx.org.id);
         rows = rows.filter((i) => divisionVisible(divScope, docDivisionFromMaps(maps, i)));
@@ -1245,7 +1258,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       i.dueAt != null && new Date(i.dueAt).getTime() < Date.now() &&
       (i.paidCents ?? 0) < (i.totalCents ?? 0);
 
-    const divScope = divisionScopeOf(ctx.member);
+    const divScope = divisionScopeOf(ctx);
     let rows: { doc: typeof crmInvoices.$inferSelect; customerName: string | null }[];
     let filtered: number;
     let total: number;
@@ -1323,7 +1336,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       const number = await nextDocNumber(tx, crmEstimates, ctx.org.id, "E");
       const [row] = await tx.insert(crmEstimates).values({
         orgId: ctx.org.id, customerId: d.customerId, projectId: d.projectId ?? null,
-        divisionId: d.divisionId ?? divisionScopeOf(ctx.member),
+        divisionId: d.divisionId ?? divisionScopeOf(ctx),
         number, title: d.title, introText: d.introText ?? null,
         termsText: d.termsText ?? ctx.org.termsAndConditions ?? null,
         taxRateBps: d.taxRateBps, depositCents: d.depositCents ?? null,

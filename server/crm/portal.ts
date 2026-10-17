@@ -908,6 +908,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       // the original's expiry.
       expiresAt: est.expiresAt,
       createdByMemberId: est.createdByMemberId,
+      // The client's selections stay in the original's division.
+      divisionId: est.divisionId,
       customFields: {
         selectedFromEstimateId: est.id,
         selectedFromNumber: est.number ?? null,

@@ -16,6 +16,10 @@
  *      in list endpoints. Unassigned (null division) rows are visible only to
  *      owners and division-less members — the owner keeps Braxton out of WA
  *      and Mike/Andrey out of FL, with nothing leaking through the commons.
+ *      The owner (and any division-less member) can also step INTO one
+ *      division — a "workspace" (division-workspaces.ts, tenancy.ts
+ *      attachActiveDivision) — and is then scoped exactly like a pinned
+ *      member: divisionScopeOf(ctx) answers his workspace.
  */
 import type { Express } from "express";
 import { z } from "zod";
@@ -83,10 +87,60 @@ export function companyBranding(
 
 // ── List scoping (pure — unit-tested) ───────────────────────────────────────
 
-/** The division a member's lists are confined to, or null for "everything". */
-export function divisionScopeOf(member: { role: string; divisionId: string | null }): string | null {
+type ScopeMember = { role: string; divisionId: string | null };
+
+/**
+ * The division a member is PINNED to (never leaves): their divisionId unless
+ * they are the owner. Owners and division-less members are unpinned and may
+ * pick a division workspace instead (see divisionScopeOf).
+ */
+export function pinnedDivisionOf(member: ScopeMember): string | null {
   if (member.role === "owner") return null;
   return member.divisionId ?? null;
+}
+
+/** Only an unpinned member (the owner, a division-less admin) can switch division workspaces. */
+export function canSwitchDivision(member: ScopeMember): boolean {
+  return pinnedDivisionOf(member) === null;
+}
+
+/**
+ * The division a request's lists are confined to, or null for "everything".
+ *
+ * Pass the request's OrgContext: a pinned member is confined to their
+ * division; an unpinned member is confined to the division workspace they
+ * picked (ctx.activeDivisionId, resolved by requireOrg from the
+ * x-crm-division header / their saved pick), or sees everything in "All
+ * divisions". Passing a bare member keeps the old pinned-only answer.
+ */
+export function divisionScopeOf(subject: ScopeMember | { member: ScopeMember; activeDivisionId?: string | null }): string | null {
+  if ("member" in subject) return pinnedDivisionOf(subject.member) ?? subject.activeDivisionId ?? null;
+  return pinnedDivisionOf(subject);
+}
+
+/**
+ * The workspace a request runs in, from the x-crm-division header (or, when
+ * the header is absent, the member's saved pick). Pure — the caller passes the
+ * org's division ids.
+ *   - pinned member → null (the header is IGNORED; their pin already scopes
+ *     every list through divisionScopeOf, and a header can never widen it);
+ *   - header "all" → null (All divisions);
+ *   - header naming one of the org's divisions → that division;
+ *   - header absent → the saved pick when it is still one of the org's divisions;
+ *   - header naming anything else (a deleted or foreign division) → the saved
+ *     pick, else null — never a division outside this org.
+ */
+export function resolveActiveDivision(
+  member: ScopeMember & { activeDivisionId?: string | null },
+  header: string | null | undefined,
+  orgDivisionIds: readonly string[],
+): string | null {
+  if (!canSwitchDivision(member)) return null;
+  const h = typeof header === "string" ? header.trim() : "";
+  if (h.toLowerCase() === "all") return null;
+  if (h && orgDivisionIds.includes(h)) return h;
+  const saved = member.activeDivisionId ?? null;
+  return saved && orgDivisionIds.includes(saved) ? saved : null;
 }
 
 /**
@@ -135,8 +189,16 @@ export async function getDivision(orgId: string, id: string | null | undefined):
   return d ?? null;
 }
 
-/** The customer's most recent project that has a division, if any. */
+/** The customer's most recent project that has a division, else the client's own explicit division, if any. */
 async function latestCustomerProjectDivision(orgId: string, customerId: string): Promise<CrmDivision | null> {
+  const fromProject = await latestProjectDivisionOnly(orgId, customerId);
+  if (fromProject) return fromProject;
+  const [c] = await db.select({ divisionId: crmCustomers.divisionId }).from(crmCustomers)
+    .where(and(eq(crmCustomers.orgId, orgId), eq(crmCustomers.id, customerId))).limit(1);
+  return getDivision(orgId, c?.divisionId);
+}
+
+async function latestProjectDivisionOnly(orgId: string, customerId: string): Promise<CrmDivision | null> {
   const [p] = await db.select({ divisionId: crmProjects.divisionId }).from(crmProjects)
     .where(and(
       eq(crmProjects.orgId, orgId),
@@ -198,9 +260,15 @@ export type DivisionMaps = {
   byProject: Map<string, string | null>;
   byCustomer: Map<string, string | null>;
   byEstimate: Map<string, string | null>;
+  byInvoice?: Map<string, string | null>;
 };
 
-/** One pass over the org's projects/estimates so list endpoints can scope in JS. */
+/**
+ * One pass over the org's projects/estimates so list endpoints can scope in JS.
+ * A client's division: its explicit pick (crm_customers.division_id) → its most
+ * recent project's → its most recent estimate's explicit pick → its assigned
+ * owner member's. Every link is a real assignment; nothing is guessed.
+ */
 export async function divisionMapsForOrg(orgId: string): Promise<DivisionMaps> {
   const projects = await db.select({
     id: crmProjects.id, customerId: crmProjects.customerId,
@@ -208,13 +276,19 @@ export async function divisionMapsForOrg(orgId: string): Promise<DivisionMaps> {
   }).from(crmProjects).where(eq(crmProjects.orgId, orgId));
   const estimates = await db.select({
     id: crmEstimates.id, projectId: crmEstimates.projectId, customerId: crmEstimates.customerId,
-    divisionId: crmEstimates.divisionId,
+    divisionId: crmEstimates.divisionId, createdAt: crmEstimates.createdAt,
   }).from(crmEstimates).where(eq(crmEstimates.orgId, orgId));
+  const explicitCustomers = await db.select({ id: crmCustomers.id, divisionId: crmCustomers.divisionId })
+    .from(crmCustomers).where(and(eq(crmCustomers.orgId, orgId), isNotNull(crmCustomers.divisionId)));
 
   const byProject = new Map(projects.map((p) => [p.id, p.divisionId]));
   const byCustomer = new Map<string, string | null>();
+  for (const c of explicitCustomers) byCustomer.set(c.id, c.divisionId);
   for (const p of [...projects].sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))) {
     if (!byCustomer.has(p.customerId)) byCustomer.set(p.customerId, p.divisionId);
+  }
+  for (const e of [...estimates].sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))) {
+    if (e.divisionId && !byCustomer.get(e.customerId)) byCustomer.set(e.customerId, e.divisionId);
   }
   const assignedCustomers = await db.select({ id: crmCustomers.id, divisionId: crmMembers.divisionId })
     .from(crmCustomers).innerJoin(crmMembers, and(eq(crmMembers.id, crmCustomers.ownerMemberId), eq(crmMembers.orgId, orgId)))
@@ -226,16 +300,23 @@ export async function divisionMapsForOrg(orgId: string): Promise<DivisionMaps> {
     e.divisionId ??
       ((e.projectId ? byProject.get(e.projectId) : undefined) ?? byCustomer.get(e.customerId) ?? null),
   ]));
-  return { byProject, byCustomer, byEstimate };
+  const maps: DivisionMaps = { byProject, byCustomer, byEstimate };
+  const invoices = await db.select({
+    id: crmInvoices.id, projectId: crmInvoices.projectId, estimateId: crmInvoices.estimateId, customerId: crmInvoices.customerId,
+  }).from(crmInvoices).where(eq(crmInvoices.orgId, orgId));
+  maps.byInvoice = new Map(invoices.map((i) => [i.id, docDivisionFromMaps(maps, i)]));
+  return maps;
 }
 
 /** A document row's division per the resolution order, from prebuilt maps. */
 export function docDivisionFromMaps(
   maps: DivisionMaps,
-  doc: { projectId?: string | null; estimateId?: string | null; customerId?: string | null },
+  doc: { projectId?: string | null; estimateId?: string | null; invoiceId?: string | null; customerId?: string | null },
 ): string | null {
   if (doc.projectId && maps.byProject.has(doc.projectId)) return maps.byProject.get(doc.projectId) ?? null;
   if (doc.estimateId && maps.byEstimate.has(doc.estimateId)) return maps.byEstimate.get(doc.estimateId) ?? null;
+  // A payment against an invoice belongs where its invoice does.
+  if (doc.invoiceId && maps.byInvoice?.has(doc.invoiceId)) return maps.byInvoice.get(doc.invoiceId) ?? null;
   if (doc.customerId) return maps.byCustomer.get(doc.customerId) ?? null;
   return null;
 }
@@ -366,13 +447,26 @@ export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): vo
       .where(eq(crmProjects.divisionId, existing.id));
     const [{ n: members }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmMembers)
       .where(eq(crmMembers.divisionId, existing.id));
-    if (projects + members > 0) {
+    // Estimates and clients carry their own division too: deleting it would
+    // drop them out of every workspace and change their letterhead.
+    const [{ n: estimates }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.divisionId, existing.id)));
+    const [{ n: customers }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.divisionId, existing.id)));
+    if (projects + members + estimates + customers > 0) {
+      const used = [
+        projects ? `${projects} project(s)` : null, estimates ? `${estimates} estimate(s)` : null,
+        customers ? `${customers} client(s)` : null, members ? `${members} member(s)` : null,
+      ].filter(Boolean).join(", ");
       return res.status(409).json({
-        message: `This division is still in use by ${projects} project(s) and ${members} member(s). Reassign them first.`,
-        projects, members,
+        message: `This division is still in use by ${used}. Reassign them first.`,
+        projects, members, estimates, customers,
       });
     }
     await db.delete(crmDivisions).where(eq(crmDivisions.id, existing.id));
+    // Anyone whose saved workspace was this division lands back on All divisions.
+    await db.update(crmMembers).set({ activeDivisionId: null })
+      .where(and(eq(crmMembers.orgId, ctx.org.id), eq(crmMembers.activeDivisionId, existing.id)));
     res.json({ ok: true });
   });
 }

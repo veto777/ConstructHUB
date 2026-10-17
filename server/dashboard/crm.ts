@@ -11,7 +11,9 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db";
 import { crmMembers, crmOrgs, crmEffectivePermissions } from "@shared/schema";
-import type { OrgContext } from "../crm/tenancy";
+import { attachActiveDivision, type OrgContext } from "../crm/tenancy";
+
+const NO_HEADERS = { headers: {} };
 
 export async function readOnlyCrmContext(userId: number, pinnedOrgId?: string | null): Promise<OrgContext | null> {
   if (pinnedOrgId) {
@@ -21,7 +23,7 @@ export async function readOnlyCrmContext(userId: number, pinnedOrgId?: string | 
       .innerJoin(crmOrgs, eq(crmOrgs.id, crmMembers.orgId))
       .where(and(eq(crmMembers.orgId, pinnedOrgId), eq(crmMembers.userId, userId), eq(crmMembers.status, "active")))
       .limit(1);
-    if (hit) return { org: hit.org, member: hit.member, permissions: crmEffectivePermissions(hit.member.role, hit.member.permissions) };
+    if (hit) return attachActiveDivision(NO_HEADERS, { org: hit.org, member: hit.member, permissions: crmEffectivePermissions(hit.member.role, hit.member.permissions) });
   }
   const [first] = await db
     .select({ member: crmMembers, org: crmOrgs })
@@ -31,5 +33,6 @@ export async function readOnlyCrmContext(userId: number, pinnedOrgId?: string | 
     .orderBy(asc(crmMembers.createdAt))
     .limit(1);
   if (!first) return null;
-  return { org: first.org, member: first.member, permissions: crmEffectivePermissions(first.member.role, first.member.permissions) };
+  // The dashboard tiles follow the division workspace the member last picked in the CRM.
+  return attachActiveDivision(NO_HEADERS, { org: first.org, member: first.member, permissions: crmEffectivePermissions(first.member.role, first.member.permissions) });
 }

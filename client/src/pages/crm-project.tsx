@@ -1,6 +1,6 @@
 import { governmentLinkNotice } from "@shared/government-links";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
+import { resetCrmData, useActiveDivision } from "@/components/crm-division-switcher";
+import { divisionLabel } from "@shared/divisions";
 import { apiIssueMessage } from "@/lib/api-issue-message";
 import {
   ArrowLeft, Loader2, Plus, DollarSign, FileDiff, ClipboardCheck, ClipboardCopy, NotebookPen,
@@ -85,7 +87,7 @@ export default function CrmProjectPage() {
   // The board list caps at the newest 2000 — a direct link to an older project
   // falls back to the single-record route instead of reading "not found".
   const listSettled = !isLoading && !!projects;
-  const { data: direct, isError: directError, isLoading: directLoading } = useQuery<any>({
+  const { data: direct, isError: directError, isLoading: directLoading, error: directErr } = useQuery<any>({
     queryKey: [`/api/crm/projects/${id}`],
     enabled: !!id && listSettled && !inList,
     retry: false,
@@ -94,6 +96,20 @@ export default function CrmProjectPage() {
   // Children only load once the project is known to exist (and be visible) —
   // a bad id renders "Project not found" without six 404s behind it.
   const ready = !!project;
+
+  // Division of this project (workspace + letterhead). Moving it out of the
+  // workspace you are in takes it off this workspace's lists.
+  const { divisions: wsDivisions, canSwitch: canSwitchDivision } = useActiveDivision();
+  const setProjectDivision = useMutation({
+    mutationFn: async (divisionId: string | null) =>
+      (await apiRequest("PATCH", `/api/crm/projects/${id}`, { divisionId })).json(),
+    onSuccess: (_r, divisionId) => {
+      const d = wsDivisions.find((x) => x.id === divisionId);
+      toast({ title: d ? `Moved to ${divisionLabel(d)}` : "Division removed", description: "Its invoices, and estimates without a division of their own, follow it." });
+      resetCrmData();
+    },
+    onError: (e) => toast({ title: "Couldn't change the division", description: apiErrorMessage(e), variant: "destructive" }),
+  });
 
   const { data: costing, isError: costingError } = useQuery<any>({
     queryKey: [`/api/crm/projects/${id}/costing`], enabled: ready && seeCosts, retry: false,
@@ -220,6 +236,9 @@ export default function CrmProjectPage() {
         title={isError ? "Couldn't load this project" : "Project not found"}
         description={isError
           ? "Check your connection and refresh the page."
+          // Hidden only by the division workspace: the server says so (code other_division).
+          : /other_division/.test(String((directErr as any)?.message ?? ""))
+          ? apiErrorMessage(directErr)
           : "It may belong to a project manager other than you, or it's been removed."}
       >
         <Link href="/crm/pipeline">
@@ -248,6 +267,21 @@ export default function CrmProjectPage() {
             <HelpButton k="crm-project" videoOnly />
           </div>
           <StatusPill tone={statusTone(project.status)}>{project.stageLabel}</StatusPill>
+          {/* The project's division (its workspace and letterhead). Only seats that may switch divisions move it. */}
+          {wsDivisions.length > 0 && (canSwitchDivision && canManageJobs ? (
+            <Select value={project.divisionId ?? "none"}
+              onValueChange={(v) => setProjectDivision.mutate(v === "none" ? null : v)}>
+              <SelectTrigger className="h-8 w-48" data-testid="select-project-division" aria-label="Division"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No division (unassigned)</SelectItem>
+                {wsDivisions.map((d) => <SelectItem key={d.id} value={d.id}>{divisionLabel(d)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          ) : project.divisionId ? (
+            <StatusPill tone="neutral" data-testid="pill-project-division">
+              {(() => { const d = wsDivisions.find((x) => x.id === project.divisionId); return d ? divisionLabel(d) : "Division"; })()}
+            </StatusPill>
+          ) : null)}
         </div>
         <div className="text-sm text-muted-foreground">{project.number} · {project.stageGroup} — the job's money up top, its working lists in the tabs below.</div>
       </div>

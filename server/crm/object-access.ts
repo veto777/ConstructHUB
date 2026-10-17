@@ -6,7 +6,9 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import * as s from "@shared/schema";
 import type { OrgContext } from "./tenancy";
-import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
+import {
+  divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps, pinnedDivisionOf, type DivisionMaps,
+} from "./divisions";
 
 export const objectTables = {
   customers: s.crmCustomers, projects: s.crmProjects, jobs: s.crmJobs,
@@ -22,11 +24,47 @@ export type ObjectKind = keyof typeof objectTables;
 /** Whole-client bearer grants expose every client document, so only seats
  * with organization-wide document access may mint or receive one. */
 export function canShareWholeClientPortal(ctx: OrgContext): boolean {
-  return !divisionScopeOf(ctx.member) && ctx.permissions.viewAllJobs && ctx.permissions.seePrices && ctx.permissions.manageCustomers;
+  // The pin, not the workspace: the owner inside one division workspace still
+  // holds organization-wide document access.
+  return !pinnedDivisionOf(ctx.member) && ctx.permissions.viewAllJobs && ctx.permissions.seePrices && ctx.permissions.manageCustomers;
+}
+
+/**
+ * The division a CRM object belongs to, by the one resolution order every
+ * list, the workspace filter and the Divisions overview share: a project's own
+ * division; an estimate's pick → its project → its client; a client's explicit
+ * pick → its projects/estimates → its owner member's; an invoice → its project
+ * → estimate → client; any other document → its project → estimate → invoice
+ * → client. With no project/client, a visit or report falls back to the
+ * division of the member who booked/requested it. null = unassigned.
+ */
+export async function objectDivision(
+  kind: ObjectKind, r: any, m: DivisionMaps,
+  memberDivision: (memberId: string) => Promise<string | null> | string | null,
+): Promise<string | null> {
+  let division: string | null = kind === "projects" ? r.divisionId ?? null
+    : kind === "estimates" ? (m.byEstimate.has(r.id) ? m.byEstimate.get(r.id) ?? null : r.divisionId ?? null)
+    : kind === "customers" ? m.byCustomer.get(r.id) ?? r.divisionId ?? null
+    : kind === "invoices" && m.byInvoice?.has(r.id) ? m.byInvoice.get(r.id) ?? null
+    : docDivisionFromMaps(m, r);
+  if (!division && (kind === "customers" || kind === "appointments" || kind === "reports" || kind === "measurements")) {
+    const memberId = kind === "customers" ? r.ownerMemberId : (!r.projectId && !r.customerId ? r.createdByMemberId ?? r.requestedByMemberId : null);
+    if (memberId) division = await memberDivision(memberId);
+  }
+  return division ?? null;
 }
 
 export function objectPolicy(ctx: OrgContext) {
   const cached = new Map<string, Promise<any>>();
+  const memberDivs = new Map<string, Promise<string | null>>();
+  const memberDivision = (memberId: string): Promise<string | null> => {
+    if (!memberDivs.has(memberId)) {
+      memberDivs.set(memberId, db.select({ divisionId: s.crmMembers.divisionId }).from(s.crmMembers)
+        .where(and(eq(s.crmMembers.orgId, ctx.org.id), eq(s.crmMembers.id, memberId))).limit(1)
+        .then((rows) => rows[0]?.divisionId ?? null));
+    }
+    return memberDivs.get(memberId)!;
+  };
   let maps: ReturnType<typeof divisionMapsForOrg> | undefined;
   const divisions = () => maps ??= divisionMapsForOrg(ctx.org.id);
   async function row(kind: ObjectKind, id: string): Promise<any> {
@@ -57,26 +95,16 @@ export function objectPolicy(ctx: OrgContext) {
       if (r.kind === "pamphlet" || r.kind === "estimate_default") return true;
       const parent = r.kind === "estimate" || r.kind === "contract" ? "estimates"
         : r.kind === "photo" || r.kind === "measurement" ? "customers" : null;
-      return parent && r.refId ? visible(parent, r.refId) : !divisionScopeOf(ctx.member) && ctx.permissions.viewAllJobs;
+      return parent && r.refId ? visible(parent, r.refId) : !pinnedDivisionOf(ctx.member) && ctx.permissions.viewAllJobs;
     }
-    let division: string | null = null;
-    const scope = divisionScopeOf(ctx.member);
+    const scope = divisionScopeOf(ctx);
     if (scope) {
-      const m = await divisions();
-      division = kind === "projects" ? r.divisionId
-        : kind === "estimates" ? m.byEstimate.get(r.id)
-        : kind === "customers" ? m.byCustomer.get(r.id)
-        : docDivisionFromMaps(m, r);
-      // An unlinked appointment belongs to its booker's division; a customer
-      // belongs to its explicitly assigned owner's division when no project exists.
-      if (!division && (kind === "customers" || kind === "appointments" || kind === "reports" || kind === "measurements")) {
-        const memberId = kind === "customers" ? r.ownerMemberId : (!r.projectId && !r.customerId ? r.createdByMemberId ?? r.requestedByMemberId : null);
-        if (memberId) {
-          const [m] = await db.select().from(s.crmMembers).where(and(eq(s.crmMembers.orgId, ctx.org.id), eq(s.crmMembers.id, memberId))).limit(1);
-          division = m?.divisionId ?? null;
-        }
-      }
-      if (!divisionVisible(scope, division)) return false;
+      const division = await objectDivision(kind, r, await divisions(), memberDivision);
+      // Workspace mode (an unpinned member inside one division): an unlinked
+      // calendar event of a division-less booker is an org event, kept in
+      // every workspace so the owner's own blocks never vanish.
+      const orgEvent = kind === "appointments" && !division && !r.projectId && !r.customerId && !pinnedDivisionOf(ctx.member);
+      if (!orgEvent && !divisionVisible(scope, division)) return false;
     }
     if (ctx.permissions.viewAllJobs) return true;
     if ((kind === "reports" || kind === "measurements") && r.requestedByMemberId === ctx.member.id) return true;
@@ -103,6 +131,16 @@ export function objectPolicy(ctx: OrgContext) {
   return { visible, filter };
 }
 
+/** The CRM object an in-app link points at (/crm/clients/:id, /crm/inbox?c=:id, …), or null for an org-level link. */
+export function linkedObject(link: string | null | undefined): { kind: ObjectKind; id: string } | null {
+  if (!link) return null;
+  const m = /^\/crm\/(clients|projects|estimates|invoices)\/([^/?#]+)/.exec(link);
+  if (m) return { kind: m[1] === "clients" ? "customers" : m[1] as ObjectKind, id: m[2] };
+  const inbox = /^\/crm\/inbox\?(?:.*&)?c=([^&#]+)/.exec(link);
+  if (inbox) return { kind: "customers", id: inbox[1] };
+  return null;
+}
+
 /** Called by requireOrg for every authenticated CRM request. Route templates
  * distinguish object IDs from static paths such as customers/export.csv. */
 export async function authorizeObjectRequest(req: any, res: any, ctx: OrgContext): Promise<boolean> {
@@ -110,40 +148,56 @@ export async function authorizeObjectRequest(req: any, res: any, ctx: OrgContext
   if (!template.startsWith("/api/crm/")) return true;
   const policy = objectPolicy(ctx);
   req.crmObjectPolicy = policy;
+  // A record hidden only by the division WORKSPACE (the owner is inside FL and
+  // opened a WA link) still answers 404 — divisions stay separate — but says
+  // why, so the app can offer to switch instead of claiming it doesn't exist.
+  let allDivisions: ReturnType<typeof objectPolicy> | null = null;
+  const notFound = async (kind: ObjectKind, id: string | undefined) => {
+    if (id && ctx.activeDivisionId && !pinnedDivisionOf(ctx.member)) {
+      allDivisions ??= objectPolicy({ ...ctx, activeDivisionId: null });
+      if (await allDivisions.visible(kind, id)) {
+        res.status(404).json({
+          code: "other_division",
+          message: "This record belongs to another division. Switch to All divisions (or its division) to open it.",
+        });
+        return false;
+      }
+    }
+    res.status(404).json({ message: "Record not found" });
+    return false;
+  };
   const parts = template.split("/");
   for (let i = 3; i < parts.length - 1; i++) {
     const kind = parts[i] === "inbox" ? "customers" : parts[i];
     if (!(kind in objectTables) || !parts[i + 1].startsWith(":")) continue;
     const id = req.params[parts[i + 1].slice(1)];
-    if (!id || !await policy.visible(kind as ObjectKind, id)) {
-      res.status(404).json({ message: "Record not found" }); return false;
-    }
+    if (!id || !await policy.visible(kind as ObjectKind, id)) return notFound(kind as ObjectKind, id);
   }
   // Query filters and attachment references must not provide an alternate ID path.
   const refs = { customerId: "customers", projectId: "projects", estimateId: "estimates", invoiceId: "invoices", jobId: "jobs" } as const;
   for (const [key, kind] of Object.entries(refs)) {
     const id = req.query?.[key];
-    if (id && (divisionScopeOf(ctx.member) || !ctx.permissions.viewAllJobs) && !await policy.visible(kind, String(id))) {
-      res.status(404).json({ message: "Record not found" }); return false;
+    if (id && (divisionScopeOf(ctx) || !ctx.permissions.viewAllJobs) && !await policy.visible(kind, String(id))) {
+      return notFound(kind, String(id));
     }
   }
   if (parts[3] === "attachments") {
     const ref = req.method === "GET" ? req.query : req.body;
     const kind = ref?.kind === "estimate" || ref?.kind === "contract" ? "estimates" : "customers";
-    if (ref?.refId && !await policy.visible(kind, String(ref.refId))) {
-      res.status(404).json({ message: "Record not found" }); return false;
-    }
+    if (ref?.refId && !await policy.visible(kind, String(ref.refId))) return notFound(kind, String(ref.refId));
   }
   // Mutations cannot relink an allowed object into a hidden division/object.
   // Unscoped seats retain their existing validation/error semantics.
-  if (divisionScopeOf(ctx.member) || !ctx.permissions.viewAllJobs) {
+  if (divisionScopeOf(ctx) || !ctx.permissions.viewAllJobs) {
     for (const [key, kind] of Object.entries(refs)) {
       const id = req.body?.[key];
-      if (id && !await policy.visible(kind, String(id))) {
-        res.status(404).json({ message: "Record not found" }); return false;
-      }
+      if (id && !await policy.visible(kind, String(id))) return notFound(kind, String(id));
     }
-    if (divisionScopeOf(ctx.member) && req.body && "divisionId" in req.body && req.body.divisionId !== divisionScopeOf(ctx.member)) {
+    // A PINNED member can never move work out of their division. The owner in
+    // a division workspace may (that is how a record is reassigned; it then
+    // leaves the workspace he is in).
+    const pinned = pinnedDivisionOf(ctx.member);
+    if (pinned && req.body && "divisionId" in req.body && req.body.divisionId !== pinned) {
       res.status(404).json({ message: "Record not found" }); return false;
     }
   }

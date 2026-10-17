@@ -13,7 +13,9 @@ import type { PoolClient } from "pg";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { db, pool } from "../db";
 import * as schema from "@shared/schema";
-import { crmOrgs, crmMembers, users, crmEffectivePermissions } from "@shared/schema";
+import { crmOrgs, crmMembers, crmDivisions, users, crmEffectivePermissions } from "@shared/schema";
+import { canSwitchDivision, resolveActiveDivision } from "./divisions";
+import { CRM_DIVISION_HEADER } from "@shared/divisions";
 import type { CrmPermission } from "@shared/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { authorizeObjectRequest } from "./object-access";
@@ -27,7 +29,30 @@ export type OrgContext = {
   org: typeof crmOrgs.$inferSelect;
   member: typeof crmMembers.$inferSelect;
   permissions: Record<CrmPermission, boolean>;
+  /**
+   * The division workspace this request runs in (null = All divisions). Set by
+   * requireOrg from the x-crm-division header / the member's saved pick, only
+   * for unpinned members; read through divisionScopeOf(ctx). Contexts built
+   * outside requireOrg (portal, webhooks, jobs) leave it unset = unscoped.
+   */
+  activeDivisionId?: string | null;
 };
+
+export { CRM_DIVISION_HEADER };
+
+/** Resolve ctx.activeDivisionId for this request (see divisions.ts resolveActiveDivision). */
+export async function attachActiveDivision(req: any, ctx: OrgContext): Promise<OrgContext> {
+  ctx.activeDivisionId = null;
+  if (!canSwitchDivision(ctx.member)) return ctx;
+  const raw = req?.headers?.[CRM_DIVISION_HEADER];
+  const header: string | null = (Array.isArray(raw) ? raw[0] : raw) ?? null;
+  if (!header && !ctx.member.activeDivisionId) return ctx;
+  if (header && header.trim().toLowerCase() === "all") return ctx;
+  const ids = (await db.select({ id: crmDivisions.id }).from(crmDivisions)
+    .where(eq(crmDivisions.orgId, ctx.org.id))).map((d) => d.id);
+  ctx.activeDivisionId = resolveActiveDivision(ctx.member, header, ids);
+  return ctx;
+}
 
 /**
  * Get-or-create the caller's org.
@@ -136,6 +161,7 @@ export async function listOrgsForUser(userId: number) {
  */
 export async function requireOrg(req: any, res: any, userId: number): Promise<OrgContext | null> {
   const ctx = await resolveOrg(req, res, userId);
+  if (ctx) await attachActiveDivision(req, ctx);
   if (!ctx || !await authorizeObjectRequest(req, res, ctx)) return null;
   if (!await crmPlanOk(req, res, ctx)) return null;
   return ctx;
@@ -144,6 +170,7 @@ export async function requireOrg(req: any, res: any, userId: number): Promise<Or
 /** SMS setup is also sold by the platform; this grants no CRM feature access. */
 export async function requireSmsOrg(req: any, res: any, userId: number): Promise<OrgContext | null> {
   const ctx = await resolveOrg(req, res, userId);
+  if (ctx) await attachActiveDivision(req, ctx);
   if (!ctx || !await authorizeObjectRequest(req, res, ctx)) return null;
   const ent = await getEntitlements(ctx.org.ownerUserId);
   if (ent.isPlatformAdmin || textingNumbersAllowance(ent) !== 0

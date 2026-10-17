@@ -15,6 +15,7 @@ import { InToolShell } from "@/components/tool/in-shell";
 import { CrmLogo } from "@/components/crm-logo";
 import { CrmCreateMenu } from "@/components/crm-create-menu";
 import { CrmNotificationsBell } from "@/components/crm-notifications-bell";
+import { CrmDivisionSwitcher } from "@/components/crm-division-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { marketingUrl } from "@/lib/site";
@@ -49,15 +50,19 @@ export function CrmToolLayout({ footer, children }: { footer?: ReactNode; childr
   const config = crmNav(me);
 
   const brand = (
-    <Link href="/crm" className="flex items-center gap-2.5 min-w-0" aria-label="CRM home" data-testid="link-crm-tool-home">
-      <CrmLogo height={22} />
-      {me?.org?.name && (
-        <span className="hidden lg:flex items-center gap-1.5 min-w-0 max-w-[12rem] text-[12px] text-white/70" data-testid="text-crm-tool-org">
-          {me.org.logoUrl && <img src={me.org.logoUrl} alt="" className="h-4 w-4 rounded-sm object-contain bg-white shrink-0" />}
-          <span className="truncate">{me.org.name}</span>
-        </span>
-      )}
-    </Link>
+    <span className="flex items-center gap-2.5 min-w-0">
+      <Link href="/crm" className="flex items-center gap-2.5 min-w-0" aria-label="CRM home" data-testid="link-crm-tool-home">
+        <CrmLogo height={22} />
+        {me?.org?.name && (
+          <span className="hidden lg:flex items-center gap-1.5 min-w-0 max-w-[12rem] text-[12px] text-white/70" data-testid="text-crm-tool-org">
+            {me.org.logoUrl && <img src={me.org.logoUrl} alt="" className="h-4 w-4 rounded-sm object-contain bg-white shrink-0" />}
+            <span className="truncate">{me.org.name}</span>
+          </span>
+        )}
+      </Link>
+      {/* Division workspace: All divisions or one division (owner / division-less admins only). */}
+      <CrmDivisionSwitcher variant="topbar" />
+    </span>
   );
 
   const actions = (

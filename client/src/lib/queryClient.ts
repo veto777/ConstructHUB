@@ -1,6 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { rememberPlanPrompt } from "@/lib/plan-errors";
 import { inNativeApp } from "./app-shell";
+import { withDivisionHeader } from "./division-workspace";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -23,17 +24,18 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  let res = await fetch(url, {
+  // /api/crm/* carries the division workspace header (lib/division-workspace.ts).
+  let res = await fetch(url, withDivisionHeader(url, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
-  });
+  }));
 
   if (res.status === 403 && (await res.clone().json().catch(() => ({}))).reauth === true) {
     const { requestRecentAuth } = await import('@/components/recent-auth');
     await requestRecentAuth();
-    res = await fetch(url, { method, headers: data ? { "Content-Type": "application/json" } : {}, body: data ? JSON.stringify(data) : undefined, credentials: "include" });
+    res = await fetch(url, withDivisionHeader(url, { method, headers: data ? { "Content-Type": "application/json" } : {}, body: data ? JSON.stringify(data) : undefined, credentials: "include" }));
   }
   await throwIfResNotOk(res);
   if (method.toUpperCase() !== "GET" && /^\/api\/(auth|gbp)(?:\/|$)/.test(url)) {
@@ -78,13 +80,14 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey.join("/") as string;
+    const res = await fetch(url, withDivisionHeader(url, {
       credentials: "include",
       // Never let the browser cache API responses: 404/410 are cacheable by
       // default (RFC 9111), so a stale "expired" would survive the fix — e.g.
       // an extended estimate kept showing the expired page.
       cache: "no-store",
-    });
+    }));
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;

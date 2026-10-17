@@ -1,4 +1,5 @@
 import { objectPolicy } from "./object-access";
+import { divisionScopeOf } from "./divisions";
 /**
  * Measurement report import — HOVER today, CladAI over the wire tomorrow.
  *
@@ -253,6 +254,7 @@ async function createCustomer(
   orgId: string,
   ownerMemberId: string | null,
   c: ParsedReportContact & { companyName?: string | null },
+  divisionId: string | null = null,
 ) {
   const displayName =
     c.name?.trim() || c.email || c.phone || "Measurement report import";
@@ -273,6 +275,7 @@ async function createCustomer(
       ownerMemberId,
       portalToken: token(),
       notes: "Created from an imported measurement report.",
+      divisionId,
     } as any)
     .returning();
   queueCrmEvent(orgId, "customer.created", { ...customerEventPayload(row), source: "measurement_report" });
@@ -484,7 +487,7 @@ export function registerCrmReportRoutes(app: Express, getDevUser: GetUser): void
     } else {
       customer = await matchCustomer(ctx.org.id, parsed.contact.email, parsed.contact.phone);
       if (!customer) {
-        customer = await createCustomer(ctx.org.id, ctx.member.id, parsed.contact);
+        customer = await createCustomer(ctx.org.id, ctx.member.id, parsed.contact, divisionScopeOf(ctx));
         created = true;
       }
     }

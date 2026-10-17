@@ -38,7 +38,8 @@ import { registerCrmClient360Routes } from "./notes-timeline";
 import { registerCrmScheduleRoutes } from "./schedule";
 import { registerCrmFollowUpRoutes } from "./follow-ups";
 import { registerCrmCalendarRoutes } from "./calendar";
-import { registerCrmDivisionRoutes, getDivision } from "./divisions";
+import { registerCrmDivisionRoutes, getDivision, canSwitchDivision, pinnedDivisionOf } from "./divisions";
+import { registerDivisionWorkspaceRoutes } from "./division-workspaces";
 import { registerCrmAdminRoutes } from "./admin";
 import { registerCrmMigrateRoutes } from "./migrate";
 import { registerCrmDiscountRoutes } from "./discounts";
@@ -383,6 +384,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   // Calendar sync: tokenized iCal feed + Google Calendar push.
   registerCrmCalendarRoutes(app, getDevUser);
   // Divisions: WA HQ + FL style operating arms of one company.
+  registerDivisionWorkspaceRoutes(app, getDevUser);
   registerCrmDivisionRoutes(app, getDevUser);
   // Platform admin (email-list gated, never org membership) + beta invites.
   registerCrmAdminRoutes(app, getDevUser);
@@ -448,6 +450,14 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       org: presentOrg(ctx.org),
       member: presentMember(ctx.member, ctx.permissions.seeCosts),
       permissions: ctx.permissions,
+      // The division workspace this request ran in (null = All divisions), whether this seat may switch
+      // (unpinned: the owner, division-less admins) and the division a pinned seat is held to.
+      divisionWorkspace: {
+        activeDivisionId: ctx.activeDivisionId ?? null,
+        savedDivisionId: canSwitchDivision(ctx.member) ? ctx.member.activeDivisionId ?? null : null,
+        canSwitch: canSwitchDivision(ctx.member),
+        pinnedDivisionId: pinnedDivisionOf(ctx.member),
+      },
       orgs,
       seats,
       crm: {

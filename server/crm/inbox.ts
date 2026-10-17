@@ -104,7 +104,7 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
         AND read_at IS NULL
     `) as any).rows ?? [];
     const unreadTotal: number = unreadRows[0]?.n ?? 0;
-    if (divisionScopeOf(ctx.member) || !ctx.permissions.viewAllJobs) {
+    if (divisionScopeOf(ctx) || !ctx.permissions.viewAllJobs) {
       const access = objectPolicy(ctx);
       const visible = [];
       for (const r of rows) if (await access.visible("customers", r.customerId)) visible.push(r);

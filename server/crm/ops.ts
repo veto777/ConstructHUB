@@ -210,7 +210,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       .orderBy(desc(crmInvoices.createdAt)).limit(500);
     // Division scoping — same resolution order as estimates (project →
     // estimate's project → customer's latest project).
-    const divScope = divisionScopeOf(ctx.member);
+    const divScope = divisionScopeOf(ctx);
     if (divScope) {
       const maps = await divisionMapsForOrg(ctx.org.id);
       rows = rows.filter((i) => divisionVisible(divScope, docDivisionFromMaps(maps, i)));

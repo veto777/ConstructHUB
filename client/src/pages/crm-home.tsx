@@ -28,6 +28,8 @@ import {
 import { InfoTip } from "@/components/info-tip";
 import { HelpButton } from "@/components/help-button";
 import { ClientSearchPicker } from "@/components/crm-search-picker";
+import { DivisionBadge, useActiveDivision } from "@/components/crm-division-switcher";
+import { divisionLabel } from "@shared/divisions";
 
 interface Step {
   key: string;
@@ -106,6 +108,8 @@ export default function CrmHomePage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  // The division workspace (null = All divisions); the home page is then that division's dashboard.
+  const { active: activeDivision, canSwitch: canSwitchDivision } = useActiveDivision();
   const { data: ob, isLoading, isError } = useQuery<Onboarding>({ queryKey: ["/api/crm/onboarding"] });
 
   // Dashboard metrics — read-only rollups over endpoints the app already has.
@@ -211,19 +215,29 @@ export default function CrmHomePage() {
   return (
     <CrmPage>
       <div>
-        <div className="flex items-center gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
+        <div className="flex flex-wrap items-center gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight" data-testid="text-home-title">
             {me?.org?.name ? me.org.name : "Welcome"}
           </h1>
+          {/* Inside a division workspace this is THAT division's dashboard — say so in the header. */}
+          {activeDivision && <DivisionBadge className="ml-2" testId="badge-home-division" />}
           <InfoTip k="dashboard" />
           {/* The Home walkthrough (static key: the title here is not a CrmPageHeader). */}
           <HelpButton k="crm-home" videoOnly />
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          {ob.requiredComplete
+        <p className="text-sm text-muted-foreground mt-1" data-testid="text-home-subtitle">
+          {activeDivision
+            ? `${divisionLabel(activeDivision)} division dashboard — every number, list and new record here is this division's only.`
+            : ob.requiredComplete
             ? "Your workspace is set up — here's where things stand."
             : "A couple of things left before your workspace is ready."}
         </p>
+        {activeDivision && canSwitchDivision && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Switch divisions from the top bar, or see every division side by side in{" "}
+            <Link href="/crm/team?tab=divisions" className="underline" data-testid="link-home-divisions-overview">Divisions → Overview</Link>.
+          </p>
+        )}
       </div>
 
       {ob.showChecklist && (

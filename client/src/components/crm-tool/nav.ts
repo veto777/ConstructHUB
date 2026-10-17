@@ -15,7 +15,7 @@ import type { ToolDef, ToolNavCtx, ToolShellConfig } from "@/components/tool/she
 import { CRM_ESTIMATES_MENU, crmHasAny } from "@shared/crm-access";
 
 type Gate = { perm?: string; anyOf?: readonly string[]; platformAdmin?: boolean };
-type Me = { permissions?: Record<string, boolean>; isPlatformAdmin?: boolean } | null | undefined;
+type Me = { permissions?: Record<string, boolean>; isPlatformAdmin?: boolean; divisionWorkspace?: { canSwitch?: boolean } } | null | undefined;
 
 const isJobcam = (p: string) => p.startsWith("/crm/jobcam") || /^\/crm\/projects\/[^/]+\/jobcam/.test(p);
 const fixed = (to: string) => (_c: ToolNavCtx) => to;
@@ -72,6 +72,9 @@ export function crmNav(me: Me): ToolShellConfig {
       // A crew member who cannot write estimates has no "New estimate".
       groups: t.key === "estimates" && me?.permissions?.manageEstimates !== true
         ? t.groups.map((g) => ({ ...g, items: g.items.filter((i) => i.key !== "new") }))
+        // Divisions (workspaces + overview) for the seats that may switch division.
+        : t.key === "team" && me?.divisionWorkspace?.canSwitch === true
+        ? t.groups.map((g) => ({ ...g, items: [...g.items, { key: "divisions", label: "Divisions", params: { tab: "divisions" }, to: fixed("/crm/team?tab=divisions") }] }))
         : t.groups,
     })),
   };

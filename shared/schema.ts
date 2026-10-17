@@ -1286,6 +1286,12 @@ export const crmMembers = pgTable("crm_members", {
   // Division scoping: null = all divisions. A member pinned to a division (and
   // not the owner) sees only that division's work in list endpoints.
   divisionId: varchar("division_id"),
+  // The division WORKSPACE an unpinned member (the owner, a division-less
+  // admin) last picked: null = "All divisions (overview)". Remembered here so
+  // it follows them across devices; the client also sends it on every request
+  // as the x-crm-division header (server/crm/tenancy.ts). Ignored for a member
+  // pinned by divisionId — they never leave their own division.
+  activeDivisionId: varchar("active_division_id"),
   // Sparse overrides on top of the role defaults; see CRM_PERMISSIONS.
   permissions: jsonb("permissions"),
   // SMS consent (carrier compliance): when this member first agreed to receive
@@ -1818,6 +1824,10 @@ export const crmCustomers = pgTable("crm_customers", {
   billingPostalCode: text("billing_postal_code"),
   leadSourceId: varchar("lead_source_id"),
   ownerMemberId: varchar("owner_member_id"),
+  // Explicit division of the client (set when the client is created inside a
+  // division workspace, or by "Sort unassigned records"). Wins over the
+  // project/estimate inference in divisions.ts divisionMapsForOrg.
+  divisionId: varchar("division_id"),
   notes: text("notes"),
   tags: text("tags").array(),
   // First-class custom fields on EVERY entity. HCP's own docs say "Housecall Pro

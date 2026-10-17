@@ -86,7 +86,7 @@ async function crmStatsNumbers(ctx: OrgContext) {
   const orgId = ctx.org.id;
 
   // Reuse the object policy before aggregation, including assignment overrides.
-  if (divisionScopeOf(ctx.member) || !ctx.permissions.viewAllJobs) {
+  if (divisionScopeOf(ctx) || !ctx.permissions.viewAllJobs) {
     const access = objectPolicy(ctx);
     const estimates = await access.filter("estimates", await db.select().from(crmEstimates).where(eq(crmEstimates.orgId, orgId)));
     const projects = await access.filter("projects", await db.select().from(crmProjects).where(eq(crmProjects.orgId, orgId)));
@@ -184,7 +184,7 @@ export async function crmTeamActivityFor(ctx: OrgContext, limit: number): Promis
   };
 
   const access = objectPolicy(ctx);
-  const restricted = divisionScopeOf(ctx.member) || !ctx.permissions.viewAllJobs;
+  const restricted = divisionScopeOf(ctx) || !ctx.permissions.viewAllJobs;
   type Item = CrmTeamActivityItem;
   const items: Item[] = [];
   const money = (c: number) =>

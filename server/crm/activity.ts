@@ -179,6 +179,13 @@ export function activityText(row: {
       case "jobcam.share.sent": return `sent a JobCam share link${m.to ? ` to ${m.to}` : ""}${m.channel ? ` by ${m.channel}` : ""}`;
       case "jobcam.storage.requested": return "asked ConstructHUB for more JobCam storage";
       case "data.exported": return `exported the client list${m.rows != null ? ` (${m.rows} rows)` : ""}`;
+      case "divisions.unassigned_sorted": {
+        const n = (Number(m.customers) || 0) + (Number(m.projects) || 0) + (Number(m.estimates) || 0);
+        const per = m.byDivision && typeof m.byDivision === "object"
+          ? Object.entries(m.byDivision as Record<string, number>).map(([k, v]) => `${v} to ${k}`).join(", ") : "";
+        return `sorted ${n} unassigned record${n === 1 ? "" : "s"} into divisions${per ? ` (${per})` : ""}`;
+      }
+      case "division.assigned": return `moved ${m.kind ?? "a record"}${m.label ? ` ${m.label}` : ""} to ${m.to ?? "no division"}`;
       // ── lane: calls+crm — Call Assistant rows (docs/call-assistant/LANES.md) ──
       case "call.answered": return `answered a call${m.outcome ? ` (${String(m.outcome).replace(/_/g, " ")})` : ""}${m.summary ? `: ${String(m.summary).slice(0, 140)}` : ""}`;
       case "call.lead": return `took a phone lead${m.need ? ` — ${String(m.need).slice(0, 100)}` : ""}${m.created ? " and created this client" : ""}`;
@@ -236,7 +243,7 @@ export function registerCrmActivityRoutes(app: Express, getDevUser: GetUser): vo
     const rows = await db.select().from(crmActivityLog)
       .where(and(eq(crmActivityLog.orgId, ctx.org.id), eq(crmActivityLog.customerId, cust.id)))
       .orderBy(desc(crmActivityLog.createdAt)).limit(100);
-    if (divisionScopeOf(ctx.member) || !ctx.permissions.viewAllJobs) {
+    if (divisionScopeOf(ctx) || !ctx.permissions.viewAllJobs) {
       const access = objectPolicy(ctx);
       const types: Record<string, ObjectKind> = { customer: "customers", project: "projects", estimate: "estimates", invoice: "invoices", payment: "payments" };
       const visible = [];
