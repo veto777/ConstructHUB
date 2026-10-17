@@ -5,10 +5,11 @@
  * when, with a one-click "Hold it" link (a signed token that expires at the send time; GET shows a confirm page,
  * POST holds). Editing the release or pressing Hold clears the time.
  *
- * At the time, the press pass (worker.ts runPressPass → sendDue) claims the release in one UPDATE (send_at back to
- * NULL where it still equals the claimed value), so it is sent at most once however many passes run. It then
- * re-checks that the text is the one that was scheduled, and runs approve.ts approveRelease, the Approve button's
- * own path: the guideline check, the credit and the wire queue are unchanged. A blocking issue, no credit, or an
+ * At the time, the press pass (worker.ts runPressPass → sendDue) runs approve.ts approveRelease, the Approve
+ * button's own path, in one transaction on the locked row (SELECT … FOR UPDATE): send_at must still be the time the
+ * pass found, the text must hash to the scheduled version, then the guideline check, the credit and status 'ready'
+ * with approved_hash. So it is sent at most once however many passes run, and an edit either lands first (and stops
+ * it) or is refused. A blocking issue, no credit, or an
  * edit after scheduling means it is not sent, and the customer is told why.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
