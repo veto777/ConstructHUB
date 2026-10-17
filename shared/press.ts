@@ -9,7 +9,7 @@
  * get 2 free; one release a month for the best results. A bigger bundle lowers OUR cost, never the customer's price.
  *
  * The distributor is never named as our supplier: on the page it is one outlet among the rest (owner). Customers see
- * the tiers as Standard / National / Premium; the wire's own names (Budget / National / Premium) are used only in
+ * the tiers as Standard / Plus / Premium; the wire's own names (Budget / National / Premium) are used only in
  * the submission email (PRESS_WIRE_TIER_NAME).
  */
 
@@ -45,7 +45,7 @@ export const PRESS_CREDIT_MONTHS = 12;
 export const PRESS_RECOMMENDED_GAP_DAYS = 28;
 
 /** The tier as the customer sees it. */
-export const PRESS_TIER_LABEL: Record<PressTier, string> = { budget: "Standard", national: "National", premium: "Premium" };
+export const PRESS_TIER_LABEL: Record<PressTier, string> = { budget: "Standard", national: "Plus", premium: "Premium" };
 /** The tier as the wire names it (the submission email only). */
 export const PRESS_WIRE_TIER_NAME: Record<PressTier, string> = { budget: "Budget", national: "National", premium: "Premium" };
 
@@ -61,8 +61,8 @@ export const PRESS_TIER_INFO: Record<PressTier, PressTierInfo> = {
     perks: ["5,000+ newsrooms: the Associated Press, Reuters, Dow Jones, Bloomberg Radio, CNBC, Fox News Channel, USA Today", "Major newspapers: The New York Times, The Wall Street Journal, The Washington Post, Los Angeles Times", "Finance sites and terminals: Yahoo Finance, MarketWatch, Morningstar, FactSet, Refinitiv", "Typically 450–700 sites run it"],
   },
   premium: {
-    tier: "premium", tagline: "Everything in National, plus the biggest business and TV desks", pickups: null,
-    perks: ["Everything in National", "Adds Business Insider, Markets Insider, CNN.com and CNN Money, Benzinga Pro", "Adds the ABC, CBS and NBC television network desks and Bloomberg Television", "Adds more local daily papers, and media targeting"],
+    tier: "premium", tagline: "Everything in Plus, and the biggest business and TV desks", pickups: null,
+    perks: ["Everything in Plus", "Adds Business Insider, Markets Insider, CNN.com and CNN Money, Benzinga Pro", "Adds the ABC, CBS and NBC television network desks and Bloomberg Television", "Adds more local daily papers, and media targeting"],
   },
 };
 
@@ -76,7 +76,7 @@ export const PRESS_PACKAGES: readonly PressPackage[] = [
 
 export const pressPackage = (key: string): PressPackage | undefined => PRESS_PACKAGES.find((p) => p.key === key);
 export const pressPackagePrice = (p: PressPackage, tier: PressTier): number => PRESS_RELEASE_PRICE_CENTS[tier] * p.paidReleases;
-/** "National · 12-Month Program" — an order's name on the receipt and in the app. */
+/** "Plus · 12-Month Program" — an order's name on the receipt and in the app. */
 export const pressOrderName = (p: PressPackage | undefined, tier: PressTier): string =>
   `${PRESS_TIER_LABEL[tier]} · ${p?.key === "program_12" ? `12-Month Program (${PRESS_PROGRAM_CREDITS} releases)` : "1 release"}`;
 

@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRight, ExternalLink, AlertTriangle, Check, CheckCircle2, Clock, FileText, Globe2, Image as ImageIcon, Info, Lightbulb, Loader2, Newspaper, Package, Send, XCircle } from "lucide-react";
 import {
-  PRESS_CREDIT_MONTHS, PRESS_AUTOPILOT_MAX_DAY, PRESS_HEADLINE_OUTLETS, PRESS_NEWS_TYPES, PRESS_PACKAGES, PRESS_TIERS, PRESS_TIER_INFO, PRESS_TIER_LABEL, PRESS_WIRE_TIER_NAME, pressPackage, PRESS_PROGRAM_CREDITS, PRESS_PROGRAM_FREE, PRESS_PROGRAM_PAID, PRESS_STATUS_HELP, PRESS_STATUS_LABELS,
+  PRESS_CREDIT_MONTHS, PRESS_AUTOPILOT_MAX_DAY, PRESS_HEADLINE_OUTLETS, PRESS_NEWS_TYPES, PRESS_PACKAGES, PRESS_TIERS, PRESS_TIER_INFO, PRESS_TIER_LABEL, pressPackage, PRESS_PROGRAM_CREDITS, PRESS_PROGRAM_FREE, PRESS_PROGRAM_PAID, PRESS_STATUS_HELP, PRESS_STATUS_LABELS,
   pressPackagePrice, type PressAutopilotView, type PressGuidelineIssue, type PressIdea, type PressPackageKey, type PressOrderView, type PressPackage, type PressPrefill, type PressPrefillField, type PressReleaseInput, type PressReleaseStatus, type PressReleaseText, type PressReleaseView, type PressTier,
 } from "@shared/press";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -97,7 +97,7 @@ function Packages({ credits, onBuy, buying }: { credits: Record<PressTier, numbe
             <div key={tier} className={cn("wire-package flex min-w-0 flex-col rounded-xl border bg-card p-5 lg:p-7", popular && "wire-package-featured")} data-testid={`press-package-${tier}`}>
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-base font-semibold">{PRESS_TIER_LABEL[tier]}</h3>
-                {popular && <Badge variant="outline" className="wire-featured-label">National reach</Badge>}
+                {popular && <Badge variant="outline" className="wire-featured-label">Recommended</Badge>}
               </div>
               <p className="mt-3 min-h-10 text-sm text-muted-foreground">{info.tagline}</p>
               <div className="mt-6 text-4xl font-semibold tabular-nums tracking-tighter lg:text-[2.75rem]">
@@ -134,7 +134,7 @@ function OutletsDialog({ tier, onClose }: { tier: PressTier | null; onClose: () 
       <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{tier ? tierWord(tier) : ""} distribution: every outlet</DialogTitle>
-          <DialogDescription>The wire's 2026 U.S. {tier ? PRESS_WIRE_TIER_NAME[tier] : ""} list, as published. Some publications choose what they post.</DialogDescription>
+          <DialogDescription>The wire's published 2026 U.S. list for this package. Some publications choose what they post.</DialogDescription>
         </DialogHeader>
         <Input placeholder="Search outlets" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search outlets" />
         <div className="max-h-[55vh] overflow-y-auto rounded-lg border p-2 text-sm">
@@ -548,7 +548,7 @@ function Timeline({ releases, onOpen }: { releases: PressReleaseView[]; onOpen: 
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 
-/** The top 10 headline outlets of National and of Premium (shared/press.ts order), each named once and tagged with the lowest package that has it, on a slow loop. */
+/** The top 10 headline outlets of Plus and of Premium (shared/press.ts order), each named once and tagged with the lowest package that has it, on a slow loop. */
 const CAROUSEL_OUTLETS: { name: string; tier: "premium" | "national" }[] = (() => {
   const seen = new Set<string>(), out: { name: string; tier: "premium" | "national" }[] = [];
   for (const tier of ["national", "premium"] as const)

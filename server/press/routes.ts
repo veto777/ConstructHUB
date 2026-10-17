@@ -152,7 +152,7 @@ export function registerPressRoutes(app: Express, deps: Deps, getUser: GetUser =
       if (!user) return;
       const body = z.object({ packageKey: z.string(), tier: tierSchema }).safeParse(req.body ?? {});
       const pkg = body.success ? pressPackage(body.data.packageKey) : undefined;
-      if (!body.success || !pkg) return res.status(400).json({ message: "Pick Standard, National or Premium, and one release or the 12-month program" });
+      if (!body.success || !pkg) return res.status(400).json({ message: "Pick Standard, Plus or Premium, and one release or the 12-month program" });
       const tier = body.data.tier;
       const amount = pressPackagePrice(pkg, tier);
       const order = await store.createOrder({ userId: user.id, email: user.email, packageKey: pkg.key, tier, credits: pkg.credits, amountCents: amount });
