@@ -167,7 +167,7 @@ export function photoStage(fileName: string): "progress" | "finished" | null {
  * Never a guess from a bare file name.
  */
 export function resolveAttachmentActor(
-  att: { kind: string; fileName: string; uploadedByMemberId?: string | null; uploadedByLabel?: string | null },
+  att: { kind: string; fileName: string; uploadedByMemberId?: string | null; uploadedByLabel?: string | null; uploadedByKind?: string | null },
   ev: {
     member: (id: string) => CrmActor | null;
     /** The activity-log actor recorded for this attachment's upload, if any. */
@@ -182,7 +182,7 @@ export function resolveAttachmentActor(
     if (ev.logged) return ev.logged;
     return { kind: "member", name: "Former team member", recorded: true };
   }
-  if (att.uploadedByLabel) return uploadLabelActor(att.uploadedByLabel);
+  if (att.uploadedByLabel) return uploadLabelActor(att.uploadedByLabel, att.uploadedByKind);
   if (ev.logged) return ev.logged;
   if (att.kind === "contract") return systemActor("System");
   if (att.kind === "measurement") return systemActor("HOVER import");

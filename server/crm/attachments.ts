@@ -142,13 +142,21 @@ export type AttachmentUploader = {
   uploadedByMemberId?: string | null;
   /** "HOVER import", "System", the client's name… Defaults to "System" when no member is given. */
   uploadedByLabel?: string | null;
+  /** member | client | system. Defaults to member with a member id, else system. */
+  uploadedByKind?: "member" | "client" | "system" | null;
 };
 
 /** The uploader columns for a generated file: a member, else the label, else "System". */
-export function generatedUploader(args: AttachmentUploader): { uploadedByMemberId: string | null; uploadedByLabel: string | null } {
+export function generatedUploader(args: AttachmentUploader): {
+  uploadedByMemberId: string | null; uploadedByLabel: string | null; uploadedByKind: string;
+} {
   const memberId = args.uploadedByMemberId ?? null;
   const label = String(args.uploadedByLabel ?? "").trim().slice(0, 200) || null;
-  return { uploadedByMemberId: memberId, uploadedByLabel: label ?? (memberId ? null : "System") };
+  return {
+    uploadedByMemberId: memberId,
+    uploadedByLabel: label ?? (memberId ? null : "System"),
+    uploadedByKind: args.uploadedByKind ?? (memberId ? "member" : "system"),
+  };
 }
 
 /**
@@ -245,22 +253,27 @@ const present = (a: typeof crmAttachments.$inferSelect, url: string, uploadedBy:
 
 /** A stored row's uploader as an actor: the member, else the label, else null (not recorded). */
 export function storedUploader(
-  a: { uploadedByMemberId?: string | null; uploadedByLabel?: string | null },
+  a: { uploadedByMemberId?: string | null; uploadedByLabel?: string | null; uploadedByKind?: string | null },
   member: (id: string) => CrmActor | null,
 ): CrmActor | null {
   if (a.uploadedByMemberId) {
     const m = member(a.uploadedByMemberId);
     if (m) return m;
   }
-  if (a.uploadedByLabel) return uploadLabelActor(a.uploadedByLabel);
+  if (a.uploadedByLabel) return uploadLabelActor(a.uploadedByLabel, a.uploadedByKind);
   return null;
 }
 
 /** What an attachment row is, for the activity-log meta (file names only — never storage keys). */
 function attachmentMeta(a: typeof crmAttachments.$inferSelect, extra: Record<string, unknown> = {}) {
-  const stage = a.fileName.startsWith("progress--") ? "progress" : a.fileName.startsWith("finished--") ? "finished" : null;
+  // The stage tag is a photo-only convention — a PDF named "progress--x.pdf" keeps its name.
+  const stage = a.kind !== "photo" ? null
+    : a.fileName.startsWith("progress--") ? "progress" : a.fileName.startsWith("finished--") ? "finished" : null;
   return {
     kind: a.kind,
+    // The parent (customer / estimate id) — lets the audit feed gate a row
+    // for a restricted seat even after the attachment itself is deleted.
+    refId: a.refId,
     fileName: stage ? a.fileName.slice(stage.length + 2) : a.fileName,
     stage,
     ...extra,
@@ -471,7 +484,7 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     }
 
     const [row] = await db.insert(crmAttachments)
-      .values({ ...values, uploadedByMemberId: ctx.member.id, uploadedByLabel: null }).returning();
+      .values({ ...values, uploadedByMemberId: ctx.member.id, uploadedByLabel: null, uploadedByKind: "member" }).returning();
     const where = await attachmentContext(row);
     logActivity(ctx, "attachment.added", {
       entityType: "attachment", entityId: row.id, customerId: where.customerId,
@@ -564,6 +577,7 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
           orgId: ctx.org.id, kind: ESTIMATE_DEFAULT_KIND, refId: null,
           fileName: src.fileName, mime: src.mime, sizeBytes: src.sizeBytes, storagePath: src.storagePath,
           uploadedByMemberId: src.uploadedByMemberId ?? null, uploadedByLabel: src.uploadedByLabel ?? null,
+          uploadedByKind: src.uploadedByKind ?? null,
         }).returning();
         return { on: true, defaultId: row.id, changed: true, unlink: false };
       }
@@ -578,9 +592,10 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     if (result.unlink) await unlinkStored(src.storagePath);
     if (result.changed) {
       console.log(`[crm] member ${ctx.member.id} ${on ? "added" : "removed"} "${src.fileName}" ${on ? "to" : "from"} future estimates (org ${ctx.org.id})`);
+      const where = await attachmentContext(src);
       logActivity(ctx, on ? "attachment.default_on" : "attachment.default_off", {
-        entityType: "attachment", entityId: result.defaultId ?? src.id,
-        meta: attachmentMeta(src),
+        entityType: "attachment", entityId: result.defaultId ?? src.id, customerId: where.customerId,
+        meta: attachmentMeta(src, { number: where.number }),
       });
     }
     res.json({ on: result.on, defaultId: result.defaultId });
@@ -626,6 +641,7 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
         orgId: ctx.org.id, kind: "estimate", refId: est.id,
         fileName: src.fileName, mime: src.mime, sizeBytes: src.sizeBytes, storagePath: src.storagePath,
         uploadedByMemberId: src.uploadedByMemberId ?? null, uploadedByLabel: src.uploadedByLabel ?? null,
+        uploadedByKind: src.uploadedByKind ?? null,
       }).returning();
       return { row, created: true };
     });
@@ -732,7 +748,7 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     // The client did it: their name is the uploader (refId already links the customer).
     const clientName = String(cust.displayName ?? "").trim() || "Client";
     const [row] = await db.insert(crmAttachments)
-      .values({ ...values, uploadedByMemberId: null, uploadedByLabel: clientName.slice(0, 200) }).returning();
+      .values({ ...values, uploadedByMemberId: null, uploadedByLabel: clientName.slice(0, 200), uploadedByKind: "client" }).returning();
     recordActivity({
       orgId: cust.orgId, actorLabel: "client", action: "attachment.added",
       entityType: "attachment", entityId: row.id, customerId,

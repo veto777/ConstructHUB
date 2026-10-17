@@ -1439,6 +1439,9 @@ export const crmAttachments = pgTable("crm_attachments", {
   // rows from before uploads were attributed — never guessed (notes-timeline.ts).
   uploadedByMemberId: varchar("uploaded_by_member_id"),
   uploadedByLabel: text("uploaded_by_label"),
+  // Who KIND of uploader: member | client | system — stored at write time so a
+  // client named "Stripe" never reads as the Stripe source.
+  uploadedByKind: text("uploaded_by_kind"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

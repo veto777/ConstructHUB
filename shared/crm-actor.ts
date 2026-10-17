@@ -93,11 +93,16 @@ export function actorSentence(a: CrmActor, rest: string): string {
 }
 
 /**
- * crm_attachments.uploaded_by_label (no member): a known system source, else
- * the client's name the portal recorded at upload time.
+ * crm_attachments.uploaded_by_label (no member), read through the
+ * uploaded_by_kind stored beside it at write time — a client whose name
+ * happens to be "Stripe" stays the client. A label without a kind (never
+ * written by the app; only a hand-made row) falls back to the known system
+ * source list.
  */
-export function uploadLabelActor(label: string): CrmActor {
+export function uploadLabelActor(label: string, kind?: string | null): CrmActor {
   const l = clean(label);
+  if (kind === "client") return clientActor(l);
+  if (kind === "system") return systemActor(l);
   if ((CRM_SYSTEM_ACTOR_LABELS as readonly string[]).includes(l)) return systemActor(l);
   return clientActor(l);
 }

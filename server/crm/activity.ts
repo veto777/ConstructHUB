@@ -22,7 +22,7 @@ import { divisionScopeOf } from "./divisions";
  */
 import type { Express } from "express";
 import { db } from "../db";
-import { crmActivityLog, crmCustomers, crmMembers, type CrmActivityLogRow } from "@shared/schema";
+import { crmActivityLog, crmAttachments, crmCustomers, crmMembers, type CrmActivityLogRow } from "@shared/schema";
 import { and, desc, eq, notInArray } from "drizzle-orm";
 import { loadActorDirectory, type ActorDirectory } from "./actors";
 import { actorLabel, type CrmActor } from "@shared/crm-actor";
@@ -285,6 +285,35 @@ export function presentActivity(row: CrmActivityLogRow, dir: ActorDirectory, hid
  *  name) — kept out of the folded-in audit feed so a photo is one line, not two. */
 export const TIMELINE_CARRIED_ACTIONS = ["attachment.added", "attachment.attached", "attachment.auto_attached"];
 
+/**
+ * Restricted-seat visibility of an attachment log row whose attachment no
+ * longer exists (deleted): the parent recorded in meta.refId / customerId,
+ * mirroring object-access's attachment rule (estimate files and contracts
+ * need seePrices + the estimate; photos/measurements the customer; org
+ * collateral is visible to every seat).
+ */
+export async function deletedAttachmentVisible(
+  ctx: OrgContext,
+  access: { visible: (kind: ObjectKind, id: string) => Promise<boolean> },
+  r: { entityId: string | null; customerId: string | null; meta: unknown },
+): Promise<boolean> {
+  const m = (r.meta ?? {}) as Record<string, any>;
+  // The attachment still exists → its own check (already failed) is final.
+  if (r.entityId && await attachmentExists(ctx.org.id, r.entityId)) return false;
+  if (m.kind === "pamphlet" || m.kind === "estimate_default") return true;
+  if (m.kind === "estimate" || m.kind === "contract") {
+    return !!ctx.permissions.seePrices && typeof m.refId === "string" && access.visible("estimates", m.refId);
+  }
+  const customerId = (typeof m.refId === "string" && m.refId) || r.customerId;
+  return !!customerId && access.visible("customers", customerId);
+}
+
+async function attachmentExists(orgId: string, id: string): Promise<boolean> {
+  const [row] = await db.select({ id: crmAttachments.id }).from(crmAttachments)
+    .where(and(eq(crmAttachments.orgId, orgId), eq(crmAttachments.id, id))).limit(1);
+  return !!row;
+}
+
 // ── Routes ──────────────────────────────────────────────────────────────────
 
 export function registerCrmActivityRoutes(app: Express, getDevUser: GetUser): void {
@@ -312,9 +341,15 @@ export function registerCrmActivityRoutes(app: Express, getDevUser: GetUser): vo
     const show = (r: CrmActivityLogRow) => presentActivity(r, dir, hideMoney, cust.displayName);
     if (divisionScopeOf(ctx) || !ctx.permissions.viewAllJobs) {
       const access = objectPolicy(ctx);
-      const types: Record<string, ObjectKind> = { customer: "customers", project: "projects", estimate: "estimates", invoice: "invoices", payment: "payments" };
+      const types: Record<string, ObjectKind> = { customer: "customers", project: "projects", estimate: "estimates", invoice: "invoices", payment: "payments", attachment: "attachments" };
       const visible = [];
-      for (const r of rows) if (r.entityId && types[r.entityType ?? ""] && await access.visible(types[r.entityType!], r.entityId)) visible.push(r);
+      for (const r of rows) {
+        if (!r.entityId || !types[r.entityType ?? ""]) continue;
+        if (await access.visible(types[r.entityType!], r.entityId)) { visible.push(r); continue; }
+        // A deleted attachment has no row left to check: gate by the parent
+        // the log row recorded, with the same rules attachments use.
+        if (r.entityType === "attachment" && await deletedAttachmentVisible(ctx, access, r)) visible.push(r);
+      }
       return res.json(visible.map(show));
     }
     res.json(rows.map(show));

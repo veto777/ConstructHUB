@@ -47,7 +47,7 @@ async function upload(p: string, file: { name: string; type: string; data: Buffe
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, ...randomBytes(64), 0xff, 0xd9]);
 const PDF = Buffer.from(`%PDF-1.4 vitest actor ${randomUUID()}`);
 const uploaderOf = async (id: string) =>
-  (await q(`select uploaded_by_member_id as m, uploaded_by_label as l from crm_attachments where id = $1`, [id]))[0];
+  (await q(`select uploaded_by_member_id as m, uploaded_by_label as l, uploaded_by_kind as k from crm_attachments where id = $1`, [id]))[0];
 /** The activity-log rows for one entity. logActivity is fire-and-forget (it may land just after
  *  the response), so wait briefly until `want` (an action) shows up. */
 const logOf = async (entityId: string, want?: string) => {
@@ -103,7 +103,7 @@ describe("actor attribution (dev server)", () => {
       { kind: "photo", refId: custId, stage: "progress" }, cookie);
     expect(r.status).toBe(201);
     attIds.push(r.body.id);
-    expect(await uploaderOf(r.body.id)).toEqual({ m: memberId, l: null });
+    expect(await uploaderOf(r.body.id)).toEqual({ m: memberId, l: null, k: "member" });
     expect(r.body.uploadedBy).toMatchObject({ kind: "member", isOwner: true });
     const log = await logOf(r.body.id, "attachment.added");
     expect(log).toEqual([expect.objectContaining({ action: "attachment.added", actor_member_id: memberId, customer_id: custId })]);
@@ -122,7 +122,7 @@ describe("actor attribution (dev server)", () => {
     const r = await upload("/api/client/photos", { name: "porch.jpg", type: "image/jpeg", data: JPEG }, { customerId: custId }, `crm_client=${raw}`);
     expect(r.status).toBe(201);
     attIds.push(r.body.id);
-    expect(await uploaderOf(r.body.id)).toEqual({ m: null, l: custName });
+    expect(await uploaderOf(r.body.id)).toEqual({ m: null, l: custName, k: "client" });
     expect((await logOf(r.body.id, "attachment.added"))[0]).toMatchObject({ action: "attachment.added", actor_member_id: null, actor_label: "client" });
     const tl = await api(`/api/crm/customers/${custId}/timeline`, {}, cookie);
     const e = (tl.body as any[]).find((x) => x.id === `att-${r.body.id}`);
@@ -147,14 +147,14 @@ describe("actor attribution (dev server)", () => {
     const on = await post(`/api/crm/attachments/${f.body.id}/estimate-default`, { on: true }, cookie);
     expect(on.status).toBe(200);
     attIds.push(on.body.defaultId);
-    expect(await uploaderOf(on.body.defaultId)).toEqual({ m: memberId, l: null });
+    expect(await uploaderOf(on.body.defaultId)).toEqual({ m: memberId, l: null, k: "member" });
     expect((await logOf(on.body.defaultId, "attachment.default_on")).map((r) => r.action)).toContain("attachment.default_on");
 
     // A new estimate auto-attaches the library file: same uploader, logged as Auto-attach.
     const e2 = await mk();
     const [auto] = await q(`select id from crm_attachments where kind = 'estimate' and ref_id = $1`, [e2]);
     expect(auto).toBeTruthy();
-    expect(await uploaderOf(auto.id)).toEqual({ m: memberId, l: null });
+    expect(await uploaderOf(auto.id)).toEqual({ m: memberId, l: null, k: "member" });
     expect((await logOf(auto.id))[0]).toMatchObject({ action: "attachment.auto_attached", actor_label: "Auto-attach", customer_id: custId });
 
     // Remove it, then put it back from the library by hand: attacher = the member.
@@ -164,7 +164,7 @@ describe("actor attribution (dev server)", () => {
     const lib = await post(`/api/crm/estimates/${e2}/attachments/from-library`, { attachmentId: on.body.defaultId }, cookie);
     expect(lib.status).toBe(201);
     attIds.push(lib.body.id);
-    expect(await uploaderOf(lib.body.id)).toEqual({ m: memberId, l: null });
+    expect(await uploaderOf(lib.body.id)).toEqual({ m: memberId, l: null, k: "member" });
     expect((await logOf(lib.body.id, "attachment.attached"))[0]).toMatchObject({ action: "attachment.attached", actor_member_id: memberId });
 
     const tl = await api(`/api/crm/customers/${custId}/timeline`, {}, cookie);
@@ -183,23 +183,74 @@ describe("actor attribution (dev server)", () => {
     const created = det.body.events.find((ev: any) => ev.type === "created");
     expect(created.actor).toMatchObject({ kind: "member", isOwner: true });
     expect(created.actorName).toBe(ownerLabel);
+
+    // The library toggle is on the client's Activity too (customerId recorded).
+    const defaultRow = (act.body as any[]).find((a) => a.action === "attachment.default_on");
+    expect(defaultRow?.text).toBe(`${ownerLabel} set vitest-actor-warranty.pdf to attach to all future estimates`);
+
+    // A restricted seat (no viewAllJobs) still sees the attachment rows it may see —
+    // including the delete, whose attachment row is gone (gated by its estimate).
+    const [orig] = await q(`select permissions from crm_members where id = $1`, [memberId]);
+    try {
+      await q(`update crm_members set permissions = coalesce(permissions, '{}'::jsonb) || '{"viewAllJobs": false}'::jsonb where id = $1`, [memberId]);
+      const me = await api("/api/crm/me", {}, cookie);
+      expect(me.body.permissions.viewAllJobs).toBe(false);
+      const restricted = await api(`/api/crm/customers/${custId}/activity`, {}, cookie);
+      expect(restricted.status).toBe(200);
+      const actions = (restricted.body as any[]).map((a) => a.action);
+      expect(actions).toContain("attachment.deleted");
+      expect(actions).toContain("attachment.default_on");
+    } finally {
+      await q(`update crm_members set permissions = $2 where id = $1`, [memberId, orig.permissions === null ? null : JSON.stringify(orig.permissions)]);
+    }
     await post(`/api/crm/attachments/${on.body.defaultId}/estimate-default`, { on: false }, cookie);
+  });
+
+  it("the stage tag is photo-only: a PDF named progress--… keeps its name in the log", async () => {
+    const e = await post("/api/crm/estimates", { customerId: custId, title: "Vitest actor stage", items: [] }, cookie);
+    estIds.push(e.body.id);
+    const f = await upload("/api/crm/attachments", { name: "progress--schedule.pdf", type: "application/pdf", data: PDF },
+      { kind: "estimate", refId: e.body.id }, cookie);
+    expect(f.status).toBe(201);
+    attIds.push(f.body.id);
+    await logOf(f.body.id, "attachment.added");
+    const [row] = await q(`select meta from crm_activity_log where entity_id = $1 and action = 'attachment.added'`, [f.body.id]);
+    expect(row.meta).toMatchObject({ kind: "estimate", fileName: "progress--schedule.pdf", stage: null, refId: e.body.id });
+  });
+
+  it("a client named like a system source stays the client (uploaded_by_kind)", async () => {
+    await q(`update crm_customers set display_name = 'Stripe' where id = $1`, [custId]);
+    try {
+      const raw = randomBytes(32).toString("hex");
+      await q(`insert into crm_client_sessions (token_hash, customer_ids, expires_at, last_seen_at) values ($1, $2::jsonb, now() + interval '1 day', now())`,
+        [sha256(raw), JSON.stringify([custId])]);
+      const r = await upload("/api/client/photos", { name: "stripe-client.jpg", type: "image/jpeg", data: JPEG }, { customerId: custId }, `crm_client=${raw}`);
+      expect(r.status).toBe(201);
+      attIds.push(r.body.id);
+      expect(await uploaderOf(r.body.id)).toEqual({ m: null, l: "Stripe", k: "client" });
+      const tl = await api(`/api/crm/customers/${custId}/timeline`, {}, cookie);
+      const e = (tl.body as any[]).find((x) => x.id === `att-${r.body.id}`);
+      expect(e.actor).toMatchObject({ kind: "client", name: "Stripe" });
+      expect(e.text).toBe("Stripe shared a photo — stripe-client.jpg");
+    } finally {
+      await q(`update crm_customers set display_name = $2 where id = $1`, [custId, custName]);
+    }
   });
 
   it("generated PDFs default to 'System'; the HOVER photo import is 'HOVER import'", async () => {
     const { storeGeneratedPdf } = await import("./attachments");
     const pdf = await storeGeneratedPdf({ orgId, kind: "contract", refId: estIds[0] ?? null, fileName: "contract-vitest.pdf", buffer: PDF });
     attIds.push(pdf.id);
-    expect(await uploaderOf(pdf.id)).toEqual({ m: null, l: "System" });
+    expect(await uploaderOf(pdf.id)).toEqual({ m: null, l: "System", k: "system" });
 
     const { importHoverJobPhotos } = await import("./hover");
     const job = { models: [{ images: [{ id: "img1", image: { url: "https://hover.example.test/img1.jpg" } }] }] };
     const fakeFetch: any = async () => new Response(JPEG, { headers: { "content-type": "image/jpeg" } });
     const got = await importHoverJobPhotos(orgId, "vitestjob", custId, job, {}, fakeFetch);
     expect(got.stored).toBe(1);
-    const [row] = await q(`select id, uploaded_by_member_id as m, uploaded_by_label as l from crm_attachments where ref_id = $1 and file_name = 'hover-vitestjob-img1.jpg'`, [custId]);
+    const [row] = await q(`select id, uploaded_by_member_id as m, uploaded_by_label as l, uploaded_by_kind as k from crm_attachments where ref_id = $1 and file_name = 'hover-vitestjob-img1.jpg'`, [custId]);
     attIds.push(row.id);
-    expect({ m: row.m, l: row.l }).toEqual({ m: null, l: "HOVER import" });
+    expect({ m: row.m, l: row.l, k: row.k }).toEqual({ m: null, l: "HOVER import", k: "system" });
     const tl = await api(`/api/crm/customers/${custId}/timeline`, {}, cookie);
     expect((tl.body as any[]).find((x) => x.id === `att-${row.id}`).text).toBe("HOVER import added a photo — hover-vitestjob-img1.jpg");
   });

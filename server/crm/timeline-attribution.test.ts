@@ -59,6 +59,11 @@ describe("actor names", () => {
     expect(actorLabel(systemActor("HOVER import"))).toBe("HOVER import");
     expect(uploadLabelActor("HOVER import").kind).toBe("system");
     expect(uploadLabelActor("Carley Geiss")).toMatchObject({ kind: "client", name: "Carley Geiss" });
+    // The stored kind wins over the name: a client called "Stripe" is the client.
+    expect(uploadLabelActor("Stripe", "client")).toMatchObject({ kind: "client", name: "Stripe" });
+    expect(uploadLabelActor("HOVER import", "system")).toMatchObject({ kind: "system" });
+    expect(resolveAttachmentActor({ kind: "photo", fileName: "a.jpg", uploadedByLabel: "System", uploadedByKind: "client" }, { member: dir.member }))
+      .toMatchObject({ kind: "client", name: "System" });
     expect(logLabelActor("client", "Carley Geiss")).toMatchObject({ kind: "client", name: "Carley Geiss" });
     expect(logLabelActor("Ava (Call Assistant)")).toMatchObject({ kind: "system", name: "Ava (Call Assistant)" });
   });

@@ -698,6 +698,7 @@ export async function ensureCrmSchema(): Promise<void> {
     -- ("Carley Geiss", "HOVER import", "System"). Both null on rows from before this was recorded.
     ALTER TABLE crm_attachments ADD COLUMN IF NOT EXISTS uploaded_by_member_id varchar;
     ALTER TABLE crm_attachments ADD COLUMN IF NOT EXISTS uploaded_by_label text;
+    ALTER TABLE crm_attachments ADD COLUMN IF NOT EXISTS uploaded_by_kind text;
   `);
 
   // ── Client 360: contractor notes + financing click log ───────────────────

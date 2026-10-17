@@ -71,13 +71,14 @@ export async function attachDefaultFilesToEstimate(orgId: string, estimateId: st
         orgId, kind: "estimate", refId: estimateId,
         fileName: d.fileName, mime: d.mime, sizeBytes: d.sizeBytes, storagePath: d.storagePath,
         uploadedByMemberId: d.uploadedByMemberId ?? null, uploadedByLabel: d.uploadedByLabel ?? null,
+        uploadedByKind: d.uploadedByKind ?? null,
       }))).returning({ id: crmAttachments.id, fileName: crmAttachments.fileName });
       const [est] = await tx.select({ customerId: crmEstimates.customerId, number: crmEstimates.number })
         .from(crmEstimates).where(and(eq(crmEstimates.id, estimateId), eq(crmEstimates.orgId, orgId))).limit(1);
       await tx.insert(crmActivityLog).values(made.map((m) => ({
         orgId, actorMemberId: null, actorLabel: "Auto-attach", action: "attachment.auto_attached",
         entityType: "attachment", entityId: m.id, customerId: est?.customerId ?? null,
-        meta: { kind: "estimate", fileName: m.fileName, number: est?.number ?? null },
+        meta: { kind: "estimate", fileName: m.fileName, number: est?.number ?? null, refId: estimateId },
       })));
       return rows.length;
     });
