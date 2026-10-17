@@ -35,6 +35,7 @@ import {
 import { EstimateEngagement } from "@/components/crm-engagement";
 import { EstimateDiscounts } from "@/components/crm-discounts";
 import { EstimateAttach, CustomerPhotos, CustomerComments, OrgPamphlets } from "@/components/client-uploads";
+import { EstimateDefaultFiles } from "@/components/estimate-attachments-card";
 import { JobcamPanel } from "@/components/jobcam/project-panel";
 import { CustomerMeasurements } from "@/components/client-measurements";
 import { TakePaymentDialog, invoiceDueCents } from "@/components/crm-take-payment";
@@ -1855,6 +1856,7 @@ export default function CrmClientPage() {
       <Card data-testid="section-customer-jobcam"><CardContent className="p-4 sm:p-5"><JobcamPanel customerId={id!} /></CardContent></Card>
       <CustomerComments customerId={id!} />
       <OrgPamphlets />
+      <EstimateDefaultFiles />
 
       {/* Good / better / best options for one estimate. */}
       {optsFor && (

@@ -17,6 +17,7 @@ import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone, crmTable, crmTableCards,
 } from "@/components/crm-ui";
 import { EstimateDiscounts } from "@/components/crm-discounts";
+import { EstimateAttachmentsCard } from "@/components/estimate-attachments-card";
 import { HelpButton } from "@/components/help-button";
 import { money } from "@/lib/estimate-math";
 import { cn } from "@/lib/utils";
@@ -764,6 +765,9 @@ export default function CrmEstimateDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Attachments — files on this estimate + "Add to all future estimates" (self-contained). */}
+      <EstimateAttachmentsCard estimateId={e.id} />
 
       {/* Events trail — created/sent/viewed/updated, newest first. */}
       {events.length > 0 && (

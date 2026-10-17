@@ -13,6 +13,13 @@ import { objectPolicy } from "./object-access";
  *   - photo: job photos the HOMEOWNER uploads from the portal (refId =
  *     customer id, max 20 per customer). Contractors see them on the client
  *     detail page.
+ *   - estimate_default: the org's "Add to all future estimates" set (refId
+ *     null). Usually made by ticking a file on an estimate, so the row SHARES
+ *     that file's storagePath; every new estimate gets a kind 'estimate' copy
+ *     of each (estimate-default-files.ts). Contractor-only — clients see the
+ *     copies on their estimates, never the library itself.
+ * Because storagePaths can be shared, a delete unlinks the file on disk only
+ * when no row still references it.
  * A fourth kind is SYSTEM-GENERATED, never uploaded:
  *   - contract: the signed-contract PDF minted when an estimate is approved
  *     (refId = estimate id, server/crm/contract-pdf.ts). Clients download it
@@ -52,6 +59,7 @@ import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow, requireClient } from "./client-auth";
 import { requireDocSession } from "./portal";
 import { sendWithFallback } from "../email";
+import { ESTIMATE_DEFAULT_KIND, fileKeyOf, lockStoragePath } from "./estimate-default-files";
 import { portalBaseUrl } from "../site-context";
 
 type GetUser = (req: any, res: any) => any;
@@ -165,6 +173,13 @@ export async function storeGeneratedPdf(args: {
   return storeGeneratedFile({ ...args, mime: "application/pdf", ext: "pdf" });
 }
 
+/** Remove a stored file — callers first prove no row references it. */
+async function unlinkStored(storagePath: string) {
+  const abs = path.resolve(STORAGE_DIR, storagePath);
+  if (!abs.startsWith(path.resolve(STORAGE_DIR) + path.sep)) return;
+  await fs.promises.unlink(abs).catch(() => {});
+}
+
 function streamAttachment(res: any, att: typeof crmAttachments.$inferSelect, inline: boolean) {
   // storagePath is written by storeFile only (orgId/uuid.ext) — resolve and
   // confirm containment anyway so a hand-edited row can never escape the dir.
@@ -189,6 +204,9 @@ const present = (a: typeof crmAttachments.$inferSelect, url: string) => ({
   mime: a.mime,
   sizeBytes: a.sizeBytes,
   createdAt: a.createdAt,
+  // Same file on disk ⇔ same fileKey: how the estimate card tells which of
+  // its files are also in the auto-attach set (storagePath never leaves).
+  fileKey: fileKeyOf(a.storagePath),
   url: `${url}/${a.id}/file`,
   downloadUrl: `${url}/${a.id}/file`,
 });
@@ -332,8 +350,8 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     if (!ctx) return;
 
     const kind = String(req.body?.kind || "");
-    if (kind !== "pamphlet" && kind !== "estimate" && kind !== "photo") {
-      return res.status(400).json({ message: "kind must be pamphlet, estimate or photo" });
+    if (kind !== "pamphlet" && kind !== "estimate" && kind !== "photo" && kind !== ESTIMATE_DEFAULT_KIND) {
+      return res.status(400).json({ message: "kind must be pamphlet, estimate, estimate_default or photo" });
     }
     // Project photos are field work — a PM (manageJobs) uploads them without
     // needing customer-management rights. Everything else stays manageCustomers.
@@ -402,13 +420,126 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       }
     }
 
-    const [row] = await db
-      .delete(crmAttachments)
+    const [att] = await db.select().from(crmAttachments)
       .where(and(eq(crmAttachments.id, req.params.id), eq(crmAttachments.orgId, ctx.org.id)))
-      .returning();
-    if (!row) return res.status(404).json({ message: "Attachment not found" });
-    await fs.promises.unlink(path.resolve(STORAGE_DIR, row.storagePath)).catch(() => {});
+      .limit(1);
+    if (!att) return res.status(404).json({ message: "Attachment not found" });
+    // storagePaths are shared (an auto-attach file is one file on disk under
+    // many estimates) — unlink only once the LAST row naming it is gone.
+    const orphaned = await db.transaction(async (tx) => {
+      await lockStoragePath(tx, att.storagePath);
+      const [row] = await tx.delete(crmAttachments)
+        .where(and(eq(crmAttachments.id, att.id), eq(crmAttachments.orgId, ctx.org.id)))
+        .returning();
+      if (!row) return null;
+      const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(crmAttachments)
+        .where(eq(crmAttachments.storagePath, row.storagePath));
+      return { unlink: n === 0 };
+    });
+    if (!orphaned) return res.status(404).json({ message: "Attachment not found" });
+    if (orphaned.unlink) await unlinkStored(att.storagePath);
     res.json({ ok: true });
+  });
+
+  /**
+   * "Add to all future estimates" toggle for one file. on=true puts the file
+   * in the org's auto-attach set — an estimate_default row sharing its
+   * storagePath (no copy); on=false takes it out. Existing estimates are never
+   * touched either way. Idempotent: on twice is one row, off twice is a no-op.
+   * The id may be an estimate file, a company pamphlet, or a library row itself.
+   */
+  app.post("/api/crm/attachments/:id/estimate-default", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageCustomers")) return;
+    const parsed = z.object({ on: z.boolean() }).strict().safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Send { on: true | false }" });
+    const on = parsed.data.on;
+
+    const [src] = await db.select().from(crmAttachments)
+      .where(and(eq(crmAttachments.id, req.params.id), eq(crmAttachments.orgId, ctx.org.id)))
+      .limit(1);
+    if (!src) return res.status(404).json({ message: "Attachment not found" });
+    if (src.kind !== "estimate" && src.kind !== "pamphlet" && src.kind !== ESTIMATE_DEFAULT_KIND) {
+      return res.status(400).json({ message: "Only estimate files and company pamphlets can be added to every estimate." });
+    }
+
+    const result = await db.transaction(async (tx) => {
+      await lockStoragePath(tx, src.storagePath);
+      // Re-read under the lock — a concurrent delete may have just removed it.
+      const [still] = await tx.select({ id: crmAttachments.id }).from(crmAttachments)
+        .where(and(eq(crmAttachments.id, src.id), eq(crmAttachments.orgId, ctx.org.id))).limit(1);
+      if (!still) return null;
+      const existing = await tx.select().from(crmAttachments)
+        .where(and(eq(crmAttachments.orgId, ctx.org.id), eq(crmAttachments.kind, ESTIMATE_DEFAULT_KIND),
+          eq(crmAttachments.storagePath, src.storagePath)));
+      if (on) {
+        if (existing.length) return { on: true, defaultId: existing[0].id, changed: false, unlink: false };
+        const [row] = await tx.insert(crmAttachments).values({
+          orgId: ctx.org.id, kind: ESTIMATE_DEFAULT_KIND, refId: null,
+          fileName: src.fileName, mime: src.mime, sizeBytes: src.sizeBytes, storagePath: src.storagePath,
+        }).returning();
+        return { on: true, defaultId: row.id, changed: true, unlink: false };
+      }
+      if (!existing.length) return { on: false, defaultId: null, changed: false, unlink: false };
+      await tx.delete(crmAttachments).where(inArray(crmAttachments.id, existing.map((r) => r.id)));
+      // Toggling off a library-only upload removes its last reference.
+      const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(crmAttachments)
+        .where(eq(crmAttachments.storagePath, src.storagePath));
+      return { on: false, defaultId: null, changed: true, unlink: n === 0 };
+    });
+    if (!result) return res.status(404).json({ message: "Attachment not found" });
+    if (result.unlink) await unlinkStored(src.storagePath);
+    if (result.changed) {
+      console.log(`[crm] member ${ctx.member.id} ${on ? "added" : "removed"} "${src.fileName}" ${on ? "to" : "from"} future estimates (org ${ctx.org.id})`);
+    }
+    res.json({ on: result.on, defaultId: result.defaultId });
+  });
+
+  /**
+   * "Add from library": put one auto-attach file or company pamphlet on THIS
+   * estimate — a kind 'estimate' row sharing the file's storagePath. Already
+   * on the estimate → 200 with the existing row (idempotent), else 201.
+   */
+  app.post("/api/crm/estimates/:id/attachments/from-library", async (req: any, res) => {
+    const user = getDevUser(req, res);
+    if (!user) return;
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return;
+    if (!requirePermission(res, ctx, "manageCustomers")) return;
+    const parsed = z.object({ attachmentId: z.string().min(1).max(64) }).strict().safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Pick a file from the library" });
+
+    const [est] = await db.select({ id: crmEstimates.id }).from(crmEstimates)
+      .where(and(eq(crmEstimates.id, req.params.id), eq(crmEstimates.orgId, ctx.org.id))).limit(1);
+    if (!est) return res.status(404).json({ message: "Estimate not found" });
+
+    const [src] = await db.select().from(crmAttachments)
+      .where(and(eq(crmAttachments.id, parsed.data.attachmentId), eq(crmAttachments.orgId, ctx.org.id),
+        inArray(crmAttachments.kind, [ESTIMATE_DEFAULT_KIND, "pamphlet"])))
+      .limit(1);
+    if (!src) return res.status(404).json({ message: "Library file not found" });
+
+    const out = await db.transaction(async (tx) => {
+      await lockStoragePath(tx, src.storagePath);
+      const [still] = await tx.select({ id: crmAttachments.id }).from(crmAttachments)
+        .where(eq(crmAttachments.id, src.id)).limit(1);
+      if (!still) return null;
+      const [dup] = await tx.select().from(crmAttachments)
+        .where(and(eq(crmAttachments.orgId, ctx.org.id), eq(crmAttachments.kind, "estimate"),
+          eq(crmAttachments.refId, est.id), eq(crmAttachments.storagePath, src.storagePath)))
+        .limit(1);
+      if (dup) return { row: dup, created: false };
+      const [row] = await tx.insert(crmAttachments).values({
+        orgId: ctx.org.id, kind: "estimate", refId: est.id,
+        fileName: src.fileName, mime: src.mime, sizeBytes: src.sizeBytes, storagePath: src.storagePath,
+      }).returning();
+      return { row, created: true };
+    });
+    if (!out) return res.status(404).json({ message: "Library file not found" });
+    res.status(out.created ? 201 : 200).json(present(out.row, "/api/crm/attachments"));
   });
 
   app.get("/api/crm/attachments/:id/file", async (req: any, res) => {

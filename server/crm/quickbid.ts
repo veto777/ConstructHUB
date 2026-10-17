@@ -27,6 +27,7 @@ import { logEvent, presentEstimate, presentEstimateItem, recalcEstimate } from "
 import { estimateDefaultsFromOrg } from "./doc-defaults";
 import { inferSqftMetric, quickBidLine, type SqftMetric } from "./quickbid-math";
 import { nextDocNumber } from "./doc-number";
+import { attachDefaultFilesToEstimate } from "./estimate-default-files";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -170,6 +171,8 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
       taxable: l.item.taxable,
     })) as any);
 
+    // The org's "Add to all future estimates" files (never fails the bid).
+    await attachDefaultFilesToEstimate(ctx.org.id, est.id);
     const fresh = await recalcEstimate(ctx.org.id, est.id);
     await logEvent(ctx.org.id, est.id, "created", ctx.member.id, req, {
       quickBid: true, measurementId: m.id,

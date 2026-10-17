@@ -32,7 +32,7 @@ import {
 import { SectionTitle, EmptyState } from "@/components/crm-ui";
 
 /** One confirm step before a delete — every remove here is permanent and client-visible. */
-function ConfirmDelete({
+export function ConfirmDelete({
   open, onOpenChange, title, description, confirmLabel, onConfirm, testId,
 }: {
   open: boolean;
@@ -59,11 +59,11 @@ function ConfirmDelete({
   );
 }
 
-const kb = (n?: number | null) =>
+export const kb = (n?: number | null) =>
   n === null || n === undefined ? "" : n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null);
 
-async function uploadFile(url: string, file: File, fields: Record<string, string>) {
+export async function uploadFile(url: string, file: File, fields: Record<string, string>) {
   const fd = new FormData();
   for (const [k, v] of Object.entries(fields)) fd.append(k, v);
   fd.append("file", file);

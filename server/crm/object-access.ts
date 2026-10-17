@@ -52,7 +52,9 @@ export function objectPolicy(ctx: OrgContext) {
     // Attachments inherit their actual parent, never merely the org.
     if (kind === "attachments") {
       if ((r.kind === "contract" || r.kind === "estimate") && !ctx.permissions.seePrices) return false;
-      if (r.kind === "pamphlet") return true; // org price-book collateral
+      // Org collateral: company pamphlets and the "add to all future
+      // estimates" library (estimate_default, refId null).
+      if (r.kind === "pamphlet" || r.kind === "estimate_default") return true;
       const parent = r.kind === "estimate" || r.kind === "contract" ? "estimates"
         : r.kind === "photo" || r.kind === "measurement" ? "customers" : null;
       return parent && r.refId ? visible(parent, r.refId) : !divisionScopeOf(ctx.member) && ctx.permissions.viewAllJobs;

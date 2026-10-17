@@ -43,6 +43,7 @@ import {
 } from "./divisions";
 import { priceFloorViolation } from "./price-floor";
 import { nextDocNumber as allocateDocNumber } from "./doc-number";
+import { attachDefaultFilesToEstimate } from "./estimate-default-files";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -1341,6 +1342,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     }
     const fresh = await recalcEstimate(ctx.org.id, est.id);
     await logEvent(ctx.org.id, est.id, "created", ctx.member.id, req);
+    // The org's "Add to all future estimates" files (never fails the create).
+    await attachDefaultFilesToEstimate(ctx.org.id, est.id);
     logActivity(ctx, "estimate.created", {
       entityType: "estimate", entityId: est.id, customerId: est.customerId,
       meta: { number: est.number, totalCents: fresh?.totalCents ?? est.totalCents },
