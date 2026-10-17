@@ -21,7 +21,10 @@ let addr: typeof import("./customer-address-state");
 const orgId = randomUUID();
 const fl = randomUUID();
 const wa = randomUUID();
-const ids = { stated: randomUUID(), fromForm: randomUUID(), fromText: randomUUID(), nowhere: randomUUID(), picked: randomUUID() };
+const ids = { stated: randomUUID(), fromForm: randomUUID(), fromText: randomUUID(), nowhere: randomUUID(), picked: randomUUID(),
+  twoJobs: randomUUID(), shareA: randomUUID(), shareB: randomUUID(), linked: randomUUID() };
+const projFl = randomUUID();
+const projWa = randomUUID();
 const estimateId = randomUUID();
 
 beforeAll(async () => {
@@ -44,11 +47,27 @@ beforeAll(async () => {
     [randomUUID(), orgId]);
   await q(`insert into crm_estimates (id, org_id, customer_id, public_token, number) values ($1,$2,$3,$4,'E-T1')`,
     [estimateId, orgId, ids.fromForm, randomUUID()]);
+  // A client with no address of their own and one job in each state.
+  await cust(ids.twoJobs, "Two jobs", {});
+  await q(`insert into crm_projects (id, org_id, customer_id, name, state) values ($1,$3,$4,'FL job','FL'), ($2,$3,$4,'WA job','WA')`,
+    [projFl, projWa, orgId, ids.twoJobs]);
+  // Two clients sharing one office phone; an UNLINKED form on that phone says Florida → evidence for neither.
+  await cust(ids.shareA, "Share A", { phone: "813-555-0199" });
+  await cust(ids.shareB, "Share B", { phone: "(813) 555 0199" });
+  await q(`insert into crm_leads (id, org_id, source, phone, address_line1, fields) values ($1,$2,'website_form','8135550199','1 Bay St, Tampa, FL 33602','{}'::jsonb)`,
+    [randomUUID(), orgId]);
+  // A form LINKED to a client wins over a contact match that points elsewhere.
+  await cust(ids.linked, "Linked", { email: "linked@example.com" });
+  await q(`insert into crm_leads (id, org_id, source, email, address_line1, customer_id, fields) values
+    ($1,$3,'website_form','linked@example.com','5590 Example Rd, Bellingham, WA 98226',$4,'{}'::jsonb),
+    ($2,$3,'website_form','linked@example.com','1 Bay St, Tampa, FL 33602',null,'{}'::jsonb)`,
+    [randomUUID(), randomUUID(), orgId, ids.linked]);
 });
 
 afterAll(async () => {
   await q(`delete from crm_estimates where org_id = $1`, [orgId]);
   await q(`delete from crm_leads where org_id = $1`, [orgId]);
+  await q(`delete from crm_projects where org_id = $1`, [orgId]);
   await q(`delete from crm_customers where org_id = $1`, [orgId]);
   await q(`delete from crm_divisions where org_id = $1`, [orgId]);
   await q(`delete from crm_orgs where id = $1`, [orgId]);
@@ -71,7 +90,16 @@ describe("auto-sort by address", () => {
     expect(await div(ids.nowhere)).toBeNull();     // no address anywhere → not guessed
     expect(await div(ids.picked)).toBe(fl);       // a pick is never overwritten
     expect((await q(`select division_id from crm_estimates where id = $1`, [estimateId]))[0].division_id).toBe(wa);
-    expect(out.counts.customers).toBe(3);
+    // Each job goes by its own address; the client itself has no single state.
+    const pdiv = async (id: string) => (await q(`select division_id from crm_projects where id = $1`, [id]))[0].division_id;
+    expect(await pdiv(projFl)).toBe(fl);
+    expect(await pdiv(projWa)).toBe(wa);
+    expect(await div(ids.twoJobs)).toBeNull();
+    // A shared phone is not evidence; a linked form beats a contact-only one.
+    expect(await div(ids.shareA)).toBeNull();
+    expect(await div(ids.shareB)).toBeNull();
+    expect(await div(ids.linked)).toBe(wa);
+    expect(out.counts.customers).toBe(4);
     // Idempotent: a second run moves nothing.
     const again = await ws.applyUnassignedSuggestions(orgId);
     expect(again.counts).toEqual({ customers: 0, projects: 0, estimates: 0 });

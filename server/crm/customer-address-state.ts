@@ -58,7 +58,14 @@ export async function customerAddressStates(
   const missing = () => customers.filter((c) => !out.has(c.id));
   if (!missing().length) return out;
 
-  for (const p of projects) if (!out.has(p.customerId)) set(p.customerId, stateOfAddress(p), "project");
+  // Projects speak for the client only when every addressed project agrees (one client can have a FL job
+  // and a WA job — then neither decides; each project is placed by its own address instead).
+  const projectStates = new Map<string, Set<string>>();
+  for (const p of projects) {
+    const st = stateOfAddress(p);
+    if (st) projectStates.set(p.customerId, (projectStates.get(p.customerId) ?? new Set()).add(st));
+  }
+  for (const [cid, states] of projectStates) if (!out.has(cid) && states.size === 1) set(cid, [...states][0], "project");
   if (!missing().length) return out;
 
   const measurements = await db.select({
@@ -82,16 +89,24 @@ export async function customerAddressStates(
     postalCode: crmLeads.postalCode, addressLine1: crmLeads.addressLine1, city: crmLeads.city, fields: crmLeads.fields,
   }).from(crmLeads).where(and(eq(crmLeads.orgId, orgId)));
   const stillIds = new Set(still.map((c) => c.id));
+  // A submission LINKED to a client speaks only for that client, and before any contact match.
   for (const l of leads) {
-    const ids = new Set<string>();
-    if (l.customerId && stillIds.has(l.customerId)) ids.add(l.customerId);
-    for (const id of byEmail.get(email(l.email) ?? "") ?? []) ids.add(id);
-    for (const id of byPhone.get(phone10(l.phone) ?? "") ?? []) ids.add(id);
-    if (!ids.size) continue;
-    const st = leadFormState(l);
-    // A form shared by several clients (same email/phone on two records) still names one address.
-    for (const id of ids) set(id, st, "lead_form");
+    if (l.customerId && stillIds.has(l.customerId)) set(l.customerId, leadFormState(l), "lead_form");
   }
+  // Contact matches: only an unlinked submission, only when its email/phone points at exactly ONE client
+  // (a shared business phone or family email is not evidence), and only when every such submission for
+  // that client agrees on the state.
+  const contactStates = new Map<string, Set<string>>();
+  for (const l of leads) {
+    if (l.customerId) continue;
+    const ids = new Set<string>([...(byEmail.get(email(l.email) ?? "") ?? []), ...(byPhone.get(phone10(l.phone) ?? "") ?? [])]);
+    if (ids.size !== 1) continue;
+    const st = leadFormState(l);
+    if (!st) continue;
+    const id = [...ids][0];
+    contactStates.set(id, (contactStates.get(id) ?? new Set()).add(st));
+  }
+  for (const [id, states] of contactStates) if (states.size === 1) set(id, [...states][0], "lead_form");
   return out;
 }
 

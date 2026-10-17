@@ -25,6 +25,10 @@ const ZIP_PREFIX_RANGES: [number, number, string][] = [
   [967, 968, "HI"], [970, 979, "OR"], [980, 994, "WA"], [995, 999, "AK"],
 ];
 
+/** Two-letter state codes that are also common USPS street suffixes or abbreviations (CT court, LA lane,
+ *  AL alley, WY way, MT mount, PA path/pass, CO county, DE "de", IN "in", OK, ME). */
+const STREET_SUFFIX_CODES = new Set(["CT", "LA", "AL", "WY", "MT", "PA", "CO", "DE", "IN", "OK", "ME"]);
+
 /** State of a ZIP (5 digits, optional +4), or null. */
 export function stateFromZip(raw: string | null | undefined): string | null {
   const m = /\b(\d{5})(?:-\d{4})?\b/.exec(String(raw ?? ""));
@@ -44,10 +48,20 @@ export function stateFromAddressText(raw: string | null | undefined): string | n
   const m = /(?:^|[\s,])([A-Za-z]{2}|[A-Za-z]+(?: [A-Za-z]+)?)\.?(?:,?\s+(\d{5}(?:-\d{4})?))?(?:,?\s*(?:USA|US|United States))?$/i.exec(s);
   let named: string | null = null;
   if (m) {
-    // A two-letter code must be upper case to count ("WA" — not "Co" in "Hillsborough Co").
-    const asState = (w: string) => (w.length === 2 && w !== w.toUpperCase() ? null : normalizeUsState(w));
-    // Two-word names first ("New York"), then the last word alone ("Bellingham WA" → WA).
-    named = (m[1].includes(" ") ? normalizeUsState(m[1]) : null) ?? asState(m[1].split(" ").pop()!);
+    const hasZip = Boolean(m[2]);
+    // ", WA" / ", Florida": the comma marks the state slot of an address.
+    const afterComma = /,\s*$/.test(s.slice(0, (m.index ?? 0) + m[0].indexOf(m[1])));
+    const word = m[1].split(" ").pop()!;
+    // A two-letter code must be upper case ("WA" — not "Co" in "Hillsborough Co"), and one that is also a
+    // street suffix ("Oak CT", "Elm LA", "Pine AL", "Birch WY") counts only with a ZIP or after a comma.
+    const asCode = (w: string) => {
+      if (w.length !== 2 || w !== w.toUpperCase()) return null;
+      if (STREET_SUFFIX_CODES.has(w) && !hasZip && !afterComma) return null;
+      return normalizeUsState(w);
+    };
+    // A full state name doubles as a street name ("500 N Washington"), so it needs a ZIP or a comma.
+    const asName = (w: string) => (w.length > 2 && (hasZip || afterComma) ? normalizeUsState(w) : null);
+    named = (m[1].includes(" ") ? asName(m[1]) : null) ?? asCode(word) ?? asName(word);
   }
   const zip = stateFromZip(m?.[2] ?? (/\b\d{5}(?:-\d{4})?$/.test(s) ? s : null));
   if (named && zip && named !== zip) return null;

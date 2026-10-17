@@ -25,7 +25,7 @@ import {
   crmDivisions, crmMembers, crmCustomers, crmProjects, crmEstimates, crmInvoices, crmPayments,
   type CrmDivision,
 } from "@shared/schema";
-import { and, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { divisionLabel, normalizeUsState, sortDivisions } from "@shared/divisions";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { canSwitchDivision, divisionMapsForOrg, pinnedDivisionOf, type DivisionMaps } from "./divisions";
@@ -249,7 +249,8 @@ export function suggestDivisions(input: {
     out.push({
       kind: "project", id: p.id, label: [p.number, p.name].filter(Boolean).join(" · "), customerId: p.customerId,
       customerName: c?.displayName ?? null, state: c?.state ?? p.state,
-      ...pick([latestProjectDivision.get(p.customerId), "customer_project"], [stateMatch(c?.state), "customer_state"], [stateMatch(p.state), "project_state"]),
+      // The project's OWN address first: a client with a FL job and a WA job gets each in its own division.
+      ...pick([latestProjectDivision.get(p.customerId), "customer_project"], [stateMatch(p.state), "project_state"], [stateMatch(c?.state), "customer_state"]),
     });
   }
   for (const e of input.estimates) {
@@ -260,8 +261,8 @@ export function suggestDivisions(input: {
     out.push({
       kind: "estimate", id: e.id, label: [e.number, e.title].filter(Boolean).join(" · ") || "Estimate", customerId: e.customerId,
       customerName: c?.displayName ?? null, state: c?.state ?? p?.state ?? null,
-      ...pick([projDiv, "project"], [latestProjectDivision.get(e.customerId), "customer_project"],
-        [stateMatch(c?.state), "customer_state"], [stateMatch(p?.state), "project_state"]),
+      ...pick([projDiv, "project"], [stateMatch(p?.state), "project_state"], [latestProjectDivision.get(e.customerId), "customer_project"],
+        [stateMatch(c?.state), "customer_state"]),
     });
   }
   return out;
@@ -281,7 +282,11 @@ export async function unassignedPreviewFor(orgId: string) {
   for (const i of invoices) if (await bucket("invoices", i) === UNASSIGNED) invoicesUnassigned += 1;
 
   // The client's state comes from EVERY address we hold for them (record, projects, HOVER, website forms).
-  const addressStates = await customerAddressStates(orgId, customers, projects);
+  const relevant = new Set<string>(unassigned.customers);
+  for (const p of projects) if (unassigned.projects.has(p.id)) relevant.add(p.customerId);
+  for (const e of estimates) if (unassigned.estimates.has(e.id)) relevant.add(e.customerId);
+  const addressStates = await customerAddressStates(orgId, customers.filter((c) => relevant.has(c.id)),
+    projects.filter((p) => relevant.has(p.customerId)));
   const located = customers.map((c) => ({ ...c, state: addressStates.get(c.id)?.state ?? c.state }));
   const records = suggestDivisions({ divisions, customers: located, projects, estimates, unassigned });
   const zero = () => ({ customers: 0, projects: 0, estimates: 0 });
@@ -328,7 +333,9 @@ export async function applyUnassignedSuggestions(orgId: string, onlyDivisionIds:
             // Only rows still without a (live) division — never overwrite a pick made since the preview.
             const done = await tx.update(t).set({ divisionId, updatedAt: new Date() } as any)
               .where(and(eq(t.orgId, orgId), inArray(t.id, ids.slice(i, i + 500)),
-                or(isNull(t.divisionId), notInArray(t.divisionId, known))))
+                // Still without a LIVE division at write time — a division created and picked since the
+                // preview counts (checked against the table, not the preview's list).
+                or(isNull(t.divisionId), sql`not exists (select 1 from ${crmDivisions} d where d.id = ${t.divisionId} and d.org_id = ${orgId})`)))
               .returning({ id: t.id });
             counts[`${kind}s` as keyof typeof counts] += done.length;
             const l = label.get(divisionId) ?? divisionId;
@@ -342,10 +349,21 @@ export async function applyUnassignedSuggestions(orgId: string, onlyDivisionIds:
 }
 
 /** Hourly: every org with divisions gets its new unassigned records placed by address, logged as System. */
+/** Cheap gate for the hourly sort: does the org have ANY client/project/estimate without a live division? */
+async function hasDivisionlessRows(orgId: string): Promise<boolean> {
+  const r: any = await db.execute(sql`select exists (
+      select 1 from ${crmCustomers} x where x.org_id = ${orgId} and (x.division_id is null or not exists (select 1 from ${crmDivisions} d where d.id = x.division_id))
+      union all select 1 from ${crmProjects} x where x.org_id = ${orgId} and (x.division_id is null or not exists (select 1 from ${crmDivisions} d where d.id = x.division_id))
+      union all select 1 from ${crmEstimates} x where x.org_id = ${orgId} and (x.division_id is null or not exists (select 1 from ${crmDivisions} d where d.id = x.division_id))
+    ) as any`);
+  return Boolean((r.rows ?? r)[0]?.any);
+}
+
 export async function runAutoDivisionSort(): Promise<void> {
   const orgs = await db.selectDistinct({ orgId: crmDivisions.orgId }).from(crmDivisions);
   for (const { orgId } of orgs) {
     try {
+      if (!(await hasDivisionlessRows(orgId))) continue;
       const out = await applyUnassignedSuggestions(orgId);
       const moved = out.counts.customers + out.counts.projects + out.counts.estimates;
       if (moved) {
