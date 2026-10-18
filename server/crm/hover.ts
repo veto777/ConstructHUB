@@ -703,6 +703,8 @@ export interface ParsedHoverJob {
   /** The job LABEL ("Karmy", "123 Pine remodel") — in practice usually the
    *  client's name; used as a display-name fallback, never for matching. */
   jobName: string | null;
+  /** When the capture was ordered in HOVER (job created_at) — the "date bid" for a client who was measured. */
+  capturedAt: string | null;
 }
 
 /** The model whose deliverables we read: the first COMPLETED model with an id, else the first with an id. */
@@ -763,6 +765,7 @@ export function parseHoverJob(job: any): ParsedHoverJob {
     primaryModelId: model ? String(model.id) : null,
     photoUrls,
     jobName: pick(job, ["name", "job.name", "job_name"]),
+    capturedAt: pick(job, ["created_at", "job.created_at"]),
   };
 }
 
@@ -1705,6 +1708,8 @@ async function ingestHoverJobInner(
         // Cleared once the auto-project step has run to a decision (retried by later deliveries/syncs if not).
         needsAutoProject: true,
       },
+      // The capture's own date from HOVER, not when it reached us — the clients list dates the bid by it.
+      requestedAt: parsed.capturedAt && !Number.isNaN(Date.parse(parsed.capturedAt)) ? new Date(parsed.capturedAt) : null,
       completedAt: new Date(),
     } as any)
     .returning();
