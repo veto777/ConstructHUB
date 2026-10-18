@@ -17,17 +17,29 @@ import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 // ── Address + name keys ─────────────────────────────────────────────────────
 
+/** USPS street suffixes and directions, long form → the short form both sides collapse to. */
+const STREET_WORDS: Record<string, string> = {
+  street: "st", avenue: "ave", av: "ave", drive: "dr", road: "rd", lane: "ln", court: "ct", place: "pl", boulevard: "blvd",
+  circle: "cir", terrace: "ter", highway: "hwy", parkway: "pkwy", trail: "trl", loop: "loop", way: "way", plaza: "plz",
+  square: "sq", crescent: "cres", cove: "cv", point: "pt", ridge: "rdg", heights: "hts",
+  north: "n", south: "s", east: "e", west: "w", northwest: "nw", northeast: "ne", southwest: "sw", southeast: "se",
+};
+
 /**
- * Canonical service-address key: lowercase line1 with punctuation and extra whitespace stripped, plus the 5-digit
- * zip. The SAME normalization runs on both sides, so "123 PINE st." / "123 Pine St" and "98101-1234" / "98101" never
- * decide a match. Null when either side is too thin to trust.
+ * Canonical service-address key: the street line (before any ", City, ST" tail) lowercased, punctuation stripped,
+ * USPS suffixes and directions collapsed ("1110 Warren Street" / "1110 WARREN St." / "1110 Warren Street, Bellingham,
+ * WA" → "1110 warren st"), plus the 5-digit zip. The SAME normalization runs on both sides, so formatting never
+ * decides a match. Null when either side is too thin to trust.
  */
 export function normalizeHoverAddress(line1?: string | null, zip?: string | null): string | null {
   const line = String(line1 ?? "")
+    .split(/[,\r\n]/)[0]
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => STREET_WORDS[w] ?? w)
+    .join(" ");
   const zip5 = String(zip ?? "").replace(/\D/g, "").slice(0, 5);
   if (!line || zip5.length !== 5) return null;
   return `${line}|${zip5}`;

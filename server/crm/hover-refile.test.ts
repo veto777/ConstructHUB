@@ -49,7 +49,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  for (const t of ["crm_attachments", "crm_measurements", "crm_customers"]) await pool.query(`DELETE FROM ${t} WHERE org_id=$1`, [orgId]);
+  for (const t of ["crm_leads", "crm_attachments", "crm_measurements", "crm_customers"]) await pool.query(`DELETE FROM ${t} WHERE org_id=$1`, [orgId]);
   await pool.query("DELETE FROM crm_orgs WHERE id=$1", [orgId]);
   await pool.query("DELETE FROM users WHERE id=$1", [userId]);
   await pool.end();
@@ -66,6 +66,30 @@ describe("company email (staff) rule", () => {
     expect(isCompanyEmail("jane@otherbuilder.com", people)).toBe(false);
     // Free-mail people never make gmail.com "the company".
     expect(isCompanyEmail("someone@gmail.com", ["owner@gmail.com"])).toBe(false);
+  });
+});
+
+describe("address key", () => {
+  it("collapses suffixes, directions and a city tail so the same house always matches", async () => {
+    const { normalizeHoverAddress: n } = await import("./hover-share");
+    expect(n("1110 Warren Street", "98225")).toBe("1110 warren st|98225");
+    expect(n("1110 WARREN St.", "98225-1234")).toBe("1110 warren st|98225");
+    expect(n("1110 Warren Street, Bellingham, WA", "98225")).toBe("1110 warren st|98225");
+    expect(n("23120 Southeast Black Nugget Road, Issaquah, WA", "98029")).toBe(n("23120 SE Black Nugget Rd", "98029"));
+    expect(n("1226 62nd Street North", "33710")).toBe("1226 62nd st n|33710");
+    expect(n("1110 Warren Street", "98226")).not.toBe(n("1110 Warren Street", "98225"));
+  });
+});
+
+describe("lead form at the capture address", () => {
+  it("hands a new HOVER client the homeowner's own name and contact from their form", async () => {
+    const { leadFormAtAddress } = await import("./hover");
+    await pool.query(`INSERT INTO crm_leads(org_id,source,name,email,phone,address_line1,city,state,postal_code,received_at)
+      VALUES($1,'import','Derek Derouen','derek@example.invalid','(360) 555-0101','1110 Warren St','Bellingham','WA','98225',now()),
+            ($1,'import','Old Owner','old@example.invalid',null,'1110 Warren Street','Bellingham','WA','98225',now() - interval '1 year')`, [orgId]);
+    expect(await leadFormAtAddress(orgId, "1110 Warren Street", "98225")).toEqual({ name: "Derek Derouen", email: "derek@example.invalid", phone: "(360) 555-0101" });
+    expect(await leadFormAtAddress(orgId, "1110 Warren Street", "98226")).toBeNull();
+    expect(await leadFormAtAddress(orgId, "9 Nowhere Lane", "98225")).toBeNull();
   });
 });
 
