@@ -1,6 +1,6 @@
 /**
  * The form-sync script a contractor pastes on their own website (served at GET /form-sync.js, see
- * server/crm/leads.ts). Plain ES5, no dependencies, under 4 KB.
+ * server/crm/leads.ts). Plain ES5, no dependencies, under 5 KB.
  *
  *   <script src="https://portal.constructhub.us/form-sync.js" data-token="<TOKEN>" async></script>
  *
@@ -55,7 +55,7 @@ try{var ss=w.sessionStorage,sv=ss&&ss.getItem("ch_attr");if(sv)A=JSON.parse(sv)|
 else{var K=["utm_source","utm_medium","utm_campaign","gclid","gbraid","wbraid","fbclid","msclkid","ttclid"],qs=new URLSearchParams(L.search||""),rf=d.referrer||"",n=0,i,v;
 for(i=0;i<K.length;i++){v=qs.get(K[i]);if(v){A[K[i]]=v.slice(0,200);n++;}}
 if(rf&&rf.indexOf(L.origin+"/")!=0&&rf!=L.origin){A.referrer=rf.slice(0,500);n++;}
-if(n){A.landing=String(L.href).slice(0,500);ss&&ss.setItem("ch_attr",JSON.stringify(A));}}}catch(e){A={};}
+if(n){A.landing=String(L.href).slice(0,500);try{ss&&ss.setItem("ch_attr",JSON.stringify(A));}catch(e){}}}}catch(e){A={};}
 function cl(o){var r={},n=0,k,v;for(k in o){if(BD.test(k))continue;v=o[k];if(v==null||typeof v=="object")continue;v=String(v).replace(/^\\s+|\\s+$/g,"").slice(0,2000);if(!v)continue;if(++n>60)break;r[String(k).slice(0,100)]=v;}return r;}
 function who(f){var e="",p="",k;for(k in f){if(!e&&AT.test(f[k]))e=f[k].toLowerCase();else if(!p&&CT.test(k)){p=f[k].replace(/\\D/g,"").slice(-10);}}return e||p?e+"|"+p:"";}
 function bc(k){var q=P[k];if(!q)return;delete P[k];clearTimeout(q.t);S[k]=+new Date();

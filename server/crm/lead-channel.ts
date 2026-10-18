@@ -82,7 +82,8 @@ const readable = (s: string) => {
 /** A known site by its utm_source value or referrer host; null for anything else. */
 function knownSite(s: string): { key: LeadChannelKey; label: string } | null {
   const v = s.toLowerCase();
-  if (/(^|\.)google\.[a-z.]+$|^(google|adwords|googleads)$/.test(v)) return { key: "google", label: "Google" };
+  // google.com, google.ca, google.co.uk — not google.evil.com.
+  if (/(^|\.)google\.(com|[a-z]{2}|[a-z]{2,3}\.[a-z]{2})$|^(google|adwords|googleads)$/.test(v)) return { key: "google", label: "Google" };
   if (/(^|\.)(facebook\.com|fb\.com|fb\.me)$|^(facebook|fb)$/.test(v)) return { key: "facebook", label: "Facebook" };
   if (/(^|\.)instagram\.com$|^(instagram|ig)$/.test(v)) return { key: "instagram", label: "Instagram" };
   if (/^meta$/.test(v)) return { key: "facebook", label: "Meta" };

@@ -308,7 +308,7 @@ export default function CrmLeadsPage() {
                 grows past the page (a long email or message used to push Received off the right edge). */}
             <table className={`${crmTable.table} sm:table-fixed`}>
               <colgroup className="hidden sm:table-column-group">
-                <col className="w-[20%]" /><col className="w-[21%]" /><col className="w-[24%]" /><col className="w-[19%]" /><col className="w-[11%]" /><col className="w-10" />
+                <col className="w-[20%]" /><col className="w-[21%]" /><col className="w-[24%]" /><col className="w-[19%]" /><col className="w-[11%]" /><col className="w-14" />
               </colgroup>
               <thead className={`${crmTable.thead} ${crmTableCards.thead}`}>
                 <tr>

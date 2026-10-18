@@ -515,7 +515,7 @@ html.dark[data-shade="2"] {
   --border: 220 18% 38%;
   --input: 220 18% 42%;
   --muted: 220 20% 34%;
-  --muted-foreground: 215 15% 74%;
+  --muted-foreground: 215 15% 80%; /* 4.5:1+ on the lifted muted/secondary washes (review 2026-10-18) */
   --accent: 220 20% 34%;
   --secondary: 220 20% 36%;
   --sidebar: 222 26% 22%;

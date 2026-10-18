@@ -45,6 +45,8 @@ describe("leadChannel", () => {
     expect(leadChannel(lead({ fields: { name: "Pat" } })).key).toBe("website");
     expect(leadChannel({ source: "import", fields: { site: "alpinesidingpros.net", flags: 'Elementor form "contact form"' } }).key).toBe("website");
     expect(leadChannel(lead({ fields: { _referrer: "https://www.skagitbuilders.example/partners" } }))).toEqual({ key: "referral", label: "Referral", detail: "skagitbuilders.example" });
+    expect(leadChannel(lead({ fields: { _referrer: "https://google.evil.example/" } })).key).toBe("referral");
+    expect(leadChannel(lead({ fields: { _referrer: "https://www.google.co.uk/" } })).key).toBe("google");
   });
 
   it("leadTracking reads fields first, then the URLs, ignoring prefixes and case", () => {

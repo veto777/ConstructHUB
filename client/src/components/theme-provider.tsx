@@ -44,7 +44,8 @@ function readShade(): number {
   if (typeof window === "undefined") return 0;
   try {
     const saved = localStorage.getItem("themeShade");
-    if (saved !== null && /^\d$/.test(saved)) return clampShade(Number(saved));
+    // The same test as the boot script in index.html, so both paint the same shade; anything else falls back.
+    if (saved !== null && /^[0-4]$/.test(saved)) return Number(saved);
     // Accounts from before the slider: their light/dark choice maps to the two ends.
     return localStorage.getItem("theme") === "dark" ? MAX_SHADE : 0;
   } catch {

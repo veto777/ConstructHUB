@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Sun, Moon } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { MAX_SHADE, THEME_SHADES, useTheme } from "./theme-provider";
@@ -10,10 +11,11 @@ import { cn } from "@/lib/utils";
 export function ThemeShadeSlider({ className }: { className?: string }) {
   const { shade, setShade } = useTheme();
   const current = THEME_SHADES[shade] ?? THEME_SHADES[0];
+  const labelId = useId();
   return (
     <div className={cn("space-y-2", className)} data-testid="theme-shade">
       <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-        <span id="theme-shade-label">Appearance</span>
+        <span id={labelId}>Appearance</span>
         <span className="text-foreground" data-testid="theme-shade-current">{current.label}</span>
       </div>
       <div className="flex items-center gap-2.5">
@@ -22,16 +24,17 @@ export function ThemeShadeSlider({ className }: { className?: string }) {
           min={0} max={MAX_SHADE} step={1}
           value={[shade]}
           onValueChange={([v]) => { if (typeof v === "number") setShade(v); }}
-          aria-labelledby="theme-shade-label"
+          aria-labelledby={labelId}
           aria-valuetext={current.label}
           data-testid="theme-shade-slider"
         />
         <Moon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
+      {/* Tick labels: a mouse shortcut only, so hidden from assistive tech (the slider itself announces the shade). */}
       <div className="flex justify-between px-6 text-[10px] text-muted-foreground" aria-hidden="true">
         {THEME_SHADES.map((s) => (
-          <button key={s.value} type="button" tabIndex={-1} onClick={() => setShade(s.value)}
-            className={cn("rounded px-0.5 hover:text-foreground", s.value === shade && "font-semibold text-foreground")}>{s.label}</button>
+          <span key={s.value} onClick={() => setShade(s.value)}
+            className={cn("cursor-pointer rounded px-0.5 hover:text-foreground", s.value === shade && "font-semibold text-foreground")}>{s.label}</span>
         ))}
       </div>
     </div>
