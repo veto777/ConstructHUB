@@ -103,7 +103,7 @@ exports[`compileVoiceProfile > compiles a brand-new org's default profile (snaps
   },
   "escalationKinds": [],
   "greeting": "Thank you for calling Acme Roofing, this is Janice — calls may be recorded. What can we help you with today?",
-  "hash": "987d22e6b6899ea5735b1819f3822b02cbc5e21361dd92eeb0855e8b69465a55",
+  "hash": "7996fdcdb5b0a0acacd5b37572f93e6427cf9c2b4f93f6bc930ca23fe0afe858",
   "intake": [
     {
       "choices": [],
@@ -131,7 +131,7 @@ exports[`compileVoiceProfile > compiles a brand-new org's default profile (snaps
       "key": "first_name",
       "neverReadAloud": false,
       "prefillFrom": "crm",
-      "prompt": "And who am I speaking with? A first name is fine.",
+      "prompt": "And may I have your first and last name?",
       "required": true,
       "validation": "name",
     },
@@ -225,7 +225,7 @@ Tell them: "I've passed this straight to the right person and they'll get back t
 COLLECT, conversationally, ONE thing at a time, in this order (slot key in brackets):
  1. [need] "What can we help you with today?"
  2. [address] "What's the street address and city for the property?" — street address and city; if they give only a city, ask for the street
- 3. [first_name] "And who am I speaking with? A first name is fine." — a first name is enough; never insist on a last name; if it sounds unusual or foreign, or you aren't sure you heard it right, ask them to spell it and read the spelling back once — then use exactly what they confirm; if the caller line below already knows this, confirm it instead of asking
+ 3. [first_name] "And may I have your first and last name?" — their first and last name; if they give only a first name, ask once for the last name, and if they'd rather not say, take the first name and move on — never hold up the request over it; store the whole name as given; if it sounds unusual or foreign, or you aren't sure you heard it right, ask them to spell it and read the spelling back once — then use exactly what they confirm; if the caller line below already knows this, confirm it instead of asking
  4. [phone] "Is the number you're calling from the best one to reach you?" — a callback number; caller ID is in the caller line at the end of this briefing: ask once whether the number they're calling from is the best one, NEVER read the digits out loud, and if they already said it's fine don't ask again; store the caller-ID number
  5. [email] "What's a good email for the estimate?" — as spoken, e.g. 'mike dot torres at gmail dot com' → mike.torres@gmail.com; if they don't have one or decline, move on; if the caller line below already knows this, confirm it instead of asking; read it back once to confirm; optional — skip without fuss if they'd rather not
  6. [best_time] "When is the best time for someone to call you back?" — optional — skip without fuss if they'd rather not
@@ -332,7 +332,7 @@ Tell them: "I've passed this straight to the right person and they'll get back t
 COLLECT, conversationally, ONE thing at a time, in this order (slot key in brackets):
  1. [need] "What can we help you with today?"
  2. [address] "What's the street address and city for the property?" — street address and city; if they give only a city, ask for the street
- 3. [first_name] "And who am I speaking with? A first name is fine." — a first name is enough; never insist on a last name; if it sounds unusual or foreign, or you aren't sure you heard it right, ask them to spell it and read the spelling back once — then use exactly what they confirm; if the caller line below already knows this, confirm it instead of asking
+ 3. [first_name] "And may I have your first and last name?" — their first and last name; if they give only a first name, ask once for the last name, and if they'd rather not say, take the first name and move on — never hold up the request over it; store the whole name as given; if it sounds unusual or foreign, or you aren't sure you heard it right, ask them to spell it and read the spelling back once — then use exactly what they confirm; if the caller line below already knows this, confirm it instead of asking
  4. [phone] "Is the number you're calling from the best one to reach you?" — a callback number; caller ID is in the caller line at the end of this briefing: ask once whether the number they're calling from is the best one, NEVER read the digits out loud, and if they already said it's fine don't ask again; store the caller-ID number
  5. [email] "What's a good email for the estimate?" — as spoken, e.g. 'mike dot torres at gmail dot com' → mike.torres@gmail.com; if they don't have one or decline, move on; if the caller line below already knows this, confirm it instead of asking; read it back once to confirm; optional — skip without fuss if they'd rather not
  6. [best_time] "When is the best time for someone to call you back?" — optional — skip without fuss if they'd rather not
@@ -482,7 +482,7 @@ exports[`compileVoiceProfile > compiles a fully filled-in profile (snapshot of t
     "existing_customer",
   ],
   "greeting": "Thank you for calling Cascade Exteriors, this is Gabe — calls may be recorded. What can we help you with today?",
-  "hash": "d7e92c618a78f573222fb8737e766fdb0eb6f52acaf13717281d43f495501073",
+  "hash": "ac2ba8436c2f0f78c5fdfccc7d13e9dff58095d2c0d5399e6ec33781e3d3cc78",
   "intake": [
     {
       "choices": [],
@@ -510,7 +510,7 @@ exports[`compileVoiceProfile > compiles a fully filled-in profile (snapshot of t
       "key": "first_name",
       "neverReadAloud": false,
       "prefillFrom": "crm",
-      "prompt": "And who am I speaking with? A first name is fine.",
+      "prompt": "And may I have your first and last name?",
       "required": true,
       "validation": "name",
     },

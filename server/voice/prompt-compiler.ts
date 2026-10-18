@@ -427,7 +427,7 @@ function escalationSection(p: VoiceProfile, kinds: EscalationKind[]): string {
 const VALIDATION_HINTS: Record<IntakeQuestion["validation"], string> = {
   none: "",
   address: "street address and city; if they give only a city, ask for the street",
-  name: "a first name is enough; never insist on a last name; if it sounds unusual or foreign, or you aren't sure you heard it right, ask them to spell it and read the spelling back once — then use exactly what they confirm",
+  name: "their first and last name; if they give only a first name, ask once for the last name, and if they'd rather not say, take the first name and move on — never hold up the request over it; store the whole name as given; if it sounds unusual or foreign, or you aren't sure you heard it right, ask them to spell it and read the spelling back once — then use exactly what they confirm",
   phone: "a callback number",
   email: "as spoken, e.g. 'mike dot torres at gmail dot com' → mike.torres@gmail.com; if they don't have one or decline, move on",
   datetime: "a day and time in their words",
