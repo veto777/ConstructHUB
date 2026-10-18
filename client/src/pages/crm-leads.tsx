@@ -97,7 +97,10 @@ interface Connect {
   hover: { connected: boolean; lastSyncAt: string | null };
 }
 
-const TABS: { key: LeadStatus; label: string }[] = [
+type TabKey = LeadStatus | "all";
+const TABS: { key: TabKey; label: string }[] = [
+  // "All" so the four labels (next row) can be read across every lead — the dead ones live under Archived and Spam.
+  { key: "all", label: "All" },
   { key: "new", label: "New" },
   { key: "contacted", label: "Contacted" },
   { key: "converted", label: "Converted" },
@@ -181,12 +184,13 @@ function ChannelMark({ k }: { k: string }) {
   return <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />;
 }
 
-function readParams(): { tab: LeadStatus; q: string; source: LeadSource | "all"; lead: string | null } {
+function readParams(): { tab: TabKey; q: string; source: LeadSource | "all"; lead: string | null } {
   const p = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
   const t = p.get("tab");
   const s = p.get("source");
   return {
-    tab: TABS.some((x) => x.key === t) ? (t as LeadStatus) : "new",
+    // Default to All: the labels in the next row (Open / Pending / Complete / Dead lead) then mean every lead.
+    tab: TABS.some((x) => x.key === t) ? (t as TabKey) : "all",
     q: p.get("q") ?? "",
     source: SOURCES.some((x) => x.key === s) ? (s as LeadSource | "all") : "all",
     lead: p.get("lead"),
@@ -196,7 +200,7 @@ function readParams(): { tab: LeadStatus; q: string; source: LeadSource | "all";
 export default function CrmLeadsPage() {
   const { toast } = useToast();
   const [initial] = useState(readParams);
-  const [tab, setTab] = useState<LeadStatus>(initial.tab);
+  const [tab, setTab] = useState<TabKey>(initial.tab);
   const [label, setLabel] = useState<"all" | BidState>(() => { const v = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("label"); return v && BID_STATES.some((b) => b.key === v) ? (v as BidState) : "all"; });
   const [source, setSource] = useState<LeadSource | "all">(initial.source);
   // Place filters. An empty state means "follow the ribbon's workspace" (the server picks that division's state).
@@ -224,7 +228,7 @@ export default function CrmLeadsPage() {
     const params = new URLSearchParams(window.location.search);
     const set = (k: string, v: string | null) => (v ? params.set(k, v) : params.delete(k));
     set("q", qDebounced.trim() || null);
-    set("tab", tab !== "new" ? tab : null);
+    set("tab", tab !== "all" ? tab : null);
     set("source", source !== "all" ? source : null);
     set("label", label !== "all" ? label : null);
     set("state", placeState || null);
@@ -357,12 +361,13 @@ export default function CrmLeadsPage() {
       <SegmentedTabs as="group" label="Lead status" testId="tabs-lead-status">
         {TABS.map((t) => (
           <button key={t.key} type="button" aria-pressed={tab === t.key} onClick={() => setTab(t.key)} data-testid={`tab-lead-${t.key}`}>
-            {t.label} <TabCount>{latest?.counts?.[t.key] ?? 0}</TabCount>
+            {t.label} <TabCount>{t.key === "all" ? Object.values(latest?.counts ?? {}).reduce((a, b) => a + b, 0) : latest?.counts?.[t.key as LeadStatus] ?? 0}</TabCount>
           </button>
         ))}
       </SegmentedTabs>
       {/* Every lead carries one of the owner's four labels (2026-10-18): Open (nobody scheduled anything), Pending (visit or
           HOVER report, no bid sent), Complete (bid sent), Dead lead (never recovered — archived / spam, or marked dead). */}
+      <div className="flex flex-wrap items-center gap-3">
       <SegmentedTabs as="group" label="Lead label" testId="tabs-lead-label">
         {LABEL_TABS.map((t) => (
           <button key={t.key} type="button" aria-pressed={label === t.key} onClick={() => setLabel(t.key)}
@@ -371,6 +376,10 @@ export default function CrmLeadsPage() {
           </button>
         ))}
       </SegmentedTabs>
+      <span className="text-xs text-muted-foreground" data-testid="text-label-scope">
+        {tab === "all" ? "Labels count every lead." : <>Labels count the {TABS.find((t) => t.key === tab)?.label} tab only — <button type="button" className="text-primary hover:underline" onClick={() => setTab("all")} data-testid="button-labels-all">see every lead</button>.</>}
+      </span>
+      </div>
 
       {isLoading || isPlaceholderData || !me ? (
         <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
