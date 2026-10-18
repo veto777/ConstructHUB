@@ -36,6 +36,7 @@ import {
 import { logTeamActivity, projectStageLabel } from "./stats";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
+import { advanceJobStage, stageSideEffects } from "./job-stage-auto";
 import { loadActorDirectory, estimateEventActor } from "./actors";
 import { actorLabel } from "@shared/crm-actor";
 import { estimateDefaultsFromOrg, estimateDocText, depositFromBps } from "./doc-defaults";
@@ -1094,6 +1095,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     queueCrmEvent(ctx.org.id, "project.created", projectEventPayload(row));
     // The client's HOVER captures at this address (and their 3D model) belong to the new project.
     await adoptHoverMeasurementsForProject(row);
+    // A project born Approved (the client page's stage toggle) gets the schedule-the-start reminder too.
+    await stageSideEffects({ orgId: ctx.org.id, project: row, from: null, actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email } });
     res.status(201).json(presentProject(row, ctx));
   });
 
@@ -1134,6 +1137,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         link: `/crm/projects/${row.id}`,
       });
       queueProjectStageChange(ctx.org.id, row.id, before.status, row.status);
+      // The same reminder bookkeeping an automatic move does (Approved → "call to schedule"; later → done).
+      await stageSideEffects({ orgId: ctx.org.id, project: row, from: before.status, actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email } });
     }
     res.json(presentProject(row, ctx));
   });
@@ -1702,6 +1707,14 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         queueCrmEvent(ctx.org.id, statusTo === "sent" ? "estimate.sent" : "estimate.declined", {
           estimateId: e.id, number: e.number, customerId: e.customerId,
           projectId: patch.projectId ?? e.projectId ?? null, manual: true,
+        });
+      }
+      // Marked sent by hand is still a bid out the door: the job moves to Bid Submitted (never back).
+      if (statusTo === "sent") {
+        await advanceJobStage({
+          orgId: ctx.org.id, to: "bid_submitted", trigger: "estimate.sent",
+          actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email },
+          projectId: patch.projectId ?? e.projectId, estimate: { ...e, ...patch, status: "sent" }, meta: { number: e.number, manual: true },
         });
       }
     }

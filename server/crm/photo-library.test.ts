@@ -192,7 +192,7 @@ describe("listing and filters", () => {
   it("lists the org's photos newest first with per-stage counts", async () => {
     const r = await call(ownerA, "/api/crm/photos");
     expect(r.status).toBe(200);
-    expect(r.data.facets).toEqual({ all: 76, progress: 3, finished: 71, client: 1, hover: 1, unstaged: 2 });
+    expect(r.data.facets).toEqual({ all: 76, progress: 3, finished: 71, punchlist: 0, client: 1, hover: 1, unstaged: 2 });
     expect(r.data.total).toBe(76);
     expect(r.data.photos).toHaveLength(60);
     expect(r.data.photos[0].customer.name).toBe("Cedar Many");

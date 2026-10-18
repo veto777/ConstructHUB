@@ -120,11 +120,22 @@ function shade(hex: string, k: number): string {
  * points paired across the face into segments (even-odd), drawn a hair in front of and behind the face so they
  * show from either side. Faces flatter than ~6° (flat roofs, decks) get none.
  */
-function makeCourseLines(faces: MeshFace[], ringOf: Map<string, V3[]>, stepFt: number, color: string): THREE.LineSegments {
+function makeCourseLines(faces: MeshFace[], ringOf: Map<string, V3[]>, holesOf: Map<string, V3[][]>, stepFt: number, color: string): THREE.LineSegments {
   const pos: number[] = [];
+  // Where a ring crosses the plane y = h, as points.
+  const crossings = (ring: V3[], h: number): V3[] => {
+    const hits: V3[] = [];
+    for (let i = 0; i < ring.length; i++) {
+      const p = ring[i], q = ring[(i + 1) % ring.length];
+      if ((p.y - h) * (q.y - h) >= 0 || p.y === q.y) continue;
+      hits.push(new THREE.Vector3().lerpVectors(p, q, (h - p.y) / (q.y - p.y)));
+    }
+    return hits;
+  };
   for (const f of faces) {
     const ring = ringOf.get(f.id);
     if (!ring || ring.length < 3) continue;
+    const holes = holesOf.get(f.id) ?? [];
     const n = ringNormal(ring);
     const u = new THREE.Vector3().crossVectors(n, new THREE.Vector3(0, 1, 0));
     const sinTilt = Math.sqrt(Math.max(0, 1 - n.y * n.y));
@@ -135,18 +146,26 @@ function makeCourseLines(faces: MeshFace[], ringOf: Map<string, V3[]>, stepFt: n
     for (const p of ring) { minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); }
     for (let h = Math.ceil(minY / revealFt) * revealFt; h < maxY - 1e-3; h += revealFt) {
       if (h - minY < 1e-3) continue;
-      const hits: V3[] = [];
-      for (let i = 0; i < ring.length; i++) {
-        const p = ring[i], q = ring[(i + 1) % ring.length];
-        if ((p.y - h) * (q.y - h) >= 0 || p.y === q.y) continue;
-        hits.push(new THREE.Vector3().lerpVectors(p, q, (h - p.y) / (q.y - p.y)));
+      const hits = crossings(ring, h).sort((a, b) => a.dot(u) - b.dot(u));
+      // A course never runs through a window or door: the spans where an opening crosses this height are cut out.
+      const cuts: [number, number][] = [];
+      for (const hole of holes) {
+        const hc = crossings(hole, h).map((p) => p.dot(u)).sort((a, b) => a - b);
+        for (let i = 0; i + 1 < hc.length; i += 2) cuts.push([hc[i], hc[i + 1]]);
       }
-      hits.sort((a, b) => a.dot(u) - b.dot(u));
       for (let i = 0; i + 1 < hits.length; i += 2) {
-        for (const side of [0.03, -0.03]) {
-          const off = n.clone().multiplyScalar(side);
-          const a = hits[i].clone().add(off), b = hits[i + 1].clone().add(off);
-          pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
+        const a = hits[i], ta = a.dot(u), tb = hits[i + 1].dot(u);
+        let spans: [number, number][] = [[ta, tb]];
+        for (const [c0, c1] of cuts) {
+          spans = spans.flatMap(([s0, s1]) => (c1 <= s0 || c0 >= s1 ? [[s0, s1]] : [[s0, Math.max(s0, c0)], [Math.min(s1, c1), s1]].filter(([x, y]) => y - x > 0.02) as [number, number][]));
+        }
+        for (const [s0, s1] of spans) {
+          for (const side of [0.03, -0.03]) {
+            const off = n.clone().multiplyScalar(side);
+            const p0 = a.clone().add(u.clone().multiplyScalar(s0 - ta)).add(off);
+            const p1 = a.clone().add(u.clone().multiplyScalar(s1 - ta)).add(off);
+            pos.push(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
+          }
         }
       }
     }
@@ -225,9 +244,9 @@ function build(mesh: HoverMesh, sidingColor: string, roofColor: string, sidingRe
   const soffitMesh = new THREE.Mesh(sf.g, soffitMat);
   triFace.set(soffitMesh, sf.triFace);
   root.add(roofMesh, wallCut, wallFull, openMesh, doorMesh, soffitMesh);
-  const sidingLines = sidingReveal ? makeCourseLines(walls, ringOf, sidingReveal / 12, shade(sidingColor, 0.55)) : null;
+  const sidingLines = sidingReveal ? makeCourseLines(walls, ringOf, holesOf, sidingReveal / 12, shade(sidingColor, 0.55)) : null;
   if (sidingLines) root.add(sidingLines);
-  const shingleLines = roofShingles ? makeCourseLines(roofs, ringOf, SHINGLE_EXPOSURE_FT, shade(roofColor, 0.6)) : null;
+  const shingleLines = roofShingles ? makeCourseLines(roofs, ringOf, holesOf, SHINGLE_EXPOSURE_FT, shade(roofColor, 0.6)) : null;
   if (shingleLines) root.add(shingleLines);
 
   // Outlines: every facet edge once; openings in a lighter tone so they read as frames.
@@ -432,8 +451,8 @@ export default function Hover3DViewer(props: Hover3DViewerProps) {
     };
     const walls = props.mesh.faces.filter((f) => f.type === "wall");
     const roofs = props.mesh.faces.filter((f) => f.type === "roof");
-    b.sidingLines = swap(b.sidingLines, props.sidingReveal ? makeCourseLines(walls, b.ringOf, props.sidingReveal / 12, shade(props.sidingColor, 0.55)) : null);
-    b.shingleLines = swap(b.shingleLines, props.roofShingles ? makeCourseLines(roofs, b.ringOf, SHINGLE_EXPOSURE_FT, shade(props.roofColor, 0.6)) : null);
+    b.sidingLines = swap(b.sidingLines, props.sidingReveal ? makeCourseLines(walls, b.ringOf, b.holesOf, props.sidingReveal / 12, shade(props.sidingColor, 0.55)) : null);
+    b.shingleLines = swap(b.shingleLines, props.roofShingles ? makeCourseLines(roofs, b.ringOf, b.holesOf, SHINGLE_EXPOSURE_FT, shade(props.roofColor, 0.6)) : null);
   }, [props.sidingReveal, props.roofShingles, props.sidingColor, props.roofColor, props.mesh]);
 
   // Windows/doors on → walls with cut-outs + glass; off → solid walls.

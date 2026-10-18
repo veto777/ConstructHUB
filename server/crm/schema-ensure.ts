@@ -752,6 +752,26 @@ export async function ensureCrmSchema(): Promise<void> {
       WHERE idempotency_key IS NOT NULL;
     CREATE INDEX IF NOT EXISTS crm_estimate_events_interest_idx ON crm_estimate_events (estimate_id, type)
       WHERE type LIKE 'interest\\_%';
+    -- The "call the client to schedule the start date" reminder (server/crm/job-stage-auto.ts): one open task per
+    -- project; the task carries no estimate, so the idempotency index above does not cover it.
+    CREATE INDEX IF NOT EXISTS crm_tasks_source_open_idx ON crm_tasks (org_id, source) WHERE done_at IS NULL;
+
+    -- Punch list & final walkthrough (shared/punch-list.ts): one row per scope of the approved work.
+    CREATE TABLE IF NOT EXISTS crm_punch_scopes (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      project_id varchar NOT NULL,
+      scope text NOT NULL,
+      label text NOT NULL,
+      items jsonb NOT NULL DEFAULT '[]'::jsonb,
+      sort_order integer NOT NULL DEFAULT 0,
+      walkthrough_done_at timestamp,
+      walkthrough_done_by_member_id varchar,
+      created_at timestamp DEFAULT now(),
+      updated_at timestamp DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_punch_scopes_project_scope_uq ON crm_punch_scopes (project_id, scope);
+    CREATE INDEX IF NOT EXISTS crm_punch_scopes_org_idx ON crm_punch_scopes (org_id);
 
     -- Review pipeline (server/crm/review-pipeline.ts): the won-job clients the owner set aside ("Not now").
     CREATE TABLE IF NOT EXISTS crm_review_pipeline (

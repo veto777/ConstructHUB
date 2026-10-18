@@ -20,7 +20,7 @@ import {
 
 export function StageBadge({ photo, className }: { photo: Pick<CrmPhoto, "stage" | "source">; className?: string }) {
   const tone = photo.stage === "finished" ? "bg-emerald-600/90" : photo.stage === "progress" ? "bg-amber-600/90"
-    : photo.source === "hover" ? "bg-sky-700/90" : "bg-violet-600/90";
+    : photo.stage === "punchlist" ? "bg-rose-600/90" : photo.source === "hover" ? "bg-sky-700/90" : "bg-violet-600/90";
   return (
     <span className={cn("rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white", tone, className)}>
       {stageLabel(photo)}

@@ -25,7 +25,7 @@ import { inNativeApp } from "@/lib/app-shell";
 import { AppPushCard } from "@/components/app-push-card";
 import { SelfEstimateSettingsCard } from "@/components/crm-self-estimate-settings";
 import {
-  Settings, Building2, FileText, Bell, CreditCard, Blocks,
+  Settings, Building2, FileText, Bell, CreditCard, Blocks, PartyPopper,
   Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud, Plus,
   CalendarDays, RefreshCw, Unplug, Ruler, MessageSquare, Lock, DatabaseBackup,
 } from "lucide-react";
@@ -278,6 +278,16 @@ export default function CrmSettingsPage() {
     onSuccess: () => {
       invalidateOrg();
       toast({ title: "Voice nudge saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
+  // Confetti when a job is closed out (the PM's reward) — on unless the company turns it off.
+  const saveCelebrations = useMutation({
+    mutationFn: async (on: boolean) => (await apiRequest("PATCH", "/api/crm/org", { celebrations: on })).json(),
+    onSuccess: () => {
+      invalidateOrg();
+      toast({ title: "Celebrations saved" });
     },
     onError: (e: any) => toast({ title: "Could not save", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -1006,6 +1016,28 @@ export default function CrmSettingsPage() {
       {/* ── Bid discounts (org defaults) ────────────────────────────────── */}
       {/* Client page — container order and which show (owner/admin). */}
       <ClientPageLayoutCard />
+
+      {/* Celebrations — confetti when a job is closed out. */}
+      <Card data-testid="card-celebrations">
+        <CardHeader>
+          <SectionTitle icon={PartyPopper} title="Celebrations"
+            description={'A little reward for the PM: when a job is closed out — by hand or by the last walkthrough — confetti sprays the screen with "Congrats, a job has been closed out!"'} />
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Confetti on close-out</div>
+              <p className="text-xs text-muted-foreground">On for the whole company. Turn it off here if it's not your style.</p>
+            </div>
+            <Switch
+              checked={(org?.customFields as any)?.celebrations !== false}
+              onCheckedChange={(v) => saveCelebrations.mutate(v)}
+              disabled={saveCelebrations.isPending}
+              aria-label="Confetti on close-out" data-testid="switch-celebrations"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card data-testid="card-bid-discounts">
         <CardHeader>

@@ -32,6 +32,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { sendWithFallback } from "../email";
 import { clientPortalBaseUrl, portalBaseUrl } from "../site-context";
 import { financingLinksOf, getPrimaryFinancing } from "./financing";
+import { punchListsForCustomers } from "./punch-list";
 import { logEvent } from "./entities";
 import { themePayload } from "@shared/theme-colors";
 import { clientShareView } from "./hover-share";
@@ -539,6 +540,8 @@ export function registerCrmClientAuthRoutes(app: Express): void {
         ...clientFile(a), orgName: orgName.get(a.orgId) ?? null,
       })),
       photos: photoRows.map((a) => ({ ...clientFile(a), customerId: a.refId })),
+      // The punch list & final walkthrough, read-only: the notes per scope and whether each walkthrough is done.
+      punchLists: await punchListsForCustomers(client.customerIds),
       estimates: estimates.map((e) => ({
         id: e.id, number: e.number, title: e.title, status: e.status,
         totalCents: e.totalCents, sentAt: e.sentAt, expiresAt: e.expiresAt,

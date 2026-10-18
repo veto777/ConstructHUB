@@ -5,9 +5,9 @@
  */
 import { marketingUrl } from "@/lib/site";
 
-export type CrmPhotoStage = "progress" | "finished" | null;
+export type CrmPhotoStage = "progress" | "finished" | "punchlist" | null;
 export type CrmPhotoSource = "crew" | "client" | "hover";
-export type CrmPhotoFilter = "all" | "progress" | "finished" | "client" | "hover" | "unstaged";
+export type CrmPhotoFilter = "all" | "progress" | "finished" | "punchlist" | "client" | "hover" | "unstaged";
 export type CrmJobStatusFilter = "all" | "active" | "completed";
 
 export interface CrmPhoto {
@@ -44,6 +44,7 @@ export const CRM_PHOTO_TABS: { key: CrmPhotoFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "progress", label: "In progress" },
   { key: "finished", label: "Finished" },
+  { key: "punchlist", label: "Punch list" },
   { key: "client", label: "From clients" },
   { key: "hover", label: "HOVER captures" },
 ];
@@ -51,6 +52,7 @@ export const CRM_PHOTO_TABS: { key: CrmPhotoFilter; label: string }[] = [
 export function stageLabel(p: Pick<CrmPhoto, "stage" | "source">): string {
   if (p.stage === "finished") return "Finished";
   if (p.stage === "progress") return "In progress";
+  if (p.stage === "punchlist") return "Punch list";
   return p.source === "hover" ? "HOVER" : "From client";
 }
 

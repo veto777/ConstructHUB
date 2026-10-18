@@ -14,6 +14,7 @@ import {
 } from "@/components/crm-ui";
 import { InfoTip } from "@/components/info-tip";
 import { PortalPamphlets, PortalPhotoShare } from "@/components/client-uploads";
+import { PortalPunchLists } from "@/components/portal-punch-list";
 import { PortalJobcamFeed } from "@/components/jobcam/portal-feed";
 import { PortalMessages, PortalContact, PortalContactFooter } from "@/components/portal-messages";
 import { ContractorPreviewBanner, PortalFinancing } from "@/components/crm-client-360";
@@ -244,7 +245,7 @@ const SIDEBAR_NAV: { key: ViewKey; title: string; icon: LucideIcon }[] = [
 function Dashboard({ data }: { data: any }) {
   const {
     customer, orgs = [], estimates = [], invoices = [], contracts = [], reports = [],
-    accounts = [], pamphlets = [], photos = [], financing = [],
+    accounts = [], pamphlets = [], photos = [], financing = [], punchLists = [],
   } = data;
   const { toast } = useToast();
   const [view, setView] = useState<ViewKey>("home");
@@ -648,12 +649,14 @@ function Dashboard({ data }: { data: any }) {
     home: (
       <>
         {needsAction}
+        {/* The punch list & final walkthrough on their job, read-only (notes per scope + the crew's punch-list photos). */}
+        <PortalPunchLists lists={punchLists} photos={photos} />
         {selfEstimateBlock}
         {/* Financing — clicks are recorded before the lender link opens. */}
         <PortalFinancing financing={financing} preview={preview} />
         {/* From <company> — org pamphlets (brochures, warranties) */}
         <PortalPamphlets pamphlets={pamphlets} />
-        {!actionCount && !financing?.length && !pamphlets?.length && !selfEstimateBlock.length && (
+        {!actionCount && !financing?.length && !pamphlets?.length && !selfEstimateBlock.length && !punchLists?.length && (
           <Card><EmptyState compact icon={LayoutDashboard} title="You're all caught up"
             description="Estimates, invoices and contracts live in the menu. Anything needing your action shows up here." /></Card>
         )}

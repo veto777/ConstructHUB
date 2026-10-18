@@ -1,18 +1,22 @@
 /**
- * A client's job stage (owner, 2026-10-17): Bid → Bid Submitted → Approved → In progress → Closed out. The tracker on the CRM
- * client page (click a stage to move the job there; Closed out offers to text the client) and the status pill
- * next to clients in Google Reviews.
+ * A client's job stage (owner, 2026-10-17): Bid → Bid Submitted → Approved → Job Scheduled → In progress → Closed out.
+ * The tracker on the CRM client page (click a stage to move the job there; Closed out asks first and offers to
+ * text the client) and the status pill next to clients in Google Reviews.
  *
  * Derived, never stored (pure). The client's NEWEST live project decides (cancelled ones never count):
- *   lead / estimating → Bid · proposal_sent → Bid Submitted · approved / scheduled → Approved
+ *   lead / estimating → Bid · proposal_sent → Bid Submitted · approved → Approved · scheduled → Job Scheduled
  *   in_progress / waiting_on_trades / punch_list → In progress · complete / invoiced / paid → Closed out
  * With no live project, the estimates decide: one approved (won) → Approved; one out (draft / sent / viewed) → Bid.
  * A HOVER measurement or an expired estimate still reads Bid (the bare minimum); nothing at all → null.
+ *
+ * The stage also moves ON ITS OWN (server/crm/job-stage-auto.ts) when a bid is sent, a bid is approved, a visit is
+ * put on the calendar or an invoice goes out — always forward, never back (`nextAutoStatus`).
  */
 export const JOB_STAGES = [
   { key: "bid", label: "Bid" },
   { key: "bid_submitted", label: "Bid Submitted" },
   { key: "approved", label: "Approved" },
+  { key: "job_scheduled", label: "Job Scheduled" },
   { key: "in_progress", label: "In progress" },
   { key: "closed_out", label: "Closed out" },
 ] as const;
@@ -20,13 +24,14 @@ export type JobStage = (typeof JOB_STAGES)[number]["key"];
 
 const PROJECT_STAGE: Record<string, JobStage> = {
   lead: "bid", estimating: "bid", proposal_sent: "bid_submitted",
-  approved: "approved", scheduled: "approved",
+  approved: "approved", scheduled: "job_scheduled",
   in_progress: "in_progress", waiting_on_trades: "in_progress", punch_list: "in_progress",
   complete: "closed_out", invoiced: "closed_out", paid: "closed_out",
 };
 /** The project status a stage toggle writes (the first status of that stage). */
 export const STAGE_PROJECT_STATUS: Record<JobStage, string> = {
-  bid: "estimating", bid_submitted: "proposal_sent", approved: "approved", in_progress: "in_progress", closed_out: "complete",
+  bid: "estimating", bid_submitted: "proposal_sent", approved: "approved", job_scheduled: "scheduled",
+  in_progress: "in_progress", closed_out: "complete",
 };
 const ESTIMATE_SUBMITTED = new Set(["sent", "viewed"]);
 
@@ -39,6 +44,19 @@ export function currentProject<T extends P>(projects: T[] | undefined): T | null
   return live.length ? live.reduce((a, b) => (time(b) > time(a) ? b : a)) : null;
 }
 export const stageOfProjectStatus = (s: string | null | undefined): JobStage | null => (s ? PROJECT_STAGE[s] ?? null : null);
+export const stageIndex = (s: JobStage | null | undefined): number => (s ? JOB_STAGES.findIndex((x) => x.key === s) : -1);
+
+/**
+ * The project status an AUTOMATIC move writes, or null when nothing should change: a job only ever moves forward on
+ * its own (a sent bid never knocks an approved job back to Bid Submitted), never past Closed out (a closed job stays
+ * closed — invoiced / paid are not "re-completed"), and a cancelled or unknown status is never touched.
+ */
+export function nextAutoStatus(currentStatus: string | null | undefined, to: JobStage): string | null {
+  const from = stageOfProjectStatus(currentStatus);
+  if (!from) return null;
+  if (stageIndex(to) <= stageIndex(from)) return null;
+  return STAGE_PROJECT_STATUS[to];
+}
 
 export function jobStageOf(input: { estimates?: { status?: string | null }[]; projects?: P[]; measured?: boolean }): JobStage | null {
   const p = currentProject(input.projects);

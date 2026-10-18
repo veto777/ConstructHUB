@@ -62,6 +62,7 @@ import { sendWithFallback } from "../email";
 import { ESTIMATE_DEFAULT_KIND, fileKeyOf, lockStoragePath } from "./estimate-default-files";
 import { portalBaseUrl } from "../site-context";
 import { logActivity, recordActivity } from "./activity";
+import { GENERAL_SCOPE, parsePunchPhotoName, punchPhotoName } from "@shared/punch-list";
 import { loadActorDirectory } from "./actors";
 import { uploadLabelActor, type CrmActor } from "@shared/crm-actor";
 
@@ -277,14 +278,15 @@ export function storedUploader(
 /** What an attachment row is, for the activity-log meta (file names only — never storage keys). */
 function attachmentMeta(a: typeof crmAttachments.$inferSelect, extra: Record<string, unknown> = {}) {
   // The stage tag is a photo-only convention — a PDF named "progress--x.pdf" keeps its name.
+  const punch = a.kind === "photo" ? parsePunchPhotoName(a.fileName) : null;
   const stage = a.kind !== "photo" ? null
-    : a.fileName.startsWith("progress--") ? "progress" : a.fileName.startsWith("finished--") ? "finished" : null;
+    : a.fileName.startsWith("progress--") ? "progress" : a.fileName.startsWith("finished--") ? "finished" : punch ? "punchlist" : null;
   return {
     kind: a.kind,
     // The parent (customer / estimate id) — lets the audit feed gate a row
     // for a restricted seat even after the attachment itself is deleted.
     refId: a.refId,
-    fileName: stage ? a.fileName.slice(stage.length + 2) : a.fileName,
+    fileName: punch ? punch.displayName : stage ? a.fileName.slice(stage.length + 2) : a.fileName,
     stage,
     ...extra,
   };
@@ -486,12 +488,16 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
         message: kind === "photo" ? "JPEG, PNG or HEIC photos only" : "PDF or image files only",
       });
     }
-    // Stage tag ("progress" | "finished") rides in the stored name so the UI
-    // (and the client portal) can badge it without a schema change.
+    // Stage tag ("progress" | "finished" | "punchlist") rides in the stored name so the UI
+    // (and the client portal) can badge it without a schema change. A punch-list photo also
+    // names its scope ("punchlist--siding--x.jpg", shared/punch-list.ts).
     if (kind === "photo") {
       const stage = String(req.body?.stage || "");
       if (stage === "progress" || stage === "finished") {
         values.fileName = `${stage}--${values.fileName}`;
+      } else if (stage === "punchlist") {
+        const scope = String(req.body?.scope || "");
+        values.fileName = punchPhotoName(/^[a-z0-9_]{1,40}$/.test(scope) ? scope : GENERAL_SCOPE.key, values.fileName);
       }
     }
 

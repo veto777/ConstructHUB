@@ -284,6 +284,9 @@ const ROUTES: RouteRow[] = [
   R("PATCH", "/api/crm/selections/:childId", "manageJobs", { path: (t) => `/api/crm/selections/${t.selection}`, body: { status: "not-a-status" }, scoped: true }),
   R("GET", "/api/crm/projects/:id/daily-logs", null, { path: (t) => `/api/crm/projects/${t.project}/daily-logs`, scoped: true }),
   R("POST", "/api/crm/projects/:id/daily-logs", null, { path: (t) => `/api/crm/projects/${t.project}/daily-logs`, body: { tempF: "hot" }, scoped: true }),
+  // Punch list & final walkthrough (punch-list.ts): read with the project, write with manageJobs.
+  R("GET", "/api/crm/projects/:id/punch", null, { path: (t) => `/api/crm/projects/${t.project}/punch`, scoped: true }),
+  R("PUT", "/api/crm/projects/:id/punch", "manageJobs", { path: (t) => `/api/crm/projects/${t.project}/punch`, body: { scopes: [{ label: "General" }] }, scoped: true }),
   R("PATCH", "/api/crm/daily-logs/:logId", null, { path: (t) => `/api/crm/daily-logs/${t.dailyLog}`, body: { tempF: "hot" }, probe: { weather: "sunny" }, scoped: true }),
   R("DELETE", "/api/crm/daily-logs/:logId", null, { path: (t) => `/api/crm/daily-logs/${t.dailyLog}`, effect: true, scoped: true }),
   R("GET", "/api/crm/projects/:id/phases", null, { path: (t) => `/api/crm/projects/${t.project}/phases`, scoped: true }),
