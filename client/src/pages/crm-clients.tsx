@@ -32,6 +32,8 @@ interface Client {
   portalLastSeenAt: string | null;
   createdAt: string | null;
   bidStatus?: "won" | "undecided" | "declined" | "none";
+  /** When the latest bid went out (or was written). */
+  bidDate?: string | null;
 }
 
 const BID_TABS = [
@@ -39,6 +41,8 @@ const BID_TABS = [
   { key: "won", label: "Job Won" },
   { key: "undecided", label: "Undecided" },
   { key: "declined", label: "Declined" },
+  // Houses the crew measured in HOVER with no homeowner yet — kept out of All.
+  { key: "hover", label: "HOVER scans" },
 ] as const;
 
 const BID_PILL: Record<string, { label: string; cls: string }> = {
@@ -55,7 +59,7 @@ type BidTab = (typeof BID_TABS)[number]["key"];
 interface ClientPage {
   rows: Client[];
   total: number;
-  bidCounts: Record<"won" | "undecided" | "declined" | "none", number>;
+  bidCounts: Record<"won" | "undecided" | "declined" | "none" | "hover", number>;
   limit: number;
   offset: number;
 }
@@ -385,7 +389,7 @@ export default function CrmClientsPage() {
             <thead className={`${crmTable.thead} ${crmTableCards.thead}`}>
               <tr>
                 <th className={crmTable.th}>Client</th>
-                <th className={crmTable.th}>Contact</th>
+                <th className={`${crmTable.th} whitespace-nowrap`}>Date bid</th>
                 <th className={`${crmTable.th} hidden sm:table-cell`}>Address</th>
                 <th className={`${crmTable.th} hidden sm:table-cell`}>Bid</th>
                 <th className={`${crmTable.th} hidden sm:table-cell`}>Added</th>
@@ -422,22 +426,8 @@ export default function CrmClientsPage() {
                       </div>
                     </div>
                   </td>
-                  <td className={crmTableCards.td}>
-                    {/* Capped widths (here, Client and Address) so one long
-                        email or street can't push Bid/Added off-screen. */}
-                    <div className="space-y-0.5 text-sm min-w-0 max-w-[16rem] sm:max-w-[12rem]">
-                      {c.email && (
-                        <div className="flex items-center gap-1.5 text-muted-foreground" title={c.email}>
-                          <Mail className="h-3 w-3 shrink-0" /><span className="truncate min-w-0">{c.email}</span>
-                        </div>
-                      )}
-                      {c.phone && (
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <Phone className="h-3 w-3 shrink-0" />{c.phone}
-                        </div>
-                      )}
-                      {!c.email && !c.phone && <span className="text-muted-foreground">—</span>}
-                    </div>
+                  <td className={`${crmTableCards.td} text-sm whitespace-nowrap`} data-testid={`client-bid-date-${c.id}`}>
+                    {c.bidDate ? new Date(c.bidDate).toLocaleDateString() : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className={`${crmTable.td} hidden sm:table-cell`}>
                     {(c.addressLine1 || c.city) ? (
