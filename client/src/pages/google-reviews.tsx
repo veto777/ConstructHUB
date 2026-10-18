@@ -37,6 +37,7 @@ import {
 import { useUrlParam } from "@/hooks/use-url-param";
 import { useLocation } from "wouter";
 import { REVIEWS_VIEW_HEAD, reviewsHref, reviewsViewOf } from "@/components/reviews-tool/nav";
+import { ReviewSitesCard } from "@/components/reviews-tool/review-sites-card";
 import { caughtPrivatelyCount, describeReviewEscalationThreshold, normalizeReviewEscalationThreshold, REVIEW_ESCALATION_THRESHOLD_CHOICES } from "@shared/review-flow";
 import { MAX_OTHER_REVIEW_LINKS, MAX_REVIEW_LINK_LABEL, REVIEW_PLATFORMS, destinationLabel, normalizeOtherReviewLinks, resolvePrimaryUrl, reviewDestinations, reviewLinkLabel, type OtherReviewLink } from "@shared/review-links";
 import { REMINDER_INTERVAL_HOURS_MAX, REMINDER_INTERVAL_HOURS_MIN } from "@shared/review-reminders";
@@ -1099,19 +1100,25 @@ export default function GoogleReviewsPage() {
             </Section>
             )}
 
+            {/* The threshold first (owner, 2026-10-17: "the threshold for the reviews that reach google and other platforms
+                need to be added to settings"), then the review sites it sends clients to, then reminders. */}
+            {view === "settings" && <FeedbackRoutingCard />}
+
+            {view === "settings" && <ReviewSitesCard />}
+
+            {view === "settings" && <ReminderSettingsCard />}
+
             {view === "settings" && (
               <div className="g-callout" data-testid="card-settings-how">
                 <h2>How this works</h2>
                 <ol className="list-decimal space-y-1 pl-5">
-                  <li>Feedback routing: every client rates the job from 1 to 10. Pick the score below which their words come to you privately instead of the Google review step.</li>
+                  <li>Which ratings reach your review sites: every client rates the job from 1 to 10. Scores at or above your threshold are invited to review you on Google and your other review sites; scores below it come to you privately. One threshold applies to every review site.</li>
+                  <li>Review sites: for each Google Business Profile, list Google and your other review sites and pick where happy clients go first. &ldquo;Find review sites&rdquo; reads your website and suggests the review links on it.</li>
                   <li>Follow-up reminders: choose how many a client can get, how many hours apart, and the hours of the day they may arrive.</li>
                   <li>Save each card. Requests you send from then on follow the new settings.</li>
                 </ol>
               </div>
             )}
-            {view === "settings" && <FeedbackRoutingCard />}
-
-            {view === "settings" && <ReminderSettingsCard />}
 
             {view === "requests" && (
             <Section
@@ -1346,7 +1353,9 @@ export default function GoogleReviewsPage() {
                       )}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">Each client is routed to this profile&rsquo;s primary destination (usually Google).</p>
+                  {sendOtherDestinations.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Each client is routed to this profile&rsquo;s Google review link.</p>
+                  )}
                 </>
               ) : (
                 <Notice tone="warning">
@@ -1358,48 +1367,60 @@ export default function GoogleReviewsPage() {
               )}
             </div>
 
+            {/* Where this client goes (owner, 2026-10-17): a "Send them to" dropdown for the primary destination (Google
+                first) and "Also show" chips for the other sites offered after it. Same body fields as before
+                (primaryReviewUrl / includedReviewUrls); the sites themselves are set in Settings → Review sites. */}
             {selectedTemplateId && sendOtherDestinations.length > 0 && (
-              <div className="space-y-2" data-testid="section-send-destinations">
-                <Label>Where to send them</Label>
-                <p className="text-xs text-muted-foreground">Pick the review sites to include and the primary one each client is routed to first. Google is always included.</p>
-                <div className="space-y-1 rounded-xl border p-2">
-                  {sendDestinations.map((d) => {
-                    const label = destinationLabel(d);
-                    const isGoogle = d.platform === "google";
-                    const included = isGoogle || sendIncludedUrls.includes(d.url);
-                    return (
-                      <div key={d.url} className="flex items-center gap-2 rounded-lg px-2 py-1.5" data-testid={`row-send-dest-${d.platform}`}>
-                        <input
-                          type="checkbox"
-                          checked={included}
+              <div className="mt-4 space-y-3 border-t pt-4" data-testid="section-send-destinations">
+                <div className="space-y-2">
+                  <Label htmlFor="select-send-primary">Send them to</Label>
+                  <Select
+                    value={sendPrimaryUrl || sendGoogleUrl}
+                    onValueChange={(url) => {
+                      setSendPrimaryUrl(url);
+                      if (url !== sendGoogleUrl && !sendIncludedUrls.includes(url)) setSendIncludedUrls((u) => [...u, url]);
+                    }}
+                  >
+                    <SelectTrigger id="select-send-primary" data-testid="select-send-primary"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {sendDestinations.map((d) => (
+                        <SelectItem key={d.url} value={d.url} data-testid={`option-send-primary-${d.platform}`}>{destinationLabel(d)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label id="label-send-also">Also show</Label>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="label-send-also" data-testid="group-send-also">
+                    {sendDestinations.filter((d) => d.url !== (sendPrimaryUrl || sendGoogleUrl)).map((d) => {
+                      const label = destinationLabel(d);
+                      const isGoogle = d.platform === "google";
+                      const on = isGoogle || sendIncludedUrls.includes(d.url);
+                      return (
+                        <button
+                          key={d.url}
+                          type="button"
+                          aria-pressed={on}
                           disabled={isGoogle}
-                          onChange={(e) => {
-                            setSendIncludedUrls((urls) => e.target.checked ? [...urls, d.url] : urls.filter((u) => u !== d.url));
-                            if (!e.target.checked && sendPrimaryUrl === d.url) setSendPrimaryUrl(sendGoogleUrl);
-                          }}
-                          aria-label={`Include ${label}`}
-                          data-testid={`checkbox-send-dest-${d.platform}`}
-                        />
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}{isGoogle ? " · always included" : ""}</span>
-                        <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                          <input
-                            type="radio"
-                            name="send-primary"
-                            checked={sendPrimaryUrl === d.url}
-                            disabled={!included}
-                            onChange={() => {
-                              setSendPrimaryUrl(d.url);
-                              if (!isGoogle && !sendIncludedUrls.includes(d.url)) setSendIncludedUrls((u) => [...u, d.url]);
-                            }}
-                            data-testid={`radio-send-primary-${d.platform}`}
-                          />
-                          Primary
-                        </label>
-                      </div>
-                    );
-                  })}
+                          onClick={() => setSendIncludedUrls((urls) => on ? urls.filter((u) => u !== d.url) : [...urls, d.url])}
+                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors max-sm:py-2 ${on ? "border-blue-600 bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "bg-background text-muted-foreground hover:bg-muted"} disabled:cursor-default`}
+                          title={isGoogle ? "Google is always offered" : on ? `Don't show ${label}` : `Also show ${label}`}
+                          data-testid={`chip-send-also-${d.platform}`}
+                        >
+                          {on ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Plus className="h-3.5 w-3.5" aria-hidden="true" />}
+                          {label}{isGoogle ? " · always" : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Offered after the first review step. Change the list in <button type="button" onClick={() => { setCreateOpen(false); navigate(reviewsHref("settings")); }} className="font-medium text-primary hover:underline" data-testid="link-send-review-sites-settings">Settings → Review sites</button>.</p>
                 </div>
               </div>
+            )}
+            {selectedTemplateId && sendOtherDestinations.length === 0 && (
+              <p className="mt-2 text-xs text-muted-foreground" data-testid="text-send-no-other-sites">
+                Want Yelp, BBB or Houzz too? Add them in <button type="button" onClick={() => { setCreateOpen(false); navigate(reviewsHref("settings")); }} className="font-medium text-primary hover:underline" data-testid="link-send-review-sites-settings">Settings → Review sites</button>.
+              </p>
             )}
             </SendStep>
 
@@ -2885,16 +2906,16 @@ function FeedbackRoutingCard() {
   return (
     <Section
       testId="card-feedback-routing"
-      title="Feedback routing"
-      description="Hear problems before Google does: pick the score that comes to you privately."
-      actions={<StatusPill tone="info" data-testid="badge-feedback-routing">{threshold >= 10 ? "Only 10s" : `Below ${threshold}`}</StatusPill>}
+      title="Which ratings reach Google and your other review sites"
+      description="One threshold for every review site: scores at or above it are invited to review you publicly; scores below it come to you privately first."
+      actions={<StatusPill tone="info" data-testid="badge-feedback-routing">{threshold >= 10 ? "Only 10s" : `${threshold}+ reach review sites`}</StatusPill>}
     >
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-[220px_1fr] sm:items-start">
           <div className="space-y-2">
             <Label htmlFor="select-escalation-threshold" className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              Private feedback below
+              Review threshold
             </Label>
             <Select value={customThreshold ? "__custom__" : String(threshold)} onValueChange={(v) => { if (v === "__custom__") { setCustomThreshold(true); return; } setCustomThreshold(false); setDraft(parseInt(v, 10)); }} disabled={isLoading}>
               <SelectTrigger id="select-escalation-threshold" data-testid="select-escalation-threshold"><SelectValue /></SelectTrigger>
@@ -2913,12 +2934,13 @@ function FeedbackRoutingCard() {
                 className="max-sm:h-11" data-testid="input-escalation-threshold-custom" />
             )}
           </div>
-          <p className="text-sm leading-relaxed text-muted-foreground sm:pt-7" data-testid="text-escalation-summary">
-            {describeReviewEscalationThreshold(threshold)}
-          </p>
+          <div className="space-y-1 text-sm leading-relaxed text-muted-foreground sm:pt-7">
+            <p data-testid="text-escalation-summary">{describeReviewEscalationThreshold(threshold)}</p>
+            <p data-testid="text-escalation-all-sites">The same score applies to your other review sites (Yelp, BBB, Houzz…): a client below it is never shown any of them.</p>
+          </div>
         </div>
         <Notice tone="info" title="What the alert carries">
-          Name, score, job and the client's own words, in the bell and by email the moment they send it (and on Telegram when your LSA alert bot is linked). Scores below the threshold are never shown the Google link — this decides who is invited to review publicly and who you hear from first.
+          Name, score, job and the client's own words, in the bell and by email the moment they send it (and on Telegram when your LSA alert bot is linked). Scores below the threshold are never shown the Google link or your other review sites — this decides who is invited to review publicly and who you hear from first.
         </Notice>
         <div className="flex justify-end">
           <Button
