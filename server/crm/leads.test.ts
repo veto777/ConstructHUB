@@ -337,6 +337,25 @@ describe("CRM API", () => {
     expect(res.body.rows.every((r: any) => r.source === "form_sync" && r.status === "new")).toBe(true);
   });
 
+  it("every column header sorts: ?sort=name|contact|service|source|receivedAt&dir=asc|desc, in SQL, empties last", async () => {
+    const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
+    const rows = async (qs: string) => {
+      const res = await api(`/api/crm/leads?status=all&q=${encodeURIComponent(RUN)}&limit=200&${qs}`);
+      expect(res.status).toBe(200);
+      return res.body.rows as any[];
+    };
+    const asc = (await rows("sort=name&dir=asc")).map((r) => r.name).filter(Boolean);
+    expect(asc.length).toBeGreaterThan(1);
+    for (let i = 1; i < asc.length; i++) expect(collator.compare(asc[i - 1], asc[i])).toBeLessThanOrEqual(0);
+    const desc = (await rows("sort=name&dir=desc")).map((r) => r.name).filter(Boolean);
+    expect(desc).toEqual([...asc].reverse());
+    const received = (await rows("sort=receivedAt&dir=asc")).map((r) => new Date(r.receivedAt).getTime());
+    for (let i = 1; i < received.length; i++) expect(received[i]).toBeGreaterThanOrEqual(received[i - 1]);
+    for (const key of ["contact", "service", "source"]) expect((await rows(`sort=${key}&dir=asc`)).length).toBe(asc.length || received.length);
+    expect((await api(`/api/crm/leads?sort=zip`)).status).toBe(400);
+    expect((await api(`/api/crm/leads?sort=name&dir=sideways`)).status).toBe(400);
+  });
+
   it("changes status", async () => {
     const [lead] = await leadsByMarker(`${RUN} mapped`);
     const res = await api(`/api/crm/leads/${lead.id}`, { method: "PATCH", body: JSON.stringify({ status: "contacted" }) });

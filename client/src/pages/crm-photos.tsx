@@ -12,6 +12,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CrmPage, CrmPageHeader, StatusPill, statusTone } from "@/components/crm-ui";
 import { CrmPhotoGrid, CrmPhotoJobList, StageBadge, StageTabs } from "@/components/crm-photo-picker";
+import { SortSelect, useTableSort, type SortColumn } from "@/components/sortable-th";
+
+/** The "By job" card grid's Sort dropdown (GET /api/crm/photos/jobs?sort=&dir= — the server orders every job before paging). */
+type JobSortKey = "lastPhotoAt" | "name" | "photos";
+const JOB_SORT_COLUMNS: SortColumn<JobSortKey>[] = [
+  { key: "lastPhotoAt", label: "Last photo", kind: "date" },
+  { key: "name", label: "Client", kind: "text" },
+  { key: "photos", label: "Photos", kind: "number" },
+];
 import { useToast } from "@/hooks/use-toast";
 import {
   crmPhotoError, optimizerHref, reviewRequestHref,
@@ -49,6 +58,7 @@ export default function CrmPhotosPage() {
   const [selected, setSelected] = useState<Map<string, CrmPhoto>>(new Map());
   const [lightbox, setLightbox] = useState<{ list: CrmPhoto[]; index: number } | null>(null);
   const [mediaOpen, setMediaOpen] = useState(false);
+  const jobSort = useTableSort<JobSortKey>("lastPhotoAt", "desc", "photo-jobs", { keys: JOB_SORT_COLUMNS.map((c) => c.key) });
   useEffect(() => { const t = setTimeout(() => setQ(search.trim()), 300); return () => clearTimeout(t); }, [search]);
 
   const toggle = (p: CrmPhoto) => setSelected((prev) => {
@@ -124,6 +134,9 @@ export default function CrmPhotosPage() {
               <span className="text-xs text-muted-foreground">to</span>
               <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-[9.5rem]" aria-label="Taken to" data-testid="input-photos-to" />
             </div>
+            {!showGrid && (
+              <SortSelect columns={JOB_SORT_COLUMNS} sort={jobSort.sort} onChange={jobSort.setSort} testId="select-sort-photo-jobs" />
+            )}
           </div>
           <StageTabs value={stage} onChange={setStage} facets={showGrid ? facets : undefined} />
         </CardContent>
@@ -170,7 +183,7 @@ export default function CrmPhotosPage() {
           testId="photos-grid"
         />
       ) : (
-        <CrmPhotoJobList params={{ ...shared, stage }} onPick={(j) => { setJob(j); setFacets(undefined); }} />
+        <CrmPhotoJobList params={{ ...shared, stage, sort: jobSort.sort.key, dir: jobSort.sort.dir }} onPick={(j) => { setJob(j); setFacets(undefined); }} />
       )}
 
       <p className="text-xs text-muted-foreground" data-testid="text-photos-google-note">

@@ -24,6 +24,35 @@ import {
   Pencil, Trash2, Search,
 } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, SectionTitle, crmTable } from "@/components/crm-ui";
+import { SortButtons, SortableTh, useTableSort, type SortColumn } from "@/components/sortable-th";
+
+/** Every list on this page sorts (in the browser — each is the org's whole set, SKUs capped at 500). */
+type ItemSortKey = "name" | "code" | "price" | "mode" | "unit";
+const ITEM_SORT_COLUMNS: SortColumn<ItemSortKey>[] = [
+  { key: "name", label: "Name", kind: "text" },
+  { key: "code", label: "SKU #", kind: "text" },
+  { key: "price", label: "Price", kind: "number" },
+  { key: "mode", label: "Pricing", kind: "text" },
+  { key: "unit", label: "Unit", kind: "text" },
+];
+type MaterialSortKey = "name" | "unit" | "cost" | "price" | "waste" | "margin";
+const MATERIAL_SORT_COLUMNS: SortColumn<MaterialSortKey>[] = [
+  { key: "name", label: "Material", kind: "text" },
+  { key: "unit", label: "Unit", kind: "text" },
+  { key: "cost", label: "Cost", kind: "number" },
+  { key: "price", label: "Price", kind: "number" },
+  { key: "waste", label: "Waste", kind: "number" },
+  { key: "margin", label: "Margin", kind: "number" },
+];
+type LaborSortKey = "name" | "cost" | "price";
+const LABOR_SORT_COLUMNS: SortColumn<LaborSortKey>[] = [
+  { key: "name", label: "Name", kind: "text" },
+  { key: "cost", label: "Cost/hr", kind: "number" },
+  { key: "price", label: "Price/hr", kind: "number" },
+];
+/** A SKU's headline price, whatever its pricing mode (null when none is set). */
+const itemPriceCents = (i: any): number | null =>
+  i.pricingMode === "per_sqft" ? (i.rateCentsPerSqft ?? null) : (i.flatPriceCents ?? null);
 import { confirmAction } from "@/components/confirm-dialog";
 import { SelfEstimateSettingsCard } from "@/components/crm-self-estimate-settings";
 
@@ -235,6 +264,21 @@ export default function CrmPriceBookPage() {
     : `No SKUs yet.${canManage ? " Add one below, or seed the starter set above." : ""}`);
   const matsState = listState(matsLoading, matsError, materials, "No materials yet.");
   const laborState = listState(laborLoading, laborError, labor, "No labor rates yet.");
+
+  const itemSort = useTableSort<ItemSortKey>("name", "asc", "pricebook-items", { keys: ITEM_SORT_COLUMNS.map((c) => c.key) });
+  const sortedItems = items ? itemSort.sorted(items, {
+    name: (i) => i.name, code: (i) => i.code, price: itemPriceCents, mode: (i) => i.pricingMode, unit: (i) => i.unit,
+  }) : undefined;
+  const matSort = useTableSort<MaterialSortKey>("name", "asc", "pricebook-materials", { keys: MATERIAL_SORT_COLUMNS.map((c) => c.key) });
+  const sortedMaterials = materials ? matSort.sorted(materials, {
+    name: (m) => m.name, unit: (m) => m.unit, cost: (m) => m.costCents, price: (m) => m.priceCents,
+    waste: (m) => m.wasteFactorBps,
+    margin: (m) => (m.priceCents > 0 ? (m.priceCents - m.costCents) / m.priceCents : null),
+  }) : undefined;
+  const laborSort = useTableSort<LaborSortKey>("name", "asc", "pricebook-labor", { keys: LABOR_SORT_COLUMNS.map((c) => c.key) });
+  const sortedLabor = labor ? laborSort.sorted(labor, {
+    name: (l) => l.name, cost: (l) => l.hourlyCostCents, price: (l) => l.hourlyPriceCents,
+  }) : undefined;
 
   const invalidate = () => {
     ["items", "materials", "labor-rates"].forEach((k) =>
@@ -504,6 +548,9 @@ export default function CrmPriceBookPage() {
                 : `${items.length} SKU${items.length === 1 ? "" : "s"}${filtering ? " found" : ""}`}
             </p>
           )}
+          {!!items?.length && (
+            <SortButtons columns={ITEM_SORT_COLUMNS} sort={itemSort.sort} onSort={itemSort.onSort} onChange={itemSort.setSort} testId="sort-items" />
+          )}
           {itemsState && !items?.length && !itemsLoading && !itemsError && !filtering ? (
             <Card>
               <EmptyState
@@ -517,7 +564,7 @@ export default function CrmPriceBookPage() {
           ) : itemsState ? (
             <Card><CardContent className="py-2">{itemsState}</CardContent></Card>
           ) : null}
-          {items?.map((i) => (
+          {sortedItems?.map((i) => (
             <Card key={i.id} data-testid={`pb-item-${i.id}`}>
               <CardContent className="p-4 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -672,14 +719,16 @@ export default function CrmPriceBookPage() {
                 <div className={crmTable.wrapper}>
                   <table className={crmTable.table}>
                     <thead className={crmTable.thead}><tr>
-                      <th className={crmTable.th}>Material</th><th className={crmTable.th}>Unit</th>
-                      {seeCosts && <th className={crmTable.thRight}>Cost</th>}
-                      <th className={crmTable.thRight}>Price</th><th className={crmTable.thRight}>Waste</th>
-                      {seeCosts && <th className={crmTable.thRight}>Margin</th>}
+                      <SortableTh sortKey="name" label="Material" sort={matSort.sort} onSort={matSort.onSort} testId="sort-mat-name" />
+                      <SortableTh sortKey="unit" label="Unit" sort={matSort.sort} onSort={matSort.onSort} testId="sort-mat-unit" />
+                      {seeCosts && <SortableTh sortKey="cost" label="Cost" sort={matSort.sort} onSort={matSort.onSort} align="right" testId="sort-mat-cost" />}
+                      <SortableTh sortKey="price" label="Price" sort={matSort.sort} onSort={matSort.onSort} align="right" testId="sort-mat-price" />
+                      <SortableTh sortKey="waste" label="Waste" sort={matSort.sort} onSort={matSort.onSort} align="right" testId="sort-mat-waste" />
+                      {seeCosts && <SortableTh sortKey="margin" label="Margin" sort={matSort.sort} onSort={matSort.onSort} align="right" testId="sort-mat-margin" />}
                       {canManage && <th className={crmTable.thRight}><span className="sr-only">Actions</span></th>}
                     </tr></thead>
                     <tbody>
-                      {materials?.map((m) => {
+                      {sortedMaterials?.map((m) => {
                         const margin = seeCosts && m.priceCents > 0
                           ? ((m.priceCents - m.costCents) / m.priceCents * 100).toFixed(0) + "%" : "—";
                         return (
@@ -757,7 +806,11 @@ export default function CrmPriceBookPage() {
               {!labor?.length && !laborLoading && !laborError && (
                 <EmptyState compact icon={Percent} title="No labor rates yet" />
               )}
-              {labor?.map((l) => (
+              {!!labor?.length && (
+                <SortButtons columns={LABOR_SORT_COLUMNS.filter((c) => c.key !== "cost" || seeCosts)}
+                  sort={laborSort.sort} onSort={laborSort.onSort} onChange={laborSort.setSort} testId="sort-labor" />
+              )}
+              {sortedLabor?.map((l) => (
                 <div key={l.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2"
                   data-testid={`pb-lab-${l.id}`}>
                   <div className="font-medium flex items-center gap-2">

@@ -367,6 +367,16 @@ const SOURCE_NAMES: Record<string, string> = {
   website_form: "ConstructHUB form", form_sync: "Website form", call_assistant: "Call Assistant", import: "Import", manual: "Added by hand",
 };
 
+/** The /crm/leads column headers (?sort=). */
+export const LEAD_SORT_KEYS = ["name", "contact", "service", "source", "receivedAt"] as const;
+export type LeadSortKey = (typeof LEAD_SORT_KEYS)[number];
+/** The "From" column sorts by the name the list shows (SOURCE_NAMES), not the stored key. */
+const sourceNameSql = sql.join([
+  sql`case ${crmLeads.source}`,
+  ...Object.entries(SOURCE_NAMES).map(([k, v]) => sql`when ${k} then ${v}`),
+  sql`else ${crmLeads.source} end`,
+], sql` `);
+
 function presentLead(l: CrmLead, customers: Map<string, string>) {
   return {
     ...l,
@@ -479,6 +489,18 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
   });
 
   /** The Leads list: paged, filtered by status (default new), source and search; counts per status for the tabs. */
+  /** ORDER BY for one /crm/leads header: text case-insensitively, the lead's name falling back to its email/phone
+   *  the way the list shows it; empties last either way. */
+  const leadOrder = (key: LeadSortKey, dir: "asc" | "desc") => {
+    const d = dir === "desc" ? sql`desc` : sql`asc`;
+    const expr = key === "name" ? sql`lower(coalesce(nullif(${crmLeads.name}, ''), nullif(${crmLeads.email}, ''), nullif(${crmLeads.phone}, '')))`
+      : key === "contact" ? sql`lower(coalesce(nullif(${crmLeads.email}, ''), nullif(${crmLeads.phone}, '')))`
+      : key === "service" ? sql`lower(coalesce(nullif(${crmLeads.service}, ''), nullif(${crmLeads.message}, '')))`
+      : key === "source" ? sql`lower(${sourceNameSql}), lower(coalesce(${crmLeads.sourceLabel}, ''))`
+      : sql`${crmLeads.receivedAt}`;
+    return sql`${expr} ${d} nulls last`;
+  };
+
   app.get("/api/crm/leads", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageCustomers");
     if (!ctx) return;
@@ -497,6 +519,14 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
       return res.status(400).json({ message: `source must be one of: all, ${CRM_LEAD_SOURCES.join(", ")}.` });
     }
     const q = String(req.query.q || "").trim().slice(0, 200);
+    // ?sort=name|contact|service|source|receivedAt&dir=asc|desc — the column
+    // headers on /crm/leads. Sorted in SQL so "Load more" keeps the order.
+    const sortRaw = req.query.sort === undefined || req.query.sort === "" ? "receivedAt" : String(req.query.sort);
+    if (!(LEAD_SORT_KEYS as readonly string[]).includes(sortRaw)) {
+      return res.status(400).json({ message: `sort must be one of: ${LEAD_SORT_KEYS.join(", ")}.` });
+    }
+    const dirRaw = req.query.dir === undefined || req.query.dir === "" ? (sortRaw === "receivedAt" ? "desc" : "asc") : String(req.query.dir);
+    if (dirRaw !== "asc" && dirRaw !== "desc") return res.status(400).json({ message: "dir must be asc or desc." });
     const base: any[] = [eq(crmLeads.orgId, ctx.org.id)];
     if (source && source !== "all") base.push(eq(crmLeads.source, source));
     if (q) {
@@ -516,7 +546,7 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     for (const r of countRows) counts[r.status] = (counts[r.status] ?? 0) + r.n;
     const where = status === "all" ? base : [...base, eq(crmLeads.status, status)];
     const rows = await db.select().from(crmLeads).where(and(...where))
-      .orderBy(desc(crmLeads.receivedAt), desc(crmLeads.id)).limit(limit).offset(offset);
+      .orderBy(leadOrder(sortRaw as LeadSortKey, dirRaw), desc(crmLeads.receivedAt), desc(crmLeads.id)).limit(limit).offset(offset);
     const custIds = [...new Set(rows.map((r) => r.customerId).filter(Boolean) as string[])];
     const customers = new Map<string, string>();
     if (custIds.length) {

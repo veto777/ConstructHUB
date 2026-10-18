@@ -31,7 +31,7 @@ import {
   jobcamMedia, jobcamShareLinks,
 } from "@shared/schema";
 import {
-  and, eq, desc, asc, ilike, or, sql, isNull, isNotNull, inArray, gte, lte, lt,
+  and, eq, desc, asc, ilike, or, sql, isNull, isNotNull, inArray, gte, lte, lt, type AnyColumn, type SQL,
 } from "drizzle-orm";
 import { logTeamActivity, projectStageLabel } from "./stats";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
@@ -66,10 +66,74 @@ interface DocQuery {
   from: Date | null;
   to: Date | null;
   q: string;
+  /** The legacy presets; `sortKey` (a column header click) wins when set. */
   sort: "newest" | "oldest" | "largest";
+  sortKey: DocSortKey | null;
+  dir: "asc" | "desc";
   /** Page window. The default (500 from 0) is the historical cap. */
   limit: number;
   offset: number;
+}
+
+/** Column keys the Documents Center headers send as ?sort=<key>&dir=asc|desc. */
+export const DOC_SORT_KEYS = ["number", "client", "title", "status", "total", "created", "sent", "due"] as const;
+export type DocSortKey = (typeof DOC_SORT_KEYS)[number];
+
+/** The ORDER BY for a Documents Center list: text columns case-insensitively,
+ *  numbers by their digits (EST-9 before EST-10), empties last either way. */
+function docOrder(dq: DocQuery, col: {
+  number: AnyColumn; title: AnyColumn; status: AnyColumn; total: AnyColumn; created: AnyColumn;
+  sent: AnyColumn; due: AnyColumn | null; client: AnyColumn;
+}): SQL {
+  if (!dq.sortKey) {
+    return dq.sort === "oldest" ? sql`${col.created} asc`
+      : dq.sort === "largest" ? sql`${col.total} desc`
+      : sql`${col.created} desc`;
+  }
+  const dir = dq.dir === "desc" ? sql`desc` : sql`asc`;
+  const expr = dq.sortKey === "number" ? sql`nullif(regexp_replace(coalesce(${col.number}, ''), '\\D', '', 'g'), '')::bigint`
+    : dq.sortKey === "client" ? sql`lower(${col.client})`
+    : dq.sortKey === "title" ? sql`lower(nullif(${col.title}, ''))`
+    : dq.sortKey === "status" ? sql`lower(${col.status})`
+    : dq.sortKey === "total" ? sql`${col.total}`
+    : dq.sortKey === "sent" ? sql`${col.sent}`
+    : dq.sortKey === "due" && col.due ? sql`${col.due}`
+    : sql`${col.created}`;
+  return sql`${expr} ${dir} nulls last`;
+}
+
+/** Column keys the /crm/clients headers send as ?sort=<key>&dir=asc|desc. */
+export const CUSTOMER_SORT_KEYS = ["name", "bidDate", "address", "bidStatus", "createdAt"] as const;
+export type CustomerSortKey = (typeof CUSTOMER_SORT_KEYS)[number];
+const textCollator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
+const BID_SORT_LABEL: Record<string, string> = { won: "Job Won", undecided: "Undecided", declined: "Declined", bid: "Bid" };
+
+/** Sorts the client book in place for one header: names/addresses
+ *  alphabetically (case ignored), bid status by its label, dates in time;
+ *  clients with nothing in that column sit at the bottom either way. */
+export function sortCustomers(
+  rows: (typeof crmCustomers.$inferSelect)[], key: CustomerSortKey, dir: "asc" | "desc",
+  outcome: Map<string, string>, bidDates: Map<string, string>,
+): void {
+  const value = (c: typeof crmCustomers.$inferSelect): string | number | null => {
+    switch (key) {
+      case "name": return c.displayName || null;
+      case "address": return [c.addressLine1, c.city, c.state].filter(Boolean).join(", ") || null;
+      case "bidStatus": return BID_SORT_LABEL[outcome.get(c.id) ?? "none"] ?? null;
+      case "bidDate": { const d = bidDates.get(c.id); return d ? Date.parse(d) : null; }
+      default: return c.createdAt ? new Date(c.createdAt).getTime() : null;
+    }
+  };
+  const sign = dir === "desc" ? -1 : 1;
+  const decorated = rows.map((c, i) => ({ c, i, v: value(c) }));
+  decorated.sort((a, b) => {
+    const ea = a.v == null;
+    const eb = b.v == null;
+    if (ea || eb) return ea && eb ? a.i - b.i : ea ? 1 : -1;
+    const cmp = typeof a.v === "number" && typeof b.v === "number" ? a.v - b.v : textCollator.compare(String(a.v), String(b.v));
+    return cmp !== 0 ? cmp * sign : a.i - b.i;
+  });
+  for (let i = 0; i < rows.length; i++) rows[i] = decorated[i].c;
 }
 
 /**
@@ -223,6 +287,7 @@ function parseDocQuery(
   };
 
   const sortRaw = String(query.sort || "newest");
+  const dirRaw = String(query.dir || "");
   const int = (v: any, dflt: number, min: number, max: number) => {
     const n = parseInt(String(v ?? ""), 10);
     return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : dflt;
@@ -234,6 +299,8 @@ function parseDocQuery(
     to: parseDate(query.to, true),
     q: String(query.q || "").trim().slice(0, 200),
     sort: sortRaw === "oldest" || sortRaw === "largest" ? sortRaw : "newest",
+    sortKey: (DOC_SORT_KEYS as readonly string[]).includes(sortRaw) ? (sortRaw as DocSortKey) : null,
+    dir: dirRaw === "desc" ? "desc" : "asc",
     limit: int(query.limit, 500, 1, 500),
     offset: int(query.offset, 0, 0, 1_000_000),
   };
@@ -617,14 +684,27 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       if (bidStatus && !["won", "undecided", "declined", "none", "bid"].includes(bidStatus)) {
         return res.status(400).json({ message: "bidStatus must be one of: won, undecided, declined, bid, none." });
       }
+      // ?sort=name|bidDate|address|bidStatus|createdAt&dir=asc|desc — the
+      // column headers on /crm/clients. Sorting happens here, before the
+      // page is cut, so page 2 of "name A→Z" is really the next names.
+      const sortRaw = req.query.sort === undefined || req.query.sort === "" ? "createdAt" : String(req.query.sort);
+      if (!(CUSTOMER_SORT_KEYS as readonly string[]).includes(sortRaw)) {
+        return res.status(400).json({ message: `sort must be one of: ${CUSTOMER_SORT_KEYS.join(", ")}.` });
+      }
+      const sortKey = sortRaw as CustomerSortKey;
+      const dirRaw = req.query.dir === undefined || req.query.dir === "" ? (sortKey === "createdAt" ? "desc" : "asc") : String(req.query.dir);
+      if (dirRaw !== "asc" && dirRaw !== "desc") {
+        return res.status(400).json({ message: "dir must be asc or desc." });
+      }
       const all = await objectPolicy(ctx).filter("customers",
         await db.select().from(crmCustomers).where(and(...where)).orderBy(desc(crmCustomers.createdAt)));
       const outcome = await outcomesFor(all.map((c) => c.id));
       const bidCounts = { won: 0, undecided: 0, declined: 0, bid: 0, none: 0 } as Record<string, number>;
       for (const c of all) bidCounts[outcome.get(c.id) ?? "none"] += 1;
       const matching = bidStatus ? all.filter((c) => (outcome.get(c.id) ?? "none") === bidStatus) : all;
+      sortCustomers(matching, sortKey, dirRaw, outcome, bidDates);
       const page = matching.slice(offset, offset + limit);
-      return res.json({ rows: present(page, outcome), total: matching.length, bidCounts, limit, offset });
+      return res.json({ rows: present(page, outcome), total: matching.length, bidCounts, limit, offset, sort: sortKey, dir: dirRaw });
     }
 
     // Legacy shape: bare array of the newest 500 (every picker relies on it).
@@ -1205,9 +1285,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         ilike(crmCustomers.displayName, pat),
       ) as any);
     }
-    const order = dq.sort === "oldest" ? asc(crmEstimates.createdAt)
-      : dq.sort === "largest" ? desc(crmEstimates.totalCents)
-      : desc(crmEstimates.createdAt);
+    const order = docOrder(dq, {
+      number: crmEstimates.number, title: crmEstimates.title, status: crmEstimates.status, total: crmEstimates.totalCents,
+      created: crmEstimates.createdAt, sent: crmEstimates.sentAt, due: null, client: crmCustomers.displayName,
+    });
     const joinCust = and(
       eq(crmCustomers.id, crmEstimates.customerId),
       eq(crmCustomers.orgId, ctx.org.id),
@@ -1301,9 +1382,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         ilike(crmCustomers.displayName, pat),
       ) as any);
     }
-    const order = dq.sort === "oldest" ? asc(crmInvoices.createdAt)
-      : dq.sort === "largest" ? desc(crmInvoices.totalCents)
-      : desc(crmInvoices.createdAt);
+    const order = docOrder(dq, {
+      number: crmInvoices.number, title: crmInvoices.title, status: crmInvoices.status, total: crmInvoices.totalCents,
+      created: crmInvoices.createdAt, sent: crmInvoices.sentAt, due: crmInvoices.dueAt, client: crmCustomers.displayName,
+    });
     const joinCust = and(
       eq(crmCustomers.id, crmInvoices.customerId),
       eq(crmCustomers.orgId, ctx.org.id),

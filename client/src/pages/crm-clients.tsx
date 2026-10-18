@@ -16,6 +16,7 @@ import { EMAIL_RE, customerErrorMessage, duplicateMatches, type DuplicateMatch }
 import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ChevronRight, Download, Upload } from "lucide-react";
 import { SegmentedTabs, TabCount } from "@/components/tool";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable, crmTableCards } from "@/components/crm-ui";
+import { SortSelect, SortableTh, useTableSort, type SortColumn } from "@/components/sortable-th";
 import { lazySample, showSample } from "@/components/sample-preview";
 const SampleClientsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleClientsTable");
 
@@ -67,6 +68,18 @@ interface ClientPage {
 
 const PAGE_SIZE = 100;
 
+/** Every column header sorts (GET /api/crm/customers?sort=&dir= — the server
+ *  orders the whole book before cutting the page). */
+type ClientSortKey = "name" | "bidDate" | "address" | "bidStatus" | "createdAt";
+const CLIENT_SORT_KEYS: readonly ClientSortKey[] = ["name", "bidDate", "address", "bidStatus", "createdAt"];
+const CLIENT_SORT_COLUMNS: SortColumn<ClientSortKey>[] = [
+  { key: "name", label: "Client", kind: "text" },
+  { key: "bidDate", label: "Date bid", kind: "date" },
+  { key: "address", label: "Address", kind: "text" },
+  { key: "bidStatus", label: "Bid", kind: "text" },
+  { key: "createdAt", label: "Added", kind: "date" },
+];
+
 /** The tab + search live in the URL (?tab=won&q=kane) so a reload or Back keeps them. */
 function readListParams(): { tab: BidTab; q: string } {
   const p = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
@@ -94,6 +107,7 @@ export default function CrmClientsPage() {
     return () => clearTimeout(t);
   }, [q]);
   const [tab, setTab] = useState<BidTab>(initial.tab);
+  const { sort, setSort, onSort } = useTableSort<ClientSortKey>("createdAt", "desc", "clients", { keys: CLIENT_SORT_KEYS });
   // Mirror tab + search into the URL without adding history entries.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -124,13 +138,15 @@ export default function CrmClientsPage() {
   const {
     data, isLoading, isError, isPlaceholderData, fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["/api/crm/customers", "paged", qDebounced, tab],
+    queryKey: ["/api/crm/customers", "paged", qDebounced, tab, sort.key, sort.dir],
     // While another tab (or search) loads, the tab counts stay on screen from
     // the previous answer; the rows area shows the spinner, never the old rows.
     placeholderData: keepPreviousData,
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<ClientPage> => {
-      const params = new URLSearchParams({ paged: "1", limit: String(PAGE_SIZE), offset: String(pageParam) });
+      const params = new URLSearchParams({
+        paged: "1", limit: String(PAGE_SIZE), offset: String(pageParam), sort: sort.key, dir: sort.dir,
+      });
       if (qDebounced) params.set("q", qDebounced);
       if (tab !== "all") params.set("bidStatus", tab);
       const r = await fetch(`/api/crm/customers?${params}`, { credentials: "include" });
@@ -385,15 +401,17 @@ export default function CrmClientsPage() {
           const tabLabel = tab === "all" ? "" : ` ${BID_TABS.find((b) => b.key === tab)?.label ?? ""}`;
           return (
         <>
+        {/* The headers are hidden on a phone (card layout) — the Sort select stands in for them. */}
+        <SortSelect columns={CLIENT_SORT_COLUMNS} sort={sort} onChange={setSort} className="sm:hidden" testId="select-sort-clients" />
         <div className={crmTable.wrapper}>
           <table className={crmTable.table}>
             <thead className={`${crmTable.thead} ${crmTableCards.thead}`}>
               <tr>
-                <th className={crmTable.th}>Client</th>
-                <th className={`${crmTable.th} whitespace-nowrap`}>Date bid</th>
-                <th className={`${crmTable.th} hidden sm:table-cell`}>Address</th>
-                <th className={`${crmTable.th} hidden sm:table-cell`}>Bid</th>
-                <th className={`${crmTable.th} hidden sm:table-cell`}>Added</th>
+                <SortableTh sortKey="name" label="Client" sort={sort} onSort={onSort} />
+                <SortableTh sortKey="bidDate" label="Date bid" sort={sort} onSort={onSort} />
+                <SortableTh sortKey="address" label="Address" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
+                <SortableTh sortKey="bidStatus" label="Bid" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
+                <SortableTh sortKey="createdAt" label="Added" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
                 <th className="w-10" />
               </tr>
             </thead>

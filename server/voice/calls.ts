@@ -39,7 +39,22 @@ const listQuery = z.object({
   q: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
+  /** The Calls table headers: ?sort=<column>&dir=asc|desc (default: newest first). */
+  sort: z.enum(["callNo", "startedAt", "caller", "outcome", "about", "length"]).default("startedAt"),
+  dir: z.enum(["asc", "desc"]).optional(),
 });
+
+/** ORDER BY for one Calls header — text case-insensitively, the caller by the name the row shows (else the number); empties last. */
+function callOrder(q: z.infer<typeof listQuery>): SQL {
+  const d = (q.dir ?? (q.sort === "startedAt" ? "desc" : "asc")) === "desc" ? sql`desc` : sql`asc`;
+  const expr = q.sort === "callNo" ? sql`${voiceCalls.callNo}`
+    : q.sort === "caller" ? sql`lower(coalesce(nullif(${voiceCalls.callerName}, ''), ${voiceCalls.fromNumber}))`
+    : q.sort === "outcome" ? sql`lower(${voiceCalls.outcome})`
+    : q.sort === "about" ? sql`lower(coalesce(nullif(${voiceCalls.serviceNeeded}, ''), nullif(${voiceCalls.summary}, '')))`
+    : q.sort === "length" ? sql`${voiceCalls.durationSeconds}`
+    : sql`${voiceCalls.startedAt}`;
+  return sql`${expr} ${d} nulls last`;
+}
 
 /** The list shape: everything but the heavy JSON columns. */
 const listColumns = {
@@ -227,7 +242,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     const cond = and(...where);
     const [{ n: total }] = await db.select({ n: sql<number>`count(*)::int` }).from(voiceCalls).where(cond);
     const calls = await db.select(listColumns).from(voiceCalls).where(cond)
-      .orderBy(desc(voiceCalls.startedAt)).limit(q.limit).offset((q.page - 1) * q.limit);
+      .orderBy(callOrder(q), desc(voiceCalls.startedAt)).limit(q.limit).offset((q.page - 1) * q.limit);
     sendUnlogged(res, {
       calls: calls.map(({ recordingPending, recordingStatus, deliveryTasks, deliveryEscalations, ...c }) => {
         const rec = recordingInfoOf({ ...c, recordingPending, recordingStatus });

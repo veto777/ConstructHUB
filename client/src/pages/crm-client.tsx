@@ -51,6 +51,27 @@ import { InfoTip } from "@/components/info-tip";
 import { HelpButton } from "@/components/help-button";
 import { confirmAction } from "@/components/confirm-dialog";
 import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
+import { SortButtons, useTableSort, type SortColumn } from "@/components/sortable-th";
+
+/** The client's estimate and invoice cards sort on every fact they show (in the browser — one client's documents). */
+type ClientDocSortKey = "number" | "title" | "status" | "total" | "created";
+const CLIENT_ESTIMATE_SORT_COLUMNS: SortColumn<ClientDocSortKey>[] = [
+  { key: "number", label: "Number", kind: "number" },
+  { key: "title", label: "Title", kind: "text" },
+  { key: "status", label: "Status", kind: "text" },
+  { key: "total", label: "Total", kind: "number" },
+  { key: "created", label: "Created", kind: "date" },
+];
+type ClientInvoiceSortKey = ClientDocSortKey | "due";
+const CLIENT_INVOICE_SORT_COLUMNS: SortColumn<ClientInvoiceSortKey>[] = [
+  ...CLIENT_ESTIMATE_SORT_COLUMNS,
+  { key: "due", label: "Due", kind: "date" },
+];
+/** "EST-12" → 12, so numbers sort as numbers. */
+const docNumberValue = (n: unknown): number | null => {
+  const digits = String(n ?? "").replace(/\D/g, "");
+  return digits ? Number(digits) : null;
+};
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -528,10 +549,20 @@ export default function CrmClientPage() {
   // found", not a connection problem.
   const notFound = isError && /^404:/.test(String((error as any)?.message ?? ""));
 
-  const { data: invoices, isError: invoicesError } = useQuery<any[]>({
+  const { data: invoicesRaw, isError: invoicesError } = useQuery<any[]>({
     queryKey: [`/api/crm/invoices?customerId=${id}`],
     enabled: !!id && canSeePrices,
   });
+  const estimateSort = useTableSort<ClientDocSortKey>("created", "desc", "client-estimates", { keys: CLIENT_ESTIMATE_SORT_COLUMNS.map((c) => c.key) });
+  const invoiceSort = useTableSort<ClientInvoiceSortKey>("created", "desc", "client-invoices", { keys: CLIENT_INVOICE_SORT_COLUMNS.map((c) => c.key) });
+  const invoices = invoicesRaw ? invoiceSort.sorted(invoicesRaw, {
+    number: (i: any) => docNumberValue(i.number),
+    title: (i: any) => i.title,
+    status: (i: any) => i.status,
+    total: (i: any) => i.totalCents,
+    created: (i: any) => i.createdAt,
+    due: (i: any) => i.dueAt,
+  }) : invoicesRaw;
 
   // ── The HUB: this page is the fast track for everything about the client ──
   // Payments (history + outstanding), their appointments, and the message
@@ -969,7 +1000,14 @@ export default function CrmClientPage() {
   }
 
   const c = data.customer;
-  const estimates = data.estimates ?? [];
+  const estimates = estimateSort.sorted(data.estimates ?? [], {
+    number: (e: any) => docNumberValue(e.number),
+    title: (e: any) => e.title,
+    status: (e: any) => e.status,
+    // A signed estimate's figure is what the client signed for.
+    total: (e: any) => (e.approvedAt && e.approvedTotalCents != null ? e.approvedTotalCents : e.totalCents),
+    created: (e: any) => e.createdAt,
+  });
 
   // One prefill for both Schedule buttons.
   const openSchedule = () => {
@@ -1522,6 +1560,10 @@ export default function CrmClientPage() {
               ) : undefined}
             />
           )}
+          {estimates.length > 1 && (
+            <SortButtons columns={CLIENT_ESTIMATE_SORT_COLUMNS.filter((col) => col.key !== "total" || canSeePrices)}
+              sort={estimateSort.sort} onSort={estimateSort.onSort} onChange={estimateSort.setSort} testId="sort-client-estimates" />
+          )}
           {estimates.map((e: any) => (
             <div key={e.id} className="rounded-lg border p-4 space-y-2.5 hover:border-border/80 transition-colors" data-testid={`estimate-${e.id}`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1681,6 +1723,10 @@ export default function CrmClientPage() {
                 title="No invoices yet"
                 description="Approve an estimate, then convert it — the client pays online."
               />
+            )}
+            {(invoices?.length ?? 0) > 1 && (
+              <SortButtons columns={CLIENT_INVOICE_SORT_COLUMNS} sort={invoiceSort.sort} onSort={invoiceSort.onSort}
+                onChange={invoiceSort.setSort} testId="sort-client-invoices" />
             )}
             {invoices?.map((inv: any) => {
               const due = Math.max(0, (inv.totalCents ?? 0) - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
