@@ -184,7 +184,7 @@ describe("DB: model3d + wireframe loaders", () => {
     if (r.status !== "ready") return;
     expect(r.modelId).toBe("555");
     expect(r.cached).toBe(false);
-    expect(r.mesh.counts).toEqual({ roof: 2, wall: 4, opening: 1, skipped: 0 });
+    expect(r.mesh.counts).toEqual({ roof: 2, wall: 4, opening: 1, window: 0, door: 0, soffit: 0, skipped: 0 });
     // The bearer only ever went to HOVER's API.
     const xmlCall = fake.st.calls.find((c) => c.path === "/api/v3/models/555/artifacts/cad_export.xml")!;
     expect(xmlCall.auth).toBe("Bearer at-model3d");

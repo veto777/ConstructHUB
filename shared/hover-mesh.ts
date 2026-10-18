@@ -28,13 +28,19 @@
  * numeric references) — an export is data, never markup we execute. Pure: no I/O, safe to import anywhere.
  */
 
-export type MeshFaceType = "roof" | "wall" | "opening";
+/** HOVER face classes: windows and doors are openings with a kind; a WALLPENETRATION is an untyped cut-out. */
+export type MeshFaceType = "roof" | "wall" | "opening" | "window" | "door" | "soffit";
+export const OPENING_TYPES: readonly MeshFaceType[] = ["opening", "window", "door"];
+/** Bump when the parsed shape changes: a cached mesh of an older version is re-read from HOVER's export. */
+export const MESH_VERSION = 2;
 
 export interface MeshFace {
   id: string;
   /** HOVER's facet label ("RF-5", "SI-1", "BR-2", "Unclassified-3"); openings usually have none. */
   name: string | null;
   type: MeshFaceType;
+  /** HOVER's window-type / door-type ("doublehung", "casement", "exterior", "garage"), lower-cased; null otherwise. */
+  subtype: string | null;
   /** Indices into vertices (÷3), an ordered ring, not closed (first ≠ last). */
   polygon: number[];
   areaSqft: number | null;
@@ -54,7 +60,7 @@ export interface MeshEdge {
 }
 
 export interface HoverMesh {
-  version: 1;
+  version: number;
   units: "ft";
   up: "z";
   /** Flat [x, y, z, x, y, z, …] in feet, HOVER's model frame. */
@@ -64,7 +70,7 @@ export interface HoverMesh {
   edges: MeshEdge[];
   location: { address: string | null; lat: number | null; long: number | null } | null;
   bounds: { min: [number, number, number]; max: [number, number, number] };
-  counts: { roof: number; wall: number; opening: number; skipped: number };
+  counts: { roof: number; wall: number; opening: number; window: number; door: number; soffit: number; skipped: number };
   totals: { roofSqft: number | null; wallSqft: number | null };
 }
 
@@ -143,7 +149,9 @@ export function polygonArea(pts: V3[]): number {
   return Math.sqrt(nx * nx + ny * ny + nz * nz) / 2;
 }
 
-const FACE_TYPES: Record<string, MeshFaceType> = { ROOF: "roof", WALL: "wall", WALLPENETRATION: "opening" };
+const FACE_TYPES: Record<string, MeshFaceType> = {
+  ROOF: "roof", WALL: "wall", WALLPENETRATION: "opening", WINDOW: "window", DOOR: "door", GARAGEDOOR: "door", SOFFIT: "soffit",
+};
 
 export class HoverMeshError extends Error {
   constructor(public code: "too_large" | "not_xml" | "empty_geometry" | "too_many", message: string) {
@@ -159,7 +167,7 @@ export function parseHoverXml3d(xml: string): HoverMesh {
   if (!/<DATA_EXPORT[\s>]/.test(xml)) throw new HoverMeshError("not_xml", "not a HOVER XML 3D export");
 
   // Ids are only unique inside one structure (<STRUCTURES><ROOF id="ROOF1">…), so they are scoped per structure.
-  interface RawFace { id: string; type: string; name: string | null; children: string[]; path: string[]; size: number | null; pitch: string | undefined; scope: number }
+  interface RawFace { id: string; type: string; name: string | null; subtype: string | null; children: string[]; path: string[]; size: number | null; pitch: string | undefined; scope: number }
   const faces: RawFace[] = [];
   const lines = new Map<string, { p: string; q: string; type: string }>();
   const points = new Map<string, V3>();
@@ -196,6 +204,7 @@ export function parseHoverXml3d(xml: string): HoverMesh {
           id: key(attrs.id ?? `anon${faces.length}`),
           type: (attrs.type ?? "").toUpperCase(),
           name: attrs.name?.trim() || null,
+          subtype: (attrs["window-type"] ?? attrs["door-type"])?.trim().toLowerCase() || null,
           children: (attrs.children ?? "").split(",").map((s) => s.trim()).filter(Boolean).map(key),
           path: [], size: null, pitch: undefined, scope,
         };
@@ -246,7 +255,7 @@ export function parseHoverXml3d(xml: string): HoverMesh {
   };
 
   const out: MeshFace[] = [];
-  const counts = { roof: 0, wall: 0, opening: 0, skipped: 0 };
+  const counts = { roof: 0, wall: 0, opening: 0, window: 0, door: 0, soffit: 0, skipped: 0 };
   const roofLineIds = new Set<string>();
   const idOut = (id: string) => (id.startsWith("1:") ? id.slice(2) : id.replace(":", "-"));
   for (const f of faces) {
@@ -259,16 +268,16 @@ export function parseHoverXml3d(xml: string): HoverMesh {
     if (poly.some((i) => i === null)) { counts.skipped++; continue; }
     let areaSqft: number | null = f.size !== null && f.size >= 0 ? round(f.size, 2) : null;
     let areaSource: MeshFace["areaSource"] = areaSqft !== null ? "hover" : null;
-    if (areaSqft === null && type === "opening") {
+    if (areaSqft === null && OPENING_TYPES.includes(type)) {
       areaSqft = round(polygonArea(ring.map((pid) => points.get(pid)!)), 2);
       areaSource = "geometry";
     }
     if (type === "roof") for (const lid of f.path) roofLineIds.add(lid);
     counts[type]++;
     out.push({
-      id: idOut(f.id), name: f.name, type, polygon: poly as number[], areaSqft, areaSource,
+      id: idOut(f.id), name: f.name, type, subtype: f.subtype, polygon: poly as number[], areaSqft, areaSource,
       pitch: type === "roof" ? pitchLabel(f.pitch) : null,
-      parentId: type === "opening" && parentOf.has(f.id) ? idOut(parentOf.get(f.id)!) : null,
+      parentId: OPENING_TYPES.includes(type) && parentOf.has(f.id) ? idOut(parentOf.get(f.id)!) : null,
     });
   }
   if (!out.length) throw new HoverMeshError("empty_geometry", "the export holds no renderable faces");
@@ -294,7 +303,7 @@ export function parseHoverXml3d(xml: string): HoverMesh {
     return xs.length ? round(xs.reduce((a, b) => a + b, 0), 1) : null;
   };
   return {
-    version: 1, units: "ft", up: "z", vertices, faces: out, edges, location,
+    version: MESH_VERSION, units: "ft", up: "z", vertices, faces: out, edges, location,
     bounds: { min, max }, counts, totals: { roofSqft: sum("roof"), wallSqft: sum("wall") },
   };
 }

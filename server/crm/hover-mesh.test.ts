@@ -100,7 +100,8 @@ describe("parseHoverXml3d (synthetic gable box)", () => {
   const mesh = parseHoverXml3d(syntheticXml());
 
   it("classifies faces and skips types it does not render", () => {
-    expect(mesh.counts).toEqual({ roof: 2, wall: 4, opening: 2, skipped: 1 });
+    // The GUTTER face is the one skipped; windows/doors/soffits are read since v2 (none in this fixture).
+    expect(mesh.counts).toEqual({ roof: 2, wall: 4, opening: 2, window: 0, door: 0, soffit: 0, skipped: 1 });
     expect(mesh.faces.map((f) => f.id)).toEqual(["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"]);
     expect(mesh.faces.find((f) => f.name === "commented out")).toBeUndefined();
   });
@@ -171,5 +172,35 @@ describe("parseHoverXml3d refusals", () => {
     expect(code(() => parseHoverXml3d("{}"))).toBe("not_xml");
     expect(code(() => parseHoverXml3d("<DATA_EXPORT><STRUCTURES></STRUCTURES></DATA_EXPORT>"))).toBe("empty_geometry");
     expect(code(() => parseHoverXml3d(`<DATA_EXPORT>${" ".repeat(MESH_LIMITS.xmlBytes)}</DATA_EXPORT>`))).toBe("too_large");
+  });
+});
+
+describe("windows, doors and soffits", () => {
+  const XML = `<DATA_EXPORT><STRUCTURES><ROOF id="ROOF1"><FACES>
+<FACE id="F1" type="WALL" name="SI-1" children="F2,F3"><POLYGON id="P1" path="L1,L2,L3,L4" size="80"/></FACE>
+<FACE id="F2" type="WINDOW" name="W-1" window-type="DOUBLEHUNG"><POLYGON id="P2" path="L5,L6,L7,L8" size="4"/></FACE>
+<FACE id="F3" type="DOOR" name="D-1" door-type="EXTERIOR"><POLYGON id="P3" path="L9,L10,L11,L12"/></FACE>
+<FACE id="F4" type="SOFFIT" name="SO-1"><POLYGON id="P4" path="L13,L14,L15,L16" size="10"/></FACE>
+</FACES><LINES>
+<LINE id="L1" path="P1,P2" type="other"/><LINE id="L2" path="P2,P3" type="other"/><LINE id="L3" path="P3,P4" type="other"/><LINE id="L4" path="P4,P1" type="other"/>
+<LINE id="L5" path="P5,P6" type="other"/><LINE id="L6" path="P6,P7" type="other"/><LINE id="L7" path="P7,P8" type="other"/><LINE id="L8" path="P8,P5" type="other"/>
+<LINE id="L9" path="P9,P10" type="other"/><LINE id="L10" path="P10,P11" type="other"/><LINE id="L11" path="P11,P12" type="other"/><LINE id="L12" path="P12,P9" type="other"/>
+<LINE id="L13" path="P13,P14" type="other"/><LINE id="L14" path="P14,P15" type="other"/><LINE id="L15" path="P15,P16" type="other"/><LINE id="L16" path="P16,P13" type="other"/>
+</LINES><POINTS>
+<POINT id="P1" data="0,0,0"/><POINT id="P2" data="10,0,0"/><POINT id="P3" data="10,0,8"/><POINT id="P4" data="0,0,8"/>
+<POINT id="P5" data="2,0,2"/><POINT id="P6" data="4,0,2"/><POINT id="P7" data="4,0,4"/><POINT id="P8" data="2,0,4"/>
+<POINT id="P9" data="6,0,0"/><POINT id="P10" data="8,0,0"/><POINT id="P11" data="8,0,7"/><POINT id="P12" data="6,0,7"/>
+<POINT id="P13" data="0,0,8"/><POINT id="P14" data="10,0,8"/><POINT id="P15" data="10,-1,8"/><POINT id="P16" data="0,-1,8"/>
+</POINTS></ROOF></STRUCTURES></DATA_EXPORT>`;
+  it("reads HOVER's WINDOW / DOOR / SOFFIT faces (they were skipped before), with kind and parent wall", () => {
+    const m = parseHoverXml3d(XML);
+    expect(m.version).toBe(2);
+    expect(m.counts).toEqual({ roof: 0, wall: 1, opening: 0, window: 1, door: 1, soffit: 1, skipped: 0 });
+    const w = m.faces.find((f) => f.type === "window")!;
+    expect(w).toMatchObject({ name: "W-1", subtype: "doublehung", parentId: "F1", areaSqft: 4, areaSource: "hover" });
+    const d = m.faces.find((f) => f.type === "door")!;
+    // No size from HOVER → the polygon's own area (2 × 7 ft).
+    expect(d).toMatchObject({ subtype: "exterior", parentId: "F1", areaSqft: 14, areaSource: "geometry" });
+    expect(m.faces.find((f) => f.type === "soffit")).toMatchObject({ name: "SO-1", areaSqft: 10, parentId: null });
   });
 });
