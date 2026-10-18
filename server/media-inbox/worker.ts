@@ -22,6 +22,7 @@ import { asksIfAi, companyDomain, firstNameOf, formMessage, holdingReply, person
 import { pickEmail, siteName } from "../backlinks/outreach";
 import { isSuppressed } from "../backlinks/store";
 import { fetchSince, mailboxConfig, mailboxConfigured, sendMail } from "./mailbox";
+import { checkMailbox } from "./verify";
 import * as store from "./store";
 import { workerInterval } from "../workers";
 
@@ -37,8 +38,8 @@ const ANSWER_BATCH = 25;
 
 /**
  * Can the address's domain receive mail at all? Bounces hurt the new mailbox (2026-10-15: 9 of ~140 cold emails, ~6%;
- * Gmail flags senders past ~2%). Port 25 is closed on the server, so mailboxes can't be probed: a domain with no MX
- * record (or a null MX) is skipped; a DNS timeout is not held against it.
+ * Gmail flags senders past ~2%). A domain with no MX record (or a null MX) is skipped; a DNS timeout is not held against
+ * it. The mailbox itself is then checked with its server (./verify.ts).
  */
 export async function acceptsMail(domain: string): Promise<boolean> {
   try {
@@ -48,7 +49,16 @@ export async function acceptsMail(domain: string): Promise<boolean> {
     return !["ENOTFOUND", "ENODATA", "ESERVFAIL", "NXDOMAIN"].includes(e?.code);
   }
 }
-export const workerDeps = { fetchSince, sendMail, decide, extractNextStep, acceptsMail };
+export const workerDeps = { fetchSince, sendMail, decide, extractNextStep, acceptsMail, checkMailbox };
+
+/** Addresses that are never a cold contact even when a site lists them (2026-10-17: applicationsprogramming@ bounced). */
+export const NOT_A_CONTACT = /^(applications?|programming|applicationsprogramming|eeo|hr|humanresources|recruit\w*|careers?|jobs?|employment|accounting|accountspayable|ap|ar|billing|invoices?|legal|compliance|privacy|webmaster|hostmaster|security|abuse|unsubscribe|subscriptions?|circulation|delivery)@/i;
+
+/** The recipient's server refused this mailbox (verify.ts). An unknown answer is not held against it. */
+async function mailboxRefused(email: string): Promise<string | null> {
+  const c = await workerDeps.checkMailbox(email, mailboxConfig().user).catch(() => null);
+  return c?.verdict === "no" ? `Mailbox does not exist (${c.reply})` : null;
+}
 
 /**
  * Step 2b: an auto-reply from a company we contacted is never answered, but it is read (owner, 2026-10-14: "do not
@@ -247,7 +257,12 @@ export async function followUpSilent(): Promise<{ followedUp: number; newContact
         .map((e) => e.toLowerCase()).filter((e) => !tried.has(e) && !machineReason({ fromEmail: e, subject: "" }));
       const fresh: string[] = [];
       for (const e of new Set(found)) if (!(await isSuppressed(e))) fresh.push(e);
-      next = pickEmail(fresh);
+      // Best address first; one the recipient's server refuses is dropped for the next best.
+      let left = fresh.filter((e) => !NOT_A_CONTACT.test(e));
+      for (let pick = pickEmail(left); pick; pick = pickEmail(left)) {
+        if (!(await mailboxRefused(pick))) { next = pick; break; }
+        left = left.filter((e) => e !== pick);
+      }
     }
     if (!next) {
       await store.noteOnPartner(t.partnerId, `No reply from ${[...tried].join(", ")} after a follow-up, and no other contact address found on ${t.domain ?? "their site"}.`);
@@ -400,6 +415,9 @@ export async function sendOne(q: QueueItem, s: MediaSettings): Promise<string | 
   if (await store.hasBounced(q.to_email)) return skip("This address bounced before");
   const mailDomain = q.to_email.split("@")[1] ?? "";
   if (!(await workerDeps.acceptsMail(mailDomain))) return skip(`${mailDomain} has no mail server (no MX record)`);
+  if (NOT_A_CONTACT.test(q.to_email)) return skip("Not a contact address (jobs, billing, programming and the like)");
+  const refused = await mailboxRefused(q.to_email);
+  if (refused) return skip(refused);
   const e = queueEmail(q.kind, q.company, s);
   const messageId = await workerDeps.sendMail({ to: q.to_email, subject: e.subject, body: e.body });
   const partnerId = await store.partnerForOutreach(q.company, q.domain, e.kind, q.to_email);
