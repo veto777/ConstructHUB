@@ -560,10 +560,23 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
           bidAt: sql<string | null>`max(coalesce(${crmEstimates.sentAt}, ${crmEstimates.createdAt}))`,
         }).from(crmEstimates).where(and(eq(crmEstimates.orgId, ctx.org.id), inArray(crmEstimates.customerId, chunk)))
           .groupBy(crmEstimates.customerId);
+        // A HOVER measurement is a bid at the very least (owner, 2026-10-18): a client measured but not yet quoted
+        // reads "Bid", dated by the capture.
+        const measured = await db.select({
+          customerId: crmMeasurements.customerId,
+          at: sql<string | null>`max(coalesce(${crmMeasurements.completedAt}, ${crmMeasurements.createdAt}))`,
+        }).from(crmMeasurements).where(and(eq(crmMeasurements.orgId, ctx.org.id), inArray(crmMeasurements.customerId, chunk)))
+          .groupBy(crmMeasurements.customerId);
+        for (const m of measured) {
+          if (!m.customerId) continue;
+          outcome.set(m.customerId, "bid");
+          if (m.at) bidDates.set(m.customerId, new Date(m.at).toISOString());
+        }
         for (const a of agg) {
           if (a.bidAt) bidDates.set(a.customerId, new Date(a.bidAt).toISOString());
           outcome.set(a.customerId,
-            a.approved > 0 ? "won" : a.open > 0 ? "undecided" : a.declined > 0 ? "declined" : "none");
+            // Any estimate at all (draft, expired) is at least a bid.
+            a.approved > 0 ? "won" : a.open > 0 ? "undecided" : a.declined > 0 ? "declined" : "bid");
         }
       }
       return outcome;
@@ -590,22 +603,15 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       const offset = int(req.query.offset, 0, 0, 1_000_000);
       const bidStatus = req.query.bidStatus === undefined || req.query.bidStatus === "" || req.query.bidStatus === "all"
         ? null : String(req.query.bidStatus);
-      if (bidStatus && !["won", "undecided", "declined", "none", "hover"].includes(bidStatus)) {
-        return res.status(400).json({ message: "bidStatus must be one of: won, undecided, declined, none, hover." });
+      if (bidStatus && !["won", "undecided", "declined", "none", "bid"].includes(bidStatus)) {
+        return res.status(400).json({ message: "bidStatus must be one of: won, undecided, declined, bid, none." });
       }
       const all = await objectPolicy(ctx).filter("customers",
         await db.select().from(crmCustomers).where(and(...where)).orderBy(desc(crmCustomers.createdAt)));
       const outcome = await outcomesFor(all.map((c) => c.id));
-      // HOVER scans that never became a client (an address, no contact, no bid) sit in their own tab, out of
-      // "All": they are properties the crew measured, not people (server/crm/hover-refile.ts, hover.ts).
-      const isScanOnly = (c: (typeof all)[number]) => {
-        const f = (c.customFields ?? {}) as Record<string, unknown>;
-        return !!f.hoverAutoCreated && !!f.hoverNeedsContact && !c.email && !c.phone && !outcome.has(c.id);
-      };
-      const bucket = (c: (typeof all)[number]) => (isScanOnly(c) ? "hover" : outcome.get(c.id) ?? "none");
-      const bidCounts = { won: 0, undecided: 0, declined: 0, none: 0, hover: 0 } as Record<string, number>;
-      for (const c of all) bidCounts[bucket(c)] += 1;
-      const matching = bidStatus ? all.filter((c) => bucket(c) === bidStatus) : all.filter((c) => !isScanOnly(c));
+      const bidCounts = { won: 0, undecided: 0, declined: 0, bid: 0, none: 0 } as Record<string, number>;
+      for (const c of all) bidCounts[outcome.get(c.id) ?? "none"] += 1;
+      const matching = bidStatus ? all.filter((c) => (outcome.get(c.id) ?? "none") === bidStatus) : all;
       const page = matching.slice(offset, offset + limit);
       return res.json({ rows: present(page, outcome), total: matching.length, bidCounts, limit, offset });
     }

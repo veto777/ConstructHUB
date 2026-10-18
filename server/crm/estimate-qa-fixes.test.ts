@@ -268,7 +268,7 @@ describe("clients list + delete", () => {
     expect(r.status).toBe(200);
     expect(r.body.rows.length).toBeLessThanOrEqual(3);
     const counts = r.body.bidCounts;
-    expect(counts.won + counts.undecided + counts.declined + counts.none).toBe(r.body.total);
+    expect(counts.won + counts.undecided + counts.declined + counts.bid + counts.none).toBe(r.body.total);
     expect(r.body.total).toBeGreaterThanOrEqual(r.body.rows.length);
   });
 

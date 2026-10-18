@@ -31,7 +31,7 @@ interface Client {
   tags: string[] | null;
   portalLastSeenAt: string | null;
   createdAt: string | null;
-  bidStatus?: "won" | "undecided" | "declined" | "none";
+  bidStatus?: "won" | "undecided" | "declined" | "bid" | "none";
   /** When the latest bid went out (or was written). */
   bidDate?: string | null;
 }
@@ -41,14 +41,15 @@ const BID_TABS = [
   { key: "won", label: "Job Won" },
   { key: "undecided", label: "Undecided" },
   { key: "declined", label: "Declined" },
-  // Houses the crew measured in HOVER with no homeowner yet — kept out of All.
-  { key: "hover", label: "HOVER scans" },
+  // Measured in HOVER or quoted, no decision yet tracked (expired / draft) — a bid at the very least.
+  { key: "bid", label: "Bid" },
 ] as const;
 
 const BID_PILL: Record<string, { label: string; cls: string }> = {
   won: { label: "Job Won", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" },
   undecided: { label: "Undecided", cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
   declined: { label: "Declined", cls: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" },
+  bid: { label: "Bid", cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200" },
 };
 
 type BidTab = (typeof BID_TABS)[number]["key"];
@@ -59,7 +60,7 @@ type BidTab = (typeof BID_TABS)[number]["key"];
 interface ClientPage {
   rows: Client[];
   total: number;
-  bidCounts: Record<"won" | "undecided" | "declined" | "none" | "hover", number>;
+  bidCounts: Record<"won" | "undecided" | "declined" | "bid" | "none", number>;
   limit: number;
   offset: number;
 }
@@ -150,7 +151,7 @@ export default function CrmClientsPage() {
   // Every client under the search, whatever the tab (the four buckets add up
   // to the whole book).
   const bookTotal = latest?.bidCounts
-    ? latest.bidCounts.won + latest.bidCounts.undecided + latest.bidCounts.declined + latest.bidCounts.none
+    ? latest.bidCounts.won + latest.bidCounts.undecided + latest.bidCounts.declined + (latest.bidCounts.bid ?? 0) + latest.bidCounts.none
     : 0;
   const tabTotal = (t: BidTab) => (t === "all" ? bookTotal : latest?.bidCounts?.[t] ?? 0);
 

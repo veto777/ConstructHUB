@@ -7,7 +7,7 @@
  *   lead / estimating / proposal_sent → Bid · approved / scheduled → Approved
  *   in_progress / waiting_on_trades / punch_list → In progress · complete / invoiced / paid → Closed out
  * With no live project, the estimates decide: one approved (won) → Approved; one out (draft / sent / viewed) → Bid.
- * Declined / expired / cancelled estimates never count; nothing at all → null.
+ * A HOVER measurement or an expired estimate still reads Bid (the bare minimum); nothing at all → null.
  */
 export const JOB_STAGES = [
   { key: "bid", label: "Bid" },
@@ -39,12 +39,14 @@ export function currentProject<T extends P>(projects: T[] | undefined): T | null
 }
 export const stageOfProjectStatus = (s: string | null | undefined): JobStage | null => (s ? PROJECT_STAGE[s] ?? null : null);
 
-export function jobStageOf(input: { estimates?: { status?: string | null }[]; projects?: P[] }): JobStage | null {
+export function jobStageOf(input: { estimates?: { status?: string | null }[]; projects?: P[]; measured?: boolean }): JobStage | null {
   const p = currentProject(input.projects);
   if (p) return PROJECT_STAGE[p.status!];
   const es = (input.estimates ?? []).map((e) => String(e.status ?? ""));
   if (es.includes("approved")) return "approved";
   if (es.some((s) => ESTIMATE_BID.has(s))) return "bid";
+  // Measured in HOVER (or any estimate written at all): a bid at the very least.
+  if (input.measured || es.some((s) => s === "expired")) return "bid";
   return null;
 }
 
