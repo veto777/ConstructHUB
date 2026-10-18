@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ClientSection, ClientSections, useClientPageLayout } from "@/components/client-page-layout";
 import { PricebookItemInput } from "@/components/pricebook-item-input";
 import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff";
 import { JobStageControl } from "@/components/job-stage";
@@ -537,6 +538,8 @@ export default function CrmClientPage() {
   const canTakePayment = me?.permissions?.takePayment === true;
   const canManageJobs = me?.permissions?.manageJobs === true;
   const canManageCustomers = me?.permissions?.manageCustomers === true;
+  // Which containers show below, and in what order (shared/client-page-layout.ts).
+  const layout = useClientPageLayout(me);
   // Hard delete is OWNER-only — the server gates on the role itself, so the
   // button simply doesn't render for admin/pm/office seats.
   const isOwner = me?.member?.role === "owner";
@@ -1287,8 +1290,12 @@ export default function CrmClientPage() {
       )}
 
       {/* The HOVER report's details, imported (renders nothing without a HOVER capture). */}
+      {/* The containers below sit in the account's order (Settings → Client page); owners/admins can remove one. */}
+      <ClientSections>
+      <ClientSection id="hover" layout={layout} when={!!id}>
       {id && <HoverTakeoffCard customerId={id} />}
-
+      </ClientSection>
+      <ClientSection id="payments" layout={layout} when={canSeePrices}>
       {/* Payments — see what this client owes and what they've paid, and take
           a payment (online link or manual record) without leaving the page. */}
       {canSeePrices && (() => {
@@ -1370,7 +1377,8 @@ export default function CrmClientPage() {
           </Card>
         );
       })()}
-
+      </ClientSection>
+      <ClientSection id="schedule" layout={layout}>
       {/* Schedule — this client's appointments, straight from the calendar. */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
@@ -1425,7 +1433,8 @@ export default function CrmClientPage() {
           )}
         </CardContent>
       </Card>
-
+      </ClientSection>
+      <ClientSection id="estimates" layout={layout}>
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <SectionTitle
@@ -1700,7 +1709,8 @@ export default function CrmClientPage() {
           ))}
         </CardContent>
       </Card>
-
+      </ClientSection>
+      <ClientSection id="invoices" layout={layout} when={canSeePrices}>
       {canSeePrices && (
         <Card>
           <CardHeader>
@@ -1826,7 +1836,8 @@ export default function CrmClientPage() {
           </CardContent>
         </Card>
       )}
-
+      </ClientSection>
+      <ClientSection id="projects" layout={layout}>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
           <SectionTitle
@@ -1883,7 +1894,8 @@ export default function CrmClientPage() {
           ))}
         </CardContent>
       </Card>
-
+      </ClientSection>
+      <ClientSection id="messages" layout={layout} when={canManageCustomers}>
       {/* Messages — the client's portal thread, right on their page. */}
       {canManageCustomers && (
         <Card>
@@ -1930,7 +1942,8 @@ export default function CrmClientPage() {
           </CardContent>
         </Card>
       )}
-
+      </ClientSection>
+      <ClientSection id="measurements" layout={layout}>
       {/* Client 360 — the behaviour log + internal notes (self-contained mounts). */}
       <CustomerTimeline customerId={id!} />
       <CustomerNotes
@@ -1942,14 +1955,21 @@ export default function CrmClientPage() {
 
       {/* Measurements — HOVER reports + manual entries (self-contained mount). */}
       <CustomerMeasurements customerId={id!} />
-
+      </ClientSection>
+      <ClientSection id="photos" layout={layout}>
       {/* Client portal v2 — photos/comments from this client + the org pamphlet shelf. */}
       <CustomerPhotos customerId={id!} canUpload={me?.permissions?.manageJobs === true || me?.permissions?.manageCustomers === true} />
+      </ClientSection>
+      <ClientSection id="jobcam" layout={layout}>
       {/* JobCam — the crew's job-site shots across this client's projects (same shelf as Project Photos). */}
       <Card data-testid="section-customer-jobcam"><CardContent className="p-4 sm:p-5"><JobcamPanel customerId={id!} /></CardContent></Card>
+      </ClientSection>
+      <ClientSection id="comments" layout={layout}>
       <CustomerComments customerId={id!} />
       <OrgPamphlets />
       <EstimateDefaultFiles />
+      </ClientSection>
+      </ClientSections>
 
       {/* Good / better / best options for one estimate. */}
       {optsFor && (

@@ -371,7 +371,7 @@ export function takeoffSource(m: MeasurementRow): NonNullable<HoverTakeoff["sour
     measurementId: m.id,
     hoverJobId: raw.hoverJobId != null ? String(raw.hoverJobId) : null,
     hoverModelId: raw.hoverModelId != null ? String(raw.hoverModelId) : null,
-    capturedAt: (m.completedAt ?? m.createdAt)?.toISOString?.() ?? null,
+    capturedAt: (m.requestedAt ?? m.completedAt ?? m.createdAt)?.toISOString?.() ?? null,
     address: [m.addressLine1, m.city, m.state].filter(Boolean).join(", ") || null,
     projectId: m.projectId ?? null,
     pdfUrl: raw.pdfAttachmentId ? `/api/crm/attachments/${raw.pdfAttachmentId}/file` : null,

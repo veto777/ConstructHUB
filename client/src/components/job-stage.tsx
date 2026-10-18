@@ -41,7 +41,8 @@ export function JobStageTracker({ stage, testId = "job-stage-tracker", onPick, b
                 title={onPick && !current ? `Move the job to ${s.label}` : undefined}
                 className={`flex flex-1 items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition-colors disabled:cursor-default ${onPick && !current ? "hover:border-foreground/40" : ""} ${current ? `${tone.soft} border-current ${tone.text}` : done ? "border-transparent bg-muted/60" : "border-dashed border-border bg-background text-muted-foreground"}`}
                 data-testid={`button-${testId}-${s.key}`}>
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${current || done ? tone.solid : "bg-muted-foreground/30"}`}>
+                {/* Every finished step gets the same blue check (owner): the grey of a Bid-only tone never reads as done. */}
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${done ? "bg-sky-600" : current ? tone.solid : "bg-muted-foreground/30"}`}>
                   {done ? <Check className="h-4 w-4" aria-hidden="true" /> : i + 1}
                 </span>
                 <span className={`whitespace-nowrap text-sm ${current ? "font-bold" : done ? "font-semibold text-foreground" : "font-medium"}`}>{s.label}</span>
