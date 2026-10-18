@@ -48,8 +48,8 @@ const digits10 = (p?: string | null) => { const d = String(p ?? "").replace(/\D/
 const emailKey = (e?: string | null) => (e && e.includes("@") ? e.trim().toLowerCase() : null);
 /** A usable person/company name: not empty, not a street address, not a placeholder. */
 export function usableName(n?: string | null): string | null {
-  const s = String(n ?? "").replace(/\s+/g, " ").trim();
-  if (s.length < 2 || /^(n\/?a|na|none|unknown|test|hover import)( n\/?a)?$/i.test(s)) return null;
+  const s = String(n ?? "").replace(/\s+/g, " ").replace(/^[\s\-–,./]+|[\s\-–,./]+$/g, "").trim();
+  if (s.replace(/[^a-z]/gi, "").length < 2 || /^(n\/?a|na|none|unknown|test\b.*|john doe|hover import)( n\/?a)?$/i.test(s)) return null;
   if (streetKey(s)) return null;
   if (/^\d{4}-\d{2}-\d{2}\b/.test(s)) return null; // "2025-01-24 Vanderbilt …" is a job label, not a person
   return s;
@@ -62,6 +62,8 @@ function parseAddress(a?: string | null) {
   const st = tail.match(/\b([A-Z]{2})\b(?=\s*\d{5}|\s*$)/)?.[1] ?? null;
   return { addressLine1: parts[0], city: parts[1] && !/^\w{2}\s*\d{5}/.test(parts[1]) ? parts[1].replace(/\s+[A-Z]{2}(\s+\d{5})?$/, "").trim() || null : null, state: st, postalCode: zip5(tail) };
 }
+/** A full person/company name: two or more words ("Brian Williams"); "Brian" or "Benson" alone is weak. */
+const fullName = (n?: string | null) => { const u = usableName(n); return !!u && u.split(" ").length >= 2; };
 const titleCase = (s: string) => (s === s.toLowerCase() || s === s.toUpperCase() ? s.replace(/\b\w/g, (c) => c.toUpperCase()) : s);
 
 // ── Load ────────────────────────────────────────────────────────────────────
@@ -97,7 +99,6 @@ const namedByStreet = new Map<string, any[]>();
 for (const c of customers) {
   push(clientsByEmail as any, emailKey(c.email), c.id);
   push(clientsByPhone as any, digits10(c.phone), c.id);
-  if (!isPlaceholder(c)) push(namedByStreet, streetKey(c.address_line1), c);
 }
 const measByCustomer = new Map<string, any[]>();
 for (const m of measurements) push(measByCustomer, m.customer_id, m);
@@ -135,13 +136,6 @@ for (const c of customers) {
   const placeholder = isPlaceholder(c);
 
   if (placeholder) {
-    // A placeholder at ONE named client's street is that client.
-    const twins = [streetKey(c.address_line1)].filter(Boolean).flatMap((k) => namedByStreet.get(k!) ?? [])
-      .filter((d) => d.id !== c.id && (!zip5(d.postal_code) || !zip5(c.postal_code) || zip5(d.postal_code) === zip5(c.postal_code)));
-    if (twins.length === 1) {
-      changes.push({ customerId: c.id, was: c.display_name, set: {}, sources: { merge: "a named client at the same address" }, mergeInto: { id: twins[0].id, name: twins[0].display_name } });
-      continue;
-    }
     const formName = forms.map((f) => usableName(f.lead.name)).find(Boolean);
     const hoverName = (measByCustomer.get(c.id) ?? []).map((m) => hoverNameByMeasurement.get(m.id)).find(Boolean);
     if (formName) { set.display_name = titleCase(formName); sources.display_name = forms.find((f) => usableName(f.lead.name))!.via + (hoverName ? ` (HOVER says "${hoverName}")` : ""); }
@@ -168,6 +162,25 @@ for (const c of customers) {
   if (Object.keys(set).length) changes.push({ customerId: c.id, was: c.display_name, set, sources });
 }
 
+// Second pass, with every address now known: a placeholder or weak-named client ("Brian -", "Benson") at the street
+// of exactly ONE client with a full name is that client — HOVER capture, photos, estimates, forms all move over.
+const effStreet = (c: any) => streetKey(changes.find((x) => x.customerId === c.id)?.set.address_line1 ?? c.address_line1);
+const effZip = (c: any) => zip5(changes.find((x) => x.customerId === c.id)?.set.postal_code ?? c.postal_code);
+for (const c of customers) if (fullName(changes.find((x) => x.customerId === c.id)?.set.display_name ?? c.display_name)) push(namedByStreet, effStreet(c), c);
+for (const c of customers) {
+  const ch = changes.find((x) => x.customerId === c.id);
+  const name = ch?.set.display_name ?? c.display_name;
+  if (fullName(name)) continue;
+  const k = effStreet(c);
+  if (!k) continue;
+  const z = effZip(c);
+  const twins = (namedByStreet.get(k) ?? []).filter((d) => d.id !== c.id && (!z || !effZip(d) || effZip(d) === z));
+  if (twins.length !== 1) continue;
+  const into = { id: twins[0].id, name: changes.find((x) => x.customerId === twins[0].id)?.set.display_name ?? twins[0].display_name };
+  if (ch) { ch.set = {}; ch.sources = { merge: `"${name}" is "${into.name}" at the same address` }; ch.mergeInto = into; }
+  else changes.push({ customerId: c.id, was: c.display_name, set: {}, sources: { merge: `"${name}" is "${into.name}" at the same address` }, mergeInto: into });
+}
+
 const summary = {
   clients: customers.length,
   renamed: changes.filter((x) => x.set.display_name).length,
@@ -190,9 +203,15 @@ if (APPLY) {
     for (const ch of changes) {
       if (ch.mergeInto) {
         const to = ch.mergeInto.id;
-        await client.query(`update crm_measurements set customer_id = $1, updated_at = now() where org_id = $2 and customer_id = $3`, [to, ORG, ch.customerId]);
+        for (const [t, col] of [["crm_measurements", "customer_id"], ["crm_projects", "customer_id"], ["crm_estimates", "customer_id"], ["crm_invoices", "customer_id"],
+          ["crm_appointments", "customer_id"], ["crm_leads", "customer_id"], ["crm_customer_notes", "customer_id"], ["crm_activity_log", "customer_id"], ["crm_tasks", "customer_id"]]) {
+          await client.query(`update ${t} set ${col} = $1 where org_id = $2 and ${col} = $3`, [to, ORG, ch.customerId]);
+        }
         await client.query(`update crm_attachments set ref_id = $1 where org_id = $2 and ref_id = $3 and kind in ('photo','measurement')`, [to, ORG, ch.customerId]);
-        await client.query(`update crm_projects set customer_id = $1 where org_id = $2 and customer_id = $3`, [to, ORG, ch.customerId]);
+        // The merged record's contact fills what the target lacks.
+        await client.query(`update crm_customers t set email = coalesce(t.email, s.email), phone = coalesce(t.phone, s.phone),
+          address_line1 = coalesce(t.address_line1, s.address_line1), city = coalesce(t.city, s.city), state = coalesce(t.state, s.state), postal_code = coalesce(t.postal_code, s.postal_code),
+          updated_at = now() from crm_customers s where t.id = $1 and s.id = $2`, [to, ch.customerId]);
         await client.query(`update crm_customers set archived_at = now(), custom_fields = coalesce(custom_fields, '{}') || jsonb_build_object('mergedInto', $1::text) where id = $2`, [to, ch.customerId]);
         continue;
       }
