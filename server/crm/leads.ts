@@ -588,6 +588,14 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     if (dirRaw !== "asc" && dirRaw !== "desc") return res.status(400).json({ message: "dir must be asc or desc." });
     const base: any[] = [eq(crmLeads.orgId, ctx.org.id)];
     if (source && source !== "all") base.push(eq(crmLeads.source, source));
+    // ?since=<ISO>&until=<ISO>: the period the page shows (default on the client: this calendar year). Every count
+    // on the page — status tabs, labels, states, markets — is for the same period, so they always add up.
+    const dateOf = (v: unknown): Date | null => { if (v === undefined || v === "" || v === null) return null; const d = new Date(String(v)); return Number.isNaN(d.getTime()) ? null : d; };
+    const since = dateOf(req.query.since), until = dateOf(req.query.until);
+    if ((req.query.since && !since) || (req.query.until && !until)) return res.status(400).json({ message: "since / until must be ISO dates." });
+    if (since && until && until < since) return res.status(400).json({ message: "until must be after since." });
+    if (since) base.push(sql`${crmLeads.receivedAt} >= ${since}`);
+    if (until) base.push(sql`${crmLeads.receivedAt} < ${until}`);
     if (q) {
       const pat = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
       const conds: any[] = [ilike(crmLeads.name, pat), ilike(crmLeads.email, pat), ilike(crmLeads.phone, pat),

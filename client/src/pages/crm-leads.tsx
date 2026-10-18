@@ -108,6 +108,43 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "spam", label: "Spam" },
 ];
 
+/** The period the page shows. Default: this calendar year. "Custom" takes two dates. */
+const PERIODS = [
+  { key: "this_year", label: `This year (${new Date().getFullYear()})` },
+  { key: "30d", label: "Last 30 days" },
+  { key: "90d", label: "Last 90 days" },
+  { key: "6m", label: "Last 6 months" },
+  { key: "1y", label: "Last year (365 days)" },
+  { key: "last_year", label: `Last calendar year (${new Date().getFullYear() - 1})` },
+  { key: "2y", label: "Last 2 years" },
+  { key: "all_time", label: "All time" },
+  { key: "custom", label: "Custom dates…" },
+] as const;
+type PeriodKey = (typeof PERIODS)[number]["key"];
+const isPeriod = (v: unknown): v is PeriodKey => PERIODS.some((p) => p.key === v);
+/** Local-time bounds for a period → ISO strings for the API (until is exclusive). */
+function periodBounds(key: PeriodKey, from: string, to: string): { since: string | null; until: string | null } {
+  const now = new Date();
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const daysAgo = (n: number) => { const d = startOfDay(now); d.setDate(d.getDate() - n); return d; };
+  switch (key) {
+    case "this_year": return { since: new Date(now.getFullYear(), 0, 1).toISOString(), until: null };
+    case "30d": return { since: daysAgo(30).toISOString(), until: null };
+    case "90d": return { since: daysAgo(90).toISOString(), until: null };
+    case "6m": { const d = startOfDay(now); d.setMonth(d.getMonth() - 6); return { since: d.toISOString(), until: null }; }
+    case "1y": return { since: daysAgo(365).toISOString(), until: null };
+    case "last_year": return { since: new Date(now.getFullYear() - 1, 0, 1).toISOString(), until: new Date(now.getFullYear(), 0, 1).toISOString() };
+    case "2y": { const d = startOfDay(now); d.setFullYear(d.getFullYear() - 2); return { since: d.toISOString(), until: null }; }
+    case "all_time": return { since: null, until: null };
+    case "custom": {
+      const s = from ? new Date(`${from}T00:00:00`) : null;
+      const u = to ? new Date(`${to}T00:00:00`) : null;
+      if (u) u.setDate(u.getDate() + 1); // inclusive "to" day
+      return { since: s && !Number.isNaN(s.getTime()) ? s.toISOString() : null, until: u && !Number.isNaN(u.getTime()) ? u.toISOString() : null };
+    }
+  }
+}
+
 const SOURCES: { key: LeadSource | "all"; label: string }[] = [
   { key: "all", label: "All sources" },
   { key: "form_sync", label: "Your website forms" },
@@ -206,6 +243,10 @@ export default function CrmLeadsPage() {
   // Place filters. An empty state means "follow the ribbon's workspace" (the server picks that division's state).
   const [placeState, setPlaceState] = useState<string>(() => new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("state") ?? "");
   const [market, setMarket] = useState<string>(() => new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("market") ?? "all");
+  const [period, setPeriod] = useState<PeriodKey>(() => { const v = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("period"); return isPeriod(v) ? v : "this_year"; });
+  const [customFrom, setCustomFrom] = useState<string>(() => new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("from") ?? "");
+  const [customTo, setCustomTo] = useState<string>(() => new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("to") ?? "");
+  const bounds = periodBounds(period, customFrom, customTo);
   const [q, setQ] = useState(initial.q);
   const [qDebounced, setQDebounced] = useState(initial.q);
   useEffect(() => { const t = setTimeout(() => setQDebounced(q), 250); return () => clearTimeout(t); }, [q]);
@@ -219,6 +260,7 @@ export default function CrmLeadsPage() {
       setTab(p.tab); setSource(p.source); setQ(p.q); setQDebounced(p.q); setOpenId(p.lead);
       const lb = u.get("label"); setLabel(lb && BID_STATES.some((b) => b.key === lb) ? (lb as BidState) : "all");
       setPlaceState(u.get("state") ?? ""); setMarket(u.get("market") ?? "all");
+      const pr = u.get("period"); setPeriod(isPeriod(pr) ? pr : "this_year"); setCustomFrom(u.get("from") ?? ""); setCustomTo(u.get("to") ?? "");
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -233,13 +275,16 @@ export default function CrmLeadsPage() {
     set("label", label !== "all" ? label : null);
     set("state", placeState || null);
     set("market", market !== "all" ? market : null);
+    set("period", period !== "this_year" ? period : null);
+    set("from", period === "custom" && customFrom ? customFrom : null);
+    set("to", period === "custom" && customTo ? customTo : null);
     set("lead", openId);
     const search = params.toString();
     const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
     if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
       window.history.replaceState(window.history.state, "", next);
     }
-  }, [qDebounced, tab, label, source, placeState, market, openId]);
+  }, [qDebounced, tab, label, source, placeState, market, period, customFrom, customTo, openId]);
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const canManage = me?.permissions?.manageCustomers === true;
@@ -247,7 +292,7 @@ export default function CrmLeadsPage() {
   const canSettings = me?.permissions?.manageSettings === true;
 
   const { data, isLoading, isError, isPlaceholderData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["/api/crm/leads", "list", tab, label, source, placeState, market, qDebounced, sort.key, sort.dir],
+    queryKey: ["/api/crm/leads", "list", tab, label, source, placeState, market, bounds.since, bounds.until, qDebounced, sort.key, sort.dir],
     enabled: canManage,
     placeholderData: keepPreviousData,
     initialPageParam: 0,
@@ -259,6 +304,8 @@ export default function CrmLeadsPage() {
       if (label !== "all") params.set("bidState", label);
       if (placeState) params.set("state", placeState);
       if (market !== "all") params.set("market", market);
+      if (bounds.since) params.set("since", bounds.since);
+      if (bounds.until) params.set("until", bounds.until);
       if (qDebounced.trim()) params.set("q", qDebounced.trim());
       // The division header makes the list follow the ribbon's workspace when no state is chosen.
       const r = await fetch(`/api/crm/leads?${params}`, withDivisionHeader(`/api/crm/leads?${params}`, { credentials: "include" }));
@@ -342,6 +389,19 @@ export default function CrmLeadsPage() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
+          <SelectTrigger className="w-[210px] bg-card" aria-label="Period" data-testid="select-lead-period"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {PERIODS.map((p) => <SelectItem key={p.key} value={p.key} data-testid={`period-option-${p.key}`}>{p.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {period === "custom" && (
+          <div className="flex items-center gap-1.5 text-sm" data-testid="lead-period-custom">
+            <Input type="date" className="h-10 w-[150px] bg-card" value={customFrom} max={customTo || undefined} onChange={(e) => setCustomFrom(e.target.value)} aria-label="From" data-testid="input-lead-from" />
+            <span className="text-muted-foreground">to</span>
+            <Input type="date" className="h-10 w-[150px] bg-card" value={customTo} min={customFrom || undefined} onChange={(e) => setCustomTo(e.target.value)} aria-label="To" data-testid="input-lead-to" />
+          </div>
+        )}
         {(latest?.place?.markets?.length ?? 0) > 1 && (
           <Select value={market} onValueChange={setMarket}>
             <SelectTrigger className="w-[200px] bg-card" aria-label="Market" data-testid="select-lead-market">
