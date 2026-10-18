@@ -240,3 +240,22 @@ it("treats preset throttling as a note without retry actions", async () => {
     await page.screenshot({ path: "/tmp/gabe-neutral-phone.png" });
   } finally { await page.close(); }
 });
+
+it("the hover arrow hides Gabe for the tab; the Ask Gabe nudge brings him back", async () => {
+  const { page } = await fixture();
+  try {
+    const hide = page.getByTestId("hub-hide");
+    // Invisible (and not a tap target) until the launcher is hovered.
+    expect(await hide.evaluate((e) => [getComputedStyle(e).opacity, getComputedStyle(e).pointerEvents])).toEqual(["0", "none"]);
+    await page.getByTestId("hub-launcher").hover();
+    await expect.poll(() => hide.evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
+    await hide.click();
+    expect(await page.getByTestId("hub-launcher").count()).toBe(0);
+    await page.reload(); await page.waitForTimeout(400);
+    expect(await page.getByTestId("hub-launcher").count()).toBe(0);
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent("constructhub:hub-open", { detail: { question: "hi" } })));
+    await page.getByTestId("hub-panel").waitFor();
+    await page.getByTestId("hub-close").click();
+    await page.getByTestId("hub-launcher").waitFor();
+  } finally { await page.close(); }
+});

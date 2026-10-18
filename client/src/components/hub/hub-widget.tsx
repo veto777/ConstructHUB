@@ -115,6 +115,11 @@ function resetLabel(iso: string | undefined): string | null {
 
 const readFlag = (key: string) => { try { return window.localStorage.getItem(key); } catch { return null; } };
 const writeFlag = (key: string, value: string) => { try { window.localStorage.setItem(key, value); } catch { /* private mode */ } };
+// "Hide Gabe" (the little arrow on the launcher) tucks him away for this tab only: the flag lives in
+// sessionStorage, so a new tab — or the dashboard's "Ask Gabe" nudge — brings him back.
+const HIDDEN_FLAG = "hub.hidden";
+const readSession = (key: string) => { try { return window.sessionStorage.getItem(key); } catch { return null; } };
+const writeSession = (key: string, value: string | null) => { try { value === null ? window.sessionStorage.removeItem(key) : window.sessionStorage.setItem(key, value); } catch { /* private mode */ } };
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -144,6 +149,7 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
   });
 
   const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(() => readSession(HIDDEN_FLAG) === "1");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -301,6 +307,8 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
   useEffect(() => {
     const onOpen = (e: Event) => {
       const question = (e as CustomEvent<{ question?: string }>).detail?.question;
+      setHidden(false);
+      writeSession(HIDDEN_FLAG, null);
       setOpen(true);
       setBubble(false);
       if (typeof question === "string" && question.trim()) setInput(question.slice(0, 500));
@@ -325,6 +333,7 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
     setWelcome(asWelcome);
   };
   const dismissWelcome = () => { setBubble(false); setWelcomePending(false); writeFlag(welcomeKey, "1"); };
+  const hideLauncher = () => { setHidden(true); setBubble(false); writeSession(HIDDEN_FLAG, "1"); };
 
   const push = (msg: Omit<Msg, "id">) => {
     const id = nextId.current++;
@@ -502,7 +511,7 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
 
   return (
     <>
-      {!open && bubble && (
+      {!open && !hidden && bubble && (
         <div
           className={cn(
             "fixed right-4 z-40 hidden w-[260px] rounded-2xl border bg-card p-3 text-sm text-card-foreground shadow-xl sm:block",
@@ -523,27 +532,43 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
         </div>
       )}
 
-      {!open && (
-        <button
-          ref={launcherRef}
-          type="button"
-          onClick={() => openPanel(welcomePending)}
-          aria-label="Ask Gabe, your ConstructHUB guide"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          aria-controls={panelId}
-          title="Ask Gabe"
+      {!open && !hidden && (
+        <div
           className={cn(
-            "fixed right-4 z-40 h-14 w-14 rounded-full shadow-lg shadow-orange-900/25 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-400/60",
+            "group fixed right-4 z-40 h-14 w-14",
             portalMobile ? "bottom-[calc(68px+env(safe-area-inset-bottom))] md:bottom-5" : "bottom-4 sm:bottom-5",
           )}
-          data-testid="hub-launcher"
         >
-          <HubMascot size={56} decorative />
-          {welcomePending && (
-            <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-orange-500" data-testid="hub-welcome-dot" />
-          )}
-        </button>
+          <button
+            ref={launcherRef}
+            type="button"
+            onClick={() => openPanel(welcomePending)}
+            aria-label="Ask Gabe, your ConstructHUB guide"
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            aria-controls={panelId}
+            title="Ask Gabe"
+            className="relative h-14 w-14 rounded-full shadow-lg shadow-orange-900/25 transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-400/60"
+            data-testid="hub-launcher"
+          >
+            <HubMascot size={56} decorative />
+            {welcomePending && (
+              <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-orange-500" data-testid="hub-welcome-dot" />
+            )}
+          </button>
+          {/* The little arrow: only on hover (or keyboard focus), it tucks Gabe away for this tab. */}
+          <button
+            type="button"
+            onClick={hideLauncher}
+            aria-label="Hide Gabe until you close this tab"
+            title="Hide Gabe"
+            // pointer-events gated with the opacity: invisible, it must not steal a tap on Gabe's corner (phones have no hover).
+            className="pointer-events-none absolute -left-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border bg-card text-muted-foreground opacity-0 shadow transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60 group-hover:pointer-events-auto group-hover:opacity-100"
+            data-testid="hub-hide"
+          >
+            <ChevronDown className="h-3 w-3" aria-hidden="true" />
+          </button>
+        </div>
       )}
 
       {open && (

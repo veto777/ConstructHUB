@@ -21,16 +21,17 @@
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
     <meta name="theme-color" content="#0d1b3d" />
-    <!-- Before first paint: mark the document as about to run the app ("js") and apply the saved theme
-         (ThemeProvider keeps it in localStorage "theme"). Under "js" the static fallback in #root is never
+    <!-- Before first paint: mark the document as about to run the app ("js") and apply the saved appearance
+         (ThemeProvider keeps the shade 0–4 in localStorage "themeShade", and light|dark in "theme"; shades 2–4
+         are dark). Under "js" the static fallback in #root is never
          shown — the boot screen is (the app's own loading state: its background and spinner, light or dark),
          so a full page load never flashes the bare fallback text and nothing moves when React mounts.
          No JavaScript, a crawler, a brand check reading the source: no "js", so the fallback text shows.
          If the app has not replaced the fallback after 12 s (a script that failed to load), the mark is taken
          back and the fallback text, with its links, appears. Checked by server/boot-fallback.test.ts and
          e2e/boot-fallback.spec.ts. -->
-    <script>(function(d){var c=d.documentElement.classList;c.add("js");try{if(localStorage.getItem("theme")==="dark")c.add("dark")}catch(e){}setTimeout(function(){if(d.getElementById("ch-fallback"))c.remove("js")},12000)})(document)</script>
-    <style id="ch-boot-style">#ch-boot{display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:hsl(0 0% 99%)}html.dark #ch-boot{background:hsl(222 30% 14%)}#ch-boot i{box-sizing:border-box;width:2rem;height:2rem;border:2px solid hsl(228 91% 63%);border-top-color:transparent;border-radius:9999px;animation:ch-boot-spin 1s linear infinite}html.dark #ch-boot i{border-color:hsl(228 91% 67%);border-top-color:transparent}@keyframes ch-boot-spin{to{transform:rotate(360deg)}}html.js #ch-fallback{display:none}html.js #ch-boot{display:flex}</style>
+    <script>(function(d){var h=d.documentElement,c=h.classList;c.add("js");try{var s=localStorage.getItem("themeShade");if(s!==null&&/^[0-4]$/.test(s)){h.setAttribute("data-shade",s);if(+s>=2)c.add("dark")}else if(localStorage.getItem("theme")==="dark")c.add("dark")}catch(e){}setTimeout(function(){if(d.getElementById("ch-fallback"))c.remove("js")},12000)})(document)</script>
+    <style id="ch-boot-style">#ch-boot{display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:hsl(0 0% 99%)}html[data-shade="1"] #ch-boot{background:hsl(32 10% 91.5%)}html.dark #ch-boot{background:hsl(222 30% 14%)}html.dark[data-shade="2"] #ch-boot{background:hsl(222 22% 27%)}html.dark[data-shade="3"] #ch-boot{background:hsl(222 26% 19%)}#ch-boot i{box-sizing:border-box;width:2rem;height:2rem;border:2px solid hsl(228 91% 63%);border-top-color:transparent;border-radius:9999px;animation:ch-boot-spin 1s linear infinite}html.dark #ch-boot i{border-color:hsl(228 91% 67%);border-top-color:transparent}@keyframes ch-boot-spin{to{transform:rotate(360deg)}}html.js #ch-fallback{display:none}html.js #ch-boot{display:flex}</style>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ConstructHUB" />

@@ -483,6 +483,63 @@
 }
 
 /*
+ * ── Appearance shades ──────────────────────────────────────────────────────
+ * The slider in the header (theme-provider.tsx) sets data-shade 0–4 on <html>: 0 is the light palette above,
+ * 4 the dark one, and these three lift or lower the surface tokens in between. 1 (Soft) is light with dimmer
+ * paper; 2 (Dusk) and 3 (Dim) carry the dark class with lighter navy surfaces. Text and accent tokens are left
+ * alone so contrast holds; only backgrounds, borders and the sidebar move. Placed after the app/CRM palettes so
+ * they win at equal specificity, and keyed on html so they also beat .dark.app-theme.
+ */
+html[data-shade="1"]:not(.dark) {
+  --background: 32 10% 91.5%;
+  --card: 32 12% 97%;
+  --card-border: 32 10% 83%;
+  --popover: 32 12% 97%;
+  --popover-border: 32 10% 81%;
+  --border: 32 10% 83%;
+  --input: 32 10% 79%;
+  --muted: 32 10% 88%;
+  --accent: 32 10% 88%;
+  --secondary: 32 10% 88.5%;
+  --muted-foreground: 222 10% 38%;
+}
+html.dark[data-shade="2"] {
+  --background: 222 22% 27%;
+  --foreground: 210 20% 95%;
+  --card: 222 22% 30%;
+  --card-foreground: 210 20% 95%;
+  --card-border: 220 18% 38%;
+  --popover: 222 22% 30%;
+  --popover-foreground: 210 20% 95%;
+  --popover-border: 220 18% 39%;
+  --border: 220 18% 38%;
+  --input: 220 18% 42%;
+  --muted: 220 20% 34%;
+  --muted-foreground: 215 15% 80%; /* 4.5:1+ on the lifted muted/secondary washes (review 2026-10-18) */
+  --accent: 220 20% 34%;
+  --secondary: 220 20% 36%;
+  --sidebar: 222 26% 22%;
+  --sidebar-border: 220 20% 30%;
+  --sidebar-accent: 220 22% 29%;
+}
+html.dark[data-shade="3"] {
+  --background: 222 26% 19%;
+  --card: 222 26% 22%;
+  --card-border: 220 22% 29%;
+  --popover: 222 26% 22%;
+  --popover-border: 220 22% 30%;
+  --border: 220 22% 29%;
+  --input: 220 22% 33%;
+  --muted: 220 22% 25%;
+  --muted-foreground: 215 15% 66%;
+  --accent: 220 22% 25%;
+  --secondary: 220 22% 27%;
+  --sidebar: 222 30% 15%;
+  --sidebar-border: 220 22% 23%;
+  --sidebar-accent: 220 24% 22%;
+}
+
+/*
  * ── Marketing site: "Bold trades" ───────────────────────────────────────────
  * The landing page and the public header/footer wear their own type and
  * palette: Barlow Condensed for display, DM Sans for body, navy + one orange

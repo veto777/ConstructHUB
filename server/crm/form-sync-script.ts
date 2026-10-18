@@ -1,6 +1,6 @@
 /**
  * The form-sync script a contractor pastes on their own website (served at GET /form-sync.js, see
- * server/crm/leads.ts). Plain ES5, no dependencies, under 4 KB.
+ * server/crm/leads.ts). Plain ES5, no dependencies, under 5 KB.
  *
  *   <script src="https://portal.constructhub.us/form-sync.js" data-token="<TOKEN>" async></script>
  *
@@ -13,6 +13,11 @@
  *   wrapped. A same-origin POST whose body is JSON, FormData or URLSearchParams and looks like a lead (an email
  *   value, or a key like email/phone/tel/mobile) is copied. The wrapper never touches the original request or its
  *   response and never waits for it: a lead the site's own server answers with a 400 is still captured.
+ * - Where they came from: on the landing page the script reads utm_*, the ad click ids (gclid, gbraid, wbraid, fbclid,
+ *   msclkid, ttclid), the referrer when it is another site, and the landing URL, and keeps them in sessionStorage for
+ *   the tab (first touch wins, so a form on /contact/ still carries the ad that brought the visitor). They ride along
+ *   with every lead as `attribution`; the server stores them as _-prefixed fields and names the channel
+ *   (server/crm/lead-channel.ts). Nothing is read from cookies and nothing identifies the visitor.
  * - Out: sensitive names dropped, honeypots checked (company_url or website filled = a bot, nothing is sent), then
  *   one sendBeacon (fetch keepalive as the fallback) 0.8 s later. Copies of one submission within that window (the
  *   submit event plus the fetch it triggers) are merged by email/phone and sent once; the same contact is not sent
@@ -43,11 +48,18 @@ var s=d.currentScript||d.querySelector('script[src*="form-sync.js"][data-token]'
 var t=s&&s.getAttribute("data-token");if(!t)return;
 var B=${endpoint},E=B+encodeURIComponent(t),F=w.fetch,L=location;
 var BD=/${SCRIPT_SENSITIVE}/i,SK=/^(password|file|submit|button|reset|image)$/i,HP=${JSON.stringify(HONEYPOT_FIELDS)},CT=/e-?mail|phone|tel|mobile|cell/i,AT=/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
-var P={},S={};
+var P={},S={},A={};
+/* Where the visitor came from, read once on the landing page and kept for the tab (first touch wins):
+   utm_* and ad click ids from the URL, the referrer when it is another site, and the landing URL. */
+try{var ss=w.sessionStorage,sv=ss&&ss.getItem("ch_attr");if(sv)A=JSON.parse(sv)||{};
+else{var K=["utm_source","utm_medium","utm_campaign","gclid","gbraid","wbraid","fbclid","msclkid","ttclid"],qs=new URLSearchParams(L.search||""),rf=d.referrer||"",n=0,i,v;
+for(i=0;i<K.length;i++){v=qs.get(K[i]);if(v){A[K[i]]=v.slice(0,200);n++;}}
+if(rf&&rf.indexOf(L.origin+"/")!=0&&rf!=L.origin){A.referrer=rf.slice(0,500);n++;}
+if(n){A.landing=String(L.href).slice(0,500);try{ss&&ss.setItem("ch_attr",JSON.stringify(A));}catch(e){}}}}catch(e){A={};}
 function cl(o){var r={},n=0,k,v;for(k in o){if(BD.test(k))continue;v=o[k];if(v==null||typeof v=="object")continue;v=String(v).replace(/^\\s+|\\s+$/g,"").slice(0,2000);if(!v)continue;if(++n>60)break;r[String(k).slice(0,100)]=v;}return r;}
 function who(f){var e="",p="",k;for(k in f){if(!e&&AT.test(f[k]))e=f[k].toLowerCase();else if(!p&&CT.test(k)){p=f[k].replace(/\\D/g,"").slice(-10);}}return e||p?e+"|"+p:"";}
 function bc(k){var q=P[k];if(!q)return;delete P[k];clearTimeout(q.t);S[k]=+new Date();
-var y=JSON.stringify({fields:q.f,pageUrl:L.href.slice(0,500),title:d.title.slice(0,200),formId:q.m.formId||null,formName:q.m.formName||null});
+var y=JSON.stringify({fields:q.f,pageUrl:L.href.slice(0,500),title:d.title.slice(0,200),formId:q.m.formId||null,formName:q.m.formName||null,attribution:A});
 try{if(navigator.sendBeacon&&navigator.sendBeacon(E,new Blob([y],{type:"text/plain"})))return;}catch(e){}
 try{F&&F.call(w,E,{method:"POST",body:y,keepalive:true,mode:"no-cors"})["catch"](function(){});}catch(e){}}
 function sd(fs,mt){try{

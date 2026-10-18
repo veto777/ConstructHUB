@@ -19,6 +19,7 @@ import {
 import { CrmCreateMenu } from "@/components/crm-create-menu";
 import { InfoTip } from "@/components/info-tip";
 import { useTheme } from "@/components/theme-provider";
+import { ThemeShadeSlider } from "@/components/theme-shade-slider";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
@@ -244,6 +245,8 @@ export function CrmRibbon() {
                 : <Sun className="h-5 w-5 shrink-0" strokeWidth={1.8} />}
               {theme === "light" ? "Dark mode" : "Light mode"}
             </button>
+            {/* The shades in between (theme-provider.tsx); the button above still jumps between the two ends. */}
+            <ThemeShadeSlider className="px-3.5 pb-3 pt-1" />
           </div>
         </SheetContent>
       </Sheet>
