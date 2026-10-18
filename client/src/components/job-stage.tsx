@@ -69,15 +69,17 @@ export function JobStagePill({ stage, testId }: { stage: JobStage | null | undef
  * one is created from the won estimate. Closed out asks first and offers the closing text, sent like any CRM text
  * (texting setup, STOP opt-outs, the monthly allowance and the client timeline all apply).
  */
-export function JobStageControl({ customer, estimates, projects, companyName, canEdit }: {
+export function JobStageControl({ customer, estimates, projects, companyName, canEdit, measured = false }: {
   customer: { id: string; displayName: string; firstName?: string | null; phone?: string | null };
   estimates: { status?: string | null; title?: string | null }[];
   projects: { id: string; status?: string | null; name?: string | null; createdAt?: string | null }[];
   companyName: string;
   canEdit: boolean;
+  /** The client has a HOVER measurement: Bid at the very least. */
+  measured?: boolean;
 }) {
   const { toast } = useToast();
-  const stage = jobStageOf({ estimates, projects });
+  const stage = jobStageOf({ estimates, projects, measured });
   const project = currentProject(projects);
   const first = customer.firstName?.trim() || customer.displayName.split(/\s+/)[0];
   const jobName = project?.name?.trim() || estimates.find((e) => e.status === "approved")?.title?.trim() || "project";

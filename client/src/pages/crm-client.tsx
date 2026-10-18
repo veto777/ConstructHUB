@@ -868,6 +868,13 @@ export default function CrmClientPage() {
     retry: false,
   });
   const estTakeoff = takeoffData?.takeoff ?? null;
+  // Any HOVER capture on file makes the job stage read Bid at the very least.
+  const { data: stageTakeoff } = useQuery<{ takeoff: unknown; takeoffs?: unknown[] }>({
+    queryKey: [`/api/crm/customers/${id}/takeoff`, "stage"],
+    queryFn: async () => (await apiRequest("GET", `/api/crm/customers/${id}/takeoff`)).json(),
+    enabled: !!id,
+    retry: false,
+  });
 
   const createEstimate = useMutation({
     mutationFn: async () => {
@@ -1205,7 +1212,7 @@ export default function CrmClientPage() {
         <CardContent className="p-4 sm:p-5">
           <p className="mb-3 text-sm font-bold">Job stage</p>
           <JobStageControl customer={c} estimates={estimates} projects={data.projects ?? []}
-            companyName={me?.org?.name ?? "us"} canEdit={canManageJobs} />
+            companyName={me?.org?.name ?? "us"} canEdit={canManageJobs} measured={!!stageTakeoff?.takeoffs?.length || !!stageTakeoff?.takeoff} />
         </CardContent>
       </Card>
 

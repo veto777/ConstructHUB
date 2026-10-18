@@ -12,7 +12,10 @@ describe("jobStageOf", () => {
     expect(jobStageOf({})).toBeNull();
     expect(jobStageOf({ estimates: [{ status: "sent" }] })).toBe("bid");
     expect(jobStageOf({ estimates: [{ status: "sent" }, { status: "approved" }], projects: [{ status: "cancelled" }] })).toBe("approved");
-    expect(jobStageOf({ estimates: [{ status: "cancelled" }, { status: "declined" }, { status: "expired" }] })).toBeNull();
+    expect(jobStageOf({ estimates: [{ status: "cancelled" }, { status: "declined" }] })).toBeNull();
+    // A HOVER measurement or an expired quote is still a bid.
+    expect(jobStageOf({ estimates: [{ status: "expired" }] })).toBe("bid");
+    expect(jobStageOf({ measured: true })).toBe("bid");
   });
   it("picks the newest non-cancelled project as the current one", () => {
     const a = { id: "a", status: "complete", createdAt: "2026-01-01" }, b = { id: "b", status: "cancelled", createdAt: "2026-09-01" };
