@@ -296,6 +296,8 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
         ballpark: ctx.permissions.seePrices ? se.ballpark ?? null : undefined,
       };
     })(),
+    // Where the bid was written: imported from HouseCall Pro, or here.
+    source: (e.customFields as any)?.hcpId ? "hcp" : "constructhub",
     createdAt: e.createdAt, updatedAt: e.updatedAt,
   };
 }
