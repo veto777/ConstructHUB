@@ -5,8 +5,13 @@
  *   "no"      the server refused the recipient itself (550/551/553, or 5.1.x) — skip the address;
  *   "ok"      the server accepted it (a catch-all domain accepts everything, so this is a "maybe");
  *   "unknown" no answer, a temporary error, or a refusal aimed at us (blocklist, policy) — send as before.
+ * vb11 sits on a home connection that Spamhaus lists (PBL), so Microsoft 365 and other filtered hosts won't answer it.
+ * MAIL_CHECK_SSH names an ssh host (vb11: `vb7mirror`, ConstructHUB's fallback box on a clean address) to ask through
+ * instead (`ssh -W`, one shared connection); unset, the check connects directly.
  */
 import net from "node:net";
+import { spawn } from "node:child_process";
+import { Duplex } from "node:stream";
 import { promises as dns } from "node:dns";
 
 export type MailboxCheck = { verdict: "ok" | "no" | "unknown"; reply: string };
@@ -16,9 +21,22 @@ const STAGES = ["banner", "ehlo", "mail", "rcpt"] as const;
 // A refusal about us (our IP, a blocklist, policy), not about the recipient.
 const ABOUT_US = /block|spamhaus|barracuda|black ?list|listed|reputation|policy|rbl|dnsbl|spf|dmarc|client host|your ip|\bip\b|rate|too many|try again/i;
 
+/** A connection to host:25, directly or through MAIL_CHECK_SSH. */
+function openSmtp(host: string): Duplex {
+  const via = process.env.MAIL_CHECK_SSH?.trim();
+  if (!via) return net.connect({ host, port: 25 });
+  const ssh = spawn("ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", "ControlMaster=auto",
+    "-o", "ControlPath=/tmp/mailcheck-%r@%h:%p", "-o", "ControlPersist=10m", "-W", `${host}:25`, via], { stdio: ["pipe", "pipe", "ignore"] });
+  const d = Duplex.from({ readable: ssh.stdout, writable: ssh.stdin });
+  ssh.on("error", (e) => d.destroy(e));
+  ssh.on("exit", () => d.destroy());
+  d.on("close", () => ssh.kill());
+  return d;
+}
+
 function rcptReply(host: string, rcpt: string, from: string, helo: string, timeoutMs: number): Promise<Reply> {
   return new Promise((resolve) => {
-    const sock = net.connect({ host, port: 25 });
+    const sock = openSmtp(host);
     let buf = "", stage: (typeof STAGES)[number] = "banner", done = false;
     const commands: Record<string, string> = { ehlo: `EHLO ${helo}`, mail: `MAIL FROM:<${from}>`, rcpt: `RCPT TO:<${rcpt}>` };
     const finish = (r: Reply) => {
@@ -28,7 +46,8 @@ function rcptReply(host: string, rcpt: string, from: string, helo: string, timeo
       sock.destroy();
       resolve(r);
     };
-    sock.setTimeout(timeoutMs, () => finish({ stage, code: 0, text: "timeout" }));
+    const timer = setTimeout(() => finish({ stage, code: 0, text: "timeout" }), timeoutMs);
+    sock.on("close", () => clearTimeout(timer));
     sock.on("error", (e) => finish({ stage, code: 0, text: e.message }));
     sock.on("close", () => finish({ stage, code: 0, text: "connection closed" }));
     sock.on("data", (d) => {

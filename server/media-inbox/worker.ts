@@ -410,6 +410,7 @@ export type QueueItem = { id: number; domain: string; company: string; kind: str
 /** Send one queued email after the safety checks. Returns why it was skipped, or null when sent. */
 export async function sendOne(q: QueueItem, s: MediaSettings): Promise<string | null> {
   const skip = async (why: string) => { await store.finishQueued(q.id, "skipped", why); return why; };
+  if (!/^[^\s@<>:/,;{}()]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(q.to_email)) return skip("Not a valid email address");
   if (await isSuppressed(q.to_email) || machineReason({ fromEmail: q.to_email, subject: "" })) return skip("Suppressed or not a person's address");
   if (await store.partnerIdForEmail(q.to_email, q.domain)) return skip("Already in contact");
   if (await store.hasBounced(q.to_email)) return skip("This address bounced before");
