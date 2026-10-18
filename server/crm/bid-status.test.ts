@@ -1,6 +1,6 @@
 /** shared/bid-status.ts — Open / Pending / Complete / Dead lead and "bid not submitted", from what is on file. */
 import { describe, it, expect } from "vitest";
-import { bidStateOf, bidNotSubmitted, clientStageOf, deadLeadOf, type BidFacts } from "@shared/bid-status";
+import { bidStateOf, bidNotSubmitted, clientStageOf, deadLeadOf, leadBidStateOf, type BidFacts } from "@shared/bid-status";
 
 const f = (over: Partial<BidFacts> = {}): BidFacts => ({ dead: false, anyEstimate: false, sentEstimate: false, appointment: false, hover: false, projectStatus: null, ...over });
 
@@ -47,5 +47,17 @@ describe("dead-lead mark", () => {
       .toEqual({ at: "2026-10-18T00:00:00.000Z", memberId: "m1", reason: "No response after 3 calls" });
     expect(deadLeadOf({ bidDead: true })).toBeNull();
     expect(deadLeadOf(null)).toBeNull();
+  });
+});
+
+describe("lead label", () => {
+  it("a converted lead carries its client's state; an archived or spam lead that never converted is dead; the rest are open", () => {
+    expect(leadBidStateOf("converted", f({ appointment: true }))).toBe("pending");
+    expect(leadBidStateOf("converted", f({ anyEstimate: true, sentEstimate: true }))).toBe("complete");
+    expect(leadBidStateOf("converted", f({ dead: true }))).toBe("dead");
+    expect(leadBidStateOf("archived", null)).toBe("dead");
+    expect(leadBidStateOf("spam", null)).toBe("dead");
+    expect(leadBidStateOf("new", null)).toBe("open");
+    expect(leadBidStateOf("contacted", null)).toBe("open");
   });
 });

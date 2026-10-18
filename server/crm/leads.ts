@@ -38,6 +38,8 @@ import { divisionScopeOf } from "./divisions";
 import { nextDocNumber } from "./entities";
 import { adoptHoverMeasurementsForProject } from "./hover-share";
 import { attributionFields, leadChannel } from "./lead-channel";
+import { bidFactsFor } from "./bid-facts";
+import { leadBidStateOf, BID_STATES, type BidState, type BidFacts } from "@shared/bid-status";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -526,6 +528,11 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
       return res.status(400).json({ message: `source must be one of: all, ${CRM_LEAD_SOURCES.join(", ")}.` });
     }
     const q = String(req.query.q || "").trim().slice(0, 200);
+    // ?bidState=open|pending|complete|dead — the owner's lead labels (shared/bid-status.ts), derived per lead.
+    const bidState = req.query.bidState === undefined || req.query.bidState === "" || req.query.bidState === "all" ? null : String(req.query.bidState);
+    if (bidState && !BID_STATES.some((s) => s.key === bidState)) {
+      return res.status(400).json({ message: "bidState must be one of: open, pending, complete, dead." });
+    }
     // ?sort=name|contact|service|source|receivedAt&dir=asc|desc — the column
     // headers on /crm/leads. Sorted in SQL so "Load more" keeps the order.
     const sortRaw = req.query.sort === undefined || req.query.sort === "" ? "receivedAt" : String(req.query.sort);
@@ -552,17 +559,30 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     const counts = Object.fromEntries(CRM_LEAD_LIST_STATUSES.map((s) => [s, 0])) as Record<string, number>;
     for (const r of countRows) counts[r.status] = (counts[r.status] ?? 0) + r.n;
     const where = status === "all" ? base : [...base, eq(crmLeads.status, status)];
-    const rows = await db.select().from(crmLeads).where(and(...where))
-      .orderBy(leadOrder(sortRaw as LeadSortKey, dirRaw), desc(crmLeads.receivedAt), desc(crmLeads.id)).limit(limit).offset(offset);
+    // Every lead under this tab carries a label: Open / Pending / Complete / Dead lead. The label is derived (a
+    // converted lead reads its client's state), so the label counts and the label filter work on the whole tab in
+    // memory: ids + status + client only, then the page is cut from the labelled set.
+    const slim = await db.select({ id: crmLeads.id, status: crmLeads.status, customerId: crmLeads.customerId }).from(crmLeads)
+      .where(and(...where)).orderBy(leadOrder(sortRaw as LeadSortKey, dirRaw), desc(crmLeads.receivedAt), desc(crmLeads.id)).limit(50_000);
+    const facts = await bidFactsFor(ctx.org.id, slim.map((r) => r.customerId).filter(Boolean) as string[]);
+    const labelOf = (r: { status: string; customerId: string | null }): BidState =>
+      leadBidStateOf(r.status, r.customerId ? (facts.get(r.customerId) as BidFacts | undefined) ?? null : null);
+    const bidCounts = { open: 0, pending: 0, complete: 0, dead: 0 } as Record<BidState, number>;
+    for (const r of slim) bidCounts[labelOf(r)] += 1;
+    const labelled = bidState ? slim.filter((r) => labelOf(r) === bidState) : slim;
+    const pageIds = labelled.slice(offset, offset + limit).map((r) => r.id);
+    const rowsUnordered = pageIds.length ? await db.select().from(crmLeads).where(and(eq(crmLeads.orgId, ctx.org.id), inArray(crmLeads.id, pageIds))) : [];
+    const byId = new Map(rowsUnordered.map((r) => [r.id, r]));
+    const rows = pageIds.map((id) => byId.get(id)!).filter(Boolean);
     const custIds = [...new Set(rows.map((r) => r.customerId).filter(Boolean) as string[])];
     const customers = new Map<string, string>();
     if (custIds.length) {
       for (const c of await db.select({ id: crmCustomers.id, displayName: crmCustomers.displayName }).from(crmCustomers)
         .where(and(eq(crmCustomers.orgId, ctx.org.id), inArray(crmCustomers.id, custIds)))) customers.set(c.id, c.displayName);
     }
-    const total = status === "all" ? Object.values(counts).reduce((a, b) => a + b, 0) : counts[status] ?? 0;
+    const total = labelled.length;
     const [{ any }] = await db.select({ any: sql<number>`count(*)::int` }).from(crmLeads).where(eq(crmLeads.orgId, ctx.org.id));
-    res.json({ rows: rows.map((r) => presentLead(r, customers)), total, counts, limit, offset, everAny: any > 0 });
+    res.json({ rows: rows.map((r) => ({ ...presentLead(r, customers), bidState: labelOf(r) })), total, counts, bidCounts, limit, offset, everAny: any > 0 });
   });
 
   /**

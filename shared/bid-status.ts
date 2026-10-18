@@ -65,3 +65,13 @@ export function deadLeadOf(customFields: unknown): DeadLeadMark | null {
   if (!v || typeof v !== "object" || !v.at) return null;
   return { at: String(v.at), memberId: v.memberId ? String(v.memberId) : null, reason: v.reason ? String(v.reason) : null };
 }
+
+/**
+ * A lead row's label (crm_leads): once it became a client, the client's own state; an archived or spam lead that
+ * never became one is a Dead lead ("never recovered"); anything else still waiting on us is Open.
+ */
+export function leadBidStateOf(leadStatus: string | null | undefined, client: BidFacts | null): BidState {
+  if (client) return bidStateOf(client);
+  if (leadStatus === "archived" || leadStatus === "spam") return "dead";
+  return "open";
+}

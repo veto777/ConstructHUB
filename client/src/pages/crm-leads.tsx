@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import { BID_STATES, type BidState } from "@shared/bid-status";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { marketingUrl } from "@/lib/site";
 import { SegmentedTabs, TabCount } from "@/components/tool";
@@ -58,12 +59,15 @@ interface Lead {
   customerId: string | null;
   customer: { id: string; displayName: string } | null;
   receivedAt: string;
+  /** Open / Pending / Complete / Dead lead (shared/bid-status.ts) — derived, never typed. */
+  bidState?: BidState;
 }
 
 interface LeadPage {
   rows: Lead[];
   total: number;
   counts: Record<LeadStatus, number>;
+  bidCounts?: Record<BidState, number>;
   limit: number;
   offset: number;
   everAny: boolean;
@@ -93,6 +97,15 @@ const SOURCES: { key: LeadSource | "all"; label: string }[] = [
   { key: "call_assistant", label: "Call Assistant" },
   { key: "import", label: "Imported" },
 ];
+
+const LABEL_TABS: { key: "all" | BidState; label: string }[] = [{ key: "all", label: "All" }, ...BID_STATES.map((s) => ({ key: s.key, label: s.label }))];
+const LABEL_PILL: Record<BidState, string> = {
+  open: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
+  pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  complete: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+  dead: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+};
+const LABEL_TEXT = Object.fromEntries(BID_STATES.map((s) => [s.key, s.label])) as Record<BidState, string>;
 
 const STATUS_TONE: Record<LeadStatus, PillTone> = {
   new: "info", contacted: "warning", converted: "success", archived: "neutral", spam: "danger",
@@ -169,6 +182,7 @@ export default function CrmLeadsPage() {
   const { toast } = useToast();
   const [initial] = useState(readParams);
   const [tab, setTab] = useState<LeadStatus>(initial.tab);
+  const [label, setLabel] = useState<"all" | BidState>(() => { const v = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("label"); return v && BID_STATES.some((b) => b.key === v) ? (v as BidState) : "all"; });
   const [source, setSource] = useState<LeadSource | "all">(initial.source);
   const [q, setQ] = useState(initial.q);
   const [qDebounced, setQDebounced] = useState(initial.q);
@@ -183,13 +197,14 @@ export default function CrmLeadsPage() {
     set("q", qDebounced.trim() || null);
     set("tab", tab !== "new" ? tab : null);
     set("source", source !== "all" ? source : null);
+    set("label", label !== "all" ? label : null);
     set("lead", openId);
     const search = params.toString();
     const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
     if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
       window.history.replaceState(window.history.state, "", next);
     }
-  }, [qDebounced, tab, source, openId]);
+  }, [qDebounced, tab, label, source, openId]);
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const canManage = me?.permissions?.manageCustomers === true;
@@ -197,7 +212,7 @@ export default function CrmLeadsPage() {
   const canSettings = me?.permissions?.manageSettings === true;
 
   const { data, isLoading, isError, isPlaceholderData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["/api/crm/leads", "list", tab, source, qDebounced, sort.key, sort.dir],
+    queryKey: ["/api/crm/leads", "list", tab, label, source, qDebounced, sort.key, sort.dir],
     enabled: canManage,
     placeholderData: keepPreviousData,
     initialPageParam: 0,
@@ -206,6 +221,7 @@ export default function CrmLeadsPage() {
         status: tab, limit: String(PAGE_SIZE), offset: String(pageParam), sort: sort.key, dir: sort.dir,
       });
       if (source !== "all") params.set("source", source);
+      if (label !== "all") params.set("bidState", label);
       if (qDebounced.trim()) params.set("q", qDebounced.trim());
       const r = await fetch(`/api/crm/leads?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
@@ -283,6 +299,16 @@ export default function CrmLeadsPage() {
           </button>
         ))}
       </SegmentedTabs>
+      {/* Every lead carries one of the owner's four labels (2026-10-18): Open (nobody scheduled anything), Pending (visit or
+          HOVER report, no bid sent), Complete (bid sent), Dead lead (never recovered — archived / spam, or marked dead). */}
+      <SegmentedTabs as="group" label="Lead label" testId="tabs-lead-label">
+        {LABEL_TABS.map((t) => (
+          <button key={t.key} type="button" aria-pressed={label === t.key} onClick={() => setLabel(t.key)}
+            title={BID_STATES.find((s) => s.key === t.key)?.hint} data-testid={`tab-label-${t.key}`}>
+            {t.label} <TabCount>{t.key === "all" ? Object.values(latest?.bidCounts ?? {}).reduce((a, b) => a + b, 0) : latest?.bidCounts?.[t.key] ?? 0}</TabCount>
+          </button>
+        ))}
+      </SegmentedTabs>
 
       {isLoading || isPlaceholderData || !me ? (
         <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -330,8 +356,16 @@ export default function CrmLeadsPage() {
                       <div className="flex min-w-0 items-center gap-3 max-sm:max-w-[16rem]">
                         <InitialAvatar name={leadName(l)} />
                         <div className="min-w-0">
-                          <button type="button" className="block truncate text-left font-medium text-primary hover:underline"
-                            onClick={() => setOpenId(l.id)} data-testid={`button-open-lead-${l.id}`}>{leadName(l)}</button>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <button type="button" className="block truncate text-left font-medium text-primary hover:underline"
+                              onClick={() => setOpenId(l.id)} data-testid={`button-open-lead-${l.id}`}>{leadName(l)}</button>
+                            {l.bidState && (
+                              <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${LABEL_PILL[l.bidState]}`}
+                                title={BID_STATES.find((s) => s.key === l.bidState)?.hint} data-testid={`pill-label-${l.id}`}>
+                                {LABEL_TEXT[l.bidState]}
+                              </span>
+                            )}
+                          </div>
                           {l.customer ? (
                             <Link href={`/crm/clients/${l.customer.id}`} className="flex items-center gap-1 truncate text-xs text-muted-foreground hover:underline"
                               data-testid={`link-lead-client-${l.id}`}>
