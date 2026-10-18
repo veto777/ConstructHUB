@@ -25,6 +25,9 @@ export interface Hover3DViewerProps {
   mesh: HoverMesh;
   sidingColor: string;
   roofColor: string;
+  /** Window glass tint and door panel colour (previews, like the siding and roof). */
+  windowColor: string;
+  doorColor: string;
   showOpenings: boolean;
   /** Horizontal lap-siding lines on every wall at this reveal (inches); null = plain walls. */
   sidingReveal: number | null;
@@ -33,7 +36,8 @@ export interface Hover3DViewerProps {
   showLabels: boolean;
   /** Bump `seq` to re-apply the same preset. */
   view: { preset: ViewPreset; seq: number };
-  selectedId: string | null;
+  /** Highlighted faces — one, or several in "select several" mode. */
+  selectedIds: string[];
   onSelect: (face: MeshFace | null) => void;
 }
 
@@ -96,6 +100,8 @@ interface Built {
   triFace: Map<THREE.Mesh, MeshFace[]>;
   roofMat: THREE.MeshStandardMaterial;
   wallMat: THREE.MeshStandardMaterial;
+  glassMat: THREE.MeshStandardMaterial;
+  doorMat: THREE.MeshStandardMaterial;
   wallCut: THREE.Mesh;
   wallFull: THREE.Mesh;
   openings: THREE.Object3D[];
@@ -155,7 +161,9 @@ function makeCourseLines(faces: MeshFace[], ringOf: Map<string, V3[]>, holesOf: 
       }
       for (let i = 0; i + 1 < hits.length; i += 2) {
         const a = hits[i], ta = a.dot(u), tb = hits[i + 1].dot(u);
-        let spans: [number, number][] = [[ta, tb]];
+        // Courses stop a trim board's width short of every face edge — corner boards, rake and fascia trim.
+        if (tb - ta <= 2 * TRIM_FT) continue;
+        let spans: [number, number][] = [[ta + TRIM_FT, tb - TRIM_FT]];
         for (const [c0, c1] of cuts) {
           spans = spans.flatMap(([s0, s1]) => (c1 <= s0 || c0 >= s1 ? [[s0, s1]] : [[s0, Math.max(s0, c0)], [Math.min(s1, c1), s1]].filter(([x, y]) => y - x > 0.02) as [number, number][]));
         }
@@ -176,8 +184,10 @@ function makeCourseLines(faces: MeshFace[], ringOf: Map<string, V3[]>, holesOf: 
 }
 
 const SHINGLE_EXPOSURE_FT = 5.625 / 12;
+/** A 5½" trim board: courses never run into the corner, rake or fascia trim. */
+const TRIM_FT = 5.5 / 12;
 
-function build(mesh: HoverMesh, sidingColor: string, roofColor: string, sidingReveal: number | null, roofShingles: boolean): Built {
+function build(mesh: HoverMesh, sidingColor: string, roofColor: string, windowColor: string, doorColor: string, sidingReveal: number | null, roofShingles: boolean): Built {
   const { pts, center, radius } = toThree(mesh);
   const ringOf = new Map<string, V3[]>();
   for (const f of mesh.faces) ringOf.set(f.id, f.polygon.map((i) => pts[i]).filter(Boolean));
@@ -206,13 +216,13 @@ function build(mesh: HoverMesh, sidingColor: string, roofColor: string, sidingRe
   const roofMat = new THREE.MeshStandardMaterial({ color: roofColor, roughness: 0.85, metalness: 0.02, side: THREE.DoubleSide, flatShading: true });
   const wallMat = new THREE.MeshStandardMaterial({ color: sidingColor, roughness: 0.9, metalness: 0, side: THREE.DoubleSide, flatShading: true });
   const glassMat = new THREE.MeshStandardMaterial({
-    color: "#4a6378", roughness: 0.25, metalness: 0.2, transparent: true, opacity: 0.55, side: THREE.DoubleSide,
+    color: windowColor, roughness: 0.25, metalness: 0.2, transparent: true, opacity: 0.55, side: THREE.DoubleSide,
     polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
   });
 
   // Doors as a solid panel, soffits as light trim under the eaves; windows (and untyped cut-outs) as glass.
   const doorMat = new THREE.MeshStandardMaterial({
-    color: "#6b5341", roughness: 0.7, metalness: 0.05, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+    color: doorColor, roughness: 0.7, metalness: 0.05, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
   });
   const soffitMat = new THREE.MeshStandardMaterial({ color: "#efece4", roughness: 0.95, metalness: 0, side: THREE.DoubleSide, flatShading: true });
 
@@ -290,7 +300,7 @@ function build(mesh: HoverMesh, sidingColor: string, roofColor: string, sidingRe
     });
 
   return {
-    root, pickables: [roofMesh, wallCut, wallFull, openMesh, doorMesh, soffitMesh], triFace, roofMat, wallMat, wallCut, wallFull,
+    root, pickables: [roofMesh, wallCut, wallFull, openMesh, doorMesh, soffitMesh], triFace, roofMat, wallMat, glassMat, doorMat, wallCut, wallFull,
     openings: [openMesh, doorMesh, openLines], sidingLines, shingleLines, ringOf, holesOf, center, radius, labelAnchors,
   };
 }
@@ -336,7 +346,7 @@ export default function Hover3DViewer(props: Hover3DViewerProps) {
     const fill = new THREE.DirectionalLight(0xffffff, 0.45);
     scene.add(fill);
 
-    const built = build(propsRef.current.mesh, propsRef.current.sidingColor, propsRef.current.roofColor, propsRef.current.sidingReveal, propsRef.current.roofShingles);
+    const built = build(propsRef.current.mesh, propsRef.current.sidingColor, propsRef.current.roofColor, propsRef.current.windowColor, propsRef.current.doorColor, propsRef.current.sidingReveal, propsRef.current.roofShingles);
     scene.add(built.root);
     sun.position.set(built.radius * 1.5, built.radius * 2.5, built.radius * 1.2);
     fill.position.set(-built.radius * 1.5, built.radius, -built.radius);
@@ -437,7 +447,9 @@ export default function Hover3DViewer(props: Hover3DViewerProps) {
     if (!s) return;
     s.built.wallMat.color.set(props.sidingColor);
     s.built.roofMat.color.set(props.roofColor);
-  }, [props.sidingColor, props.roofColor, props.mesh]);
+    s.built.glassMat.color.set(props.windowColor);
+    s.built.doorMat.color.set(props.doorColor);
+  }, [props.sidingColor, props.roofColor, props.windowColor, props.doorColor, props.mesh]);
 
   // Course lines follow the reveal / shingle switches and the colours they are shaded from.
   useEffect(() => {
@@ -493,11 +505,15 @@ export default function Hover3DViewer(props: Hover3DViewerProps) {
       (s.highlight.material as THREE.Material).dispose();
       s.highlight = null;
     }
-    const face = props.selectedId ? props.mesh.faces.find((f) => f.id === props.selectedId) : null;
-    if (!face) return;
-    const ring = s.built.ringOf.get(face.id);
-    if (!ring) return;
-    const pos = triangulate(ring, face.type === "wall" && props.showOpenings ? s.built.holesOf.get(face.id) ?? [] : []);
+    const ids = new Set(props.selectedIds);
+    const pos: number[] = [];
+    for (const face of props.mesh.faces) {
+      if (!ids.has(face.id)) continue;
+      const ring = s.built.ringOf.get(face.id);
+      if (!ring) continue;
+      pos.push(...triangulate(ring, face.type === "wall" && props.showOpenings ? s.built.holesOf.get(face.id) ?? [] : []));
+    }
+    if (!pos.length) return;
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
     const mat = new THREE.MeshBasicMaterial({
@@ -506,7 +522,7 @@ export default function Hover3DViewer(props: Hover3DViewerProps) {
     });
     s.highlight = new THREE.Mesh(g, mat);
     s.built.root.add(s.highlight);
-  }, [props.selectedId, props.mesh, props.showOpenings]);
+  }, [props.selectedIds, props.mesh, props.showOpenings]);
 
   return (
     <div className="relative h-full w-full overflow-hidden" data-testid="hover-3d-viewer">
