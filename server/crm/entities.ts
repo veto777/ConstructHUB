@@ -363,6 +363,8 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
         ballpark: ctx.permissions.seePrices ? se.ballpark ?? null : undefined,
       };
     })(),
+    // Where the bid was written: imported from HouseCall Pro, or here.
+    source: (e.customFields as any)?.hcpId ? "hcp" : "constructhub",
     createdAt: e.createdAt, updatedAt: e.updatedAt,
   };
 }
@@ -639,7 +641,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         }
         const measured = await db.select({
           customerId: crmMeasurements.customerId,
-          at: sql<string | null>`max(coalesce(${crmMeasurements.completedAt}, ${crmMeasurements.createdAt}))`,
+          // requestedAt is HOVER's own capture date; completed/created are when it reached us.
+          at: sql<string | null>`max(coalesce(${crmMeasurements.requestedAt}, ${crmMeasurements.completedAt}, ${crmMeasurements.createdAt}))`,
         }).from(crmMeasurements).where(and(eq(crmMeasurements.orgId, ctx.org.id), inArray(crmMeasurements.customerId, chunk)))
           .groupBy(crmMeasurements.customerId);
         for (const m of measured) {

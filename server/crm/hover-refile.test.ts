@@ -81,6 +81,16 @@ describe("address key", () => {
   });
 });
 
+describe("capture date", () => {
+  it("carries HOVER's own job date (created_at), the date the client was bid", async () => {
+    const { parseHoverJob } = await import("./hover");
+    const p = parseHoverJob({ id: 1, name: "Hulst", created_at: "2026-06-16T18:55:07.708Z", location_line_1: "34 Willow Ln", location_postal_code: "98273", models: [] });
+    expect(p.capturedAt).toBe("2026-06-16T18:55:07.708Z");
+    expect(parseHoverJob({ job: { id: 2, name: "Nested", created_at: "2025-01-02T00:00:00Z" } }).capturedAt).toBe("2025-01-02T00:00:00Z");
+    expect(parseHoverJob({ id: 3, name: "No date" }).capturedAt).toBeNull();
+  });
+});
+
 describe("lead form at the capture address", () => {
   it("hands a new HOVER client the homeowner's own name and contact from their form", async () => {
     const { leadFormAtAddress } = await import("./hover");
