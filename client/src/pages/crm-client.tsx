@@ -48,6 +48,7 @@ import { TakePaymentDialog, invoiceDueCents } from "@/components/crm-take-paymen
 import { deadLeadOf } from "@shared/bid-status";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
+import { ClientDocuments } from "@/components/client-documents";
 import { QuickBid } from "@/components/crm-quick-bid";
 import { AppointmentForm, type Appointment } from "@/components/crm-appointment-form";
 import { InfoTip } from "@/components/info-tip";
@@ -1901,6 +1902,10 @@ export default function CrmClientPage() {
           </CardContent>
         </Card>
       )}
+      </ClientSection>
+      <ClientSection id="documents" layout={layout} when={canSeePrices}>
+      {/* The whole paper trail — estimates, signed contracts, invoices, a receipt per payment (HCP imports included). */}
+      {canSeePrices && id && <ClientDocuments customerId={id} />}
       </ClientSection>
       <ClientSection id="projects" layout={layout}>
       <Card>

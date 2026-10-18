@@ -163,18 +163,30 @@ export default function PublicPortalPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {invoices.map((i: any) => (
-                <a key={i.id} href={i.link} data-testid={`portal-invoice-row-${i.id}`}>
-                  <div className="flex items-center justify-between gap-3 rounded-lg border px-4 py-3 hover:bg-accent transition-colors cursor-pointer">
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{i.number} · {i.title}</div>
-                      <div className="text-sm text-muted-foreground tabular-nums">
-                        {money(i.totalCents)}
-                        {i.paidAt ? ` · paid ${day(i.paidAt)}` : i.dueCents > 0 ? ` · ${money(i.dueCents)} due` : ""}
+                <div key={i.id} className="space-y-1">
+                  <a href={i.link} data-testid={`portal-invoice-row-${i.id}`}>
+                    <div className="flex items-center justify-between gap-3 rounded-lg border px-4 py-3 hover:bg-accent transition-colors cursor-pointer">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{i.number} · {i.title}</div>
+                        <div className="text-sm text-muted-foreground tabular-nums">
+                          {money(i.totalCents)}
+                          {i.paidAt ? ` · paid ${day(i.paidAt)}` : i.dueCents > 0 ? ` · ${money(i.dueCents)} due` : ""}
+                        </div>
                       </div>
+                      <StatusPill tone={statusTone(invoiceStatus(i))}>{invoiceStatus(i)}</StatusPill>
                     </div>
-                    <StatusPill tone={statusTone(invoiceStatus(i))}>{invoiceStatus(i)}</StatusPill>
-                  </div>
-                </a>
+                  </a>
+                  {/* A receipt for every payment — opens as a printable page (save it as a PDF). */}
+                  {Array.isArray(i.receipts) && i.receipts.length > 0 && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs" data-testid={`portal-receipts-${i.id}`}>
+                      {i.receipts.map((r: any) => (
+                        <a key={r.paymentId} href={r.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid={`portal-receipt-${r.paymentId}`}>
+                          Receipt · {money(r.amountCents)} · {day(r.paidAt)}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ))}
             </CardContent>
           </Card>

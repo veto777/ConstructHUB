@@ -19,6 +19,7 @@ import { randomBytes, createHash, createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { db } from "../db";
 import {
+  crmPayments,
   crmCustomers,
   crmOrgs,
   crmEstimates,
@@ -445,7 +446,8 @@ export function registerCrmClientAuthRoutes(app: Express): void {
       .where(
         and(
           inArray(crmInvoices.customerId, client.customerIds),
-          sql`${crmInvoices.sentAt} is not null`,
+          // Sent to the client — or paid by them (an imported, already-paid invoice belongs in their history with its receipts).
+          sql`(${crmInvoices.sentAt} is not null or coalesce(${crmInvoices.paidCents}, 0) > 0)`,
           isNull(crmInvoices.voidedAt),
         ),
       )
@@ -499,6 +501,14 @@ export function registerCrmClientAuthRoutes(app: Express): void {
     });
 
     const primary = customers[0];
+    // Payments behind the receipts in the invoice history (succeeded, or partly refunded).
+    const receiptsByInvoice = new Map<string, (typeof crmPayments.$inferSelect)[]>();
+    if (invoices.length) {
+      const payRows = await db.select().from(crmPayments)
+        .where(and(inArray(crmPayments.invoiceId, invoices.map((i) => i.id)), inArray(crmPayments.status, ["succeeded", "partially_refunded"])))
+        .orderBy(desc(crmPayments.paidAt));
+      for (const p of payRows) { const list = receiptsByInvoice.get(p.invoiceId!) ?? []; list.push(p); receiptsByInvoice.set(p.invoiceId!, list); }
+    }
     // The org's financing links, primary first — the portal's Financing
     // section renders these and records the click before opening them.
     const financing = orgs.flatMap((o) => {
@@ -557,6 +567,11 @@ export function registerCrmClientAuthRoutes(app: Express): void {
         dueAt: i.dueAt, paidAt: i.paidAt, sentAt: i.sentAt,
         orgName: orgName.get(i.orgId) ?? null,
         link: `/i/${i.publicToken}`,
+        // One receipt per payment, as a printable page behind this same gate.
+        receipts: (receiptsByInvoice.get(i.id) ?? []).map((p) => ({
+          paymentId: p.id, amountCents: p.amountCents, method: p.method, paidAt: p.paidAt ?? p.createdAt,
+          link: `/api/public/invoices/${i.publicToken}/receipts/${p.id}.html`,
+        })),
       })),
       // A signed contract IS an approved estimate — the typed name from the
       // approve flow is the signature.

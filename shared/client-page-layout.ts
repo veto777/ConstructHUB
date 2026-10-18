@@ -16,6 +16,7 @@ export const CLIENT_SECTIONS = [
   { key: "comments", label: "Client comments & pamphlets" },
   { key: "invoices", label: "Invoices" },
   { key: "payments", label: "Payments" },
+  { key: "documents", label: "Documents (estimates, contracts, invoices, receipts)" },
 ] as const;
 export type ClientSectionKey = (typeof CLIENT_SECTIONS)[number]["key"];
 export type ClientPageLayout = { order: ClientSectionKey[]; hidden: ClientSectionKey[] };
