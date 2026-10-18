@@ -118,7 +118,7 @@ const IN_DEPTH: string[] = [
   "Every call starts the same way: the greeting, your recording notice if it's on, and a question about what the " +
     "call is for, before it collects anything. That first answer is what separates a homeowner with a leak from a " +
     "sales pitch. For a real job it follows your intake questions from the Agent Studio. Out of the box that is the " +
-    "work needed, the property address and city, a first name, whether the number they're calling from is the best " +
+    "work needed, the property address and city, the caller's first and last name, whether the number they're calling from is the best " +
     "one to reach them (it never reads the digits aloud), an email for the estimate, read back once, and the best " +
     "time to call back. When the number already belongs to a client in your CRM, it confirms the name and email on " +
     "file instead of asking again.",

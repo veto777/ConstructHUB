@@ -87,6 +87,19 @@ export function cityFromAddress(address: string | null | undefined): string | nu
   return last && !NOT_A_CITY.test(last) && last.length <= 60 ? last : null;
 }
 
+/** "Pat O'Brien" → first "Pat", last "O'Brien"; one word is a first name only. */
+export function splitCallerName(name: string | null | undefined): { first: string | null; last: string | null } {
+  const words = String(name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return { first: null, last: null };
+  return { first: words[0], last: words.length > 1 ? words.slice(1).join(" ") : null };
+}
+
+/** The first-name slot (which holds the whole name the caller gave) plus a separate last-name slot, when one was filled and not already in it. */
+function fullName(first: string | null, last: string | null): string | null {
+  if (!first) return last;
+  return last && !first.toLowerCase().includes(last.toLowerCase()) ? `${first} ${last}` : first;
+}
+
 export function leadFactsFrom(call: Pick<VoiceCallRow, "fromNumber" | "callerName" | "callerEmail" | "callerAddress" | "callerCity" | "serviceNeeded">, slots: Record<string, string> = {}): LeadFacts {
   const pick = (...keys: string[]) => {
     for (const k of keys) { const v = slots[k]; if (typeof v === "string" && v.trim()) return v.trim(); }
@@ -99,7 +112,7 @@ export function leadFactsFrom(call: Pick<VoiceCallRow, "fromNumber" | "callerNam
   const city = pick("city") ?? (call.callerCity?.trim() || null) ?? cityFromAddress(rawAddress);
   return {
     phone,
-    name: pick("first_name", "name", "full_name") ?? (call.callerName?.trim() || null),
+    name: fullName(pick("first_name", "name", "full_name"), pick("last_name")) ?? (call.callerName?.trim() || null),
     email: email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email.toLowerCase() : (call.callerEmail?.trim() || null),
     address: streetOnly(rawAddress, city),
     city,
@@ -206,7 +219,9 @@ async function deliverLeadLocked(args: Parameters<typeof deliverLead>[0]): Promi
     else if (facts.address && rawAddress && customer.addressLine1 === rawAddress && rawAddress !== facts.address) patch.addressLine1 = facts.address;
     if (!customer.city && facts.city) patch.city = facts.city;
     if (!customer.state && state) patch.state = state;
-    if (!customer.firstName && facts.name) patch.firstName = facts.name;
+    const caller = splitCallerName(facts.name);
+    if (!customer.firstName && caller.first) patch.firstName = caller.first;
+    if (!customer.lastName && caller.last && (!customer.firstName || customer.firstName.toLowerCase() === caller.first?.toLowerCase())) patch.lastName = caller.last;
     if (!customer.phone && facts.phone) patch.phone = facts.phone;
     const existingTags = customer.tags ?? [];
     const addTags = tags.filter((t) => !existingTags.includes(t));
@@ -225,7 +240,8 @@ async function deliverLeadLocked(args: Parameters<typeof deliverLead>[0]): Promi
       const [row] = await tx.insert(crmCustomers).values({
         orgId: org.id,
         displayName: facts.name || `Caller ${prettyPhone(facts.phone)}`,
-        firstName: facts.name,
+        firstName: splitCallerName(facts.name).first,
+        lastName: splitCallerName(facts.name).last,
         phone: facts.phone,
         email: facts.email,
         addressLine1: facts.address,

@@ -337,14 +337,14 @@ export type VoiceService = z.infer<typeof serviceSchema>;
 
 /**
  * The default intake script (owner rules, 2026-10-01): need → address + city
- * → first name → confirm the caller-id number (never read digits aloud) →
+ * → first and last name (owner, 2026-10-17; the slot key stays first_name) → confirm the caller-id number (never read digits aloud) →
  * a good email (read back once) → best time. Custom questions are added by
  * the Studio; keys are what the decision protocol's `slots` carry.
  */
 export const DEFAULT_INTAKE_QUESTIONS: IntakeQuestion[] = [
   { key: "need", prompt: "What can we help you with today?", required: true, validation: "none", choices: [], confirm: false, neverReadAloud: false, prefillFrom: "" },
   { key: "address", prompt: "What's the street address and city for the property?", required: true, validation: "address", choices: [], confirm: false, neverReadAloud: false, prefillFrom: "" },
-  { key: "first_name", prompt: "And who am I speaking with? A first name is fine.", required: true, validation: "name", choices: [], confirm: false, neverReadAloud: false, prefillFrom: "crm" },
+  { key: "first_name", prompt: "And may I have your first and last name?", required: true, validation: "name", choices: [], confirm: false, neverReadAloud: false, prefillFrom: "crm" },
   { key: "phone", prompt: "Is the number you're calling from the best one to reach you?", required: true, validation: "phone", choices: [], confirm: false, neverReadAloud: true, prefillFrom: "caller_id" },
   { key: "email", prompt: "What's a good email for the estimate?", required: false, validation: "email", choices: [], confirm: true, neverReadAloud: false, prefillFrom: "crm" },
   { key: "best_time", prompt: "When is the best time for someone to call you back?", required: false, validation: "none", choices: [], confirm: false, neverReadAloud: false, prefillFrom: "" },

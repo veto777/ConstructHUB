@@ -149,7 +149,7 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
                 <dl className="grid grid-cols-[minmax(5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1" data-testid="list-call-slots">
                   {orderedSlots(call.slots).map(([k, v]) => (
                     <div key={k} className="contents">
-                      <dt className="text-muted-foreground">{k.replace(/_/g, " ")}</dt>
+                      <dt className="text-muted-foreground">{k === "first_name" ? "name" : k.replace(/_/g, " ")}</dt>
                       <dd className="break-words">{k === "phone" ? fmtPhone(v) : v}</dd>
                     </div>
                   ))}

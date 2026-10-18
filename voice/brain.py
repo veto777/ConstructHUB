@@ -618,7 +618,7 @@ class Brain:
             convo = "\n".join(f"{'Caller' if t['role'] == 'caller' else self.assistant}: {t['text']}" for t in self.transcript)
             prompt = ("Transcript of the call so far:\n" + convo +
                       "\n\n(system: the call is ending and no lead was submitted. If you have a callback number plus an address or a clear "
-                      "request, answer with action submit_lead and every slot you know — a first name is enough, the caller-id number is "
+                      "request, answer with action submit_lead and every slot you know — the name they gave is enough, the caller-id number is "
                       "the callback. Otherwise answer with action alert, kind other, and a one-sentence summary so the office can call back. "
                       "\"say\" must be an empty string.)")
             raw = await asyncio.wait_for(provider.decide(self.system_prompt(), [{"role": "user", "content": prompt}], temperature=0.1), 25)
