@@ -1212,7 +1212,8 @@ export default function CrmClientPage() {
         <CardContent className="p-4 sm:p-5">
           <p className="mb-3 text-sm font-bold">Job stage</p>
           <JobStageControl customer={c} estimates={estimates} projects={data.projects ?? []}
-            companyName={me?.org?.name ?? "us"} canEdit={canManageJobs} measured={!!stageTakeoff?.takeoffs?.length || !!stageTakeoff?.takeoff} />
+            companyName={me?.org?.name ?? "us"} canEdit={canManageJobs} measured={!!stageTakeoff?.takeoffs?.length || !!stageTakeoff?.takeoff}
+            canSeePrices={canSeePrices} canAttach={canManageCustomers} />
         </CardContent>
       </Card>
 

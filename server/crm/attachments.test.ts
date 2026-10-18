@@ -160,6 +160,20 @@ describe("client portal v2 — attachments + comments (dev server)", () => {
     expect(del.status).toBe(200);
   });
 
+  it("a signed contract uploads onto its estimate as kind contract", async () => {
+    const up = await upload("/api/crm/attachments",
+      { name: "signed.pdf", type: "application/pdf", data: PDF },
+      { kind: "contract", refId: estimateA }, cookie);
+    expect(up.status).toBe(201);
+    expect(up.body.kind).toBe("contract");
+    attachmentIds.push(up.body.id);
+    const list = await api(`/api/crm/attachments?kind=contract&refId=${estimateA}`, {}, cookie);
+    expect(list.status).toBe(200);
+    expect(list.body.some((a: any) => a.id === up.body.id)).toBe(true);
+    const bad = await upload("/api/crm/attachments", { name: "x.pdf", type: "application/pdf", data: PDF }, { kind: "contract", refId: "nope" }, cookie);
+    expect(bad.status).toBe(404);
+  });
+
   it("estimate attachments: contractor upload → public gated list + download", async () => {
     const up = await upload("/api/crm/attachments",
       { name: "scope.pdf", type: "application/pdf", data: PDF },

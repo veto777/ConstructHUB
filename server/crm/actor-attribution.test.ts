@@ -246,13 +246,15 @@ describe("actor attribution (dev server)", () => {
     expect(await uploaderOf(pdf.id)).toEqual({ m: null, l: "System", k: "system" });
 
     const { importHoverJobPhotos } = await import("./hover");
-    const job = { models: [{ images: [{ id: "img1", image: { url: "https://hover.example.test/img1.jpg" } }] }] };
+    const job = { created_at: "2026-06-16T18:55:07.000Z", models: [{ images: [{ id: "img1", image: { url: "https://hover.example.test/img1.jpg" } }] }] };
     const fakeFetch: any = async () => new Response(JPEG, { headers: { "content-type": "image/jpeg" } });
     const got = await importHoverJobPhotos(orgId, "vitestjob", custId, job, {}, fakeFetch);
     expect(got.stored).toBe(1);
-    const [row] = await q(`select id, uploaded_by_member_id as m, uploaded_by_label as l, uploaded_by_kind as k from crm_attachments where ref_id = $1 and file_name = 'hover-vitestjob-img1.jpg'`, [custId]);
+    const [row] = await q(`select id, uploaded_by_member_id as m, uploaded_by_label as l, uploaded_by_kind as k, created_at from crm_attachments where ref_id = $1 and file_name = 'hover-vitestjob-img1.jpg'`, [custId]);
     attIds.push(row.id);
     expect({ m: row.m, l: row.l, k: row.k }).toEqual({ m: null, l: "HOVER import", k: "system" });
+    // Dated by the capture (the job's created_at), not by the import.
+    expect(new Date(row.created_at).toISOString()).toBe("2026-06-16T18:55:07.000Z");
     const tl = await api(`/api/crm/customers/${custId}/timeline`, {}, cookie);
     expect((tl.body as any[]).find((x) => x.id === `att-${row.id}`).text).toBe("HOVER import added a photo — hover-vitestjob-img1.jpg");
   });

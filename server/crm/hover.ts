@@ -1001,12 +1001,15 @@ export async function importHoverJobPhotos(
   auth: Record<string, string>, fetchFn: FetchFn = fetch,
 ): Promise<{ stored: number; expected: number; complete: boolean }> {
   const models: any[] = job?.job?.models ?? job?.models ?? [];
-  const images: { id: string; url: string }[] = [];
+  // Date each photo by the capture, not the import: the image's own stamp, else the job's.
+  const when = (v: unknown): Date | null => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? new Date(v) : null);
+  const jobDate = when(job?.job?.created_at ?? job?.created_at);
+  const images: { id: string; url: string; at: Date | null }[] = [];
   for (const m of models) {
     for (const img of m?.images ?? []) {
       const url = img?.image?.url ?? img?.url;
       const id = img?.id;
-      if (id != null && typeof url === "string") images.push({ id: String(id), url });
+      if (id != null && typeof url === "string") images.push({ id: String(id), url, at: when(img?.created_at ?? img?.image?.created_at) ?? jobDate });
     }
   }
   const wanted = images.slice(0, HOVER_PHOTO_CAP);
@@ -1035,7 +1038,7 @@ export async function importHoverJobPhotos(
       const buffer = Buffer.from(await r.arrayBuffer());
       if (!buffer.length || buffer.length > 15 * 1024 * 1024) { failed++; continue; }
       await storeGeneratedFile({
-        orgId, kind: "photo", refId: customerId, fileName, buffer,
+        orgId, kind: "photo", refId: customerId, fileName, buffer, createdAt: img.at,
         mime, ext: mime === "image/png" ? "png" : "jpg", uploadedByLabel: "HOVER import",
       });
       have.add(fileName);
@@ -1392,7 +1395,8 @@ async function attachHoverMeasurementPdf(args: {
       // Another process (or a concurrent request) stored it while we were downloading: reuse theirs.
       const theirs = await existingPdf(tx);
       if (theirs) return theirs;
-      const att = await storeGeneratedPdf({ orgId: args.orgId, kind: "measurement", refId: args.customerId, fileName, buffer: pdf, uploadedByLabel: "HOVER import", uploadedByKind: "system" });
+      const [mrow] = await tx.select({ requestedAt: crmMeasurements.requestedAt }).from(crmMeasurements).where(eq(crmMeasurements.id, args.measurementId)).limit(1);
+      const att = await storeGeneratedPdf({ orgId: args.orgId, kind: "measurement", refId: args.customerId, fileName, buffer: pdf, createdAt: mrow?.requestedAt ?? null, uploadedByLabel: "HOVER import", uploadedByKind: "system" });
       return att.id;
     });
     await mergeMeasurementRaw(args.measurementId, {

@@ -172,6 +172,8 @@ export async function storeGeneratedFile(args: {
   refId: string | null;
   fileName: string;
   buffer: Buffer;
+  /** When the file was really made (a HOVER capture's date), so "newest first" means newest capture, not newest import. */
+  createdAt?: Date | null;
   mime: string;
   ext: string;
 } & AttachmentUploader): Promise<typeof crmAttachments.$inferSelect> {
@@ -187,6 +189,7 @@ export async function storeGeneratedFile(args: {
     mime: args.mime,
     sizeBytes: args.buffer.length,
     storagePath,
+    ...(args.createdAt ? { createdAt: args.createdAt } : {}),
     ...generatedUploader(args),
   }).returning();
   return row;
@@ -198,6 +201,8 @@ export async function storeGeneratedPdf(args: {
   refId: string | null;
   fileName: string;
   buffer: Buffer;
+  /** When the file was really made (a HOVER capture's date), so "newest first" means newest capture, not newest import. */
+  createdAt?: Date | null;
 } & AttachmentUploader): Promise<typeof crmAttachments.$inferSelect> {
   return storeGeneratedFile({ ...args, mime: "application/pdf", ext: "pdf" });
 }
@@ -437,8 +442,8 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     if (!ctx) return;
 
     const kind = String(req.body?.kind || "");
-    if (kind !== "pamphlet" && kind !== "estimate" && kind !== "photo" && kind !== ESTIMATE_DEFAULT_KIND) {
-      return res.status(400).json({ message: "kind must be pamphlet, estimate, estimate_default or photo" });
+    if (kind !== "pamphlet" && kind !== "estimate" && kind !== "contract" && kind !== "photo" && kind !== ESTIMATE_DEFAULT_KIND) {
+      return res.status(400).json({ message: "kind must be pamphlet, estimate, contract, estimate_default or photo" });
     }
     // Project photos are field work — a PM (manageJobs) uploads them without
     // needing customer-management rights. Everything else stays manageCustomers.
@@ -461,7 +466,9 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
         .limit(1);
       if (!cust) return res.status(404).json({ message: "Client not found" });
     }
-    if (kind === "estimate") {
+    // A signed contract (kind "contract") is pinned to its estimate like a scope file: the client page's job-stage
+    // card uploads it once the job is approved — the same row the system writes at e-signature.
+    if (kind === "estimate" || kind === "contract") {
       refId = String(req.body?.refId || "");
       const [est] = await db
         .select({ id: crmEstimates.id })
