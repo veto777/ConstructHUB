@@ -56,16 +56,43 @@ async function fetchModel3d(src: Viewer3DSource): Promise<Model3dResponse> {
 }
 
 /** Generic color names only — no manufacturer color names. */
+// Generic colour families (previews, not product names). The first QUICK of each row are the buttons; every one is
+// in the "More colors" dropdown; any colour at all through the custom picker.
+export const QUICK = 10;
 export const SIDING_SWATCHES = [
   { name: "White", hex: "#f1f0ea" }, { name: "Cream", hex: "#ebe0c4" }, { name: "Beige", hex: "#cdb894" },
   { name: "Light gray", hex: "#b9bcbb" }, { name: "Gray", hex: "#868a8b" }, { name: "Blue", hex: "#5b6f84" },
   { name: "Green", hex: "#7f9070" }, { name: "Red", hex: "#8a3b33" }, { name: "Navy", hex: "#2f3b50" },
   { name: "Charcoal", hex: "#3c3f42" },
+  { name: "Warm white", hex: "#f4efe3" }, { name: "Pale sand", hex: "#e5dbc3" }, { name: "Khaki", hex: "#b8a888" },
+  { name: "Taupe", hex: "#a39483" }, { name: "Mocha", hex: "#7a6555" }, { name: "Chestnut", hex: "#5c4536" },
+  { name: "Fog", hex: "#d5d8d6" }, { name: "Pewter", hex: "#9fa4a6" }, { name: "Iron gray", hex: "#5f6467" },
+  { name: "Graphite", hex: "#2b2e30" }, { name: "Black", hex: "#17181a" },
+  { name: "Sky blue", hex: "#a9bfcf" }, { name: "Slate blue", hex: "#6c8299" }, { name: "Deep ocean", hex: "#3d5366" },
+  { name: "Mint", hex: "#b9c9b4" }, { name: "Sage", hex: "#99a68c" }, { name: "Olive", hex: "#6f7a52" }, { name: "Forest", hex: "#3f5240" },
+  { name: "Butter", hex: "#efe1a9" }, { name: "Gold", hex: "#c9a44c" }, { name: "Terracotta", hex: "#b1623f" },
+  { name: "Brick", hex: "#7b3a2f" }, { name: "Burgundy", hex: "#5e2a30" }, { name: "Plum", hex: "#4f3b4e" },
 ] as const;
 export const ROOF_SWATCHES = [
   { name: "Charcoal", hex: "#3a3c3f" }, { name: "Black", hex: "#1f2022" }, { name: "Slate gray", hex: "#5d6468" },
   { name: "Brown", hex: "#5e4a3a" }, { name: "Tan", hex: "#a08a6a" }, { name: "Green", hex: "#3a4a3c" },
   { name: "Red clay", hex: "#93503a" }, { name: "Light gray", hex: "#9a9c9b" },
+  { name: "Weathered wood", hex: "#6b6058" }, { name: "Driftwood", hex: "#8a7f73" }, { name: "Pewter gray", hex: "#777b7e" },
+  { name: "Onyx", hex: "#2a2b2d" }, { name: "Shakewood", hex: "#7a5a44" }, { name: "Hickory", hex: "#8b6b50" },
+  { name: "Desert tan", hex: "#b59a76" }, { name: "Hunter green", hex: "#2f4a38" }, { name: "Slate blue", hex: "#4d5a6b" },
+  { name: "Terra cotta", hex: "#a8603f" }, { name: "Copper", hex: "#9c5a33" }, { name: "Silver (metal)", hex: "#b8bcbf" },
+  { name: "Galvanized (metal)", hex: "#9da2a6" }, { name: "Bronze (metal)", hex: "#5a4a3c" }, { name: "White (metal)", hex: "#e9e9e6" },
+] as const;
+export const WINDOW_SWATCHES = [
+  { name: "Clear glass", hex: "#4a6378" }, { name: "Sky", hex: "#6f8ea6" }, { name: "Bronze tint", hex: "#5c4f44" },
+  { name: "Gray tint", hex: "#5a6166" }, { name: "Green tint", hex: "#4f6b62" }, { name: "Blue tint", hex: "#3f5d7a" },
+  { name: "Mirror", hex: "#8fa3b3" }, { name: "Dark", hex: "#2e3a44" }, { name: "Smoke", hex: "#6b6f73" }, { name: "Frosted", hex: "#b7c4cc" },
+] as const;
+export const DOOR_SWATCHES = [
+  { name: "Walnut", hex: "#6b5341" }, { name: "Oak", hex: "#a07c52" }, { name: "Mahogany", hex: "#5a2f26" },
+  { name: "Black", hex: "#1c1c1e" }, { name: "White", hex: "#f0eee8" }, { name: "Red", hex: "#9b2f2a" },
+  { name: "Navy", hex: "#263754" }, { name: "Forest", hex: "#2f4a38" }, { name: "Teal", hex: "#2f6b6a" }, { name: "Charcoal", hex: "#3c3f42" },
+  { name: "Yellow", hex: "#e0b43a" }, { name: "Sage", hex: "#8a9a7b" }, { name: "Burgundy", hex: "#5e2a30" }, { name: "Gray", hex: "#868a8b" },
 ] as const;
 
 const PRESETS: { id: ViewPreset; label: string }[] = [
@@ -212,6 +239,11 @@ function Centered({ children }: { children: React.ReactNode }) {
 function ModelTab({ mesh }: { mesh: HoverMesh }) {
   const [siding, setSiding] = useState<string>(SIDING_SWATCHES[0].hex);
   const [roof, setRoof] = useState<string>(ROOF_SWATCHES[0].hex);
+  const [windowColor, setWindowColor] = useState<string>(WINDOW_SWATCHES[0].hex);
+  const [doorColor, setDoorColor] = useState<string>(DOOR_SWATCHES[0].hex);
+  // "Select several": taps add/remove faces; the panel totals them.
+  const [multi, setMulti] = useState(false);
+  const [picked, setPicked] = useState<MeshFace[]>([]);
   const [showOpenings, setShowOpenings] = useState(true);
   // Lap-siding reveal in inches (0 = plain walls) and shingle courses on the roof — a look, not a product.
   const [reveal, setReveal] = useState<number>(7);
@@ -219,6 +251,13 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
   const [showLabels, setShowLabels] = useState(false);
   const [view, setView] = useState<{ preset: ViewPreset; seq: number }>({ preset: "iso", seq: 0 });
   const [selected, setSelected] = useState<MeshFace | null>(null);
+  const onPick = (f: MeshFace | null) => {
+    if (!multi) { setSelected(f); return; }
+    if (!f) return;
+    setPicked((cur) => (cur.some((x) => x.id === f.id) ? cur.filter((x) => x.id !== f.id) : [...cur, f]));
+  };
+  const selectedIds = multi ? picked.map((f) => f.id) : selected ? [selected.id] : [];
+  const pickedArea = picked.reduce((a, f) => a + (f.areaSqft ?? 0), 0);
   const [panelOpen, setPanelOpen] = useState(false);
 
   const parentName = useMemo(() => {
@@ -231,7 +270,8 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
       <div className="relative min-h-[45vh] flex-1 bg-gradient-to-b from-sky-100 to-slate-50 dark:from-slate-800 dark:to-slate-900">
         <Suspense fallback={<Centered><Loader2 className="h-5 w-5 animate-spin" /> Starting 3D…</Centered>}>
           <Hover3DViewer mesh={mesh} sidingColor={siding} roofColor={roof} showOpenings={showOpenings} sidingReveal={reveal || null} roofShingles={shingles}
-            showLabels={showLabels} view={view} selectedId={selected?.id ?? null} onSelect={setSelected} />
+            showLabels={showLabels} view={view} selectedIds={selectedIds} onSelect={onPick}
+            windowColor={windowColor} doorColor={doorColor} />
         </Suspense>
         <div className="absolute left-2 top-2 flex flex-wrap gap-1" data-testid="hover-3d-presets">
           {PRESETS.map((p) => (
@@ -240,13 +280,36 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
               {p.label}
             </Button>
           ))}
+          <Button size="sm" variant={multi ? "default" : "secondary"} className="h-7 px-2 text-xs shadow-sm" aria-pressed={multi}
+            onClick={() => { setMulti((v) => !v); setSelected(null); setPicked([]); }} data-testid="hover-3d-multi-toggle">
+            {multi ? "Select several: on" : "Select several"}
+          </Button>
           {/* Phones: the design panel sits under the model, shown on demand. */}
           <Button size="sm" variant="default" className="h-7 px-2 text-xs shadow-sm md:hidden"
             onClick={() => setPanelOpen((v) => !v)} data-testid="hover-3d-design-toggle">
             {panelOpen ? "Hide design" : "Colors & options"}
           </Button>
         </div>
-        {selected && (
+        {multi && (
+          <div className="absolute bottom-2 left-2 right-2 rounded-lg border bg-background/95 p-3 text-sm shadow-md sm:right-auto sm:min-w-64 sm:max-w-sm"
+            data-testid="hover-3d-multi-info">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-semibold">{picked.length ? `${picked.length} face${picked.length === 1 ? "" : "s"} · ${pickedArea.toLocaleString("en-US", { maximumFractionDigits: 1 })} sq ft` : "Tap faces to add them up"}</span>
+              {picked.length > 0 && <button type="button" className="text-xs text-muted-foreground hover:underline" onClick={() => setPicked([])}>Clear</button>}
+            </div>
+            {picked.length > 0 && (
+              <ul className="mt-1 max-h-28 overflow-y-auto text-xs tabular-nums text-muted-foreground">
+                {picked.map((f) => (
+                  <li key={f.id} className="flex justify-between gap-3">
+                    <span className="capitalize">{f.name ?? f.type}</span>
+                    <span>{f.areaSqft === null ? "—" : `${f.areaSqft.toLocaleString("en-US", { maximumFractionDigits: 1 })} sq ft`}{f.pitch ? ` · ${f.pitch}` : ""}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {selected && !multi && (
           <div className="absolute bottom-2 left-2 right-2 rounded-lg border bg-background/95 p-3 text-sm shadow-md sm:right-auto sm:min-w-64"
             data-testid="hover-3d-face-info">
             <div className="flex items-center justify-between gap-3">
@@ -275,6 +338,8 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
         panelOpen ? "block max-h-[45vh]" : "hidden")} data-testid="hover-3d-design">
         <SwatchRow title="Siding color" swatches={SIDING_SWATCHES} value={siding} onChange={setSiding} testid="siding" />
         <SwatchRow title="Roof color" swatches={ROOF_SWATCHES} value={roof} onChange={setRoof} testid="roof" />
+        <SwatchRow title="Window color" swatches={WINDOW_SWATCHES} value={windowColor} onChange={setWindowColor} testid="window" />
+        <SwatchRow title="Door color" swatches={DOOR_SWATCHES} value={doorColor} onChange={setDoorColor} testid="door" />
         <label className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-2">{showOpenings ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />} Show windows/doors</span>
           <Switch checked={showOpenings} onCheckedChange={setShowOpenings} data-testid="hover-3d-toggle-openings" />
@@ -319,16 +384,28 @@ function SwatchRow({ title, swatches, value, onChange, testid }: {
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
         <span className="font-medium">{title}</span>
-        <span className="text-xs text-muted-foreground">{current?.name}</span>
+        <span className="text-xs text-muted-foreground">{current?.name ?? "Custom"}</span>
       </div>
       <div className="flex flex-wrap gap-2">
-        {swatches.map((s) => (
+        {swatches.slice(0, QUICK).map((s) => (
           <button key={s.hex} type="button" title={s.name} aria-label={`${title}: ${s.name}`} aria-pressed={s.hex === value}
             onClick={() => onChange(s.hex)} data-testid={`hover-3d-swatch-${testid}-${s.name.replace(/\s+/g, "-").toLowerCase()}`}
             className={cn("h-8 w-8 rounded-full border shadow-sm outline-none ring-offset-2 ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring",
               s.hex === value && "ring-2 ring-primary")}
             style={{ backgroundColor: s.hex }} />
         ))}
+      </div>
+      {/* The whole palette, and any colour at all. */}
+      <div className="flex items-center gap-2">
+        <select value={current ? value : ""} onChange={(e) => e.target.value && onChange(e.target.value)} aria-label={`${title}: more colors`}
+          className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-xs" data-testid={`hover-3d-palette-${testid}`}>
+          <option value="">More colors…</option>
+          {swatches.map((s) => <option key={s.hex} value={s.hex}>{s.name}</option>)}
+        </select>
+        <label className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border" title="Custom color" aria-label={`${title}: custom color`}>
+          <input type="color" value={/^#[0-9a-f]{6}$/i.test(value) ? value : "#888888"} onChange={(e) => onChange(e.target.value)}
+            className="h-5 w-5 cursor-pointer border-0 bg-transparent p-0" data-testid={`hover-3d-custom-${testid}`} />
+        </label>
       </div>
     </div>
   );
