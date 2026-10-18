@@ -88,9 +88,14 @@ const companyLabels = new Set([...staffEmails].map((e) => e.split("@")[1]).filte
 const isStaffEmail = (e: string | null) => !!e && (staffEmails.has(e) || companyLabels.has(e.split("@")[1]?.split(".")[0] ?? "") || /^(phone-?leads|leads|info|office|sales|noreply|no-reply)@/.test(e));
 const isStaffPhone = (p: string | null) => !!p && staffPhones.has(p);
 
+/** "Alison Avenue", "Birch Bay Dr": a street with no house number is still a street, not a person. */
+const looksLikeStreet = (n?: string | null) => {
+  const words = String(n ?? "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean).map((w) => SUFFIX[w] ?? w);
+  return words.length >= 2 && /^(st|ave|dr|rd|ln|ct|pl|blvd|cir|ter|hwy|pkwy|trl|loop)$/.test(words[words.length - 1]);
+};
 const isPlaceholder = (c: any) => {
   const f = c.custom_fields ?? {};
-  return !usableName(c.display_name) || (!!f.hoverAutoCreated && streetKey(c.display_name) !== null);
+  return !usableName(c.display_name) || (!!f.hoverAutoCreated && (streetKey(c.display_name) !== null || looksLikeStreet(c.display_name)));
 };
 const leadsByCustomer = new Map<string, any[]>();
 const leadsByStreet = new Map<string, any[]>();
