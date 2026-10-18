@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { bidStateOf, bidNotSubmitted, clientStageOf, deadLeadOf, leadBidStateOf, type BidFacts } from "@shared/bid-status";
 
-const f = (over: Partial<BidFacts> = {}): BidFacts => ({ dead: false, anyEstimate: false, sentEstimate: false, appointment: false, hover: false, projectStatus: null, ...over });
+const f = (over: Partial<BidFacts> = {}): BidFacts => ({ dead: false, anyEstimate: false, sentEstimate: false, approvedEstimate: false, appointment: false, hover: false, projectStatus: null, ...over });
 
 describe("bid state", () => {
   it("open: nothing scheduled, nothing measured, nothing written", () => {
@@ -33,7 +33,8 @@ describe("client stage", () => {
     expect(clientStageOf(f({ projectStatus: "scheduled", sentEstimate: true }))).toBe("job_scheduled");
     expect(clientStageOf(f({ projectStatus: "complete" }))).toBe("closed_out");
   });
-  it("without a project: sent bid → Bid Submitted; any estimate or HOVER → Bid; else none", () => {
+  it("without a project: signed bid → Approved; sent bid → Bid Submitted; any estimate or HOVER → Bid; else none", () => {
+    expect(clientStageOf(f({ anyEstimate: true, sentEstimate: true, approvedEstimate: true }))).toBe("approved");
     expect(clientStageOf(f({ anyEstimate: true, sentEstimate: true }))).toBe("bid_submitted");
     expect(clientStageOf(f({ anyEstimate: true }))).toBe("bid");
     expect(clientStageOf(f({ hover: true }))).toBe("bid");
@@ -51,13 +52,23 @@ describe("dead-lead mark", () => {
 });
 
 describe("lead label", () => {
-  it("a converted lead carries its client's state; an archived or spam lead that never converted is dead; the rest are open", () => {
-    expect(leadBidStateOf("converted", f({ appointment: true }))).toBe("pending");
-    expect(leadBidStateOf("converted", f({ anyEstimate: true, sentEstimate: true }))).toBe("complete");
-    expect(leadBidStateOf("converted", f({ dead: true }))).toBe("dead");
-    expect(leadBidStateOf("archived", null)).toBe("dead");
-    expect(leadBidStateOf("spam", null)).toBe("dead");
-    expect(leadBidStateOf("new", null)).toBe("open");
-    expect(leadBidStateOf("contacted", null)).toBe("open");
+  const DAY = 86400_000; const now = Date.parse("2026-10-18T12:00:00Z");
+  it("a converted or matched lead carries its client's state; archived / spam is dead; a fresh lead is open", () => {
+    expect(leadBidStateOf("converted", f({ appointment: true }), new Date(now - 60 * DAY), now)).toBe("pending");
+    expect(leadBidStateOf("new", f({ anyEstimate: true, sentEstimate: true }), new Date(now - 90 * DAY), now)).toBe("complete");
+    expect(leadBidStateOf("converted", f({ dead: true }), new Date(now - DAY), now)).toBe("dead");
+    expect(leadBidStateOf("archived", null, new Date(now - DAY), now)).toBe("dead");
+    expect(leadBidStateOf("spam", null, new Date(now - DAY), now)).toBe("dead");
+    expect(leadBidStateOf("new", null, new Date(now - 3 * DAY), now)).toBe("open");
+    expect(leadBidStateOf("contacted", null, new Date(now - 29 * DAY), now)).toBe("open");
+  });
+  it("owner rule: no bid within 30 days of arriving → assumed dead (matched client with nothing started too)", () => {
+    expect(leadBidStateOf("new", null, new Date(now - 31 * DAY), now)).toBe("dead");
+    expect(leadBidStateOf("new", f(), new Date(now - 31 * DAY), now)).toBe("dead");
+    expect(leadBidStateOf("new", f({ hover: true }), new Date(now - 31 * DAY), now)).toBe("pending");
+    expect(leadBidStateOf("new", null, new Date(now - 30 * DAY), now)).toBe("open");
+  });
+  it("an archived lead whose client did get a bid still reads complete", () => {
+    expect(leadBidStateOf("archived", f({ anyEstimate: true, sentEstimate: true }), new Date(now - 90 * DAY), now)).toBe("complete");
   });
 });

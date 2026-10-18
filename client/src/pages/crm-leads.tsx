@@ -28,6 +28,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { BID_STATES, type BidState } from "@shared/bid-status";
+import { withDivisionHeader } from "@/lib/division-workspace";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { marketingUrl } from "@/lib/site";
 import { SegmentedTabs, TabCount } from "@/components/tool";
@@ -61,6 +62,15 @@ interface Lead {
   receivedAt: string;
   /** Open / Pending / Complete / Dead lead (shared/bid-status.ts) — derived, never typed. */
   bidState?: BidState;
+  /** Where it belongs: state code ("??" unknown) and market key ("unknown") — server/crm/lead-state.ts. */
+  place?: { state: string; market: string } | null;
+  /** The client this lead matches by email / phone without a formal conversion — the label comes from them. */
+  matchedCustomer?: { id: string; displayName: string } | null;
+}
+interface PlaceInfo {
+  state: string; market: string; workspaceState: string | null;
+  states: { code: string; name: string; count: number }[];
+  markets: { key: string; name: string; state: string | null; count: number }[];
 }
 
 interface LeadPage {
@@ -68,6 +78,7 @@ interface LeadPage {
   total: number;
   counts: Record<LeadStatus, number>;
   bidCounts?: Record<BidState, number>;
+  place?: PlaceInfo;
   limit: number;
   offset: number;
   everAny: boolean;
@@ -184,12 +195,26 @@ export default function CrmLeadsPage() {
   const [tab, setTab] = useState<LeadStatus>(initial.tab);
   const [label, setLabel] = useState<"all" | BidState>(() => { const v = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("label"); return v && BID_STATES.some((b) => b.key === v) ? (v as BidState) : "all"; });
   const [source, setSource] = useState<LeadSource | "all">(initial.source);
+  // Place filters. An empty state means "follow the ribbon's workspace" (the server picks that division's state).
+  const [placeState, setPlaceState] = useState<string>(() => new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("state") ?? "");
+  const [market, setMarket] = useState<string>(() => new URLSearchParams(typeof window === "undefined" ? "" : window.location.search).get("market") ?? "all");
   const [q, setQ] = useState(initial.q);
   const [qDebounced, setQDebounced] = useState(initial.q);
   useEffect(() => { const t = setTimeout(() => setQDebounced(q), 250); return () => clearTimeout(t); }, [q]);
   const [openId, setOpenId] = useState<string | null>(initial.lead);
   const [converting, setConverting] = useState<Lead | null>(null);
   const { sort, setSort, onSort } = useTableSort<LeadSortKey>("receivedAt", "desc", "leads", { keys: LEAD_SORT_KEYS });
+  // Back / Forward restores the filters from the URL (the writing effect below only mirrors state → URL).
+  useEffect(() => {
+    const onPop = () => {
+      const p = readParams(); const u = new URLSearchParams(window.location.search);
+      setTab(p.tab); setSource(p.source); setQ(p.q); setQDebounced(p.q); setOpenId(p.lead);
+      const lb = u.get("label"); setLabel(lb && BID_STATES.some((b) => b.key === lb) ? (lb as BidState) : "all");
+      setPlaceState(u.get("state") ?? ""); setMarket(u.get("market") ?? "all");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -198,13 +223,15 @@ export default function CrmLeadsPage() {
     set("tab", tab !== "new" ? tab : null);
     set("source", source !== "all" ? source : null);
     set("label", label !== "all" ? label : null);
+    set("state", placeState || null);
+    set("market", market !== "all" ? market : null);
     set("lead", openId);
     const search = params.toString();
     const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
     if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
       window.history.replaceState(window.history.state, "", next);
     }
-  }, [qDebounced, tab, label, source, openId]);
+  }, [qDebounced, tab, label, source, placeState, market, openId]);
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const canManage = me?.permissions?.manageCustomers === true;
@@ -212,7 +239,7 @@ export default function CrmLeadsPage() {
   const canSettings = me?.permissions?.manageSettings === true;
 
   const { data, isLoading, isError, isPlaceholderData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["/api/crm/leads", "list", tab, label, source, qDebounced, sort.key, sort.dir],
+    queryKey: ["/api/crm/leads", "list", tab, label, source, placeState, market, qDebounced, sort.key, sort.dir],
     enabled: canManage,
     placeholderData: keepPreviousData,
     initialPageParam: 0,
@@ -222,8 +249,11 @@ export default function CrmLeadsPage() {
       });
       if (source !== "all") params.set("source", source);
       if (label !== "all") params.set("bidState", label);
+      if (placeState) params.set("state", placeState);
+      if (market !== "all") params.set("market", market);
       if (qDebounced.trim()) params.set("q", qDebounced.trim());
-      const r = await fetch(`/api/crm/leads?${params}`, { credentials: "include" });
+      // The division header makes the list follow the ribbon's workspace when no state is chosen.
+      const r = await fetch(`/api/crm/leads?${params}`, withDivisionHeader(`/api/crm/leads?${params}`, { credentials: "include" }));
       if (!r.ok) throw new Error(await r.text());
       return r.json();
     },
@@ -291,6 +321,34 @@ export default function CrmLeadsPage() {
             {SOURCES.map((s) => <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        {/* Where the lead belongs — WA / FL / TX, then the market inside it (Tampa, St Petersburg, Bellingham…). With
+            nothing chosen the list follows the ribbon's division workspace. */}
+        <Select value={placeState || (latest?.place?.state ?? "all")} onValueChange={(v) => { setPlaceState(v); setMarket("all"); }}>
+          <SelectTrigger className="w-[190px] bg-card" aria-label="State" data-testid="select-lead-state">
+            <SelectValue placeholder="Every state" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Every state</SelectItem>
+            {(latest?.place?.states ?? []).map((s) => (
+              <SelectItem key={s.code} value={s.code} data-testid={`state-option-${s.code}`}>{s.name} ({s.count})</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {(latest?.place?.markets?.length ?? 0) > 1 && (
+          <Select value={market} onValueChange={setMarket}>
+            <SelectTrigger className="w-[200px] bg-card" aria-label="Market" data-testid="select-lead-market">
+              <SelectValue placeholder="Every market" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Every market</SelectItem>
+              {(latest?.place?.markets ?? [])
+                .filter((m) => { const st = placeState || latest?.place?.state; return !st || st === "all" || !m.state || m.state === st; })
+                .map((m) => (
+                  <SelectItem key={m.key} value={m.key} data-testid={`market-option-${m.key}`}>{m.name}{m.state ? ` · ${m.state}` : ""} ({m.count})</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
       <SegmentedTabs as="group" label="Lead status" testId="tabs-lead-status">
         {TABS.map((t) => (
@@ -371,6 +429,11 @@ export default function CrmLeadsPage() {
                               data-testid={`link-lead-client-${l.id}`}>
                               <User className="h-3 w-3 shrink-0" /> Client: {l.customer.displayName}
                             </Link>
+                          ) : l.matchedCustomer ? (
+                            <Link href={`/crm/clients/${l.matchedCustomer.id}`} className="flex items-center gap-1 truncate text-xs text-muted-foreground hover:underline"
+                              title="Matched by email or phone — the label comes from this client's file" data-testid={`link-lead-matched-${l.id}`}>
+                              <User className="h-3 w-3 shrink-0" /> Same person as client: {l.matchedCustomer.displayName}
+                            </Link>
                           ) : place(l) ? (
                             <div className="truncate text-xs text-muted-foreground sm:hidden">{place(l)}</div>
                           ) : null}
@@ -400,6 +463,11 @@ export default function CrmLeadsPage() {
                           {l.channel.detail && <span className="min-w-0 truncate text-muted-foreground" title={l.channel.detail}>· {l.channel.detail}</span>}
                         </div>
                         {l.sourceLabel && <div className="truncate text-xs text-muted-foreground" title={l.sourceLabel}>{l.sourceLabel}</div>}
+                        {l.place && (l.place.state !== "??" || l.place.market !== "unknown") && (
+                          <div className="truncate text-xs font-medium text-muted-foreground" data-testid={`lead-place-${l.id}`}>
+                            {[latest?.place?.markets.find((m) => m.key === l.place!.market)?.name, l.place.state !== "??" ? l.place.state : null].filter(Boolean).join(" · ")}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className={`${crmTable.td} hidden whitespace-nowrap text-sm text-muted-foreground sm:table-cell`}>

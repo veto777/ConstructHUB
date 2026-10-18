@@ -140,6 +140,12 @@ export default function CrmClientsPage() {
   const [stateTab, setStateTab] = useState<StateTab>(initial.state);
   const [stage, setStage] = useState<string>(initial.stage);
   const { sort, setSort, onSort } = useTableSort<ClientSortKey>("createdAt", "desc", "clients", { keys: CLIENT_SORT_KEYS });
+  // Back / Forward restores the tabs from the URL (the writing effect below only mirrors state → URL).
+  useEffect(() => {
+    const onPop = () => { const p = readListParams(); setTab(p.tab); setStateTab(p.state); setStage(p.stage); setQ(p.q); setQDebounced(p.q); };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   // Mirror tabs + stage + search into the URL without adding history entries.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

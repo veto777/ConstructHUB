@@ -6,7 +6,7 @@
  *   - **pending**   a visit is scheduled or a HOVER report was run, but no bid has been sent to the client yet.
  *                   `bidNotSubmitted` flags the sharper case inside it: a HOVER report exists and NO estimate sits in
  *                   the client's file at all — the lead is still open and needs a bid written.
- *   - **complete**  the bid is done and in front of the client (an estimate was sent, viewed, approved or declined).
+ *   - **complete**  the bid is done and in front of the client (an estimate was sent, viewed, approved, declined or expired).
  *   - **dead**      marked a dead lead by staff (no response, dead end, tire kicker) — with who, when and why.
  *
  * The pipeline **stage** is the job's phase (shared/job-stage.ts) when the client has a live project; without one,
@@ -28,8 +28,10 @@ export type BidFacts = {
   dead: boolean;
   /** Any estimate at all on the client (draft included). */
   anyEstimate: boolean;
-  /** An estimate the client has seen: sent / viewed / approved / declined. */
+  /** An estimate the client has seen: sent / viewed / approved / declined / expired. */
   sentEstimate: boolean;
+  /** A signed estimate (the job is won even before a project row exists). */
+  approvedEstimate: boolean;
   /** Any appointment on the calendar for the client (past or future, not cancelled). */
   appointment: boolean;
   /** A HOVER measurement report on file. */
@@ -52,6 +54,8 @@ export const bidNotSubmitted = (f: BidFacts): boolean => f.hover && !f.anyEstima
 export function clientStageOf(f: BidFacts): JobStage | null {
   const fromProject = stageOfProjectStatus(f.projectStatus);
   if (fromProject) return fromProject;
+  // Same order as the client page's tracker (shared/job-stage.ts jobStageOf): a signed bid is Approved without a project.
+  if (f.approvedEstimate) return "approved";
   if (f.sentEstimate) return "bid_submitted";
   if (f.anyEstimate || f.hover) return "bid";
   return null;
@@ -66,12 +70,25 @@ export function deadLeadOf(customFields: unknown): DeadLeadMark | null {
   return { at: String(v.at), memberId: v.memberId ? String(v.memberId) : null, reason: v.reason ? String(v.reason) : null };
 }
 
+/** Owner rule (2026-10-18): no bid in ConstructHUB or Housecall Pro within this many days of the lead arriving → assumed dead. */
+export const LEAD_DEAD_AFTER_DAYS = 30;
+
 /**
- * A lead row's label (crm_leads): once it became a client, the client's own state; an archived or spam lead that
- * never became one is a Dead lead ("never recovered"); anything else still waiting on us is Open.
+ * A lead row's label (crm_leads): once it became — or matches by email / phone — a client, the client's own state
+ * (visit or HOVER → Pending, bid sent → Complete, marked dead → Dead); an archived or spam lead is a Dead lead; a lead
+ * with nothing on file after LEAD_DEAD_AFTER_DAYS is assumed dead; anything younger still waiting on us is Open.
  */
-export function leadBidStateOf(leadStatus: string | null | undefined, client: BidFacts | null): BidState {
-  if (client) return bidStateOf(client);
-  if (leadStatus === "archived" || leadStatus === "spam") return "dead";
-  return "open";
+export function leadBidStateOf(
+  leadStatus: string | null | undefined, client: BidFacts | null,
+  receivedAt?: string | Date | null, now: number = Date.now(),
+): BidState {
+  if (leadStatus === "archived" || leadStatus === "spam") return client?.dead === false && bidStateOf(client) === "complete" ? "complete" : "dead";
+  const ageDays = receivedAt ? (now - new Date(receivedAt).getTime()) / 86400_000 : 0;
+  const stale = ageDays > LEAD_DEAD_AFTER_DAYS;
+  if (client) {
+    const s = bidStateOf(client);
+    // A matched client with nothing started on it is no different from an unmatched lead: 30 days → dead.
+    return s === "open" && stale ? "dead" : s;
+  }
+  return stale ? "dead" : "open";
 }

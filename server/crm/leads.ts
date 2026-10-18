@@ -21,7 +21,7 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import { db } from "../db";
 import {
-  crmLeads, crmCustomers, crmLeadSources, crmProjects, voiceNumbers, CRM_LEAD_LIST_STATUSES, CRM_LEAD_SOURCES, CRM_PROJECT_STATUSES,
+  crmDivisions, crmOrgs, crmLeads, crmCustomers, crmLeadSources, crmProjects, voiceNumbers, CRM_LEAD_LIST_STATUSES, CRM_LEAD_SOURCES, CRM_PROJECT_STATUSES,
   type CrmLead,
 } from "@shared/schema";
 import { and, desc, eq, ilike, isNull, or, sql, inArray } from "drizzle-orm";
@@ -39,6 +39,11 @@ import { nextDocNumber } from "./entities";
 import { adoptHoverMeasurementsForProject } from "./hover-share";
 import { attributionFields, leadChannel } from "./lead-channel";
 import { bidFactsFor } from "./bid-facts";
+import { leadPlaceOf, UNKNOWN_STATE } from "./lead-state";
+import { leadMarketsOf, UNKNOWN_MARKET } from "@shared/lead-markets";
+import { memberLeadRule, leadAllowed, leadVisibilityOf } from "@shared/lead-visibility";
+import { crmMembers } from "@shared/schema";
+import { normalizeUsState, US_STATE_NAMES } from "@shared/divisions";
 import { leadBidStateOf, BID_STATES, type BidState, type BidFacts } from "@shared/bid-status";
 
 type GetUser = (req: any, res: any) => any;
@@ -383,6 +388,31 @@ const sourceNameSql = sql.join([
   sql`else ${crmLeads.source} end`,
 ], sql` `);
 
+/** Unconverted leads → the client with the same email (else the same phone digits), per org. */
+async function matchLeadsToClients(orgId: string, leads: { id: string; email: string | null; phone: string | null }[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const emails = [...new Set(leads.map((l) => (l.email ?? "").trim().toLowerCase()).filter((e) => e.includes("@")))];
+  const phones = [...new Set(leads.map((l) => digitsOf(l.phone ?? "")).filter((d) => d.length >= 10).map((d) => d.slice(-10)))];
+  const byEmail = new Map<string, string>(); const byPhone = new Map<string, string>();
+  for (let i = 0; i < emails.length; i += 1000) {
+    const rows = await db.select({ id: crmCustomers.id, email: crmCustomers.email }).from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, orgId), isNull(crmCustomers.archivedAt), sql`lower(${crmCustomers.email}) in (${sql.join(emails.slice(i, i + 1000).map((e) => sql`${e}`), sql`, `)})`));
+    for (const r of rows) if (r.email) byEmail.set(r.email.toLowerCase(), r.id);
+  }
+  for (let i = 0; i < phones.length; i += 1000) {
+    const rows = await db.select({ id: crmCustomers.id, phone: crmCustomers.phone }).from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, orgId), isNull(crmCustomers.archivedAt), sql`right(regexp_replace(coalesce(${crmCustomers.phone}, ''), '[^0-9]', '', 'g'), 10) in (${sql.join(phones.slice(i, i + 1000).map((p) => sql`${p}`), sql`, `)})`));
+    for (const r of rows) { const d = digitsOf(r.phone ?? "").slice(-10); if (d) byPhone.set(d, r.id); }
+  }
+  for (const l of leads) {
+    const e = (l.email ?? "").trim().toLowerCase();
+    const p = digitsOf(l.phone ?? "").slice(-10);
+    const id = (e && byEmail.get(e)) || (p.length === 10 && byPhone.get(p)) || null;
+    if (id) out.set(l.id, id);
+  }
+  return out;
+}
+
 function presentLead(l: CrmLead, customers: Map<string, string>) {
   return {
     ...l,
@@ -533,6 +563,20 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     if (bidState && !BID_STATES.some((s) => s.key === bidState)) {
       return res.status(400).json({ message: "bidState must be one of: open, pending, complete, dead." });
     }
+    // ?state=WA|FL|TX|??|all and ?market=<key>|unknown|all — where the lead belongs (server/crm/lead-state.ts).
+    // With no ?state the list follows the ribbon's division workspace (its state); "all" is one click away.
+    const divisions = await db.select({ id: crmDivisions.id, state: crmDivisions.state }).from(crmDivisions).where(eq(crmDivisions.orgId, ctx.org.id));
+    const divisionStates = [...new Set(divisions.map((d) => normalizeUsState(d.state)).filter(Boolean) as string[])];
+    const workspace = divisionScopeOf(ctx);
+    const workspaceState = workspace ? normalizeUsState(divisions.find((d) => d.id === workspace)?.state) : null;
+    const stateRaw = req.query.state === undefined ? (workspaceState ?? "all") : String(req.query.state);
+    const stateFilter = stateRaw === "" || stateRaw === "all" ? null : stateRaw === UNKNOWN_STATE ? UNKNOWN_STATE : normalizeUsState(stateRaw);
+    if (stateRaw && stateRaw !== "all" && !stateFilter) return res.status(400).json({ message: "state must be a two-letter state, ??, or all." });
+    const markets = leadMarketsOf(ctx.org.customFields);
+    const marketRaw = req.query.market === undefined || req.query.market === "" || req.query.market === "all" ? null : String(req.query.market);
+    if (marketRaw && marketRaw !== UNKNOWN_MARKET && !markets.some((m) => m.key === marketRaw)) {
+      return res.status(400).json({ message: `market must be one of: all, unknown, ${markets.map((m) => m.key).join(", ")}.` });
+    }
     // ?sort=name|contact|service|source|receivedAt&dir=asc|desc — the column
     // headers on /crm/leads. Sorted in SQL so "Load more" keeps the order.
     const sortRaw = req.query.sort === undefined || req.query.sort === "" ? "receivedAt" : String(req.query.sort);
@@ -562,27 +606,75 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     // Every lead under this tab carries a label: Open / Pending / Complete / Dead lead. The label is derived (a
     // converted lead reads its client's state), so the label counts and the label filter work on the whole tab in
     // memory: ids + status + client only, then the page is cut from the labelled set.
-    const slim = await db.select({ id: crmLeads.id, status: crmLeads.status, customerId: crmLeads.customerId }).from(crmLeads)
-      .where(and(...where)).orderBy(leadOrder(sortRaw as LeadSortKey, dirRaw), desc(crmLeads.receivedAt), desc(crmLeads.id)).limit(50_000);
-    const facts = await bidFactsFor(ctx.org.id, slim.map((r) => r.customerId).filter(Boolean) as string[]);
-    const labelOf = (r: { status: string; customerId: string | null }): BidState =>
-      leadBidStateOf(r.status, r.customerId ? (facts.get(r.customerId) as BidFacts | undefined) ?? null : null);
+    const slim = await db.select({
+      id: crmLeads.id, status: crmLeads.status, customerId: crmLeads.customerId, receivedAt: crmLeads.receivedAt,
+      email: crmLeads.email, state: crmLeads.state, city: crmLeads.city, sourceLabel: crmLeads.sourceLabel, pageUrl: crmLeads.pageUrl,
+      message: crmLeads.message, phone: crmLeads.phone, fields: crmLeads.fields,
+    }).from(crmLeads)
+      .where(and(...where)).orderBy(leadOrder(sortRaw as LeadSortKey, dirRaw), desc(crmLeads.receivedAt), desc(crmLeads.id)).limit(100_000);
+    // A lead that was never "converted" in the CRM may still be a client — the same person imported from Housecall
+    // Pro, or added by hand. Match by email, else by phone digits, so the lead reads the client's real state.
+    const matched = await matchLeadsToClients(ctx.org.id, slim.filter((r) => !r.customerId));
+    const clientOf = (r: { id: string; customerId: string | null }) => r.customerId ?? matched.get(r.id) ?? null;
+    const facts = await bidFactsFor(ctx.org.id, slim.map(clientOf).filter(Boolean) as string[]);
+    const labelOf = (r: { id: string; status: string; customerId: string | null; receivedAt: Date | null }): BidState => {
+      const cid = clientOf(r);
+      return leadBidStateOf(r.status, cid ? (facts.get(cid) as BidFacts | undefined) ?? null : null, r.receivedAt);
+    };
+    const places = new Map(slim.map((r) => [r.id, leadPlaceOf(r as any, divisionStates, markets, { companyName: ctx.org.name })]));
+    // Lead visibility by location (shared/lead-visibility.ts): a restricted seat sees only its states / markets.
+    const rule = ctx.member.role === "owner" || ctx.permissions.manageSettings ? null : memberLeadRule(ctx.org.customFields, ctx.member.id);
+    // Place counts describe the tab under the search (before the place filters), so a state's count is what you get.
+    const stateCounts: Record<string, number> = {};
+    const marketCounts: Record<string, number> = {};
+    for (const r of (rule ? slim.filter((x) => leadAllowed(rule, places.get(x.id)!, UNKNOWN_STATE, UNKNOWN_MARKET)) : slim)) {
+      const p = places.get(r.id)!;
+      stateCounts[p.state] = (stateCounts[p.state] ?? 0) + 1;
+      marketCounts[p.market] = (marketCounts[p.market] ?? 0) + 1;
+    }
+    const visible = rule ? slim.filter((r) => leadAllowed(rule, places.get(r.id)!, UNKNOWN_STATE, UNKNOWN_MARKET)) : slim;
+    const placed = visible.filter((r) => {
+      const p = places.get(r.id)!;
+      return (!stateFilter || p.state === stateFilter) && (!marketRaw || p.market === marketRaw);
+    });
     const bidCounts = { open: 0, pending: 0, complete: 0, dead: 0 } as Record<BidState, number>;
-    for (const r of slim) bidCounts[labelOf(r)] += 1;
-    const labelled = bidState ? slim.filter((r) => labelOf(r) === bidState) : slim;
+    for (const r of placed) bidCounts[labelOf(r)] += 1;
+    const labelled = bidState ? placed.filter((r) => labelOf(r) === bidState) : placed;
     const pageIds = labelled.slice(offset, offset + limit).map((r) => r.id);
     const rowsUnordered = pageIds.length ? await db.select().from(crmLeads).where(and(eq(crmLeads.orgId, ctx.org.id), inArray(crmLeads.id, pageIds))) : [];
     const byId = new Map(rowsUnordered.map((r) => [r.id, r]));
     const rows = pageIds.map((id) => byId.get(id)!).filter(Boolean);
-    const custIds = [...new Set(rows.map((r) => r.customerId).filter(Boolean) as string[])];
+    const custIds = [...new Set(rows.map((r) => r.customerId ?? matched.get(r.id)).filter(Boolean) as string[])];
     const customers = new Map<string, string>();
     if (custIds.length) {
       for (const c of await db.select({ id: crmCustomers.id, displayName: crmCustomers.displayName }).from(crmCustomers)
         .where(and(eq(crmCustomers.orgId, ctx.org.id), inArray(crmCustomers.id, custIds)))) customers.set(c.id, c.displayName);
     }
-    const total = labelled.length;
+    // Exact SQL total when no derived filter narrows the tab (and no visibility rule); else the labelled set's size.
+    const sqlTotal = status === "all" ? Object.values(counts).reduce((a, b) => a + b, 0) : counts[status] ?? 0;
+    const total = !bidState && !stateFilter && !marketRaw && !rule ? sqlTotal : labelled.length;
     const [{ any }] = await db.select({ any: sql<number>`count(*)::int` }).from(crmLeads).where(eq(crmLeads.orgId, ctx.org.id));
-    res.json({ rows: rows.map((r) => ({ ...presentLead(r, customers), bidState: labelOf(r) })), total, counts, bidCounts, limit, offset, everAny: any > 0 });
+    const stateOptions = [...new Set([...divisionStates, ...Object.keys(stateCounts)])]
+      .filter((s) => s !== UNKNOWN_STATE).sort()
+      .map((code) => ({ code, name: US_STATE_NAMES[code] ?? code, count: stateCounts[code] ?? 0 }));
+    res.json({
+      rows: rows.map((r) => {
+        const mid = !r.customerId ? matched.get(r.id) ?? null : null;
+        return {
+          ...presentLead(r, customers), bidState: labelOf(r), place: places.get(r.id) ?? null,
+          // The client this lead matches by email / phone (not formally converted) — shown as a link, labelled from it.
+          matchedCustomer: mid && customers.has(mid) ? { id: mid, displayName: customers.get(mid)! } : null,
+        };
+      }),
+      total, counts, bidCounts, limit, offset, everAny: any > 0,
+      restricted: !!rule,
+      place: {
+        state: stateFilter ?? "all", market: marketRaw ?? "all", workspaceState,
+        states: [...stateOptions, { code: UNKNOWN_STATE, name: "Unknown", count: stateCounts[UNKNOWN_STATE] ?? 0 }],
+        markets: [...markets.map((m) => ({ key: m.key, name: m.name, state: m.state, count: marketCounts[m.key] ?? 0 })),
+          { key: UNKNOWN_MARKET, name: "No market", state: null, count: marketCounts[UNKNOWN_MARKET] ?? 0 }],
+      },
+    });
   });
 
   /**
@@ -618,11 +710,66 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
   });
 
   /** One lead (the bell's link opens it: /crm/leads?lead=<id>). */
+  /** Lead visibility by location for one lead: null when this seat may see it, else a 404 was sent. */
+  async function leadVisibleTo(ctx: OrgContext, lead: CrmLead): Promise<boolean> {
+    if (ctx.member.role === "owner" || ctx.permissions.manageSettings) return true;
+    const rule = memberLeadRule(ctx.org.customFields, ctx.member.id);
+    if (!rule) return true;
+    const divisions = await db.select({ state: crmDivisions.state }).from(crmDivisions).where(eq(crmDivisions.orgId, ctx.org.id));
+    const place = leadPlaceOf(lead as any, divisions.map((d) => d.state ?? ""), leadMarketsOf(ctx.org.customFields), { companyName: ctx.org.name });
+    return leadAllowed(rule, place, UNKNOWN_STATE, UNKNOWN_MARKET);
+  }
+
+  /** Settings → Leads: who may see which places. Owners and settings seats are never restricted. */
+  app.get("/api/crm/leads/visibility", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "manageSettings");
+    if (!ctx) return;
+    const [members, divisions] = await Promise.all([
+      db.select({ id: crmMembers.id, displayName: crmMembers.displayName, email: crmMembers.email, role: crmMembers.role, status: crmMembers.status })
+        .from(crmMembers).where(and(eq(crmMembers.orgId, ctx.org.id), eq(crmMembers.status, "active"))),
+      db.select({ state: crmDivisions.state }).from(crmDivisions).where(eq(crmDivisions.orgId, ctx.org.id)),
+    ]);
+    const markets = leadMarketsOf(ctx.org.customFields);
+    const states = [...new Set([...divisions.map((d) => normalizeUsState(d.state)), ...markets.map((m) => m.state)].filter(Boolean) as string[])].sort();
+    res.json({
+      members: members.map((m) => ({ ...m, alwaysAll: m.role === "owner" })),
+      rules: leadVisibilityOf(ctx.org.customFields),
+      states: states.map((code) => ({ code, name: US_STATE_NAMES[code] ?? code })),
+      markets: markets.map((m) => ({ key: m.key, name: m.name, state: m.state })),
+    });
+  });
+  app.put("/api/crm/leads/visibility", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "manageSettings");
+    if (!ctx) return;
+    const parsed = z.object({
+      rules: z.record(z.string().max(64), z.object({
+        states: z.array(z.string().max(20)).max(60),
+        markets: z.array(z.string().max(40)).max(200),
+        unknownToo: z.boolean().optional(),
+      }).nullable()).refine((r) => Object.keys(r).length <= 500),
+    }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Send { rules: { [memberId]: { states, markets, unknownToo } | null } }" });
+    const members = await db.select({ id: crmMembers.id }).from(crmMembers).where(eq(crmMembers.orgId, ctx.org.id));
+    const known = new Set(members.map((m) => m.id));
+    const next: Record<string, unknown> = { ...leadVisibilityOf(ctx.org.customFields) };
+    for (const [memberId, rule] of Object.entries(parsed.data.rules)) {
+      if (!known.has(memberId)) return res.status(400).json({ message: "Unknown team member" });
+      if (!rule || (!rule.states.length && !rule.markets.length)) delete next[memberId];
+      else next[memberId] = { states: [...new Set(rule.states.map((s) => normalizeUsState(s)).filter(Boolean))], markets: [...new Set(rule.markets)], unknownToo: rule.unknownToo === true };
+    }
+    const [org] = await db.update(crmOrgs).set({
+      customFields: sql`coalesce(${crmOrgs.customFields}, '{}'::jsonb) || jsonb_build_object('leadVisibility', ${JSON.stringify(next)}::jsonb)`,
+      updatedAt: new Date(),
+    } as any).where(eq(crmOrgs.id, ctx.org.id)).returning();
+    logActivity(ctx, "leads.visibility.updated", { entityType: "org", entityId: ctx.org.id, meta: { members: Object.keys(next).length } });
+    res.json({ rules: leadVisibilityOf(org.customFields) });
+  });
+
   app.get("/api/crm/leads/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageCustomers");
     if (!ctx) return;
     const [lead] = await db.select().from(crmLeads).where(and(eq(crmLeads.orgId, ctx.org.id), eq(crmLeads.id, String(req.params.id)))).limit(1);
-    if (!lead) return res.status(404).json({ message: "Lead not found" });
+    if (!lead || !(await leadVisibleTo(ctx, lead))) return res.status(404).json({ message: "Lead not found" });
     const customers = new Map<string, string>();
     if (lead.customerId) {
       const [c] = await db.select({ id: crmCustomers.id, displayName: crmCustomers.displayName }).from(crmCustomers)
@@ -635,6 +782,10 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
   app.patch("/api/crm/leads/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageCustomers");
     if (!ctx) return;
+    {
+      const [cur] = await db.select().from(crmLeads).where(and(eq(crmLeads.orgId, ctx.org.id), eq(crmLeads.id, String(req.params.id)))).limit(1);
+      if (!cur || !(await leadVisibleTo(ctx, cur))) return res.status(404).json({ message: "Lead not found" });
+    }
     const parsed = statusSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: `Status must be one of: ${CRM_LEAD_LIST_STATUSES.join(", ")}.` });
     const [row] = await db.update(crmLeads).set({ status: parsed.data.status, updatedAt: new Date() })
@@ -655,7 +806,7 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     const body = parsed.data;
     if (body.addToPipeline && !ctx.permissions.manageJobs) return res.status(403).json({ message: "Requires permission: manageJobs" });
     const [lead] = await db.select().from(crmLeads).where(and(eq(crmLeads.orgId, ctx.org.id), eq(crmLeads.id, String(req.params.id)))).limit(1);
-    if (!lead) return res.status(404).json({ message: "Lead not found" });
+    if (!lead || !(await leadVisibleTo(ctx, lead))) return res.status(404).json({ message: "Lead not found" });
     // A second click or a retry must not make a second client.
     if (lead.status === "converted" && lead.customerId) {
       const [existing] = await db.select().from(crmCustomers)

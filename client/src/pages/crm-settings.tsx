@@ -1497,6 +1497,9 @@ export default function CrmSettingsPage() {
         </Card>
       )}
 
+      {/* ── Lead visibility by location (owner, 2026-10-18) ─────────────── */}
+      <LeadVisibilityCard />
+
       {/* ── Payments ────────────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -2056,5 +2059,89 @@ export default function CrmSettingsPage() {
         <a href="/crm-privacy" className="hover:underline" data-testid="link-crm-privacy">Privacy Policy</a>
       </p>
     </CrmPage>
+  );
+}
+
+/**
+ * Settings → Lead visibility by location: per team member, the states and markets whose leads they may see. No
+ * boxes ticked = every lead. Owners and seats that run Settings always see everything (server/crm/leads.ts).
+ */
+function LeadVisibilityCard() {
+  const { toast } = useToast();
+  const { data, isError } = useQuery<{
+    members: { id: string; displayName: string | null; email: string | null; role: string; alwaysAll: boolean }[];
+    rules: Record<string, { states: string[]; markets: string[]; unknownToo: boolean }>;
+    states: { code: string; name: string }[];
+    markets: { key: string; name: string; state: string }[];
+  }>({ queryKey: ["/api/crm/leads/visibility"] });
+  const [draft, setDraft] = useState<Record<string, { states: string[]; markets: string[]; unknownToo: boolean }>>({});
+  useEffect(() => { if (data) setDraft(data.rules ?? {}); }, [data]);
+  const save = useMutation({
+    mutationFn: async () => (await apiRequest("PUT", "/api/crm/leads/visibility", { rules: draft })).json(),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/crm/leads/visibility"] }); toast({ title: "Lead visibility saved" }); },
+    onError: (e: any) => toast({ title: "Could not save lead visibility", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const ruleOf = (id: string) => draft[id] ?? { states: [], markets: [], unknownToo: false };
+  const toggle = (id: string, kind: "states" | "markets", value: string) => setDraft((d) => {
+    const r = { ...(d[id] ?? { states: [], markets: [], unknownToo: false }) };
+    const list = new Set(r[kind]); list.has(value) ? list.delete(value) : list.add(value); r[kind] = [...list];
+    return { ...d, [id]: r };
+  });
+  if (isError || !data) return null;
+  const people = data.members.filter((m) => !m.alwaysAll);
+  return (
+    <Card>
+      <CardHeader>
+        <SectionTitle icon={Users} title="Lead visibility by location"
+          description="Choose which states or markets each team member can see leads for. Nothing ticked means every lead. Owners always see everything." />
+      </CardHeader>
+      <CardContent className="space-y-3" data-testid="section-lead-visibility">
+        {!people.length ? (
+          <p className="text-sm text-muted-foreground">Only owners on the team so far — add a team member and their lead access shows here.</p>
+        ) : people.map((m) => {
+          const r = ruleOf(m.id);
+          const restricted = r.states.length > 0 || r.markets.length > 0;
+          return (
+            <div key={m.id} className="rounded-lg border p-3 space-y-2" data-testid={`lead-visibility-${m.id}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-medium">{m.displayName || m.email} <span className="text-xs font-normal text-muted-foreground">· {m.role}</span></div>
+                <span className="text-xs text-muted-foreground">{restricted ? "Sees only the places ticked" : "Sees every lead"}</span>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
+                <span className="text-xs uppercase tracking-wide text-muted-foreground w-full">States</span>
+                {data.states.map((s) => (
+                  <label key={s.code} className="flex items-center gap-1.5">
+                    <Checkbox checked={r.states.includes(s.code)} onCheckedChange={() => toggle(m.id, "states", s.code)} data-testid={`check-lead-state-${m.id}-${s.code}`} /> {s.name}
+                  </label>
+                ))}
+              </div>
+              {data.markets.length > 0 && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground w-full">Markets</span>
+                  {data.markets.map((mk) => (
+                    <label key={mk.key} className="flex items-center gap-1.5">
+                      <Checkbox checked={r.markets.includes(mk.key)} onCheckedChange={() => toggle(m.id, "markets", mk.key)} data-testid={`check-lead-market-${m.id}-${mk.key}`} /> {mk.name} <span className="text-xs text-muted-foreground">{mk.state}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {restricted && (
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Checkbox checked={r.unknownToo} onCheckedChange={(v) => setDraft((d) => ({ ...d, [m.id]: { ...ruleOf(m.id), unknownToo: v === true } }))} data-testid={`check-lead-unknown-${m.id}`} />
+                  Also show leads whose place is unknown
+                </label>
+              )}
+            </div>
+          );
+        })}
+        {people.length > 0 && (
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending} data-testid="button-save-lead-visibility">
+              {save.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Save lead visibility
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

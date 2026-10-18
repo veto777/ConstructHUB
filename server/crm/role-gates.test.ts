@@ -333,6 +333,9 @@ const ROUTES: RouteRow[] = [
   R("POST", "/api/crm/estimates/:id/remind", "manageEstimates", { path: (t) => `/api/crm/estimates/${t.estimate}/remind`, effect: true, scoped: true }),
   R("POST", "/api/crm/estimates/:id/invoice", { all: ["manageInvoices", "seePrices"] }, { path: (t) => `/api/crm/estimates/${t.estimate}/invoice`, effect: true, scoped: true }),
   R("POST", "/api/crm/estimates/:id/payment-link", { all: ["takePayment", "seePrices"] }, { path: (t) => `/api/crm/estimates/${t.estimate}/payment-link`, effect: true, scoped: true }),
+  // Lead visibility by location (Settings → Leads): owners / settings seats only.
+  R("GET", "/api/crm/leads/visibility", "manageSettings"),
+  R("PUT", "/api/crm/leads/visibility", "manageSettings", { body: { rules: {} } }),
   // Dead lead: sales or customer managers mark it; a colleague's client is 404 for a scoped seat.
   R("POST", "/api/crm/customers/:id/dead-lead", { any: ["manageCustomers", "manageEstimates"] }, { path: (t) => `/api/crm/customers/${t.customer}/dead-lead`, body: { dead: true, reason: "test" }, scoped: true }),
   // Off-platform deposit recorded against the signed estimate (server/crm/payment-reconcile.ts).
