@@ -5,6 +5,7 @@
  * all queries by that org id. An org id is never taken from the request body.
  */
 import type { Express } from "express";
+import { normalizeClientPageLayout } from "@shared/client-page-layout";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { db } from "../db";
@@ -224,6 +225,9 @@ const orgPatchSchema = z.object({
   // The main (band) colour the accent pairs with — black (default) or white.
   // Merged into custom_fields as themeBase; null clears back to black.
   themeBase: z.enum(["black", "white"]).nullable().optional(),
+  // The client page's container order and hidden set (shared/client-page-layout.ts); merged into custom_fields as
+  // clientPageLayout, normalized (unknown keys dropped); null resets to the default.
+  clientPageLayout: z.object({ order: z.array(z.string().max(40)).max(40), hidden: z.array(z.string().max(40)).max(40) }).nullable().optional(),
   // Text alerts to the owner's mobile on signed approvals and payments.
   // Opt-in (default off): texting costs money per message.
   smsAlerts: z.boolean().optional(),
@@ -718,9 +722,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
     // data) is never clobbered.
-    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, ...profile } = parsed.data;
+    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, clientPageLayout, ...profile } = parsed.data;
     const mergedCustomFields =
-      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined
+      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined || clientPageLayout !== undefined
         ? (() => {
             const base = {
               ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
@@ -746,6 +750,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
             if (smsEstimates !== undefined) base.smsEstimates = smsEstimates;
             if (voiceNudge !== undefined) base.voiceNudge = voiceNudge;
             if (discountDefaults !== undefined) base.discountDefaults = discountDefaults;
+            if (clientPageLayout !== undefined) {
+              if (clientPageLayout === null) delete base.clientPageLayout;
+              else base.clientPageLayout = normalizeClientPageLayout(clientPageLayout);
+            }
             return base;
           })()
         : undefined;

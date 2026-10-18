@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ClientPageLayoutCard } from "@/components/client-page-layout";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -1003,6 +1004,9 @@ export default function CrmSettingsPage() {
       </Card>
 
       {/* ── Bid discounts (org defaults) ────────────────────────────────── */}
+      {/* Client page — container order and which show (owner/admin). */}
+      <ClientPageLayoutCard />
+
       <Card data-testid="card-bid-discounts">
         <CardHeader>
           <SectionTitle
