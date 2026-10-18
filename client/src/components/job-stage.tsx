@@ -37,12 +37,13 @@ export function JobStageTracker({ stage, testId = "job-stage-tracker", onPick, b
           const tone = TONE[s.key];
           return (
             <li key={s.key} className="flex flex-1 items-center" data-testid={`${testId}-${s.key}`} aria-current={current ? "step" : undefined}>
+              {/* The phase the job is ON is green; every phase it has moved past is blue with a check (owner). */}
               <button type="button" disabled={!onPick || busy || current} onClick={() => onPick?.(s.key)}
                 title={onPick && !current ? `Move the job to ${s.label}` : undefined}
-                className={`flex flex-1 items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition-colors disabled:cursor-default ${onPick && !current ? "hover:border-foreground/40" : ""} ${current ? `${tone.soft} border-current ${tone.text}` : done ? "border-transparent bg-muted/60" : "border-dashed border-border bg-background text-muted-foreground"}`}
+                className={`flex flex-1 items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition-colors disabled:cursor-default ${onPick && !current ? "hover:border-foreground/40" : ""} ${current ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300" : done ? "border-transparent bg-sky-50 dark:bg-sky-950/40" : "border-dashed border-border bg-background text-muted-foreground"}`}
                 data-testid={`button-${testId}-${s.key}`}>
                 {/* Every finished step gets the same blue check (owner): the grey of a Bid-only tone never reads as done. */}
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${done ? "bg-sky-600" : current ? tone.solid : "bg-muted-foreground/30"}`}>
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${done ? "bg-sky-600" : current ? "bg-emerald-600" : "bg-muted-foreground/30"}`}>
                   {done ? <Check className="h-4 w-4" aria-hidden="true" /> : i + 1}
                 </span>
                 <span className={`whitespace-nowrap text-sm ${current ? "font-bold" : done ? "font-semibold text-foreground" : "font-medium"}`}>{s.label}</span>
