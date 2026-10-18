@@ -31,13 +31,23 @@ function burst(canvas: HTMLCanvasElement, onDone: () => void): () => void {
       });
     }
   };
-  add(0, H, -Math.PI / 3, 0.8, 18, 90);
-  add(W, H, -2 * Math.PI / 3, 0.8, 18, 90);
-  add(W / 2, -10, Math.PI / 2, 2.2, 5, 70);
+  // About five seconds of it (owner): the corner cannons fire again every ¾ s for the first 3½ s, the top keeps
+  // showering until the last second, and everything fades out over the final second. Phones get a lighter load.
+  const scale = W < 640 ? 0.6 : 1;
+  const TOTAL = 300, FADE_FROM = 240;
+  const shot = () => {
+    add(0, H, -Math.PI / 3, 0.8, 18, Math.round(70 * scale));
+    add(W, H, -2 * Math.PI / 3, 0.8, 18, Math.round(70 * scale));
+    add(W / 2, H, -Math.PI / 2, 1.2, 16, Math.round(40 * scale));
+  };
+  shot();
+  add(W / 2, -10, Math.PI / 2, 2.2, 5, Math.round(80 * scale));
   let raf = 0, frames = 0, stopped = false;
   const tick = () => {
     if (stopped) return;
     frames++;
+    if (frames % 45 === 0 && frames <= 210) shot();
+    if (frames % 6 === 0 && frames < FADE_FROM) add(Math.random() * W, -10, Math.PI / 2, 1.6, 4, Math.round(4 * scale));
     ctx.clearRect(0, 0, W, H);
     let alive = 0;
     for (const p of pieces) {
@@ -48,17 +58,17 @@ function burst(canvas: HTMLCanvasElement, onDone: () => void): () => void {
       ctx.save();
       ctx.translate(p.x, p.y); ctx.rotate(p.rot);
       ctx.fillStyle = p.color;
-      ctx.globalAlpha = frames > 150 ? Math.max(0, 1 - (frames - 150) / 60) : 1;
+      ctx.globalAlpha = frames > FADE_FROM ? Math.max(0, 1 - (frames - FADE_FROM) / (TOTAL - FADE_FROM)) : 1;
       if (p.shape) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); } else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
       ctx.restore();
     }
-    if (alive && frames < 210) raf = requestAnimationFrame(tick); else onDone();
+    if ((alive || frames < FADE_FROM) && frames < TOTAL) raf = requestAnimationFrame(tick); else onDone();
   };
   raf = requestAnimationFrame(tick);
   return () => { stopped = true; cancelAnimationFrame(raf); };
 }
 
-/** Mount it to fire once; it calls `onDone` when the pieces have fallen (about 3.5 s) or the person taps it away. */
+/** Mount it to fire once; it calls `onDone` when the pieces have fallen (about 5 s) or the person taps it away. */
 export function ConfettiCelebration({ title = "Congrats — a job has been closed out!", subtitle, onDone }: {
   title?: string; subtitle?: string | null; onDone: () => void;
 }) {
