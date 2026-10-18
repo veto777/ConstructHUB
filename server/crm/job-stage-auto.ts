@@ -25,6 +25,8 @@ import { queueCrmEvent, queueProjectStageChange, projectEventPayload } from "./i
 import { nextDocNumber } from "./entities";
 import { adoptHoverMeasurementsForProject } from "./hover-share";
 import { notifyMembers } from "./notify";
+import { anchorPassesPhase } from "@shared/job-flow";
+import { enterPhase, loadJobFlow } from "./job-flow";
 
 type Project = typeof crmProjects.$inferSelect;
 type Estimate = typeof crmEstimates.$inferSelect;
@@ -106,6 +108,7 @@ export async function advanceJobStage(args: {
         meta: { name: created.name, number: created.number, from: null, to: status, stage: args.to, trigger: args.trigger, created: true, ...(args.meta ?? {}) },
       });
       await stageSideEffects({ orgId: args.orgId, project: created, from: null, actor: args.actor });
+      await enterPhase({ orgId: args.orgId, project: created, phaseKey: args.to, trigger: args.trigger });
       return { moved: true, created: true, project: created, from: null, to: status };
     }
 
@@ -113,6 +116,8 @@ export async function advanceJobStage(args: {
     if (!status) return { moved: false, created: false, project, from: project.status, to: null };
     const patch: Partial<Project> = { status, stageChangedAt: new Date(), updatedAt: new Date() };
     if (args.contractValueCents != null) patch.contractValueCents = args.contractValueCents;
+    // A custom phase of the account's flow stays the current one unless this anchor is AHEAD of it (never backward).
+    if (project.stageKey && anchorPassesPhase(await loadJobFlow(args.orgId), args.to, project.stageKey)) patch.stageKey = null;
     const [row] = await db.update(crmProjects).set(patch)
       .where(and(eq(crmProjects.orgId, args.orgId), eq(crmProjects.id, project.id))).returning();
     if (!row) return { moved: false, created: false, project, from: project.status, to: null };
@@ -127,6 +132,7 @@ export async function advanceJobStage(args: {
       meta: { name: row.name, number: row.number, from: project.status, to: row.status, stage: args.to, trigger: args.trigger, ...(args.meta ?? {}) },
     });
     await stageSideEffects({ orgId: args.orgId, project: row, from: project.status, actor: args.actor });
+    await enterPhase({ orgId: args.orgId, project: row, phaseKey: args.to, trigger: args.trigger });
     return { moved: true, created: false, project: row, from: project.status, to: row.status };
   } catch (e: any) {
     console.error(`[crm] job stage auto-advance (${args.trigger}) failed:`, e?.message || e);

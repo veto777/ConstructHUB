@@ -24,8 +24,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
-  JOB_STAGES, STAGE_PROJECT_STATUS, currentProject, jobStageLabel, jobStageOf, stageIndex, stageOfProjectStatus, type JobStage,
+  STAGE_PROJECT_STATUS, currentProject, jobStageLabel, jobStageOf, stageIndex, stageOfProjectStatus, type JobStage,
 } from "@shared/job-stage";
+import { DEFAULT_JOB_FLOW, anchorStatusBefore, currentPhaseKey, phaseIndex, phaseLabel, type FlowPhase, type JobFlow } from "@shared/job-flow";
 import { newPunchId, openWalkthroughs, parsePunchPhotoName, type PunchScope } from "@shared/punch-list";
 
 /** The pill's colours (Google Reviews lists): grey while bidding, blue once it is out, green from approval on. */
@@ -39,19 +40,22 @@ const TONE: Record<JobStage, { solid: string; soft: string; text: string }> = {
 };
 
 /**
- * The six steps: the one the job is ON is solid green, every step it has moved past is blue with a check, the NEXT
- * step is lit with a blue outline (the call to action), the rest grey dashed. Two by two on a phone.
+ * The account's phases (Settings → Job flow; the six built-in ones by default): the one the job is ON is solid
+ * green, every phase it has moved past is blue with a check, the NEXT one is lit with a blue outline (the call to
+ * action), the rest grey dashed. Two by two on a phone; the row wraps when there are more than six.
  */
-export function JobStageTracker({ stage, testId = "job-stage-tracker", onPick, busy }: {
-  stage: JobStage | null; testId?: string;
-  /** Makes each step a button that moves the job there. */
-  onPick?: (s: JobStage) => void; busy?: boolean;
+export function JobStageTracker({ current, flow = DEFAULT_JOB_FLOW, testId = "job-stage-tracker", onPick, busy }: {
+  /** The current phase's key (a built-in stage or a custom phase). */
+  current: string | null; flow?: JobFlow; testId?: string;
+  /** Makes each phase a button that moves the job there. */
+  onPick?: (p: FlowPhase) => void; busy?: boolean;
 }) {
-  const at = stageIndex(stage);
+  const at = phaseIndex(flow, current);
+  const wraps = flow.phases.length > 6;
   return (
-    <div data-testid={testId} aria-label={`Job stage: ${jobStageLabel(stage) ?? "no job yet"}`}>
-      <ol className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-0">
-        {JOB_STAGES.map((s, i) => {
+    <div data-testid={testId} aria-label={`Job stage: ${phaseLabel(flow, current) ?? "no job yet"}`}>
+      <ol className={`grid grid-cols-2 gap-2 ${wraps ? "sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" : "sm:flex sm:items-center sm:gap-0"}`}>
+        {flow.phases.map((s, i) => {
           const done = i < at, current = i === at, next = i === at + 1;
           const box = current ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
             : done ? "border-transparent bg-sky-50 dark:bg-sky-950/40"
@@ -61,7 +65,7 @@ export function JobStageTracker({ stage, testId = "job-stage-tracker", onPick, b
             <li key={s.key} className="flex flex-1 items-center" data-testid={`${testId}-${s.key}`} aria-current={current ? "step" : undefined}
               data-state={current ? "current" : done ? "done" : next ? "next" : "later"}>
               {/* The phase the job is ON is green; every phase it has moved past is blue with a check (owner). */}
-              <button type="button" disabled={!onPick || busy || current} onClick={() => onPick?.(s.key)}
+              <button type="button" disabled={!onPick || busy || current} onClick={() => onPick?.(s)}
                 title={onPick && !current ? `Move the job to ${s.label}` : undefined}
                 className={`flex flex-1 items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition-colors disabled:cursor-default ${onPick && !current ? "hover:border-foreground/40" : ""} ${box}`}
                 data-testid={`button-${testId}-${s.key}`}>
@@ -69,9 +73,9 @@ export function JobStageTracker({ stage, testId = "job-stage-tracker", onPick, b
                 <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${done ? "bg-sky-600 text-white" : current ? "bg-emerald-600 text-white" : next ? "border-2 border-sky-500 text-sky-700 dark:text-sky-300" : "bg-muted-foreground/30 text-white"}`}>
                   {done ? <Check className="h-4 w-4" aria-hidden="true" /> : i + 1}
                 </span>
-                <span className={`whitespace-nowrap text-sm ${current ? "font-bold" : done ? "font-semibold text-foreground" : next ? "font-semibold" : "font-medium"}`}>{s.label}</span>
+                <span className={`text-sm ${wraps ? "" : "whitespace-nowrap"} ${current ? "font-bold" : done ? "font-semibold text-foreground" : next ? "font-semibold" : "font-medium"}`}>{s.label}</span>
               </button>
-              {i < JOB_STAGES.length - 1 && <span className={`hidden h-0.5 w-3 shrink-0 sm:block ${i < at ? "bg-foreground/40" : "bg-border"}`} aria-hidden="true" />}
+              {!wraps && i < flow.phases.length - 1 && <span className={`hidden h-0.5 w-3 shrink-0 sm:block ${i < at ? "bg-foreground/40" : "bg-border"}`} aria-hidden="true" />}
             </li>
           );
         })}
@@ -397,11 +401,13 @@ function PunchListBlock({ projectId, customerId, canEdit, onClosedOut, onScopes 
  */
 export function JobStageControl({
   customer, estimates, projects, appointments = [], companyName, canEdit, measured = false, canSeePrices = false, canAttach = false,
-  celebrations = true, onSchedule,
+  celebrations = true, flow = DEFAULT_JOB_FLOW, onSchedule,
 }: {
   customer: { id: string; displayName: string; firstName?: string | null; phone?: string | null };
   estimates: SubmittedEstimate[];
-  projects: { id: string; status?: string | null; name?: string | null; createdAt?: string | null }[];
+  projects: { id: string; status?: string | null; name?: string | null; createdAt?: string | null; stageKey?: string | null }[];
+  /** The account's phases (Settings → Job flow). */
+  flow?: JobFlow;
   /** This client's calendar visits — the scheduled start and the Job Scheduled gate. */
   appointments?: StageAppointment[];
   companyName: string;
@@ -419,6 +425,7 @@ export function JobStageControl({
   const { toast } = useToast();
   const stage = jobStageOf({ estimates, projects, measured });
   const project = currentProject(projects);
+  const current = currentPhaseKey(flow, stage, project?.stageKey);
   const appt = pickAppointment(appointments, project?.id);
   const first = customer.firstName?.trim() || customer.displayName.split(/\s+/)[0];
   const jobName = project?.name?.trim() || estimates.find((e) => e.status === "approved")?.title?.trim() || "project";
@@ -431,13 +438,23 @@ export function JobStageControl({
   const endParty = useCallback(() => setParty(false), []);
 
   const move = useMutation({
-    mutationFn: async ({ to, message }: { to: JobStage; message?: string }) => {
-      const status = STAGE_PROJECT_STATUS[to];
+    mutationFn: async ({ to, message }: { to: FlowPhase; message?: string }) => {
+      const newName = jobName === "project" ? `${customer.displayName} job` : jobName;
+      if (!to.builtin) {
+        // A custom phase: stored beside the status, which stays as it is (the built-in anchors keep their meaning).
+        if (project) await apiRequest("PATCH", `/api/crm/projects/${project.id}`, { stageKey: to.key });
+        else await apiRequest("POST", "/api/crm/projects", { customerId: customer.id, name: newName, status: anchorStatusBefore(flow, to.key), stageKey: to.key });
+        return { to, texted: null as string | null };
+      }
+      const status = STAGE_PROJECT_STATUS[to.builtin];
       // Never knock an invoiced/paid job back to "complete": it is already Closed out.
-      if (project && stageOfProjectStatus(project.status) !== to) {
+      if (project && stageOfProjectStatus(project.status) !== to.builtin) {
         await apiRequest("PATCH", `/api/crm/projects/${project.id}`, { status });
+      } else if (project && project.stageKey) {
+        // Same status, but the job sat at a custom phase: back to the built-in one.
+        await apiRequest("PATCH", `/api/crm/projects/${project.id}`, { stageKey: null });
       } else if (!project) {
-        await apiRequest("POST", "/api/crm/projects", { customerId: customer.id, name: jobName === "project" ? `${customer.displayName} job` : jobName, status });
+        await apiRequest("POST", "/api/crm/projects", { customerId: customer.id, name: newName, status });
       }
       let texted: string | null = null;
       if (message) {
@@ -454,9 +471,9 @@ export function JobStageControl({
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/pipeline"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/attention"] });
       setClosing(false);
-      if (to === "closed_out") celebrate();
+      if (to.builtin === "closed_out") celebrate();
       toast({
-        title: `Job moved to ${jobStageLabel(to)}`,
+        title: `Job moved to ${to.label}`,
         description: texted === "sent" ? `Closing text sent to ${customer.displayName}.` : texted ? `The text was not sent: ${texted}` : undefined,
         variant: texted && texted !== "sent" ? "destructive" : undefined,
       });
@@ -464,20 +481,21 @@ export function JobStageControl({
     onError: (e) => toast({ title: "Couldn't move the job", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
-  const pick = (to: JobStage) => {
-    if (to === "closed_out") {
+  const pick = (to: FlowPhase) => {
+    if (to.builtin === "closed_out") {
       setText(`Hi ${first}, your ${jobName} is officially closed out. Thank you for choosing us — we really appreciated working with you!`);
       setSendText(!!customer.phone);
       setClosing(true);
       return;
     }
     // Job Scheduled means a visit on the calendar: without one, book it (the server moves the stage on its own).
-    if (to === "job_scheduled" && !appt && onSchedule) {
+    if (to.builtin === "job_scheduled" && !appt && onSchedule) {
       onSchedule(project?.id ?? null);
       return;
     }
     move.mutate({ to });
   };
+  const closedOutPhase = flow.phases.find((p) => p.builtin === "closed_out")!;
 
   const walk = openWalkthroughs(scopes);
   const showPunch = !!project && stageIndex(stage) >= stageIndex("job_scheduled");
@@ -486,8 +504,8 @@ export function JobStageControl({
 
   return (
     <>
-      <JobStageTracker stage={stage} onPick={canEdit ? pick : undefined} busy={move.isPending} />
-      {canEdit && <p className="mt-2 text-xs text-muted-foreground">Tap a stage to move the job — it also moves on its own when a bid is sent or approved, a visit goes on the calendar or an invoice goes out. Closed out puts the client on the Google Reviews list.</p>}
+      <JobStageTracker current={current} flow={flow} onPick={canEdit ? pick : undefined} busy={move.isPending} />
+      {canEdit && <p className="mt-2 text-xs text-muted-foreground">Tap a phase to move the job — it also moves on its own when a bid is sent or approved, a visit goes on the calendar or an invoice goes out. {closedOutPhase.label} puts the client on the Google Reviews list.{flow.phases.length > 6 ? " Add or change phases in Settings → Job flow." : ""}</p>}
 
       {needsCall && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2.5 text-sm dark:border-emerald-900 dark:bg-emerald-950/30" data-testid="stage-reminder-schedule">
@@ -521,7 +539,7 @@ export function JobStageControl({
             <DialogTitle>Close out {customer.displayName}'s job?</DialogTitle>
             <DialogDescription>
               {walk.open > 0 ? <><b>{walk.open} of {walk.total} walkthrough{walk.total === 1 ? "" : "s"} not done</b> — close out anyway? </> : null}
-              The job moves to <b>Closed out</b> and the client joins the Google Reviews "Ready to ask" list.
+              The job moves to <b>{closedOutPhase.label}</b> and the client joins the Google Reviews "Ready to ask" list.
             </DialogDescription>
           </DialogHeader>
           <label className="flex items-center gap-2 text-sm font-semibold">
@@ -534,7 +552,7 @@ export function JobStageControl({
           )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setClosing(false)}>Cancel</Button>
-            <Button onClick={() => move.mutate({ to: "closed_out", message: sendText && text.trim() ? text.trim() : undefined })}
+            <Button onClick={() => move.mutate({ to: closedOutPhase, message: sendText && text.trim() ? text.trim() : undefined })}
               disabled={move.isPending} data-testid="button-close-out-confirm">
               {move.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {sendText ? "Close out & send text" : walk.open > 0 ? "Close out anyway" : "Close out"}

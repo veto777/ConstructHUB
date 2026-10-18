@@ -3,6 +3,7 @@ import { ClientSection, ClientSections, useClientPageLayout } from "@/components
 import { PricebookItemInput } from "@/components/pricebook-item-input";
 import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff";
 import { JobStageControl } from "@/components/job-stage";
+import { useJobFlow } from "@/components/job-flow-settings";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation, Link } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -531,6 +532,7 @@ export default function CrmClientPage() {
   const [, setLocation] = useLocation();
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  const flow = useJobFlow(me);
   const interestMap = useClientInterest(!!id && me?.permissions?.manageEstimates === true, { customerId: id });
   const canEstimate = me?.permissions?.manageEstimates === true;
   const canSeePrices = me?.permissions?.seePrices === true;
@@ -1263,7 +1265,7 @@ export default function CrmClientPage() {
           <JobStageControl customer={c} estimates={estimates} projects={data.projects ?? []} appointments={appointments}
             companyName={me?.org?.name ?? "us"} canEdit={canManageJobs} measured={!!stageTakeoff?.takeoffs?.length || !!stageTakeoff?.takeoff}
             canSeePrices={canSeePrices} canAttach={canManageCustomers}
-            celebrations={(me?.org?.customFields as any)?.celebrations !== false}
+            celebrations={(me?.org?.customFields as any)?.celebrations !== false} flow={flow}
             onSchedule={canManageJobs ? openSchedule : undefined} />
         </CardContent>
       </Card>

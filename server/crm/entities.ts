@@ -37,6 +37,9 @@ import { logTeamActivity, projectStageLabel } from "./stats";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
 import { advanceJobStage, stageSideEffects } from "./job-stage-auto";
+import { enterPhase, jobFlowOf } from "./job-flow";
+import { anchorStatusBefore, isBuiltinKey, phaseOf } from "@shared/job-flow";
+import { stageOfProjectStatus } from "@shared/job-stage";
 import { loadActorDirectory, estimateEventActor } from "./actors";
 import { actorLabel } from "@shared/crm-actor";
 import { estimateDefaultsFromOrg, estimateDocText, depositFromBps } from "./doc-defaults";
@@ -545,6 +548,8 @@ const projectSchema = z.object({
   permitNumber: z.string().max(80).nullable().optional(),
   parcelNumber: z.string().max(80).nullable().optional(),
   customFields: z.record(z.any()).nullable().optional(),
+  // A custom phase of the account's job flow (shared/job-flow.ts); null = the built-in stage derived from status.
+  stageKey: z.string().max(40).nullable().optional(),
 });
 
 const jobSchema = z.object({
@@ -1083,6 +1088,12 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       if (!div) return res.status(400).json({ message: "Division not found in this organization" });
     }
 
+    // Born at a custom phase (the tracker with no project yet): the status of the built-in phase before it.
+    const flow = jobFlowOf(ctx.org.customFields);
+    if (parsed.data.stageKey) {
+      if (isBuiltinKey(parsed.data.stageKey) || !phaseOf(flow, parsed.data.stageKey)) return res.status(400).json({ message: "Unknown phase — check Settings → Job flow" });
+      parsed.data.status ??= anchorStatusBefore(flow, parsed.data.stageKey);
+    }
     // Number and insert in one transaction under the per-org number lock —
     // never count(*)+1, which repeats after a delete and races.
     const row = await db.transaction(async (tx) => {
@@ -1097,6 +1108,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     await adoptHoverMeasurementsForProject(row);
     // A project born Approved (the client page's stage toggle) gets the schedule-the-start reminder too.
     await stageSideEffects({ orgId: ctx.org.id, project: row, from: null, actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email } });
+    // The phase it was born at sends its alerts (Settings → Job flow).
+    await enterPhase({ orgId: ctx.org.id, project: row, phaseKey: row.stageKey ?? stageOfProjectStatus(row.status), trigger: "created", org: ctx.org });
     res.status(201).json(presentProject(row, ctx));
   });
 
@@ -1120,16 +1133,27 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       const div = await getDivision(ctx.org.id, parsed.data.divisionId);
       if (!div) return res.status(400).json({ message: "Division not found in this organization" });
     }
-    const [before] = await db.select({ status: crmProjects.status }).from(crmProjects)
+    const [before] = await db.select({ status: crmProjects.status, stageKey: crmProjects.stageKey }).from(crmProjects)
       .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, req.params.id))).limit(1);
     const patch: any = { ...parsed.data, updatedAt: new Date() };
+    const statusChanges = !!parsed.data.status && before?.status !== parsed.data.status;
+    // The tracker's custom phases (Settings → Job flow): a custom phase is stored beside the status and shown as the
+    // current one; a move to a built-in phase (a status change with no stageKey) clears it.
+    const flow = jobFlowOf(ctx.org.customFields);
+    if (parsed.data.stageKey) {
+      if (isBuiltinKey(parsed.data.stageKey) || !phaseOf(flow, parsed.data.stageKey)) return res.status(400).json({ message: "Unknown phase — check Settings → Job flow" });
+    } else if (parsed.data.stageKey === undefined && statusChanges && before?.stageKey) {
+      patch.stageKey = null;
+    }
+    const phaseChanges = parsed.data.stageKey !== undefined && (before?.stageKey ?? null) !== parsed.data.stageKey;
     // Time-in-stage restarts only on a real move — the edit dialog and API
     // callers may resend the unchanged status with other edits.
-    if (parsed.data.status && before?.status !== parsed.data.status) patch.stageChangedAt = new Date();
+    if (statusChanges || phaseChanges) patch.stageChangedAt = new Date();
     const [row] = await db.update(crmProjects).set(patch)
       .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, req.params.id))).returning();
     if (!row) return res.status(404).json({ message: "Project not found" });
-    if (parsed.data.status && before && before.status !== parsed.data.status) {
+    const actor = { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email };
+    if (statusChanges && before) {
       await logTeamActivity({
         orgId: ctx.org.id, memberId: ctx.member.id,
         type: "projectStage",
@@ -1138,7 +1162,16 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       });
       queueProjectStageChange(ctx.org.id, row.id, before.status, row.status);
       // The same reminder bookkeeping an automatic move does (Approved → "call to schedule"; later → done).
-      await stageSideEffects({ orgId: ctx.org.id, project: row, from: before.status, actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email } });
+      await stageSideEffects({ orgId: ctx.org.id, project: row, from: before.status, actor });
+    }
+    if (phaseChanges && row.stageKey) {
+      const label = phaseOf(flow, row.stageKey)?.label ?? row.stageKey;
+      await logTeamActivity({ orgId: ctx.org.id, memberId: ctx.member.id, type: "projectStage", title: `moved ${row.name} to ${label}`, link: `/crm/projects/${row.id}` });
+      logActivity(ctx, "project.phase", { entityType: "project", entityId: row.id, customerId: row.customerId, meta: { name: row.name, number: row.number, phase: row.stageKey, phaseLabel: label, from: before?.stageKey ?? before?.status ?? null } });
+    }
+    // The phase the job just entered sends its alerts — a custom phase when one was set, else the built-in stage.
+    if (phaseChanges || statusChanges) {
+      await enterPhase({ orgId: ctx.org.id, project: row, phaseKey: row.stageKey ?? stageOfProjectStatus(row.status), trigger: "manual", org: ctx.org });
     }
     res.json(presentProject(row, ctx));
   });

@@ -217,6 +217,13 @@ export function activityText(row: {
       case "self_estimate.requested":
         return `asked for a price online${Array.isArray(m.trades) && m.trades.length ? ` (${m.trades.join(" + ")})` : ""}${m.lowCents != null && m.highCents != null ? ` — ballpark ${money(m.lowCents)}–${money(m.highCents)}` : ""}${m.number ? ` — draft estimate ${m.number} created` : ""}`;
       case "self_estimate.settings_updated": return `updated the client self-estimate prices${m.division ? ` (${m.division === "org" ? "no division" : "a division"})` : ""}`;
+      case "project.phase": return `moved ${m.name ? String(m.name).slice(0, 120) : "the job"} to ${m.phaseLabel ?? m.phase ?? "a phase"}`;
+      case "project.phase_alert": {
+        const what = `${m.channel === "sms" ? "text" : "email"} alert for ${m.phaseLabel ?? m.phase ?? "a phase"}`;
+        const who = m.to === "client" ? "the client" : `${m.staff === "owner" ? "the owner" : m.staff === "sales" ? "the sales rep" : m.staff === "pm" ? "the project manager" : "a team member"}`;
+        const where = m.recipient ? ` (${String(m.recipient).slice(0, 80)})` : "";
+        return m.result === "sent" ? `sent the ${what} to ${who}${where}` : `skipped the ${what} to ${who}${where}${m.reason ? ` — ${String(m.reason).slice(0, 160)}` : ""}`;
+      }
       case "project.stage_auto": return `${m.created ? "created" : "moved"} ${m.name ? `${String(m.name).slice(0, 120)}` : "the job"}${m.created ? " at" : " to"} ${jobStageLabel(m.stage) ?? m.to ?? "a new stage"} automatically (${STAGE_TRIGGERS[String(m.trigger)] ?? String(m.trigger ?? "system")})`;
       case "task.done": return `marked a task done${m.title ? `: ${String(m.title).slice(0, 120)}` : ""}`;
       case "task.reopened": return `reopened a task${m.title ? `: ${String(m.title).slice(0, 120)}` : ""}`;
