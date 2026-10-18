@@ -26,6 +26,7 @@ import {
 } from "@shared/schema";
 import { and, desc, eq, ilike, isNull, or, sql, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import { objectPolicy } from "./object-access";
 import {
   clientIp, leadTokenOf, mintLeadToken, notifyLeadReceived, orgForLeadToken, orgOwnerMember, websiteLeadSourceId,
 } from "./lead-capture";
@@ -608,6 +609,7 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     // memory: ids + status + client only, then the page is cut from the labelled set.
     const slim = await db.select({
       id: crmLeads.id, status: crmLeads.status, customerId: crmLeads.customerId, receivedAt: crmLeads.receivedAt,
+      bidStateOverride: crmLeads.bidStateOverride,
       email: crmLeads.email, state: crmLeads.state, city: crmLeads.city, sourceLabel: crmLeads.sourceLabel, pageUrl: crmLeads.pageUrl,
       message: crmLeads.message, phone: crmLeads.phone, fields: crmLeads.fields,
     }).from(crmLeads)
@@ -617,7 +619,9 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     const matched = await matchLeadsToClients(ctx.org.id, slim.filter((r) => !r.customerId));
     const clientOf = (r: { id: string; customerId: string | null }) => r.customerId ?? matched.get(r.id) ?? null;
     const facts = await bidFactsFor(ctx.org.id, slim.map(clientOf).filter(Boolean) as string[]);
-    const labelOf = (r: { id: string; status: string; customerId: string | null; receivedAt: Date | null }): BidState => {
+    const labelOf = (r: { id: string; status: string; customerId: string | null; receivedAt: Date | null; bidStateOverride?: string | null }): BidState => {
+      // A label set by hand in the lead's details wins until it is cleared back to Auto.
+      if (r.bidStateOverride && BID_STATES.some((s) => s.key === r.bidStateOverride)) return r.bidStateOverride as BidState;
       const cid = clientOf(r);
       return leadBidStateOf(r.status, cid ? (facts.get(cid) as BidFacts | undefined) ?? null : null, r.receivedAt);
     };
@@ -763,6 +767,51 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     } as any).where(eq(crmOrgs.id, ctx.org.id)).returning();
     logActivity(ctx, "leads.visibility.updated", { entityType: "org", entityId: ctx.org.id, meta: { members: Object.keys(next).length } });
     res.json({ rules: leadVisibilityOf(org.customFields) });
+  });
+
+  /**
+   * Set the lead's label by hand — Open / Pending / Complete / Dead lead — or clear it back to Auto (the derived
+   * one). "Dead lead" on a lead that is (or matches) a client also marks that client dead, and clearing it reopens
+   * them, so the Clients page agrees with the Leads page.
+   */
+  app.post("/api/crm/leads/:id/label", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "manageCustomers");
+    if (!ctx) return;
+    const parsed = z.object({
+      bidState: z.enum(["open", "pending", "complete", "dead"]).nullable(),
+      note: z.string().max(300).nullable().optional(),
+    }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Send { bidState: open | pending | complete | dead | null, note? }" });
+    const [lead] = await db.select().from(crmLeads).where(and(eq(crmLeads.orgId, ctx.org.id), eq(crmLeads.id, String(req.params.id)))).limit(1);
+    if (!lead || !(await leadVisibleTo(ctx, lead))) return res.status(404).json({ message: "Lead not found" });
+    const note = parsed.data.note?.trim() || null;
+    const [row] = await db.update(crmLeads).set({
+      bidStateOverride: parsed.data.bidState, bidStateNote: parsed.data.bidState ? note : null,
+      bidStateAt: parsed.data.bidState ? new Date() : null, bidStateBy: parsed.data.bidState ? ctx.member.id : null,
+      updatedAt: new Date(),
+    }).where(eq(crmLeads.id, lead.id)).returning();
+    // Keep the client in step for Dead lead: the person the lead became, or matches by email / phone.
+    const clientId = lead.customerId ?? (await matchLeadsToClients(ctx.org.id, [lead])).get(lead.id) ?? null;
+    const toDead = parsed.data.bidState === "dead";
+    const wasDead = lead.bidStateOverride === "dead";
+    if (clientId && (toDead || wasDead)) {
+      const [cust] = await db.select({ id: crmCustomers.id, customFields: crmCustomers.customFields }).from(crmCustomers)
+        .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, clientId))).limit(1);
+      if (cust && (await objectPolicy(ctx).visible("customers", cust.id))) {
+        const mark = toDead ? { at: new Date().toISOString(), memberId: ctx.member.id, reason: note } : null;
+        await db.update(crmCustomers).set({
+          customFields: mark
+            ? sql`coalesce(${crmCustomers.customFields}, '{}'::jsonb) || jsonb_build_object('bidDead', ${JSON.stringify(mark)}::jsonb)`
+            : sql`coalesce(${crmCustomers.customFields}, '{}'::jsonb) - 'bidDead'`,
+          updatedAt: new Date(),
+        } as any).where(eq(crmCustomers.id, cust.id));
+        logActivity(ctx, mark ? "lead.dead" : "lead.reopened", { entityType: "customer", entityId: cust.id, customerId: cust.id, meta: { reason: note, fromLead: lead.id } });
+      }
+    }
+    logActivity(ctx, "lead.label", {
+      entityType: "lead", entityId: lead.id, customerId: clientId, meta: { bidState: parsed.data.bidState, note, name: lead.name },
+    });
+    res.json({ id: row.id, bidStateOverride: row.bidStateOverride, bidStateNote: row.bidStateNote, bidStateAt: row.bidStateAt, clientMarked: !!clientId && toDead });
   });
 
   app.get("/api/crm/leads/:id", async (req: any, res) => {

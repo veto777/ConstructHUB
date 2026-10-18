@@ -1925,6 +1925,12 @@ export const crmLeads = pgTable("crm_leads", {
   status: text("status").notNull().default("new"),
   customerId: varchar("customer_id"),
   externalId: text("external_id"),
+  // A label set by hand in the lead's details (Open / Pending / Complete / Dead lead) — wins over the derived one
+  // (shared/bid-status.ts) until cleared back to Auto. Who, when and why go with it.
+  bidStateOverride: text("bid_state_override"),
+  bidStateNote: text("bid_state_note"),
+  bidStateAt: timestamp("bid_state_at"),
+  bidStateBy: varchar("bid_state_by"),
   receivedAt: timestamp("received_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

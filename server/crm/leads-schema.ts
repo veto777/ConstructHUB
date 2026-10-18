@@ -27,5 +27,10 @@ export const LEADS_DDL: readonly string[] = [
      updated_at timestamp DEFAULT now()
    )`,
   `CREATE INDEX IF NOT EXISTS crm_leads_org_received_idx ON crm_leads (org_id, received_at DESC)`,
+  // 2026-10-18: a label set by hand in the lead's details, over the derived Open / Pending / Complete / Dead lead.
+  `ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS bid_state_override text`,
+  `ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS bid_state_note text`,
+  `ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS bid_state_at timestamp`,
+  `ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS bid_state_by varchar`,
   `CREATE UNIQUE INDEX IF NOT EXISTS crm_leads_org_source_external_uq ON crm_leads (org_id, source, external_id) WHERE external_id IS NOT NULL`,
 ];

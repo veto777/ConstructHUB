@@ -441,6 +441,7 @@ const ROUTES: RouteRow[] = [
   R("GET", "/api/crm/leads/:id", "manageCustomers", { path: () => `/api/crm/leads/${none}` }),
   R("PATCH", "/api/crm/leads/:id", "manageCustomers", { path: () => `/api/crm/leads/${none}`, body: { status: "nope" } }),
   R("POST", "/api/crm/leads/:id/convert", "manageCustomers", { path: () => `/api/crm/leads/${none}/convert`, body: { addToPipeline: "x" } }),
+  R("POST", "/api/crm/leads/:id/label", "manageCustomers", { path: () => `/api/crm/leads/${none}/label`, body: { bidState: "nope" } }),
   R("POST", "/api/crm/leads/import", "owner", { body: { nope: true } }),
   R("GET", "/api/crm/integrations/hover/status", "manageIntegrations"),
   R("GET", "/api/crm/integrations/hover/connect", "manageIntegrations", { effect: true }),

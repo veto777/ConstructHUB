@@ -66,6 +66,10 @@ interface Lead {
   place?: { state: string; market: string } | null;
   /** The client this lead matches by email / phone without a formal conversion — the label comes from them. */
   matchedCustomer?: { id: string; displayName: string } | null;
+  /** A label set by hand in the details box (wins over the derived one until cleared). */
+  bidStateOverride?: BidState | null;
+  bidStateNote?: string | null;
+  bidStateAt?: string | null;
 }
 interface PlaceInfo {
   state: string; market: string; workspaceState: string | null;
@@ -419,8 +423,8 @@ export default function CrmLeadsPage() {
                               onClick={() => setOpenId(l.id)} data-testid={`button-open-lead-${l.id}`}>{leadName(l)}</button>
                             {l.bidState && (
                               <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${LABEL_PILL[l.bidState]}`}
-                                title={BID_STATES.find((s) => s.key === l.bidState)?.hint} data-testid={`pill-label-${l.id}`}>
-                                {LABEL_TEXT[l.bidState]}
+                                title={l.bidStateOverride ? `Set by hand${l.bidStateNote ? `: ${l.bidStateNote}` : ""}` : BID_STATES.find((s) => s.key === l.bidState)?.hint} data-testid={`pill-label-${l.id}`}>
+                                {LABEL_TEXT[l.bidState]}{l.bidStateOverride ? " ✎" : ""}
                               </span>
                             )}
                           </div>
@@ -554,9 +558,24 @@ function RowMenu({ lead, onOpen, onConvert, onStatus }: {
 function LeadDetails({ id, cached, onClose, onConvert, onStatus }: {
   id: string; cached?: Lead; onClose: () => void; onConvert: (l: Lead) => void; onStatus: (id: string, s: LeadStatus) => void;
 }) {
+  const { toast } = useToast();
   const { data, isError } = useQuery<Lead>({ queryKey: ["/api/crm/leads", id], enabled: !cached });
   const lead = cached ?? data;
   const extra = lead?.fields ? Object.entries(lead.fields) : [];
+  // The label by hand: Auto (derived) or one of the four. A note travels with Dead lead.
+  const [labelPick, setLabelPick] = useState<string>(lead?.bidStateOverride ?? "auto");
+  const [labelNote, setLabelNote] = useState<string>(lead?.bidStateNote ?? "");
+  useEffect(() => { setLabelPick(lead?.bidStateOverride ?? "auto"); setLabelNote(lead?.bidStateNote ?? ""); }, [lead?.id, lead?.bidStateOverride, lead?.bidStateNote]);
+  const setLabel = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/crm/leads/${id}/label`, { bidState: labelPick === "auto" ? null : labelPick, note: labelNote.trim() || null })).json(),
+    onSuccess: (r: any) => {
+      toast({ title: labelPick === "auto" ? "Label back to automatic" : `Labelled ${LABEL_TEXT[labelPick as BidState]}`, description: r?.clientMarked ? "The client is marked a dead lead too." : undefined });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+    },
+    onError: (e: any) => toast({ title: "Could not set the label", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const dirty = !!lead && (labelPick !== (lead.bidStateOverride ?? "auto") || (labelNote.trim() || "") !== (lead.bidStateNote ?? ""));
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto" data-testid="dialog-lead-details">
@@ -573,7 +592,40 @@ function LeadDetails({ id, cached, onClose, onConvert, onStatus }: {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3 text-sm">
-              <StatusPill tone={STATUS_TONE[lead.status]}>{TABS.find((t) => t.key === lead.status)?.label}</StatusPill>
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill tone={STATUS_TONE[lead.status]}>{TABS.find((t) => t.key === lead.status)?.label}</StatusPill>
+                {lead.bidState && (
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${LABEL_PILL[lead.bidState]}`} data-testid="pill-lead-label">
+                    {LABEL_TEXT[lead.bidState]}{lead.bidStateOverride ? " · set by hand" : ""}
+                  </span>
+                )}
+              </div>
+              {/* Label by hand — Open / Pending / Complete / Dead lead — or back to Auto (worked out from the file). */}
+              <div className="rounded-lg border p-3 space-y-2" data-testid="lead-label-editor">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label htmlFor="lead-label" className="text-xs uppercase tracking-wide text-muted-foreground">Label</Label>
+                  <Select value={labelPick} onValueChange={setLabelPick}>
+                    <SelectTrigger id="lead-label" className="w-44 h-8" data-testid="select-lead-label"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Automatic</SelectItem>
+                      {BID_STATES.map((s) => <SelectItem key={s.key} value={s.key} data-testid={`lead-label-option-${s.key}`}>{s.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" className="h-8" onClick={() => setLabel.mutate()} disabled={!dirty || setLabel.isPending || (labelPick === "dead" && labelNote.trim().length < 3)} data-testid="button-save-lead-label">
+                    {setLabel.isPending && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />} Save label
+                  </Button>
+                </div>
+                {labelPick !== "auto" && (
+                  <Input value={labelNote} onChange={(e) => setLabelNote(e.target.value)} className="h-8"
+                    placeholder={labelPick === "dead" ? "Why it's dead — no response, tire kicker, out of area…" : "Note (optional)"} maxLength={300} data-testid="input-lead-label-note" />
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {labelPick === "auto"
+                    ? "Automatic: Open until something is scheduled, Pending once a visit or HOVER report exists, Complete once a bid is sent, Dead lead after 30 days with nothing on file."
+                    : labelPick === "dead" ? "Dead lead also marks the client (if this lead is one) a dead lead; switching back to Automatic reopens them."
+                      : "Set by hand — stays until you switch it back to Automatic."}
+                </p>
+              </div>
               <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5">
                 {lead.email && <><dt className="text-muted-foreground">Email</dt><dd className="break-all"><a className="hover:underline" href={`mailto:${lead.email}`}>{lead.email}</a></dd></>}
                 {lead.phone && <><dt className="text-muted-foreground">Phone</dt><dd><a className="hover:underline" href={`tel:${lead.phone}`}>{lead.phone}</a></dd></>}
