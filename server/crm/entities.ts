@@ -560,8 +560,16 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
           bidAt: sql<string | null>`max(coalesce(${crmEstimates.sentAt}, ${crmEstimates.createdAt}))`,
         }).from(crmEstimates).where(and(eq(crmEstimates.orgId, ctx.org.id), inArray(crmEstimates.customerId, chunk)))
           .groupBy(crmEstimates.customerId);
-        // A HOVER measurement is a bid at the very least (owner, 2026-10-18): a client measured but not yet quoted
-        // reads "Bid", dated by the capture.
+        // Any job record is a bid at the very least (owner, 2026-10-18): a client with a project but no estimate
+        // reads "Bid" dated by the project; a HOVER capture overrides that date; an estimate overrides both.
+        const withProject = await db.select({
+          customerId: crmProjects.customerId, at: sql<string | null>`min(${crmProjects.createdAt})`,
+        }).from(crmProjects).where(and(eq(crmProjects.orgId, ctx.org.id), inArray(crmProjects.customerId, chunk), isNull(crmProjects.archivedAt)))
+          .groupBy(crmProjects.customerId);
+        for (const p of withProject) {
+          outcome.set(p.customerId, "bid");
+          if (p.at) bidDates.set(p.customerId, new Date(p.at).toISOString());
+        }
         const measured = await db.select({
           customerId: crmMeasurements.customerId,
           at: sql<string | null>`max(coalesce(${crmMeasurements.completedAt}, ${crmMeasurements.createdAt}))`,

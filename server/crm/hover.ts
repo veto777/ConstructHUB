@@ -63,7 +63,7 @@ import {
   createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual,
 } from "crypto";
 import { db, pool } from "../db";
-import { crmCustomers, crmMeasurements, crmAttachments, crmOrgs , crmMembers } from "@shared/schema";
+import { crmCustomers, crmMeasurements, crmAttachments, crmOrgs , crmMembers, crmLeads } from "@shared/schema";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow } from "./client-auth";
@@ -1047,6 +1047,31 @@ export async function importHoverJobPhotos(
 }
 
 /**
+ * The newest lead form at a street address (house number + street, same ZIP when both carry one): the homeowner
+ * typed it, so its name/contact are the record of truth for a client created from a HOVER capture.
+ */
+export async function leadFormAtAddress(orgId: string, line1?: string | null, zip?: string | null):
+  Promise<{ name: string | null; email: string | null; phone: string | null } | null> {
+  const key = normalizeHoverAddress(line1, zip);
+  if (!key) return null;
+  const [street, zip5] = key.split("|");
+  const rows = await db.select({ name: crmLeads.name, email: crmLeads.email, phone: crmLeads.phone, line1: crmLeads.addressLine1, zip: crmLeads.postalCode })
+    .from(crmLeads).where(and(eq(crmLeads.orgId, orgId), sql`${crmLeads.addressLine1} is not null`)).orderBy(desc(crmLeads.receivedAt)).limit(5000);
+  for (const l of rows) {
+    const k = normalizeHoverAddress(l.line1, l.zip ?? zip);
+    if (!k || k.split("|")[0] !== street) continue;
+    if (zip5 && l.zip && !k.endsWith(`|${zip5}`)) continue;
+    const name = (l.name ?? "").replace(/\s+/g, " ").trim();
+    return {
+      name: name.length >= 2 && !/^(n\/?a|none|test)$/i.test(name) ? name : null,
+      email: l.email?.includes("@") ? l.email.trim().toLowerCase() : null,
+      phone: l.phone && l.phone.replace(/\D/g, "").length >= 10 ? l.phone.trim() : null,
+    };
+  }
+  return null;
+}
+
+/**
  * Attach the job to an existing client or CREATE one so the contractor never
  * opens the portal to an empty book. Match: address → contact (staff never
  * matches). Create: from the homeowner's contact when it's a real homeowner;
@@ -1101,9 +1126,12 @@ async function linkOrCreateHoverCustomer(
     // contact block as the staff identity.
     const staffFields = await matchOrgMemberContactFields(orgId, c.email, c.phone);
     const staffContact = staffFields.email || staffFields.phone;
-    const name = staffContact ? null : c.name?.trim() || null;
-    const email = staffFields.email ? null : c.email ?? null;
-    const phone = staffFields.phone ? null : c.phone ?? null;
+    // The homeowner's own lead form at this address beats whatever the crew typed into HOVER (owner, 2026-10-18):
+    // their spelling of their name, their email and phone.
+    const form = await leadFormAtAddress(orgId, c.addressLine1, c.postalCode);
+    const name = form?.name ?? (staffContact ? null : c.name?.trim() || null);
+    const email = form?.email ?? (staffFields.email ? null : c.email ?? null);
+    const phone = form?.phone ?? (staffFields.phone ? null : c.phone ?? null);
     const displayName =
       name || jobName?.trim() || c.addressLine1?.trim() || email || phone || "HOVER import";
     const nameParts = name?.split(/\s+/) ?? [];
