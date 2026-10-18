@@ -546,6 +546,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     // Bid outcome per client, for the Won / Undecided / Declined tabs: any
     // approved estimate wins; else an open (sent/viewed) one means undecided;
     // else any declined means declined; no bids → "none".
+    const bidDates = new Map<string, string>();
     const outcomesFor = async (ids: string[]) => {
       const outcome = new Map<string, string>();
       for (let i = 0; i < ids.length; i += 1000) {
@@ -555,9 +556,12 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
           approved: sql<number>`count(*) filter (where ${crmEstimates.status} = 'approved')::int`,
           open: sql<number>`count(*) filter (where ${crmEstimates.status} in ('sent','viewed'))::int`,
           declined: sql<number>`count(*) filter (where ${crmEstimates.status} = 'declined')::int`,
+          // "Date bid": when the latest bid went out (sent), else when it was written.
+          bidAt: sql<string | null>`max(coalesce(${crmEstimates.sentAt}, ${crmEstimates.createdAt}))`,
         }).from(crmEstimates).where(and(eq(crmEstimates.orgId, ctx.org.id), inArray(crmEstimates.customerId, chunk)))
           .groupBy(crmEstimates.customerId);
         for (const a of agg) {
+          if (a.bidAt) bidDates.set(a.customerId, new Date(a.bidAt).toISOString());
           outcome.set(a.customerId,
             a.approved > 0 ? "won" : a.open > 0 ? "undecided" : a.declined > 0 ? "declined" : "none");
         }
@@ -566,7 +570,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     };
     // The client list itself is shareable with a PM; pricing lives elsewhere.
     const present = (rows: (typeof crmCustomers.$inferSelect)[], outcome: Map<string, string>) =>
-      rows.map((c) => ({ ...c, portalToken: undefined, bidStatus: outcome.get(c.id) ?? "none" }));
+      rows.map((c) => ({ ...c, portalToken: undefined, bidStatus: outcome.get(c.id) ?? "none", bidDate: bidDates.get(c.id) ?? null }));
 
     // Paged mode (opt-in with ?paged=1, or any limit/offset): { rows, total,
     // bidCounts, limit, offset }. bidCounts cover EVERY client the caller may
@@ -586,15 +590,22 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       const offset = int(req.query.offset, 0, 0, 1_000_000);
       const bidStatus = req.query.bidStatus === undefined || req.query.bidStatus === "" || req.query.bidStatus === "all"
         ? null : String(req.query.bidStatus);
-      if (bidStatus && !["won", "undecided", "declined", "none"].includes(bidStatus)) {
-        return res.status(400).json({ message: "bidStatus must be one of: won, undecided, declined, none." });
+      if (bidStatus && !["won", "undecided", "declined", "none", "hover"].includes(bidStatus)) {
+        return res.status(400).json({ message: "bidStatus must be one of: won, undecided, declined, none, hover." });
       }
       const all = await objectPolicy(ctx).filter("customers",
         await db.select().from(crmCustomers).where(and(...where)).orderBy(desc(crmCustomers.createdAt)));
       const outcome = await outcomesFor(all.map((c) => c.id));
-      const bidCounts = { won: 0, undecided: 0, declined: 0, none: 0 } as Record<string, number>;
-      for (const c of all) bidCounts[outcome.get(c.id) ?? "none"] += 1;
-      const matching = bidStatus ? all.filter((c) => (outcome.get(c.id) ?? "none") === bidStatus) : all;
+      // HOVER scans that never became a client (an address, no contact, no bid) sit in their own tab, out of
+      // "All": they are properties the crew measured, not people (server/crm/hover-refile.ts, hover.ts).
+      const isScanOnly = (c: (typeof all)[number]) => {
+        const f = (c.customFields ?? {}) as Record<string, unknown>;
+        return !!f.hoverAutoCreated && !!f.hoverNeedsContact && !c.email && !c.phone && !outcome.has(c.id);
+      };
+      const bucket = (c: (typeof all)[number]) => (isScanOnly(c) ? "hover" : outcome.get(c.id) ?? "none");
+      const bidCounts = { won: 0, undecided: 0, declined: 0, none: 0, hover: 0 } as Record<string, number>;
+      for (const c of all) bidCounts[bucket(c)] += 1;
+      const matching = bidStatus ? all.filter((c) => bucket(c) === bidStatus) : all.filter((c) => !isScanOnly(c));
       const page = matching.slice(offset, offset + limit);
       return res.json({ rows: present(page, outcome), total: matching.length, bidCounts, limit, offset });
     }
