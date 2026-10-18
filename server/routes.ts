@@ -17,6 +17,7 @@ import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { presentListing } from "./competitor-analysis";
 import { rateLimit, actorKey, takeBudget } from "./growth-limits";
+import { findReviewSites, ReviewSiteFinderError } from "./review-site-finder";
 import { hiddenFromReviews, registerReviewPipelineRoutes } from "./crm/review-pipeline";
 import { registerCrmPhotoPlatformRoutes, registerReviewProjectPhotoRoutes, resolveReviewCrmLink, reviewPhotoUrl } from "./crm/photo-library";
 import { ownedBy } from "./ownership";
@@ -101,6 +102,8 @@ const growthCostLimit = rateLimit("growth-processing", 30, 60);
 // Anonymous contact forms that email staff: 5 per hour per IP (and per signed-in user).
 const seoInquiryLimit = rateLimit("seo-inquiry", 5, 5, 3600_000);
 const reinstatementLimit = rateLimit("reinstatement", 5, 5, 3600_000);
+// Settings → Review sites → "Find review sites" fetches an outside page: 20 per hour per user, 40 per IP.
+const reviewSiteFinderLimit = rateLimit("review-site-finder", 20, 40, 3600_000);
 
 // Review template links: resolve Google short links, then accept only Google hosts.
 async function resolveReviewLink(input: unknown): Promise<string | null> {
@@ -5493,16 +5496,37 @@ function main() {
       const { rows: grants } = await pool.query("SELECT 1 FROM gbp_grants WHERE user_id=$1 LIMIT 1", [user.id]);
       // gbp_google_subject / gbp_unlinked_by_user are migration-only columns (server/gbp/schema.ts), so raw SQL.
       const { rows } = await pool.query(
-        `SELECT id, business_name AS name, place_id AS "placeId" FROM business_locations
+        `SELECT id, business_name AS name, place_id AS "placeId", website FROM business_locations
          WHERE user_id=$1 AND gbp_google_subject IS NOT NULL AND gbp_unlinked_by_user = false AND place_id IS NOT NULL
          ORDER BY business_name`, [user.id]);
       const locations = rows
-        .map((l: any) => ({ id: l.id as number, name: String(l.name), reviewUrl: googleReviewLink(`https://search.google.com/local/writereview?placeid=${encodeURIComponent(String(l.placeId))}`) }))
-        .filter((l): l is { id: number; name: string; reviewUrl: string } => !!l.reviewUrl);
+        .map((l: any) => ({
+          id: l.id as number, name: String(l.name),
+          reviewUrl: googleReviewLink(`https://search.google.com/local/writereview?placeid=${encodeURIComponent(String(l.placeId))}`),
+          // The listing's own website as stored (Settings → Review sites scans it by default); null when none is stored.
+          website: typeof l.website === "string" && l.website.trim() ? l.website.trim() : null,
+        }))
+        .filter((l): l is { id: number; name: string; reviewUrl: string; website: string | null } => !!l.reviewUrl);
       res.json({ connected: grants.length > 0, locations });
     } catch (err: any) {
       logError("Error loading linked listings:", err);
       res.status(500).json({ message: "Failed to load linked listings" });
+    }
+  });
+
+  // Settings → Review sites → "Find review sites": reads the one page the owner enters (SSRF-safe, server/review-site-finder.ts)
+  // and returns the review-site links written on it as suggestions. Nothing is saved; the owner ticks what to add.
+  // Signed in, rate limited, and behind the plan gate like every /api/review-templates route (server/platform-access.ts).
+  app.post("/api/review-templates/find-review-sites", (req, res, next) => {
+    if (!(req as any).user) return void res.status(401).json({ message: "Login required" });
+    next();
+  }, reviewSiteFinderLimit, async (req, res) => {
+    try {
+      res.json(await findReviewSites(req.body?.url));
+    } catch (err: any) {
+      if (err instanceof ReviewSiteFinderError) return res.status(err.status).json({ message: err.message });
+      logError("Error finding review sites:", err);
+      res.status(500).json({ message: "Couldn't look for review sites" });
     }
   });
 
@@ -5595,11 +5619,12 @@ function main() {
         if (otherLinks.error) return res.status(400).json({ message: otherLinks.error });
         updateData.otherReviewLinks = otherLinks.links;
       }
-      if (req.body.primaryReviewUrl !== undefined) {
+      // A new primary, or new sites (a removed primary site falls back to Google rather than pointing nowhere).
+      if (req.body.primaryReviewUrl !== undefined || updateData.otherReviewLinks !== undefined) {
         const current = templates.find((t) => t.id === id)!;
         const gUrl = updateData.googleProfileUrl ?? current.googleProfileUrl;
         const others = updateData.otherReviewLinks ?? normalizeOtherReviewLinks(current.otherReviewLinks).links;
-        updateData.primaryReviewUrl = normalizePrimaryReviewUrl(req.body.primaryReviewUrl, gUrl, others);
+        updateData.primaryReviewUrl = normalizePrimaryReviewUrl(req.body.primaryReviewUrl ?? current.primaryReviewUrl, gUrl, others);
       }
       if (isDefault === true) {
         for (const t of templates) {

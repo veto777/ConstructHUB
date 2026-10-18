@@ -13,7 +13,7 @@ export const REVIEWS_VIEW_HEAD: Record<ReviewsView, [string, string]> = {
   requests: ["Review requests", "Hear it first. Set the score that comes to you privately; everything above it goes straight to Google."],
   reviews: ["Google reviews", "Read and reply to the reviews on your Google Business Profiles."],
   profiles: ["Profiles & links", "Each Google Business Profile gets its own review link. Other review sites are listed here too."],
-  settings: ["Settings", "Where private feedback goes and when reminders are sent."],
+  settings: ["Settings", "Which ratings reach Google and your other review sites, the sites themselves, and when reminders are sent."],
 };
 
 /** The address of a view (extra query parameters kept, e.g. ?location= for Google reviews). */

@@ -117,6 +117,7 @@ const transport: Transport = (url, address) =>
 export function makeSafeFetch(
   resolve = (host: string) => lookup(host, { all: true, verbatim: true }),
   send: Transport = transport,
+  maxRedirects = 5,
 ) {
   return async (
     raw: string,
@@ -124,7 +125,7 @@ export function makeSafeFetch(
   ): Promise<PageResponse> => {
     let url = siteUrl(raw);
     const redirects: string[] = [];
-    for (let n = 0; n <= 5; n++) {
+    for (let n = 0; n <= maxRedirects; n++) {
       if (!allowed(url)) throw new Error("Redirect excluded by crawl policy");
       const u = new URL(url),
         host = u.hostname.replace(/^\[|\]$/g, "");
