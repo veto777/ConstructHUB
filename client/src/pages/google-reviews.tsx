@@ -1312,7 +1312,7 @@ export default function GoogleReviewsPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         {/* A header, scrolling numbered cards, and a Send bar that stays in view; full screen on a phone.
             min-w-0 on every child keeps long client details from widening the dialog past its edge. */}
-        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl [&>*]:min-w-0 max-sm:left-0 max-sm:top-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0" data-testid="modal-send-review">
+        <DialogContent className="app-status-pad-phone flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl [&>*]:min-w-0 max-sm:left-0 max-sm:top-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0" data-testid="modal-send-review">
           <DialogHeader className="shrink-0 space-y-1 border-b bg-blue-50 px-4 py-3 pr-12 sm:py-4 text-left dark:bg-blue-950/40 sm:px-6">
             <DialogTitle className="flex items-center gap-2.5 text-lg font-bold">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white"><Star className="h-4 w-4" aria-hidden="true" /></span>

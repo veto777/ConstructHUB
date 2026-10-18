@@ -202,9 +202,10 @@ function Sidebar({
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          {/* Phones (and the iPhone apps, where the page runs under the status bar): clear the clock at the top
-              and the home indicator at the bottom. env() is 0 where there is nothing to clear. */}
-          <div className="flex h-full w-full flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">{children}</div>
+          {/* Phones (and the iPhone apps, where the page runs under the status bar): the sheet itself clears the
+              clock at the top (ui/sheet.tsx); this clears the home indicator at the bottom. env() is 0 where there
+              is nothing to clear. */}
+          <div className="flex h-full w-full flex-col pb-[env(safe-area-inset-bottom)]">{children}</div>
         </SheetContent>
       </Sheet>
     )

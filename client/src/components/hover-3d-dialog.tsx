@@ -16,6 +16,7 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Box, ExternalLink, Eye, EyeOff, Loader2, Rows3, Ruler } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -57,7 +58,7 @@ async function fetchModel3d(src: Viewer3DSource): Promise<Model3dResponse> {
 
 /** Generic color names only — no manufacturer color names. */
 // Generic colour families (previews, not product names). The first QUICK of each row are the buttons; every one is
-// in the "More colors" dropdown; any colour at all through the custom picker.
+// in the "More colors" dropdown; the custom picker offers soft exterior tones (PASTEL_GRID) and an exact hex code.
 export const QUICK = 10;
 export const SIDING_SWATCHES = [
   { name: "White", hex: "#f1f0ea" }, { name: "Cream", hex: "#ebe0c4" }, { name: "Beige", hex: "#cdb894" },
@@ -94,6 +95,29 @@ export const DOOR_SWATCHES = [
   { name: "Navy", hex: "#263754" }, { name: "Forest", hex: "#2f4a38" }, { name: "Teal", hex: "#2f6b6a" }, { name: "Charcoal", hex: "#3c3f42" },
   { name: "Yellow", hex: "#e0b43a" }, { name: "Sage", hex: "#8a9a7b" }, { name: "Burgundy", hex: "#5e2a30" }, { name: "Gray", hex: "#868a8b" },
 ] as const;
+
+/**
+ * The custom picker's tones: 12 hues at five depths, all muted (saturation 22–32%), plus warm and cool neutrals —
+ * the soft colours houses are actually painted, not the phone's fluorescent colour wheel (owner 2026-10-18: "make
+ * the color wheel more pastel colors, not fluorescent"). An exact code still goes in the hex box.
+ */
+const PASTEL_HUES = [0, 22, 40, 55, 80, 120, 160, 190, 210, 235, 270, 320];
+const PASTEL_DEPTHS: readonly [s: number, l: number][] = [[30, 88], [32, 80], [30, 70], [26, 58], [22, 45]];
+const PASTEL_NEUTRALS: readonly [h: number, s: number, l: number][] = [
+  [40, 8, 95], [40, 8, 88], [40, 6, 78], [40, 5, 66], [210, 5, 56], [210, 7, 42], [210, 8, 30], [210, 10, 20],
+];
+export function hslHex(h: number, s: number, l: number): string {
+  const sat = s / 100, light = l / 100;
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const a = sat * Math.min(light, 1 - light);
+    const c = light - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(c * 255).toString(16).padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+export const PASTEL_GRID = PASTEL_DEPTHS.map(([s, l]) => PASTEL_HUES.map((h) => hslHex(h, s, l)));
+export const PASTEL_NEUTRAL_HEXES = PASTEL_NEUTRALS.map(([h, s, l]) => hslHex(h, s, l));
 
 const PRESETS: { id: ViewPreset; label: string }[] = [
   { id: "front", label: "Front" }, { id: "back", label: "Back" }, { id: "left", label: "Left" },
@@ -159,7 +183,8 @@ export function Hover3DDialog({ open, onOpenChange, source, title, initialTab }:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden p-0 sm:h-[92vh] sm:w-[96vw] sm:max-w-[1400px] sm:rounded-lg"
+        // app-status-pad-phone: on a phone the dialog fills the screen, so the title clears the clock (index.css).
+        className="app-status-pad-phone flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden p-0 sm:h-[92vh] sm:w-[96vw] sm:max-w-[1400px] sm:rounded-lg"
         data-testid="dialog-hover-3d">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-3 pr-12">
           <div className="min-w-0">
@@ -402,12 +427,42 @@ function SwatchRow({ title, swatches, value, onChange, testid }: {
           <option value="">More colors…</option>
           {swatches.map((s) => <option key={s.hex} value={s.hex}>{s.name}</option>)}
         </select>
-        <label className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border" title="Custom color" aria-label={`${title}: custom color`}>
-          <input type="color" value={/^#[0-9a-f]{6}$/i.test(value) ? value : "#888888"} onChange={(e) => onChange(e.target.value)}
-            className="h-5 w-5 cursor-pointer border-0 bg-transparent p-0" data-testid={`hover-3d-custom-${testid}`} />
-        </label>
+        <CustomColor title={title} value={value} onChange={onChange} testid={testid} />
       </div>
     </div>
+  );
+}
+
+/** The custom colour button: a popover of soft exterior tones (PASTEL_GRID) and a hex box, not the native wheel. */
+function CustomColor({ title, value, onChange, testid }: { title: string; value: string; onChange: (hex: string) => void; testid: string }) {
+  const [hex, setHex] = useState(value);
+  useEffect(() => setHex(value), [value]);
+  const swatch = (h: string, extra?: string) => (
+    <button key={h} type="button" title={h} aria-label={`${title}: ${h}`} aria-pressed={h === value} onClick={() => onChange(h)}
+      className={cn("aspect-square w-full rounded-sm border border-black/10 outline-none ring-offset-1 ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring dark:border-white/10",
+        h === value && "ring-2 ring-primary", extra)}
+      style={{ backgroundColor: h }} />
+  );
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border" title="Custom color"
+          aria-label={`${title}: custom color`} data-testid={`hover-3d-custom-${testid}`}>
+          <span aria-hidden="true" className="h-5 w-5 rounded-sm border border-black/10" style={{ backgroundColor: /^#[0-9a-f]{6}$/i.test(value) ? value : "#888888" }} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[min(22rem,calc(100vw-1.5rem))] p-3" data-testid={`hover-3d-custom-${testid}-popover`}>
+        <p className="mb-2 text-xs font-medium text-muted-foreground">Custom color — soft exterior tones</p>
+        <div className="grid grid-cols-12 gap-1">{PASTEL_GRID.flat().map((h) => swatch(h))}</div>
+        <div className="mt-1.5 grid grid-cols-12 gap-1">{PASTEL_NEUTRAL_HEXES.map((h) => swatch(h))}</div>
+        <label className="mt-3 flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Exact code</span>
+          <input value={hex} maxLength={7} spellCheck={false} placeholder="#aabbcc"
+            onChange={(e) => { const v = e.target.value.trim(); setHex(v); if (/^#[0-9a-f]{6}$/i.test(v)) onChange(v.toLowerCase()); }}
+            className="h-7 w-24 rounded-md border bg-background px-2 font-mono text-xs" data-testid={`hover-3d-custom-${testid}-hex`} />
+        </label>
+      </PopoverContent>
+    </Popover>
   );
 }
 
