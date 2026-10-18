@@ -194,10 +194,21 @@ function mayAsk(res: any, ctx: OrgContext): boolean {
   return false;
 }
 
+/**
+ * The review pipeline is company-wide: the platform page sends no division header, so requireOrg would fall back
+ * to the owner's saved CRM workspace (FL) and quietly drop every WA client. Unpinned seats see every division; a
+ * member pinned to one division stays confined to it (divisionScopeOf still applies the pin).
+ */
+async function pipelineCtx(req: any, res: any, getUser: GetUser): Promise<OrgContext | null> {
+  const ctx = await photoCtx(req, res, getUser);
+  if (ctx) ctx.activeDivisionId = null;
+  return ctx;
+}
+
 export function registerReviewPipelineRoutes(app: Express, getUser: GetUser): void {
   app.get("/api/reviews/pipeline", requirePlatformAccess, async (req: any, res) => {
     try {
-      const ctx = await photoCtx(req, res, getUser);
+      const ctx = await pipelineCtx(req, res, getUser);
       if (!ctx || !mayAsk(res, ctx)) return;
       res.json(await buildReviewPipeline(ctx, getUser(req, res).id));
     } catch (err) {
@@ -209,7 +220,7 @@ export function registerReviewPipelineRoutes(app: Express, getUser: GetUser): vo
   /** Not now / Put back ("dismissed") and Hide / Unhide ("hidden"); one row per client, the latest choice wins. */
   const setState = (kind: "dismissed" | "hidden", on: boolean) => async (req: any, res: any) => {
     try {
-      const ctx = await photoCtx(req, res, getUser);
+      const ctx = await pipelineCtx(req, res, getUser);
       if (!ctx || !mayAsk(res, ctx)) return;
       const customerId = String(req.params.customerId).slice(0, 64);
       if (!await objectPolicy(ctx).visible("customers", customerId)) return res.status(404).json({ message: "Client not found" });
