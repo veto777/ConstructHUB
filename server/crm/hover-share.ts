@@ -32,17 +32,22 @@ const STREET_WORDS: Record<string, string> = {
  * decides a match. Null when either side is too thin to trust.
  */
 export function normalizeHoverAddress(line1?: string | null, zip?: string | null): string | null {
-  const line = String(line1 ?? "")
-    .split(/[,\r\n]/)[0]
+  const raw = String(line1 ?? "");
+  const parts = raw.split(/[,\r\n]/);
+  const line = parts[0]
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/[^a-z0-9\s#]/g, " ")
+    .replace(/#\s*/g, "unit ")
     .split(/\s+/)
     .filter(Boolean)
     .map((w) => STREET_WORDS[w] ?? w)
     .join(" ");
+  // "412 Cedar Ridge Dr, Apt 2" — the unit after the comma is part of the address, never the city: two apartments
+  // of one building are two homes, not one.
+  const unit = parts.slice(1).map((t) => t.toLowerCase().match(/^\s*(?:apt|apartment|unit|ste|suite|bldg|lot|#)\s*\.?\s*([a-z0-9-]+)\s*$/)?.[1]).find(Boolean);
   const zip5 = String(zip ?? "").replace(/\D/g, "").slice(0, 5);
   if (!line || zip5.length !== 5) return null;
-  return `${line}|${zip5}`;
+  return `${line}${unit && !new RegExp(`\\b(?:apt|unit|ste|suite|bldg|lot) ${unit}\\b`).test(line) ? ` unit ${unit}` : ""}|${zip5}`;
 }
 
 /**

@@ -638,8 +638,10 @@ export default function CrmClientPage() {
     onSuccess: (r: any) => {
       setApptOpen(false); setApptTitle(""); setApptStart(""); setApptEnd(""); setApptNotes(""); setApptProjectId(null);
       refresh();
-      // The visit moves the job to Job Scheduled on its own (server/crm/job-stage-auto.ts) — show it.
+      // The visit moves the job to Job Scheduled on its own (server/crm/job-stage-auto.ts) — show it everywhere.
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reviews/pipeline"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/attention"] });
       const clash = r?.conflicts?.length ? ` Heads up: overlaps ${r.conflicts.length} other visit(s).` : "";
       toast({ title: "Appointment scheduled", description: `It's on the calendar.${clash}` });
@@ -1264,7 +1266,7 @@ export default function CrmClientPage() {
           <p className="mb-3 text-sm font-bold">Job stage</p>
           <JobStageControl customer={c} estimates={estimates} projects={data.projects ?? []} appointments={appointments}
             companyName={me?.org?.name ?? "us"} canEdit={canManageJobs} measured={!!stageTakeoff?.takeoffs?.length || !!stageTakeoff?.takeoff}
-            canSeePrices={canSeePrices} canAttach={canManageCustomers}
+            canSeePrices={canSeePrices} canAttach={canManageCustomers} canText={canManageCustomers}
             celebrations={(me?.org?.customFields as any)?.celebrations !== false} flow={flow}
             onSchedule={canManageJobs ? openSchedule : undefined} />
         </CardContent>
@@ -1303,7 +1305,7 @@ export default function CrmClientPage() {
 
       {/* The HOVER report's details, imported (renders nothing without a HOVER capture). */}
       {/* The containers below sit in the account's order (Settings → Client page); owners/admins can remove one. */}
-      <ClientSections>
+      <ClientSections layout={layout}>
       <ClientSection id="hover" layout={layout} when={!!id}>
       {id && <HoverTakeoffCard customerId={id} />}
       </ClientSection>
@@ -1497,9 +1499,11 @@ export default function CrmClientPage() {
                         {/* Search the price book; a pick fills the line (and the qty from the HOVER takeoff when one matches). */}
                         <PricebookItemInput value={it.name} placeholder="Search your price book, or type an item" testId={`input-item-name-${idx}`}
                           onChange={(v) => setItems(items.map((x, i) => i === idx ? { ...x, name: v } : x))}
+                          quantityFor={(line) => (estTakeoff ? takeoffQuantityForLine(line, estTakeoff)?.quantity ?? null : null)}
                           onPick={(pb) => {
                             const fromHover = estTakeoff ? takeoffQuantityForLine({ name: pb.name, unit: pb.unit }, estTakeoff) : null;
-                            setItems(items.map((x, i) => i === idx ? {
+                            // Functional update: a slow price lookup never puts back lines edited meanwhile.
+                            setItems((cur) => cur.map((x, i) => i === idx ? {
                               ...x, name: pb.name, unit: pb.unit ?? "", description: pb.description, taxable: pb.taxable,
                               unitPriceCents: pb.unitPriceCents, quantityMilli: Math.round((fromHover?.quantity ?? 1) * 1000),
                             } : x));
@@ -2046,7 +2050,18 @@ export default function CrmClientPage() {
               <div>
                 <Label htmlFor="appt-start">Starts</Label>
                 <Input id="appt-start" type="datetime-local" value={apptStart}
-                  onChange={(e) => setApptStart(e.target.value)} data-testid="input-appointment-start" />
+                  onChange={(e) => {
+                    // Moving the start keeps the visit's length: the end follows, so it can never sit before the start.
+                    const next = e.target.value;
+                    const prevStart = apptStart ? new Date(apptStart).getTime() : NaN;
+                    const prevEnd = apptEnd ? new Date(apptEnd).getTime() : NaN;
+                    const nextStart = next ? new Date(next).getTime() : NaN;
+                    if (Number.isFinite(nextStart) && (!Number.isFinite(prevEnd) || prevEnd <= nextStart || Number.isFinite(prevStart))) {
+                      const length = Number.isFinite(prevStart) && Number.isFinite(prevEnd) && prevEnd > prevStart ? prevEnd - prevStart : 2 * 3600_000;
+                      setApptEnd(toLocalInput(new Date(nextStart + length)));
+                    }
+                    setApptStart(next);
+                  }} data-testid="input-appointment-start" />
               </div>
               <div>
                 <Label htmlFor="appt-end">Ends</Label>
@@ -2054,6 +2069,9 @@ export default function CrmClientPage() {
                   onChange={(e) => setApptEnd(e.target.value)} data-testid="input-appointment-end" />
               </div>
             </div>
+            {apptStart && apptEnd && new Date(apptEnd).getTime() <= new Date(apptStart).getTime() && (
+              <p className="text-xs text-destructive" data-testid="text-appointment-end-before-start">The end is before the start — pick a later end time.</p>
+            )}
             <div>
               <Label htmlFor="appt-notes">Notes (optional)</Label>
               <Textarea id="appt-notes" rows={2} value={apptNotes} onChange={(e) => setApptNotes(e.target.value)}
@@ -2062,7 +2080,7 @@ export default function CrmClientPage() {
           </div>
           <DialogFooter>
             <Button onClick={() => scheduleAppt.mutate()}
-              disabled={!apptTitle.trim() || !apptStart || scheduleAppt.isPending}
+              disabled={!apptTitle.trim() || !apptStart || scheduleAppt.isPending || (!!apptEnd && new Date(apptEnd).getTime() <= new Date(apptStart).getTime())}
               data-testid="button-save-appointment">
               {scheduleAppt.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Schedule

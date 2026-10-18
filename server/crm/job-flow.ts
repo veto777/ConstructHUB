@@ -142,6 +142,10 @@ export async function enterPhase(args: {
     }
   } catch (e: any) {
     console.error("[crm] phase alerts failed:", e?.message || e);
+    // Nothing went out: release the slot so entering the phase again retries the alerts.
+    if (!out.some((o) => o.result === "sent")) {
+      await db.delete(crmStageAlerts).where(and(eq(crmStageAlerts.projectId, args.project.id), eq(crmStageAlerts.phaseKey, String(args.phaseKey)))).catch(() => {});
+    }
   }
   return out;
 }

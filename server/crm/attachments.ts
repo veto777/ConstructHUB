@@ -497,7 +497,11 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
         values.fileName = `${stage}--${values.fileName}`;
       } else if (stage === "punchlist") {
         const scope = String(req.body?.scope || "");
-        values.fileName = punchPhotoName(/^[a-z0-9_]{1,40}$/.test(scope) ? scope : GENERAL_SCOPE.key, values.fileName);
+        // The project the walkthrough belongs to — this client's own, or the photo files without one.
+        const pid = String(req.body?.projectId || "");
+        const project = /^[0-9a-f-]{36}$/.test(pid) ? (await db.select({ id: crmProjects.id }).from(crmProjects)
+          .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, pid), eq(crmProjects.customerId, String(refId)))).limit(1))[0] : null;
+        values.fileName = punchPhotoName(/^[a-z0-9_]{1,40}$/.test(scope) ? scope : GENERAL_SCOPE.key, values.fileName, project?.id ?? null);
       }
     }
 
@@ -752,10 +756,11 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       .limit(1);
     if (!cust) return res.status(404).json({ message: "Customer not found" });
 
+    // The homeowner's own allowance: the crew's photos and a HOVER capture's never use it up.
     const [{ n }] = await db
       .select({ n: sql<number>`count(*)::int` })
       .from(crmAttachments)
-      .where(and(eq(crmAttachments.kind, "photo"), eq(crmAttachments.refId, customerId)));
+      .where(and(eq(crmAttachments.kind, "photo"), eq(crmAttachments.refId, customerId), eq(crmAttachments.uploadedByKind, "client")));
     if (n >= MAX_PHOTOS_PER_CUSTOMER) {
       return res.status(409).json({ message: `Photo limit reached (${MAX_PHOTOS_PER_CUSTOMER} max)` });
     }

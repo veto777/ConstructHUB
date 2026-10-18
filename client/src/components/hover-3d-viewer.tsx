@@ -463,9 +463,11 @@ export default function Hover3DViewer(props: Hover3DViewerProps) {
     };
     const walls = props.mesh.faces.filter((f) => f.type === "wall");
     const roofs = props.mesh.faces.filter((f) => f.type === "roof");
-    b.sidingLines = swap(b.sidingLines, props.sidingReveal ? makeCourseLines(walls, b.ringOf, b.holesOf, props.sidingReveal / 12, shade(props.sidingColor, 0.55)) : null);
-    b.shingleLines = swap(b.shingleLines, props.roofShingles ? makeCourseLines(roofs, b.ringOf, b.holesOf, SHINGLE_EXPOSURE_FT, shade(props.roofColor, 0.6)) : null);
-  }, [props.sidingReveal, props.roofShingles, props.sidingColor, props.roofColor, props.mesh]);
+    // Windows and doors hidden → solid walls, so the courses run straight through where they were.
+    const holes = props.showOpenings ? b.holesOf : new Map<string, V3[][]>();
+    b.sidingLines = swap(b.sidingLines, props.sidingReveal ? makeCourseLines(walls, b.ringOf, holes, props.sidingReveal / 12, shade(props.sidingColor, 0.55)) : null);
+    b.shingleLines = swap(b.shingleLines, props.roofShingles ? makeCourseLines(roofs, b.ringOf, holes, SHINGLE_EXPOSURE_FT, shade(props.roofColor, 0.6)) : null);
+  }, [props.sidingReveal, props.roofShingles, props.sidingColor, props.roofColor, props.showOpenings, props.mesh]);
 
   // Windows/doors on → walls with cut-outs + glass; off → solid walls.
   useEffect(() => {

@@ -7,7 +7,7 @@
  *                            hover, that asks before removing the container from every client page
  *   <ClientPageLayoutCard>   Settings → Client page: arrange, show/hide, reset
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { Children, isValidElement, useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Eye, EyeOff, LayoutList, Loader2, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -43,8 +43,16 @@ function useSaveLayout(okTitle: string) {
   });
 }
 
-export function ClientSections({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col gap-6" data-testid="client-sections">{children}</div>;
+export function ClientSections({ layout, children }: { layout?: ClientLayoutState; children: ReactNode }) {
+  // Rendered in the account's order (not CSS order), so Tab and a screen reader walk the page as it looks.
+  const kids = Children.toArray(children);
+  const rank = (k: ReactNode) => {
+    const id = isValidElement(k) ? (k.props as { id?: string }).id : undefined;
+    const i = id && layout ? layout.order.indexOf(id as ClientSectionKey) : -1;
+    return i < 0 ? 99 : i;
+  };
+  const ordered = layout ? kids.map((k, i) => ({ k, i })).sort((a, b) => rank(a.k) - rank(b.k) || a.i - b.i).map((x) => x.k) : kids;
+  return <div className="flex flex-col gap-6" data-testid="client-sections">{ordered}</div>;
 }
 
 export function ClientSection({ id, layout, when = true, children }: {
@@ -52,10 +60,12 @@ export function ClientSection({ id, layout, when = true, children }: {
 }) {
   const [confirming, setConfirming] = useState(false);
   const save = useSaveLayout(`${sectionLabel(id)} removed from client pages`);
-  if (!when || layout.hidden.includes(id)) return null;
-  const order = layout.order.indexOf(id);
+  if (!when) return null;
+  // A removed container stays mounted but hidden: the dialogs inside it (New estimate, New project) still open
+  // from the quick actions at the top of the page, and nothing is laid out or focusable.
+  if (layout.hidden.includes(id)) return <div hidden aria-hidden="true" data-testid={`client-section-hidden-${id}`}>{children}</div>;
   return (
-    <div className="group relative" style={{ order: order < 0 ? 99 : order }} data-testid={`client-section-${id}`}>
+    <div className="group relative" data-testid={`client-section-${id}`}>
       {children}
       {layout.canEdit && (
         <>

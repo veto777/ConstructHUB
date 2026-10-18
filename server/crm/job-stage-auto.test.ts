@@ -55,8 +55,12 @@ describe("punch-list helpers (pure)", () => {
     expect(scopeKeyOf("Pool house!")).toBe("pool_house");
     expect(openWalkthroughs([{ walkthroughDoneAt: null }, { walkthroughDoneAt: "2026-01-01" }, {}])).toEqual({ open: 2, total: 3 });
     expect(punchPhotoName("siding", "IMG_1.jpg")).toBe("punchlist--siding--IMG_1.jpg");
-    expect(parsePunchPhotoName("punchlist--siding--IMG_1.jpg")).toEqual({ scope: "siding", displayName: "IMG_1.jpg" });
-    expect(parsePunchPhotoName("punchlist--IMG_1.jpg")).toEqual({ scope: "general", displayName: "IMG_1.jpg" });
+    expect(parsePunchPhotoName("punchlist--siding--IMG_1.jpg")).toEqual({ scope: "siding", displayName: "IMG_1.jpg", projectId: null });
+    expect(parsePunchPhotoName("punchlist--IMG_1.jpg")).toEqual({ scope: "general", displayName: "IMG_1.jpg", projectId: null });
+    // The project rides in the name (a repeat client's two roofing jobs keep their walkthrough photos apart).
+    const pid = "11111111-2222-4333-8444-555555555555";
+    expect(punchPhotoName("siding", "IMG_1.jpg", pid)).toBe(`punchlist--siding--@${pid}--IMG_1.jpg`);
+    expect(parsePunchPhotoName(`punchlist--siding--@${pid}--IMG_1.jpg`)).toEqual({ scope: "siding", displayName: "IMG_1.jpg", projectId: pid });
     expect(parsePunchPhotoName("progress--IMG_1.jpg")).toBeNull();
   });
 });

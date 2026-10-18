@@ -13,26 +13,44 @@ export function PhotoViewer({ photos, index, onIndex, onClose }: {
 }) {
   const p = photos[index];
   const touch = useRef<number | null>(null);
+  const swiped = useRef(false);
+  const box = useRef<HTMLDivElement>(null);
   const go = (d: number) => onIndex((index + d + photos.length) % photos.length);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       else if (e.key === "ArrowRight") go(1);
       else if (e.key === "ArrowLeft") go(-1);
+      else if (e.key === "Tab" && box.current) {
+        // Focus stays inside the viewer while it is open (a true modal), wrapping at either end.
+        const f = Array.from(box.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'));
+        if (!f.length) return;
+        const i = f.indexOf(document.activeElement as HTMLElement);
+        const next = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i === -1 || i >= f.length - 1 ? 0 : i + 1);
+        e.preventDefault(); f[next].focus();
+      }
     };
     window.addEventListener("keydown", key);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { window.removeEventListener("keydown", key); document.body.style.overflow = prev; };
   }); // eslint-disable-line react-hooks/exhaustive-deps
+  // Opening moves focus to the viewer; closing gives it back to where it came from.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    box.current?.querySelector<HTMLElement>('[data-testid="photo-viewer-close"]')?.focus();
+    return () => { opener?.focus?.(); };
+  }, []);
   if (!p) return null;
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex flex-col bg-black/95" role="dialog" aria-modal="true" aria-label={p.name} data-testid="photo-viewer"
-      onClick={onClose}
-      onTouchStart={(e) => { touch.current = e.touches[0].clientX; }}
+    <div ref={box} className="fixed inset-0 z-[200] flex flex-col bg-black/95" role="dialog" aria-modal="true" aria-label={p.name} data-testid="photo-viewer"
+      onClick={() => { if (swiped.current) { swiped.current = false; return; } onClose(); }}
+      onTouchStart={(e) => { touch.current = e.touches[0].clientX; swiped.current = false; }}
       onTouchEnd={(e) => {
         if (touch.current == null) return;
         const dx = e.changedTouches[0].clientX - touch.current; touch.current = null;
+        // A swipe steps through the set; the click the browser synthesizes after it must not close the viewer.
+        if (Math.abs(dx) > 10) swiped.current = true;
         if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
       }}>
       <div className="flex items-center justify-between gap-3 px-3 py-2 text-white" onClick={(e) => e.stopPropagation()}>

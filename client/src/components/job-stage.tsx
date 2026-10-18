@@ -27,7 +27,7 @@ import {
   STAGE_PROJECT_STATUS, currentProject, jobStageLabel, jobStageOf, stageIndex, stageOfProjectStatus, type JobStage,
 } from "@shared/job-stage";
 import { DEFAULT_JOB_FLOW, anchorStatusBefore, currentPhaseKey, phaseIndex, phaseLabel, type FlowPhase, type JobFlow } from "@shared/job-flow";
-import { newPunchId, openWalkthroughs, parsePunchPhotoName, type PunchScope } from "@shared/punch-list";
+import { newPunchId, openWalkthroughs, parsePunchPhotoName, type PunchScope, scopeKeyOf } from "@shared/punch-list";
 
 /** The pill's colours (Google Reviews lists): grey while bidding, blue once it is out, green from approval on. */
 const TONE: Record<JobStage, { solid: string; soft: string; text: string }> = {
@@ -85,7 +85,7 @@ export function JobStageTracker({ current, flow = DEFAULT_JOB_FLOW, testId = "jo
 }
 
 export type SubmittedEstimate = {
-  id?: string; number?: string | null; title?: string | null; status?: string | null; source?: "hcp" | "constructhub";
+  id?: string; projectId?: string | null; number?: string | null; title?: string | null; status?: string | null; source?: "hcp" | "constructhub";
   totalCents?: number; approvedTotalCents?: number | null; sentAt?: string | null; approvedAt?: string | null; signatureName?: string | null;
 };
 export type StageAppointment = { id: string; title?: string | null; startsAt: string; endsAt?: string | null; status?: string | null; projectId?: string | null; customerId?: string | null };
@@ -97,9 +97,13 @@ const dayTime = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday
 const isoDay = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
 /** The bid that went to the client (the approved one, else the latest sent), and its signed contract on file. */
-function pickSubmitted(estimates: SubmittedEstimate[]): SubmittedEstimate | null {
-  const main = estimates.filter((e) => e.id && !/change order/i.test(e.title ?? ""));
-  const pool = main.length ? main : estimates.filter((e) => e.id);
+function pickSubmitted(estimates: SubmittedEstimate[], projectId?: string | null): SubmittedEstimate | null {
+  // The current job's own bids first (a repeat client's older job keeps its own contract); unlinked ones otherwise.
+  const ofJob = projectId ? estimates.filter((e) => e.projectId === projectId) : [];
+  const scoped = ofJob.length ? ofJob : estimates.filter((e) => !e.projectId || !projectId);
+  const base = scoped.length ? scoped : estimates;
+  const main = base.filter((e) => e.id && !/change order/i.test(e.title ?? ""));
+  const pool = main.length ? main : base.filter((e) => e.id);
   const t = (s?: string | null) => (s ? new Date(s).getTime() : 0);
   const approved = pool.filter((e) => e.status === "approved").sort((a, b) => t(b.approvedAt) - t(a.approvedAt))[0];
   if (approved) return approved;
@@ -120,11 +124,11 @@ export function pickAppointment(appointments: StageAppointment[], projectId: str
  * Under the tracker: the submitted bid (number, title, amount, when it went out, where it was written — HouseCall Pro
  * or here) and the signed contract: the file on its estimate (view), or Attach / Replace once the job is approved.
  */
-function SubmittedBid({ estimates, stage, canSeePrices, canAttach }: {
-  estimates: SubmittedEstimate[]; stage: JobStage | null; canSeePrices: boolean; canAttach: boolean;
+function SubmittedBid({ estimates, projectId, stage, canSeePrices, canAttach }: {
+  estimates: SubmittedEstimate[]; projectId?: string | null; stage: JobStage | null; canSeePrices: boolean; canAttach: boolean;
 }) {
   const { toast } = useToast();
-  const e = pickSubmitted(estimates);
+  const e = pickSubmitted(estimates, projectId);
   const fileRef = useRef<HTMLInputElement>(null);
   const qk = [`/api/crm/attachments?kind=contract&refId=${e?.id ?? ""}`];
   const { data: contracts } = useQuery<any[]>({ queryKey: qk, enabled: !!e?.id });
@@ -133,11 +137,14 @@ function SubmittedBid({ estimates, stage, canSeePrices, canAttach }: {
     mutationFn: async (file: File) => {
       const r = await uploadFile("/api/crm/attachments", file, { kind: "contract", refId: e!.id! });
       // Replace: the previous signed copy goes once the new one is stored.
-      if (contract) await fetch(`/api/crm/attachments/${contract.id}`, { method: "DELETE", credentials: "same-origin" });
+      if (contract) {
+        const del = await fetch(`/api/crm/attachments/${contract.id}`, { method: "DELETE", credentials: "same-origin" });
+        if (!del.ok) throw new Error("The new copy is stored, but the old one could not be removed. Remove it under Documents.");
+      }
       return r;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: qk }); toast({ title: contract ? "Signed contract replaced" : "Signed contract attached" }); },
-    onError: (err) => toast({ title: "Could not attach the contract", description: apiErrorMessage(err), variant: "destructive" }),
+    onError: (err) => { queryClient.invalidateQueries({ queryKey: qk }); toast({ title: "Could not attach the contract", description: apiErrorMessage(err), variant: "destructive" }); },
   });
   if (!e) return null;
   const approved = stageIndex(stage) >= stageIndex("approved");
@@ -219,14 +226,21 @@ function PunchListBlock({ projectId, customerId, canEdit, onClosedOut, onScopes 
   const [uploading, setUploading] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  // Quick taps (check, check, add) save one after the other, each from the latest list — never two replacements
+  // racing — and only the newest save's answer replaces what is on screen.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const seq = useRef(0);
   const save = useMutation({
-    mutationFn: async (next: PunchScope[]) => (await apiRequest("PUT", `/api/crm/projects/${projectId}/punch`, {
-      scopes: next.map((s) => ({ scope: s.scope, label: s.label, items: s.items, walkthroughDone: !!s.walkthroughDoneAt })),
-    })).json() as Promise<PunchPayload>,
-    onSuccess: (r) => {
+    mutationFn: async ({ next }: { next: PunchScope[]; seq: number }) => {
+      const run = queue.current.then(async () => (await apiRequest("PUT", `/api/crm/projects/${projectId}/punch`, {
+        scopes: next.map((s) => ({ scope: s.scope, label: s.label, items: s.items, walkthroughDone: !!s.walkthroughDoneAt })),
+      })).json() as Promise<PunchPayload>);
+      queue.current = run.catch(() => {});
+      return run;
+    },
+    onSuccess: (r, vars) => {
       queryClient.setQueryData(qk, r);
-      setScopes(r.scopes);
-      onScopes(r.scopes);
+      if (vars.seq === seq.current) { setScopes(r.scopes); onScopes(r.scopes); }
       if (r.closedOut) {
         queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customerId}`] });
         queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
@@ -234,9 +248,15 @@ function PunchListBlock({ projectId, customerId, canEdit, onClosedOut, onScopes 
         onClosedOut();
       }
     },
-    onError: (e) => { toast({ title: "Couldn't save the punch list", description: apiErrorMessage(e), variant: "destructive" }); queryClient.invalidateQueries({ queryKey: qk }); },
+    onError: (e) => {
+      toast({ title: "Couldn't save the punch list", description: apiErrorMessage(e), variant: "destructive" });
+      // Back to what the server has — the tap that failed is undone on screen too.
+      const known = queryClient.getQueryData<PunchPayload>(qk);
+      if (known?.scopes) { setScopes(known.scopes); onScopes(known.scopes); }
+      queryClient.invalidateQueries({ queryKey: qk });
+    },
   });
-  const commit = (next: PunchScope[]) => { setScopes(next); save.mutate(next); };
+  const commit = (next: PunchScope[]) => { setScopes(next); save.mutate({ next, seq: ++seq.current }); };
   const update = (scope: string, fn: (s: PunchScope) => PunchScope) => commit(scopes.map((s) => (s.scope === scope ? fn(s) : s)));
 
   const addItem = (scope: string) => {
@@ -265,14 +285,15 @@ function PunchListBlock({ projectId, customerId, canEdit, onClosedOut, onScopes 
     const label = newScope.trim();
     if (!label) return;
     if (scopes.some((s) => s.label.toLowerCase() === label.toLowerCase())) return toast({ title: `${label} is already a section` });
-    commit([...scopes, { scope: "", label, items: [], walkthroughDoneAt: null }]);
+    // The key is minted here, so photos added before the save answers already file under this scope.
+    commit([...scopes, { scope: scopeKeyOf(label), label, items: [], walkthroughDoneAt: null }]);
     setNewScope(""); setAddingScope(false);
   };
   const uploadPhotos = async (scope: string, files: FileList) => {
     setUploading(scope);
     let ok = 0; const reasons = new Set<string>();
     for (const f of Array.from(files).slice(0, 20)) {
-      try { await uploadFile("/api/crm/attachments", f, { kind: "photo", refId: customerId, stage: "punchlist", scope }); ok++; }
+      try { await uploadFile("/api/crm/attachments", f, { kind: "photo", refId: customerId, stage: "punchlist", scope, projectId }); ok++; }
       catch (e: any) { reasons.add(`${f.name}: ${String(e?.message || "upload failed")}`); }
     }
     setUploading(null);
@@ -280,7 +301,11 @@ function PunchListBlock({ projectId, customerId, canEdit, onClosedOut, onScopes 
     toast(reasons.size ? { title: `${ok} uploaded, ${reasons.size} failed`, description: Array.from(reasons).slice(0, 3).join(" · "), variant: "destructive" }
       : { title: `${ok} punch-list photo${ok === 1 ? "" : "s"} added`, description: "The client can see them in their portal too." });
   };
-  const photosOf = (scope: string) => (photos ?? []).filter((p: any) => parsePunchPhotoName(String(p.fileName ?? ""))?.scope === scope);
+  // This job's photos of the scope (a photo filed without a project — an older upload — shows too).
+  const photosOf = (scope: string) => (photos ?? []).filter((p: any) => {
+    const t = parsePunchPhotoName(String(p.fileName ?? ""));
+    return t?.scope === scope && (!t.projectId || t.projectId === projectId);
+  });
   const src = (p: any) => (String(p.mime).startsWith("image/") && !/hei[cf]/.test(p.mime) ? `${p.url}?inline=1` : null);
 
   const progress = openWalkthroughs(scopes);
@@ -401,7 +426,7 @@ function PunchListBlock({ projectId, customerId, canEdit, onClosedOut, onScopes 
  */
 export function JobStageControl({
   customer, estimates, projects, appointments = [], companyName, canEdit, measured = false, canSeePrices = false, canAttach = false,
-  celebrations = true, flow = DEFAULT_JOB_FLOW, onSchedule,
+  celebrations = true, flow = DEFAULT_JOB_FLOW, onSchedule, canText,
 }: {
   customer: { id: string; displayName: string; firstName?: string | null; phone?: string | null };
   estimates: SubmittedEstimate[];
@@ -421,6 +446,8 @@ export function JobStageControl({
   celebrations?: boolean;
   /** Opens the client page's Schedule-appointment dialog, prefilled for this project. */
   onSchedule?: (projectId: string | null) => void;
+  /** This seat may message clients (the closing text goes through /api/crm/messages). */
+  canText?: boolean;
 }) {
   const { toast } = useToast();
   const stage = jobStageOf({ estimates, projects, measured });
@@ -484,7 +511,7 @@ export function JobStageControl({
   const pick = (to: FlowPhase) => {
     if (to.builtin === "closed_out") {
       setText(`Hi ${first}, your ${jobName} is officially closed out. Thank you for choosing us — we really appreciated working with you!`);
-      setSendText(!!customer.phone);
+      setSendText(!!customer.phone && canText !== false);
       setClosing(true);
       return;
     }
@@ -530,7 +557,7 @@ export function JobStageControl({
         </div>
       )}
 
-      <SubmittedBid estimates={estimates} stage={stage} canSeePrices={canSeePrices} canAttach={canAttach} />
+      <SubmittedBid estimates={estimates} projectId={project?.id} stage={stage} canSeePrices={canSeePrices} canAttach={canAttach} />
       {showPunch && <PunchListBlock projectId={project.id} customerId={customer.id} canEdit={canEdit} onClosedOut={celebrate} onScopes={setScopes} />}
 
       <Dialog open={closing} onOpenChange={setClosing}>
@@ -543,9 +570,11 @@ export function JobStageControl({
             </DialogDescription>
           </DialogHeader>
           <label className="flex items-center gap-2 text-sm font-semibold">
-            <input type="checkbox" checked={sendText} disabled={!customer.phone} onChange={(e) => setSendText(e.target.checked)} data-testid="checkbox-close-out-text" />
+            <input type="checkbox" checked={sendText} disabled={!customer.phone || canText === false} onChange={(e) => setSendText(e.target.checked)} data-testid="checkbox-close-out-text" />
             <MessageSquare className="h-4 w-4" aria-hidden="true" />
-            {customer.phone ? `Text the client (${customer.phone})` : "No phone number on file — no text will be sent"}
+            {!customer.phone ? "No phone number on file — no text will be sent"
+              : canText === false ? "Your seat can't message clients — no text will be sent"
+              : `Text the client (${customer.phone})`}
           </label>
           {sendText && (
             <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} maxLength={600} aria-label="Closing text" data-testid="input-close-out-text" />

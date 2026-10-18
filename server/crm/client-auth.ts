@@ -539,7 +539,7 @@ export function registerCrmClientAuthRoutes(app: Express): void {
       pamphlets: pamphletRows.map((a) => ({
         ...clientFile(a), orgName: orgName.get(a.orgId) ?? null,
       })),
-      photos: photoRows.map((a) => ({ ...clientFile(a), customerId: a.refId })),
+      photos: photoRows.map((a) => ({ ...clientFile(a), customerId: a.refId, uploadedByKind: a.uploadedByKind ?? null })),
       // The punch list & final walkthrough, read-only: the notes per scope and whether each walkthrough is done.
       punchLists: await punchListsForCustomers(client.customerIds),
       estimates: estimates.map((e) => ({

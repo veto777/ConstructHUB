@@ -23,7 +23,8 @@ export type FlowAlert = { to: FlowRecipient; staff?: FlowStaff; channel: FlowCha
 export type FlowPhase = { key: string; label: string; builtin?: JobStage; alerts: FlowAlert[] };
 export type JobFlow = { phases: FlowPhase[] };
 
-export const MAX_FLOW_PHASES = 30;
+/** A sanity ceiling, not a product limit (owner: as many phases as needed). */
+export const MAX_FLOW_PHASES = 100;
 export const MAX_PHASE_ALERTS = 8;
 export const MAX_PHASE_LABEL = 40;
 export const MAX_ALERT_TEMPLATE = 600;

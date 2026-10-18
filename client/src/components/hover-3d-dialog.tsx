@@ -215,7 +215,12 @@ export function Hover3DDialog({ open, onOpenChange, source, title, initialTab }:
 
         <div className="relative min-h-0 flex-1">
           {tab === "model" && (
-            q.isLoading || !d ? (
+            q.isError ? (
+              <Centered>
+                <p className="max-w-md text-center text-sm text-muted-foreground" data-testid="hover-3d-error">The 3D model could not be loaded. Check your connection and try again.</p>
+                <Button size="sm" variant="outline" onClick={() => q.refetch()}>Try again</Button>
+              </Centered>
+            ) : q.isLoading || !d ? (
               <Centered><Loader2 className="h-5 w-5 animate-spin" /> Loading the 3D model…</Centered>
             ) : ready ? (
               <ModelTab mesh={d.mesh!} />

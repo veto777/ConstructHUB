@@ -19,7 +19,7 @@ import { presentListing } from "./competitor-analysis";
 import { rateLimit, actorKey, takeBudget } from "./growth-limits";
 import { findReviewSites, ReviewSiteFinderError } from "./review-site-finder";
 import { hiddenFromReviews, jobStagesForRequests, registerReviewPipelineRoutes } from "./crm/review-pipeline";
-import { registerCrmPhotoPlatformRoutes, registerReviewProjectPhotoRoutes, resolveReviewCrmLink, reviewPhotoUrl } from "./crm/photo-library";
+import { HOMEOWNER_PICK_MAX, registerCrmPhotoPlatformRoutes, registerReviewProjectPhotoRoutes, resolveReviewCrmLink, reviewPhotoUrl } from "./crm/photo-library";
 import { ownedBy } from "./ownership";
 import { buildExclusionList } from "./click-guard-exclusions";
 import { GOOGLE_ADS_GUIDE_SECTIONS, GOOGLE_ADS_GUIDE_ORDER } from "./google-ads-guide-content";
@@ -5405,7 +5405,7 @@ function main() {
         return res.status(409).json({ message: "This client is hidden from review requests. Unhide them under Ready to ask to send one." });
       }
       const uploadedPhotos = Array.isArray(photos) ? photos : [];
-      if (uploadedPhotos.length + (crmLink.photos?.length ?? 0) > 30) return res.status(400).json({ message: "Maximum 30 photos per review request." });
+      if (uploadedPhotos.length + (crmLink.photos?.length ?? 0) > HOMEOWNER_PICK_MAX) return res.status(400).json({ message: `Up to ${HOMEOWNER_PICK_MAX} photos per review request.` });
 
       const token = randomUUID();
       const isScheduled = scheduledFor && new Date(scheduledFor) > new Date();
@@ -5522,7 +5522,7 @@ function main() {
   app.post("/api/review-templates/find-review-sites", (req, res, next) => {
     if (!(req as any).user) return void res.status(401).json({ message: "Login required" });
     next();
-  }, reviewSiteFinderLimit, async (req, res) => {
+  }, requirePlatformAccess, reviewSiteFinderLimit, async (req, res) => {
     try {
       res.json(await findReviewSites(req.body?.url));
     } catch (err: any) {

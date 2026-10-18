@@ -44,6 +44,7 @@ import {
 import { requireOrg, type OrgContext } from "./tenancy";
 import { CRM_DIVISION_HEADER } from "@shared/divisions";
 import { objectPolicy } from "./object-access";
+import { pinnedDivisionOf } from "./divisions";
 import { storedFilePath } from "./attachments";
 import { likeContains } from "./entities";
 import { requirePlatformAccess } from "../platform-access";
@@ -436,7 +437,7 @@ export function registerCrmPhotoLibraryRoutes(app: Express, getDevUser: GetUser)
           project: projects[0] ? { id: projects[0].id, name: projects[0].name, status: projects[0].status } : null,
           projectCount: projects.length,
           jobStatus: jobStatusOf(projects),
-          counts: { all: g.all, progress: g.progress, finished: g.finished, client: g.client, hover: g.hover, unstaged: g.unstaged },
+          counts: { all: g.all, progress: g.progress, finished: g.finished, punchlist: g.punchlist, client: g.client, hover: g.hover, unstaged: g.unstaged },
           cover: cover ? { id: cover, thumbUrl: THUMB(cover, "sm", scope.div) } : null,
           lastPhotoAt: g.last,
         };
@@ -515,6 +516,8 @@ export function registerCrmPhotoLibraryRoutes(app: Express, getDevUser: GetUser)
     if (!ctx) return;
     const [att] = await visiblePhotos(ctx, [String(req.params.id)]);
     if (!att) return res.status(404).json({ message: "Photo not found" });
+    // A row whose file is gone from disk is "not found", not an unsupported format.
+    if (!storedFilePath(att)) return res.status(404).json({ message: "File not found" });
     const file = await rendition(att, req.query.size === "lg" ? "lg" : "sm");
     if (!file) return res.status(415).json({ message: "No preview for this photo format." });
     sendRendition(res, file);
@@ -646,20 +649,32 @@ export async function resolveReviewCrmLink(req: any, res: any, getUser: GetUser,
   crmOrgId?: string; crmCustomerId?: string | null; photos?: { attachmentId: string; originalName: string }[];
 } | null> {
   const customerId = typeof body?.crmCustomerId === "string" && body.crmCustomerId ? body.crmCustomerId.slice(0, 64) : null;
-  const rawIds = Array.isArray(body?.crmPhotoIds) ? body.crmPhotoIds.filter((x: unknown) => typeof x === "string" && x).map((x: string) => x.slice(0, 64)) : [];
+  const rawIds: string[] = Array.isArray(body?.crmPhotoIds) ? [...new Set<string>(body.crmPhotoIds.filter((x: unknown) => typeof x === "string" && x).map((x: string) => x.slice(0, 64)))] : [];
   if (!customerId && !rawIds.length) return {};
   // Job photos go 5–10 per request (owner rule); the composer holds the minimum, the server the maximum.
   if (rawIds.length > HOMEOWNER_PICK_MAX) { res.status(400).json({ message: `Pick up to ${HOMEOWNER_PICK_MAX} job photos per review request.` }); return null; }
   const ctx = await photoCtx(req, res, getUser);
   if (!ctx) return null;
+  // Linking a client to a request is the same right as the Ready to ask list itself (job or client rights), photos or not.
+  if (!canExport(res, ctx)) return null;
+  // Ready to ask is company-wide (a pinned member still only sees their division); the send honours the same scope,
+  // or a client picked under "All divisions" would come back "not found" because of the sender's saved workspace.
+  if (!pinnedDivisionOf(ctx.member)) ctx.activeDivisionId = null;
   if (customerId && !await objectPolicy(ctx).visible("customers", customerId)) {
     res.status(404).json({ message: "Client not found" }); return null;
   }
   let photos: { attachmentId: string; originalName: string }[] = [];
   if (rawIds.length) {
-    if (!canExport(res, ctx)) return null;
     const rows = await visiblePhotos(ctx, rawIds);
     if (rows.length !== new Set(rawIds).size) { res.status(404).json({ message: "Photo not found" }); return null; }
+    // The picker is locked to the picked client; the server holds the same line — never another client's photos.
+    if (customerId && rows.some((a) => a.refId !== customerId)) { res.status(400).json({ message: "Those photos belong to another client." }); return null; }
+    // The floor too: 5–10 of the job's photos, fewer only when the client has fewer (the composer says the same).
+    if (customerId && rows.length < HOMEOWNER_PICK_MIN) {
+      const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmAttachments)
+        .where(and(eq(crmAttachments.orgId, ctx.org.id), eq(crmAttachments.kind, "photo"), eq(crmAttachments.refId, customerId)));
+      if (n >= HOMEOWNER_PICK_MIN) { res.status(400).json({ message: `Pick at least ${HOMEOWNER_PICK_MIN} job photos, or none and let the client choose.` }); return null; }
+    }
     photos = rows.map((a) => ({ attachmentId: a.id, originalName: safeZipName(classifyPhoto(a.fileName).displayName) }));
   }
   return { crmOrgId: ctx.org.id, crmCustomerId: customerId, photos };

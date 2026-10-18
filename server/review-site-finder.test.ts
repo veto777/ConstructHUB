@@ -172,7 +172,7 @@ describe("Find review sites: the SSRF-safe page read", () => {
     expect(finder).toContain("makeSafeFetch(undefined, undefined, FINDER_MAX_REDIRECTS)");
     expect(FINDER_MAX_REDIRECTS).toBe(3);
     const routes = src("server/routes.ts");
-    expect(routes).toMatch(/app\.post\("\/api\/review-templates\/find-review-sites", \(req, res, next\) => \{\s*if \(!\(req as any\)\.user\) return void res\.status\(401\)[\s\S]{0,80}\}, reviewSiteFinderLimit,/);
+    expect(routes).toMatch(/app\.post\("\/api\/review-templates\/find-review-sites", \(req, res, next\) => \{\s*if \(!\(req as any\)\.user\) return void res\.status\(401\)[\s\S]{0,80}\}, requirePlatformAccess, reviewSiteFinderLimit,/);
     expect(routes).toContain('const reviewSiteFinderLimit = rateLimit("review-site-finder"');
     expect(isOpenWithoutPlan("/api/review-templates/find-review-sites")).toBe(false);
   });

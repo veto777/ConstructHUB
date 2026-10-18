@@ -7,19 +7,24 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export type PickedPricebookItem = {
   id: string; name: string; unit: string | null; description: string; taxable: boolean; unitPriceCents: number;
 };
 
-export function PricebookItemInput({ value, onChange, onPick, placeholder, testId }: {
+export function PricebookItemInput({ value, onChange, onPick, quantityFor, placeholder, testId }: {
   value: string;
   onChange: (v: string) => void;
   onPick: (item: PickedPricebookItem) => void;
+  /** The quantity the line will carry (from the HOVER takeoff), so a computed item is priced for it — a minimum
+   *  charge or a quantity break lands on the line's total, never on the per-unit price. */
+  quantityFor?: (item: { name: string; unit: string | null }) => number | null;
   placeholder?: string;
   testId?: string;
 }) {
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -30,8 +35,14 @@ export function PricebookItemInput({ value, onChange, onPick, placeholder, testI
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
-  const { data, isLoading } = useQuery<any[]>({
-    queryKey: [`/api/crm/pricebook/items${q ? `?q=${encodeURIComponent(q)}` : ""}`],
+  // Keyed under the price book's own list key, so a price-book save refreshes these results too.
+  const { data, isLoading, isError } = useQuery<any[]>({
+    queryKey: ["/api/crm/pricebook/items", { q }],
+    queryFn: async () => {
+      const r = await fetch(`/api/crm/pricebook/items${q ? `?q=${encodeURIComponent(q)}` : ""}`, { credentials: "same-origin" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
     enabled: open,
   });
   const items = (data ?? []).slice(0, 8);
@@ -40,12 +51,17 @@ export function PricebookItemInput({ value, onChange, onPick, placeholder, testI
     setBusy(item.id);
     try {
       let price: number | null = item.flatPriceCents ?? null;
+      const qty = quantityFor?.({ name: item.name, unit: item.unit ?? null }) ?? null;
       if (price == null) {
-        const r = await apiRequest("POST", `/api/crm/pricebook/items/${item.id}/preview`, { quantityMilli: 1000 });
-        price = (await r.json()).totalPriceCents ?? 0;
+        const q = qty && qty > 0 ? qty : 1;
+        const r = await apiRequest("POST", `/api/crm/pricebook/items/${item.id}/preview`, { quantityMilli: Math.round(q * 1000) });
+        const total = Number((await r.json()).totalPriceCents ?? 0);
+        price = Math.round(total / q);
       }
       onPick({ id: item.id, name: item.name, unit: item.unit ?? null, description: item.description ?? "", taxable: item.taxable ?? true, unitPriceCents: price ?? 0 });
       setOpen(false);
+    } catch (e) {
+      toast({ title: "Could not price that item", description: apiErrorMessage(e), variant: "destructive" });
     } finally {
       setBusy(null);
     }
@@ -54,7 +70,13 @@ export function PricebookItemInput({ value, onChange, onPick, placeholder, testI
   return (
     <div className="relative" ref={box}>
       <Input value={value} placeholder={placeholder} onFocus={() => setOpen(true)} data-testid={testId}
+        onKeyDown={(e) => { if (e.key === "Escape" && open) { e.preventDefault(); e.stopPropagation(); setOpen(false); } }}
         onChange={(e) => { onChange(e.target.value); setOpen(true); }} autoComplete="off" />
+      {open && isError && !isLoading && (
+        <div className="absolute z-50 mt-1 w-full min-w-[18rem] rounded-md border bg-popover p-2 text-xs text-destructive shadow-lg" data-testid={testId ? `${testId}-error` : undefined}>
+          The price book did not answer. <button type="button" className="font-medium underline" onClick={() => setQ((v) => v + "")}>Try again</button>
+        </div>
+      )}
       {open && (isLoading || items.length > 0) && (
         <div className="absolute z-50 mt-1 max-h-72 w-full min-w-[18rem] overflow-y-auto rounded-md border bg-popover p-1 shadow-lg" data-testid={testId ? `${testId}-options` : undefined}>
           <p className="px-2 pb-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">From your price book</p>

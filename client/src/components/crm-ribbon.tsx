@@ -166,7 +166,7 @@ export function CrmRibbon() {
         <SheetContent
           side="bottom"
           data-testid="ribbon-more-sheet"
-          className="rounded-t-2xl px-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+          className="max-h-[85dvh] overflow-y-auto rounded-t-2xl px-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
         >
           <SheetHeader className="pb-2">
             <SheetTitle className="text-base">More</SheetTitle>

@@ -35,12 +35,12 @@ export const STAGE_PROJECT_STATUS: Record<JobStage, string> = {
 };
 const ESTIMATE_SUBMITTED = new Set(["sent", "viewed"]);
 
-type P = { status?: string | null; createdAt?: string | Date | null };
+type P = { status?: string | null; createdAt?: string | Date | null; archivedAt?: string | Date | null };
 const time = (p: P) => (p.createdAt ? new Date(p.createdAt).getTime() : 0);
 
 /** The project a stage belongs to: the newest one that is not cancelled. */
 export function currentProject<T extends P>(projects: T[] | undefined): T | null {
-  const live = (projects ?? []).filter((p) => p.status && p.status !== "cancelled" && PROJECT_STAGE[p.status]);
+  const live = (projects ?? []).filter((p) => p.status && p.status !== "cancelled" && !p.archivedAt && PROJECT_STAGE[p.status]);
   return live.length ? live.reduce((a, b) => (time(b) > time(a) ? b : a)) : null;
 }
 export const stageOfProjectStatus = (s: string | null | undefined): JobStage | null => (s ? PROJECT_STAGE[s] ?? null : null);

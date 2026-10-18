@@ -21,7 +21,10 @@ export function PortalPunchLists({ lists, photos }: { lists: PortalPunchList[]; 
       <SectionTitle icon={ClipboardCheck} title="Punch list & final walkthrough"
         description="The last details on your job, by scope, and the walkthrough that signs each one off." />
       {lists.map((l, li) => {
-        const punchPhotos = (photos ?? []).filter((p: any) => p.customerId === l.customerId && parsePunchPhotoName(String(p.fileName ?? "")));
+        const punchPhotos = (photos ?? []).filter((p: any) => {
+          const t = parsePunchPhotoName(String(p.fileName ?? ""));
+          return p.customerId === l.customerId && t && (!t.projectId || t.projectId === l.projectId);
+        });
         const done = l.scopes.filter((s) => s.walkthroughDoneAt).length;
         return (
           <Card key={l.projectId} data-testid={`portal-punch-${l.projectId}`}>

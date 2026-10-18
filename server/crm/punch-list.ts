@@ -21,7 +21,7 @@ import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { objectPolicy } from "./object-access";
 import { logActivity } from "./activity";
 import { advanceJobStage } from "./job-stage-auto";
-import { deriveScopes, normalizePunchItems, scopeKeyOf, type PunchItem, type PunchScope } from "@shared/punch-list";
+import { deriveScopes, normalizePunchItems, scopeKeyOf, type PunchItem, type PunchScope, GENERAL_SCOPE } from "@shared/punch-list";
 import { stageOfProjectStatus } from "@shared/job-stage";
 
 type GetUser = (req: any, res: any) => any;
@@ -58,8 +58,22 @@ export async function loadPunchScopes(orgId: string, project: typeof crmProjects
   const rows = await db.select().from(crmPunchScopes)
     .where(and(eq(crmPunchScopes.orgId, orgId), eq(crmPunchScopes.projectId, project.id)))
     .orderBy(asc(crmPunchScopes.sortOrder), asc(crmPunchScopes.createdAt));
-  if (rows.length) return rows;
   const seed = await derivedScopesFor(orgId, project);
+  if (rows.length) {
+    // A scope approved after the first open (a second estimate signed later) joins the list; notes and sign-offs
+    // already there are never touched. A lone, untouched "General" placeholder gives way to the real scopes.
+    const have = new Set(rows.map((r) => r.scope));
+    const missing = seed.filter((s) => s.scope !== GENERAL_SCOPE.key && !have.has(s.scope));
+    if (!missing.length) return rows;
+    const placeholder = rows.length === 1 && rows[0].scope === GENERAL_SCOPE.key && !normalizePunchItems(rows[0].items).length && !rows[0].walkthroughDoneAt ? rows[0] : null;
+    if (placeholder) await db.delete(crmPunchScopes).where(eq(crmPunchScopes.id, placeholder.id)).catch(() => {});
+    const base = Math.max(-1, ...rows.map((r) => r.sortOrder ?? 0)) + 1;
+    await db.insert(crmPunchScopes).values(missing.map((s, i) => ({ orgId, projectId: project.id, scope: s.scope, label: s.label, items: [], sortOrder: base + i })))
+      .onConflictDoNothing().catch(() => {});
+    return db.select().from(crmPunchScopes)
+      .where(and(eq(crmPunchScopes.orgId, orgId), eq(crmPunchScopes.projectId, project.id)))
+      .orderBy(asc(crmPunchScopes.sortOrder), asc(crmPunchScopes.createdAt));
+  }
   // Two first opens at once: the unique (project, scope) index makes the second a no-op, then both read the rows.
   await db.insert(crmPunchScopes).values(seed.map((s, i) => ({ orgId, projectId: project.id, scope: s.scope, label: s.label, items: [], sortOrder: i })))
     .onConflictDoNothing().catch(() => {});

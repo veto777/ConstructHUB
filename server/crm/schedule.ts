@@ -22,7 +22,8 @@ import { and, asc, desc, eq, gte, lt, lte, inArray, ne } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { logTeamActivity } from "./stats";
 import { queueCrmEvent } from "./integrations";
-import { advanceJobStage, completeScheduleStartTask } from "./job-stage-auto";
+import { advanceJobStage, completeScheduleStartTask, customerCurrentProject } from "./job-stage-auto";
+import { stageIndex, stageOfProjectStatus } from "@shared/job-stage";
 import { divisionScopeOf, appointmentDivisionVisible, divisionMapsForOrg } from "./divisions";
 
 type GetUser = (req: any, res: any) => any;
@@ -301,12 +302,36 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
    */
   async function jobOnCalendar(ctx: OrgContext, row: typeof crmAppointments.$inferSelect): Promise<void> {
     if (row.status === "canceled" || (!row.projectId && !row.customerId)) return;
+    // Which job: the visit's project, else the client's current one. A sales visit while the job is still a bid
+    // is not a start date — only an Approved job (or one at a custom phase after it) moves to Job Scheduled.
+    let project = row.projectId ? (await db.select().from(crmProjects)
+      .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, row.projectId))).limit(1))[0] ?? null : null;
+    if (!project && row.customerId) project = await customerCurrentProject(ctx.org.id, row.customerId);
+    let estimate: typeof crmEstimates.$inferSelect | null = null;
+    if (project) {
+      const stage = stageOfProjectStatus(project.status);
+      if (stage !== "approved") {
+        // Already on the calendar (or further along): the "call to schedule" reminder is done either way.
+        if (stageIndex(stage) > stageIndex("approved")) await completeScheduleStartTask(ctx.org.id, project.id).catch(() => false);
+        return;
+      }
+    } else if (row.customerId) {
+      // No project yet: a won bid on file makes this the job's start date, and the project comes with it.
+      [estimate] = await db.select().from(crmEstimates)
+        .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.customerId, row.customerId), eq(crmEstimates.status, "approved")))
+        .orderBy(desc(crmEstimates.approvedAt)).limit(1);
+      if (!estimate) return;
+    }
     const r = await advanceJobStage({
       orgId: ctx.org.id, to: "job_scheduled", trigger: "appointment",
       actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email },
-      projectId: row.projectId, customerId: row.customerId,
+      projectId: project?.id ?? row.projectId, customerId: row.customerId, estimate,
       meta: { appointmentId: row.id, title: row.title, startsAt: row.startsAt },
     });
+    // The visit now belongs to the project it started.
+    if (r.created && r.project && !row.projectId) {
+      await db.update(crmAppointments).set({ projectId: r.project.id }).where(eq(crmAppointments.id, row.id)).catch(() => {});
+    }
     // The job was already past Approved (or the visit was re-linked): the reminder is still done.
     if (r.project) await completeScheduleStartTask(ctx.org.id, r.project.id).catch(() => false);
   }

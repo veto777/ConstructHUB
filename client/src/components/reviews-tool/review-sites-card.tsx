@@ -83,11 +83,13 @@ function ProfileSitesEditor({ template, listings }: { template: Template; listin
   const [links, setLinks] = useState<OtherReviewLink[]>(savedLinks);
   const [primaryUrl, setPrimaryUrl] = useState(template.primaryReviewUrl || "");
   // Back to the saved values whenever the saved profile changes (after a save, or an edit in the profile dialog).
+  // Keyed on the saved CONTENT, so a background refetch that changes nothing never wipes half-typed rows.
+  const savedKey = JSON.stringify([template.googleProfileUrl, savedLinks, template.primaryReviewUrl || ""]);
   useEffect(() => {
     setGoogleUrl(template.googleProfileUrl);
     setLinks(savedLinks);
     setPrimaryUrl(template.primaryReviewUrl || "");
-  }, [template.googleProfileUrl, savedLinks, template.primaryReviewUrl]);
+  }, [savedKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const checked = normalizeOtherReviewLinks(links);
   const validLinks = checked.links;

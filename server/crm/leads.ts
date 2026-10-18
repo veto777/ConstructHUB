@@ -503,7 +503,7 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     const expr = key === "name" ? sql`lower(coalesce(nullif(${crmLeads.name}, ''), nullif(${crmLeads.email}, ''), nullif(${crmLeads.phone}, '')))`
       : key === "contact" ? sql`lower(coalesce(nullif(${crmLeads.email}, ''), nullif(${crmLeads.phone}, '')))`
       : key === "service" ? sql`lower(coalesce(nullif(${crmLeads.service}, ''), nullif(${crmLeads.message}, '')))`
-      : key === "source" ? sql`lower(${sourceNameSql}), lower(coalesce(${crmLeads.sourceLabel}, ''))`
+      : key === "source" ? sql`lower(${sourceNameSql}) ${d} nulls last, lower(coalesce(${crmLeads.sourceLabel}, ''))`
       : sql`${crmLeads.receivedAt}`;
     return sql`${expr} ${d} nulls last`;
   };

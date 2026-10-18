@@ -113,13 +113,21 @@ export async function advanceJobStage(args: {
     }
 
     const status = nextAutoStatus(project.status, args.to);
-    if (!status) return { moved: false, created: false, project, from: project.status, to: null };
+    if (!status) {
+      // The stage stays where it is (already past this one), but a signed total is still the contract value.
+      if (args.contractValueCents != null && project.contractValueCents !== args.contractValueCents) {
+        await db.update(crmProjects).set({ contractValueCents: args.contractValueCents, updatedAt: new Date() })
+          .where(and(eq(crmProjects.orgId, args.orgId), eq(crmProjects.id, project.id)));
+      }
+      return { moved: false, created: false, project, from: project.status, to: null };
+    }
     const patch: Partial<Project> = { status, stageChangedAt: new Date(), updatedAt: new Date() };
     if (args.contractValueCents != null) patch.contractValueCents = args.contractValueCents;
     // A custom phase of the account's flow stays the current one unless this anchor is AHEAD of it (never backward).
     if (project.stageKey && anchorPassesPhase(await loadJobFlow(args.orgId), args.to, project.stageKey)) patch.stageKey = null;
+    // Written only if the job is still where it was read: two triggers at once never move a job backward.
     const [row] = await db.update(crmProjects).set(patch)
-      .where(and(eq(crmProjects.orgId, args.orgId), eq(crmProjects.id, project.id))).returning();
+      .where(and(eq(crmProjects.orgId, args.orgId), eq(crmProjects.id, project.id), eq(crmProjects.status, project.status))).returning();
     if (!row) return { moved: false, created: false, project, from: project.status, to: null };
     await logTeamActivity({
       orgId: args.orgId, memberId: args.actor.memberId ?? null, actorLabel: args.actor.memberId ? null : args.actor.label,

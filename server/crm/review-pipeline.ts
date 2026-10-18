@@ -86,10 +86,14 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
   // Each won estimate passes the estimate policy itself (division, assignment), not only its client.
   const won = await policy.filter("estimates", await db.select().from(crmEstimates)
     .where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.status, "approved")))) as Estimate[];
+  // A job closed out without a won estimate on file (an imported or hand-made project) is still a job to ask about.
+  const closedProjects = await policy.filter("projects", await db.select().from(crmProjects)
+    .where(and(eq(crmProjects.orgId, orgId), inArray(crmProjects.status, [...DONE]), isNull(crmProjects.archivedAt)))) as
+    { id: string; customerId: string; name: string; status: string; createdAt: Date | null; completedAt: Date | null }[];
   // Hidden clients load whether or not a won job still qualifies, so Unhide is always reachable.
   const hiddenRows = await db.select({ customerId: crmReviewPipeline.customerId }).from(crmReviewPipeline)
     .where(and(eq(crmReviewPipeline.orgId, orgId), eq(crmReviewPipeline.kind, "hidden")));
-  const ids = [...new Set([...won.map((e) => e.customerId), ...hiddenRows.map((h) => h.customerId)])];
+  const ids = [...new Set([...won.map((e) => e.customerId), ...closedProjects.map((p) => p.customerId), ...hiddenRows.map((h) => h.customerId)])];
   if (!ids.length) return { ready: [], dismissed: [], hidden: [], askedCount: 0, notClosedOut: 0 };
   const customers = await db.select().from(crmCustomers)
     .where(and(eq(crmCustomers.orgId, orgId), inArray(crmCustomers.id, ids), isNull(crmCustomers.archivedAt)));
@@ -98,8 +102,9 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
   const visibleIds = visible.map((c) => c.id);
 
   const [projects, photos, asked, dismissals, suppressed] = await Promise.all([
+    // Live projects only: an archived one neither keeps a client off the list nor puts them on it.
     db.select({ id: crmProjects.id, status: crmProjects.status, customerId: crmProjects.customerId, createdAt: crmProjects.createdAt }).from(crmProjects)
-      .where(and(eq(crmProjects.orgId, orgId), inArray(crmProjects.customerId, visibleIds))),
+      .where(and(eq(crmProjects.orgId, orgId), inArray(crmProjects.customerId, visibleIds), isNull(crmProjects.archivedAt))),
     pool.query<{ ref_id: string; n: string; finished: string }>(
       `select ref_id, count(*) n, count(*) filter (where file_name like 'finished--%') finished
          from crm_attachments where org_id = $1 and kind = 'photo' and ref_id = any($2) group by ref_id`, [orgId, visibleIds]),
@@ -126,6 +131,9 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
 
   const jobsBy = new Map<string, typeof won>();
   for (const e of won) jobsBy.set(e.customerId, [...(jobsBy.get(e.customerId) ?? []), e]);
+  const closedBy = new Map<string, typeof closedProjects>();
+  for (const p of closedProjects.sort((a, b) => ((b.completedAt ?? b.createdAt)?.getTime() ?? 0) - ((a.completedAt ?? a.createdAt)?.getTime() ?? 0)))
+    closedBy.set(p.customerId, [...(closedBy.get(p.customerId) ?? []), p]);
 
   const ready: PipelineItem[] = [];
   let notClosedOut = 0;
@@ -137,14 +145,17 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
     const list = (jobsBy.get(c.id) ?? [])
       .filter((e) => !e.projectId || projectStatus.get(e.projectId) !== "cancelled")
       .sort((a, b) => (b.approvedAt?.getTime() ?? 0) - (a.approvedAt?.getTime() ?? 0));
-    if (!list.length) continue;
+    const closed = closedBy.get(c.id) ?? [];
+    if (!list.length && !closed.length) continue;
     const stages = list.map((e) => e.projectId ? projectStatus.get(e.projectId) ?? null : null).filter((x): x is string => !!x);
-    const status = stages.find((x) => DONE.has(x)) ?? stages[0] ?? null;
+    const status = stages.find((x) => DONE.has(x)) ?? closed[0]?.status ?? stages[0] ?? null;
     const jobs: PipelineJob[] = list.map((e) => ({
       estimateId: e.id, number: e.number, title: e.title, wonAt: e.approvedAt?.toISOString() ?? null,
       // Price-blind seats (field crews) get no contract values.
       totalCents: ctx.permissions.seePrices ? e.approvedTotalCents ?? e.totalCents ?? 0 : 0,
     }));
+    // No won estimate on file: the closed-out project itself is the job (its name, its finish date, no value).
+    if (!jobs.length) for (const p of closed) jobs.push({ estimateId: p.id, number: "", title: p.name, wonAt: (p.completedAt ?? p.createdAt)?.toISOString() ?? null, totalCents: 0 });
     const pc = photoCount.get(c.id);
     const email = c.email?.trim() || null;
     const item: PipelineItem = {

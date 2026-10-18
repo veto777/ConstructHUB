@@ -75,7 +75,7 @@ describe("normalizeJobFlow (pure)", () => {
     ]);
   });
   it("caps the flow at MAX_FLOW_PHASES by dropping custom phases from the end, never an anchor", () => {
-    const many = Array.from({ length: 40 }, (_, i) => ({ key: `c${i}`, label: `C${i}` }));
+    const many = Array.from({ length: MAX_FLOW_PHASES + 10 }, (_, i) => ({ key: `c${i}`, label: `C${i}` }));
     const got = normalizeJobFlow({ phases: [...KEYS.map((key) => ({ key })), ...many] });
     expect(got.phases).toHaveLength(MAX_FLOW_PHASES);
     expect(got.phases.filter((p) => p.builtin)).toHaveLength(6);
@@ -175,7 +175,7 @@ describe("job flow over the API (dev server)", () => {
     const noAnchor = await json("PATCH", "/api/crm/org", { jobFlow: { phases: FLOW.phases.filter((p) => p.key !== "approved") } }, cookie);
     expect(noAnchor.status).toBe(400);
     expect(noAnchor.body.message).toMatch(/built-in phases/i);
-    const tooMany = await json("PATCH", "/api/crm/org", { jobFlow: { phases: [...FLOW.phases, ...Array.from({ length: 25 }, (_, i) => ({ key: `extra_${i}` }))] } }, cookie);
+    const tooMany = await json("PATCH", "/api/crm/org", { jobFlow: { phases: [...FLOW.phases, ...Array.from({ length: MAX_FLOW_PHASES }, (_, i) => ({ key: `extra_${i}` }))] } }, cookie);
     expect(tooMany.status).toBe(400);
     // Nothing above touched the stored flow.
     expect((await api("/api/crm/me", {}, cookie)).body.org.customFields.jobFlow.phases).toHaveLength(7);

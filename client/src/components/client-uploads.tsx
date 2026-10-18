@@ -147,7 +147,7 @@ export function PortalPhotoShare({ accounts, photos }: { accounts: any[]; photos
               variant="outline"
               size="sm"
               onClick={() => inputRef.current?.click()}
-              disabled={upload.isPending || mine.length >= 20}
+              disabled={upload.isPending || mine.filter((p: any) => p.uploadedByKind === "client").length >= 20}
               data-testid="button-upload-photo"
             >
               {upload.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Camera className="h-4 w-4 mr-1.5" />}
@@ -172,7 +172,7 @@ export function PortalPhotoShare({ accounts, photos }: { accounts: any[]; photos
             </div>
           )}
           {viewing != null && (
-            <PhotoViewer index={viewing} onIndex={setViewing} onClose={() => setViewing(null)}
+            <PhotoViewer index={Math.min(viewing, mine.length - 1)} onIndex={setViewing} onClose={() => setViewing(null)}
               photos={mine.map((p: any) => ({ id: p.id, name: p.fileName, downloadUrl: p.downloadUrl,
                 src: String(p.mime).startsWith("image/") && !/hei[cf]/.test(p.mime) ? `${p.downloadUrl}?inline=1` : null }))} />
           )}

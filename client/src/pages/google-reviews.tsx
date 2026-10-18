@@ -8,7 +8,7 @@ import { AiReplySettings } from "@/components/ai-review-replies";
 import { GoogleSurface, GoogleAvatar, GoogleStarRow, GooglePill, GoogleAiOverview, relativeTime } from "@/components/google";
 import { GbpConnection } from "@/components/gbp-connection";
 import { SamplePreview, showSample } from "@/components/sample-preview";
-import { useEffect, useState, useMemo, type ReactNode } from "react";
+import { useEffect, useRef, useState, useMemo, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { inNativeApp } from "@/lib/app-shell";
@@ -153,12 +153,16 @@ export default function GoogleReviewsPage() {
   const [crmPhotos, setCrmPhotos] = useState<ReviewCrmPhoto[]>([]);
   const [crmPickerOpen, setCrmPickerOpen] = useState(false);
   const pickCrmClient = (c: CrmPhotoClient | null) => {
-    setCrmClient(c);
+    setCrmClient((prev) => {
+      // Another client (or none): nothing of the previous one rides along — not their email, not their photos.
+      if (prev && prev.id !== c?.id) setCrmPhotos([]);
+      return c;
+    });
     if (!c) return;
     setClientName(c.name);
-    if (c.email) setClientEmail(c.email);
-    if (c.phone) setClientPhone(c.phone);
-    if (c.address) setClientAddress(c.address);
+    setClientEmail(c.email ?? "");
+    setClientPhone(c.phone ?? "");
+    setClientAddress(c.address ?? "");
   };
   // "Use in a review request" on the CRM Photos page lands here with the photos (and client) preattached.
   useReviewHandoff(({ customer, photos }) => {
@@ -254,8 +258,8 @@ export default function GoogleReviewsPage() {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    if (attachedPhotos.length + crmPhotos.length + files.length > 30) {
-      toast({ title: "Too many photos", description: "Maximum 30 photos per review request.", variant: "destructive" });
+    if (attachedPhotos.length + crmPhotos.length + files.length > PICK_MAX) {
+      toast({ title: "Too many photos", description: `Up to ${PICK_MAX} photos per review request.`, variant: "destructive" });
       return;
     }
     setUploadingPhotos(true);
@@ -312,15 +316,23 @@ export default function GoogleReviewsPage() {
     setMediaPickerFolderId(folderId);
     setMediaPickerLoading(true);
     setMediaPickerSelected(new Set());
+    // The previous folder's photos never stand in for this one's; a failed load says so instead of showing them.
+    setMediaPickerPhotos([]);
     try {
       const res = await fetch(`/api/media/folders/${folderId}/photos`, { credentials: "include" });
-      if (res.ok) setMediaPickerPhotos(await res.json());
-    } catch {} finally { setMediaPickerLoading(false); }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rows = await res.json();
+      setMediaPickerPhotos((cur) => (mediaPickerFolderRef.current === folderId ? rows : cur));
+    } catch {
+      toast({ title: "Could not load that folder", description: "Try again in a moment.", variant: "destructive" });
+    } finally { setMediaPickerLoading(false); }
   };
+  const mediaPickerFolderRef = useRef<number | null>(null);
+  useEffect(() => { mediaPickerFolderRef.current = mediaPickerFolderId; }, [mediaPickerFolderId]);
 
   const attachFromMediaLibrary = () => {
     const selectedPhotos = mediaPickerPhotos.filter(p => mediaPickerSelected.has(p.id));
-    const remaining = 30 - attachedPhotos.length - crmPhotos.length;
+    const remaining = PICK_MAX - attachedPhotos.length - crmPhotos.length;
     const toAttach = selectedPhotos.slice(0, remaining).map(p => ({ url: p.url, originalName: p.name, size: p.size || 0 }));
     setAttachedPhotos(prev => [...prev, ...toAttach]);
     setShowMediaPicker(false);
@@ -419,6 +431,8 @@ export default function GoogleReviewsPage() {
       toast({ title: "Moved to Trash", description: "Review request moved to trash. It will be permanently deleted after 14 days." });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/list"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/trash"] });
+      // A trashed request frees the client up on Ready to ask again.
+      queryClient.invalidateQueries({ queryKey: PIPELINE_KEY });
     },
     onError: (err: any) => {
       toast({ title: "Could not delete", description: apiErrorMessage(err), variant: "destructive" });
@@ -436,6 +450,7 @@ export default function GoogleReviewsPage() {
     onSuccess: () => {
       toast({ title: "Restored", description: "Review request restored from trash." });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/list"] });
+      queryClient.invalidateQueries({ queryKey: PIPELINE_KEY });
       queryClient.invalidateQueries({ queryKey: ["/api/reviews/trash"] });
     },
     onError: (err: any) => {
@@ -578,12 +593,18 @@ export default function GoogleReviewsPage() {
     openSendDialog();
     setClientName(""); setClientEmail(""); setClientPhone(""); setClientAddress("");
     pickCrmClient(it.customer);
-    // A fresh draft: nothing from an earlier client's request rides along.
+    // A fresh draft: nothing from an earlier client's request rides along — photos, message, BCC, schedule or theme.
     setCrmPhotos([]);
     setAttachedPhotos([]);
     setPersonalMessage("");
     setProjectDescription(it.description);
     setMessageMode("description");
+    setBccEmail("");
+    setScheduleEnabled(false);
+    setScheduleDate("");
+    setScheduleTime("09:00");
+    setEmailTheme("navy-orange");
+    setShowMediaPicker(false);
   };
 
   const hasGoogleUrl = !!((user?.googleProfileUrl || templates.find((t: any) => String(t.id) === selectedTemplateId)?.googleProfileUrl));
@@ -1428,7 +1449,7 @@ export default function GoogleReviewsPage() {
 
             <SendStep n={2} tone="emerald" title="Client & job photos" hint="Pick a CRM client to fill everything in, or type the details by hand.">
             <CrmReviewPhotos client={crmClient} onClient={pickCrmClient} crmPhotos={crmPhotos} onCrmPhotos={setCrmPhotos}
-              room={Math.min(30 - attachedPhotos.length, PICK_MAX) - crmPhotos.length} pickerOpen={crmPickerOpen} onPickerOpen={setCrmPickerOpen} />
+              room={PICK_MAX - attachedPhotos.length - crmPhotos.length} pickerOpen={crmPickerOpen} onPickerOpen={setCrmPickerOpen} />
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -1545,7 +1566,7 @@ export default function GoogleReviewsPage() {
                     <p className="absolute bottom-0 left-0 right-0 truncate bg-black/60 px-1 text-[9px] text-white">{photo.originalName}</p>
                   </div>
                 ))}
-                {attachedPhotos.length + crmPhotos.length < 30 && (
+                {attachedPhotos.length + crmPhotos.length < PICK_MAX && (
                   <label
                     className={`flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors hover:border-primary ${uploadingPhotos ? "pointer-events-none opacity-50" : ""}`}
                     data-testid="button-add-photos"
@@ -1568,7 +1589,7 @@ export default function GoogleReviewsPage() {
                     />
                   </label>
                 )}
-                {attachedPhotos.length + crmPhotos.length < 30 && (
+                {attachedPhotos.length + crmPhotos.length < PICK_MAX && (
                   <button
                     type="button"
                     onClick={openMediaPicker}
@@ -1581,7 +1602,7 @@ export default function GoogleReviewsPage() {
                 )}
               </div>
               {attachedPhotos.length + crmPhotos.length > 0 && (
-                <p className="text-xs text-muted-foreground">{attachedPhotos.length + crmPhotos.length}/30 photos attached</p>
+                <p className="text-xs text-muted-foreground">{attachedPhotos.length + crmPhotos.length}/{PICK_MAX} photos attached</p>
               )}
             </div>
             </SendStep>
@@ -1899,11 +1920,20 @@ export default function GoogleReviewsPage() {
                 Select a Google Business Profile above to send requests.
               </p>
             )}
+            {crmShort && (
+              <p className="flex items-center gap-1 text-xs text-destructive" data-testid="text-send-photo-floor">
+                <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                Pick at least {Math.min(PICK_MIN, crmClient?.photoCount ?? PICK_MIN)} job photos (up to {PICK_MAX}), or none and let the client choose.
+              </p>
+            )}
+            {uploadingPhotos && (
+              <p className="text-xs text-muted-foreground" data-testid="text-send-uploading">Photos are still uploading…</p>
+            )}
 
             <Button
               className="h-11 w-full text-base font-semibold"
               onClick={() => createMutation.mutate()}
-              disabled={!canSend || createMutation.isPending || (scheduleEnabled && (!scheduleDate || !scheduleTime))}
+              disabled={!canSend || createMutation.isPending || uploadingPhotos || (scheduleEnabled && (!scheduleDate || !scheduleTime))}
               data-testid="button-send-review-request"
             >
               {createMutation.isPending ? (

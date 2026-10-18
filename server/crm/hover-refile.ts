@@ -45,6 +45,7 @@ export async function refileHoverCollectors(orgId: string, opts: { dryRun?: bool
 }> {
   const collectors = await hoverCollectors(orgId);
   const moves: RefileMove[] = [];
+  const targetsThisRun = new Map<string, typeof crmCustomers.$inferSelect>();
   for (const col of collectors) {
     const [owner] = await db.select().from(crmCustomers).where(and(eq(crmCustomers.orgId, orgId), eq(crmCustomers.id, col.id)));
     if (!owner) continue;
@@ -54,14 +55,16 @@ export async function refileHoverCollectors(orgId: string, opts: { dryRun?: bool
     for (const m of ms) {
       if (!m.addressLine1?.trim()) continue; // no address: nowhere better to put it
       const key = normalizeHoverAddress(m.addressLine1, m.postalCode);
-      if (key && key === ownKey) continue; // the collector's own property stays
+      if (!key || key === ownKey) continue; // the collector's own property stays; an unkeyed address has nowhere better to go
       const raw = (m.rawPayload ?? {}) as Record<string, any>;
       const jobId = raw.hoverJobId != null ? String(raw.hoverJobId) : m.externalId ?? null;
       const address = [m.addressLine1, m.city, [m.state, m.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 
       const found = (await matchHoverCustomerByAddress(orgId, m.addressLine1, m.postalCode)).matches.filter((c) => c.id !== col.id);
-      const ambiguous = found.length > 1;
-      let target = found.length === 1 ? found[0] : null;
+      // A target this run already picked or made for the address is reused: five captures of one house are one client.
+      const reuse = targetsThisRun.get(key);
+      const ambiguous = !reuse && found.length > 1;
+      let target = reuse ?? (found.length === 1 ? found[0] : null);
       let created = false;
       const photoFilter = and(
         eq(crmAttachments.orgId, orgId), eq(crmAttachments.kind, "photo"), eq(crmAttachments.refId, col.id),
@@ -90,9 +93,12 @@ export async function refileHoverCollectors(orgId: string, opts: { dryRun?: bool
           created = true;
         }
         const t = target!;
+        targetsThisRun.set(key, t);
         await tx.update(crmMeasurements).set({
           customerId: t.id,
-          rawPayload: { ...raw, matchedVia: created ? null : "address", refiledFrom: col.id, refiledAt: new Date().toISOString() },
+          // The rep's project is not this home's project; the capture is adopted by the homeowner's job when one exists.
+          projectId: null,
+          rawPayload: { ...raw, matchedVia: created ? null : "address", refiledFrom: col.id, refiledAt: new Date().toISOString(), refiledProjectId: m.projectId ?? null },
           updatedAt: new Date(),
         } as any).where(and(eq(crmMeasurements.orgId, orgId), eq(crmMeasurements.id, m.id), eq(crmMeasurements.customerId, col.id)));
         const photos = await tx.update(crmAttachments).set({ refId: t.id }).where(photoFilter).returning({ id: crmAttachments.id });

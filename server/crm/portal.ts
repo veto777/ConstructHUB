@@ -40,7 +40,8 @@ import { actorLabel, memberActor } from "@shared/crm-actor";
 import { emitCrmEvent, queueCrmEvent, queueProjectStageChange } from "./integrations";
 import { estimateDocText, invoiceDocText } from "./doc-defaults";
 import { recordActivity, logActivity } from "./activity";
-import { advanceJobStage } from "./job-stage-auto";
+import { stageIndex, stageOfProjectStatus } from "@shared/job-stage";
+import { advanceJobStage, customerCurrentProject } from "./job-stage-auto";
 import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER } from "./sms";
 import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
 import { notifyMembers } from "./notify";
@@ -830,10 +831,13 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     } else if (est.projectId) {
       const [proj] = await db.select({ status: crmProjects.status }).from(crmProjects)
         .where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId))).limit(1).catch(() => []);
-      const moved = await db.update(crmProjects).set({
+      // Only a job still at Bid / Bid Submitted goes back to estimating: a declined change order on an approved,
+      // scheduled or running job never knocks the job back (the stage only moves forward on its own).
+      const stillBidding = proj && stageIndex(stageOfProjectStatus(proj.status)) <= stageIndex("bid_submitted") && proj.status !== "estimating";
+      const moved = stillBidding ? await db.update(crmProjects).set({
         status: "estimating", stageChangedAt: new Date(), updatedAt: new Date(),
-      } as any).where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId)))
-        .returning({ id: crmProjects.id }).catch(() => []);
+      } as any).where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId), eq(crmProjects.status, proj.status)))
+        .returning({ id: crmProjects.id }).catch(() => []) : [];
       if (proj && moved.length) queueProjectStageChange(est.orgId, est.projectId, proj.status, "estimating");
     }
 
@@ -1860,12 +1864,18 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
       meta: { number: inv.number, to, emailed, resend: !!inv.sentAt },
     });
-    // An invoice out means the work is under way: the job moves to In progress if it was still before that.
-    await advanceJobStage({
-      orgId: ctx.org.id, to: "in_progress", trigger: "invoice.sent",
-      actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email },
-      projectId: inv.projectId, customerId: inv.customerId, meta: { number: inv.number },
-    });
+    // An invoice out means the work is under way: the job moves to In progress — from Job Scheduled. A deposit
+    // invoice right after approval never skips the start date (the "call to schedule" reminder stays open).
+    const invProject = inv.projectId
+      ? (await db.select().from(crmProjects).where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, inv.projectId))).limit(1))[0] ?? null
+      : await customerCurrentProject(ctx.org.id, inv.customerId);
+    if (invProject && stageOfProjectStatus(invProject.status) === "job_scheduled") {
+      await advanceJobStage({
+        orgId: ctx.org.id, to: "in_progress", trigger: "invoice.sent",
+        actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email },
+        projectId: invProject.id, customerId: inv.customerId, meta: { number: inv.number },
+      });
+    }
     res.json({ invoice: row, link, emailed, emailError });
   });
 

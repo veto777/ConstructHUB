@@ -85,12 +85,14 @@ export function openWalkthroughs(scopes: { walkthroughDoneAt?: string | null }[]
 }
 
 /** The stage tag + scope a punch-list photo carries in its stored name: "punchlist--siding--IMG_1.jpg". */
-export function punchPhotoName(scope: string, fileName: string): string {
-  return `punchlist--${scope}--${fileName}`;
+export function punchPhotoName(scope: string, fileName: string, projectId?: string | null): string {
+  // "punchlist--<scope>--@<project id>--<name>": the project rides in the name so a repeat client's jobs keep
+  // their own walkthrough photos apart (older names without it belong to whichever job shows them).
+  return `punchlist--${scope}--${projectId ? `@${projectId}--` : ""}${fileName}`;
 }
-export function parsePunchPhotoName(fileName: string): { scope: string; displayName: string } | null {
-  const m = /^punchlist--([a-z0-9_]{1,40})--(.+)$/.exec(fileName);
-  if (m) return { scope: m[1], displayName: m[2] };
-  if (fileName.startsWith("punchlist--")) return { scope: GENERAL_SCOPE.key, displayName: fileName.slice(11) || fileName };
+export function parsePunchPhotoName(fileName: string): { scope: string; displayName: string; projectId: string | null } | null {
+  const m = /^punchlist--([a-z0-9_]{1,40})--(?:@([0-9a-f-]{36})--)?(.+)$/.exec(fileName);
+  if (m) return { scope: m[1], displayName: m[3], projectId: m[2] ?? null };
+  if (fileName.startsWith("punchlist--")) return { scope: GENERAL_SCOPE.key, displayName: fileName.slice(11) || fileName, projectId: null };
   return null;
 }
