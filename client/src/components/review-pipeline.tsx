@@ -17,6 +17,7 @@ import { Section, StatusPill } from "@/components/app-ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import type { CrmPhotoClient } from "@/lib/crm-photos";
 
 export type PipelineItem = {
@@ -93,9 +94,19 @@ export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) 
   const [showHidden, setShowHidden] = useState(false);
   const [confirmHide, setConfirmHide] = useState<PipelineItem | null>(null);
   const dismiss = useMutation({
-    mutationFn: async ({ id, on, kind = "dismiss" }: { id: string; on: boolean; kind?: "dismiss" | "hide" }) =>
+    mutationFn: async ({ id, on, kind = "dismiss" }: { id: string; on: boolean; kind?: "dismiss" | "hide"; name?: string }) =>
       apiRequest(on ? "POST" : "DELETE", `/api/reviews/pipeline/${id}/${kind}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: PIPELINE_KEY }),
+    onSuccess: (_r, v) => {
+      queryClient.invalidateQueries({ queryKey: PIPELINE_KEY });
+      // A misclick is one tap to undo.
+      if (v.on) toast({
+        title: v.kind === "hide" ? `${v.name ?? "Client"} hidden` : `${v.name ?? "Client"} set aside`,
+        description: v.kind === "hide" ? "No review requests will go to them." : "Find them under \"set aside\" at the bottom of the list.",
+        action: (
+          <ToastAction altText="Undo" onClick={() => dismiss.mutate({ id: v.id, on: false, kind: v.kind })} data-testid="button-pipeline-undo">Undo</ToastAction>
+        ),
+      });
+    },
     onError: (e) => toast({ title: "Couldn't update the list", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
@@ -141,7 +152,7 @@ export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) 
         <ul className="divide-y" data-testid="list-review-pipeline">
           {rows.map((it) => <Row key={it.customer.id} it={it} onPrepare={onPrepare}
             busy={dismiss.isPending && dismiss.variables?.id === it.customer.id}
-            onDismiss={() => dismiss.mutate({ id: it.customer.id, on: true })} onHide={() => setConfirmHide(it)} />)}
+            onDismiss={() => dismiss.mutate({ id: it.customer.id, on: true, name: it.customer.name })} onHide={() => setConfirmHide(it)} />)}
         </ul>
       ) : (
         <p className="px-4 py-6 text-center text-sm text-muted-foreground sm:px-6">Every won job has been asked. New wins show up here automatically.</p>
@@ -212,7 +223,7 @@ export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) 
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction data-testid="button-pipeline-hide-confirm" onClick={() => {
-              if (confirmHide) dismiss.mutate({ id: confirmHide.customer.id, on: true, kind: "hide" });
+              if (confirmHide) dismiss.mutate({ id: confirmHide.customer.id, on: true, kind: "hide", name: confirmHide.customer.name });
               setConfirmHide(null);
             }}>Hide client</AlertDialogAction>
           </AlertDialogFooter>
@@ -253,7 +264,7 @@ function Row({ it, onPrepare, onDismiss, onHide, busy }: {
         <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={onDismiss} disabled={busy} data-testid={`button-pipeline-dismiss-${it.customer.id}`}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Not now"}
         </Button>
-        <Button size="sm" className="h-8 px-3 text-xs" onClick={() => onPrepare(it)} disabled={blocked} data-testid={`button-pipeline-prepare-${it.customer.id}`}>
+        <Button size="sm" className="ml-2 h-8 px-3 text-xs sm:ml-4" onClick={() => onPrepare(it)} disabled={blocked} data-testid={`button-pipeline-prepare-${it.customer.id}`}>
           <Send className="mr-1 h-3.5 w-3.5" aria-hidden="true" /><span className="hidden sm:inline">Prepare request</span><span className="sm:hidden">Prepare</span>
         </Button>
       </div>
