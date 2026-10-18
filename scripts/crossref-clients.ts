@@ -77,6 +77,16 @@ const measurements = await q(`select id, customer_id, external_id, address_line1
 const hcpAddr = await q(`select customer_id, custom_fields->>'hcpAddress' a from crm_estimates
   where org_id = $1 and coalesce(custom_fields->>'hcpAddress', '') <> '' order by created_at desc`, [ORG]);
 const hoverNames: { customerId: string | null; measurementId: string; jobId: string; name: string | null }[] = JSON.parse(fs.readFileSync(NAMES, "utf8"));
+// The company's own mailboxes and the team's: a form carrying one was logged by staff (a phone lead), never the
+// homeowner's address — it must not land on a client.
+const members = await q<{ email: string | null; phone: string | null }>(`select email, phone from crm_members where org_id = $1`, [ORG]);
+const orgRow = (await q<{ email: string | null; phone: string | null }>(`select email, phone from crm_orgs where id = $1`, [ORG]))[0];
+const staffEmails = new Set([...members, orgRow].map((m) => emailKey(m?.email)).filter(Boolean) as string[]);
+const staffPhones = new Set([...members, orgRow].map((m) => digits10(m?.phone)).filter(Boolean) as string[]);
+const FREE_MAIL = new Set(["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com", "aol.com", "comcast.net", "live.com", "msn.com", "me.com", "att.net"]);
+const companyLabels = new Set([...staffEmails].map((e) => e.split("@")[1]).filter((d) => d && !FREE_MAIL.has(d)).map((d) => d.split(".")[0]));
+const isStaffEmail = (e: string | null) => !!e && (staffEmails.has(e) || companyLabels.has(e.split("@")[1]?.split(".")[0] ?? "") || /^(phone-?leads|leads|info|office|sales|noreply|no-reply)@/.test(e));
+const isStaffPhone = (p: string | null) => !!p && staffPhones.has(p);
 
 const isPlaceholder = (c: any) => {
   const f = c.custom_fields ?? {};
@@ -157,8 +167,8 @@ for (const c of customers) {
     }
   }
   const trusted = forms.filter((f) => f.via === "linked form" || f.via === "form at the same address");
-  if (!c.email) { const f = trusted.find((x) => emailKey(x.lead.email)); if (f) { set.email = f.lead.email.trim(); sources.email = f.via; } }
-  if (!c.phone) { const f = trusted.find((x) => digits10(x.lead.phone)); if (f) { set.phone = f.lead.phone.trim(); sources.phone = f.via; } }
+  if (!c.email) { const f = trusted.find((x) => emailKey(x.lead.email) && !isStaffEmail(emailKey(x.lead.email))); if (f) { set.email = f.lead.email.trim(); sources.email = f.via; } }
+  if (!c.phone) { const f = trusted.find((x) => digits10(x.lead.phone) && !isStaffPhone(digits10(x.lead.phone))); if (f) { set.phone = f.lead.phone.trim(); sources.phone = f.via; } }
   if (Object.keys(set).length) changes.push({ customerId: c.id, was: c.display_name, set, sources });
 }
 
