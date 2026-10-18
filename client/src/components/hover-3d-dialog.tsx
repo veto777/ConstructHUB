@@ -14,7 +14,7 @@
  */
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Box, ExternalLink, Eye, EyeOff, Loader2, Ruler } from "lucide-react";
+import { Box, ExternalLink, Eye, EyeOff, Loader2, Rows3, Ruler } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -213,6 +213,9 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
   const [siding, setSiding] = useState<string>(SIDING_SWATCHES[0].hex);
   const [roof, setRoof] = useState<string>(ROOF_SWATCHES[0].hex);
   const [showOpenings, setShowOpenings] = useState(true);
+  // Lap-siding reveal in inches (0 = plain walls) and shingle courses on the roof — a look, not a product.
+  const [reveal, setReveal] = useState<number>(7);
+  const [shingles, setShingles] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
   const [view, setView] = useState<{ preset: ViewPreset; seq: number }>({ preset: "iso", seq: 0 });
   const [selected, setSelected] = useState<MeshFace | null>(null);
@@ -227,7 +230,7 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
     <div className="flex h-full flex-col md:flex-row">
       <div className="relative min-h-[45vh] flex-1 bg-gradient-to-b from-sky-100 to-slate-50 dark:from-slate-800 dark:to-slate-900">
         <Suspense fallback={<Centered><Loader2 className="h-5 w-5 animate-spin" /> Starting 3D…</Centered>}>
-          <Hover3DViewer mesh={mesh} sidingColor={siding} roofColor={roof} showOpenings={showOpenings}
+          <Hover3DViewer mesh={mesh} sidingColor={siding} roofColor={roof} showOpenings={showOpenings} sidingReveal={reveal || null} roofShingles={shingles}
             showLabels={showLabels} view={view} selectedId={selected?.id ?? null} onSelect={setSelected} />
         </Suspense>
         <div className="absolute left-2 top-2 flex flex-wrap gap-1" data-testid="hover-3d-presets">
@@ -277,6 +280,18 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
           <Switch checked={showOpenings} onCheckedChange={setShowOpenings} data-testid="hover-3d-toggle-openings" />
         </label>
         <label className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2"><Rows3 className="h-4 w-4" /> Siding lines</span>
+          <select value={reveal} onChange={(e) => setReveal(Number(e.target.value))} aria-label="Siding reveal"
+            className="h-8 rounded-md border bg-background px-2 text-sm" data-testid="hover-3d-siding-reveal">
+            <option value={0}>Off</option>
+            {[4, 5, 6, 7, 8, 10, 12].map((n) => <option key={n} value={n}>{n}" reveal</option>)}
+          </select>
+        </label>
+        <label className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2"><Rows3 className="h-4 w-4" /> Shingle look</span>
+          <Switch checked={shingles} onCheckedChange={setShingles} data-testid="hover-3d-toggle-shingles" />
+        </label>
+        <label className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-2"><Ruler className="h-4 w-4" /> Measurements</span>
           <Switch checked={showLabels} onCheckedChange={setShowLabels} data-testid="hover-3d-toggle-labels" />
         </label>
@@ -284,7 +299,8 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
           <div className="font-medium text-foreground">From HOVER's model</div>
           <div>{mesh.counts.roof} roof facets{mesh.totals.roofSqft !== null ? ` · ${Math.round(mesh.totals.roofSqft).toLocaleString("en-US")} sq ft` : ""}</div>
           <div>{mesh.counts.wall} wall faces{mesh.totals.wallSqft !== null ? ` · ${Math.round(mesh.totals.wallSqft).toLocaleString("en-US")} sq ft` : ""}</div>
-          <div>{mesh.counts.opening} openings</div>
+          <div>{mesh.counts.window ?? 0} windows · {mesh.counts.door ?? 0} doors{mesh.counts.opening ? ` · ${mesh.counts.opening} other openings` : ""}</div>
+          {!!mesh.counts.soffit && <div>{mesh.counts.soffit} soffit faces</div>}
         </div>
         <p className="text-xs text-muted-foreground">
           Drag to spin, pinch or scroll to zoom, right-drag or two fingers to pan. Tap a face for its size and pitch.
