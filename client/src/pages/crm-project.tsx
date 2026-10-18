@@ -28,6 +28,11 @@ import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
+import { SortableTh, useTableSort } from "@/components/sortable-th";
+
+/** The job-costing table sorts on every column (in the browser — one project's cost codes). */
+type CostSortKey = "code" | "name" | "budget" | "committed" | "actual" | "variance";
+const COST_SORT_KEYS: readonly CostSortKey[] = ["code", "name", "budget", "committed", "actual", "variance"];
 import { confirmAction } from "@/components/confirm-dialog";
 import { InfoTip } from "@/components/info-tip";
 import { HelpButton } from "@/components/help-button";
@@ -115,6 +120,11 @@ export default function CrmProjectPage() {
 
   const { data: costing, isError: costingError } = useQuery<any>({
     queryKey: [`/api/crm/projects/${id}/costing`], enabled: ready && seeCosts, retry: false,
+  });
+  const costSort = useTableSort<CostSortKey>("code", "asc", "project-costing", { keys: COST_SORT_KEYS });
+  const costLines: any[] = costSort.sorted(costing?.lines ?? [], {
+    code: (l: any) => l.code, name: (l: any) => l.name, budget: (l: any) => l.budgetCents,
+    committed: (l: any) => l.committedCents, actual: (l: any) => l.actualCents, variance: (l: any) => l.varianceCents,
   });
   const { data: costCodes } = useQuery<any[]>({ queryKey: ["/api/crm/cost-codes"], enabled: ready && seeCosts });
   const { data: cos, isLoading: cosLoading, isError: cosError } = useQuery<any>({ queryKey: [`/api/crm/projects/${id}/change-orders`], enabled: ready });
@@ -424,13 +434,16 @@ export default function CrmProjectPage() {
                   <table className={crmTable.table}>
                     <thead className={crmTable.thead}>
                       <tr>
-                        <th className={crmTable.th}>Code</th><th className={crmTable.th}>Name</th>
-                        <th className={crmTable.thRight}>Budget</th><th className={crmTable.thRight}>Committed</th>
-                        <th className={crmTable.thRight}>Actual</th><th className={crmTable.thRight}>Variance</th>
+                        <SortableTh sortKey="code" label="Code" sort={costSort.sort} onSort={costSort.onSort} />
+                        <SortableTh sortKey="name" label="Name" sort={costSort.sort} onSort={costSort.onSort} />
+                        <SortableTh sortKey="budget" label="Budget" sort={costSort.sort} onSort={costSort.onSort} align="right" />
+                        <SortableTh sortKey="committed" label="Committed" sort={costSort.sort} onSort={costSort.onSort} align="right" />
+                        <SortableTh sortKey="actual" label="Actual" sort={costSort.sort} onSort={costSort.onSort} align="right" />
+                        <SortableTh sortKey="variance" label="Variance" sort={costSort.sort} onSort={costSort.onSort} align="right" />
                       </tr>
                     </thead>
                     <tbody>
-                      {costing.lines.map((l: any) => (
+                      {costLines.map((l: any) => (
                         // The costing API returns one "Unassigned" line with
                         // costCodeId null — give it a stable, unique key.
                         <tr key={l.costCodeId ?? "unassigned"} className={`${crmTable.tr} ${l.overBudget ? "bg-destructive/5" : ""}`}

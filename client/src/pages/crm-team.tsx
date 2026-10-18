@@ -30,6 +30,17 @@ import {
 import { InfoTip } from "@/components/info-tip";
 import { confirmAction } from "@/components/confirm-dialog";
 import { CrmDivisionsTab } from "@/components/crm-divisions-tab";
+import { SortButtons, useTableSort, type SortColumn } from "@/components/sortable-th";
+
+/** The member cards sort on every fact they show (the owner stays wherever the sort puts them). */
+type MemberSortKey = "name" | "email" | "role" | "status" | "lastActive";
+const MEMBER_SORT_COLUMNS: SortColumn<MemberSortKey>[] = [
+  { key: "name", label: "Name", kind: "text" },
+  { key: "email", label: "Email", kind: "text" },
+  { key: "role", label: "Role", kind: "text" },
+  { key: "status", label: "Status", kind: "text" },
+  { key: "lastActive", label: "Last active", kind: "date" },
+];
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type PermissionMap = Record<string, boolean>;
@@ -427,6 +438,7 @@ export default function CrmTeamPage() {
   // Optional: text the invite too (a field tech reads a text, not an inbox).
   const [invitePhone, setInvitePhone] = useState("");
   const { data: smsStatus } = useQuery<any>({ queryKey: ["/api/crm/sms/status"] });
+  const memberSort = useTableSort<MemberSortKey>("name", "asc", "team-members", { keys: MEMBER_SORT_COLUMNS.map((c) => c.key) });
 
   const invite = useMutation({
     mutationFn: async () =>
@@ -536,7 +548,13 @@ export default function CrmTeamPage() {
   }
 
   const seats = teamData?.seats ?? me.seats;
-  const members = teamData?.members ?? [];
+  const members = memberSort.sorted(teamData?.members ?? [], {
+    name: (m) => m.displayName || m.email,
+    email: (m) => m.email,
+    role: (m) => m.role,
+    status: (m) => m.status,
+    lastActive: (m) => m.lastActiveAt,
+  });
 
   return (
     <CrmPage>
@@ -906,6 +924,9 @@ export default function CrmTeamPage() {
               />
             </CardHeader>
             <CardContent className="space-y-3">
+              {members.length > 1 && (
+                <SortButtons columns={MEMBER_SORT_COLUMNS} sort={memberSort.sort} onSort={memberSort.onSort} onChange={memberSort.setSort} testId="sort-members" />
+              )}
               {members.map((m) => {
                 const isOwner = m.role === "owner";
                 return (

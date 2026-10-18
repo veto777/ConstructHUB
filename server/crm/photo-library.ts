@@ -232,6 +232,9 @@ const listQuery = z.object({
   to: z.string().max(40).optional(),
   limit: z.coerce.number().int().min(1).max(120).default(60),
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  /** The "By job" view's Sort dropdown (jobs only; the photo grid ignores it). */
+  sort: z.enum(["lastPhotoAt", "name", "photos"]).default("lastPhotoAt"),
+  dir: z.enum(["asc", "desc"]).optional(),
 });
 type ListQuery = z.infer<typeof listQuery>;
 
@@ -398,6 +401,17 @@ export function registerCrmPhotoLibraryRoutes(app: Express, getDevUser: GetUser)
       .from(crmAttachments).where(where).groupBy(crmAttachments.refId)
       .having(stageCond ? sql`count(*) filter (where ${stageCond}) > 0` : undefined)
       .orderBy(sql`max(${crmAttachments.createdAt}) desc`);
+    // ?sort=name|photos|lastPhotoAt&dir= — the whole job list is in hand, so
+    // sort before cutting the page and "Load more" keeps the order.
+    const dir = (q.dir ?? (q.sort === "name" ? "asc" : "desc")) === "desc" ? -1 : 1;
+    const nameOf = (g: { refId: string | null }) => scope.customers.get(g.refId!)?.displayName ?? "";
+    const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
+    groups.sort((a, b) => {
+      const c = q.sort === "name" ? collator.compare(nameOf(a), nameOf(b))
+        : q.sort === "photos" ? a.all - b.all
+        : new Date(a.last).getTime() - new Date(b.last).getTime();
+      return c * dir;
+    });
     const page = groups.slice(q.offset, q.offset + q.limit);
     const pageIds = page.map((g) => g.refId!).filter(Boolean);
     // The cover: the newest finished shot, else the newest photo.

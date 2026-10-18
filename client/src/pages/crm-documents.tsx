@@ -15,6 +15,7 @@ import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, statusTone, crmTable,
 } from "@/components/crm-ui";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
+import { SortableTh, sortOptions, useTableSort, type SortColumn, type SortState } from "@/components/sortable-th";
 import { InfoTip } from "@/components/info-tip";
 import { lazySample, showSample } from "@/components/sample-preview";
 const SampleDocsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleDocsTable");
@@ -119,8 +120,37 @@ const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : "—"
 
 type RangeKey = "any" | "today" | "7d" | "30d" | "custom";
 const RANGE_KEYS: RangeKey[] = ["any", "today", "7d", "30d", "custom"];
-const SORT_KEYS = ["newest", "oldest", "largest"] as const;
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Every column header sorts (the server orders: ?sort=<key>&dir=asc|desc). */
+type DocSortKey = "number" | "client" | "title" | "status" | "total" | "created" | "sent" | "due";
+const DOC_SORT_KEYS: readonly DocSortKey[] = ["number", "client", "title", "status", "total", "created", "sent", "due"];
+const DOC_SORT_COLUMNS: SortColumn<DocSortKey>[] = [
+  { key: "number", label: "Number", kind: "number" },
+  { key: "client", label: "Client", kind: "text" },
+  { key: "title", label: "Title", kind: "text" },
+  { key: "status", label: "Status", kind: "text" },
+  { key: "total", label: "Total", kind: "number" },
+  { key: "created", label: "Created", kind: "date" },
+  { key: "sent", label: "Sent", kind: "date" },
+  { key: "due", label: "Due", kind: "date" },
+];
+/** The three presets the URL and API have always spoken (?sort=newest…) keep
+ *  their names; every other choice travels as "<key>:<dir>". */
+const LEGACY_SORT: Record<string, SortState<DocSortKey>> = {
+  newest: { key: "created", dir: "desc" },
+  oldest: { key: "created", dir: "asc" },
+  largest: { key: "total", dir: "desc" },
+};
+const sortParam = (s: SortState<DocSortKey>) =>
+  Object.entries(LEGACY_SORT).find(([, v]) => v.key === s.key && v.dir === s.dir)?.[0] ?? `${s.key}:${s.dir}`;
+const parseSortParam = (v: string | null): SortState<DocSortKey> | null => {
+  if (!v) return null;
+  if (LEGACY_SORT[v]) return LEGACY_SORT[v];
+  const [key, dir] = v.split(":");
+  return DOC_SORT_KEYS.includes(key as DocSortKey) && (dir === "asc" || dir === "desc")
+    ? { key: key as DocSortKey, dir } : null;
+};
 
 /** The user's LOCAL calendar day as exact UTC instants. "Today" at 11pm in
  *  Oregon is still today — a bare YYYY-MM-DD would be read as a UTC day. */
@@ -163,7 +193,6 @@ function initialFilters(allowedStatuses: string[]) {
   let p: URLSearchParams;
   try { p = new URLSearchParams(window.location.search); } catch { p = new URLSearchParams(); }
   const range = p.get("range") as RangeKey | null;
-  const sort = p.get("sort");
   const page = parseInt(p.get("page") ?? "", 10);
   return {
     statuses: new Set((p.get("status") ?? "").split(",").filter((s) => allowedStatuses.includes(s))),
@@ -171,7 +200,7 @@ function initialFilters(allowedStatuses: string[]) {
     dateField: (p.get("field") === "sent" ? "sent" : "created") as "created" | "sent",
     from: YMD.test(p.get("from") ?? "") ? p.get("from")! : "",
     to: YMD.test(p.get("to") ?? "") ? p.get("to")! : "",
-    sort: (SORT_KEYS as readonly string[]).includes(sort ?? "") ? sort as (typeof SORT_KEYS)[number] : "newest",
+    sort: parseSortParam(p.get("sort")),
     q: (p.get("q") ?? "").slice(0, 200),
     page: Number.isFinite(page) && page > 0 ? page - 1 : 0, // 1-based in the URL
   };
@@ -216,7 +245,9 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
   const [dateField, setDateField] = useState<"created" | "sent">(init.dateField);
   const [fromInput, setFromInput] = useState(init.from);
   const [toInput, setToInput] = useState(init.to);
-  const [sort, setSort] = useState<"newest" | "oldest" | "largest">(init.sort);
+  // A sort in the URL wins; otherwise the last choice for this list, else newest first.
+  const { sort, setSort, onSort } = useTableSort<DocSortKey>("created", "desc", `docs-${kind}`, { keys: DOC_SORT_KEYS, initial: init.sort });
+  const sortKey = sortParam(sort);
   const [qInput, setQInput] = useState(init.q);
   const [q, setQ] = useState(init.q.trim());
   const [page, setPage] = useState(init.page);
@@ -229,7 +260,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
 
   // Any filter change starts over at page 1 (but a page from the URL on first
   // load is kept).
-  const filterKey = [[...selected].sort().join(","), range, dateField, fromInput, toInput, sort, q].join("|");
+  const filterKey = [[...selected].sort().join(","), range, dateField, fromInput, toInput, sortKey, q].join("|");
   const lastFilterKey = useRef(filterKey);
   useEffect(() => {
     if (lastFilterKey.current !== filterKey) {
@@ -246,7 +277,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
     if (range === "custom" && fromInput) p.set("from", fromInput);
     if (range === "custom" && toInput) p.set("to", toInput);
     if (dateField !== "created") p.set("field", dateField);
-    if (sort !== "newest") p.set("sort", sort);
+    if (sortKey !== "newest") p.set("sort", sortKey);
     if (q) p.set("q", q);
     if (page > 0) p.set("page", String(page + 1));
     const qs = p.toString();
@@ -254,12 +285,14 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
     if (next !== `${window.location.pathname}${window.location.search}`) {
       try { window.history.replaceState(window.history.state, "", next); } catch { /* sandboxed — ignore */ }
     }
-  }, [selected, range, fromInput, toInput, dateField, sort, q, page]);
+  }, [selected, range, fromInput, toInput, dateField, sortKey, q, page]);
 
   const dates = rangeDates(range, fromInput, toInput);
   const queryString = useMemo(() => {
     const p = new URLSearchParams();
-    p.set("sort", sort);
+    // The presets keep their one-word form; a column header sends key + dir.
+    if (LEGACY_SORT[sortKey]) p.set("sort", sortKey);
+    else { p.set("sort", sort.key); p.set("dir", sort.dir); }
     p.set("dateField", dateField);
     if (selected.size) p.set("status", [...selected].join(","));
     if (dates.from) p.set("from", dates.from);
@@ -268,7 +301,13 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
     p.set("limit", String(PAGE_SIZE));
     p.set("offset", String(page * PAGE_SIZE));
     return p.toString();
-  }, [sort, dateField, selected, dates.from, dates.to, q, page]);
+  }, [sort, sortKey, dateField, selected, dates.from, dates.to, q, page]);
+
+  // One option per column and direction; the presets keep their old values so
+  // a bookmarked ?sort=largest still lands on the same choice.
+  const sortChoices = useMemo(() => sortOptions(
+    DOC_SORT_COLUMNS.filter((c) => c.key !== "due" || cfg.hasDueColumn),
+  ).map((o) => ({ ...o, value: sortParam(o.state) })), [cfg.hasDueColumn]);
 
   const { data, isLoading, isError } = useQuery<DocListResponse>({
     queryKey: [`${cfg.endpoint}?${queryString}`],
@@ -426,14 +465,12 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
               </div>
               <select
                 data-testid="select-sort"
-                value={sort}
-                onChange={(e) => setSort(e.target.value as typeof sort)}
+                value={sortKey}
+                onChange={(e) => { const s = parseSortParam(e.target.value); if (s) setSort(s); }}
                 className={selectCls}
                 aria-label="Sort order"
               >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="largest">Largest first</option>
+                {sortChoices.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
 
@@ -525,18 +562,20 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
           <table className={crmTable.table}>
             <thead className={crmTable.thead}>
               <tr>
-                <th className={crmTable.th}>Number</th>
+                <SortableTh sortKey="number" label="Number" sort={sort} onSort={onSort} />
                 {/* Below sm the client name rides under the number, so the
                     Total column stays on screen at phone width. */}
-                <th className={cn(crmTable.th, "hidden sm:table-cell")}>Client</th>
-                <th className={cn(crmTable.th, "hidden md:table-cell")}>Title</th>
-                <th className={cn(crmTable.th, "hidden sm:table-cell")}>Status</th>
-                <th className={crmTable.thRight}>Total</th>
-                <th className={cn(crmTable.th, "hidden sm:table-cell")}>
-                  {dateField === "sent" ? "Sent" : "Created"}
-                </th>
+                <SortableTh sortKey="client" label="Client" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
+                <SortableTh sortKey="title" label="Title" sort={sort} onSort={onSort} className="hidden md:table-cell" />
+                <SortableTh sortKey="status" label="Status" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
+                <SortableTh sortKey="total" label="Total" sort={sort} onSort={onSort} align="right" />
+                <SortableTh
+                  sortKey={dateField === "sent" ? "sent" : "created"}
+                  label={dateField === "sent" ? "Sent" : "Created"}
+                  sort={sort} onSort={onSort} className="hidden sm:table-cell"
+                />
                 {cfg.hasDueColumn && (
-                  <th className={cn(crmTable.th, "hidden sm:table-cell")}>Due</th>
+                  <SortableTh sortKey="due" label="Due" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
                 )}
                 {cfg.hasDueColumn && <th className={crmTable.th}></th>}
                 {(isOwner || kind === "estimates") && (
@@ -609,11 +648,11 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
                     )}
                     {(r.refundedCents ?? 0) > 0 && <div className="text-xs text-muted-foreground">{money(r.refundedCents)} refunded</div>}
                   </td>
-                  <td className={cn(crmTable.td, "hidden sm:table-cell text-muted-foreground")}>
+                  <td className={cn(crmTable.td, "hidden sm:table-cell whitespace-nowrap text-muted-foreground")}>
                     {day(dateField === "sent" ? r.sentAt : r.createdAt)}
                   </td>
                   {cfg.hasDueColumn && (
-                    <td className={cn(crmTable.td, "hidden sm:table-cell text-muted-foreground")}>
+                    <td className={cn(crmTable.td, "hidden sm:table-cell whitespace-nowrap text-muted-foreground")}>
                       {day(r.dueAt)}
                     </td>
                   )}

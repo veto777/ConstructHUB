@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { PhoneIncoming, ShieldAlert, ShieldBan, BellRing, Mic, MicOff, ChevronLeft, ChevronRight, Info, RefreshCw } from "lucide-react";
 import { EmptyState, StatusPill, crmTable, crmTableCards } from "@/components/crm-ui";
+import { SortSelect, SortableTh, useTableSort, type SortColumn, type SortState } from "@/components/sortable-th";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -186,10 +187,11 @@ export function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const q = useDebounced(search.trim());
-  useEffect(() => setPage(1), [q, outcome]);
+  const { sort, setSort, onSort } = useTableSort<CallSortKey>("startedAt", "desc", "calls", { keys: CALL_SORT_KEYS });
+  useEffect(() => setPage(1), [q, outcome, sort]);
   const url = useMemo(
-    () => callsUrl({ q: q || undefined, outcome: outcome === "all" ? undefined : outcome, page, limit: PAGE_SIZE }),
-    [q, outcome, page],
+    () => callsUrl({ q: q || undefined, outcome: outcome === "all" ? undefined : outcome, page, limit: PAGE_SIZE, sort: sort.key, dir: sort.dir }),
+    [q, outcome, page, sort],
   );
   const list = useQuery<VoiceCallList>({ queryKey: [url], refetchInterval: LIVE_REFRESH_MS });
   const filtered = !!q || outcome !== "all";
@@ -231,7 +233,7 @@ export function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) 
         </>
       ) : (
         <>
-          <CallsTable calls={list.data.calls} onOpen={onOpen} testId="table-calls" numberHint={CALL_NO_HINT_LOG} />
+          <CallsTable calls={list.data.calls} onOpen={onOpen} testId="table-calls" numberHint={CALL_NO_HINT_LOG} sort={sort} onSort={onSort} onSortChange={setSort} />
           <Pager page={list.data.page} limit={list.data.limit} total={list.data.total} onPage={setPage} />
         </>
       )}
@@ -243,10 +245,21 @@ export function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) 
 export const CALL_NO_HINT_LOG = "Every call gets the next number in the order it came in, spam included. Spam and blocked calls are kept out of this list (see Spam blocked), so a skipped number is a screened call.";
 const CALL_NO_HINT_SPAM = "Every call gets the next number in the order it came in. This list shows only spam and blocked calls, so the numbers in between are your real calls.";
 
+/** Every Calls header sorts (GET /api/crm/voice/calls?sort=&dir= — ordered in SQL, so paging keeps the order). */
+type CallSortKey = "callNo" | "startedAt" | "caller" | "outcome" | "about" | "length";
+const CALL_SORT_COLUMNS: SortColumn<CallSortKey>[] = [
+  { key: "callNo", label: "Call #", kind: "number" },
+  { key: "startedAt", label: "When", kind: "date" },
+  { key: "caller", label: "Caller", kind: "text" },
+  { key: "outcome", label: "Outcome", kind: "text" },
+  { key: "about", label: "What it was about", kind: "text" },
+  { key: "length", label: "Length", kind: "number" },
+];
+const CALL_SORT_KEYS = CALL_SORT_COLUMNS.map((c) => c.key);
+
 function CallNoHeader({ hint, testId }: { hint: string; testId: string }) {
   return (
     <span className="inline-flex items-center gap-1">
-      Call #
       <Tooltip>
         <TooltipTrigger asChild>
           <button type="button" className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Why call numbers skip" data-testid={`${testId}-callno-hint`}>
@@ -279,19 +292,27 @@ const DELIVERY_PILL = {
   failed: { tone: "danger", label: "Delivery needs attention" },
 } as const;
 
-function CallsTable({ calls, onOpen, testId, numberHint }: { calls: VoiceCallListRow[]; onOpen: (id: string) => void; testId: string; numberHint: string }) {
+function CallsTable({ calls, onOpen, testId, numberHint, sort, onSort, onSortChange }: {
+  calls: VoiceCallListRow[]; onOpen: (id: string) => void; testId: string; numberHint: string;
+  sort: SortState<CallSortKey>; onSort: (key: CallSortKey) => void; onSortChange: (s: SortState<CallSortKey>) => void;
+}) {
   useSyncOpenCallDrawers(calls);
   return (
+    <div className="space-y-2">
+    {/* The headers are hidden on a phone (card layout) — the Sort select stands in for them. */}
+    <SortSelect columns={CALL_SORT_COLUMNS} sort={sort} onChange={onSortChange} className="sm:hidden" testId={`${testId}-sort-select`} />
     <div className={crmTable.wrapper}>
       <table className={crmTable.table} data-testid={testId}>
         <thead className={cn(crmTable.thead, crmTableCards.thead)}>
           <tr>
-            <th className={crmTable.th}><CallNoHeader hint={numberHint} testId={testId} /></th>
-            <th className={crmTable.th}>When</th>
-            <th className={crmTable.th}>Caller</th>
-            <th className={crmTable.th}>Outcome</th>
-            <th className={cn(crmTable.th, "hidden md:table-cell")}>What it was about</th>
-            <th className={crmTable.thRight}>Length</th>
+            <SortableTh sortKey="callNo" label="Call #" sort={sort} onSort={onSort} testId={`${testId}-sort-callNo`}>
+              {" "}<CallNoHeader hint={numberHint} testId={testId} />
+            </SortableTh>
+            <SortableTh sortKey="startedAt" label="When" sort={sort} onSort={onSort} testId={`${testId}-sort-startedAt`} />
+            <SortableTh sortKey="caller" label="Caller" sort={sort} onSort={onSort} testId={`${testId}-sort-caller`} />
+            <SortableTh sortKey="outcome" label="Outcome" sort={sort} onSort={onSort} testId={`${testId}-sort-outcome`} />
+            <SortableTh sortKey="about" label="What it was about" sort={sort} onSort={onSort} className="hidden md:table-cell" testId={`${testId}-sort-about`} />
+            <SortableTh sortKey="length" label="Length" sort={sort} onSort={onSort} align="right" testId={`${testId}-sort-length`} />
           </tr>
         </thead>
         <tbody>
@@ -365,6 +386,7 @@ function CallsTable({ calls, onOpen, testId, numberHint }: { calls: VoiceCallLis
         </tbody>
       </table>
     </div>
+    </div>
   );
 }
 
@@ -398,7 +420,8 @@ export function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (i
   const { toast } = useToast();
   const ledger = useQuery<SpamLedger>({ queryKey: ["/api/crm/voice/spam"], refetchInterval: LIVE_REFRESH_MS });
   const month = ledger.data?.thisMonth;
-  const spamCalls = useQuery<VoiceCallList>({ queryKey: [callsUrl({ spam: 1, limit: PAGE_SIZE })], refetchInterval: LIVE_REFRESH_MS });
+  const spamSort = useTableSort<CallSortKey>("startedAt", "desc", "spam-calls", { keys: CALL_SORT_KEYS });
+  const spamCalls = useQuery<VoiceCallList>({ queryKey: [callsUrl({ spam: 1, limit: PAGE_SIZE, sort: spamSort.sort.key, dir: spamSort.sort.dir })], refetchInterval: LIVE_REFRESH_MS });
   const [number, setNumber] = useState("");
 
   // A block/unblock changes the ledger, the spam totals and which calls the lists show.
@@ -547,7 +570,8 @@ export function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (i
           <p className="text-sm text-muted-foreground">None so far.</p>
         ) : (
           <>
-            <CallsTable calls={spamCalls.data.calls} onOpen={onOpen} testId="table-spam-calls" numberHint={CALL_NO_HINT_SPAM} />
+            <CallsTable calls={spamCalls.data.calls} onOpen={onOpen} testId="table-spam-calls" numberHint={CALL_NO_HINT_SPAM}
+              sort={spamSort.sort} onSort={spamSort.onSort} onSortChange={spamSort.setSort} />
             {spamCalls.data.total > spamCalls.data.calls.length && (
               <p className="text-xs text-muted-foreground">Showing the latest {spamCalls.data.calls.length} of {spamCalls.data.total}.</p>
             )}

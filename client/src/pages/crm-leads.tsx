@@ -31,6 +31,7 @@ import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { marketingUrl } from "@/lib/site";
 import { SegmentedTabs, TabCount } from "@/components/tool";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, StatusPill, crmTable, crmTableCards, type PillTone } from "@/components/crm-ui";
+import { SortSelect, SortableTh, useTableSort, type SortColumn } from "@/components/sortable-th";
 
 type LeadStatus = "new" | "contacted" | "converted" | "archived" | "spam";
 type LeadSource = "website_form" | "form_sync" | "call_assistant" | "import" | "manual";
@@ -97,6 +98,17 @@ const STATUS_TONE: Record<LeadStatus, PillTone> = {
 
 const PAGE_SIZE = 50;
 
+/** Every column header sorts (GET /api/crm/leads?sort=&dir= — ordered in SQL so "Load more" keeps the order). */
+type LeadSortKey = "name" | "contact" | "service" | "source" | "receivedAt";
+const LEAD_SORT_KEYS: readonly LeadSortKey[] = ["name", "contact", "service", "source", "receivedAt"];
+const LEAD_SORT_COLUMNS: SortColumn<LeadSortKey>[] = [
+  { key: "name", label: "Lead", kind: "text" },
+  { key: "contact", label: "Contact", kind: "text" },
+  { key: "service", label: "Asked for", kind: "text" },
+  { key: "source", label: "From", kind: "text" },
+  { key: "receivedAt", label: "Received", kind: "date" },
+];
+
 const when = (iso: string | null | undefined) => {
   if (!iso) return null;
   const d = new Date(iso);
@@ -128,6 +140,7 @@ export default function CrmLeadsPage() {
   useEffect(() => { const t = setTimeout(() => setQDebounced(q), 250); return () => clearTimeout(t); }, [q]);
   const [openId, setOpenId] = useState<string | null>(initial.lead);
   const [converting, setConverting] = useState<Lead | null>(null);
+  const { sort, setSort, onSort } = useTableSort<LeadSortKey>("receivedAt", "desc", "leads", { keys: LEAD_SORT_KEYS });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -149,12 +162,14 @@ export default function CrmLeadsPage() {
   const canSettings = me?.permissions?.manageSettings === true;
 
   const { data, isLoading, isError, isPlaceholderData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["/api/crm/leads", "list", tab, source, qDebounced],
+    queryKey: ["/api/crm/leads", "list", tab, source, qDebounced, sort.key, sort.dir],
     enabled: canManage,
     placeholderData: keepPreviousData,
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<LeadPage> => {
-      const params = new URLSearchParams({ status: tab, limit: String(PAGE_SIZE), offset: String(pageParam) });
+      const params = new URLSearchParams({
+        status: tab, limit: String(PAGE_SIZE), offset: String(pageParam), sort: sort.key, dir: sort.dir,
+      });
       if (source !== "all") params.set("source", source);
       if (qDebounced.trim()) params.set("q", qDebounced.trim());
       const r = await fetch(`/api/crm/leads?${params}`, { credentials: "include" });
@@ -251,15 +266,17 @@ export default function CrmLeadsPage() {
         </Card>
       ) : (
         <>
+          {/* The headers are hidden on a phone (card layout) — the Sort select stands in for them. */}
+          <SortSelect columns={LEAD_SORT_COLUMNS} sort={sort} onChange={setSort} className="sm:hidden" testId="select-sort-leads" />
           <div className={crmTable.wrapper}>
             <table className={crmTable.table}>
               <thead className={`${crmTable.thead} ${crmTableCards.thead}`}>
                 <tr>
-                  <th className={crmTable.th}>Lead</th>
-                  <th className={crmTable.th}>Contact</th>
-                  <th className={`${crmTable.th} hidden sm:table-cell`}>Asked for</th>
-                  <th className={`${crmTable.th} hidden sm:table-cell`}>From</th>
-                  <th className={`${crmTable.th} hidden sm:table-cell`}>Received</th>
+                  <SortableTh sortKey="name" label="Lead" sort={sort} onSort={onSort} />
+                  <SortableTh sortKey="contact" label="Contact" sort={sort} onSort={onSort} />
+                  <SortableTh sortKey="service" label="Asked for" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
+                  <SortableTh sortKey="source" label="From" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
+                  <SortableTh sortKey="receivedAt" label="Received" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
                   <th className="w-10" />
                 </tr>
               </thead>

@@ -230,6 +230,33 @@ describe("documents center", () => {
     const ids1 = new Set(p1.body.rows.map((x: any) => x.id));
     for (const x of p2.body.rows) expect(ids1.has(x.id)).toBe(false);
   });
+
+  it("every column header sorts: ?sort=<key>&dir=asc|desc orders the whole list (empties last); the presets still work", async () => {
+    const c = await customer("docsort");
+    await estimate(c, { title: `FIX-c13 bravo ${run}`, items: [line("Base", 300_00)] });
+    await estimate(c, { title: `FIX-c13 alpha ${run}`, items: [line("Base", 900_00)] });
+    const mine = (rows: any[]) => rows.filter((r) => r.customerId === c);
+    const titles = async (qs: string) => {
+      const r = await api(`/api/crm/estimates?${qs}&q=${encodeURIComponent(`FIX-c13`)}&limit=500`, {}, cookie);
+      expect(r.status).toBe(200);
+      return mine(r.body.rows).map((r: any) => r.title);
+    };
+    expect(await titles("sort=title&dir=asc")).toEqual([`FIX-c13 alpha ${run}`, `FIX-c13 bravo ${run}`]);
+    expect(await titles("sort=title&dir=desc")).toEqual([`FIX-c13 bravo ${run}`, `FIX-c13 alpha ${run}`]);
+    expect(await titles("sort=total&dir=asc")).toEqual([`FIX-c13 bravo ${run}`, `FIX-c13 alpha ${run}`]);
+    expect(await titles("sort=largest")).toEqual([`FIX-c13 alpha ${run}`, `FIX-c13 bravo ${run}`]);
+    // Whole-list order, not just this client's rows: ascending totals never decrease.
+    const all = await api("/api/crm/estimates?sort=total&dir=asc&limit=500", {}, cookie);
+    const totals = all.body.rows.map((r: any) => r.totalCents);
+    for (let i = 1; i < totals.length; i++) expect(totals[i]).toBeGreaterThanOrEqual(totals[i - 1]);
+    // Client names A→Z, case ignored.
+    const byClient = await api("/api/crm/estimates?sort=client&dir=asc&limit=500", {}, cookie);
+    const names = byClient.body.rows.map((r: any) => (r.customerName ?? "").toLowerCase()).filter(Boolean);
+    for (let i = 1; i < names.length; i++) expect(names[i].localeCompare(names[i - 1]) >= 0).toBe(true);
+    // An unknown key falls back to newest first rather than erroring (the presets never did).
+    const unknown = await api("/api/crm/estimates?sort=bogus&limit=5", {}, cookie);
+    expect(unknown.status).toBe(200);
+  });
 });
 
 describe("invoices", () => {
@@ -270,6 +297,43 @@ describe("clients list + delete", () => {
     const counts = r.body.bidCounts;
     expect(counts.won + counts.undecided + counts.declined + counts.bid + counts.none).toBe(r.body.total);
     expect(r.body.total).toBeGreaterThanOrEqual(r.body.rows.length);
+  });
+
+  it("paged mode sorts the whole book on ?sort=name|bidDate|address|bidStatus|createdAt&dir= before cutting the page", async () => {
+    const zed = await customer("sort-zed", { displayName: `FIX-c13 zed ${run}`, addressLine1: "900 Yonder Rd", city: "Zanesville" });
+    const amy = await customer("sort-amy", { displayName: `fix-c13 amy ${run}`, addressLine1: "1 Able St", city: "Akron" });
+    // Only amy has a bid, so she has a bid date and a status; zed sorts last on both (empties last, either direction).
+    await estimate(amy);
+    const search = encodeURIComponent(`c13 `);
+    const order = async (qs: string) => {
+      const r = await api(`/api/crm/customers?paged=1&limit=100&q=${search}&${qs}`, {}, cookie);
+      expect(r.status).toBe(200);
+      return r.body.rows.filter((x: any) => x.id === amy || x.id === zed).map((x: any) => x.id);
+    };
+    // Names alphabetically, case ignored ("fix-c13 amy" before "FIX-c13 zed").
+    expect(await order("sort=name&dir=asc")).toEqual([amy, zed]);
+    expect(await order("sort=name&dir=desc")).toEqual([zed, amy]);
+    expect(await order("sort=address&dir=asc")).toEqual([amy, zed]);
+    expect(await order("sort=address&dir=desc")).toEqual([zed, amy]);
+    expect(await order("sort=bidDate&dir=asc")).toEqual([amy, zed]);
+    expect(await order("sort=bidDate&dir=desc")).toEqual([amy, zed]);
+    expect(await order("sort=bidStatus&dir=asc")).toEqual([amy, zed]);
+    expect(await order("sort=bidStatus&dir=desc")).toEqual([amy, zed]);
+    // Added: amy was created after zed, so newest first puts her first.
+    expect(await order("sort=createdAt&dir=desc")).toEqual([amy, zed]);
+    expect(await order("sort=createdAt&dir=asc")).toEqual([zed, amy]);
+    // The default is still newest first, and the answer says which order it used.
+    const dflt = await api(`/api/crm/customers?paged=1&limit=3`, {}, cookie);
+    expect(dflt.body.sort).toBe("createdAt");
+    expect(dflt.body.dir).toBe("desc");
+    // The whole page is in order (not just these two): names never go backwards.
+    const page = await api(`/api/crm/customers?paged=1&limit=100&sort=name&dir=asc`, {}, cookie);
+    const names = page.body.rows.map((x: any) => x.displayName);
+    const collator = new Intl.Collator("en", { sensitivity: "base", numeric: true });
+    for (let i = 1; i < names.length; i++) expect(collator.compare(names[i - 1], names[i])).toBeLessThanOrEqual(0);
+    // Bad values are refused, not guessed.
+    expect((await api(`/api/crm/customers?paged=1&sort=phone`, {}, cookie)).status).toBe(400);
+    expect((await api(`/api/crm/customers?paged=1&sort=name&dir=up`, {}, cookie)).status).toBe(400);
   });
 
   it("force-delete takes the client's visits and the project's change orders with it", async () => {

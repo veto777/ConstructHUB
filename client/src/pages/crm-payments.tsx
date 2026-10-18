@@ -23,6 +23,17 @@ import { lazySample, showSample } from "@/components/sample-preview";
 const SamplePaymentsList = lazySample(() => import("@/components/crm-sample-previews"), "SamplePaymentsList");
 import { TakePaymentDialog } from "@/components/crm-take-payment";
 import { AdminSetupNote } from "@/hooks/use-platform-admin";
+import { SortButtons, useTableSort, type SortColumn } from "@/components/sortable-th";
+
+/** The recent-payments list sorts on every fact it shows (in the browser — it is the newest 50). */
+type PaymentSortKey = "date" | "amount" | "client" | "method" | "status";
+const PAYMENT_SORT_COLUMNS: SortColumn<PaymentSortKey>[] = [
+  { key: "date", label: "Date", kind: "date" },
+  { key: "amount", label: "Amount", kind: "number" },
+  { key: "client", label: "Client", kind: "text" },
+  { key: "method", label: "Method", kind: "text" },
+  { key: "status", label: "Status", kind: "text" },
+];
 
 const money = (c?: number | null) =>
   `$${((c ?? 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -152,6 +163,14 @@ export default function CrmPaymentsPage() {
   // ── Owner: reverse a mistyped manual payment ──────────────────────────────
   const [reverseFor, setReverseFor] = useState<any | null>(null);
   const [reverseReason, setReverseReason] = useState("");
+  const { sort, setSort, onSort, sorted } = useTableSort<PaymentSortKey>("date", "desc", "payments", { keys: PAYMENT_SORT_COLUMNS.map((c) => c.key) });
+  const sortedPayments = sorted((payments ?? []).slice(0, 50), {
+    date: (p: any) => p.createdAt,
+    amount: (p: any) => p.amountCents,
+    client: (p: any) => p.customerName,
+    method: (p: any) => METHOD_LABELS[p.method] ?? p.method ?? p.provider,
+    status: (p: any) => p.status,
+  });
   const reverse = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", `/api/crm/payments/${reverseFor.id}/reverse`, { reason: reverseReason })).json(),
@@ -433,7 +452,10 @@ export default function CrmPaymentsPage() {
               } />}
             </>
           ) : null}
-          {payments?.slice(0, 50).map((p: any) => {
+          {canSeePrices && !paymentsError && !paymentsLoading && !!payments?.length && (
+            <SortButtons columns={PAYMENT_SORT_COLUMNS} sort={sort} onSort={onSort} onChange={setSort} testId="sort-payments" className="pb-1" />
+          )}
+          {sortedPayments.map((p: any) => {
             const doc = p.invoiceNumber ? `Invoice ${p.invoiceNumber}` : p.estimateNumber ? `Estimate ${p.estimateNumber}` : null;
             return (
               <div key={p.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2"

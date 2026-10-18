@@ -17,6 +17,17 @@ import {
 import { lazySample, showSample } from "@/components/sample-preview";
 const SampleReportsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleReportsTable");
 import { confirmAction } from "@/components/confirm-dialog";
+import { SortSelect, SortableTh, useTableSort, type SortColumn } from "@/components/sortable-th";
+
+/** Every column of the imported-reports table sorts (in the browser — the list is at most LIST_CAP rows). */
+type ReportSortKey = "report" | "client" | "status" | "date" | "squares";
+const REPORT_SORT_COLUMNS: SortColumn<ReportSortKey>[] = [
+  { key: "report", label: "Report", kind: "text" },
+  { key: "client", label: "Client", kind: "text" },
+  { key: "status", label: "Status", kind: "text" },
+  { key: "date", label: "Date", kind: "date" },
+  { key: "squares", label: "Squares", kind: "number" },
+];
 
 /**
  * Measurement report imports. Upload a HOVER PDF or paste the report text —
@@ -153,6 +164,14 @@ export default function CrmReportsPage() {
   }, [draft?.id]);
 
   const [shown, setShown] = useState(PAGE);
+  const { sort, setSort, onSort, sorted } = useTableSort<ReportSortKey>("date", "desc", "reports", { keys: REPORT_SORT_COLUMNS.map((c) => c.key) });
+  const sortedReports = reports ? sorted(reports, {
+    report: (r) => r.fileName ?? "Pasted report",
+    client: (r) => r.customerName || r.contact?.name || null,
+    status: (r) => r.status,
+    date: (r) => r.date,
+    squares: (r) => r.squares,
+  }) : [];
 
   const reportWhere = (r: ReportRow) =>
     `${r.provider} · ${[r.addressLine1, r.city, r.state].filter(Boolean).join(", ") || "no address"}`;
@@ -340,7 +359,7 @@ export default function CrmReportsPage() {
 
       {/* ── Past imports ────────────────────────────────────────────────── */}
       <section className="space-y-3" data-testid="section-report-list">
-        <SectionTitle icon={FileText} title="Imported reports" description="Newest first. Drafts are parsed but not yet confirmed." />
+        <SectionTitle icon={FileText} title="Imported reports" description="Newest first unless you sort a column. Drafts are parsed but not yet confirmed." />
         {isLoading ? (
           <div className="flex justify-center p-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : !reports?.length ? (
@@ -356,8 +375,9 @@ export default function CrmReportsPage() {
           <>
             {/* Phones get stacked cards; the table starts at sm. `m-` test ids
                 keep the two layouts' ids unique. */}
+            <SortSelect columns={REPORT_SORT_COLUMNS} sort={sort} onChange={setSort} className="sm:hidden" testId="select-sort-reports" />
             <div className="space-y-2 sm:hidden">
-              {reports.slice(0, shown).map((r) => (
+              {sortedReports.slice(0, shown).map((r) => (
                 <Card key={r.id} data-testid={`report-card-${r.id}`}>
                   <CardContent className="p-4 space-y-1.5">
                     <div className="flex items-start justify-between gap-2">
@@ -380,16 +400,16 @@ export default function CrmReportsPage() {
               <table className={crmTable.table}>
                 <thead className={crmTable.thead}>
                   <tr>
-                    <th className={crmTable.th}>Report</th>
-                    <th className={crmTable.th}>Client</th>
-                    <th className={crmTable.th}>Status</th>
-                    <th className={crmTable.th}>Date</th>
-                    <th className={crmTable.thRight}>Squares</th>
+                    <SortableTh sortKey="report" label="Report" sort={sort} onSort={onSort} />
+                    <SortableTh sortKey="client" label="Client" sort={sort} onSort={onSort} />
+                    <SortableTh sortKey="status" label="Status" sort={sort} onSort={onSort} />
+                    <SortableTh sortKey="date" label="Date" sort={sort} onSort={onSort} />
+                    <SortableTh sortKey="squares" label="Squares" sort={sort} onSort={onSort} align="right" />
                     <th className={crmTable.thRight}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {reports.slice(0, shown).map((r) => (
+                  {sortedReports.slice(0, shown).map((r) => (
                     <tr key={r.id} className={crmTable.tr} data-testid={`report-row-${r.id}`}>
                       <td className={crmTable.td}>
                         <div className="font-medium">{r.fileName ?? "Pasted report"}</div>
