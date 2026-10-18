@@ -773,6 +773,18 @@ export async function ensureCrmSchema(): Promise<void> {
     CREATE UNIQUE INDEX IF NOT EXISTS crm_punch_scopes_project_scope_uq ON crm_punch_scopes (project_id, scope);
     CREATE INDEX IF NOT EXISTS crm_punch_scopes_org_idx ON crm_punch_scopes (org_id);
 
+    -- Job flow (shared/job-flow.ts): a project's custom phase, and the once-per-phase guard for phase alerts.
+    ALTER TABLE crm_projects ADD COLUMN IF NOT EXISTS stage_key text;
+    CREATE TABLE IF NOT EXISTS crm_stage_alerts (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      project_id varchar NOT NULL,
+      phase_key text NOT NULL,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_stage_alerts_project_phase_uq ON crm_stage_alerts (project_id, phase_key);
+    CREATE INDEX IF NOT EXISTS crm_stage_alerts_org_idx ON crm_stage_alerts (org_id);
+
     -- Review pipeline (server/crm/review-pipeline.ts): the won-job clients the owner set aside ("Not now").
     CREATE TABLE IF NOT EXISTS crm_review_pipeline (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

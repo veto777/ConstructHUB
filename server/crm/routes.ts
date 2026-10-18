@@ -6,6 +6,7 @@
  */
 import type { Express } from "express";
 import { normalizeClientPageLayout } from "@shared/client-page-layout";
+import { MAX_FLOW_PHASES, MAX_PHASE_ALERTS, isDefaultJobFlow, missingAnchors, normalizeJobFlow } from "@shared/job-flow";
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { db } from "../db";
@@ -133,6 +134,7 @@ const FIELD_LABELS: Record<string, string> = {
   termsAndConditions: "Terms and conditions", warrantyText: "Warranty text",
   defaultDepositBps: "Default deposit", defaultTaxRateBps: "Default sales tax",
   themeColor: "Theme colour", themeBase: "Main colour", discountDefaults: "Bid discounts",
+  clientPageLayout: "Client page layout", celebrations: "Celebrations", jobFlow: "Job flow",
   notificationPrefs: "Notification preferences", displayName: "Name", title: "Title",
   avatarUrl: "Avatar URL", calendarColor: "Calendar colour", role: "Role", status: "Status",
   hourlyCostCents: "Cost rate", divisionId: "Division", permissions: "Permissions",
@@ -231,6 +233,24 @@ const orgPatchSchema = z.object({
   clientPageLayout: z.object({ order: z.array(z.string().max(40)).max(40), hidden: z.array(z.string().max(40)).max(40) }).nullable().optional(),
   // Confetti when a job is closed out (the PM's reward). Default on; merged into custom_fields as celebrations.
   celebrations: z.boolean().optional(),
+  // The account's job flow (shared/job-flow.ts): the six built-in phases plus any custom ones, each with its alerts.
+  // Normalized on save (anchors in order, unknown keys dropped); the six built-in phases can never be removed;
+  // null resets to the default.
+  jobFlow: z.object({
+    phases: z.array(z.object({
+      key: z.string().min(1).max(40),
+      label: z.string().max(60).optional(),
+      builtin: z.string().max(40).optional(),
+      alerts: z.array(z.object({
+        to: z.enum(["client", "staff"]),
+        staff: z.string().max(64).optional(),
+        channel: z.enum(["email", "sms"]),
+        template: z.string().max(600),
+      })).max(MAX_PHASE_ALERTS, `A phase can have at most ${MAX_PHASE_ALERTS} alerts`).optional(),
+    })).max(MAX_FLOW_PHASES, `A job flow can have at most ${MAX_FLOW_PHASES} phases`),
+  }).nullable().optional().refine((v) => !v || missingAnchors(v).length === 0, {
+    message: "The built-in phases (Bid, Bid Submitted, Approved, Job Scheduled, In progress, Closed out) can be renamed and reordered but not removed",
+  }),
   // Text alerts to the owner's mobile on signed approvals and payments.
   // Opt-in (default off): texting costs money per message.
   smsAlerts: z.boolean().optional(),
@@ -726,9 +746,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
     // data) is never clobbered.
-    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, clientPageLayout, celebrations, ...profile } = parsed.data;
+    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, clientPageLayout, celebrations, jobFlow, ...profile } = parsed.data;
     const mergedCustomFields =
-      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined || clientPageLayout !== undefined || celebrations !== undefined
+      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined || clientPageLayout !== undefined || celebrations !== undefined || jobFlow !== undefined
         ? (() => {
             const base = {
               ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
@@ -759,6 +779,12 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
               else base.clientPageLayout = normalizeClientPageLayout(clientPageLayout);
             }
             if (celebrations !== undefined) base.celebrations = celebrations;
+            // The default flow is "no key" — a reset leaves custom_fields as it was before the owner touched it.
+            if (jobFlow !== undefined) {
+              const flow = jobFlow === null ? null : normalizeJobFlow(jobFlow);
+              if (!flow || isDefaultJobFlow(flow)) delete base.jobFlow;
+              else base.jobFlow = flow;
+            }
             return base;
           })()
         : undefined;

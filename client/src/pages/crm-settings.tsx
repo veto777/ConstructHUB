@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ClientPageLayoutCard } from "@/components/client-page-layout";
+import { JobFlowCard } from "@/components/job-flow-settings";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -1016,6 +1017,9 @@ export default function CrmSettingsPage() {
       {/* ── Bid discounts (org defaults) ────────────────────────────────── */}
       {/* Client page — container order and which show (owner/admin). */}
       <ClientPageLayoutCard />
+
+      {/* Job flow — the phases on the client page's tracker and the alerts each one sends (owner/admin). */}
+      <JobFlowCard />
 
       {/* Celebrations — confetti when a job is closed out. */}
       <Card data-testid="card-celebrations">

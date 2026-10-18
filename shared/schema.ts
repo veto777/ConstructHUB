@@ -1967,6 +1967,9 @@ export const crmProjects = pgTable("crm_projects", {
   lat: doublePrecision("lat"),
   lng: doublePrecision("lng"),
   customFields: jsonb("custom_fields"),
+  // A custom phase of the account's job flow (shared/job-flow.ts) the job was moved to; null = the built-in stage
+  // derived from `status` is the current phase.
+  stageKey: text("stage_key"),
   stageChangedAt: timestamp("stage_changed_at").defaultNow(),
   archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -2382,6 +2385,16 @@ export const crmAppointments = pgTable("crm_appointments", {
 // (shared/punch-list.ts). Items are a small jsonb list [{id, text, doneAt}];
 // the walkthrough columns record who signed the scope off and when. Every
 // scope signed off closes the job out (server/crm/punch-list.ts).
+// crm_stage_alerts: one row per (project, phase) whose phase alerts (shared/job-flow.ts) have been processed —
+// the "once per project per phase" guard for server/crm/job-flow.ts.
+export const crmStageAlerts = pgTable("crm_stage_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  phaseKey: text("phase_key").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const crmPunchScopes = pgTable("crm_punch_scopes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull(),
