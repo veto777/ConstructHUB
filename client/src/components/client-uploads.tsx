@@ -423,12 +423,14 @@ export function EstimateAttach({ estimateId, canManage }: { estimateId: string; 
 
 /* ── Contractor: photos the client shared (client detail strip) ──────────── */
 
-/** Stage tag rides in the stored file name ("progress--x.jpg" / "finished--x.jpg"). */
-function photoStage(fileName: string): "progress" | "finished" | null {
+/** Stage tag rides in the stored file name ("progress--x.jpg" / "finished--x.jpg" / "punchlist--<scope>--x.jpg"). */
+export function photoStage(fileName: string): "progress" | "finished" | "punchlist" | null {
   if (fileName.startsWith("progress--")) return "progress";
   if (fileName.startsWith("finished--")) return "finished";
+  if (fileName.startsWith("punchlist--")) return "punchlist";
   return null;
 }
+const STAGE_LABEL = { progress: "In progress", finished: "Finished", punchlist: "Punch list" } as const;
 
 export function CustomerPhotos({ customerId, canUpload = false }: { customerId: string; canUpload?: boolean }) {
   const { toast } = useToast();
@@ -540,8 +542,8 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
                     )}
                   </button>
                   {st && (
-                    <span className={`absolute bottom-1 left-1 rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white ${st === "finished" ? "bg-emerald-600/90" : "bg-amber-600/90"}`}>
-                      {st === "finished" ? "Finished" : "In progress"}
+                    <span className={`absolute bottom-1 left-1 rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white ${st === "finished" ? "bg-emerald-600/90" : st === "punchlist" ? "bg-rose-600/90" : "bg-amber-600/90"}`}>
+                      {STAGE_LABEL[st]}
                     </span>
                   )}
                   {canUpload && (
@@ -553,7 +555,7 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
                       onClick={() => setConfirming(p)}
                       disabled={del.isPending}
                       data-testid={`button-delete-photo-${p.id}`}
-                      aria-label={`Delete photo ${String(p.fileName ?? "").replace(/^(progress|finished)--/, "")}`.trim()}
+                      aria-label={`Delete photo ${String(p.fileName ?? "").replace(/^(progress|finished)--/, "").replace(/^punchlist--[a-z0-9_]+--/, "")}`.trim()}
                       title="Delete photo"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -569,7 +571,7 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
             photos={photos.map((p: any) => {
               const st = photoStage(String(p.fileName ?? ""));
               return { id: p.id, name: p.fileName, downloadUrl: p.downloadUrl,
-                label: st === "finished" ? "Finished" : st === "progress" ? "In progress" : null,
+                label: st ? STAGE_LABEL[st] : null,
                 src: String(p.mime).startsWith("image/") && !/hei[cf]/.test(p.mime) ? `${p.url}?inline=1` : null };
             })} />
         ) : null}

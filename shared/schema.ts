@@ -2378,6 +2378,25 @@ export const crmAppointments = pgTable("crm_appointments", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ── Punch list & final walkthrough — one row per scope of the approved work ──
+// (shared/punch-list.ts). Items are a small jsonb list [{id, text, doneAt}];
+// the walkthrough columns record who signed the scope off and when. Every
+// scope signed off closes the job out (server/crm/punch-list.ts).
+export const crmPunchScopes = pgTable("crm_punch_scopes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  scope: text("scope").notNull(),
+  label: text("label").notNull(),
+  items: jsonb("items").notNull().default(sql`'[]'::jsonb`),
+  sortOrder: integer("sort_order").notNull().default(0),
+  walkthroughDoneAt: timestamp("walkthrough_done_at"),
+  walkthroughDoneByMemberId: varchar("walkthrough_done_by_member_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type CrmPunchScopeRow = typeof crmPunchScopes.$inferSelect;
+
 // ── Change orders — the #1 missing feature for remodelers ───────────────────
 export const crmChangeOrders = pgTable("crm_change_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

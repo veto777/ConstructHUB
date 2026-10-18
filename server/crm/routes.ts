@@ -49,6 +49,7 @@ import { registerCrmDiscountRoutes } from "./discounts";
 import { registerCrmSelfEstimateRoutes } from "./self-estimate";
 import { registerCrmTaxHooks } from "./tax";
 import { registerCrmAttachmentRoutes } from "./attachments";
+import { registerCrmPunchListRoutes } from "./punch-list";
 import { registerCrmPhotoLibraryRoutes } from "./photo-library";
 import { registerCrmReceiptRoutes } from "./receipts";
 import { registerCrmQuickBidRoutes } from "./quickbid";
@@ -228,6 +229,8 @@ const orgPatchSchema = z.object({
   // The client page's container order and hidden set (shared/client-page-layout.ts); merged into custom_fields as
   // clientPageLayout, normalized (unknown keys dropped); null resets to the default.
   clientPageLayout: z.object({ order: z.array(z.string().max(40)).max(40), hidden: z.array(z.string().max(40)).max(40) }).nullable().optional(),
+  // Confetti when a job is closed out (the PM's reward). Default on; merged into custom_fields as celebrations.
+  celebrations: z.boolean().optional(),
   // Text alerts to the owner's mobile on signed approvals and payments.
   // Opt-in (default off): texting costs money per message.
   smsAlerts: z.boolean().optional(),
@@ -407,6 +410,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmSelfEstimateRoutes(app, getDevUser);
   // Client portal v2: pamphlet/estimate/photo attachments + homeowner comments.
   registerCrmAttachmentRoutes(app, getDevUser);
+  registerCrmPunchListRoutes(app, getDevUser);
   // The photo library: every project photo of the org, by job and stage (server/crm/photo-library.ts).
   registerCrmPhotoLibraryRoutes(app, getDevUser);
   // Receipts-to-date: preview + one-click send; auto-emailed after payments.
@@ -722,9 +726,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
     // data) is never clobbered.
-    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, clientPageLayout, ...profile } = parsed.data;
+    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, clientPageLayout, celebrations, ...profile } = parsed.data;
     const mergedCustomFields =
-      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined || clientPageLayout !== undefined
+      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined || clientPageLayout !== undefined || celebrations !== undefined
         ? (() => {
             const base = {
               ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
@@ -754,6 +758,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
               if (clientPageLayout === null) delete base.clientPageLayout;
               else base.clientPageLayout = normalizeClientPageLayout(clientPageLayout);
             }
+            if (celebrations !== undefined) base.celebrations = celebrations;
             return base;
           })()
         : undefined;

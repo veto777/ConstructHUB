@@ -72,7 +72,11 @@ export default function CrmSchedulePage() {
     const qs = p.toString();
     navigate(`${location}${qs ? `?${qs}` : ""}`, { replace: true });
   };
-  const [cursor, setCursor] = useState(() => new Date());
+  // ?date=2026-10-21 (the client page's "View on the calendar") opens on that day, in the browser's zone.
+  const [cursor, setCursor] = useState(() => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(new URLSearchParams(search).get("date") ?? "");
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date();
+  });
   const [days, setDays] = useState<number>(14);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);

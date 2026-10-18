@@ -36,6 +36,7 @@ import archiver from "archiver";
 import { z } from "zod";
 import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
+import { parsePunchPhotoName } from "@shared/punch-list";
 import {
   crmAttachments, crmCustomers, crmMeasurements, crmMembers, crmProjects, mediaFolders, mediaPhotos, reviewRequests,
   type CrmPermission,
@@ -57,16 +58,18 @@ type Project = typeof crmProjects.$inferSelect;
 
 // ── Classification ──────────────────────────────────────────────────────────
 
-export const PHOTO_FILTERS = ["all", "progress", "finished", "client", "hover", "unstaged"] as const;
+export const PHOTO_FILTERS = ["all", "progress", "finished", "punchlist", "client", "hover", "unstaged"] as const;
 export type PhotoFilter = (typeof PHOTO_FILTERS)[number];
 export type PhotoSource = "crew" | "client" | "hover";
 
 /** Stage, source and the display name of a stored photo file name (pure). */
 export function classifyPhoto(fileName: string): {
-  stage: "progress" | "finished" | null; source: PhotoSource; hoverJobId: string | null; displayName: string;
+  stage: "progress" | "finished" | "punchlist" | null; source: PhotoSource; hoverJobId: string | null; displayName: string;
 } {
   if (fileName.startsWith("progress--")) return { stage: "progress", source: "crew", hoverJobId: null, displayName: fileName.slice(10) || fileName };
   if (fileName.startsWith("finished--")) return { stage: "finished", source: "crew", hoverJobId: null, displayName: fileName.slice(10) || fileName };
+  const punch = parsePunchPhotoName(fileName);
+  if (punch) return { stage: "punchlist", source: "crew", hoverJobId: null, displayName: punch.displayName };
   if (fileName.startsWith("hover-")) {
     const m = /^hover-(.+)-([^-]+)\.[A-Za-z0-9]+$/.exec(fileName);
     return { stage: null, source: "hover", hoverJobId: m ? m[1] : null, displayName: fileName };
@@ -77,15 +80,17 @@ export function classifyPhoto(fileName: string): {
 const fn = crmAttachments.fileName;
 const IS_PROGRESS = sql`${fn} like 'progress--%'`;
 const IS_FINISHED = sql`${fn} like 'finished--%'`;
+const IS_PUNCH = sql`${fn} like 'punchlist--%'`;
 const IS_HOVER = sql`${fn} like 'hover-%'`;
 /** The SQL twin of classifyPhoto for one filter (null = no condition). */
 export function filterSql(f: PhotoFilter): SQL | null {
   switch (f) {
     case "progress": return IS_PROGRESS;
     case "finished": return IS_FINISHED;
+    case "punchlist": return IS_PUNCH;
     case "hover": return IS_HOVER;
-    case "client": return sql`not (${IS_PROGRESS}) and not (${IS_FINISHED}) and not (${IS_HOVER})`;
-    case "unstaged": return sql`not (${IS_PROGRESS}) and not (${IS_FINISHED})`;
+    case "client": return sql`not (${IS_PROGRESS}) and not (${IS_FINISHED}) and not (${IS_PUNCH}) and not (${IS_HOVER})`;
+    case "unstaged": return sql`not (${IS_PROGRESS}) and not (${IS_FINISHED}) and not (${IS_PUNCH})`;
     default: return null;
   }
 }
@@ -281,11 +286,12 @@ const FACETS = {
   all: sql<number>`count(*)::int`,
   progress: sql<number>`(count(*) filter (where ${IS_PROGRESS}))::int`,
   finished: sql<number>`(count(*) filter (where ${IS_FINISHED}))::int`,
+  punchlist: sql<number>`(count(*) filter (where ${IS_PUNCH}))::int`,
   client: sql<number>`(count(*) filter (where ${filterSql("client")}))::int`,
   hover: sql<number>`(count(*) filter (where ${IS_HOVER}))::int`,
   unstaged: sql<number>`(count(*) filter (where ${filterSql("unstaged")}))::int`,
 };
-const EMPTY_FACETS = { all: 0, progress: 0, finished: 0, client: 0, hover: 0, unstaged: 0 };
+const EMPTY_FACETS = { all: 0, progress: 0, finished: 0, punchlist: 0, client: 0, hover: 0, unstaged: 0 };
 
 /** The visible photos among `ids` (org, kind photo, then the attachment policy). Missing or hidden ids are dropped. */
 export async function visiblePhotos(ctx: OrgContext, ids: string[]): Promise<Attachment[]> {

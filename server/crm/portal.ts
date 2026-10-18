@@ -40,6 +40,7 @@ import { actorLabel, memberActor } from "@shared/crm-actor";
 import { emitCrmEvent, queueCrmEvent, queueProjectStageChange } from "./integrations";
 import { estimateDocText, invoiceDocText } from "./doc-defaults";
 import { recordActivity, logActivity } from "./activity";
+import { advanceJobStage } from "./job-stage-auto";
 import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER } from "./sms";
 import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
 import { notifyMembers } from "./notify";
@@ -519,6 +520,12 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       entityType: "estimate", entityId: est.id, customerId: est.customerId,
       meta: { number: est.number, to, emailed, texted, resend: !!est.sentAt },
     });
+    // A bid out the door moves the job to Bid Submitted on its own (never back; a client with no project gets one).
+    await advanceJobStage({
+      orgId: ctx.org.id, to: "bid_submitted", trigger: "estimate.sent",
+      actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email },
+      projectId: row.projectId, estimate: row, meta: { number: est.number },
+    });
 
     // Owner's "bid sent" notice — fires even when the client copy failed to
     // send (the estimate is marked sent either way; the link is live).
@@ -541,16 +548,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       totalCents: row.totalCents, to, resend: !!est.sentAt,
     });
 
-    if (est.projectId) {
-      const [proj] = await db.select({ status: crmProjects.status }).from(crmProjects)
-        .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, est.projectId))).limit(1).catch(() => []);
-      const moved = await db.update(crmProjects)
-        .set({ status: "proposal_sent", stageChangedAt: new Date(), updatedAt: new Date() })
-        .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, est.projectId)))
-        .returning({ id: crmProjects.id })
-        .catch(() => []);
-      if (proj && moved.length) queueProjectStageChange(ctx.org.id, est.projectId, proj.status, "proposal_sent");
-    }
+    // (The linked project moved to Bid Submitted above — forward only; a change order sent on a job under way no
+    // longer knocks it back to Proposal Sent.)
 
     res.json({ estimate: presentEstimate(row, ctx), link, emailed, emailError, texted, smsTo, smsError });
   });
@@ -820,16 +819,22 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         : { reason: row.declineReason }),
     });
 
-    if (est.projectId) {
+    if (approve) {
+      // The signature moves the job to Approved on its own (never back from a later stage; a client with no
+      // project gets one from this estimate) and starts the "call to schedule the start date" reminder.
+      await advanceJobStage({
+        orgId: est.orgId, to: "approved", trigger: "estimate.approved", actor: { label: "client" },
+        projectId: est.projectId, estimate: row, contractValueCents: approval?.totals.totalCents ?? est.totalCents,
+        meta: { number: est.number, signatureName: row.signatureName },
+      });
+    } else if (est.projectId) {
       const [proj] = await db.select({ status: crmProjects.status }).from(crmProjects)
         .where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId))).limit(1).catch(() => []);
       const moved = await db.update(crmProjects).set({
-        status: approve ? "approved" : "estimating",
-        contractValueCents: approve ? (approval?.totals.totalCents ?? est.totalCents) : undefined,
-        stageChangedAt: new Date(), updatedAt: new Date(),
+        status: "estimating", stageChangedAt: new Date(), updatedAt: new Date(),
       } as any).where(and(eq(crmProjects.orgId, est.orgId), eq(crmProjects.id, est.projectId)))
         .returning({ id: crmProjects.id }).catch(() => []);
-      if (proj && moved.length) queueProjectStageChange(est.orgId, est.projectId, proj.status, approve ? "approved" : "estimating");
+      if (proj && moved.length) queueProjectStageChange(est.orgId, est.projectId, proj.status, "estimating");
     }
 
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
@@ -1854,6 +1859,12 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     logActivity(ctx, "invoice.sent", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
       meta: { number: inv.number, to, emailed, resend: !!inv.sentAt },
+    });
+    // An invoice out means the work is under way: the job moves to In progress if it was still before that.
+    await advanceJobStage({
+      orgId: ctx.org.id, to: "in_progress", trigger: "invoice.sent",
+      actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email },
+      projectId: inv.projectId, customerId: inv.customerId, meta: { number: inv.number },
     });
     res.json({ invoice: row, link, emailed, emailError });
   });

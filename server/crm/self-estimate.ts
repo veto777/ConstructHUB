@@ -612,8 +612,10 @@ async function presentTasks(ctx: OrgContext, rows: (typeof crmTasks.$inferSelect
   const mName = new Map(members.map((m) => [m.id, m.name || m.email]));
   return rows.map((t) => ({
     id: t.id, title: t.title,
-    // Rendered per seat from structured fields — amounts only with "See prices".
-    body: taskBodyText(t.meta, ctx.permissions.seePrices),
+    // A price request renders per seat from structured fields — amounts only with "See prices"; any other task
+    // (the schedule-the-start reminder) stored its text as written.
+    body: t.source === "self_estimate_request" ? taskBodyText(t.meta, ctx.permissions.seePrices) : (t.body ?? ""),
+    projectId: typeof (t.meta as any)?.projectId === "string" ? (t.meta as any).projectId : null,
     source: t.source,
     customerId: t.customerId, customerName: t.customerId ? cName.get(t.customerId) ?? null : null,
     estimateId: t.estimateId, relatedEstimateId: t.relatedEstimateId,

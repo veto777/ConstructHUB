@@ -26,12 +26,19 @@ import { crmActivityLog, crmAttachments, crmCustomers, crmMembers, type CrmActiv
 import { and, desc, eq } from "drizzle-orm";
 import { loadActorDirectory, type ActorDirectory } from "./actors";
 import { actorLabel, type CrmActor } from "@shared/crm-actor";
+import { jobStageLabel } from "@shared/job-stage";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import {
   CRM_PERMISSION_LABELS, CRM_MEMBER_FIELD_LABELS, CRM_CUSTOMER_FIELD_LABELS, crmFieldLabel,
 } from "@shared/crm-access";
 
 type GetUser = (req: any, res: any) => any;
+
+/** What moved a job on its own (server/crm/job-stage-auto.ts), as words. */
+const STAGE_TRIGGERS: Record<string, string> = {
+  "estimate.sent": "the bid was sent", "estimate.approved": "the bid was approved", appointment: "a visit went on the calendar",
+  "invoice.sent": "an invoice was sent", punchlist: "every walkthrough was completed",
+};
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -106,6 +113,7 @@ export function logActivity(
 function photoNoun(m: Record<string, any>): string {
   if (m.stage === "progress") return "a project photo (in progress)";
   if (m.stage === "finished") return "a project photo (finished)";
+  if (m.stage === "punchlist") return "a punch-list photo";
   return "a photo";
 }
 
@@ -209,6 +217,7 @@ export function activityText(row: {
       case "self_estimate.requested":
         return `asked for a price online${Array.isArray(m.trades) && m.trades.length ? ` (${m.trades.join(" + ")})` : ""}${m.lowCents != null && m.highCents != null ? ` — ballpark ${money(m.lowCents)}–${money(m.highCents)}` : ""}${m.number ? ` — draft estimate ${m.number} created` : ""}`;
       case "self_estimate.settings_updated": return `updated the client self-estimate prices${m.division ? ` (${m.division === "org" ? "no division" : "a division"})` : ""}`;
+      case "project.stage_auto": return `${m.created ? "created" : "moved"} ${m.name ? `${String(m.name).slice(0, 120)}` : "the job"}${m.created ? " at" : " to"} ${jobStageLabel(m.stage) ?? m.to ?? "a new stage"} automatically (${STAGE_TRIGGERS[String(m.trigger)] ?? String(m.trigger ?? "system")})`;
       case "task.done": return `marked a task done${m.title ? `: ${String(m.title).slice(0, 120)}` : ""}`;
       case "task.reopened": return `reopened a task${m.title ? `: ${String(m.title).slice(0, 120)}` : ""}`;
       case "payment.recorded":

@@ -621,18 +621,24 @@ export default function CrmClientPage() {
   const [apptStart, setApptStart] = useState("");
   const [apptEnd, setApptEnd] = useState("");
   const [apptNotes, setApptNotes] = useState("");
+  // The project the visit is for (the Job stage card books the start date against the current project).
+  const [apptProjectId, setApptProjectId] = useState<string | null>(null);
   const scheduleAppt = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", "/api/crm/appointments", {
         customerId: id,
+        projectId: apptProjectId,
         title: apptTitle.trim(),
         startsAt: new Date(apptStart).toISOString(),
         endsAt: apptEnd ? new Date(apptEnd).toISOString() : null,
         notes: apptNotes.trim() || null,
       })).json(),
     onSuccess: (r: any) => {
-      setApptOpen(false); setApptTitle(""); setApptStart(""); setApptEnd(""); setApptNotes("");
+      setApptOpen(false); setApptTitle(""); setApptStart(""); setApptEnd(""); setApptNotes(""); setApptProjectId(null);
       refresh();
+      // The visit moves the job to Job Scheduled on its own (server/crm/job-stage-auto.ts) — show it.
+      queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/attention"] });
       const clash = r?.conflicts?.length ? ` Heads up: overlaps ${r.conflicts.length} other visit(s).` : "";
       toast({ title: "Appointment scheduled", description: `It's on the calendar.${clash}` });
     },
@@ -1012,10 +1018,11 @@ export default function CrmClientPage() {
     created: (e: any) => e.createdAt,
   });
 
-  // One prefill for both Schedule buttons.
-  const openSchedule = () => {
+  // One prefill for both Schedule buttons; the Job stage card passes the project (a start date, not a site visit).
+  const openSchedule = (projectId?: string | null) => {
     const { start, end } = nextVisitSlot();
-    setApptTitle(`${c.displayName} — site visit`);
+    setApptProjectId(projectId ?? null);
+    setApptTitle(projectId ? `${c.displayName} — project start` : `${c.displayName} — site visit`);
     setApptStart(toLocalInput(start));
     setApptEnd(toLocalInput(end));
     setApptOpen(true);
@@ -1248,13 +1255,16 @@ export default function CrmClientPage() {
         </CardContent>
       </Card>
 
-      {/* Where this client's job stands: Bid → Approved → In progress → Completed (shared/job-stage.ts). */}
+      {/* Where this client's job stands: Bid → Bid Submitted → Approved → Job Scheduled → In progress → Closed out
+          (shared/job-stage.ts), with the start-date reminder, the scheduled visit and the punch list & walkthrough. */}
       <Card>
         <CardContent className="p-4 sm:p-5">
           <p className="mb-3 text-sm font-bold">Job stage</p>
-          <JobStageControl customer={c} estimates={estimates} projects={data.projects ?? []}
+          <JobStageControl customer={c} estimates={estimates} projects={data.projects ?? []} appointments={appointments}
             companyName={me?.org?.name ?? "us"} canEdit={canManageJobs} measured={!!stageTakeoff?.takeoffs?.length || !!stageTakeoff?.takeoff}
-            canSeePrices={canSeePrices} canAttach={canManageCustomers} />
+            canSeePrices={canSeePrices} canAttach={canManageCustomers}
+            celebrations={(me?.org?.customFields as any)?.celebrations !== false}
+            onSchedule={canManageJobs ? openSchedule : undefined} />
         </CardContent>
       </Card>
 
@@ -1266,7 +1276,7 @@ export default function CrmClientPage() {
             <span className="text-sm font-medium text-muted-foreground mr-1">Quick actions</span>
             {canManageJobs && (
               <Button size="sm" variant="outline" data-testid="button-schedule-appointment"
-                onClick={openSchedule}>
+                onClick={() => openSchedule()}>
                 <Calendar className="h-4 w-4 mr-2" /> Schedule appointment
               </Button>
             )}
@@ -1389,7 +1399,7 @@ export default function CrmClientPage() {
           />
           {canManageJobs && (
             <Button size="sm" variant="outline" data-testid="button-schedule-appointment-section"
-              onClick={openSchedule}>
+              onClick={() => openSchedule()}>
               <Calendar className="h-4 w-4 mr-2" /> Schedule appointment
             </Button>
           )}
@@ -2022,7 +2032,7 @@ export default function CrmClientPage() {
         <DialogContent data-testid="dialog-schedule-appointment">
           <DialogHeader>
             <DialogTitle>Schedule — {c.displayName}</DialogTitle>
-            <DialogDescription>Put a visit with this client on the calendar.</DialogDescription>
+            <DialogDescription>{apptProjectId ? "Put the project start on the calendar — the job moves to Job Scheduled on its own." : "Put a visit with this client on the calendar."}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>

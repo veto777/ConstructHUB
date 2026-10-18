@@ -22,6 +22,7 @@ import { and, asc, desc, eq, gte, lt, lte, inArray, ne } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { logTeamActivity } from "./stats";
 import { queueCrmEvent } from "./integrations";
+import { advanceJobStage, completeScheduleStartTask } from "./job-stage-auto";
 import { divisionScopeOf, appointmentDivisionVisible, divisionMapsForOrg } from "./divisions";
 
 type GetUser = (req: any, res: any) => any;
@@ -290,8 +291,25 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
       link: row.projectId ? `/crm/projects/${row.projectId}` : "/crm/schedule",
     });
     queueCrmEvent(ctx.org.id, "appointment.scheduled", appointmentEventPayload(row));
+    await jobOnCalendar(ctx, row);
     res.status(201).json({ appointment: row, conflicts });
   });
+
+  /**
+   * A visit for a project (or for a client whose current project is Approved) puts the job at Job Scheduled on its
+   * own and closes the "call to schedule the start date" reminder — never backward, never a canceled visit.
+   */
+  async function jobOnCalendar(ctx: OrgContext, row: typeof crmAppointments.$inferSelect): Promise<void> {
+    if (row.status === "canceled" || (!row.projectId && !row.customerId)) return;
+    const r = await advanceJobStage({
+      orgId: ctx.org.id, to: "job_scheduled", trigger: "appointment",
+      actor: { memberId: ctx.member.id, label: ctx.member.displayName || ctx.member.email },
+      projectId: row.projectId, customerId: row.customerId,
+      meta: { appointmentId: row.id, title: row.title, startsAt: row.startsAt },
+    });
+    // The job was already past Approved (or the visit was re-linked): the reminder is still done.
+    if (r.project) await completeScheduleStartTask(ctx.org.id, r.project.id).catch(() => false);
+  }
 
   app.patch("/api/crm/appointments/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
@@ -357,6 +375,10 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
     // Only the move INTO complete — re-saving a finished visit is not a second completion.
     if (row && row.status === "complete" && appt.status !== "complete") {
       queueCrmEvent(ctx.org.id, "appointment.completed", appointmentEventPayload(row));
+    }
+    // Linked to a project / client, rescheduled or un-canceled: the job is on the calendar.
+    if (row && (parsed.data.projectId || parsed.data.customerId || parsed.data.startsAt || (parsed.data.status && parsed.data.status !== "canceled"))) {
+      await jobOnCalendar(ctx, row);
     }
     res.json(row);
   });

@@ -147,8 +147,9 @@ export function commentTimelineText(
 }
 
 /** The stage tag the CRM upload route stores in front of the name. */
-export function photoStage(fileName: string): "progress" | "finished" | null {
-  return fileName.startsWith("progress--") ? "progress" : fileName.startsWith("finished--") ? "finished" : null;
+export function photoStage(fileName: string): "progress" | "finished" | "punchlist" | null {
+  return fileName.startsWith("progress--") ? "progress" : fileName.startsWith("finished--") ? "finished"
+    : fileName.startsWith("punchlist--") ? "punchlist" : null;
 }
 
 /**
