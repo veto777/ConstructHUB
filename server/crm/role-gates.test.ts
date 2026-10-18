@@ -333,6 +333,14 @@ const ROUTES: RouteRow[] = [
   R("POST", "/api/crm/estimates/:id/remind", "manageEstimates", { path: (t) => `/api/crm/estimates/${t.estimate}/remind`, effect: true, scoped: true }),
   R("POST", "/api/crm/estimates/:id/invoice", { all: ["manageInvoices", "seePrices"] }, { path: (t) => `/api/crm/estimates/${t.estimate}/invoice`, effect: true, scoped: true }),
   R("POST", "/api/crm/estimates/:id/payment-link", { all: ["takePayment", "seePrices"] }, { path: (t) => `/api/crm/estimates/${t.estimate}/payment-link`, effect: true, scoped: true }),
+  // Dead lead: sales or customer managers mark it; a colleague's client is 404 for a scoped seat.
+  R("POST", "/api/crm/customers/:id/dead-lead", { any: ["manageCustomers", "manageEstimates"] }, { path: (t) => `/api/crm/customers/${t.customer}/dead-lead`, body: { dead: true, reason: "test" }, scoped: true }),
+  // Off-platform deposit recorded against the signed estimate (server/crm/payment-reconcile.ts).
+  R("POST", "/api/crm/estimates/:id/payments", { all: ["takePayment", "seePrices"] }, { path: (t) => `/api/crm/estimates/${t.estimate}/payments`, body: {}, scoped: true }),
+  // Reconciliation prompts: every member reads their own; answering one is 404 unless it is theirs or visible to a payment seat.
+  R("GET", "/api/crm/reconcile/due", null),
+  R("GET", "/api/crm/reconcile/open", null),
+  R("POST", "/api/crm/reconcile/:id/answer", null, { body: { action: "not_yet" } }),
   R("POST", "/api/crm/quick-bid", "manageEstimates", { body: {} }),
   R("GET", "/api/crm/measurements", null),
   R("POST", "/api/crm/measurements", "manageEstimates", { body: { provider: 1 } }),

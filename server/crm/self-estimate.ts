@@ -769,6 +769,9 @@ export function registerCrmSelfEstimateRoutes(app: Express, getDevUser: GetUser)
     const [t] = await db.select().from(crmTasks)
       .where(and(eq(crmTasks.orgId, ctx.org.id), eq(crmTasks.id, String(req.params.id)))).limit(1);
     if (!t || !(await taskVisible(ctx, t))) return res.status(404).json({ message: "Task not found" });
+    if (t.source === "payment_reconcile") {
+      return res.status(409).json({ message: "Answer this from the payment prompt — record the payment, or say why nothing was due." });
+    }
     const [row] = await db.update(crmTasks).set(p.data.done
       ? { doneAt: new Date(), doneByMemberId: ctx.member.id }
       : { doneAt: null, doneByMemberId: null })

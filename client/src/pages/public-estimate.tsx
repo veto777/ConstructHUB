@@ -20,6 +20,7 @@ import { EstimateAttachments } from "@/components/client-uploads";
 import { orgThemeStyle } from "@/lib/org-theme";
 import { Home3DCard } from "@/components/hover-3d-card";
 import { SelfEstimatePrompts, estimateTransport } from "@/components/self-estimate";
+import { CardFeeConfirm } from "@/components/card-fee-confirm";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -82,15 +83,22 @@ function PayCard({ token, company, estimate, payInfo }: {
   const { toast } = useToast();
   // ?paid=1 is only the Stripe redirect hint — "Paid" comes from the server.
   const returned = new URLSearchParams(window.location.search).get("paid");
+  // The card-fee pop-up: a card checkout is created only from its Continue button.
+  const [feeConfirm, setFeeConfirm] = useState(false);
   const pay = useMutation({
-    mutationFn: async () => {
-      const r = await fetch(`/api/public/estimates/${token}/pay`, { method: "POST" });
+    mutationFn: async (method?: "card" | "ach") => {
+      const r = await fetch(`/api/public/estimates/${token}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(method ? { method } : {}),
+      });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.message || "Could not start payment");
       return j;
     },
     onSuccess: (j: any) => { if (j.url) window.location.href = j.url; },
-    onError: (e: any) => toast({ title: "Payment unavailable", description: String(e.message ?? e), variant: "destructive" }),
+    // The fee pop-up closes on a failure so the reason is readable and the client can try again.
+    onError: (e: any) => { setFeeConfirm(false); toast({ title: "Payment unavailable", description: String(e.message ?? e), variant: "destructive" }); },
   });
 
   if (estimate.paid) {
@@ -164,8 +172,50 @@ function PayCard({ token, company, estimate, payInfo }: {
               </a>
             )}
           </div>
+        ) : payInfo?.cardFee && (payInfo.achAvailable || payInfo.cardAvailable) ? (
+          <div className="space-y-3">
+            {/* The fee is stated BEFORE the client chooses a rail, and again in the pop-up. */}
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1" data-testid="text-card-fee-notice">
+              {payInfo.achAvailable && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Bank transfer (ACH)</span>
+                  <span className="font-medium tabular-nums">{money(amount)} — no fee</span>
+                </div>
+              )}
+              {payInfo.cardAvailable && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">
+                    Card (includes {money(payInfo.cardFee.feeCents)} card processing fee, {(payInfo.cardFee.bps / 100).toFixed(2)}%)
+                  </span>
+                  <span className="font-medium tabular-nums">{money(payInfo.cardFee.totalCents)}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {payInfo.achAvailable && (
+                <Button size="lg" variant="outline" onClick={() => pay.mutate("ach")} disabled={pay.isPending}
+                  data-testid="button-pay-ach">
+                  {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Pay {money(amount)} by bank
+                </Button>
+              )}
+              {payInfo.cardAvailable && (
+                <Button size="lg" onClick={() => setFeeConfirm(true)} disabled={pay.isPending} data-testid="button-pay-card">
+                  {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Pay {money(payInfo.cardFee.totalCents)} by card
+                </Button>
+              )}
+            </div>
+            <CardFeeConfirm
+              open={feeConfirm} onOpenChange={setFeeConfirm}
+              amountCents={amount} quote={payInfo.cardFee} achAvailable={!!payInfo.achAvailable}
+              pending={pay.isPending} companyName={company.name}
+              onCard={() => pay.mutate("card")}
+              onBank={() => { setFeeConfirm(false); pay.mutate("ach"); }}
+            />
+          </div>
         ) : (
-          <Button size="lg" className="w-full sm:w-auto" onClick={() => pay.mutate()} disabled={pay.isPending} data-testid="button-pay">
+          <Button size="lg" className="w-full sm:w-auto" onClick={() => pay.mutate(undefined)} disabled={pay.isPending} data-testid="button-pay">
             {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Pay {money(amount)}
           </Button>

@@ -28,6 +28,7 @@ import { CRM_PERMISSION_LABELS } from "@shared/crm-access";
 import { registerCrmEntityRoutes } from "./entities";
 import { registerCrmPortalRoutes, registerCrmInvoicePortalRoutes } from "./portal";
 import { registerCrmPaymentRoutes } from "./payments";
+import { registerCrmReconcileRoutes, startReconcileWorker } from "./payment-reconcile";
 import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
 import { registerCrmIntegrationRoutes } from "./integrations";
 import { registerCrmLeadCaptureRoutes } from "./lead-capture";
@@ -390,6 +391,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmPortalRoutes(app, getDevUser);
   registerCrmInvoicePortalRoutes(app, getDevUser);
   registerCrmPaymentRoutes(app, getDevUser);
+  // Off-platform payments: the reconciliation prompt series, its answers, and recording a deposit by check/cash/wire.
+  registerCrmReconcileRoutes(app, getDevUser);
+  startReconcileWorker();
   registerCrmOpsRoutes(app, getDevUser);
   registerCrmPhaseRoutes(app, getDevUser);
   registerCrmIntegrationRoutes(app);

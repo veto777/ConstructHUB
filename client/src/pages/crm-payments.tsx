@@ -22,6 +22,7 @@ import {
 import { lazySample, showSample } from "@/components/sample-preview";
 const SamplePaymentsList = lazySample(() => import("@/components/crm-sample-previews"), "SamplePaymentsList");
 import { TakePaymentDialog } from "@/components/crm-take-payment";
+import { ReconcileDialog, type ReconcilePromptRow } from "@/components/reconcile-prompt";
 import { AdminSetupNote } from "@/hooks/use-platform-admin";
 import { SortButtons, useTableSort, type SortColumn } from "@/components/sortable-th";
 
@@ -159,6 +160,10 @@ export default function CrmPaymentsPage() {
     queryKey: [`/api/crm/payments?customerId=${takeClientId}`],
     enabled: canTakePayment && canSeePrices && !!takeClientId, retry: false,
   });
+
+  // ── Needs reconciling: open "how was the deposit / final payment received?" series ──
+  const { data: reconcile } = useQuery<{ open: ReconcilePromptRow[] }>({ queryKey: ["/api/crm/reconcile/open"], enabled: canTakePayment, retry: false });
+  const [reconcileFor, setReconcileFor] = useState<ReconcilePromptRow | null>(null);
 
   // ── Owner: reverse a mistyped manual payment ──────────────────────────────
   const [reverseFor, setReverseFor] = useState<any | null>(null);
@@ -373,6 +378,7 @@ export default function CrmPaymentsPage() {
 
       {takeClient && (
         <TakePaymentDialog
+          customerId={takeClient.id}
           customerName={takeClient.displayName}
           invoices={takeInvoices}
           estimates={takeEstimates}
@@ -416,6 +422,38 @@ export default function CrmPaymentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {canTakePayment && (reconcile?.open?.length ?? 0) > 0 && (
+        <Card className="border-amber-500/40" data-testid="card-reconcile">
+          <CardHeader>
+            <SectionTitle
+              icon={AlertTriangle}
+              title="Needs reconciling"
+              description="Approved or closed-out jobs with no payment on file. Record how the money came in (check, cash, wire, card) or mark that nothing was due."
+            />
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {reconcile!.open.map((r) => (
+              <div key={r.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2" data-testid={`reconcile-${r.id}`}>
+                <div className="min-w-0">
+                  <div className="font-medium">{r.customerName} — {r.kind === "deposit" ? "deposit" : "final payment"}{r.expectedCents != null ? ` of ${money(r.expectedCents)}` : ""}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {r.projectName ?? "Job"} · {r.kind === "deposit" ? "approved" : "closed out"} {r.daysSince === 0 ? "today" : `${r.daysSince} day${r.daysSince === 1 ? "" : "s"} ago`}
+                    {r.sentDays.length ? ` · reminded day ${r.sentDays.join(", ")}` : ""}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Link href={`/crm/clients/${r.customerId}`}><Button size="sm" variant="ghost">Client</Button></Link>
+                  <Button size="sm" onClick={() => setReconcileFor(r)} data-testid={`button-reconcile-${r.id}`}>Reconcile</Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      {reconcileFor && (
+        <ReconcileDialog key={reconcileFor.id} prompt={reconcileFor} open onOpenChange={(o) => { if (!o) setReconcileFor(null); }} />
+      )}
 
       <Card>
         <CardHeader>

@@ -550,6 +550,13 @@ export default function CrmSettingsPage() {
   });
   const [finLinks, setFinLinks] = useState<{ label: string; url: string; primary?: boolean }[]>([]);
   const [newLink, setNewLink] = useState({ label: "", url: "" });
+  // Reconciliation prompts + receipts (shared/payment-settings.ts), seeded from the same settings call.
+  const [recForm, setRecForm] = useState({
+    enabled: true, approvalDays: "1, 3, 5", closeoutDays: "1, 3, 5",
+    photo: "optional" as "off" | "optional" | "required", notify: "pm_sales" as "pm" | "pm_sales" | "owners",
+    email: true, sms: false,
+  });
+  const [rcptForm, setRcptForm] = useState({ email: true, sms: false });
   useEffect(() => {
     if (!paySettings) return;
     setFeeForm({
@@ -560,6 +567,17 @@ export default function CrmSettingsPage() {
       achOnlyOver: paySettings.payments?.achOnlyOverCents ? String(paySettings.payments.achOnlyOverCents / 100) : "",
     });
     setFinLinks(paySettings.financingLinks ?? []);
+    if (paySettings.reconcile) {
+      const r = paySettings.reconcile;
+      setRecForm({
+        enabled: r.enabled !== false,
+        approvalDays: (r.approvalDays ?? [1, 3, 5]).join(", "),
+        closeoutDays: (r.closeoutDays ?? [1, 3, 5]).join(", "),
+        photo: r.photo ?? "optional", notify: r.notify ?? "pm_sales",
+        email: r.channels?.email !== false, sms: r.channels?.sms === true,
+      });
+    }
+    if (paySettings.receipts) setRcptForm({ email: paySettings.receipts.email !== false, sms: paySettings.receipts.sms === true });
   }, [paySettings]);
 
   const savePaySettings = useMutation({
@@ -1581,7 +1599,14 @@ export default function CrmSettingsPage() {
               <div>
                 <div className="text-sm font-medium">Pass the card processing fee to the client</div>
                 <p className="text-xs text-muted-foreground">
-                  Card checkouts add a clearly-labelled "Card processing fee" line. Bank transfer (ACH) is always fee-free.
+                  Off = you absorb the fee yourself (some contractors waive it to win more work). On = the client pays it on card checkouts.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Before any card checkout starts, the client sees the rate and the dollar amount in a pop-up with the
+                  no-fee bank option beside it; the fee rides on the Stripe receipt as its own "Card processing fee"
+                  line. Applies to invoices, deposits and the links you make from Take a payment. Bank transfer (ACH)
+                  is always fee-free. Card-network rules cap a pass-through at your actual cost (3% for Visa) and a few
+                  states restrict it — check yours.
                 </p>
               </div>
               <Switch
@@ -1615,6 +1640,96 @@ export default function CrmSettingsPage() {
                 </Button>
               </div>
             )}
+          </div>
+
+          {/* Reconciliation prompts — off-platform money gets asked about on a schedule. */}
+          <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-reconcile">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-medium">Payment reconciliation prompts</div>
+                <p className="text-xs text-muted-foreground">
+                  After a job is approved, and again after it is closed out, the PM / staff get a pop-up asking how the deposit
+                  (or final payment) was received until it is recorded or marked "nothing was due". Online payments clear it on
+                  their own; a check, cash or wire needs the payment type entered.
+                </p>
+              </div>
+              <Switch checked={recForm.enabled} onCheckedChange={(v) => setRecForm((f) => ({ ...f, enabled: v }))}
+                aria-label="Payment reconciliation prompts" data-testid="switch-reconcile" />
+            </div>
+            {recForm.enabled && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="rec-approval-days">Days after approval (deposit)</Label>
+                  <Input id="rec-approval-days" value={recForm.approvalDays} placeholder="1, 3, 5" data-testid="input-reconcile-approval-days"
+                    onChange={(e) => setRecForm((f) => ({ ...f, approvalDays: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="rec-closeout-days">Days after close-out (final payment)</Label>
+                  <Input id="rec-closeout-days" value={recForm.closeoutDays} placeholder="1, 3, 5" data-testid="input-reconcile-closeout-days"
+                    onChange={(e) => setRecForm((f) => ({ ...f, closeoutDays: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="rec-notify">Who is asked</Label>
+                  <Select value={recForm.notify} onValueChange={(v) => setRecForm((f) => ({ ...f, notify: v as typeof f.notify }))}>
+                    <SelectTrigger id="rec-notify" data-testid="select-reconcile-notify"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pm">The project manager (else sales, else the owner)</SelectItem>
+                      <SelectItem value="pm_sales">The project manager and the sales rep</SelectItem>
+                      <SelectItem value="owners">The project manager and every owner</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="rec-photo">Photo or copy of the check</Label>
+                  <Select value={recForm.photo} onValueChange={(v) => setRecForm((f) => ({ ...f, photo: v as typeof f.photo }))}>
+                    <SelectTrigger id="rec-photo" data-testid="select-reconcile-photo"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="optional">Ask for one (optional)</SelectItem>
+                      <SelectItem value="required">Require one for check and cash</SelectItem>
+                      <SelectItem value="off">Don't ask</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="sm:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                  <span className="text-muted-foreground">Besides the in-app pop-up, also send:</span>
+                  <label className="flex items-center gap-2"><Switch checked={recForm.email} onCheckedChange={(v) => setRecForm((f) => ({ ...f, email: v }))} aria-label="Email the reminder" data-testid="switch-reconcile-email" /> Email</label>
+                  <label className="flex items-center gap-2"><Switch checked={recForm.sms} onCheckedChange={(v) => setRecForm((f) => ({ ...f, sms: v }))} aria-label="Text the reminder" data-testid="switch-reconcile-sms" /> Text message</label>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button size="sm" disabled={savePaySettings.isPending} data-testid="button-save-reconcile"
+                onClick={() => savePaySettings.mutate({ reconcile: {
+                  enabled: recForm.enabled, approvalDays: recForm.approvalDays, closeoutDays: recForm.closeoutDays,
+                  photo: recForm.photo, notify: recForm.notify, channels: { email: recForm.email, sms: recForm.sms },
+                } })}>
+                {savePaySettings.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save reconciliation prompts
+              </Button>
+            </div>
+          </div>
+
+          {/* Receipts — what the client gets automatically after any payment. */}
+          <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-receipts">
+            <div>
+              <div className="text-sm font-medium">Automatic receipts</div>
+              <p className="text-xs text-muted-foreground">
+                After any payment — online, or recorded by hand — the client gets a receipt. Email is on by default; add a text
+                message, or turn both off to disable automatic receipts (you can still send one from an invoice).
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              <label className="flex items-center gap-2"><Switch checked={rcptForm.email} onCheckedChange={(v) => setRcptForm((f) => ({ ...f, email: v }))} aria-label="Email receipts" data-testid="switch-receipt-email" /> Email receipt</label>
+              <label className="flex items-center gap-2"><Switch checked={rcptForm.sms} onCheckedChange={(v) => setRcptForm((f) => ({ ...f, sms: v }))} aria-label="Text receipts" data-testid="switch-receipt-sms" /> Text receipt to their cell phone</label>
+              {!rcptForm.email && !rcptForm.sms && <span className="text-xs text-amber-700 dark:text-amber-400" data-testid="text-receipts-off">Automatic receipts are disabled.</span>}
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" disabled={savePaySettings.isPending} data-testid="button-save-receipts"
+                onClick={() => savePaySettings.mutate({ receipts: { email: rcptForm.email, sms: rcptForm.sms } })}>
+                {savePaySettings.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save receipts
+              </Button>
+            </div>
           </div>
 
           {/* Financing links — the primary one shows on estimates & invoices. */}

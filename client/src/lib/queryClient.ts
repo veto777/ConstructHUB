@@ -23,11 +23,13 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  /** Extra request headers — e.g. an Idempotency-Key on a payment write (server/crm/payment-guard.ts). */
+  extra?: { headers?: Record<string, string> },
 ): Promise<Response> {
   // /api/crm/* carries the division workspace header (lib/division-workspace.ts).
   let res = await fetch(url, withDivisionHeader(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: { ...(data ? { "Content-Type": "application/json" } : {}), ...(extra?.headers ?? {}) },
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   }));

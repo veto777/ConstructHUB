@@ -10,6 +10,8 @@ import { PrintLockdown } from "@/components/print-lockdown";
 import { DocGateChallenge } from "@/components/doc-gate";
 import { orgThemeStyle } from "@/lib/org-theme";
 import { apiErrorMessage } from "@/lib/queryClient";
+import { CardFeeConfirm } from "@/components/card-fee-confirm";
+import { useState } from "react";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -43,6 +45,9 @@ export default function PublicInvoicePage() {
   // never for a contractor preview (that's not client behaviour).
   useEngagementTracker("invoice", token, !!data && !preview);
 
+  // The card-fee pop-up: open only while the payer decides; a card checkout
+  // is created from its Continue button, never from the card button directly.
+  const [feeConfirm, setFeeConfirm] = useState(false);
   const pay = useMutation({
     mutationFn: async (method?: "card" | "ach") => {
       const r = await fetch(`/api/public/invoices/${token}/pay`, {
@@ -55,7 +60,8 @@ export default function PublicInvoicePage() {
       return j;
     },
     onSuccess: (j: any) => { if (j.url) window.location.href = j.url; },
-    onError: (e: any) => toast({ title: "Payment unavailable", description: String(e.message ?? e), variant: "destructive" }),
+    // The fee pop-up closes on a failure so the reason is readable and the client can try again.
+    onError: (e: any) => { setFeeConfirm(false); toast({ title: "Payment unavailable", description: String(e.message ?? e), variant: "destructive" }); },
   });
 
   if (isLoading) return <div className="flex justify-center p-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -357,13 +363,20 @@ export default function PublicInvoicePage() {
                       </Button>
                     )}
                     {payInfo.cardAvailable && (
-                      <Button size="lg" onClick={() => pay.mutate("card")} disabled={pay.isPending}
+                      <Button size="lg" onClick={() => setFeeConfirm(true)} disabled={pay.isPending}
                         data-testid="button-pay-invoice-card">
                         {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                         Pay {money(payInfo.cardFee.totalCents)} by card
                       </Button>
                     )}
                   </div>
+                  <CardFeeConfirm
+                    open={feeConfirm} onOpenChange={setFeeConfirm}
+                    amountCents={payInfo.dueCents} quote={payInfo.cardFee} achAvailable={!!payInfo.achAvailable}
+                    pending={pay.isPending} companyName={company.name}
+                    onCard={() => pay.mutate("card")}
+                    onBank={() => { setFeeConfirm(false); pay.mutate("ach"); }}
+                  />
                 </>
               ) : (
                 <Button size="lg" className="w-full sm:w-auto" onClick={() => pay.mutate(undefined)} disabled={pay.isPending} data-testid="button-pay-invoice">

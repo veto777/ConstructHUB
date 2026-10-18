@@ -19,6 +19,7 @@ import { CrmSidebar } from "@/components/crm-sidebar";
 import { CrmFrame, CrmToolLayout } from "@/components/crm-tool/layout";
 import { CrmPaywall } from "@/components/crm-plans";
 import { CrmRibbon } from "@/components/crm-ribbon";
+import { ReconcilePrompts } from "@/components/reconcile-prompt";
 import { CrmAccessGate } from "@/components/crm-access";
 import { AppTabBar } from "@/components/app-tabbar";
 import { inNativeApp } from "@/lib/app-shell";
@@ -642,6 +643,8 @@ function PortalRouter() {
     <Suspense fallback={<PageLoading />}>
     {/* A page the seat's permissions don't cover shows "ask your admin" (shared/crm-access.ts). */}
     <CrmAccessGate>
+    {/* "How was the deposit / final payment received?" — due prompts pop up on any CRM page (payment-reconcile.ts). */}
+    <ReconcilePrompts />
     <Switch>
       <Route path="/" component={CrmHomePage} />
       <Route path="/crm" component={CrmHomePage} />

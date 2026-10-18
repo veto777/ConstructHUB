@@ -444,8 +444,8 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     if (!ctx) return;
 
     const kind = String(req.body?.kind || "");
-    if (kind !== "pamphlet" && kind !== "estimate" && kind !== "contract" && kind !== "photo" && kind !== ESTIMATE_DEFAULT_KIND) {
-      return res.status(400).json({ message: "kind must be pamphlet, estimate, contract, estimate_default or photo" });
+    if (kind !== "pamphlet" && kind !== "estimate" && kind !== "contract" && kind !== "photo" && kind !== ESTIMATE_DEFAULT_KIND && kind !== "payment_proof") {
+      return res.status(400).json({ message: "kind must be pamphlet, estimate, contract, estimate_default, photo or payment_proof" });
     }
     // Project photos are field work — a PM (manageJobs) uploads them without
     // needing customer-management rights. Everything else stays manageCustomers.
@@ -453,10 +453,14 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       if (!ctx.permissions.manageJobs && !ctx.permissions.manageCustomers) {
         return res.status(403).json({ message: "Requires permission: manageJobs" });
       }
+    } else if (kind === "payment_proof") {
+      // A photo / copy of a check behind a recorded payment: whoever takes payments files it. It is NOT a job
+      // photo — it never joins the photo library, the client portal or a review request.
+      if (!requirePermission(res, ctx, "takePayment")) return;
     } else if (!requirePermission(res, ctx, "manageCustomers")) return;
 
     let refId: string | null = null;
-    if (kind === "photo") {
+    if (kind === "photo" || kind === "payment_proof") {
       // Project photo onto a CLIENT's page: refId = customer id — the same
       // shelf as client-shared and HOVER photos, so every photo of the job
       // lives together (and the client sees progress in their portal too).
@@ -482,7 +486,7 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
     const file = req.file as Express.Multer.File | undefined;
     if (!file) return res.status(400).json({ message: "No file uploaded" });
 
-    const values = await storeFile(file, kind === "photo" ? PHOTO_MIMES : DOC_MIMES, ctx.org.id, kind, refId);
+    const values = await storeFile(file, kind === "photo" ? PHOTO_MIMES : kind === "payment_proof" ? { ...DOC_MIMES, ...PHOTO_MIMES } : DOC_MIMES, ctx.org.id, kind, refId);
     if (!values) {
       return res.status(415).json({
         message: kind === "photo" ? "JPEG, PNG or HEIC photos only" : "PDF or image files only",
@@ -526,7 +530,7 @@ export function registerCrmAttachmentRoutes(app: Express, getDevUser: GetUser): 
       const [att] = await db.select({ kind: crmAttachments.kind }).from(crmAttachments)
         .where(and(eq(crmAttachments.id, req.params.id), eq(crmAttachments.orgId, ctx.org.id)))
         .limit(1);
-      if (!(att?.kind === "photo" && ctx.permissions.manageJobs)) {
+      if (!(att?.kind === "photo" && ctx.permissions.manageJobs) && !(att?.kind === "payment_proof" && ctx.permissions.takePayment)) {
         return res.status(403).json({ message: "Requires permission: manageCustomers" });
       }
     }

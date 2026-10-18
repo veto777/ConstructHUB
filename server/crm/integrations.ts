@@ -23,7 +23,7 @@ import {
 } from "@shared/schema";
 import { and, eq, desc, sql, isNull } from "drizzle-orm";
 import { sendWithFallback } from "../email";
-import { autoSendPaymentReceipt } from "./receipts";
+import { autoSendPaymentReceipt, autoSendDepositReceipt } from "./receipts";
 import { textOrgOwners } from "./sms";
 import { notifyMembers } from "./notify";
 import { providerFixture, type StripeFixture } from "../tutorials/fixtures";
@@ -349,6 +349,12 @@ export function registerCrmIntegrationRoutes(app: Express): void {
           if (actual?.method) await db.update(crmPayments).set({ method: actual.method }).where(eq(crmPayments.id, pay.id));
           if (settled.invoicePaid) await emitCrmEvent(pay.orgId, "invoice.paid", { invoiceId: pay.invoiceId });
           if (pay.invoiceId) autoSendPaymentReceipt(pay.orgId, pay.invoiceId).catch(() => {});
+          // A deposit paid online on the estimate page gets its receipt too (email / text per Settings → Payments).
+          else if (pay.estimateId) autoSendDepositReceipt(pay.orgId, pay.id).catch(() => {});
+          // Money landed: the "how was the deposit / final payment received?" prompt series is answered.
+          import("./payment-reconcile").then((m) => m.completeReconcileTasks(pay.orgId, {
+            estimateId: pay.estimateId, invoiceId: pay.invoiceId, projectId: pay.projectId, customerId: pay.customerId,
+          })).catch(() => {});
           await emitCrmEvent(pay.orgId, "payment.succeeded", {
             paymentId: pay.id, amountCents: pay.amountCents, method: actual?.method ?? pay.method,
             estimateId: pay.estimateId, invoiceId: pay.invoiceId, projectId: pay.projectId,

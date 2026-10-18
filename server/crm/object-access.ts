@@ -90,6 +90,11 @@ export function objectPolicy(ctx: OrgContext) {
     // Attachments inherit their actual parent, never merely the org.
     if (kind === "attachments") {
       if ((r.kind === "contract" || r.kind === "estimate") && !ctx.permissions.seePrices) return false;
+      // A photo of a check behind a recorded payment: payment / invoice seats only, through the client it belongs to.
+      if (r.kind === "payment_proof") {
+        if (!ctx.permissions.takePayment && !ctx.permissions.manageInvoices) return false;
+        return r.refId ? visible("customers", r.refId) : false;
+      }
       // Org collateral: company pamphlets and the "add to all future
       // estimates" library (estimate_default, refId null).
       if (r.kind === "pamphlet" || r.kind === "estimate_default") return true;

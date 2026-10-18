@@ -45,6 +45,7 @@ import { JobcamPanel } from "@/components/jobcam/project-panel";
 import { CustomerMeasurements } from "@/components/client-measurements";
 import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
 import { TakePaymentDialog, invoiceDueCents } from "@/components/crm-take-payment";
+import { deadLeadOf } from "@shared/bid-status";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
 import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { QuickBid } from "@/components/crm-quick-bid";
@@ -661,6 +662,21 @@ export default function CrmClientPage() {
   // ── Take a payment (online link or manual record) ─────────────────────────
   const [takeOpen, setTakeOpen] = useState(false);
 
+  // ── Dead lead (owner, 2026-10-18): no response, dead end, tire kicker — with a reason, reversible ──
+  const [deadOpen, setDeadOpen] = useState(false);
+  const [deadReason, setDeadReason] = useState("");
+  const deadLead = deadLeadOf(data?.customer?.customFields);
+  const markDead = useMutation({
+    mutationFn: async (dead: boolean) =>
+      (await apiRequest("POST", `/api/crm/customers/${id}/dead-lead`, { dead, reason: dead ? deadReason.trim() || null : null })).json(),
+    onSuccess: (r: any) => {
+      toast(r?.dead ? { title: "Marked as a dead lead", description: "It files under Dead lead on the Clients list; reopen it any time." } : { title: "Lead reopened" });
+      setDeadOpen(false); setDeadReason("");
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0] ?? "").startsWith("/api/crm/customers") });
+    },
+    onError: (e: any) => toast({ title: "Could not update the lead", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
   // ── Message thread (client portal comments) ───────────────────────────────
   const [replyBody, setReplyBody] = useState("");
   const sendReply = useMutation({
@@ -1117,6 +1133,39 @@ export default function CrmClientPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {deadLead && (
+                <span className="inline-flex items-center rounded-full bg-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  title={`Since ${new Date(deadLead.at).toLocaleDateString()}${deadLead.reason ? ` — ${deadLead.reason}` : ""}`} data-testid="pill-dead-lead">
+                  Dead lead{deadLead.reason ? ` · ${deadLead.reason}` : ""}
+                </span>
+              )}
+              {(canManageCustomers || canEstimate) && (deadLead ? (
+                <Button variant="outline" size="sm" onClick={() => markDead.mutate(false)} disabled={markDead.isPending} data-testid="button-reopen-lead">
+                  Reopen lead
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setDeadOpen(true)} data-testid="button-dead-lead">
+                  Dead lead
+                </Button>
+              ))}
+              <Dialog open={deadOpen} onOpenChange={setDeadOpen}>
+                <DialogContent className="max-w-md" data-testid="dialog-dead-lead">
+                  <DialogHeader>
+                    <DialogTitle>Mark {c.displayName} as a dead lead?</DialogTitle>
+                    <DialogDescription>No response, a dead end, a tire kicker — say which, so the next person knows. It moves to the Dead lead tab and can be reopened any time.</DialogDescription>
+                  </DialogHeader>
+                  <div>
+                    <Label htmlFor="dead-reason">Why</Label>
+                    <Input id="dead-reason" value={deadReason} onChange={(e) => setDeadReason(e.target.value)} placeholder="No response after three calls" maxLength={300} data-testid="input-dead-reason" />
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDeadOpen(false)}>Cancel</Button>
+                    <Button variant="destructive" onClick={() => markDead.mutate(true)} disabled={markDead.isPending || deadReason.trim().length < 3} data-testid="button-confirm-dead-lead">
+                      Mark dead lead
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
               {canManageCustomers && data.portalPath && <ViewAsClientButton customerId={id!} />}
               {canManageCustomers && (
                 <>
@@ -1997,6 +2046,7 @@ export default function CrmClientPage() {
       {/* estimates → a "Deposit on a signed estimate" link; payments → hides
           deposits already paid. */}
       <TakePaymentDialog
+          customerId={id}
         customerName={c.displayName}
         invoices={invoices}
         estimates={estimates}

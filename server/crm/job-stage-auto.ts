@@ -25,6 +25,7 @@ import { queueCrmEvent, queueProjectStageChange, projectEventPayload } from "./i
 import { nextDocNumber } from "./entities";
 import { adoptHoverMeasurementsForProject } from "./hover-share";
 import { notifyMembers } from "./notify";
+import { reconcileOnStage } from "./payment-reconcile";
 import { anchorPassesPhase } from "@shared/job-flow";
 import { enterPhase, loadJobFlow } from "./job-flow";
 
@@ -171,6 +172,8 @@ export async function stageSideEffects(args: { orgId: string; project: Project; 
     } else if (stageIndex(stage) > stageIndex("approved")) {
       await completeScheduleStartTask(args.orgId, args.project.id);
     }
+    // "How was the deposit / final payment received?" — the prompt series that keeps off-platform money on the books.
+    await reconcileOnStage(args.orgId, args.project, stage);
   } catch (e: any) {
     console.error("[crm] job stage side effects failed:", e?.message || e);
   }

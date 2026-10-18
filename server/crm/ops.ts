@@ -21,17 +21,20 @@ import {
   crmPunchItems, crmDailyLogs, crmSelections, crmEstimateOptions,
   crmApiKeys, crmWebhooks, crmProjects, crmCustomers, crmOrgs, crmEstimates,
   crmEstimateItems, crmPayments, crmMembers,
-  crmNotificationChannel, crmNotificationEnabled, crmEngagementSessions, crmCustomerNotes,
+  crmNotificationChannel, crmNotificationEnabled, crmEngagementSessions, crmCustomerNotes, crmAttachments,
   CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
   CRM_LINE_ITEM_KINDS,
 } from "@shared/schema";
-import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
+import { and, eq, desc, asc, sql, isNull, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission, requireOwnerRole, stripMoney, type OrgContext } from "./tenancy";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
 import { requireCrmFeature, emitCrmEvent, queueCrmEvent, webhookUrlIsSafe } from "./integrations";
 import { invoiceDefaultsFromOrg } from "./doc-defaults";
 import { autoSendPaymentReceipt } from "./receipts";
+import { paymentWriteLimit, claimIdempotent, answerIdempotent, rememberIdempotent, releaseIdempotent } from "./payment-guard";
+import { completeReconcileTasks } from "./payment-reconcile";
+import { receiptSettingsOf, reconcileSettingsOf } from "@shared/payment-settings";
 import { logActivity } from "./activity";
 import { loadActorDirectory } from "./actors";
 import { actorLabel, UNRECORDED_TEAM_ACTOR } from "@shared/crm-actor";
@@ -289,12 +292,21 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
     if (!est) return res.status(404).json({ message: "Estimate not found" });
     if (!est.approvedAt) return res.status(409).json({ message: "Only an approved estimate can be invoiced." });
+    // The draw: a percentage of the signed total (default all of it), OR a dollar amount (Take a payment: "bill
+    // $5,000 now") which becomes the matching percentage so progress billing still adds up to 100%. An optional
+    // discount (dollars or percent of this draw) rides as its own "Discount" line — never hidden in a unit price.
     const draw = z.object({
-      percentBps: z.number().int().min(1).max(10000).default(10000),
+      percentBps: z.number().int().min(1).max(10000).optional(),
+      amountCents: z.number().int().min(100).max(10_000_000_00).optional(),
       retainageBps: z.number().int().min(0).max(2000).default(0),
+      discountCents: z.number().int().min(0).max(10_000_000_00).optional(),
+      discountBps: z.number().int().min(0).max(10000).optional(),
+      discountLabel: z.string().max(120).optional(),
+      title: z.string().max(200).optional(),
+      dueInDays: z.number().int().min(0).max(365).default(30),
     }).safeParse(req.body ?? {});
     if (!draw.success) return res.status(400).json({ message: "Invalid progress billing", issues: draw.error.issues });
-    const { percentBps: pct, retainageBps } = draw.data;
+    const { retainageBps } = draw.data;
     const items = await db.select().from(crmEstimateItems)
       .where(and(eq(crmEstimateItems.orgId, ctx.org.id), eq(crmEstimateItems.estimateId, est.id)))
       .orderBy(asc(crmEstimateItems.sortOrder));
@@ -304,7 +316,34 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       ? est.selectedDiscounts.filter((s: any) => typeof s?.percentBps === "number") as { percentBps: number }[]
       : [];
     const approval = computeApprovalTotals(items, est.taxRateBps ?? 0, selected);
+    let pct = draw.data.percentBps ?? 10000;
+    if (draw.data.amountCents != null) {
+      if (approval.totalCents <= 0) return res.status(400).json({ message: "This estimate has no signed total to bill against." });
+      if (draw.data.amountCents > approval.totalCents) {
+        return res.status(400).json({ message: `The signed total is ${usd(approval.totalCents)} — bill that or less.` });
+      }
+      pct = Math.max(1, Math.min(10000, Math.round((draw.data.amountCents * 10000) / approval.totalCents)));
+    }
     const lines = progressInvoiceItems(items, pct, approval.optionalDiscountCents);
+    let drawCents = lines.reduce((s, l) => s + (l.kind === "discount" ? -1 : 1) * Math.round((l.unitPriceCents * l.quantityMilli) / 1000), 0);
+    // A dollar draw bills EXACTLY the dollars entered: the basis-point rounding above is squared up on the largest
+    // line (one basis point of a $1M job is $100 — never let that become the invoice).
+    if (draw.data.amountCents != null && pct < 10000 && drawCents !== draw.data.amountCents) {
+      const biggest = lines.filter((l) => l.kind !== "discount").sort((a, b) => b.unitPriceCents - a.unitPriceCents)[0];
+      if (biggest) {
+        biggest.unitPriceCents = Math.max(0, biggest.unitPriceCents + (draw.data.amountCents - drawCents));
+        drawCents = draw.data.amountCents;
+      }
+    }
+    const discountCents = draw.data.discountCents ?? (draw.data.discountBps ? Math.round((drawCents * draw.data.discountBps) / 10000) : 0);
+    if (discountCents > 0) {
+      if (discountCents >= drawCents) return res.status(400).json({ message: "The discount can't be the whole invoice." });
+      lines.push({
+        kind: "discount", name: (draw.data.discountLabel?.trim() || "Discount").slice(0, 120),
+        description: draw.data.discountBps ? `${draw.data.discountBps / 100}% off this invoice.` : null,
+        unit: null, unitPriceCents: discountCents, quantityMilli: 1000, taxable: false,
+      } as (typeof lines)[number]);
+    }
 
     // Progress billing may split an estimate across several invoices, but
     // never past 100% of it: a second click on "Create invoice" must not bill
@@ -339,9 +378,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       const [row] = await tx.insert(crmInvoices).values({
         orgId: ctx.org.id, customerId: est.customerId, projectId: est.projectId ?? null,
         estimateId: est.id, number,
-        title: pct < 10000 ? `${est.title} — progress billing` : est.title,
+        title: draw.data.title?.trim() || (pct < 10000 ? `${est.title} — progress billing` : est.title),
         taxRateBps: est.taxRateBps, retainageBps, publicToken: tok(),
-        dueAt: new Date(Date.now() + 30 * 86400000),
+        dueAt: new Date(Date.now() + draw.data.dueInDays * 86400000),
         // Invoice footer from Settings; warranty and terms as signed on the estimate.
         ...invoiceDefaultsFromOrg(ctx.org, est),
         // The draw this invoice bills, so the next one knows what is left.
@@ -352,18 +391,49 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
         description: i.description, unit: i.unit, unitPriceCents: i.unitPriceCents,
         quantityMilli: i.quantityMilli, taxable: i.taxable,
       })) as any);
-      return { inv: row };
+      // Deposits already collected on this estimate (payments with no invoice yet) become payments ON this invoice,
+      // oldest first, whole payments only — the money is counted once and the invoice asks for what is left. A
+      // deposit larger than this draw waits for a later draw. Same arithmetic as recalcInvoice for what is due.
+      let subtotal = 0, taxable = 0, discount = 0;
+      for (const i of lines) {
+        const line = Math.round((i.unitPriceCents * i.quantityMilli) / 1000);
+        if (i.kind === "discount") { discount += Math.abs(line); continue; }
+        subtotal += line; if (i.taxable) taxable += line;
+      }
+      const tax = Math.round((Math.max(0, taxable - discount) * (est.taxRateBps || 0)) / 10000);
+      const gross = Math.max(0, subtotal - discount + tax);
+      const dueNow = gross - Math.round((gross * (retainageBps || 0)) / 10000);
+      const deposits = await tx.select().from(crmPayments).where(and(
+        eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.estimateId, est.id), isNull(crmPayments.invoiceId),
+        inArray(crmPayments.status, ["succeeded", "partially_refunded"]),
+      )).orderBy(asc(crmPayments.paidAt));
+      let credited = 0;
+      const creditedIds: string[] = [];
+      for (const p of deposits) {
+        const net = Math.max(0, p.amountCents - Number((p as any).refundedCents ?? 0));
+        if (net <= 0 || credited + net > dueNow) continue;
+        await tx.update(crmPayments).set({ invoiceId: row.id, projectId: p.projectId ?? row.projectId ?? null })
+          .where(eq(crmPayments.id, p.id));
+        credited += net; creditedIds.push(p.id);
+      }
+      if (credited > 0) {
+        await tx.update(crmInvoices).set({
+          paidCents: credited, status: credited >= dueNow ? "paid" : "partial", paidAt: credited >= dueNow ? new Date() : null,
+          customFields: { progressBps: pct, depositCreditCents: credited, depositPaymentIds: creditedIds },
+        }).where(eq(crmInvoices.id, row.id));
+      }
+      return { inv: row, credited };
     });
     if (result.error) {
       const { status, ...body } = result.error;
       return res.status(status).json(body);
     }
-    const { inv } = result;
+    const { inv, credited } = result;
     logActivity(ctx, "invoice.created", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
-      meta: { number: inv.number, fromEstimate: est.number ?? est.id },
+      meta: { number: inv.number, fromEstimate: est.number ?? est.id, ...(credited ? { depositCreditCents: credited } : {}) },
     });
-    res.status(201).json(await recalcInvoice(ctx.org.id, inv.id));
+    res.status(201).json({ ...(await recalcInvoice(ctx.org.id, inv.id)), depositCreditCents: credited });
   });
 
   /**
@@ -371,18 +441,28 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
    * collect this way, and without it an invoice can never reach "paid" unless
    * Stripe is connected. Same credit math as the Stripe webhook path.
    */
-  app.post("/api/crm/invoices/:id/payments", async (req: any, res) => {
+  app.post("/api/crm/invoices/:id/payments", paymentWriteLimit, async (req: any, res) => {
     const ctx = await ctxFor(req, res, "takePayment");
     if (!ctx) return;
     if (!requirePermission(res, ctx, "seePrices")) return; // an invoice or payment is an amount
+    // The Idempotency-Key is claimed first: a double-click or a retried request replays the first answer (or is told
+    // the first is still running), never a second row (server/crm/payment-guard.ts).
+    const claim = claimIdempotent(req, ctx.org.id);
+    if (answerIdempotent(res, req, claim)) return;
+    const fail = (status: number, body: Record<string, unknown>) => { releaseIdempotent(req, ctx.org.id); return res.status(status).json(body); };
     const parsed = z.object({
       amountCents: z.number().int().min(1).max(10_000_000_00),
       // cash/check/wire/credit_card are the manual rails; ach/card/other are
       // kept so older clients and imports still validate.
       method: z.enum(["cash", "check", "wire", "credit_card", "ach", "card", "other"]),
       note: z.string().max(2000).nullable().optional(),
+      /** When the money was received (defaults to now); a photo / copy of the check filed as a payment_proof. */
+      paidAt: z.string().datetime().optional(),
+      proofAttachmentId: z.string().max(64).nullable().optional(),
     }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid payment", issues: parsed.error.issues });
+    if (!parsed.success) return fail(400, { message: "Invalid payment", issues: parsed.error.issues });
+    const paidAt = parsed.data.paidAt ? new Date(parsed.data.paidAt) : new Date();
+    if (Number.isNaN(paidAt.getTime()) || paidAt.getTime() > Date.now() + 5 * 60_000) return fail(400, { message: "The payment date can't be in the future." });
 
     // Serialize balance checks and ledger writes for this invoice. Without
     // the row lock two valid-looking requests can both spend the same balance.
@@ -402,13 +482,25 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
           outstandingCents: outstanding,
         } };
       }
+      // The check photo, when one was filed: it must be this client's payment_proof. Settings may require one.
+      let proofNote: string | null = null;
+      if (parsed.data.proofAttachmentId) {
+        const [proof] = await tx.select().from(crmAttachments).where(and(
+          eq(crmAttachments.orgId, ctx.org.id), eq(crmAttachments.id, parsed.data.proofAttachmentId),
+          eq(crmAttachments.kind, "payment_proof"), eq(crmAttachments.refId, inv.customerId),
+        )).limit(1);
+        if (!proof) return { error: { status: 400, message: "That photo isn't on this client's file — upload it again." } };
+        proofNote = `Proof of payment: ${proof.fileName} (attachment ${proof.id}).`;
+      } else if (reconcileSettingsOf(ctx.org.customFields).photo === "required" && (parsed.data.method === "check" || parsed.data.method === "cash")) {
+        return { error: { status: 400, message: "Your settings require a photo or copy of the check for a check or cash payment." } };
+      }
 
       const [pay] = await tx.insert(crmPayments).values({
         orgId: ctx.org.id, customerId: inv.customerId, invoiceId: inv.id,
         projectId: inv.projectId ?? null, provider: "manual", purpose: "progress",
         amountCents: parsed.data.amountCents, currency: "usd",
         method: parsed.data.method, status: "succeeded",
-        note: parsed.data.note ?? null, paidAt: new Date(),
+        note: [parsed.data.note?.trim() || null, proofNote].filter(Boolean).join(" ") || null, paidAt,
       } as any).returning();
 
       const paid = (inv.paidCents ?? 0) + parsed.data.amountCents;
@@ -421,7 +513,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     });
     if (result.error) {
       const { status, ...body } = result.error;
-      return res.status(status).json(body);
+      return fail(status, body);
     }
     const { inv, pay, paid, due, row } = result;
 
@@ -438,18 +530,27 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       .catch((e: any) => console.error("[crm] auto-receipt failed:", e?.message || e));
     // Say whether that receipt will actually go out — the same two gates
     // autoSendPaymentReceipt applies — so the UI never promises one it skips.
-    const [receiptTo] = await db.select({ email: crmCustomers.email }).from(crmCustomers)
+    const [receiptTo] = await db.select({ email: crmCustomers.email, phone: crmCustomers.phone }).from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, inv.customerId))).limit(1);
-    const receiptSkippedReason = !crmNotificationEnabled(ctx.org.customFields, "paymentReceipt")
-      ? "receipts_off" : !receiptTo?.email ? "no_email" : null;
+    // The same two channels autoSendPaymentReceipt checks (Settings → Payments → Automatic receipts).
+    const receiptPrefs = receiptSettingsOf(ctx.org.customFields);
+    const receiptSkippedReason = !receiptPrefs.email && !receiptPrefs.sms ? "receipts_off"
+      : (receiptPrefs.email && receiptTo?.email) || (receiptPrefs.sms && receiptTo?.phone) ? null
+        : receiptPrefs.email ? "no_email" : "no_phone";
     logActivity(ctx, "payment.recorded", {
       entityType: "payment", entityId: pay.id, customerId: inv.customerId,
       meta: { amountCents: pay.amountCents, method: pay.method, number: inv.number, invoiceId: inv.id },
     });
-    res.status(201).json({
-      payment: pay, invoice: row,
-      receiptQueued: receiptSkippedReason === null, receiptSkippedReason,
+    // Money is on the books: the "how was the deposit / final payment received?" prompt series is answered.
+    const reconciledPrompts = await completeReconcileTasks(ctx.org.id, {
+      invoiceId: inv.id, projectId: inv.projectId ?? null, estimateId: inv.estimateId ?? null, customerId: inv.customerId,
     });
+    const body = {
+      payment: pay, invoice: row,
+      receiptQueued: receiptSkippedReason === null, receiptSkippedReason, reconciledPrompts,
+    };
+    rememberIdempotent(req, ctx.org.id, 201, body);
+    res.status(201).json(body);
   });
 
   /**
@@ -461,7 +562,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
    * the reversal lands on the client's notes and the audit log. Stripe
    * payments are never reversed here — their refunds come from Stripe.
    */
-  app.post("/api/crm/payments/:id/reverse", async (req: any, res) => {
+  app.post("/api/crm/payments/:id/reverse", paymentWriteLimit, async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
     if (ctx.member.role !== "owner") {

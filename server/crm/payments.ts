@@ -38,6 +38,8 @@ import { amountDueCents } from "@shared/estimate-totals";
 import { logActivity } from "./activity";
 import { getBaseUrl } from "../auth";
 import { financingLinksSchema, financingLinksOf, getPrimaryFinancing } from "./financing";
+import { reconcileSettingsOf, receiptSettingsOf, parseDayList } from "@shared/payment-settings";
+import { paymentWriteLimit, paymentSettingsLimit, publicPayLimit } from "./payment-guard";
 import { uploadToR2, getR2Url } from "../r2";
 import { providerFixture, type StripeFixture } from "../tutorials/fixtures";
 
@@ -140,6 +142,74 @@ export function cardFeeCents(org: { customFields: unknown } | null | undefined, 
   return Math.round((amountCents * s.surchargeBps) / 10000);
 }
 
+/** What the payer is told before choosing card: the rate, the fee on this
+ *  amount and the card total. null when card is not offered or the org
+ *  absorbs the fee — the page then shows one plain Pay button. */
+export function cardFeeQuote(
+  org: { customFields: unknown } | null | undefined,
+  rails: { card: boolean },
+  amountCents: number,
+): { bps: number; feeCents: number; totalCents: number } | null {
+  const s = paymentSettingsOf(org);
+  if (!rails.card || !s.passFeeToClient || !s.surchargeBps) return null;
+  const feeCents = cardFeeCents(org, amountCents);
+  return { bps: s.surchargeBps, feeCents, totalCents: amountCents + feeCents };
+}
+
+export type PayChoice = "card" | "ach";
+
+/** The rails a Checkout session offers. A pinned choice offers exactly that
+ *  rail. An unpinned session lists ACH first (the default pick); with a card
+ *  fee configured and ACH available it offers ACH only, because the fee line
+ *  exists only on an explicit card checkout and must never be skippable. */
+export function checkoutMethods(
+  rails: { ach: boolean; card: boolean },
+  choice: PayChoice | undefined,
+  cardFeeOn: boolean,
+): Stripe.Checkout.SessionCreateParams.PaymentMethodType[] {
+  if (choice === "card") return ["card"];
+  if (choice === "ach") return ["us_bank_account"];
+  const methods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [];
+  if (rails.ach) methods.push("us_bank_account");
+  if (rails.card && !(cardFeeOn && rails.ach)) methods.push("card");
+  return methods;
+}
+
+/** Validates the payer's (or the contractor's) rail choice against what the
+ *  org offers. Returns the choice, or a message for a 400 when it is a rail
+ *  this payment does not offer. */
+export function resolvePayChoice(
+  raw: unknown, rails: { ach: boolean; card: boolean }, cardFeeOn = false,
+): { choice: PayChoice | undefined; error?: string } {
+  // A method that is sent but not one of ours is a bug or a probe, not "unspecified".
+  if (raw !== undefined && raw !== null && raw !== "" && raw !== "card" && raw !== "ach") return { choice: undefined, error: "method must be card or ach." };
+  let choice: PayChoice | undefined = raw === "card" || raw === "ach" ? raw : undefined;
+  if (choice === "ach" && !rails.ach) return { choice, error: "Bank transfer (ACH) isn't available for this payment — please pay by card." };
+  if (choice === "card" && !rails.card) return { choice, error: "Card payment isn't available for this payment — please pay by bank transfer (ACH)." };
+  // With a card fee configured and card the ONLY rail, an unpinned checkout IS a card checkout: the fee rides along.
+  if (!choice && cardFeeOn && rails.card && !rails.ach) choice = "card";
+  return { choice };
+}
+
+/** The clearly-labelled fee line that rides on a CARD checkout, so the fee
+ *  shows on Stripe's page and on the receipt as its own item. */
+export function cardFeeLineItem(
+  org: { customFields: unknown } | null | undefined, currency: string, feeCents: number,
+): Stripe.Checkout.SessionCreateParams.LineItem {
+  const s = paymentSettingsOf(org);
+  return { quantity: 1, price_data: {
+    currency, unit_amount: feeCents,
+    product_data: {
+      name: `Card processing fee (${((s.surchargeBps ?? 0) / 100).toFixed(2)}%)`,
+      description: "Covers the card network processing cost. Pay by bank transfer (ACH) to avoid this fee.",
+    },
+  }};
+}
+
+/** The pending-row note that records a passed-through fee. */
+export const cardFeeNote = (feeCents: number) =>
+  `Card processing fee $${(feeCents / 100).toFixed(2)} paid by the client on top.`;
+
 // ── Company logo upload ─────────────────────────────────────────────────────
 // R2 when it's fully configured; otherwise local disk under tmp/org-logos,
 // served by the GET route below (logos render on public documents, so the
@@ -199,6 +269,11 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         // A walkthrough recording slot's stand-in account is shown as a connected account looks (null everywhere else).
         ...(stripeFx ? { livemode: stripeFx.accountOnScreen.livemode, ...(detail ? { externalAccountId: stripeFx.accountOnScreen.externalAccountId } : {}) } : {}),
       } : null,
+      // The org's pass-through card fee, so the take-payment dialog can offer a
+      // bank link and a card link and show the client's fee before either is made.
+      cardFee: (() => { const s = paymentSettingsOf(ctx.org); return s.passFeeToClient && s.surchargeBps ? { bps: s.surchargeBps } : null; })(),
+      // Whether a recorded check/cash payment should carry a photo of the check (Settings → Payments → Reconciliation prompts).
+      reconcile: { photo: reconcileSettingsOf(ctx.org.customFields).photo },
       // Stated up front, in the product, per the spec's honesty requirement.
       disclosure: {
         custody: "Payments go directly into your own Stripe account. We never hold your money.",
@@ -433,36 +508,44 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       res.status(503).json({ message: "Online payment isn't available for this amount under your payment settings — record it manually instead." });
       return false;
     }
-    const methods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [];
-    // ACH first — 0.8% capped at $5 vs ~2.9% on card. With a card surcharge
-    // configured, an unpinned session must not offer card (the fee line only
-    // exists on explicit card checkouts, which only the client-facing flow pins).
-    if (rails.ach) methods.push("us_bank_account");
-    if (rails.card && !(cardFeeCents(org, amountCents) > 0 && rails.ach)) methods.push("card");
+    // The contractor may pin the link to one rail: a "card link" carries the
+    // org's card fee as its own line (the client was told the fee before the
+    // link was made); a "bank link" never does. Unpinned = ACH first, and with
+    // a card fee configured, ACH only — the fee must never be skippable.
+    const feeOn = cardFeeCents(org, amountCents) > 0;
+    const { choice, error } = resolvePayChoice(req.body?.method, rails, feeOn);
+    if (error) { res.status(400).json({ message: error }); return false; }
+    const feeCents = choice === "card" ? cardFeeCents(org, amountCents) : 0;
+    const methods = checkoutMethods(rails, choice, feeOn);
+    const currency = acct.defaultCurrency || "usd";
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ quantity: 1, price_data: {
+      currency, unit_amount: amountCents,
+      product_data: { name: opts.docName, description: org.name ? `Payable to ${org.name}` : undefined },
+    }}];
+    if (feeCents > 0) lineItems.push(cardFeeLineItem(org, currency, feeCents));
 
     const base = getBaseUrl(req);
     try {
       const session = await stripe.checkout.sessions.create({
         mode: "payment", payment_method_types: methods,
         customer_email: customer?.email ?? undefined,
-        line_items: [{ quantity: 1, price_data: {
-          currency: acct.defaultCurrency || "usd", unit_amount: amountCents,
-          product_data: { name: opts.docName, description: org.name ? `Payable to ${org.name}` : undefined },
-        }}],
+        line_items: lineItems,
         success_url: `${base}${opts.successPath}?paid=1`,
         cancel_url: `${base}${opts.successPath}?paid=0`,
-        metadata: opts.metadata,
+        metadata: { ...opts.metadata, ...(feeCents > 0 ? { cardFeeCents: String(feeCents) } : {}) },
         payment_intent_data: { metadata: opts.metadata },
       }, { stripeAccount: acct.externalAccountId }); // direct charge on THEIR account
 
+      const note = [opts.pendingRow.note, feeCents > 0 ? cardFeeNote(feeCents) : null].filter(Boolean).join(" ") || null;
       await recordCheckoutPayment({
         orgId: org.id,
         provider: "stripe", externalId: session.id,
-        amountCents, currency: acct.defaultCurrency || "usd",
-        method: rails.ach ? "ach" : "card", status: "pending", applicationFeeCents: 0,
+        amountCents, currency,
+        method: choice ?? (rails.ach ? "ach" : "card"), status: "pending", applicationFeeCents: 0,
         ...opts.pendingRow,
+        note,
       }, session, acct.externalAccountId);
-      res.json({ url: session.url, amountCents, rails });
+      res.json({ url: session.url, amountCents, rails, method: choice ?? null, cardFeeCents: feeCents });
       return true;
     } catch (e: any) {
       console.error("[crm] payment-link checkout failed:", e?.message || e);
@@ -472,7 +555,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
   }
 
   /** Contractor: a hosted card+ACH checkout link for an open invoice. */
-  app.post("/api/crm/invoices/:id/payment-link", async (req: any, res) => {
+  app.post("/api/crm/invoices/:id/payment-link", paymentWriteLimit, async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
@@ -514,7 +597,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
 
   /** Contractor: a hosted card+ACH checkout link for an approved estimate's
    *  deposit (or full signed amount when no deposit is set). */
-  app.post("/api/crm/estimates/:id/payment-link", async (req: any, res) => {
+  app.post("/api/crm/estimates/:id/payment-link", paymentWriteLimit, async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
@@ -570,11 +653,13 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (!requirePermission(res, ctx, "manageSettings")) return;
     res.json({
       payments: paymentSettingsOf(ctx.org),
+      reconcile: reconcileSettingsOf(ctx.org.customFields),
+      receipts: receiptSettingsOf(ctx.org.customFields),
       financingLinks: financingLinksOf(ctx.org),
     });
   });
 
-  app.put("/api/crm/payments/settings", async (req: any, res) => {
+  app.put("/api/crm/payments/settings", paymentSettingsLimit, async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
@@ -588,21 +673,51 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         // Cents; $1M cap keeps typos ($1e12) from silently disabling card forever.
         achOnlyOverCents: z.number().int().min(0).max(100_000_000).nullable().optional(),
       }).optional(),
+      // The "how was the deposit / final payment received?" prompt series (shared/payment-settings.ts).
+      reconcile: z.object({
+        enabled: z.boolean(),
+        approvalDays: z.union([z.string().max(80), z.array(z.number())]),
+        closeoutDays: z.union([z.string().max(80), z.array(z.number())]),
+        photo: z.enum(["off", "optional", "required"]),
+        notify: z.enum(["pm", "pm_sales", "owners"]),
+        channels: z.object({ email: z.boolean(), sms: z.boolean() }),
+      }).optional(),
+      // The client's automatic receipt: email, text, both or neither.
+      receipts: z.object({ email: z.boolean(), sms: z.boolean() }).optional(),
       financingLinks: financingLinksSchema.optional(),
     }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Invalid payment settings", issues: parsed.error.issues });
 
-    const cf = { ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}) };
+    // Each section is merged into custom_fields IN POSTGRES (jsonb ||), so two sessions saving different sections
+    // at once never restore each other's stale values; a section not sent is not touched.
+    const paymentsPatch: Record<string, unknown> = {};
     if (parsed.data.payments) {
-      cf.payments = {
+      Object.assign(paymentsPatch, {
         surchargeBps: parsed.data.payments.surchargeBps && parsed.data.payments.surchargeBps > 0
           ? parsed.data.payments.surchargeBps : null,
         passFeeToClient: parsed.data.payments.passFeeToClient,
         railMode: parsed.data.payments.railMode ?? "both",
         achOnlyOverCents: parsed.data.payments.achOnlyOverCents && parsed.data.payments.achOnlyOverCents > 0
           ? parsed.data.payments.achOnlyOverCents : null,
-      };
+      });
     }
+    if (parsed.data.reconcile) {
+      const r = parsed.data.reconcile;
+      const approvalDays = parseDayList(r.approvalDays);
+      const closeoutDays = parseDayList(r.closeoutDays);
+      if (r.enabled && (!approvalDays.length || !closeoutDays.length)) {
+        return res.status(400).json({ message: "List the days the prompts fire, e.g. 1, 3, 5 (whole days, 1–60)." });
+      }
+      paymentsPatch.reconcile = { enabled: r.enabled, approvalDays, closeoutDays, photo: r.photo, notify: r.notify, channels: r.channels };
+    }
+    let prefsPatch: Record<string, unknown> | null = null;
+    if (parsed.data.receipts) {
+      // One switch with the notifications grid: the paymentReceipt pref's email / sms channels (shared/payment-settings.ts).
+      const prev = ((ctx.org.customFields as Record<string, any> | null)?.notificationPrefs ?? {}).paymentReceipt;
+      const inApp = prev && typeof prev === "object" ? prev.inApp !== false : prev !== false;
+      prefsPatch = { paymentReceipt: { inApp, email: parsed.data.receipts.email, sms: parsed.data.receipts.sms } };
+    }
+    const cf = { ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}) };
     if (parsed.data.financingLinks) {
       // Exactly one primary: the first link marked primary wins; when none is
       // marked the first link becomes the client-facing one.
@@ -613,9 +728,13 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         return { label: l.label, url: l.url, primary };
       });
     }
-    const [org] = await db.update(crmOrgs).set({ customFields: cf, updatedAt: new Date() })
+    const merged = sql`coalesce(${crmOrgs.customFields}, '{}'::jsonb)
+      || jsonb_build_object('payments', coalesce(${crmOrgs.customFields}->'payments', '{}'::jsonb) || ${JSON.stringify(paymentsPatch)}::jsonb)
+      || ${prefsPatch ? sql`jsonb_build_object('notificationPrefs', coalesce(${crmOrgs.customFields}->'notificationPrefs', '{}'::jsonb) || ${JSON.stringify(prefsPatch)}::jsonb)` : sql`'{}'::jsonb`}
+      || ${parsed.data.financingLinks ? sql`jsonb_build_object('financingLinks', ${JSON.stringify(cf.financingLinks ?? [])}::jsonb)` : sql`'{}'::jsonb`}`;
+    const [org] = await db.update(crmOrgs).set({ customFields: merged as any, updatedAt: new Date() })
       .where(eq(crmOrgs.id, ctx.org.id)).returning();
-    res.json({ payments: paymentSettingsOf(org), financingLinks: financingLinksOf(org) });
+    res.json({ payments: paymentSettingsOf(org), reconcile: reconcileSettingsOf(org.customFields), receipts: receiptSettingsOf(org.customFields), financingLinks: financingLinksOf(org) });
   });
 
   // ── Company logo upload ───────────────────────────────────────────────────
@@ -674,7 +793,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
   /** Public: what the invoice page needs before the client pays — the fee the
    *  client would pay by card, and the org's primary financing link. Same
    *  email gate as the document read. */
-  app.get("/api/public/invoices/:token/pay-info", async (req: any, res) => {
+  app.get("/api/public/invoices/:token/pay-info", publicPayLimit, async (req: any, res) => {
     const t = String(req.params.token || "");
     const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
     if (!inv) return res.status(404).json({ message: "This invoice link is no longer valid." });
@@ -682,38 +801,39 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, inv.orgId)).limit(1);
     const acct = await activeAccount(inv.orgId);
     const dueCents = Math.max(0, inv.totalCents - (inv.retainageCents ?? 0) - (inv.paidCents ?? 0));
-    const settings = paymentSettingsOf(org);
     // No Stripe key on this server → the pay route answers 503, so no rail.
     const rails = stripe ? allowedRails(org, acct, dueCents) : { ach: false, card: false };
-    const fee = cardFeeCents(org, dueCents);
     res.json({
       dueCents,
       cardAvailable: rails.card,
       achAvailable: rails.ach,
-      cardFee: rails.card && settings.passFeeToClient && settings.surchargeBps
-        ? { bps: settings.surchargeBps, feeCents: fee, totalCents: dueCents + fee }
-        : null,
+      cardFee: cardFeeQuote(org, rails, dueCents),
       financing: getPrimaryFinancing(org),
     });
   });
 
-  /** Public: the estimate page's financing link (deposit fee stays contractor-
-   *  absorbed — the surcharge applies to card invoice payments only), plus
-   *  whether the deposit can be paid online at all — the same rail check the
-   *  deposit pay route applies, so the page can skip a button that must fail. */
-  app.get("/api/public/estimates/:token/pay-info", async (req: any, res) => {
+  /** Public: the estimate page's financing link, whether the deposit can be
+   *  paid online at all (the same rail check the deposit pay route applies, so
+   *  the page can skip a button that must fail), and the card fee the client
+   *  is told before choosing card — the same pass-through as on invoices. */
+  app.get("/api/public/estimates/:token/pay-info", publicPayLimit, async (req: any, res) => {
     const t = String(req.params.token || "");
     const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
     if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
     if (!(await requireDocSession(req, res, est.customerId))) return;
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
-    const amount = amountDueCents(est);
-    const rails = await onlinePaymentRails(org, amount ?? 0);
-    res.json({ financing: getPrimaryFinancing(org), cardAvailable: rails.card, achAvailable: rails.ach });
+    const amount = amountDueCents(est) ?? 0;
+    const rails = await onlinePaymentRails(org, amount);
+    res.json({
+      dueCents: amount,
+      financing: getPrimaryFinancing(org),
+      cardAvailable: rails.card, achAvailable: rails.ach,
+      cardFee: cardFeeQuote(org, rails, amount),
+    });
   });
 
   /** Public: pay an invoice. Same direct-charge model as the deposit flow. */
-  app.post("/api/public/invoices/:token/pay", async (req: any, res) => {
+  app.post("/api/public/invoices/:token/pay", publicPayLimit, async (req: any, res) => {
     const t = String(req.params.token || "");
     const [inv] = await db.select().from(crmInvoices).where(eq(crmInvoices.publicToken, t)).limit(1);
     if (!inv) return res.status(404).json({ message: "This invoice link is no longer valid." });
@@ -747,32 +867,14 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (!rails.ach && !rails.card) {
       return res.status(503).json({ message: "Online payment isn't available for this invoice. Please contact us to arrange payment." });
     }
-    const requested = z.enum(["card", "ach"]).safeParse(req.body?.method);
-    const choice = requested.success ? requested.data : undefined;
-    if (choice === "ach" && !rails.ach) {
-      return res.status(400).json({ message: "Bank transfer (ACH) isn't available for this invoice — please pay by card." });
-    }
-    if (choice === "card" && !rails.card) {
-      return res.status(400).json({ message: "Card payment isn't available for this invoice — please pay by bank transfer (ACH)." });
-    }
-
-    const methods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [];
-    if (choice === "card") methods.push("card");
-    else if (choice === "ach") methods.push("us_bank_account");
-    else {
-      // ACH listed first so it is the default choice when both are offered.
-      // With a card surcharge configured, an UNPINNED session must not offer
-      // card at all — the fee line only exists on explicit card checkouts, so
-      // offering card here would let the payer skip the configured surcharge.
-      const surcharge = cardFeeCents(org, amount) > 0;
-      if (rails.ach) methods.push("us_bank_account");
-      if (rails.card && !(surcharge && rails.ach)) methods.push("card");
-    }
+    const feeOn = cardFeeCents(org, amount) > 0;
+    const { choice, error: choiceError } = resolvePayChoice(req.body?.method, rails, feeOn);
+    if (choiceError) return res.status(400).json({ message: choiceError });
+    const methods = checkoutMethods(rails, choice, feeOn);
 
     // CC fee passthrough: a clearly-labelled surcharge line on CARD checkout
     // only, and only when the org turned it on. ACH stays fee-free.
     const fee = choice === "card" ? cardFeeCents(org, amount) : 0;
-    const settings = paymentSettingsOf(org);
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ quantity: 1, price_data: {
       currency: acct.defaultCurrency || "usd", unit_amount: amount,
       product_data: {
@@ -780,15 +882,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         description: org?.name ? `Payable to ${org.name}` : undefined,
       },
     }}];
-    if (fee > 0) {
-      lineItems.push({ quantity: 1, price_data: {
-        currency: acct.defaultCurrency || "usd", unit_amount: fee,
-        product_data: {
-          name: `Card processing fee (${((settings.surchargeBps ?? 0) / 100).toFixed(2)}%)`,
-          description: "Covers the card network processing cost. Pay by bank transfer (ACH) to avoid this fee.",
-        },
-      }});
-    }
+    if (fee > 0) lineItems.push(cardFeeLineItem(org, acct.defaultCurrency || "usd", fee));
 
     const base = getBaseUrl(req);
     try {
@@ -807,9 +901,9 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         orgId: inv.orgId, customerId: inv.customerId, invoiceId: inv.id,
         projectId: inv.projectId ?? null, provider: "stripe", externalId: session.id,
         purpose: "progress", amountCents: amount, currency: acct.defaultCurrency || "usd",
-        method: choice === "card" ? "card" : choice === "ach" ? "ach" : (rails.ach ? "ach" : "card"),
+        method: choice ?? (rails.ach ? "ach" : "card"),
         status: "pending", applicationFeeCents: 0,
-        note: fee > 0 ? `Card processing fee $${(fee / 100).toFixed(2)} paid by the client on top.` : null,
+        note: fee > 0 ? cardFeeNote(fee) : null,
       }, session, acct.externalAccountId);
       res.json({ url: session.url, amountCents: amount, cardFeeCents: fee, achAvailable: acct.achEnabled });
     } catch (e: any) {
@@ -818,7 +912,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     }
   });
 
-  app.post("/api/public/estimates/:token/pay", async (req: any, res) => {
+  app.post("/api/public/estimates/:token/pay", publicPayLimit, async (req: any, res) => {
     const t = String(req.params.token || "");
     const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
     if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
@@ -855,14 +949,31 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
 
     // ACH listed first so it is the default choice — it is 100× cheaper on a
     // large deposit and is the whole reason this exists. The org's rail policy
-    // (ACH-only / threshold) applies here exactly as on invoices.
+    // (ACH-only / threshold) and its card-fee pass-through apply here exactly
+    // as on invoices: an explicit card choice carries the fee line, an ACH
+    // choice never does, and an unpinned session with a fee offers ACH only.
     const rails = allowedRails(org, acct, amount);
     if (!rails.ach && !rails.card) {
       return res.status(503).json({ message: "Online payment isn't available for this estimate. Please contact us to arrange payment." });
     }
-    const methods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [];
-    if (rails.ach) methods.push("us_bank_account");
-    if (rails.card) methods.push("card");
+    const feeOn = cardFeeCents(org, amount) > 0;
+    const { choice, error: choiceError } = resolvePayChoice(req.body?.method, rails, feeOn);
+    if (choiceError) return res.status(400).json({ message: choiceError });
+    const methods = checkoutMethods(rails, choice, feeOn);
+    const fee = choice === "card" ? cardFeeCents(org, amount) : 0;
+    const currency = acct.defaultCurrency || "usd";
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{
+      quantity: 1,
+      price_data: {
+        currency,
+        unit_amount: amount,
+        product_data: {
+          name: `${est.depositCents ? "Deposit" : "Payment"} — ${est.title}${est.number ? ` (${est.number})` : ""}`,
+          description: org?.name ? `Payable to ${org.name}` : undefined,
+        },
+      },
+    }];
+    if (fee > 0) lineItems.push(cardFeeLineItem(org, currency, fee));
 
     const base = getBaseUrl(req);
     try {
@@ -870,21 +981,12 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         mode: "payment",
         payment_method_types: methods,
         customer_email: cust?.email ?? undefined,
-        line_items: [{
-          quantity: 1,
-          price_data: {
-            currency: est.orgId ? (acct.defaultCurrency || "usd") : "usd",
-            unit_amount: amount,
-            product_data: {
-              name: `${est.depositCents ? "Deposit" : "Payment"} — ${est.title}${est.number ? ` (${est.number})` : ""}`,
-              description: org?.name ? `Payable to ${org.name}` : undefined,
-            },
-          },
-        }],
+        line_items: lineItems,
         success_url: `${base}/e/${t}?paid=1`,
         cancel_url: `${base}/e/${t}?paid=0`,
         // application_fee_amount omitted entirely: we take nothing.
-        metadata: { estimateId: est.id, orgId: est.orgId, customerId: est.customerId },
+        metadata: { estimateId: est.id, orgId: est.orgId, customerId: est.customerId,
+          ...(fee > 0 ? { cardFeeCents: String(fee) } : {}) },
         payment_intent_data: { metadata: { estimateId: est.id, orgId: est.orgId, customerId: est.customerId } },
       }, { stripeAccount: acct.externalAccountId }); // ← direct charge on THEIR account
 
@@ -892,12 +994,13 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         orgId: est.orgId, customerId: est.customerId, estimateId: est.id,
         projectId: est.projectId ?? null, provider: "stripe",
         externalId: session.id, purpose: est.depositCents ? "deposit" : "final",
-        amountCents: amount, currency: acct.defaultCurrency || "usd",
-        method: rails.ach ? "ach" : "card", status: "pending",
+        amountCents: amount, currency,
+        method: choice ?? (rails.ach ? "ach" : "card"), status: "pending",
         applicationFeeCents: 0,
+        note: fee > 0 ? cardFeeNote(fee) : null,
       }, session, acct.externalAccountId);
 
-      res.json({ url: session.url, amountCents: amount, achAvailable: acct.achEnabled });
+      res.json({ url: session.url, amountCents: amount, cardFeeCents: fee, achAvailable: acct.achEnabled });
     } catch (e: any) {
       console.error("[crm] checkout session failed:", e?.message || e);
       res.status(502).json({ message: String(e?.message || "Could not start checkout").slice(0, 200) });
