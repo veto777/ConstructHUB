@@ -211,7 +211,7 @@ export function CrmPhotoJobList({ params, onPick, compact = false }: {
  * photos, by stage, tick up to `max`, then onPick. Nothing is copied here;
  * the caller hands the ids to its own gated route.
  */
-export function CrmPhotoPicker({ open, onOpenChange, max, onPick, title = "CRM project photos", description, confirmLabel = "Use photos", busy = false }: {
+export function CrmPhotoPicker({ open, onOpenChange, max, onPick, title = "CRM project photos", description, confirmLabel = "Use photos", busy = false, only }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   max: number;
@@ -220,6 +220,8 @@ export function CrmPhotoPicker({ open, onOpenChange, max, onPick, title = "CRM p
   description?: string;
   confirmLabel?: string;
   busy?: boolean;
+  /** Locks the picker to ONE client's job photos (the review composer with a client picked): no other job is listed. */
+  only?: { id: string; name: string } | null;
 }) {
   const [view, setView] = useState<"jobs" | "all">("jobs");
   const [job, setJob] = useState<CrmPhotoJob | null>(null);
@@ -228,7 +230,9 @@ export function CrmPhotoPicker({ open, onOpenChange, max, onPick, title = "CRM p
   const [q, setQ] = useState("");
   const [facets, setFacets] = useState<CrmPhotoFacets | undefined>();
   const [selected, setSelected] = useState<Map<string, CrmPhoto>>(new Map());
-  useEffect(() => { if (open) { setSelected(new Map()); setJob(null); } }, [open]);
+  useEffect(() => {
+    if (open) { setSelected(new Map()); setJob(only ? { customer: { id: only.id, name: only.name } } as CrmPhotoJob : null); }
+  }, [open, only?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const t = setTimeout(() => setQ(search.trim()), 300); return () => clearTimeout(t); }, [search]);
   const toggle = (p: CrmPhoto) => setSelected((prev) => {
     const next = new Map(prev);
@@ -245,7 +249,7 @@ export function CrmPhotoPicker({ open, onOpenChange, max, onPick, title = "CRM p
         </DialogHeader>
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            {job ? (
+            {only ? null : job ? (
               <Button variant="ghost" size="sm" onClick={() => setJob(null)} data-testid="button-picker-back-to-jobs">
                 <ChevronLeft className="mr-1 h-4 w-4" />All jobs
               </Button>
@@ -259,7 +263,7 @@ export function CrmPhotoPicker({ open, onOpenChange, max, onPick, title = "CRM p
                 </Button>
               </div>
             )}
-            {job ? <p className="truncate text-sm font-medium">{job.customer.name}</p> : (
+            {job ? <p className="truncate text-sm font-semibold">{only ? `${job.customer.name}'s job photos` : job.customer.name}</p> : (
               <div className="relative min-w-[12rem] flex-1">
                 <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client or address" className="h-9 pl-8"

@@ -62,7 +62,7 @@ import path from "path";
 import {
   createHash, createHmac, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual,
 } from "crypto";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { crmCustomers, crmMeasurements, crmAttachments, crmOrgs , crmMembers } from "@shared/schema";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
@@ -795,7 +795,7 @@ function trimJson(value: unknown): unknown {
  * more → ambiguous (the caller creates a NEW customer and flags it, never
  * guesses); zero → no match (the caller creates from the job).
  */
-async function matchHoverCustomerByAddress(
+export async function matchHoverCustomerByAddress(
   orgId: string, addressLine1?: string | null, postalCode?: string | null,
 ) {
   const key = normalizeHoverAddress(addressLine1, postalCode);
@@ -933,11 +933,54 @@ async function matchOrgMemberContactFields(
   // The company's own phone/email count as staff too (a capture ordered from the office).
   const [org] = await db.select({ email: crmOrgs.email, phone: crmOrgs.phone }).from(crmOrgs)
     .where(eq(crmOrgs.id, orgId)).limit(1);
-  for (const m of [...members, ...(org ? [org] : [])]) {
+  const people = [...members, ...(org ? [org] : [])];
+  for (const m of people) {
     if (em && (m.email ?? "").trim().toLowerCase() === em) result.email = true;
     if (ph && ph.length >= 7 && phoneKey(m.phone) === ph) result.phone = true;
   }
+  // Reps who never joined the CRM still write from the company's own domain: andrey@ (a member) makes
+  // mike@alpinesidingpros.com, george@alpinesidingpros.net and alpinesidingpros@outlook.com staff too.
+  if (em && !result.email && isCompanyEmail(em, people.map((m) => m.email))) result.email = true;
+  // A contact already carrying HOVER captures of 3+ different properties is whoever orders the captures,
+  // never a homeowner (2026-10-17: 532 captures sat on 4 rep/office records).
+  if (!result.email || !result.phone) {
+    const repeat = await pool.query<{ by_email: boolean; by_phone: boolean }>(
+      `select bool_or($2 <> '' and lower(trim(c.email)) = $2) by_email,
+              bool_or($3 <> '' and right(regexp_replace(coalesce(c.phone, ''), '[^0-9]', '', 'g'), 10) = $3) by_phone
+         from crm_customers c
+        where c.org_id = $1
+          and (($2 <> '' and lower(trim(c.email)) = $2) or ($3 <> '' and right(regexp_replace(coalesce(c.phone, ''), '[^0-9]', '', 'g'), 10) = $3))
+          and (select count(distinct lower(trim(m.address_line1))) from crm_measurements m
+                where m.org_id = c.org_id and m.customer_id = c.id and m.provider = 'hover' and coalesce(m.address_line1, '') <> '') >= 3`,
+      [orgId, em, ph.length >= 7 ? ph.slice(-10) : ""]);
+    if (repeat.rows[0]?.by_email) result.email = true;
+    if (repeat.rows[0]?.by_phone) result.phone = true;
+  }
   return result;
+}
+
+const FREE_MAIL = new Set([
+  "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "yahoo.com", "ymail.com",
+  "icloud.com", "me.com", "mac.com", "aol.com", "comcast.net", "protonmail.com", "proton.me", "gmx.com",
+]);
+/** RFC 2606 reserved names: never a real company's domain. */
+const RESERVED = new Set(["example", "invalid", "test", "localhost"]);
+/**
+ * Is this email the company's own (pure)? The company's names are the first labels of its people's NON-free-mail
+ * domains ("alpinesidingpros" from andrey@alpinesidingpros.com). A match is any domain with that first label (.com,
+ * .net, …), or a free-mail box named after the company (alpinesidingpros@outlook.com).
+ */
+export function isCompanyEmail(email: string, peopleEmails: (string | null | undefined)[]): boolean {
+  const [local, domain] = email.trim().toLowerCase().split("@");
+  if (!local || !domain) return false;
+  const names = new Set<string>();
+  for (const e of peopleEmails) {
+    const d = (e ?? "").trim().toLowerCase().split("@")[1];
+    if (d && !FREE_MAIL.has(d)) { const label = d.split(".")[0]; if (label.length >= 4 && !RESERVED.has(label)) names.add(label); }
+  }
+  if (!names.size) return false;
+  if (FREE_MAIL.has(domain)) return names.has(local.replace(/[^a-z0-9]/g, ""));
+  return names.has(domain.split(".")[0]);
 }
 /**
  * Pull the job's capture photos ("before" photos) onto the client's profile:

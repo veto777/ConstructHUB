@@ -41,6 +41,7 @@ import {
   type CrmPermission,
 } from "@shared/schema";
 import { requireOrg, type OrgContext } from "./tenancy";
+import { CRM_DIVISION_HEADER } from "@shared/divisions";
 import { objectPolicy } from "./object-access";
 import { storedFilePath } from "./attachments";
 import { likeContains } from "./entities";
@@ -128,6 +129,8 @@ type Scope = {
   projectsByCustomer: Map<string, Project[]>;
   /** HOVER job id → the (visible) project its measurement is filed to. */
   hoverProject: Map<string, string>;
+  /** The division workspace the listing ran in ("all" or an id), carried on every thumbnail URL. */
+  div: string;
 };
 
 async function chunked<T>(ids: string[], run: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
@@ -152,7 +155,7 @@ async function buildScope(ctx: OrgContext, customers: Customer[]): Promise<Scope
       .from(crmMeasurements).where(and(eq(crmMeasurements.orgId, ctx.org.id), eq(crmMeasurements.provider, "hover"), inArray(crmMeasurements.customerId, chunk))));
     for (const m of ms) if (m.externalId && m.projectId && projectIds.has(m.projectId)) hoverProject.set(m.externalId, m.projectId);
   }
-  return { customers: new Map(visible.map((c) => [c.id, c])), projectsByCustomer, hoverProject };
+  return { customers: new Map(visible.map((c) => [c.id, c])), projectsByCustomer, hoverProject, div: ctx.activeDivisionId ?? "all" };
 }
 
 /** Every client of the org that has at least one photo, as this seat may see them. */
@@ -190,7 +193,13 @@ function projectOf(scope: Scope, att: Attachment): Project | null {
 
 // ── Presentation ────────────────────────────────────────────────────────────
 
-const THUMB = (id: string, size: "sm" | "lg" = "sm") => `/api/crm/photos/${id}/thumb${size === "lg" ? "?size=lg" : ""}`;
+/**
+ * A thumbnail URL. An <img> cannot send the x-crm-division header, so the workspace the listing ran in rides along
+ * as ?div= — without it the owner's saved division answered, and every photo of a client in the OTHER division came
+ * back 404 (blank tiles in "All divisions").
+ */
+const THUMB = (id: string, size: "sm" | "lg" = "sm", div = "all") =>
+  `/api/crm/photos/${id}/thumb?div=${encodeURIComponent(div)}${size === "lg" ? "&size=lg" : ""}`;
 function presentPhoto(scope: Scope, a: Attachment) {
   const c = scope.customers.get(a.refId ?? "");
   const cls = classifyPhoto(a.fileName);
@@ -203,8 +212,8 @@ function presentPhoto(scope: Scope, a: Attachment) {
     mime: a.mime,
     sizeBytes: a.sizeBytes,
     createdAt: a.createdAt,
-    thumbUrl: THUMB(a.id),
-    url: THUMB(a.id, "lg"),
+    thumbUrl: THUMB(a.id, "sm", scope.div),
+    url: THUMB(a.id, "lg", scope.div),
     downloadUrl: `/api/crm/attachments/${a.id}/file`,
     customer: c ? { id: c.id, name: c.displayName, address: addressOf(c) } : null,
     project: p ? { id: p.id, name: p.name, status: p.status } : null,
@@ -408,7 +417,7 @@ export function registerCrmPhotoLibraryRoutes(app: Express, getDevUser: GetUser)
           projectCount: projects.length,
           jobStatus: jobStatusOf(projects),
           counts: { all: g.all, progress: g.progress, finished: g.finished, client: g.client, hover: g.hover, unstaged: g.unstaged },
-          cover: cover ? { id: cover, thumbUrl: THUMB(cover) } : null,
+          cover: cover ? { id: cover, thumbUrl: THUMB(cover, "sm", scope.div) } : null,
           lastPhotoAt: g.last,
         };
       }),
@@ -479,6 +488,9 @@ export function registerCrmPhotoLibraryRoutes(app: Express, getDevUser: GetUser)
 
   /** A photo's thumbnail (size=sm, default) or screen-size view (size=lg). Same visibility as the file itself. */
   app.get("/api/crm/photos/:id/thumb", async (req: any, res) => {
+    // The workspace from ?div= when no header came (an <img>); requireOrg still validates it against the org's divisions.
+    const div = typeof req.query.div === "string" ? req.query.div.slice(0, 64) : "";
+    if (div && !req.headers[CRM_DIVISION_HEADER]) req.headers[CRM_DIVISION_HEADER] = div;
     const ctx = await photoCtx(req, res, getDevUser);
     if (!ctx) return;
     const [att] = await visiblePhotos(ctx, [String(req.params.id)]);
@@ -553,7 +565,7 @@ export function registerCrmPhotoPlatformRoutes(app: Express, getDevUser: GetUser
         await fs.promises.rm(dest, { force: true });
         return res.status(429).json({ message: "Upload storage is busy. Try again later.", files, skipped });
       }
-      files.push({ id, originalName, size, attachmentId: a.id, thumbUrl: THUMB(a.id) });
+      files.push({ id, originalName, size, attachmentId: a.id, thumbUrl: THUMB(a.id, "sm", got.ctx.activeDivisionId ?? "all") });
     }
     res.json({ files, skipped });
   });

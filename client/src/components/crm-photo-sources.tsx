@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { getDivisionWorkspace } from "@/lib/division-workspace";
 import { CrmPhotoGrid, CrmPhotoPicker, StageTabs } from "@/components/crm-photo-picker";
 import {
   clearHandoff, crmPhotoError, fetchCrmJson, handoffIds,
@@ -48,7 +49,7 @@ export function CrmOptimizerSource({ remaining, onFiles, enabled = true }: {
       });
       if (!r.ok) throw new Error(await crmPhotoError(r));
       const out = await r.json() as { files: { id: string; originalName: string; attachmentId: string }[]; skipped: { reason: string }[] };
-      onFiles(out.files.map((f) => ({ serverId: f.id, originalName: f.originalName, previewUrl: `/api/crm/photos/${f.attachmentId}/thumb?size=lg` })));
+      onFiles(out.files.map((f) => ({ serverId: f.id, originalName: f.originalName, previewUrl: `/api/crm/photos/${f.attachmentId}/thumb?div=${encodeURIComponent(getDivisionWorkspace())}&size=lg` })));
       toast({
         title: `${out.files.length} CRM photo${out.files.length === 1 ? "" : "s"} added`,
         description: out.skipped.length ? `${out.skipped.length} skipped: ${out.skipped[0].reason}` : "Set your business info and process them like any upload.",
@@ -116,7 +117,7 @@ export function useReviewHandoff(onArrive: (h: { customer: CrmPhotoClient | null
           customer = found.clients.find((c) => c.id === customerId) ?? null;
         }
         // Photos from several jobs (no single client): keep them by id; thumbnails come from the gated thumb route.
-        for (const id of ids) if (!photos.some((p) => p.id === id)) photos.push({ id, thumbUrl: `/api/crm/photos/${id}/thumb`, fileName: "CRM photo" });
+        for (const id of ids) if (!photos.some((p) => p.id === id)) photos.push({ id, thumbUrl: `/api/crm/photos/${id}/thumb?div=${encodeURIComponent(getDivisionWorkspace())}`, fileName: "CRM photo" });
       } catch { /* not on a CRM team in this session: nothing to attach */ }
       onArrive({ customer, photos: photos.slice(0, PICK_MAX) });
     })();
@@ -239,11 +240,16 @@ export function CrmReviewPhotos({ client, onClient, crmPhotos, onCrmPhotos, room
         </div>
       )}
 
-      <Button type="button" size="sm" variant="outline" onClick={() => setPickerOpen(true)} disabled={room <= 0} data-testid="button-review-crm-picker">
-        <Camera className="mr-1.5 h-3.5 w-3.5" />Browse all CRM project photos
-      </Button>
+      {/* With a client picked, their own job's photos are in the grid above and the picker is locked to that job. */}
+      {!client && (
+        <Button type="button" size="sm" variant="outline" onClick={() => setPickerOpen(true)} disabled={room <= 0} data-testid="button-review-crm-picker">
+          <Camera className="mr-1.5 h-3.5 w-3.5" />Browse CRM project photos
+        </Button>
+      )}
       <CrmPhotoPicker open={pickerOpen} onOpenChange={setPickerOpen} max={Math.max(1, room)} confirmLabel="Attach"
-        description="Pick photos from any job. Your client gets them on the review page to add to their Google review."
+        only={client ? { id: client.id, name: client.name } : null}
+        description={client ? "Only this client's job photos. Your client gets them on the review page to add to their Google review."
+          : "Pick photos from any job. Your client gets them on the review page to add to their Google review."}
         onPick={(ps) => {
           const have = new Set(crmPhotos.map((p) => p.id));
           onCrmPhotos([...crmPhotos, ...ps.filter((p) => !have.has(p.id)).slice(0, room).map((p) => ({ id: p.id, thumbUrl: p.thumbUrl, fileName: p.fileName }))]);
