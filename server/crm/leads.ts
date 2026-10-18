@@ -37,6 +37,7 @@ import { queueCrmEvent, customerEventPayload, projectEventPayload } from "./inte
 import { divisionScopeOf } from "./divisions";
 import { nextDocNumber } from "./entities";
 import { adoptHoverMeasurementsForProject } from "./hover-share";
+import { attributionFields, leadChannel } from "./lead-channel";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -173,6 +174,8 @@ export function pageMetaFrom(fields: Record<string, string>): { pageUrl: string 
 /** text/plain (sendBeacon), application/json or urlencoded → the payload, or null when it can't be read. */
 export function parseFormSyncBody(raw: unknown, contentType: string | undefined): {
   fields: Record<string, unknown>; pageUrl: string | null; formId: string | null; formName: string | null; title: string | null;
+  /** Where the visitor came from (the script's first-touch utm_*, click ids, referrer, landing page); see lead-channel.ts. */
+  attribution: Record<string, unknown> | null;
 } | null {
   const ct = String(contentType || "").toLowerCase();
   let text: string;
@@ -200,6 +203,7 @@ export function parseFormSyncBody(raw: unknown, contentType: string | undefined)
     formId: hasEnvelope ? str(obj.formId, 120) : null,
     formName: hasEnvelope ? str(obj.formName, 120) : null,
     title: hasEnvelope ? str(obj.title, 200) : null,
+    attribution: hasEnvelope && obj.attribution && typeof obj.attribution === "object" && !Array.isArray(obj.attribution) ? obj.attribution : null,
   };
 }
 
@@ -381,6 +385,7 @@ function presentLead(l: CrmLead, customers: Map<string, string>) {
   return {
     ...l,
     sourceName: SOURCE_NAMES[l.source] ?? l.source,
+    channel: leadChannel(l),
     customer: l.customerId && customers.has(l.customerId) ? { id: l.customerId, displayName: customers.get(l.customerId)! } : null,
   };
 }
@@ -462,6 +467,8 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     if (honeypotTripped(body.fields)) return res.status(201).json({ ok: true });
     const fields = sanitizeFields(body.fields);
     if (!Object.keys(fields).length) return res.status(400).json({ message: "No form fields were sent." });
+    // The visitor's trail (utm_*, gclid, referrer…) rides along as _-prefixed fields; a form's own key of that name wins.
+    for (const [k, v] of Object.entries(attributionFields(body.attribution))) if (!(k in fields)) fields[k] = v;
     // 20 per visitor IP and 300 per company per 15 minutes (the client-auth fixed-window buckets).
     if (!allow(`formsync:ip:${clientIp(req)}`, 20) || !allow(`formsync:org:${org.id}`, 300)) {
       return res.status(201).json({ ok: true });

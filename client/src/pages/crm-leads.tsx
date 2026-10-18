@@ -11,7 +11,7 @@ import { useInfiniteQuery, useMutation, useQuery, keepPreviousData } from "@tans
 import { Link } from "wouter";
 import {
   Magnet, Search, Loader2, Mail, Phone, MoreHorizontal, Copy, ChevronDown, Globe, PhoneCall, Ruler, FileCode2,
-  CheckCircle2, Circle, ExternalLink, UserPlus, Archive, PhoneOutgoing, Eye, User,
+  CheckCircle2, Circle, ExternalLink, UserPlus, Archive, PhoneOutgoing, Eye, User, Megaphone, Link2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,8 @@ interface Lead {
   source: LeadSource;
   sourceName: string;
   sourceLabel: string | null;
+  /** Where it came from, as the contractor thinks of it (server/crm/lead-channel.ts): Google Ads, Facebook, Website, Phone call… */
+  channel: { key: string; label: string; detail: string | null };
   name: string | null;
   email: string | null;
   phone: string | null;
@@ -115,8 +117,41 @@ const when = (iso: string | null | undefined) => {
   return Number.isNaN(d.getTime()) ? null : d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 };
 
+/** The Received column: the day on one line, the time under it, so the column stays narrow. */
+const whenParts = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return [d.toLocaleDateString([], { month: "short", day: "numeric" }), d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })] as const;
+};
+
 const leadName = (l: Lead) => l.name || l.email || l.phone || "No name given";
 const place = (l: Lead) => [l.addressLine1, l.city, l.state, l.postalCode].filter(Boolean).join(", ");
+
+/** A 16px mark for the channel: a lettered badge in the site's colour, or an icon for the website, phone and the rest. */
+const CHANNEL_BADGE: Record<string, { letter: string; className: string }> = {
+  google_ads: { letter: "G", className: "border border-border bg-white text-[#4285F4]" },
+  google: { letter: "G", className: "border border-border bg-white text-[#4285F4]" },
+  meta_ads: { letter: "f", className: "bg-[#1877F2] text-white" },
+  facebook: { letter: "f", className: "bg-[#1877F2] text-white" },
+  instagram: { letter: "I", className: "bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF] text-white" },
+  microsoft_ads: { letter: "B", className: "bg-[#008373] text-white" },
+  bing: { letter: "B", className: "bg-[#008373] text-white" },
+  youtube: { letter: "▶", className: "bg-[#FF0000] text-white" },
+  tiktok: { letter: "T", className: "bg-black text-white" },
+  yelp: { letter: "Y", className: "bg-[#D32323] text-white" },
+  nextdoor: { letter: "N", className: "bg-[#8ED500] text-[#1f2a00]" },
+  angi: { letter: "A", className: "bg-[#FF6153] text-white" },
+  thumbtack: { letter: "T", className: "bg-[#009FD9] text-white" },
+  houzz: { letter: "H", className: "bg-[#4DBC15] text-white" },
+};
+function ChannelMark({ k }: { k: string }) {
+  const badge = CHANNEL_BADGE[k];
+  if (badge) {
+    return <span aria-hidden="true" className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] font-bold leading-none ${badge.className}`}>{badge.letter}</span>;
+  }
+  const Icon = k === "phone" ? PhoneCall : k === "manual" ? UserPlus : k === "campaign" ? Megaphone : k === "referral" ? Link2 : Globe;
+  return <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />;
+}
 
 function readParams(): { tab: LeadStatus; q: string; source: LeadSource | "all"; lead: string | null } {
   const p = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
@@ -269,7 +304,12 @@ export default function CrmLeadsPage() {
           {/* The headers are hidden on a phone (card layout) — the Sort select stands in for them. */}
           <SortSelect columns={LEAD_SORT_COLUMNS} sort={sort} onChange={setSort} className="sm:hidden" testId="select-sort-leads" />
           <div className={crmTable.wrapper}>
-            <table className={crmTable.table}>
+            {/* Fixed layout from sm up: the columns share the width and long values truncate, so the table never
+                grows past the page (a long email or message used to push Received off the right edge). */}
+            <table className={`${crmTable.table} sm:table-fixed`}>
+              <colgroup className="hidden sm:table-column-group">
+                <col className="w-[20%]" /><col className="w-[21%]" /><col className="w-[24%]" /><col className="w-[19%]" /><col className="w-[11%]" /><col className="w-10" />
+              </colgroup>
               <thead className={`${crmTable.thead} ${crmTableCards.thead}`}>
                 <tr>
                   <SortableTh sortKey="name" label="Lead" sort={sort} onSort={onSort} />
@@ -286,7 +326,8 @@ export default function CrmLeadsPage() {
                     onClick={(e) => { if ((e.target as HTMLElement).closest("a,button,[role=menu]")) return; setOpenId(l.id); }}
                     data-testid={`lead-${l.id}`}>
                     <td className={crmTableCards.td}>
-                      <div className="flex min-w-0 max-w-[16rem] items-center gap-3">
+                      {/* On a phone the row is a card, where only a hard cap keeps a long value from widening the table. */}
+                      <div className="flex min-w-0 items-center gap-3 max-sm:max-w-[16rem]">
                         <InitialAvatar name={leadName(l)} />
                         <div className="min-w-0">
                           <button type="button" className="block truncate text-left font-medium text-primary hover:underline"
@@ -303,27 +344,32 @@ export default function CrmLeadsPage() {
                       </div>
                     </td>
                     <td className={crmTableCards.td}>
-                      <div className="min-w-0 max-w-[16rem] space-y-0.5 text-sm sm:max-w-[13rem]">
+                      <div className="min-w-0 space-y-0.5 text-sm max-sm:max-w-[16rem]">
                         {l.email && <a href={`mailto:${l.email}`} className="flex items-center gap-1.5 text-muted-foreground hover:underline" title={l.email}><Mail className="h-3 w-3 shrink-0" /><span className="min-w-0 truncate">{l.email}</span></a>}
-                        {l.phone && <a href={`tel:${l.phone}`} className="flex items-center gap-1.5 text-muted-foreground hover:underline"><Phone className="h-3 w-3 shrink-0" />{l.phone}</a>}
+                        {l.phone && <a href={`tel:${l.phone}`} className="flex items-center gap-1.5 text-muted-foreground hover:underline"><Phone className="h-3 w-3 shrink-0" /><span className="min-w-0 truncate">{l.phone}</span></a>}
                         {!l.email && !l.phone && <span className="text-muted-foreground">No way to reach them</span>}
                       </div>
                     </td>
                     <td className={`${crmTable.td} hidden sm:table-cell`}>
-                      <div className="max-w-[16rem] text-sm">
+                      <div className="min-w-0 text-sm">
                         {l.service && <div className="truncate font-medium">{l.service}</div>}
-                        {l.message && <div className="line-clamp-2 text-muted-foreground">{l.message}</div>}
+                        {l.message && <div className="line-clamp-2 break-words text-muted-foreground">{l.message}</div>}
                         {!l.service && !l.message && <span className="text-muted-foreground">—</span>}
                       </div>
                     </td>
                     <td className={`${crmTable.td} hidden sm:table-cell`}>
-                      <div className="max-w-[12rem] text-sm">
-                        <div>{l.sourceName}</div>
+                      {/* The channel first (Google Ads, Facebook, Website, Phone call), then which site or line it came through. */}
+                      <div className="min-w-0 text-sm" data-testid={`lead-channel-${l.id}`}>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <ChannelMark k={l.channel.key} />
+                          <span className="shrink-0 whitespace-nowrap font-medium">{l.channel.label}</span>
+                          {l.channel.detail && <span className="min-w-0 truncate text-muted-foreground" title={l.channel.detail}>· {l.channel.detail}</span>}
+                        </div>
                         {l.sourceLabel && <div className="truncate text-xs text-muted-foreground" title={l.sourceLabel}>{l.sourceLabel}</div>}
                       </div>
                     </td>
                     <td className={`${crmTable.td} hidden whitespace-nowrap text-sm text-muted-foreground sm:table-cell`}>
-                      {when(l.receivedAt)}
+                      {(() => { const p = whenParts(l.receivedAt); return p ? <><div>{p[0]}</div><div className="text-xs">{p[1]}</div></> : null; })()}
                     </td>
                     <td className="max-sm:absolute max-sm:right-1 max-sm:top-1.5 sm:px-2 sm:py-3 sm:align-middle">
                       <RowMenu lead={l} onOpen={() => setOpenId(l.id)} onConvert={() => setConverting(l)}
@@ -419,8 +465,9 @@ function LeadDetails({ id, cached, onClose, onConvert, onStatus }: {
           <>
             <DialogHeader>
               <DialogTitle>{leadName(lead)}</DialogTitle>
-              <DialogDescription>
-                {lead.sourceName}{lead.sourceLabel ? ` · ${lead.sourceLabel}` : ""} · {when(lead.receivedAt)}
+              <DialogDescription className="flex flex-wrap items-center gap-x-1.5">
+                <ChannelMark k={lead.channel.key} />
+                <span>{lead.channel.label}{lead.channel.detail ? ` · ${lead.channel.detail}` : ""} · {lead.sourceName}{lead.sourceLabel ? ` · ${lead.sourceLabel}` : ""} · {when(lead.receivedAt)}</span>
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3 text-sm">

@@ -102,13 +102,21 @@ describe("body parsing", () => {
     expect(parseFormSyncBody(Buffer.from("name=C&email=c%40x.example"), "application/x-www-form-urlencoded")?.fields).toEqual({ name: "C", email: "c@x.example" });
     expect(parseFormSyncBody(Buffer.from("not json"), "text/plain")).toBe(null);
   });
+
+  it("keeps the script's attribution envelope apart from the fields; a bare body has none", () => {
+    const env = { fields: { name: "A" }, attribution: { gclid: "abc", referrer: "https://www.google.com/" } };
+    expect(parseFormSyncBody(Buffer.from(JSON.stringify(env)), "text/plain")?.attribution).toEqual({ gclid: "abc", referrer: "https://www.google.com/" });
+    expect(parseFormSyncBody(Buffer.from(JSON.stringify({ fields: { name: "A" }, attribution: ["x"] })), "text/plain")?.attribution).toBe(null);
+    expect(parseFormSyncBody(Buffer.from(JSON.stringify({ name: "B", attribution: { gclid: "x" } })), "application/json")?.attribution).toBe(null);
+  });
 });
 
 // ── The script, run in a fake browser ──────────────────────────────────────
 
 type Beacon = { url: string; body: any };
-function runScript(opts: { origin?: string } = {}) {
+function runScript(opts: { origin?: string; search?: string; referrer?: string; storage?: Record<string, string> } = {}) {
   const origin = opts.origin ?? "https://columbusroofing.example";
+  const storage = opts.storage;
   const beacons: Beacon[] = [];
   const listeners: Record<string, ((e: any) => void)[]> = {};
   const timers: (() => void)[] = [];
@@ -120,15 +128,17 @@ function runScript(opts: { origin?: string } = {}) {
     XMLHttpRequest: FakeXHR,
     addEventListener: () => {},
     URL, URLSearchParams, FormData: class {},
+    sessionStorage: storage ? { getItem: (k: string) => storage[k] ?? null, setItem: (k: string, v: string) => { storage[k] = v; } } : undefined,
   };
   const doc: any = {
     title: "Contact us",
+    referrer: opts.referrer ?? "",
     currentScript: { getAttribute: (n: string) => (n === "data-token" ? "org1.tok" : null) },
     querySelector: () => null,
     addEventListener: (t: string, fn: any) => { (listeners[t] ??= []).push(fn); },
   };
   const ctx = vm.createContext({
-    window: win, document: doc, location: { href: `${origin}/contact`, origin },
+    window: win, document: doc, location: { href: `${origin}/contact${opts.search ?? ""}`, origin, search: opts.search ?? "" },
     navigator: { sendBeacon: (url: string, blob: FakeBlob) => { beacons.push({ url, body: JSON.parse(blob.parts[0]) }); return true; } },
     Blob: FakeBlob, URL, URLSearchParams, JSON, String, Object, setTimeout: (fn: () => void) => { timers.push(fn); return timers.length; },
     clearTimeout: (id: number) => { timers[id - 1] = () => {}; },
@@ -192,6 +202,25 @@ describe("form-sync.js", () => {
     expect(win.ConstructHUBForms.send({ name: "Lee", phone: "614-555-0100" })).toBe(true);
     flush();
     expect(beacons.length).toBe(1);
+    expect(beacons[0].body.attribution).toEqual({}); // no trail on this page, nothing claimed
+  });
+
+  it("reads the ad click, utm tags and an outside referrer on the landing page and keeps them for the tab", () => {
+    const storage: Record<string, string> = {};
+    const a = runScript({ search: "?gclid=EAIa&utm_source=google&utm_medium=cpc&utm_campaign=siding&foo=1", referrer: "https://www.google.com/", storage });
+    a.win.ConstructHUBForms.send({ name: "Lee", phone: "614-555-0100" }); a.flush();
+    expect(a.beacons[0].body.attribution).toEqual({
+      gclid: "EAIa", utm_source: "google", utm_medium: "cpc", utm_campaign: "siding",
+      referrer: "https://www.google.com/", landing: "https://columbusroofing.example/contact?gclid=EAIa&utm_source=google&utm_medium=cpc&utm_campaign=siding&foo=1",
+    });
+    // The next page in the same tab (the site's own referrer, no params) keeps the first touch.
+    const b = runScript({ referrer: "https://columbusroofing.example/", storage });
+    b.win.ConstructHUBForms.send({ name: "Lee", phone: "614-555-0100" }); b.flush();
+    expect(b.beacons[0].body.attribution.gclid).toBe("EAIa");
+    // The site's own pages as referrer, without storage, claim nothing.
+    const c = runScript({ referrer: "https://columbusroofing.example/siding" });
+    c.win.ConstructHUBForms.send({ name: "Lee", phone: "614-555-0100" }); c.flush();
+    expect(c.beacons[0].body.attribution).toEqual({});
   });
 });
 
@@ -409,5 +438,26 @@ describe("CRM API", () => {
     expect(new Date(one.received_at).toISOString()).toBe("2025-03-02T15:00:00.000Z");
     const tooMany = await api("/api/crm/leads/import", { method: "POST", body: JSON.stringify(Array.from({ length: 1001 }, () => ({}))) });
     expect(tooMany.status).toBe(400);
+  });
+});
+
+describe("where a lead came from", () => {
+  it("stores the script's attribution as _ fields (the form's own key wins) and names the channel in the API", async () => {
+    const tok = await token();
+    const post = (fields: Record<string, string>, attribution: Record<string, string>) => fetch(`${BASE}/api/public/form-sync/${tok}`, {
+      method: "POST", headers: { "content-type": "text/plain;charset=UTF-8", "x-forwarded-for": ip(), origin: "https://columbusroofing.example" },
+      body: JSON.stringify({ fields, pageUrl: "https://columbusroofing.example/contact", formId: "contact", attribution }),
+    });
+    expect((await post({ name: `${RUN} Ad Click`, email: `${RUN.toLowerCase()}-ad@example.com`, message: `${RUN} ad`, _utm_campaign: "mine" },
+      { gclid: "EAIa", utm_source: "google", utm_medium: "cpc", utm_campaign: "theirs", referrer: "https://www.google.com/", password: "nope", extra: "dropped" })).status).toBe(201);
+    expect((await post({ name: `${RUN} Facebook`, email: `${RUN.toLowerCase()}-fb@example.com`, message: `${RUN} fb` }, { fbclid: "IwAR" })).status).toBe(201);
+    const [ad] = await leadsByMarker(`${RUN} ad`);
+    expect(ad.fields).toMatchObject({ _gclid: "EAIa", _utm_source: "google", _utm_medium: "cpc", _utm_campaign: "mine", _referrer: "https://www.google.com/" });
+    expect(ad.fields).not.toHaveProperty("_password");
+    expect(ad.fields).not.toHaveProperty("_extra");
+    const list = (await api(`/api/crm/leads?q=${encodeURIComponent(RUN)}`)).body;
+    const byName = Object.fromEntries(list.rows.map((r: any) => [r.name, r.channel]));
+    expect(byName[`${RUN} Ad Click`]).toEqual({ key: "google_ads", label: "Google Ads", detail: "mine" });
+    expect(byName[`${RUN} Facebook`]).toEqual({ key: "facebook", label: "Facebook", detail: null });
   });
 });
