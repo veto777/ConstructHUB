@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { PricebookItemInput } from "@/components/pricebook-item-input";
+import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff";
 import { JobStageControl } from "@/components/job-stage";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation, Link } from "wouter";
@@ -859,6 +861,14 @@ export default function CrmClientPage() {
   const tax = Math.round((Math.max(0, subtotal - discount) * taxBps) / 10000);
   const total = Math.max(0, subtotal - discount + tax);
 
+  // The client's HOVER takeoff (if any): a picked price-book item takes its quantity from it.
+  const { data: takeoffData } = useQuery<{ takeoff: HoverTakeoff | null }>({
+    queryKey: [`/api/crm/customers/${id}/takeoff`],
+    enabled: !!id && open,
+    retry: false,
+  });
+  const estTakeoff = takeoffData?.takeoff ?? null;
+
   const createEstimate = useMutation({
     mutationFn: async () => {
       const clean = items.filter((i) => i.name.trim());
@@ -1417,8 +1427,18 @@ export default function CrmClientPage() {
                       data-testid={`line-item-${idx}`}>
                       <div className="sm:col-span-5">
                         <Label className="text-xs">Item</Label>
-                        <Input value={it.name} placeholder="Tear off & dispose existing roof"
-                          onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))} />
+                        {/* Search the price book; a pick fills the line (and the qty from the HOVER takeoff when one matches). */}
+                        <PricebookItemInput value={it.name} placeholder="Search your price book, or type an item" testId={`input-item-name-${idx}`}
+                          onChange={(v) => setItems(items.map((x, i) => i === idx ? { ...x, name: v } : x))}
+                          onPick={(pb) => {
+                            const fromHover = estTakeoff ? takeoffQuantityForLine({ name: pb.name, unit: pb.unit }, estTakeoff) : null;
+                            setItems(items.map((x, i) => i === idx ? {
+                              ...x, name: pb.name, unit: pb.unit ?? "", description: pb.description, taxable: pb.taxable,
+                              unitPriceCents: pb.unitPriceCents, quantityMilli: Math.round((fromHover?.quantity ?? 1) * 1000),
+                            } : x));
+                            if (title.trim() === "" || title === "Estimate") setTitle(pb.name);
+                            if (fromHover) toast({ title: `Quantity from HOVER: ${fromHover.quantity} ${pb.unit ?? ""}`.trim(), description: "Check it before you send." });
+                          }} />
                       </div>
                       <div className="sm:col-span-2">
                         <Label className="text-xs">Qty</Label>
