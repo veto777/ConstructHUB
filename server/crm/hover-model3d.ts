@@ -42,7 +42,7 @@ import net from "net";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { crmAttachments, crmEstimates, crmMeasurements } from "@shared/schema";
-import { parseHoverXml3d, HoverMeshError, MESH_LIMITS, type HoverMesh } from "@shared/hover-mesh";
+import { parseHoverXml3d, HoverMeshError, MESH_LIMITS, MESH_VERSION, type HoverMesh } from "@shared/hover-mesh";
 import { requireOrg } from "./tenancy";
 import { allow as rateAllow, requireClient } from "./client-auth";
 import { requireDocSession, previewGrantValid } from "./portal";
@@ -337,7 +337,9 @@ async function loadModel3dInner(m0: MeasurementRow, fetchFn: FetchFn, refresh: b
     const hit = await readCached(m.orgId, st.meshAttachmentId);
     if (hit) {
       try {
-        return { status: "ready", mesh: JSON.parse(hit.buffer.toString("utf8")), modelId: String(st.modelId ?? ""), cached: true };
+        const mesh = JSON.parse(hit.buffer.toString("utf8")) as HoverMesh;
+        // A mesh parsed by an older reader (before windows/doors/soffits were read) is re-read from HOVER's export.
+        if (mesh.version === MESH_VERSION) return { status: "ready", mesh, modelId: String(st.modelId ?? ""), cached: true };
       } catch { /* a broken cache file is refetched below */ }
     }
   }
