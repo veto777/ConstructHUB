@@ -86,6 +86,8 @@ echo "== pre-deploy dump =="
 # (custom format, ~7 MB today) and keeps the newest KEEP_DUMPS (10) of backups/*.dump|*.sql.gz, deleting the rest.
 # (ls+glob+pipefail aborted the deploy when one pattern had no match; find is used instead.)
 # Hand-made dumps named pre-*.dump count towards the 10 — copy one elsewhere first to keep it longer.
+# backups/ (trailing slash) follows the symlink: since 2026-10-18 the dumps live on the SAN at
+# /mnt/backup/db-backups/constructhub-live-pre-deploy.
 KEEP_DUMPS="${KEEP_DUMPS:-10}"
 "${SSH[@]}" "bash -s" "$APP_DIR" "$KEEP_DUMPS" <<'REMOTE'
 set -euo pipefail
@@ -97,8 +99,8 @@ f="backups/pre-deploy-$(date -u +%Y%m%dT%H%M%SZ).dump"
 pg_dump "$url" -Fc -f "$f"
 echo "dumped $(du -h "$f" | cut -f1) to $f"
 # newest first; everything after the first $keep goes
-find backups -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql.gz" \) -printf "%T@ %p\n" | sort -rn | awk -v k="$keep" 'NR>k{print $2}' | while read -r old; do rm -f -- "$old" && echo "pruned $old"; done
-echo "$(find backups -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql.gz" \) | wc -l) dump(s) kept, $(du -sh backups | cut -f1)"
+find backups/ -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql.gz" \) -printf "%T@ %p\n" | sort -rn | awk -v k="$keep" 'NR>k{print $2}' | while read -r old; do rm -f -- "$old" && echo "pruned $old"; done
+echo "$(find backups/ -maxdepth 1 -type f \( -name "*.dump" -o -name "*.sql.gz" \) | wc -l) dump(s) kept, $(du -shL backups | cut -f1)"
 REMOTE
 
 echo "== restart =="
