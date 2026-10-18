@@ -18,6 +18,9 @@ import { SegmentedTabs, TabCount } from "@/components/tool";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable, crmTableCards } from "@/components/crm-ui";
 import { SortSelect, SortableTh, useTableSort, type SortColumn } from "@/components/sortable-th";
 import { lazySample, showSample } from "@/components/sample-preview";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BID_STATES, type BidState } from "@shared/bid-status";
+import { JOB_STAGES, type JobStage } from "@shared/job-stage";
 const SampleClientsTable = lazySample(() => import("@/components/crm-sample-previews"), "SampleClientsTable");
 
 interface Client {
@@ -33,9 +36,29 @@ interface Client {
   portalLastSeenAt: string | null;
   createdAt: string | null;
   bidStatus?: "won" | "undecided" | "declined" | "bid" | "none";
+  /** Open / Pending / Complete / Dead lead (shared/bid-status.ts), the pipeline stage, and the HOVER-without-bid flag. */
+  bidState?: BidState;
+  bidNotSubmitted?: boolean;
+  stage?: JobStage | null;
+  deadLead?: { at: string; memberId: string | null; reason: string | null } | null;
   /** When the latest bid went out (or was written). */
   bidDate?: string | null;
 }
+
+/** The owner's four bid statuses + the sharper "bid not submitted" (HOVER run, no estimate in the file). */
+const STATE_TABS: { key: "all" | BidState | "not_submitted"; label: string }[] = [
+  { key: "all", label: "All" },
+  ...BID_STATES.map((s) => ({ key: s.key, label: s.label })),
+  { key: "not_submitted", label: "Bid not submitted" },
+];
+type StateTab = (typeof STATE_TABS)[number]["key"];
+const STATE_PILL: Record<BidState, string> = {
+  open: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
+  pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  complete: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+  dead: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+};
+const STAGE_LABEL = Object.fromEntries(JOB_STAGES.map((s) => [s.key, s.label])) as Record<string, string>;
 
 const BID_TABS = [
   { key: "all", label: "All" },
@@ -62,6 +85,9 @@ interface ClientPage {
   rows: Client[];
   total: number;
   bidCounts: Record<"won" | "undecided" | "declined" | "bid" | "none", number>;
+  stateCounts?: Record<BidState, number>;
+  stageCounts?: Record<string, number>;
+  notSubmittedCount?: number;
   limit: number;
   offset: number;
 }
@@ -80,12 +106,16 @@ const CLIENT_SORT_COLUMNS: SortColumn<ClientSortKey>[] = [
   { key: "createdAt", label: "Added", kind: "date" },
 ];
 
-/** The tab + search live in the URL (?tab=won&q=kane) so a reload or Back keeps them. */
-function readListParams(): { tab: BidTab; q: string } {
+/** The tabs, stage and search live in the URL (?tab=won&state=open&stage=bid&q=kane) so a reload or Back keeps them. */
+function readListParams(): { tab: BidTab; state: StateTab; stage: string; q: string } {
   const p = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
   const t = p.get("tab");
+  const st = p.get("state");
+  const sg = p.get("stage");
   return {
     tab: BID_TABS.some((b) => b.key === t) ? (t as BidTab) : "all",
+    state: STATE_TABS.some((b) => b.key === st) ? (st as StateTab) : "all",
+    stage: sg && JOB_STAGES.some((s) => s.key === sg) ? sg : "all",
     q: p.get("q") ?? "",
   };
 }
@@ -107,18 +137,22 @@ export default function CrmClientsPage() {
     return () => clearTimeout(t);
   }, [q]);
   const [tab, setTab] = useState<BidTab>(initial.tab);
+  const [stateTab, setStateTab] = useState<StateTab>(initial.state);
+  const [stage, setStage] = useState<string>(initial.stage);
   const { sort, setSort, onSort } = useTableSort<ClientSortKey>("createdAt", "desc", "clients", { keys: CLIENT_SORT_KEYS });
-  // Mirror tab + search into the URL without adding history entries.
+  // Mirror tabs + stage + search into the URL without adding history entries.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (qDebounced.trim()) params.set("q", qDebounced); else params.delete("q");
     if (tab !== "all") params.set("tab", tab); else params.delete("tab");
+    if (stateTab !== "all") params.set("state", stateTab); else params.delete("state");
+    if (stage !== "all") params.set("stage", stage); else params.delete("stage");
     const search = params.toString();
     const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
     if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
       window.history.replaceState(window.history.state, "", next);
     }
-  }, [qDebounced, tab]);
+  }, [qDebounced, tab, stateTab, stage]);
   const clearSearch = () => { setQ(""); setQDebounced(""); };
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
@@ -138,7 +172,7 @@ export default function CrmClientsPage() {
   const {
     data, isLoading, isError, isPlaceholderData, fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["/api/crm/customers", "paged", qDebounced, tab, sort.key, sort.dir],
+    queryKey: ["/api/crm/customers", "paged", qDebounced, tab, stateTab, stage, sort.key, sort.dir],
     // While another tab (or search) loads, the tab counts stay on screen from
     // the previous answer; the rows area shows the spinner, never the old rows.
     placeholderData: keepPreviousData,
@@ -149,6 +183,9 @@ export default function CrmClientsPage() {
       });
       if (qDebounced) params.set("q", qDebounced);
       if (tab !== "all") params.set("bidStatus", tab);
+      if (stateTab === "not_submitted") params.set("notSubmitted", "1");
+      else if (stateTab !== "all") params.set("bidState", stateTab);
+      if (stage !== "all") params.set("stage", stage);
       const r = await fetch(`/api/crm/customers?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error(await r.text());
       return r.json();
@@ -350,6 +387,37 @@ export default function CrmClientsPage() {
           })}
         </SegmentedTabs>
       </div>
+      {/* Where every lead stands (owner, 2026-10-18): Open → Pending → Complete, or Dead lead; "Bid not submitted" is a
+          HOVER report with no estimate in the file. The stage filter is the job's pipeline phase. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <SegmentedTabs as="group" label="Lead status" testId="tabs-bid-state">
+          {STATE_TABS.map((t) => {
+            const n = t.key === "all" ? bookTotal
+              : t.key === "not_submitted" ? (latest?.notSubmittedCount ?? 0)
+                : (latest?.stateCounts?.[t.key] ?? 0);
+            return (
+              <button key={t.key} type="button" aria-pressed={stateTab === t.key}
+                onClick={() => setStateTab(t.key)} title={BID_STATES.find((s) => s.key === t.key)?.hint}
+                data-testid={`tab-state-${t.key}`}>
+                {t.label} <TabCount>{n}</TabCount>
+              </button>
+            );
+          })}
+        </SegmentedTabs>
+        <Select value={stage} onValueChange={setStage}>
+          <SelectTrigger className="w-52 bg-card" aria-label="Pipeline stage" data-testid="select-stage-filter">
+            <SelectValue placeholder="Every stage" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Every stage</SelectItem>
+            {JOB_STAGES.map((s) => (
+              <SelectItem key={s.key} value={s.key} data-testid={`stage-option-${s.key}`}>
+                {s.label}{latest?.stageCounts ? ` (${latest.stageCounts[s.key] ?? 0})` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {isLoading || isPlaceholderData ? (
         <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -411,13 +479,14 @@ export default function CrmClientsPage() {
                 <SortableTh sortKey="bidDate" label="Date bid" sort={sort} onSort={onSort} />
                 <SortableTh sortKey="address" label="Address" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
                 <SortableTh sortKey="bidStatus" label="Bid" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
+                <th className={`${crmTable.th ?? "px-4 py-2 text-left text-xs font-medium text-muted-foreground"} hidden sm:table-cell`}>Lead · stage</th>
                 <SortableTh sortKey="createdAt" label="Added" sort={sort} onSort={onSort} className="hidden sm:table-cell" />
                 <th className="w-10" />
               </tr>
             </thead>
             <tbody>
               {shown.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground" data-testid="text-bid-tab-empty">
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground" data-testid="text-bid-tab-empty">
                   {qDebounced.trim()
                     ? `No clients in this bucket match “${qDebounced.trim()}”.`
                     : "No clients in this bucket yet."}
@@ -469,6 +538,21 @@ export default function CrmClientsPage() {
                         {BID_PILL[c.bidStatus].label}
                       </span>
                     ) : <span className="text-muted-foreground text-sm">—</span>}
+                  </td>
+                  <td className={`${crmTable.td} hidden sm:table-cell`} data-testid={`client-state-${c.id}`}>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {c.bidState && (
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATE_PILL[c.bidState]}`}
+                          title={c.deadLead?.reason ? `Dead lead: ${c.deadLead.reason}` : undefined} data-testid={`pill-state-${c.id}`}>
+                          {BID_STATES.find((s) => s.key === c.bidState)?.label}
+                        </span>
+                      )}
+                      {c.bidNotSubmitted && (
+                        <span className="inline-flex items-center rounded-full border border-amber-400/60 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-300"
+                          title="A HOVER report was run but no estimate is in the file" data-testid={`pill-not-submitted-${c.id}`}>HOVER · no bid</span>
+                      )}
+                      {c.stage && <span className="text-xs text-muted-foreground">{STAGE_LABEL[c.stage]}</span>}
+                    </div>
                   </td>
                   <td className={`${crmTable.td} hidden sm:table-cell text-sm text-muted-foreground whitespace-nowrap`}>
                     {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}

@@ -39,7 +39,8 @@ import { logActivity } from "./activity";
 import { advanceJobStage, stageSideEffects } from "./job-stage-auto";
 import { enterPhase, jobFlowOf } from "./job-flow";
 import { anchorStatusBefore, isBuiltinKey, phaseOf } from "@shared/job-flow";
-import { stageOfProjectStatus } from "@shared/job-stage";
+import { stageOfProjectStatus, JOB_STAGES } from "@shared/job-stage";
+import { bidStateOf, bidNotSubmitted, clientStageOf, deadLeadOf, type BidFacts, type BidState } from "@shared/bid-status";
 import { loadActorDirectory, estimateEventActor } from "./actors";
 import { actorLabel } from "@shared/crm-actor";
 import { estimateDefaultsFromOrg, estimateDocText, depositFromBps } from "./doc-defaults";
@@ -622,6 +623,14 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     // approved estimate wins; else an open (sent/viewed) one means undecided;
     // else any declined means declined; no bids → "none".
     const bidDates = new Map<string, string>();
+    // Facts behind the owner's four bid statuses and the pipeline stage (shared/bid-status.ts): what is on file,
+    // per client — a visit on the calendar, a HOVER report, any estimate, a sent one, the newest live project.
+    const facts = new Map<string, BidFacts>();
+    const factsOf = (id: string): BidFacts => {
+      let f = facts.get(id);
+      if (!f) { f = { dead: false, anyEstimate: false, sentEstimate: false, appointment: false, hover: false, projectStatus: null }; facts.set(id, f); }
+      return f;
+    };
     const outcomesFor = async (ids: string[]) => {
       const outcome = new Map<string, string>();
       for (let i = 0; i < ids.length; i += 1000) {
@@ -631,6 +640,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
           approved: sql<number>`count(*) filter (where ${crmEstimates.status} = 'approved')::int`,
           open: sql<number>`count(*) filter (where ${crmEstimates.status} in ('sent','viewed'))::int`,
           declined: sql<number>`count(*) filter (where ${crmEstimates.status} = 'declined')::int`,
+          any: sql<number>`count(*)::int`,
+          // "Sent" = the client has seen it: sent / viewed / approved / declined, or a sent timestamp on file.
+          sent: sql<number>`count(*) filter (where ${crmEstimates.status} in ('sent','viewed','approved','declined') or ${crmEstimates.sentAt} is not null)::int`,
           // "Date bid": when the latest bid went out (sent), else when it was written.
           bidAt: sql<string | null>`max(coalesce(${crmEstimates.sentAt}, ${crmEstimates.createdAt}))`,
         }).from(crmEstimates).where(and(eq(crmEstimates.orgId, ctx.org.id), inArray(crmEstimates.customerId, chunk)))
@@ -645,6 +657,18 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
           outcome.set(p.customerId, "bid");
           if (p.at) bidDates.set(p.customerId, new Date(p.at).toISOString());
         }
+        // The newest live project decides the pipeline stage.
+        const liveProjects = await db.select({ customerId: crmProjects.customerId, status: crmProjects.status, createdAt: crmProjects.createdAt })
+          .from(crmProjects).where(and(eq(crmProjects.orgId, ctx.org.id), inArray(crmProjects.customerId, chunk), isNull(crmProjects.archivedAt),
+            sql`${crmProjects.status} <> 'cancelled'`)).orderBy(desc(crmProjects.createdAt));
+        for (const p of liveProjects) {
+          const f = factsOf(p.customerId);
+          if (!f.projectStatus && stageOfProjectStatus(p.status)) f.projectStatus = p.status;
+        }
+        const visits = await db.select({ customerId: crmAppointments.customerId }).from(crmAppointments)
+          .where(and(eq(crmAppointments.orgId, ctx.org.id), inArray(crmAppointments.customerId, chunk), sql`coalesce(${crmAppointments.status}, '') <> 'cancelled'`))
+          .groupBy(crmAppointments.customerId);
+        for (const v of visits) if (v.customerId) factsOf(v.customerId).appointment = true;
         const measured = await db.select({
           customerId: crmMeasurements.customerId,
           // requestedAt is HOVER's own capture date; completed/created are when it reached us.
@@ -654,9 +678,13 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         for (const m of measured) {
           if (!m.customerId) continue;
           outcome.set(m.customerId, "bid");
+          factsOf(m.customerId).hover = true;
           if (m.at) bidDates.set(m.customerId, new Date(m.at).toISOString());
         }
         for (const a of agg) {
+          const f = factsOf(a.customerId);
+          f.anyEstimate = a.any > 0;
+          f.sentEstimate = a.sent > 0;
           if (a.bidAt) bidDates.set(a.customerId, new Date(a.bidAt).toISOString());
           outcome.set(a.customerId,
             // Any estimate at all (draft, expired) is at least a bid.
@@ -665,9 +693,16 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       }
       return outcome;
     };
+    const factsFor = (c: typeof crmCustomers.$inferSelect): BidFacts => ({ ...factsOf(c.id), dead: !!deadLeadOf(c.customFields) });
+    const stateOf = (c: typeof crmCustomers.$inferSelect): BidState => bidStateOf(factsFor(c));
+    const stageOf = (c: typeof crmCustomers.$inferSelect) => clientStageOf(factsFor(c));
+    const notSubmittedOf = (c: typeof crmCustomers.$inferSelect) => bidNotSubmitted(factsFor(c));
     // The client list itself is shareable with a PM; pricing lives elsewhere.
     const present = (rows: (typeof crmCustomers.$inferSelect)[], outcome: Map<string, string>) =>
-      rows.map((c) => ({ ...c, portalToken: undefined, bidStatus: outcome.get(c.id) ?? "none", bidDate: bidDates.get(c.id) ?? null }));
+      rows.map((c) => ({
+        ...c, portalToken: undefined, bidStatus: outcome.get(c.id) ?? "none", bidDate: bidDates.get(c.id) ?? null,
+        bidState: stateOf(c), bidNotSubmitted: notSubmittedOf(c), stage: stageOf(c), deadLead: deadLeadOf(c.customFields),
+      }));
 
     // Paged mode (opt-in with ?paged=1, or any limit/offset): { rows, total,
     // bidCounts, limit, offset }. bidCounts cover EVERY client the caller may
@@ -690,6 +725,16 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       if (bidStatus && !["won", "undecided", "declined", "none", "bid"].includes(bidStatus)) {
         return res.status(400).json({ message: "bidStatus must be one of: won, undecided, declined, bid, none." });
       }
+      // ?bidState=open|pending|complete|dead, ?stage=<pipeline stage key>, ?notSubmitted=1 (HOVER run, no estimate).
+      const bidState = req.query.bidState === undefined || req.query.bidState === "" || req.query.bidState === "all" ? null : String(req.query.bidState);
+      if (bidState && !["open", "pending", "complete", "dead"].includes(bidState)) {
+        return res.status(400).json({ message: "bidState must be one of: open, pending, complete, dead." });
+      }
+      const stage = req.query.stage === undefined || req.query.stage === "" || req.query.stage === "all" ? null : String(req.query.stage);
+      if (stage && !JOB_STAGES.some((s) => s.key === stage)) {
+        return res.status(400).json({ message: `stage must be one of: ${JOB_STAGES.map((s) => s.key).join(", ")}.` });
+      }
+      const notSubmitted = req.query.notSubmitted === "1";
       // ?sort=name|bidDate|address|bidStatus|createdAt&dir=asc|desc — the
       // column headers on /crm/clients. Sorting happens here, before the
       // page is cut, so page 2 of "name A→Z" is really the next names.
@@ -706,11 +751,23 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         await db.select().from(crmCustomers).where(and(...where)).orderBy(desc(crmCustomers.createdAt)));
       const outcome = await outcomesFor(all.map((c) => c.id));
       const bidCounts = { won: 0, undecided: 0, declined: 0, bid: 0, none: 0 } as Record<string, number>;
-      for (const c of all) bidCounts[outcome.get(c.id) ?? "none"] += 1;
-      const matching = bidStatus ? all.filter((c) => (outcome.get(c.id) ?? "none") === bidStatus) : all;
+      const stateCounts = { open: 0, pending: 0, complete: 0, dead: 0 } as Record<BidState, number>;
+      const stageCounts = Object.fromEntries(JOB_STAGES.map((s) => [s.key, 0])) as Record<string, number>;
+      let notSubmittedCount = 0;
+      for (const c of all) {
+        bidCounts[outcome.get(c.id) ?? "none"] += 1;
+        stateCounts[stateOf(c)] += 1;
+        const st = stageOf(c);
+        if (st) stageCounts[st] += 1;
+        if (notSubmittedOf(c)) notSubmittedCount += 1;
+      }
+      let matching = bidStatus ? all.filter((c) => (outcome.get(c.id) ?? "none") === bidStatus) : all;
+      if (bidState) matching = matching.filter((c) => stateOf(c) === bidState);
+      if (stage) matching = matching.filter((c) => stageOf(c) === stage);
+      if (notSubmitted) matching = matching.filter((c) => notSubmittedOf(c));
       sortCustomers(matching, sortKey, dirRaw, outcome, bidDates);
       const page = matching.slice(offset, offset + limit);
-      return res.json({ rows: present(page, outcome), total: matching.length, bidCounts, limit, offset, sort: sortKey, dir: dirRaw });
+      return res.json({ rows: present(page, outcome), total: matching.length, bidCounts, stateCounts, stageCounts, notSubmittedCount, limit, offset, sort: sortKey, dir: dirRaw });
     }
 
     // Legacy shape: bare array of the newest 500 (every picker relies on it).
@@ -840,6 +897,33 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
 
   /** Field edits from the client page's Edit dialog; the activity log names
    *  only the fields that actually changed. */
+  /** Mark a client a dead lead (no response, dead end, tire kicker) — or reopen the lead. Who, when and why go on
+   *  the client and the activity log; the Clients list files them under "Dead lead". */
+  app.post("/api/crm/customers/:id/dead-lead", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    if (!ctx.permissions.manageCustomers && !ctx.permissions.manageEstimates) {
+      return res.status(403).json({ message: "Requires permission: manageCustomers or manageEstimates" });
+    }
+    const parsed = z.object({ dead: z.boolean(), reason: z.string().max(300).nullable().optional() }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Send { dead: true | false, reason? }" });
+    const [cust] = await db.select().from(crmCustomers)
+      .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, String(req.params.id)))).limit(1);
+    if (!cust || !(await objectPolicy(ctx).visible("customers", cust.id))) return res.status(404).json({ message: "Client not found" });
+    const reason = parsed.data.reason?.trim() || null;
+    const mark = parsed.data.dead ? { at: new Date().toISOString(), memberId: ctx.member.id, reason } : null;
+    const [row] = await db.update(crmCustomers).set({
+      customFields: mark
+        ? sql`coalesce(${crmCustomers.customFields}, '{}'::jsonb) || jsonb_build_object('bidDead', ${JSON.stringify(mark)}::jsonb)`
+        : sql`coalesce(${crmCustomers.customFields}, '{}'::jsonb) - 'bidDead'`,
+      updatedAt: new Date(),
+    } as any).where(eq(crmCustomers.id, cust.id)).returning();
+    logActivity(ctx, mark ? "lead.dead" : "lead.reopened", {
+      entityType: "customer", entityId: cust.id, customerId: cust.id, meta: { reason },
+    });
+    res.json({ dead: !!mark, deadLead: deadLeadOf(row.customFields) });
+  });
+
   app.patch("/api/crm/customers/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageCustomers");
     if (!ctx) return;
