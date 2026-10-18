@@ -7,7 +7,8 @@
  *   • roof and wall faces shaded separately, in the colors picked in the design panel
  *   • openings (windows/doors) cut out of their wall and drawn as outlined glass; "show windows/doors" off fills the
  *     wall instead
- *   • tap/click a face → onSelect(face) (label, area, pitch shown by the dialog); the face is highlighted
+ *   • tap/click a face → onSelect(face, { add }) (label, area, pitch shown by the dialog); the face is highlighted.
+ *     `add` is true when Shift, Ctrl or ⌘ was held — the dialog adds the face to the set instead of replacing it
  *   • view presets: front / back / left / right / top, in the export's own frame (see the dialog's note)
  *   • a measurements overlay: facet name · area · pitch floating at each roof facet and named wall
  *
@@ -38,7 +39,7 @@ export interface Hover3DViewerProps {
   view: { preset: ViewPreset; seq: number };
   /** Highlighted faces — one, or several in "select several" mode. */
   selectedIds: string[];
-  onSelect: (face: MeshFace | null) => void;
+  onSelect: (face: MeshFace | null, opts: { add: boolean }) => void;
 }
 
 type V3 = THREE.Vector3;
@@ -418,7 +419,7 @@ export default function Hover3DViewer(props: Hover3DViewerProps) {
       const hits = ray.intersectObjects(built.pickables.filter((m) => m.visible), false);
       const hit = hits.find((x) => x.faceIndex !== undefined && x.faceIndex !== null);
       const face = hit ? built.triFace.get(hit.object as THREE.Mesh)?.[hit.faceIndex!] ?? null : null;
-      propsRef.current.onSelect(face);
+      propsRef.current.onSelect(face, { add: e.shiftKey || e.ctrlKey || e.metaKey });
     };
     renderer.domElement.addEventListener("pointerdown", onDown);
     renderer.domElement.addEventListener("pointerup", onUp);

@@ -14,13 +14,14 @@
  */
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Box, ExternalLink, Eye, EyeOff, Loader2, Rows3, Ruler } from "lucide-react";
+import { Box, Check, CopyPlus, ExternalLink, Eye, EyeOff, Loader2, Rows3, Ruler } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import type { HoverMesh, MeshFace } from "@shared/hover-mesh";
+import { EMPTY_PICK, pickFace, pickedArea, setSeveral, type PickState } from "@shared/hover-pick";
 import type { ViewPreset } from "./hover-3d-viewer";
 
 const Hover3DViewer = lazy(() => import("./hover-3d-viewer"));
@@ -271,23 +272,22 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
   const [roof, setRoof] = useState<string>(ROOF_SWATCHES[0].hex);
   const [windowColor, setWindowColor] = useState<string>(WINDOW_SWATCHES[0].hex);
   const [doorColor, setDoorColor] = useState<string>(DOOR_SWATCHES[0].hex);
-  // "Select several": taps add/remove faces; the panel totals them.
-  const [multi, setMulti] = useState(false);
-  const [picked, setPicked] = useState<MeshFace[]>([]);
+  // Face selection — single, or "select several" where taps add/remove faces and the card totals them.
+  // Shift/Ctrl/⌘-click adds too. Rules in shared/hover-pick.ts.
+  const [pick, setPick] = useState<PickState<MeshFace>>(EMPTY_PICK);
+  const multi = pick.several;
+  const picked = pick.picked;
+  const selected = multi ? null : picked[0] ?? null;
+  const onPick = (f: MeshFace | null, opts?: { add: boolean }) => setPick((s) => pickFace(s, f, opts?.add ?? false));
+  const several = (on: boolean) => setPick((s) => setSeveral(s, on));
+  const selectedIds = picked.map((f) => f.id);
   const [showOpenings, setShowOpenings] = useState(true);
   // Lap-siding reveal in inches (0 = plain walls) and shingle courses on the roof — a look, not a product.
   const [reveal, setReveal] = useState<number>(7);
   const [shingles, setShingles] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
   const [view, setView] = useState<{ preset: ViewPreset; seq: number }>({ preset: "iso", seq: 0 });
-  const [selected, setSelected] = useState<MeshFace | null>(null);
-  const onPick = (f: MeshFace | null) => {
-    if (!multi) { setSelected(f); return; }
-    if (!f) return;
-    setPicked((cur) => (cur.some((x) => x.id === f.id) ? cur.filter((x) => x.id !== f.id) : [...cur, f]));
-  };
-  const selectedIds = multi ? picked.map((f) => f.id) : selected ? [selected.id] : [];
-  const pickedArea = picked.reduce((a, f) => a + (f.areaSqft ?? 0), 0);
+  const totalArea = pickedArea(picked);
   const [panelOpen, setPanelOpen] = useState(false);
 
   const parentName = useMemo(() => {
@@ -310,9 +310,10 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
               {p.label}
             </Button>
           ))}
-          <Button size="sm" variant={multi ? "default" : "secondary"} className="h-7 px-2 text-xs shadow-sm" aria-pressed={multi}
-            onClick={() => { setMulti((v) => !v); setSelected(null); setPicked([]); }} data-testid="hover-3d-multi-toggle">
-            {multi ? "Select several: on" : "Select several"}
+          <Button size="sm" variant={multi ? "default" : "secondary"} className="h-7 gap-1 px-2 text-xs shadow-sm" aria-pressed={multi}
+            title={multi ? "Back to one face at a time" : "Tap several walls or roof facets and add them up (or Shift-click them)"}
+            onClick={() => several(!multi)} data-testid="hover-3d-multi-toggle">
+            {multi ? <><Check className="h-3.5 w-3.5" /> Done selecting</> : <><CopyPlus className="h-3.5 w-3.5" /> Select several</>}
           </Button>
           {/* Phones: the design panel sits under the model, shown on demand. */}
           <Button size="sm" variant="default" className="h-7 px-2 text-xs shadow-sm md:hidden"
@@ -324,9 +325,15 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
           <div className="absolute bottom-2 left-2 right-2 rounded-lg border bg-background/95 p-3 text-sm shadow-md sm:right-auto sm:min-w-64 sm:max-w-sm"
             data-testid="hover-3d-multi-info">
             <div className="flex items-center justify-between gap-3">
-              <span className="font-semibold">{picked.length ? `${picked.length} face${picked.length === 1 ? "" : "s"} · ${pickedArea.toLocaleString("en-US", { maximumFractionDigits: 1 })} sq ft` : "Tap faces to add them up"}</span>
-              {picked.length > 0 && <button type="button" className="text-xs text-muted-foreground hover:underline" onClick={() => setPicked([])}>Clear</button>}
+              <span className="font-semibold" data-testid="hover-3d-multi-total">
+                {picked.length ? `${picked.length} face${picked.length === 1 ? "" : "s"} · ${totalArea.toLocaleString("en-US", { maximumFractionDigits: 1 })} sq ft` : "Tap walls or roof facets to add them up"}
+              </span>
+              <span className="flex shrink-0 gap-3 text-xs text-muted-foreground">
+                {picked.length > 0 && <button type="button" className="hover:underline" onClick={() => setPick({ several: true, picked: [] })} data-testid="hover-3d-multi-clear">Clear</button>}
+                <button type="button" className="hover:underline" onClick={() => several(false)} data-testid="hover-3d-multi-done">Done</button>
+              </span>
             </div>
+            {picked.length < 2 && <p className="mt-0.5 text-xs text-muted-foreground">Tap a face to add it, tap it again to take it out. On a computer, Shift-click adds faces any time.</p>}
             {picked.length > 0 && (
               <ul className="mt-1 max-h-28 overflow-y-auto text-xs tabular-nums text-muted-foreground">
                 {picked.map((f) => (
@@ -346,7 +353,11 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
               <span className="font-semibold">
                 {selected.name ?? (selected.type === "opening" ? "Window / door" : selected.type === "roof" ? "Roof facet" : "Wall")}
               </span>
-              <button type="button" className="text-xs text-muted-foreground hover:underline" onClick={() => setSelected(null)}>Close</button>
+              <span className="flex shrink-0 gap-3 text-xs text-muted-foreground">
+                <button type="button" className="hover:underline" onClick={() => several(true)}
+                  title="Keep this face and tap more to add them up" data-testid="hover-3d-add-more">+ Add more faces</button>
+                <button type="button" className="hover:underline" onClick={() => onPick(null)}>Close</button>
+              </span>
             </div>
             <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs tabular-nums">
               <dt className="text-muted-foreground">Type</dt>
@@ -398,8 +409,8 @@ function ModelTab({ mesh }: { mesh: HoverMesh }) {
           {!!mesh.counts.soffit && <div>{mesh.counts.soffit} soffit faces</div>}
         </div>
         <p className="text-xs text-muted-foreground">
-          Drag to spin, pinch or scroll to zoom, right-drag or two fingers to pan. Tap a face for its size and pitch.
-          Colors are a preview, not a product selection.
+          Drag to spin, pinch or scroll to zoom, right-drag or two fingers to pan. Tap a face for its size and pitch;
+          Shift-click or <b>Select several</b> adds up walls and roof facets. Colors are a preview, not a product selection.
         </p>
       </aside>
     </div>
