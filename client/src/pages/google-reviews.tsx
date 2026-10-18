@@ -2,6 +2,7 @@ import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-wor
 import { GoogleReport } from "@/components/profile-guard";
 import { CrmReviewPhotos, PICK_MAX, PICK_MIN, useReviewHandoff, type ReviewCrmPhoto } from "@/components/crm-photo-sources";
 import { ReviewPipeline, PIPELINE_KEY, type PipelineItem } from "@/components/review-pipeline";
+import { JobStagePill } from "@/components/job-stage";
 import type { CrmPhotoClient } from "@/lib/crm-photos";
 import { AiReplySettings } from "@/components/ai-review-replies";
 import { GoogleSurface, GoogleAvatar, GoogleStarRow, GooglePill, GoogleAiOverview, relativeTime } from "@/components/google";
@@ -696,6 +697,7 @@ export default function GoogleReviewsPage() {
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-medium" data-testid={`text-client-name-${review.id}`}>{review.clientName}</p>
                               {getStatusBadge(review)}
+                              <JobStagePill stage={review.jobStage} testId={`pill-review-stage-${review.id}`} />
                               {review.feedbackRating && review.privateFeedbackAt ? (
                                 <Badge variant="outline" className="border-amber-500/60 text-xs text-amber-700 dark:text-amber-300" title="Scored below your threshold: the private form came first (expand to read it)" data-testid={`badge-private-feedback-${review.id}`}>
                                   <MessageSquare className="mr-1 h-3 w-3" aria-hidden="true" />

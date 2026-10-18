@@ -18,7 +18,7 @@ import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, can
 import { presentListing } from "./competitor-analysis";
 import { rateLimit, actorKey, takeBudget } from "./growth-limits";
 import { findReviewSites, ReviewSiteFinderError } from "./review-site-finder";
-import { hiddenFromReviews, registerReviewPipelineRoutes } from "./crm/review-pipeline";
+import { hiddenFromReviews, jobStagesForRequests, registerReviewPipelineRoutes } from "./crm/review-pipeline";
 import { registerCrmPhotoPlatformRoutes, registerReviewProjectPhotoRoutes, resolveReviewCrmLink, reviewPhotoUrl } from "./crm/photo-library";
 import { ownedBy } from "./ownership";
 import { buildExclusionList } from "./click-guard-exclusions";
@@ -5467,7 +5467,9 @@ function main() {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
       const requests = await storage.getReviewRequestsByUser(user.id);
-      res.json(requests);
+      // Each CRM-linked client's job stage (Bid / Approved / In progress / Completed) beside the request.
+      const stages = await jobStagesForRequests(requests);
+      res.json(requests.map((r) => r.crmCustomerId && stages.has(r.crmCustomerId) ? { ...r, jobStage: stages.get(r.crmCustomerId) } : r));
     } catch (err: any) {
       res.status(500).json({ message: "Failed to load review requests" });
     }

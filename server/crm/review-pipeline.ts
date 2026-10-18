@@ -25,6 +25,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, pool } from "../db";
 import { crmCustomers, crmDivisions, crmEstimates, crmProjects, crmReviewPipeline } from "@shared/schema";
 import { pinnedDivisionOf } from "./divisions";
+import { jobStageOf, type JobStage } from "@shared/job-stage";
 import { objectPolicy } from "./object-access";
 import { EXPORT_PERMS, photoCtx } from "./photo-library";
 import type { OrgContext } from "./tenancy";
@@ -56,6 +57,8 @@ export type PipelineItem = {
   dismissedAt: string | null;
   /** The client's division (null = unassigned), for the owner's division ribbon. */
   divisionId: string | null;
+  /** Bid / Approved / In progress / Completed (shared/job-stage.ts). */
+  jobStage: JobStage | null;
 };
 
 const addressOf = (c: Customer) => [c.addressLine1, c.city, [c.state, c.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null;
@@ -75,6 +78,8 @@ export function describeJobs(jobs: Pick<PipelineJob, "title">[]): string {
 
 export async function buildReviewPipeline(ctx: OrgContext, userId: number): Promise<{
   ready: PipelineItem[]; dismissed: PipelineItem[]; hidden: PipelineItem[]; askedCount: number;
+  /** Won-job clients not asked yet whose job is not Closed out — they join the list once it is. */
+  notClosedOut: number;
 }> {
   const orgId = ctx.org.id;
   const policy = objectPolicy(ctx);
@@ -85,15 +90,15 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
   const hiddenRows = await db.select({ customerId: crmReviewPipeline.customerId }).from(crmReviewPipeline)
     .where(and(eq(crmReviewPipeline.orgId, orgId), eq(crmReviewPipeline.kind, "hidden")));
   const ids = [...new Set([...won.map((e) => e.customerId), ...hiddenRows.map((h) => h.customerId)])];
-  if (!ids.length) return { ready: [], dismissed: [], hidden: [], askedCount: 0 };
+  if (!ids.length) return { ready: [], dismissed: [], hidden: [], askedCount: 0, notClosedOut: 0 };
   const customers = await db.select().from(crmCustomers)
     .where(and(eq(crmCustomers.orgId, orgId), inArray(crmCustomers.id, ids), isNull(crmCustomers.archivedAt)));
   const visible = await policy.filter("customers", customers) as Customer[];
-  if (!visible.length) return { ready: [], dismissed: [], hidden: [], askedCount: 0 };
+  if (!visible.length) return { ready: [], dismissed: [], hidden: [], askedCount: 0, notClosedOut: 0 };
   const visibleIds = visible.map((c) => c.id);
 
   const [projects, photos, asked, dismissals, suppressed] = await Promise.all([
-    db.select({ id: crmProjects.id, status: crmProjects.status }).from(crmProjects)
+    db.select({ id: crmProjects.id, status: crmProjects.status, customerId: crmProjects.customerId, createdAt: crmProjects.createdAt }).from(crmProjects)
       .where(and(eq(crmProjects.orgId, orgId), inArray(crmProjects.customerId, visibleIds))),
     pool.query<{ ref_id: string; n: string; finished: string }>(
       `select ref_id, count(*) n, count(*) filter (where file_name like 'finished--%') finished
@@ -111,6 +116,8 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
     pool.query<{ email: string }>("select email from review_recipient_preferences where user_id = $1 and unsubscribed = true", [userId]),
   ]);
   const projectStatus = new Map(projects.map((p) => [p.id, p.status]));
+  const projectsOf = new Map<string, { status: string; createdAt: Date | null }[]>();
+  for (const p of projects) projectsOf.set(p.customerId, [...(projectsOf.get(p.customerId) ?? []), p]);
   const photoCount = new Map(photos.rows.map((r) => [r.ref_id, { n: Number(r.n), finished: Number(r.finished) }]));
   const askedIds = new Set(asked.rows.map((r) => r.id));
   const dismissedAt = new Map(dismissals.map((d) => [d.customerId, d.dismissedAt]));
@@ -121,6 +128,7 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
   for (const e of won) jobsBy.set(e.customerId, [...(jobsBy.get(e.customerId) ?? []), e]);
 
   const ready: PipelineItem[] = [];
+  let notClosedOut = 0;
   const dismissed: PipelineItem[] = [];
   const hidden: PipelineItem[] = [];
   for (const c of visible) {
@@ -151,8 +159,12 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
       unsubscribed: !!email && unsub.has(normalizeRecipient(email)),
       dismissedAt: dismissedAt.get(c.id)?.toISOString() ?? null,
       divisionId: c.divisionId ?? null,
+      jobStage: jobStageOf({ estimates: list.map(() => ({ status: "approved" })), projects: projectsOf.get(c.id) ?? [] }),
     };
-    (hiddenIds.has(c.id) ? hidden : item.dismissedAt ? dismissed : ready).push(item);
+    // Only a Closed-out job is asked for a review (owner, 2026-10-17); the rest wait, counted, until it is.
+    if (hiddenIds.has(c.id)) hidden.push(item);
+    else if (item.jobStage !== "closed_out") notClosedOut++;
+    else (item.dismissedAt ? dismissed : ready).push(item);
   }
   // Finished jobs first (the moment to ask), then the most recently won.
   const order = (a: PipelineItem, b: PipelineItem) =>
@@ -171,10 +183,11 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
       jobs: [], wonAt: null, projectStatus: null, jobFinished: false, finishedPhotoCount: 0, description: "",
       needsEmail: !email, unsubscribed: false, dismissedAt: dismissedAt.get(c.id)?.toISOString() ?? null,
       divisionId: c.divisionId ?? null,
+      jobStage: jobStageOf({ projects: projectsOf.get(c.id) ?? [] }),
     });
   }
   hidden.sort((a, b) => a.customer.name.localeCompare(b.customer.name));
-  return { ready, dismissed, hidden, askedCount: [...askedIds].filter((id) => !hiddenIds.has(id)).length };
+  return { ready, dismissed, hidden, notClosedOut, askedCount: [...askedIds].filter((id) => !hiddenIds.has(id)).length };
 }
 
 /**
@@ -260,4 +273,27 @@ export function registerReviewPipelineRoutes(app: Express, getUser: GetUser): vo
   app.delete("/api/reviews/pipeline/:customerId/dismiss", requirePlatformAccess, setState("dismissed", false));
   app.post("/api/reviews/pipeline/:customerId/hide", requirePlatformAccess, setState("hidden", true));
   app.delete("/api/reviews/pipeline/:customerId/hide", requirePlatformAccess, setState("hidden", false));
+}
+
+/**
+ * The job stage of each CRM-linked review request's client (Sent requests list). Only the stage word leaves here;
+ * a request typed by hand (no linked client) gets none.
+ */
+export async function jobStagesForRequests(requests: { crmOrgId?: string | null; crmCustomerId?: string | null }[]): Promise<Map<string, JobStage | null>> {
+  const pairs = requests.filter((r) => r.crmOrgId && r.crmCustomerId).map((r) => [r.crmOrgId!, r.crmCustomerId!] as const);
+  const out = new Map<string, JobStage | null>();
+  if (!pairs.length) return out;
+  const ids = [...new Set(pairs.map((p) => p[1]))];
+  const orgs = [...new Set(pairs.map((p) => p[0]))];
+  const [est, proj] = await Promise.all([
+    pool.query<{ customer_id: string; status: string }>("select customer_id, status from crm_estimates where org_id = any($1) and customer_id = any($2)", [orgs, ids]),
+    pool.query<{ customer_id: string; status: string; created_at: Date }>("select customer_id, status, created_at from crm_projects where org_id = any($1) and customer_id = any($2) and archived_at is null", [orgs, ids]),
+  ]);
+  for (const id of ids) {
+    out.set(id, jobStageOf({
+      estimates: est.rows.filter((r) => r.customer_id === id),
+      projects: proj.rows.filter((r) => r.customer_id === id).map((r) => ({ status: r.status, createdAt: r.created_at })),
+    }));
+  }
+  return out;
 }

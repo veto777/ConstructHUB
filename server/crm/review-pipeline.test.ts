@@ -99,7 +99,9 @@ beforeAll(async () => {
   await pool.query(`INSERT INTO crm_attachments(id,org_id,kind,ref_id,file_name,mime,size_bytes,storage_path)
     VALUES(gen_random_uuid(),$1,'photo',$2,'finished--a.jpg','image/jpeg',1,'x'),(gen_random_uuid(),$1,'photo',$2,'progress--b.jpg','image/jpeg',1,'y')`, [orgA, C.finished]);
   C.recent = await customer(orgA, "Birch Recent", null);
-  await job(orgA, C.recent, { status: "approved", title: "Estimate", total: 300_000, daysAgo: 2, project: "scheduled" });
+  await job(orgA, C.recent, { status: "approved", title: "Estimate", total: 300_000, daysAgo: 2, project: "invoiced" });
+  C.underway = await customer(orgA, "Hazel Underway", "hazel@example.invalid");
+  await job(orgA, C.underway, { status: "approved", title: "Roof", total: 1, daysAgo: 3, project: "in_progress" });
   C.draft = await customer(orgA, "Cedar Draft", "cedar@example.invalid");
   await job(orgA, C.draft, { status: "sent", title: "Roof", total: 1, daysAgo: 1 });
   C.cancelled = await customer(orgA, "Dogwood Cancelled", "dog@example.invalid");
@@ -130,23 +132,25 @@ afterAll(async () => {
 }, 60_000);
 
 describe("review pipeline", () => {
-  it("lists won-job clients not yet asked, finished jobs first, prefilled", async () => {
+  it("lists Closed-out clients not yet asked, newest win first, prefilled; jobs not Closed out wait, counted", async () => {
     const r = await call(owner, "/api/reviews/pipeline");
     expect(r.status).toBe(200);
-    expect(r.data.ready.map((i: any) => i.customer.name)).toEqual(["Ash Finished", "Birch Recent"]);
-    const ash = r.data.ready[0];
+    expect(r.data.ready.map((i: any) => i.customer.name)).toEqual(["Birch Recent", "Ash Finished"]);
+    expect(r.data.notClosedOut).toBe(1);
+    const ash = r.data.ready.find((i: any) => i.customer.name === "Ash Finished");
     expect(ash.customer).toMatchObject({ email: "ash@example.invalid", address: "1 Main St, Tampa, FL 33601", photoCount: 2 });
     expect(ash.finishedPhotoCount).toBe(1);
     expect(ash.jobs).toHaveLength(2);
     expect(ash.description).toBe("Window install · Hardie lap siding");
     expect(ash.needsEmail).toBe(false);
-    const birch = r.data.ready[1];
-    expect(birch).toMatchObject({ needsEmail: true, jobFinished: false, projectStatus: "scheduled", description: "" });
+    const birch = r.data.ready.find((i: any) => i.customer.name === "Birch Recent");
+    expect(birch).toMatchObject({ needsEmail: true, jobFinished: true, projectStatus: "invoiced", description: "", jobStage: "closed_out" });
     expect(r.data.askedCount).toBe(2);
     // The owner's division ribbon: every division, no pin; each client carries its division.
     expect(r.data.pinnedDivisionId).toBeNull();
     expect(Array.isArray(r.data.divisions)).toBe(true);
     expect(ash).toHaveProperty("divisionId");
+    expect(ash.jobStage).toBe("closed_out");
   });
 
   it("not now sets a client aside and puts them back, logged by name", async () => {

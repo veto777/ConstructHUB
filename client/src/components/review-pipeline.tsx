@@ -12,6 +12,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { JobStagePill } from "@/components/job-stage";
+import type { JobStage } from "@shared/job-stage";
 import { Button } from "@/components/ui/button";
 import { Section, StatusPill } from "@/components/app-ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,10 +34,11 @@ export type PipelineItem = {
   unsubscribed: boolean;
   dismissedAt: string | null;
   divisionId: string | null;
+  jobStage: JobStage | null;
 };
 type Division = { id: string; code: string; name: string };
 type Pipeline = {
-  ready: PipelineItem[]; dismissed: PipelineItem[]; hidden: PipelineItem[]; askedCount: number;
+  ready: PipelineItem[]; dismissed: PipelineItem[]; hidden: PipelineItem[]; askedCount: number; notClosedOut?: number;
   divisions?: Division[]; pinnedDivisionId?: string | null;
 };
 
@@ -46,8 +49,7 @@ const SIZES = [10, 25, 50, 100] as const;
 const SIZE_KEY = "review-pipeline-size";
 // Filters (pure, on the loaded list): what state the job is in, and the trade read from the job titles.
 const STATUS_FILTERS = [
-  ["all", "All won jobs"], ["finished", "Finished jobs"], ["underway", "Not finished yet"],
-  ["photos", "Has job photos"], ["nophotos", "No job photos"], ["noemail", "Missing email"],
+  ["all", "All closed-out jobs"], ["photos", "Has job photos"], ["nophotos", "No job photos"], ["noemail", "Missing email"],
 ] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number][0];
 const TRADES = [
@@ -58,8 +60,6 @@ export function matchesPipeline(it: PipelineItem, f: { q: string; status: Status
   const text = [it.customer.name, it.customer.email, it.customer.address, it.description, ...it.jobs.map((j) => j.title)].filter(Boolean).join(" ").toLowerCase();
   if (f.q && !f.q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => text.includes(w))) return false;
   const photos = it.customer.photoCount;
-  if (f.status === "finished" && !it.jobFinished) return false;
-  if (f.status === "underway" && it.jobFinished) return false;
   if (f.status === "photos" && !photos) return false;
   if (f.status === "nophotos" && photos) return false;
   if (f.status === "noemail" && !it.needsEmail) return false;
@@ -71,10 +71,6 @@ function savedSize(): number {
   try { const n = Number(localStorage.getItem(SIZE_KEY)); return (SIZES as readonly number[]).includes(n) ? n : COLLAPSED; } catch { return COLLAPSED; }
 }
 
-const STAGE: Record<string, string> = {
-  scheduled: "Scheduled", in_progress: "In progress", waiting_on_trades: "In progress",
-  punch_list: "Punch list", complete: "Finished", invoiced: "Finished", paid: "Finished",
-};
 const day = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
 const money = (cents: number) => `$${Math.round(cents / 100).toLocaleString()}`;
 
@@ -119,7 +115,7 @@ export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) 
 
   if (isLoading) return null;
   if (error) return <p className="text-sm text-destructive" role="alert" data-testid="text-pipeline-error">{error.message}</p>;
-  if (!data || (!data.ready.length && !data.dismissed.length && !data.hidden.length)) return null;
+  if (!data || (!data.ready.length && !data.dismissed.length && !data.hidden.length && !data.notClosedOut)) return null;
 
   const divisions = data.divisions ?? [];
   const showRibbon = !data.pinnedDivisionId && divisions.length > 0;
@@ -135,7 +131,7 @@ export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) 
     <Section
       title={<span>Ready to ask <span className="font-normal text-muted-foreground">· {data.ready.length}</span>
         {pinnedDiv && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 align-middle text-xs font-semibold" data-testid="badge-pipeline-division">{pinnedDiv.code}</span>}</span>}
-      description="Every CRM client with a won job who hasn't been asked for a review yet. Finished jobs first."
+      description="Every client whose job is Closed out and who hasn't been asked for a review yet. A job joins this list the moment it's Closed out."
       flush testId="section-review-pipeline">
       {showRibbon && (
         <div className="flex gap-1 overflow-x-auto border-b px-4 pb-3 sm:px-6" role="tablist" aria-label="Division" data-testid="pipeline-division-ribbon">
@@ -185,10 +181,13 @@ export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) 
             onDismiss={() => dismiss.mutate({ id: it.customer.id, on: true, name: it.customer.name })} onHide={() => setConfirmHide(it)} />)}
         </ul>
       ) : (
-        <p className="px-4 py-6 text-center text-sm text-muted-foreground sm:px-6">Every won job has been asked. New wins show up here automatically.</p>
+        <p className="px-4 py-6 text-center text-sm text-muted-foreground sm:px-6">No Closed-out jobs waiting. A job shows up here as soon as it's Closed out on the client page.</p>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-xs text-muted-foreground sm:px-6">
-        <span>{data.askedCount} won-job client{data.askedCount === 1 ? "" : "s"} already asked</span>
+        <span>
+          {data.askedCount} already asked
+          {!!data.notClosedOut && <> · <span className="font-medium text-foreground" data-testid="text-pipeline-not-closed">{data.notClosedOut} won job{data.notClosedOut === 1 ? "" : "s"} not Closed out yet</span></>}
+        </span>
         <span className="flex items-center gap-3">
           {matched.length > COLLAPSED && (
             <label className="flex items-center gap-1.5">
@@ -267,7 +266,6 @@ function Row({ it, onPrepare, onDismiss, onHide, busy }: {
   it: PipelineItem; onPrepare: (it: PipelineItem) => void; onDismiss: () => void; onHide: () => void; busy: boolean;
 }) {
   const total = it.jobs.reduce((s, j) => s + j.totalCents, 0);
-  const stage = it.projectStatus ? STAGE[it.projectStatus] ?? null : null;
   const blocked = it.unsubscribed;
   const photos = it.customer.photoCount;
   return (
@@ -275,7 +273,7 @@ function Row({ it, onPrepare, onDismiss, onHide, busy }: {
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 truncate text-sm font-medium md:max-w-[45%] md:shrink-0">{it.customer.name}</span>
-          {stage && <StatusPill tone={it.jobFinished ? "success" : "neutral"} className="shrink-0">{stage}</StatusPill>}
+          <JobStagePill stage={it.jobStage} testId={`pill-pipeline-stage-${it.customer.id}`} />
           {it.needsEmail && <StatusPill tone="warning" className="shrink-0">No email</StatusPill>}
           {it.unsubscribed && <StatusPill tone="neutral" className="shrink-0">Unsubscribed</StatusPill>}
           <span className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline">{it.description || "Won job"}</span>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { JobStageControl } from "@/components/job-stage";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation, Link } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -1186,6 +1187,15 @@ export default function CrmClientPage() {
               )}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Where this client's job stands: Bid → Approved → In progress → Completed (shared/job-stage.ts). */}
+      <Card>
+        <CardContent className="p-4 sm:p-5">
+          <p className="mb-3 text-sm font-bold">Job stage</p>
+          <JobStageControl customer={c} estimates={estimates} projects={data.projects ?? []}
+            companyName={me?.org?.name ?? "us"} canEdit={canManageJobs} />
         </CardContent>
       </Card>
 
