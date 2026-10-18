@@ -15,6 +15,7 @@
  * Public-facing:
  *   - EstimateAttachments — the gated public estimate page's attachment list
  */
+import { PhotoViewer } from "@/components/photo-viewer";
 import { useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -111,6 +112,7 @@ export function PortalPhotoShare({ accounts, photos }: { accounts: any[]; photos
   const inputRef = useRef<HTMLInputElement>(null);
   const customerId = accounts?.[0]?.id;
   const mine = (photos ?? []).filter((p: any) => p.customerId === customerId);
+  const [viewing, setViewing] = useState<number | null>(null);
 
   const upload = useMutation({
     mutationFn: async (file: File) =>
@@ -157,17 +159,22 @@ export function PortalPhotoShare({ accounts, photos }: { accounts: any[]; photos
           </div>
           {mine.length > 0 && (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2" data-testid="client-photo-grid">
-              {mine.map((p: any) => (
-                <a key={p.id} href={p.downloadUrl} data-testid={`client-photo-${p.id}`}
-                  className="block rounded-lg border overflow-hidden bg-muted/30 hover:border-primary/40 transition-colors">
+              {mine.map((p: any, i: number) => (
+                <button type="button" key={p.id} onClick={() => setViewing(i)} data-testid={`client-photo-${p.id}`}
+                  className="block w-full rounded-lg border overflow-hidden bg-muted/30 hover:border-primary/40 transition-colors">
                   {String(p.mime).startsWith("image/") && !/hei[cf]/.test(p.mime) ? (
                     <img src={`${p.downloadUrl}?inline=1`} alt={p.fileName} className="h-20 w-full object-cover" />
                   ) : (
                     <div className="h-20 flex items-center justify-center"><ImageIcon className="h-5 w-5 text-muted-foreground" /></div>
                   )}
-                </a>
+                </button>
               ))}
             </div>
+          )}
+          {viewing != null && (
+            <PhotoViewer index={viewing} onIndex={setViewing} onClose={() => setViewing(null)}
+              photos={mine.map((p: any) => ({ id: p.id, name: p.fileName, downloadUrl: p.downloadUrl,
+                src: String(p.mime).startsWith("image/") && !/hei[cf]/.test(p.mime) ? `${p.downloadUrl}?inline=1` : null }))} />
           )}
         </CardContent>
       </Card>
@@ -428,6 +435,7 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
   const qk = [`/api/crm/attachments?kind=photo&refId=${customerId}`];
   const { data: photos } = useQuery<any[]>({ queryKey: qk });
   const fileRef = useRef<HTMLInputElement>(null);
+  const [viewing, setViewing] = useState<number | null>(null);
   const [stage, setStage] = useState<"progress" | "finished">("progress");
   const [busy, setBusy] = useState(false);
 
@@ -519,18 +527,18 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
               : "When the client shares photos from their portal, they land here."} />
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2" data-testid="customer-photo-strip">
-            {photos.map((p: any) => {
+            {photos.map((p: any, i: number) => {
               const st = photoStage(String(p.fileName ?? ""));
               return (
                 <div key={p.id} className="relative group" data-testid={`customer-photo-${p.id}`}>
-                  <a href={p.downloadUrl}
-                    className="block rounded-lg border overflow-hidden bg-muted/30 hover:border-primary/40 transition-colors">
+                  <button type="button" onClick={() => setViewing(i)} aria-label={`Open ${p.fileName}`}
+                    className="block w-full rounded-lg border overflow-hidden bg-muted/30 hover:border-primary/40 transition-colors">
                     {String(p.mime).startsWith("image/") && !/hei[cf]/.test(p.mime) ? (
                       <img src={`${p.url}?inline=1`} alt={p.fileName} className="h-20 w-full object-cover" />
                     ) : (
                       <div className="h-20 flex items-center justify-center"><ImageIcon className="h-5 w-5 text-muted-foreground" /></div>
                     )}
-                  </a>
+                  </button>
                   {st && (
                     <span className={`absolute bottom-1 left-1 rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white ${st === "finished" ? "bg-emerald-600/90" : "bg-amber-600/90"}`}>
                       {st === "finished" ? "Finished" : "In progress"}
@@ -556,6 +564,15 @@ export function CustomerPhotos({ customerId, canUpload = false }: { customerId: 
             })}
           </div>
         )}
+        {viewing != null && photos?.length ? (
+          <PhotoViewer index={Math.min(viewing, photos.length - 1)} onIndex={setViewing} onClose={() => setViewing(null)}
+            photos={photos.map((p: any) => {
+              const st = photoStage(String(p.fileName ?? ""));
+              return { id: p.id, name: p.fileName, downloadUrl: p.downloadUrl,
+                label: st === "finished" ? "Finished" : st === "progress" ? "In progress" : null,
+                src: String(p.mime).startsWith("image/") && !/hei[cf]/.test(p.mime) ? `${p.url}?inline=1` : null };
+            })} />
+        ) : null}
       </CardContent>
       <ConfirmDelete
         open={!!confirming}
