@@ -31,8 +31,13 @@ export type PipelineItem = {
   needsEmail: boolean;
   unsubscribed: boolean;
   dismissedAt: string | null;
+  divisionId: string | null;
 };
-type Pipeline = { ready: PipelineItem[]; dismissed: PipelineItem[]; hidden: PipelineItem[]; askedCount: number };
+type Division = { id: string; code: string; name: string };
+type Pipeline = {
+  ready: PipelineItem[]; dismissed: PipelineItem[]; hidden: PipelineItem[]; askedCount: number;
+  divisions?: Division[]; pinnedDivisionId?: string | null;
+};
 
 export const PIPELINE_KEY = ["/api/reviews/pipeline"];
 // Collapsed to a few rows; the dropdown shows 10–100 (remembered per browser).
@@ -81,11 +86,13 @@ export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) 
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [trade, setTrade] = useState("all");
+  // Division ribbon (owner/unpinned seats): "all", a division id, or "none" (unassigned).
+  const [div, setDiv] = useState("all");
   const { data, isLoading, error } = useQuery<Pipeline, Error>({
     queryKey: PIPELINE_KEY,
     queryFn: async () => {
       const r = await fetch("/api/reviews/pipeline", { credentials: "include" });
-      if (r.status === 404 || r.status === 402 || r.status === 403) return { ready: [], dismissed: [], hidden: [], askedCount: 0 };
+      if (r.status === 404 || r.status === 402 || r.status === 403) return { ready: [], dismissed: [], hidden: [], askedCount: 0, divisions: [], pinnedDivisionId: null };
       if (!r.ok) throw new Error("Couldn't load your won jobs — refresh to try again.");
       return r.json();
     },
@@ -114,15 +121,38 @@ export function ReviewPipeline({ onPrepare }: { onPrepare: (item: PipelineItem) 
   if (error) return <p className="text-sm text-destructive" role="alert" data-testid="text-pipeline-error">{error.message}</p>;
   if (!data || (!data.ready.length && !data.dismissed.length && !data.hidden.length)) return null;
 
+  const divisions = data.divisions ?? [];
+  const showRibbon = !data.pinnedDivisionId && divisions.length > 0;
+  const inDiv = (it: PipelineItem) => div === "all" || (div === "none" ? !it.divisionId : it.divisionId === div);
+  const byDiv = showRibbon ? data.ready.filter(inDiv) : data.ready;
   const filtering = !!q.trim() || status !== "all" || trade !== "all";
-  const matched = filtering ? data.ready.filter((it) => matchesPipeline(it, { q: q.trim(), status, trade })) : data.ready;
+  const matched = filtering ? byDiv.filter((it) => matchesPipeline(it, { q: q.trim(), status, trade })) : byDiv;
+  const count = (f: (it: PipelineItem) => boolean) => data.ready.filter(f).length;
+  const unassigned = count((it) => !it.divisionId);
+  const pinnedDiv = data.pinnedDivisionId ? divisions.find((d) => d.id === data.pinnedDivisionId) : null;
   const rows = matched.slice(0, size);
   return (
     <Section
-      title={<span>Ready to ask <span className="font-normal text-muted-foreground">· {data.ready.length}</span></span>}
+      title={<span>Ready to ask <span className="font-normal text-muted-foreground">· {data.ready.length}</span>
+        {pinnedDiv && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 align-middle text-xs font-semibold" data-testid="badge-pipeline-division">{pinnedDiv.code}</span>}</span>}
       description="Every CRM client with a won job who hasn't been asked for a review yet. Finished jobs first."
       flush testId="section-review-pipeline">
-      {(data.ready.length > COLLAPSED || filtering) && (
+      {showRibbon && (
+        <div className="flex gap-1 overflow-x-auto border-b px-4 pb-3 sm:px-6" role="tablist" aria-label="Division" data-testid="pipeline-division-ribbon">
+          {[
+            { key: "all", label: "All divisions", n: data.ready.length },
+            ...divisions.map((d) => ({ key: d.id, label: `${d.code} · ${d.name}`, n: count((it) => it.divisionId === d.id) })).filter((t) => t.n > 0),
+            ...(unassigned ? [{ key: "none", label: "Unassigned", n: unassigned }] : []),
+          ].map((t) => (
+            <button key={t.key} type="button" role="tab" aria-selected={div === t.key} onClick={() => setDiv(t.key)}
+              className={`shrink-0 rounded-full border px-3 py-1 text-sm font-medium transition-colors ${div === t.key ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground"}`}
+              data-testid={`tab-pipeline-division-${t.key}`}>
+              {t.label} <span className="opacity-75">{t.n}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {(byDiv.length > COLLAPSED || filtering) && (
         <div className="flex flex-wrap items-center gap-2 border-b px-4 pb-3 sm:px-6" data-testid="pipeline-filters">
           <div className="relative min-w-[12rem] flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />

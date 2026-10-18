@@ -143,6 +143,10 @@ describe("review pipeline", () => {
     const birch = r.data.ready[1];
     expect(birch).toMatchObject({ needsEmail: true, jobFinished: false, projectStatus: "scheduled", description: "" });
     expect(r.data.askedCount).toBe(2);
+    // The owner's division ribbon: every division, no pin; each client carries its division.
+    expect(r.data.pinnedDivisionId).toBeNull();
+    expect(Array.isArray(r.data.divisions)).toBe(true);
+    expect(ash).toHaveProperty("divisionId");
   });
 
   it("not now sets a client aside and puts them back, logged by name", async () => {

@@ -23,7 +23,8 @@
 import type { Express } from "express";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, pool } from "../db";
-import { crmCustomers, crmEstimates, crmProjects, crmReviewPipeline } from "@shared/schema";
+import { crmCustomers, crmDivisions, crmEstimates, crmProjects, crmReviewPipeline } from "@shared/schema";
+import { pinnedDivisionOf } from "./divisions";
 import { objectPolicy } from "./object-access";
 import { EXPORT_PERMS, photoCtx } from "./photo-library";
 import type { OrgContext } from "./tenancy";
@@ -53,6 +54,8 @@ export type PipelineItem = {
   needsEmail: boolean;
   unsubscribed: boolean;
   dismissedAt: string | null;
+  /** The client's division (null = unassigned), for the owner's division ribbon. */
+  divisionId: string | null;
 };
 
 const addressOf = (c: Customer) => [c.addressLine1, c.city, [c.state, c.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null;
@@ -147,6 +150,7 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
       needsEmail: !email,
       unsubscribed: !!email && unsub.has(normalizeRecipient(email)),
       dismissedAt: dismissedAt.get(c.id)?.toISOString() ?? null,
+      divisionId: c.divisionId ?? null,
     };
     (hiddenIds.has(c.id) ? hidden : item.dismissedAt ? dismissed : ready).push(item);
   }
@@ -166,6 +170,7 @@ export async function buildReviewPipeline(ctx: OrgContext, userId: number): Prom
       customer: { id: c.id, name: c.displayName, email, phone: c.phone || null, address: addressOf(c), photoCount: photoCount.get(c.id)?.n ?? 0 },
       jobs: [], wonAt: null, projectStatus: null, jobFinished: false, finishedPhotoCount: 0, description: "",
       needsEmail: !email, unsubscribed: false, dismissedAt: dismissedAt.get(c.id)?.toISOString() ?? null,
+      divisionId: c.divisionId ?? null,
     });
   }
   hidden.sort((a, b) => a.customer.name.localeCompare(b.customer.name));
@@ -210,7 +215,15 @@ export function registerReviewPipelineRoutes(app: Express, getUser: GetUser): vo
     try {
       const ctx = await pipelineCtx(req, res, getUser);
       if (!ctx || !mayAsk(res, ctx)) return;
-      res.json(await buildReviewPipeline(ctx, getUser(req, res).id));
+      const pinned = pinnedDivisionOf(ctx.member);
+      const divisions = await db.select({ id: crmDivisions.id, code: crmDivisions.code, name: crmDivisions.name }).from(crmDivisions)
+        .where(eq(crmDivisions.orgId, ctx.org.id)).orderBy(crmDivisions.code);
+      // The ribbon: every division for an unpinned seat (owner/admin); a pinned member only ever sees their own.
+      res.json({
+        ...await buildReviewPipeline(ctx, getUser(req, res).id),
+        divisions: pinned ? divisions.filter((d) => d.id === pinned) : divisions,
+        pinnedDivisionId: pinned,
+      });
     } catch (err) {
       logError("review pipeline", err);
       res.status(500).json({ message: "Could not load the review pipeline." });
