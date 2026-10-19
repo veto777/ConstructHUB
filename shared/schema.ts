@@ -1682,6 +1682,7 @@ export const CRM_NOTIFICATION_PREFS = [
   "memberAccountChange", // a team member changed their own profile or password
   "leadReceived",        // a lead came in through the website lead form
   "spamReport",          // the AI Call Assistant's weekly "we stopped N spam calls" report (server/voice/spam-report.ts)
+  "hoverReportReady",    // a new HOVER measurement report landed in the CRM (owner, 2026-10-19; scoped by state in shared/hover-notify.ts)
 ] as const;
 export type CrmNotificationPref = (typeof CRM_NOTIFICATION_PREFS)[number];
 

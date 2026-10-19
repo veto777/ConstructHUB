@@ -281,6 +281,11 @@ const orgPatchSchema = z.object({
       message: "Unknown notification preference key",
     })
     .optional(),
+  // Where a notification applies (shared/hover-notify.ts): "New HOVER report" rings for these states only;
+  // null / [] = every state. Merged into custom_fields like notificationPrefs.
+  notificationScopes: z.object({
+    hoverReportReady: z.object({ states: z.array(z.string().trim().length(2)).max(60) }).nullable(),
+  }).partial().optional(),
 });
 
 const profilePatchSchema = z.object({
@@ -753,9 +758,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
     // data) is never clobbered.
-    const { notificationPrefs, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, clientPageLayout, celebrations, jobFlow, ...profile } = parsed.data;
+    const { notificationPrefs, notificationScopes, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, clientPageLayout, celebrations, jobFlow, ...profile } = parsed.data;
     const mergedCustomFields =
-      notificationPrefs !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined || clientPageLayout !== undefined || celebrations !== undefined || jobFlow !== undefined
+      notificationPrefs !== undefined || notificationScopes !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined || clientPageLayout !== undefined || celebrations !== undefined || jobFlow !== undefined
         ? (() => {
             const base = {
               ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
@@ -765,6 +770,15 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
                 ...(((ctx.org.customFields as any)?.notificationPrefs as Record<string, boolean> | undefined) ?? {}),
                 ...notificationPrefs,
               };
+            }
+            if (notificationScopes) {
+              const prev = ((ctx.org.customFields as any)?.notificationScopes as Record<string, unknown> | undefined) ?? {};
+              const next: Record<string, unknown> = { ...prev };
+              for (const [k, v] of Object.entries(notificationScopes)) {
+                if (v === null || (v && !v.states.length)) delete next[k]; // back to "every state"
+                else if (v) next[k] = { states: [...new Set(v.states.map((s) => s.toUpperCase()))] };
+              }
+              if (Object.keys(next).length) base.notificationScopes = next; else delete base.notificationScopes;
             }
             // null = "back to the default orange" — the key comes off entirely
             // rather than sitting there as an explicit null.

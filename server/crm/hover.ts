@@ -64,6 +64,7 @@ import {
 } from "crypto";
 import { db, pool } from "../db";
 import { crmCustomers, crmMeasurements, crmAttachments, crmOrgs , crmMembers, crmLeads } from "@shared/schema";
+import { notifyHoverReportReady } from "./hover-notify";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow } from "./client-auth";
@@ -1737,6 +1738,9 @@ async function ingestHoverJobInner(
   if (customer?.id) {
     projectId = await runAutoProject(orgId, row.id, jobId, { ambiguous, staffContact: linked.staffContact, jobName: parsed.jobName });
   }
+  // The owner hears about every NEW report in the states they chose (Settings → Notifications → New HOVER report).
+  // Only here, on a first-time ingest — a re-delivered webhook or a sync of a known job returned `duplicate` above.
+  await notifyHoverReportReady(orgId, row as any);
   try {
     const idx = await cachedHoverShareIndex(orgId, fetchFn);
     const share = pickJobShare(idx.shares, jobId);

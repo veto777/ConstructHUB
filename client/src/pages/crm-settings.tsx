@@ -64,6 +64,7 @@ const NOTIFICATIONS = [
   { key: "clientComments", label: "Client comments", description: "A client sent a message or photo from their portal." },
   { key: "financeClick", label: "Financing interest", description: "A client opened one of your financing links from their client portal." },
   { key: "paymentReceipt", label: "Payment receipts", description: "The receipt email that goes out when a payment is recorded." },
+  { key: "hoverReportReady", label: "New HOVER report", description: "A new HOVER measurement report landed in the CRM. Pick the states below." },
 ] as const;
 
 type NotifKey = (typeof NOTIFICATIONS)[number]["key"];
@@ -1005,6 +1006,7 @@ export default function CrmSettingsPage() {
               </div>
             ))}
           </div>
+          <HoverNotifyStates org={org} />
           <p className="text-xs text-muted-foreground pt-3">
             Text alerts also need a text sender set up in the SMS card below.
           </p>
@@ -2143,5 +2145,51 @@ function LeadVisibilityCard() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Which states the "New HOVER report" notification rings for (owner, 2026-10-19: WA for Alpine). One checkbox per
+ * state the company's divisions cover; none checked = every report. Stored as customFields.notificationScopes.
+ */
+function HoverNotifyStates({ org }: { org: any }) {
+  const { toast } = useToast();
+  const { data: divisions } = useQuery<any[]>({ queryKey: ["/api/crm/divisions"] });
+  const chosen: string[] = ((org?.customFields as any)?.notificationScopes?.hoverReportReady?.states ?? []).map((s: string) => String(s).toUpperCase());
+  const states = [...new Set([
+    ...((divisions ?? []).map((d) => String(d.state ?? d.code ?? "").trim().toUpperCase()).filter((s) => /^[A-Z]{2}$/.test(s))),
+    ...chosen,
+  ])].sort();
+  const save = useMutation({
+    mutationFn: async (next: string[]) =>
+      (await apiRequest("PATCH", "/api/crm/org", { notificationScopes: { hoverReportReady: next.length ? { states: next } : null } })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/org"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
+      toast({ title: "HOVER report states saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  if (!states.length) return null;
+  return (
+    <div className="mt-3 rounded-md border bg-muted/30 p-3" data-testid="hover-notify-states">
+      <div className="text-sm font-medium">New HOVER report — which states</div>
+      <div className="text-xs text-muted-foreground mb-2">
+        {chosen.length ? `Ringing for ${chosen.join(", ")} only.` : "Ringing for every report, wherever it is."} A report with no state on it always rings.
+      </div>
+      <div className="flex flex-wrap gap-4">
+        {states.map((s) => (
+          <label key={s} className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={chosen.includes(s)}
+              disabled={save.isPending}
+              onCheckedChange={(v) => save.mutate(v ? [...chosen, s] : chosen.filter((x) => x !== s))}
+              data-testid={`checkbox-hover-notify-${s}`}
+            />
+            {s}
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
