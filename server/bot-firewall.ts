@@ -12,7 +12,8 @@
  *
  * Not checked: requests that never went through Cloudflare (the deploy's local checks, the tower), webhooks and
  * the machine-to-machine paths other services call (Stripe, SignalWire, inbound mail, Telegram, the Click Guard /
- * VPN Shield scripts on customers' sites and the Google Ads script, /.well-known, robots.txt), and the paid
+ * VPN Shield scripts on customers' sites and the Google Ads script, /.well-known, robots.txt), the public tutorial
+ * media the social networks' fetchers download (/api/tutorials/media), and the paid
  * Public/Code API when it carries its key (it has its own keys and limits).
  */
 import type { NextFunction, Request, Response } from "express";
@@ -20,6 +21,9 @@ import { promises as dns } from "dns";
 
 /** Paths other services call server-to-server; a browser user agent can't be expected there. */
 const MACHINE_PATHS: readonly RegExp[] = [
+  // Public tutorial media (walkthrough cuts, Instagram Stories): Instagram, TikTok, LinkedIn and Blotato fetch these
+  // with their own fetchers, never a browser. Blocking them (2026-10-17..19) silently failed every scheduled post.
+  /^\/api\/tutorials\/media\//,
   /^\/voice\//,
   /webhook/i,
   /^\/api\/inbound-mail/,

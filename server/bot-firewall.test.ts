@@ -61,3 +61,9 @@ describe("bot firewall", () => {
     expect(overRate("3.3.3.3", "/api/auth/me", t)).toBe(true);
   });
 });
+
+it("public tutorial media is open to the social networks' fetchers", () => {
+  expect(classifyRequest("/api/tutorials/media/crm-clients.social-vertical.0123abcd.mp4", "facebookexternalhit/1.1")).toBe("machine");
+  expect(classifyRequest("/api/tutorials/media/story-tut-crm-pricebook.4a0254f3.mp4", "curl/8.5.0")).toBe("machine");
+  expect(classifyRequest("/api/tutorials", "curl/8.5.0")).toBe("bot");
+});
