@@ -70,7 +70,7 @@ export function ClientDocuments({ customerId }: { customerId: string }) {
               {data.invoices.map((i) => (
                 <Row key={i.id} testId={`doc-invoice-${i.id}`}
                   main={<><Link href={i.link} className="font-medium text-primary hover:underline">{i.number ?? "Invoice"}</Link> · {i.title}</>}
-                  sub={`${money(i.totalCents)} · ${i.dueCents > 0 ? `${money(i.dueCents)} due` : `paid${i.paidAt ? ` ${day(i.paidAt)}` : ""}`}${i.receipts ? ` · ${i.receipts} receipt${i.receipts === 1 ? "" : "s"}` : ""}${i.imported ? " · from Housecall Pro" : ""}`}
+                  sub={`${money(i.totalCents)} · ${i.dueCents > 0 ? `${money(i.dueCents)} due` : i.paidCents > 0 ? `paid${i.paidAt ? ` ${day(i.paidAt)}` : ""}` : "nothing due"}${i.receipts ? ` · ${i.receipts} receipt${i.receipts === 1 ? "" : "s"}` : ""}${i.imported ? " · from Housecall Pro" : ""}`}
                   right={<><StatusPill tone={statusTone(i.status)}>{i.status}</StatusPill><Open href={i.clientLink} label="Client view" /></>} />
               ))}
             </DocGroup>

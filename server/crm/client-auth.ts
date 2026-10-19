@@ -505,7 +505,7 @@ export function registerCrmClientAuthRoutes(app: Express): void {
     const receiptsByInvoice = new Map<string, (typeof crmPayments.$inferSelect)[]>();
     if (invoices.length) {
       const payRows = await db.select().from(crmPayments)
-        .where(and(inArray(crmPayments.invoiceId, invoices.map((i) => i.id)), inArray(crmPayments.status, ["succeeded", "partially_refunded"])))
+        .where(and(inArray(crmPayments.invoiceId, invoices.map((i) => i.id)), inArray(crmPayments.status, ["succeeded", "partially_refunded"]), sql`${crmPayments.amountCents} > 0`))
         .orderBy(desc(crmPayments.paidAt));
       for (const p of payRows) { const list = receiptsByInvoice.get(p.invoiceId!) ?? []; list.push(p); receiptsByInvoice.set(p.invoiceId!, list); }
     }

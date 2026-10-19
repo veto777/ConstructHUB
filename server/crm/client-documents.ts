@@ -7,7 +7,7 @@
  * browser's Print → Save as PDF makes the file. One route for staff, one for the client behind the document gate.
  */
 import type { Express } from "express";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { crmAttachments, crmCustomers, crmEstimates, crmInvoices, crmOrgs, crmPayments } from "@shared/schema";
 import { requireOrg, requirePermission } from "./tenancy";
@@ -37,6 +37,10 @@ export function paymentReceiptPage(r: ReceiptData, paymentId: string): string | 
   const paidThrough = Math.max(0, ordered.slice(0, idx + 1).reduce((s, x) => s + x.amountCents, 0));
   const dueCents = r.totalCents - r.retainageCents;
   const balanceAfter = Math.max(0, dueCents - paidThrough);
+  // Money returned AFTER this payment (a later refund, including a partial refund of this very payment): the receipt
+  // is rendered on demand, so it says so and never stamps PAID IN FULL on an invoice that is no longer paid (Kimi audit).
+  const refundedAfter = -ordered.slice(idx + 1).filter((x) => x.amountCents < 0).reduce((s, x) => s + x.amountCents, 0);
+  const paidInFull = balanceAfter === 0 && refundedAfter === 0;
   const b = r.company;
   const date = p.paidAt ? new Date(p.paidAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—";
   const title = `Receipt — ${r.invoice.number ?? "invoice"} — ${money(p.amountCents)}`;
@@ -62,7 +66,9 @@ export function paymentReceiptPage(r: ReceiptData, paymentId: string): string | 
     <tr><td>Paid by</td><td>${esc(METHOD_LABELS[p.method ?? ""] ?? p.method ?? "Payment")}${p.note ? ` — ${esc(p.note)}` : ""}</td></tr>
     <tr><td>Invoice total</td><td>${money(r.totalCents)}${r.retainageCents ? ` <span class="muted">(${money(r.retainageCents)} retainage withheld)</span>` : ""}</td></tr>
     <tr><td>Paid to date (after this payment)</td><td>${money(paidThrough)}</td></tr>
-    <tr><td>Balance after this payment</td><td>${balanceAfter === 0 ? `<span class="paid">PAID IN FULL</span>` : money(balanceAfter)}</td></tr>
+    <tr><td>Balance after this payment</td><td>${paidInFull ? `<span class="paid">PAID IN FULL</span>` : money(balanceAfter)}</td></tr>
+    ${refundedAfter > 0 ? `<tr><td>Refunded since this payment</td><td>${money(refundedAfter)}</td></tr>
+    <tr><td>Balance now</td><td>${money(Math.max(0, dueCents - Math.max(0, ordered.reduce((s, x) => s + x.amountCents, 0))))}</td></tr>` : ""}
   </table>
   <p class="muted">Thank you for your business. Questions about this receipt? ${b.phone ? `Call ${esc(b.phone)}` : "Reply to the email it came with"}.</p>
   <p class="muted" style="margin-top:26px;font-size:11px">Receipt ${esc(paymentId)} · generated ${esc(new Date(r.generatedAt).toLocaleString("en-US"))}</p>
@@ -74,7 +80,7 @@ export async function receiptsForInvoices(orgId: string, invoices: { id: string;
   if (!invoices.length) return [];
   const byId = new Map(invoices.map((i) => [i.id, i]));
   const rows = await db.select().from(crmPayments)
-    .where(and(eq(crmPayments.orgId, orgId), inArray(crmPayments.invoiceId, invoices.map((i) => i.id)), inArray(crmPayments.status, RECEIPT_STATUSES)))
+    .where(and(eq(crmPayments.orgId, orgId), inArray(crmPayments.invoiceId, invoices.map((i) => i.id)), inArray(crmPayments.status, RECEIPT_STATUSES), gt(crmPayments.amountCents, 0)))
     .orderBy(desc(crmPayments.paidAt), desc(crmPayments.createdAt));
   return rows.map((p) => {
     const inv = byId.get(p.invoiceId!)!;
@@ -153,7 +159,8 @@ export function registerCrmClientDocumentRoutes(app: Express, getDevUser: GetUse
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
-    if (!requirePermission(res, ctx, "manageInvoices")) return;
+    // Same gate as the Documents card that links here (seePrices + the invoice's object policy): a seat that can read
+    // the amounts on the card can open the receipt behind them (Kimi audit — it used to demand manageInvoices too).
     if (!requirePermission(res, ctx, "seePrices")) return;
     const [pay] = await db.select().from(crmPayments).where(and(eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.id, String(req.params.id)))).limit(1);
     if (!pay?.invoiceId) return res.status(404).json({ message: "Receipt not found" });

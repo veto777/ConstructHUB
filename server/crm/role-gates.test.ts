@@ -228,7 +228,7 @@ const ROUTES: RouteRow[] = [
   R("GET", "/api/crm/customers/:id", null, { path: (t) => `/api/crm/customers/${t.customer}`, scoped: true }),
   // The client's documents (every item is an amount) and a payment's printable receipt.
   R("GET", "/api/crm/customers/:id/documents", "seePrices", { path: (t) => `/api/crm/customers/${t.customer}/documents`, scoped: true }),
-  R("GET", "/api/crm/receipts/:id.html", { all: ["manageInvoices", "seePrices"] }, { path: () => `/api/crm/receipts/${none}.html` }),
+  R("GET", "/api/crm/receipts/:id.html", "seePrices", { path: () => `/api/crm/receipts/${none}.html` }),
   R("PATCH", "/api/crm/customers/:id", "manageCustomers", { path: (t) => `/api/crm/customers/${t.customer}`, body: { email: "not-an-email" }, scoped: true }),
   R("DELETE", "/api/crm/customers/:id", "owner", { path: (t) => `/api/crm/customers/${t.customer}`, effect: true, scoped: true }),
   R("PATCH", "/api/crm/customers/:id/follow-up", "manageCustomers", { path: (t) => `/api/crm/customers/${t.customer}/follow-up`, body: {}, scoped: true }),

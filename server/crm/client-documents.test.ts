@@ -54,4 +54,17 @@ describe("per-payment receipt", () => {
     // a refund is not a receipt
     expect(paymentReceiptPage(r, "rf")).toBeNull();
   });
+  it("a refund AFTER the payment is shown and blocks PAID IN FULL (Kimi audit: partial card refund)", () => {
+    // $10,000 paid in full by card, then $3,000 refunded: the receipt still shows the $10,000 received, but says
+    // $3,000 went back and the invoice is no longer paid in full.
+    const r: ReceiptData = { ...receipt, totalCents: 10_000_00, subtotalCents: 10_000_00, payments: [
+      { id: "card", amountCents: 10_000_00, method: "credit_card", note: null, paidAt: new Date("2026-10-01T12:00:00Z") },
+      { id: "rf", amountCents: -3_000_00, method: "Refund", note: null, paidAt: new Date("2026-10-05T12:00:00Z") },
+    ] };
+    const html = paymentReceiptPage(r, "card")!;
+    expect(html).toContain("Amount received</td><td class=\"big\">$10,000.00");
+    expect(html).not.toContain("PAID IN FULL");
+    expect(html).toContain("Refunded since this payment</td><td>$3,000.00");
+    expect(html).toContain("Balance now</td><td>$3,000.00");
+  });
 });

@@ -140,7 +140,10 @@ function periodBounds(key: PeriodKey, from: string, to: string): { since: string
       const s = from ? new Date(`${from}T00:00:00`) : null;
       const u = to ? new Date(`${to}T00:00:00`) : null;
       if (u) u.setDate(u.getDate() + 1); // inclusive "to" day
-      return { since: s && !Number.isNaN(s.getTime()) ? s.toISOString() : null, until: u && !Number.isNaN(u.getTime()) ? u.toISOString() : null };
+      const since = s && !Number.isNaN(s.getTime()) ? s.toISOString() : null, until = u && !Number.isNaN(u.getTime()) ? u.toISOString() : null;
+      // No date picked yet: keep showing the default period rather than silently switching to all time (Kimi audit).
+      if (!since && !until) return periodBounds("this_year", "", "");
+      return { since, until };
     }
   }
 }
@@ -400,6 +403,7 @@ export default function CrmLeadsPage() {
             <Input type="date" className="h-10 w-[150px] bg-card" value={customFrom} max={customTo || undefined} onChange={(e) => setCustomFrom(e.target.value)} aria-label="From" data-testid="input-lead-from" />
             <span className="text-muted-foreground">to</span>
             <Input type="date" className="h-10 w-[150px] bg-card" value={customTo} min={customFrom || undefined} onChange={(e) => setCustomTo(e.target.value)} aria-label="To" data-testid="input-lead-to" />
+            {!customFrom && !customTo && <span className="text-xs text-muted-foreground" data-testid="text-lead-custom-hint">Pick a date — showing this year until you do</span>}
           </div>
         )}
         {(latest?.place?.markets?.length ?? 0) > 1 && (
