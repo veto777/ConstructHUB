@@ -26,11 +26,15 @@ const RECEIPT_STATUSES = ["succeeded", "partially_refunded"];
 
 /** A full, printable HTML page for ONE payment on an invoice: what was paid, how, when, and the balance after it. */
 export function paymentReceiptPage(r: ReceiptData, paymentId: string): string | null {
-  const ordered = [...r.payments].filter((p) => p.amountCents > 0).sort((a, b) => new Date(a.paidAt ?? 0).getTime() - new Date(b.paidAt ?? 0).getTime());
-  const idx = ordered.findIndex((p) => p.id === paymentId);
+  // The ledger in date order — payments AND refunds (negative entries) — so "paid to date" after this payment nets out
+  // any money already returned before it (Codex audit: a refund between two payments must not print PAID IN FULL).
+  // Ties on the same instant: refunds first, then by id, so the result never depends on query order.
+  const ordered = [...r.payments].sort((a, b) =>
+    (new Date(a.paidAt ?? 0).getTime() - new Date(b.paidAt ?? 0).getTime()) || (Math.sign(a.amountCents) - Math.sign(b.amountCents)) || a.id.localeCompare(b.id));
+  const idx = ordered.findIndex((p) => p.id === paymentId && p.amountCents > 0);
   if (idx < 0) return null;
   const p = ordered[idx];
-  const paidThrough = ordered.slice(0, idx + 1).reduce((s, x) => s + x.amountCents, 0);
+  const paidThrough = Math.max(0, ordered.slice(0, idx + 1).reduce((s, x) => s + x.amountCents, 0));
   const dueCents = r.totalCents - r.retainageCents;
   const balanceAfter = Math.max(0, dueCents - paidThrough);
   const b = r.company;
@@ -93,10 +97,14 @@ export function registerCrmClientDocumentRoutes(app: Express, getDevUser: GetUse
     const [cust] = await db.select().from(crmCustomers)
       .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, String(req.params.id)))).limit(1);
     if (!cust || !(await objectPolicy(ctx).visible("customers", cust.id))) return res.status(404).json({ message: "Client not found" });
-    const [estimates, invoices] = await Promise.all([
+    // Seeing the client does not mean seeing every document: a seat assigned to one of the client's projects, or pinned
+    // to one division, gets only the estimates and invoices it could open directly (Codex audit, 2026-10-18).
+    const policy = objectPolicy(ctx);
+    const [allEstimates, allInvoices] = await Promise.all([
       db.select().from(crmEstimates).where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.customerId, cust.id))).orderBy(desc(crmEstimates.createdAt)),
       db.select().from(crmInvoices).where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.customerId, cust.id), isNull(crmInvoices.voidedAt))).orderBy(desc(crmInvoices.createdAt)),
     ]);
+    const [estimates, invoices] = await Promise.all([policy.filter("estimates", allEstimates), policy.filter("invoices", allInvoices)]);
     const estIds = estimates.map((e) => e.id);
     const contracts = estIds.length ? await db.select().from(crmAttachments)
       .where(and(eq(crmAttachments.orgId, ctx.org.id), eq(crmAttachments.kind, "contract"), inArray(crmAttachments.refId, estIds)))

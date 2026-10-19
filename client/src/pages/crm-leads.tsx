@@ -638,7 +638,9 @@ function LeadDetails({ id, cached, onClose, onConvert, onStatus }: {
   const setLabel = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/crm/leads/${id}/label`, { bidState: labelPick === "auto" ? null : labelPick, note: labelNote.trim() || null })).json(),
     onSuccess: (r: any) => {
-      toast({ title: labelPick === "auto" ? "Label back to automatic" : `Labelled ${LABEL_TEXT[labelPick as BidState]}`, description: r?.clientMarked ? "The client is marked a dead lead too." : undefined });
+      toast({ title: labelPick === "auto" ? "Label back to automatic" : `Labelled ${LABEL_TEXT[labelPick as BidState]}`, description: r?.clientSync === "marked" ? "The client is marked a dead lead too."
+          : r?.clientSync === "reopened" ? "The client is reopened too."
+          : r?.clientSync === "unchanged" ? "Lead only — the client this lead matches was not changed." : undefined });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
     },

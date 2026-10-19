@@ -793,33 +793,52 @@ export function registerCrmLeadRoutes(app: Express, getDevUser: GetUser): void {
     const [lead] = await db.select().from(crmLeads).where(and(eq(crmLeads.orgId, ctx.org.id), eq(crmLeads.id, String(req.params.id)))).limit(1);
     if (!lead || !(await leadVisibleTo(ctx, lead))) return res.status(404).json({ message: "Lead not found" });
     const note = parsed.data.note?.trim() || null;
-    const [row] = await db.update(crmLeads).set({
-      bidStateOverride: parsed.data.bidState, bidStateNote: parsed.data.bidState ? note : null,
-      bidStateAt: parsed.data.bidState ? new Date() : null, bidStateBy: parsed.data.bidState ? ctx.member.id : null,
-      updatedAt: new Date(),
-    }).where(eq(crmLeads.id, lead.id)).returning();
-    // Keep the client in step for Dead lead: the person the lead became, or matches by email / phone.
-    const clientId = lead.customerId ?? (await matchLeadsToClients(ctx.org.id, [lead])).get(lead.id) ?? null;
     const toDead = parsed.data.bidState === "dead";
-    const wasDead = lead.bidStateOverride === "dead";
-    if (clientId && (toDead || wasDead)) {
-      const [cust] = await db.select({ id: crmCustomers.id, customFields: crmCustomers.customFields }).from(crmCustomers)
-        .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, clientId))).limit(1);
-      if (cust && (await objectPolicy(ctx).visible("customers", cust.id))) {
-        const mark = toDead ? { at: new Date().toISOString(), memberId: ctx.member.id, reason: note } : null;
-        await db.update(crmCustomers).set({
-          customFields: mark
-            ? sql`coalesce(${crmCustomers.customFields}, '{}'::jsonb) || jsonb_build_object('bidDead', ${JSON.stringify(mark)}::jsonb)`
-            : sql`coalesce(${crmCustomers.customFields}, '{}'::jsonb) - 'bidDead'`,
-          updatedAt: new Date(),
-        } as any).where(eq(crmCustomers.id, cust.id));
-        logActivity(ctx, mark ? "lead.dead" : "lead.reopened", { entityType: "customer", entityId: cust.id, customerId: cust.id, meta: { reason: note, fromLead: lead.id } });
+    // The person the lead became, or matches by email / phone — kept in step for Dead lead.
+    const clientId = lead.customerId ?? (await matchLeadsToClients(ctx.org.id, [lead])).get(lead.id) ?? null;
+    const clientVisible = !!clientId && (await objectPolicy(ctx).visible("customers", clientId));
+    // One transaction, lead row then client row locked in that order: two saves racing on the same lead can no
+    // longer leave the lead saying Open while the client says Dead (Codex audit, 2026-10-18). The transition is
+    // decided from the row as it is under the lock, not from the earlier read.
+    const result = await db.transaction(async (tx) => {
+      const [locked] = await tx.select().from(crmLeads).where(eq(crmLeads.id, lead.id)).for("update");
+      if (!locked) return null;
+      const wasDead = locked.bidStateOverride === "dead";
+      const [row] = await tx.update(crmLeads).set({
+        bidStateOverride: parsed.data.bidState, bidStateNote: parsed.data.bidState ? note : null,
+        bidStateAt: parsed.data.bidState ? new Date() : null, bidStateBy: parsed.data.bidState ? ctx.member.id : null,
+        updatedAt: new Date(),
+      }).where(eq(crmLeads.id, lead.id)).returning();
+      let clientSync: "marked" | "reopened" | "unchanged" | null = null;
+      if (clientId && (toDead || wasDead)) {
+        clientSync = "unchanged";
+        if (clientVisible) {
+          const [cust] = await tx.select({ id: crmCustomers.id }).from(crmCustomers)
+            .where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, clientId))).for("update");
+          if (cust) {
+            const mark = toDead ? { at: new Date().toISOString(), memberId: ctx.member.id, reason: note } : null;
+            const [updated] = await tx.update(crmCustomers).set({
+              customFields: mark
+                ? sql`coalesce(${crmCustomers.customFields}, '{}'::jsonb) || jsonb_build_object('bidDead', ${JSON.stringify(mark)}::jsonb)`
+                : sql`coalesce(${crmCustomers.customFields}, '{}'::jsonb) - 'bidDead'`,
+              updatedAt: new Date(),
+            } as any).where(eq(crmCustomers.id, cust.id)).returning({ id: crmCustomers.id });
+            if (updated) clientSync = mark ? "marked" : "reopened";
+          }
+        }
       }
+      return { row, clientSync };
+    });
+    if (!result) return res.status(404).json({ message: "Lead not found" });
+    const { row, clientSync } = result;
+    if (clientSync === "marked" || clientSync === "reopened") {
+      logActivity(ctx, clientSync === "marked" ? "lead.dead" : "lead.reopened", { entityType: "customer", entityId: clientId!, customerId: clientId!, meta: { reason: note, fromLead: lead.id } });
     }
     logActivity(ctx, "lead.label", {
-      entityType: "lead", entityId: lead.id, customerId: clientId, meta: { bidState: parsed.data.bidState, note, name: lead.name },
+      entityType: "lead", entityId: lead.id, customerId: clientId, meta: { bidState: parsed.data.bidState, note, name: lead.name, clientSync },
     });
-    res.json({ id: row.id, bidStateOverride: row.bidStateOverride, bidStateNote: row.bidStateNote, bidStateAt: row.bidStateAt, clientMarked: !!clientId && toDead });
+    // clientMarked is true only when the client row was actually updated (a client this seat cannot see is left alone, and said so).
+    res.json({ id: row.id, bidStateOverride: row.bidStateOverride, bidStateNote: row.bidStateNote, bidStateAt: row.bidStateAt, clientMarked: clientSync === "marked", clientSync });
   });
 
   app.get("/api/crm/leads/:id", async (req: any, res) => {

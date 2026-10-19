@@ -87,6 +87,20 @@ describe('shared CRM object access — every registered direct-ID route', () => 
     expect(stats.body.unscheduledJobs).toEqual({ count: 1, totalCents: 1000 });
     expect((await request('/api/crm/customers')).body.map((c: any) => c.id)).toEqual([fixtures[0].ids.customers]);
   });
+  it("lists only the documents the seat could open, even on a client it can see (Codex audit 2026-10-18)", async () => {
+    // The division-A client also has an estimate + invoice under the division-B project, made by someone else.
+    const estB = randomUUID(), invB = randomUUID();
+    await pool.query(`insert into crm_estimates(id,org_id,customer_id,project_id,division_id,public_token,status,total_cents,title) values ($1,$2,$3,$4,$5,gen_random_uuid(),'approved',5000,'B-only')`, [estB, org, fixtures[0].ids.customers, fixtures[1].ids.projects, b]);
+    await pool.query(`insert into crm_invoices(id,org_id,customer_id,project_id,estimate_id,public_token,status,total_cents,title) values ($1,$2,$3,$4,$5,gen_random_uuid(),'sent',5000,'B-only')`, [invB, org, fixtures[0].ids.customers, fixtures[1].ids.projects, estB]);
+    const docs = await request(`/api/crm/customers/${fixtures[0].ids.customers}/documents`);
+    expect(docs.status).toBe(200);
+    expect(docs.body.estimates.map((e: any) => e.id)).toEqual([fixtures[0].ids.estimates]);
+    expect(docs.body.invoices.map((i: any) => i.id)).toEqual([fixtures[0].ids.invoices]);
+    expect(docs.body.contracts.map((c: any) => c.estimateId)).not.toContain(estB);
+    expect(JSON.stringify(docs.body)).not.toContain('B-only');
+    // the hidden client's documents are a 404, as before
+    expect((await request(`/api/crm/customers/${fixtures[1].ids.customers}/documents`)).status).toBe(404);
+  });
   it('does not hand scoped seats a whole-client bearer grant', async () => {
     const id = fixtures[0].ids.customers;
     const detail = await request(`/api/crm/customers/${id}`);
