@@ -15,9 +15,10 @@ const money = (c?: number | null) => `$${((c ?? 0) / 100).toLocaleString("en-US"
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null);
 const METHOD: Record<string, string> = { cash: "Cash", check: "Check", wire: "Wire", credit_card: "Credit card", ach: "ACH", card: "Card", other: "Other" };
 
+type FileRef = { id: string; fileName: string; downloadUrl: string };
 type Docs = {
-  estimates: { id: string; number: string | null; title: string; status: string; totalCents: number; sentAt: string | null; approvedAt: string | null; link: string; clientLink: string; imported: boolean; contract: { id: string; fileName: string; downloadUrl: string } | null }[];
-  contracts: { estimateId: string; estimateNumber: string | null; title: string; approvedAt: string | null; totalCents: number; attachmentId: string | null; fileName: string | null; downloadUrl: string | null }[];
+  estimates: { id: string; number: string | null; title: string; status: string; totalCents: number; sentAt: string | null; approvedAt: string | null; link: string; clientLink: string; imported: boolean; contract: FileRef | null; bidPdf: FileRef | null }[];
+  contracts: { estimateId: string; estimateNumber: string | null; title: string; approvedAt: string | null; totalCents: number; attachmentId: string | null; fileName: string | null; downloadUrl: string | null; signoff: string | null; bidPdf: FileRef | null }[];
   invoices: { id: string; number: string | null; title: string; status: string; totalCents: number; paidCents: number; dueCents: number; paidAt: string | null; link: string; clientLink: string; imported: boolean; receipts: number }[];
   receipts: { paymentId: string; invoiceId: string; invoiceNumber: string | null; amountCents: number; method: string | null; paidAt: string | null; provider: string; link: string }[];
 };
@@ -41,17 +42,28 @@ export function ClientDocuments({ customerId }: { customerId: string }) {
                 <Row key={e.id} testId={`doc-estimate-${e.id}`}
                   main={<><Link href={e.link} className="font-medium text-primary hover:underline">{e.number ?? "Estimate"}</Link> · {e.title}</>}
                   sub={`${money(e.totalCents)}${e.approvedAt ? ` · signed ${day(e.approvedAt)}` : e.sentAt ? ` · sent ${day(e.sentAt)}` : ""}${e.imported ? " · from Housecall Pro" : ""}`}
-                  right={<><StatusPill tone={statusTone(e.status)}>{e.status}</StatusPill><Open href={e.clientLink} label="Client view" /></>} />
+                  right={<>
+                    <StatusPill tone={statusTone(e.status)}>{e.status}</StatusPill>
+                    {e.bidPdf && <Button asChild size="sm" variant="outline"><a href={e.bidPdf.downloadUrl} target="_blank" rel="noopener noreferrer" title={e.bidPdf.fileName} data-testid={`link-bid-pdf-${e.id}`}><FileText className="h-4 w-4 mr-1.5" /> Bid PDF</a></Button>}
+                    <Open href={e.clientLink} label="Client view" />
+                  </>} />
               ))}
             </DocGroup>
             <DocGroup icon={FileSignature} title="Signed contracts" empty="No signed estimates yet." testId="docs-contracts">
               {data.contracts.map((c) => (
                 <Row key={c.estimateId} testId={`doc-contract-${c.estimateId}`}
                   main={<>{c.estimateNumber ?? "Estimate"} · {c.title}</>}
-                  sub={`${money(c.totalCents)} · signed ${day(c.approvedAt) ?? "—"}`}
+                  sub={`${money(c.totalCents)} · ${c.downloadUrl || c.signoff !== "pro approved" ? "signed" : "approved"} ${day(c.approvedAt) ?? "—"}`}
                   right={c.downloadUrl
                     ? <Button asChild size="sm" variant="outline"><a href={c.downloadUrl} target="_blank" rel="noopener noreferrer" data-testid={`link-contract-${c.estimateId}`}><FileSignature className="h-4 w-4 mr-1.5" /> Contract PDF</a></Button>
-                    : <span className="text-xs text-amber-700 dark:text-amber-400" title="Signed in Housecall Pro; the file was not in the export" data-testid={`text-contract-missing-${c.estimateId}`}>No file on record</span>} />
+                    : <>
+                      <span className="text-xs text-amber-700 dark:text-amber-400"
+                        title={c.signoff === "pro approved" ? "Marked approved by staff in Housecall Pro; the client never e-signed, so no signed copy exists. The bid PDF is the document on file." : "Signed in Housecall Pro; the file was not in the export"}
+                        data-testid={`text-contract-missing-${c.estimateId}`}>
+                        {c.signoff === "pro approved" ? "Approved by staff in Housecall Pro · no e-signature" : "No file on record"}
+                      </span>
+                      {c.bidPdf && <Button asChild size="sm" variant="outline"><a href={c.bidPdf.downloadUrl} target="_blank" rel="noopener noreferrer" title={c.bidPdf.fileName} data-testid={`link-bid-pdf-contract-${c.estimateId}`}><FileText className="h-4 w-4 mr-1.5" /> Bid PDF</a></Button>}
+                    </>} />
               ))}
             </DocGroup>
             <DocGroup icon={ReceiptText} title="Invoices" empty="No invoices yet." testId="docs-invoices">

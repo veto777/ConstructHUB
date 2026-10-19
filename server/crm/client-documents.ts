@@ -103,6 +103,14 @@ export function registerCrmClientDocumentRoutes(app: Express, getDevUser: GetUse
       .orderBy(asc(crmAttachments.createdAt)) : [];
     const contractByEstimate = new Map<string, typeof contracts[number]>();
     for (const c of contracts) if (c.refId && !contractByEstimate.has(c.refId)) contractByEstimate.set(c.refId, c);
+    // The bid as a document: a PDF filed on the estimate (kind "estimate" — the HCP import files Housecall Pro's own
+    // PDF of every bid there; photos on the estimate share the kind and are not documents). Earliest PDF wins.
+    const bidPdfs = estIds.length ? await db.select().from(crmAttachments)
+      .where(and(eq(crmAttachments.orgId, ctx.org.id), eq(crmAttachments.kind, "estimate"), eq(crmAttachments.mime, "application/pdf"), inArray(crmAttachments.refId, estIds)))
+      .orderBy(asc(crmAttachments.createdAt)) : [];
+    const bidPdfByEstimate = new Map<string, typeof bidPdfs[number]>();
+    for (const b of bidPdfs) if (b.refId && !bidPdfByEstimate.has(b.refId)) bidPdfByEstimate.set(b.refId, b);
+    const fileOf = (a: { id: string; fileName: string } | undefined) => (a ? { id: a.id, fileName: a.fileName, downloadUrl: `/api/crm/attachments/${a.id}/file` } : null);
     const receipts = await receiptsForInvoices(ctx.org.id, invoices, "crm");
     res.json({
       customer: { id: cust.id, displayName: cust.displayName },
@@ -110,12 +118,16 @@ export function registerCrmClientDocumentRoutes(app: Express, getDevUser: GetUse
         id: e.id, number: e.number, title: e.title, status: e.status, totalCents: e.approvedTotalCents ?? e.totalCents,
         sentAt: e.sentAt, approvedAt: e.approvedAt, createdAt: e.createdAt,
         link: `/crm/estimates/${e.id}`, clientLink: `/e/${e.publicToken}`, imported: !!(e.customFields as any)?.hcpId,
-        contract: contractByEstimate.get(e.id) ? { id: contractByEstimate.get(e.id)!.id, fileName: contractByEstimate.get(e.id)!.fileName, downloadUrl: `/api/crm/attachments/${contractByEstimate.get(e.id)!.id}/file` } : null,
+        contract: fileOf(contractByEstimate.get(e.id)),
+        bidPdf: fileOf(bidPdfByEstimate.get(e.id)),
       })),
       contracts: estimates.filter((e) => e.approvedAt).map((e) => {
         const c = contractByEstimate.get(e.id);
+        // "pro approved" = marked approved by staff in Housecall Pro; the client never e-signed, so no signed copy exists anywhere.
+        const signoff = String((e.customFields as any)?.hcpSignoff ?? "") || null;
         return { estimateId: e.id, estimateNumber: e.number, title: e.title, approvedAt: e.approvedAt, totalCents: e.approvedTotalCents ?? e.totalCents,
-          attachmentId: c?.id ?? null, fileName: c?.fileName ?? null, downloadUrl: c ? `/api/crm/attachments/${c.id}/file` : null };
+          attachmentId: c?.id ?? null, fileName: c?.fileName ?? null, downloadUrl: c ? `/api/crm/attachments/${c.id}/file` : null,
+          signoff, bidPdf: fileOf(bidPdfByEstimate.get(e.id)) };
       }),
       invoices: invoices.map((i) => ({
         id: i.id, number: i.number, title: i.title, status: i.status, totalCents: i.totalCents, paidCents: i.paidCents ?? 0,
