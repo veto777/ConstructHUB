@@ -184,3 +184,19 @@ describe("resolveTaxRateBps — official city rates and construction treatment",
     });
   });
 });
+
+describe("resolveTaxRateBps — WA street address placed by WA DOR", () => {
+  it("names the taxing jurisdiction when it isn't the mailing city (Forrest Hild: Blaine mailing, PTBA 3737)", () => {
+    const r = resolveTaxRateBps({
+      city: "Blaine", state: "WA",
+      official: official({ city: null, county: "Whatcom", locationCode: "3737", kind: "special", ratePct: 8.9, rateBps: 890,
+        matchedBy: "address", jurisdiction: "Whatcom County Unincorp. PTBA" }),
+    });
+    expect(r).toMatchObject({ bps: 890, source: "official" });
+    expect(r.label).toBe("Blaine, WA — Whatcom County Unincorp. PTBA · 8.9% (WA DOR, Q4 2026)");
+  });
+  it("an address inside the city reads like the city line", () => {
+    const r = resolveTaxRateBps({ city: "Bellingham", state: "WA", official: official({ matchedBy: "address", jurisdiction: "Bellingham" }) });
+    expect(r.label).toBe("Bellingham, WA · 9.2% (WA DOR, Q4 2026)");
+  });
+});

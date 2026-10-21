@@ -10,6 +10,8 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
 vi.mock("../email", () => ({ sendWithFallback: vi.fn(async () => ({ accepted: ["fixture@example.invalid"] })) }));
+// No live WA DOR calls in tests: off by default, stubbed in the one test that exercises it.
+process.env.WA_DOR_ADDRESS_LOOKUP = "off";
 
 const lane = (() => {
   try {
@@ -121,6 +123,35 @@ describe.skipIf(!lane)("estimate tax from the job-site address (lane Postgres)",
     expect((await rate(a)).data.label).toBe("No rate found for Atlantisville, WA — using your default (6.5%)");
     const b = await client({ addressLine1: "6 No City Rd", city: null, state: "WA" });
     expect((await rate(b)).data).toMatchObject({ bps: 650, source: "org", fallbackReason: "no_city" });
+  });
+
+  it("WA: the street address is placed by WA DOR (Forrest Hild: Blaine mailing address → Whatcom PTBA 3737, 8.9%)", async () => {
+    const { clearWaAddressCache } = await import("../sales-tax/wa-address");
+    clearWaAddressCache();
+    const realFetch = globalThis.fetch;
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: any, init?: any) => {
+      const u = String(url);
+      if (!u.startsWith("https://webgis.dor.wa.gov/")) return realFetch(url, init);
+      asked.push(u);
+      if (u.includes("Broken")) return new Response("busy", { status: 503 });
+      return new Response(`<?xml version="1.0" encoding="utf-8"?><response loccode="3737" localrate=".024" rate=".089" code="2"><addressline code="3737" period="Q42026" /></response>`);
+    });
+    process.env.WA_DOR_ADDRESS_LOOKUP = "on";
+    try {
+      const id = await client({ addressLine1: "4783 Bayshore Drive", city: "Blaine", state: "WA", postalCode: "98230" });
+      const r = await rate(id);
+      expect(r.data).toMatchObject({ bps: 890, source: "official", city: "Blaine", state: "WA" });
+      expect(r.data.label).toBe("Blaine, WA — Whatcom County Unincorp. PTBA · 8.9% (WA DOR, Q4 2026)");
+      expect(asked[0]).toContain("addr=4783+Bayshore+Drive");
+      expect(asked[0]).toContain("zip=98230");
+      // DOR down → the city table, never an error.
+      const down = await client({ addressLine1: "1 Broken Rd", city: "Ferndale", state: "WA", postalCode: "98248" });
+      expect((await rate(down)).data).toMatchObject({ bps: waRate.Ferndale, source: "official", city: "Ferndale" });
+    } finally {
+      process.env.WA_DOR_ADDRESS_LOOKUP = "off";
+      vi.unstubAllGlobals();
+    }
   });
 
   it("another org's client is not found; customerId is required", async () => {

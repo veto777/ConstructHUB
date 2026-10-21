@@ -11,6 +11,7 @@ import { parseCsv, toPct, titleCase } from "./fetch-util";
 import { parseWaCsv, parseWaPeriod } from "./sources/wa";
 import { pickCityRow, contentHash, packResult, unpackResult, type BundledSalesTaxFile } from "./store";
 import { pctToBps, quarterLabel } from "./types";
+import { parseWaAddressXml } from "./wa-address";
 import { CONSTRUCTION_TAX_TREATMENT, constructionTaxTreatment } from "@shared/construction-tax-treatment";
 
 // Lines exactly as WA DOR publishes them in lsu-quarterly-tax-rates.csv (Q4 2026).
@@ -56,6 +57,19 @@ describe("WA DOR quarterly file", () => {
 
   it("refuses a file whose columns moved", () => {
     expect(() => parseWaCsv(`County,Name,Rate\nWhatcom,Bellingham,.092\n`, "2026-10-01")).toThrow(/column/);
+  });
+});
+
+describe("WA DOR address lookup answer", () => {
+  // WA DOR's answer for 4783 Bayshore Dr, Blaine 98230 (Forrest Hild's address), 2026-10-21.
+  const FORREST = `<?xml version="1.0" encoding="utf-8"?><response loccode="3737" localrate=".024" rate=".089" code="2" xmlns=""><addressline code="3737" street="BAYSHORE DR" househigh="4783" houselow="4783" evenodd="O" state="WA" zip="98230" plus4="6501" period="Q42026" rta="N" ptba="Whatcom PTBA" cez="" /><rate name="WHATCOM PTBA" code="3737" staterate=".065" localrate=".024" /></response>`;
+  it("a Blaine mailing address in unincorporated Whatcom PTBA → location 3737 at 8.9%", () => {
+    expect(parseWaAddressXml(FORREST)).toEqual({ locationCode: "3737", ratePct: 8.9, periodLabel: "Q4 2026", resultCode: 2 });
+  });
+  it("ZIP-only, not-found and error answers are not used (a ZIP spans jurisdictions)", () => {
+    expect(parseWaAddressXml(FORREST.replace('code="2"', 'code="5"'))).toBeNull();
+    expect(parseWaAddressXml(`<response loccode="-1" localrate="-1" rate="-1" code="6" />`)).toBeNull();
+    expect(parseWaAddressXml("<html>error</html>")).toBeNull();
   });
 });
 

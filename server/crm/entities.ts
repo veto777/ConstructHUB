@@ -374,6 +374,8 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
     // Autosaved by the New estimate dialog and not finished yet (shared/estimate-draft.ts): the dialog offers to
     // continue it instead of starting a duplicate. Cleared when the user presses Create estimate.
     autosave: (e.customFields as any)?.autosave ? true : undefined,
+    // The dialog's own form state for a resumed draft (auto title on/off, ...): shared/estimate-draft.ts.
+    autosaveMeta: (e.customFields as any)?.autosave ? (e.customFields as any).autosave.meta ?? null : undefined,
     createdAt: e.createdAt, updatedAt: e.updatedAt,
   };
 }
@@ -1560,6 +1562,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       items: z.array(itemSchema).max(300).default([]),
       // The New estimate dialog's autosave: a DRAFT created as soon as the form has content (never sent).
       autosave: z.boolean().optional(),
+      autosaveMeta: z.record(z.any()).optional(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid estimate", issues: parsed.error.issues });
@@ -1598,7 +1601,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         ...estimateDefaultsFromOrg(ctx.org),
         ...(d.depositCents !== undefined ? { depositBps: null } : {}),
         publicToken: token(), createdByMemberId: ctx.member.id,
-        ...(d.autosave ? { customFields: { autosave: { at: new Date().toISOString(), memberId: ctx.member.id } } } : {}),
+        ...(d.autosave ? { customFields: { autosave: { at: new Date().toISOString(), memberId: ctx.member.id, meta: d.autosaveMeta ?? null } } } : {}),
         // No expiry on a draft — the 7-day clock starts when it is SENT
         // (portal.ts), so a draft never burns its validity window unsent.
       } as any).returning();
@@ -1720,6 +1723,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       items: z.array(itemSchema).max(300).optional(),
       // false = the dialog's Create estimate finished an autosaved draft (the flag goes).
       autosave: z.boolean().optional(),
+      autosaveMeta: z.record(z.any()).optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid estimate", issues: parsed.error.issues });
     const d = parsed.data;
@@ -1771,11 +1775,14 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       if (depositMsg) return res.status(400).json({ message: depositMsg });
     }
 
-    const { items, autosave, ...fields } = d;
+    const { items, autosave, autosaveMeta, ...fields } = d;
     const patch: any = { updatedAt: new Date() };
     if (autosave === false && (e.customFields as any)?.autosave) {
       const { autosave: _done, ...rest } = (e.customFields as Record<string, unknown>) ?? {};
       patch.customFields = rest;
+    } else if (autosaveMeta && (e.customFields as any)?.autosave) {
+      const cf = (e.customFields as Record<string, any>) ?? {};
+      patch.customFields = { ...cf, autosave: { ...cf.autosave, meta: autosaveMeta } };
     }
     for (const k of [
       "title", "introText", "termsText", "taxRateBps", "depositCents", "projectId", "divisionId", "status",

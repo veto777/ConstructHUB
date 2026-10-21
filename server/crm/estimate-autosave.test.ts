@@ -10,7 +10,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import {
-  autosavePayload, clearDraftMirror, draftHasContent, draftMirrorKey, readDraftMirror, snapshotFromEstimate,
+  autoTitleFrom, autosavePayload, clearDraftMirror, draftHasContent, draftMirrorKey, readDraftMirror, snapshotFromEstimate,
   writeDraftMirror, type EstimateDraftSnapshot,
 } from "@shared/estimate-draft";
 
@@ -38,12 +38,35 @@ describe("draftHasContent — what blocks an outside click / Esc from closing th
     expect(draftHasContent(null)).toBe(false);
   });
   it("any typed content keeps it open: a title, a message, a line name, a scope, a price", () => {
-    expect(draftHasContent({ ...empty, title: "Roof" })).toBe(true);
+    expect(draftHasContent({ ...empty, title: "Roof", autoTitle: false })).toBe(true);
+    // An automatic title is not content of its own (the lines it comes from are).
+    expect(draftHasContent({ ...empty, title: "Roof", autoTitle: true })).toBe(false);
     expect(draftHasContent({ ...empty, intro: "Hi" })).toBe(true);
     expect(draftHasContent({ ...empty, items: [{ ...blank, name: "Gutters" }] })).toBe(true);
     expect(draftHasContent({ ...empty, items: [{ ...blank, description: "scope only" }] })).toBe(true);
     expect(draftHasContent({ ...empty, items: [{ ...blank, unitPriceCents: 1650 }] })).toBe(true);
     expect(draftHasContent(OWNER)).toBe(true);
+  });
+});
+
+describe("autoTitleFrom — the title follows the lines until the user types one", () => {
+  const L = (name: string, kind = "labor") => ({ name, kind });
+  it("one, two, three+ lines, in order; blanks and discount lines skipped", () => {
+    expect(autoTitleFrom([])).toBe("Estimate");
+    expect(autoTitleFrom([L("  ")])).toBe("Estimate");
+    expect(autoTitleFrom([L("Door Remodel")])).toBe("Door Remodel");
+    // The owner's screenshot: the picked-then-replaced "Door Remodel" must not linger.
+    expect(autoTitleFrom([L("Siding Remodel - Primed (NO PAINT)"), L("Exterior Painting")]))
+      .toBe("Siding Remodel - Primed (NO PAINT) + Exterior Painting");
+    expect(autoTitleFrom([L("Siding Remodel"), L("Exterior Painting"), L("Seamless Gutter")])).toBe("Siding Remodel + Exterior Painting + 1 more");
+    expect(autoTitleFrom([L("A"), L("Discount", "discount")])).toBe("A");
+    expect(autoTitleFrom([L("x".repeat(150)), L("y".repeat(150))]).length).toBeLessThanOrEqual(200);
+  });
+  it("a draft from before auto titles (no meta) is recomputed; only a typed title stays manual", () => {
+    const items = [{ kind: "labor", name: "Door Remodel", quantityMilli: 1000, unitPriceCents: 500000, taxable: true }];
+    expect(snapshotFromEstimate({ title: "Seamless Gutter Installation" }, items).autoTitle).toBe(true);
+    expect(snapshotFromEstimate({ title: "Smith job", autosaveMeta: { autoTitle: false } }, items).autoTitle).toBe(false);
+    expect(autosavePayload({ ...OWNER, autoTitle: false }).autosaveMeta).toMatchObject({ autoTitle: false });
   });
 });
 
@@ -138,7 +161,7 @@ describe.skipIf(!lane)("autosaved drafts through the CRM routes (lane Postgres)"
   it("autosave creates exactly ONE draft, then updates it; Create finishes that same estimate", async () => {
     const first = await call("/api/crm/estimates", { customerId, ...autosavePayload({ ...OWNER, items: [] }), autosave: true });
     expect(first.status).toBe(201);
-    expect(first.data).toMatchObject({ status: "draft", autosave: true, sentAt: null });
+    expect(first.data).toMatchObject({ status: "draft", autosave: true, sentAt: null, autosaveMeta: { autoTitle: true } });
     for (const step of [1, 2, 3]) {
       const r = await call(`/api/crm/estimates/${first.data.id}`, autosavePayload({ ...OWNER, intro: `v${step}` }), "PATCH");
       expect(r.status).toBe(200);
@@ -146,7 +169,10 @@ describe.skipIf(!lane)("autosaved drafts through the CRM routes (lane Postgres)"
     let rows = await estimatesOf();
     expect(rows).toHaveLength(1);
     expect(rows[0].custom_fields.autosave).toBeTruthy();
+    // The auto/manual title flag rides along with the draft.
+    await call(`/api/crm/estimates/${first.data.id}`, autosavePayload({ ...OWNER, intro: "v3", autoTitle: false }), "PATCH");
     const detail = await call(`/api/crm/estimates/${first.data.id}`);
+    expect(detail.data.estimate.autosaveMeta).toMatchObject({ autoTitle: false });
     expect(detail.data.items[0]).toMatchObject({ quantityMilli: 2_200_000, unitPriceCents: 1650 });
     expect(detail.data.estimate.introText).toBe("v3");
     // The client page lists it like any draft, flagged so "New estimate" offers to continue it.

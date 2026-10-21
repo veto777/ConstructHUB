@@ -18,8 +18,12 @@
  *      case-insensitive city match) — the org's configuration beats the table
  *   2. the state's construction treatment says contractors don't charge sales
  *      tax on real-property jobs (e.g. FL) → 0, source "construction-exempt"
- *   3. the official rate for the job-site city in the state DOR table
- *      (sales_tax_rates, server/sales-tax/store.ts; ZIP disambiguates)
+ *   3. the official rate for the job site: in WA, the street address placed by
+ *      WA DOR's own address lookup (server/sales-tax/wa-address.ts — a Blaine
+ *      mailing address can be unincorporated Whatcom PTBA at 8.9%, not the City
+ *      of Blaine at 9.1%); otherwise / when that fails, the job-site city in the
+ *      state DOR table (sales_tax_rates, server/sales-tax/store.ts; ZIP
+ *      disambiguates)
  *   4. the division default (custom_fields->taxRates.default)
  *   5. the org default (crm_orgs.default_tax_rate_bps)
  *   6. 0, source "none" — and the label says no rate was found, never silently
@@ -47,7 +51,9 @@ import { getDivision } from "./divisions";
 import { normalizeUsState } from "@shared/divisions";
 import { stateOfAddress } from "@shared/us-address-state";
 import { constructionTaxTreatment, type ConstructionTaxTreatment } from "@shared/construction-tax-treatment";
-import { lookupOfficialRate, type OfficialLookup, type OfficialRate } from "../sales-tax/store";
+import { lookupByLocationCode, lookupOfficialRate, type OfficialLookup, type OfficialRate } from "../sales-tax/store";
+import { lookupWaAddress } from "../sales-tax/wa-address";
+import { pctToBps } from "../sales-tax/types";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -106,6 +112,8 @@ const fmtPct = (pct: number) => `${Number(pct.toFixed(4))}%`;
 /** "No tax on job" → "no tax on job", but "GET on contractor" / "T&M …" keep their capitals. */
 const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
 
+const cityKeyLoose = (s: string | null | undefined) => String(s ?? "").trim().toLowerCase();
+
 /** " — TX: commercial repair taxed; new/residential mostly not — check" for a "depends" state, else "". */
 function dependsSuffix(t: ConstructionTaxTreatment | null | undefined): string {
   return t?.treatment === "depends" ? ` — ${t.state}: ${lowerFirst(t.shortRule)} — check` : "";
@@ -157,7 +165,9 @@ export function resolveTaxRateBps(args: {
   // 3. The official rate for the job-site city.
   const off = args.official?.match ?? null;
   if (off) {
-    const where = place(off.kind === "state" ? cityRaw || null : off.city ?? cityRaw, state ?? off.state);
+    const where = off.matchedBy === "address"
+      ? `${place(cityRaw || off.city, state ?? off.state)}${off.jurisdiction && cityKeyLoose(off.jurisdiction) !== cityKeyLoose(cityRaw) ? ` — ${off.jurisdiction}` : ""}`
+      : place(off.kind === "state" ? cityRaw || null : off.city ?? cityRaw, state ?? off.state);
     const varies = off.varies ? ` — rate varies within ${off.city ?? cityRaw}; check the address` : "";
     return {
       ...base, bps: clampBps(off.rateBps), source: "official", official: off,
@@ -190,6 +200,7 @@ export function resolveTaxRateBps(args: {
 export async function estimateTaxInputs(orgId: string, args: { customerId: string; projectId?: string | null }) {
   const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, orgId)).limit(1);
   let addr: { city: string | null; state: string | null; postalCode: string | null; addressLine1: string | null } | null = null;
+  // (addressLine1 also feeds the WA DOR address lookup.)
   let divisionId: string | null = null;
 
   if (args.projectId) {
@@ -212,6 +223,7 @@ export async function estimateTaxInputs(orgId: string, args: { customerId: strin
     city: addr?.city?.trim() || null,
     state,
     zip: addr?.postalCode ?? null,
+    addressLine1: addr?.addressLine1?.trim() || null,
     divisionCustomFields: div?.customFields ?? null,
     orgDefaultTaxRateBps: org?.defaultTaxRateBps ?? null,
   };
@@ -227,7 +239,15 @@ export async function resolveEstimateTaxRate(
 ): Promise<TaxResolution> {
   const inputs = await estimateTaxInputs(orgId, args);
   let official: OfficialLookup | null = null;
-  if (inputs.state && inputs.city) {
+  // WA: the exact location code for the street address, from WA DOR (falls through to the city on any miss).
+  if (inputs.state === "WA" && inputs.addressLine1) {
+    try {
+      official = await waAddressOfficial(inputs.addressLine1, inputs.city, inputs.zip);
+    } catch (e: any) {
+      console.error("[crm/tax] WA address lookup failed:", e?.message ?? e);
+    }
+  }
+  if (!official && inputs.state && inputs.city) {
     try {
       official = await lookupOfficialRate(pool, { state: inputs.state, city: inputs.city, zip: inputs.zip });
     } catch (e: any) {
@@ -236,6 +256,29 @@ export async function resolveEstimateTaxRate(
     }
   }
   return resolveTaxRateBps({ ...inputs, official });
+}
+
+/**
+ * WA DOR's location code for a street address, as an official-table match: the rate DOR returns for the address
+ * (current period), named after the location row of our WA DOR table when it has that code.
+ */
+export async function waAddressOfficial(addressLine1: string, city: string | null, zip: string | null, fetchImpl?: typeof fetch): Promise<OfficialLookup | null> {
+  const loc = await lookupWaAddress({ addressLine1, city, zip }, fetchImpl);
+  if (!loc) return null;
+  const row = await lookupByLocationCode(pool, "WA", loc.locationCode).catch(() => null);
+  const jurisdiction = row
+    ? row.kind === "unincorporated" ? `unincorporated ${row.county} County` : row.city
+    : `WA location ${loc.locationCode}`;
+  return {
+    loaded: true,
+    match: {
+      state: "WA", city: row?.kind === "city" ? row.city : null, county: row?.county ?? null, locationCode: loc.locationCode,
+      kind: row?.kind ?? "special", ratePct: loc.ratePct, rateBps: pctToBps(loc.ratePct),
+      effectiveDate: row?.effectiveDate ?? "", source: "WA DOR",
+      sourceUrl: "https://webgis.dor.wa.gov/webapi/AddressRates.aspx",
+      periodLabel: loc.periodLabel ?? row?.periodLabel ?? "", varies: false, matchedBy: "address", jurisdiction,
+    },
+  };
 }
 
 /** What custom_fields->taxSource records about a resolution. */
@@ -253,6 +296,7 @@ export function taxSourceRecord(r: TaxResolution) {
       ? {
         source: r.official.source, periodLabel: r.official.periodLabel, effectiveDate: r.official.effectiveDate,
         city: r.official.city, county: r.official.county, locationCode: r.official.locationCode, sourceUrl: r.official.sourceUrl,
+        matchedBy: r.official.matchedBy ?? "city", jurisdiction: r.official.jurisdiction ?? null,
       }
       : null,
     fallbackReason: r.fallbackReason ?? null,

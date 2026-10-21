@@ -54,7 +54,7 @@ import { AppointmentForm, type Appointment } from "@/components/crm-appointment-
 import { InfoTip } from "@/components/info-tip";
 import { useEstimateTaxRate, TaxRateNote, bpsToPctText } from "@/components/estimate-tax-rate";
 import { useEstimateAutosave, AutosaveIndicator, useDialogFullscreen, FullscreenToggle } from "@/components/estimate-autosave";
-import { draftHasContent, snapshotFromEstimate, type EstimateDraftSnapshot } from "@shared/estimate-draft";
+import { autoTitleFrom, draftHasContent, snapshotFromEstimate, type EstimateDraftSnapshot } from "@shared/estimate-draft";
 import { HelpButton } from "@/components/help-button";
 import { confirmAction } from "@/components/confirm-dialog";
 import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
@@ -929,7 +929,13 @@ export default function CrmClientPage() {
   // A refresh reopens the dialog with everything restored. shared/estimate-draft.ts, components/estimate-autosave.tsx
   const { data: orgForDraft } = useQuery<any>({ queryKey: ["/api/crm/org"] });
   const [finalizing, setFinalizing] = useState(false);
-  const draftSnapshot: EstimateDraftSnapshot = { title, intro, taxPct, taxTouched, items };
+  // The title follows the lines live ("Siding Remodel + Exterior Painting") until the user types in it;
+  // "↺ auto title" switches back. Persisted with the draft (autosaveMeta.autoTitle).
+  const [autoTitle, setAutoTitle] = useState(true);
+  useEffect(() => {
+    if (autoTitle) setTitle(autoTitleFrom(items));
+  }, [autoTitle, items]);
+  const draftSnapshot: EstimateDraftSnapshot = { title, autoTitle, intro, taxPct, taxTouched, items };
   const autosave = useEstimateAutosave({
     orgId: orgForDraft?.id ?? null, customerId: id, open, snapshot: draftSnapshot, paused: finalizing,
   });
@@ -937,6 +943,7 @@ export default function CrmClientPage() {
   const [confirmClose, setConfirmClose] = useState(false);
   const [resumeOffer, setResumeOffer] = useState<{ id: string; title: string; updatedAt?: string } | null>(null);
   const loadSnapshot = (snap: EstimateDraftSnapshot) => {
+    setAutoTitle(snap.autoTitle !== false);
     setTitle(snap.title || "Estimate");
     setIntro(snap.intro ?? "");
     setTaxPct(snap.taxPct ?? "0");
@@ -946,7 +953,7 @@ export default function CrmClientPage() {
       : [{ ...BLANK }]);
   };
   const resetForm = () => {
-    setItems([{ ...BLANK }]); setIntro(""); setTitle("Estimate"); setTaxPct("0"); setTaxTouched(false);
+    setItems([{ ...BLANK }]); setIntro(""); setTitle("Estimate"); setAutoTitle(true); setTaxPct("0"); setTaxTouched(false);
     setResumeOffer(null);
   };
   // After a refresh (or a crash): reopen with everything that was typed.
@@ -1620,8 +1627,16 @@ export default function CrmClientPage() {
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="sm:col-span-2">
-                    <Label htmlFor="e-title">Title</Label>
-                    <Input id="e-title" value={title} onChange={(e) => setTitle(e.target.value)}
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="e-title">Title</Label>
+                      {autoTitle ? (
+                        <span className="text-[11px] text-muted-foreground" data-testid="text-auto-title">auto, from the lines</span>
+                      ) : (
+                        <button type="button" className="text-[11px] text-primary hover:underline" data-testid="button-auto-title"
+                          title="Name the estimate after its lines again" onClick={() => setAutoTitle(true)}>↺ auto title</button>
+                      )}
+                    </div>
+                    <Input id="e-title" value={title} onChange={(e) => { setAutoTitle(false); setTitle(e.target.value); }}
                       data-testid="input-estimate-title" />
                   </div>
                   <div>
@@ -1655,7 +1670,6 @@ export default function CrmClientPage() {
                               ...x, name: pb.name, unit: pb.unit ?? "", description: pb.description, taxable: pb.taxable,
                               unitPriceCents: pb.unitPriceCents, quantityMilli: Math.round((fromHover?.quantity ?? 1) * 1000),
                             } : x));
-                            if (title.trim() === "" || title === "Estimate") setTitle(pb.name);
                             if (fromHover) toast({ title: `Quantity from HOVER: ${fromHover.quantity} ${pb.unit ?? ""}`.trim(), description: "Check it before you send." });
                           }} />
                       </div>

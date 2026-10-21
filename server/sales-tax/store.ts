@@ -155,6 +155,10 @@ export type OfficialRate = {
   periodLabel: string;
   /** The city has several published rates (multi-county city, districts) and none matched the ZIP. */
   varies: boolean;
+  /** "address": WA DOR placed the street address in this location code (wa-address.ts); else matched by city name. */
+  matchedBy?: "address" | "city";
+  /** The taxing jurisdiction's name when it isn't the mailing city ("Whatcom County Unincorp. PTBA"). */
+  jurisdiction?: string | null;
 };
 
 export type OfficialLookup = {
@@ -198,6 +202,12 @@ export function pickCityRow<T extends { zip: string | null; kind: string; rate_b
 
 const SELECT_ROW = `SELECT state, city, county, location_code, zip, kind, rate_pct::text, rate_bps, effective_date::text,
   source, source_url, period_label FROM sales_tax_rates`;
+
+/** One location code's row (WA DOR codes are unique per state). */
+export async function lookupByLocationCode(pool: Pool, state: string, code: string): Promise<OfficialRate | null> {
+  const r = (await pool.query(`${SELECT_ROW} WHERE state = $1 AND location_code = $2 LIMIT 1`, [state, code])).rows as RateRowDb[];
+  return r[0] ? toOfficial(r[0], false) : null;
+}
 
 export async function lookupOfficialRate(
   pool: Pool, args: { state: string; city?: string | null; zip?: string | null; county?: string | null },

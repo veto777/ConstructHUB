@@ -1,17 +1,21 @@
 /**
  * The New estimate dialog never loses work (owner, 2026-10-21: "make sure it saves the estimates no matter what
- * stage you are at"). Pure pieces shared by the dialog (client/src/components/estimate-autosave.ts) and the tests:
+ * stage you are at"). Pure pieces shared by the dialog (client/src/components/estimate-autosave.tsx) and the tests:
  *
  *  - draftHasContent: once anything is typed, an outside click / Esc no longer closes the dialog, the X asks
  *    "Save as draft / Discard / Keep editing", and the draft is autosaved to the server as a DRAFT estimate.
- *  - autosavePayload: what the autosave sends (POST once, then PATCH). A line with a price or scope but no name
- *    yet is kept as "Untitled item" so nothing typed is dropped.
+ *  - autosavePayload: what the autosave (and Create) sends. A line with a price or scope but no name yet is kept as
+ *    "Untitled item" so nothing typed is dropped. The contractor's own discount becomes a kind:"discount" line, so
+ *    recalcEstimate / shared/estimate-totals.ts handle it (tax after the discount) — no second totals math here.
+ *  - autoTitleFrom: while the user hasn't typed a title, it follows the lines live ("A + B", "A + B + 1 more").
  *  - the localStorage mirror (key per org + client): written on every change, restored after a refresh or a
  *    failed server save, cleared once the estimate is created or the draft is discarded.
  */
+import { lineBases } from "./estimate-totals";
 
 export const DEFAULT_ESTIMATE_TITLE = "Estimate";
 export const UNTITLED_LINE = "Untitled item";
+export const TITLE_MAX = 200;
 
 export type DraftLine = {
   kind: string;
@@ -23,28 +27,61 @@ export type DraftLine = {
   taxable: boolean;
   /** The price-book item a line was picked from, when it was. */
   pricebookItemId?: string | null;
+  /** That item's list price when picked (client-side only: drives "Update price book to $X"). */
+  listPriceCents?: number | null;
 };
+
+/** A preset / org-default discount the client may choose on the estimate page (crm_estimate_discounts). */
+export type DraftOffer = { code: string; label: string; percentBps: number; conditions: string | null; enabled: boolean };
+
+/** The contractor's own discount on this estimate: a dollar amount or a percent of the subtotal. */
+export type ContractorDiscount = { mode: "amount" | "percent"; value: string; label: string };
 
 export type EstimateDraftSnapshot = {
   title: string;
-  /** True while the title is generated from the lines (the user hasn't typed in it). */
+  /** True while the title is generated from the lines (the user hasn't typed in it). Missing = true. */
   autoTitle?: boolean;
   intro: string;
   taxPct: string;
   taxTouched: boolean;
   items: DraftLine[];
+  offers?: DraftOffer[];
+  contractorDiscount?: ContractorDiscount | null;
 };
 
 const lineHasContent = (l: DraftLine) =>
   !!(l.name?.trim() || l.description?.trim() || l.unitPriceCents > 0 || (l.unit ?? "").trim());
 
-/** Anything worth keeping: a title other than the default, any line content, or the message to the client. */
+const discountCentsOf = (cd: ContractorDiscount | null | undefined, items: DraftLine[]): number => {
+  if (!cd) return 0;
+  const n = parseFloat(String(cd.value).replace(/[$,%\s]/g, ""));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (cd.mode === "amount") return Math.round(n * 100);
+  const pct = Math.min(100, n);
+  return Math.round((lineBases(items.filter((l) => l.kind !== "discount")).subtotalCents * pct) / 100);
+};
+
+/** Anything worth keeping: a typed title, any line content, the message, or a contractor discount. */
 export function draftHasContent(s: EstimateDraftSnapshot | null | undefined): boolean {
   if (!s) return false;
   const title = s.title.trim();
-  if (title && title !== DEFAULT_ESTIMATE_TITLE && !s.autoTitle) return true;
+  if (s.autoTitle === false && title && title !== DEFAULT_ESTIMATE_TITLE) return true;
   if (s.intro.trim()) return true;
+  if (discountCentsOf(s.contractorDiscount, s.items) > 0) return true;
   return s.items.some(lineHasContent);
+}
+
+/**
+ * The title while it is automatic: the line names in order. One line → its name; two → "A + B"; three or more →
+ * "A + B + N more". Long results are cut at a word. No named line → "Estimate".
+ */
+export function autoTitleFrom(items: Array<{ name?: string | null; kind?: string }>): string {
+  const names = items.filter((i) => i.kind !== "discount").map((i) => (i.name ?? "").trim()).filter(Boolean);
+  if (!names.length) return DEFAULT_ESTIMATE_TITLE;
+  const t = names.length <= 2 ? names.join(" + ") : `${names[0]} + ${names[1]} + ${names.length - 2} more`;
+  if (t.length <= TITLE_MAX) return t;
+  const cut = t.slice(0, TITLE_MAX - 1);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 40)).trimEnd()}…`;
 }
 
 export const pctTextToBps = (t: string): number => {
@@ -52,23 +89,59 @@ export const pctTextToBps = (t: string): number => {
   return Number.isFinite(n) ? Math.min(3000, Math.max(0, Math.round(n * 100))) : 0;
 };
 
+/** The contractor discount as an estimate line (kind "discount", not taxable), or null when there is none. */
+export function contractorDiscountLine(cd: ContractorDiscount | null | undefined, items: DraftLine[]) {
+  const cents = discountCentsOf(cd, items);
+  if (!cd || cents <= 0) return null;
+  const pct = cd.mode === "percent" ? ` (${Number(parseFloat(cd.value).toFixed(2))}%)` : "";
+  return {
+    kind: "discount", name: `${cd.label.trim() || "Discount"}${pct}`.slice(0, 300), description: null,
+    quantityMilli: 1000, unit: null, unitPriceCents: cents, taxable: false,
+  };
+}
+
 /** The body for POST /api/crm/estimates (with customerId) or PATCH /api/crm/estimates/:id. */
 export function autosavePayload(s: EstimateDraftSnapshot) {
+  const lines = s.items.filter(lineHasContent).map((l) => ({
+    kind: l.kind || "labor",
+    name: (l.name.trim() || UNTITLED_LINE).slice(0, 300),
+    description: l.description?.trim() ? l.description : null,
+    quantityMilli: Math.max(0, Math.round(l.quantityMilli || 0)),
+    unit: l.unit?.trim() ? l.unit.trim().slice(0, 20) : null,
+    unitPriceCents: Math.max(0, Math.round(l.unitPriceCents || 0)),
+    taxable: l.taxable !== false,
+    pricebookItemId: l.pricebookItemId ?? null,
+  }));
+  const disc = contractorDiscountLine(s.contractorDiscount, s.items);
+  const items = [...lines, ...(disc ? [{ ...disc, pricebookItemId: null }] : [])].map((l, idx) => ({ ...l, sortOrder: idx }));
   return {
-    title: (s.title.trim() || DEFAULT_ESTIMATE_TITLE).slice(0, 200),
+    title: (s.title.trim() || DEFAULT_ESTIMATE_TITLE).slice(0, TITLE_MAX),
     introText: s.intro.trim() ? s.intro : null,
     taxRateBps: pctTextToBps(s.taxPct),
-    items: s.items.filter(lineHasContent).map((l, idx) => ({
-      kind: l.kind || "labor",
-      name: (l.name.trim() || UNTITLED_LINE).slice(0, 300),
-      description: l.description?.trim() ? l.description : null,
-      quantityMilli: Math.max(0, Math.round(l.quantityMilli || 0)),
-      unit: l.unit?.trim() ? l.unit.trim().slice(0, 20) : null,
-      unitPriceCents: Math.max(0, Math.round(l.unitPriceCents || 0)),
-      taxable: l.taxable !== false,
-      sortOrder: idx,
-    })),
+    items,
+    // Kept on the draft (customFields.autosave.meta) so a resumed draft keeps its auto title and discount form.
+    autosaveMeta: { autoTitle: s.autoTitle !== false, contractorDiscount: s.contractorDiscount ?? null },
   };
+}
+
+/** The offers to store for the estimate (PUT /api/crm/estimates/:id/discounts): every one, ticked or not. */
+export const offersPayload = (offers: DraftOffer[] | undefined) =>
+  (offers ?? []).map((o, idx) => ({
+    code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null, enabled: o.enabled, sortOrder: idx,
+  }));
+
+/** The org's Bid discounts (Settings), else the presets with their default ticks. */
+export function defaultOffers(
+  orgCustomFields: unknown,
+  presets: ReadonlyArray<{ code: string; label: string; percentBps: number; conditions: string; defaultEnabled: boolean }>,
+): DraftOffer[] {
+  const saved = (orgCustomFields as any)?.discountDefaults;
+  if (Array.isArray(saved) && saved.length) {
+    return saved
+      .filter((o: any) => o && typeof o.code === "string" && typeof o.label === "string" && Number.isInteger(o.percentBps))
+      .map((o: any) => ({ code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null, enabled: o.enabled !== false }));
+  }
+  return presets.map((p) => ({ code: p.code, label: p.label, percentBps: p.percentBps, conditions: p.conditions, enabled: p.defaultEnabled }));
 }
 
 // ── localStorage mirror ─────────────────────────────────────────────────────
@@ -111,22 +184,34 @@ export function clearDraftMirror(key: string, s?: StorageLike | null): void {
   try { storage(s)?.removeItem(key); } catch { /* blocked */ }
 }
 
-/** A server estimate row back into the dialog's form (continue an autosaved draft). */
+/** A server estimate (+ its offers) back into the dialog's form (continue an autosaved draft). */
 export function snapshotFromEstimate(
-  e: { title?: string | null; introText?: string | null; taxRateBps?: number | null; customFields?: unknown },
+  e: { title?: string | null; introText?: string | null; taxRateBps?: number | null; autosaveMeta?: any },
   items: Array<Partial<DraftLine> & { name?: string | null }>,
+  offers?: DraftOffer[],
 ): EstimateDraftSnapshot {
+  const meta = e.autosaveMeta ?? {};
+  const cd: ContractorDiscount | null = meta.contractorDiscount ?? null;
+  // The contractor discount is rebuilt from the form, so its generated line is not loaded as a line.
+  let rows = items;
+  if (cd) {
+    const lastDisc = [...items].reverse().find((i) => i.kind === "discount");
+    rows = items.filter((i) => i !== lastDisc);
+  }
   return {
     title: e.title ?? DEFAULT_ESTIMATE_TITLE,
+    // Manual only when the user actually typed a title (meta.autoTitle false). A draft from before the auto
+    // title (no meta) gets its title recomputed from the lines — a stale picked-item title is not "typed".
+    autoTitle: meta.autoTitle !== false,
     intro: e.introText ?? "",
     taxPct: String(Number(((e.taxRateBps ?? 0) / 100).toFixed(2))),
     taxTouched: true,
-    items: items.length
-      ? items.map((i) => ({
-        kind: i.kind ?? "labor", name: i.name === UNTITLED_LINE ? "" : i.name ?? "", description: i.description ?? "",
-        quantityMilli: i.quantityMilli ?? 1000, unit: i.unit ?? "", unitPriceCents: i.unitPriceCents ?? 0,
-        taxable: i.taxable ?? true, pricebookItemId: i.pricebookItemId ?? null,
-      }))
-      : [],
+    items: rows.map((i) => ({
+      kind: i.kind ?? "labor", name: i.name === UNTITLED_LINE ? "" : i.name ?? "", description: i.description ?? "",
+      quantityMilli: i.quantityMilli ?? 1000, unit: i.unit ?? "", unitPriceCents: i.unitPriceCents ?? 0,
+      taxable: i.taxable ?? true, pricebookItemId: i.pricebookItemId ?? null,
+    })),
+    ...(offers ? { offers } : {}),
+    contractorDiscount: cd,
   };
 }

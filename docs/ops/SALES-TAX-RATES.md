@@ -30,7 +30,12 @@ then its ZIP, then the division's state, then the org's state. The first match b
 1. The division's per-city override (`crm_divisions.custom_fields->taxRates.cities`). The org's own configuration wins
    over the official table.
 2. The state's construction treatment is `not_taxable` (`shared/construction-tax-treatment.ts`). The rate is 0.
-3. The official rate for the city in `sales_tax_rates`. A ZIP narrows the match when a city has several rates.
+3. The official rate for the job site. For a WA address with a street line, WA DOR's own free address lookup
+   (`webgis.dor.wa.gov/webapi/AddressRates.aspx`, `server/sales-tax/wa-address.ts`, cached for a day, 4 s timeout)
+   gives the exact location code. A mailing city is not the tax jurisdiction: 4783 Bayshore Dr, Blaine 98230 is
+   unincorporated Whatcom PTBA (3737, 8.9%), not the City of Blaine (3702, 9.1%). Otherwise, or when DOR doesn't
+   answer, the city in `sales_tax_rates` is used, with a ZIP narrowing the match when a city has several rates.
+   Set `WA_DOR_ADDRESS_LOOKUP=off` to disable the address lookup.
 4. The division default (`taxRates.default`).
 5. The org default (`crm_orgs.default_tax_rate_bps`).
 6. 0, with source `none`.
