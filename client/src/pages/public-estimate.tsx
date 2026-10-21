@@ -21,6 +21,8 @@ import { orgThemeStyle } from "@/lib/org-theme";
 import { Home3DCard } from "@/components/hover-3d-card";
 import { SelfEstimatePrompts, estimateTransport } from "@/components/self-estimate";
 import { CardFeeConfirm } from "@/components/card-fee-confirm";
+import { WARRANTY_ANCHOR, normalizeBidHeadline } from "@shared/bid-headline";
+import { BidHeadlineBanner } from "@/components/bid-headline-banner";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -647,6 +649,9 @@ export default function PublicEstimatePage() {
             Estimate for {customer.displayName}
           </h1>
         </div>
+        {/* The org's bid headline (Settings → Estimate & invoice defaults) —
+            first thing on the bid, above the scopes and the line items. */}
+        <BidHeadlineBanner headline={company.bidHeadline} hasWarranty={!!company.warrantyText} />
         {preview && (
           <Card className="border-amber-500/50 bg-amber-500/5" data-testid="preview-banner">
             <CardContent className="p-4 text-sm text-center">
@@ -1240,7 +1245,10 @@ export default function PublicEstimatePage() {
             </div>
           )}
           {company.warrantyText && (
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{company.warrantyText}</p>
+            <div id={WARRANTY_ANCHOR} className="scroll-mt-24 space-y-1" data-testid="section-warranty">
+              {normalizeBidHeadline(company.bidHeadline) && <div className="font-semibold text-sm">Warranty</div>}
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap" data-testid="text-warranty">{company.warrantyText}</p>
+            </div>
           )}
           {e.footerText && (
             <p className="text-xs text-muted-foreground whitespace-pre-wrap" data-testid="text-estimate-footer">{e.footerText}</p>

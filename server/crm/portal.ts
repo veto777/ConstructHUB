@@ -54,6 +54,7 @@ import { onlinePaymentRails } from "./payments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
 import type { CrmNotificationPref } from "@shared/schema";
 import { resolveOrgTheme, themePayload } from "@shared/theme-colors";
+import { WARRANTY_ANCHOR, bidHeadlineEmailHtml, bidHeadlineFromCustomFields } from "@shared/bid-headline";
 import { logError } from "../ops/log";
 import { clientHome3dForEstimate } from "./hover-share";
 import { viewerMeasurementForEstimate } from "./hover-model3d-offer";
@@ -292,6 +293,9 @@ function publicEstimateView(
       // estimate never goes out under the WA HQ address.
       ...companyBranding(org, division),
       warrantyText: docText.warrantyText,
+      // The org's bid headline (shared/bid-headline.ts) — opens the estimate,
+      // above the scopes and items. Live from Settings; null when none is set.
+      bidHeadline: bidHeadlineFromCustomFields(org.customFields),
       // Org-wide T&C render on a separate linked page (?terms=1), HCP-style —
       // never inline on the estimate itself. The estimate's snapshot of them.
       termsAndConditions: docText.companyTermsText,
@@ -402,12 +406,21 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const addressLine = branding.addressLine1
       ? `${esc([branding.addressLine1, branding.addressLine2].filter(Boolean).join(", "))}${branding.city ? `<br>${esc(branding.city)}` : ""}${branding.state ? `, ${esc(branding.state)}` : ""}${branding.postalCode ? ` ${esc(branding.postalCode)}` : ""}`
       : "";
+    // The org's bid headline opens the email too, right under the title.
+    const headline = bidHeadlineFromCustomFields(ctx.org.customFields);
+    const headlineHtml = headline
+      ? bidHeadlineEmailHtml(headline, {
+          accentHex: resolveOrgTheme(ctx.org.customFields).hex,
+          warrantyHref: estimateDocText(est, ctx.org).warrantyText ? `${link}#${WARRANTY_ANCHOR}` : null,
+        })
+      : "";
     const html = `
       <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e5e5e5;padding:28px 24px">
         ${logoAbs ? `<p style="text-align:center;margin:0 0 14px"><img src="${logoAbs}" alt="${esc(branding.name)}" style="max-height:64px;max-width:260px"></p>` : ""}
         <h1 style="text-align:center;font-size:26px;margin:6px 0 20px">
           Approve Estimate${est.number ? ` ${esc(est.number)}` : ""} from ${esc(branding.name)}
         </h1>
+        ${headlineHtml}
         <p style="font-size:16px">Hi ${esc(cust.displayName)},</p>
         <p style="font-size:16px">
           Please find estimate${est.number ? ` ${esc(est.number)}` : ""} from ${esc(branding.name)} below.
@@ -1725,6 +1738,10 @@ async function deliverSignedContract(
     // The company terms as this estimate carries them (snapshot, or live
     // Settings for an older estimate) — the same text the client page showed.
     terms: estimateDocText(est, org).companyTermsText,
+    // The warranty the client page showed, and the bid headline it opened
+    // with — frozen into the contract at signing.
+    warrantyText: estimateDocText(est, org).warrantyText,
+    bidHeadline: bidHeadlineFromCustomFields(org.customFields),
   });
   const fileName = contractFileName(est.number);
   const att = await storeGeneratedPdf({

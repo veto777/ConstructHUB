@@ -10,10 +10,12 @@
  * Layout: company letterhead (text-based — the company name in the org's
  * theme accent, brand orange by default, stands in for a logo; embedding
  * remote logo images is deliberately skipped),
- * a 'Prepared for' client block, the estimate number/dates, every option with
+ * the org's bid headline banner when it has one (shared/bid-headline.ts —
+ * above everything the client is buying), a 'Prepared for' client block,
+ * the estimate number/dates, every option with
  * its full description and price, the line items, the client-selected optional
  * discounts, the totals block (subtotal → discounts → tax → APPROVED total),
- * the org's terms (flowing over as many pages as needed), and the signature
+ * the warranty (when there is a headline to point at it), the org's terms (flowing over as many pages as needed), and the signature
  * block with the typed name, date and approval IP. Every page gets the
  * 'company · license · website' band and a 'Page X of Y' number.
  */
@@ -98,6 +100,10 @@ export type ContractPdfInput = {
   }[];
   /** org.termsAndConditions — flows over as many pages as it needs. */
   terms?: string | null;
+  /** The warranty the estimate carries (doc-defaults.ts) — its own section, before the terms. */
+  warrantyText?: string | null;
+  /** The org's bid headline — a banner right under the letterhead. */
+  bidHeadline?: { title: string; subline?: string | null } | null;
   /**
    * The approve-time breakdown of the client's optional discounts, when the
    * caller re-derived it (portal.ts deliverSignedContract re-runs
@@ -182,6 +188,10 @@ export async function buildContractPdf(
     options: rawInput.options.map(cleanStrings),
     orgName: pdfText(rawInput.orgName),
     terms: rawInput.terms == null ? rawInput.terms : pdfText(rawInput.terms),
+    warrantyText: rawInput.warrantyText == null ? rawInput.warrantyText : pdfText(rawInput.warrantyText),
+    bidHeadline: rawInput.bidHeadline?.title?.trim()
+      ? { title: pdfText(rawInput.bidHeadline.title), subline: rawInput.bidHeadline.subline ? pdfText(rawInput.bidHeadline.subline) : null }
+      : null,
   };
   const { branding: b, customer: c, estimate: e } = input;
   const approvedTotal = e.approvedTotalCents ?? e.totalCents;
@@ -254,6 +264,39 @@ export async function buildContractPdf(
   doc.x = left;
   doc.moveTo(left, doc.y).lineTo(rightEdge, doc.y).lineWidth(1).strokeColor(LINE).stroke();
   doc.moveDown(1.2);
+
+  // ── Bid headline — the org's banner, before anything being bought ─────────
+  const warrantyBody = input.warrantyText?.trim() || null;
+  const headline = input.bidHeadline;
+  if (headline) {
+    const pad = 12;
+    const innerW = pageWidth - pad * 2;
+    const linkLine = warrantyBody ? "See the Warranty section of this contract." : null;
+    doc.font("Helvetica-Bold").fontSize(14);
+    const titleH = doc.heightOfString(headline.title, { width: innerW, align: "center" });
+    doc.font("Helvetica").fontSize(9.5);
+    const subH = headline.subline ? doc.heightOfString(headline.subline, { width: innerW, align: "center" }) + 4 : 0;
+    doc.fontSize(8.5);
+    const linkH = linkLine ? doc.heightOfString(linkLine, { width: innerW, align: "center" }) + 4 : 0;
+    const boxTop = doc.y;
+    const boxH = pad * 2 + titleH + subH + linkH;
+    doc.roundedRect(left, boxTop, pageWidth, boxH, 6).lineWidth(1.5).strokeColor(accent).stroke();
+    doc.font("Helvetica-Bold").fontSize(14).fillColor(INK)
+      .text(headline.title, left + pad, boxTop + pad, { width: innerW, align: "center" });
+    if (headline.subline) {
+      doc.y += 4;
+      doc.font("Helvetica").fontSize(9.5).fillColor("#374151")
+        .text(headline.subline, left + pad, doc.y, { width: innerW, align: "center" });
+    }
+    if (linkLine) {
+      doc.y += 4;
+      doc.font("Helvetica").fontSize(8.5).fillColor("#2563eb")
+        .text(linkLine, left + pad, doc.y, { width: innerW, align: "center", goTo: "warranty" });
+    }
+    doc.x = left;
+    doc.y = boxTop + boxH;
+    doc.moveDown(1.2);
+  }
 
   // ── Prepared for ──────────────────────────────────────────────────────────
   doc.font("Helvetica").fontSize(8).fillColor(MUTED).text("PREPARED FOR", { characterSpacing: 1 });
@@ -372,6 +415,15 @@ export async function buildContractPdf(
     termsBlocks.push(["Estimate terms", estTerms], ["Terms and conditions", orgTerms]);
   } else if (estTerms || orgTerms) {
     termsBlocks.push(["Terms and conditions", (estTerms || orgTerms)!]);
+  }
+  // ── Warranty — its own section, the one the headline points at. Printed
+  // only under a headline, so a contract without one is unchanged.
+  if (headline && warrantyBody) {
+    doc.moveDown(1);
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text("Warranty", { destination: "warranty" });
+    doc.moveDown(0.3);
+    doc.font("Helvetica").fontSize(8.5).fillColor("#374151").text(warrantyBody, { lineGap: 1.5 });
+    doc.x = left;
   }
   for (const [heading, body] of termsBlocks) {
     doc.moveDown(1);

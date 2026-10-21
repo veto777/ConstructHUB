@@ -38,6 +38,7 @@ import { CRM_TEXTING_PLANS as TEXTING_PLANS } from "@shared/plan-copy";
 import { CrmBillingCard } from "@/components/crm-billing-card";
 import { confirmAction } from "@/components/confirm-dialog";
 import { AdminSetupNote } from "@/hooks/use-platform-admin";
+import { BID_HEADLINE_SUBLINE_MAX, BID_HEADLINE_TITLE_MAX, bidHeadlineFromCustomFields } from "@shared/bid-headline";
 
 /**
  * Org settings — company profile, document defaults, notification switches,
@@ -339,6 +340,7 @@ export default function CrmSettingsPage() {
   const [defaults, setDefaults] = useState({
     estimateFooter: "", invoiceFooter: "", termsAndConditions: "",
     warrantyText: "", depositPct: "", taxPct: "",
+    headlineTitle: "", headlineSubline: "",
   });
   useEffect(() => {
     if (!org) return;
@@ -347,6 +349,8 @@ export default function CrmSettingsPage() {
       invoiceFooter: org.invoiceFooter ?? "",
       termsAndConditions: org.termsAndConditions ?? "",
       warrantyText: org.warrantyText ?? "",
+      headlineTitle: bidHeadlineFromCustomFields(org.customFields)?.title ?? "",
+      headlineSubline: bidHeadlineFromCustomFields(org.customFields)?.subline ?? "",
       depositPct: org.defaultDepositBps ? String(org.defaultDepositBps / 100) : "",
       taxPct: org.defaultTaxRateBps ? String(org.defaultTaxRateBps / 100) : "",
     });
@@ -365,6 +369,10 @@ export default function CrmSettingsPage() {
         invoiceFooter: emptyToNull(defaults.invoiceFooter),
         termsAndConditions: emptyToNull(defaults.termsAndConditions),
         warrantyText: emptyToNull(defaults.warrantyText),
+        // A blank title takes the headline off every estimate.
+        bidHeadline: defaults.headlineTitle.trim()
+          ? { title: defaults.headlineTitle, subline: emptyToNull(defaults.headlineSubline) }
+          : null,
         defaultDepositBps: deposit.bps,
         defaultTaxRateBps: tax.bps,
       })).json();
@@ -922,6 +930,24 @@ export default function CrmSettingsPage() {
               <Textarea id="warranty" rows={3} data-testid="textarea-warranty"
                 value={defaults.warrantyText}
                 onChange={(e) => setDefaults((d) => ({ ...d, warrantyText: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2 rounded-lg border p-3" data-testid="bid-headline-settings">
+              <Label htmlFor="bid-headline">Bid headline</Label>
+              <Input id="bid-headline" data-testid="input-bid-headline" maxLength={BID_HEADLINE_TITLE_MAX}
+                placeholder="e.g. Every job backed by our 10-year workmanship warranty"
+                value={defaults.headlineTitle}
+                onChange={(e) => setDefaults((d) => ({ ...d, headlineTitle: e.target.value }))} />
+              <Label htmlFor="bid-headline-subline" className="text-xs text-muted-foreground">Smaller line under it</Label>
+              <Textarea id="bid-headline-subline" rows={2} data-testid="textarea-bid-headline-subline"
+                maxLength={BID_HEADLINE_SUBLINE_MAX}
+                placeholder="The conditions and limits of the claim, e.g. what is covered and for how long."
+                value={defaults.headlineSubline}
+                onChange={(e) => setDefaults((d) => ({ ...d, headlineSubline: e.target.value }))} />
+              <p className="text-xs text-muted-foreground">
+                A banner at the very top of every estimate — on the client's page, the estimate email and the
+                signed contract — above the scopes and line items, with a link to your warranty text. If the claim
+                has conditions or limits, state them on the smaller line. Leave the headline blank to show none.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="default-deposit">Default deposit (%)</Label>

@@ -74,6 +74,7 @@ import { getBaseUrl, generateAccountId } from "../auth";
 import { forgetDashboard } from "../dashboard/cache";
 import { sendWithFallback, sendPasswordResetEmail } from "../email";
 import { getCrmEntitlements } from "./entitlements";
+import { BID_HEADLINE_SUBLINE_MAX, BID_HEADLINE_TITLE_MAX, normalizeBidHeadline } from "@shared/bid-headline";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -134,7 +135,7 @@ const FIELD_LABELS: Record<string, string> = {
   city: "City", state: "State", postalCode: "ZIP", country: "Country", timezone: "Time zone",
   licenseNumber: "License number", licenseState: "License state", industry: "Industry",
   description: "Description", invoiceFooter: "Invoice footer", estimateFooter: "Estimate footer",
-  termsAndConditions: "Terms and conditions", warrantyText: "Warranty text",
+  termsAndConditions: "Terms and conditions", warrantyText: "Warranty text", bidHeadline: "Bid headline",
   defaultDepositBps: "Default deposit", defaultTaxRateBps: "Default sales tax",
   themeColor: "Theme colour", themeBase: "Main colour", discountDefaults: "Bid discounts",
   clientPageLayout: "Client page layout", celebrations: "Celebrations", jobFlow: "Job flow",
@@ -214,6 +215,12 @@ const orgPatchSchema = z.object({
   estimateFooter: z.string().max(5000).nullable().optional(),
   termsAndConditions: z.string().max(20000).nullable().optional(),
   warrantyText: z.string().max(5000).nullable().optional(),
+  // The banner every estimate opens with (shared/bid-headline.ts). Merged into custom_fields as bidHeadline;
+  // null or a blank title takes it off.
+  bidHeadline: z.object({
+    title: z.string().max(BID_HEADLINE_TITLE_MAX),
+    subline: z.string().max(BID_HEADLINE_SUBLINE_MAX).nullable().optional(),
+  }).nullable().optional(),
   defaultDepositBps: z.number().int().min(0).max(10000).nullable().optional(),
   // Org-wide fallback sales-tax rate (basis points) — see server/crm/tax.ts.
   defaultTaxRateBps: z.number().int().min(0).max(3000).nullable().optional(),
@@ -761,9 +768,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // notificationPrefs and themeColor are virtual fields: they merge into
     // custom_fields so the rest of that jsonb (e.g. HCP import reference
     // data) is never clobbered.
-    const { notificationPrefs, notificationScopes, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, clientPageLayout, celebrations, jobFlow, ...profile } = parsed.data;
+    const { notificationPrefs, notificationScopes, themeColor, themeBase, smsAlerts, smsEstimates, voiceNudge, discountDefaults, clientPageLayout, celebrations, jobFlow, bidHeadline, ...profile } = parsed.data;
     const mergedCustomFields =
-      notificationPrefs !== undefined || notificationScopes !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined || clientPageLayout !== undefined || celebrations !== undefined || jobFlow !== undefined
+      bidHeadline !== undefined || notificationPrefs !== undefined || notificationScopes !== undefined || themeColor !== undefined || themeBase !== undefined || smsAlerts !== undefined || smsEstimates !== undefined || voiceNudge !== undefined || discountDefaults !== undefined || clientPageLayout !== undefined || celebrations !== undefined || jobFlow !== undefined
         ? (() => {
             const base = {
               ...((ctx.org.customFields as Record<string, unknown> | null) ?? {}),
@@ -803,6 +810,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
               else base.clientPageLayout = normalizeClientPageLayout(clientPageLayout);
             }
             if (celebrations !== undefined) base.celebrations = celebrations;
+            if (bidHeadline !== undefined) {
+              const h = normalizeBidHeadline(bidHeadline);
+              if (h) base.bidHeadline = h; else delete base.bidHeadline;
+            }
             // The default flow is "no key" — a reset leaves custom_fields as it was before the owner touched it.
             if (jobFlow !== undefined) {
               const flow = jobFlow === null ? null : normalizeJobFlow(jobFlow);
