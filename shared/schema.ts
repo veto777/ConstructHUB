@@ -1481,9 +1481,27 @@ export const crmCustomerNotes = pgTable("crm_customer_notes", {
   authorMemberId: varchar("author_member_id"),
   body: text("body").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  // Where the note came from: null = written in ConstructHUB; "hover" = a note on the client's HOVER job,
+  // imported by the HOVER sync (server/crm/hover-notes.ts). sourceAuthor is the writer's name as HOVER
+  // has it (they need not be a ConstructHUB seat).
+  source: text("source"),
+  sourceAuthor: text("source_author"),
 });
 
 export type CrmCustomerNote = typeof crmCustomerNotes.$inferSelect;
+
+// crm_hover_note_links: HOVER note id → the crm_customer_notes row it became. Makes the import idempotent
+// (one row per HOVER note, ever) and remembers a note the team deleted here, so a re-sync never brings it back.
+// hoverUpdatedAt is HOVER's updated_at as last imported: a newer one means the note was edited in HOVER.
+export const crmHoverNoteLinks = pgTable("crm_hover_note_links", {
+  orgId: varchar("org_id").notNull(),
+  hoverNoteId: text("hover_note_id").notNull(),
+  hoverJobId: text("hover_job_id").notNull(),
+  noteId: varchar("note_id").notNull(),
+  hoverUpdatedAt: text("hover_updated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [primaryKey({ columns: [t.orgId, t.hoverNoteId] })]);
 
 // crm_activity_log: the org-wide accountability feed (HCP-style "who did
 // what, when"). One row per meaningful mutation — sign-ins, document and

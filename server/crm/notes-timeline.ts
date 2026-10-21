@@ -362,14 +362,29 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       ? rows
       : rows.filter((r) => !/^A \$[\d,.]+ payment .* was reversed by the account owner\./.test(r.note.body ?? ""));
     res.json(
-      shown.map((r) => ({
-        id: r.note.id,
-        body: r.note.body,
-        authorMemberId: r.note.authorMemberId,
-        author: authorOf(r.note.authorMemberId),
-        authorName: actorLabel(authorOf(r.note.authorMemberId)),
-        createdAt: r.note.createdAt,
-      })),
+      shown.map((r) => {
+        // A note imported from a HOVER job: its writer is HOVER's user, not a seat here.
+        if (r.note.source === "hover" && !r.note.authorMemberId) {
+          return {
+            id: r.note.id,
+            body: r.note.body,
+            authorMemberId: null,
+            author: null,
+            authorName: r.note.sourceAuthor || "HOVER user",
+            source: "hover",
+            createdAt: r.note.createdAt,
+          };
+        }
+        return {
+          id: r.note.id,
+          body: r.note.body,
+          authorMemberId: r.note.authorMemberId,
+          author: authorOf(r.note.authorMemberId),
+          authorName: actorLabel(authorOf(r.note.authorMemberId)),
+          source: r.note.source ?? null,
+          createdAt: r.note.createdAt,
+        };
+      }),
     );
   });
 

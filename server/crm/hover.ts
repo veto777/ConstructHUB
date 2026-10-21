@@ -42,6 +42,9 @@ import { objectPolicy } from "./object-access";
  *      homeowner can open) is stored as rawPayload.share — found via GET /api/v1/job_shares per org user on every
  *      sync, or pasted by the contractor. hover.to/3d/<jobId> needs a HOVER login and is never sent to a client.
  *
+ *   6. Job notes (server/crm/hover-notes.ts): after every sync, a background pass reads each linked job's notes
+ *      (GET /api/v2/notes.json?job_id=<id>) into the client's Notes, labelled HOVER, idempotent per HOVER note id.
+ *
  * Tokens: access tokens live 2h and are cached in memory per org; refresh
  * tokens are indefinite but ROTATE on every refresh — the new one is always
  * persisted before the access token is used.
@@ -65,6 +68,7 @@ import {
 import { db, pool } from "../db";
 import { crmCustomers, crmMeasurements, crmAttachments, crmOrgs , crmMembers, crmLeads } from "@shared/schema";
 import { notifyHoverReportReady } from "./hover-notify";
+import { syncHoverNotes, type HoverNotesReport } from "./hover-notes";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { allow as rateAllow } from "./client-auth";
@@ -205,6 +209,8 @@ export interface HoverConn {
   lastSyncReport?: HoverSyncReport | null;
   /** Auto-sync cadence in hours (default 6). */
   syncEveryHours?: number | null;
+  /** The last background pass that copied HOVER job notes into the clients' Notes (server/crm/hover-notes.ts). */
+  lastNotesSync?: HoverNotesReport | null;
 }
 
 async function readHoverConn(orgId: string): Promise<HoverConn | null> {
@@ -2058,7 +2064,35 @@ export async function runHoverSync(orgId: string): Promise<HoverSyncRunReport> {
     lastError: report.errors.length ? report.errors[0] : null,
     lastSyncReport,
   }).catch(() => {});
+  // Job notes → the clients' Notes. In the background: a first pass over hundreds of jobs takes minutes at
+  // HOVER's rate limit, and neither the Sync button nor the scheduler should wait on it.
+  startHoverNotesSync(orgId, jobs);
   return report;
+}
+
+const hoverNotesRunning = new Set<string>();
+
+/** Start a notes pass for the org unless one is already running. Never throws. */
+export function startHoverNotesSync(orgId: string, listedJobs: any[]): Promise<HoverNotesReport | null> {
+  if (hoverNotesRunning.has(orgId)) return Promise.resolve(null);
+  hoverNotesRunning.add(orgId);
+  return (async () => {
+    try {
+      const notes = await syncHoverNotes(orgId, listedJobs, (p) => hoverApi(orgId, "GET", p), { sleep: (ms) => backoffSleep(ms) });
+      if (notes.inserted || notes.updated || notes.error) {
+        console.log(`[hover] notes org ${orgId}: due ${notes.due}, read ${notes.checked}, new ${notes.inserted}, updated ${notes.updated}${notes.error ? `, ${notes.error}` : ""}`);
+      }
+      // Only while still connected — a disconnect during the pass must not leave a stub hover block behind.
+      if (await readHoverConn(orgId)) await writeHoverConn(orgId, { lastNotesSync: notes }).catch(() => {});
+      return notes;
+    } catch (e: any) {
+      console.error(`[hover] notes pass for org ${orgId} failed:`, String(e?.message || e).slice(0, 200));
+      if (!hoverReconnectNeeded(e)) void recordFailure("job", "HOVER notes sync", e, { orgId }, "warning");
+      return null;
+    } finally {
+      hoverNotesRunning.delete(orgId);
+    }
+  })();
 }
 
 /** Allowed auto-sync cadences, in hours. 6h is the default. */

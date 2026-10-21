@@ -149,7 +149,14 @@ export function CustomerNotes({ customerId, canManage, meMemberId, meRole }: {
                 <>
                   <p className="text-sm whitespace-pre-wrap">{n.body}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span>{n.author && n.author.recorded !== false ? <ActorName actor={n.author} /> : (n.authorName ?? "Author not recorded")} · {when(n.createdAt)}</span>
+                    <span>
+                      {n.author && n.author.recorded !== false ? <ActorName actor={n.author} /> : (n.authorName ?? "Author not recorded")} · {when(n.createdAt)}
+                      {n.source === "hover" && (
+                        <Badge variant="outline" className="ml-1.5 px-1.5 py-0 text-[10px] font-medium" data-testid={`note-source-${n.id}`}>
+                          HOVER
+                        </Badge>
+                      )}
+                    </span>
                     {canManage && canModify(n) && (
                       <span className="flex gap-1">
                         <Button size="sm" variant="ghost" className="h-7 text-xs"

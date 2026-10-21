@@ -702,6 +702,32 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_attachments ADD COLUMN IF NOT EXISTS uploaded_by_kind text;
   `);
 
+  // ── HOVER job notes in the client's Notes (server/crm/hover-notes.ts) ─────
+  // The source label + HOVER's writer on the note, and the HOVER note id → note row link that keeps the import
+  // idempotent. Its own statement, so it never rides on (or rolls back with) the larger blocks around it.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_customer_notes (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      customer_id varchar NOT NULL,
+      author_member_id varchar,
+      body text NOT NULL,
+      created_at timestamp DEFAULT now()
+    );
+    ALTER TABLE crm_customer_notes ADD COLUMN IF NOT EXISTS source text;
+    ALTER TABLE crm_customer_notes ADD COLUMN IF NOT EXISTS source_author text;
+    CREATE TABLE IF NOT EXISTS crm_hover_note_links (
+      org_id varchar NOT NULL,
+      hover_note_id text NOT NULL,
+      hover_job_id text NOT NULL,
+      note_id varchar NOT NULL,
+      hover_updated_at text,
+      created_at timestamp DEFAULT now(),
+      updated_at timestamp DEFAULT now(),
+      PRIMARY KEY (org_id, hover_note_id)
+    );
+  `);
+
   // ── Client 360: contractor notes + financing click log ───────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS crm_customer_notes (
