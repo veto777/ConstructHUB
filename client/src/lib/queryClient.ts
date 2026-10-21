@@ -20,6 +20,33 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/**
+ * A deploy closes the app's port for ~10-15 s; Cloudflare answers 502/503/52x (HTML) or the fetch fails outright.
+ * The request never reached the app, so it is safe to send again: wait and retry for up to ~60 s instead of
+ * showing "restarting" (owner, 2026-10-21: a Save during a deploy must never fail). A 504 (gateway timeout) may
+ * have reached the app, so only reads are retried on it.
+ */
+const RESTART_WAITS_MS = [1000, 2000, 3000, 5000, 8000, 10000, 15000, 15000];
+async function gatewayDown(res: Response, method: string): Promise<boolean> {
+  const s = res.status;
+  const gateway = s === 502 || s === 503 || (s >= 520 && s <= 530) || (s === 504 && method.toUpperCase() === "GET");
+  if (!gateway) return false;
+  const text = await res.clone().text().catch(() => "");
+  try { const j = JSON.parse(text); if (j && typeof j === "object" && typeof j.message === "string") return false; } catch { /* not our JSON */ }
+  return true;
+}
+async function sendThroughRestart(send: () => Promise<Response>, method: string): Promise<Response> {
+  for (let i = 0; ; i++) {
+    try {
+      const res = await send();
+      if (i >= RESTART_WAITS_MS.length || !(await gatewayDown(res, method))) return res;
+    } catch (err) {
+      if (i >= RESTART_WAITS_MS.length) throw err;
+    }
+    await new Promise((r) => setTimeout(r, RESTART_WAITS_MS[i]));
+  }
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -28,12 +55,13 @@ export async function apiRequest(
   extra?: { headers?: Record<string, string> },
 ): Promise<Response> {
   // /api/crm/* carries the division workspace header (lib/division-workspace.ts).
-  let res = await fetch(url, withDivisionHeader(url, {
+  const send = () => fetch(url, withDivisionHeader(url, {
     method,
     headers: { ...(data ? { "Content-Type": "application/json" } : {}), ...(extra?.headers ?? {}) },
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   }));
+  let res = await sendThroughRestart(send, method);
 
   if (res.status === 403 && (await res.clone().json().catch(() => ({}))).reauth === true) {
     const { requestRecentAuth } = await import('@/components/recent-auth');
