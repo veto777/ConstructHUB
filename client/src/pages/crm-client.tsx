@@ -2327,10 +2327,23 @@ export default function CrmClientPage() {
                   {/* Nudge a client whose estimate is sitting unanswered. */}
                   {canEstimate && e.sentAt && !e.approvedAt && !e.declinedAt && (
                     <Button size="sm" variant="ghost"
-                      onClick={() => remind.mutate(e.id)} disabled={remind.isPending}
+                      title="Emails the client a reminder to look at this estimate (and texts them if texting is set up)"
+                      onClick={() => confirmAction({
+                        id: "remind-estimate",
+                        title: `Send ${c.firstName ?? c.name ?? "the client"} a reminder about ${e.number ?? "this estimate"}?`,
+                        description: (
+                          <div className="space-y-1.5 text-sm" data-testid="remind-confirm-details">
+                            <div><span className="text-muted-foreground">To:</span> <span className="font-medium">{c.email || "no email on file"}</span>
+                              {c.phone && smsStatus?.canTextClients !== false && smsStatus?.configured ? <> · <span className="text-muted-foreground">text to</span> <span className="font-medium">{c.phone}</span></> : null}</div>
+                            <div className="text-muted-foreground">A short "your estimate is waiting for you" message with the same link. Nothing about the estimate changes.</div>
+                          </div>
+                        ),
+                        confirmLabel: "Yes, send the reminder", destructive: false,
+                        onConfirm: () => remind.mutate(e.id),
+                      })} disabled={remind.isPending}
                       data-testid={`button-remind-${e.id}`}>
                       {remind.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BellRing className="h-4 w-4 mr-2" />}
-                      Remind
+                      Send client a reminder
                     </Button>
                   )}
                   {/* One invoice per signed estimate from here: once a live
