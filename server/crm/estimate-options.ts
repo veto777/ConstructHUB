@@ -18,6 +18,7 @@
  * price-book item ids priced live when used; a template is a frozen document (free-typed lines, scope text, adjusted
  * prices, discounts, message) — the two do different jobs, so packages are untouched.
  */
+import { cleanOfferConditions } from "@shared/discount-presets";
 import type { Express } from "express";
 import { z } from "zod";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -139,7 +140,7 @@ async function createDraftCopy(ctx: OrgContext, src: typeof crmEstimates.$inferS
     if (offers.length) {
       await db.insert(crmEstimateDiscounts).values(offers.map((o) => ({
         orgId: ctx.org.id, estimateId: est.id, code: o.code, label: o.label, percentBps: o.percentBps,
-        conditions: o.conditions, enabled: o.enabled, sortOrder: o.sortOrder, rule: (o as any).rule ?? null,
+        conditions: cleanOfferConditions(o.conditions), enabled: o.enabled, sortOrder: o.sortOrder, rule: (o as any).rule ?? null,
       })) as any);
     }
   }

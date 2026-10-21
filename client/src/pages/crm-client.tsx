@@ -29,6 +29,7 @@ import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { EMAIL_RE, customerErrorMessage } from "@/lib/crm-customer-errors";
 import { milliToQty, priceToCents, qtyToMilli } from "@/lib/estimate-math";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cleanOfferConditions } from "@shared/discount-presets";
 import {
   ArrowLeft, Plus, Loader2, Send, Eye, Check, CheckCircle2, XCircle, Copy,
   FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, BellRing,
@@ -998,7 +999,7 @@ export default function CrmClientPage() {
   const loadSnapshot = (snap: EstimateDraftSnapshot) => {
     setAutoTitle(snap.autoTitle !== false);
     setTitle(snap.title || "Estimate");
-    setOffers(snap.offers ?? null);
+    setOffers(snap.offers ? snap.offers.map((o) => ({ ...o, conditions: cleanOfferConditions(o.conditions) })) : null);
     setContractorDiscount(snap.contractorDiscount ?? null);
     const ot = (snap as any).optionTabs;
     setTab0(ot?.tab0 ?? { id: null, name: "Option 1", cancelled: false });

@@ -42,3 +42,13 @@ export const DISCOUNT_PRESETS = [
     defaultEnabled: false,
   },
 ] as const;
+
+/** Old internal price-match wording that must never reach a client; any copy still in a browser draft is swapped on save. */
+const LEGACY_CONDITIONS: Record<string, string> = {
+  "Requires providing the competing bid. Off by default — price matching is a bad sales tactic.":
+    "To qualify, we need to see a copy of the estimate we're price matching so we can compare apples to apples: the same scope of work, materials and warranty.",
+};
+export function cleanOfferConditions(conditions: string | null | undefined): string | null {
+  if (conditions == null) return null;
+  return LEGACY_CONDITIONS[conditions.trim()] ?? conditions;
+}

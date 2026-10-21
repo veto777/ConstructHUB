@@ -28,7 +28,7 @@ type GetUser = (req: any, res: any) => any;
 // matching a competitor's number is a bad sales tactic; offering it at all is
 // a deliberate choice, and the client must provide the competing bid.
 export { DISCOUNT_PRESETS } from "@shared/discount-presets";
-import { DISCOUNT_PRESETS } from "@shared/discount-presets";
+import { DISCOUNT_PRESETS, cleanOfferConditions } from "@shared/discount-presets";
 import { bundleRuleOf, effectiveOffer, orgDiscountRule } from "@shared/scope-category";
 
 // ── The math (pure — unit-tested in discounts.test.ts) ─────────────────────
@@ -206,7 +206,7 @@ export function registerCrmDiscountRoutes(app: Express, getDevUser: GetUser): vo
           code: o.code,
           label: o.label,
           percentBps: o.percentBps,
-          conditions: o.conditions ?? null,
+          conditions: cleanOfferConditions(o.conditions),
           enabled: o.enabled,
           sortOrder: o.sortOrder ?? idx,
           // The org's rule for this code (e.g. Alpine's tiered bundle) always applies, whoever made the offer.
