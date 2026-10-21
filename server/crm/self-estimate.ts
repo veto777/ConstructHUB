@@ -60,7 +60,7 @@ import { previewGrantValid } from "./portal";
 import { logEvent, estimateTotals } from "./entities";
 import { nextDocNumber } from "./doc-number";
 import { estimateDefaultsFromOrg, depositFromBps } from "./doc-defaults";
-import { resolveEstimateTaxRate } from "./tax";
+import { resolveEstimateTaxRate, taxSourceRecord } from "./tax";
 import { attachDefaultFilesToEstimate } from "./estimate-default-files";
 import { resolveEstimateDivision, divisionScopeOf, pinnedDivisionOf, companyBranding } from "./divisions";
 import { DISCOUNT_PRESETS } from "./discounts";
@@ -428,7 +428,7 @@ async function createRequest(a: Anchor, body: z.infer<typeof requestBodySchema>,
         },
         // Pre-ticked for the client when the estimator sends it — still the client's claim.
         preselectedDiscountCodes: bp.discounts.map((d) => d.code),
-        taxSource: { source: tax.source, bps: tax.bps, matchedCity: tax.matchedCity ?? null },
+        taxSource: taxSourceRecord(tax),
       },
     } as any).returning();
     if (lines.length) {

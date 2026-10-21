@@ -589,6 +589,43 @@ export const stateGuides = pgTable("state_guides", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Official sales-tax rates, one row per location a state revenue department publishes (WA DOR's quarterly
+// location codes, ...). Loaded per state, all-or-nothing, by server/sales-tax/store.ts from the bundled
+// server/data/sales-tax-rates.json at boot and by the quarterly refresh (server/sales-tax/refresh-cli.ts).
+// DDL: server/sales-tax/schema.ts (idempotent, run at boot). Read by the estimate tax resolver (server/crm/tax.ts).
+export const salesTaxRates = pgTable("sales_tax_rates", {
+  id: serial("id").primaryKey(),
+  state: varchar("state", { length: 2 }).notNull(),
+  city: text("city"),
+  // cityKey(city) (server/sales-tax/city-key.ts): what an address city is matched on.
+  cityKey: text("city_key"),
+  county: text("county"),
+  locationCode: text("location_code"),
+  zip: varchar("zip", { length: 5 }),
+  // city | unincorporated | county | state | special
+  kind: text("kind").notNull(),
+  // Combined state + local rate exactly as published (9.2 = 9.2%), and in estimate basis points (rounded).
+  ratePct: numeric("rate_pct", { precision: 7, scale: 4 }).notNull(),
+  rateBps: integer("rate_bps").notNull(),
+  effectiveDate: date("effective_date").notNull(),
+  source: text("source").notNull(),
+  sourceUrl: text("source_url").notNull(),
+  periodLabel: text("period_label").notNull(),
+});
+
+// One row per loaded state: which official file, which period, when, and from where (bundled | refresh).
+export const salesTaxRateLoads = pgTable("sales_tax_rate_loads", {
+  state: varchar("state", { length: 2 }).primaryKey(),
+  source: text("source").notNull(),
+  sourceUrl: text("source_url").notNull(),
+  effectiveDate: date("effective_date").notNull(),
+  periodLabel: text("period_label").notNull(),
+  rowCount: integer("row_count").notNull(),
+  contentHash: text("content_hash").notNull(),
+  origin: text("origin").notNull(),
+  loadedAt: timestamp("loaded_at").notNull().defaultNow(),
+});
+
 export const stateGuideSteps = pgTable("state_guide_steps", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   stateGuideId: integer("state_guide_id").notNull(),

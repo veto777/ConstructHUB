@@ -359,6 +359,8 @@ const ROUTES: RouteRow[] = [
   R("GET", "/api/crm/projects/:id/hover-models", null, { path: (t) => `/api/crm/projects/${t.project}/hover-models`, scoped: true }),
   R("GET", "/api/crm/estimates/:id/hover-models", null, { path: (t) => `/api/crm/estimates/${t.estimate}/hover-models`, scoped: true }),
   // HOVER takeoff (measurements only, no money) follows the record like the 3D lists.
+  // The New estimate dialog's Tax % pre-fill (server/crm/tax.ts): the seat that may create the estimate.
+  R("GET", "/api/crm/tax/estimate-rate", "manageEstimates", { path: (t) => `/api/crm/tax/estimate-rate?customerId=${t.customer}` }),
   R("GET", "/api/crm/customers/:id/takeoff", null, { path: (t) => `/api/crm/customers/${t.customer}/takeoff`, scoped: true }),
   R("GET", "/api/crm/projects/:id/takeoff", null, { path: (t) => `/api/crm/projects/${t.project}/takeoff`, scoped: true }),
   R("GET", "/api/crm/estimates/:id/takeoff", null, { path: (t) => `/api/crm/estimates/${t.estimate}/takeoff`, scoped: true }),

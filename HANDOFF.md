@@ -1,3 +1,11 @@
+## 🧾 2026-10-21 — estimate sales tax from the job-site address (official rates + construction treatment)
+- The New estimate dialog pre-fills **Tax %** from the client's (or project's) address and says where the rate came
+  from ("Bellingham, WA · 9.2% (WA DOR, Q4 2026)"). FL-style states pre-fill 0, because contractors don't charge sales
+  tax on real-property jobs; "depends" states (TX, NY, ...) show the condition. Tax % stays editable. Order and
+  sources: `server/crm/tax.ts`, `docs/ops/SALES-TAX-RATES.md`.
+- Official rates are stored in `sales_tax_rates` / `sales_tax_rate_loads` (WA DOR, every location code first). The
+  timer `constructhub-sales-tax-refresh.timer` on vb11 runs `dist/refresh-sales-tax.cjs --apply` four times a month.
+
 ## 🔒 2026-10-16 — security, privacy and reliability wave (deployed 01:53 UTC, main 1b6fb1e9)
 - **Call recordings were publicly downloadable** via `/api/files/voice%2F<org>%2Frecordings/<sid>.wav` (Express 5 decodes
   %2F in params). Hotfixed 00:06 UTC (main dee1bad9), then replaced by an allow-list: `server/files/public-files.ts` serves

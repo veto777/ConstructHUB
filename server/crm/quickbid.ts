@@ -23,7 +23,7 @@ import {
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { divisionScopeOf } from "./divisions";
-import { resolveEstimateTaxRate } from "./tax";
+import { resolveEstimateTaxRate, taxSourceRecord } from "./tax";
 import { logEvent, presentEstimate, presentEstimateItem, recalcEstimate } from "./entities";
 import { estimateDefaultsFromOrg } from "./doc-defaults";
 import { inferSqftMetric, quickBidLine, quickBidLineDescription, type SqftMetric } from "./quickbid-math";
@@ -161,7 +161,7 @@ export function registerCrmQuickBidRoutes(app: Express, getDevUser: GetUser): vo
         divisionId: divisionScopeOf(ctx),
         customFields: {
           quickBid: { measurementId: m.id, provider: m.provider, itemIds: p.data.itemIds },
-          taxSource: { source: tax.source, bps: tax.bps, matchedCity: tax.matchedCity ?? null },
+          taxSource: taxSourceRecord(tax),
         },
       } as any).returning();
       return row;

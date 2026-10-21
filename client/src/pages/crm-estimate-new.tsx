@@ -22,6 +22,7 @@ import { InfoTip } from "@/components/info-tip";
 import { cn } from "@/lib/utils";
 import { useActiveDivision } from "@/components/crm-division-switcher";
 import { divisionLabel } from "@shared/divisions";
+import { useEstimateTaxRate } from "@/components/estimate-tax-rate";
 
 /**
  * The fast path: a three-step, one-handed estimate builder for the contractor
@@ -174,6 +175,8 @@ export default function CrmEstimateNewPage() {
 
   // ── Step 1: the client ────────────────────────────────────────────────────
   const [customer, setCustomer] = useState<CustomerLite | null>(restored?.customer ?? null);
+  // The rate the server will apply from the client's address, shown on the review step (server/crm/tax.ts).
+  const taxRate = useEstimateTaxRate(customer?.id, step === 3);
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -920,8 +923,8 @@ export default function CrmEstimateNewPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Sales tax</span>
-                  <span className="text-muted-foreground text-right text-xs leading-relaxed max-w-[180px]">
-                    Added automatically from the client's address
+                  <span className="text-muted-foreground text-right text-xs leading-relaxed max-w-[220px]" data-testid="text-tax-source">
+                    {taxRate.data?.label ?? "Added automatically from the client's address"}
                   </span>
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2">

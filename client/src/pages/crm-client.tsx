@@ -52,6 +52,7 @@ import { ClientDocuments } from "@/components/client-documents";
 import { QuickBid } from "@/components/crm-quick-bid";
 import { AppointmentForm, type Appointment } from "@/components/crm-appointment-form";
 import { InfoTip } from "@/components/info-tip";
+import { useEstimateTaxRate, TaxRateNote, bpsToPctText } from "@/components/estimate-tax-rate";
 import { HelpButton } from "@/components/help-button";
 import { confirmAction } from "@/components/confirm-dialog";
 import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
@@ -912,6 +913,13 @@ export default function CrmClientPage() {
   const [title, setTitle] = useState("Estimate");
   const [intro, setIntro] = useState("");
   const [taxPct, setTaxPct] = useState("0");
+  // Tax % is pre-filled from the job-site address (server/crm/tax.ts) until the user types in it.
+  const [taxTouched, setTaxTouched] = useState(false);
+  const taxRate = useEstimateTaxRate(id, open);
+  useEffect(() => {
+    if (open && taxRate.data && !taxTouched) setTaxPct(bpsToPctText(taxRate.data.bps));
+  }, [open, taxRate.data, taxTouched]);
+  useEffect(() => { if (!open) setTaxTouched(false); }, [open]);
   const [items, setItems] = useState<Item[]>([{ ...BLANK }]);
 
   const subtotal = items.reduce(
@@ -948,7 +956,7 @@ export default function CrmClientPage() {
     },
     onSuccess: () => {
       setOpen(false);
-      setItems([{ ...BLANK }]); setIntro(""); setTitle("Estimate"); setTaxPct("0");
+      setItems([{ ...BLANK }]); setIntro(""); setTitle("Estimate"); setTaxPct("0"); setTaxTouched(false);
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
       toast({ title: "Estimate created" });
     },
@@ -1530,9 +1538,11 @@ export default function CrmClientPage() {
                   </div>
                   <div>
                     <Label htmlFor="e-tax">Tax %</Label>
-                    <Input id="e-tax" value={taxPct} onChange={(e) => setTaxPct(e.target.value)} />
+                    <Input id="e-tax" inputMode="decimal" value={taxPct} data-testid="input-estimate-tax"
+                      onChange={(e) => { setTaxTouched(true); setTaxPct(e.target.value); }} />
                   </div>
                 </div>
+                <TaxRateNote rate={taxRate.data} loading={taxRate.isLoading} currentBps={taxBps} />
                 <div>
                   <Label htmlFor="e-intro">Message to the client</Label>
                   <Textarea id="e-intro" rows={2} value={intro} onChange={(e) => setIntro(e.target.value)}

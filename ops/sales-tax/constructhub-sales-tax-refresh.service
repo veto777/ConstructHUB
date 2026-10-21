@@ -1,0 +1,19 @@
+# ConstructHUB official sales-tax rates: download each state's current table and load the
+# states whose table is newer (or corrected) into sales_tax_rates. A failed download keeps
+# that state's previous rows. docs/ops/SALES-TAX-RATES.md
+#   install:  see docs/ops/SALES-TAX-RATES.md -> Refresh (systemd --user, vb11)
+#   run now:  systemctl --user start constructhub-sales-tax-refresh.service
+#   logs:     journalctl --user -u constructhub-sales-tax-refresh
+[Unit]
+Description=ConstructHUB: refresh official sales-tax rate tables (state DOR files)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/ConstructHUB-live
+ExecStart=/usr/bin/node --env-file=%h/ConstructHUB-live/.env %h/ConstructHUB-live/dist/refresh-sales-tax.cjs --apply
+Environment=NODE_ENV=production
+TimeoutStartSec=30min
+NoNewPrivileges=yes
+Nice=10

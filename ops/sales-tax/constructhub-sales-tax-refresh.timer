@@ -1,0 +1,13 @@
+# Rates change quarterly (Jan/Apr/Jul/Oct 1; some states monthly). Four runs a month pick a new
+# table up within a week of its publication; an unchanged table is a no-op. docs/ops/SALES-TAX-RATES.md
+[Unit]
+Description=ConstructHUB sales-tax rate refresh (1st, 8th, 15th, 22nd of each month)
+
+[Timer]
+OnCalendar=*-*-01,08,15,22 06:30:00
+RandomizedDelaySec=20min
+Persistent=true
+Unit=constructhub-sales-tax-refresh.service
+
+[Install]
+WantedBy=timers.target

@@ -77,6 +77,18 @@ var import_meta_url = __bundled_import_meta_url;`,
     logLevel: "info",
   });
 
+  // Quarterly official sales-tax rate refresh (server/sales-tax/refresh-cli.ts; docs/ops/SALES-TAX-RATES.md).
+  await esbuild({
+    entryPoints: ["server/sales-tax/refresh-cli.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "dist/refresh-sales-tax.cjs",
+    minify: true,
+    external: externals,
+    logLevel: "warning",
+  });
+
   // The guarded one-off sender for support@ and social@ (OWNER LAW 2026-10-15; server/tools/send-email.ts).
   await esbuild({
     entryPoints: ["server/tools/send-email-cli.ts"],

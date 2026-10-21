@@ -1,5 +1,6 @@
 import { db, pool } from "./db";
 import { ensureStateGuidesSchema } from "./state-guides-schema";
+import { seedSalesTaxRates } from "./sales-tax/store";
 import { stateGuides, stateGuideSteps, masterClassModules, betaAccessCodes } from "@shared/schema";
 import { sql, eq } from "drizzle-orm";
 import { readFileSync } from "fs";
@@ -65,6 +66,14 @@ export async function seedReferenceData() {
   // columns, so a database without them (production included) would fail the seed insert and
   // /api/state-guides. Boot runs this seeder before the routes are registered.
   await ensureStateGuidesSchema(pool);
+
+  // Official sales-tax rates (server/data/sales-tax-rates.json -> sales_tax_rates). Only states whose bundled
+  // table is newer than the database copy are loaded, so a quarter the refresh timer already loaded is kept.
+  try {
+    await seedSalesTaxRates(pool, join(import.meta.dirname || __dirname, "data"));
+  } catch (e: any) {
+    console.error("[sales-tax] seed failed:", e?.message ?? e);
+  }
 
   const guideCount = await db.execute(sql`SELECT COUNT(*) as count FROM state_guides`);
   const totalGuides = Number(guideCount.rows[0].count);
