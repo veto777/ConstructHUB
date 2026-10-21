@@ -28,7 +28,7 @@ import { money } from "@/lib/estimate-math";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, CheckCircle2, ClipboardCopy, Clock, Eye, FileText, Loader2,
-  Pencil, Plus, Save, Send, Trash2, XCircle,
+  MailCheck, Pencil, Plus, Save, Send, Trash2, XCircle,
 } from "lucide-react";
 import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
 
@@ -274,6 +274,16 @@ export default function CrmEstimateDetailPage() {
     onError: (err: any) => toast({ title: "Could not open preview", description: apiErrorMessage(err), variant: "destructive" }),
   });
 
+  // "Send me a proof": the client's exact email, to the logged-in member only.
+  const proof = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/crm/estimates/${id}/send-proof`, {})).json(),
+    onSuccess: (r: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/crm/estimates/${id}`] });
+      toast({ title: `Proof sent to ${r.to}` });
+    },
+    onError: (err: any) => toast({ title: "Could not send proof", description: apiErrorMessage(err), variant: "destructive" }),
+  });
+
   // ── Owner delete ──────────────────────────────────────────────────────────
   const [delOpen, setDelOpen] = useState(false);
   const del = useMutation({
@@ -453,6 +463,14 @@ export default function CrmEstimateDetailPage() {
                 data-testid="button-send-estimate">
                 {send.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
                 {e.sentAt ? "Resend" : "Send"}
+              </Button>
+            )}
+            {canEdit && !locked && !editing && (
+              <Button variant="ghost" size="sm" onClick={() => proof.mutate()} disabled={proof.isPending}
+                title="Email yourself exactly what the client would get"
+                data-testid="button-send-proof-estimate">
+                {proof.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MailCheck className="h-4 w-4 mr-2" />}
+                Send me a proof
               </Button>
             )}
             {isOwner && !locked && !editing && (
@@ -871,6 +889,7 @@ export default function CrmEstimateDetailPage() {
               <div key={ev.id} className="flex justify-between gap-3" data-testid={`event-${ev.type}`}>
                 <span>
                   <span className="capitalize">{String(ev.type).replace(/_/g, " ")}</span>
+                  {ev.type === "proof_sent" && ev.meta?.to && <> to {ev.meta.to}</>}
                   {ev.actor && ev.actor.recorded !== false && <> · by <ActorName actor={ev.actor} /></>}
                 </span>
                 <span>{dayTime(ev.createdAt)}</span>

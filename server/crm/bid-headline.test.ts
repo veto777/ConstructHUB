@@ -72,7 +72,10 @@ describe("copied onto NEW estimates only (doc-defaults.ts)", () => {
   it("every printed surface reads the ESTIMATE's copy, never the org's live Settings", () => {
     const portal = src("server/crm/portal.ts");
     expect(portal).not.toContain("bidHeadlineFromCustomFields");
-    expect(portal.match(/normalizeBidHeadline\(est\.bidHeadline\)/g)?.length).toBe(3); // page, email, contract
+    expect(portal.match(/normalizeBidHeadline\(est\.bidHeadline\)/g)?.length).toBe(2); // page, contract
+    // The client email (and its "Send me a proof" twin) is built in estimate-email.ts.
+    expect(src("server/crm/estimate-email.ts").match(/normalizeBidHeadline\(est\.bidHeadline\)/g)?.length).toBe(1);
+    expect(src("server/crm/estimate-email.ts")).not.toContain("bidHeadlineFromCustomFields");
     // The client-selection regeneration keeps the original's copy, like its warranty.
     expect(portal).toMatch(/defaultsSnapshotAt: est\.defaultsSnapshotAt, depositBps: est\.depositBps,\s*bidHeadline: est\.bidHeadline,/);
     expect(src("server/crm/schema-ensure.ts")).toContain("ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS bid_headline jsonb;");
@@ -192,11 +195,15 @@ describe("every client-facing bid opens with it (source guards)", () => {
   it("the public payload, the estimate email and the contract PDF carry the org's headline", () => {
     const portal = src("server/crm/portal.ts");
     expect(portal).toContain("bidHeadline: normalizeBidHeadline(est.bidHeadline),");
-    // Email: the block sits right under the title, before the greeting.
-    const title = portal.indexOf("Approve Estimate${est.number");
-    const block = portal.indexOf("${headlineHtml}");
+    // Email (estimate-email.ts, shared by Send and "Send me a proof"): the
+    // block sits right under the title, before the greeting.
+    const email = src("server/crm/estimate-email.ts");
+    expect(portal).toContain("buildEstimateEmail({");
+    const title = email.indexOf("Approve Estimate${est.number");
+    const block = email.indexOf("${headlineHtml}");
+    expect(title).toBeGreaterThan(-1);
     expect(block).toBeGreaterThan(title);
-    expect(block).toBeLessThan(portal.indexOf("<p style=\"font-size:16px\">Hi ${esc(cust.displayName)},</p>"));
+    expect(block).toBeLessThan(email.indexOf("<p style=\"font-size:16px\">Hi ${esc(i.customerName)},</p>"));
     expect(portal).toMatch(/warrantyText: estimateDocText\(est, org\)\.warrantyText,\s*bidHeadline: normalizeBidHeadline\(est\.bidHeadline\)/);
   });
 

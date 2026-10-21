@@ -33,7 +33,7 @@ import { cleanOfferConditions } from "@shared/discount-presets";
 import {
   ArrowLeft, Plus, Loader2, Send, Eye, Check, CheckCircle2, XCircle, Copy,
   FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, BellRing,
-  Pencil, Search, Calendar, MessageSquare, CreditCard, Undo2, Info, GripVertical,
+  Pencil, Search, Calendar, MessageSquare, CreditCard, Undo2, Info, GripVertical, MailCheck,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -1296,6 +1296,15 @@ export default function CrmClientPage() {
     onError: (e: any) => toast({ title: "Could not send", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
+  // "Send me a proof": the client's exact email, to the logged-in member only
+  // (the link inside is a read-only preview; nothing about the estimate changes).
+  const proof = useMutation({
+    mutationFn: async (estimateId: string) =>
+      (await apiRequest("POST", `/api/crm/estimates/${estimateId}/send-proof`, {})).json(),
+    onSuccess: (r: any) => toast({ title: `Proof sent to ${r.to}` }),
+    onError: (e: any) => toast({ title: "Could not send proof", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+
   // Contractor preview: the public page is email-gated now, so the CRM opens
   // a short-lived read-only preview link instead of the raw client URL.
   const preview = useMutation({
@@ -2287,6 +2296,15 @@ export default function CrmClientPage() {
                       data-testid={`button-send-${e.id}`}>
                       {send.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
                       {e.sentAt ? "Resend" : "Send"}
+                    </Button>
+                  )}
+                  {canEstimate && !e.approvedAt && !e.declinedAt && (
+                    <Button size="sm" variant="ghost"
+                      onClick={() => proof.mutate(e.id)} disabled={proof.isPending}
+                      title="Email yourself exactly what the client would get"
+                      data-testid={`button-send-proof-${e.id}`}>
+                      {proof.isPending && proof.variables === e.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MailCheck className="h-4 w-4 mr-2" />}
+                      Send me a proof
                     </Button>
                   )}
                   {/* Nudge a client whose estimate is sitting unanswered. */}

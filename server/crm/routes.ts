@@ -27,6 +27,7 @@ import { requireOrg, requirePermission, grantExceedsOwn, listOrgsForUser, getSea
 import { CRM_PERMISSION_LABELS } from "@shared/crm-access";
 import { registerCrmEntityRoutes } from "./entities";
 import { registerCrmPortalRoutes, registerCrmInvoicePortalRoutes } from "./portal";
+import { registerEstimateProofRoutes } from "./estimate-proof";
 import { registerCrmPaymentRoutes } from "./payments";
 import { registerCrmReconcileRoutes, startReconcileWorker } from "./payment-reconcile";
 import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
@@ -409,6 +410,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmTaxHooks(app, getDevUser);
   registerCrmEntityRoutes(app, getDevUser);
   registerCrmPortalRoutes(app, getDevUser);
+  // "Send me a proof": the client email, to the member only (no send side effects).
+  registerEstimateProofRoutes(app, getDevUser);
   registerCrmInvoicePortalRoutes(app, getDevUser);
   registerCrmPaymentRoutes(app, getDevUser);
   // Off-platform payments: the reconciliation prompt series, its answers, and recording a deposit by check/cash/wire.
