@@ -29,6 +29,7 @@
  * Money is integer cents, quantities are rounded once (to 0.01 of the unit),
  * every line rounds once. Tax is not part of a ballpark (the disclaimer says so).
  */
+import { effectiveOffer } from "./scope-category";
 import { z } from "zod";
 
 // ── Trades, units, products ─────────────────────────────────────────────────
@@ -275,7 +276,7 @@ export type PricedTrade = {
   /** At least one product has a price. False → "Request a price" only. */
   quotable: boolean;
 };
-export type OfferedDiscount = { code: string; label: string; percentBps: number; conditions: string | null };
+export type OfferedDiscount = { code: string; label: string; percentBps: number; conditions: string | null; rule?: unknown };
 export type PricedSelfEstimate = {
   rangeBps: number;
   disclaimer: string;
@@ -528,7 +529,12 @@ export function computeBallpark(
   // Stacking: percentages add, capped at 100%, applied once to the pre-tax
   // subtotal — the optional-discount rule of shared/estimate-totals.ts.
   const wanted = new Set(selection.discountCodes ?? []);
-  const claimed = priced.discounts.filter((d) => wanted.has(d.code) && d.percentBps > 0);
+  // A tiered bundle (shared/scope-category.ts) is worth what the chosen trades earn — dropped when they don't qualify.
+  const tradeLines = lines.map((l) => ({ name: String((l as any).trade ?? ""), scopeCategory: (l as any).trade ?? null }));
+  const claimed = priced.discounts
+    .filter((d) => wanted.has(d.code))
+    .map((d) => (d.rule ? { ...d, percentBps: effectiveOffer(d, tradeLines).percentBps } : d))
+    .filter((d) => d.percentBps > 0);
   const discountBps = Math.min(10_000, claimed.reduce((sum, d) => sum + d.percentBps, 0));
   const discountCents = Math.round((subtotalCents * discountBps) / 10_000);
   // Per-discount amounts always add up to the discount actually applied: when

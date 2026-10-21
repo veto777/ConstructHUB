@@ -21,6 +21,8 @@ type Offer = {
   percentBps: number;
   conditions: string | null;
   enabled: boolean;
+  /** Tiered bundle rule (shared/scope-category.ts), kept as stored. */
+  rule?: unknown;
 };
 
 type Preset = {
@@ -79,7 +81,7 @@ export function EstimateDiscounts({ estimate }: { estimate: any }) {
       (await apiRequest("PUT", `/api/crm/estimates/${estimate.id}/discounts`, {
         offers: offers.map((o, idx) => ({
           code: o.code, label: o.label, percentBps: o.percentBps,
-          conditions: o.conditions || null, enabled: o.enabled, sortOrder: idx,
+          conditions: o.conditions || null, enabled: o.enabled, sortOrder: idx, rule: o.rule ?? null,
         })),
       })).json(),
     onSuccess: () => {

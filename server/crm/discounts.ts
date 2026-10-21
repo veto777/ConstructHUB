@@ -15,7 +15,7 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { db } from "../db";
-import { crmEstimateDiscounts, crmEstimateItems, crmEstimates } from "@shared/schema";
+import { crmEstimateDiscounts, crmEstimateItems, crmEstimates, crmOrgs } from "@shared/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { logActivity } from "./activity";
@@ -27,43 +27,9 @@ type GetUser = (req: any, res: any) => any;
 // The creator ticks which of these to offer. Price-match is OFF by default —
 // matching a competitor's number is a bad sales tactic; offering it at all is
 // a deliberate choice, and the client must provide the competing bid.
-export const DISCOUNT_PRESETS = [
-  {
-    code: "marketing",
-    label: "Marketing discount",
-    percentBps: 100, // 1%
-    conditions: "Yard signage during the job + 1 month after, and an honest review (unless the experience was genuinely bad).",
-    defaultEnabled: true,
-  },
-  {
-    code: "military",
-    label: "Military discount",
-    percentBps: 200, // 2%
-    conditions: "Military ID required — family members don't count.",
-    defaultEnabled: true,
-  },
-  {
-    code: "pay_in_full",
-    label: "Pay-in-full discount",
-    percentBps: 500, // 5%
-    conditions: "Paid in full immediately.",
-    defaultEnabled: true,
-  },
-  {
-    code: "bundle",
-    label: "Bundle discount",
-    percentBps: 500, // 5%
-    conditions: "Siding + roofing + windows — all three required; gutters/paint don't count as a scope.",
-    defaultEnabled: true,
-  },
-  {
-    code: "price_match",
-    label: "Price match",
-    percentBps: 0, // creator sets the concession when enabling it
-    conditions: "Requires providing the competing bid. Off by default — price matching is a bad sales tactic.",
-    defaultEnabled: false,
-  },
-] as const;
+export { DISCOUNT_PRESETS } from "@shared/discount-presets";
+import { DISCOUNT_PRESETS } from "@shared/discount-presets";
+import { bundleRuleOf, effectiveOffer, orgDiscountRule } from "@shared/scope-category";
 
 // ── The math (pure — unit-tested in discounts.test.ts) ─────────────────────
 // Lives in shared/estimate-totals.ts so the client estimate page previews
@@ -92,6 +58,8 @@ export async function resolveSelectedOffers(
   orgId: string,
   estimateId: string,
   selectedIds: string[],
+  /** The lines the offers apply to (default: the estimate's own). */
+  scopeLines?: Array<{ kind?: string; name?: string | null; scopeCategory?: string | null }>,
 ): Promise<SelectionRecord[]> {
   if (!selectedIds.length) return [];
   const offers = await db.select().from(crmEstimateDiscounts)
@@ -101,9 +69,16 @@ export async function resolveSelectedOffers(
       eq(crmEstimateDiscounts.enabled, true),
     ));
   const wanted = new Set(selectedIds);
+  // A rule-based (tiered bundle) offer is worth what THESE lines earn; one that isn't available is dropped.
+  const lines = scopeLines ?? await db.select({ kind: crmEstimateItems.kind, name: crmEstimateItems.name, scopeCategory: crmEstimateItems.scopeCategory })
+    .from(crmEstimateItems).where(and(eq(crmEstimateItems.orgId, orgId), eq(crmEstimateItems.estimateId, estimateId)));
+  // An offer stored before the org's rule existed (e.g. Alpine's bundle on an older estimate) follows the rule too.
+  const [org] = await db.select({ customFields: crmOrgs.customFields }).from(crmOrgs).where(eq(crmOrgs.id, orgId)).limit(1);
   return offers
     .filter((o) => wanted.has(o.id))
-    .map((o) => ({ id: o.id, code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions }));
+    .map((o) => ({ o, eff: effectiveOffer({ percentBps: o.percentBps, rule: o.rule ?? orgDiscountRule(org?.customFields, o.code) }, lines) }))
+    .filter(({ eff }) => eff.available)
+    .map(({ o, eff }) => ({ id: o.id, code: o.code, label: o.label, percentBps: eff.percentBps, conditions: o.conditions }));
 }
 
 /** Recompute approval totals from the DB: line items + validated selections. */
@@ -115,7 +90,7 @@ export async function recomputeApprovalTotals(
 ): Promise<{ totals: ApprovalTotals; selections: SelectionRecord[] }> {
   const items = await db.select().from(crmEstimateItems)
     .where(and(eq(crmEstimateItems.orgId, orgId), eq(crmEstimateItems.estimateId, estimateId)));
-  const selections = await resolveSelectedOffers(orgId, estimateId, selectedIds);
+  const selections = await resolveSelectedOffers(orgId, estimateId, selectedIds, items);
   const totals = computeApprovalTotals(items, taxRateBps, selections);
   return { totals, selections };
 }
@@ -129,13 +104,32 @@ const offerSchema = z.object({
   conditions: z.string().max(1000).nullable().optional(),
   enabled: z.boolean().default(true),
   sortOrder: z.number().int().min(0).max(999).optional(),
+  // Tiered bundle rule (shared/scope-category.ts), copied from the org's preset.
+  rule: z.object({
+    categories: z.array(z.string().max(30)).min(1).max(10),
+    tiers: z.array(z.object({ min: z.number().int().min(1).max(10), percentBps: z.number().int().min(0).max(10_000) })).min(1).max(10),
+  }).nullable().optional(),
 });
 
 export function presentDiscountOffer(o: typeof crmEstimateDiscounts.$inferSelect) {
   return {
     id: o.id, code: o.code, label: o.label, percentBps: o.percentBps,
     conditions: o.conditions, enabled: o.enabled, sortOrder: o.sortOrder,
+    rule: bundleRuleOf(o.rule),
   };
+}
+
+/**
+ * The offers as the client sees them on these lines: a tiered bundle shows the percent the lines earn, or
+ * not available with the reason (it cannot be ticked). Flat offers are unchanged.
+ */
+export function offersForLines<T extends { percentBps: number; rule?: unknown }>(
+  offers: T[], lines: Array<{ kind?: string; name?: string | null; scopeCategory?: string | null }>,
+) {
+  return offers.map((o) => {
+    const eff = effectiveOffer(o, lines);
+    return { offer: o, percentBps: eff.percentBps, available: eff.available, unavailableReason: eff.reason, rule: bundleRuleOf(o.rule) };
+  });
 }
 
 export function registerCrmDiscountRoutes(app: Express, getDevUser: GetUser): void {
@@ -215,6 +209,8 @@ export function registerCrmDiscountRoutes(app: Express, getDevUser: GetUser): vo
           conditions: o.conditions ?? null,
           enabled: o.enabled,
           sortOrder: o.sortOrder ?? idx,
+          // The org's rule for this code (e.g. Alpine's tiered bundle) always applies, whoever made the offer.
+          rule: o.rule ?? orgDiscountRule(ctx.org.customFields, o.code),
         })) as any,
       );
     }

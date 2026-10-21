@@ -572,7 +572,8 @@ export default function PublicEstimatePage() {
   // taxable base and tax is charged on the reduced base. The server
   // re-computes on approve; this is only what the client sees before signing.
   const offers: any[] = discountOffers ?? [];
-  const tickedOffers = offers.filter((o) => selectedDiscounts.includes(o.id));
+  // A tiered bundle the lines don't earn is shown but can't be ticked (the server recomputes it on approve anyway).
+  const tickedOffers = offers.filter((o) => selectedDiscounts.includes(o.id) && o.available !== false);
   // ── Client-selectable scopes ──────────────────────────────────────────────
   // Options carrying their own line items are checkboxes. The server
   // regenerates the real document from the ticked ones — until then the
@@ -1069,14 +1070,22 @@ export default function PublicEstimatePage() {
                   data-testid={`discount-offer-${o.code}`}>
                   <Checkbox
                     className="mt-0.5 h-5 w-5"
-                    checked={selectedDiscounts.includes(o.id)}
+                    checked={selectedDiscounts.includes(o.id) && o.available !== false}
+                    disabled={o.available === false}
                     onCheckedChange={(c) => toggleDiscount(o.id, c === true)}
                     data-testid={`check-discount-${o.code}`}
                   />
                   <span className="min-w-0">
                     <span className="font-medium text-sm">
-                      {o.label} <span className="text-primary">−{(o.percentBps / 100).toLocaleString("en-US")}%</span>
+                      {o.label}{" "}
+                      <span className="text-primary">
+                        {o.available === false ? "not available" : `−${(o.percentBps / 100).toLocaleString("en-US")}%`}
+                      </span>
                     </span>
+                    {o.ruleText && <span className="block text-xs text-muted-foreground mt-0.5">{o.ruleText}</span>}
+                    {o.available === false && o.unavailableReason && (
+                      <span className="block text-xs text-muted-foreground mt-0.5" data-testid={`text-discount-unavailable-${o.code}`}>{o.unavailableReason}</span>
+                    )}
                     {o.conditions && (
                       <span className="block text-xs text-muted-foreground mt-0.5">{o.conditions}</span>
                     )}

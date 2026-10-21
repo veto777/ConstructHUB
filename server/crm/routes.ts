@@ -277,6 +277,11 @@ const orgPatchSchema = z.object({
     percentBps: z.number().int().min(0).max(10_000),
     conditions: z.string().max(1000).nullable().optional(),
     enabled: z.boolean().default(true),
+    // Tiered, category-gated bundle (shared/scope-category.ts) — e.g. Alpine's siding/windows/roofing 5% / 2%.
+    rule: z.object({
+      categories: z.array(z.string().max(30)).min(1).max(10),
+      tiers: z.array(z.object({ min: z.number().int().min(1).max(10), percentBps: z.number().int().min(0).max(10_000) })).min(1).max(10),
+    }).nullable().optional(),
   })).max(20).optional(),
   // Merged INTO custom_fields (never a wholesale replace — the HCP importer
   // stores reference data there too). Unknown keys are rejected.

@@ -54,7 +54,13 @@ import { AppointmentForm, type Appointment } from "@/components/crm-appointment-
 import { InfoTip } from "@/components/info-tip";
 import { useEstimateTaxRate, TaxRateNote, bpsToPctText } from "@/components/estimate-tax-rate";
 import { useEstimateAutosave, AutosaveIndicator, useDialogFullscreen, FullscreenToggle } from "@/components/estimate-autosave";
-import { autoTitleFrom, draftHasContent, snapshotFromEstimate, type EstimateDraftSnapshot } from "@shared/estimate-draft";
+import {
+  autoTitleFrom, autosavePayload, contractorDiscountLine, defaultOffers, draftHasContent, offersPayload, snapshotFromEstimate,
+  type ContractorDiscount, type DraftOffer, type EstimateDraftSnapshot,
+} from "@shared/estimate-draft";
+import { computeApprovalTotals } from "@shared/estimate-totals";
+import { DISCOUNT_PRESETS } from "@shared/discount-presets";
+import { SCOPE_CATEGORIES, SCOPE_CATEGORY_LABEL, bundleRuleOf, bundleRuleText, effectiveOffer, lineCategory } from "@shared/scope-category";
 import { HelpButton } from "@/components/help-button";
 import { confirmAction } from "@/components/confirm-dialog";
 import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
@@ -99,6 +105,9 @@ interface Item {
   quantityMilli: number; unit?: string | null; unitPriceCents: number;
   taxable: boolean; hiddenFromClient: boolean;
   pricebookItemId?: string | null; unitCostCents?: number | null;
+  /** Price-book list price + field when picked ("Update price book to $X"); scope category for bundles. */
+  listPriceCents?: number | null; listField?: "flatPriceCents" | "rateCentsPerSqft" | null;
+  scopeCategory?: string | null;
 }
 
 const BLANK: Item = {
@@ -930,13 +939,22 @@ export default function CrmClientPage() {
   // A refresh reopens the dialog with everything restored. shared/estimate-draft.ts, components/estimate-autosave.tsx
   const { data: orgForDraft } = useQuery<any>({ queryKey: ["/api/crm/org"] });
   const [finalizing, setFinalizing] = useState(false);
+  // Discounts in the dialog (owner, 2026-10-21): the org's offers the client may choose (crm_estimate_discounts,
+  // a tiered bundle included) and the contractor's own discount, which is a kind:"discount" line.
+  const [offers, setOffers] = useState<DraftOffer[] | null>(null);
+  const [contractorDiscount, setContractorDiscount] = useState<ContractorDiscount | null>(null);
   // The title follows the lines live ("Siding Remodel + Exterior Painting") until the user types in it;
   // "↺ auto title" switches back. Persisted with the draft (autosaveMeta.autoTitle).
   const [autoTitle, setAutoTitle] = useState(true);
   useEffect(() => {
     if (autoTitle) setTitle(autoTitleFrom(items));
   }, [autoTitle, items]);
-  const draftSnapshot: EstimateDraftSnapshot = { title, autoTitle, intro, taxPct, taxTouched, items };
+  useEffect(() => {
+    if (open && offers === null && orgForDraft) setOffers(defaultOffers(orgForDraft.customFields, DISCOUNT_PRESETS));
+  }, [open, offers, orgForDraft]);
+  const draftSnapshot: EstimateDraftSnapshot = {
+    title, autoTitle, intro, taxPct, taxTouched, items, offers: offers ?? undefined, contractorDiscount,
+  };
   const autosave = useEstimateAutosave({
     orgId: orgForDraft?.id ?? null, customerId: id, open, snapshot: draftSnapshot, paused: finalizing,
   });
@@ -948,6 +966,8 @@ export default function CrmClientPage() {
   const loadSnapshot = (snap: EstimateDraftSnapshot) => {
     setAutoTitle(snap.autoTitle !== false);
     setTitle(snap.title || "Estimate");
+    setOffers(snap.offers ?? null);
+    setContractorDiscount(snap.contractorDiscount ?? null);
     setIntro(snap.intro ?? "");
     setTaxPct(snap.taxPct ?? "0");
     setTaxTouched(!!snap.taxTouched);
@@ -959,12 +979,18 @@ export default function CrmClientPage() {
     setItems([{ ...BLANK }]); setIntro(""); setTitle("Estimate"); setAutoTitle(true); setTaxPct("0"); setTaxTouched(false);
     setResumeOffer(null);
     setEditingEst(null);
+    setOffers(null);
+    setContractorDiscount(null);
   };
   /** Open a saved estimate (draft / unsent) in this popup: lines, scopes, tax, message; saves back to the same id. */
   const openEstimateInPopup = async (estimateId: string) => {
     try {
       const r = await (await apiRequest("GET", `/api/crm/estimates/${estimateId}`)).json();
-      const snap = snapshotFromEstimate(r.estimate, r.items ?? []);
+      const disc = await (await apiRequest("GET", `/api/crm/estimates/${estimateId}/discounts`)).json().catch(() => null);
+      const saved: DraftOffer[] | undefined = disc?.offers?.length
+        ? disc.offers.map((o: any) => ({ code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null, enabled: o.enabled, rule: o.rule ?? null }))
+        : undefined;
+      const snap = snapshotFromEstimate(r.estimate, r.items ?? [], saved);
       loadSnapshot(snap);
       autosave.adopt(estimateId, snap);
       setEditingEst({ id: estimateId, number: r.estimate.number ?? null, autosave: !!r.estimate.autosave });
@@ -998,13 +1024,14 @@ export default function CrmClientPage() {
     }
   }, [id, orgForDraft?.id]);
 
-  const subtotal = items.reduce(
-    (s, i) => s + (i.kind === "discount" ? 0 : Math.round((i.unitPriceCents * i.quantityMilli) / 1000)), 0);
-  const discount = items.reduce(
-    (s, i) => s + (i.kind === "discount" ? Math.round((i.unitPriceCents * i.quantityMilli) / 1000) : 0), 0);
+  // Totals: shared/estimate-totals.ts, the same function the server recomputes with (tax after discounts).
   const taxBps = Math.round(parseFloat(taxPct || "0") * 100);
-  const tax = Math.round((Math.max(0, subtotal - discount) * taxBps) / 10000);
-  const total = Math.max(0, subtotal - discount + tax);
+  const cdLine = contractorDiscountLine(contractorDiscount, items);
+  const totals = computeApprovalTotals([...items, ...(cdLine ? [cdLine] : [])], taxBps, []);
+  const subtotal = totals.subtotalCents;
+  const discount = totals.lineDiscountCents;
+  const tax = totals.taxCents;
+  const total = totals.totalCents;
 
   // The client's HOVER takeoff (if any): a picked price-book item takes its quantity from it.
   const { data: takeoffData } = useQuery<{ takeoff: HoverTakeoff | null }>({
@@ -1025,17 +1052,21 @@ export default function CrmClientPage() {
     mutationFn: async () => {
       const clean = items.filter((i) => i.name.trim());
       if (!clean.length) throw new Error("Add at least one line item");
-      const body = {
-        title, introText: intro || null, taxRateBps: taxBps,
-        items: clean.map((i, idx) => ({ ...i, sortOrder: idx, description: i.description || null, unit: i.unit || null })),
+      const body = autosavePayload({ ...draftSnapshot, items: clean });
+      const putOffers = async (estId: string) => {
+        if (offers) await apiRequest("PUT", `/api/crm/estimates/${estId}/discounts`, { offers: offersPayload(offers) });
       };
       setFinalizing(true);
       try {
         // Already autosaved as a draft, or an existing estimate opened here: save THAT estimate — never a duplicate.
         if (autosave.draftId) {
-          return (await apiRequest("PATCH", `/api/crm/estimates/${autosave.draftId}`, { ...body, autosave: false })).json();
+          const saved = await (await apiRequest("PATCH", `/api/crm/estimates/${autosave.draftId}`, { ...body, autosave: false })).json();
+          await putOffers(autosave.draftId);
+          return saved;
         }
-        return (await apiRequest("POST", "/api/crm/estimates", { customerId: id, ...body })).json();
+        const created = await (await apiRequest("POST", "/api/crm/estimates", { customerId: id, ...body })).json();
+        await putOffers(created.id);
+        return created;
       } finally {
         setFinalizing(false);
       }
@@ -1713,7 +1744,10 @@ export default function CrmClientPage() {
                             setItems((cur) => cur.map((x, i) => i === idx ? {
                               ...x, name: pb.name, unit: pb.unit ?? "", description: pb.description, taxable: pb.taxable,
                               unitPriceCents: pb.unitPriceCents, quantityMilli: Math.round((fromHover?.quantity ?? 1) * 1000),
+                              pricebookItemId: pb.id, listPriceCents: pb.listPriceCents, listField: pb.listField,
+                              scopeCategory: pb.scopeCategory,
                             } : x));
+                            if (pb.fromLastUse) toast({ title: "Last price and scope filled in", description: "From the last estimate this item was on." });
                             if (fromHover) toast({ title: `Quantity from HOVER: ${fromHover.quantity} ${pb.unit ?? ""}`.trim(), description: "Check it before you send." });
                           }} />
                       </div>
@@ -1741,6 +1775,31 @@ export default function CrmClientPage() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
+                      {/* Scope category (bundle discounts) and, for a re-priced price-book line, the one-click list update. */}
+                      <div className="sm:col-span-12 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Scope</span>
+                        <select value={lineCategory(it)} data-testid={`select-item-category-${idx}`}
+                          className="h-7 rounded-md border border-input bg-background px-1.5 text-xs"
+                          onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, scopeCategory: e.target.value } : x))}>
+                          {SCOPE_CATEGORIES.map((cat) => <option key={cat} value={cat}>{SCOPE_CATEGORY_LABEL[cat]}</option>)}
+                        </select>
+                        {it.pricebookItemId && it.listField && it.listPriceCents != null && it.unitPriceCents !== it.listPriceCents
+                          && me?.permissions?.managePriceBook && (
+                          <button type="button" className="text-primary hover:underline" data-testid={`button-update-pricebook-${idx}`}
+                            onClick={async () => {
+                              try {
+                                await apiRequest("PATCH", `/api/crm/pricebook/items/${it.pricebookItemId}`, { [it.listField!]: it.unitPriceCents });
+                                setItems((cur) => cur.map((x, i) => i === idx ? { ...x, listPriceCents: it.unitPriceCents } : x));
+                                queryClient.invalidateQueries({ queryKey: ["/api/crm/pricebook/items"] });
+                                toast({ title: `Price book updated to ${money(it.unitPriceCents)}`, description: it.name });
+                              } catch (e: any) {
+                                toast({ title: "Could not update the price book", description: apiErrorMessage(e), variant: "destructive" });
+                              }
+                            }}>
+                            Update price book to {money(it.unitPriceCents)} (list {money(it.listPriceCents)})
+                          </button>
+                        )}
+                      </div>
                       {/* The scope the client actually reads — persists to the
                           line's description and renders on the estimate. */}
                       <div className="sm:col-span-12">
@@ -1757,6 +1816,52 @@ export default function CrmClientPage() {
                     data-testid="button-add-item">
                     <Plus className="h-4 w-4 mr-2" /> Add line
                   </Button>
+                </div>
+
+                <div className="rounded-md border p-3 space-y-3" data-testid="section-estimate-discounts">
+                  <div className="text-sm font-medium">Discounts</div>
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] items-end">
+                    <div>
+                      <Label className="text-xs">Your discount (shows as a line)</Label>
+                      <Input value={contractorDiscount?.label ?? ""} placeholder="Discount"
+                        data-testid="input-contractor-discount-label"
+                        onChange={(e) => setContractorDiscount({ mode: contractorDiscount?.mode ?? "amount", value: contractorDiscount?.value ?? "", label: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Amount</Label>
+                      <Input className="w-28" inputMode="decimal" value={contractorDiscount?.value ?? ""} placeholder="0"
+                        data-testid="input-contractor-discount-value"
+                        onChange={(e) => setContractorDiscount({ mode: contractorDiscount?.mode ?? "amount", label: contractorDiscount?.label ?? "", value: e.target.value })} />
+                    </div>
+                    <select value={contractorDiscount?.mode ?? "amount"} data-testid="select-contractor-discount-mode"
+                      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                      onChange={(e) => setContractorDiscount({ label: contractorDiscount?.label ?? "", value: contractorDiscount?.value ?? "", mode: e.target.value as "amount" | "percent" })}>
+                      <option value="amount">$</option>
+                      <option value="percent">%</option>
+                    </select>
+                  </div>
+                  {(offers ?? []).length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-xs text-muted-foreground">Offers the client can choose on the estimate page</div>
+                      {(offers ?? []).map((o, oi) => {
+                        const eff = effectiveOffer(o, [...items, ...(cdLine ? [cdLine] : [])]);
+                        const rule = bundleRuleOf(o.rule);
+                        return (
+                          <label key={o.code} className={`flex items-start gap-2 text-sm ${eff.available ? "" : "opacity-60"}`} data-testid={`offer-${o.code}`}>
+                            <Checkbox checked={o.enabled} className="mt-0.5"
+                              onCheckedChange={(v) => setOffers((cur) => (cur ?? []).map((x, j) => j === oi ? { ...x, enabled: v === true } : x))}
+                              data-testid={`check-offer-${o.code}`} />
+                            <span>
+                              {o.label}{" "}
+                              <span className="text-primary">{eff.available ? `−${Number((eff.percentBps / 100).toFixed(2))}%` : "not available"}</span>
+                              {rule && <span className="block text-xs text-muted-foreground">{bundleRuleText(rule)}</span>}
+                              {!eff.available && eff.reason && <span className="block text-xs text-amber-700 dark:text-amber-400" data-testid={`text-offer-reason-${o.code}`}>{eff.reason}</span>}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="text-sm space-y-1 text-right">

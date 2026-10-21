@@ -1,3 +1,4 @@
+import { bundleRuleOf, bundleRuleText, orgDiscountRule } from "@shared/scope-category";
 import { useEffect, useRef, useState } from "react";
 import { ClientPageLayoutCard } from "@/components/client-page-layout";
 import { JobFlowCard } from "@/components/job-flow-settings";
@@ -241,14 +242,14 @@ export default function CrmSettingsPage() {
     { code: "pay_in_full", label: "Pay-in-full discount", percentBps: 500, conditions: "Paid in full immediately." },
     { code: "bundle", label: "Bundle discount (trifecta)", percentBps: 500, conditions: "Siding + roofing + windows — all three required." },
   ];
-  const [discForm, setDiscForm] = useState<{ code: string; label: string; percentBps: number; conditions: string | null; enabled: boolean }[]>([]);
+  const [discForm, setDiscForm] = useState<{ code: string; label: string; percentBps: number; conditions: string | null; enabled: boolean; rule?: unknown }[]>([]);
   const [discCustom, setDiscCustom] = useState({ label: "", pct: "", conditions: "" });
   // Shown inline under the offer row: 150% is refused, never saved as −100%.
   const discPctError = pctToBps(discCustom.pct, "A discount", 100).error ?? null;
   useEffect(() => {
     const saved = (org?.customFields as any)?.discountDefaults;
     if (Array.isArray(saved) && saved.length) {
-      setDiscForm(saved.map((o: any) => ({ code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null, enabled: o.enabled !== false })));
+      setDiscForm(saved.map((o: any) => ({ code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null, enabled: o.enabled !== false, rule: o.rule ?? null })));
     } else {
       setDiscForm(DISCOUNT_PRESETS.map((p) => ({ ...p, enabled: false })));
     }
@@ -1104,7 +1105,13 @@ export default function CrmSettingsPage() {
               data-testid={`default-discount-${o.code}`}>
               <div className="min-w-0">
                 <div className="text-sm font-medium">
-                  {o.label} <span className="text-primary">−{(o.percentBps / 100).toLocaleString("en-US")}%</span>
+                  {o.label}{" "}
+                  <span className="text-primary">
+                    {(() => {
+                      const rule = bundleRuleOf(o.rule) ?? orgDiscountRule(org?.customFields, o.code);
+                      return rule ? bundleRuleText(rule) : `−${(o.percentBps / 100).toLocaleString("en-US")}%`;
+                    })()}
+                  </span>
                 </div>
                 {o.conditions && <div className="text-xs text-muted-foreground mt-0.5">{o.conditions}</div>}
               </div>

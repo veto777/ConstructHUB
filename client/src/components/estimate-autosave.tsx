@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import {
-  autosavePayload, clearDraftMirror, draftHasContent, draftMirrorKey, readDraftMirror, writeDraftMirror,
+  autosavePayload, offersPayload, clearDraftMirror, draftHasContent, draftMirrorKey, readDraftMirror, writeDraftMirror,
   type DraftMirror, type EstimateDraftSnapshot,
 } from "@shared/estimate-draft";
 
@@ -34,6 +34,7 @@ export function useEstimateAutosave(opts: {
   const snapRef = useRef(snapshot);
   snapRef.current = snapshot;
   const savedJson = useRef<string>("");
+  const savedOffersJson = useRef<string>("");
   const inflight = useRef<Promise<void> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasContent = draftHasContent(snapshot);
@@ -53,7 +54,8 @@ export function useEstimateAutosave(opts: {
     if (!draftHasContent(snap) && !draftIdRef.current) return null;
     const body = autosavePayload(snap);
     const json = JSON.stringify(body);
-    if (json === savedJson.current && draftIdRef.current) return draftIdRef.current;
+    const offersSame = !snap.offers || JSON.stringify(offersPayload(snap.offers)) === savedOffersJson.current;
+    if (json === savedJson.current && offersSame && draftIdRef.current) return draftIdRef.current;
     let ok = false;
     const run = (async () => {
       setStatus("saving");
@@ -61,10 +63,18 @@ export function useEstimateAutosave(opts: {
         if (!draftIdRef.current) {
           const created = await (await apiRequest("POST", "/api/crm/estimates", { customerId, ...body, autosave: true })).json();
           setDraftId(created.id);
-        } else {
+        } else if (json !== savedJson.current) {
           await apiRequest("PATCH", `/api/crm/estimates/${draftIdRef.current}`, body);
         }
         savedJson.current = json;
+        // The discount offers the client will be able to choose (crm_estimate_discounts), when they changed.
+        if (snap.offers) {
+          const offersJson = JSON.stringify(offersPayload(snap.offers));
+          if (offersJson !== savedOffersJson.current) {
+            await apiRequest("PUT", `/api/crm/estimates/${draftIdRef.current}/discounts`, { offers: offersPayload(snap.offers) });
+            savedOffersJson.current = offersJson;
+          }
+        }
         setSavedAt(Date.now());
         setStatus("saved");
         setError(null);
@@ -111,6 +121,7 @@ export function useEstimateAutosave(opts: {
   const adopt = useCallback((id: string | null, savedBody?: EstimateDraftSnapshot) => {
     setDraftId(id);
     savedJson.current = savedBody ? JSON.stringify(autosavePayload(savedBody)) : "";
+    savedOffersJson.current = savedBody?.offers ? JSON.stringify(offersPayload(savedBody.offers)) : "";
     setStatus(id ? "saved" : "idle");
     setSavedAt(id ? Date.now() : null);
   }, []);
@@ -121,6 +132,7 @@ export function useEstimateAutosave(opts: {
     if (key) clearDraftMirror(key);
     setDraftId(null);
     savedJson.current = "";
+    savedOffersJson.current = "";
     setStatus("idle");
     setError(null);
     setSavedAt(null);

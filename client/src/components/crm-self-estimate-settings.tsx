@@ -8,6 +8,7 @@
  * number is ever invented. Server: server/crm/self-estimate.ts (manageSettings
  * OR manageEstimates; saving prices also needs See prices).
  */
+import { bundleRuleOf, bundleRuleText } from "@shared/scope-category";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -32,7 +33,7 @@ type ConfigResponse = {
   divisions: { key: string; name: string }[];
   config: NormalizedDivisionConfig;
   canEditPrices: boolean;
-  discountSource: { code: string; label: string; percentBps: number; conditions: string | null }[];
+  discountSource: { code: string; label: string; percentBps: number; conditions: string | null; rule?: unknown }[];
   pricebookItems: { id: string; name: string; unit: string; pricingMode: string; unitPrices?: Record<string, number | null> }[];
 };
 
@@ -244,7 +245,9 @@ export function SelfEstimateSettingsCard() {
                 <Checkbox checked={cfg.discountCodes.includes(d.code)}
                   onCheckedChange={(v) => setCfg({ ...cfg, discountCodes: v === true ? [...new Set([...cfg.discountCodes, d.code])] : cfg.discountCodes.filter((c) => c !== d.code) })}
                   data-testid={`checkbox-se-offer-${d.code}`} />
-                {d.label} <span className="text-primary">−{d.percentBps / 100}%</span>
+                {bundleRuleOf(d.rule)
+                  ? <>{d.label}: <span className="text-primary">{bundleRuleText(bundleRuleOf(d.rule)!)}</span></>
+                  : <>{d.label} <span className="text-primary">−{d.percentBps / 100}%</span></>}
               </label>
             ))}
           </div>

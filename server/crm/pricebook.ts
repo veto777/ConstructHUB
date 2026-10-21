@@ -7,6 +7,8 @@
  * cost+price assembly spine, Leap's formula engine, and an explicit waste factor
  * that neither of them has.
  */
+import { loadPricebookUsage } from "./pricebook-usage";
+import { rankPricebookItems } from "@shared/pricebook-usage";
 import type { Express } from "express";
 import { z } from "zod";
 import { db } from "../db";
@@ -499,10 +501,26 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (req.query.categoryId) where.push(eq(crmPbItems.categoryId, String(req.query.categoryId)));
     const rows = await db.select().from(crmPbItems).where(and(...where))
       .orderBy(asc(crmPbItems.name)).limit(500);
-    res.json(rows.map((i) => ({
-      ...presentPbItem(i, ctx),
-      formulaSymbols: i.qtyFormula ? formulaSymbols(i.qtyFormula) : [],
-    })));
+    // Usage memory (pricebook-usage.ts): how often and at what price this org last billed each item.
+    const usage = await loadPricebookUsage(ctx.org.id).catch(() => new Map());
+    const cats = new Map((await db.select({ id: crmPbCategories.id, name: crmPbCategories.name }).from(crmPbCategories)
+      .where(eq(crmPbCategories.orgId, ctx.org.id))).map((c) => [c.id, c.name]));
+    const out = rows.map((i) => {
+      const u = usage.get(i.id);
+      return {
+        ...presentPbItem(i, ctx),
+        formulaSymbols: i.qtyFormula ? formulaSymbols(i.qtyFormula) : [],
+        useCount: u?.useCount ?? 0,
+        lastUsedAt: u?.lastUsedAt ?? null,
+        lastPriceCents: ctx.permissions.seePrices ? u?.lastPriceCents ?? null : undefined,
+        lastDescription: u?.lastDescription ?? null,
+        lastUnit: u?.lastUnit ?? null,
+        categoryName: i.categoryId ? cats.get(i.categoryId) ?? null : null,
+      };
+    });
+    // The estimate line picker asks for sort=usage: most-used first, recency next, never-used last (text relevance
+    // first while typing). The price book page keeps its name order.
+    res.json(req.query.sort === "usage" ? rankPricebookItems(out, q) : out);
   });
 
   app.post("/api/crm/pricebook/items", async (req: any, res) => {

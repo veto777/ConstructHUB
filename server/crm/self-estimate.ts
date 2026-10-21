@@ -36,6 +36,7 @@
  * client is recomputed here from that config (shared/self-estimate.ts); a
  * total in a request body is never read (zod strips it).
  */
+import { bundleRuleOf, orgDiscountRule } from "@shared/scope-category";
 import type { Express } from "express";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -92,7 +93,8 @@ export function discountSourceOf(orgCustomFields: unknown): OfferedDiscount[] {
   return list
     .filter((o) => o && typeof o.code === "string" && typeof o.label === "string"
       && Number.isInteger(o.percentBps) && o.percentBps > 0 && o.percentBps <= 10_000)
-    .map((o) => ({ code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null }));
+    .map((o) => ({ code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null,
+      ...((bundleRuleOf(o.rule) ?? orgDiscountRule(orgCustomFields, o.code)) ? { rule: bundleRuleOf(o.rule) ?? orgDiscountRule(orgCustomFields, o.code) } : {}) }));
 }
 
 /**
@@ -441,7 +443,7 @@ async function createRequest(a: Anchor, body: z.infer<typeof requestBodySchema>,
       await tx.insert(crmEstimateDiscounts).values(bp.discounts.map((d, idx) => ({
         orgId: a.org.id, estimateId: draft.id, code: d.code, label: d.label, percentBps: d.percentBps,
         conditions: `Claimed by the client online — NOT verified yet.${d.conditions ? ` ${d.conditions}` : ""}`.slice(0, 1000),
-        enabled: true, sortOrder: idx,
+        enabled: true, sortOrder: idx, rule: (d as any).rule ?? null,
       })) as any);
     }
     const taskMeta = {

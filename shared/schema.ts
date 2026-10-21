@@ -2134,6 +2134,9 @@ export const crmEstimateDiscounts = pgTable("crm_estimate_discounts", {
   conditions: text("conditions"),
   enabled: boolean("enabled").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
+  // Tiered, category-gated bundle (shared/scope-category.ts BundleRule): the percent comes from the estimate's
+  // distinct qualifying scope categories, recomputed by the server on approve. Null = the flat percentBps.
+  rule: jsonb("rule"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -2153,6 +2156,11 @@ export const crmEstimateItems = pgTable("crm_estimate_items", {
   taxable: boolean("taxable").notNull().default(true),
   // Hidden line items still affect the total but are not shown to the homeowner.
   hiddenFromClient: boolean("hidden_from_client").notNull().default(false),
+  // The price-book item this line was picked from (null for typed lines and lines before 2026-10-21). Feeds the
+  // per-org usage memory (server/crm/pricebook-usage.ts). Added by PRICEBOOK_USAGE_DDL.
+  pricebookItemId: varchar("pricebook_item_id"),
+  // siding | windows | roofing | gutters | painting | doors | other (shared/scope-category.ts); null = from the name.
+  scopeCategory: text("scope_category"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

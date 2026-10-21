@@ -47,7 +47,8 @@ import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
 import { notifyMembers } from "./notify";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
-import { computeApprovalTotals, recomputeApprovalTotals, resolveSelectedOffers } from "./discounts";
+import { computeApprovalTotals, recomputeApprovalTotals, resolveSelectedOffers, offersForLines } from "./discounts";
+import { bundleRuleOf, bundleRuleText, orgDiscountRule } from "@shared/scope-category";
 import { lineBases } from "@shared/estimate-totals";
 import { storeGeneratedPdf } from "./attachments";
 import { onlinePaymentRails } from "./payments";
@@ -372,6 +373,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
             percentBps: Math.max(0, Math.min(10_000, Math.round(Number(o.percentBps) || 0))),
             conditions: o.conditions ? String(o.conditions).slice(0, 1000) : null,
             enabled: true, sortOrder: idx,
+            // The org's tiered bundle rule travels with the offer (shared/scope-category.ts).
+            rule: bundleRuleOf(o.rule) ?? orgDiscountRule(ctx.org.customFields, String(o.code)),
           }))
       : [];
     if (seed.length) {
@@ -720,9 +723,11 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       answerBlock: answerBlock ?? undefined,
       salesRep,
       estimate: { ...view.estimate, paid: settledPayments.length > 0 },
-      discountOffers: discountOffers.map((o) => ({
+      // A tiered bundle shows what THESE lines earn (or "not available" + why); the approve route recomputes it.
+      discountOffers: offersForLines(discountOffers.map((o) => ({ ...o, rule: o.rule ?? orgDiscountRule(org?.customFields, o.code) })), items).map(({ offer: o, percentBps, available, unavailableReason, rule }) => ({
         id: o.id, code: o.code, label: o.label,
-        percentBps: o.percentBps, conditions: o.conditions,
+        percentBps, conditions: o.conditions, available, unavailableReason,
+        ruleText: rule ? bundleRuleText(rule) : null,
       })),
       options: options.map((o) => {
         // An option carrying its own line items is a client-selectable scope;
@@ -978,7 +983,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         offers.map((o, idx) => ({
           orgId: est.orgId, estimateId: newEst.id,
           code: o.code, label: o.label, percentBps: o.percentBps,
-          conditions: o.conditions, enabled: true, sortOrder: idx,
+          conditions: o.conditions, enabled: true, sortOrder: idx, rule: o.rule ?? null,
         })) as any,
       );
     }

@@ -1,4 +1,6 @@
+import { SCOPE_CATEGORIES } from "@shared/scope-category";
 import { titleLooksAuto } from "@shared/estimate-draft";
+import { recordPricebookUsage } from "./pricebook-usage";
 import { invoiceRefundTotals } from "./refund-summary";
 import type { CrmCustomerDetailResponse } from "@shared/crm-customer-detail";
 import { objectPolicy, canShareWholeClientPortal } from "./object-access";
@@ -321,6 +323,8 @@ function presentEstimateItem(i: typeof crmEstimateItems.$inferSelect, ctx: OrgCo
     id: i.id, sortOrder: i.sortOrder, kind: i.kind, name: i.name,
     description: i.description, quantityMilli: i.quantityMilli, unit: i.unit,
     taxable: i.taxable, hiddenFromClient: i.hiddenFromClient,
+    pricebookItemId: i.pricebookItemId ?? null,
+    scopeCategory: i.scopeCategory ?? null,
   };
   return {
     ...base,
@@ -375,7 +379,7 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
     // Autosaved by the New estimate dialog and not finished yet (shared/estimate-draft.ts): the dialog offers to
     // continue it instead of starting a duplicate. Cleared when the user presses Create estimate.
     autosave: (e.customFields as any)?.autosave ? true : undefined,
-    // The dialog's own form state for a resumed draft (auto title on/off, ...): shared/estimate-draft.ts.
+    // The dialog's own form state for a resumed draft: auto title on/off, the contractor discount as typed.
     autosaveMeta: (e.customFields as any)?.autosave ? (e.customFields as any).autosave.meta ?? null : undefined,
     createdAt: e.createdAt, updatedAt: e.updatedAt,
   };
@@ -582,6 +586,10 @@ const itemSchema = z.object({
   taxable: z.boolean().default(true),
   hiddenFromClient: z.boolean().default(false),
   sortOrder: z.number().int().min(0).max(9999).optional(),
+  // The price-book item the line was picked from (usage memory, pricebook-usage.ts).
+  pricebookItemId: z.string().max(64).nullable().optional(),
+  // The line's scope category (bundle discounts): set on the line, else derived from the name.
+  scopeCategory: z.enum(SCOPE_CATEGORIES as unknown as [string, ...string[]]).nullable().optional(),
 });
 
 export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void {
@@ -1615,6 +1623,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       );
     }
     const fresh = await recalcEstimate(ctx.org.id, est.id);
+    // Price-book memory: once per estimate per item, plus the last price/scope billed (never fails the create).
+    await recordPricebookUsage(ctx.org.id, est.id, d.items);
     await logEvent(ctx.org.id, est.id, "created", ctx.member.id, req);
     // The org's "Add to all future estimates" files (never fails the create).
     await attachDefaultFilesToEstimate(ctx.org.id, est.id);
@@ -1864,6 +1874,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     }
 
     const fresh = await recalcEstimate(ctx.org.id, e.id);
+    if (items) await recordPricebookUsage(ctx.org.id, e.id, items);
     const changed = [
       ...Object.keys(patch).filter((k) => !["updatedAt", "depositBps", "defaultsSnapshotAt"].includes(k)),
       ...(items ? ["items"] : []),

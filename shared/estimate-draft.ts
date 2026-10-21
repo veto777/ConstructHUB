@@ -12,6 +12,7 @@
  *    failed server save, cleared once the estimate is created or the draft is discarded.
  */
 import { lineBases } from "./estimate-totals";
+import { orgDiscountRule } from "./scope-category";
 
 export const DEFAULT_ESTIMATE_TITLE = "Estimate";
 export const UNTITLED_LINE = "Untitled item";
@@ -32,10 +33,14 @@ export type DraftLine = {
   /** Kept as loaded when an existing estimate is edited in the dialog (the dialog has no control for them). */
   hiddenFromClient?: boolean;
   unitCostCents?: number | null;
+  /** Scope category for bundle discounts (shared/scope-category.ts); null/absent = from the name. */
+  scopeCategory?: string | null;
+  /** Which list price "Update price book" writes: the flat price or the per-sq-ft rate (client-side only). */
+  listField?: "flatPriceCents" | "rateCentsPerSqft" | null;
 };
 
 /** A preset / org-default discount the client may choose on the estimate page (crm_estimate_discounts). */
-export type DraftOffer = { code: string; label: string; percentBps: number; conditions: string | null; enabled: boolean };
+export type DraftOffer = { code: string; label: string; percentBps: number; conditions: string | null; enabled: boolean; rule?: unknown };
 
 /** The contractor's own discount on this estimate: a dollar amount or a percent of the subtotal. */
 export type ContractorDiscount = { mode: "amount" | "percent"; value: string; label: string };
@@ -129,9 +134,10 @@ export function autosavePayload(s: EstimateDraftSnapshot) {
     hiddenFromClient: !!l.hiddenFromClient,
     ...(typeof l.unitCostCents === "number" ? { unitCostCents: l.unitCostCents } : {}),
     pricebookItemId: l.pricebookItemId ?? null,
+    scopeCategory: l.scopeCategory ?? null,
   }));
   const disc = contractorDiscountLine(s.contractorDiscount, s.items);
-  const items = [...lines, ...(disc ? [{ ...disc, pricebookItemId: null }] : [])].map((l, idx) => ({ ...l, sortOrder: idx }));
+  const items = [...lines, ...(disc ? [{ ...disc, pricebookItemId: null, scopeCategory: null }] : [])].map((l, idx) => ({ ...l, sortOrder: idx }));
   return {
     title: (s.title.trim() || DEFAULT_ESTIMATE_TITLE).slice(0, TITLE_MAX),
     introText: s.intro.trim() ? s.intro : null,
@@ -146,6 +152,7 @@ export function autosavePayload(s: EstimateDraftSnapshot) {
 export const offersPayload = (offers: DraftOffer[] | undefined) =>
   (offers ?? []).map((o, idx) => ({
     code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null, enabled: o.enabled, sortOrder: idx,
+    rule: o.rule ?? null,
   }));
 
 /** The org's Bid discounts (Settings), else the presets with their default ticks. */
@@ -157,9 +164,11 @@ export function defaultOffers(
   if (Array.isArray(saved) && saved.length) {
     return saved
       .filter((o: any) => o && typeof o.code === "string" && typeof o.label === "string" && Number.isInteger(o.percentBps))
-      .map((o: any) => ({ code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null, enabled: o.enabled !== false }));
+      .map((o: any) => ({ code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null, enabled: o.enabled !== false,
+        rule: o.rule ?? orgDiscountRule(orgCustomFields, o.code) }));
   }
-  return presets.map((p) => ({ code: p.code, label: p.label, percentBps: p.percentBps, conditions: p.conditions, enabled: p.defaultEnabled }));
+  return presets.map((p) => ({ code: p.code, label: p.label, percentBps: p.percentBps, conditions: p.conditions, enabled: p.defaultEnabled,
+    rule: orgDiscountRule(orgCustomFields, p.code) }));
 }
 
 // ── localStorage mirror ─────────────────────────────────────────────────────
@@ -230,6 +239,7 @@ export function snapshotFromEstimate(
       kind: i.kind ?? "labor", name: i.name === UNTITLED_LINE ? "" : i.name ?? "", description: i.description ?? "",
       quantityMilli: i.quantityMilli ?? 1000, unit: i.unit ?? "", unitPriceCents: i.unitPriceCents ?? 0,
       taxable: i.taxable ?? true, pricebookItemId: i.pricebookItemId ?? null,
+      scopeCategory: i.scopeCategory ?? null,
       hiddenFromClient: !!i.hiddenFromClient,
       ...(typeof i.unitCostCents === "number" ? { unitCostCents: i.unitCostCents } : {}),
     })),
