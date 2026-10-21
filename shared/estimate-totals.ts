@@ -180,3 +180,37 @@ export function previewEstimatePage(
     noteTotalCents: scopes ? scopes.totalCents : document.totalCents,
   };
 }
+
+// ── One option shown as the document (public page option tabs) ─────────────
+
+/** An option line as crm_estimate_options.items stores it (estimate-options.ts optionLineSchema). */
+export type OptionDocLine = {
+  kind?: string; name?: string; description?: string | null; quantityMilli?: number; unit?: string | null;
+  unitPriceCents?: number; taxable?: boolean; hiddenFromClient?: boolean;
+};
+
+/**
+ * An option's lines as the public page's document shows them: the client-visible rows (hidden lines dropped,
+ * same shape as the estimate's own public items) and the totals at the estimate's tax rate with the estimate
+ * math (line discounts off the taxable base before tax); hidden lines still count, like the estimate's.
+ */
+export function optionDocument(optionId: string, lines: OptionDocLine[], taxRateBps: number) {
+  const norm = lines.map((i) => ({
+    kind: typeof i.kind === "string" ? i.kind : "labor",
+    unitPriceCents: i.unitPriceCents ?? 0,
+    quantityMilli: i.quantityMilli ?? 1000,
+    taxable: i.taxable !== false,
+  }));
+  const t = totalsFromBases(lineBases(norm), taxRateBps, []);
+  return {
+    items: lines.flatMap((i, idx) => i.hiddenFromClient ? [] : [{
+      id: `${optionId}:${idx}`, kind: norm[idx].kind, name: String(i.name ?? "Item"), description: i.description ?? null,
+      quantityMilli: norm[idx].quantityMilli, unit: i.unit ?? null, unitPriceCents: norm[idx].unitPriceCents,
+      lineTotalCents: Math.round((norm[idx].unitPriceCents * norm[idx].quantityMilli) / 1000),
+    }]),
+    subtotalCents: t.subtotalCents,
+    discountCents: t.lineDiscountCents,
+    taxCents: t.taxCents,
+    totalCents: t.totalCents,
+  };
+}

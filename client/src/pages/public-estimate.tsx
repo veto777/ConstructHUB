@@ -29,6 +29,41 @@ const money = (c?: number | null) =>
 const qty = (m: number) => (m / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 });
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null);
 
+/**
+ * A small round button bottom-right while the reader scrolls: "↑ Top" past the middle of the page or near the
+ * bottom, "↓ Bottom" otherwise. Fades out ~2 s after scrolling stops. `raised` lifts it clear of the fixed
+ * Approve bar.
+ */
+function ScrollJumpButton({ raised }: { raised: boolean }) {
+  const [shown, setShown] = useState(false);
+  const [toTop, setToTop] = useState(false);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onScroll = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      if (max < 200) return; // nothing worth jumping over
+      const y = window.scrollY;
+      setToTop(y > max / 2 || max - y < 200);
+      setShown(true);
+      clearTimeout(timer);
+      timer = setTimeout(() => setShown(false), 2000);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { window.removeEventListener("scroll", onScroll); clearTimeout(timer); };
+  }, []);
+  return (
+    <button type="button"
+      aria-label={toTop ? "Scroll to top" : "Scroll to bottom"} aria-hidden={!shown} tabIndex={shown ? 0 : -1}
+      onClick={() => window.scrollTo({ top: toTop ? 0 : document.documentElement.scrollHeight, behavior: "smooth" })}
+      className={`fixed right-4 z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg text-[11px] font-semibold leading-tight flex items-center justify-center text-center transition-opacity duration-300 print:hidden ${
+        shown ? "opacity-100" : "opacity-0 pointer-events-none"} ${
+        raised ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]" : "bottom-[calc(1.25rem+env(safe-area-inset-bottom))]"}`}
+      data-testid="button-scroll-jump" data-direction={toTop ? "top" : "bottom"}>
+      {toTop ? "↑ Top" : "↓ Bottom"}
+    </button>
+  );
+}
+
 /** "Have a question?" — lands in the contractor's Messages inbox, tagged
  *  with this estimate, and pings whoever is assigned to the job. */
 function AskQuestionCard({ token, repName }: { token: string; repName: string | null }) {
@@ -320,6 +355,8 @@ export default function PublicEstimatePage() {
   // estimate is regenerated with just the chosen scopes.
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [reviewing, setReviewing] = useState(false);
+  // Which option the document shows (display only — never what's ticked or approved). null = the estimate as written.
+  const [viewOptionId, setViewOptionId] = useState<string | null>(null);
 
   // A contractor preview grant rides in the page URL — forward it to the API.
   const previewGrant = new URLSearchParams(window.location.search).get("preview");
@@ -607,6 +644,23 @@ export default function PublicEstimatePage() {
     // "Customer can approve: Only one option" — picking one replaces the other (the server enforces it too).
     setSelectedOptions((cur) => (on ? (data?.optionApproval === "one" ? [id] : [...cur, id]) : cur.filter((x) => x !== id)));
 
+  // ── Option tabs (display only) ────────────────────────────────────────
+  // Option 1 (is_main) IS the estimate's own lines; any other option with lines can be shown as the document.
+  // Cancelled options never reach the payload. Approving/selecting is untouched — this is only what's shown.
+  const allOptions: any[] = (options ?? []).filter((o: any) => !o.cancelledAt);
+  const mainOption = allOptions.find((o) => o.isMain) ?? null;
+  const viewed = viewOptionId ? allOptions.find((o) => o.id === viewOptionId && !o.isMain && o.doc) ?? null : null;
+  const viewDoc = viewed?.doc ?? null;
+  const activeOptionId: string | null = viewed?.id ?? mainOption?.id ?? null;
+  const optionTabs = allOptions.length > 1 && allOptions.some((o) => !o.isMain && o.doc);
+  const viewOption = (o: any | null) => setViewOptionId(!o || o.isMain ? null : o.id);
+  const docItems: any[] = viewDoc ? viewDoc.items : items;
+  const docSubtotalCents = viewDoc ? viewDoc.subtotalCents : e.subtotalCents;
+  const docDiscountCents = viewDoc ? viewDoc.discountCents : e.discountCents;
+  const docTaxCents = viewDoc ? viewDoc.taxCents : shownTaxCents;
+  const docTotalCents = viewDoc ? viewDoc.totalCents : shownTotalCents;
+  const optionTabTotal = (o: any) => (o.isMain ? shownTotalCents : (o.doc?.totalCents ?? o.totalCents));
+
   // The org's company theme — black + their accent. Server-resolved in the
   // payload; re-points --primary for everything below this root.
   const themeStyle = orgThemeStyle(company?.theme);
@@ -658,7 +712,7 @@ export default function PublicEstimatePage() {
           <Card className="border-amber-500/50 bg-amber-500/5" data-testid="preview-banner">
             <CardContent className="p-4 text-sm text-center">
               <span className="font-medium">Contractor preview</span> — this is what your client
-              sees after verifying their email. Approving and paying are disabled here.
+              sees when they open the estimate link. Approving and paying are disabled here.
             </CardContent>
           </Card>
         )}
@@ -773,6 +827,19 @@ export default function PublicEstimatePage() {
                       {o.recommended && !reviewing && (
                         <div className="mt-2"><StatusPill tone="info" dot={false}>recommended</StatusPill></div>
                       )}
+                      {(o.doc || o.isMain) && (
+                        <button type="button" aria-pressed={activeOptionId === o.id}
+                          className="mt-2 block text-xs font-medium text-primary hover:underline"
+                          onClick={(ev) => {
+                            // Show this option's lines below — never toggles the checkbox.
+                            ev.preventDefault(); ev.stopPropagation();
+                            viewOption(activeOptionId === o.id ? null : o);
+                            document.getElementById("estimate-document")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}
+                          data-testid={`button-view-option-${o.id}`}>
+                          {activeOptionId === o.id ? "Viewing below" : "View"}
+                        </button>
+                      )}
                     </label>
                   );
                 })}
@@ -835,6 +902,61 @@ export default function PublicEstimatePage() {
               )}
             </CardContent>
           </Card>
+        ) : optionTabs ? (
+          <Card className="shadow-sm" data-testid="option-tabs-card">
+            <CardHeader>
+              <CardTitle className="text-lg">Choose your option</CardTitle>
+              <CardDescription>
+                {company.name} put together {allOptions.length} ways to do this. Tap one to see it below.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div role="tablist" aria-label="Estimate options" className="grid gap-3 sm:grid-cols-3"
+                onKeyDown={(ev) => {
+                  // Arrow keys move between tabs (WAI-ARIA tabs pattern).
+                  if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+                  const tabs = Array.from(ev.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]"));
+                  const i = tabs.indexOf(document.activeElement as HTMLButtonElement);
+                  if (i < 0) return;
+                  ev.preventDefault();
+                  const next = tabs[(i + (ev.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+                  next.focus(); next.click();
+                }}>
+                {!mainOption && (
+                  <button type="button" role="tab" aria-selected={activeOptionId === null} aria-controls="estimate-document"
+                    tabIndex={activeOptionId === null ? 0 : -1}
+                    onClick={() => viewOption(null)}
+                    className={`rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                      activeOptionId === null ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card hover:bg-accent/50"}`}
+                    data-testid="option-tab-estimate">
+                    <span className="font-medium">Estimate</span>
+                    <div className="text-xl font-semibold tabular-nums mt-3">{money(shownTotalCents)}</div>
+                  </button>
+                )}
+                {allOptions.map((o: any) => {
+                  const active = activeOptionId === o.id;
+                  const viewable = o.isMain || !!o.doc;
+                  return (
+                    <button key={o.id} type="button" role="tab" aria-selected={active} aria-controls="estimate-document"
+                      tabIndex={active ? 0 : -1} disabled={!viewable}
+                      onClick={() => viewOption(o)}
+                      className={`rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default ${
+                        active ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card hover:bg-accent/50"}`}
+                      data-testid={`option-${o.tier}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{o.name}</span>
+                        {o.recommended && <StatusPill tone="info" dot={false}>recommended</StatusPill>}
+                      </div>
+                      {o.description && <p className="text-xs text-muted-foreground mt-1.5">{o.description}</p>}
+                      {optionTabTotal(o) != null && (
+                        <div className="text-xl font-semibold tabular-nums mt-3" data-testid={`option-tab-total-${o.tier}`}>{money(optionTabTotal(o))}</div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         ) : options?.length > 1 && (
           <Card className="shadow-sm">
             <CardHeader>
@@ -865,7 +987,8 @@ export default function PublicEstimatePage() {
         {/* The document itself — a real letterhead: company on the left,
             document facts on the right, 'Prepared for' below, footer band
             at the bottom. */}
-        <Card className="shadow-md overflow-hidden" data-testid="estimate-document">
+        <Card id="estimate-document" role={optionTabs ? "tabpanel" : undefined} className="shadow-md overflow-hidden scroll-mt-4"
+          data-testid="estimate-document" data-viewing-option={viewed?.id ?? activeOptionId ?? undefined}>
           {/* Letterhead accent line — the org's exact theme hex (inline, so
               no hsl round-trip drift). */}
           <div className="h-1.5" style={company?.theme ? { backgroundColor: company.theme.hex } : undefined}
@@ -923,7 +1046,7 @@ export default function PublicEstimatePage() {
                 </div>
                 <div className="pt-1">
                   <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total</div>
-                  <div className="text-2xl font-bold tabular-nums" data-testid="doc-total">{money(shownTotalCents)}</div>
+                  <div className="text-2xl font-bold tabular-nums" data-testid="doc-total">{money(docTotalCents)}</div>
                 </div>
               </div>
             </div>
@@ -954,6 +1077,12 @@ export default function PublicEstimatePage() {
               </span>
             )}
             <CardTitle className="text-xl">{e.title}</CardTitle>
+            {viewed && (
+              <span className="inline-flex items-center rounded-md bg-primary/10 text-primary text-sm font-medium px-2.5 py-1"
+                data-testid="doc-viewing-option">
+                Showing {viewed.name}
+              </span>
+            )}
             {e.introText && <p className="whitespace-pre-wrap text-sm leading-relaxed">{e.introText}</p>}
 
             {/* Line items. Below sm each row stacks: name, "qty × price",
@@ -970,7 +1099,7 @@ export default function PublicEstimatePage() {
                   </tr>
                 </thead>
                 <tbody className="block sm:table-row-group">
-                  {items.map((i: any) => (
+                  {docItems.map((i: any) => (
                     <tr key={i.id} className="block sm:table-row border-t px-4 py-3 sm:p-0">
                       <td className="block sm:table-cell sm:px-4 sm:py-3">
                         <div className="font-medium">{i.name}</div>
@@ -996,36 +1125,36 @@ export default function PublicEstimatePage() {
               <div className="w-full max-w-xs text-sm space-y-1.5">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium tabular-nums">{money(e.subtotalCents)}</span>
+                  <span className="font-medium tabular-nums" data-testid="doc-subtotal">{money(docSubtotalCents)}</span>
                 </div>
-                {e.discountCents > 0 && (
+                {docDiscountCents > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Discount</span>
-                    <span className="font-medium tabular-nums">−{money(e.discountCents)}</span>
+                    <span className="font-medium tabular-nums">−{money(docDiscountCents)}</span>
                   </div>
                 )}
-                {previewing && (
+                {previewing && !viewDoc && (
                   <div className="flex justify-between" data-testid="row-optional-discount">
                     <span className="text-muted-foreground">Optional discounts</span>
                     <span className="font-medium tabular-nums">−{money(optDiscountCents)}</span>
                   </div>
                 )}
-                {appliedDiscounts.length > 0 && (
+                {appliedDiscounts.length > 0 && !viewDoc && (
                   <div className="flex justify-between" data-testid="row-applied-discounts">
                     <span className="text-muted-foreground">Optional discounts</span>
                     <span className="font-medium text-right">{appliedDiscounts.map((d) => d.label).join(", ")}</span>
                   </div>
                 )}
-                {shownTaxCents > 0 && (
+                {docTaxCents > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Tax</span>
-                    <span className="font-medium tabular-nums">{money(shownTaxCents)}</span>
+                    <span className="font-medium tabular-nums">{money(docTaxCents)}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t pt-2 text-lg font-bold">
-                  Total <span className="tabular-nums">{money(shownTotalCents)}</span>
+                  Total <span className="tabular-nums" data-testid="doc-grand-total">{money(docTotalCents)}</span>
                 </div>
-                {shownDepositCents ? (
+                {shownDepositCents && !viewDoc ? (
                   <div className="flex justify-between text-muted-foreground">
                     <span>Deposit due</span>
                     <span className="font-medium tabular-nums" data-testid="text-deposit-due">{money(shownDepositCents)}</span>
@@ -1299,6 +1428,9 @@ export default function PublicEstimatePage() {
           Private document — it opens only after verifying the email address it was sent to.
         </p>
       </div>
+
+      {/* Floating ↑ Top / ↓ Bottom while scrolling — above the Approve bar when it's showing. */}
+      <ScrollJumpButton raised={canRespond} />
 
       {/* Sticky bottom Approve bar — always one tap away, HCP-style. Scrolls
           to the signature card, which is the real (typed-name) approval. */}

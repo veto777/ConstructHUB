@@ -49,7 +49,7 @@ import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDi
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { computeApprovalTotals, recomputeApprovalTotals, resolveSelectedOffers, offersForLines } from "./discounts";
 import { bundleRuleOf, bundleRuleText, orgDiscountRule } from "@shared/scope-category";
-import { lineBases } from "@shared/estimate-totals";
+import { lineBases, optionDocument } from "@shared/estimate-totals";
 import { storeGeneratedPdf } from "./attachments";
 import { onlinePaymentRails } from "./payments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
@@ -772,6 +772,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
           subtotalCents: scopeItems.length ? bases.subtotalCents : undefined,
           lineDiscountCents: scopeItems.length ? bases.lineDiscountCents : undefined,
           taxableCents: scopeItems.length ? bases.taxableCents : undefined,
+          // The page's option tabs: Option 1 (is_main) IS the estimate's own lines; any other option with lines
+          // can be shown as the document (visible lines + totals). Display only; approving/selecting is unchanged.
+          isMain: !!(o as any).isMain,
+          doc: scopeItems.length ? optionDocument(o.id, scopeItems, est.taxRateBps ?? 0) : undefined,
         };
       }),
       // A selection-generated estimate pre-ticks the discounts the client

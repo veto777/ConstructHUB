@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  amountDueCents, computeApprovalTotals, lineBases, previewEstimatePage, sumLineBases, totalsFromBases,
+  amountDueCents, computeApprovalTotals, lineBases, optionDocument, previewEstimatePage, sumLineBases, totalsFromBases,
 } from "@shared/estimate-totals";
 
 const line = (unitPriceCents: number, over: Partial<any> = {}) => ({
@@ -134,5 +134,22 @@ describe("amountDueCents — deposit vs the signed total", () => {
   it.each(cases)("$name", (c) => {
     const depositCents = c.depositPct == null ? null : Math.round((quoted * c.depositPct) / 100);
     expect(amountDueCents({ depositCents, approvedTotalCents: c.approved, totalCents: quoted })).toBe(c.due);
+  });
+});
+
+describe("optionDocument — an option tab shown as the document", () => {
+  it("lists the visible lines and totals them like the estimate (line discount before tax)", () => {
+    const d = optionDocument("opt", [
+      { kind: "labor", name: "Siding", quantityMilli: 2000, unitPriceCents: 500_00, description: "Scope text" },
+      { kind: "material", name: "Internal", unitPriceCents: 100_00, hiddenFromClient: true },
+      { kind: "discount", name: "Promo", unitPriceCents: 100_00 },
+      { kind: "labor", name: "Untaxed", unitPriceCents: 50_00, taxable: false },
+    ], 1000);
+    expect(d.items.map((i) => i.name)).toEqual(["Siding", "Promo", "Untaxed"]);
+    expect(d.items[0]).toMatchObject({ id: "opt:0", lineTotalCents: 1000_00, description: "Scope text" });
+    expect(d.subtotalCents).toBe(1150_00); // the hidden line still counts
+    expect(d.discountCents).toBe(100_00);
+    expect(d.taxCents).toBe(100_00); // 10% of (1100 taxable - 100 discount)
+    expect(d.totalCents).toBe(1150_00);
   });
 });
