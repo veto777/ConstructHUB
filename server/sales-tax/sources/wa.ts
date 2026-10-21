@@ -49,7 +49,8 @@ export function parseWaCsv(csv: string, effectiveDate: string): SalesTaxRow[] {
     const ratePct = toPct(clean(r[iCombined] ?? ""), true);
     if (!name || !Number.isFinite(ratePct)) continue;
     const county = clean(r[iCounty] ?? "") || null;
-    const unincorporated = /County Unincorp\. Areas$/i.test(name);
+    // "Lummi Nation - Whatcom County Unincorp. Areas" is a tribal area code, not the county's own remainder.
+    const unincorporated = /County Unincorp\. Areas$/i.test(name) && !/ - /.test(name);
     const special = !unincorporated && (/ - /.test(name) || /PTBA|Unincorp/i.test(name));
     out.push({
       state: "WA",

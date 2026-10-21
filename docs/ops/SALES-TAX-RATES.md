@@ -69,14 +69,80 @@ has no combined rate, the state is not loaded and the dialog falls back to the d
 line. Per-state sources and coverage are listed in `server/sales-tax/sources/*.ts` (header comment of each adapter)
 and in the coverage table below.
 
-### Coverage
+### Coverage (loaded 2026-10-21)
 
-| state | source | file | notes |
-|---|---|---|---|
-| WA | WA DOR | `lsu-quarterly-tax-rates.csv`, linked from the Local sales & use tax rate table page | Every location code: 297 cities and towns, every county's unincorporated area, PTBA and tribal-area codes. The quarter is read from the page ("Quarter 4 - Effective October 1 through December 31, 2026"). |
+| state | source | file / page | effective (period) | rows |
+|---|---|---|---|---|
+| AR | SST AR rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/ARR2026Q4AUG28.csv | 2026-10-01 (Q4 2026) | 597 |
+| CA | CA CDTFA | https://www.cdtfa.ca.gov/taxes-and-fees/SalesTaxRates10-1-26.xlsx | 2026-10-01 (Oct 2026) | 541 |
+| CT | CT DRS | https://portal.ct.gov/drs/sales-tax/tax-information | 2026-09-25 (per DRS page of 2026-09-25) | 1 |
+| DE | DE Division of Revenue | https://revenue.delaware.gov/business-tax-forms/exemption-certificates/ | 2018-08-22 (per agency page of 2018-08-22) | 1 |
+| FL | FL DOR | https://pointmatch.floridarevenue.com/General/DiscretionarySalesSurtaxRates.aspx | 2026-10-21 (as of 2026-10-21) | 67 |
+| GA | SST GA rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/GAR2026Q4OCT01.csv | 2026-10-01 (Q4 2026) | 166 |
+| HI | HI Dept. of Taxation | https://tax.hawaii.gov/geninfo/countysurcharge/ | 2024-01-01 (effective 2024-01-01) | 4 |
+| IA | SST IA rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/IAR2025Q3MAY30.zip | 2026-10-01 (Q4 2026) | 518 |
+| IL | IL DOR | https://tax.illinois.gov/content/dam/soi/en/web/tax/research/taxrates/documents/salestaxrates/ordmache-current.txt | 2026-08-01 (Aug 2026) | 1958 |
+| IN | SST IN rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/INR2008Q4MAY7.csv | 2026-10-01 (Q4 2026) | 1 |
+| KS | SST KS rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/KSR2026Q4AUG19.zip | 2026-10-01 (Q4 2026) | 855 |
+| KY | SST KY rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/KYR2012Q4Aug13.csv | 2026-10-01 (Q4 2026) | 1 |
+| MA | MA DOR | https://www.mass.gov/guides/sales-and-use-tax | 2026-05-07 (per DOR guide of 2026-05-07) | 1 |
+| ME | Maine Revenue Services | https://www.maine.gov/revenue/taxes/sales-use-service-provider-tax/rates-due-dates | 2026-01-01 (effective 2026-01-01) | 1 |
+| MI | SST MI rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/MIR2023Q1DEC22.csv | 2026-10-01 (Q4 2026) | 1 |
+| MN | SST MN rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/MNR2026Q4AUG18.zip | 2026-10-01 (Q4 2026) | 154 |
+| MO | MO DOR | https://dor.mo.gov/pdf/rates/2026/october2026.xlsx | 2026-10-01 (Q4 2026) | 2597 |
+| MT | MT Department of Revenue | https://revenue.mt.gov/taxes/general-sales-tax | 2026-06-03 (per agency page of 2026-06-03) | 1 |
+| NC | SST NC rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/NCR2026Q3APR23.csv | 2026-10-01 (Q4 2026) | 101 |
+| ND | SST ND rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/NDR2026Q4AUG14.zip | 2026-10-01 (Q4 2026) | 418 |
+| NE | SST NE rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/NER2026Q4AUG21.zip | 2026-10-01 (Q4 2026) | 272 |
+| NJ | SST NJ rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/NJR2018Q1OCT16.zip | 2026-10-01 (Q4 2026) | 1 |
+| NM | NM TRD | https://klvg4oyd4j.execute-api.us-west-2.amazonaws.com/prod/PublicFiles/34821a9573ca43e7b06dfad20f5183fd/43c5ec78-eeed-4153-997a-1d8c921b276c/Rate%20Schedule%20July1,2026%20-%20June%2030,%202027.xlsx | 2026-07-01 (Jul 2026–Jun 2027) | 286 |
+| NV | SST NV rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/NVR2025Q4NOV05.zip | 2026-10-01 (Q4 2026) | 24 |
+| OH | SST OH rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/OHR2026Q4SEP17.csv | 2026-10-01 (Q4 2026) | 93 |
+| OK | SST OK rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/OKR2026Q4AUG17.zip | 2026-10-01 (Q4 2026) | 720 |
+| OR | OR Department of Revenue | https://www.oregon.gov/dor/programs/businesses/pages/sales-tax.aspx | 2025-09-05 (per agency page of 2025-09-05) | 1 |
+| PA | PA DOR | https://www.pa.gov/agencies/revenue/resources/tax-types-and-information/sales-use-and-hotel-occupancy-tax | 2026-08-12 (per DOR page of 2026-08-12) | 3 |
+| RI | SST RI rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/RIR2019Q2MAR27.csv | 2026-10-01 (Q4 2026) | 1 |
+| SD | SST SD rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/SDR2026Q3JUN02.zip | 2026-10-01 (Q4 2026) | 398 |
+| TN | SST TN rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/TNR2026Q4AUG21.csv | 2026-10-01 (Q4 2026) | 480 |
+| TX | TX Comptroller | https://comptroller.texas.gov/taxes/sales/docs/city-rates.xlsx | 2026-10-01 (Q4 2026) | 2996 |
+| UT | SST UT rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/UTR2026Q4AUG11.csv | 2026-10-01 (Q4 2026) | 196 |
+| VA | Virginia Tax | https://www.tax.virginia.gov/sites/default/files/inline-files/sales-and-use-tax-rates-by-locality-by-date.xlsx | 2026-01-01 (Jan 2026 – present) | 133 |
+| VT | SST VT rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/VTR2026Q4AUG20.zip | 2026-10-01 (Q4 2026) | 38 |
+| WA | WA DOR | https://dor.wa.gov/taxes-rates/sales-use-tax-rates/lsu-quarterly-tax-rates.csv | 2026-10-01 (Q4 2026) | 403 |
+| WI | SST WI rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/WIR2026Q4AUG17.csv | 2026-10-01 (Q4 2026) | 1995 |
+| WV | SST WV rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/WVR2026Q3FEB25.csv | 2026-10-01 (Q4 2026) | 102 |
+| WY | SST WY rate/boundary files | https://www.streamlinedsalestax.org/ratesandboundry/Rates/WYR2026Q4AUG20.CSV | 2026-10-01 (Q4 2026) | 25 |
 
-States that are not listed have no table loaded yet. Their estimates use the treatment line plus the division/org
-default.
+Notes:
+- WA covers every DOR location code: cities, each county's unincorporated area, and PTBA/tribal codes. For a WA street
+  address, the WA DOR address lookup gives the exact code (see Resolution order).
+- SST states use the Streamlined Sales Tax rate and boundary files that each member state publishes
+  (streamlinedsalestax.org/ratesandboundry), with place names from the U.S. Census reference files. IA, OH, NC, GA and
+  NV publish no city codes there, so they load as county rows plus districts. Some flat-rate members (IN, KY, MI, NJ, RI)
+  are a single statewide row.
+- PA, CT, MA, DE, MT and OR: the agency page states the rate but no start date. The date used is the page's own
+  "updated" date, which is a date the rate was in force, not when it began. FL: the DOR surtax table's "current as of"
+  date. HI: the county surcharge's effective date.
+- A city with several published rates (multi-county cities, special districts: Kansas City MO, Wichita KS) is narrowed by
+  ZIP or county when the address has them. Otherwise the line says "rate varies within <city>; check the address".
+
+**Not covered: no official machine-readable file.** Estimates there fall back to the division/org default, and the
+line says "City rate not loaded yet for <ST>".
+
+| state | why |
+|---|---|
+| AL | ALDOR's CSV lists each city/county tax separately with no combined rate; combining them would mean judging overlaps (police jurisdictions, "except 4 cities") ourselves. |
+| AZ | ADOR publishes rate tables only as monthly PDFs with no combined city rate; the lookup is behind a bot check. |
+| CO | The DR 1002 / jurisdiction XLSX exists but tax.colorado.gov blocks automated downloads (Cloudflare); the rates API needs registration. |
+| LA | The only downloadable file (Remote Sellers Commission) is dated 7/1/2025 and out of date; current rates exist only in lookup tools. |
+| NY | Publication 718 is a PDF with fractional rates; data.ny.gov has no rate dataset. |
+| MD | The Comptroller's rate page is a login-backed portal; MD has one statewide 6% rate (not loaded without a machine-readable source). |
+| SC | Local rates are PDFs only (ST-575, ST-500). |
+| MS | Local taxes are narrative legislative entries, not a table. |
+| ID | The Tax Commission lists resort-city taxes without rates. |
+| DC | OTR states 6% but no effective or updated date anywhere. |
+| NH | No general sales tax; nh.gov refuses automated requests, so the statement can't be checked by the refresh. Treatment table makes NH 0% anyway. |
+| AK | No state sales tax. Local rates are published by the Alaska Remote Seller Sales Tax Commission (municipalities, not a state DOR), so they are not loaded (`sources/ak.ts` exists, unregistered). The treatment table makes AK jobs 0%. |
 
 ## Construction treatment (`shared/construction-tax-treatment.ts`)
 

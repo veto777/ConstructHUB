@@ -125,6 +125,30 @@ describe("bundled server/data/sales-tax-rates.json", () => {
     expect(wa.rows.find((r) => r.city === "Ferndale")).toBeTruthy();
   });
 
+  it("phase 2: every state with an official file is loaded, with agency-checked spot values", () => {
+    const states = file.states.map((s) => s.state).sort();
+    for (const st of ["AR", "CA", "CT", "DE", "FL", "GA", "HI", "IA", "IL", "IN", "KS", "KY", "MA", "ME", "MI", "MN", "MO", "MT",
+      "NC", "ND", "NE", "NJ", "NM", "NV", "OH", "OK", "OR", "PA", "RI", "SD", "TN", "TX", "UT", "VA", "VT", "WA", "WI", "WV", "WY"]) {
+      expect(states).toContain(st);
+    }
+    // No official machine-readable file (docs/ops/SALES-TAX-RATES.md): never loaded, never guessed.
+    for (const st of ["AL", "AZ", "CO", "LA", "NY", "MD", "SC", "MS", "ID", "DC", "NH", "AK"]) expect(states).not.toContain(st);
+    const rate = (st: string, city: string, county?: string) => unpackResult(file.states.find((s) => s.state === st)!).rows
+      .find((r) => r.kind === "city" && r.city?.toLowerCase() === city.toLowerCase() && (!county || r.county === county))?.ratePct;
+    expect(rate("CA", "Los Angeles")).toBe(10.25);
+    expect(rate("TX", "Austin", "Travis")).toBe(8.25);
+    expect(rate("IL", "Chicago", "Cook")).toBe(10.5);
+    expect(rate("NM", "Albuquerque")).toBe(7.625);
+    expect(rate("UT", "Salt Lake City")).toBe(8.45);
+    expect(rate("MN", "Minneapolis")).toBe(9.025);
+    expect(rate("MO", "Kansas City", "Jackson")).toBe(8.975);
+    for (const s of file.states) for (const r of s.rows) {
+      expect(r[5]).toBeGreaterThanOrEqual(0);
+      expect(r[5]).toBeLessThan(15);
+      expect(["city", "unincorporated", "county", "state", "special"]).toContain(r[4]);
+    }
+  });
+
   it("every state entry is well-formed and round-trips", () => {
     for (const s of file.states) {
       expect(s.state).toMatch(/^[A-Z]{2}$/);

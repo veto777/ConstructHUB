@@ -154,6 +154,13 @@ describe.skipIf(!lane)("estimate tax from the job-site address (lane Postgres)",
     }
   });
 
+  it("phase-2 tables: a city in another state, and Hawaii's one county rate for any town", async () => {
+    const { lookupOfficialRate } = await import("../sales-tax/store");
+    expect((await lookupOfficialRate(pool, { state: "CA", city: "Los Angeles" })).match).toMatchObject({ ratePct: 10.25, source: expect.any(String) });
+    expect((await lookupOfficialRate(pool, { state: "HI", city: "Hilo" })).match).toMatchObject({ ratePct: 4.5, kind: "state" });
+    expect(await lookupOfficialRate(pool, { state: "CO", city: "Denver" })).toEqual({ loaded: false, match: null });
+  });
+
   it("another org's client is not found; customerId is required", async () => {
     const id = await client({ addressLine1: "7 Holly", city: "Bellingham", state: "WA" });
     expect((await call("/api/crm/me", undefined, "GET", otherUserId)).status).toBe(200);

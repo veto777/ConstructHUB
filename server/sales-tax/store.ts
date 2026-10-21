@@ -231,5 +231,11 @@ export async function lookupOfficialRate(
   // One statewide rate (no local sales taxes): every address in the state gets it.
   const statewide = (await pool.query(`${SELECT_ROW} WHERE state = $1 AND kind = 'state' LIMIT 1`, [state])).rows as RateRowDb[];
   if (statewide[0]) return { loaded: true, match: toOfficial(statewide[0], false) };
+  // A county-only table whose counties all share one rate (Hawaii: 4.5% GET everywhere) places any address.
+  const rates = (await pool.query(`SELECT DISTINCT rate_bps FROM sales_tax_rates WHERE state = $1`, [state])).rows;
+  if (rates.length === 1) {
+    const one = (await pool.query(`${SELECT_ROW} WHERE state = $1 LIMIT 1`, [state])).rows as RateRowDb[];
+    if (one[0]) return { loaded: true, match: { ...toOfficial(one[0], false), city: null, county: null, kind: "state" } };
+  }
   return { loaded: true, match: null };
 }
