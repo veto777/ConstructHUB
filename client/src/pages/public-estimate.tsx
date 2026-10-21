@@ -604,7 +604,8 @@ export default function PublicEstimatePage() {
   const selTotalCents = sel?.totalCents ?? 0;
   const scopePriceCents = (o: any) => (o.subtotalCents ?? 0) - (o.lineDiscountCents ?? 0);
   const toggleOption = (id: string, on: boolean) =>
-    setSelectedOptions((cur) => (on ? [...cur, id] : cur.filter((x) => x !== id)));
+    // "Customer can approve: Only one option" — picking one replaces the other (the server enforces it too).
+    setSelectedOptions((cur) => (on ? (data?.optionApproval === "one" ? [id] : [...cur, id]) : cur.filter((x) => x !== id)));
 
   // The org's company theme — black + their accent. Server-resolved in the
   // payload; re-points --primary for everything below this root.
@@ -721,7 +722,9 @@ export default function PublicEstimatePage() {
               <CardDescription>
                 {reviewing
                   ? "Check your selection — anything struck through is left out of your new estimate."
-                  : `${company.name} put together ${selectable.length} scopes for this job. Tick the ones you want — the total updates as you go.`}
+                  : data?.optionApproval === "one"
+                    ? `${company.name} put together ${selectable.length} options for this job. Choose one — the total updates as you go.`
+                    : `${company.name} put together ${selectable.length} scopes for this job. Tick the ones you want — the total updates as you go.`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">

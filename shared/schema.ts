@@ -2581,6 +2581,10 @@ export const crmEstimateOptions = pgTable("crm_estimate_options", {
   // stays a display-only tier card.
   items: jsonb("items"),
   selectedAt: timestamp("selected_at"),
+  // Option 1 of a tabbed estimate (its lines are also the estimate's own lines) — server/crm/estimate-options.ts.
+  isMain: boolean("is_main").notNull().default(false),
+  // "Cancel option": kept, hidden from the client, struck through for the team.
+  cancelledAt: timestamp("cancelled_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

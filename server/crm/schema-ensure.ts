@@ -5,6 +5,7 @@ import { JOBCAM_DDL } from "../jobcam/schema";
 import { LEADS_DDL } from "./leads-schema";
 import { SALES_TAX_DDL } from "../sales-tax/schema";
 import { PRICEBOOK_USAGE_DDL } from "./pricebook-usage";
+import { ESTIMATE_OPTIONS_DDL } from "./estimate-options-schema";
 
 // Idempotent schema setup for the CRM tenancy layer. Run on boot instead of
 // db:push (the live DB has pre-existing drift that trips drizzle-kit). Every
@@ -957,6 +958,9 @@ export async function ensureCrmSchema(): Promise<void> {
 
   // Price-book memory: which item a line came from, use counts and last-billed prices (pricebook-usage.ts).
   for (const stmt of PRICEBOOK_USAGE_DDL) await pool.query(stmt);
+
+  // Estimate options as tabs (Option 1, cancel option) and estimate templates (estimate-options.ts).
+  for (const stmt of ESTIMATE_OPTIONS_DDL) await pool.query(stmt);
 
   // Schema backstop for document numbers: UNIQUE (org_id, number) on every
   // numbered table. Guarded — an existing index is left alone, and a table

@@ -379,6 +379,8 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
     // Autosaved by the New estimate dialog and not finished yet (shared/estimate-draft.ts): the dialog offers to
     // continue it instead of starting a duplicate. Cleared when the user presses Create estimate.
     autosave: (e.customFields as any)?.autosave ? true : undefined,
+    // Customer can approve: only one option, or any (estimate-options.ts).
+    optionApproval: (e.customFields as any)?.optionApproval === "one" ? "one" : "any",
     // The dialog's own form state for a resumed draft: auto title on/off, the contractor discount as typed.
     autosaveMeta: (e.customFields as any)?.autosave ? (e.customFields as any).autosave.meta ?? null : undefined,
     createdAt: e.createdAt, updatedAt: e.updatedAt,

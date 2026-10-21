@@ -361,6 +361,16 @@ const ROUTES: RouteRow[] = [
   // HOVER takeoff (measurements only, no money) follows the record like the 3D lists.
   // Discard in the New estimate dialog: only its own unfinished autosaved draft (a fixture estimate is 409, never deleted).
   R("DELETE", "/api/crm/estimates/:id/autosave", "manageEstimates", { path: (t) => `/api/crm/estimates/${t.estimate}/autosave`, scoped: true }),
+  // Options as tabs, copies and templates (estimate-options.ts): estimate edits, so manageEstimates.
+  R("PUT", "/api/crm/estimates/:id/option-set", "manageEstimates", { path: (t) => `/api/crm/estimates/${t.estimate}/option-set`, body: { options: "x" }, scoped: true }),
+  R("PATCH", "/api/crm/estimates/:id/options/:optionId", "manageEstimates", { path: (t) => `/api/crm/estimates/${t.estimate}/options/${none}`, body: { name: 5 }, scoped: true }),
+  R("POST", "/api/crm/estimates/:id/options/:optionId/duplicate", "manageEstimates", { path: (t) => `/api/crm/estimates/${t.estimate}/options/${none}/duplicate`, scoped: true }),
+  R("POST", "/api/crm/estimates/:id/options/:optionId/copy-to-estimate", "manageEstimates", { path: (t) => `/api/crm/estimates/${t.estimate}/options/${none}/copy-to-estimate`, scoped: true }),
+  R("POST", "/api/crm/estimates/:id/duplicate", "manageEstimates", { path: (t) => `/api/crm/estimates/${t.estimate}/duplicate`, effect: true, scoped: true }),
+  R("PUT", "/api/crm/estimates/:id/option-approval", "manageEstimates", { path: (t) => `/api/crm/estimates/${t.estimate}/option-approval`, body: { mode: "x" }, scoped: true }),
+  R("GET", "/api/crm/estimate-templates", "manageEstimates"),
+  R("POST", "/api/crm/estimate-templates", "manageEstimates", { body: { name: 1 } }),
+  R("DELETE", "/api/crm/estimate-templates/:id", "manageEstimates", { path: () => `/api/crm/estimate-templates/${none}` }),
   // The New estimate dialog's Tax % pre-fill (server/crm/tax.ts): the seat that may create the estimate.
   R("GET", "/api/crm/tax/estimate-rate", "manageEstimates", { path: (t) => `/api/crm/tax/estimate-rate?customerId=${t.customer}` }),
   R("GET", "/api/crm/customers/:id/takeoff", null, { path: (t) => `/api/crm/customers/${t.customer}/takeoff`, scoped: true }),

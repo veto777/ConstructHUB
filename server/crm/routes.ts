@@ -30,6 +30,7 @@ import { registerCrmPortalRoutes, registerCrmInvoicePortalRoutes } from "./porta
 import { registerCrmPaymentRoutes } from "./payments";
 import { registerCrmReconcileRoutes, startReconcileWorker } from "./payment-reconcile";
 import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
+import { registerEstimateOptionRoutes } from "./estimate-options";
 import { registerCrmIntegrationRoutes } from "./integrations";
 import { registerCrmLeadCaptureRoutes } from "./lead-capture";
 import { registerCrmLeadRoutes } from "./leads";
@@ -414,6 +415,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmReconcileRoutes(app, getDevUser);
   startReconcileWorker();
   registerCrmOpsRoutes(app, getDevUser);
+  registerEstimateOptionRoutes(app, getDevUser);
   registerCrmPhaseRoutes(app, getDevUser);
   registerCrmIntegrationRoutes(app);
   // Lead capture: embeddable website form -> crm_customers + owner email.

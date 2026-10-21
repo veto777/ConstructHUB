@@ -1,3 +1,12 @@
+## 🧾 2026-10-21 — the New-estimate popup is the estimate editor (autosave, options, templates, discounts)
+- Never loses work: autosaved as a draft (customFields.autosave), mirrored to localStorage, refresh restores,
+  outside click/Esc blocked (shared/estimate-draft.ts, components/estimate-autosave.tsx). Drafts open in the popup.
+- Title follows the lines until typed (autoTitle flag in customFields.autosave.meta).
+- Price-book memory: crm_pricebook_usage (once per estimate per item, last price/scope), picker sorted by use.
+- Discounts section; Alpine's tiered bundle via crm_orgs.custom_fields.discountRules.bundle (shared/scope-category.ts).
+- Options as tabs (crm_estimate_options.is_main / cancelled_at), duplicate / copy to estimate or client, templates
+  (crm_estimate_templates), "Customer can approve: one / any" enforced in select-options (server/crm/estimate-options.ts).
+
 ## 🧾 2026-10-21 — estimate sales tax from the job-site address (official rates + construction treatment)
 - The New estimate dialog pre-fills **Tax %** from the client's (or project's) address and says where the rate came
   from ("Bellingham, WA · 9.2% (WA DOR, Q4 2026)"). FL-style states pre-fill 0, because contractors don't charge sales

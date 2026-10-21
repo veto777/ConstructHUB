@@ -855,7 +855,9 @@ export default function CrmEstimateDetailPage() {
       <EstimateAttachmentsCard estimateId={e.id} />
 
       {/* HOVER 3D model for this estimate's client (renders nothing without a HOVER capture). */}
-      {!editing && id && <HoverTakeoffCard estimateId={id} />}
+      {/* Options (tabs in the estimate popup — estimate-options.ts): listed here, edited in the popup. */}
+      {id && e && <EstimateOptionsSummary estimateId={id} customerId={e.customerId} locked={locked} showMoney={showMoney} />}
+            {!editing && id && <HoverTakeoffCard estimateId={id} />}
       {id && <Hover3DCard estimateId={id} />}
 
       {/* Events trail — created/sent/viewed/updated, newest first. */}
@@ -902,5 +904,35 @@ export default function CrmEstimateDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
     </CrmPage>
+  );
+}
+
+
+/** The estimate's options as the popup's tabs show them; cancelled ones struck through (hidden from the client). */
+function EstimateOptionsSummary({ estimateId, customerId, locked, showMoney }: { estimateId: string; customerId: string; locked: boolean; showMoney: boolean }) {
+  const { data } = useQuery<any[]>({ queryKey: [`/api/crm/estimates/${estimateId}/options`] });
+  const tabbed = (data ?? []).filter((o) => o.isMain || (Array.isArray(o.items) && o.items.length));
+  if (tabbed.length < 2) return null;
+  return (
+    <Card data-testid="card-estimate-options">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="font-medium">Options</div>
+          {!locked && (
+            <Link href={`/crm/clients/${customerId}?openEstimate=${estimateId}`}>
+              <Button size="sm" variant="outline" data-testid="link-edit-options-popup">Edit options</Button>
+            </Link>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-wrap gap-2">
+        {tabbed.map((o) => (
+          <span key={o.id} className={cn("rounded-md border px-2.5 py-1 text-sm", o.cancelledAt && "line-through opacity-60")}
+            title={o.cancelledAt ? "Cancelled — hidden from the client" : undefined}>
+            {o.name}{showMoney && o.totalCents != null ? ` · ${money(o.totalCents)}` : ""}
+          </span>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ClientSection, ClientSections, useClientPageLayout } from "@/components/client-page-layout";
 import { PricebookItemInput } from "@/components/pricebook-item-input";
 import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff";
@@ -54,6 +54,10 @@ import { AppointmentForm, type Appointment } from "@/components/crm-appointment-
 import { InfoTip } from "@/components/info-tip";
 import { useEstimateTaxRate, TaxRateNote, bpsToPctText } from "@/components/estimate-tax-rate";
 import { useEstimateAutosave, AutosaveIndicator, useDialogFullscreen, FullscreenToggle } from "@/components/estimate-autosave";
+import {
+  OptionTabsBar, EstimateMenu, TemplatesMenu, NameDialog, ClientPickerDialog, ConfirmDeleteOption,
+  type OptionAction, type EstimateAction, type EstimateTemplate,
+} from "@/components/estimate-option-tabs";
 import {
   autoTitleFrom, autosavePayload, contractorDiscountLine, defaultOffers, draftHasContent, offersPayload, snapshotFromEstimate,
   type ContractorDiscount, type DraftOffer, type EstimateDraftSnapshot,
@@ -943,6 +947,30 @@ export default function CrmClientPage() {
   // a tiered bundle included) and the contractor's own discount, which is a kind:"discount" line.
   const [offers, setOffers] = useState<DraftOffer[] | null>(null);
   const [contractorDiscount, setContractorDiscount] = useState<ContractorDiscount | null>(null);
+  // Options as tabs (estimate-options.ts): tab 0 is Option 1 = the estimate's own lines (items / contractorDiscount);
+  // further tabs are options with their own lines and discount. Saved together via PUT …/option-set.
+  type ExtraTab = { key: string; id: string | null; name: string; items: Item[]; cancelled: boolean; discount: ContractorDiscount | null };
+  const [tab0, setTab0] = useState<{ id: string | null; name: string; cancelled: boolean }>({ id: null, name: "Option 1", cancelled: false });
+  const [extraTabs, setExtraTabs] = useState<ExtraTab[]>([]);
+  const [activeTab, setActiveTab] = useState(0);
+  const [optionApproval, setOptionApproval] = useState<"one" | "any">("any");
+  const [renamingTab, setRenamingTab] = useState<number | null>(null);
+  const [nameAsk, setNameAsk] = useState<{ title: string; label: string; initial: string; run: (name: string) => void } | null>(null);
+  const [pickClientFor, setPickClientFor] = useState<((c: { id: string; displayName: string }) => void) | null>(null);
+  const [deleteTab, setDeleteTab] = useState<number | null>(null);
+  const tabKey = () => Math.random().toString(36).slice(2);
+  const tabItems: Item[] = activeTab === 0 ? items : extraTabs[activeTab - 1]?.items ?? [];
+  const setTabItems = (next: Item[] | ((cur: Item[]) => Item[])) => {
+    if (activeTab === 0) { setItems(next as any); return; }
+    const at = activeTab - 1;
+    setExtraTabs((ts) => ts.map((t, i) => (i === at ? { ...t, items: typeof next === "function" ? (next as any)(t.items) : next } : t)));
+  };
+  const tabDiscount: ContractorDiscount | null = activeTab === 0 ? contractorDiscount : extraTabs[activeTab - 1]?.discount ?? null;
+  const setTabDiscount = (d: ContractorDiscount | null) => {
+    if (activeTab === 0) { setContractorDiscount(d); return; }
+    const at = activeTab - 1;
+    setExtraTabs((ts) => ts.map((t, i) => (i === at ? { ...t, discount: d } : t)));
+  };
   // The title follows the lines live ("Siding Remodel + Exterior Painting") until the user types in it;
   // "↺ auto title" switches back. Persisted with the draft (autosaveMeta.autoTitle).
   const [autoTitle, setAutoTitle] = useState(true);
@@ -952,8 +980,11 @@ export default function CrmClientPage() {
   useEffect(() => {
     if (open && offers === null && orgForDraft) setOffers(defaultOffers(orgForDraft.customFields, DISCOUNT_PRESETS));
   }, [open, offers, orgForDraft]);
-  const draftSnapshot: EstimateDraftSnapshot = {
+  const draftSnapshot: EstimateDraftSnapshot & { optionTabs?: any; optionApproval?: "one" | "any" } = {
     title, autoTitle, intro, taxPct, taxTouched, items, offers: offers ?? undefined, contractorDiscount,
+    // Mirrored with the rest, so a refresh brings every option back too.
+    optionTabs: extraTabs.length ? { tab0, extra: extraTabs } : undefined,
+    optionApproval,
   };
   const autosave = useEstimateAutosave({
     orgId: orgForDraft?.id ?? null, customerId: id, open, snapshot: draftSnapshot, paused: finalizing,
@@ -968,6 +999,11 @@ export default function CrmClientPage() {
     setTitle(snap.title || "Estimate");
     setOffers(snap.offers ?? null);
     setContractorDiscount(snap.contractorDiscount ?? null);
+    const ot = (snap as any).optionTabs;
+    setTab0(ot?.tab0 ?? { id: null, name: "Option 1", cancelled: false });
+    setExtraTabs(Array.isArray(ot?.extra) ? ot.extra : []);
+    setOptionApproval((snap as any).optionApproval === "one" ? "one" : "any");
+    setActiveTab(0);
     setIntro(snap.intro ?? "");
     setTaxPct(snap.taxPct ?? "0");
     setTaxTouched(!!snap.taxTouched);
@@ -981,6 +1017,11 @@ export default function CrmClientPage() {
     setEditingEst(null);
     setOffers(null);
     setContractorDiscount(null);
+    setTab0({ id: null, name: "Option 1", cancelled: false });
+    setExtraTabs([]);
+    setActiveTab(0);
+    setOptionApproval("any");
+    optionsJson.current = "";
   };
   /** Open a saved estimate (draft / unsent) in this popup: lines, scopes, tax, message; saves back to the same id. */
   const openEstimateInPopup = async (estimateId: string) => {
@@ -990,7 +1031,18 @@ export default function CrmClientPage() {
       const saved: DraftOffer[] | undefined = disc?.offers?.length
         ? disc.offers.map((o: any) => ({ code: o.code, label: o.label, percentBps: o.percentBps, conditions: o.conditions ?? null, enabled: o.enabled, rule: o.rule ?? null }))
         : undefined;
-      const snap = snapshotFromEstimate(r.estimate, r.items ?? [], saved);
+      const snap: any = snapshotFromEstimate(r.estimate, r.items ?? [], saved);
+      const opts: any[] = await (await apiRequest("GET", `/api/crm/estimates/${estimateId}/options`)).json().catch(() => []);
+      const tabbed = (opts ?? []).filter((o) => o.isMain || (Array.isArray(o.items) && o.items.length));
+      if (tabbed.length >= 2) {
+        const main = tabbed.find((o) => o.isMain) ?? null;
+        const toItems = (xs: any[]): Item[] => xs.map((i) => ({ ...BLANK, ...i, description: i.description ?? "", unit: i.unit ?? "", hiddenFromClient: !!i.hiddenFromClient }));
+        snap.optionTabs = {
+          tab0: { id: main?.id ?? null, name: main?.name ?? "Option 1", cancelled: !!main?.cancelledAt },
+          extra: tabbed.filter((o) => o !== main).map((o) => ({ key: o.id, id: o.id, name: o.name, items: toItems(o.items ?? []), cancelled: !!o.cancelledAt, discount: null })),
+        };
+      }
+      snap.optionApproval = r.estimate.optionApproval === "one" ? "one" : "any";
       loadSnapshot(snap);
       autosave.adopt(estimateId, snap);
       setEditingEst({ id: estimateId, number: r.estimate.number ?? null, autosave: !!r.estimate.autosave });
@@ -1026,8 +1078,8 @@ export default function CrmClientPage() {
 
   // Totals: shared/estimate-totals.ts, the same function the server recomputes with (tax after discounts).
   const taxBps = Math.round(parseFloat(taxPct || "0") * 100);
-  const cdLine = contractorDiscountLine(contractorDiscount, items);
-  const totals = computeApprovalTotals([...items, ...(cdLine ? [cdLine] : [])], taxBps, []);
+  const cdLine = contractorDiscountLine(tabDiscount, tabItems);
+  const totals = computeApprovalTotals([...tabItems, ...(cdLine ? [cdLine] : [])], taxBps, []);
   const subtotal = totals.subtotalCents;
   const discount = totals.lineDiscountCents;
   const tax = totals.taxCents;
@@ -1048,6 +1100,130 @@ export default function CrmClientPage() {
     retry: false,
   });
 
+  const optionsJson = useRef("");
+  const optionSetBody = () => ({
+    options: extraTabs.length === 0 ? [] : [
+      { id: tab0.id, name: tab0.name, cancelled: tab0.cancelled, items: autosavePayload({ ...draftSnapshot, items: items.filter((i) => i.name.trim()) }).items },
+      ...extraTabs.map((t) => ({
+        id: t.id, name: t.name, cancelled: t.cancelled,
+        items: autosavePayload({ ...draftSnapshot, items: t.items.filter((i) => i.name.trim()), contractorDiscount: t.discount }).items,
+      })),
+    ],
+  });
+  const syncOptions = async (estId: string) => {
+    const body = optionSetBody();
+    const json = JSON.stringify([body, optionApproval]);
+    if (json === optionsJson.current) return;
+    if (!body.options.length && !tab0.id && optionsJson.current === "") { optionsJson.current = json; return; }
+    const r = await (await apiRequest("PUT", `/api/crm/estimates/${estId}/option-set`, body)).json();
+    await apiRequest("PUT", `/api/crm/estimates/${estId}/option-approval`, { mode: optionApproval });
+    const rows: any[] = r.options ?? [];
+    const main = rows.find((o) => o.isMain);
+    const extra = rows.filter((o) => !o.isMain && Array.isArray(o.items) && o.items.length);
+    setTab0((t) => ({ ...t, id: main?.id ?? null }));
+    setExtraTabs((ts) => ts.map((t, i) => ({ ...t, id: extra[i]?.id ?? t.id })));
+    optionsJson.current = json;
+  };
+  useEffect(() => {
+    if (!open || !autosave.draftId) return;
+    const t = setTimeout(() => { syncOptions(autosave.draftId!).catch(() => {}); }, 2000);
+    return () => clearTimeout(t);
+  }, [open, autosave.draftId, JSON.stringify(extraTabs), JSON.stringify(tab0), optionApproval, JSON.stringify(items)]);
+
+  const flushAll = async (): Promise<string | null> => {
+    const id = await autosave.saveNow();
+    const estId = id ?? autosave.draftId;
+    if (estId) await syncOptions(estId);
+    return estId;
+  };
+  const optionLines = (i: number) => (i === 0 ? items : extraTabs[i - 1]?.items ?? []).filter((x) => x.name.trim());
+  const saveTemplate = (name: string, tabIndex: number | null) => {
+    const lines = tabIndex == null ? items.filter((x) => x.name.trim()) : optionLines(tabIndex);
+    const disc = tabIndex == null || tabIndex === 0 ? contractorDiscount : extraTabs[tabIndex - 1]?.discount ?? null;
+    return apiRequest("POST", "/api/crm/estimate-templates", {
+      name, title: tabIndex == null ? title : null, introText: intro || null,
+      items: autosavePayload({ ...draftSnapshot, items: lines, contractorDiscount: null }).items,
+      offers: offers ? offersPayload(offers) : null, contractorDiscount: disc,
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/estimate-templates"] });
+      toast({ title: "Template saved", description: name });
+    }).catch((e: any) => toast({ title: "Could not save the template", description: apiErrorMessage(e), variant: "destructive" }));
+  };
+  const openCopy = (est: any) => {
+    toast({ title: `Copied to ${est.number ?? "a new estimate"}`, description: "Opening it now." });
+    autosave.keepClosed(); autosave.reset(); resetForm(); setOpen(false);
+    queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
+    if (est.customerId === id) void openEstimateInPopup(est.id);
+    else setLocation(`/crm/clients/${est.customerId}?openEstimate=${est.id}`);
+  };
+  const onOptionAction = async (i: number, a: OptionAction) => {
+    const name = i === 0 ? tab0.name : extraTabs[i - 1]?.name ?? "";
+    if (a === "rename") { setRenamingTab(i); return; }
+    if (a === "duplicate") {
+      const src = i === 0 ? items : extraTabs[i - 1].items;
+      const copy: Item[] = src.map((x) => ({ ...x }));
+      setExtraTabs((ts) => [...ts, { key: tabKey(), id: null, name: `${name} (copy)`, items: copy, cancelled: false, discount: i === 0 ? contractorDiscount : extraTabs[i - 1].discount }]);
+      setActiveTab(extraTabs.length + 1);
+      return;
+    }
+    if (a === "cancel" || a === "restore") {
+      const v = a === "cancel";
+      if (i === 0) setTab0((t) => ({ ...t, cancelled: v }));
+      else setExtraTabs((ts) => ts.map((t, j) => (j === i - 1 ? { ...t, cancelled: v } : t)));
+      return;
+    }
+    if (a === "delete") { setDeleteTab(i); return; }
+    if (a === "template") {
+      setNameAsk({ title: "Save option as template", label: "A name you'll recognise in the Templates list.", initial: name, run: (n) => void saveTemplate(n, i) });
+      return;
+    }
+    // copy to a new estimate: the option must be saved first
+    const estId = await flushAll();
+    if (!estId) { toast({ title: "Add a line first", description: "There is nothing to copy yet." }); return; }
+    const optId = i === 0 ? (tab0.id) : extraTabs[i - 1]?.id;
+    const go = async (customerId?: string) => {
+      try {
+        const est = optId
+          ? await (await apiRequest("POST", `/api/crm/estimates/${estId}/options/${optId}/copy-to-estimate`, customerId ? { customerId } : {})).json()
+          : await (await apiRequest("POST", `/api/crm/estimates/${estId}/duplicate`, customerId ? { customerId } : {})).json();
+        openCopy(est);
+      } catch (e: any) {
+        toast({ title: "Could not copy", description: apiErrorMessage(e), variant: "destructive" });
+      }
+    };
+    if (a === "copy-same") await go();
+    else setPickClientFor(() => (c: { id: string }) => { setPickClientFor(null); void go(c.id); });
+  };
+  const onEstimateAction = async (a: EstimateAction) => {
+    if (a === "template") {
+      setNameAsk({ title: "Save estimate as template", label: "Lines, scopes, discounts and the message are saved.", initial: title, run: (n) => void saveTemplate(n, null) });
+      return;
+    }
+    const estId = await flushAll();
+    if (!estId) { toast({ title: "Add a line first", description: "There is nothing to copy yet." }); return; }
+    const go = async (customerId?: string) => {
+      try { openCopy(await (await apiRequest("POST", `/api/crm/estimates/${estId}/duplicate`, customerId ? { customerId } : {})).json()); }
+      catch (e: any) { toast({ title: "Could not copy", description: apiErrorMessage(e), variant: "destructive" }); }
+    };
+    if (a === "duplicate") await go();
+    else setPickClientFor(() => (c: { id: string }) => { setPickClientFor(null); void go(c.id); });
+  };
+  const templateItems = (t: EstimateTemplate): Item[] =>
+    (t.items ?? []).filter((x: any) => x.kind !== "discount").map((x: any) => ({ ...BLANK, ...x, description: x.description ?? "", unit: x.unit ?? "", hiddenFromClient: !!x.hiddenFromClient }));
+  const applyTemplate = (t: EstimateTemplate) => {
+    setItems(templateItems(t).length ? templateItems(t) : [{ ...BLANK }]);
+    if (t.introText) setIntro(t.introText);
+    if (t.title) { setTitle(t.title); setAutoTitle(false); }
+    if (Array.isArray(t.offers) && t.offers.length) setOffers(t.offers as any);
+    setContractorDiscount(t.contractorDiscount ?? null);
+    setActiveTab(0);
+    toast({ title: `Started from "${t.name}"` });
+  };
+  const addTemplateAsOption = (t: EstimateTemplate) => {
+    setExtraTabs((ts) => [...ts, { key: tabKey(), id: null, name: t.name.slice(0, 80), items: templateItems(t), cancelled: false, discount: t.contractorDiscount ?? null }]);
+    setActiveTab(extraTabs.length + 1);
+  };
+
   const createEstimate = useMutation({
     mutationFn: async () => {
       const clean = items.filter((i) => i.name.trim());
@@ -1062,10 +1238,12 @@ export default function CrmClientPage() {
         if (autosave.draftId) {
           const saved = await (await apiRequest("PATCH", `/api/crm/estimates/${autosave.draftId}`, { ...body, autosave: false })).json();
           await putOffers(autosave.draftId);
+          await syncOptions(autosave.draftId);
           return saved;
         }
         const created = await (await apiRequest("POST", "/api/crm/estimates", { customerId: id, ...body })).json();
         await putOffers(created.id);
+        if (extraTabs.length) await syncOptions(created.id);
         return created;
       } finally {
         setFinalizing(false);
@@ -1676,6 +1854,10 @@ export default function CrmClientPage() {
                 onEscapeKeyDown={(e) => { if (autosave.hasContent) e.preventDefault(); }}
                 data-testid="dialog-new-estimate" data-fullscreen={fullscreen.full ? "1" : "0"}>
                 <FullscreenToggle full={fullscreen.full} onToggle={fullscreen.toggle} />
+                <div className="flex flex-wrap items-center justify-end gap-2 pr-16 -mb-2">
+                  <TemplatesMenu onUse={applyTemplate} onAddAsOption={addTemplateAsOption} />
+                  <EstimateMenu onAction={onEstimateAction} />
+                </div>
                 <DialogHeader>
                   <DialogTitle>{editingEst ? `Estimate ${editingEst.number ?? ""} for ${c.displayName}` : `New estimate for ${c.displayName}`}</DialogTitle>
                   <DialogDescription>
@@ -1728,20 +1910,47 @@ export default function CrmClientPage() {
                 </div>
 
                 <Separator />
+                {/* Options as tabs: "Option 1 | Option 2 | + Add option" (estimate-options.ts). */}
+                <OptionTabsBar
+                  tabs={[{ key: "main", name: tab0.name, cancelled: tab0.cancelled }, ...extraTabs.map((t) => ({ key: t.key, name: t.name, cancelled: t.cancelled }))]}
+                  active={activeTab}
+                  onSelect={setActiveTab}
+                  onAdd={() => { setExtraTabs((ts) => [...ts, { key: tabKey(), id: null, name: `Option ${ts.length + 2}`, items: [{ ...BLANK }], cancelled: false, discount: null }]); setActiveTab(extraTabs.length + 1); }}
+                  onAction={(i, a) => void onOptionAction(i, a)}
+                  renamingIndex={renamingTab}
+                  onRename={(i, n) => {
+                    setRenamingTab(null);
+                    if (!n) return;
+                    if (i === 0) setTab0((t) => ({ ...t, name: n.slice(0, 80) }));
+                    else setExtraTabs((ts) => ts.map((t, j) => (j === i - 1 ? { ...t, name: n.slice(0, 80) } : t)));
+                  }} />
+                {extraTabs.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="row-option-approval">
+                    <span className="text-muted-foreground">Customer can approve</span>
+                    <select value={optionApproval} onChange={(e) => setOptionApproval(e.target.value as "one" | "any")}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-sm" data-testid="select-option-approval">
+                      <option value="one">Only one option</option>
+                      <option value="any">Any options</option>
+                    </select>
+                    {(activeTab === 0 ? tab0.cancelled : extraTabs[activeTab - 1]?.cancelled) && (
+                      <span className="text-xs text-amber-700 dark:text-amber-400">This option is cancelled — hidden from the client.</span>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
-                  {items.map((it, idx) => (
+                  {tabItems.map((it, idx) => (
                     <div key={idx} className="grid gap-2 sm:grid-cols-12 items-end border rounded-md p-2"
                       data-testid={`line-item-${idx}`}>
                       <div className="sm:col-span-5">
                         <Label className="text-xs">Item</Label>
                         {/* Search the price book; a pick fills the line (and the qty from the HOVER takeoff when one matches). */}
                         <PricebookItemInput value={it.name} placeholder="Search your price book, or type an item" testId={`input-item-name-${idx}`}
-                          onChange={(v) => setItems(items.map((x, i) => i === idx ? { ...x, name: v } : x))}
+                          onChange={(v) => setTabItems(tabItems.map((x, i) => i === idx ? { ...x, name: v } : x))}
                           quantityFor={(line) => (estTakeoff ? takeoffQuantityForLine(line, estTakeoff)?.quantity ?? null : null)}
                           onPick={(pb) => {
                             const fromHover = estTakeoff ? takeoffQuantityForLine({ name: pb.name, unit: pb.unit }, estTakeoff) : null;
                             // Functional update: a slow price lookup never puts back lines edited meanwhile.
-                            setItems((cur) => cur.map((x, i) => i === idx ? {
+                            setTabItems((cur) => cur.map((x, i) => i === idx ? {
                               ...x, name: pb.name, unit: pb.unit ?? "", description: pb.description, taxable: pb.taxable,
                               unitPriceCents: pb.unitPriceCents, quantityMilli: Math.round((fromHover?.quantity ?? 1) * 1000),
                               pricebookItemId: pb.id, listPriceCents: pb.listPriceCents, listField: pb.listField,
@@ -1754,13 +1963,13 @@ export default function CrmClientPage() {
                       <div className="sm:col-span-2">
                         <Label className="text-xs">Qty</Label>
                         <Input type="number" step="0.01" value={it.quantityMilli / 1000}
-                          onChange={(e) => setItems(items.map((x, i) => i === idx
+                          onChange={(e) => setTabItems(tabItems.map((x, i) => i === idx
                             ? { ...x, quantityMilli: Math.round((parseFloat(e.target.value) || 0) * 1000) } : x))} />
                       </div>
                       <div className="sm:col-span-2">
                         <Label className="text-xs">Unit price</Label>
                         <Input type="number" step="0.01" value={(it.unitPriceCents / 100).toString()}
-                          onChange={(e) => setItems(items.map((x, i) => i === idx
+                          onChange={(e) => setTabItems(tabItems.map((x, i) => i === idx
                             ? { ...x, unitPriceCents: Math.round((parseFloat(e.target.value) || 0) * 100) } : x))} />
                       </div>
                       <div className="sm:col-span-2 text-sm">
@@ -1771,7 +1980,7 @@ export default function CrmClientPage() {
                       </div>
                       <div className="sm:col-span-1">
                         <Button variant="ghost" size="sm" data-testid={`button-remove-item-${idx}`}
-                          onClick={() => setItems(items.length > 1 ? items.filter((_, i) => i !== idx) : [{ ...BLANK }])}>
+                          onClick={() => setTabItems(tabItems.length > 1 ? tabItems.filter((_, i) => i !== idx) : [{ ...BLANK }])}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -1780,7 +1989,7 @@ export default function CrmClientPage() {
                         <span className="text-muted-foreground">Scope</span>
                         <select value={lineCategory(it)} data-testid={`select-item-category-${idx}`}
                           className="h-7 rounded-md border border-input bg-background px-1.5 text-xs"
-                          onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, scopeCategory: e.target.value } : x))}>
+                          onChange={(e) => setTabItems(tabItems.map((x, i) => i === idx ? { ...x, scopeCategory: e.target.value } : x))}>
                           {SCOPE_CATEGORIES.map((cat) => <option key={cat} value={cat}>{SCOPE_CATEGORY_LABEL[cat]}</option>)}
                         </select>
                         {it.pricebookItemId && it.listField && it.listPriceCents != null && it.unitPriceCents !== it.listPriceCents
@@ -1789,7 +1998,7 @@ export default function CrmClientPage() {
                             onClick={async () => {
                               try {
                                 await apiRequest("PATCH", `/api/crm/pricebook/items/${it.pricebookItemId}`, { [it.listField!]: it.unitPriceCents });
-                                setItems((cur) => cur.map((x, i) => i === idx ? { ...x, listPriceCents: it.unitPriceCents } : x));
+                                setTabItems((cur) => cur.map((x, i) => i === idx ? { ...x, listPriceCents: it.unitPriceCents } : x));
                                 queryClient.invalidateQueries({ queryKey: ["/api/crm/pricebook/items"] });
                                 toast({ title: `Price book updated to ${money(it.unitPriceCents)}`, description: it.name });
                               } catch (e: any) {
@@ -1808,11 +2017,11 @@ export default function CrmClientPage() {
                           className={fullscreen.full ? "min-h-[28vh]" : undefined}
                           data-testid={`input-item-scope-${idx}`}
                           placeholder="What's included — materials, prep, warranty, exclusions…"
-                          onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, description: e.target.value } : x))} />
+                          onChange={(e) => setTabItems(tabItems.map((x, i) => i === idx ? { ...x, description: e.target.value } : x))} />
                       </div>
                     </div>
                   ))}
-                  <Button variant="outline" size="sm" onClick={() => setItems([...items, { ...BLANK }])}
+                  <Button variant="outline" size="sm" onClick={() => setTabItems([...tabItems, { ...BLANK }])}
                     data-testid="button-add-item">
                     <Plus className="h-4 w-4 mr-2" /> Add line
                   </Button>
@@ -1823,19 +2032,19 @@ export default function CrmClientPage() {
                   <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] items-end">
                     <div>
                       <Label className="text-xs">Your discount (shows as a line)</Label>
-                      <Input value={contractorDiscount?.label ?? ""} placeholder="Discount"
+                      <Input value={tabDiscount?.label ?? ""} placeholder="Discount"
                         data-testid="input-contractor-discount-label"
-                        onChange={(e) => setContractorDiscount({ mode: contractorDiscount?.mode ?? "amount", value: contractorDiscount?.value ?? "", label: e.target.value })} />
+                        onChange={(e) => setTabDiscount({ mode: tabDiscount?.mode ?? "amount", value: tabDiscount?.value ?? "", label: e.target.value })} />
                     </div>
                     <div>
                       <Label className="text-xs">Amount</Label>
-                      <Input className="w-28" inputMode="decimal" value={contractorDiscount?.value ?? ""} placeholder="0"
+                      <Input className="w-28" inputMode="decimal" value={tabDiscount?.value ?? ""} placeholder="0"
                         data-testid="input-contractor-discount-value"
-                        onChange={(e) => setContractorDiscount({ mode: contractorDiscount?.mode ?? "amount", label: contractorDiscount?.label ?? "", value: e.target.value })} />
+                        onChange={(e) => setTabDiscount({ mode: tabDiscount?.mode ?? "amount", label: tabDiscount?.label ?? "", value: e.target.value })} />
                     </div>
-                    <select value={contractorDiscount?.mode ?? "amount"} data-testid="select-contractor-discount-mode"
+                    <select value={tabDiscount?.mode ?? "amount"} data-testid="select-contractor-discount-mode"
                       className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                      onChange={(e) => setContractorDiscount({ label: contractorDiscount?.label ?? "", value: contractorDiscount?.value ?? "", mode: e.target.value as "amount" | "percent" })}>
+                      onChange={(e) => setTabDiscount({ label: tabDiscount?.label ?? "", value: tabDiscount?.value ?? "", mode: e.target.value as "amount" | "percent" })}>
                       <option value="amount">$</option>
                       <option value="percent">%</option>
                     </select>
@@ -1844,7 +2053,7 @@ export default function CrmClientPage() {
                     <div className="space-y-1.5">
                       <div className="text-xs text-muted-foreground">Offers the client can choose on the estimate page</div>
                       {(offers ?? []).map((o, oi) => {
-                        const eff = effectiveOffer(o, [...items, ...(cdLine ? [cdLine] : [])]);
+                        const eff = effectiveOffer(o, [...tabItems, ...(cdLine ? [cdLine] : [])]);
                         const rule = bundleRuleOf(o.rule);
                         return (
                           <label key={o.code} className={`flex items-start gap-2 text-sm ${eff.available ? "" : "opacity-60"}`} data-testid={`offer-${o.code}`}>
@@ -1880,6 +2089,32 @@ export default function CrmClientPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          )}
+          {canEstimate && (
+            <>
+              <NameDialog open={!!nameAsk} title={nameAsk?.title ?? ""} label={nameAsk?.label ?? ""} initial={nameAsk?.initial ?? ""}
+                onCancel={() => setNameAsk(null)} onSubmit={(n) => { const run = nameAsk?.run; setNameAsk(null); run?.(n); }} />
+              <ClientPickerDialog open={!!pickClientFor} excludeId={id} onCancel={() => setPickClientFor(null)}
+                onPick={(cl) => pickClientFor?.(cl)} />
+              <ConfirmDeleteOption name={deleteTab == null ? null : deleteTab === 0 ? tab0.name : extraTabs[deleteTab - 1]?.name ?? null}
+                onCancel={() => setDeleteTab(null)}
+                onConfirm={() => {
+                  const i = deleteTab!;
+                  setDeleteTab(null);
+                  if (i === 0) {
+                    // Option 1 goes: the next option becomes Option 1 (the estimate's own lines).
+                    const [next, ...rest] = extraTabs;
+                    if (!next) return;
+                    setItems(next.items.length ? next.items : [{ ...BLANK }]);
+                    setContractorDiscount(next.discount);
+                    setTab0({ id: next.id, name: next.name, cancelled: next.cancelled });
+                    setExtraTabs(rest);
+                  } else {
+                    setExtraTabs((ts) => ts.filter((_, j) => j !== i - 1));
+                  }
+                  setActiveTab(0);
+                }} />
+            </>
           )}
           {canEstimate && (
             <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>

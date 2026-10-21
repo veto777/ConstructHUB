@@ -729,7 +729,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         percentBps, conditions: o.conditions, available, unavailableReason,
         ruleText: rule ? bundleRuleText(rule) : null,
       })),
-      options: options.map((o) => {
+      // Customer can approve: only one option, or any (estimate-options.ts); select-options enforces it.
+      optionApproval: (est.customFields as any)?.optionApproval === "one" ? "one" : "any",
+      options: options.filter((o) => !(o as any).cancelledAt).map((o) => {
         // An option carrying its own line items is a client-selectable scope;
         // subtotal/taxable are recomputed here so the page's live total can
         // never drift from what select-options would generate. A selectable
@@ -906,9 +908,14 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const block = await estimateAnswerBlock(est);
     if (block) return res.status(409).json({ message: block.message, code: block.code, link: block.link });
 
-    const options = await db.select().from(crmEstimateOptions)
-      .where(eq(crmEstimateOptions.estimateId, est.id)).orderBy(asc(crmEstimateOptions.tier));
+    const options = (await db.select().from(crmEstimateOptions)
+      .where(eq(crmEstimateOptions.estimateId, est.id)).orderBy(asc(crmEstimateOptions.tier)))
+      .filter((o) => !(o as any).cancelledAt); // a cancelled option is not on offer
     const byId = new Map(options.map((o) => [o.id, o]));
+    // "Customer can approve: Only one option" — the server, not the page, holds the line.
+    if ((est.customFields as any)?.optionApproval === "one" && new Set(parsed.data.optionIds).size > 1) {
+      return res.status(400).json({ message: "Please choose just one option for this estimate." });
+    }
     const chosen: typeof options = [];
     for (const id of [...new Set(parsed.data.optionIds)]) {
       const o = byId.get(id);
