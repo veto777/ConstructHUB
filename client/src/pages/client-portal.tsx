@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import {
   Loader2, FileText, Receipt, ShieldCheck, Mail, ArrowRight, LogOut, Inbox, Ruler,
-  LayoutDashboard, Camera, MessageSquare, FolderOpen, Image as ImageIcon, Phone, Menu, type LucideIcon,
+  LayoutDashboard, Camera, MessageSquare, FolderOpen, Image as ImageIcon, Phone, Menu, Star, type LucideIcon,
 } from "lucide-react";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
@@ -18,6 +18,7 @@ import { PortalPunchLists } from "@/components/portal-punch-list";
 import { PortalJobcamFeed } from "@/components/jobcam/portal-feed";
 import { PortalMessages, PortalContact, PortalContactFooter } from "@/components/portal-messages";
 import { ContractorPreviewBanner, PortalFinancing } from "@/components/crm-client-360";
+import { PortalReview } from "@/components/portal-review";
 import { CrmLogo } from "@/components/crm-logo";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -229,7 +230,7 @@ function RequestLink() {
 
 /* ── Signed in: CRM-style shell + views ──────────────────────────────────── */
 
-type ViewKey = "home" | "estimates" | "invoices" | "contracts" | "reports" | "photos" | "messages" | "contact" | "documents";
+type ViewKey = "home" | "estimates" | "invoices" | "contracts" | "reports" | "photos" | "messages" | "review" | "contact" | "documents";
 
 const SIDEBAR_NAV: { key: ViewKey; title: string; icon: LucideIcon }[] = [
   { key: "home", title: "Home", icon: LayoutDashboard },
@@ -239,6 +240,8 @@ const SIDEBAR_NAV: { key: ViewKey; title: string; icon: LucideIcon }[] = [
   { key: "reports", title: "Measurement reports", icon: Ruler },
   { key: "photos", title: "Photos", icon: Camera },
   { key: "messages", title: "Messages", icon: MessageSquare },
+  // Shown only when the contractor can take a review from this client (GET /api/client/review).
+  { key: "review", title: "Leave a review", icon: Star },
   { key: "contact", title: "Contact us", icon: Phone },
 ];
 
@@ -255,6 +258,9 @@ function Dashboard({ data }: { data: any }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const captureRef = useRef<HTMLInputElement>(null);
   const preview = data.contractorPreview === true;
+  // The Leave a review tab: the same review page the contractor's Google Reviews tool emails.
+  const { data: review } = useQuery<{ available: boolean; orgName?: string }>({ queryKey: ["/api/client/review"], retry: false });
+  const navItems = SIDEBAR_NAV.filter((item) => item.key !== "review" || review?.available === true);
 
   // Signed-contract PDFs, minted server-side at approval and keyed by
   // estimate id — each signed contract gets a download link when its PDF exists.
@@ -668,6 +674,7 @@ function Dashboard({ data }: { data: any }) {
     reports: reportsSection,
     photos: <><PortalJobcamFeed /><PortalPhotoShare accounts={accounts} photos={photos} /></>,
     messages: <PortalMessages accounts={accounts} focusMemberId={messageTo} onFocusConsumed={() => setMessageTo(null)} />,
+    review: <PortalReview orgName={review?.orgName} preview={preview} />,
     contact: (
       <PortalContact
         accounts={accounts}
@@ -748,7 +755,7 @@ function Dashboard({ data }: { data: any }) {
           <div className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 px-4 pb-2">
             Your project
           </div>
-          <div className="px-2 space-y-1">{SIDEBAR_NAV.map(navButton)}</div>
+          <div className="px-2 space-y-1">{navItems.map(navButton)}</div>
         </nav>
         <div className="p-3">
           <div className="flex items-center justify-between gap-1 rounded-lg border border-sidebar-border bg-sidebar-accent/40 p-2">
@@ -797,7 +804,7 @@ function Dashboard({ data }: { data: any }) {
                     <CrmLogo height={22} />
                   </div>
                   <nav className="px-2 space-y-1" data-testid="portal-drawer-nav">
-                    {SIDEBAR_NAV.map((item) => {
+                    {navItems.map((item) => {
                       const active = view === item.key;
                       const n = badge(item.key);
                       return (

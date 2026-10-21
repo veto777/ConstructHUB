@@ -676,6 +676,14 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     ],
   },
 
+  "portal-review": {
+    title: "Leave a review",
+    body: [
+      "Tell your contractor how the project went. You rate the job from 1 to 10 and add a few words about your experience.",
+      "Your answers go straight to the owner. If you'd like, you can then share your review publicly as well.",
+      "It takes about a minute, and you can come back to this tab any time to finish.",
+    ],
+  },
   "portal-reports": {
     title: "Your measurement reports",
     body: [

@@ -38,6 +38,7 @@ import { registerCrmReportRoutes } from "./reports";
 import { registerCrmHoverRoutes } from "./hover";
 import { registerHoverModel3dRoutes } from "./hover-model3d";
 import { registerCrmClientAuthRoutes, allow as rateAllow } from "./client-auth";
+import { registerPortalReviewRoutes } from "./portal-review";
 import { sendSms, normalizePhone } from "./sms";
 import { registerCrmClient360Routes } from "./notes-timeline";
 import { registerCrmScheduleRoutes } from "./schedule";
@@ -418,6 +419,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerHoverModel3dRoutes(app, getDevUser);
   // The homeowner client portal takes no contractor session at all.
   registerCrmClientAuthRoutes(app);
+  // The portal's Leave a review tab: hands the client the same /review/<token> page the Google Reviews tool emails.
+  registerPortalReviewRoutes(app);
   // Client 360: notes, timeline, financing clicks, portal preview. BEFORE the
   // attachment routes so its read-only interceptors guard preview sessions.
   registerCrmClient360Routes(app, getDevUser);
