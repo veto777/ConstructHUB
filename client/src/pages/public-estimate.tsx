@@ -1101,7 +1101,7 @@ export default function PublicEstimatePage() {
                   {docItems.map((i: any) => (
                     <tr key={i.id} className="block sm:table-row border-t px-4 py-3 sm:p-0">
                       <td className="block sm:table-cell sm:px-4 sm:py-3">
-                        <div className="font-medium">{i.name}</div>
+                        <div className="text-xl sm:text-2xl font-bold tracking-tight leading-snug" data-testid="text-line-title">{i.name}</div>
                         {/* Full scope of work — multi-line bullets preserved, HCP-style. */}
                         {i.description && <div className="text-muted-foreground text-sm mt-1 whitespace-pre-wrap leading-relaxed">{i.description}</div>}
                       </td>
