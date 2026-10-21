@@ -2307,7 +2307,7 @@ export default function CrmClientPage() {
                             <div className="text-muted-foreground">The client gets an email with a link to view and approve it.</div>
                           </div>
                         ),
-                        confirmLabel: e.sentAt ? "Yes, resend it" : "Yes, send it", destructive: false, destructive: false,
+                        confirmLabel: e.sentAt ? "Yes, resend it" : "Yes, send it", destructive: false,
                         onConfirm: () => send.mutate(e.id),
                       })} disabled={send.isPending}
                       data-testid={`button-send-${e.id}`}>
