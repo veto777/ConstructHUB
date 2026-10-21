@@ -371,6 +371,9 @@ function presentEstimate(e: typeof crmEstimates.$inferSelect, ctx: OrgContext) {
     })(),
     // Where the bid was written: imported from HouseCall Pro, or here.
     source: (e.customFields as any)?.hcpId ? "hcp" : "constructhub",
+    // Autosaved by the New estimate dialog and not finished yet (shared/estimate-draft.ts): the dialog offers to
+    // continue it instead of starting a duplicate. Cleared when the user presses Create estimate.
+    autosave: (e.customFields as any)?.autosave ? true : undefined,
     createdAt: e.createdAt, updatedAt: e.updatedAt,
   };
 }
@@ -1555,6 +1558,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       taxRateBps: z.number().int().min(0).max(3000).default(0),
       depositCents: z.number().int().min(0).nullable().optional(),
       items: z.array(itemSchema).max(300).default([]),
+      // The New estimate dialog's autosave: a DRAFT created as soon as the form has content (never sent).
+      autosave: z.boolean().optional(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid estimate", issues: parsed.error.issues });
@@ -1593,6 +1598,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         ...estimateDefaultsFromOrg(ctx.org),
         ...(d.depositCents !== undefined ? { depositBps: null } : {}),
         publicToken: token(), createdByMemberId: ctx.member.id,
+        ...(d.autosave ? { customFields: { autosave: { at: new Date().toISOString(), memberId: ctx.member.id } } } : {}),
         // No expiry on a draft — the 7-day clock starts when it is SENT
         // (portal.ts), so a draft never burns its validity window unsent.
       } as any).returning();
@@ -1712,6 +1718,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       // "approved" is never set here — approval is the client's signature.
       status: z.enum(["draft", "sent", "viewed", "declined", "expired", "cancelled"]).optional(),
       items: z.array(itemSchema).max(300).optional(),
+      // false = the dialog's Create estimate finished an autosaved draft (the flag goes).
+      autosave: z.boolean().optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Invalid estimate", issues: parsed.error.issues });
     const d = parsed.data;
@@ -1763,8 +1771,12 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       if (depositMsg) return res.status(400).json({ message: depositMsg });
     }
 
-    const { items, ...fields } = d;
+    const { items, autosave, ...fields } = d;
     const patch: any = { updatedAt: new Date() };
+    if (autosave === false && (e.customFields as any)?.autosave) {
+      const { autosave: _done, ...rest } = (e.customFields as Record<string, unknown>) ?? {};
+      patch.customFields = rest;
+    }
     for (const k of [
       "title", "introText", "termsText", "taxRateBps", "depositCents", "projectId", "divisionId", "status",
       "footerText", "warrantyText", "companyTermsText",
@@ -1847,6 +1859,30 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       meta: { number: e.number, fields: changed },
     });
     res.json(presentEstimate(fresh ?? e, ctx));
+  });
+
+  /**
+   * Discard from the New estimate dialog: deletes the draft its autosave created, and only such a draft —
+   * still flagged autosave, still a draft, never sent, never viewed or approved. Anything else is 409 (it is a
+   * real estimate by then; owners delete those with DELETE /api/crm/estimates/:id).
+   */
+  app.delete("/api/crm/estimates/:id/autosave", async (req: any, res) => {
+    const ctx = await ctxFor(req, res, "manageEstimates");
+    if (!ctx) return;
+    const [e] = await db.select().from(crmEstimates)
+      .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
+    if (!e) return res.status(404).json({ message: "Estimate not found" });
+    if (!(e.customFields as any)?.autosave || e.status !== "draft" || e.sentAt || e.firstViewedAt || e.approvedAt) {
+      return res.status(409).json({ message: "Only an unfinished autosaved draft can be discarded here." });
+    }
+    await db.transaction(async (tx) => {
+      await deleteEstimateChildren(tx, ctx.org.id, [e.id]);
+      await tx.delete(crmEstimates).where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, e.id)));
+    });
+    logActivity(ctx, "estimate.discarded", {
+      entityType: "estimate", entityId: e.id, customerId: e.customerId, meta: { number: e.number, title: e.title },
+    });
+    res.json({ ok: true, deleted: e.id });
   });
 
   /**

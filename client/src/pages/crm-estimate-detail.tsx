@@ -200,6 +200,7 @@ export default function CrmEstimateDetailPage() {
   // Leave edit mode AND drop ?edit=1, so a reload shows the saved estimate
   // instead of re-opening the editor.
   const exitEdit = () => {
+    clearEditMirror();
     setEditing(false);
     if (new URLSearchParams(window.location.search).has("edit")) {
       setLocation(`/crm/estimates/${id}`, { replace: true });
@@ -315,11 +316,40 @@ export default function CrmEstimateDetailPage() {
       : { title: "No line matched the HOVER takeoff", description: "Lines fill by unit: sf (siding or roof), sq, lf (ridge, valley, rake, eave, drip edge, flashing), ea (windows, doors) or UI." });
   };
 
+  // ── Never lose an edit (owner, 2026-10-21) ──────────────────────────────────
+  // While editing, the whole edit buffer is mirrored to this device on every change; a refresh or a crash
+  // brings the editor back with it. Cleared on Save and on Cancel.
+  const mirrorKey = id ? `ch:estimate-edit:${id}` : null;
+  const clearEditMirror = () => { try { if (mirrorKey) window.localStorage.removeItem(mirrorKey); } catch { /* blocked */ } };
+  useEffect(() => {
+    if (!editing || !mirrorKey) return;
+    try {
+      window.localStorage.setItem(mirrorKey, JSON.stringify({ v: 1, title, intro, taxPct, deposit, divisionId, status, lines, at: Date.now() }));
+    } catch { /* full / blocked */ }
+  }, [editing, mirrorKey, title, intro, taxPct, deposit, divisionId, status, lines]);
+  const [mirrorChecked, setMirrorChecked] = useState(false);
+  useEffect(() => {
+    if (!e || mirrorChecked || !mirrorKey) return;
+    setMirrorChecked(true);
+    if (editing || locked || !canEdit) return;
+    let m: any = null;
+    try { m = JSON.parse(window.localStorage.getItem(mirrorKey) || "null"); } catch { m = null; }
+    if (!m || m.v !== 1 || !Array.isArray(m.lines)) return;
+    startEdit();
+    setTitle(m.title ?? ""); setIntro(m.intro ?? ""); setTaxPct(m.taxPct ?? "0"); setDeposit(m.deposit ?? "");
+    setDivisionId(m.divisionId ?? ""); setStatus(m.status ?? e.status ?? "draft"); setLines(m.lines);
+    toast({ title: "Your unsaved changes are back", description: "Save them, or Cancel to drop them." });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [e?.id, canEdit]);
+
   // Auto-enter edit mode on ?edit=1 — a fresh draft from the builder OR the
   // "Edit" button on a client's page. Sent estimates are editable too (only a
   // signed/approved estimate is locked), so this no longer excludes sent ones.
   useEffect(() => {
-    if (e && !editing && !locked && canEdit &&
+    // A mirrored unsaved edit wins (restored by the effect above).
+    let mirrored = false;
+    try { mirrored = !!(mirrorKey && window.localStorage.getItem(mirrorKey)); } catch { /* blocked */ }
+    if (e && !editing && !locked && canEdit && !mirrored &&
         new URLSearchParams(window.location.search).get("edit") === "1") {
       startEdit();
     }

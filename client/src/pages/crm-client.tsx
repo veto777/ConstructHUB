@@ -53,6 +53,8 @@ import { QuickBid } from "@/components/crm-quick-bid";
 import { AppointmentForm, type Appointment } from "@/components/crm-appointment-form";
 import { InfoTip } from "@/components/info-tip";
 import { useEstimateTaxRate, TaxRateNote, bpsToPctText } from "@/components/estimate-tax-rate";
+import { useEstimateAutosave, AutosaveIndicator, useDialogFullscreen, FullscreenToggle } from "@/components/estimate-autosave";
+import { draftHasContent, snapshotFromEstimate, type EstimateDraftSnapshot } from "@shared/estimate-draft";
 import { HelpButton } from "@/components/help-button";
 import { confirmAction } from "@/components/confirm-dialog";
 import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
@@ -919,8 +921,47 @@ export default function CrmClientPage() {
   useEffect(() => {
     if (open && taxRate.data && !taxTouched) setTaxPct(bpsToPctText(taxRate.data.bps));
   }, [open, taxRate.data, taxTouched]);
-  useEffect(() => { if (!open) setTaxTouched(false); }, [open]);
   const [items, setItems] = useState<Item[]>([{ ...BLANK }]);
+
+  // ── Never lose an estimate (owner, 2026-10-21) ─────────────────────────────
+  // Every change is mirrored to this device; once there is content the estimate is autosaved to the server as a
+  // draft (no email/SMS) and kept up to date. Outside click / Esc never close a dialog with content; the X asks.
+  // A refresh reopens the dialog with everything restored. shared/estimate-draft.ts, components/estimate-autosave.tsx
+  const { data: orgForDraft } = useQuery<any>({ queryKey: ["/api/crm/org"] });
+  const [finalizing, setFinalizing] = useState(false);
+  const draftSnapshot: EstimateDraftSnapshot = { title, intro, taxPct, taxTouched, items };
+  const autosave = useEstimateAutosave({
+    orgId: orgForDraft?.id ?? null, customerId: id, open, snapshot: draftSnapshot, paused: finalizing,
+  });
+  const fullscreen = useDialogFullscreen(me?.member?.id ?? me?.user?.id ?? null);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [resumeOffer, setResumeOffer] = useState<{ id: string; title: string; updatedAt?: string } | null>(null);
+  const loadSnapshot = (snap: EstimateDraftSnapshot) => {
+    setTitle(snap.title || "Estimate");
+    setIntro(snap.intro ?? "");
+    setTaxPct(snap.taxPct ?? "0");
+    setTaxTouched(!!snap.taxTouched);
+    setItems(snap.items.length
+      ? snap.items.map((i) => ({ ...BLANK, ...i, description: i.description ?? "", unit: i.unit ?? "", hiddenFromClient: false }))
+      : [{ ...BLANK }]);
+  };
+  const resetForm = () => {
+    setItems([{ ...BLANK }]); setIntro(""); setTitle("Estimate"); setTaxPct("0"); setTaxTouched(false);
+    setResumeOffer(null);
+  };
+  // After a refresh (or a crash): reopen with everything that was typed.
+  const [restoredFor, setRestoredFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!id || !orgForDraft?.id || restoredFor === id) return;
+    setRestoredFor(id);
+    const m = autosave.readMirror();
+    if (m && m.open && draftHasContent(m)) {
+      loadSnapshot(m);
+      autosave.adopt(m.draftId ?? null);
+      setOpen(true);
+      toast({ title: "Your unsaved estimate is back", description: "Everything you typed was kept." });
+    }
+  }, [id, orgForDraft?.id]);
 
   const subtotal = items.reduce(
     (s, i) => s + (i.kind === "discount" ? 0 : Math.round((i.unitPriceCents * i.quantityMilli) / 1000)), 0);
@@ -949,14 +990,25 @@ export default function CrmClientPage() {
     mutationFn: async () => {
       const clean = items.filter((i) => i.name.trim());
       if (!clean.length) throw new Error("Add at least one line item");
-      return (await apiRequest("POST", "/api/crm/estimates", {
-        customerId: id, title, introText: intro || null, taxRateBps: taxBps,
+      const body = {
+        title, introText: intro || null, taxRateBps: taxBps,
         items: clean.map((i, idx) => ({ ...i, sortOrder: idx, description: i.description || null, unit: i.unit || null })),
-      })).json();
+      };
+      setFinalizing(true);
+      try {
+        // Already autosaved as a draft: finish THAT estimate — never a duplicate.
+        if (autosave.draftId) {
+          return (await apiRequest("PATCH", `/api/crm/estimates/${autosave.draftId}`, { ...body, autosave: false })).json();
+        }
+        return (await apiRequest("POST", "/api/crm/estimates", { customerId: id, ...body })).json();
+      } finally {
+        setFinalizing(false);
+      }
     },
     onSuccess: () => {
       setOpen(false);
-      setItems([{ ...BLANK }]); setIntro(""); setTitle("Estimate"); setTaxPct("0"); setTaxTouched(false);
+      autosave.reset();
+      resetForm();
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
       toast({ title: "Estimate created" });
     },
@@ -1523,12 +1575,48 @@ export default function CrmClientPage() {
             />
           )}
           {canEstimate && (
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={(next) => {
+              if (next) {
+                // An unfinished autosaved draft for this client: offer to continue it instead of starting a duplicate.
+                const prior = (data?.estimates ?? []).find((x: any) => x.autosave && x.status === "draft" && !x.sentAt);
+                if (prior && !autosave.draftId && !autosave.hasContent) setResumeOffer({ id: prior.id, title: prior.title, updatedAt: prior.updatedAt });
+                setOpen(true);
+                return;
+              }
+              // Outside click and Esc are blocked below; the X with content asks first.
+              if (autosave.hasContent) { setConfirmClose(true); return; }
+              setOpen(false);
+              autosave.reset();
+            }}>
               <DialogTrigger asChild>
                 <Button size="sm" data-testid="button-new-estimate"><Plus className="h-4 w-4 mr-2" /> New estimate</Button>
               </DialogTrigger>
-              <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
-                <DialogHeader><DialogTitle>New estimate for {c.displayName}</DialogTitle><DialogDescription>Add the line items, then save it as a draft or send it.</DialogDescription></DialogHeader>
+              <DialogContent
+                className={fullscreen.full
+                  ? "max-w-none w-screen h-[100dvh] max-h-[100dvh] sm:rounded-none overflow-y-auto flex flex-col"
+                  : "max-w-3xl max-h-[92vh] overflow-y-auto"}
+                onInteractOutside={(e) => { if (autosave.hasContent) e.preventDefault(); }}
+                onEscapeKeyDown={(e) => { if (autosave.hasContent) e.preventDefault(); }}
+                data-testid="dialog-new-estimate" data-fullscreen={fullscreen.full ? "1" : "0"}>
+                <FullscreenToggle full={fullscreen.full} onToggle={fullscreen.toggle} />
+                <DialogHeader><DialogTitle>New estimate for {c.displayName}</DialogTitle><DialogDescription>Add the line items, then save it as a draft or send it. Your work saves itself as you type.</DialogDescription></DialogHeader>
+                {resumeOffer && (
+                  <div className="rounded-md border bg-muted/40 p-3 text-sm flex flex-wrap items-center gap-2" data-testid="banner-resume-draft">
+                    <span className="flex-1 min-w-[12rem]">You have an unfinished draft, <strong>{resumeOffer.title}</strong>. Continue it?</span>
+                    <Button size="sm" data-testid="button-resume-draft" onClick={async () => {
+                      try {
+                        const r = await (await apiRequest("GET", `/api/crm/estimates/${resumeOffer.id}`)).json();
+                        const snap = snapshotFromEstimate(r.estimate, r.items ?? []);
+                        loadSnapshot(snap);
+                        autosave.adopt(resumeOffer.id, snap);
+                        setResumeOffer(null);
+                      } catch (e: any) {
+                        toast({ title: "Could not open the draft", description: apiErrorMessage(e), variant: "destructive" });
+                      }
+                    }}>Continue draft</Button>
+                    <Button size="sm" variant="outline" data-testid="button-start-new-draft" onClick={() => setResumeOffer(null)}>Start a new one</Button>
+                  </div>
+                )}
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="sm:col-span-2">
@@ -1545,7 +1633,7 @@ export default function CrmClientPage() {
                 <TaxRateNote rate={taxRate.data} loading={taxRate.isLoading} currentBps={taxBps} />
                 <div>
                   <Label htmlFor="e-intro">Message to the client</Label>
-                  <Textarea id="e-intro" rows={2} value={intro} onChange={(e) => setIntro(e.target.value)}
+                  <Textarea id="e-intro" rows={fullscreen.full ? 4 : 2} value={intro} onChange={(e) => setIntro(e.target.value)}
                     placeholder="Thanks for having us out — here's the scope we discussed." />
                 </div>
 
@@ -1599,7 +1687,8 @@ export default function CrmClientPage() {
                           line's description and renders on the estimate. */}
                       <div className="sm:col-span-12">
                         <Label className="text-xs">Scope &amp; details (shown to the client)</Label>
-                        <Textarea rows={2} value={it.description ?? ""}
+                        <Textarea rows={fullscreen.full ? 8 : 2} value={it.description ?? ""}
+                          className={fullscreen.full ? "min-h-[28vh]" : undefined}
                           data-testid={`input-item-scope-${idx}`}
                           placeholder="What's included — materials, prep, warranty, exclusions…"
                           onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, description: e.target.value } : x))} />
@@ -1619,7 +1708,8 @@ export default function CrmClientPage() {
                   <div className="text-lg font-bold">Total <span className="ml-3">{money(total)}</span></div>
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="items-center gap-2">
+                  <span className="mr-auto"><AutosaveIndicator status={autosave.status} savedAt={autosave.savedAt} error={autosave.error} /></span>
                   <Button onClick={() => createEstimate.mutate()} disabled={createEstimate.isPending}
                     data-testid="button-save-estimate">
                     {createEstimate.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Create estimate
@@ -1627,6 +1717,47 @@ export default function CrmClientPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          )}
+          {canEstimate && (
+            <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
+              <AlertDialogContent data-testid="dialog-confirm-close-estimate">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Keep this estimate?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Save it as a draft on {c.displayName}'s estimates to finish later, or throw it away.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="gap-2">
+                  <AlertDialogCancel data-testid="button-keep-editing">Keep editing</AlertDialogCancel>
+                  <Button variant="outline" data-testid="button-discard-estimate" onClick={async () => {
+                    const draft = autosave.draftId;
+                    if (draft) {
+                      try { await apiRequest("DELETE", `/api/crm/estimates/${draft}/autosave`); } catch { /* best-effort; it stays a draft */ }
+                    }
+                    autosave.reset();
+                    resetForm();
+                    setConfirmClose(false);
+                    setOpen(false);
+                    queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
+                  }}>Discard</Button>
+                  <Button data-testid="button-save-draft-close" onClick={async () => {
+                    const saved = await autosave.saveNow();
+                    if (!saved) {
+                      toast({ title: "Not saved to the server", description: "It is kept on this device; try again in a moment.", variant: "destructive" });
+                      setConfirmClose(false);
+                      return;
+                    }
+                    autosave.keepClosed();
+                    autosave.reset();
+                    resetForm();
+                    setConfirmClose(false);
+                    setOpen(false);
+                    queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
+                    toast({ title: "Saved as a draft", description: "It's in this client's estimates." });
+                  }}>Save as draft</Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </CardHeader>
         <CardContent className="space-y-2">
