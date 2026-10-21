@@ -20,6 +20,7 @@
  * block with the typed name, date and approval IP. Every page gets the
  * 'company · license · website' band and a 'Page X of Y' number.
  */
+import { isSameTerms } from "@shared/terms-dedupe";
 import PDFDocument from "pdfkit";
 
 export const BRAND_ORANGE = "#F97316";
@@ -437,10 +438,10 @@ export async function buildContractPdf(
   const termsBlocks: [string, string][] = [];
   const estTerms = e.termsText?.trim();
   const orgTerms = input.terms?.trim();
-  if (estTerms && orgTerms && estTerms !== orgTerms) {
+  if (estTerms && orgTerms && !isSameTerms(estTerms, orgTerms)) {
     termsBlocks.push(["Estimate terms", estTerms], ["Terms and conditions", orgTerms]);
   } else if (estTerms || orgTerms) {
-    termsBlocks.push(["Terms and conditions", (estTerms || orgTerms)!]);
+    termsBlocks.push(["Terms and conditions", (orgTerms || estTerms)!]);
   }
   // (The warranty prints once, at the top — after Prepared for.)
   termsBlocks.forEach(([heading, body], idx) => {

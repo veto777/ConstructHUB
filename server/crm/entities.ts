@@ -1605,7 +1605,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         orgId: ctx.org.id, customerId: d.customerId, projectId: d.projectId ?? null,
         divisionId: d.divisionId ?? divisionScopeOf(ctx),
         number, title: d.title, introText: d.introText ?? null,
-        termsText: d.termsText ?? ctx.org.termsAndConditions ?? null,
+        // Only terms typed for THIS estimate; the org's terms are copied once, as company terms (below).
+        termsText: d.termsText ?? null,
         taxRateBps: d.taxRateBps, depositCents: d.depositCents ?? null,
         // Footer, warranty, company terms and the default deposit percent are
         // copied from Settings now; a deposit typed on this request wins.

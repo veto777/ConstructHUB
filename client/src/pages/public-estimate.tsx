@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { isSameTerms } from "@shared/terms-dedupe";
 import { amountDueCents, previewEstimatePage } from "@shared/estimate-totals";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
@@ -580,7 +581,7 @@ export default function PublicEstimatePage() {
                   {company.termsAndConditions}
                 </p>
               )}
-              {e.termsText && (
+              {e.termsText && !isSameTerms(e.termsText, company.termsAndConditions) && (
                 <>
                   {company.termsAndConditions && <Separator />}
                   <div>
