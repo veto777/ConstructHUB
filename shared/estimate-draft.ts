@@ -29,6 +29,9 @@ export type DraftLine = {
   pricebookItemId?: string | null;
   /** That item's list price when picked (client-side only: drives "Update price book to $X"). */
   listPriceCents?: number | null;
+  /** Kept as loaded when an existing estimate is edited in the dialog (the dialog has no control for them). */
+  hiddenFromClient?: boolean;
+  unitCostCents?: number | null;
 };
 
 /** A preset / org-default discount the client may choose on the estimate page (crm_estimate_discounts). */
@@ -84,6 +87,19 @@ export function autoTitleFrom(items: Array<{ name?: string | null; kind?: string
   return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 40)).trimEnd()}…`;
 }
 
+/**
+ * Was this title set automatically? For an estimate saved before the auto-title flag existed: the default title,
+ * the title its lines give now, or the name of one of the org's price-book items (the old dialog copied the first
+ * picked item's name into the title — "Seamless Gutter Installation" on a "Door Remodel" estimate). Anything else
+ * was typed by someone and stays.
+ */
+export function titleLooksAuto(title: string | null | undefined, items: Array<{ name?: string | null; kind?: string }>, pricebookNames?: Set<string>): boolean {
+  const t = (title ?? "").trim();
+  if (!t || t === DEFAULT_ESTIMATE_TITLE) return true;
+  if (t === autoTitleFrom(items)) return true;
+  return !!pricebookNames && pricebookNames.has(t.toLowerCase());
+}
+
 export const pctTextToBps = (t: string): number => {
   const n = parseFloat(t || "0");
   return Number.isFinite(n) ? Math.min(3000, Math.max(0, Math.round(n * 100))) : 0;
@@ -110,6 +126,8 @@ export function autosavePayload(s: EstimateDraftSnapshot) {
     unit: l.unit?.trim() ? l.unit.trim().slice(0, 20) : null,
     unitPriceCents: Math.max(0, Math.round(l.unitPriceCents || 0)),
     taxable: l.taxable !== false,
+    hiddenFromClient: !!l.hiddenFromClient,
+    ...(typeof l.unitCostCents === "number" ? { unitCostCents: l.unitCostCents } : {}),
     pricebookItemId: l.pricebookItemId ?? null,
   }));
   const disc = contractorDiscountLine(s.contractorDiscount, s.items);
@@ -186,7 +204,7 @@ export function clearDraftMirror(key: string, s?: StorageLike | null): void {
 
 /** A server estimate (+ its offers) back into the dialog's form (continue an autosaved draft). */
 export function snapshotFromEstimate(
-  e: { title?: string | null; introText?: string | null; taxRateBps?: number | null; autosaveMeta?: any },
+  e: { title?: string | null; introText?: string | null; taxRateBps?: number | null; autosaveMeta?: any; titleAuto?: boolean | null },
   items: Array<Partial<DraftLine> & { name?: string | null }>,
   offers?: DraftOffer[],
 ): EstimateDraftSnapshot {
@@ -200,9 +218,11 @@ export function snapshotFromEstimate(
   }
   return {
     title: e.title ?? DEFAULT_ESTIMATE_TITLE,
-    // Manual only when the user actually typed a title (meta.autoTitle false). A draft from before the auto
-    // title (no meta) gets its title recomputed from the lines — a stale picked-item title is not "typed".
-    autoTitle: meta.autoTitle !== false,
+    // The saved flag when there is one; else the server's titleLooksAuto verdict (GET /api/crm/estimates/:id),
+    // else the same rule without price-book names. Only a title someone typed stays manual.
+    autoTitle: typeof meta.autoTitle === "boolean" ? meta.autoTitle
+      : typeof e.titleAuto === "boolean" ? e.titleAuto
+      : titleLooksAuto(e.title, rows),
     intro: e.introText ?? "",
     taxPct: String(Number(((e.taxRateBps ?? 0) / 100).toFixed(2))),
     taxTouched: true,
@@ -210,6 +230,8 @@ export function snapshotFromEstimate(
       kind: i.kind ?? "labor", name: i.name === UNTITLED_LINE ? "" : i.name ?? "", description: i.description ?? "",
       quantityMilli: i.quantityMilli ?? 1000, unit: i.unit ?? "", unitPriceCents: i.unitPriceCents ?? 0,
       taxable: i.taxable ?? true, pricebookItemId: i.pricebookItemId ?? null,
+      hiddenFromClient: !!i.hiddenFromClient,
+      ...(typeof i.unitCostCents === "number" ? { unitCostCents: i.unitCostCents } : {}),
     })),
     ...(offers ? { offers } : {}),
     contractorDiscount: cd,

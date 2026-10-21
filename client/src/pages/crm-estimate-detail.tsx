@@ -22,6 +22,7 @@ import { EstimateAttachmentsCard } from "@/components/estimate-attachments-card"
 import { HelpButton } from "@/components/help-button";
 import { Hover3DCard } from "@/components/hover-3d-card";
 import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
+import { PricebookItemInput } from "@/components/pricebook-item-input";
 import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff";
 import { money } from "@/lib/estimate-math";
 import { cn } from "@/lib/utils";
@@ -583,10 +584,16 @@ export default function CrmEstimateDetailPage() {
                   <div className="grid gap-2 sm:grid-cols-12 items-end">
                     <div className="sm:col-span-4">
                       <Label className="text-xs">Item</Label>
-                      <Input value={l.name} maxLength={300} onChange={(ev) => setLine(idx, { name: ev.target.value })}
-                        aria-invalid={unnamedLines.includes(idx)}
-                        className={unnamedLines.includes(idx) ? "border-destructive" : undefined}
-                        placeholder="Fiber-cement siding — front elevation" data-testid={`edit-line-name-${idx}`} />
+                      {/* The same price-book typeahead as the New-estimate popup; typing anything else keeps a free line. */}
+                      <div className={unnamedLines.includes(idx) ? "rounded-md ring-1 ring-destructive" : undefined}>
+                        <PricebookItemInput value={l.name} testId={`edit-line-name-${idx}`}
+                          placeholder="Search your price book, or type an item"
+                          onChange={(v) => setLine(idx, { name: v.slice(0, 300) })}
+                          onPick={(pb) => setLine(idx, {
+                            name: pb.name, unit: pb.unit ?? "", description: pb.description ?? "", taxable: pb.taxable,
+                            priceText: (pb.unitPriceCents / 100).toString(),
+                          })} />
+                      </div>
                     </div>
                     <div className="sm:col-span-2">
                       <Label className="text-xs">Kind</Label>

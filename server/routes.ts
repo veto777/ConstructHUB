@@ -570,6 +570,9 @@ export async function registerRoutes(
   try {
     const { ensureCrmSchema } = await import("./crm/schema-ensure");
     await ensureCrmSchema();
+    // Drafts autosaved before the live auto-title get their stale picked-item title recomputed (once; never blocks boot).
+    import("./crm/autosave-title-migration").then((m) => m.migrateAutosaveTitles())
+      .catch((e: any) => console.error("[crm] autosave title migration failed:", e?.message || e));
     // Campaign attribution columns on ch_analytics_events + ch_signup_attribution (needs the table above).
     const { ensureAnalyticsAttributionSchema } = await import("./analytics-attribution");
     await ensureAnalyticsAttributionSchema();

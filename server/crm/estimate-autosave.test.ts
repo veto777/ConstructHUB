@@ -10,7 +10,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import {
-  autoTitleFrom, autosavePayload, clearDraftMirror, draftHasContent, draftMirrorKey, readDraftMirror, snapshotFromEstimate,
+  autoTitleFrom, titleLooksAuto, autosavePayload, clearDraftMirror, draftHasContent, draftMirrorKey, readDraftMirror, snapshotFromEstimate,
   writeDraftMirror, type EstimateDraftSnapshot,
 } from "@shared/estimate-draft";
 
@@ -62,9 +62,15 @@ describe("autoTitleFrom — the title follows the lines until the user types one
     expect(autoTitleFrom([L("A"), L("Discount", "discount")])).toBe("A");
     expect(autoTitleFrom([L("x".repeat(150)), L("y".repeat(150))]).length).toBeLessThanOrEqual(200);
   });
-  it("a draft from before auto titles (no meta) is recomputed; only a typed title stays manual", () => {
+  it("a saved estimate without the flag: auto when the title came from a pick, manual when typed", () => {
     const items = [{ kind: "labor", name: "Door Remodel", quantityMilli: 1000, unitPriceCents: 500000, taxable: true }];
-    expect(snapshotFromEstimate({ title: "Seamless Gutter Installation" }, items).autoTitle).toBe(true);
+    const pb = new Set(["seamless gutter installation", "door remodel"]);
+    expect(titleLooksAuto("Seamless Gutter Installation", items, pb)).toBe(true);   // the owner's stale draft
+    expect(titleLooksAuto("Estimate", items)).toBe(true);
+    expect(titleLooksAuto("Door Remodel", items)).toBe(true);
+    expect(titleLooksAuto("Smith house, phase 1", items, pb)).toBe(false);
+    expect(snapshotFromEstimate({ title: "Seamless Gutter Installation", titleAuto: true }, items).autoTitle).toBe(true);
+    expect(snapshotFromEstimate({ title: "Smith house, phase 1" }, items).autoTitle).toBe(false);
     expect(snapshotFromEstimate({ title: "Smith job", autosaveMeta: { autoTitle: false } }, items).autoTitle).toBe(false);
     expect(autosavePayload({ ...OWNER, autoTitle: false }).autosaveMeta).toMatchObject({ autoTitle: false });
   });
@@ -187,6 +193,31 @@ describe.skipIf(!lane)("autosaved drafts through the CRM routes (lane Postgres)"
     expect(done.data.autosave).toBeUndefined();
     // Finished: Discard can no longer delete it.
     expect((await call(`/api/crm/estimates/${first.data.id}/autosave`, undefined, "DELETE")).status).toBe(409);
+  });
+
+  it("boot fix: an autosaved draft with a stale picked-item title gets its lines' title; a typed one is kept", async () => {
+    const pbId = randomUUID();
+    await pool.query(`INSERT INTO crm_pb_items(id, org_id, name, unit, pricing_mode, flat_price_cents) VALUES($1,$2,'Seamless Gutter Installation','lf','flat',2000)`, [pbId, orgId]);
+    const mk = async (title: string) => {
+      const d = await call("/api/crm/estimates", { customerId, title, items: [{ name: "Door Remodel", unitPriceCents: 500000 }], autosave: true });
+      // As deploy 1 saved them: no auto-title flag.
+      await pool.query(`UPDATE crm_estimates SET custom_fields = jsonb_set(custom_fields, '{autosave}', (custom_fields->'autosave') - 'meta') WHERE id=$1`, [d.data.id]);
+      return d.data.id as string;
+    };
+    const stale = await mk("Seamless Gutter Installation");
+    const typed = await mk("Smith house, phase 1");
+    // Before the fix the popup is told the stale title is automatic.
+    expect((await call(`/api/crm/estimates/${stale}`)).data.estimate.titleAuto).toBe(true);
+    expect((await call(`/api/crm/estimates/${typed}`)).data.estimate.titleAuto).toBe(false);
+    const { migrateAutosaveTitles } = await import("./autosave-title-migration");
+    await migrateAutosaveTitles();
+    const row = async (id: string) => (await pool.query("SELECT title, custom_fields->'autosave'->'meta' AS meta FROM crm_estimates WHERE id=$1", [id])).rows[0];
+    expect(await row(stale)).toMatchObject({ title: "Door Remodel", meta: { autoTitle: true } });
+    expect(await row(typed)).toMatchObject({ title: "Smith house, phase 1", meta: { autoTitle: false } });
+    // Idempotent.
+    await pool.query("UPDATE crm_estimates SET title='Hand edit' WHERE id=$1", [stale]);
+    await migrateAutosaveTitles();
+    expect((await row(stale)).title).toBe("Hand edit");
   });
 
   it("Discard deletes only the unfinished autosaved draft", async () => {

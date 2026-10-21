@@ -1,3 +1,4 @@
+import { titleLooksAuto } from "@shared/estimate-draft";
 import { invoiceRefundTotals } from "./refund-summary";
 import type { CrmCustomerDetailResponse } from "@shared/crm-customer-detail";
 import { objectPolicy, canShareWholeClientPortal } from "./object-access";
@@ -19,7 +20,7 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import { db } from "../db";
 import {
-  crmCustomers, crmProjects, crmJobs, crmEstimates, crmEstimateItems,
+  crmCustomers, crmProjects, crmJobs, crmEstimates, crmEstimateItems, crmPbItems,
   crmEstimateEvents, crmLeadSources, crmInvoices, crmInvoiceItems,
   crmEstimateOptions, crmEstimateDiscounts, crmEngagementSessions,
   crmPayments, crmCustomerNotes, crmClientComments, crmFinanceClicks,
@@ -1642,8 +1643,17 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     // History names who did each step: the member ("Veto Smith (Owner)"),
     // the client by name, or the automatic source — never the stored id.
     const dir = await loadActorDirectory(ctx.org.id);
+    // For the New-estimate popup editing this estimate: is its title automatic (follows the lines)? The saved flag,
+    // else shared/estimate-draft.ts titleLooksAuto with the org's price-book names.
+    const savedAuto = (e.customFields as any)?.autosave?.meta?.autoTitle;
+    let titleAuto: boolean;
+    if (typeof savedAuto === "boolean") titleAuto = savedAuto;
+    else {
+      const pbNames = await db.select({ name: crmPbItems.name }).from(crmPbItems).where(eq(crmPbItems.orgId, ctx.org.id));
+      titleAuto = titleLooksAuto(e.title, items, new Set(pbNames.map((p) => p.name.trim().toLowerCase())));
+    }
     res.json({
-      estimate: presentEstimate(e, ctx),
+      estimate: { ...presentEstimate(e, ctx), titleAuto },
       items: items.map((i) => presentEstimateItem(i, ctx)),
       // The client's IP is audit data, not team reading material — same /24
       // redaction the engagement endpoint applies (portal.ts redactIpPrefix).

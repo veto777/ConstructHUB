@@ -356,7 +356,11 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
   const hasNext = lastShown < filteredCount;
   // Where a row goes: an estimate opens its own page (detail/edit/resend);
   // invoices have no detail page, so they open the client's.
-  const rowHref = (r: DocRow) => (kind === "estimates" ? `/crm/estimates/${r.id}` : `/crm/clients/${r.customerId}`);
+  // A draft that was never sent opens in the client page's New-estimate popup (owner, 2026-10-21); the full
+  // editor stays one click away there ("Open full editor").
+  const estimateHref = (r: DocRow) => (r.status === "draft" && !r.sentAt
+    ? `/crm/clients/${r.customerId}?openEstimate=${r.id}` : `/crm/estimates/${r.id}`);
+  const rowHref = (r: DocRow) => (kind === "estimates" ? estimateHref(r) : `/crm/clients/${r.customerId}`);
 
   return (
     <CrmPage wide>
@@ -670,7 +674,7 @@ export function CrmDocumentsPage({ kind, actions }: { kind: "estimates" | "invoi
                             text, resend, or (owner) delete from there. */}
                         {/* The row itself opens the estimate on a phone. */}
                         {kind === "estimates" && (
-                          <Link href={`/crm/estimates/${r.id}`} className="hidden sm:inline-flex">
+                          <Link href={estimateHref(r)} className="hidden sm:inline-flex">
                             <Button
                               variant="ghost"
                               size="sm"
