@@ -3,7 +3,8 @@
  * per-document SNAPSHOT.
  *
  * A new estimate copies the org's estimate footer, warranty text, company
- * terms and default deposit percent onto itself; a new invoice copies the
+ * terms, default deposit percent and bid headline (shared/bid-headline.ts)
+ * onto itself; a new invoice copies the
  * invoice footer, warranty text and terms. The client's page and the signed
  * contract print the document's own copy, so editing Settings later changes
  * only documents created after the save — never one already in a client's
@@ -15,12 +16,15 @@
  * only, never onto a sent, viewed or signed document.
  */
 
+import { bidHeadlineFromCustomFields } from "@shared/bid-headline";
+
 type OrgDefaults = {
   estimateFooter?: string | null;
   invoiceFooter?: string | null;
   termsAndConditions?: string | null;
   warrantyText?: string | null;
   defaultDepositBps?: number | null;
+  customFields?: unknown;
 };
 
 const text = (v: string | null | undefined) => (v && v.trim() ? v : null);
@@ -33,6 +37,8 @@ export function estimateDefaultsFromOrg(org: OrgDefaults, now: Date = new Date()
     warrantyText: text(org.warrantyText),
     companyTermsText: text(org.termsAndConditions),
     depositBps: bps > 0 ? Math.min(10000, bps) : null,
+    // The headline is never read live: only estimates created while it is set carry it.
+    bidHeadline: bidHeadlineFromCustomFields(org.customFields),
     defaultsSnapshotAt: now,
   };
 }

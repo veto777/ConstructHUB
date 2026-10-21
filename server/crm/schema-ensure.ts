@@ -559,6 +559,8 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS company_terms_text text;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS deposit_bps integer;
     ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS defaults_snapshot_at timestamp;
+    -- The bid headline as copied on at creation (shared/bid-headline.ts); never backfilled.
+    ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS bid_headline jsonb;
     ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS footer_text text;
     ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS warranty_text text;
     ALTER TABLE crm_invoices ADD COLUMN IF NOT EXISTS terms_text text;

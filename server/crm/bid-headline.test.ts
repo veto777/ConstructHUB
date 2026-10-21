@@ -2,8 +2,9 @@
  * The per-org bid headline (shared/bid-headline.ts): the banner every estimate
  * opens with, above the scopes and the line items. Pure normalisation, the
  * email block, the client-page banner rendered to markup, the signed-contract
- * PDF, and source guards that each client-facing surface puts it FIRST — and
- * that an org without one gets nothing new.
+ * PDF, the copy-at-creation gate (only estimates created while the org has a
+ * headline show one), and source guards that each client-facing surface puts
+ * it FIRST — and that an org without one gets nothing new.
  */
 import { describe, it, expect } from "vitest";
 import fs from "fs";
@@ -20,6 +21,7 @@ import {
 } from "@shared/bid-headline";
 import { BidHeadlineBanner } from "@/components/bid-headline-banner";
 import { buildContractPdf, type ContractPdfInput } from "./contract-pdf";
+import { estimateDefaultsFromOrg } from "./doc-defaults";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const src = (rel: string) => fs.readFileSync(path.join(root, rel), "utf8");
@@ -52,6 +54,33 @@ describe("normalizeBidHeadline / bidHeadlineFromCustomFields", () => {
     const h = normalizeBidHeadline({ title: "x".repeat(500), subline: "y".repeat(900) })!;
     expect(h.title).toHaveLength(BID_HEADLINE_TITLE_MAX);
     expect(h.subline).toHaveLength(BID_HEADLINE_SUBLINE_MAX);
+  });
+});
+
+describe("copied onto NEW estimates only (doc-defaults.ts)", () => {
+  it("a new estimate carries the org's headline at creation", () => {
+    const d = estimateDefaultsFromOrg({ warrantyText: "Lifetime…", customFields: { bidHeadline: HEADLINE, themeColor: "blue" } });
+    expect(d.bidHeadline).toEqual(HEADLINE);
+    expect(d.warrantyText).toBe("Lifetime…");
+  });
+
+  it("an org without one gives new estimates none", () => {
+    expect(estimateDefaultsFromOrg({}).bidHeadline).toBeNull();
+    expect(estimateDefaultsFromOrg({ customFields: { bidHeadline: { title: " " } } }).bidHeadline).toBeNull();
+  });
+
+  it("every printed surface reads the ESTIMATE's copy, never the org's live Settings", () => {
+    const portal = src("server/crm/portal.ts");
+    expect(portal).not.toContain("bidHeadlineFromCustomFields");
+    expect(portal.match(/normalizeBidHeadline\(est\.bidHeadline\)/g)?.length).toBe(3); // page, email, contract
+    // The client-selection regeneration keeps the original's copy, like its warranty.
+    expect(portal).toMatch(/defaultsSnapshotAt: est\.defaultsSnapshotAt, depositBps: est\.depositBps,\s*bidHeadline: est\.bidHeadline,/);
+    expect(src("server/crm/schema-ensure.ts")).toContain("ALTER TABLE crm_estimates ADD COLUMN IF NOT EXISTS bid_headline jsonb;");
+    expect(src("shared/schema.ts")).toContain('bidHeadline: jsonb("bid_headline"),');
+    // Every create path spreads the org defaults (the HCP importer, migrate.ts, deliberately doesn't).
+    for (const f of ["server/crm/entities.ts", "server/crm/quickbid.ts", "server/crm/self-estimate.ts"]) {
+      expect(src(f), f).toMatch(/estimateDefaultsFromOrg\((ctx\.org|a\.org)\)/);
+    }
   });
 });
 
@@ -162,13 +191,13 @@ describe("every client-facing bid opens with it (source guards)", () => {
 
   it("the public payload, the estimate email and the contract PDF carry the org's headline", () => {
     const portal = src("server/crm/portal.ts");
-    expect(portal).toContain("bidHeadline: bidHeadlineFromCustomFields(org.customFields),");
+    expect(portal).toContain("bidHeadline: normalizeBidHeadline(est.bidHeadline),");
     // Email: the block sits right under the title, before the greeting.
     const title = portal.indexOf("Approve Estimate${est.number");
     const block = portal.indexOf("${headlineHtml}");
     expect(block).toBeGreaterThan(title);
     expect(block).toBeLessThan(portal.indexOf("<p style=\"font-size:16px\">Hi ${esc(cust.displayName)},</p>"));
-    expect(portal).toMatch(/warrantyText: estimateDocText\(est, org\)\.warrantyText,\s*bidHeadline: bidHeadlineFromCustomFields/);
+    expect(portal).toMatch(/warrantyText: estimateDocText\(est, org\)\.warrantyText,\s*bidHeadline: normalizeBidHeadline\(est\.bidHeadline\)/);
   });
 
   it("Settings saves it through PATCH /api/crm/org, merged into custom_fields and removed when blank", () => {

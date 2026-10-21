@@ -944,9 +944,10 @@ export default function CrmSettingsPage() {
                 value={defaults.headlineSubline}
                 onChange={(e) => setDefaults((d) => ({ ...d, headlineSubline: e.target.value }))} />
               <p className="text-xs text-muted-foreground">
-                A banner at the very top of every estimate — on the client's page, the estimate email and the
-                signed contract — above the scopes and line items, with a link to your warranty text. If the claim
-                has conditions or limits, state them on the smaller line. Leave the headline blank to show none.
+                A banner at the very top of each estimate you create after saving — on the client's page, the
+                estimate email and the signed contract — above the scopes and line items, with a link to the
+                estimate's warranty text. Estimates already created keep what they had. If the claim has conditions
+                or limits, state them on the smaller line. Leave the headline blank to show none.
               </p>
             </div>
             <div className="space-y-1.5">

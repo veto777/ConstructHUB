@@ -8,9 +8,11 @@
  * bidHeadlineFromCustomFields, which returns null for a missing, blank or
  * malformed value.
  *
- * Unlike the warranty text and terms (doc-defaults.ts snapshots them per
- * document), the headline is read LIVE from the org, so it opens every bid —
- * old ones included. The signed-contract PDF freezes it at signing.
+ * Like the warranty text and terms, the headline is copied onto each NEW
+ * estimate (doc-defaults.ts → crm_estimates.bid_headline) and only that copy
+ * prints. An estimate created before the org set or changed its headline
+ * keeps what it had (usually none): an old bid never gains a claim its own
+ * warranty text doesn't back.
  *
  * The subline is where a conditional claim discloses its limits ("limited
  * lifetime … see warranty terms"), right under the claim, at a readable size.

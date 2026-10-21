@@ -54,7 +54,7 @@ import { onlinePaymentRails } from "./payments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
 import type { CrmNotificationPref } from "@shared/schema";
 import { resolveOrgTheme, themePayload } from "@shared/theme-colors";
-import { WARRANTY_ANCHOR, bidHeadlineEmailHtml, bidHeadlineFromCustomFields } from "@shared/bid-headline";
+import { WARRANTY_ANCHOR, bidHeadlineEmailHtml, normalizeBidHeadline } from "@shared/bid-headline";
 import { logError } from "../ops/log";
 import { clientHome3dForEstimate } from "./hover-share";
 import { viewerMeasurementForEstimate } from "./hover-model3d-offer";
@@ -293,9 +293,10 @@ function publicEstimateView(
       // estimate never goes out under the WA HQ address.
       ...companyBranding(org, division),
       warrantyText: docText.warrantyText,
-      // The org's bid headline (shared/bid-headline.ts) — opens the estimate,
-      // above the scopes and items. Live from Settings; null when none is set.
-      bidHeadline: bidHeadlineFromCustomFields(org.customFields),
+      // The bid headline this estimate was created with (shared/bid-headline.ts)
+      // — opens the page above the scopes and items. Null on estimates made
+      // before the org set one: an old bid never gains a new claim.
+      bidHeadline: normalizeBidHeadline(est.bidHeadline),
       // Org-wide T&C render on a separate linked page (?terms=1), HCP-style —
       // never inline on the estimate itself. The estimate's snapshot of them.
       termsAndConditions: docText.companyTermsText,
@@ -406,8 +407,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const addressLine = branding.addressLine1
       ? `${esc([branding.addressLine1, branding.addressLine2].filter(Boolean).join(", "))}${branding.city ? `<br>${esc(branding.city)}` : ""}${branding.state ? `, ${esc(branding.state)}` : ""}${branding.postalCode ? ` ${esc(branding.postalCode)}` : ""}`
       : "";
-    // The org's bid headline opens the email too, right under the title.
-    const headline = bidHeadlineFromCustomFields(ctx.org.customFields);
+    // The estimate's bid headline opens the email too, right under the title.
+    const headline = normalizeBidHeadline(est.bidHeadline);
     const headlineHtml = headline
       ? bidHeadlineEmailHtml(headline, {
           accentHex: resolveOrgTheme(ctx.org.customFields).hex,
@@ -928,6 +929,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       // (an older original without a snapshot keeps following Settings, too).
       footerText: est.footerText, warrantyText: est.warrantyText, companyTermsText: est.companyTermsText,
       defaultsSnapshotAt: est.defaultsSnapshotAt, depositBps: est.depositBps,
+      bidHeadline: est.bidHeadline,
       taxRateBps: est.taxRateBps,
       publicToken: randomBytes(24).toString("hex"),
       status: "sent", sentAt: new Date(), sentToEmail: est.sentToEmail,
@@ -1738,10 +1740,9 @@ async function deliverSignedContract(
     // The company terms as this estimate carries them (snapshot, or live
     // Settings for an older estimate) — the same text the client page showed.
     terms: estimateDocText(est, org).companyTermsText,
-    // The warranty the client page showed, and the bid headline it opened
-    // with — frozen into the contract at signing.
+    // The warranty the client page showed, and the bid headline it opened with.
     warrantyText: estimateDocText(est, org).warrantyText,
-    bidHeadline: bidHeadlineFromCustomFields(org.customFields),
+    bidHeadline: normalizeBidHeadline(est.bidHeadline),
   });
   const fileName = contractFileName(est.number);
   const att = await storeGeneratedPdf({

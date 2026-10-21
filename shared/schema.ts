@@ -2109,6 +2109,10 @@ export const crmEstimates = pgTable("crm_estimates", {
   // is re-derived from the total on every recalc. A typed deposit clears it.
   depositBps: integer("deposit_bps"),
   defaultsSnapshotAt: timestamp("defaults_snapshot_at"),
+  // The org's bid headline (shared/bid-headline.ts) as copied on at creation
+  // — { title, subline } or null. Only this copy prints, so an estimate made
+  // before the org set (or changed) its headline never shows the new one.
+  bidHeadline: jsonb("bid_headline"),
   customFields: jsonb("custom_fields"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

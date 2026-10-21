@@ -558,7 +558,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     body: [
       "The fine print and starting values every new document begins with: your estimate and invoice footers, terms & conditions, warranty text, bid headline, default deposit and default sales tax.",
       "A new estimate copies the footer, warranty text, terms and default deposit onto itself, so a change here reaches estimates you create after saving, never one already sent. The sales tax is used when an estimate has none of its own.",
-      "The bid headline is different: it is a banner at the very top of every estimate, old ones included, above the scopes and line items, with a link to your warranty. Put the conditions and limits of the claim on its smaller line. Leave it blank and nothing shows.",
+      "The bid headline is copied the same way: a banner at the very top of each new estimate, above the scopes and line items, with a link to that estimate's warranty. Estimates already created keep what they had. Put the conditions and limits of the claim on its smaller line. Leave it blank and nothing shows.",
       "Example: every estimate page your clients open shows \"10-year workmanship warranty.\" — because you typed it here once.",
     ],
   },

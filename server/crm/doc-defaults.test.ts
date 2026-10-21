@@ -36,7 +36,7 @@ describe("doc-defaults helpers", () => {
     const at = new Date("2026-10-15T00:00:00Z");
     expect(estimateDefaultsFromOrg(ORG, at)).toEqual({
       footerText: "Est footer v1", warrantyText: "Warranty v1", companyTermsText: "Terms v1",
-      depositBps: 2500, defaultsSnapshotAt: at,
+      depositBps: 2500, bidHeadline: null, defaultsSnapshotAt: at,
     });
     expect(estimateDefaultsFromOrg({ ...ORG, defaultDepositBps: 0, estimateFooter: "  " }, at))
       .toMatchObject({ footerText: null, depositBps: null });
