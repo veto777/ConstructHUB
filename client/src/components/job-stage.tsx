@@ -2,8 +2,11 @@
  * The job stage (shared/job-stage.ts): the big Bid → Bid Submitted → Approved → Job Scheduled → In progress →
  * Closed out tracker on the CRM client page, and the small colored pill used next to clients in Google Reviews.
  *
- * Under the tracker: the submitted bid + signed contract, the "call to schedule the start date" reminder after
- * approval, the scheduled visit with a link to that day on the calendar, and — from Job Scheduled on — the punch
+ * The first phase is the Schedule Bid button (owner, 2026-10-21): it opens the Schedule Bid dialog and, once the bid
+ * is booked, reads "Bid scheduled" with the date.
+ *
+ * Under the tracker: the scheduled bid, the submitted bid + signed contract, the "call to schedule the start date"
+ * reminder after approval, the scheduled visit with a link to that day on the calendar, and — from Job Scheduled on — the punch
  * list & final walkthrough, one section per scope (every walkthrough complete closes the job out). Closing out
  * (by hand or by the last walkthrough) sprays confetti for the PM unless Settings → Celebrations is off.
  */
@@ -44,11 +47,15 @@ const TONE: Record<JobStage, { solid: string; soft: string; text: string }> = {
  * green, every phase it has moved past is blue with a check, the NEXT one is lit with a blue outline (the call to
  * action), the rest grey dashed. Two by two on a phone; the row wraps when there are more than six.
  */
-export function JobStageTracker({ current, flow = DEFAULT_JOB_FLOW, testId = "job-stage-tracker", onPick, busy }: {
+export function JobStageTracker({ current, flow = DEFAULT_JOB_FLOW, testId = "job-stage-tracker", onPick, busy, onScheduleBid, bidAt }: {
   /** The current phase's key (a built-in stage or a custom phase). */
   current: string | null; flow?: JobFlow; testId?: string;
   /** Makes each phase a button that moves the job there. */
   onPick?: (p: FlowPhase) => void; busy?: boolean;
+  /** The first phase reads "Schedule Bid" and opens the Schedule Bid dialog (owner, 2026-10-21). */
+  onScheduleBid?: () => void;
+  /** When the client's bid is booked: the first phase reads "Bid scheduled" with the date. */
+  bidAt?: string | null;
 }) {
   const at = phaseIndex(flow, current);
   const wraps = flow.phases.length > 6;
@@ -57,6 +64,10 @@ export function JobStageTracker({ current, flow = DEFAULT_JOB_FLOW, testId = "jo
       <ol className={`grid grid-cols-2 gap-2 ${wraps ? "sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" : "sm:flex sm:items-center sm:gap-0"}`}>
         {flow.phases.map((s, i) => {
           const done = i < at, current = i === at, next = i === at + 1;
+          // The built-in Bid phase (unless renamed in Settings → Job flow) is the Schedule Bid button.
+          const bidPhase = s.builtin === "bid" && s.label === "Bid" && !!onScheduleBid;
+          const label = bidPhase ? (bidAt ? "Bid scheduled" : "Schedule Bid") : s.label;
+          const clickable = bidPhase ? !busy : !!onPick && !busy && !current;
           const box = current ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
             : done ? "border-transparent bg-sky-50 dark:bg-sky-950/40"
             : next ? "border-sky-500 bg-background text-sky-700 dark:text-sky-300"
@@ -65,15 +76,18 @@ export function JobStageTracker({ current, flow = DEFAULT_JOB_FLOW, testId = "jo
             <li key={s.key} className="flex flex-1 items-center" data-testid={`${testId}-${s.key}`} aria-current={current ? "step" : undefined}
               data-state={current ? "current" : done ? "done" : next ? "next" : "later"}>
               {/* The phase the job is ON is green; every phase it has moved past is blue with a check (owner). */}
-              <button type="button" disabled={!onPick || busy || current} onClick={() => onPick?.(s)}
-                title={onPick && !current ? `Move the job to ${s.label}` : undefined}
-                className={`flex flex-1 items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition-colors disabled:cursor-default ${onPick && !current ? "hover:border-foreground/40" : ""} ${box}`}
-                data-testid={`button-${testId}-${s.key}`}>
+              <button type="button" disabled={!clickable} onClick={() => (bidPhase ? onScheduleBid!() : onPick?.(s))}
+                title={bidPhase ? (bidAt ? "Schedule another bid" : "Put the bid on the calendar") : onPick && !current ? `Move the job to ${s.label}` : undefined}
+                className={`flex flex-1 items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition-colors disabled:cursor-default ${clickable ? "hover:border-foreground/40" : ""} ${box}`}
+                data-testid={bidPhase ? `button-${testId}-schedule-bid` : `button-${testId}-${s.key}`}>
                 {/* Every finished step gets the same blue check (owner): the grey of a Bid-only tone never reads as done. */}
                 <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${done ? "bg-sky-600 text-white" : current ? "bg-emerald-600 text-white" : next ? "border-2 border-sky-500 text-sky-700 dark:text-sky-300" : "bg-muted-foreground/30 text-white"}`}>
                   {done ? <Check className="h-4 w-4" aria-hidden="true" /> : i + 1}
                 </span>
-                <span className={`text-sm ${wraps ? "" : "whitespace-nowrap"} ${current ? "font-bold" : done ? "font-semibold text-foreground" : next ? "font-semibold" : "font-medium"}`}>{s.label}</span>
+                <span className="min-w-0">
+                  <span className={`block text-sm ${wraps ? "" : "whitespace-nowrap"} ${current ? "font-bold" : done ? "font-semibold text-foreground" : next ? "font-semibold" : "font-medium"}`}>{label}</span>
+                  {bidPhase && bidAt && <span className="block whitespace-nowrap text-xs font-normal text-muted-foreground" data-testid={`${testId}-bid-at`}>{shortDayTime(bidAt)}</span>}
+                </span>
               </button>
               {!wraps && i < flow.phases.length - 1 && <span className={`hidden h-0.5 w-3 shrink-0 sm:block ${i < at ? "bg-foreground/40" : "bg-border"}`} aria-hidden="true" />}
             </li>
@@ -88,10 +102,11 @@ export type SubmittedEstimate = {
   id?: string; projectId?: string | null; number?: string | null; title?: string | null; status?: string | null; source?: "hcp" | "constructhub";
   totalCents?: number; approvedTotalCents?: number | null; sentAt?: string | null; approvedAt?: string | null; signatureName?: string | null;
 };
-export type StageAppointment = { id: string; title?: string | null; startsAt: string; endsAt?: string | null; status?: string | null; projectId?: string | null; customerId?: string | null };
+export type StageAppointment = { id: string; title?: string | null; startsAt: string; endsAt?: string | null; status?: string | null; projectId?: string | null; customerId?: string | null; kind?: string | null };
 
 const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const day = (iso?: string | null) => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
+const shortDayTime = (iso: string) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const dayTime = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 /** "2026-10-21" in the browser's zone — the day the calendar opens on (/crm/schedule?date=). */
 const isoDay = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -112,12 +127,21 @@ function pickSubmitted(estimates: SubmittedEstimate[], projectId?: string | null
 
 /** The visit that scheduled the job: the project's own (soonest upcoming, else the latest), else an unlinked one of the client's. */
 export function pickAppointment(appointments: StageAppointment[], projectId: string | null | undefined): StageAppointment | null {
-  const live = appointments.filter((a) => a.status !== "canceled");
+  // A scheduled bid is a sales visit, not the job's start date (pickBid has those).
+  const live = appointments.filter((a) => a.status !== "canceled" && a.kind !== "bid");
   const pool = (projectId && live.some((a) => a.projectId === projectId)) ? live.filter((a) => a.projectId === projectId) : live.filter((a) => !a.projectId);
   const now = Date.now();
   const t = (a: StageAppointment) => new Date(a.startsAt).getTime();
   const upcoming = pool.filter((a) => t(a) >= now).sort((a, b) => t(a) - t(b));
   return upcoming[0] ?? pool.sort((a, b) => t(b) - t(a))[0] ?? null;
+}
+
+/** The client's scheduled bid: the soonest upcoming one, else the latest (Schedule Bid, server/crm/bid-schedule.ts). */
+export function pickBid(appointments: StageAppointment[]): StageAppointment | null {
+  const bids = appointments.filter((a) => a.kind === "bid" && a.status !== "canceled");
+  const now = Date.now();
+  const t = (a: StageAppointment) => new Date(a.startsAt).getTime();
+  return bids.filter((a) => t(a) >= now).sort((a, b) => t(a) - t(b))[0] ?? bids.sort((a, b) => t(b) - t(a))[0] ?? null;
 }
 
 /**
@@ -426,7 +450,7 @@ function PunchListBlock({ projectId, customerId, canEdit, onClosedOut, onScopes 
  */
 export function JobStageControl({
   customer, estimates, projects, appointments = [], companyName, canEdit, measured = false, canSeePrices = false, canAttach = false,
-  celebrations = true, flow = DEFAULT_JOB_FLOW, onSchedule, canText,
+  celebrations = true, flow = DEFAULT_JOB_FLOW, onSchedule, onScheduleBid, canText,
 }: {
   customer: { id: string; displayName: string; firstName?: string | null; phone?: string | null };
   estimates: SubmittedEstimate[];
@@ -446,6 +470,8 @@ export function JobStageControl({
   celebrations?: boolean;
   /** Opens the client page's Schedule-appointment dialog, prefilled for this project. */
   onSchedule?: (projectId: string | null) => void;
+  /** Opens the Schedule Bid dialog for this client (the tracker's first phase). */
+  onScheduleBid?: () => void;
   /** This seat may message clients (the closing text goes through /api/crm/messages). */
   canText?: boolean;
 }) {
@@ -454,6 +480,8 @@ export function JobStageControl({
   const project = currentProject(projects);
   const current = currentPhaseKey(flow, stage, project?.stageKey);
   const appt = pickAppointment(appointments, project?.id);
+  const bid = pickBid(appointments);
+  const bidUpcoming = !!bid && new Date(bid.startsAt).getTime() >= Date.now();
   const first = customer.firstName?.trim() || customer.displayName.split(/\s+/)[0];
   const jobName = project?.name?.trim() || estimates.find((e) => e.status === "approved")?.title?.trim() || "project";
   const [closing, setClosing] = useState(false);
@@ -531,9 +559,17 @@ export function JobStageControl({
 
   return (
     <>
-      <JobStageTracker current={current} flow={flow} onPick={canEdit ? pick : undefined} busy={move.isPending} />
+      <JobStageTracker current={current} flow={flow} onPick={canEdit ? pick : undefined} busy={move.isPending}
+        onScheduleBid={canEdit ? onScheduleBid : undefined} bidAt={bidUpcoming ? bid!.startsAt : null} />
       {canEdit && <p className="mt-2 text-xs text-muted-foreground">Tap a phase to move the job — it also moves on its own when a bid is sent or approved, a visit goes on the calendar or an invoice goes out. {closedOutPhase.label} puts the client on the Google Reviews list.{flow.phases.length > 6 ? " Add or change phases in Settings → Job flow." : ""}</p>}
 
+      {bidUpcoming && stageIndex(stage) < stageIndex("approved") && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-muted/30 px-3 py-2.5 text-sm" data-testid="stage-bid-scheduled">
+          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="min-w-0 flex-1"><b>Bid scheduled</b> · {dayTime(bid!.startsAt)}</span>
+          <Link href={`/crm/schedule?date=${isoDay(bid!.startsAt)}`} className="font-medium text-primary hover:underline" data-testid="link-stage-bid-calendar">View on the calendar</Link>
+        </div>
+      )}
       {needsCall && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2.5 text-sm dark:border-emerald-900 dark:bg-emerald-950/30" data-testid="stage-reminder-schedule">
           <PhoneCall className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden="true" />

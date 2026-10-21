@@ -3,6 +3,7 @@ import { ClientSection, ClientSections, useClientPageLayout } from "@/components
 import { PricebookItemInput } from "@/components/pricebook-item-input";
 import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff";
 import { JobStageControl } from "@/components/job-stage";
+import { ScheduleBidDialog } from "@/components/schedule-bid";
 import { useJobFlow } from "@/components/job-flow-settings";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation, Link } from "wouter";
@@ -33,7 +34,7 @@ import { cleanOfferConditions } from "@shared/discount-presets";
 import {
   ArrowLeft, Plus, Loader2, Send, Eye, Check, CheckCircle2, XCircle, Copy,
   FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, BellRing,
-  Pencil, Search, Calendar, MessageSquare, CreditCard, Undo2, Info, GripVertical,
+  Pencil, Search, Calendar, CalendarClock, MessageSquare, CreditCard, Undo2, Info, GripVertical,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -639,6 +640,8 @@ export default function CrmClientPage() {
   };
 
   // ── Schedule an appointment (lands on the calendar + this page) ──────────
+  // Schedule Bid (the Job stage tracker's first phase and the quick action): server/crm/bid-schedule.ts.
+  const [bidOpen, setBidOpen] = useState(false);
   const [apptOpen, setApptOpen] = useState(false);
   const [apptTitle, setApptTitle] = useState("");
   const [apptStart, setApptStart] = useState("");
@@ -1630,7 +1633,7 @@ export default function CrmClientPage() {
             companyName={me?.org?.name ?? "us"} canEdit={canManageJobs} measured={!!stageTakeoff?.takeoffs?.length || !!stageTakeoff?.takeoff}
             canSeePrices={canSeePrices} canAttach={canManageCustomers} canText={canManageCustomers}
             celebrations={(me?.org?.customFields as any)?.celebrations !== false} flow={flow}
-            onSchedule={canManageJobs ? openSchedule : undefined} />
+            onSchedule={canManageJobs ? openSchedule : undefined} onScheduleBid={canManageJobs ? () => setBidOpen(true) : undefined} />
         </CardContent>
       </Card>
 
@@ -1640,6 +1643,12 @@ export default function CrmClientPage() {
         <Card>
           <CardContent className="p-4 flex flex-wrap items-center gap-2" data-testid="client-quick-actions">
             <span className="text-sm font-medium text-muted-foreground mr-1">Quick actions</span>
+            {canManageJobs && (
+              <Button size="sm" variant="outline" data-testid="button-quick-schedule-bid"
+                onClick={() => setBidOpen(true)}>
+                <CalendarClock className="h-4 w-4 mr-2" /> Schedule bid
+              </Button>
+            )}
             {canManageJobs && (
               <Button size="sm" variant="outline" data-testid="button-schedule-appointment"
                 onClick={() => openSchedule()}>
@@ -2664,6 +2673,10 @@ export default function CrmClientPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ScheduleBidDialog open={bidOpen} onOpenChange={setBidOpen}
+        client={{ id: c.id, displayName: c.displayName, email: c.email, phone: c.phone, addressLine1: c.addressLine1 }}
+        onScheduled={() => { refresh(); queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] }); }} />
 
       {/* Schedule an appointment — lands on the calendar and this page. */}
       <Dialog open={apptOpen} onOpenChange={setApptOpen}>

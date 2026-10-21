@@ -40,6 +40,7 @@ import { CrmBillingCard } from "@/components/crm-billing-card";
 import { confirmAction } from "@/components/confirm-dialog";
 import { AdminSetupNote } from "@/hooks/use-platform-admin";
 import { BID_HEADLINE_SUBLINE_MAX, BID_HEADLINE_TITLE_MAX, bidHeadlineFromCustomFields } from "@shared/bid-headline";
+import { CRM_NOTIFICATION_CHANNEL_DEFAULTS } from "@shared/notification-defaults";
 
 /**
  * Org settings — company profile, document defaults, notification switches,
@@ -67,6 +68,7 @@ const NOTIFICATIONS = [
   { key: "financeClick", label: "Financing interest", description: "A client opened one of your financing links from their client portal." },
   { key: "paymentReceipt", label: "Payment receipts", description: "The receipt email that goes out when a payment is recorded." },
   { key: "hoverReportReady", label: "New HOVER report", description: "A new HOVER measurement report landed in the CRM. Pick the states below." },
+  { key: "bidReminder", label: "Bid reminder", description: "30 minutes before a scheduled bid, a text to whoever booked it and the crew going. On by default." },
 ] as const;
 
 type NotifKey = (typeof NOTIFICATIONS)[number]["key"];
@@ -392,10 +394,11 @@ export default function CrmSettingsPage() {
     (org?.customFields as any)?.notificationPrefs ?? {};
   const chanOn = (k: NotifKey, ch: "inApp" | "email" | "sms"): boolean => {
     const v = notifPrefs[k];
-    if (v === undefined || v === null) return ch !== "sms";
+    const dflt = CRM_NOTIFICATION_CHANNEL_DEFAULTS[k]?.[ch] ?? ch !== "sms";
+    if (v === undefined || v === null) return dflt;
     if (typeof v === "boolean") return ch === "sms" ? false : v;
     const o = v as Record<string, boolean>;
-    return o[ch] === undefined ? ch !== "sms" : o[ch] === true;
+    return o[ch] === undefined ? dflt : o[ch] === true;
   };
 
   const saveNotif = useMutation({
@@ -984,7 +987,7 @@ export default function CrmSettingsPage() {
       </Card>
 
       {/* ── Notifications ───────────────────────────────────────────────── */}
-      <Card>
+      <Card id="notifications" className="scroll-mt-4">
         <CardHeader>
           <SectionTitle
             icon={Bell}

@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import {
-  CalendarDays, Loader2, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
+  CalendarDays, CalendarClock, Loader2, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
 } from "lucide-react";
+import { ScheduleBidDialog } from "@/components/schedule-bid";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -177,6 +178,8 @@ export default function CrmSchedulePage() {
     return m;
   }, [appointments]);
 
+  // Schedule bid (owner, 2026-10-21): a client or lead, or a new one, on the calendar with a confirmation email.
+  const [bidOpen, setBidOpen] = useState(false);
   const openCreate = (d: Date | null) => {
     if (!canManage) return;
     setEditing(null);
@@ -289,6 +292,11 @@ export default function CrmSchedulePage() {
                 </button>
               ))}
             </div>
+            {canManage && (
+              <Button size="sm" variant="outline" onClick={() => setBidOpen(true)} data-testid="button-schedule-bid">
+                <CalendarClock className="h-4 w-4 mr-1" /> Schedule bid
+              </Button>
+            )}
             {canManage && (
               <Button size="sm" onClick={() => openCreate(new Date())} data-testid="button-add-appointment">
                 <Plus className="h-4 w-4 mr-1" /> Add
@@ -538,6 +546,7 @@ export default function CrmSchedulePage() {
         </>
       )}
 
+      <ScheduleBidDialog open={bidOpen} onOpenChange={setBidOpen} day={cursor} landOnClient={false} />
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-appointment">
           <AppointmentForm

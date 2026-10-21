@@ -301,7 +301,8 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
    * own and closes the "call to schedule the start date" reminder — never backward, never a canceled visit.
    */
   async function jobOnCalendar(ctx: OrgContext, row: typeof crmAppointments.$inferSelect): Promise<void> {
-    if (row.status === "canceled" || (!row.projectId && !row.customerId)) return;
+    // A scheduled bid is a sales visit, never the job's start date (server/crm/bid-schedule.ts).
+    if (row.status === "canceled" || row.kind === "bid" || (!row.projectId && !row.customerId)) return;
     // Which job: the visit's project, else the client's current one. A sales visit while the job is still a bid
     // is not a start date — only an Approved job (or one at a custom phase after it) moves to Job Scheduled.
     let project = row.projectId ? (await db.select().from(crmProjects)
@@ -372,6 +373,8 @@ export function registerCrmScheduleRoutes(app: Express, getDevUser: GetUser): vo
     if (mergedEnd && mergedEnd < mergedStart) {
       return res.status(400).json({ message: "End time must be at or after the start time" });
     }
+    // A scheduled bid moved to a new time gets its 30-minute reminder again (server/crm/bid-schedule.ts).
+    if (patch.startsAt && patch.startsAt.getTime() !== appt.startsAt.getTime()) patch.reminderSentAt = null;
     if (parsed.data.status === "on_my_way") patch.onMyWayAt = new Date();
     if (parsed.data.status === "started") patch.startedAt = new Date();
     if (parsed.data.status === "complete") patch.completedAt = new Date();

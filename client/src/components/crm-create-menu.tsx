@@ -15,8 +15,9 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { parseDollarInput, dollarInputError } from "@/lib/dollar-input";
 import {
-  FileText, ReceiptText, UserPlus, MessageSquare, Users, Loader2, Mail, Phone,
+  FileText, ReceiptText, UserPlus, MessageSquare, Users, Loader2, Mail, Phone, CalendarClock,
 } from "lucide-react";
+import { ScheduleBidDialog } from "@/components/schedule-bid";
 
 /**
  * The global Create menu — one button in the CRM shell (sidebar header and
@@ -34,6 +35,8 @@ import {
  *     is grayed out with a pointer to Settings → SMS when SMS isn't
  *     configured — never a clickable dead button.
  *   - Customer → the same small client dialog (portal auto-created).
+ *   - Schedule bid → pick a client or a lead, or add a new one, and put the bid on the calendar
+ *     (client/src/components/schedule-bid.tsx).
  *
  * `onNavigate` fires whenever an action leaves the page (a link, or a dialog
  * that lands you somewhere) so a host sheet — the ribbon's More sheet, the
@@ -51,7 +54,7 @@ const emailInvalid = (email: string) => email.trim() !== "" && !EMAIL_RE.test(em
  * A create call's error as a sentence. A 400 carries zod `issues` — name the
  * field ("Enter a valid email address.") instead of "Invalid customer".
  */
-function createErrorMessage(e: any): string {
+export function createErrorMessage(e: any): string {
   try {
     const body = JSON.parse(String(e?.message ?? "").replace(/^\d{3}:\s*/, ""));
     const fields: string[] = (body?.issues ?? []).map((i: any) => String(i?.path?.[0] ?? ""));
@@ -128,9 +131,9 @@ function ClientPicker({ value, onChange }: {
 
 // ── Customer / Lead ─────────────────────────────────────────────────────────
 
-const EMPTY_CLIENT = { displayName: "", email: "", phone: "", addressLine1: "", note: "" };
+export const EMPTY_CLIENT = { displayName: "", email: "", phone: "", addressLine1: "", note: "" };
 
-function ClientFields({ form, setForm, idPrefix, showNote }: {
+export function ClientFields({ form, setForm, idPrefix, showNote }: {
   form: typeof EMPTY_CLIENT;
   setForm: (f: typeof EMPTY_CLIENT) => void;
   idPrefix: string;
@@ -184,7 +187,7 @@ function ClientFields({ form, setForm, idPrefix, showNote }: {
 
 /** The dedupe idiom: a 409 names the existing client(s) — link, don't force.
  *  Following a link closes the dialog (it would otherwise stay on top). */
-function DupeError({ error, onOpen }: { error: any; onOpen: () => void }) {
+export function DupeError({ error, onOpen }: { error: any; onOpen: () => void }) {
   let matches: { id: string; displayName: string }[] = [];
   try {
     // apiRequest errors read "409: {json}" — strip the status prefix.
@@ -207,7 +210,7 @@ function DupeError({ error, onOpen }: { error: any; onOpen: () => void }) {
 }
 
 /** The shared create-client body; throws a readable error before the POST. */
-function clientBody(form: typeof EMPTY_CLIENT, nameRequired: string) {
+export function clientBody(form: typeof EMPTY_CLIENT, nameRequired: string) {
   const body: any = {
     displayName: form.displayName.trim(),
     email: form.email.trim() || null,
@@ -550,6 +553,7 @@ export function CrmCreateMenu({ trigger, onNavigate }: {
   const [leadOpen, setLeadOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
+  const [bidOpen, setBidOpen] = useState(false);
 
   // A seat that can create nothing (a field crew by default) gets no Create button at all.
   const canCreateAnything = perms.manageEstimates === true || perms.manageInvoices === true || perms.manageCustomers === true;
@@ -570,6 +574,11 @@ export function CrmCreateMenu({ trigger, onNavigate }: {
           {perms.manageInvoices === true && (
             <DropdownMenuItem data-testid="create-item-invoice" onSelect={() => setInvoiceOpen(true)}>
               <ReceiptText className="h-4 w-4 mr-2" /> Invoice
+            </DropdownMenuItem>
+          )}
+          {perms.manageCustomers === true && perms.manageJobs === true && (
+            <DropdownMenuItem data-testid="create-item-schedule-bid" onSelect={() => setBidOpen(true)}>
+              <CalendarClock className="h-4 w-4 mr-2" /> Schedule bid
             </DropdownMenuItem>
           )}
           {perms.manageCustomers === true && perms.manageJobs === true && (
@@ -594,6 +603,7 @@ export function CrmCreateMenu({ trigger, onNavigate }: {
       <LeadDialog open={leadOpen} onOpenChange={setLeadOpen} onNavigate={onNavigate} />
       <InvoiceDialog open={invoiceOpen} onOpenChange={setInvoiceOpen} onNavigate={onNavigate} />
       <MessageDialog open={messageOpen} onOpenChange={setMessageOpen} onNavigate={onNavigate} />
+      <ScheduleBidDialog open={bidOpen} onOpenChange={setBidOpen} onNavigate={onNavigate} />
     </>
   );
 }

@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { crmNotificationEnabled, CRM_NOTIFICATION_PREFS } from "@shared/schema";
+import { CRM_NOTIFICATION_CHANNEL_DEFAULTS } from "@shared/notification-defaults";
 
 const BASE = process.env.CRM_TEST_BASE_URL ?? "http://127.0.0.1:8119";
 
@@ -29,10 +30,12 @@ async function api(path: string, opts: RequestInit = {}, cookie?: string) {
 describe("crmNotificationEnabled (pure)", () => {
   it("defaults to ON for every preference when nothing is stored", () => {
     for (const pref of CRM_NOTIFICATION_PREFS) {
-      expect(crmNotificationEnabled(null, pref)).toBe(true);
-      expect(crmNotificationEnabled(undefined, pref)).toBe(true);
-      expect(crmNotificationEnabled({}, pref)).toBe(true);
-      expect(crmNotificationEnabled({ notificationPrefs: {} }, pref)).toBe(true);
+      // The bid reminder is a text, not an email, unless the owner turns its email on (shared/notification-defaults.ts).
+      const on = CRM_NOTIFICATION_CHANNEL_DEFAULTS[pref]?.email ?? true;
+      expect(crmNotificationEnabled(null, pref)).toBe(on);
+      expect(crmNotificationEnabled(undefined, pref)).toBe(on);
+      expect(crmNotificationEnabled({}, pref)).toBe(on);
+      expect(crmNotificationEnabled({ notificationPrefs: {} }, pref)).toBe(on);
     }
   });
 

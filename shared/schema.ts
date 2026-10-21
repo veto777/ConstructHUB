@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { CRM_NOTIFICATION_CHANNEL_DEFAULTS } from "./notification-defaults";
 import { check, primaryKey, pgTable, text, varchar, integer, serial, bigserial, bigint, boolean, timestamp, jsonb, real, doublePrecision, numeric, date, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1743,9 +1744,13 @@ export const CRM_NOTIFICATION_PREFS = [
   "leadReceived",        // a lead came in through the website lead form
   "spamReport",          // the AI Call Assistant's weekly "we stopped N spam calls" report (server/voice/spam-report.ts)
   "hoverReportReady",    // a new HOVER measurement report landed in the CRM (owner, 2026-10-19; scoped by state in shared/hover-notify.ts)
+  "bidReminder",         // a scheduled bid starts in 30 minutes — text the member who booked it (owner, 2026-10-21; server/crm/bid-schedule.ts)
 ] as const;
 export type CrmNotificationPref = (typeof CRM_NOTIFICATION_PREFS)[number];
 
+/** The channel's default when the org never set it (shared/notification-defaults.ts: the bid reminder starts as a text). */
+const channelDefault = (pref: CrmNotificationPref, channel: CrmNotificationChannelName): boolean =>
+  CRM_NOTIFICATION_CHANNEL_DEFAULTS[pref]?.[channel] ?? channel !== "sms";
 /** Default ON; only an explicit `false` silences a notification. */
 export function crmNotificationEnabled(customFields: unknown, pref: CrmNotificationPref): boolean {
   // Legacy alias: "is the EMAIL channel on for this pref".
@@ -1764,14 +1769,14 @@ export function crmNotificationChannel(
 ): boolean {
   const prefs = (customFields as Record<string, unknown> | null | undefined)?.notificationPrefs;
   const v = prefs && typeof prefs === "object" ? (prefs as Record<string, unknown>)[pref] : undefined;
-  if (v === undefined || v === null) return channel !== "sms";
+  if (v === undefined || v === null) return channelDefault(pref, channel);
   if (typeof v === "boolean") return channel === "sms" ? false : v;
   if (typeof v === "object") {
     const o = v as Record<string, unknown>;
-    if (o[channel] === undefined) return channel !== "sms";
+    if (o[channel] === undefined) return channelDefault(pref, channel);
     return o[channel] === true;
   }
-  return channel !== "sms";
+  return channelDefault(pref, channel);
 }
 
 /** In-app notifications — the bell. One row per recipient member. */
@@ -2480,6 +2485,11 @@ export const crmAppointments = pgTable("crm_appointments", {
   onMyWayAt: timestamp("on_my_way_at"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
+  // "bid" = a scheduled bid / sales visit (server/crm/bid-schedule.ts): the client gets a confirmation email and the
+  // booking member a text 30 minutes before. null = any other visit.
+  kind: text("kind"),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  confirmationSentAt: timestamp("confirmation_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

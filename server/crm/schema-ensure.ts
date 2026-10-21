@@ -486,6 +486,11 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS onboarding_dismissed_at timestamp;
     ALTER TABLE crm_orgs ADD COLUMN IF NOT EXISTS custom_fields jsonb;
     ALTER TABLE crm_appointments ADD COLUMN IF NOT EXISTS created_by_member_id varchar;
+    -- Scheduled bids (server/crm/bid-schedule.ts): the kind, and the once-only stamps of the 30-minute reminder text
+    -- and the client's confirmation email.
+    ALTER TABLE crm_appointments ADD COLUMN IF NOT EXISTS kind text;
+    ALTER TABLE crm_appointments ADD COLUMN IF NOT EXISTS reminder_sent_at timestamp;
+    ALTER TABLE crm_appointments ADD COLUMN IF NOT EXISTS confirmation_sent_at timestamp;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS invoice_id varchar;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS note text;
     ALTER TABLE crm_projects ADD COLUMN IF NOT EXISTS division_id varchar;

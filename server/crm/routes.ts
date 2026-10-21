@@ -43,6 +43,7 @@ import { registerPortalReviewRoutes } from "./portal-review";
 import { sendSms, normalizePhone } from "./sms";
 import { registerCrmClient360Routes } from "./notes-timeline";
 import { registerCrmScheduleRoutes } from "./schedule";
+import { registerBidScheduleRoutes } from "./bid-schedule";
 import { registerCrmFollowUpRoutes } from "./follow-ups";
 import { registerCrmCalendarRoutes } from "./calendar";
 import { registerCrmDivisionRoutes, getDivision, canSwitchDivision, pinnedDivisionOf } from "./divisions";
@@ -440,6 +441,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmClient360Routes(app, getDevUser);
   // Appointment CRUD + read-only schedule/activity feeds for the calendar.
   registerCrmScheduleRoutes(app, getDevUser);
+  // Schedule Bid: a bid visit for a client or lead, the client's confirmation email and the 30-minute reminder text.
+  registerBidScheduleRoutes(app, getDevUser);
   // Follow-up cadences + the Home needs-attention rollup.
   registerCrmFollowUpRoutes(app, getDevUser);
   // Calendar sync: tokenized iCal feed + Google Calendar push.
