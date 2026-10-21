@@ -147,15 +147,16 @@ export function CustomerNotes({ customerId, canManage, meMemberId, meRole }: {
                 </div>
               ) : (
                 <>
+                  {/* Imported from the client's HOVER job: say so up front, not just in the byline. */}
+                  {n.source === "hover" && (
+                    <Badge variant="secondary" className="mb-1.5 px-2 py-0.5 text-[11px] font-semibold" data-testid={`note-source-${n.id}`}>
+                      Note from HOVER
+                    </Badge>
+                  )}
                   <p className="text-sm whitespace-pre-wrap">{n.body}</p>
                   <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                     <span>
-                      {n.author && n.author.recorded !== false ? <ActorName actor={n.author} /> : (n.authorName ?? "Author not recorded")} · {when(n.createdAt)}
-                      {n.source === "hover" && (
-                        <Badge variant="outline" className="ml-1.5 px-1.5 py-0 text-[10px] font-medium" data-testid={`note-source-${n.id}`}>
-                          HOVER
-                        </Badge>
-                      )}
+                      {n.author && n.author.recorded !== false ? <ActorName actor={n.author} /> : (n.authorName ?? "Author not recorded")}{n.source === "hover" ? " in HOVER" : ""} · {when(n.createdAt)}
                     </span>
                     {canManage && canModify(n) && (
                       <span className="flex gap-1">
