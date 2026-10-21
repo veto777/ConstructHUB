@@ -21,7 +21,7 @@ import { orgThemeStyle } from "@/lib/org-theme";
 import { Home3DCard } from "@/components/hover-3d-card";
 import { SelfEstimatePrompts, estimateTransport } from "@/components/self-estimate";
 import { CardFeeConfirm } from "@/components/card-fee-confirm";
-import { WARRANTY_ANCHOR, normalizeBidHeadline } from "@shared/bid-headline";
+import { WARRANTY_ANCHOR } from "@shared/bid-headline";
 import { BidHeadlineBanner } from "@/components/bid-headline-banner";
 
 const money = (c?: number | null) =>
@@ -1069,6 +1069,23 @@ export default function PublicEstimatePage() {
             </div>
           </div>
           <CardContent className="p-4 sm:p-8 space-y-6">
+            {/* The warranty — FIRST in the contract, right under Prepared for,
+                before the title and the line items (owner, 2026-10-21: "the
+                actual contract should have the warranty in it first line").
+                The estimate's own short warranty text; the full warranty lives
+                in the Terms and Conditions. The only full copy on the page. */}
+            {company.warrantyText && (
+              <div id={WARRANTY_ANCHOR} className="scroll-mt-24 rounded-lg border-2 border-primary/60 bg-primary/5 p-4 space-y-2"
+                data-testid="section-warranty">
+                <div className="flex items-center gap-2 font-semibold">
+                  <ShieldCheck className="h-5 w-5 text-primary shrink-0" /> Warranty
+                </div>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed" data-testid="text-warranty">{company.warrantyText}</p>
+                <a href={termsHref} className="inline-block text-sm text-primary underline font-medium" data-testid="link-warranty-terms">
+                  Read the full Terms and Conditions
+                </a>
+              </div>
+            )}
             {payInfo?.financing && (
               <span className="inline-flex items-center rounded-md bg-primary/10 text-primary text-sm font-medium px-2.5 py-1"
                 data-testid="badge-financing-available">
@@ -1384,12 +1401,7 @@ export default function PublicEstimatePage() {
               <span className="text-muted-foreground">{new Date(e.expiresAt).toDateString()}</span>
             </div>
           )}
-          {company.warrantyText && (
-            <div id={WARRANTY_ANCHOR} className="scroll-mt-24 space-y-1" data-testid="section-warranty">
-              {normalizeBidHeadline(company.bidHeadline) && <div className="font-semibold text-sm">Warranty</div>}
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap" data-testid="text-warranty">{company.warrantyText}</p>
-            </div>
-          )}
+          {/* The warranty prints at the top of the document (section-warranty) — not again here. */}
           {e.footerText && (
             <p className="text-xs text-muted-foreground whitespace-pre-wrap" data-testid="text-estimate-footer">{e.footerText}</p>
           )}

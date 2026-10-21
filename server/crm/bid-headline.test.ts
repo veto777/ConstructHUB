@@ -170,11 +170,11 @@ describe("signed-contract PDF", () => {
     expect(raw).toContain("(warranty)");
   });
 
-  it("is unchanged for an org without a headline — no banner, no extra warranty section", async () => {
+  it("an org without a headline gets no banner — the warranty still prints first (contract-pdf.test.ts)", async () => {
     const pdf = await buildContractPdf({ ...PDF_INPUT, bidHeadline: null }, { compress: false });
     const t = pdfText(pdf);
     expect(t).not.toContain("See the Warranty section");
-    expect(t).not.toContain("Workmanship warranty body text.");
+    expect(t.indexOf("Workmanship warranty body text.")).toBeLessThan(t.indexOf("Paint the house"));
     expect(t).toContain("Standing terms here.");
   });
 });

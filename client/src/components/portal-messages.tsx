@@ -23,14 +23,22 @@ import {
 import { SectionTitle, EmptyState, InitialAvatar } from "@/components/crm-ui";
 
 type TeamMember = {
-  memberId: string;
+  /** null = the division office itself — "Message now" goes to the office. */
+  memberId: string | null;
   name: string;
   role: string;
   email: string | null;
   phone: string | null;
 };
 
-type Office = { name: string | null; email: string | null; phone: string | null; website: string | null };
+/** The client's division office (server: client-contact.ts clientOfficeContact) — never the owner's personal details. */
+type Office = {
+  name: string | null; email: string | null; phone: string | null; website: string | null;
+  licenseNumber?: string | null; licenseState?: string | null;
+};
+
+const licenseLine = (o: Office) =>
+  o.licenseNumber ? `License #${o.licenseNumber}${o.licenseState ? ` (${o.licenseState})` : ""}` : null;
 
 function relTime(iso: string): string {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -158,7 +166,7 @@ export function PortalMessages({ accounts, focusMemberId, onFocusConsumed }: {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="office">To: the office (whole team)</SelectItem>
-                  {team!.team.map((m) => (
+                  {team!.team.filter((m): m is TeamMember & { memberId: string } => !!m.memberId).map((m) => (
                     <SelectItem key={m.memberId} value={m.memberId}>
                       To: {m.name} ({m.role})
                     </SelectItem>
@@ -243,6 +251,9 @@ export function PortalContact({ accounts, onMessageNow }: {
                   <Globe className="h-3.5 w-3.5" /> {office.website.replace(/^https?:\/\//, "")}
                 </a>
               )}
+              {licenseLine(office) && (
+                <div className="text-xs text-muted-foreground" data-testid="contact-office-license">{licenseLine(office)}</div>
+              )}
             </div>
             <Button size="sm" variant="outline" className="mt-1"
               onClick={() => onMessageNow(null)} data-testid="button-message-office">
@@ -260,8 +271,8 @@ export function PortalContact({ accounts, onMessageNow }: {
           <Card>
             <CardContent className="p-0 divide-y">
               {team.map((m) => (
-                <div key={m.memberId} className="flex items-center justify-between gap-3 p-4"
-                  data-testid={`contact-member-${m.memberId}`}>
+                <div key={m.memberId ?? "office"} className="flex items-center justify-between gap-3 p-4"
+                  data-testid={`contact-member-${m.memberId ?? "office"}`}>
                   <div className="flex items-center gap-3 min-w-0">
                     <InitialAvatar name={m.name} />
                     <div className="min-w-0">
@@ -280,7 +291,7 @@ export function PortalContact({ accounts, onMessageNow }: {
                   </div>
                   <Button size="sm" variant="outline" className="shrink-0"
                     onClick={() => onMessageNow(m.memberId)}
-                    data-testid={`button-message-member-${m.memberId}`}>
+                    data-testid={`button-message-member-${m.memberId ?? "office"}`}>
                     <MessageSquare className="h-3.5 w-3.5 mr-1.5" /> Message now
                   </Button>
                 </div>
@@ -293,8 +304,10 @@ export function PortalContact({ accounts, onMessageNow }: {
   );
 }
 
-/** The always-there footer: how to reach us + website. */
-export function PortalContactFooter({ office }: { office: Office | null | undefined }) {
+/** The always-there footer: how to reach us + website — the client's division office, same as Contact us. */
+export function PortalContactFooter({ accounts }: { accounts: any[] }) {
+  const { data } = useTeam(accounts?.[0]?.id);
+  const office = data?.office;
   if (!office || (!office.email && !office.phone && !office.website)) return null;
   return (
     <footer className="border-t mt-8 py-4 px-3 text-xs text-muted-foreground flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 max-w-full"
@@ -312,6 +325,7 @@ export function PortalContactFooter({ office }: { office: Office | null | undefi
           {office.website.replace(/^https?:\/\//, "")}
         </a>
       )}
+      {licenseLine(office) && <span className="whitespace-nowrap">{licenseLine(office)}</span>}
     </footer>
   );
 }

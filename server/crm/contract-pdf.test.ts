@@ -303,3 +303,46 @@ describe("contract totals block (QA c13 F05)", () => {
     expect(t).not.toContain("-$500.00");
   });
 });
+
+describe("the warranty is the contract's first section (owner, 2026-10-21)", () => {
+  const SUMMARY = "Alpine Lifetime Workmanship Warranty. Covers our installation for as long as you own the home. " +
+    "See the Terms and Conditions (Sections 18, 19 and 27) for full details.";
+
+  it("prints right after Prepared for — before the title, options and line items — and once only", async () => {
+    const pdf = await buildContractPdf({ ...INPUT, warrantyText: SUMMARY }, { compress: false });
+    const t = flat(pdf);
+    const at = (needle: string) => { const i = t.indexOf(needle); expect(i, needle).toBeGreaterThan(-1); return i; };
+    expect(at("PREPARED FOR")).toBeLessThan(at("WARRANTY"));
+    expect(at("WARRANTY")).toBeLessThan(at("Sections 18, 19 and 27"));
+    expect(at("Sections 18, 19 and 27")).toBeLessThan(at("Whole-house re siding"));
+    expect(at("Sections 18, 19 and 27")).toBeLessThan(at("Vinyl siding, standard profile."));
+    expect(at("Sections 18, 19 and 27")).toBeLessThan(at("Remove existing siding"));
+    expect(t.split("Sections 18, 19 and 27").length - 1).toBe(1);
+    // Links to the terms, which carry the target.
+    expect(at("see the Terms and Conditions in this contract")).toBeLessThan(at("Standing terms: payment is due on completion."));
+    const raw = pdf.toString("latin1");
+    expect(raw).toContain("(warranty)");
+    expect(raw).toContain("(terms)");
+  });
+
+  it("is absent when the estimate has no warranty text", async () => {
+    const t = flat(await buildContractPdf({ ...INPUT, warrantyText: null }, { compress: false }));
+    expect(t).not.toContain("WARRANTY");
+    expect(t).not.toContain("see the Terms and Conditions in this contract");
+  });
+});
+
+describe("the estimate page shows the warranty at the top (source guard)", () => {
+  it("one warranty block, under Prepared for, before the title and line items, linking to the terms", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const page = fs.readFileSync(path.resolve(import.meta.dirname, "../../client/src/pages/public-estimate.tsx"), "utf8");
+    const block = page.indexOf('data-testid="section-warranty"');
+    expect(block).toBeGreaterThan(page.indexOf('data-testid="prepared-for"'));
+    expect(block).toBeLessThan(page.indexOf("<CardTitle className=\"text-xl\">{e.title}</CardTitle>"));
+    expect(page.split('data-testid="section-warranty"').length - 1).toBe(1);
+    expect(page.split('data-testid="text-warranty"').length - 1).toBe(1);
+    expect(page.slice(block, block + 1200)).toContain('href={termsHref}');
+    expect(page.slice(block - 400, block)).toContain("{company.warrantyText && (");
+  });
+});

@@ -859,7 +859,7 @@ function Dashboard({ data }: { data: any }) {
           {viewBody[view]}
 
           {/* Always-there contact strip — the client can always find us. */}
-          <PortalContactFooter office={orgs?.[0] ?? null} />
+          <PortalContactFooter accounts={accounts} />
 
           <div className="flex flex-col items-center gap-2.5 pb-4">
             {/* The CRM powers this portal; the header above stays the contractor's. */}

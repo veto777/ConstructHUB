@@ -12,10 +12,11 @@
  * remote logo images is deliberately skipped),
  * the org's bid headline banner when it has one (shared/bid-headline.ts —
  * above everything the client is buying), a 'Prepared for' client block,
- * the estimate number/dates, every option with
+ * the warranty (the estimate's own warranty text, whenever it has one — first,
+ * before the title and line items), the estimate number/dates, every option with
  * its full description and price, the line items, the client-selected optional
  * discounts, the totals block (subtotal → discounts → tax → APPROVED total),
- * the warranty (when there is a headline to point at it), the org's terms (flowing over as many pages as needed), and the signature
+ * the org's terms (flowing over as many pages as needed), and the signature
  * block with the typed name, date and approval IP. Every page gets the
  * 'company · license · website' band and a 'Page X of Y' number.
  */
@@ -308,6 +309,31 @@ export async function buildContractPdf(
   if (c.phone) doc.text(c.phone);
   doc.moveDown(1.2);
 
+  // ── Warranty — the first section after the parties, before the title and
+  // the line items (owner, 2026-10-21: "the actual contract should have the
+  // warranty in it first line"). The estimate's own warranty text (a short
+  // summary for Alpine); the full warranty is in the terms at the end. The
+  // headline's "See the Warranty section" link lands here. Printed once.
+  if (warrantyBody) {
+    const hasTerms = !!(e.termsText?.trim() || input.terms?.trim());
+    doc.x = left;
+    doc.moveTo(left, doc.y).lineTo(rightEdge, doc.y).lineWidth(1.5).strokeColor(accent).stroke();
+    doc.moveDown(0.5);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(accent)
+      .text("WARRANTY", left, doc.y, { width: pageWidth, characterSpacing: 1, destination: "warranty" });
+    doc.moveDown(0.3);
+    doc.font("Helvetica").fontSize(9.5).fillColor(INK).text(warrantyBody, left, doc.y, { width: pageWidth, lineGap: 1.5 });
+    if (hasTerms) {
+      doc.moveDown(0.3);
+      doc.font("Helvetica").fontSize(8.5).fillColor("#2563eb")
+        .text("Full terms: see the Terms and Conditions in this contract.", left, doc.y, { width: pageWidth, goTo: "terms" });
+    }
+    doc.moveDown(0.5);
+    doc.moveTo(left, doc.y).lineTo(rightEdge, doc.y).lineWidth(1.5).strokeColor(accent).stroke();
+    doc.x = left;
+    doc.moveDown(1.2);
+  }
+
   // ── Title + intro ─────────────────────────────────────────────────────────
   doc.font("Helvetica-Bold").fontSize(14).fillColor(INK).text(e.title);
 
@@ -416,22 +442,14 @@ export async function buildContractPdf(
   } else if (estTerms || orgTerms) {
     termsBlocks.push(["Terms and conditions", (estTerms || orgTerms)!]);
   }
-  // ── Warranty — its own section, the one the headline points at. Printed
-  // only under a headline, so a contract without one is unchanged.
-  if (headline && warrantyBody) {
+  // (The warranty prints once, at the top — after Prepared for.)
+  termsBlocks.forEach(([heading, body], idx) => {
     doc.moveDown(1);
-    doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text("Warranty", { destination: "warranty" });
-    doc.moveDown(0.3);
-    doc.font("Helvetica").fontSize(8.5).fillColor("#374151").text(warrantyBody, { lineGap: 1.5 });
-    doc.x = left;
-  }
-  for (const [heading, body] of termsBlocks) {
-    doc.moveDown(1);
-    doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text(heading);
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text(heading, idx === 0 ? { destination: "terms" } : {});
     doc.moveDown(0.3);
     doc.font("Helvetica").fontSize(8.5).fillColor("#374151").text(body, { lineGap: 1.5 });
     doc.x = left; // pdfkit leaves x wherever the last call ended
-  }
+  });
 
   // ── Signature ─────────────────────────────────────────────────────────────
   doc.moveDown(1.6);
