@@ -25,6 +25,7 @@ import { HoverTakeoffCard } from "@/components/hover-takeoff-card";
 import { PricebookItemInput } from "@/components/pricebook-item-input";
 import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff";
 import { money } from "@/lib/estimate-math";
+import { confirmAction } from "@/components/confirm-dialog";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, CheckCircle2, ClipboardCopy, Clock, Eye, FileText, Loader2,
@@ -459,7 +460,23 @@ export default function CrmEstimateDetailPage() {
             )}
             {canEdit && !locked && !editing && (
               <Button size="sm" variant={e.sentAt ? "outline" : "default"}
-                onClick={() => send.mutate()} disabled={send.isPending}
+                // Never send by accident: confirm who gets it and what it says first (owner, 2026-10-21).
+                onClick={() => confirmAction({
+                  id: "send-estimate",
+                  title: `${e.sentAt ? "Resend" : "Send"} estimate ${e.number ?? ""} to ${customer?.firstName ?? customer?.name ?? "the client"}?`.replace(/\s+/g, " "),
+                  description: (
+                    <div className="space-y-1.5 text-sm" data-testid="send-confirm-details">
+                      <div><span className="text-muted-foreground">To:</span> <span className="font-medium">{customer?.email || "no email on file"}</span></div>
+                      <div><span className="text-muted-foreground">Estimate:</span> <span className="font-medium">{e.number} · {e.title}</span></div>
+                      <div><span className="text-muted-foreground">Total:</span> <span className="font-medium">{money(e.totalCents)}</span>
+                        {e.depositCents ? <> · <span className="text-muted-foreground">deposit</span> <span className="font-medium">{money(e.depositCents)}</span></> : null}
+                        {" "}· <span className="text-muted-foreground">tax</span> <span className="font-medium">{((e.taxRateBps ?? 0) / 100).toString()}%</span></div>
+                      <div className="text-muted-foreground">The client gets an email with a link to view and approve it.</div>
+                    </div>
+                  ),
+                  confirmLabel: e.sentAt ? "Yes, resend it" : "Yes, send it", destructive: false,
+                  onConfirm: () => send.mutate(),
+                })} disabled={send.isPending}
                 data-testid="button-send-estimate">
                 {send.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
                 {e.sentAt ? "Resend" : "Send"}
