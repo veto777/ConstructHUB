@@ -48,6 +48,7 @@ import { registerTutorialMediaRoutes } from "./tutorials/media";
 import { registerTutorialFixtures } from "./tutorials/fixtures";
 import { processPhoto, generateFileName, analyzePhoto } from "./photo-processor";
 import { registerStripeRoutes } from "./stripe";
+import { registerCheckoutPauseRoutes, ensureCheckoutInterestSchema } from "./billing/checkout-pause";
 import { platformAccessGate, requirePlatformAccess } from "./platform-access";
 import { registerTrackingRoutes } from "./tracking-script";
 import { registerAdsConsultantRoutes } from "./ads-consultant";
@@ -210,6 +211,9 @@ export async function registerRoutes(
     if (req.method !== "POST") return next();
     return growthCostLimit(req, res, next);
   });
+  // While Stripe has charges off, buy buttons get the "tell us what you want" form (before every checkout route).
+  await ensureCheckoutInterestSchema();
+  registerCheckoutPauseRoutes(app);
   registerStripeRoutes(app);
   registerTrackingRoutes(app);
   registerAdsConsultantRoutes(app);

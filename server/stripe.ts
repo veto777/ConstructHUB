@@ -18,6 +18,7 @@ import {
   ANNUAL_MONTHS, TRIAL_DAYS, SALES_THRESHOLD_CENTS, CALL_ASSISTANT_TIER_ADDONS, LEGACY_AGENCY_INCLUDED_LOCATIONS,
 } from "@shared/plans";
 import { stripe, PaymentsNotConfiguredError } from "./billing/client";
+import { capInvoiceRetries } from "./billing/retry-cap";
 import { describeSubscription } from "./billing/prices";
 import {
   BillingRequestError, parsePlanOrder, parsePlanKey, parseInterval, parseAddonQuantities,
@@ -917,6 +918,8 @@ export function registerStripeRoutes(app: Express) {
           const synced = await syncInvoiceEvent(event);
           eventUserId = synced?.userId ?? null;
           sendBillingEmail = synced?.applied === true;
+          // At most two automatic card attempts per bill (server/billing/retry-cap.ts).
+          if (event.type === "invoice.payment_failed") await capInvoiceRetries(event.data.object as Stripe.Invoice);
           break;
         }
         case "charge.refunded":

@@ -2,6 +2,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { rememberPlanPrompt } from "@/lib/plan-errors";
 import { inNativeApp } from "./app-shell";
 import { withDivisionHeader } from "./division-workspace";
+import { CHECKOUT_PAUSED_CODE } from "@shared/checkout-pause";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -38,6 +39,14 @@ export async function apiRequest(
     const { requestRecentAuth } = await import('@/components/recent-auth');
     await requestRecentAuth();
     res = await fetch(url, withDivisionHeader(url, { method, headers: data ? { "Content-Type": "application/json" } : {}, body: data ? JSON.stringify(data) : undefined, credentials: "include" }));
+  }
+  // A buy button while Stripe has charges off: open the "tell us what you'd like" form (the toast is silenced).
+  if (res.status === 503) {
+    const body = await res.clone().json().catch(() => null);
+    if (body?.code === CHECKOUT_PAUSED_CODE) {
+      const { openCheckoutPausedForm } = await import("@/components/checkout-paused-form");
+      openCheckoutPausedForm(typeof body.item === "string" ? body.item : "");
+    }
   }
   await throwIfResNotOk(res);
   if (method.toUpperCase() !== "GET" && /^\/api\/(auth|gbp)(?:\/|$)/.test(url)) {

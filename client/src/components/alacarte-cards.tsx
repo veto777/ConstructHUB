@@ -23,6 +23,7 @@ import {
   ALACARTE, ALACARTE_KEYS, ALACARTE_LINKED, ALACARTE_ADDON_ONLY, ALACARTE_MAX_QUANTITY, ALACARTE_PRICING_HREF,
   alacartePriceCents, alacarteAnnualSavingsCents, type AlacarteKey, type AlacarteTier,
 } from "@shared/alacarte";
+import { openCheckoutPausedForm, useCheckoutPaused } from "@/components/checkout-paused-form";
 
 /** GET /api/alacarte/me — the fields the cards read. */
 export type AlacarteMe = {
@@ -73,7 +74,9 @@ export function AlacarteCards({ interval, signedIn }: { interval: BillingInterva
     },
   });
 
+  const checkoutPaused = useCheckoutPaused();
   const buy = (key: AlacarteKey) => {
+    if (checkoutPaused) { openCheckoutPausedForm(`Single tool: ${ALACARTE[key].name} · ${interval}`); return; }
     if (!signedIn) { setLocation(`/auth?next=${encodeURIComponent(`${ALACARTE_PRICING_HREF.split("#")[0]}${interval === "year" ? "?interval=year" : ""}#alacarte`)}`); return; }
     trackEvent("begin_checkout", { item_category: "alacarte", item: key, tier });
     checkout.mutate({ key, interval, quantity: quantities[key] ?? 1 });

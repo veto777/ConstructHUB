@@ -32,6 +32,7 @@ import { PurchaseReviewDialog, type PurchaseReview } from "@/components/purchase
 import { ADDONS, PLANS, PLAN_KEYS, CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, ADDON_MAX_QUANTITY, callAssistantTierOf, type AddonKey, type BillingInterval, type CallAssistantTierKey } from "@shared/plans";
 import { CRM_PLANS } from "@shared/crm-plans";
 import { callAssistantPricing, callAssistantTiers, callAssistantYearlyNote, callAssistantAboveTopLine, formatUsd, joinNames } from "@shared/plan-copy";
+import { openCheckoutPausedForm, useCheckoutPaused } from "@/components/checkout-paused-form";
 
 const suffix = (interval: BillingInterval) => (interval === "year" ? "/yr" : "/mo");
 /** The extra number's price per interval, from the price book. */
@@ -170,7 +171,9 @@ export function CallAssistantPlanCards({ interval, signedIn }: { interval: Billi
   const numberCents = extraNumberCents(interval);
   const isCurrent = (tier: CallAssistantTierKey) => live && sub?.tier === tier && sub?.interval === interval && sub?.extraNumbers === extraNumbers;
 
+  const checkoutPaused = useCheckoutPaused();
   const choose = (tier: CallAssistantTierKey) => {
+    if (checkoutPaused) { openCheckoutPausedForm(`${CALL_ASSISTANT_NAME}: ${tier} · ${interval}`); return; }
     if (!signedIn) {
       setLocation(`/auth?mode=signup&next=${encodeURIComponent(`/pricing${interval === "year" ? "?interval=year" : ""}#call-assistant`)}`);
       return;

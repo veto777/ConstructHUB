@@ -18,6 +18,7 @@ import type { FeaturePriceSummary } from "@shared/feature-pages/pricing";
 import { PLANS, type BillingInterval } from "@shared/plans";
 import { ALACARTE, ALACARTE_PRICING_HREF, alacartePriceCents, type AlacarteKey, type AlacarteTier } from "@shared/alacarte";
 import { BTN_LG, BTN_OUTLINE, BTN_PRIMARY, TEXT_LINK } from "./primitives";
+import { openCheckoutPausedForm, useCheckoutPaused } from "@/components/checkout-paused-form";
 
 const INTERVAL: BillingInterval = "month";
 
@@ -44,7 +45,9 @@ export function AlacarteOffer({ keys, price, slug, signedIn }: { keys: AlacarteK
       toast({ title: `Couldn't start checkout for ${ALACARTE[key].name}`, description: apiErrorMessage(err), variant: "destructive" });
     },
   });
+  const checkoutPaused = useCheckoutPaused();
   const buy = (key: AlacarteKey) => {
+    if (checkoutPaused) { openCheckoutPausedForm(`Single tool: ${ALACARTE[key].name}`); return; }
     if (!signedIn) { setLocation(`/auth?next=${encodeURIComponent(`/features/${slug}`)}`); return; }
     checkout.mutate(key);
   };

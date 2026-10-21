@@ -12,6 +12,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { ConfirmHost } from "@/components/confirm-dialog";
+import { CheckoutPausedHost } from "@/components/checkout-paused-form";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -1138,6 +1139,8 @@ function App() {
             <Toaster />
             {/* The one confirmation dialog — see confirmAction(). */}
             <ConfirmHost />
+            {/* Buy buttons while Stripe checkout is paused — see openCheckoutPausedForm(). */}
+            <CheckoutPausedHost />
           </TooltipProvider>
         </CartProvider>
       </QueryClientProvider>

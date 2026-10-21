@@ -1,4 +1,5 @@
 import * as React from "react"
+import { CHECKOUT_PAUSED_MESSAGE } from "@shared/checkout-pause"
 
 import type {
   ToastActionElement,
@@ -141,6 +142,8 @@ type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
   const id = genId()
+  // The paused-checkout form already says this (components/checkout-paused-form.tsx); no red toast on top of it.
+  if (props.description === CHECKOUT_PAUSED_MESSAGE) return { id, dismiss: () => {}, update: (_p: ToasterToast) => {} }
 
   const update = (props: ToasterToast) =>
     dispatch({

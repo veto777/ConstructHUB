@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -158,7 +158,7 @@ export default function ContractSignPage() {
       if (data.url) window.location.href = data.url;
     },
     onError: (err: any) => {
-      toast({ title: "Checkout Failed", description: err.message, variant: "destructive" });
+      toast({ title: "Checkout Failed", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 

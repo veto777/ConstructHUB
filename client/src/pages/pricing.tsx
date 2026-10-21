@@ -43,6 +43,7 @@ import { PurchaseReviewDialog } from "@/components/purchase-review";
 import { AlacarteCards } from "@/components/alacarte-cards";
 import { ALACARTE, type AlacarteKey, isAlacarteKey } from "@shared/alacarte";
 import { trackConversion, trackEvent } from "@/lib/gtag";
+import { openCheckoutPausedForm, useCheckoutPaused } from "@/components/checkout-paused-form";
 
 // Design B (the marketing site's editorial look): hairline cards on cream, ONE
 // navy panel colour for the Unlimited hero card (it turns cream in dark mode,
@@ -204,6 +205,8 @@ export default function PricingPage() {
     onError: (err) => showError("Couldn't open billing")(err),
   });
 
+  const checkoutPaused = useCheckoutPaused();
+
   /** A request the server says only a sales rep can sell (409 talk_to_sales) opens the inquiry form. */
   const [salesTopic, setSalesTopic] = useState<string | null>(null);
   const requestTopic = (r: PlanRequest) => `${PLANS[r.plan].name} plan`;
@@ -271,6 +274,8 @@ export default function PricingPage() {
 
   /** One subscription per account: a Stripe subscription is changed in place, never checked out again. */
   const choosePlan = (r: PlanRequest) => {
+    // Stripe checkout paused: everyone (signed in or not) gets the request form instead (components/checkout-paused-form.tsx).
+    if (checkoutPaused) { openCheckoutPausedForm(`Plan: ${PLANS[r.plan].name} · ${r.interval}`); return; }
     if (!user) { setLocation(`/auth?next=${encodeURIComponent(`/pricing${r.interval === "year" ? "?interval=year" : ""}`)}`); return; }
     if (view.changesInPlace) setConfirm(r);
     else setReview(r);

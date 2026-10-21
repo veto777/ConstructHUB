@@ -11,6 +11,7 @@ import { formatUsd } from "@/lib/pricing-display";
 import { SALES_THRESHOLD_CENTS } from "@shared/plans";
 import { ShoppingCart, X, Loader2, Package, ArrowRight, Trash2, MessageSquare } from "lucide-react";
 import { useState, useEffect } from "react";
+import { openCheckoutPausedForm, useCheckoutPaused } from "@/components/checkout-paused-form";
 
 export function CartSheet() {
   const { items, removeItem, clearCart, getTotal, getItemCount, salesItems, dismissSalesItem } = useCart();
@@ -60,7 +61,9 @@ export function CartSheet() {
   });
 
   const isDev = import.meta.env.DEV;
+  const checkoutPaused = useCheckoutPaused();
   const handleCheckout = () => {
+    if (checkoutPaused) { setOpen(false); openCheckoutPausedForm(`Cart: ${items.map((i: any) => i.name).filter(Boolean).join(", ")}`); return; }
     if (!user && !isDev) {
       setOpen(false);
       setLocation("/auth");

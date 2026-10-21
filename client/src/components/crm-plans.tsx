@@ -15,6 +15,7 @@ import { PLANS, PLAN_KEYS, type BillingInterval } from "@shared/plans";
 import { joinNames } from "@shared/plan-copy";
 import { PurchaseReviewDialog, type PurchaseReview } from "@/components/purchase-review";
 import { inNativeApp } from "@/lib/app-shell";
+import { openCheckoutPausedForm, useCheckoutPaused } from "@/components/checkout-paused-form";
 
 /**
  * The CRM's plans — a separate product from the ConstructHUB platform plans,
@@ -123,7 +124,9 @@ export function CrmPlanCards({ interval, signedIn, returnTo = "pricing" }: {
   const totalCents = (plan: CrmPlanKey) => crmPlanPriceCents(plan, interval) + seatsFor(plan) * seatCents;
   const isCurrent = (plan: CrmPlanKey) => live && sub?.plan === plan && sub?.interval === interval && sub?.extraSeats === seatsFor(plan);
 
+  const checkoutPaused = useCheckoutPaused();
   const choose = (plan: CrmPlanKey) => {
+    if (checkoutPaused) { openCheckoutPausedForm(`CRM plan: ${CRM_PLANS[plan].name} · ${interval}`); return; }
     if (!signedIn) {
       setLocation(`/auth?mode=signup&next=${encodeURIComponent(`/pricing${interval === "year" ? "?interval=year" : ""}#crm`)}`);
       return;
