@@ -322,6 +322,14 @@ export default function CrmEstimateDetailPage() {
   // brings the editor back with it. Cleared on Save and on Cancel.
   const mirrorKey = id ? `ch:estimate-edit:${id}` : null;
   const clearEditMirror = () => { try { if (mirrorKey) window.localStorage.removeItem(mirrorKey); } catch { /* blocked */ } };
+  // Editing happens in the client page's estimate popup (owner, 2026-10-21); this full-page editor is only
+  // for an explicit "Open full editor" (?full=1).
+  const wantFull = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("full") === "1";
+  const editInPopup = () => {
+    if (!e?.customerId) { startEdit(); return; }
+    clearEditMirror();
+    setLocation(`/crm/clients/${e.customerId}?openEstimate=${e.id}`);
+  };
   useEffect(() => {
     if (!editing || !mirrorKey) return;
     try {
@@ -336,6 +344,7 @@ export default function CrmEstimateDetailPage() {
     let m: any = null;
     try { m = JSON.parse(window.localStorage.getItem(mirrorKey) || "null"); } catch { m = null; }
     if (!m || m.v !== 1 || !Array.isArray(m.lines)) return;
+    if (!wantFull) { editInPopup(); return; }
     startEdit();
     setTitle(m.title ?? ""); setIntro(m.intro ?? ""); setTaxPct(m.taxPct ?? "0"); setDeposit(m.deposit ?? "");
     setDivisionId(m.divisionId ?? ""); setStatus(m.status ?? e.status ?? "draft"); setLines(m.lines);
@@ -352,7 +361,7 @@ export default function CrmEstimateDetailPage() {
     try { mirrored = !!(mirrorKey && window.localStorage.getItem(mirrorKey)); } catch { /* blocked */ }
     if (e && !editing && !locked && canEdit && !mirrored &&
         new URLSearchParams(window.location.search).get("edit") === "1") {
-      startEdit();
+      if (wantFull) startEdit(); else editInPopup();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [e?.id, canEdit]);
@@ -429,9 +438,14 @@ export default function CrmEstimateDetailPage() {
               </Button>
             )}
             {canEdit && !locked && !editing && (
-              <Button variant="outline" size="sm" onClick={startEdit} data-testid="button-edit-estimate">
+              <>
+              <Button variant="outline" size="sm" onClick={editInPopup} data-testid="button-edit-estimate">
                 <Pencil className="h-4 w-4 mr-2" /> Edit
               </Button>
+              <Button variant="ghost" size="sm" onClick={startEdit} data-testid="button-edit-estimate-full">
+                Full page
+              </Button>
+              </>
             )}
             {canEdit && !locked && !editing && (
               <Button size="sm" variant={e.sentAt ? "outline" : "default"}

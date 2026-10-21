@@ -1656,7 +1656,7 @@ export default function CrmClientPage() {
                           const target = saved ?? autosave.draftId;
                           if (!target) return;
                           autosave.keepClosed(); autosave.reset(); resetForm(); setOpen(false);
-                          setLocation(`/crm/estimates/${target}?edit=1`);
+                          setLocation(`/crm/estimates/${target}?edit=1&full=1`);
                         }}>Open full editor</button></>
                     )}
                   </DialogDescription>
@@ -1866,9 +1866,7 @@ export default function CrmClientPage() {
                       reflects edits immediately); hidden once signed/approved. */}
                   {canEstimate && canSeePrices && !e.approvedAt && (
                     <Button size="sm" variant="ghost"
-                      onClick={() => (e.status === "draft" && !e.sentAt
-                        ? openEstimateInPopup(e.id)
-                        : setLocation(`/crm/estimates/${e.id}?edit=1`))}
+                      onClick={() => openEstimateInPopup(e.id)}
                       data-testid={`button-edit-estimate-${e.id}`}>
                       <Pencil className="h-4 w-4 mr-2" /> Edit
                     </Button>
