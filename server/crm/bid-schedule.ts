@@ -41,7 +41,6 @@ type GetUser = (req: any, res: any) => any;
 type Org = typeof crmOrgs.$inferSelect;
 type Customer = typeof crmCustomers.$inferSelect;
 type Appointment = typeof crmAppointments.$inferSelect;
-type Member = typeof crmMembers.$inferSelect;
 
 export const BID_KIND = "bid";
 /** How long before a bid the reminder text goes out. */
@@ -81,15 +80,14 @@ function bidTime(startsAt: Date, timezone: string | null | undefined): string {
   catch { return startsAt.toISOString().slice(11, 16); }
 }
 
-const memberName = (m: Pick<Member, "displayName" | "email">) => m.displayName || m.email || "Your estimator";
 
 /** The confirmation email's subject, text and HTML (pure; the unit test reads it). */
 export function bidConfirmationEmail(args: {
-  org: Pick<Org, "name" | "phone" | "email" | "timezone">; customer: Pick<Customer, "displayName">;
+  org: Pick<Org, "name" | "phone" | "email" | "timezone">; customer: Pick<Customer, "displayName"> & { firstName?: string | null };
   startsAt: Date; endsAt: Date | null; address: string | null; estimator: string | null; notes?: string | null;
 }): { subject: string; text: string; html: string } {
   const { org, customer, startsAt, address, estimator } = args;
-  const first = (customer.displayName || "").trim().split(/\s+/)[0] || "there";
+  const first = customer.firstName?.trim() || (customer.displayName || "").trim().split(/\s+/)[0] || "there";
   const when = bidWhen(startsAt, org.timezone);
   const subject = `Your appointment with ${org.name} is confirmed — ${when}`;
   const rows: [string, string][] = [
@@ -134,7 +132,8 @@ export async function sendBidConfirmation(org: Org, customer: Customer, appt: Ap
   const address = customerAddress(customer);
   const mail = bidConfirmationEmail({
     org, customer, startsAt: appt.startsAt, endsAt: appt.endsAt, address,
-    estimator: estimator ? memberName(estimator) : null, notes: appt.notes,
+    // Only a real name goes to the client — never a teammate's login email.
+    estimator: estimator?.displayName?.trim() || null, notes: appt.notes,
   });
   const ics = buildICalendar(org.name, [{
     id: appt.id, title: `Estimate appointment — ${org.name}`, customerName: null, projectName: null,
@@ -327,11 +326,12 @@ export async function remindBid(appt: Appointment): Promise<{ texted: number; re
   const link = customer ? `/crm/clients/${customer.id}` : "/crm/schedule";
   const title = `Bid with ${name} at ${bidTime(appt.startsAt, org.timezone)}`;
   const address = customer ? customerAddress(customer) : null;
+  const mins = Math.max(1, Math.round((appt.startsAt.getTime() - Date.now()) / 60_000));
 
   if (crmNotificationChannel(org.customFields, "bidReminder", "inApp") && recipients.length) {
     await db.insert(crmNotifications).values(recipients.map((m) => ({
       orgId: org.id, memberId: m.id, type: "bidReminder", title: title.slice(0, 300),
-      body: [`Starts in ${BID_REMINDER_MINUTES} minutes.`, address].filter(Boolean).join(" ").slice(0, 1000), link,
+      body: [`Starts in ${mins} minutes.`, address].filter(Boolean).join(" ").slice(0, 1000), link,
     }))).catch((e: any) => console.error("[crm] bid reminder bell failed:", e?.message || e));
     for (const m of recipients) if (m.userId) pushSoon(m.userId, appForLink(link), { title: `${org.name}: ${title}`, body: address, link });
   }
@@ -342,7 +342,7 @@ export async function remindBid(appt: Appointment): Promise<{ texted: number; re
       await sendWithFallback({
         to: m.email, subject: `Reminder: ${title}`,
         html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px">
-          <p style="font-size:15px"><b>${esc(title)}</b> — starts in ${BID_REMINDER_MINUTES} minutes.</p>
+          <p style="font-size:15px"><b>${esc(title)}</b> — starts in ${mins} minutes.</p>
           ${address ? `<p style="font-size:15px">${esc(address)}</p>` : ""}
           <p style="margin:20px 0"><a href="${esc(`${siteBaseUrl(null)}${link}`)}" style="background:#4f46e5;color:#fff;padding:11px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;display:inline-block">Open the client</a></p>
           <p style="font-size:12px;color:#999">Turn this off in Settings → Notifications → Bid reminder.</p>
