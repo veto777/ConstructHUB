@@ -89,6 +89,8 @@ describe("HOVER takeoff — real full_json v2 (anonymised)", () => {
   it("estimator automation: line quantities + formula symbols", () => {
     expect(takeoffQuantityForLine({ name: "Siding install", unit: "sf" }, t)?.quantity).toBe(2200);
     expect(takeoffQuantityForLine({ name: "Roof replacement", unit: "sq ft" }, t)?.quantity).toBe(2418);
+    expect(takeoffQuantityForLine({ name: "Siding Remodel - James Hardie Shingles (Primed)", unit: "sf" }, t)?.quantity).toBe(2200);
+    expect(takeoffQuantityForLine({ name: "Architectural shingles", unit: "sf" }, t)?.quantity).toBe(2418);
     expect(takeoffQuantityForLine({ name: "Architectural shingles", unit: "sq" }, t)?.quantity).toBe(24.18);
     expect(takeoffQuantityForLine({ name: "Window install", unit: "ea" }, t)?.quantity).toBe(9);
     expect(takeoffQuantityForLine({ name: "Entry door", unit: "each" }, t)?.quantity).toBe(4);

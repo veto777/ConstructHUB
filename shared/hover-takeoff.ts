@@ -588,7 +588,9 @@ export function takeoffQuantityForLine(
   const name = String(line.name ?? "").toLowerCase();
   const pick = (v: number | null, basis: string): TakeoffFill | null =>
     v === null || !Number.isFinite(v) ? null : { quantity: round2(v), basis };
-  const roofy = /roof|shingle|underlay|felt|ice[\s-]*(and|&)?[\s-]*water|ice[\s-]*shield|ridge[\s-]*cap|hip[\s-]*cap|decking|sheathing|tear\s*-?off|re-?roof/.test(name);
+  // A siding product named "shingles" (Hardie shingle siding) is siding, not a roof.
+  const sidingy = /siding|hardie|batten|cladding|\bwall/.test(name);
+  const roofy = !sidingy && /roof|shingle|underlay|felt|ice[\s-]*(and|&)?[\s-]*water|ice[\s-]*shield|ridge[\s-]*cap|hip[\s-]*cap|decking|sheathing|tear\s*-?off|re-?roof/.test(name);
 
   switch (unit) {
     case "sf":
