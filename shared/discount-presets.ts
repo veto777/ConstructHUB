@@ -38,7 +38,7 @@ export const DISCOUNT_PRESETS = [
     code: "price_match",
     label: "Price match",
     percentBps: 0, // creator sets the concession when enabling it
-    conditions: "Requires providing the competing bid. Off by default — price matching is a bad sales tactic.",
+    conditions: "To qualify, we need to see a copy of the estimate we're price matching so we can compare apples to apples: the same scope of work, materials and warranty.",
     defaultEnabled: false,
   },
 ] as const;

@@ -32,8 +32,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Plus, Loader2, Send, Eye, Check, CheckCircle2, XCircle, Copy,
   FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, BellRing,
-  Pencil, Search, Calendar, MessageSquare, CreditCard, Undo2,
+  Pencil, Search, Calendar, MessageSquare, CreditCard, Undo2, Info,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, statusTone,
 } from "@/components/crm-ui";
@@ -2063,6 +2064,19 @@ export default function CrmClientPage() {
                             <span>
                               {o.label}{" "}
                               <span className="text-primary">{eff.available ? `−${Number((eff.percentBps / 100).toFixed(2))}%` : "not available"}</span>
+                              {o.conditions && (
+                                // What the client must do to qualify (shown to them too) — e.g. price match needs the competing estimate.
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button type="button" className="ml-1.5 inline-flex align-middle text-muted-foreground hover:text-foreground"
+                                      aria-label={`How to qualify for ${o.label}`} onClick={(ev) => ev.stopPropagation()}
+                                      data-testid={`info-offer-${o.code}`}>
+                                      <Info className="h-3.5 w-3.5" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-72 text-sm" side="top">{o.conditions}</PopoverContent>
+                                </Popover>
+                              )}
                               {rule && <span className="block text-xs text-muted-foreground">{bundleRuleText(rule)}</span>}
                               {!eff.available && eff.reason && <span className="block text-xs text-amber-700 dark:text-amber-400" data-testid={`text-offer-reason-${o.code}`}>{eff.reason}</span>}
                             </span>
