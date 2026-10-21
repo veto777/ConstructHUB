@@ -194,7 +194,9 @@ export function registerEstimateOptionRoutes(app: Express, getDevUser: GetUser):
     if (!editGuard(est, res)) return;
     const existing = await db.select().from(crmEstimateOptions)
       .where(and(eq(crmEstimateOptions.orgId, ctx.org.id), eq(crmEstimateOptions.estimateId, est.id)));
-    const managed = existing.filter((o) => Array.isArray(o.items) && (o.items as any[]).length || (o as any).isMain);
+    // Every row this route wrote is managed, an empty new tab included (items = []); only legacy
+    // display-only tiers (items null) are left alone. Skipping empty rows left orphan $0 options behind.
+    const managed = existing.filter((o) => Array.isArray(o.items) || (o as any).isMain);
     const want = parsed.data.options.length >= 2 ? parsed.data.options : [];
     const keep = new Set(want.map((o) => o.id).filter(Boolean) as string[]);
     for (const o of managed) {

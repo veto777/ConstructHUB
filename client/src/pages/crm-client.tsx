@@ -1124,7 +1124,8 @@ export default function CrmClientPage() {
     await apiRequest("PUT", `/api/crm/estimates/${estId}/option-approval`, { mode: optionApproval });
     const rows: any[] = r.options ?? [];
     const main = rows.find((o) => o.isMain);
-    const extra = rows.filter((o) => !o.isMain && Array.isArray(o.items) && o.items.length);
+    // Rows come back in tab order (tier); an empty new tab must get its id too, or every save adds another row.
+    const extra = rows.filter((o) => !o.isMain && Array.isArray(o.items));
     setTab0((t) => ({ ...t, id: main?.id ?? null }));
     setExtraTabs((ts) => ts.map((t, i) => ({ ...t, id: extra[i]?.id ?? t.id })));
     optionsJson.current = json;
