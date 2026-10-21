@@ -30,11 +30,11 @@ const qty = (m: number) => (m / 1000).toLocaleString("en-US", { maximumFractionD
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null);
 
 /**
- * A small round button bottom-right while the reader scrolls: "↑ Top" past the middle of the page or near the
- * bottom, "↓ Bottom" otherwise. Fades out ~2 s after scrolling stops. `raised` lifts it clear of the fixed
- * Approve bar.
+ * A small round white button on the right edge, halfway down the screen, while the reader scrolls: "↑ Top" past
+ * the middle of the page or near the bottom, "↓ Bottom" otherwise. Fades out 3 s after scrolling stops (owner,
+ * 2026-10-21). Vertically centred, so it never collides with the fixed Approve bar (`raised` is kept for callers).
  */
-function ScrollJumpButton({ raised }: { raised: boolean }) {
+function ScrollJumpButton(_props: { raised: boolean }) {
   const [shown, setShown] = useState(false);
   const [toTop, setToTop] = useState(false);
   useEffect(() => {
@@ -46,7 +46,7 @@ function ScrollJumpButton({ raised }: { raised: boolean }) {
       setToTop(y > max / 2 || max - y < 200);
       setShown(true);
       clearTimeout(timer);
-      timer = setTimeout(() => setShown(false), 2000);
+      timer = setTimeout(() => setShown(false), 3000);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => { window.removeEventListener("scroll", onScroll); clearTimeout(timer); };
@@ -55,9 +55,8 @@ function ScrollJumpButton({ raised }: { raised: boolean }) {
     <button type="button"
       aria-label={toTop ? "Scroll to top" : "Scroll to bottom"} aria-hidden={!shown} tabIndex={shown ? 0 : -1}
       onClick={() => window.scrollTo({ top: toTop ? 0 : document.documentElement.scrollHeight, behavior: "smooth" })}
-      className={`fixed right-4 z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg text-[11px] font-semibold leading-tight flex items-center justify-center text-center transition-opacity duration-300 print:hidden ${
-        shown ? "opacity-100" : "opacity-0 pointer-events-none"} ${
-        raised ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]" : "bottom-[calc(1.25rem+env(safe-area-inset-bottom))]"}`}
+      className={`fixed right-4 top-1/2 -translate-y-1/2 z-40 h-14 w-14 rounded-full border border-slate-200 bg-white text-slate-900 shadow-lg text-[11px] font-semibold leading-tight flex items-center justify-center text-center transition-opacity duration-300 print:hidden ${
+        shown ? "opacity-100" : "opacity-0 pointer-events-none"}`}
       data-testid="button-scroll-jump" data-direction={toTop ? "top" : "bottom"}>
       {toTop ? "↑ Top" : "↓ Bottom"}
     </button>
