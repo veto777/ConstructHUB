@@ -691,6 +691,21 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
           email: m.email, phone: m.phone,
           role: m.role === "owner" ? "Owner" : m.role === "sales" ? "Sales" : "Project Manager",
         };
+        // The owner/admin login is a shared office account, so clients get the division's contact instead:
+        // its named contact person (custom_fields.contactMemberId) if set, else the division's office line and
+        // inbox (owner, 2026-10-21: Alpine WA → Andrey; FL → the FL office).
+        if (salesRep && (m.role === "owner" || m.role === "admin") && m.id === est.createdByMemberId) {
+          const div: any = await resolveEstimateDivision(est);
+          const contactId = div?.customFields?.contactMemberId ?? div?.custom_fields?.contactMemberId ?? null;
+          const [cm] = contactId
+            ? await db.select().from(crmMembers).where(and(eq(crmMembers.id, contactId), eq(crmMembers.orgId, est.orgId))).limit(1)
+            : [];
+          if (cm) {
+            salesRep = { name: cm.displayName || cm.email || salesRep.name, email: cm.email, phone: cm.phone, role: "Sales" };
+          } else if (div?.phone || div?.email) {
+            salesRep = { ...salesRep, name: div.name || salesRep.name, phone: div.phone || salesRep.phone, email: div.email || salesRep.email };
+          }
+        }
       }
     }
 
