@@ -33,7 +33,7 @@ import { cleanOfferConditions } from "@shared/discount-presets";
 import {
   ArrowLeft, Plus, Loader2, Send, Eye, Check, CheckCircle2, XCircle, Copy,
   FileText, Trash2, Receipt, Landmark, Clock, Layers, Ban, Mail, Phone, MapPin, BellRing,
-  Pencil, Search, Calendar, MessageSquare, CreditCard, Undo2, Info,
+  Pencil, Search, Calendar, MessageSquare, CreditCard, Undo2, Info, GripVertical,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -938,6 +938,9 @@ export default function CrmClientPage() {
     if (open && taxRate.data && !taxTouched) setTaxPct(bpsToPctText(taxRate.data.bps));
   }, [open, taxRate.data, taxTouched]);
   const [items, setItems] = useState<Item[]>([{ ...BLANK }]);
+  // Drag-to-reorder of the popup's line cards (grip in each card's top-left corner).
+  const [dragLine, setDragLine] = useState<number | null>(null);
+  const [dragOverLine, setDragOverLine] = useState<number | null>(null);
 
   // ── Never lose an estimate (owner, 2026-10-21) ─────────────────────────────
   // Every change is mirrored to this device; once there is content the estimate is autosaved to the server as a
@@ -1941,8 +1944,27 @@ export default function CrmClientPage() {
                 )}
                 <div className="space-y-2">
                   {tabItems.map((it, idx) => (
-                    <div key={idx} className="grid gap-2 sm:grid-cols-12 items-end border rounded-md p-2"
+                    // A clearly outlined card per scope; drag it by the grip (top-left) to reorder.
+                    <div key={idx}
+                      className={`relative grid gap-2 sm:grid-cols-12 items-end rounded-md border-2 border-foreground/25 p-2 pl-8 ${dragOverLine === idx && dragLine !== null && dragLine !== idx ? "ring-2 ring-primary" : ""} ${dragLine === idx ? "opacity-50" : ""}`}
+                      draggable={dragLine === idx}
+                      onDragStart={(ev) => { ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", String(idx)); }}
+                      onDragOver={(ev) => { if (dragLine === null) return; ev.preventDefault(); setDragOverLine(idx); }}
+                      onDrop={(ev) => {
+                        ev.preventDefault();
+                        const from = dragLine;
+                        setDragLine(null); setDragOverLine(null);
+                        if (from === null || from === idx) return;
+                        setTabItems((cur) => { const a = [...cur]; const [m] = a.splice(from, 1); a.splice(idx, 0, m); return a; });
+                      }}
+                      onDragEnd={() => { setDragLine(null); setDragOverLine(null); }}
                       data-testid={`line-item-${idx}`}>
+                      <span className="absolute left-1.5 top-2 cursor-grab active:cursor-grabbing rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title="Drag to reorder" aria-label={`Drag to reorder line ${idx + 1}`}
+                        onMouseDown={() => setDragLine(idx)} onMouseUp={() => setDragLine(null)}
+                        data-testid={`drag-line-${idx}`}>
+                        <GripVertical className="h-4 w-4" />
+                      </span>
                       <div className="sm:col-span-5">
                         <Label className="text-xs">Item</Label>
                         {/* Search the price book; a pick fills the line (and the qty from the HOVER takeoff when one matches). */}
