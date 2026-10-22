@@ -62,30 +62,38 @@ export function useEngagementTracker(
     };
 
     // ── Section dwell ──────────────────────────────────────────────────────
+    // Several elements can share a section name (two contact cards): the
+    // name's clock runs while ANY of them is on screen, never twice.
     const secsBySection = new Map<string, number>();   // running total, ms
     const sentSecs = new Map<string, number>();        // last total sent, whole secs
-    const visibleSince = new Map<Element, number>();   // element → ms it came on screen
+    const onScreen = new Map<string, Set<Element>>();  // name → elements visible now
+    const since = new Map<string, number>();           // name → ms its clock last started
     const sectionOf = (el: Element) => el.getAttribute("data-track-section") || "";
-    const bank = (el: Element, until: number) => {
-      const since = visibleSince.get(el);
-      if (since == null) return;
-      const name = sectionOf(el);
-      if (name) secsBySection.set(name, (secsBySection.get(name) ?? 0) + Math.max(0, until - since));
-      visibleSince.set(el, until);
+    const bank = (name: string, until: number) => {
+      const from = since.get(name);
+      if (from == null) return;
+      secsBySection.set(name, (secsBySection.get(name) ?? 0) + Math.max(0, until - from));
+      since.set(name, until);
     };
+    const bankAll = (until: number) => Array.from(since.keys()).forEach((n) => bank(n, until));
     const io = typeof IntersectionObserver === "function"
       ? new IntersectionObserver((entries) => {
         const t = Date.now();
+        const vh = window.innerHeight || 1;
         for (const en of entries) {
-          const vh = window.innerHeight || 1;
+          const name = sectionOf(en.target);
+          if (!name) continue;
           // A tall section never reaches 35% of ITSELF on a phone — count it once it fills 35% of the screen.
           const on = en.isIntersecting
             && (en.intersectionRatio >= SECTION_VISIBLE_RATIO || en.intersectionRect.height >= vh * SECTION_VISIBLE_RATIO);
-          if (on && !visibleSince.has(en.target)) {
-            if (document.visibilityState === "visible") visibleSince.set(en.target, t);
-          } else if (!on && visibleSince.has(en.target)) {
-            bank(en.target, t);
-            visibleSince.delete(en.target);
+          const set = onScreen.get(name) ?? new Set<Element>();
+          if (on && !set.has(en.target)) {
+            set.add(en.target);
+            onScreen.set(name, set);
+            if (!since.has(name) && document.visibilityState === "visible") since.set(name, t);
+          } else if (!on && set.has(en.target)) {
+            set.delete(en.target);
+            if (!set.size) { bank(name, t); since.delete(name); }
           }
         }
       }, { threshold: [0, 0.1, 0.2, SECTION_VISIBLE_RATIO, 0.5, 0.75, 1] })
@@ -105,7 +113,7 @@ export function useEngagementTracker(
 
     const queueSectionTotals = () => {
       const t = Date.now();
-      if (document.visibilityState === "visible") Array.from(visibleSince.keys()).forEach((el) => bank(el, t));
+      if (document.visibilityState === "visible") bankAll(t);
       for (const [name, ms] of Array.from(secsBySection.entries())) {
         const secs = Math.floor(ms / 1000);
         if (secs > 0 && secs !== sentSecs.get(name)) {
@@ -208,10 +216,12 @@ export function useEngagementTracker(
     const onVisible = () => {
       const t = Date.now();
       if (document.visibilityState === "visible") {
-        Array.from(visibleSince.keys()).forEach((el) => visibleSince.set(el, t));
+        // Restart the clock of every section still on screen.
+        for (const [name, set] of Array.from(onScreen.entries())) if (set.size) since.set(name, t);
         ping();
       } else {
-        Array.from(visibleSince.keys()).forEach((el) => bank(el, t));
+        bankAll(t);
+        since.clear();
         ping(true);
       }
     };
