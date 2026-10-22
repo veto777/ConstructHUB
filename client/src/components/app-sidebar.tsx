@@ -504,9 +504,9 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
   return (
     <Sidebar sheet={sheet}>
       <SidebarHeader className="p-4 pb-3">
-        <Link href={user ? "/settings?tab=profile" : "/"} className="flex items-end gap-0.5 cursor-pointer" aria-label={user ? "Your profile" : "Home"} data-testid="link-logo-home">
+        <Link href={user ? "/settings?tab=profile" : "/"} className="flex items-end gap-2.5 cursor-pointer" aria-label={user ? "Your profile" : "Home"} data-testid="link-logo-home">
           <span className="flex flex-col min-w-0 mb-1.5">
-            <CHLogo height={40} />
+            <CHLogo height={38} />
             <p className="sr-only" data-testid="text-app-title">The All-in-One Growth Platform for Contractors</p>
           </span>
           {/* The mascot stands beside the mark on every ConstructHUB sidebar (6ce8c7e8 dropped it by accident;
