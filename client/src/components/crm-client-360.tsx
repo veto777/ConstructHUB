@@ -255,9 +255,11 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm"><ActorLine actor={e.actor} actionText={e.actionText} text={e.text} /></div>
                     <div className="text-xs text-muted-foreground">{when(e.at)}</div>
+                    <div className="sm:hidden mt-0.5 text-xs font-medium text-primary">What they did</div>
                   </div>
                   <span className="mt-1 inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                    What they did <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                    <span className="hidden sm:inline">What they did</span>
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                   </span>
                 </summary>
                 <div className="mt-3 pl-10">

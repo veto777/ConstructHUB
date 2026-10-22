@@ -248,7 +248,7 @@ function RequestPaymentDialog({ data, open, onOpenChange, onDone }: { data: Ledg
     title: `Send ${data.customer?.displayName ?? "the client"} a payment request for ${money(dueNow)}?`,
     description: <span className="block space-y-1 text-sm">
       <span className="block">To: <strong>{data.customer?.email}</strong>{alsoText && data.customer?.phone ? <> · text to <strong>{data.customer.phone}</strong></> : null}</span>
-      <span className="block">{data.estimate.number} · {title}{kind === "final" ? "" : ` · due ${day(due)}`}</span>
+      <span className="block">{data.estimate.number} · {title}{kind === "final" ? "" : ` · due ${day(noonIso(due))}`}</span>
       <span className="block">Request: <strong>{money(requestCents)}</strong>{data.estimate.taxRateBps > 0 ? " (tax included)" : ""}</span>
       {credit > 0 && <span className="block">Deposit already received, credited: −{money(credit)} → <strong>{money(dueNow)} due</strong></span>}
       <span className="block">Balance still owed after this is paid: <strong>{balanceAfter === 0 ? "$0.00 — paid in full" : money(balanceAfter)}</strong></span>

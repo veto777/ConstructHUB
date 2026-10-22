@@ -25,12 +25,14 @@ function Chip({ ok, label, testid }: { ok: boolean; label: string; testid: strin
 
 /** Discount interest as three steps: opened the list → opened the additional ones → ticked one. */
 function DiscountInterest({ level }: { level: number }) {
-  const steps = ["Opened discounts", "Opened additional", "Ticked one"];
+  const steps = ["Opened", "Additional", "Ticked one"];
   return (
-    <span className="inline-flex items-center rounded-full border overflow-hidden text-[11px] font-medium"
-      title="How far into the discounts they went" data-testid="chip-discounts" data-level={level}>
+    <span className="inline-flex max-w-full flex-wrap items-center rounded-full border overflow-hidden text-[11px] font-medium"
+      title="How far into the discounts they went: opened the list → opened the additional ones (bundle, price match) → ticked one"
+      data-testid="chip-discounts" data-level={level}>
+      <span className={cn("px-2 py-0.5", level > 0 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted/50 text-muted-foreground")}>Discounts:</span>
       {steps.map((s, i) => (
-        <span key={s} className={cn("inline-flex items-center gap-1 px-2 py-0.5", i > 0 && "border-l",
+        <span key={s} className={cn("inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 border-l",
           level > i ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted/50 text-muted-foreground")}>
           {level > i ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}{s}
         </span>
