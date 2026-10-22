@@ -36,6 +36,7 @@ import {
   crmEstimates,
   crmEstimateEvents,
   crmEngagementSessions,
+  crmEngagementEvents,
   crmFinanceClicks,
   crmInvoices,
   crmMembers,
@@ -61,6 +62,7 @@ import {
   UNRECORDED_ACTOR, UNRECORDED_TEAM_ACTOR, type CrmActor,
 } from "@shared/crm-actor";
 import { INTEREST_EVENT_TYPES, interestEventText } from "@shared/self-estimate";
+import { buildVisitDetail, groupSessionsIntoVisits, type VisitDetail } from "@shared/engagement-events";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -99,6 +101,8 @@ export type TimelineEntry = {
   at: string;                  // ISO timestamp
   durationSecs?: number | null;
   amountCents?: number | null;
+  /** engagement: what the client read and clicked during this visit (the row's dropdown). */
+  visit?: VisitDetail | null;
 };
 
 /** Newest-first; ties break deterministically by id so the order is stable. */
@@ -604,18 +608,66 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
     }
 
     // Engagement rows are org-wide; keep only this customer's documents.
-    // The public page is the client's — the visit reads as theirs.
-    for (const s of sessions) {
-      const doc = s.docType === "estimate" ? estById.get(s.docId) : invById.get(s.docId);
-      if (!doc) continue;
-      const ref = refOf(doc);
-      entries.push({
-        id: `eng-${s.id}`, kind: "engagement", verb: "opened",
-        ...said(client, `opened ${s.docType} ${ref} · stayed ${formatDurationSecs(s.durationSecs ?? 0)}`),
-        ref,
-        at: (s.startedAt ?? new Date()).toISOString(),
-        durationSecs: s.durationSecs ?? 0,
-      });
+    // The public page is the client's — the visit reads as theirs. Sessions
+    // on one document close together (the estimate, then its Terms page) are
+    // ONE visit: one row, with what they read and clicked in its dropdown.
+    const mySessions = sessions.filter((s) =>
+      s.docType === "estimate" ? estById.has(s.docId) : invById.has(s.docId));
+    const trackRows = mySessions.length
+      ? await db.select().from(crmEngagementEvents)
+          .where(and(
+            eq(crmEngagementEvents.orgId, orgId),
+            inArray(crmEngagementEvents.sessionId, mySessions.map((s) => s.id)),
+          )).limit(10000)
+      : [];
+    const bySession = new Map<string, typeof trackRows>();
+    for (const r of trackRows) {
+      const list = bySession.get(r.sessionId) ?? [];
+      list.push(r);
+      bySession.set(r.sessionId, list);
+    }
+    const byDoc = new Map<string, typeof mySessions>();
+    for (const s of mySessions) {
+      const k = `${s.docType}:${s.docId}`;
+      byDoc.set(k, [...(byDoc.get(k) ?? []), s]);
+    }
+    const visitWindows: { estimateId: string; from: number; to: number }[] = [];
+    for (const docSessions of Array.from(byDoc.values())) {
+      for (const visit of groupSessionsIntoVisits(docSessions)) {
+        const first = visit[0];
+        const doc = first.docType === "estimate" ? estById.get(first.docId) : invById.get(first.docId);
+        if (!doc) continue;
+        const ref = refOf(doc);
+        const from = new Date(first.startedAt ?? 0).getTime();
+        const to = visit.reduce((m, s) => Math.max(m,
+          new Date(s.lastPingAt ?? s.startedAt ?? 0).getTime(),
+          new Date(s.startedAt ?? 0).getTime() + (s.durationSecs ?? 0) * 1000), from);
+        if (first.docType === "estimate") visitWindows.push({ estimateId: first.docId, from, to });
+        const approvedAt = first.docType === "estimate" ? (doc as any).approvedAt : null;
+        const approved = !!approvedAt && new Date(approvedAt).getTime() >= from && new Date(approvedAt).getTime() <= to + 5 * 60_000;
+        const evs = visit.flatMap((s) => (bySession.get(s.id) ?? [])
+          .map((r) => ({ sessionId: r.sessionId, name: r.name, detail: (r.detail ?? null) as any, tMs: r.tMs })));
+        const durationSecs = visit.reduce((m, s) => m + (s.durationSecs ?? 0), 0);
+        entries.push({
+          id: `eng-${first.id}`, kind: "engagement", verb: "opened",
+          ...said(client, `opened ${first.docType} ${ref} · stayed ${formatDurationSecs(durationSecs)}`),
+          ref,
+          at: (first.startedAt ?? new Date()).toISOString(),
+          durationSecs,
+          visit: buildVisitDetail(visit, evs, { approved }),
+        });
+      }
+    }
+    // The bare "opened estimate E-101" event duplicates the visit row that
+    // starts with it — keep it only when no visit covers it.
+    for (let k = entries.length - 1; k >= 0; k--) {
+      const en = entries[k];
+      if (en.kind !== "estimate_event" || en.verb !== "viewed") continue;
+      const ev = events.find((e) => `ev-${e.id}` === en.id);
+      const t = new Date(en.at).getTime();
+      if (ev && visitWindows.some((w) => w.estimateId === ev.estimateId && t >= w.from - 2 * 60_000 && t <= w.to + 60_000)) {
+        entries.splice(k, 1);
+      }
     }
 
     // Payments are money: a price-blind seat gets no payment lines at all

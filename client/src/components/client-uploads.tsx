@@ -662,7 +662,7 @@ export function EstimateAttachments({ token }: { token: string }) {
   });
   if (!atts?.length) return null;
   return (
-    <Card className="shadow-sm" data-testid="estimate-attachments">
+    <Card className="shadow-sm" data-testid="estimate-attachments" data-track-section="attachments">
       <CardHeader>
         <SectionTitle icon={Paperclip} title="Attached documents" />
       </CardHeader>
@@ -674,7 +674,7 @@ export function EstimateAttachments({ token }: { token: string }) {
               <div className="font-medium truncate">{a.fileName}</div>
               <div className="text-xs text-muted-foreground">{kb(a.sizeBytes)}</div>
             </div>
-            <a href={a.downloadUrl} data-testid={`public-attachment-download-${a.id}`}>
+            <a href={a.downloadUrl} data-testid={`public-attachment-download-${a.id}`} data-track="attachment_open" data-track-detail={a.fileName}>
               <Button size="sm" variant="outline">
                 <Download className="h-4 w-4 mr-1.5" /> Download
               </Button>

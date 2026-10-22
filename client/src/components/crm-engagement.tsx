@@ -3,6 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Eye, CalendarPlus, Loader2, ShieldAlert, Forward, Users } from "lucide-react";
 import { InfoTip } from "@/components/info-tip";
+import { BehaviourChips } from "@/components/visit-behaviour";
 
 /** Compact duration: 45s → "<1m", 720s → "12m", 3900s → "1h 5m". */
 function fmtDuration(secs: number): string {
@@ -92,6 +93,7 @@ export function EstimateEngagement({ estimate: e, canManage, onChanged }: Props)
           </ul>
         </details>
       )}
+      {eng?.behaviour && <BehaviourChips summary={eng.behaviour} />}
       {/* Access intelligence: denied gate attempts (who was typed), forward
           detection, and the client's explicit shares. */}
       {(eng?.accessEvents?.length ?? 0) > 0 && (

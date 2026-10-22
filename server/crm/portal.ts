@@ -19,7 +19,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { db } from "../db";
 import {
   crmCustomers, crmProjects, crmEstimates, crmEstimateItems, crmEstimateOptions, crmOrgs, crmMembers,
-  crmEstimateEvents, crmEngagementSessions,
+  crmEstimateEvents, crmEngagementSessions, crmEngagementEvents,
   CRM_PROJECT_STAGE_META,
   crmNotificationEnabled,
   crmNotificationChannel,
@@ -61,6 +61,10 @@ import { logError } from "../ops/log";
 import { clientHome3dForEstimate } from "./hover-share";
 import { viewerMeasurementForEstimate } from "./hover-model3d-offer";
 import { buildEstimateEmail } from "./estimate-email";
+import {
+  TRACK_NAME_RE, TRACK_MAX_EVENTS_PER_POST, TRACK_MAX_ROWS_PER_SESSION, TRACK_MAX_DETAIL_CHARS,
+  TRACK_SESSION_MAX_AGE_MS, TRACK_CUMULATIVE, buildVisitDetail, groupSessionsIntoVisits, mergeSummaries,
+} from "@shared/engagement-events";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -1322,6 +1326,101 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     res.json({ ok: true, durationSecs: row?.durationSecs ?? sess.durationSecs });
   });
 
+  /** Behaviour events for an engagement session (shared/engagement-events.ts):
+   *  what the client read and clicked. The session id (unguessable, minted
+   *  by /start only for a client session on a live document) plus the
+   *  document's token must both match, the session must be recent, and each
+   *  session is capped — a replayed or scripted flood stores nothing beyond
+   *  the cap. Running totals (seconds per section, scroll depth) are one row
+   *  per session+key, kept at their max. */
+  const eventPostAt = new Map<string, number>();
+  app.post("/api/public/engagement/events", async (req: any, res) => {
+    const parsed = z.object({
+      sessionId: z.string().min(8).max(64),
+      token: z.string().min(24).max(120),
+      events: z.array(z.object({
+        name: z.string().regex(TRACK_NAME_RE),
+        detail: z.string().max(400).nullish(),
+        section: z.string().max(60).nullish(),
+        secs: z.number().min(0).max(86_400).nullish(),
+        pct: z.number().min(0).max(100).nullish(),
+        page: z.string().max(20).nullish(),
+        device: z.string().max(20).nullish(),
+        t: z.number().min(0).max(TRACK_SESSION_MAX_AGE_MS),
+      })).max(TRACK_MAX_EVENTS_PER_POST),
+    }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid events" });
+    const { sessionId, token: t, events } = parsed.data;
+    if (!events.length) return res.json({ ok: true, stored: 0 });
+
+    // Light per-session throttle: the page sends every 15s (plus a beacon on
+    // leave), so more than ~5 posts a second is not a browser.
+    const nowMs = Date.now();
+    const last = eventPostAt.get(sessionId) ?? 0;
+    if (nowMs - last < 200) return res.status(429).json({ message: "Slow down" });
+    eventPostAt.set(sessionId, nowMs);
+    if (eventPostAt.size > 5000) {
+      for (const [k, v] of Array.from(eventPostAt.entries())) if (nowMs - v > 60_000) eventPostAt.delete(k);
+    }
+
+    const [sess] = await db.select().from(crmEngagementSessions)
+      .where(eq(crmEngagementSessions.id, sessionId)).limit(1);
+    if (!sess) return res.status(404).json({ message: "Not found" });
+    const started = sess.startedAt ? new Date(sess.startedAt).getTime() : 0;
+    if (nowMs - started > TRACK_SESSION_MAX_AGE_MS) return res.json({ ok: true, stored: 0 });
+    // The token must be THIS session's document's token.
+    const [doc] = sess.docType === "estimate"
+      ? await db.select({ id: crmEstimates.id }).from(crmEstimates)
+          .where(and(eq(crmEstimates.publicToken, t), eq(crmEstimates.id, sess.docId), eq(crmEstimates.orgId, sess.orgId))).limit(1)
+      : await db.select({ id: crmInvoices.id }).from(crmInvoices)
+          .where(and(eq(crmInvoices.publicToken, t), eq(crmInvoices.id, sess.docId), eq(crmInvoices.orgId, sess.orgId))).limit(1);
+    if (!doc) return res.status(404).json({ message: "Not found" });
+
+    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmEngagementEvents)
+      .where(and(eq(crmEngagementEvents.orgId, sess.orgId), eq(crmEngagementEvents.sessionId, sess.id)));
+    let room = TRACK_MAX_ROWS_PER_SESSION - Number(n ?? 0);
+    let stored = 0;
+    for (const e of events) {
+      const tMs = Math.round(e.t);
+      if (TRACK_CUMULATIVE.has(e.name)) {
+        const key = e.name === "section_time" ? String(e.section ?? "").slice(0, 40) : "page";
+        if (!key) continue;
+        const val = Math.round((e.name === "section_time" ? e.secs : e.pct) ?? 0);
+        const detail: Record<string, any> = e.name === "section_time" ? { section: key, secs: val } : { pct: val };
+        const field = e.name === "section_time" ? "secs" : "pct";
+        if (room > 0) {
+          // One row per (session, name, key): first-seen time kept, value kept at its max.
+          await db.execute(sql`
+            INSERT INTO crm_engagement_events (org_id, session_id, doc_type, doc_id, name, key, detail, t_ms)
+            VALUES (${sess.orgId}, ${sess.id}, ${sess.docType}, ${sess.docId}, ${e.name}, ${key}, ${JSON.stringify(detail)}::jsonb, ${tMs})
+            ON CONFLICT (session_id, name, key) WHERE key IS NOT NULL DO UPDATE SET detail = CASE
+              WHEN coalesce((excluded.detail->>${field})::int, 0) > coalesce((crm_engagement_events.detail->>${field})::int, 0)
+              THEN excluded.detail ELSE crm_engagement_events.detail END`);
+          room--;
+        } else {
+          await db.update(crmEngagementEvents).set({ detail })
+            .where(and(
+              eq(crmEngagementEvents.orgId, sess.orgId), eq(crmEngagementEvents.sessionId, sess.id),
+              eq(crmEngagementEvents.name, e.name), eq(crmEngagementEvents.key, key),
+              sql`coalesce((${crmEngagementEvents.detail}->>${field})::int, 0) < ${val}`,
+            ));
+        }
+        stored++;
+        continue;
+      }
+      if (room <= 0) break;
+      const detail: Record<string, any> = {};
+      if (e.detail) detail.d = e.detail.slice(0, TRACK_MAX_DETAIL_CHARS);
+      if (e.name === "page_view") { detail.page = e.page ?? null; detail.device = e.device ?? null; }
+      await db.insert(crmEngagementEvents).values({
+        orgId: sess.orgId, sessionId: sess.id, docType: sess.docType, docId: sess.docId,
+        name: e.name, key: null, detail: Object.keys(detail).length ? detail : null, tMs, createdAt: new Date(),
+      } as any);
+      room--; stored++;
+    }
+    res.json({ ok: true, stored });
+  });
+
   /** Contractor-side read: per-estimate engagement summary. Org-scoped; IPs
    *  are redacted to their /24 before leaving the server. */
   app.get("/api/crm/estimates/:id/engagement", async (req: any, res) => {
@@ -1356,7 +1455,25 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       ))
       .orderBy(desc(crmEstimateEvents.createdAt)).limit(50);
 
+    // What they read and clicked, rolled up across every visit (the chips on the estimate row).
+    const trackRows = sessions.length
+      ? await db.select().from(crmEngagementEvents)
+          .where(and(
+            eq(crmEngagementEvents.orgId, ctx.org.id),
+            eq(crmEngagementEvents.docType, "estimate"),
+            eq(crmEngagementEvents.docId, est.id),
+          )).limit(5000)
+      : [];
+    const behaviour = trackRows.length
+      ? mergeSummaries(groupSessionsIntoVisits(sessions).map((v) => {
+          const ids = new Set(v.map((s) => s.id));
+          return buildVisitDetail(v, trackRows.filter((r) => ids.has(r.sessionId))
+            .map((r) => ({ sessionId: r.sessionId, name: r.name, detail: r.detail as any, tMs: r.tMs }))).summary;
+        }))
+      : null;
+
     res.json({
+      behaviour,
       visits: sessions.length,
       totalSecs: sessions.reduce((s, x) => s + (x.durationSecs ?? 0), 0),
       lastVisitAt: sessions[0]?.startedAt ?? null,

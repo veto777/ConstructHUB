@@ -24,7 +24,7 @@ export function BidHeadlineBanner({ headline: raw, hasWarranty }: { headline: un
   }, [!!headline, hasWarranty]);
   if (!headline) return null;
   return (
-    <Card className="border-2 border-primary bg-primary/5 shadow-sm" data-testid="bid-headline">
+    <Card className="border-2 border-primary bg-primary/5 shadow-sm" data-testid="bid-headline" data-track-section="headline">
       <CardContent className="p-5 sm:p-6 flex items-start gap-3 sm:gap-4">
         <ShieldCheck className="h-8 w-8 text-primary shrink-0 mt-0.5" aria-hidden />
         <div className="min-w-0 space-y-1.5">
@@ -45,7 +45,7 @@ export function BidHeadlineBanner({ headline: raw, hasWarranty }: { headline: un
                 ev.preventDefault();
                 el.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
-              data-testid="link-bid-headline-warranty">
+              data-testid="link-bid-headline-warranty" data-track="warranty_open">
               Read the full warranty ↓
             </a>
           )}

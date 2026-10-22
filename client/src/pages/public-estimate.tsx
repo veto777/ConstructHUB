@@ -87,7 +87,7 @@ function AskQuestionCard({ token, repName }: { token: string; repName: string | 
     onError: (e: any) => toast({ title: "Could not send", description: String(e.message ?? e), variant: "destructive" }),
   });
   return (
-    <Card data-testid="card-ask-question">
+    <Card data-testid="card-ask-question" data-track-section="questions">
       <CardContent className="p-4 space-y-2">
         <div className="font-medium text-sm">
           Questions about this estimate?{repName ? ` ${repName} answers fast.` : ""}
@@ -99,9 +99,9 @@ function AskQuestionCard({ token, repName }: { token: string; repName: string | 
         ) : (
           <div className="flex gap-2">
             <Textarea rows={2} className="resize-none" placeholder="Ask anything — scope, timing, materials…"
-              value={body} onChange={(ev) => setBody(ev.target.value)} data-testid="input-ask-question" />
+              value={body} onChange={(ev) => setBody(ev.target.value)} data-testid="input-ask-question" data-track="question_open" />
             <Button className="self-end" disabled={!body.trim() || send.isPending}
-              onClick={() => send.mutate()} data-testid="button-ask-question">
+              onClick={() => send.mutate()} data-testid="button-ask-question" data-track="question_send">
               {send.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send"}
             </Button>
           </div>
@@ -232,13 +232,13 @@ function PayCard({ token, company, estimate, payInfo }: {
             <div className="flex flex-wrap gap-2">
               {payInfo.achAvailable && (
                 <Button size="lg" variant="outline" onClick={() => pay.mutate("ach")} disabled={pay.isPending}
-                  data-testid="button-pay-ach">
+                  data-testid="button-pay-ach" data-track="pay_click" data-track-detail="bank (ACH)">
                   {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Pay {money(amount)} by bank
                 </Button>
               )}
               {payInfo.cardAvailable && (
-                <Button size="lg" onClick={() => setFeeConfirm(true)} disabled={pay.isPending} data-testid="button-pay-card">
+                <Button size="lg" onClick={() => setFeeConfirm(true)} disabled={pay.isPending} data-testid="button-pay-card" data-track="pay_click" data-track-detail="card">
                   {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Pay {money(payInfo.cardFee.totalCents)} by card
                 </Button>
@@ -253,7 +253,7 @@ function PayCard({ token, company, estimate, payInfo }: {
             />
           </div>
         ) : (
-          <Button size="lg" className="w-full sm:w-auto" onClick={() => pay.mutate(undefined)} disabled={pay.isPending} data-testid="button-pay">
+          <Button size="lg" className="w-full sm:w-auto" onClick={() => pay.mutate(undefined)} disabled={pay.isPending} data-testid="button-pay" data-track="pay_click">
             {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Pay {money(amount)}
           </Button>
@@ -302,7 +302,7 @@ function ShareEstimateCard({ token }: { token: string }) {
             className="flex-1 h-11" data-testid="input-share-email" />
           <Button variant="outline" className="h-11"
             disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()) || share.isPending}
-            onClick={() => share.mutate()} data-testid="button-share-estimate">
+            onClick={() => share.mutate()} data-testid="button-share-estimate" data-track="share_send">
             {share.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             Send secure link
           </Button>
@@ -415,7 +415,8 @@ export default function PublicEstimatePage() {
 
   // Engagement heartbeat — starts only once the document has loaded, and
   // never for a contractor preview (that's not client behaviour).
-  useEngagementTracker("estimate", token, !!data && !data?.preview);
+  useEngagementTracker("estimate", token, !!data && !data?.preview,
+    new URLSearchParams(window.location.search).get("terms") === "1" ? "terms" : "estimate");
 
   // The org's primary financing link. Gated like the document itself; skipped
   // in contractor preview (no client session exists there).
@@ -566,11 +567,11 @@ export default function PublicEstimatePage() {
   if (showTerms) {
     const backHref = `/e/${token}${previewGrant ? `?preview=${encodeURIComponent(previewGrant)}` : ""}`;
     return (
-      <main className="min-h-screen bg-muted/40" style={orgThemeStyle(company?.theme)} data-testid="estimate-terms-root">
+      <main className="min-h-screen bg-muted/40" style={orgThemeStyle(company?.theme)} data-testid="estimate-terms-root" data-track-section="terms">
         <PrintLockdown />
         <BrandBar company={company} />
         <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-          <a href={backHref} className="text-sm text-primary hover:underline" data-testid="link-back-to-estimate">
+          <a href={backHref} className="text-sm text-primary hover:underline" data-testid="link-back-to-estimate" data-track="back_to_estimate">
             ← Back to estimate
           </a>
           <h1 className="text-3xl font-bold tracking-tight">Terms and Conditions</h1>
@@ -807,7 +808,7 @@ export default function PublicEstimatePage() {
                     <label key={o.id}
                       className={`rounded-lg border p-4 transition-colors ${reviewing ? "" : "cursor-pointer"} ${
                         on ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card hover:bg-accent/50"}`}
-                      data-testid={`option-${o.tier}`}>
+                      data-testid={`option-${o.tier}`} data-track="scope_toggle" data-track-detail={o.name}>
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium">{o.name}</span>
                         {reviewing ? (
@@ -929,7 +930,7 @@ export default function PublicEstimatePage() {
                     onClick={() => viewOption(null)}
                     className={`rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                       activeOptionId === null ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card hover:bg-accent/50"}`}
-                    data-testid="option-tab-estimate">
+                    data-testid="option-tab-estimate" data-track="option_tab" data-track-detail="Estimate">
                     <span className="font-medium">Estimate</span>
                     <div className="text-xl font-semibold tabular-nums mt-3">{money(shownTotalCents)}</div>
                   </button>
@@ -943,7 +944,7 @@ export default function PublicEstimatePage() {
                       onClick={() => viewOption(o)}
                       className={`rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default ${
                         active ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card hover:bg-accent/50"}`}
-                      data-testid={`option-${o.tier}`}>
+                      data-testid={`option-${o.tier}`} data-track="option_tab" data-track-detail={o.name}>
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium">{o.name}</span>
                         {o.recommended && <StatusPill tone="info" dot={false}>recommended</StatusPill>}
@@ -970,7 +971,7 @@ export default function PublicEstimatePage() {
               {options.map((o: any) => (
                 <div key={o.id}
                   className={`rounded-lg border p-4 transition-colors ${o.recommended ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card"}`}
-                  data-testid={`option-${o.tier}`}>
+                  data-testid={`option-${o.tier}`} data-track="option_tab" data-track-detail={o.name}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">{o.name}</span>
                     {o.recommended && <StatusPill tone="info" dot={false}>recommended</StatusPill>}
@@ -1052,7 +1053,7 @@ export default function PublicEstimatePage() {
               </div>
             </div>
             {/* Prepared for — the client's own details. */}
-            <div className="rounded-lg border bg-muted/30 p-4" data-testid="prepared-for">
+            <div className="rounded-lg border bg-muted/30 p-4" data-testid="prepared-for" data-track-section="letterhead">
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Prepared for</div>
               <div className="font-medium mt-1">{customer.displayName}</div>
               {(customer.addressLine1 || customer.city) && (
@@ -1078,12 +1079,12 @@ export default function PublicEstimatePage() {
                 in the Terms and Conditions. The only full copy on the page. */}
             {company.warrantyText && (
               <div id={WARRANTY_ANCHOR} className="scroll-mt-24 rounded-lg border-2 border-primary/60 bg-primary/5 p-4 space-y-2"
-                data-testid="section-warranty">
+                data-testid="section-warranty" data-track-section="warranty">
                 <div className="flex items-center gap-2 font-semibold">
                   <ShieldCheck className="h-5 w-5 text-primary shrink-0" /> Warranty
                 </div>
                 <p className="text-sm whitespace-pre-wrap leading-relaxed" data-testid="text-warranty">{company.warrantyText}</p>
-                <a href={termsHref} className="inline-block text-sm text-primary underline font-medium" data-testid="link-warranty-terms">
+                <a href={termsHref} className="inline-block text-sm text-primary underline font-medium" data-testid="link-warranty-terms" data-track="terms_open" data-track-detail="from the warranty">
                   Read the full Terms and Conditions
                 </a>
               </div>
@@ -1118,7 +1119,7 @@ export default function PublicEstimatePage() {
                 </thead>
                 <tbody className="block sm:table-row-group">
                   {docItems.map((i: any) => (
-                    <tr key={i.id} className="block sm:table-row border-t px-4 py-3 sm:p-0">
+                    <tr key={i.id} className="block sm:table-row border-t px-4 py-3 sm:p-0" data-track-section={`scope:${String(i.name ?? "").slice(0, 34)}`}>
                       <td className="block sm:table-cell sm:px-4 sm:py-3">
                         <div className="text-xl sm:text-2xl font-bold tracking-tight leading-snug" data-testid="text-line-title">{i.name}</div>
                         {/* Full scope of work — multi-line bullets preserved, HCP-style. */}
@@ -1170,7 +1171,7 @@ export default function PublicEstimatePage() {
                   </div>
                 )}
                 <div className="flex justify-between border-t pt-2 text-lg font-bold">
-                  Total <span className="tabular-nums" data-testid="doc-grand-total">{money(docTotalCents)}</span>
+                  Total <span className="tabular-nums" data-testid="doc-grand-total" data-track-section="totals">{money(docTotalCents)}</span>
                 </div>
                 {shownDepositCents && !viewDoc ? (
                   <div className="flex justify-between text-muted-foreground">
@@ -1268,7 +1269,7 @@ export default function PublicEstimatePage() {
           <Card className="shadow-sm">
             <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm text-muted-foreground">Prefer to spread payments out?</div>
-              <a href={payInfo.financing.url} target="_blank" rel="noreferrer" data-testid="link-financing"
+              <a href={payInfo.financing.url} target="_blank" rel="noreferrer" data-testid="link-financing" data-track="financing_open"
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
                 Finance this project →
                 <span className="font-normal text-muted-foreground">{payInfo.financing.label}</span>
@@ -1278,7 +1279,7 @@ export default function PublicEstimatePage() {
         )}
 
         {canRespond && (
-          <Card className="shadow-md border-primary/30" id="sign-card">
+          <Card className="shadow-md border-primary/30" id="sign-card" data-track-section="approve">
             <CardHeader className="p-4 sm:p-6">
               <CardTitle className="text-lg">Ready to go ahead?</CardTitle>
               <CardDescription>Type your name to approve. This is your signature.</CardDescription>
@@ -1287,7 +1288,7 @@ export default function PublicEstimatePage() {
               <div>
                 <Label htmlFor="sig">Your full name</Label>
                 <Input id="sig" value={name} onChange={(ev) => setName(ev.target.value)}
-                  placeholder={customer.displayName} data-testid="input-signature"
+                  placeholder={customer.displayName} data-testid="input-signature" data-track="approve_open" data-track-detail="typed in the signature box"
                   className="h-12 text-base" />
               </div>
               {/* Ticking scopes is not a selection until it is generated:
@@ -1303,12 +1304,12 @@ export default function PublicEstimatePage() {
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button disabled={name.trim().length < 2 || respond.isPending}
                   className="w-full sm:w-auto h-12 sm:h-10"
-                  onClick={() => respond.mutate("approve")} data-testid="button-approve">
+                  onClick={() => respond.mutate("approve")} data-testid="button-approve" data-track="approve_submit">
                   {respond.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
                   Approve this estimate
                 </Button>
                 <Button variant="outline" className="w-full sm:w-auto h-12 sm:h-10"
-                  onClick={() => setShowDecline(!showDecline)} data-testid="button-show-decline">
+                  onClick={() => setShowDecline(!showDecline)} data-testid="button-show-decline" data-track="decline_open">
                   Decline
                 </Button>
               </div>
@@ -1338,7 +1339,7 @@ export default function PublicEstimatePage() {
             <div className="flex items-center justify-center gap-5 pt-1">
               <Button variant="outline" className="rounded-full px-5"
                 onClick={() => { setShowDecline(true); scrollToSign(); }}
-                data-testid="button-decline-shortcut">
+                data-testid="button-decline-shortcut" data-track="decline_open">
                 Decline estimate
               </Button>
               {(company.email || company.phone) && (
@@ -1365,7 +1366,7 @@ export default function PublicEstimatePage() {
         {/* Footer facts — job address, expiry, warranty, contact card, T&C link. */}
         {/* Who to talk to — the client should never wonder who their person is. */}
         {salesRep && (
-          <Card data-testid="card-sales-rep">
+          <Card data-testid="card-sales-rep" data-track-section="contact">
             <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide">Your {salesRep.role === "Sales" ? "salesperson" : "contact"}</div>
@@ -1385,7 +1386,7 @@ export default function PublicEstimatePage() {
 
         {!preview && <AskQuestionCard token={token!} repName={salesRep?.name ?? null} />}
 
-        <div className="space-y-4 border-t pt-6" data-testid="estimate-footer-info">
+        <div className="space-y-4 border-t pt-6" data-testid="estimate-footer-info" data-track-section="contact">
           {(customer.addressLine1 || customer.city) && (
             <div>
               <div className="font-semibold text-sm">For:</div>
@@ -1419,7 +1420,7 @@ export default function PublicEstimatePage() {
           </div>
           <p className="text-sm">
             Please make sure to read our{" "}
-            <a href={termsHref} className="text-primary underline font-medium" data-testid="link-terms">
+            <a href={termsHref} className="text-primary underline font-medium" data-testid="link-terms" data-track="terms_open">
               Terms and Conditions
             </a>
           </p>
@@ -1452,7 +1453,7 @@ export default function PublicEstimatePage() {
           data-testid="estimate-approve-bar">
           <div className="max-w-3xl mx-auto">
             <Button size="lg" className="w-full h-12 rounded-full text-base" onClick={scrollToSign}
-              data-testid="button-approve-bar">
+              data-testid="button-approve-bar" data-track="approve_open">
               Approve
             </Button>
           </div>

@@ -21,7 +21,7 @@ import {
   crmPunchItems, crmDailyLogs, crmSelections, crmEstimateOptions,
   crmApiKeys, crmWebhooks, crmProjects, crmCustomers, crmOrgs, crmEstimates,
   crmEstimateItems, crmPayments, crmMembers,
-  crmNotificationChannel, crmNotificationEnabled, crmEngagementSessions, crmCustomerNotes, crmAttachments,
+  crmNotificationChannel, crmNotificationEnabled, crmEngagementSessions, crmEngagementEvents, crmCustomerNotes, crmAttachments,
   CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
   CRM_LINE_ITEM_KINDS,
@@ -682,6 +682,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       if (refusal) return { error: { status: 409, message: refusal } };
       await tx.delete(crmInvoiceItems)
         .where(and(eq(crmInvoiceItems.orgId, ctx.org.id), eq(crmInvoiceItems.invoiceId, inv.id)));
+      await tx.delete(crmEngagementEvents)
+        .where(and(eq(crmEngagementEvents.orgId, ctx.org.id),
+          eq(crmEngagementEvents.docType, "invoice"), eq(crmEngagementEvents.docId, inv.id)));
       await tx.delete(crmEngagementSessions)
         .where(and(eq(crmEngagementSessions.orgId, ctx.org.id),
           eq(crmEngagementSessions.docType, "invoice"), eq(crmEngagementSessions.docId, inv.id)));

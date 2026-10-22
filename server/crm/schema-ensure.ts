@@ -622,6 +622,23 @@ export async function ensureCrmSchema(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS crm_engagement_doc_idx ON crm_engagement_sessions (doc_type, doc_id);
     CREATE INDEX IF NOT EXISTS crm_engagement_org_idx ON crm_engagement_sessions (org_id);
+
+    CREATE TABLE IF NOT EXISTS crm_engagement_events (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id varchar NOT NULL,
+      session_id varchar NOT NULL,
+      doc_type text NOT NULL,
+      doc_id varchar NOT NULL,
+      name text NOT NULL,
+      key text,
+      detail jsonb,
+      t_ms integer NOT NULL DEFAULT 0,
+      created_at timestamp DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS crm_engagement_events_session_idx ON crm_engagement_events (session_id);
+    CREATE INDEX IF NOT EXISTS crm_engagement_events_doc_idx ON crm_engagement_events (org_id, doc_type, doc_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_engagement_events_total_uniq ON crm_engagement_events (session_id, name, key) WHERE key IS NOT NULL;
   `);
 
   // ── Homeowner client portal: magic-link tokens + sessions ────────────────

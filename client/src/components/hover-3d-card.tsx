@@ -79,7 +79,7 @@ export function Home3DCard({ home3d, viewer, companyName }: {
   if (!viewer) return null;
   const share = home3d && isShareUrl(home3d.url) && isLive(home3d.expiresAt) ? home3d : null;
   return (
-    <Card data-testid="card-home-3d">
+    <Card data-testid="card-home-3d" data-track-section="model3d_card">
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
         <Thumb src={share?.imageUrl ?? null} alt="3D model of your home" />
         <div className="min-w-0 flex-1 space-y-1">

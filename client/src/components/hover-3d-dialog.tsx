@@ -186,7 +186,7 @@ export function Hover3DDialog({ open, onOpenChange, source, title, initialTab }:
       <DialogContent
         // app-status-pad-phone: on a phone the dialog fills the screen, so the title clears the clock (index.css).
         className="app-status-pad-phone flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden p-0 sm:h-[92vh] sm:w-[96vw] sm:max-w-[1400px] sm:rounded-lg"
-        data-testid="dialog-hover-3d">
+        data-testid="dialog-hover-3d" data-track-section="model3d" data-track-interact="model3d_interact">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-3 pr-12">
           <div className="min-w-0">
             <DialogTitle className="flex items-center gap-2 text-base">
@@ -199,7 +199,7 @@ export function Hover3DDialog({ open, onOpenChange, source, title, initialTab }:
           <div role="tablist" className="flex gap-1 rounded-lg bg-muted p-1 text-sm" aria-label="Viewer">
             {tabs.map((t) => (
               <button key={t.id} role="tab" type="button" aria-selected={tab === t.id}
-                onClick={() => setTab(t.id)} data-testid={`hover-3d-tab-${t.id}`}
+                onClick={() => setTab(t.id)} data-testid={`hover-3d-tab-${t.id}`} data-track="model3d_tab" data-track-detail={t.label}
                 className={cn("rounded-md px-3 py-1.5 font-medium transition-colors",
                   tab === t.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
                 {t.label}
@@ -524,7 +524,7 @@ export function View3DButton({ source, label = "View 3D model", title, initialTa
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button type="button" size={size} variant={variant} className={className} onClick={() => setOpen(true)} data-testid={testid}>
+      <Button type="button" size={size} variant={variant} className={className} onClick={() => setOpen(true)} data-testid={testid} data-track="model3d_open">
         <Box className="mr-1.5 h-3.5 w-3.5" /> {label}
       </Button>
       {open && <Hover3DDialog open={open} onOpenChange={setOpen} source={source} title={title} initialTab={initialTab} />}

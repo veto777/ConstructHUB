@@ -29,10 +29,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Loader2, StickyNote, Activity, Eye, Landmark, MessageSquare, Paperclip,
-  CreditCard, FileText, Pencil, Trash2, ExternalLink, History,
+  CreditCard, FileText, Pencil, Trash2, ExternalLink, History, ChevronDown,
 } from "lucide-react";
 import { SectionTitle, EmptyState } from "@/components/crm-ui";
 import { confirmAction } from "@/components/confirm-dialog";
+import { VisitTimeline } from "@/components/visit-behaviour";
 
 const when = (d?: string | null) => (d ? new Date(d).toLocaleString() : null);
 
@@ -242,6 +243,28 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
         ) : (
           shown.map((e: any) => {
             const Icon = TIMELINE_ICONS[e.kind] ?? Activity;
+            // A client visit opens into what they read and clicked.
+            if (e.kind === "engagement" && e.visit) return (
+              <details key={e.id} className="group rounded-lg border px-4 py-2.5"
+                data-testid={`timeline-entry-${e.id}`}>
+                <summary className="flex cursor-pointer list-none items-start gap-3 [&::-webkit-details-marker]:hidden"
+                  data-testid={`timeline-visit-toggle-${e.id}`}>
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm"><ActorLine actor={e.actor} actionText={e.actionText} text={e.text} /></div>
+                    <div className="text-xs text-muted-foreground">{when(e.at)}</div>
+                  </div>
+                  <span className="mt-1 inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                    What they did <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                  </span>
+                </summary>
+                <div className="mt-3 pl-10">
+                  <VisitTimeline visit={e.visit} />
+                </div>
+              </details>
+            );
             return (
               <div key={e.id} className="flex items-start gap-3 rounded-lg border px-4 py-2.5"
                 data-testid={`timeline-entry-${e.id}`}>
