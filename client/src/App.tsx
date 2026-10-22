@@ -986,6 +986,10 @@ function AppContent() {
     );
   }
 
+  // Full-bleed like the portal's /auth above: a new Google account's one-time "Finish setting up"
+  // (/auth?mode=finish, owner 2026-10-21) must not sit inside the dashboard frame it hasn't reached yet.
+  if (location.startsWith("/auth")) return <AuthPage />;
+
   if (location === "/landing") {
     return (
       <>

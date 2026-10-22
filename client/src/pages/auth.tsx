@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PublicPageHeader } from "@/components/public-page-chrome";
 import { SocialLinks } from "@/components/social-links";
 import { YOUTUBE_CHANNEL_URL } from "@shared/social-links";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
-import { Mail, Lock, User, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Loader2, ArrowLeft, Eye, EyeOff, Phone, Building2 } from "lucide-react";
 import { CHLogo } from "@/components/ch-logo";
 import { AppleSignInButton } from "@/components/apple-sign-in";
 import { CrmLogo } from "@/components/crm-logo";
@@ -20,8 +20,11 @@ import { StandingGator } from "@/components/mascot";
 import { inNativeApp } from "@/lib/app-shell";
 import { BTN_OUTLINE, BTN_PRIMARY, Kicker } from "@/components/feature-landing/primitives";
 import { trackConversion } from "@/lib/gtag";
+import { SIGNUP_TEAM_SIZES, SIGNUP_TRADES, formatUsPhoneInput, normalizeSignupEmail, parseSignupDetails } from "@shared/signup";
 
-type AuthMode = "2fa" | "login" | "signup" | "forgot-password" | "reset-password";
+// "finish": a brand-new Google account answers sign-up's step 2 once (server/auth.ts finishGoogleLogin).
+type AuthMode = "2fa" | "login" | "signup" | "finish" | "forgot-password" | "reset-password";
+type SignupStep = 1 | 2 | 3;
 
 export default function AuthPage() {
   const { toast } = useToast();
@@ -50,13 +53,14 @@ export default function AuthPage() {
     // already-signed-in browser into its existing workspace made it look
     // like the invite "shared" that workspace's data — never redirect here;
     // the choice card below handles it instead.
-    if (user && !betaParam && modeParam !== "forgot-password") setLocation(nextParam ?? "/");
+    if (user && !betaParam && modeParam !== "forgot-password" && modeParam !== "finish") setLocation(nextParam ?? "/");
   }, [user, betaParam, nextParam, setLocation]);
 
   const initialMode: AuthMode =
     modeParam === "2fa" ? "2fa" :
     modeParam === "reset-password" && tokenParam ? "reset-password" :
     modeParam === "forgot-password" ? "forgot-password" :
+    modeParam === "finish" ? "finish" :
     modeParam === "signup" || betaParam ? "signup" : "login";
 
   const [mode, setMode] = useState<AuthMode>(initialMode);
@@ -65,11 +69,11 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  // The three-step sign-up's screen, so the gator's line and the notes under the card follow it.
+  const [signupStep, setSignupStep] = useState<SignupStep>(1);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Keep ?mode= in step with the screen (a refresh used to drop forgot-password
   // back to sign-in). next/beta ride along; a stale error/token never does.
@@ -99,41 +103,6 @@ export default function AuthPage() {
       toast({ title: "Verification failed", description: "We couldn't finish verifying your email. Try the link again, or sign in to request a new one.", variant: "destructive" });
     }
   }, [errorParam]);
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!agreedToTerms) {
-      toast({ title: "You must agree to the Terms of Use and Privacy Policy", variant: "destructive" });
-      return;
-    }
-    if (password !== confirmPassword) {
-      toast({ title: "Passwords don't match", variant: "destructive" });
-      return;
-    }
-    if (password.length < 8) {
-      toast({ title: "Password too short", description: "Must be at least 8 characters.", variant: "destructive" });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await apiRequest("POST", "/api/auth/signup", {
-        email: email.trim(),
-        password,
-        displayName: displayName.trim() || undefined,
-        beta: betaParam || undefined,
-        next: nextParam || undefined,
-      });
-      const data = await res.json();
-      setMessage(data.message);
-      trackConversion("signup", {}, { eventId: typeof data.metaEventId === "string" ? data.metaEventId : undefined });
-      toast({ title: "Account created!", description: "Check your email for a verification link." });
-    } catch (err: any) {
-      toast({ title: "Signup failed", description: apiErrorMessage(err, "Signup failed"), variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -279,7 +248,13 @@ export default function AuthPage() {
     );
   }
 
-  const bubble = BUBBLE[mode];
+  const bubble = mode === "signup" ? SIGNUP_BUBBLE[signupStep] : BUBBLE[mode];
+  // Sign-up and its Google follow-up are task screens: on a phone the card (and its button) start right
+  // under the ribbon — the wordmark and the gator's line show from the desktop layout up (owner, 2026-10-21).
+  const taskScreen = mode === "signup" || mode === "finish";
+  // Past step 1 the questions need the room on a laptop screen too: the masthead steps aside there as well.
+  // "Finish setting up" keeps it — a signed-in visitor has no ribbon above, so it is the page's only logo.
+  const questionScreen = mode === "signup" && signupStep > 1;
   const app = inNativeApp();
 
   return (
@@ -291,9 +266,9 @@ export default function AuthPage() {
       {/* The form: cream paper with the drafting grid fading out below the masthead. */}
       <div className="relative lg:col-span-7 xl:col-span-6 flex flex-col min-h-screen">
         <div className="absolute inset-x-0 top-0 h-[28rem] mkt-grid-paper [mask-image:linear-gradient(to_bottom,black_0%,transparent_100%)]" aria-hidden />
-        <div className="relative flex-1 flex flex-col items-center px-4 sm:px-6 py-8 sm:py-12 lg:justify-center">
+        <div className={`relative flex-1 flex flex-col items-center px-4 sm:px-6 ${taskScreen ? "pt-4 pb-8" : "py-8"} sm:py-12 lg:justify-center`}>
           <div className="w-full max-w-[28rem] space-y-6">
-            <div className="text-center lg:text-left space-y-3">
+            <div className={`${questionScreen && !app ? "hidden " : mode === "signup" && !app ? "hidden lg:block " : ""}text-center lg:text-left space-y-3`}>
               {/* One logo per screen: on phone browsers the ribbon above already shows it; the apps have no ribbon. */}
               <div className={`${app ? "flex pt-2" : "hidden lg:flex"} justify-center lg:justify-start`}>
                 {isPortal()
@@ -314,12 +289,12 @@ export default function AuthPage() {
 
             {/* Phones and tablets: the gator stands beside the card's top, facing his line; the bubble's tail
                 points back at him (.mkt-bubble-left), the two centered as one group. */}
-            <div className="lg:hidden flex items-start justify-center gap-2 px-2" aria-hidden>
+            <div className={`${taskScreen ? "hidden" : "lg:hidden flex"} items-start justify-center gap-2 px-2`} aria-hidden>
               <StandingGator height={96} className="shrink-0" />
               <p className="mkt-bubble mkt-bubble-left mt-3 px-4 py-2.5 text-[17px] leading-snug max-w-[13rem]" data-testid="text-auth-bubble-small">{bubble}</p>
             </div>
 
-            <Card className="relative p-6 sm:p-8 space-y-5 rounded-2xl border-mkt-rule bg-mkt-card shadow-none -mt-2 lg:mt-0">
+            <Card className={`relative ${taskScreen ? "p-5" : "p-6"} sm:p-8 space-y-5 rounded-2xl border-mkt-rule bg-mkt-card shadow-none -mt-2 lg:mt-0`}>
               {mode === "2fa" && (
                 <>
                   <div className="space-y-1">
@@ -451,126 +426,18 @@ export default function AuthPage() {
               )}
 
               {mode === "signup" && (
-                <>
-                  <div className="space-y-1">
-                    <h1 className={FORM_TITLE} data-testid="text-form-title">Create your account</h1>
-                    <p className={FORM_LEDE}>Get started with {isPortal() ? CRM_NAME : BRAND_NAME}</p>
-                  </div>
-
-                  {betaParam && (
-                    <div className="rounded-xl border border-mkt-orange bg-[color:var(--mkt-orange-soft)] px-3.5 py-2.5 text-sm text-mkt-ink" data-testid="banner-beta-invite">
-                      You're invited to the ConstructHub CRM beta — unlimited access during beta.
-                    </div>
-                  )}
-
-                  <AppleSignInButton label="Sign up with Apple" next={nextParam} testId="button-apple-signup" />
-                  <a href={betaParam ? `/api/auth/google?beta=${encodeURIComponent(betaParam)}` : nextParam ? `/api/auth/google?next=${encodeURIComponent(nextParam)}` : "/api/auth/google"} className={GOOGLE_BUTTON} data-testid="link-google-signup">
-                    <GoogleMark />
-                    Sign up with Google
-                  </a>
-
-                  <OrRule />
-
-                  {message ? (
-                    <div className="text-center space-y-3 py-4">
-                      <div className="flex justify-center">
-                        <Mail className="h-10 w-10 text-mkt-orange" />
-                      </div>
-                      <p className="font-display font-semibold text-[1.2rem] text-mkt-ink">Check your email</p>
-                      <p className="text-sm text-mkt-ink-soft">{message}</p>
-                      <button type="button" className={TEXT_BUTTON} onClick={handleResendVerification} disabled={loading} data-testid="button-resend-signup">
-                        Resend verification email
-                      </button>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleSignup} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-name" className={FIELD_LABEL}>Full Name</Label>
-                        <div className="relative">
-                          <User className={FIELD_ICON} />
-                          <Input
-                            id="signup-name"
-                            type="text"
-                            value={displayName}
-                            onChange={e => setDisplayName(e.target.value)}
-                            placeholder="John Doe"
-                            className={`${FIELD} pl-10`}
-                            data-testid="input-signup-name"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-email" className={FIELD_LABEL}>Email</Label>
-                        <div className="relative">
-                          <Mail className={FIELD_ICON} />
-                          <Input
-                            id="signup-email"
-                            type="email"
-                            value={email}
-                            onChange={e => setEmail(e.target.value)}
-                            placeholder="you@example.com"
-                            className={`${FIELD} pl-10`}
-                            required
-                            data-testid="input-signup-email"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-password" className={FIELD_LABEL}>Password</Label>
-                        <div className="relative">
-                          <Lock className={FIELD_ICON} />
-                          <Input
-                            id="signup-password"
-                            type={showPassword ? "text" : "password"}
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            placeholder="At least 8 characters"
-                            className={`${FIELD} pl-10 pr-10`}
-                            required
-                            data-testid="input-signup-password"
-                          />
-                          <PasswordToggle shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-confirm" className={FIELD_LABEL}>Confirm Password</Label>
-                        <div className="relative">
-                          <Lock className={FIELD_ICON} />
-                          <Input
-                            id="signup-confirm"
-                            type={showPassword ? "text" : "password"}
-                            value={confirmPassword}
-                            onChange={e => setConfirmPassword(e.target.value)}
-                            placeholder="Confirm your password"
-                            className={`${FIELD} pl-10`}
-                            required
-                            data-testid="input-signup-confirm"
-                          />
-                        </div>
-                      </div>
-                      <label className="flex items-start gap-2.5 text-[13px] leading-relaxed text-mkt-ink-soft cursor-pointer">
-                        <input type="checkbox" checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-primary" data-testid="checkbox-agree-terms" />
-                        <span>I agree to the <a href={termsHref} target="_blank" rel="noopener noreferrer" className={INLINE_LINK} data-testid="link-signup-terms">Terms of Use</a> and <a href={privacyHref} target="_blank" rel="noopener noreferrer" className={INLINE_LINK} data-testid="link-signup-privacy">Privacy Policy</a></span>
-                      </label>
-                      <Button type="submit" className={SUBMIT} disabled={loading || !agreedToTerms} data-testid="button-signup">
-                        {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                        Create Account
-                      </Button>
-                    </form>
-                  )}
-
-                  <div className="text-center text-[13px]">
-                    <button
-                      type="button"
-                      onClick={() => changeMode("login")}
-                      className={TEXT_BUTTON}
-                      data-testid="link-goto-login"
-                    >
-                      Already have an account? Sign in
-                    </button>
-                  </div>
-                </>
+                <SignupSteps
+                  betaParam={betaParam}
+                  nextParam={nextParam}
+                  prefillEmail={params.get("email")}
+                  termsHref={termsHref}
+                  privacyHref={privacyHref}
+                  onStepChange={setSignupStep}
+                  onSignIn={(known) => { setEmail(known); changeMode("login"); }}
+                />
               )}
+
+              {mode === "finish" && <FinishSetup user={user} nextParam={nextParam} />}
 
               {mode === "forgot-password" && (
                 <>
@@ -669,7 +536,7 @@ export default function AuthPage() {
               )}
             </Card>
 
-            {mode === "signup" && (
+            {mode === "signup" && signupStep === 1 && (
               <p className="text-center text-[13px] leading-relaxed text-mkt-ink-soft" data-testid="text-signup-agreement">
                 By signing up — including with Google — you agree to our{" "}
                 <a href={termsHref} target="_blank" rel="noopener noreferrer" className={INLINE_LINK}>Terms of Use</a>
@@ -680,7 +547,7 @@ export default function AuthPage() {
 
             {/* The walkthrough videos and the social accounts: a quiet line under the form, never above it. */}
             <div className="space-y-1 text-center text-[13px] text-mkt-ink-soft" data-testid="auth-social">
-              {mode === "signup" && (
+              {mode === "signup" && signupStep === 1 && (
                 <p>
                   New here?{" "}
                   <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noopener noreferrer" className={INLINE_LINK} data-testid="link-signup-youtube-tour">
@@ -722,10 +589,17 @@ export default function AuthPage() {
 /** What the gator says on each screen. */
 const BUBBLE: Record<AuthMode, string> = {
   signup: "Welcome in — let's build your business.",
+  finish: "Almost there — tell me about your business.",
   login: "Welcome back.",
   "2fa": "Welcome back.",
   "forgot-password": "Let's get you back on the job.",
   "reset-password": "Let's get you back on the job.",
+};
+
+const SIGNUP_BUBBLE: Record<SignupStep, string> = {
+  1: "Welcome in — let's build your business.",
+  2: "Tell me about your crew.",
+  3: "Last step — lock it down.",
 };
 
 // Design B recipes for the form (the shadcn controls take the editorial
@@ -770,5 +644,457 @@ function GoogleMark() {
       <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
       <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
     </svg>
+  );
+}
+
+// ── The three-step sign-up ──────────────────────────────────────────────────────────────────
+// Owner, 2026-10-21: "fix the sign-up flow like the competitors" (Housecall Pro, Jobber, Roofr).
+// 1 "Start free": Google or one email field — the email is saved as a lead on Continue
+//   (server/signup-leads.ts), so the team can follow up even if they stop here.
+// 2 "About your business": name, mobile, trade, team size.
+// 3 "Create your password": then POST /api/auth/signup as before (verification email unchanged).
+// /auth?mode=signup&email=… (the landing page's hero field) saves the email and opens on step 2.
+
+type BusinessAnswers = { firstName: string; lastName: string; phone: string; trade: string; teamSize: string };
+const NO_ANSWERS: BusinessAnswers = { firstName: "", lastName: "", phone: "", trade: "", teamSize: "" };
+
+function SignupSteps({ betaParam, nextParam, prefillEmail, termsHref, privacyHref, onStepChange, onSignIn }: {
+  betaParam: string | null;
+  nextParam: string | null;
+  prefillEmail: string | null;
+  termsHref: string;
+  privacyHref: string;
+  onStepChange: (step: SignupStep) => void;
+  onSignIn: (email: string) => void;
+}) {
+  const { toast } = useToast();
+  const prefill = normalizeSignupEmail(prefillEmail);
+  const [step, setStepState] = useState<SignupStep>(1);
+  const [email, setEmail] = useState(prefill ?? "");
+  const [existing, setExisting] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<BusinessAnswers>(NO_ANSWERS);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [companyName, setCompanyName] = useState("");
+  const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState("");
+
+  // Each step is a browser history entry, so a phone's Back gesture goes back a step, not off the page.
+  const setStep = (next: SignupStep, push = true) => {
+    setStepState(next);
+    setError("");
+    onStepChange(next);
+    if (push) {
+      try { window.history.pushState({ ...(window.history.state ?? {}), signupStep: next }, "", window.location.href); } catch { /* cosmetic */ }
+    }
+  };
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const back = e.state?.signupStep;
+      if (back === 1 || back === 2 || back === 3) setStep(back, false);
+      else setStep(1, false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  /** Step 1's save. Resolves true to move on; only a refused email or an existing account stops the visitor. */
+  const saveLead = async (value: string, source: string): Promise<boolean> => {
+    try {
+      const res = await apiRequest("POST", "/api/auth/signup-lead", { email: value, source });
+      const data = await res.json();
+      if (data.exists) { setExisting(value); return false; }
+      return true;
+    } catch (err: any) {
+      const status = String(err?.message ?? "").slice(0, 3);
+      if (status === "400" || status === "429") { setError(apiErrorMessage(err, "Enter a valid email address")); return false; }
+      return true; // the lead is follow-up data: a hiccup saving it never blocks a sign-up
+    }
+  };
+
+  // The hand-off from the landing page: save the email it collected, then ask step 2's questions.
+  const prefillDone = useRef(false);
+  useEffect(() => {
+    if (!prefill || prefillDone.current) return;
+    prefillDone.current = true;
+    setLoading(true);
+    void saveLead(prefill, "prefill").then((ok) => { if (ok) setStep(2); }).finally(() => setLoading(false));
+  }, [prefill]);
+
+  const submitEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setExisting(null);
+    const value = normalizeSignupEmail(email);
+    if (!value) { setError("Enter a valid email address"); return; }
+    setLoading(true);
+    try { if (await saveLead(value, "auth")) setStep(2); } finally { setLoading(false); }
+  };
+
+  const submitAnswers = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = parseSignupDetails(answers);
+    if (!parsed.ok) { setError(parsed.message); return; }
+    setLoading(true);
+    try {
+      await apiRequest("POST", "/api/auth/signup-lead/details", parsed.details);
+    } catch (err: any) {
+      // A refused answer is shown; a lapsed lead or a hiccup is not the visitor's problem — step 3 sends it all again.
+      if (String(err?.message ?? "").startsWith("400") && !/start again/i.test(apiErrorMessage(err, ""))) {
+        setError(apiErrorMessage(err, "Check your answers"));
+        setLoading(false);
+        return;
+      }
+    }
+    setLoading(false);
+    setStep(3);
+  };
+
+  const createAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 8) { setError("Your password needs at least 8 characters"); return; }
+    if (!agreed) { setError("Agree to the Terms of Use and Privacy Policy to continue"); return; }
+    const parsed = parseSignupDetails(answers);
+    if (!parsed.ok) { setStep(2); setError(parsed.message); return; }
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/auth/signup", {
+        email: normalizeSignupEmail(email),
+        password,
+        ...parsed.details,
+        companyName: companyName.trim() || undefined,
+        beta: betaParam || undefined,
+        next: nextParam || undefined,
+      });
+      const data = await res.json();
+      setSent(data.message);
+      trackConversion("signup", {}, { eventId: typeof data.metaEventId === "string" ? data.metaEventId : undefined });
+    } catch (err: any) {
+      toast({ title: "Signup failed", description: apiErrorMessage(err, "Signup failed"), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resend = async () => {
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/auth/resend-verification", { email: normalizeSignupEmail(email) });
+      toast({ title: "Email sent", description: (await res.json()).message });
+    } catch {
+      toast({ title: "Error", description: "Could not resend verification email.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <div className="text-center space-y-3 py-4" data-testid="signup-check-email">
+        <div className="flex justify-center"><Mail className="h-10 w-10 text-mkt-orange" /></div>
+        <h1 className="font-display font-semibold text-[1.4rem] text-mkt-ink">Check your email</h1>
+        <p className="text-sm text-mkt-ink-soft">
+          We sent a link to <strong className="text-mkt-ink">{normalizeSignupEmail(email)}</strong>. Open it to verify your email, then sign in.
+        </p>
+        <button type="button" className={TEXT_BUTTON} onClick={resend} disabled={loading} data-testid="button-resend-signup">
+          Resend verification email
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={step === 1 ? "space-y-5" : "space-y-4"} data-testid="signup-steps" data-signup-step={step}>
+      <StepHeader step={step} onBack={step > 1 ? () => window.history.back() : undefined} />
+
+      {step === 1 && (
+        <>
+          <div className="space-y-1">
+            <h1 className={FORM_TITLE} data-testid="text-form-title">Start free</h1>
+            <p className={FORM_LEDE}>Set up your {isPortal() ? CRM_NAME : BRAND_NAME} account in about a minute.</p>
+          </div>
+
+          {betaParam && (
+            <div className="rounded-xl border border-mkt-orange bg-[color:var(--mkt-orange-soft)] px-3.5 py-2.5 text-sm text-mkt-ink" data-testid="banner-beta-invite">
+              You're invited to the ConstructHub CRM beta — unlimited access during beta.
+            </div>
+          )}
+
+          <AppleSignInButton label="Sign up with Apple" next={nextParam} testId="button-apple-signup" />
+          <a href={betaParam ? `/api/auth/google?beta=${encodeURIComponent(betaParam)}` : nextParam ? `/api/auth/google?next=${encodeURIComponent(nextParam)}` : "/api/auth/google"} className={GOOGLE_BUTTON} data-testid="link-google-signup">
+            <GoogleMark />
+            Continue with Google
+          </a>
+
+          <OrRule />
+
+          <form onSubmit={submitEmail} className="space-y-3" noValidate>
+            <div className="space-y-2">
+              <Label htmlFor="signup-email" className={FIELD_LABEL}>Work email</Label>
+              <div className="relative">
+                <Mail className={FIELD_ICON} />
+                <Input
+                  id="signup-email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setError(""); setExisting(null); }}
+                  placeholder="you@yourcompany.com"
+                  className={`${FIELD} pl-10`}
+                  aria-invalid={!!error}
+                  data-testid="input-signup-email"
+                />
+              </div>
+            </div>
+            <FieldError message={error} />
+            {existing && (
+              <div className="rounded-xl border border-mkt-rule bg-mkt-paper px-3.5 py-3 text-sm text-mkt-ink" data-testid="signup-email-exists">
+                There's already an account for <strong>{existing}</strong>.{" "}
+                <button type="button" className={TEXT_BUTTON} onClick={() => onSignIn(existing)} data-testid="button-signup-exists-signin">
+                  Sign in instead
+                </button>
+              </div>
+            )}
+            <Button type="submit" className={SUBMIT} disabled={loading} data-testid="button-signup-continue">
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Continue
+            </Button>
+            <p className="text-center text-[13px] text-mkt-ink-soft" data-testid="text-signup-free">Free account · No credit card to sign up</p>
+          </form>
+
+          <div className="text-center text-[13px]">
+            <button type="button" onClick={() => onSignIn(normalizeSignupEmail(email) ?? "")} className={TEXT_BUTTON} data-testid="link-goto-login">
+              Already have an account? Sign in
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === 2 && (
+        <>
+          <div className="space-y-1">
+            <h1 className={FORM_TITLE} data-testid="text-form-title">About your business</h1>
+            <p className={FORM_LEDE}>So we can set things up for your trade.</p>
+          </div>
+          <form onSubmit={submitAnswers} className="space-y-3.5" noValidate>
+            <BusinessQuestions answers={answers} onChange={(next) => { setAnswers(next); setError(""); }} />
+            <FieldError message={error} />
+            <Button type="submit" className={SUBMIT} disabled={loading} data-testid="button-signup-details">
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Continue
+            </Button>
+          </form>
+        </>
+      )}
+
+      {step === 3 && (
+        <>
+          <div className="space-y-1">
+            <h1 className={FORM_TITLE} data-testid="text-form-title">Create your password</h1>
+            <p className={FORM_LEDE}>For <strong className="text-mkt-ink">{normalizeSignupEmail(email)}</strong></p>
+          </div>
+          <form onSubmit={createAccount} className="space-y-4" noValidate>
+            {/* The username field lets password managers save the login against the right email. */}
+            <input type="email" name="email" autoComplete="username" value={normalizeSignupEmail(email) ?? ""} readOnly hidden />
+            <div className="space-y-2">
+              <Label htmlFor="signup-password" className={FIELD_LABEL}>Password</Label>
+              <div className="relative">
+                <Lock className={FIELD_ICON} />
+                <Input
+                  id="signup-password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  placeholder="At least 8 characters"
+                  className={`${FIELD} pl-10 pr-10`}
+                  data-testid="input-signup-password"
+                />
+                <PasswordToggle shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="signup-company" className={FIELD_LABEL}>Company name <span className="normal-case tracking-normal font-normal text-mkt-muted">(optional)</span></Label>
+              <div className="relative">
+                <Building2 className={FIELD_ICON} />
+                <Input
+                  id="signup-company"
+                  autoComplete="organization"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Smith Roofing LLC"
+                  className={`${FIELD} pl-10`}
+                  maxLength={200}
+                  data-testid="input-signup-company"
+                />
+              </div>
+            </div>
+            <label className="flex items-start gap-2.5 text-[13px] leading-relaxed text-mkt-ink-soft cursor-pointer">
+              <input type="checkbox" checked={agreed} onChange={(e) => { setAgreed(e.target.checked); setError(""); }} className="mt-0.5 h-4 w-4 shrink-0 accent-primary" data-testid="checkbox-agree-terms" />
+              <span>I agree to the <a href={termsHref} target="_blank" rel="noopener noreferrer" className={INLINE_LINK} data-testid="link-signup-terms">Terms of Use</a> and <a href={privacyHref} target="_blank" rel="noopener noreferrer" className={INLINE_LINK} data-testid="link-signup-privacy">Privacy Policy</a></span>
+            </label>
+            <FieldError message={error} />
+            <Button type="submit" className={SUBMIT} disabled={loading} data-testid="button-signup">
+              {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Create my account
+            </Button>
+          </form>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** "Step 2 of 3", three segments, and Back from step 2 on. */
+function StepHeader({ step, onBack }: { step: SignupStep; onBack?: () => void }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3 min-h-[20px]">
+        {onBack ? (
+          <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-mkt-muted hover:text-mkt-ink transition-colors" data-testid="button-signup-back">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back
+          </button>
+        ) : <span />}
+        <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-mkt-muted" data-testid="text-signup-progress">Step {step} of 3</span>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={step} aria-label={`Step ${step} of 3`}>
+        {[1, 2, 3].map((n) => (
+          <span key={n} className={`h-1.5 rounded-full ${n <= step ? "bg-mkt-orange" : "bg-mkt-rule"}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Step 2's questions; the Google follow-up ("Finish setting up") asks the same ones. */
+function BusinessQuestions({ answers, onChange }: { answers: BusinessAnswers; onChange: (next: BusinessAnswers) => void }) {
+  const set = (patch: Partial<BusinessAnswers>) => onChange({ ...answers, ...patch });
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label htmlFor="signup-first" className={FIELD_LABEL}>First name</Label>
+          <Input id="signup-first" autoComplete="given-name" value={answers.firstName} onChange={(e) => set({ firstName: e.target.value })} className={FIELD} maxLength={100} data-testid="input-signup-first-name" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="signup-last" className={FIELD_LABEL}>Last name</Label>
+          <Input id="signup-last" autoComplete="family-name" value={answers.lastName} onChange={(e) => set({ lastName: e.target.value })} className={FIELD} maxLength={100} data-testid="input-signup-last-name" />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="signup-phone" className={FIELD_LABEL}>Mobile phone</Label>
+        <div className="relative">
+          <Phone className={FIELD_ICON} />
+          <Input
+            id="signup-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel-national"
+            value={answers.phone}
+            onChange={(e) => set({ phone: formatUsPhoneInput(e.target.value) })}
+            placeholder="(555) 123-4567"
+            className={`${FIELD} pl-10`}
+            data-testid="input-signup-phone"
+          />
+        </div>
+      </div>
+      <fieldset>
+        <legend className={`${FIELD_LABEL} mb-2`}>Your trade</legend>
+        <div className="flex flex-wrap gap-1.5">
+          {SIGNUP_TRADES.map((t) => (
+            <Chip key={t.value} selected={answers.trade === t.value} onClick={() => set({ trade: t.value })} testId={`chip-trade-${t.value}`}>{t.label}</Chip>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend className={`${FIELD_LABEL} mb-2`}>Team size</legend>
+        <div className="grid grid-cols-4 gap-1.5">
+          {SIGNUP_TEAM_SIZES.map((t) => (
+            <Chip key={t.value} selected={answers.teamSize === t.value} onClick={() => set({ teamSize: t.value })} testId={`chip-team-${t.value}`}>{t.label}</Chip>
+          ))}
+        </div>
+      </fieldset>
+    </>
+  );
+}
+
+function Chip({ selected, onClick, testId, children }: { selected: boolean; onClick: () => void; testId: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      data-testid={testId}
+      className={`h-8 px-2.5 sm:h-9 sm:px-3 rounded-full border text-[13px] sm:text-[14px] font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange ${
+        selected ? "border-mkt-orange bg-mkt-orange text-white" : "border-mkt-rule bg-mkt-paper text-mkt-ink hover:border-mkt-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function FieldError({ message }: { message: string }) {
+  if (!message) return null;
+  return <p role="alert" className="text-[13px] font-semibold text-destructive" data-testid="text-signup-error">{message}</p>;
+}
+
+/** A brand-new Google account's one-time "About your business" (server/auth.ts sends it here, then on to `next`). */
+function FinishSetup({ user, nextParam }: { user: any; nextParam: string | null }) {
+  const [, setLocation] = useLocation();
+  const [answers, setAnswers] = useState<BusinessAnswers>(NO_ANSWERS);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const named = useRef(false);
+  useEffect(() => {
+    // Start from the name Google sent; they can correct it.
+    if (!user || named.current) return;
+    named.current = true;
+    const [first = "", ...rest] = String(user.displayName ?? "").trim().split(/\s+/);
+    setAnswers((a) => ({ ...a, firstName: first, lastName: rest.join(" ") }));
+  }, [user]);
+  const done = () => setLocation(nextParam ?? "/");
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = parseSignupDetails(answers);
+    if (!parsed.ok) { setError(parsed.message); return; }
+    setLoading(true);
+    try {
+      await apiRequest("POST", "/api/auth/finish-setup", parsed.details);
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      done();
+    } catch (err: any) {
+      setError(apiErrorMessage(err, "Could not save. Please try again."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (user === null) {
+    return (
+      <div className="space-y-3 text-center py-4">
+        <h1 className={FORM_TITLE}>Sign in first</h1>
+        <a href="/auth" className={TEXT_BUTTON}>Go to sign in</a>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-5" data-testid="finish-setup">
+      <div className="space-y-1">
+        <h1 className={FORM_TITLE} data-testid="text-form-title">Finish setting up</h1>
+        <p className={FORM_LEDE}>A few quick questions so we can set things up for your trade.</p>
+      </div>
+      <form onSubmit={submit} className="space-y-3.5" noValidate>
+        <BusinessQuestions answers={answers} onChange={(next) => { setAnswers(next); setError(""); }} />
+        <FieldError message={error} />
+        <Button type="submit" className={SUBMIT} disabled={loading || !user} data-testid="button-finish-setup">
+          {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+          Continue
+        </Button>
+      </form>
+    </div>
   );
 }

@@ -27,6 +27,7 @@ import { DataSourceCard, type SeoStatus } from "@/pages/seo/shell";
 import { InfoTip } from "@/components/info-tip";
 import { AdminCampaigns } from "@/components/admin-campaigns";
 import { confirmAction } from "@/components/confirm-dialog";
+import { formatUsPhoneInput, teamSizeLabel, tradeLabel } from "@shared/signup";
 
 /**
  * Platform admin — "watch all our users". Read-only monitoring across every
@@ -54,6 +55,9 @@ interface AdminUser {
   createdAt: string;
   lastActiveAt: string | null;
   betaAt: string | null;
+  phone: string | null;
+  trade: string | null;
+  teamSize: string | null;
   plan: { plan: string; status: string };
   orgs: { orgId: string; orgName: string; role: string; status: string }[];
 }
@@ -520,6 +524,7 @@ export default function CrmAdminPage() {
       !needle ||
       u.email.toLowerCase().includes(needle) ||
       (u.displayName ?? "").toLowerCase().includes(needle) ||
+      (u.phone ?? "").includes(needle) ||
       u.orgs.some((o) => o.orgName.toLowerCase().includes(needle)),
   );
 
@@ -609,6 +614,12 @@ export default function CrmAdminPage() {
                           <div className="min-w-0">
                             <div className="font-medium truncate">{u.displayName || "—"}</div>
                             <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                            {/* Sign-up's "About your business" answers (owner, 2026-10-21); older accounts have none. */}
+                            {(u.phone || u.trade || u.teamSize) && (
+                              <div className="text-xs text-muted-foreground truncate" data-testid={`text-user-signup-${u.id}`}>
+                                {[u.phone && formatUsPhoneInput(u.phone), tradeLabel(u.trade), u.teamSize && `Team: ${teamSizeLabel(u.teamSize)}`].filter(Boolean).join(" · ")}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>

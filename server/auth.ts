@@ -30,6 +30,8 @@ import { isPlatformAdmin } from "./admin";
 import { siteBaseUrl, oauthBaseUrl } from "./site-context";
 import { reportMetaSignup, requestIp } from "./meta-pixel";
 import { recordSignupAttribution } from "./analytics-attribution";
+import { ensureSignupLeadsSchema, registerSignupLeadRoutes, markLeadConverted, needsSignupDetails } from "./signup-leads";
+import { parseSignupDetails, type SignupDetails } from "@shared/signup";
 import { logError, fail500 } from "./ops/log";
 
 export { safeNextPath } from "./app-shell";
@@ -55,6 +57,8 @@ declare module "express-session" {
     nativeGoogleChallenge?: string;
     /** "Continue with Google" step-up: the signed-in user it may re-verify. */
     googleReauth?: { userId: number; expires: number };
+    /** The sign-up lead this browser started on step 1 (server/signup-leads.ts); step 2 may update only it. */
+    signupLeadId?: number;
   }
 }
 
@@ -91,6 +95,7 @@ export async function setupAuth(app: Express) {
   await ensureAppConnectionsSchema();
   await ensureAppPushSchema();
   await ensureAppleAuthSchema();
+  await ensureSignupLeadsSchema();
 
   // SECURITY: never fall back to a hardcoded secret in production — a constant
   // baked into source lets anyone forge signed session cookies. Fail fast so a
@@ -247,7 +252,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.use(["/api/auth/signup", "/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/2fa/login"],
+  app.use(["/api/auth/signup", "/api/auth/signup-lead", "/api/auth/finish-setup", "/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/2fa/login"],
     rateLimit("growth-auth", 30, 60, 15 * 60_000), async (req, res, next) => {
       if (typeof req.body?.email === "string") {
         const account = createHash("sha256").update(req.body.email.trim().toLowerCase()).digest("hex");
@@ -257,6 +262,10 @@ export async function setupAuth(app: Express) {
     });
 
   app.use(["/api/auth/2fa/setup", "/api/auth/2fa/verify", "/api/auth/2fa/disable", "/api/auth/change-password"], rateLimit("security-changes", 10, 30, 15 * 60_000));
+
+  // The three-step sign-up's lead capture (step 1 email, step 2 questions) and the Google
+  // "Finish setting up" screen — after the rate limits above, which cover them.
+  registerSignupLeadRoutes(app);
 
   // The Google button on /auth: starts Google OAuth; the callback signs the user in (making a
   // Google-only account when needed) and lands them on ?next= (validated) or the home page.
@@ -394,6 +403,11 @@ export async function setupAuth(app: Express) {
       // validate again before putting it in a Location header.
       const nextPath = safeNextPath(req.session.authNext);
       delete req.session.authNext;
+      // A brand-new Google account answers "About your business" once (mobile, trade, team size —
+      // owner, 2026-10-21), then goes where it was going. Older accounts are never stopped here.
+      if (!native && req.user && await needsSignupDetails(req.user.id)) {
+        return res.redirect(`/auth?mode=finish${nextPath ? `&next=${encodeURIComponent(nextPath)}` : ""}`);
+      }
       res.redirect(nextPath ?? (native ? "/" : "/?auth=success"));
     }
 
@@ -420,17 +434,26 @@ export async function setupAuth(app: Express) {
     } catch (err) { next(err); }
   });
 
-  // The auth page's "Get Started": creates the unverified account, emails a 24-hour
-  // verification link, and applies a beta invite code when present.
+  // The auth page's "Create my account" (step 3 of the sign-up): creates the unverified account,
+  // emails a 24-hour verification link, and applies a beta invite code when present. The
+  // three-step page also sends step 2's answers (name, mobile, trade, team size) and an optional
+  // company name; a body without `phone` is the older one-page shape and still works.
   app.post("/api/auth/signup", async (req, res) => {
     try {
       const { email, password, displayName, beta, next } = req.body;
-      if (!email || !password) {
+      if (!email || !password || typeof email !== "string" || typeof password !== "string") {
         return res.status(400).json({ message: "Email and password are required" });
       }
       if (password.length < 8) {
         return res.status(400).json({ message: "Password must be at least 8 characters" });
       }
+      let details: SignupDetails | null = null;
+      if (req.body.phone !== undefined) {
+        const parsed = parseSignupDetails(req.body);
+        if (!parsed.ok) return res.status(400).json({ message: parsed.message });
+        details = parsed.details;
+      }
+      const companyName = typeof req.body.companyName === "string" ? req.body.companyName.trim().slice(0, 200) || null : null;
 
       // Carry the post-signup destination (e.g. a /crm/join invite) through
       // email verification — same trick as the Google OAuth authNext.
@@ -457,7 +480,11 @@ export async function setupAuth(app: Express) {
         .values({
           email: email.toLowerCase().trim(),
           passwordHash,
-          displayName: displayName || null,
+          displayName: details ? `${details.firstName} ${details.lastName}` : displayName || null,
+          phone: details?.phone ?? null,
+          trade: details?.trade ?? null,
+          teamSize: details?.teamSize ?? null,
+          companyName,
           emailVerified: false,
           verificationToken,
           verificationExpiry,
@@ -468,6 +495,9 @@ export async function setupAuth(app: Express) {
 
       // First-touch campaign of this browser, if it accepted analytics (never blocks the sign-up).
       void recordSignupAttribution(newUser.id, req.headers.cookie);
+      // The step-1 lead (server/signup-leads.ts) is now an account (never blocks the sign-up).
+      void markLeadConverted(newUser.email, newUser.id, details, null);
+      delete req.session.signupLeadId;
       // Meta ads are judged by accounts, not form fills (server/meta-pixel.ts): the browser reports the same event
       // under this id, and Meta counts it once. Never blocks the sign-up.
       const metaEventId = randomBytes(16).toString("hex");
@@ -765,6 +795,9 @@ export async function setupAuth(app: Express) {
           companyName: fresh.companyName,
           companyLogoUrl: fresh.companyLogoUrl,
           googleProfileUrl: fresh.googleProfileUrl,
+          phone: fresh.phone,
+          trade: fresh.trade,
+          teamSize: fresh.teamSize,
           totpEnabled: fresh.totpEnabled,
           hasPassword: !!fresh.passwordHash,
           hasGbpAccess: (await (await import("./gbp/grants")).grantStatus(fresh.id)).connected,

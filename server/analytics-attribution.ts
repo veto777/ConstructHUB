@@ -159,6 +159,36 @@ export async function recordSignupAttribution(userId: number, cookieHeader: unkn
   }
 }
 
+/**
+ * The same first touch, read without writing: the sign-up lead (server/signup-leads.ts)
+ * is saved before any account exists. Same consent gate, same window; null when
+ * there is no consent or no attributed landing. Never throws.
+ */
+export async function firstTouchAttribution(cookieHeader: unknown, q?: Queryable): Promise<{
+  utmSource: string | null; utmMedium: string | null; utmCampaign: string | null; referrerHost: string | null;
+} | null> {
+  try {
+    const vid = consentedVisitorId(cookieHeader);
+    if (!vid) return null;
+    const target = q ?? (await import("./db")).pool;
+    const r = await target.query(
+      `SELECT utm_source, utm_medium, utm_campaign, referrer_host
+         FROM ch_analytics_events
+        WHERE visitor_id = $1 AND landing
+          AND (utm_source IS NOT NULL OR utm_medium IS NOT NULL OR utm_campaign IS NOT NULL OR referrer_host IS NOT NULL)
+          AND created_at >= (now() AT TIME ZONE 'UTC') - make_interval(days => $2::int)
+        ORDER BY created_at ASC
+        LIMIT 1`,
+      [vid, FIRST_TOUCH_WINDOW_DAYS],
+    );
+    const row = r.rows[0];
+    return row ? { utmSource: row.utm_source, utmMedium: row.utm_medium, utmCampaign: row.utm_campaign, referrerHost: row.referrer_host } : null;
+  } catch (e: any) {
+    console.error("[analytics] lead attribution failed:", e?.message || e);
+    return null;
+  }
+}
+
 // ── The report ─────────────────────────────────────────────────────────────────────────────────
 
 /** Days are US Eastern (the owner's clock); ch_analytics_events.created_at / users.created_at hold UTC wall time. */

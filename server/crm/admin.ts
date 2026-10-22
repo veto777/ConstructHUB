@@ -259,6 +259,10 @@ export function registerCrmAdminRoutes(app: Express, getDevUser: GetUser): void 
           createdAt: u.createdAt,
           lastActiveAt,
           betaAt: u.betaAt,
+          // Sign-up's "About your business" answers (null on older accounts).
+          phone: u.phone,
+          trade: u.trade,
+          teamSize: u.teamSize,
           plan: plans.get(u.id) ?? { plan: "free", status: "inactive" },
           orgs: orgs.map((o) => ({
             orgId: o.orgId,

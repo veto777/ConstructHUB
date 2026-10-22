@@ -27,6 +27,11 @@ export const users = pgTable("users", {
   // Set when the account was created through a CRM beta invite. Beta accounts
   // get unlimited CRM seats and are never billed (see server/crm/tenancy.ts).
   betaAt: timestamp("beta_at"),
+  // "About your business" on sign-up (owner, 2026-10-21; server/signup-leads.ts adds the columns):
+  // E.164 mobile, a SIGNUP_TRADES value and a SIGNUP_TEAM_SIZES value (shared/signup.ts). Null on older accounts.
+  phone: text("phone"),
+  trade: text("trade"),
+  teamSize: text("team_size"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -1832,6 +1837,30 @@ export const chSignupAttribution = pgTable("ch_signup_attribution", {
   referrerHost: text("referrer_host"),
   touchedAt: timestamp("touched_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Someone part-way through the three-step sign-up, saved from step 1 on so the team can follow up
+ * with the ones who quit before choosing a password (server/signup-leads.ts; owner, 2026-10-21).
+ * converted_user_id is set once the account exists.
+ */
+export const signupLeads = pgTable("signup_leads", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  email: text("email").notNull().unique(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  phone: text("phone"),
+  trade: text("trade"),
+  teamSize: text("team_size"),
+  source: text("source"),
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  referrerHost: text("referrer_host"),
+  convertedUserId: integer("converted_user_id"),
+  convertedAt: timestamp("converted_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 /** Analytics bookkeeping — `attribution_started` holds the date campaign tags began being recorded. */

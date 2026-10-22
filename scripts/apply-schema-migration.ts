@@ -28,6 +28,7 @@ import { JOBCAM_DDL } from "../server/jobcam/schema";
 import { YOUTUBE_DDL } from "../server/youtube/schema";
 import { YOUTUBE_CUSTOMER_DDL } from "../server/youtube/customer-schema";
 import { ANALYTICS_ATTRIBUTION_DDL } from "../server/analytics-attribution";
+import { SIGNUP_LEADS_DDL } from "../server/signup-leads";
 import { SCRAPE_SCHEDULE_DDL } from "../server/scrape-schedule-input";
 
 import { ensureDirectorySchema } from "../server/directories/schema";
@@ -106,6 +107,9 @@ const STATEMENTS = [
   // Campaign attribution: landing / utm_* / referrer_host on ch_analytics_events,
   // ch_signup_attribution, ch_analytics_meta (server/analytics-attribution.ts; boot runs these too).
   ...ANALYTICS_ATTRIBUTION_DDL,
+  // The three-step sign-up: users.phone / trade / team_size and signup_leads
+  // (server/signup-leads.ts; boot runs these too from setupAuth).
+  ...SIGNUP_LEADS_DDL,
   // DB review w3-r8 (2026-10-15) — indexes for queries that only had a seq-scan path
   // (boot runs these too: server/competitors/schema.ts, server/gbp/schema.ts,
   // server/gbp/content.ts, server/agency/schema.ts).
