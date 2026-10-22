@@ -600,7 +600,7 @@ export function takeoffQuantityForLine(
       if (roofy) return pick(t.roof.quantitySqft, `roof area + ${t.roof.wastePct}% waste`);
       return pick(t.siding.quantitySqft, `siding area rounded up to ${t.rules.sidingRoundUpTo}`);
     case "sq":
-      if (/siding|wall/.test(name)) return pick(t.siding.quantitySqft === null ? null : t.siding.quantitySqft / 100, "siding squares");
+      if (sidingy) return pick(t.siding.quantitySqft === null ? null : t.siding.quantitySqft / 100, "siding squares");
       return pick(t.roof.squares, `roof squares + ${t.roof.wastePct}% waste`);
     case "ea":
       if (/window/.test(name)) return pick(t.counts.windows, "window count");

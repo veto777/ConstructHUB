@@ -60,7 +60,7 @@ type GetUser = (req: any, res: any) => any;
 export type TaxRateSource = "city" | "construction-exempt" | "official" | "division" | "org" | "none";
 
 /** Why the official table did not give the rate (only on a fallback). */
-export type TaxFallbackReason = "no_city" | "no_state" | "not_loaded" | "no_match";
+export type TaxFallbackReason = "no_city" | "no_state" | "not_loaded" | "no_match" | "address_lookup_failed";
 
 export type TaxResolution = {
   bps: number;
@@ -133,6 +133,8 @@ export function resolveTaxRateBps(args: {
   divisionCustomFields?: unknown;
   orgDefaultTaxRateBps?: number | null;
   official?: OfficialLookup | null;
+  /** The street-address lookup (WA DOR) was tried and gave nothing: a city-table rate is then only an estimate. */
+  addressLookupMissed?: "failed" | "no_match" | null;
 }): TaxResolution {
   const rates = divisionTaxRates(args.divisionCustomFields);
   const cityRaw = (args.city ?? "").trim();
@@ -169,6 +171,12 @@ export function resolveTaxRateBps(args: {
       ? `${place(cityRaw || off.city, state ?? off.state)}${off.jurisdiction && cityKeyLoose(off.jurisdiction) !== cityKeyLoose(cityRaw) ? ` — ${off.jurisdiction}` : ""}`
       : place(off.kind === "state" ? cityRaw || null : off.city ?? cityRaw, state ?? off.state);
     const varies = off.varies ? ` — rate varies within ${off.city ?? cityRaw}; check the address` : "";
+    if (args.addressLookupMissed && off.matchedBy !== "address") {
+      return {
+        ...base, bps: clampBps(off.rateBps), source: "official", official: off, fallbackReason: "address_lookup_failed",
+        label: `${where} · ${fmtPct(off.ratePct)} — estimate: city rate (${off.source}, ${off.periodLabel}); the street address couldn't be matched with WA DOR — check`,
+      };
+    }
     return {
       ...base, bps: clampBps(off.rateBps), source: "official", official: off,
       label: `${where} · ${fmtPct(off.ratePct)} (${off.source}, ${off.periodLabel})${varies}${dependsSuffix(treatment)}`,
@@ -239,11 +247,14 @@ export async function resolveEstimateTaxRate(
 ): Promise<TaxResolution> {
   const inputs = await estimateTaxInputs(orgId, args);
   let official: OfficialLookup | null = null;
+  let addressLookupMissed: "failed" | "no_match" | null = null;
   // WA: the exact location code for the street address, from WA DOR (falls through to the city on any miss).
   if (inputs.state === "WA" && inputs.addressLine1) {
     try {
       official = await waAddressOfficial(inputs.addressLine1, inputs.city, inputs.zip);
+      if (!official) addressLookupMissed = "no_match";
     } catch (e: any) {
+      addressLookupMissed = "failed";
       console.error("[crm/tax] WA address lookup failed:", e?.message ?? e);
     }
   }
@@ -255,7 +266,7 @@ export async function resolveEstimateTaxRate(
       console.error("[crm/tax] official rate lookup failed:", e?.message ?? e);
     }
   }
-  return resolveTaxRateBps({ ...inputs, official });
+  return resolveTaxRateBps({ ...inputs, official, addressLookupMissed });
 }
 
 /**

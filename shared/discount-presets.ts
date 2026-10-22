@@ -1,9 +1,8 @@
 /**
  * The preset discount offers (Settings → Bid discounts starts from these; the per-estimate Discounts dialog and the
  * New estimate dialog tick them). Shared so the client can show them before an estimate exists.
- * The creator ticks which of these to offer. Price-match is OFF by default —
- * matching a competitor's number is a bad sales tactic; offering it at all is
- * a deliberate choice, and the client must provide the competing bid.
+ * The creator ticks which of these to offer. Price-match is off by default; when offered, the client must provide
+ * the competing estimate.
  */
 export const DISCOUNT_PRESETS = [
   {
@@ -31,20 +30,24 @@ export const DISCOUNT_PRESETS = [
     code: "bundle",
     label: "Bundle discount",
     percentBps: 500, // 5%
-    conditions: "Siding + roofing + windows — all three required; gutters/paint don't count as a scope.",
+    conditions: "Bundle two or more of siding, windows and roofing on one job. Painting, gutters and doors don't count as a scope.",
     defaultEnabled: true,
   },
   {
     code: "price_match",
     label: "Price match",
-    percentBps: 0, // creator sets the concession when enabling it
+    percentBps: 0, // 0 = "we'll match it" (no fixed %); the creator may set a concession instead
     conditions: "To qualify, we need to see a copy of the estimate we're price matching so we can compare apples to apples: the same scope of work, materials and warranty.",
     defaultEnabled: false,
   },
 ] as const;
 
-/** Old internal price-match wording that must never reach a client; any copy still in a browser draft is swapped on save. */
+/** Old wording that must never reach a client (internal price-match note, the all-three bundle text); swapped on save and at render. */
+export const BUNDLE_CONDITIONS = "Bundle two or more of siding, windows and roofing on one job. Painting, gutters and doors don't count as a scope.";
 const LEGACY_CONDITIONS: Record<string, string> = {
+  // Old bundle wording (all three required) contradicts the tiered rule shown above it.
+  "Siding + roofing + windows — all three required; gutters/paint don't count as a scope.": BUNDLE_CONDITIONS,
+  "Siding + roofing + windows — all three required.": BUNDLE_CONDITIONS,
   "Requires providing the competing bid. Off by default — price matching is a bad sales tactic.":
     "To qualify, we need to see a copy of the estimate we're price matching so we can compare apples to apples: the same scope of work, materials and warranty.",
 };

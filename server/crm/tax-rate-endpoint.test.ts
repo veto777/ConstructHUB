@@ -95,7 +95,9 @@ describe.skipIf(!lane)("estimate tax from the job-site address (lane Postgres)",
     const r = await rate(id);
     expect(r.status).toBe(200);
     expect(r.data).toMatchObject({ bps: waRate.Bellingham, source: "official", city: "Bellingham", state: "WA" });
-    expect(r.data.label).toMatch(/^Bellingham, WA · [\d.]+% \(WA DOR, Q\d 20\d\d\)$/);
+    // The street-address lookup is off in this file, so the city rate is labelled as an estimate.
+    expect(r.data.label).toMatch(/^Bellingham, WA · [\d.]+% — estimate: city rate \(WA DOR, Q\d 20\d\d\); .* — check$/);
+    expect(r.data.fallbackReason).toBe("address_lookup_failed");
   });
 
   it("the state comes from the ZIP when the address has none; city case doesn't matter", async () => {

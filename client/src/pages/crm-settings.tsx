@@ -242,7 +242,7 @@ export default function CrmSettingsPage() {
     { code: "marketing", label: "Marketing discount", percentBps: 100, conditions: "Yard signage during the job + 1 month after, and an honest review." },
     { code: "military", label: "Military discount", percentBps: 200, conditions: "Military ID required." },
     { code: "pay_in_full", label: "Pay-in-full discount", percentBps: 500, conditions: "Paid in full immediately." },
-    { code: "bundle", label: "Bundle discount (trifecta)", percentBps: 500, conditions: "Siding + roofing + windows — all three required." },
+    { code: "bundle", label: "Bundle discount", percentBps: 500, conditions: "Bundle two or more of siding, windows and roofing on one job. Painting, gutters and doors don't count as a scope." },
   ];
   const [discForm, setDiscForm] = useState<{ code: string; label: string; percentBps: number; conditions: string | null; enabled: boolean; rule?: unknown }[]>([]);
   const [discCustom, setDiscCustom] = useState({ label: "", pct: "", conditions: "" });
@@ -570,8 +570,10 @@ export default function CrmSettingsPage() {
     email: true, sms: false,
   });
   const [rcptForm, setRcptForm] = useState({ email: true, sms: false });
+  const [offlineText, setOfflineText] = useState("");
   useEffect(() => {
     if (!paySettings) return;
+    setOfflineText(paySettings.offlineInstructions ?? "");
     setFeeForm({
       passFeeToClient: paySettings.payments?.passFeeToClient === true,
       surchargePct: paySettings.payments?.surchargeBps ? String(paySettings.payments.surchargeBps / 100) : "",
@@ -1774,6 +1776,27 @@ export default function CrmSettingsPage() {
             </div>
           </div>
 
+          {/* Check / Zelle — how a client pays without a card or bank link. */}
+          <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-offline-instructions">
+            <div>
+              <div className="text-sm font-medium">How to pay by check or Zelle</div>
+              <p className="text-xs text-muted-foreground">
+                Shown on every payment request and its email, next to the online payment button. For example: who checks are
+                payable to, where to mail them, and the Zelle email or phone. Leave it empty to show nothing.
+              </p>
+            </div>
+            <Textarea rows={4} maxLength={1500} value={offlineText} onChange={(e) => setOfflineText(e.target.value)}
+              placeholder={"Checks payable to …, mailed to …\nZelle: …"} data-testid="textarea-offline-instructions" />
+            <div className="flex justify-end">
+              <Button size="sm" disabled={savePaySettings.isPending} data-testid="button-save-offline-instructions"
+                onClick={() => savePaySettings.mutate({ offlineInstructions: offlineText.trim() || null })}>
+                {savePaySettings.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save
+              </Button>
+            </div>
+            <DivisionOfflinePay />
+          </div>
+
           {/* Financing links — the primary one shows on estimates & invoices. */}
           <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-financing">
             <div>
@@ -2105,6 +2128,49 @@ export default function CrmSettingsPage() {
  * Settings → Lead visibility by location: per team member, the states and markets whose leads they may see. No
  * boxes ticked = every lead. Owners and seats that run Settings always see everything (server/crm/leads.ts).
  */
+/** Per-division check / Zelle text (WA and FL bank differently): each division's own, else the company-wide text above. */
+function DivisionOfflinePay() {
+  const { toast } = useToast();
+  const { data: divisions } = useQuery<any[]>({ queryKey: ["/api/crm/divisions"] });
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const save = useMutation({
+    mutationFn: async ({ id, text }: { id: string; text: string }) =>
+      (await apiRequest("PATCH", `/api/crm/divisions/${id}`, { offlinePaymentInstructions: text.trim() || null })).json(),
+    onSuccess: (_r, v) => {
+      setDrafts((d) => { const n = { ...d }; delete n[v.id]; return n; });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/divisions"] });
+      toast({ title: "Saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  if (!divisions || divisions.length < 2) return null;
+  return (
+    <div className="space-y-3 pt-2" data-testid="section-division-offline-instructions">
+      <p className="text-xs text-muted-foreground">
+        Different details per division? Fill these in — a division left empty uses the text above.
+      </p>
+      {divisions.map((d) => {
+        const stored = String((d.customFields as any)?.offlinePaymentInstructions ?? "");
+        const value = drafts[d.id] ?? stored;
+        return (
+          <div key={d.id} className="space-y-1.5">
+            <Label htmlFor={`offline-${d.id}`}>{d.name}{d.code ? ` (${d.code})` : ""}</Label>
+            <Textarea id={`offline-${d.id}`} rows={3} maxLength={1500} value={value}
+              onChange={(e) => setDrafts((x) => ({ ...x, [d.id]: e.target.value }))}
+              placeholder="Empty = the company-wide text above" data-testid={`textarea-offline-${d.code ?? d.id}`} />
+            <div className="flex justify-end">
+              <Button size="sm" variant="outline" disabled={save.isPending || value === stored}
+                onClick={() => save.mutate({ id: d.id, text: value })} data-testid={`button-save-offline-${d.code ?? d.id}`}>
+                Save {d.code ?? d.name}
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function LeadVisibilityCard() {
   const { toast } = useToast();
   const { data, isError } = useQuery<{

@@ -2233,6 +2233,25 @@ export const crmEngagementSessions = pgTable("crm_engagement_sessions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+/**
+ * What the client read and clicked during an engagement session — see
+ * shared/engagement-events.ts for the vocabulary. One row per click/open;
+ * running totals (seconds per section, scroll depth) are one row per
+ * session+key, upserted with their max. t_ms = ms after the session started.
+ */
+export const crmEngagementEvents = pgTable("crm_engagement_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  sessionId: varchar("session_id").notNull(),
+  docType: text("doc_type").notNull(), // estimate | invoice
+  docId: varchar("doc_id").notNull(),
+  name: text("name").notNull(),
+  key: text("key"),
+  detail: jsonb("detail"),
+  tMs: integer("t_ms").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const crmLeadSources = pgTable("crm_lead_sources", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull(),
@@ -2314,6 +2333,9 @@ export const crmPayments = pgTable("crm_payments", {
   failureReason: text("failure_reason"),
   // Free-text memo on manually recorded (offline) payments — "check #1042".
   note: text("note"),
+  // The client-facing receipt number (R-1001…), allocated the first time the
+  // receipt is built (server/crm/payment-receipts.ts) and never changed.
+  receiptNumber: text("receipt_number"),
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

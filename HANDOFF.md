@@ -1552,3 +1552,5 @@ without moving that session's tree. The commit built was exactly origin/main and
 wv-clb-actions) was deployed from a clean detached checkout of origin/main (/mnt/scratch/worktrees/ConstructHUB-deploy-a,
 removed afterwards) with `DEPLOY_ALLOW_UNSAFE=1`, for the same reason as above: `main` is checked out in
 ~/ConstructHUB-release by another session. The commit built was exactly origin/main and the tree was clean; deploy OK.
+
+2026-10-21: deploys ran from clean worktrees at origin/main with DEPLOY_ALLOW_UNSAFE=1 because ~/ConstructHUB-release held another session's unfinished merge.

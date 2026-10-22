@@ -74,6 +74,12 @@ describe("inferSqftMetric", () => {
     expect(inferSqftMetric("Siding Remodel - Color +")).toBe("siding");
     expect(inferSqftMetric("Exterior Painting")).toBe("siding");
   });
+  it("roofing shingles price roof area; Hardie shingle siding prices siding area", () => {
+    expect(inferSqftMetric("Architectural shingles")).toBe("roof");
+    expect(inferSqftMetric("Tear-off and underlayment")).toBe("roof");
+    expect(inferSqftMetric("Siding Remodel - James Hardie Shingles (Primed)")).toBe("siding");
+    expect(inferSqftMetric("Board & Batten (16\" OC)")).toBe("siding");
+  });
 });
 
 describe("POST /api/crm/quick-bid (dev server)", () => {

@@ -199,4 +199,13 @@ describe("resolveTaxRateBps — WA street address placed by WA DOR", () => {
     const r = resolveTaxRateBps({ city: "Bellingham", state: "WA", official: official({ matchedBy: "address", jurisdiction: "Bellingham" }) });
     expect(r.label).toBe("Bellingham, WA · 9.2% (WA DOR, Q4 2026)");
   });
+  it("the street-address lookup missed: the city rate is labelled as an estimate, with a reason", () => {
+    const r = resolveTaxRateBps({ city: "Blaine", state: "WA", official: official({ city: "Blaine", ratePct: 9.1, rateBps: 910 }), addressLookupMissed: "no_match" });
+    expect(r).toMatchObject({ bps: 910, source: "official", fallbackReason: "address_lookup_failed" });
+    expect(r.label).toMatch(/^Blaine, WA · 9\.1% — estimate: city rate \(WA DOR, Q4 2026\); .* — check$/);
+  });
+  it("an address match is never labelled as an estimate", () => {
+    const r = resolveTaxRateBps({ city: "Bellingham", state: "WA", official: official({ matchedBy: "address", jurisdiction: "Bellingham" }), addressLookupMissed: "no_match" });
+    expect(r.fallbackReason).toBeUndefined();
+  });
 });

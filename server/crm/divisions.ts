@@ -26,8 +26,9 @@ import { z } from "zod";
 import { db } from "../db";
 import {
   crmDivisions, crmMembers, crmCustomers, crmProjects, crmEstimates, crmInvoices,
-  type CrmOrg, type CrmDivision,
+  type CrmOrg, type CrmDivision, type CrmMember,
 } from "@shared/schema";
+import { divisionContactId, divisionForState } from "./client-contact";
 import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 
@@ -227,6 +228,35 @@ export async function resolveEstimateDivision(
   return latestCustomerProjectDivision(est.orgId, est.customerId);
 }
 
+/** The division's named client contact (custom_fields.contactMemberId) — a member of this org — else null. */
+export async function divisionContactMember(orgId: string, div: CrmDivision | null): Promise<CrmMember | null> {
+  const id = divisionContactId(div);
+  if (!id) return null;
+  const [m] = await db.select().from(crmMembers)
+    .where(and(eq(crmMembers.id, id), eq(crmMembers.orgId, orgId))).limit(1);
+  return m ?? null;
+}
+
+/**
+ * The division a CLIENT belongs to (client portal Contact us / footer): the
+ * division of their latest estimate (sent first) — its own pick, its project's
+ * — else their latest project's, else the client's own division, else the one
+ * division whose state is the client's address state. Null = the org.
+ */
+export async function resolveClientDivision(
+  orgId: string,
+  customer: { id: string; state?: string | null },
+): Promise<CrmDivision | null> {
+  const [est] = await db.select().from(crmEstimates)
+    .where(and(eq(crmEstimates.orgId, orgId), eq(crmEstimates.customerId, customer.id)))
+    .orderBy(sql`${crmEstimates.sentAt} is null`, desc(crmEstimates.createdAt))
+    .limit(1);
+  const d = est ? await resolveEstimateDivision(est) : await latestCustomerProjectDivision(orgId, customer.id);
+  if (d) return d;
+  const all = await db.select().from(crmDivisions).where(eq(crmDivisions.orgId, orgId));
+  return divisionForState(all, customer.state);
+}
+
 /** Branding division for an invoice: its project's, else its estimate's project's, else the customer's latest project's. */
 export async function resolveInvoiceDivision(
   inv: Pick<typeof crmInvoices.$inferSelect, "orgId" | "customerId" | "projectId" | "estimateId">,
@@ -344,6 +374,9 @@ const divisionSchema = z.object({
     default: z.number().int().min(0).max(3000).nullable().optional(),
     cities: z.record(z.number().int().min(0).max(3000)).optional(),
   }).nullable().optional(),
+  // "How to pay by check or Zelle" for this division, stored at
+  // custom_fields->offlinePaymentInstructions; empty = use the org's.
+  offlinePaymentInstructions: z.string().max(1500).nullable().optional(),
 });
 
 export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): void {
@@ -387,7 +420,7 @@ export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): vo
     const isFirst = !(await db.select({ id: crmDivisions.id }).from(crmDivisions)
       .where(eq(crmDivisions.orgId, ctx.org.id)).limit(1)).length;
     // taxRates is PATCH-only (stored in custom_fields, not a column).
-    const { taxRates: _taxRates, ...createData } = parsed.data;
+    const { taxRates: _taxRates, offlinePaymentInstructions: _offline, ...createData } = parsed.data;
     const [row] = await db.insert(crmDivisions).values({
       ...createData,
       isHeadquarters: parsed.data.isHeadquarters ?? isFirst,
@@ -421,12 +454,15 @@ export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): vo
     }
     // taxRates merges INTO custom_fields (never a wholesale replace) — the
     // same rule as the org's notificationPrefs.
-    const { taxRates, ...patch } = parsed.data;
+    const { taxRates, offlinePaymentInstructions, ...patch } = parsed.data;
+    const cfPatch: Record<string, unknown> = {};
+    if (taxRates !== undefined) cfPatch.taxRates = taxRates;
+    if (offlinePaymentInstructions !== undefined) cfPatch.offlinePaymentInstructions = offlinePaymentInstructions?.trim() || null;
     const [row] = await db.update(crmDivisions)
       .set({
         ...patch,
-        ...(taxRates !== undefined
-          ? { customFields: { ...((existing.customFields as Record<string, unknown> | null) ?? {}), taxRates } }
+        ...(Object.keys(cfPatch).length
+          ? { customFields: { ...((existing.customFields as Record<string, unknown> | null) ?? {}), ...cfPatch } }
           : {}),
         updatedAt: new Date(),
       })

@@ -55,9 +55,15 @@ export type EstimateDraftSnapshot = {
   items: DraftLine[];
   offers?: DraftOffer[];
   contractorDiscount?: ContractorDiscount | null;
+  /** Option 2+ tabs (the dialog's own shape); their lines count as content too. */
+  optionTabs?: { extra?: Array<{ items?: DraftLine[]; discount?: ContractorDiscount | null }> } | null;
+  /** An existing (non-autosave) estimate opened in the dialog, so a refresh restores it as that estimate. */
+  editing?: { id: string; number: string | null; autosave: boolean } | null;
+  /** The tax rate the opened estimate was saved with (bps), for the note under Tax %. */
+  savedTaxBps?: number | null;
 };
 
-const lineHasContent = (l: DraftLine) =>
+export const lineHasContent = (l: DraftLine) =>
   !!(l.name?.trim() || l.description?.trim() || l.unitPriceCents > 0 || (l.unit ?? "").trim());
 
 const discountCentsOf = (cd: ContractorDiscount | null | undefined, items: DraftLine[]): number => {
@@ -76,7 +82,27 @@ export function draftHasContent(s: EstimateDraftSnapshot | null | undefined): bo
   if (s.autoTitle === false && title && title !== DEFAULT_ESTIMATE_TITLE) return true;
   if (s.intro.trim()) return true;
   if (discountCentsOf(s.contractorDiscount, s.items) > 0) return true;
-  return s.items.some(lineHasContent);
+  if (s.items.some(lineHasContent)) return true;
+  // Lines typed only in Option 2+ are work too (a refresh or an outside click must not lose them).
+  return (s.optionTabs?.extra ?? []).some((t) => (t.items ?? []).some(lineHasContent) || discountCentsOf(t.discount, t.items ?? []) > 0);
+}
+
+/**
+ * An option's saved lines back into the dialog's form: its generated contractor-discount line (the last
+ * kind:"discount" line) becomes the tab's discount again — "Discount (10%)" as a percent that follows the
+ * prices, anything else as a dollar amount — and is taken out of the lines.
+ */
+export function discountFromOptionLines<T extends { kind?: string | null; name?: string | null; unitPriceCents?: number | null }>(
+  items: T[],
+): { discount: ContractorDiscount | null; items: T[] } {
+  const last = [...items].reverse().find((i) => i.kind === "discount");
+  if (!last) return { discount: null, items };
+  const rest = items.filter((i) => i !== last);
+  const name = String(last.name ?? "").trim();
+  const m = /^(.*?)\s*\((\d+(?:\.\d+)?)%\)$/.exec(name);
+  if (m) return { discount: { mode: "percent", value: m[2], label: m[1].trim() || "Discount" }, items: rest };
+  const cents = Math.max(0, Math.round(last.unitPriceCents ?? 0));
+  return { discount: { mode: "amount", value: String(Number((cents / 100).toFixed(2))), label: name || "Discount" }, items: rest };
 }
 
 /**

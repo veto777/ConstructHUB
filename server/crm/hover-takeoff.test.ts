@@ -92,6 +92,9 @@ describe("HOVER takeoff — real full_json v2 (anonymised)", () => {
     expect(takeoffQuantityForLine({ name: "Siding Remodel - James Hardie Shingles (Primed)", unit: "sf" }, t)?.quantity).toBe(2200);
     expect(takeoffQuantityForLine({ name: "Architectural shingles", unit: "sf" }, t)?.quantity).toBe(2418);
     expect(takeoffQuantityForLine({ name: "Architectural shingles", unit: "sq" }, t)?.quantity).toBe(24.18);
+    // Hardie shingle SIDING priced per square takes siding squares, not roof squares.
+    expect(takeoffQuantityForLine({ name: "James Hardie Shingles", unit: "sq" }, t)?.quantity).toBe(22);
+    expect(takeoffQuantityForLine({ name: "Board & Batten (16\" OC)", unit: "sq" }, t)?.quantity).toBe(22);
     expect(takeoffQuantityForLine({ name: "Window install", unit: "ea" }, t)?.quantity).toBe(9);
     expect(takeoffQuantityForLine({ name: "Entry door", unit: "each" }, t)?.quantity).toBe(4);
     expect(takeoffQuantityForLine({ name: "Window wrap", unit: "UI" }, t)?.quantity).toBe(808);

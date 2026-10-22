@@ -27,6 +27,7 @@ import { requireOrg, requirePermission, grantExceedsOwn, listOrgsForUser, getSea
 import { CRM_PERMISSION_LABELS } from "@shared/crm-access";
 import { registerCrmEntityRoutes } from "./entities";
 import { registerCrmPortalRoutes, registerCrmInvoicePortalRoutes } from "./portal";
+import { registerEstimateProofRoutes } from "./estimate-proof";
 import { registerCrmPaymentRoutes } from "./payments";
 import { registerCrmReconcileRoutes, startReconcileWorker } from "./payment-reconcile";
 import { registerCrmOpsRoutes, registerCrmPhaseRoutes } from "./ops";
@@ -57,6 +58,7 @@ import { registerCrmAttachmentRoutes } from "./attachments";
 import { registerCrmPunchListRoutes } from "./punch-list";
 import { registerCrmPhotoLibraryRoutes } from "./photo-library";
 import { registerCrmReceiptRoutes } from "./receipts";
+import { registerCrmPaymentReceiptRoutes } from "./payment-receipts";
 import { registerCrmClientDocumentRoutes } from "./client-documents";
 import { registerCrmQuickBidRoutes } from "./quickbid";
 import { registerCrmMessageRoutes } from "./messages";
@@ -410,6 +412,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmTaxHooks(app, getDevUser);
   registerCrmEntityRoutes(app, getDevUser);
   registerCrmPortalRoutes(app, getDevUser);
+  // "Send me a proof": the client email, to the member only (no send side effects).
+  registerEstimateProofRoutes(app, getDevUser);
   registerCrmInvoicePortalRoutes(app, getDevUser);
   registerCrmPaymentRoutes(app, getDevUser);
   // Off-platform payments: the reconciliation prompt series, its answers, and recording a deposit by check/cash/wire.
@@ -465,6 +469,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmPhotoLibraryRoutes(app, getDevUser);
   // Receipts-to-date: preview + one-click send; auto-emailed after payments.
   registerCrmReceiptRoutes(app, getDevUser);
+  registerCrmPaymentReceiptRoutes(app, getDevUser);
   // The client's paper trail: estimates, signed contracts, invoices, a receipt per payment (CRM + portal).
   registerCrmClientDocumentRoutes(app, getDevUser);
   // Quick Bid: per-sqft SKUs priced from the client's latest measurement report.

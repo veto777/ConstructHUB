@@ -248,7 +248,7 @@ const SIDEBAR_NAV: { key: ViewKey; title: string; icon: LucideIcon }[] = [
 function Dashboard({ data }: { data: any }) {
   const {
     customer, orgs = [], estimates = [], invoices = [], contracts = [], reports = [],
-    accounts = [], pamphlets = [], photos = [], financing = [], punchLists = [],
+    accounts = [], pamphlets = [], photos = [], financing = [], punchLists = [], receipts = [],
   } = data;
   const { toast } = useToast();
   const [view, setView] = useState<ViewKey>("home");
@@ -479,7 +479,7 @@ function Dashboard({ data }: { data: any }) {
   const invoicesSection = (
     <section className="space-y-3" data-testid="section-invoices">
       <SectionTitle icon={Receipt} title="Invoices & receipts" infoKey="portal-invoices" />
-      {!invoices.length ? (
+      {!invoices.length && receipts.length > 0 ? null : !invoices.length ? (
         <Card><EmptyState compact icon={Receipt} title="No invoices yet"
           description="Invoices and receipts from your contractor appear here." /></Card>
       ) : (
@@ -518,6 +518,21 @@ function Dashboard({ data }: { data: any }) {
             </tbody>
           </table>
         </div>
+      )}
+      {receipts.length > 0 && (
+        <Card data-testid="portal-receipts">
+          <CardContent className="p-4 space-y-2">
+            <div className="text-sm font-medium">Receipts</div>
+            {receipts.map((r: any) => (
+              <a key={r.paymentId} href={r.link} target="_blank" rel="noopener noreferrer"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/40"
+                data-testid={`portal-receipt-${r.paymentId}`}>
+                <span>{r.receiptNumber ? `${r.receiptNumber} · ` : ""}{money(r.amountCents)} · {r.method} · {r.forLabel}</span>
+                <span className="text-xs text-muted-foreground">{day(r.paidAt) ?? ""} · View / print</span>
+              </a>
+            ))}
+          </CardContent>
+        </Card>
       )}
     </section>
   );
@@ -859,7 +874,7 @@ function Dashboard({ data }: { data: any }) {
           {viewBody[view]}
 
           {/* Always-there contact strip — the client can always find us. */}
-          <PortalContactFooter office={orgs?.[0] ?? null} />
+          <PortalContactFooter accounts={accounts} />
 
           <div className="flex flex-col items-center gap-2.5 pb-4">
             {/* The CRM powers this portal; the header above stays the contractor's. */}

@@ -37,6 +37,7 @@ import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { Camera, Copy, ExternalLink, FilePlus2, Landmark, Link2, Loader2 } from "lucide-react";
 import { CardFeeConfirm, pct as feePct, type CardFeeQuote } from "@/components/card-fee-confirm";
 import { MANUAL_PAYMENT_METHODS } from "@shared/payment-settings";
+import { confirmAction } from "@/components/confirm-dialog";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -518,7 +519,13 @@ export function TakePaymentDialog({
                     )}
                     <div className="flex justify-end gap-2">
                       <Button size="sm" variant="ghost" onClick={() => setDepositForm(null)}>Cancel</Button>
-                      <Button size="sm" onClick={() => recordDeposit.mutate()} data-testid="button-record-deposit"
+                      <Button size="sm" onClick={() => confirmAction({
+                        id: "record-deposit",
+                        title: `Record a ${money(Math.round((parseFloat(df.amount) || 0) * 100))} deposit on ${e.number ?? "this estimate"}?`,
+                        description: `${MANUAL_PAYMENT_METHODS.find((m) => m.value === df.method)?.label ?? df.method}${df.note.trim() ? ` · ${df.note.trim()}` : ""} from ${customerName}. A numbered receipt goes to the client automatically.`,
+                        confirmLabel: "Yes, record it", destructive: false,
+                        onConfirm: () => recordDeposit.mutate(),
+                      })} data-testid="button-record-deposit"
                         disabled={recordDeposit.isPending || uploadingProof || !df.method || Math.round((parseFloat(df.amount) || 0) * 100) < 1 || (depositNeedsPhoto && !df.file)}>
                         {(recordDeposit.isPending || uploadingProof) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                         Record deposit
@@ -667,7 +674,13 @@ export function TakePaymentDialog({
 
         {inv && (
           <DialogFooter>
-            <Button onClick={() => recordManual.mutate()}
+            <Button onClick={() => confirmAction({
+                id: "record-manual-payment",
+                title: `Record ${money(amountCents)} on ${inv.number ?? "this invoice"}?`,
+                description: `${MANUAL_PAYMENT_METHODS.find((m) => m.value === method)?.label ?? method}${note.trim() ? ` · ${note.trim()}` : ""} from ${customerName}. A numbered receipt goes to the client automatically.`,
+                confirmLabel: "Yes, record it", destructive: false,
+                onConfirm: () => recordManual.mutate(),
+              })}
               disabled={amountCents < 1 || !method || recordManual.isPending}
               title={!method ? "Pick the payment type first" : undefined}
               data-testid="button-record-manual-payment">

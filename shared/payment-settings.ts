@@ -96,11 +96,37 @@ export function receiptSettingsOf(customFields: unknown): ReceiptSettings {
 export const MANUAL_PAYMENT_METHODS = [
   { value: "check", label: "Check" },
   { value: "cash", label: "Cash" },
+  { value: "zelle", label: "Zelle" },
   { value: "wire", label: "Wire transfer" },
   { value: "credit_card", label: "Credit card" },
   { value: "ach", label: "Bank transfer (ACH)" },
   { value: "card", label: "Card (taken another way)" },
+  { value: "financing", label: "Financing" },
   { value: "other", label: "Other" },
 ] as const;
 export type ManualPaymentMethod = (typeof MANUAL_PAYMENT_METHODS)[number]["value"];
 export const MANUAL_PAYMENT_METHOD_VALUES = MANUAL_PAYMENT_METHODS.map((m) => m.value) as [ManualPaymentMethod, ...ManualPaymentMethod[]];
+
+/** How a payment method reads on a receipt, a ledger row or an email. */
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: "Cash", check: "Check", zelle: "Zelle", wire: "Wire transfer", credit_card: "Credit card",
+  ach: "Bank transfer (ACH)", card: "Card", financing: "Financing", other: "Other",
+};
+export function paymentMethodLabel(method: string | null | undefined): string {
+  if (!method) return "Payment";
+  return PAYMENT_METHOD_LABELS[method] ?? method.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+}
+
+/** The org's "pay by check or Zelle" instructions (Settings → Payments), shown with payment requests. Null when unset. */
+export function offlinePaymentInstructionsOf(customFields: unknown): string | null {
+  const v = (customFields as Record<string, any> | null | undefined)?.payments?.offlineInstructions;
+  return typeof v === "string" && v.trim() ? v.trim().slice(0, 1500) : null;
+}
+
+/** The division's own check/Zelle instructions (crm_divisions.custom_fields.offlinePaymentInstructions — WA and FL
+ *  bank differently), else the org's. Null when neither is set. */
+export function offlinePaymentInstructionsFor(orgCustomFields: unknown, divisionCustomFields?: unknown): string | null {
+  const v = (divisionCustomFields as Record<string, any> | null | undefined)?.offlinePaymentInstructions;
+  if (typeof v === "string" && v.trim()) return v.trim().slice(0, 1500);
+  return offlinePaymentInstructionsOf(orgCustomFields);
+}

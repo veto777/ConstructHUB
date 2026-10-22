@@ -24,7 +24,7 @@ import { db } from "../db";
 import {
   crmCustomers, crmProjects, crmJobs, crmEstimates, crmEstimateItems, crmPbItems,
   crmEstimateEvents, crmLeadSources, crmInvoices, crmInvoiceItems,
-  crmEstimateOptions, crmEstimateDiscounts, crmEngagementSessions,
+  crmEstimateOptions, crmEstimateDiscounts, crmEngagementSessions, crmEngagementEvents,
   crmPayments, crmCustomerNotes, crmClientComments, crmFinanceClicks,
   crmAttachments, crmAppointments, crmChangeOrders, crmPunchItems,
   crmDailyLogs, crmSelections, crmBudgetLines, crmCommitments,
@@ -458,6 +458,9 @@ async function deleteEstimateChildren(tx: any, orgId: string, estimateIds: strin
     .where(and(eq(crmEstimateItems.orgId, orgId), inArray(crmEstimateItems.estimateId, estimateIds)));
   await tx.delete(crmEstimateEvents)
     .where(and(eq(crmEstimateEvents.orgId, orgId), inArray(crmEstimateEvents.estimateId, estimateIds)));
+  await tx.delete(crmEngagementEvents)
+    .where(and(eq(crmEngagementEvents.orgId, orgId), eq(crmEngagementEvents.docType, "estimate"),
+      inArray(crmEngagementEvents.docId, estimateIds)));
   await tx.delete(crmEngagementSessions)
     .where(and(eq(crmEngagementSessions.orgId, orgId), eq(crmEngagementSessions.docType, "estimate"),
       inArray(crmEngagementSessions.docId, estimateIds)));
@@ -468,6 +471,9 @@ async function deleteInvoiceChildren(tx: any, orgId: string, invoiceIds: string[
   if (!invoiceIds.length) return;
   await tx.delete(crmInvoiceItems)
     .where(and(eq(crmInvoiceItems.orgId, orgId), inArray(crmInvoiceItems.invoiceId, invoiceIds)));
+  await tx.delete(crmEngagementEvents)
+    .where(and(eq(crmEngagementEvents.orgId, orgId), eq(crmEngagementEvents.docType, "invoice"),
+      inArray(crmEngagementEvents.docId, invoiceIds)));
   await tx.delete(crmEngagementSessions)
     .where(and(eq(crmEngagementSessions.orgId, orgId), eq(crmEngagementSessions.docType, "invoice"),
       inArray(crmEngagementSessions.docId, invoiceIds)));
@@ -1605,7 +1611,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         orgId: ctx.org.id, customerId: d.customerId, projectId: d.projectId ?? null,
         divisionId: d.divisionId ?? divisionScopeOf(ctx),
         number, title: d.title, introText: d.introText ?? null,
-        termsText: d.termsText ?? ctx.org.termsAndConditions ?? null,
+        // Only terms typed for THIS estimate; the org's terms are copied once, as company terms (below).
+        termsText: d.termsText ?? null,
         taxRateBps: d.taxRateBps, depositCents: d.depositCents ?? null,
         // Footer, warranty, company terms and the default deposit percent are
         // copied from Settings now; a deposit typed on this request wins.
@@ -1708,6 +1715,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         parsed.data.items.map((it, idx) => ({ ...it, orgId: ctx.org.id, estimateId: e.id, sortOrder: it.sortOrder ?? idx })) as any,
       );
     }
+    await recordPricebookUsage(ctx.org.id, e.id, parsed.data.items);
     const fresh = await recalcEstimate(ctx.org.id, e.id);
     logActivity(ctx, "estimate.updated", {
       entityType: "estimate", entityId: e.id, customerId: e.customerId,

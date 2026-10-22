@@ -13,14 +13,14 @@ import { FileText, FileSignature, Receipt, ReceiptText, ExternalLink, Loader2, A
 
 const money = (c?: number | null) => `$${((c ?? 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null);
-const METHOD: Record<string, string> = { cash: "Cash", check: "Check", wire: "Wire", credit_card: "Credit card", ach: "ACH", card: "Card", other: "Other" };
+const METHOD: Record<string, string> = { cash: "Cash", check: "Check", zelle: "Zelle", wire: "Wire", credit_card: "Credit card", ach: "ACH", card: "Card", financing: "Financing", other: "Other" };
 
 type FileRef = { id: string; fileName: string; downloadUrl: string };
 type Docs = {
   estimates: { id: string; number: string | null; title: string; status: string; totalCents: number; sentAt: string | null; approvedAt: string | null; link: string; clientLink: string; imported: boolean; contract: FileRef | null; bidPdf: FileRef | null }[];
   contracts: { estimateId: string; estimateNumber: string | null; title: string; approvedAt: string | null; totalCents: number; attachmentId: string | null; fileName: string | null; downloadUrl: string | null; signoff: string | null; bidPdf: FileRef | null }[];
   invoices: { id: string; number: string | null; title: string; status: string; totalCents: number; paidCents: number; dueCents: number; paidAt: string | null; link: string; clientLink: string; imported: boolean; receipts: number }[];
-  receipts: { paymentId: string; invoiceId: string; invoiceNumber: string | null; amountCents: number; method: string | null; paidAt: string | null; provider: string; link: string }[];
+  receipts: { paymentId: string; receiptNumber?: string | null; invoiceId: string | null; invoiceNumber: string | null; estimateNumber?: string | null; amountCents: number; method: string | null; paidAt: string | null; provider: string; link: string }[];
 };
 
 export function ClientDocuments({ customerId }: { customerId: string }) {
@@ -77,7 +77,7 @@ export function ClientDocuments({ customerId }: { customerId: string }) {
             <DocGroup icon={Receipt} title="Receipts" empty="No payments on file yet — a receipt appears for every payment." testId="docs-receipts">
               {data.receipts.map((r) => (
                 <Row key={r.paymentId} testId={`doc-receipt-${r.paymentId}`}
-                  main={<>{money(r.amountCents)} · {r.invoiceNumber ?? "Invoice"}</>}
+                  main={<>{money(r.amountCents)} · {r.invoiceNumber ?? (r.estimateNumber ? `${r.estimateNumber} deposit` : "Invoice")}{r.receiptNumber ? ` · ${r.receiptNumber}` : ""}</>}
                   sub={`${METHOD[r.method ?? ""] ?? r.method ?? "Payment"} · ${day(r.paidAt) ?? "—"}${r.provider === "hcp_import" ? " · from Housecall Pro" : ""}`}
                   right={<Button asChild size="sm" variant="outline"><a href={r.link} target="_blank" rel="noopener noreferrer" data-testid={`link-receipt-${r.paymentId}`}><Receipt className="h-4 w-4 mr-1.5" /> Receipt</a></Button>} />
               ))}

@@ -19,7 +19,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { db } from "../db";
 import {
   crmCustomers, crmProjects, crmEstimates, crmEstimateItems, crmEstimateOptions, crmOrgs, crmMembers,
-  crmEstimateEvents, crmEngagementSessions,
+  crmEstimateEvents, crmEngagementSessions, crmEngagementEvents,
   CRM_PROJECT_STAGE_META,
   crmNotificationEnabled,
   crmNotificationChannel,
@@ -42,23 +42,33 @@ import { estimateDocText, invoiceDocText } from "./doc-defaults";
 import { recordActivity, logActivity } from "./activity";
 import { stageIndex, stageOfProjectStatus } from "@shared/job-stage";
 import { advanceJobStage, customerCurrentProject } from "./job-stage-auto";
+import { offlinePaymentInstructionsFor } from "@shared/payment-settings";
 import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER } from "./sms";
 import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
 import { notifyMembers } from "./notify";
-import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
+import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision, divisionContactMember } from "./divisions";
+import { isSharedOfficeLogin } from "./client-contact";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { computeApprovalTotals, recomputeApprovalTotals, resolveSelectedOffers, offersForLines } from "./discounts";
-import { bundleRuleOf, bundleRuleText, orgDiscountRule } from "@shared/scope-category";
+import { bundleRuleOf, bundleRuleText, orgDiscountRule, lineCategory } from "@shared/scope-category";
+import { cleanOfferConditions } from "@shared/discount-presets";
+import { autoTitleFrom } from "@shared/estimate-draft";
 import { lineBases, optionDocument } from "@shared/estimate-totals";
 import { storeGeneratedPdf } from "./attachments";
 import { onlinePaymentRails } from "./payments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
 import type { CrmNotificationPref } from "@shared/schema";
 import { resolveOrgTheme, themePayload } from "@shared/theme-colors";
-import { WARRANTY_ANCHOR, bidHeadlineEmailHtml, normalizeBidHeadline } from "@shared/bid-headline";
+import { normalizeBidHeadline } from "@shared/bid-headline";
 import { logError } from "../ops/log";
 import { clientHome3dForEstimate } from "./hover-share";
 import { viewerMeasurementForEstimate } from "./hover-model3d-offer";
+import { buildEstimateEmail } from "./estimate-email";
+import {
+  TRACK_NAME_RE, TRACK_MAX_EVENTS_PER_POST, TRACK_MAX_ROWS_PER_SESSION, TRACK_MAX_DETAIL_CHARS,
+  TRACK_SESSION_MAX_AGE_MS, TRACK_CUMULATIVE, buildVisitDetail, groupSessionsIntoVisits, mergeSummaries,
+} from "@shared/engagement-events";
+import { UPSELL_SCOPES, createUpsellDraft, upsellRecipients } from "./estimate-upsell";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -159,8 +169,8 @@ const PREVIEW_TTL_MS = 15 * 60 * 1000;
 const previewSecret = () => process.env.SESSION_SECRET || "";
 type PreviewDoc = "estimate" | "invoice";
 
-function mintPreviewGrant(kind: PreviewDoc, docId: string): string {
-  const exp = Date.now() + PREVIEW_TTL_MS;
+export function mintPreviewGrant(kind: PreviewDoc, docId: string, ttlMs = PREVIEW_TTL_MS): string {
+  const exp = Date.now() + ttlMs;
   const sig = createHmac("sha256", previewSecret())
     .update(`${kind}-preview:${docId}:${exp}`).digest("hex").slice(0, 32);
   return `${exp}.${sig}`;
@@ -274,7 +284,7 @@ function publicEstimateView(
       footerText: docText.footerText,
       subtotalCents: est.subtotalCents, discountCents: est.discountCents,
       taxRateBps: est.taxRateBps,
-      taxCents: est.taxCents, totalCents: est.totalCents, depositCents: est.depositCents,
+      taxCents: est.taxCents, totalCents: est.totalCents, depositCents: est.depositCents, depositBps: est.depositBps,
       taxableBaseCents,
       approvedTotalCents: est.approvedTotalCents, selectedDiscounts: est.selectedDiscounts,
       expiresAt: est.expiresAt, sentAt: est.sentAt, createdAt: est.createdAt,
@@ -371,7 +381,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
             orgId: ctx.org.id, estimateId: est.id,
             code: String(o.code).slice(0, 40), label: String(o.label).slice(0, 120),
             percentBps: Math.max(0, Math.min(10_000, Math.round(Number(o.percentBps) || 0))),
-            conditions: o.conditions ? String(o.conditions).slice(0, 1000) : null,
+            conditions: o.conditions ? cleanOfferConditions(String(o.conditions).slice(0, 1000)) : null,
             enabled: true, sortOrder: idx,
             // The org's tiered bundle rule travels with the offer (shared/scope-category.ts).
             rule: bundleRuleOf(o.rule) ?? orgDiscountRule(ctx.org.customFields, String(o.code)),
@@ -399,72 +409,20 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // The letterhead is the division's when the work belongs to one.
     const branding = companyBranding(ctx.org, await resolveEstimateDivision(est));
 
-    // HCP-format email: contractor logo up top, "Approve Estimate #N" headline,
-    // personal note, one big View-estimate button, then the customer-portal
-    // link, contact block and a Terms & Conditions hyperlink.
-    const logoAbs = branding.logoUrl
-      ? (branding.logoUrl.startsWith("http") ? branding.logoUrl : `${base}${branding.logoUrl}`)
-      : null;
-    const portalUrl = clientPortalBaseUrl(req);
-    const termsUrl = `${base}/e/${est.publicToken}?terms=1`;
-    const addressLine = branding.addressLine1
-      ? `${esc([branding.addressLine1, branding.addressLine2].filter(Boolean).join(", "))}${branding.city ? `<br>${esc(branding.city)}` : ""}${branding.state ? `, ${esc(branding.state)}` : ""}${branding.postalCode ? ` ${esc(branding.postalCode)}` : ""}`
-      : "";
-    // The estimate's bid headline opens the email too, right under the title.
-    const headline = normalizeBidHeadline(est.bidHeadline);
-    const headlineHtml = headline
-      ? bidHeadlineEmailHtml(headline, {
-          accentHex: resolveOrgTheme(ctx.org.customFields).hex,
-          warrantyHref: estimateDocText(est, ctx.org).warrantyText ? `${link}#${WARRANTY_ANCHOR}` : null,
-        })
-      : "";
-    const html = `
-      <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e5e5e5;padding:28px 24px">
-        ${logoAbs ? `<p style="text-align:center;margin:0 0 14px"><img src="${logoAbs}" alt="${esc(branding.name)}" style="max-height:64px;max-width:260px"></p>` : ""}
-        <h1 style="text-align:center;font-size:26px;margin:6px 0 20px">
-          Approve Estimate${est.number ? ` ${esc(est.number)}` : ""} from ${esc(branding.name)}
-        </h1>
-        ${headlineHtml}
-        <p style="font-size:16px">Hi ${esc(cust.displayName)},</p>
-        <p style="font-size:16px">
-          Please find estimate${est.number ? ` ${esc(est.number)}` : ""} from ${esc(branding.name)} below.
-          Feel free to reach out with any questions or clarification.
-        </p>
-        ${parsed.data.message ? `<p style="font-size:16px;white-space:pre-wrap">${esc(parsed.data.message)}</p>` : ""}
-        <p style="font-size:16px;margin:14px 0 0">Thank you,<br>-${esc(from)}${branding.phone ? `<br><a href="tel:${esc(branding.phone)}" style="color:#2563eb">${esc(branding.phone)}</a>` : ""}</p>
-        <p style="text-align:center;margin:30px 0 18px">
-          <a href="${link}" style="background:#2563eb;color:#fff;padding:14px 34px;border-radius:24px;
-             text-decoration:none;font-weight:600;font-size:16px;display:inline-block">
-            View estimate
-          </a>
-        </p>
-        <p style="text-align:center;font-size:14px;margin:0 0 26px">
-          <a href="${portalUrl}" style="color:#2563eb;text-decoration:none">View all estimates in your Customer Portal</a>
-        </p>
-        <p style="text-align:center;font-size:13px;color:#444;margin:0 0 4px">
-          ${branding.phone ? `<a href="tel:${esc(branding.phone)}" style="color:#2563eb">${esc(branding.phone)}</a>` : ""}${branding.phone && branding.email ? " | " : ""}${branding.email ? `<a href="mailto:${esc(branding.email)}" style="color:#2563eb">${esc(branding.email)}</a>` : ""}
-        </p>
-        ${branding.website ? `<p style="text-align:center;font-size:13px;margin:0 0 4px"><a href="${esc(branding.website)}" style="color:#2563eb">${esc(branding.website)}</a></p>` : ""}
-        ${addressLine ? `<p style="text-align:center;font-size:13px;color:#444;margin:10px 0 4px">${addressLine}</p>` : ""}
-        ${branding.licenseNumber ? `<p style="text-align:center;font-size:12px;color:#666;margin:0 0 4px">License ${esc(branding.licenseNumber)}${branding.licenseState ? ` (${esc(branding.licenseState)})` : ""}</p>` : ""}
-        <p style="text-align:center;font-size:14px;margin:14px 0 0">
-          <a href="${termsUrl}" style="color:#2563eb">Terms &amp; Conditions</a>
-        </p>
-        <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
-        <p style="font-size:12px;color:#666">
-          Only you can open the estimate link — it verifies ${esc(to)}. If it's forwarded to
-          anyone else, they can't get in without access to your inbox.
-          This estimate expires on ${expiresAt.toDateString()}.
-        </p>
-        <p style="font-size:12px;color:#999;word-break:break-all">If the button doesn't work, paste this into your browser: ${link}</p>
-      </div>`;
+    // The email itself is shared with "Send me a proof" (estimate-email.ts),
+    // so the proof is always exactly what the client gets.
+    const { subject, html } = buildEstimateEmail({
+      est, org: ctx.org, branding, customerName: cust.displayName,
+      base, portalUrl: clientPortalBaseUrl(req), link, from,
+      verifiesEmail: to, expiresAt, message: parsed.data.message,
+    });
 
     let emailed = false;
     let emailError: string | null = null;
     try {
       await sendWithFallback({
         to,
-        subject: `Estimate from ${branding.name}${est.number ? ` — ${est.number}` : ""}`,
+        subject,
         html,
         replyTo: ctx.member.email || (await senderReplyTo(est.createdByMemberId, branding.email)),
       } as any);
@@ -694,12 +652,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         // The owner/admin login is a shared office account, so clients get the division's contact instead:
         // its named contact person (custom_fields.contactMemberId) if set, else the division's office line and
         // inbox (owner, 2026-10-21: Alpine WA → Andrey; FL → the FL office).
-        if (salesRep && (m.role === "owner" || m.role === "admin") && m.id === est.createdByMemberId) {
-          const div: any = await resolveEstimateDivision(est);
-          const contactId = div?.customFields?.contactMemberId ?? div?.custom_fields?.contactMemberId ?? null;
-          const [cm] = contactId
-            ? await db.select().from(crmMembers).where(and(eq(crmMembers.id, contactId), eq(crmMembers.orgId, est.orgId))).limit(1)
-            : [];
+        // Shared with the client portal's Contact us (client-contact.ts / divisions.ts).
+        if (salesRep && isSharedOfficeLogin(m) && m.id === est.createdByMemberId) {
+          const div = await resolveEstimateDivision(est);
+          const cm = await divisionContactMember(est.orgId, div);
           if (cm) {
             salesRep = { name: cm.displayName || cm.email || salesRep.name, email: cm.email, phone: cm.phone, role: "Sales" };
           } else if (div?.phone || div?.email) {
@@ -739,11 +695,22 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       salesRep,
       estimate: { ...view.estimate, paid: settledPayments.length > 0 },
       // A tiered bundle shows what THESE lines earn (or "not available" + why); the approve route recomputes it.
+      // basePercentBps + rule let the page re-price a tiered offer for the option being viewed or the scopes ticked
+      // (shared effectiveOffer, the same function the server uses on approve).
       discountOffers: offersForLines(discountOffers.map((o) => ({ ...o, rule: o.rule ?? orgDiscountRule(org?.customFields, o.code) })), items).map(({ offer: o, percentBps, available, unavailableReason, rule }) => ({
         id: o.id, code: o.code, label: o.label,
-        percentBps, conditions: o.conditions, available, unavailableReason,
+        percentBps, basePercentBps: o.percentBps, rule,
+        conditions: cleanOfferConditions(o.conditions), available, unavailableReason,
         ruleText: rule ? bundleRuleText(rule) : null,
       })),
+      // The scope categories on the estimate's own lines (hidden ones too — they count for the bundle on approve).
+      docCategories: [...new Set(items.filter((i) => i.kind !== "discount").map((i) => lineCategory(i)))],
+      // The org's bundle rule, for the "add roofing and save 2%" prompt (null when the org has none).
+      bundleRule: orgDiscountRule(org?.customFields, "bundle"),
+      // Option 1 (the estimate's own lines) was cancelled: those lines are not on offer and can't be approved.
+      // Scopes the client already asked to see from here ("Yes, show me my roofing bid").
+      upsellRequested: Object.keys(((est.customFields as any)?.upsellRequests ?? {}) as object),
+      mainCancelled: options.some((o) => (o as any).isMain && (o as any).cancelledAt) || undefined,
       // Customer can approve: only one option, or any (estimate-options.ts); select-options enforces it.
       optionApproval: (est.customFields as any)?.optionApproval === "one" ? "one" : "any",
       options: options.filter((o) => !(o as any).cancelledAt).map((o) => {
@@ -776,6 +743,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
           // can be shown as the document (visible lines + totals). Display only; approving/selecting is unchanged.
           isMain: !!(o as any).isMain,
           doc: scopeItems.length ? optionDocument(o.id, scopeItems, est.taxRateBps ?? 0) : undefined,
+          categories: [...new Set(scopeItems.filter((i) => i.kind !== "discount").map((i) => lineCategory(i)))],
         };
       }),
       // A selection-generated estimate pre-ticks the discounts the client
@@ -819,6 +787,17 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (block) return res.status(409).json({ message: block.message, code: block.code, link: block.link });
     if (parsed.data.decision === "approve" && !parsed.data.signatureName) {
       return res.status(400).json({ message: "Please type your name to approve." });
+    }
+    // Option 1 IS this document's lines: once the contractor cancels it ("hidden from the client"), signing the
+    // document would sign a withdrawn option. The client picks one of the remaining options instead.
+    if (parsed.data.decision === "approve") {
+      const opts = await db.select().from(crmEstimateOptions).where(eq(crmEstimateOptions.estimateId, est.id));
+      if (opts.some((o) => (o as any).isMain && (o as any).cancelledAt)) {
+        return res.status(409).json({
+          code: "main_option_cancelled",
+          message: "That option was withdrawn. Please choose one of the other options on this estimate.",
+        });
+      }
     }
 
     const approve = parsed.data.decision === "approve";
@@ -947,14 +926,19 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
 
     // Discount ids are validated against the ORIGINAL's own enabled offers —
     // ids only, percentages are never taken from the client.
-    const selections = await resolveSelectedOffers(est.orgId, est.id, parsed.data.selectedDiscounts ?? []);
+    // Priced on the CHOSEN scopes' lines (a bundle earned by Option 1 isn't earned by Option 2 alone).
+    const selections = await resolveSelectedOffers(est.orgId, est.id, parsed.data.selectedDiscounts ?? [],
+      chosen.flatMap((o) => o.items as any[]));
 
     // Numbered under the per-org lock (entities.ts nextDocNumber) — never
     // count(*)+1, which repeats after a delete and races a concurrent create.
     const [newEst] = await db.transaction(async (tx) => tx.insert(crmEstimates).values({
       orgId: est.orgId, customerId: est.customerId, projectId: est.projectId,
       number: await nextDocNumber(tx, crmEstimates, est.orgId, "E"),
-      title: `${est.title} — your selections`.slice(0, 200),
+      // One alternative option chosen: its own lines name it (Option 1's title would describe the wrong scopes).
+      title: (chosen.length === 1 && !(chosen[0] as any).isMain
+        ? `${autoTitleFrom(chosen[0].items as any[]) || chosen[0].name} — ${chosen[0].name}`
+        : `${est.title} — your selections`).slice(0, 200),
       introText: est.introText, termsText: est.termsText,
       // The same footer/warranty/terms the client was shown on the original
       // (an older original without a snapshot keeps following Settings, too).
@@ -990,7 +974,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         unitPriceCents: i.unitPriceCents ?? 0,
         unitCostCents: i.unitCostCents ?? null,
         taxable: i.taxable !== false,
-        hiddenFromClient: false,
+        hiddenFromClient: i.hiddenFromClient === true,
+        scopeCategory: typeof i.scopeCategory === "string" ? i.scopeCategory : null,
         sortOrder: idx,
       })) as any,
     );
@@ -1009,7 +994,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         offers.map((o, idx) => ({
           orgId: est.orgId, estimateId: newEst.id,
           code: o.code, label: o.label, percentBps: o.percentBps,
-          conditions: o.conditions, enabled: true, sortOrder: idx, rule: o.rule ?? null,
+          conditions: cleanOfferConditions(o.conditions), enabled: true, sortOrder: idx, rule: o.rule ?? null,
         })) as any,
       );
     }
@@ -1078,6 +1063,79 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       number: newNumber,
       totalCents: fresh?.totalCents ?? 0,
     });
+  });
+
+  /**
+   * "Yes, show me my roofing bid" (estimate-upsell.ts). Gated like the read; a preview grant never gets here.
+   * Once per estimate + scope: the claim is written to the estimate before the draft is made, so a double click or
+   * a second tab gets "already asked" instead of a second draft and a second email.
+   */
+  app.post("/api/public/estimates/:token/upsell", async (req: any, res) => {
+    const t = String(req.params.token || "");
+    const parsed = z.object({ scope: z.enum(UPSELL_SCOPES) }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid request" });
+    if (!rateAllow(`upsell:${clientIp(req) ?? "?"}`, 10)) {
+      return res.status(429).json({ message: "Too many requests — please try again in a few minutes." });
+    }
+    const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
+    if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
+    if (!(await requireDocSession(req, res, est.customerId))) return;
+    if (!est.sentAt) return res.status(409).json({ message: "This estimate hasn't been sent yet." });
+    const scope = parsed.data.scope;
+
+    const claimed = await db.execute(sql`
+      UPDATE crm_estimates SET custom_fields = coalesce(custom_fields, '{}'::jsonb) || jsonb_build_object('upsellRequests',
+        coalesce(custom_fields->'upsellRequests', '{}'::jsonb) || jsonb_build_object(${scope}::text, jsonb_build_object('at', now())))
+      WHERE id = ${est.id} AND (custom_fields->'upsellRequests'->${scope}::text) IS NULL
+      RETURNING id`);
+    if (!((claimed as any).rows ?? claimed).length) return res.json({ ok: true, already: true });
+
+    const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
+    const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
+    if (!org || !cust) return res.status(404).json({ message: "This estimate link is no longer valid." });
+
+    let draft: Awaited<ReturnType<typeof createUpsellDraft>> | null = null;
+    try {
+      draft = await createUpsellDraft(est, cust, org, scope);
+    } catch (e: any) {
+      // The request still reaches the team; they build the bid by hand.
+      console.error("[crm] upsell draft failed:", String(e?.message || e).slice(0, 300));
+    }
+    await db.execute(sql`
+      UPDATE crm_estimates SET custom_fields = jsonb_set(custom_fields, ARRAY['upsellRequests', ${scope}::text],
+        jsonb_build_object('at', now(), 'draftEstimateId', ${draft?.id ?? null}::text, 'draftNumber', ${draft?.number ?? null}::text))
+      WHERE id = ${est.id}`);
+
+    const scopeName = scope === "windows" ? "windows" : scope;
+    await logEvent(est.orgId, est.id, "upsell_requested", "client", req, { scope, draftNumber: draft?.number ?? null });
+    recordActivity({
+      orgId: est.orgId, actorLabel: cust.displayName || "client",
+      action: "estimate.upsell_requested",
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: { number: est.number, scope: scopeName, draftNumber: draft?.number ?? null, draftEstimateId: draft?.id ?? null },
+    });
+
+    const title = `${cust.displayName} asked to see a ${scopeName} bid from ${est.number ?? "their estimate"}`;
+    const link = `/crm/clients/${cust.id}${draft ? `?openEstimate=${draft.id}` : ""}`;
+    const who = await upsellRecipients(est);
+    await notifyMembers({
+      org, pref: "clientComments", type: "estimate.upsell_requested", title,
+      body: draft ? `Draft ${draft.number} is ready for you to review and send.` : "Build the bid and send it to them.",
+      link, extraMemberIds: who.memberIds,
+    });
+    if (who.emails.length) {
+      const body = `<p><strong>${esc(cust.displayName)}</strong> was looking at ${esc(est.number ?? "their estimate")} and asked to see a <strong>${esc(scopeName)}</strong> bid too.</p>
+        ${draft
+          ? `<p>Draft <strong>${esc(draft.number ?? "")}</strong> is waiting for you${draft.measured ? ", sized from their HOVER report" : " (no HOVER measurement for it yet, so check the quantity)"}${draft.priced ? "" : " (no price-book price for this scope, so price it)"}. Review it and send it — nothing has gone to the client.</p>`
+          : `<p>Please put the bid together and send it to them.</p>`}
+        <p><a href="${getBaseUrl(req)}${link}">Open ${esc(cust.displayName)} in ConstructHUB</a></p>`;
+      await sendWithFallback({
+        to: who.emails.join(","),
+        subject: title,
+        html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${body}</div>`,
+      } as any).catch((e: any) => console.error("[crm] upsell notify failed:", e?.message || e));
+    }
+    res.json({ ok: true });
   });
 
   // ── Email verification challenge ──────────────────────────────────────────
@@ -1319,7 +1377,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (docType === "estimate") {
       const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
       if (!est) return res.status(404).json({ message: "Not found" });
-      if (!est.sentAt || est.approvedAt || est.declinedAt) return res.json({ sessionId: null });
+      // An APPROVED estimate is still tracked — the Pay card lives there (pay_click, pay_offline_info) — but it never
+      // fires the "client is reviewing their bid" alert below: the sale is already made.
+      if (!est.sentAt || est.declinedAt) return res.json({ sessionId: null });
       if (!ids.includes(est.customerId)) return res.json({ sessionId: null });
       orgId = est.orgId; docId = est.id; estRow = est;
     } else {
@@ -1347,7 +1407,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // Repeat session on an already-viewed estimate → the once-per-day
     // "client is reviewing their bid — call them" alert (fire-and-forget;
     // a failed alert must never break engagement tracking).
-    if (estRow && priorSessions >= 1 && estRow.firstViewedAt) {
+    if (estRow && !estRow.approvedAt && priorSessions >= 1 && estRow.firstViewedAt) {
       (async () => {
         const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, estRow!.orgId)).limit(1);
         const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, estRow!.customerId)).limit(1);
@@ -1372,6 +1432,101 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       durationSecs: (sess.durationSecs ?? 0) + inc,
     }).where(eq(crmEngagementSessions.id, sess.id)).returning();
     res.json({ ok: true, durationSecs: row?.durationSecs ?? sess.durationSecs });
+  });
+
+  /** Behaviour events for an engagement session (shared/engagement-events.ts):
+   *  what the client read and clicked. The session id (unguessable, minted
+   *  by /start only for a client session on a live document) plus the
+   *  document's token must both match, the session must be recent, and each
+   *  session is capped — a replayed or scripted flood stores nothing beyond
+   *  the cap. Running totals (seconds per section, scroll depth) are one row
+   *  per session+key, kept at their max. */
+  const eventPostAt = new Map<string, number>();
+  app.post("/api/public/engagement/events", async (req: any, res) => {
+    const parsed = z.object({
+      sessionId: z.string().min(8).max(64),
+      token: z.string().min(24).max(120),
+      events: z.array(z.object({
+        name: z.string().regex(TRACK_NAME_RE),
+        detail: z.string().max(400).nullish(),
+        section: z.string().max(60).nullish(),
+        secs: z.number().min(0).max(86_400).nullish(),
+        pct: z.number().min(0).max(100).nullish(),
+        page: z.string().max(20).nullish(),
+        device: z.string().max(20).nullish(),
+        t: z.number().min(0).max(TRACK_SESSION_MAX_AGE_MS),
+      })).max(TRACK_MAX_EVENTS_PER_POST),
+    }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid events" });
+    const { sessionId, token: t, events } = parsed.data;
+    if (!events.length) return res.json({ ok: true, stored: 0 });
+
+    // Light per-session throttle: the page sends every 15s (plus a beacon on
+    // leave), so more than ~5 posts a second is not a browser.
+    const nowMs = Date.now();
+    const last = eventPostAt.get(sessionId) ?? 0;
+    if (nowMs - last < 200) return res.status(429).json({ message: "Slow down" });
+    eventPostAt.set(sessionId, nowMs);
+    if (eventPostAt.size > 5000) {
+      for (const [k, v] of Array.from(eventPostAt.entries())) if (nowMs - v > 60_000) eventPostAt.delete(k);
+    }
+
+    const [sess] = await db.select().from(crmEngagementSessions)
+      .where(eq(crmEngagementSessions.id, sessionId)).limit(1);
+    if (!sess) return res.status(404).json({ message: "Not found" });
+    const started = sess.startedAt ? new Date(sess.startedAt).getTime() : 0;
+    if (nowMs - started > TRACK_SESSION_MAX_AGE_MS) return res.json({ ok: true, stored: 0 });
+    // The token must be THIS session's document's token.
+    const [doc] = sess.docType === "estimate"
+      ? await db.select({ id: crmEstimates.id }).from(crmEstimates)
+          .where(and(eq(crmEstimates.publicToken, t), eq(crmEstimates.id, sess.docId), eq(crmEstimates.orgId, sess.orgId))).limit(1)
+      : await db.select({ id: crmInvoices.id }).from(crmInvoices)
+          .where(and(eq(crmInvoices.publicToken, t), eq(crmInvoices.id, sess.docId), eq(crmInvoices.orgId, sess.orgId))).limit(1);
+    if (!doc) return res.status(404).json({ message: "Not found" });
+
+    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(crmEngagementEvents)
+      .where(and(eq(crmEngagementEvents.orgId, sess.orgId), eq(crmEngagementEvents.sessionId, sess.id)));
+    let room = TRACK_MAX_ROWS_PER_SESSION - Number(n ?? 0);
+    let stored = 0;
+    for (const e of events) {
+      const tMs = Math.round(e.t);
+      if (TRACK_CUMULATIVE.has(e.name)) {
+        const key = e.name === "section_time" ? String(e.section ?? "").slice(0, 40) : "page";
+        if (!key) continue;
+        const val = Math.round((e.name === "section_time" ? e.secs : e.pct) ?? 0);
+        const detail: Record<string, any> = e.name === "section_time" ? { section: key, secs: val } : { pct: val };
+        const field = e.name === "section_time" ? "secs" : "pct";
+        if (room > 0) {
+          // One row per (session, name, key): first-seen time kept, value kept at its max.
+          await db.execute(sql`
+            INSERT INTO crm_engagement_events (org_id, session_id, doc_type, doc_id, name, key, detail, t_ms)
+            VALUES (${sess.orgId}, ${sess.id}, ${sess.docType}, ${sess.docId}, ${e.name}, ${key}, ${JSON.stringify(detail)}::jsonb, ${tMs})
+            ON CONFLICT (session_id, name, key) WHERE key IS NOT NULL DO UPDATE SET detail = CASE
+              WHEN coalesce((excluded.detail->>${field})::int, 0) > coalesce((crm_engagement_events.detail->>${field})::int, 0)
+              THEN excluded.detail ELSE crm_engagement_events.detail END`);
+          room--;
+        } else {
+          await db.update(crmEngagementEvents).set({ detail })
+            .where(and(
+              eq(crmEngagementEvents.orgId, sess.orgId), eq(crmEngagementEvents.sessionId, sess.id),
+              eq(crmEngagementEvents.name, e.name), eq(crmEngagementEvents.key, key),
+              sql`coalesce((${crmEngagementEvents.detail}->>${field})::int, 0) < ${val}`,
+            ));
+        }
+        stored++;
+        continue;
+      }
+      if (room <= 0) break;
+      const detail: Record<string, any> = {};
+      if (e.detail) detail.d = e.detail.slice(0, TRACK_MAX_DETAIL_CHARS);
+      if (e.name === "page_view") { detail.page = e.page ?? null; detail.device = e.device ?? null; }
+      await db.insert(crmEngagementEvents).values({
+        orgId: sess.orgId, sessionId: sess.id, docType: sess.docType, docId: sess.docId,
+        name: e.name, key: null, detail: Object.keys(detail).length ? detail : null, tMs, createdAt: new Date(),
+      } as any);
+      room--; stored++;
+    }
+    res.json({ ok: true, stored });
   });
 
   /** Contractor-side read: per-estimate engagement summary. Org-scoped; IPs
@@ -1408,7 +1563,25 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       ))
       .orderBy(desc(crmEstimateEvents.createdAt)).limit(50);
 
+    // What they read and clicked, rolled up across every visit (the chips on the estimate row).
+    const trackRows = sessions.length
+      ? await db.select().from(crmEngagementEvents)
+          .where(and(
+            eq(crmEngagementEvents.orgId, ctx.org.id),
+            eq(crmEngagementEvents.docType, "estimate"),
+            eq(crmEngagementEvents.docId, est.id),
+          )).limit(5000)
+      : [];
+    const behaviour = trackRows.length
+      ? mergeSummaries(groupSessionsIntoVisits(sessions).map((v) => {
+          const ids = new Set(v.map((s) => s.id));
+          return buildVisitDetail(v, trackRows.filter((r) => ids.has(r.sessionId))
+            .map((r) => ({ sessionId: r.sessionId, name: r.name, detail: r.detail as any, tMs: r.tMs }))).summary;
+        }))
+      : null;
+
     res.json({
+      behaviour,
       visits: sessions.length,
       totalSecs: sessions.reduce((s, x) => s + (x.durationSecs ?? 0), 0),
       lastVisitAt: sessions[0]?.startedAt ?? null,
@@ -1833,6 +2006,8 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     const parsed = z.object({
       email: z.string().email().optional(),
       message: z.string().max(4000).optional(),
+      /** Also text the link to the client's cell (when the org can text clients). */
+      sms: z.boolean().optional(),
     }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Invalid send request" });
 
@@ -1860,7 +2035,9 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     }
 
     const link = `${getBaseUrl(req)}/i/${inv.publicToken}`;
-    const branding = companyBranding(ctx.org, await resolveInvoiceDivision(inv));
+    const invDivision = await resolveInvoiceDivision(inv);
+    const branding = companyBranding(ctx.org, invDivision);
+    const offlineInstructions = offlinePaymentInstructionsFor(ctx.org.customFields, invDivision?.customFields);
     // "Sam at Acme has sent you…" — or just "Acme has sent you…" when the
     // sender has no display name (never "Acme at Acme").
     const senderName = (ctx.member.displayName ?? "").trim();
@@ -1887,6 +2064,8 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
             </p>
             <p style="font-size:13px;color:#666">Or paste this in your browser:<br>
               <span style="word-break:break-all">${link}</span></p>
+            ${offlineInstructions ? `<p style="font-size:14px;margin:18px 0 4px"><strong>Prefer to pay by check or Zelle?</strong></p>
+            <p style="font-size:14px;white-space:pre-wrap;margin:0 0 18px">${esc(offlineInstructions)}</p>` : ""}
             <p style="font-size:13px;color:#666">Only you can open this link — it verifies ${esc(to)}.
               If it's forwarded to anyone else, they can't get in without access to your inbox.</p>
             <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
@@ -1904,6 +2083,14 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
       logError("[crm] invoice send failed:", emailError);
     }
 
+    let texted = false;
+    const textTo = parsed.data.sms ? normalizePhone(cust.phone) : null;
+    if (textTo && orgCanTextClients(ctx.org.customFields)) {
+      const body = `${branding.name}: ${inv.number ?? "your invoice"} — ${money(due)} due. View & pay: ${link}`;
+      const r = await sendSms(textTo, body.slice(0, 320), ctx.org.customFields, ctx.org.id).catch(() => ({ ok: false } as { ok: boolean }));
+      texted = r.ok === true;
+    }
+
     const [row] = await db.update(crmInvoices).set({
       status: inv.status === "draft" ? "sent" : inv.status,
       sentAt: new Date(), sentToEmail: to, updatedAt: new Date(),
@@ -1911,7 +2098,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     await emitCrmEvent(ctx.org.id, "invoice.sent", { invoiceId: inv.id, to });
     logActivity(ctx, "invoice.sent", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
-      meta: { number: inv.number, to, emailed, resend: !!inv.sentAt },
+      meta: { number: inv.number, to, emailed, texted, resend: !!inv.sentAt },
     });
     // An invoice out means the work is under way: the job moves to In progress — from Job Scheduled. A deposit
     // invoice right after approval never skips the start date (the "call to schedule" reminder stays open).
@@ -1925,7 +2112,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         projectId: invProject.id, customerId: inv.customerId, meta: { number: inv.number },
       });
     }
-    res.json({ invoice: row, link, emailed, emailError });
+    res.json({ invoice: row, link, emailed, emailError, texted });
   });
 
   /** Contractor preview: mint a 15-minute read-only grant for the client

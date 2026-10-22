@@ -1,5 +1,6 @@
 import { objectPolicy } from "./object-access";
-import { divisionScopeOf } from "./divisions";
+import { divisionScopeOf, resolveClientDivision, divisionContactMember } from "./divisions";
+import { buildClientTeam, clientOfficeContact } from "./client-contact";
 /**
  * The Messages center — every client message in one place, threaded per
  * client, unread/read like text messages.
@@ -264,8 +265,9 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
     const members = await db.select().from(crmMembers)
       .where(and(eq(crmMembers.orgId, cust.orgId), eq(crmMembers.status, "active")));
 
-    // Everyone attached to this client's work: project PM + sales rep, the
-    // crews assigned to the jobs, and whoever wrote their estimates.
+    // Everyone attached to this client's work: whoever made the bid (the
+    // latest estimate's creator — sent ones first) leads, then the project PM
+    // + sales rep, the crews assigned to the jobs, and other estimate writers.
     const projects = await db.select().from(crmProjects)
       .where(and(eq(crmProjects.orgId, cust.orgId), eq(crmProjects.customerId, customerId)));
     const ids = new Set<string>();
@@ -281,31 +283,24 @@ export function registerCrmInboxRoutes(app: Express, getDevUser: GetUser): void 
     }
     const ests = await db.select({ createdByMemberId: crmEstimates.createdByMemberId })
       .from(crmEstimates)
-      .where(and(eq(crmEstimates.orgId, cust.orgId), eq(crmEstimates.customerId, customerId)));
+      .where(and(eq(crmEstimates.orgId, cust.orgId), eq(crmEstimates.customerId, customerId)))
+      .orderBy(sql`${crmEstimates.sentAt} is null`, desc(crmEstimates.createdAt));
     for (const e of ests) if (e.createdByMemberId) ids.add(e.createdByMemberId);
 
-    const roleLabel = (r: string) =>
-      r === "owner" ? "Owner" : r === "admin" ? "Project Manager"
-      : r === "sales" ? "Sales" : "Team";
-    const team = members
-      .filter((m) => ids.has(m.id))
-      .map((m) => ({
-        memberId: m.id,
-        name: m.displayName || m.email || "Team member",
-        role: roleLabel(m.role),
-        email: m.email,
-        phone: m.phone,
-      }));
-
-    res.json({
-      office: {
-        name: org?.name ?? null,
-        email: org?.email ?? null,
-        phone: org?.phone ?? null,
-        website: org?.website ?? null,
-      },
-      team,
+    // The client's division (their estimates/projects, their own, their
+    // state): its office card and its contact person — never the org row's
+    // phone/inbox (the owner's personal ones) and never another division's.
+    const division = await resolveClientDivision(cust.orgId, cust);
+    const divisionContact = await divisionContactMember(cust.orgId, division);
+    const team = buildClientTeam({
+      members,
+      bidCreatorId: ests[0]?.createdByMemberId ?? null,
+      otherIds: ids,
+      division,
+      divisionContact: divisionContact?.status === "active" ? divisionContact : null,
     });
+
+    res.json({ office: clientOfficeContact(org, division), team });
   });
 
   // ── Client portal: the client's own thread (they see replies) ─────────────

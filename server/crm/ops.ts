@@ -21,7 +21,7 @@ import {
   crmPunchItems, crmDailyLogs, crmSelections, crmEstimateOptions,
   crmApiKeys, crmWebhooks, crmProjects, crmCustomers, crmOrgs, crmEstimates,
   crmEstimateItems, crmPayments, crmMembers,
-  crmNotificationChannel, crmNotificationEnabled, crmEngagementSessions, crmCustomerNotes, crmAttachments,
+  crmNotificationChannel, crmNotificationEnabled, crmEngagementSessions, crmEngagementEvents, crmCustomerNotes, crmAttachments,
   CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
   CRM_LINE_ITEM_KINDS,
@@ -34,7 +34,7 @@ import { invoiceDefaultsFromOrg } from "./doc-defaults";
 import { autoSendPaymentReceipt } from "./receipts";
 import { paymentWriteLimit, claimIdempotent, answerIdempotent, rememberIdempotent, releaseIdempotent } from "./payment-guard";
 import { completeReconcileTasks } from "./payment-reconcile";
-import { receiptSettingsOf, reconcileSettingsOf } from "@shared/payment-settings";
+import { receiptSettingsOf, reconcileSettingsOf, MANUAL_PAYMENT_METHOD_VALUES } from "@shared/payment-settings";
 import { logActivity } from "./activity";
 import { loadActorDirectory } from "./actors";
 import { actorLabel, UNRECORDED_TEAM_ACTOR } from "@shared/crm-actor";
@@ -43,7 +43,7 @@ import { textOrgOwners } from "./sms";
 import { notifyMembers } from "./notify";
 import { getBaseUrl } from "../auth";
 import { computeApprovalTotals } from "./discounts";
-import { progressInvoiceItems } from "./invoice-math";
+import { progressInvoiceItems, squareDrawToTotal } from "./invoice-math";
 import { lockDocNumbers, nextDocNumber } from "./doc-number";
 import { objectPolicy } from "./object-access";
 import { suggestPermitOffices } from "./permit-suggest";
@@ -304,6 +304,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       discountLabel: z.string().max(120).optional(),
       title: z.string().max(200).optional(),
       dueInDays: z.number().int().min(0).max(365).default(30),
+      /** A payment request ("Request a payment"): the dollars are what the client pays, tax included. */
+      amountIncludesTax: z.boolean().optional(),
+      /** What the request is for, for its label and the ledger: deposit, progress payment or the final balance. */
+      requestKind: z.enum(["deposit", "progress", "final"]).optional(),
     }).safeParse(req.body ?? {});
     if (!draw.success) return res.status(400).json({ message: "Invalid progress billing", issues: draw.error.issues });
     const { retainageBps } = draw.data;
@@ -324,11 +328,29 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       }
       pct = Math.max(1, Math.min(10000, Math.round((draw.data.amountCents * 10000) / approval.totalCents)));
     }
+    // "Final balance" bills exactly what is left — the signed total less every live invoice on the estimate, tax
+    // included — so basis-point rounding on earlier draws never leaves cents behind (or bills them twice).
+    let finalTargetCents: number | null = null;
+    if (draw.data.requestKind === "final" && draw.data.amountCents == null) {
+      const prior = await db.select({ totalCents: crmInvoices.totalCents, customFields: crmInvoices.customFields }).from(crmInvoices)
+        .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.estimateId, est.id), isNull(crmInvoices.voidedAt)));
+      if (prior.length) {
+        pct = Math.max(1, 10000 - estimateBilledBps(prior, approval.totalCents));
+        finalTargetCents = Math.max(0, approval.totalCents - prior.reduce((sum, p) => sum + p.totalCents, 0));
+        if (finalTargetCents < 100) return res.status(409).json({ message: "Nothing is left to bill on this estimate." });
+      }
+    }
     const lines = progressInvoiceItems(items, pct, approval.optionalDiscountCents);
     let drawCents = lines.reduce((s, l) => s + (l.kind === "discount" ? -1 : 1) * Math.round((l.unitPriceCents * l.quantityMilli) / 1000), 0);
     // A dollar draw bills EXACTLY the dollars entered: the basis-point rounding above is squared up on the largest
     // line (one basis point of a $1M job is $100 — never let that become the invoice).
-    if (draw.data.amountCents != null && pct < 10000 && drawCents !== draw.data.amountCents) {
+    if (finalTargetCents != null && pct < 10000) {
+      squareDrawToTotal(lines, est.taxRateBps ?? 0, finalTargetCents);
+      drawCents = lines.reduce((s, l) => s + (l.kind === "discount" ? -1 : 1) * Math.round((l.unitPriceCents * l.quantityMilli) / 1000), 0);
+    } else if (draw.data.amountCents != null && pct < 10000 && draw.data.amountIncludesTax) {
+      squareDrawToTotal(lines, est.taxRateBps ?? 0, draw.data.amountCents);
+      drawCents = lines.reduce((s, l) => s + (l.kind === "discount" ? -1 : 1) * Math.round((l.unitPriceCents * l.quantityMilli) / 1000), 0);
+    } else if (draw.data.amountCents != null && pct < 10000 && drawCents !== draw.data.amountCents) {
       const biggest = lines.filter((l) => l.kind !== "discount").sort((a, b) => b.unitPriceCents - a.unitPriceCents)[0];
       if (biggest) {
         biggest.unitPriceCents = Math.max(0, biggest.unitPriceCents + (draw.data.amountCents - drawCents));
@@ -384,7 +406,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
         // Invoice footer from Settings; warranty and terms as signed on the estimate.
         ...invoiceDefaultsFromOrg(ctx.org, est),
         // The draw this invoice bills, so the next one knows what is left.
-        customFields: { progressBps: pct },
+        customFields: { progressBps: pct, ...(draw.data.requestKind ? { requestKind: draw.data.requestKind } : {}) },
       } as any).returning();
       if (lines.length) await tx.insert(crmInvoiceItems).values(lines.map((i, idx) => ({
         orgId: ctx.org.id, invoiceId: row.id, sortOrder: idx, kind: i.kind, name: i.name,
@@ -419,7 +441,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       if (credited > 0) {
         await tx.update(crmInvoices).set({
           paidCents: credited, status: credited >= dueNow ? "paid" : "partial", paidAt: credited >= dueNow ? new Date() : null,
-          customFields: { progressBps: pct, depositCreditCents: credited, depositPaymentIds: creditedIds },
+          customFields: { progressBps: pct, ...(draw.data.requestKind ? { requestKind: draw.data.requestKind } : {}), depositCreditCents: credited, depositPaymentIds: creditedIds },
         }).where(eq(crmInvoices.id, row.id));
       }
       return { inv: row, credited };
@@ -454,7 +476,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       amountCents: z.number().int().min(1).max(10_000_000_00),
       // cash/check/wire/credit_card are the manual rails; ach/card/other are
       // kept so older clients and imports still validate.
-      method: z.enum(["cash", "check", "wire", "credit_card", "ach", "card", "other"]),
+      method: z.enum(MANUAL_PAYMENT_METHOD_VALUES),
       note: z.string().max(2000).nullable().optional(),
       /** When the money was received (defaults to now); a photo / copy of the check filed as a payment_proof. */
       paidAt: z.string().datetime().optional(),
@@ -682,6 +704,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       if (refusal) return { error: { status: 409, message: refusal } };
       await tx.delete(crmInvoiceItems)
         .where(and(eq(crmInvoiceItems.orgId, ctx.org.id), eq(crmInvoiceItems.invoiceId, inv.id)));
+      await tx.delete(crmEngagementEvents)
+        .where(and(eq(crmEngagementEvents.orgId, ctx.org.id),
+          eq(crmEngagementEvents.docType, "invoice"), eq(crmEngagementEvents.docId, inv.id)));
       await tx.delete(crmEngagementSessions)
         .where(and(eq(crmEngagementSessions.orgId, ctx.org.id),
           eq(crmEngagementSessions.docType, "invoice"), eq(crmEngagementSessions.docId, inv.id)));

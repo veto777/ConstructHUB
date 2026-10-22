@@ -383,6 +383,12 @@ export default function PublicInvoicePage() {
                   {pay.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Pay {money(inv.dueCents)}
                 </Button>
               )}
+              {payInfo?.offlineInstructions && (
+                <div className="rounded-lg border bg-muted/30 p-3 text-sm" data-testid="text-offline-instructions">
+                  <div className="font-medium mb-1">Prefer to pay by check or Zelle?</div>
+                  <div className="whitespace-pre-wrap text-muted-foreground">{payInfo.offlineInstructions}</div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

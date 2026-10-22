@@ -49,7 +49,11 @@ describe("CRM confirmations use the in-product dialog", () => {
       const out: { where: string; body: string }[] = [];
       const re = /confirmAction\(/g;
       let m: RegExpExecArray | null;
-      while ((m = re.exec(f.text))) out.push({ where: f.rel, body: f.text.slice(m.index, m.index + 1600) });
+      while ((m = re.exec(f.text))) {
+        // Up to the next confirmAction( (or 4000 chars): a detailed dialog runs past 1600 before its onConfirm.
+        const next = f.text.indexOf("confirmAction(", m.index + 1);
+        out.push({ where: f.rel, body: f.text.slice(m.index, Math.min(next === -1 ? Infinity : next, m.index + 4000)) });
+      }
       return out;
     });
     expect(calls.length).toBeGreaterThanOrEqual(18);
@@ -60,7 +64,10 @@ describe("CRM confirmations use the in-product dialog", () => {
       expect(first("confirmLabel"), `${c.where}: confirmLabel`).not.toMatch(/^"(OK|Ok|Yes|Confirm)"/);
       expect(first("confirmLabel"), `${c.where}: confirmLabel`).not.toBe("");
       // A real sentence, not a restated title.
-      expect(first("description").length, `${c.where}: description`).toBeGreaterThan(40);
+      // Read the whole description, not its first line: a JSX description spans several lines ("description: (").
+      const desc = (c.body.match(/\bdescription:\s*([\s\S]*?)\n\s*(?:confirmLabel|onConfirm|destructive):/)?.[1] ?? first("description"))
+        .replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      expect(desc.length, `${c.where}: description`).toBeGreaterThan(40);
       expect(c.body, `${c.where}: onConfirm`).toMatch(/\bonConfirm:\s*\(\)\s*=>/);
     }
   });
