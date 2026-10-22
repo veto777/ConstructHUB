@@ -986,8 +986,11 @@ export default function CrmClientPage() {
   // The tax rate that estimate was saved with (keeping it is not "you changed it").
   const [savedTaxBps, setSavedTaxBps] = useState<number | null>(null);
   useEffect(() => {
-    if (autoTitle) setTitle(autoTitleFrom(items));
-  }, [autoTitle, items]);
+    // Option 1 still empty while another option has lines: name the estimate after those.
+    const source = items.some(lineHasContent) ? items
+      : extraTabs.find((t) => !t.cancelled && t.items.some(lineHasContent))?.items ?? items;
+    if (autoTitle) setTitle(autoTitleFrom(source));
+  }, [autoTitle, items, extraTabs]);
   useEffect(() => {
     if (open && offers === null && orgForDraft) setOffers(defaultOffers(orgForDraft.customFields, DISCOUNT_PRESETS));
   }, [open, offers, orgForDraft]);
@@ -1252,6 +1255,31 @@ export default function CrmClientPage() {
     setActiveTab(extraTabs.length + 1);
   };
 
+  // 0 idle; 1 = the promoted option just landed (the auto title follows it this render); 2 = create.
+  const [createAfterPromote, setCreateAfterPromote] = useState(0);
+  const createOrPromote = () => {
+    if (!items.some(lineHasContent)) {
+      const k = extraTabs.findIndex((t) => !t.cancelled && t.items.some(lineHasContent));
+      if (k >= 0) {
+        const next = extraTabs[k];
+        setItems(next.items);
+        setContractorDiscount(next.discount);
+        setTab0({ id: next.id, name: next.name, cancelled: next.cancelled });
+        setExtraTabs((ts) => ts.filter((_, j) => j !== k));
+        setActiveTab(0);
+        setCreateAfterPromote(1);
+        return;
+      }
+    }
+    createEstimate.mutate();
+  };
+  useEffect(() => {
+    if (createAfterPromote === 1) { setCreateAfterPromote(2); return; }
+    if (createAfterPromote !== 2) return;
+    setCreateAfterPromote(0);
+    createEstimate.mutate();
+  }, [createAfterPromote]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const createEstimate = useMutation({
     mutationFn: async () => {
       // A line with a price but no name yet is saved as "Untitled item" (autosavePayload), as the totals counted it.
@@ -1288,9 +1316,8 @@ export default function CrmClientPage() {
       setOpen(false);
       autosave.reset();
       resetForm();
-      if (wasEditing) toast({ title: "Estimate saved" });
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
-      toast({ title: "Estimate created" });
+      toast({ title: wasEditing ? "Estimate saved" : "Estimate created" });
     },
     onError: (e: any) => toast({ title: "Could not create estimate", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -2128,7 +2155,9 @@ export default function CrmClientPage() {
                               data-testid={`check-offer-${o.code}`} />
                             <span>
                               {o.label}{" "}
-                              <span className="text-primary">{eff.available ? `−${Number((eff.percentBps / 100).toFixed(2))}%` : "not available"}</span>
+                              <span className="text-primary">{!eff.available ? "not available"
+                                : o.code === "price_match" && !(eff.percentBps > 0) ? "we'll match it"
+                                : `−${Number((eff.percentBps / 100).toFixed(2))}%`}</span>
                               {o.conditions && (
                                 // What the client must do to qualify (shown to them too) — e.g. price match needs the competing estimate.
                                 <Popover>
@@ -2161,7 +2190,7 @@ export default function CrmClientPage() {
 
                 <DialogFooter className="items-center gap-2">
                   <span className="mr-auto"><AutosaveIndicator status={autosave.status} savedAt={autosave.savedAt} error={autosave.error} /></span>
-                  <Button onClick={() => createEstimate.mutate()} disabled={createEstimate.isPending}
+                  <Button onClick={createOrPromote} disabled={createEstimate.isPending || createAfterPromote > 0}
                     data-testid="button-save-estimate">
                     {createEstimate.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} {editingEst && !editingEst.autosave ? "Save estimate" : "Create estimate"}
                   </Button>
