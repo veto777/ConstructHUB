@@ -1577,6 +1577,19 @@ html.dark[data-shade="4"] {
  * and battery follows the iPhone's light/dark setting — the same setting that colors those icons — so they
  * stay readable above the navy public header: a light strip under dark icons, navy under light ones.
  */
+/* The pad itself applies everywhere, not only in the apps and the Home Screen web app: a phone browser can lay a
+   full-height sheet under the clock too (owner 2026-10-21, the menu's logo under the clock, third report). env() is 0
+   where there is nothing to clear. :root outranks a caller's p-0; the strip colours below stay app/PWA-only. */
+:root .app-status-pad {
+  --safe-top: env(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+@media (max-width: 639px) {
+  :root .app-status-pad-phone {
+    --safe-top: env(safe-area-inset-top);
+    padding-top: env(safe-area-inset-top);
+  }
+}
 :root { --app-status-strip: #f4efe6; }
 @media (prefers-color-scheme: dark) { :root { --app-status-strip: #0d1b3d; } }
 html.in-app .app-status-pad {
