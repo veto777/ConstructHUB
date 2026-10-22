@@ -328,11 +328,26 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       }
       pct = Math.max(1, Math.min(10000, Math.round((draw.data.amountCents * 10000) / approval.totalCents)));
     }
+    // "Final balance" bills exactly what is left — the signed total less every live invoice on the estimate, tax
+    // included — so basis-point rounding on earlier draws never leaves cents behind (or bills them twice).
+    let finalTargetCents: number | null = null;
+    if (draw.data.requestKind === "final" && draw.data.amountCents == null) {
+      const prior = await db.select({ totalCents: crmInvoices.totalCents, customFields: crmInvoices.customFields }).from(crmInvoices)
+        .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.estimateId, est.id), isNull(crmInvoices.voidedAt)));
+      if (prior.length) {
+        pct = Math.max(1, 10000 - estimateBilledBps(prior, approval.totalCents));
+        finalTargetCents = Math.max(0, approval.totalCents - prior.reduce((sum, p) => sum + p.totalCents, 0));
+        if (finalTargetCents < 100) return res.status(409).json({ message: "Nothing is left to bill on this estimate." });
+      }
+    }
     const lines = progressInvoiceItems(items, pct, approval.optionalDiscountCents);
     let drawCents = lines.reduce((s, l) => s + (l.kind === "discount" ? -1 : 1) * Math.round((l.unitPriceCents * l.quantityMilli) / 1000), 0);
     // A dollar draw bills EXACTLY the dollars entered: the basis-point rounding above is squared up on the largest
     // line (one basis point of a $1M job is $100 — never let that become the invoice).
-    if (draw.data.amountCents != null && pct < 10000 && draw.data.amountIncludesTax) {
+    if (finalTargetCents != null && pct < 10000) {
+      squareDrawToTotal(lines, est.taxRateBps ?? 0, finalTargetCents);
+      drawCents = lines.reduce((s, l) => s + (l.kind === "discount" ? -1 : 1) * Math.round((l.unitPriceCents * l.quantityMilli) / 1000), 0);
+    } else if (draw.data.amountCents != null && pct < 10000 && draw.data.amountIncludesTax) {
       squareDrawToTotal(lines, est.taxRateBps ?? 0, draw.data.amountCents);
       drawCents = lines.reduce((s, l) => s + (l.kind === "discount" ? -1 : 1) * Math.round((l.unitPriceCents * l.quantityMilli) / 1000), 0);
     } else if (draw.data.amountCents != null && pct < 10000 && drawCents !== draw.data.amountCents) {
