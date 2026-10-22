@@ -10,5 +10,13 @@ export function isSameTerms(a: string | null | undefined, b: string | null | und
   if (!x || !y) return false;
   if (x === y || x.includes(y) || y.includes(x)) return true;
   const opening = (s: string) => s.slice(0, 200);
-  return y.includes(opening(x)) || x.includes(opening(y));
+  if (y.includes(opening(x)) || x.includes(opening(y))) return true;
+  // An older and a newer edit of the same terms (a warranty line added on top, a section reworded): most of the
+  // shorter copy's paragraphs appear word for word in the longer one.
+  const paras = (s: string | null | undefined) => (s ?? "").split(/\n+/)
+    .map((p) => p.replace(/\s+/g, " ").trim().toLowerCase()).filter((p) => p.length >= 40);
+  const [short, long] = [paras(a), paras(b)].sort((p, q) => p.length - q.length);
+  if (short.length < 3) return false;
+  const inLong = new Set(long);
+  return short.filter((p) => inLong.has(p)).length / short.length >= 0.6;
 }

@@ -49,7 +49,9 @@ import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDi
 import { isSharedOfficeLogin } from "./client-contact";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { computeApprovalTotals, recomputeApprovalTotals, resolveSelectedOffers, offersForLines } from "./discounts";
-import { bundleRuleOf, bundleRuleText, orgDiscountRule } from "@shared/scope-category";
+import { bundleRuleOf, bundleRuleText, orgDiscountRule, lineCategory } from "@shared/scope-category";
+import { cleanOfferConditions } from "@shared/discount-presets";
+import { autoTitleFrom } from "@shared/estimate-draft";
 import { lineBases, optionDocument } from "@shared/estimate-totals";
 import { storeGeneratedPdf } from "./attachments";
 import { onlinePaymentRails } from "./payments";
@@ -65,6 +67,7 @@ import {
   TRACK_NAME_RE, TRACK_MAX_EVENTS_PER_POST, TRACK_MAX_ROWS_PER_SESSION, TRACK_MAX_DETAIL_CHARS,
   TRACK_SESSION_MAX_AGE_MS, TRACK_CUMULATIVE, buildVisitDetail, groupSessionsIntoVisits, mergeSummaries,
 } from "@shared/engagement-events";
+import { UPSELL_SCOPES, createUpsellDraft, upsellRecipients } from "./estimate-upsell";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -280,7 +283,7 @@ function publicEstimateView(
       footerText: docText.footerText,
       subtotalCents: est.subtotalCents, discountCents: est.discountCents,
       taxRateBps: est.taxRateBps,
-      taxCents: est.taxCents, totalCents: est.totalCents, depositCents: est.depositCents,
+      taxCents: est.taxCents, totalCents: est.totalCents, depositCents: est.depositCents, depositBps: est.depositBps,
       taxableBaseCents,
       approvedTotalCents: est.approvedTotalCents, selectedDiscounts: est.selectedDiscounts,
       expiresAt: est.expiresAt, sentAt: est.sentAt, createdAt: est.createdAt,
@@ -377,7 +380,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
             orgId: ctx.org.id, estimateId: est.id,
             code: String(o.code).slice(0, 40), label: String(o.label).slice(0, 120),
             percentBps: Math.max(0, Math.min(10_000, Math.round(Number(o.percentBps) || 0))),
-            conditions: o.conditions ? String(o.conditions).slice(0, 1000) : null,
+            conditions: o.conditions ? cleanOfferConditions(String(o.conditions).slice(0, 1000)) : null,
             enabled: true, sortOrder: idx,
             // The org's tiered bundle rule travels with the offer (shared/scope-category.ts).
             rule: bundleRuleOf(o.rule) ?? orgDiscountRule(ctx.org.customFields, String(o.code)),
@@ -691,11 +694,22 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       salesRep,
       estimate: { ...view.estimate, paid: settledPayments.length > 0 },
       // A tiered bundle shows what THESE lines earn (or "not available" + why); the approve route recomputes it.
+      // basePercentBps + rule let the page re-price a tiered offer for the option being viewed or the scopes ticked
+      // (shared effectiveOffer, the same function the server uses on approve).
       discountOffers: offersForLines(discountOffers.map((o) => ({ ...o, rule: o.rule ?? orgDiscountRule(org?.customFields, o.code) })), items).map(({ offer: o, percentBps, available, unavailableReason, rule }) => ({
         id: o.id, code: o.code, label: o.label,
-        percentBps, conditions: o.conditions, available, unavailableReason,
+        percentBps, basePercentBps: o.percentBps, rule,
+        conditions: cleanOfferConditions(o.conditions), available, unavailableReason,
         ruleText: rule ? bundleRuleText(rule) : null,
       })),
+      // The scope categories on the estimate's own lines (hidden ones too — they count for the bundle on approve).
+      docCategories: [...new Set(items.filter((i) => i.kind !== "discount").map((i) => lineCategory(i)))],
+      // The org's bundle rule, for the "add roofing and save 2%" prompt (null when the org has none).
+      bundleRule: orgDiscountRule(org?.customFields, "bundle"),
+      // Option 1 (the estimate's own lines) was cancelled: those lines are not on offer and can't be approved.
+      // Scopes the client already asked to see from here ("Yes, show me my roofing bid").
+      upsellRequested: Object.keys(((est.customFields as any)?.upsellRequests ?? {}) as object),
+      mainCancelled: options.some((o) => (o as any).isMain && (o as any).cancelledAt) || undefined,
       // Customer can approve: only one option, or any (estimate-options.ts); select-options enforces it.
       optionApproval: (est.customFields as any)?.optionApproval === "one" ? "one" : "any",
       options: options.filter((o) => !(o as any).cancelledAt).map((o) => {
@@ -728,6 +742,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
           // can be shown as the document (visible lines + totals). Display only; approving/selecting is unchanged.
           isMain: !!(o as any).isMain,
           doc: scopeItems.length ? optionDocument(o.id, scopeItems, est.taxRateBps ?? 0) : undefined,
+          categories: [...new Set(scopeItems.filter((i) => i.kind !== "discount").map((i) => lineCategory(i)))],
         };
       }),
       // A selection-generated estimate pre-ticks the discounts the client
@@ -771,6 +786,17 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (block) return res.status(409).json({ message: block.message, code: block.code, link: block.link });
     if (parsed.data.decision === "approve" && !parsed.data.signatureName) {
       return res.status(400).json({ message: "Please type your name to approve." });
+    }
+    // Option 1 IS this document's lines: once the contractor cancels it ("hidden from the client"), signing the
+    // document would sign a withdrawn option. The client picks one of the remaining options instead.
+    if (parsed.data.decision === "approve") {
+      const opts = await db.select().from(crmEstimateOptions).where(eq(crmEstimateOptions.estimateId, est.id));
+      if (opts.some((o) => (o as any).isMain && (o as any).cancelledAt)) {
+        return res.status(409).json({
+          code: "main_option_cancelled",
+          message: "That option was withdrawn. Please choose one of the other options on this estimate.",
+        });
+      }
     }
 
     const approve = parsed.data.decision === "approve";
@@ -899,14 +925,19 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
 
     // Discount ids are validated against the ORIGINAL's own enabled offers —
     // ids only, percentages are never taken from the client.
-    const selections = await resolveSelectedOffers(est.orgId, est.id, parsed.data.selectedDiscounts ?? []);
+    // Priced on the CHOSEN scopes' lines (a bundle earned by Option 1 isn't earned by Option 2 alone).
+    const selections = await resolveSelectedOffers(est.orgId, est.id, parsed.data.selectedDiscounts ?? [],
+      chosen.flatMap((o) => o.items as any[]));
 
     // Numbered under the per-org lock (entities.ts nextDocNumber) — never
     // count(*)+1, which repeats after a delete and races a concurrent create.
     const [newEst] = await db.transaction(async (tx) => tx.insert(crmEstimates).values({
       orgId: est.orgId, customerId: est.customerId, projectId: est.projectId,
       number: await nextDocNumber(tx, crmEstimates, est.orgId, "E"),
-      title: `${est.title} — your selections`.slice(0, 200),
+      // One alternative option chosen: its own lines name it (Option 1's title would describe the wrong scopes).
+      title: (chosen.length === 1 && !(chosen[0] as any).isMain
+        ? `${autoTitleFrom(chosen[0].items as any[]) || chosen[0].name} — ${chosen[0].name}`
+        : `${est.title} — your selections`).slice(0, 200),
       introText: est.introText, termsText: est.termsText,
       // The same footer/warranty/terms the client was shown on the original
       // (an older original without a snapshot keeps following Settings, too).
@@ -942,7 +973,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         unitPriceCents: i.unitPriceCents ?? 0,
         unitCostCents: i.unitCostCents ?? null,
         taxable: i.taxable !== false,
-        hiddenFromClient: false,
+        hiddenFromClient: i.hiddenFromClient === true,
+        scopeCategory: typeof i.scopeCategory === "string" ? i.scopeCategory : null,
         sortOrder: idx,
       })) as any,
     );
@@ -961,7 +993,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         offers.map((o, idx) => ({
           orgId: est.orgId, estimateId: newEst.id,
           code: o.code, label: o.label, percentBps: o.percentBps,
-          conditions: o.conditions, enabled: true, sortOrder: idx, rule: o.rule ?? null,
+          conditions: cleanOfferConditions(o.conditions), enabled: true, sortOrder: idx, rule: o.rule ?? null,
         })) as any,
       );
     }
@@ -1030,6 +1062,79 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       number: newNumber,
       totalCents: fresh?.totalCents ?? 0,
     });
+  });
+
+  /**
+   * "Yes, show me my roofing bid" (estimate-upsell.ts). Gated like the read; a preview grant never gets here.
+   * Once per estimate + scope: the claim is written to the estimate before the draft is made, so a double click or
+   * a second tab gets "already asked" instead of a second draft and a second email.
+   */
+  app.post("/api/public/estimates/:token/upsell", async (req: any, res) => {
+    const t = String(req.params.token || "");
+    const parsed = z.object({ scope: z.enum(UPSELL_SCOPES) }).safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Invalid request" });
+    if (!rateAllow(`upsell:${clientIp(req) ?? "?"}`, 10)) {
+      return res.status(429).json({ message: "Too many requests — please try again in a few minutes." });
+    }
+    const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
+    if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
+    if (!(await requireDocSession(req, res, est.customerId))) return;
+    if (!est.sentAt) return res.status(409).json({ message: "This estimate hasn't been sent yet." });
+    const scope = parsed.data.scope;
+
+    const claimed = await db.execute(sql`
+      UPDATE crm_estimates SET custom_fields = coalesce(custom_fields, '{}'::jsonb) || jsonb_build_object('upsellRequests',
+        coalesce(custom_fields->'upsellRequests', '{}'::jsonb) || jsonb_build_object(${scope}::text, jsonb_build_object('at', now())))
+      WHERE id = ${est.id} AND (custom_fields->'upsellRequests'->${scope}::text) IS NULL
+      RETURNING id`);
+    if (!((claimed as any).rows ?? claimed).length) return res.json({ ok: true, already: true });
+
+    const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
+    const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, est.customerId)).limit(1);
+    if (!org || !cust) return res.status(404).json({ message: "This estimate link is no longer valid." });
+
+    let draft: Awaited<ReturnType<typeof createUpsellDraft>> | null = null;
+    try {
+      draft = await createUpsellDraft(est, cust, org, scope);
+    } catch (e: any) {
+      // The request still reaches the team; they build the bid by hand.
+      console.error("[crm] upsell draft failed:", String(e?.message || e).slice(0, 300));
+    }
+    await db.execute(sql`
+      UPDATE crm_estimates SET custom_fields = jsonb_set(custom_fields, ARRAY['upsellRequests', ${scope}::text],
+        jsonb_build_object('at', now(), 'draftEstimateId', ${draft?.id ?? null}::text, 'draftNumber', ${draft?.number ?? null}::text))
+      WHERE id = ${est.id}`);
+
+    const scopeName = scope === "windows" ? "windows" : scope;
+    await logEvent(est.orgId, est.id, "upsell_requested", "client", req, { scope, draftNumber: draft?.number ?? null });
+    recordActivity({
+      orgId: est.orgId, actorLabel: cust.displayName || "client",
+      action: "estimate.upsell_requested",
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: { number: est.number, scope: scopeName, draftNumber: draft?.number ?? null, draftEstimateId: draft?.id ?? null },
+    });
+
+    const title = `${cust.displayName} asked to see a ${scopeName} bid from ${est.number ?? "their estimate"}`;
+    const link = `/crm/clients/${cust.id}${draft ? `?openEstimate=${draft.id}` : ""}`;
+    const who = await upsellRecipients(est);
+    await notifyMembers({
+      org, pref: "clientComments", type: "estimate.upsell_requested", title,
+      body: draft ? `Draft ${draft.number} is ready for you to review and send.` : "Build the bid and send it to them.",
+      link, extraMemberIds: who.memberIds,
+    });
+    if (who.emails.length) {
+      const body = `<p><strong>${esc(cust.displayName)}</strong> was looking at ${esc(est.number ?? "their estimate")} and asked to see a <strong>${esc(scopeName)}</strong> bid too.</p>
+        ${draft
+          ? `<p>Draft <strong>${esc(draft.number ?? "")}</strong> is waiting for you${draft.measured ? ", sized from their HOVER report" : " (no HOVER measurement for it yet, so check the quantity)"}${draft.priced ? "" : " (no price-book price for this scope, so price it)"}. Review it and send it — nothing has gone to the client.</p>`
+          : `<p>Please put the bid together and send it to them.</p>`}
+        <p><a href="${getBaseUrl(req)}${link}">Open ${esc(cust.displayName)} in ConstructHUB</a></p>`;
+      await sendWithFallback({
+        to: who.emails.join(","),
+        subject: title,
+        html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${body}</div>`,
+      } as any).catch((e: any) => console.error("[crm] upsell notify failed:", e?.message || e));
+    }
+    res.json({ ok: true });
   });
 
   // ── Email verification challenge ──────────────────────────────────────────

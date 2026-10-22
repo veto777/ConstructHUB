@@ -240,7 +240,7 @@ export default function CrmSettingsPage() {
     { code: "marketing", label: "Marketing discount", percentBps: 100, conditions: "Yard signage during the job + 1 month after, and an honest review." },
     { code: "military", label: "Military discount", percentBps: 200, conditions: "Military ID required." },
     { code: "pay_in_full", label: "Pay-in-full discount", percentBps: 500, conditions: "Paid in full immediately." },
-    { code: "bundle", label: "Bundle discount (trifecta)", percentBps: 500, conditions: "Siding + roofing + windows — all three required." },
+    { code: "bundle", label: "Bundle discount", percentBps: 500, conditions: "Bundle two or more of siding, windows and roofing on one job. Painting, gutters and doors don't count as a scope." },
   ];
   const [discForm, setDiscForm] = useState<{ code: string; label: string; percentBps: number; conditions: string | null; enabled: boolean; rule?: unknown }[]>([]);
   const [discCustom, setDiscCustom] = useState({ label: "", pct: "", conditions: "" });

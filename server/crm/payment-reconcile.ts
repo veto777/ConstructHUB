@@ -177,7 +177,7 @@ export async function ensureReconcileTask(orgId: string, kind: ReconcileKind, pr
       )).orderBy(desc(crmEstimates.approvedAt)).limit(1);
       if (!est) return null;
       estimateId = est.id;
-      expected = est.depositCents && est.depositCents > 0 ? est.depositCents : (amountDueCents(est) ?? 0);
+      expected = amountDueCents(est) ?? 0; // the deposit, or the whole job when they signed for pay-in-full
       if (expected <= 0) return null;
       if ((await collectedCents(orgId, { estimateId: est.id })) > 0) return null;
     } else {

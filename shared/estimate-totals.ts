@@ -120,10 +120,22 @@ export function amountDueCents(est: {
   depositCents?: number | null;
   approvedTotalCents?: number | null;
   totalCents?: number | null;
+  /** The offers the client ticked at signing (selection records, or bare codes). */
+  selectedDiscounts?: unknown;
 }): number {
   const signed = Math.max(0, est.approvedTotalCents ?? est.totalCents ?? 0);
+  // "Pay-in-full discount: paid in full immediately" — the client signed up to pay the whole job now.
+  if (hasPayInFull(est.selectedDiscounts)) return signed;
   const deposit = est.depositCents ?? 0;
   return deposit > 0 ? Math.min(deposit, signed) : signed;
+}
+
+/** The discount code whose condition is paying the whole job up front. */
+export const PAY_IN_FULL_CODE = "pay_in_full";
+
+/** True when the ticked/applied offers include pay-in-full (records `{code}` or bare code strings). */
+export function hasPayInFull(selected: unknown): boolean {
+  return Array.isArray(selected) && selected.some((s) => (typeof s === "string" ? s : (s as any)?.code) === PAY_IN_FULL_CODE);
 }
 
 // ── The public estimate page's live preview ─────────────────────────────────

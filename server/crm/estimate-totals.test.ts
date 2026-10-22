@@ -10,9 +10,11 @@
  * Optional discounts are percent-only. A FIXED concession is a kind="discount"
  * line item, so "fixed" below is exercised that way.
  */
+import { ALPINE_BUNDLE_RULE, effectiveOffer } from "@shared/scope-category";
+import { BUNDLE_CONDITIONS, cleanOfferConditions } from "@shared/discount-presets";
 import { describe, it, expect } from "vitest";
 import {
-  amountDueCents, computeApprovalTotals, lineBases, optionDocument, previewEstimatePage, sumLineBases, totalsFromBases,
+  amountDueCents, hasPayInFull, computeApprovalTotals, lineBases, optionDocument, previewEstimatePage, sumLineBases, totalsFromBases,
 } from "@shared/estimate-totals";
 
 const line = (unitPriceCents: number, over: Partial<any> = {}) => ({
@@ -151,5 +153,37 @@ describe("optionDocument — an option tab shown as the document", () => {
     expect(d.discountCents).toBe(100_00);
     expect(d.taxCents).toBe(100_00); // 10% of (1100 taxable - 100 discount)
     expect(d.totalCents).toBe(1150_00);
+  });
+});
+
+describe("pay-in-full — the whole job is due now", () => {
+  it("charges the signed total, not the deposit, when pay-in-full was ticked", () => {
+    expect(amountDueCents({ depositCents: 5_000_00, approvedTotalCents: 9_500_00, totalCents: 10_000_00,
+      selectedDiscounts: [{ id: "x", code: "pay_in_full", label: "Pay-in-full discount", percentBps: 500 }] })).toBe(9_500_00);
+  });
+  it("still charges the deposit for other discounts", () => {
+    expect(amountDueCents({ depositCents: 5_000_00, approvedTotalCents: 9_800_00, totalCents: 10_000_00,
+      selectedDiscounts: [{ id: "y", code: "military", label: "Military discount", percentBps: 200 }] })).toBe(5_000_00);
+  });
+  it("reads bare codes too", () => {
+    expect(hasPayInFull(["pay_in_full"])).toBe(true);
+    expect(hasPayInFull(null)).toBe(false);
+  });
+});
+
+describe("bundle offer on the option being shown", () => {
+  const rule = ALPINE_BUNDLE_RULE;
+  const cats = (...c: string[]) => c.map((scopeCategory) => ({ scopeCategory }));
+  it("Option 1 with siding + windows earns 2%, Option 2 with siding only earns nothing", () => {
+    expect(effectiveOffer({ percentBps: 500, rule }, cats("siding", "windows"))).toMatchObject({ available: true, percentBps: 200 });
+    expect(effectiveOffer({ percentBps: 500, rule }, cats("siding", "painting"))).toMatchObject({ available: false, percentBps: 0 });
+  });
+  it("all three earn 5%; doors, gutters and painting never count", () => {
+    expect(effectiveOffer({ percentBps: 500, rule }, cats("siding", "windows", "roofing"))).toMatchObject({ percentBps: 500 });
+    expect(effectiveOffer({ percentBps: 500, rule }, cats("siding", "doors", "gutters", "painting"))).toMatchObject({ available: false });
+  });
+  it("the old all-three wording is replaced by the rule's wording", () => {
+    expect(cleanOfferConditions("Siding + roofing + windows — all three required; gutters/paint don't count as a scope."))
+      .toBe(BUNDLE_CONDITIONS);
   });
 });

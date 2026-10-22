@@ -188,6 +188,7 @@ export function activityText(row: {
       case "estimate.deleted": return `deleted estimate ${m.number ?? ""}`.trim();
       case "estimate.sent": return `sent ${doc("estimate")}${sentTo()}`;
       case "estimate.reminded": return `sent a reminder about ${doc("estimate")}${m.to ? ` to ${m.to}` : ""}`;
+      case "estimate.upsell_requested": return `asked to see a ${m.scope ?? ""} bid from ${doc("estimate")}${m.draftNumber ? ` (draft ${m.draftNumber} made for review)` : ""}`.replace(/\s+/g, " ");
       case "estimate.extended": return `extended ${doc("estimate")}${m.days ? ` by ${m.days} day${m.days === 1 ? "" : "s"}` : ""}`;
       case "invoice.sent": return `sent ${doc("invoice")}${sentTo()}`;
       case "punchlist.walkthrough_done": return `completed the ${m.label ?? m.scope ?? ""} walkthrough${m.name ? ` on ${m.name}` : ""}`.replace(/\s+/g, " ").trim();

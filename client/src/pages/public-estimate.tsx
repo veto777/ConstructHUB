@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { isSameTerms } from "@shared/terms-dedupe";
-import { amountDueCents, previewEstimatePage } from "@shared/estimate-totals";
+import { amountDueCents, previewEstimatePage, totalsFromBases, sumLineBases, PAY_IN_FULL_CODE } from "@shared/estimate-totals";
+import { effectiveOffer, bundleRuleOf, SCOPE_CATEGORY_LABEL, type BundleRule, type ScopeCategory } from "@shared/scope-category";
+import { autoTitleFrom } from "@shared/estimate-draft";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { apiErrorMessage, queryClient } from "@/lib/queryClient";
@@ -12,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, Loader2, AlertTriangle, Phone, Mail, Globe, ShieldCheck, BadgePercent } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, AlertTriangle, Phone, Mail, Globe, ShieldCheck, BadgePercent, ChevronDown, Sparkles } from "lucide-react";
 import { StatusPill, ErrorCard, statusTone } from "@/components/crm-ui";
 import { useEngagementTracker } from "@/components/engagement-tracker";
 import { PrintLockdown } from "@/components/print-lockdown";
@@ -325,7 +327,7 @@ function BrandBar({ company }: { company: any }) {
   return (
     <header className="app-status-pad sticky top-0 z-30 border-b" data-testid="estimate-brandbar"
       style={{ backgroundColor: company?.theme?.baseHex ?? "#111827" }}>
-      <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
+      <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
         {company?.logoUrl ? (
           <span className={dark ? "inline-flex bg-white rounded-md px-1.5 py-1" : "inline-flex"}>
             <img src={company.logoUrl} alt={company?.name} className="h-8 object-contain" />
@@ -358,6 +360,12 @@ export default function PublicEstimatePage() {
   const [reviewing, setReviewing] = useState(false);
   // Which option the document shows (display only — never what's ticked or approved). null = the estimate as written.
   const [viewOptionId, setViewOptionId] = useState<string | null>(null);
+  // Optional discounts start folded behind "See available discounts" (owner, 2026-10-21).
+  const [discountsOpen, setDiscountsOpen] = useState(false);
+  // "Want more than one option?" — the combine-scopes checklist under the option tabs.
+  const [combineOpen, setCombineOpen] = useState(false);
+  // Upsell scopes asked for in this visit (the server remembers earlier ones).
+  const [upsellAsked, setUpsellAsked] = useState<string[]>([]);
 
   // A contractor preview grant rides in the page URL — forward it to the API.
   const previewGrant = new URLSearchParams(window.location.search).get("preview");
@@ -470,12 +478,13 @@ export default function PublicEstimatePage() {
   // Generate the "your selections" estimate from the ticked scopes, then go
   // there — the normal approve flow signs exactly what the client picked.
   const generate = useMutation({
-    mutationFn: async () => {
+    // No argument: the ticked scopes. An option id: approve that one option on its own (the option tabs).
+    mutationFn: async (onlyOptionId?: string) => {
       const r = await fetch(`/api/public/estimates/${token}/select-options`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          optionIds: selectedOptions,
+          optionIds: onlyOptionId ? [onlyOptionId] : selectedOptions,
           selectedDiscounts: selectedDiscounts.length ? selectedDiscounts : undefined,
         }),
       });
@@ -487,6 +496,21 @@ export default function PublicEstimatePage() {
       window.location.href = `/e/${j.token}`;
     },
     onError: (e: any) => toast({ title: "Could not create your estimate", description: String(e.message ?? e), variant: "destructive" }),
+  });
+
+  // "Yes, show me my roofing bid" — the team gets a draft to review; nothing is priced for the client here.
+  const upsell = useMutation({
+    mutationFn: async (scope: string) => {
+      const r = await fetch(`/api/public/estimates/${token}/upsell`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Something went wrong");
+      return r.json();
+    },
+    onSuccess: (_j, scope) => setUpsellAsked((cur) => [...cur, scope]),
+    onError: (e: any) => toast({ title: "Could not send your request", description: String(e.message ?? e), variant: "destructive" }),
   });
 
   if (isLoading) {
@@ -606,62 +630,128 @@ export default function PublicEstimatePage() {
     );
   }
 
-  // Optional discounts — LIVE preview, mirroring the server's approve-time
-  // math (server/crm/discounts.ts): the combined concession is capped at the
-  // taxable base and tax is charged on the reduced base. The server
-  // re-computes on approve; this is only what the client sees before signing.
+  // A contractor previewing a draft sees what the client will see once it's sent (the "not sent" block is the
+  // only difference, and the preview banner says so).
+  const blockedForClient = blocked && !(preview && answerBlock?.code === "not_sent");
+
+  // ── Option tabs ──────────────────────────────────────────────────────────
+  // Option 1 (is_main) IS the estimate's own lines; any other option with lines can be shown as the document.
+  // Cancelled options never reach the payload — and a cancelled Option 1 means the estimate's own lines aren't on
+  // offer either, so the page opens on the first remaining option.
+  const allOptions: any[] = (options ?? []).filter((o: any) => !o.cancelledAt);
+  const mainCancelled = !!data.mainCancelled;
+  const mainOption = allOptions.find((o) => o.isMain) ?? null;
+  const altOptions = allOptions.filter((o) => !o.isMain && o.doc);
+  const viewed = (viewOptionId ? altOptions.find((o) => o.id === viewOptionId) : null)
+    ?? (mainCancelled ? altOptions[0] ?? null : null);
+  const viewDoc = viewed?.doc ?? null;
+  const activeOptionId: string | null = viewed?.id ?? mainOption?.id ?? null;
+  const optionTabs = altOptions.length > 0 && (allOptions.length > 1 || mainCancelled);
+  const viewOption = (o: any | null) => setViewOptionId(!o || o.isMain ? null : o.id);
+
+  // ── Optional discounts — LIVE preview ────────────────────────────────────
+  // Same math as the server's approve (shared/estimate-totals.ts + shared/scope-category.ts effectiveOffer): a
+  // tiered bundle is worth what the lines BEING SHOWN earn — Option 2 alone may not earn what Option 1 does.
   const offers: any[] = discountOffers ?? [];
-  // A tiered bundle the lines don't earn is shown but can't be ticked (the server recomputes it on approve anyway).
-  const tickedOffers = offers.filter((o) => selectedDiscounts.includes(o.id) && o.available !== false);
-  // ── Client-selectable scopes ──────────────────────────────────────────────
-  // Options carrying their own line items are checkboxes. The server
-  // regenerates the real document from the ticked ones — until then the
-  // client is looking at TWO candidate deals: the document as written, and
-  // the scopes they ticked. Both are totalled by the one shared function.
+  const priceOffers = (cats: string[]) => offers.map((o) => {
+    const rule = bundleRuleOf(o.rule);
+    if (!rule) return { ...o, available: o.available !== false };
+    const eff = effectiveOffer({ percentBps: o.basePercentBps ?? o.percentBps, rule }, cats.map((c) => ({ scopeCategory: c })));
+    return { ...o, percentBps: eff.percentBps, available: eff.available, unavailableReason: eff.reason };
+  });
+  const ticked = (list: any[]) => list.filter((o) => selectedDiscounts.includes(o.id) && o.available !== false);
+
+  // ── Client-selectable scopes ("combine options") ─────────────────────────
+  // Options carrying their own line items can be ticked together; the server regenerates the real document from
+  // the ticked ones. With option tabs this checklist is folded behind "Want more than one option?".
   const selectable: any[] = (options ?? []).filter((o: any) => o.selectable);
-  const scopesOnOffer = selectable.length > 0 && !settled && !expired && !preview && !blocked;
+  const canCombine = selectable.length > 1 && data?.optionApproval !== "one";
+  const scopesOnOffer = selectable.length > 0 && !settled && !expired && !blockedForClient
+    && (!optionTabs || (canCombine && combineOpen));
   const chosenOptions = scopesOnOffer ? selectable.filter((o) => selectedOptions.includes(o.id)) : [];
-  const live = previewEstimatePage(e, chosenOptions, tickedOffers);
-  const selBps = live.document.optionalDiscountBps;
+  const scopeCats: string[] = [...new Set(chosenOptions.flatMap((o) => o.categories ?? []))];
+  const viewCats: string[] = viewed ? (viewed.categories ?? []) : (data.docCategories ?? []);
+  const viewOffers = priceOffers(viewCats);
+  const scopeOffers = priceOffers(scopeCats);
+  // The card lists the offers as they apply to what the client is looking at: the ticked scopes, else the document.
+  const shownOffers = chosenOptions.length ? scopeOffers : viewOffers;
+
+  const live = previewEstimatePage(e, [], ticked(viewOffers));
+  const docTotals = viewed
+    ? totalsFromBases({
+        subtotalCents: viewed.subtotalCents ?? 0, lineDiscountCents: viewed.lineDiscountCents ?? 0, taxableCents: viewed.taxableCents ?? 0,
+      }, e.taxRateBps ?? 0, ticked(viewOffers))
+    : live.document;
+  const selBps = docTotals.optionalDiscountBps;
   const previewing = selBps > 0 && !settled;
-  const optDiscountCents = live.document.optionalDiscountCents;
-  const shownTaxCents = previewing ? live.document.taxCents : e.taxCents;
+  const optDiscountCents = docTotals.optionalDiscountCents;
+  const shownTaxCents = previewing ? docTotals.taxCents : viewDoc ? viewDoc.taxCents : e.taxCents;
   const shownTotalCents = previewing
-    ? live.document.totalCents
-    : (settled === "approved" ? (e.approvedTotalCents ?? e.totalCents) : e.totalCents);
-  // The deposit the pay step will ask for — never more than the total shown.
-  const shownDepositCents = e.depositCents ? Math.min(e.depositCents, shownTotalCents) : 0;
+    ? docTotals.totalCents
+    : viewDoc ? viewDoc.totalCents : (settled === "approved" ? (e.approvedTotalCents ?? e.totalCents) : e.totalCents);
   const appliedDiscounts: any[] = settled === "approved" && Array.isArray(e.selectedDiscounts) ? e.selectedDiscounts : [];
+  // Pay-in-full: the client pays the whole job now, so "Deposit due" is the total.
+  const payInFull = settled === "approved"
+    ? appliedDiscounts.some((d) => d?.code === PAY_IN_FULL_CODE)
+    : ticked(shownOffers).some((o) => o.code === PAY_IN_FULL_CODE);
+  // The deposit the pay step will ask for — never more than the total shown. An option shown on its own gets the
+  // estimate's deposit percentage (that's what its own estimate will carry).
+  const depositFor = (total: number) => payInFull ? total
+    : viewDoc ? (e.depositBps ? Math.min(total, Math.round((total * e.depositBps) / 10_000)) : 0)
+    : (e.depositCents ? Math.min(e.depositCents, total) : 0);
+  const shownDepositCents = depositFor(shownTotalCents);
 
   const toggleDiscount = (id: string, on: boolean) =>
     setSelectedDiscounts((cur) => (on ? [...cur, id] : cur.filter((x) => x !== id)));
 
-  const sel = live.scopes;
+  const sel = chosenOptions.length
+    ? totalsFromBases(sumLineBases(chosenOptions), e.taxRateBps ?? 0, ticked(scopeOffers))
+    : null;
   const selSubtotalCents = sel ? sel.subtotalCents - sel.lineDiscountCents : 0;
   const selDiscountCents = sel?.optionalDiscountCents ?? 0;
   const selTaxCents = sel?.taxCents ?? 0;
   const selTotalCents = sel?.totalCents ?? 0;
+  const noteTotalCents = sel ? selTotalCents : shownTotalCents;
   const scopePriceCents = (o: any) => (o.subtotalCents ?? 0) - (o.lineDiscountCents ?? 0);
   const toggleOption = (id: string, on: boolean) =>
     // "Customer can approve: Only one option" — picking one replaces the other (the server enforces it too).
     setSelectedOptions((cur) => (on ? (data?.optionApproval === "one" ? [id] : [...cur, id]) : cur.filter((x) => x !== id)));
 
-  // ── Option tabs (display only) ────────────────────────────────────────
-  // Option 1 (is_main) IS the estimate's own lines; any other option with lines can be shown as the document.
-  // Cancelled options never reach the payload. Approving/selecting is untouched — this is only what's shown.
-  const allOptions: any[] = (options ?? []).filter((o: any) => !o.cancelledAt);
-  const mainOption = allOptions.find((o) => o.isMain) ?? null;
-  const viewed = viewOptionId ? allOptions.find((o) => o.id === viewOptionId && !o.isMain && o.doc) ?? null : null;
-  const viewDoc = viewed?.doc ?? null;
-  const activeOptionId: string | null = viewed?.id ?? mainOption?.id ?? null;
-  const optionTabs = allOptions.length > 1 && allOptions.some((o) => !o.isMain && o.doc);
-  const viewOption = (o: any | null) => setViewOptionId(!o || o.isMain ? null : o.id);
   const docItems: any[] = viewDoc ? viewDoc.items : items;
   const docSubtotalCents = viewDoc ? viewDoc.subtotalCents : e.subtotalCents;
   const docDiscountCents = viewDoc ? viewDoc.discountCents : e.discountCents;
-  const docTaxCents = viewDoc ? viewDoc.taxCents : shownTaxCents;
-  const docTotalCents = viewDoc ? viewDoc.totalCents : shownTotalCents;
-  const optionTabTotal = (o: any) => (o.isMain ? shownTotalCents : (o.doc?.totalCents ?? o.totalCents));
+  const docTaxCents = shownTaxCents;
+  const docTotalCents = shownTotalCents;
+  // Each option tab's price with the ticked discounts, as that option would be signed.
+  const optionTabTotal = (o: any) => {
+    if (o.id === activeOptionId) return shownTotalCents;
+    if (o.isMain) return previewEstimatePage(e, [], ticked(priceOffers(data.docCategories ?? []))).document.totalCents;
+    if (!o.doc) return o.totalCents;
+    return totalsFromBases({ subtotalCents: o.subtotalCents ?? 0, lineDiscountCents: o.lineDiscountCents ?? 0, taxableCents: o.taxableCents ?? 0 },
+      e.taxRateBps ?? 0, ticked(priceOffers(o.categories ?? []))).totalCents;
+  };
+  // The heading names what is shown: Option 2's own lines, never Option 1's title.
+  const docTitle = viewDoc ? autoTitleFrom(viewDoc.items) : e.title;
+
+  // ── "Want to see your roofing bid too?" ─────────────────────────────────
+  // Offered for the bundle's scopes this estimate doesn't have (painting, gutters, doors never count), with what
+  // adding them would unlock under the org's bundle rule.
+  const bundleRule: BundleRule | null = bundleRuleOf(data.bundleRule);
+  const upsellPool = (bundleRule?.categories ?? ["siding", "windows", "roofing"])
+    .filter((c) => c === "siding" || c === "windows" || c === "roofing");
+  const haveCats = new Set<string>([...(data.docCategories ?? []), ...altOptions.flatMap((o) => o.categories ?? [])]);
+  const missingScopes = upsellPool.filter((c) => !haveCats.has(c));
+  const haveCount = upsellPool.filter((c) => haveCats.has(c)).length;
+  const unlockFor = (add: number) => {
+    if (!bundleRule) return null;
+    const tier = [...bundleRule.tiers].sort((a, b) => b.min - a.min).find((t) => haveCount + add >= t.min);
+    const now = [...bundleRule.tiers].sort((a, b) => b.min - a.min).find((t) => haveCount >= t.min);
+    return tier && tier.percentBps > (now?.percentBps ?? 0) ? tier.percentBps : null;
+  };
+  const upsellUnlockBps = unlockFor(1);
+  const upsellRequested = new Set<string>([...(data.upsellRequested ?? []), ...upsellAsked]);
+  const showUpsell = missingScopes.length > 0 && !expired && !blockedForClient && !selfEstimate?.enabled;
+  const scopeLabel = (c: string) => SCOPE_CATEGORY_LABEL[c as ScopeCategory]?.toLowerCase() ?? c;
 
   // The org's company theme — black + their accent. Server-resolved in the
   // payload; re-points --primary for everything below this root.
@@ -680,7 +770,7 @@ export default function PublicEstimatePage() {
       <PrintLockdown />
       {/* HCP-style brand bar — the contractor's logo on their chosen base. */}
       <BrandBar company={company} />
-      <div className="max-w-3xl mx-auto space-y-5 py-6 px-3 sm:py-8 sm:px-4">
+      <div className="max-w-5xl mx-auto space-y-5 py-6 px-3 sm:py-8 sm:px-4">
         {/* Breadcrumb + big title, like the reference portal. */}
         <div className="space-y-4">
           <div className="text-sm text-muted-foreground" data-testid="estimate-breadcrumb">
@@ -771,7 +861,73 @@ export default function PublicEstimatePage() {
           </Card>
         )}
 
-        {scopesOnOffer ? (
+        {optionTabs && (
+          <Card className="shadow-sm" data-testid="option-tabs-card">
+            <CardHeader>
+              <CardTitle className="text-lg">Choose your option</CardTitle>
+              <CardDescription>
+                {company.name} put together {allOptions.length} ways to do this. Tap one to see it below.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div role="tablist" aria-label="Estimate options" className="grid gap-3 sm:grid-cols-3"
+                onKeyDown={(ev) => {
+                  // Arrow keys move between tabs (WAI-ARIA tabs pattern).
+                  if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+                  const tabs = Array.from(ev.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]"));
+                  const i = tabs.indexOf(document.activeElement as HTMLButtonElement);
+                  if (i < 0) return;
+                  ev.preventDefault();
+                  const next = tabs[(i + (ev.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+                  next.focus(); next.click();
+                }}>
+                {!mainOption && !mainCancelled && (
+                  <button type="button" role="tab" aria-selected={activeOptionId === null} aria-controls="estimate-document"
+                    tabIndex={activeOptionId === null ? 0 : -1}
+                    onClick={() => viewOption(null)}
+                    className={`rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                      activeOptionId === null ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card hover:bg-accent/50"}`}
+                    data-testid="option-tab-estimate" data-track="option_tab" data-track-detail="Estimate">
+                    <span className="font-medium">Estimate</span>
+                    <div className="text-xl font-semibold tabular-nums mt-3">{money(shownTotalCents)}</div>
+                  </button>
+                )}
+                {allOptions.map((o: any) => {
+                  const active = activeOptionId === o.id;
+                  const viewable = o.isMain || !!o.doc;
+                  return (
+                    <button key={o.id} type="button" role="tab" aria-selected={active} aria-controls="estimate-document"
+                      tabIndex={active ? 0 : -1} disabled={!viewable}
+                      onClick={() => viewOption(o)}
+                      data-track="option_tab" data-track-detail={o.name}
+                      className={`rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default ${
+                        active ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card hover:bg-accent/50"}`}
+                      data-testid={`option-${o.tier}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{o.name}</span>
+                        {o.recommended && <StatusPill tone="info" dot={false}>recommended</StatusPill>}
+                      </div>
+                      {o.description && <p className="text-xs text-muted-foreground mt-1.5">{o.description}</p>}
+                      {optionTabTotal(o) != null && (
+                        <div className="text-xl font-semibold tabular-nums mt-3" data-testid={`option-tab-total-${o.tier}`}>{money(optionTabTotal(o))}</div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {canCombine && !settled && !expired && !blockedForClient && (
+                <button type="button" className="mt-3 text-sm font-medium text-primary hover:underline"
+                  aria-expanded={combineOpen}
+                  onClick={() => { setCombineOpen(!combineOpen); if (combineOpen) setSelectedOptions([]); }}
+                  data-track="options_combine" data-track-detail={combineOpen ? "close" : "open"}
+                  data-testid="button-combine-options">
+                  {combineOpen ? "Hide combining options" : "Want more than one option? Combine them"}
+                </button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+        {scopesOnOffer && (
           <Card className="shadow-sm" data-testid="options-checklist">
             <CardHeader>
               <CardTitle className="text-lg">Choose your scopes</CardTitle>
@@ -838,6 +994,7 @@ export default function PublicEstimatePage() {
                             viewOption(activeOptionId === o.id ? null : o);
                             document.getElementById("estimate-document")?.scrollIntoView({ behavior: "smooth", block: "start" });
                           }}
+                          data-track="option_view" data-track-detail={o.name}
                           data-testid={`button-view-option-${o.id}`}>
                           {activeOptionId === o.id ? "Viewing below" : "View"}
                         </button>
@@ -874,8 +1031,8 @@ export default function PublicEstimatePage() {
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Button className="w-full sm:w-auto h-12 sm:h-10"
-                      disabled={generate.isPending}
-                      onClick={() => generate.mutate()}
+                      disabled={generate.isPending || !!preview}
+                      onClick={() => generate.mutate(undefined)}
                       data-testid="button-generate-estimate">
                       {generate.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       Generate my estimate
@@ -904,62 +1061,8 @@ export default function PublicEstimatePage() {
               )}
             </CardContent>
           </Card>
-        ) : optionTabs ? (
-          <Card className="shadow-sm" data-testid="option-tabs-card">
-            <CardHeader>
-              <CardTitle className="text-lg">Choose your option</CardTitle>
-              <CardDescription>
-                {company.name} put together {allOptions.length} ways to do this. Tap one to see it below.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div role="tablist" aria-label="Estimate options" className="grid gap-3 sm:grid-cols-3"
-                onKeyDown={(ev) => {
-                  // Arrow keys move between tabs (WAI-ARIA tabs pattern).
-                  if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
-                  const tabs = Array.from(ev.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]"));
-                  const i = tabs.indexOf(document.activeElement as HTMLButtonElement);
-                  if (i < 0) return;
-                  ev.preventDefault();
-                  const next = tabs[(i + (ev.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
-                  next.focus(); next.click();
-                }}>
-                {!mainOption && (
-                  <button type="button" role="tab" aria-selected={activeOptionId === null} aria-controls="estimate-document"
-                    tabIndex={activeOptionId === null ? 0 : -1}
-                    onClick={() => viewOption(null)}
-                    className={`rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                      activeOptionId === null ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card hover:bg-accent/50"}`}
-                    data-testid="option-tab-estimate" data-track="option_tab" data-track-detail="Estimate">
-                    <span className="font-medium">Estimate</span>
-                    <div className="text-xl font-semibold tabular-nums mt-3">{money(shownTotalCents)}</div>
-                  </button>
-                )}
-                {allOptions.map((o: any) => {
-                  const active = activeOptionId === o.id;
-                  const viewable = o.isMain || !!o.doc;
-                  return (
-                    <button key={o.id} type="button" role="tab" aria-selected={active} aria-controls="estimate-document"
-                      tabIndex={active ? 0 : -1} disabled={!viewable}
-                      onClick={() => viewOption(o)}
-                      className={`rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default ${
-                        active ? "border-primary ring-1 ring-primary/50 bg-primary/5" : "bg-card hover:bg-accent/50"}`}
-                      data-testid={`option-${o.tier}`} data-track="option_tab" data-track-detail={o.name}>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">{o.name}</span>
-                        {o.recommended && <StatusPill tone="info" dot={false}>recommended</StatusPill>}
-                      </div>
-                      {o.description && <p className="text-xs text-muted-foreground mt-1.5">{o.description}</p>}
-                      {optionTabTotal(o) != null && (
-                        <div className="text-xl font-semibold tabular-nums mt-3" data-testid={`option-tab-total-${o.tier}`}>{money(optionTabTotal(o))}</div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        ) : options?.length > 1 && (
+        )}
+        {!optionTabs && !scopesOnOffer && options?.length > 1 && (
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg">Choose your option</CardTitle>
@@ -1095,7 +1198,7 @@ export default function PublicEstimatePage() {
                 Financing available
               </span>
             )}
-            <CardTitle className="text-xl">{e.title}</CardTitle>
+            <CardTitle className="text-xl" data-testid="doc-title">{docTitle}</CardTitle>
             {viewed && (
               <span className="inline-flex items-center rounded-md bg-primary/10 text-primary text-sm font-medium px-2.5 py-1"
                 data-testid="doc-viewing-option">
@@ -1104,40 +1207,30 @@ export default function PublicEstimatePage() {
             )}
             {e.introText && <p className="whitespace-pre-wrap text-sm leading-relaxed">{e.introText}</p>}
 
-            {/* Line items. Below sm each row stacks: name, "qty × price",
-                then the line total — no sideways scrolling on a phone. The
-                qty column folds into the price line; desktop is unchanged. */}
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="block sm:table w-full text-sm">
-                <thead className="hidden sm:table-header-group bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Item</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground w-24">Qty</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground w-28">Price</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground w-28">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="block sm:table-row-group">
-                  {docItems.map((i: any) => (
-                    <tr key={i.id} className="block sm:table-row border-t px-4 py-3 sm:p-0" data-track-section={`scope:${String(i.name ?? "").slice(0, 34)}`}>
-                      <td className="block sm:table-cell sm:px-4 sm:py-3">
-                        <div className="text-xl sm:text-2xl font-bold tracking-tight leading-snug" data-testid="text-line-title">{i.name}</div>
-                        {/* Full scope of work — multi-line bullets preserved, HCP-style. */}
-                        {i.description && <div className="text-muted-foreground text-sm mt-1 whitespace-pre-wrap leading-relaxed">{i.description}</div>}
-                      </td>
-                      <td className="hidden sm:table-cell px-4 py-3 text-right tabular-nums">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</td>
-                      <td className="block sm:table-cell mt-1 sm:mt-0 sm:px-4 sm:py-3 sm:text-right tabular-nums">
-                        <span className="text-muted-foreground sm:hidden">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""} × </span>
-                        {money(i.unitPriceCents)}
-                      </td>
-                      <td className="flex items-baseline justify-between sm:table-cell sm:px-4 sm:py-3 sm:text-right tabular-nums font-medium">
-                        <span className="text-xs font-normal text-muted-foreground sm:hidden">Total</span>
-                        {money(i.lineTotalCents)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Line items. The price sits on the title's line (owner, 2026-10-21: "put the pricing at the TOP of
+                each line item"), then the scope text uses the full width. Below sm the price row drops under the
+                title — no sideways scrolling on a phone. */}
+            <div className="rounded-lg border divide-y" data-testid="doc-lines">
+              <div className="hidden sm:grid grid-cols-[1fr_8rem_8rem_8rem] gap-4 bg-muted/50 px-5 py-2.5 text-xs font-medium text-muted-foreground rounded-t-lg">
+                <span>Item</span><span className="text-right">Qty</span><span className="text-right">Price</span><span className="text-right">Total</span>
+              </div>
+              {docItems.map((i: any) => (
+                <div key={i.id} className="px-4 py-4 sm:px-5" data-testid="doc-line" data-track-section={`scope:${String(i.name ?? "").slice(0, 34)}`}>
+                  <div className="sm:grid sm:grid-cols-[1fr_8rem_8rem_8rem] sm:gap-4 sm:items-baseline">
+                    <div className="text-xl sm:text-2xl font-bold tracking-tight leading-snug min-w-0" data-testid="text-line-title">{i.name}</div>
+                    <div className="hidden sm:block text-right tabular-nums">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</div>
+                    <div className="hidden sm:block text-right tabular-nums">{money(i.unitPriceCents)}</div>
+                    <div className="hidden sm:block text-right tabular-nums font-semibold" data-testid="text-line-total">{money(i.lineTotalCents)}</div>
+                    {/* Phone: one row under the title — "300 sf × $22.00 ……… $6,600.00". */}
+                    <div className="sm:hidden mt-1 flex items-baseline justify-between gap-3 text-sm tabular-nums">
+                      <span className="text-muted-foreground">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""} × {money(i.unitPriceCents)}</span>
+                      <span className="font-semibold">{money(i.lineTotalCents)}</span>
+                    </div>
+                  </div>
+                  {/* Full scope of work — multi-line bullets preserved, HCP-style, across the whole card. */}
+                  {i.description && <div className="text-muted-foreground text-sm mt-2 whitespace-pre-wrap leading-relaxed">{i.description}</div>}
+                </div>
+              ))}
             </div>
 
             <div className="flex justify-end">
@@ -1152,7 +1245,7 @@ export default function PublicEstimatePage() {
                     <span className="font-medium tabular-nums">−{money(docDiscountCents)}</span>
                   </div>
                 )}
-                {previewing && !viewDoc && (
+                {previewing && (
                   <div className="flex justify-between" data-testid="row-optional-discount">
                     <span className="text-muted-foreground">Optional discounts</span>
                     <span className="font-medium tabular-nums">−{money(optDiscountCents)}</span>
@@ -1173,9 +1266,9 @@ export default function PublicEstimatePage() {
                 <div className="flex justify-between border-t pt-2 text-lg font-bold">
                   Total <span className="tabular-nums" data-testid="doc-grand-total" data-track-section="totals">{money(docTotalCents)}</span>
                 </div>
-                {shownDepositCents && !viewDoc ? (
+                {shownDepositCents > 0 ? (
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Deposit due</span>
+                    <span>{payInFull ? "Due now (paid in full)" : "Deposit due"}</span>
                     <span className="font-medium tabular-nums" data-testid="text-deposit-due">{money(shownDepositCents)}</span>
                   </div>
                 ) : null}
@@ -1205,65 +1298,158 @@ export default function PublicEstimatePage() {
             secure link, and the contractor sees who was added. */}
         {!preview && !expired && <ShareEstimateCard token={token!} />}
 
-        {offers.length > 0 && !settled && !expired && !blocked && (
-          <Card className="shadow-md" data-testid="discounts-section">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <BadgePercent className="h-5 w-5 text-primary" /> Optional discounts
-              </CardTitle>
-              <CardDescription>
-                Tick any you qualify for — the total updates as you go, and is confirmed when you approve.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {offers.map((o: any) => (
-                <label key={o.id} className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer hover:bg-accent/50 active:bg-accent transition-colors"
-                  data-testid={`discount-offer-${o.code}`}>
-                  <Checkbox
-                    className="mt-0.5 h-5 w-5"
-                    checked={selectedDiscounts.includes(o.id) && o.available !== false}
-                    disabled={o.available === false}
-                    onCheckedChange={(c) => toggleDiscount(o.id, c === true)}
-                    data-testid={`check-discount-${o.code}`}
-                  />
-                  <span className="min-w-0">
-                    <span className="font-medium text-sm">
-                      {o.label}{" "}
-                      <span className="text-primary">
-                        {o.available === false ? "not available" : `−${(o.percentBps / 100).toLocaleString("en-US")}%`}
-                      </span>
+        {((offers.length > 0 && !settled && !expired && !blockedForClient) || showUpsell) && (() => {
+          // Standard offers first; the bundle and price match are "Additional discounts" with the upsell.
+          const isAdditional = (o: any) => o.code === "bundle" || o.code === "price_match" || !!bundleRuleOf(o.rule);
+          const standard = settled || expired || blockedForClient ? [] : shownOffers.filter((o) => !isAdditional(o));
+          const additional = settled || expired || blockedForClient ? [] : shownOffers.filter(isAdditional);
+          const count = standard.length + additional.length;
+          const offerRow = (o: any) => {
+            const on = selectedDiscounts.includes(o.id) && o.available !== false;
+            const priceMatch = o.code === "price_match" && !(o.percentBps > 0);
+            return (
+              <label key={o.id} className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer hover:bg-accent/50 active:bg-accent transition-colors"
+                data-testid={`discount-offer-${o.code}`}>
+                <Checkbox
+                  className="mt-0.5 h-5 w-5"
+                  checked={on}
+                  disabled={o.available === false}
+                  onCheckedChange={(c) => toggleDiscount(o.id, c === true)}
+                  data-track="discount_toggle" data-track-detail={`${o.code}:${on ? "off" : "on"}`}
+                  data-testid={`check-discount-${o.code}`}
+                />
+                <span className="min-w-0">
+                  <span className="font-medium text-sm">
+                    {o.label}{" "}
+                    <span className="text-primary">
+                      {o.available === false ? "not available yet"
+                        : priceMatch ? "we'll match it"
+                        : `−${(o.percentBps / 100).toLocaleString("en-US")}%`}
                     </span>
-                    {o.ruleText && <span className="block text-xs text-muted-foreground mt-0.5">{o.ruleText}</span>}
-                    {o.available === false && o.unavailableReason && (
-                      <span className="block text-xs text-muted-foreground mt-0.5" data-testid={`text-discount-unavailable-${o.code}`}>{o.unavailableReason}</span>
-                    )}
-                    {o.conditions && (
-                      <span className="block text-xs text-muted-foreground mt-0.5">{o.conditions}</span>
-                    )}
                   </span>
-                </label>
-              ))}
-              {/* The total these ticks lead to. With scopes ticked above,
-                  that is the ticked scopes' total (the same number as "Your
-                  total" in the scope card) — never the full estimate's. */}
-              {previewing && live.noteBasis === "scopes" && (
-                <p className="text-xs text-muted-foreground" data-testid="text-discount-note">
-                  Your new total for the {chosenOptions.length === 1 ? "scope" : `${chosenOptions.length} scopes`} you
-                  ticked ({chosenOptions.map((o) => o.name).join(", ")}):{" "}
-                  <strong className="text-foreground" data-testid="text-discount-note-total">{money(live.noteTotalCents)}</strong> —
-                  verified against the offer conditions when the job is scheduled. The full estimate as
-                  written would be {money(live.document.totalCents)}.
-                </p>
-              )}
-              {previewing && live.noteBasis === "document" && (
-                <p className="text-xs text-muted-foreground" data-testid="text-discount-note">
-                  Your new total: <strong className="text-foreground" data-testid="text-discount-note-total">{money(live.noteTotalCents)}</strong> —
-                  verified against the offer conditions when the job is scheduled.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                  {o.ruleText && <span className="block text-xs text-muted-foreground mt-0.5">{o.ruleText}</span>}
+                  {o.available === false && o.unavailableReason && (
+                    <span className="block text-xs text-muted-foreground mt-0.5" data-testid={`text-discount-unavailable-${o.code}`}>{o.unavailableReason}</span>
+                  )}
+                  {o.conditions && (
+                    <span className="block text-xs text-muted-foreground mt-0.5">{o.conditions}</span>
+                  )}
+                  {priceMatch && on && (
+                    <span className="block text-xs text-foreground mt-1" data-testid="text-price-match-ticked">
+                      We'll review your competing estimate and match it. Send it to {salesRep?.name ?? company.name}
+                      {salesRep?.email || company.email ? <> at {salesRep?.email ?? company.email}</> : null}. Your total here
+                      doesn't change until we've compared them.
+                    </span>
+                  )}
+                </span>
+              </label>
+            );
+          };
+          return (
+            <Card className="shadow-md" data-testid="discounts-section" data-track-section="discounts">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <BadgePercent className="h-5 w-5 text-primary" /> {count > 0 ? "Discounts" : "Add to your project"}
+                </CardTitle>
+                <CardDescription>
+                  {count > 0
+                    ? "You may qualify for savings on this estimate. Tick any that apply — the total updates as you go."
+                    : "More of your home, done at the same time."}
+                </CardDescription>
+                {count > 0 && (
+                  <Button variant={discountsOpen ? "secondary" : "default"} className="mt-3 w-full sm:w-auto h-11 justify-between gap-3"
+                    aria-expanded={discountsOpen} aria-controls="discounts-body"
+                    onClick={() => setDiscountsOpen(!discountsOpen)}
+                    data-track="discounts_open" data-track-detail={discountsOpen ? "close" : "open"}
+                    data-testid="button-see-discounts">
+                    {discountsOpen ? "Hide discounts" : `See available discounts (${count})`}
+                    <ChevronDown className={`h-4 w-4 transition-transform ${discountsOpen ? "rotate-180" : ""}`} />
+                  </Button>
+                )}
+                {count > 0 && !discountsOpen && (sel ? sel.optionalDiscountBps : selBps) > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2" data-testid="text-discounts-folded-note">
+                    {ticked(shownOffers).length} discount{ticked(shownOffers).length === 1 ? "" : "s"} ticked — your total: <strong className="text-foreground">{money(noteTotalCents)}</strong>
+                  </p>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-5" id="discounts-body">
+                {discountsOpen && standard.length > 0 && (
+                  <div className="space-y-3" data-testid="discounts-standard">
+                    {standard.map(offerRow)}
+                  </div>
+                )}
+                {(discountsOpen && additional.length > 0) || showUpsell ? (
+                  <div className="space-y-3" data-testid="discounts-additional">
+                    {discountsOpen && additional.length > 0 && (
+                      <>
+                        <div className="text-sm font-semibold pt-1">Additional discounts</div>
+                        {additional.map(offerRow)}
+                      </>
+                    )}
+                    {showUpsell && (
+                      <div className="rounded-lg border-2 border-primary/40 bg-primary/5 p-4 space-y-3"
+                        data-track-section="upsell" data-testid="upsell-card">
+                        {preview && (
+                          <div className="text-xs font-medium text-amber-700 dark:text-amber-400" data-testid="upsell-preview-note">
+                            Preview — your client sees this; the buttons are off here.
+                          </div>
+                        )}
+                        <div className="flex items-start gap-2">
+                          <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                          <div>
+                            <div className="font-semibold">
+                              Want to see your {missingScopes.map(scopeLabel).join(" or ")} bid too?
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                              Your report and bid can be created instantly
+                              {upsellUnlockBps ? <> — add {haveCount + 1 >= upsellPool.length ? "the third" : "1 more"} scope
+                                and save <strong className="text-foreground">{(upsellUnlockBps / 100).toLocaleString("en-US")}%</strong> on the whole job with the bundle discount</> : null}.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                          {missingScopes.map((c) => {
+                            const asked = upsellRequested.has(c);
+                            return asked ? (
+                              <p key={c} className="text-sm rounded-md border bg-background p-3" data-testid={`upsell-asked-${c}`}>
+                                <CheckCircle2 className="inline h-4 w-4 text-emerald-600 mr-1 -mt-0.5" />
+                                Got it — we're putting your {scopeLabel(c)} bid together and will email it to you shortly.
+                              </p>
+                            ) : (
+                              <Button key={c} variant="outline" className="h-11 border-primary/50"
+                                disabled={!!preview || upsell.isPending}
+                                onClick={() => upsell.mutate(c)}
+                                data-track="upsell_click" data-track-detail={c}
+                                data-testid={`button-upsell-${c}`}>
+                                {upsell.isPending && upsell.variables === c && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                Yes, show me my {scopeLabel(c)} bid
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+                {/* The total these ticks lead to: the ticked scopes when there are any, else what is shown above. */}
+                {discountsOpen && sel && sel.optionalDiscountBps > 0 && (
+                  <p className="text-xs text-muted-foreground" data-testid="text-discount-note">
+                    Your new total for the {chosenOptions.length === 1 ? "scope" : `${chosenOptions.length} scopes`} you
+                    ticked ({chosenOptions.map((o) => o.name).join(", ")}):{" "}
+                    <strong className="text-foreground" data-testid="text-discount-note-total">{money(noteTotalCents)}</strong> —
+                    verified against the offer conditions when the job is scheduled.
+                  </p>
+                )}
+                {discountsOpen && previewing && !sel && (
+                  <p className="text-xs text-muted-foreground" data-testid="text-discount-note">
+                    Your new total{viewed ? ` for ${viewed.name}` : ""}: <strong className="text-foreground" data-testid="text-discount-note-total">{money(noteTotalCents)}</strong> —
+                    verified against the offer conditions when the job is scheduled.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {payInfo?.financing && (
           <Card className="shadow-sm">
@@ -1281,19 +1467,23 @@ export default function PublicEstimatePage() {
         {canRespond && (
           <Card className="shadow-md border-primary/30" id="sign-card" data-track-section="approve">
             <CardHeader className="p-4 sm:p-6">
-              <CardTitle className="text-lg">Ready to go ahead?</CardTitle>
-              <CardDescription>Type your name to approve. This is your signature.</CardDescription>
+              <CardTitle className="text-lg">Ready to go ahead{viewed ? ` with ${viewed.name}` : ""}?</CardTitle>
+              <CardDescription>
+                {viewed ? "You'll sign on the next page." : "Type your name to approve. This is your signature."}
+              </CardDescription>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
+              {!viewed && (
               <div>
                 <Label htmlFor="sig">Your full name</Label>
                 <Input id="sig" value={name} onChange={(ev) => setName(ev.target.value)}
                   placeholder={customer.displayName} data-testid="input-signature" data-track="approve_open" data-track-detail="typed in the signature box"
                   className="h-12 text-base" />
               </div>
+              )}
               {/* Ticking scopes is not a selection until it is generated:
                   this button signs the document above, as written. */}
-              {chosenOptions.length > 0 && (
+              {chosenOptions.length > 0 && !viewed && (
                 <p className="rounded-lg border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-950 dark:bg-amber-950/30 dark:text-amber-100"
                   data-testid="text-approve-scope-warning">
                   You ticked {chosenOptions.map((o) => o.name).join(", ")} above. Approving here signs the full
@@ -1301,13 +1491,32 @@ export default function PublicEstimatePage() {
                   ({money(selTotalCents)}), use <strong>Review selection</strong> first.
                 </p>
               )}
+              {/* Approve acts on what is shown: another option becomes its own estimate (with the ticked discounts
+                  carried over) and the client signs that one — never Option 1 at Option 1's price behind Option 2. */}
+              {viewed && (
+                <p className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-xs" data-testid="text-approve-option-note">
+                  You're looking at <strong>{viewed.name}</strong> ({money(shownTotalCents)}). Continuing makes {viewed.name} its
+                  own estimate with just these lines and your ticked discounts, and you sign that one. Nothing is final until you sign.
+                </p>
+              )}
               <div className="flex flex-col sm:flex-row gap-2">
+                {viewed ? (
+                  <Button disabled={generate.isPending}
+                    className="w-full sm:w-auto h-12 sm:h-10"
+                    onClick={() => generate.mutate(viewed.id)}
+                    data-track="approve_option" data-track-detail={viewed.name}
+                    data-testid="button-approve-option">
+                    {generate.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                    Continue with {viewed.name}
+                  </Button>
+                ) : (
                 <Button disabled={name.trim().length < 2 || respond.isPending}
                   className="w-full sm:w-auto h-12 sm:h-10"
                   onClick={() => respond.mutate("approve")} data-testid="button-approve" data-track="approve_submit">
                   {respond.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
                   Approve this estimate
                 </Button>
+                )}
                 <Button variant="outline" className="w-full sm:w-auto h-12 sm:h-10"
                   onClick={() => setShowDecline(!showDecline)} data-testid="button-show-decline" data-track="decline_open">
                   Decline
@@ -1451,7 +1660,7 @@ export default function PublicEstimatePage() {
       {canRespond && (
         <div className="fixed bottom-0 inset-x-0 z-30 bg-card border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           data-testid="estimate-approve-bar">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-5xl mx-auto">
             <Button size="lg" className="w-full h-12 rounded-full text-base" onClick={scrollToSign}
               data-testid="button-approve-bar" data-track="approve_open">
               Approve
