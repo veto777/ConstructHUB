@@ -754,7 +754,9 @@ export function moduleName(module: AnyModuleKey): string {
   return isAddonModule(module) ? ADDON_MODULE_NAMES[module] : MODULE_NAMES[module];
 }
 
-export const TRIAL_DAYS = 1;
+/** Platform trial length — the same as the CRM trial so every page states one offer (owner 2026-10-21: fix the
+ * sign-up funnel; the pages said 1-day, 7-day and "no free plan" at once). */
+export const TRIAL_DAYS = 7;
 /** GBP Reinstatement service, per project (one price for the page, the cards and the Hub assistant). */
 export const GBP_REINSTATEMENT_CENTS = 99_900; // owner, 2026-10-14: "reprice with $999" (was $599)
 /** Plans whose GBP reinstatement help is half the standard rate (Unlimited's bullet; owner, 2026-10-16: "apply the half price"). */

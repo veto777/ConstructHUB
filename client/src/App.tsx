@@ -196,6 +196,17 @@ const GoogleAdsLanding = () => <LegacyLanding featureKey="clickGuard" />;
 const CompetitorsLanding = () => <LegacyLanding featureKey="competitors" />;
 const MasterClassLanding = () => <LegacyLanding featureKey="masterClass" />;
 
+/** /signup and /register (typed by people and used in old ad links) → the sign-up form, keeping utm and other params. */
+function SignupRedirect() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    q.set("mode", "signup");
+    setLocation(`/auth?${q.toString()}`, { replace: true });
+  }, [setLocation]);
+  return null;
+}
+
 /** The old à-la-carte tools page: single features are add-ons on /pricing now. */
 function IndividualPricingRedirect() {
   const [, setLocation] = useLocation();
@@ -481,6 +492,8 @@ function PublicRouter() {
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/signup" component={SignupRedirect} />
+      <Route path="/register" component={SignupRedirect} />
       <Route path="/invite/:code" component={InvitePage} />
       <Route path="/databases" component={Ribboned.DatabasesPage} />
       <Route path="/property" component={Ribboned.PropertyPage} />

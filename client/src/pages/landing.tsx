@@ -26,7 +26,7 @@ import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 import { GROWTH_TOOLS } from "@/lib/growth-tools";
 import { BRAND_NAME, copyrightNotice, formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
 import { SiteNavBar } from "@/components/site-nav";
-import { PLANS, PLAN_KEYS, ANNUAL_MONTHS } from "@shared/plans";
+import { PLANS, PLAN_KEYS, ANNUAL_MONTHS, TRIAL_DAYS } from "@shared/plans";
 import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
 import { CALL_ASSISTANT_PATH, CallAssistantSection } from "@/components/call-assistant-marketing";
 import { callAssistantPricing } from "@shared/plan-copy";
@@ -322,7 +322,8 @@ export default function LandingPage() {
             </p>
 
             <ul className="col-span-2 mt-9 mb-12 md:mb-0 flex flex-wrap gap-x-6 gap-y-2 text-[14px] text-mkt-ink-soft animate-in-delay-4">
-              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange" /> No card needed to sign up</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange" /> Free account, no card</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange" /> {TRIAL_DAYS}-day free trial on any plan</li>
               <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange" /> Setup in minutes</li>
               <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange" /> Cancel anytime</li>
               <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-mkt-orange" /> Turnkey business building available</li>
@@ -510,11 +511,6 @@ export default function LandingPage() {
                   {formatUsd(PLANS[key].monthlyCents)}<span className="font-sans text-sm font-medium text-mkt-muted ml-1">/month</span>
                 </div>
                 <p className="text-[15px] text-mkt-ink-soft mt-4 leading-relaxed">{PLANS[key].tagline}</p>
-                {key === "agency" && (
-                  <p className="text-[13px] text-mkt-muted mt-3 leading-relaxed" data-testid="text-agency-locations">
-                    {PLANS.agency.limits.locations} locations included, then per-location pricing.
-                  </p>
-                )}
               </div>
             ))}
           </div>

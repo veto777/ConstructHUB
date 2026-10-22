@@ -217,7 +217,7 @@ beforeEach(() => {
 const cancellationWrites = () => mocks.sql.filter((q) => /SET cancel_at_period_end/.test(q.text)).map((q) => q.values);
 
 describe("GET /api/stripe/plans", () => {
-  it("returns the shared price book — five plans, add-ons, the legacy Agency bands, a 1-day trial; no free or retired plans", async () => {
+  it("returns the shared price book — five plans, add-ons, the legacy Agency bands, a 7-day trial; no free or retired plans", async () => {
     const res = await request("GET /api/stripe/plans");
     expect(res.body.plans.map((p: any) => p.key)).toEqual(["starter", "team", "pro", "growth", "agency"]);
     expect(res.body.plans.map((p: any) => [p.monthlyCents, p.annualCents])).toEqual(PLAN_KEYS.map(k => [PLANS[k].monthlyCents, PLANS[k].annualCents]));
@@ -231,7 +231,7 @@ describe("GET /api/stripe/plans", () => {
 });
 
 describe("POST /api/stripe/create-checkout", () => {
-  it("Pro monthly: one Stripe Price from the price book, created once by lookup key, 1-day trial", async () => {
+  it("Pro monthly: one Stripe Price from the price book, created once by lookup key, 7-day trial", async () => {
     mocks.rows.push([customerRow()]);
     const res = await request("/api/stripe/create-checkout", { plan: "pro", interval: "month", price: 1 });
     expect(res.code).toBe(200);

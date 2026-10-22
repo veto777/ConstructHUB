@@ -378,27 +378,28 @@ export default function PricingPage() {
       <section className="relative">
         <div className="absolute inset-0 mkt-grid-paper [mask-image:linear-gradient(to_bottom,black_0%,black_40%,transparent_100%)]" aria-hidden />
         <div className={`relative max-w-7xl mx-auto ${SECTION_X} lg:grid lg:grid-cols-12 lg:gap-10 lg:items-center`}>
-          <div className="lg:col-span-7 pt-8 sm:pt-12 lg:pt-14 pb-8 lg:pb-14 text-center lg:text-left">
+          <div className="lg:col-span-7 pt-6 sm:pt-12 lg:pt-14 pb-5 sm:pb-8 lg:pb-14 text-center lg:text-left">
             <Kicker n="" className="justify-center lg:justify-start">Pricing</Kicker>
             <h1 className="font-display mt-5 font-semibold text-[2.6rem] leading-[1.02] sm:text-[3.4rem] lg:text-[4rem] tracking-[-0.02em] text-mkt-ink" data-testid="text-pricing-title">
               Plans &amp; <span className="mkt-marker">pricing</span>
             </h1>
             <p className="mt-5 text-base sm:text-lg text-mkt-ink-soft max-w-[36rem] mx-auto lg:mx-0 leading-relaxed" data-testid="text-trial">
               A new account starts any plan with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing.
-              The CRM is a separate product with its own plans, from {CRM_FROM_PRICE}, and the {CALL_ASSISTANT_NAME} is a separate service, from {CALL_ASSISTANT_FROM_PRICE}.
-              Or buy any single tool on its own, à la carte.
+              {/* On a phone the trial line is enough; the product tabs right below say the rest. */}
+              <span className="hidden sm:inline"> The CRM is a separate product with its own plans, from {CRM_FROM_PRICE}, and the {CALL_ASSISTANT_NAME} is a separate service, from {CALL_ASSISTANT_FROM_PRICE}.
+              Or buy any single tool on its own, à la carte.</span>
             </p>
           </div>
 
-          {/* The mascot and his line on the navy grid panel (decorative). */}
-          <div className="pb-10 lg:py-10 lg:col-span-5" aria-hidden>
+          {/* The mascot and his line on the navy grid panel (decorative). Desktop only: on a phone it pushed every
+              price and button below the first screen. */}
+          <div className="hidden lg:block lg:py-10 lg:col-span-5" aria-hidden>
             <div className="relative overflow-hidden rounded-[28px] lg:rounded-[32px] bg-mkt-panel text-mkt-panel-ink">
               <div className="absolute inset-0 mkt-grid-paper-panel" />
               <div className="relative flex lg:flex-col items-center lg:items-center gap-4 lg:gap-5 p-5 sm:p-6 lg:px-8 lg:pt-9 lg:pb-0">
                 <p className="order-1 flex-1 lg:flex-none mkt-bubble px-4 py-3 lg:px-5 lg:py-4 text-[15px] sm:text-[17px] lg:text-[19px] leading-snug lg:-rotate-1" data-testid="text-pricing-bubble">
                   Pick the plan that fits your crew.
                 </p>
-                <StandingGator height={112} className="order-2 shrink-0 lg:hidden" />
                 <StandingGator height={280} className="hidden lg:block order-2 shrink-0 -mb-1" />
               </div>
             </div>
@@ -407,7 +408,7 @@ export default function PricingPage() {
         <div className="mkt-ruler" aria-hidden />
       </section>
 
-      <div className={`max-w-7xl mx-auto ${SECTION_X} py-12 lg:py-16 space-y-20 lg:space-y-28`}>
+      <div className={`max-w-7xl mx-auto ${SECTION_X} pt-2 pb-12 sm:py-12 lg:py-16 space-y-20 lg:space-y-28`}>
         {view.live && (
           <div className="flex flex-wrap items-center justify-center gap-3 text-sm -mt-2" data-testid="banner-current-plan">
             <Badge variant="outline" className="px-3 py-1 text-sm rounded-full border-mkt-ink text-mkt-ink bg-mkt-card" data-testid="badge-current-plan">
@@ -542,7 +543,7 @@ export default function PricingPage() {
                 })}
               </div>
               <p className="text-center text-[13px] text-mkt-muted mt-6">
-                No free plan. A new account's first plan starts with the {TRIAL_DAYS}-day trial. Prices in USD.
+                Creating an account is free. A new account's first plan starts with the {TRIAL_DAYS}-day trial. Prices in USD.
                 Outgrow a plan's locations or seats? Move up — there is no per-location pricing.
               </p>
 
