@@ -33,11 +33,14 @@ export function quickBidLineDescription(args: {
 
 /**
  * Which measurement metric an item prices against when the row doesn't say.
- * Anything roof-flavoured prices roof area; everything else on an exterior
- * report is wall/siding area.
+ * Siding products (Hardie shingle siding included) price wall/siding area; roofing
+ * (roof, shingles, underlayment, tear-off…) prices roof area; anything else on an
+ * exterior report (paint, trim…) is wall/siding area. Same split as hover-takeoff.ts.
  */
 export function inferSqftMetric(name: string): SqftMetric {
-  return /roof/i.test(name) ? "roof" : "siding";
+  const n = name.toLowerCase();
+  if (/siding|hardie|batten|cladding|\bwall/.test(n)) return "siding";
+  return /roof|shingle|underlay|felt|decking|sheathing|tear\s*-?off/.test(n) ? "roof" : "siding";
 }
 
 /**

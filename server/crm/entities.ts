@@ -1709,6 +1709,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
         parsed.data.items.map((it, idx) => ({ ...it, orgId: ctx.org.id, estimateId: e.id, sortOrder: it.sortOrder ?? idx })) as any,
       );
     }
+    await recordPricebookUsage(ctx.org.id, e.id, parsed.data.items);
     const fresh = await recalcEstimate(ctx.org.id, e.id);
     logActivity(ctx, "estimate.updated", {
       entityType: "estimate", entityId: e.id, customerId: e.customerId,

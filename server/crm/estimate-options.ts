@@ -34,6 +34,7 @@ import { SCOPE_CATEGORIES } from "@shared/scope-category";
 import { estimateDefaultsFromOrg } from "./doc-defaults";
 import { resolveEstimateTaxRate, taxSourceRecord } from "./tax";
 import { logActivity } from "./activity";
+import { recordPricebookUsage } from "./pricebook-usage";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -216,6 +217,8 @@ export function registerEstimateOptionRoutes(app: Express, getDevUser: GetUser):
         await db.insert(crmEstimateOptions).values({ ...values, orgId: ctx.org.id, estimateId: est.id } as any);
       }
     }
+    // Price-book items picked on any tab count (once per estimate per item: pricebook-usage.ts).
+    await recordPricebookUsage(ctx.org.id, est.id, want.flatMap((o) => o.items));
     const rows = await db.select().from(crmEstimateOptions)
       .where(and(eq(crmEstimateOptions.orgId, ctx.org.id), eq(crmEstimateOptions.estimateId, est.id)))
       .orderBy(asc(crmEstimateOptions.tier));

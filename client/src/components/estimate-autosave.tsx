@@ -28,7 +28,12 @@ export function useEstimateAutosave(opts: {
   const [draftId, setDraftIdState] = useState<string | null>(null);
   const draftIdRef = useRef<string | null>(null);
   const setDraftId = (id: string | null) => { draftIdRef.current = id; setDraftIdState(id); };
-  const [status, setStatus] = useState<AutosaveStatus>("idle");
+  const [status, setStatusState] = useState<AutosaveStatus>("idle");
+  // The live status, for code that awaits a save and must not read a stale render's value.
+  const statusRef = useRef<AutosaveStatus>("idle");
+  const setStatus = (s: AutosaveStatus) => { statusRef.current = s; setStatusState(s); };
+  // While Create / Discard runs: no new autosave starts (an in-flight one is awaited by settle()).
+  const holdRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const snapRef = useRef(snapshot);
@@ -48,8 +53,9 @@ export function useEstimateAutosave(opts: {
 
   /** Save now; resolves to the server draft's id, or null when it could not be saved (or there is nothing yet). */
   const saveNow = useCallback(async (): Promise<string | null> => {
-    if (!customerId || paused) return draftIdRef.current;
+    if (!customerId || paused || holdRef.current) return draftIdRef.current;
     if (inflight.current) { await inflight.current; }
+    if (holdRef.current) return draftIdRef.current;
     const snap = snapRef.current;
     if (!draftHasContent(snap) && !draftIdRef.current) return null;
     const body = autosavePayload(snap);
@@ -114,6 +120,20 @@ export function useEstimateAutosave(opts: {
     };
   }, [open, saveNow]);
 
+  /**
+   * Stop autosaving and wait for a save already in flight, then the server draft's id (null when none was
+   * created). Create and Discard call this first, so a POST still on its way can't leave a second estimate.
+   */
+  const settle = useCallback(async (): Promise<string | null> => {
+    holdRef.current = true;
+    if (timer.current) clearTimeout(timer.current);
+    while (inflight.current) { await inflight.current.catch(() => {}); }
+    return draftIdRef.current;
+  }, []);
+  /** Autosave again after settle() (Create failed). */
+  const release = useCallback(() => { holdRef.current = false; }, []);
+  const getStatus = useCallback(() => statusRef.current, []);
+
   /** The mirror left by an earlier session for this client, if any. */
   const readMirror = useCallback((): DraftMirror | null => (key ? readDraftMirror(key) : null), [key]);
 
@@ -129,6 +149,7 @@ export function useEstimateAutosave(opts: {
   /** Forget everything (after Create, or Discard). */
   const reset = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
+    holdRef.current = false;
     if (key) clearDraftMirror(key);
     setDraftId(null);
     savedJson.current = "";
@@ -143,7 +164,7 @@ export function useEstimateAutosave(opts: {
     if (key) clearDraftMirror(key);
   }, [key]);
 
-  return { draftId, status, error, savedAt, hasContent, saveNow, readMirror, adopt, reset, keepClosed };
+  return { draftId, status, error, savedAt, hasContent, saveNow, readMirror, adopt, reset, keepClosed, settle, release, getStatus };
 }
 
 /** "Saving…" / "Saved · just now" / "Saved · 3 min ago" / "Not saved — kept on this device". */

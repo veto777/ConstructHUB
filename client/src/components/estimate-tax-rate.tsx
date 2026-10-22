@@ -33,15 +33,21 @@ export function useEstimateTaxRate(customerId: string | null | undefined, enable
 export const bpsToPctText = (bps: number) => String(Number((bps / 100).toFixed(2)));
 
 /** The line under Tax %: where the rate came from, and whether the user changed it. */
-export function TaxRateNote({ rate, loading, currentBps }: { rate?: EstimateTaxRate; loading?: boolean; currentBps?: number }) {
+export function TaxRateNote({ rate, loading, currentBps, savedBps }: {
+  rate?: EstimateTaxRate; loading?: boolean; currentBps?: number;
+  /** The rate an opened estimate was saved with: keeping it is not "you changed it". */
+  savedBps?: number | null;
+}) {
   if (loading) return <p className="text-xs text-muted-foreground" data-testid="text-tax-source">Looking up the tax rate for the client's address…</p>;
   if (!rate) return null;
-  const changed = currentBps !== undefined && currentBps !== rate.bps;
+  const keptSaved = savedBps != null && currentBps === savedBps && currentBps !== rate.bps;
+  const changed = !keptSaved && currentBps !== undefined && currentBps !== rate.bps;
   const warn = rate.source === "none" || rate.fallbackReason != null || / — check$/.test(rate.label);
   return (
     <p className={`text-xs ${warn ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`} data-testid="text-tax-source">
       {rate.label}
       {changed && <span className="text-muted-foreground"> · you changed it (suggested {bpsToPctText(rate.bps)}%)</span>}
+      {keptSaved && <span className="text-muted-foreground"> · this estimate was saved at {bpsToPctText(currentBps!)}% (the address rate now is {bpsToPctText(rate.bps)}%)</span>}
     </p>
   );
 }

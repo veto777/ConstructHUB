@@ -10,7 +10,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import {
-  autoTitleFrom, titleLooksAuto, autosavePayload, clearDraftMirror, draftHasContent, draftMirrorKey, readDraftMirror, snapshotFromEstimate,
+  autoTitleFrom, titleLooksAuto, autosavePayload, clearDraftMirror, discountFromOptionLines, draftHasContent, draftMirrorKey, readDraftMirror, snapshotFromEstimate,
   writeDraftMirror, type EstimateDraftSnapshot,
 } from "@shared/estimate-draft";
 
@@ -32,6 +32,24 @@ class MemStorage {
   removeItem(k: string) { this.m.delete(k); }
 }
 
+describe("discountFromOptionLines — an options discount comes back as the tabs discount", () => {
+  const roof = { kind: "material", name: "Roof", unitPriceCents: 1_000_000 };
+  it("a percent stays a percent (it follows later price changes)", () => {
+    const r = discountFromOptionLines([roof, { kind: "discount", name: "Loyalty (10%)", unitPriceCents: 100_000 }]);
+    expect(r.discount).toEqual({ mode: "percent", value: "10", label: "Loyalty" });
+    expect(r.items).toEqual([roof]);
+  });
+  it("a dollar discount stays dollars; no discount line → null", () => {
+    expect(discountFromOptionLines([roof, { kind: "discount", name: "Discount", unitPriceCents: 25_050 }]).discount)
+      .toEqual({ mode: "amount", value: "250.5", label: "Discount" });
+    expect(discountFromOptionLines([roof])).toEqual({ discount: null, items: [roof] });
+  });
+  it("round-trips with autosavePayload", () => {
+    const saved = autosavePayload({ ...empty, items: [{ ...blank, name: "Roof", unitPriceCents: 1_000_000 }], contractorDiscount: { mode: "percent", value: "7.5", label: "Spring" } }).items;
+    expect(discountFromOptionLines(saved).discount).toEqual({ mode: "percent", value: "7.5", label: "Spring" });
+  });
+});
+
 describe("draftHasContent — what blocks an outside click / Esc from closing the dialog", () => {
   it("an untouched dialog (default title, blank line, pre-filled tax) closes freely", () => {
     expect(draftHasContent(empty)).toBe(false);
@@ -45,6 +63,9 @@ describe("draftHasContent — what blocks an outside click / Esc from closing th
     expect(draftHasContent({ ...empty, items: [{ ...blank, name: "Gutters" }] })).toBe(true);
     expect(draftHasContent({ ...empty, items: [{ ...blank, description: "scope only" }] })).toBe(true);
     expect(draftHasContent({ ...empty, items: [{ ...blank, unitPriceCents: 1650 }] })).toBe(true);
+    // QA: lines typed only in Option 2 are content (a refresh / outside click must not lose them).
+    expect(draftHasContent({ ...empty, optionTabs: { extra: [{ items: [{ ...blank }] }] } })).toBe(false);
+    expect(draftHasContent({ ...empty, optionTabs: { extra: [{ items: [{ ...blank, name: "Roof", unitPriceCents: 500000 }] }] } })).toBe(true);
     expect(draftHasContent(OWNER)).toBe(true);
   });
 });

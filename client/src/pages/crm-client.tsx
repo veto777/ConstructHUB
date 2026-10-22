@@ -5,7 +5,7 @@ import { takeoffQuantityForLine, type HoverTakeoff } from "@shared/hover-takeoff
 import { JobStageControl } from "@/components/job-stage";
 import { useJobFlow } from "@/components/job-flow-settings";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute, useLocation, Link } from "wouter";
+import { useRoute, useLocation, useSearch, Link } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +61,7 @@ import {
   type OptionAction, type EstimateAction, type EstimateTemplate,
 } from "@/components/estimate-option-tabs";
 import {
-  autoTitleFrom, autosavePayload, contractorDiscountLine, defaultOffers, draftHasContent, offersPayload, snapshotFromEstimate,
+  autoTitleFrom, autosavePayload, contractorDiscountLine, defaultOffers, discountFromOptionLines, draftHasContent, lineHasContent, offersPayload, snapshotFromEstimate,
   type ContractorDiscount, type DraftOffer, type EstimateDraftSnapshot,
 } from "@shared/estimate-draft";
 import { computeApprovalTotals } from "@shared/estimate-totals";
@@ -979,6 +979,10 @@ export default function CrmClientPage() {
   // The title follows the lines live ("Siding Remodel + Exterior Painting") until the user types in it;
   // "↺ auto title" switches back. Persisted with the draft (autosaveMeta.autoTitle).
   const [autoTitle, setAutoTitle] = useState(true);
+  // An existing estimate opened in this popup (drafts and unsent estimates open here, not in the full-page editor).
+  const [editingEst, setEditingEst] = useState<{ id: string; number: string | null; autosave: boolean } | null>(null);
+  // The tax rate that estimate was saved with (keeping it is not "you changed it").
+  const [savedTaxBps, setSavedTaxBps] = useState<number | null>(null);
   useEffect(() => {
     if (autoTitle) setTitle(autoTitleFrom(items));
   }, [autoTitle, items]);
@@ -987,6 +991,8 @@ export default function CrmClientPage() {
   }, [open, offers, orgForDraft]);
   const draftSnapshot: EstimateDraftSnapshot & { optionTabs?: any; optionApproval?: "one" | "any" } = {
     title, autoTitle, intro, taxPct, taxTouched, items, offers: offers ?? undefined, contractorDiscount,
+    // A refresh restores an opened estimate as THAT estimate (not "New estimate"), with its saved tax rate.
+    editing: editingEst, savedTaxBps,
     // Mirrored with the rest, so a refresh brings every option back too.
     optionTabs: extraTabs.length ? { tab0, extra: extraTabs } : undefined,
     optionApproval,
@@ -997,8 +1003,6 @@ export default function CrmClientPage() {
   const fullscreen = useDialogFullscreen(me?.member?.id ?? me?.user?.id ?? null);
   const [confirmClose, setConfirmClose] = useState(false);
   const [resumeOffer, setResumeOffer] = useState<{ id: string; title: string; updatedAt?: string } | null>(null);
-  // An existing estimate opened in this popup (drafts and unsent estimates open here, not in the full-page editor).
-  const [editingEst, setEditingEst] = useState<{ id: string; number: string | null; autosave: boolean } | null>(null);
   const loadSnapshot = (snap: EstimateDraftSnapshot) => {
     setAutoTitle(snap.autoTitle !== false);
     setTitle(snap.title || "Estimate");
@@ -1020,6 +1024,7 @@ export default function CrmClientPage() {
     setItems([{ ...BLANK }]); setIntro(""); setTitle("Estimate"); setAutoTitle(true); setTaxPct("0"); setTaxTouched(false);
     setResumeOffer(null);
     setEditingEst(null);
+    setSavedTaxBps(null);
     setOffers(null);
     setContractorDiscount(null);
     setTab0({ id: null, name: "Option 1", cancelled: false });
@@ -1044,38 +1049,47 @@ export default function CrmClientPage() {
         const toItems = (xs: any[]): Item[] => xs.map((i) => ({ ...BLANK, ...i, description: i.description ?? "", unit: i.unit ?? "", hiddenFromClient: !!i.hiddenFromClient }));
         snap.optionTabs = {
           tab0: { id: main?.id ?? null, name: main?.name ?? "Option 1", cancelled: !!main?.cancelledAt },
-          extra: tabbed.filter((o) => o !== main).map((o) => ({ key: o.id, id: o.id, name: o.name, items: toItems(o.items ?? []), cancelled: !!o.cancelledAt, discount: null })),
+          extra: tabbed.filter((o) => o !== main).map((o) => {
+            // The option's generated discount line becomes its discount again (a % keeps following the prices).
+            const d = discountFromOptionLines<any>(o.items ?? []);
+            return { key: o.id, id: o.id, name: o.name, items: toItems(d.items), cancelled: !!o.cancelledAt, discount: d.discount };
+          }),
         };
       }
       snap.optionApproval = r.estimate.optionApproval === "one" ? "one" : "any";
       loadSnapshot(snap);
       autosave.adopt(estimateId, snap);
       setEditingEst({ id: estimateId, number: r.estimate.number ?? null, autosave: !!r.estimate.autosave });
+      setSavedTaxBps(typeof r.estimate.taxRateBps === "number" ? r.estimate.taxRateBps : null);
       setResumeOffer(null);
       setOpen(true);
     } catch (e: any) {
       toast({ title: "Could not open the estimate", description: apiErrorMessage(e), variant: "destructive" });
     }
   };
-  // ?openEstimate=<id> (from the Estimates list) opens that estimate here.
-  const [openedFromUrl, setOpenedFromUrl] = useState(false);
+  // ?openEstimate=<id> (from the Estimates list, or "Copy to another client") opens that estimate here. Keyed on the
+  // client + estimate, because navigating to another client reuses this page component.
+  const search = useSearch();
+  const [openedFromUrl, setOpenedFromUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (openedFromUrl || !id || !orgForDraft?.id) return;
-    const want = new URLSearchParams(window.location.search).get("openEstimate");
-    setOpenedFromUrl(true);
-    if (!want) return;
+    if (!id || !orgForDraft?.id) return;
+    const want = new URLSearchParams(search).get("openEstimate");
+    if (!want || openedFromUrl === `${id}:${want}`) return;
+    setOpenedFromUrl(`${id}:${want}`);
     window.history.replaceState(null, "", window.location.pathname);
     void openEstimateInPopup(want);
-  }, [id, orgForDraft?.id]);
+  }, [id, orgForDraft?.id, search]);
   // After a refresh (or a crash): reopen with everything that was typed.
   const [restoredFor, setRestoredFor] = useState<string | null>(null);
   useEffect(() => {
     if (!id || !orgForDraft?.id || restoredFor === id) return;
     setRestoredFor(id);
     const m = autosave.readMirror();
-    if (m && m.open && draftHasContent(m)) {
+    if (m && m.open && (draftHasContent(m) || m.editing)) {
       loadSnapshot(m);
-      autosave.adopt(m.draftId ?? null);
+      autosave.adopt(m.draftId ?? m.editing?.id ?? null);
+      if (m.editing) setEditingEst(m.editing);
+      setSavedTaxBps(typeof m.savedTaxBps === "number" ? m.savedTaxBps : null);
       setOpen(true);
       toast({ title: "Your unsaved estimate is back", description: "Everything you typed was kept." });
     }
@@ -1106,12 +1120,16 @@ export default function CrmClientPage() {
   });
 
   const optionsJson = useRef("");
+  // The tabs' server ids as of the last option-set save (state lags inside an async handler; see "copy").
+  const optIdsRef = useRef<{ main: string | null; extra: (string | null)[] }>({ main: null, extra: [] });
+  optIdsRef.current = { main: tab0.id, extra: extraTabs.map((t) => t.id) };
+  // autosavePayload keeps a priced line with no name as "Untitled item" — the totals counted it, so it is saved.
   const optionSetBody = () => ({
     options: extraTabs.length === 0 ? [] : [
-      { id: tab0.id, name: tab0.name, cancelled: tab0.cancelled, items: autosavePayload({ ...draftSnapshot, items: items.filter((i) => i.name.trim()) }).items },
+      { id: tab0.id, name: tab0.name, cancelled: tab0.cancelled, items: autosavePayload({ ...draftSnapshot, items }).items },
       ...extraTabs.map((t) => ({
         id: t.id, name: t.name, cancelled: t.cancelled,
-        items: autosavePayload({ ...draftSnapshot, items: t.items.filter((i) => i.name.trim()), contractorDiscount: t.discount }).items,
+        items: autosavePayload({ ...draftSnapshot, items: t.items, contractorDiscount: t.discount }).items,
       })),
     ],
   });
@@ -1128,6 +1146,7 @@ export default function CrmClientPage() {
     const extra = rows.filter((o) => !o.isMain && Array.isArray(o.items));
     setTab0((t) => ({ ...t, id: main?.id ?? null }));
     setExtraTabs((ts) => ts.map((t, i) => ({ ...t, id: extra[i]?.id ?? t.id })));
+    optIdsRef.current = { main: main?.id ?? null, extra: extraTabs.map((t, i) => extra[i]?.id ?? t.id) };
     optionsJson.current = json;
   };
   useEffect(() => {
@@ -1142,9 +1161,9 @@ export default function CrmClientPage() {
     if (estId) await syncOptions(estId);
     return estId;
   };
-  const optionLines = (i: number) => (i === 0 ? items : extraTabs[i - 1]?.items ?? []).filter((x) => x.name.trim());
+  const optionLines = (i: number) => (i === 0 ? items : extraTabs[i - 1]?.items ?? []).filter(lineHasContent);
   const saveTemplate = (name: string, tabIndex: number | null) => {
-    const lines = tabIndex == null ? items.filter((x) => x.name.trim()) : optionLines(tabIndex);
+    const lines = tabIndex == null ? items.filter(lineHasContent) : optionLines(tabIndex);
     const disc = tabIndex == null || tabIndex === 0 ? contractorDiscount : extraTabs[tabIndex - 1]?.discount ?? null;
     return apiRequest("POST", "/api/crm/estimate-templates", {
       name, title: tabIndex == null ? title : null, introText: intro || null,
@@ -1186,7 +1205,8 @@ export default function CrmClientPage() {
     // copy to a new estimate: the option must be saved first
     const estId = await flushAll();
     if (!estId) { toast({ title: "Add a line first", description: "There is nothing to copy yet." }); return; }
-    const optId = i === 0 ? (tab0.id) : extraTabs[i - 1]?.id;
+    // Read after the flush: a tab saved just now has its id only in the ref, not in this render's state.
+    const optId = i === 0 ? optIdsRef.current.main : optIdsRef.current.extra[i - 1] ?? null;
     const go = async (customerId?: string) => {
       try {
         const est = optId
@@ -1232,26 +1252,32 @@ export default function CrmClientPage() {
 
   const createEstimate = useMutation({
     mutationFn: async () => {
-      const clean = items.filter((i) => i.name.trim());
-      if (!clean.length) throw new Error("Add at least one line item");
-      const body = autosavePayload({ ...draftSnapshot, items: clean });
+      // A line with a price but no name yet is saved as "Untitled item" (autosavePayload), as the totals counted it.
+      if (!items.some(lineHasContent)) throw new Error("Add at least one line item");
+      const body = autosavePayload(draftSnapshot);
       const putOffers = async (estId: string) => {
         if (offers) await apiRequest("PUT", `/api/crm/estimates/${estId}/discounts`, { offers: offersPayload(offers) });
       };
       setFinalizing(true);
+      // Wait for an autosave POST still on its way, so its draft is the one saved here (never a second estimate).
+      const draftId = await autosave.settle();
+      let ok = false;
       try {
         // Already autosaved as a draft, or an existing estimate opened here: save THAT estimate — never a duplicate.
-        if (autosave.draftId) {
-          const saved = await (await apiRequest("PATCH", `/api/crm/estimates/${autosave.draftId}`, { ...body, autosave: false })).json();
-          await putOffers(autosave.draftId);
-          await syncOptions(autosave.draftId);
+        if (draftId) {
+          const saved = await (await apiRequest("PATCH", `/api/crm/estimates/${draftId}`, { ...body, autosave: false })).json();
+          await putOffers(draftId);
+          await syncOptions(draftId);
+          ok = true;
           return saved;
         }
         const created = await (await apiRequest("POST", "/api/crm/estimates", { customerId: id, ...body })).json();
         await putOffers(created.id);
         if (extraTabs.length) await syncOptions(created.id);
+        ok = true;
         return created;
       } finally {
+        if (!ok) autosave.release();
         setFinalizing(false);
       }
     },
@@ -1847,7 +1873,11 @@ export default function CrmClientPage() {
               // An existing estimate opened here is saved as you type: one last save, then close.
               if (editingEst && !editingEst.autosave) {
                 void autosave.saveNow().then((saved) => {
-                  if (!saved && autosave.status === "error") return;
+                  // Read the LIVE status: this render's value is from before the save.
+                  if (!saved || autosave.getStatus() === "error") {
+                    toast({ title: "Not saved to the server", description: "Your changes are kept on this device; try closing again in a moment.", variant: "destructive" });
+                    return;
+                  }
                   autosave.keepClosed(); autosave.reset(); resetForm(); setOpen(false);
                   queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${id}`] });
                 });
@@ -1917,7 +1947,7 @@ export default function CrmClientPage() {
                       onChange={(e) => { setTaxTouched(true); setTaxPct(e.target.value); }} />
                   </div>
                 </div>
-                <TaxRateNote rate={taxRate.data} loading={taxRate.isLoading} currentBps={taxBps} />
+                <TaxRateNote rate={taxRate.data} loading={taxRate.isLoading} currentBps={taxBps} savedBps={savedTaxBps} />
                 <div>
                   <Label htmlFor="e-intro">Message to the client</Label>
                   <Textarea id="e-intro" rows={fullscreen.full ? 4 : 2} value={intro} onChange={(e) => setIntro(e.target.value)}
@@ -2175,7 +2205,7 @@ export default function CrmClientPage() {
                 <AlertDialogFooter className="gap-2">
                   <AlertDialogCancel data-testid="button-keep-editing">Keep editing</AlertDialogCancel>
                   <Button variant="outline" data-testid="button-discard-estimate" onClick={async () => {
-                    const draft = autosave.draftId;
+                    const draft = await autosave.settle();
                     if (draft) {
                       try { await apiRequest("DELETE", `/api/crm/estimates/${draft}/autosave`); } catch { /* best-effort; it stays a draft */ }
                     }
