@@ -157,7 +157,10 @@ export function eventLine(name: string, detail: Record<string, any> | null): str
     case "model3d_interact": return "Spun / zoomed the 3D model";
     case "option_tab": return `Looked at ${d ? `“${d}”` : "another option"}`;
     case "scope_toggle": return d ? `Ticked/unticked the scope “${d}”` : "Ticked/unticked a scope";
-    case "discounts_open": return "Opened the discounts list";
+    case "discounts_open": return d === "close" ? "Closed the discounts list" : "Opened the discounts list (See available discounts)";
+    case "options_combine": return d === "close" ? "Closed “combine scopes”" : "Opened “combine scopes”";
+    case "option_view": return `Viewed ${d ? `“${d}”` : "an option"}`;
+    case "approve_option": return `Clicked Approve on ${d ? `“${d}”` : "an option"}`;
     case "discount_toggle": {
       const o = parseOfferDetail(d);
       return o.on === false ? `Unticked the ${o.label} discount` : `Ticked the ${o.label} discount`;
@@ -243,7 +246,7 @@ export function buildVisitDetail(
     if (e.name === "attachment_open") summary.pamphlets = true;
     if (e.name.startsWith("model3d")) summary.model3d = true;
     if (e.name.startsWith("discount")) summary.discountsViewed = true;
-    if (e.name === "approve_open") { approveOpen = true; summary.approveStarted = true; lastApproveAt = off; }
+    if (e.name === "approve_open" || e.name === "approve_option") { approveOpen = true; summary.approveStarted = true; lastApproveAt = off; }
     if (e.name === "approve_submit") approveDone = true;
     if (e.name === "approve_cancel") lastApproveAt = off;
     let text = eventLine(e.name, e.detail);
