@@ -73,6 +73,7 @@ export function LandingMobileMenu({ links, routeLinks = [], signInHref }: { link
           {signInHref && (
             <Link
               href={signInHref}
+              rel="nofollow"
               onClick={() => setOpen(false)}
               className="block rounded-md px-3 py-2.5 text-base font-medium hover:bg-muted transition-colors"
               data-testid="link-mobile-signin"

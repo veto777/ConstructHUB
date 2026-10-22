@@ -72,7 +72,7 @@ export function LockedModule({ what, module, moduleTitle, opensWith, access, onE
         </p>
         {access && !access.signedIn && (
           <p className="mt-2 text-sm text-muted-foreground" data-testid="text-paywall-signed-out">
-            Already enrolled? <Link href="/auth?next=%2Fmaster-class" className="underline underline-offset-2 hover:text-foreground">Sign in</Link> to open your modules.
+            Already enrolled? <Link href="/auth?next=%2Fmaster-class" rel="nofollow" className="underline underline-offset-2 hover:text-foreground">Sign in</Link> to open your modules.
           </p>
         )}
         <div className="mt-4 flex flex-wrap gap-2">

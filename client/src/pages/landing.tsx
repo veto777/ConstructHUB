@@ -309,7 +309,7 @@ export default function LandingPage() {
             </p>
 
             <div className="col-span-2 mt-8 max-w-[17.5rem] sm:max-w-none flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 animate-in-delay-3">
-              <Link href="/auth?mode=signup" data-testid="link-hero-signup" className={`${BTN_PRIMARY} ${BTN_LG}`}>
+              <Link href="/auth?mode=signup" rel="nofollow" data-testid="link-hero-signup" className={`${BTN_PRIMARY} ${BTN_LG}`}>
                 Create Your Account <ArrowRight className="h-4 w-4" />
               </Link>
               <Link href={DFY_PATH} data-testid="link-hero-dfy" className={`${BTN_OUTLINE} ${BTN_LG}`}>
@@ -613,7 +613,7 @@ export default function LandingPage() {
             Use our DIY tools to start and grow at your own pace — or hand the work to us with our done-for-you services. Either way, {BRAND_NAME} has you covered.
           </p>
           <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
-            <Link href="/auth?mode=signup" data-testid="link-cta-signup" className={`${BTN_PRIMARY} ${BTN_LG} px-8`}>
+            <Link href="/auth?mode=signup" rel="nofollow" data-testid="link-cta-signup" className={`${BTN_PRIMARY} ${BTN_LG} px-8`}>
               Create Your Account <ArrowRight className="h-4 w-4" />
             </Link>
             <Link href={SALES_HREF} data-testid="link-cta-consulting" className={`${BTN_OUTLINE_ON_NAVY} ${BTN_LG}`}>
