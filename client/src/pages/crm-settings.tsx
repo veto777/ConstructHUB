@@ -1791,6 +1791,7 @@ export default function CrmSettingsPage() {
                 Save
               </Button>
             </div>
+            <DivisionOfflinePay />
           </div>
 
           {/* Financing links — the primary one shows on estimates & invoices. */}
@@ -2124,6 +2125,49 @@ export default function CrmSettingsPage() {
  * Settings → Lead visibility by location: per team member, the states and markets whose leads they may see. No
  * boxes ticked = every lead. Owners and seats that run Settings always see everything (server/crm/leads.ts).
  */
+/** Per-division check / Zelle text (WA and FL bank differently): each division's own, else the company-wide text above. */
+function DivisionOfflinePay() {
+  const { toast } = useToast();
+  const { data: divisions } = useQuery<any[]>({ queryKey: ["/api/crm/divisions"] });
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const save = useMutation({
+    mutationFn: async ({ id, text }: { id: string; text: string }) =>
+      (await apiRequest("PATCH", `/api/crm/divisions/${id}`, { offlinePaymentInstructions: text.trim() || null })).json(),
+    onSuccess: (_r, v) => {
+      setDrafts((d) => { const n = { ...d }; delete n[v.id]; return n; });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/divisions"] });
+      toast({ title: "Saved" });
+    },
+    onError: (e: any) => toast({ title: "Could not save", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  if (!divisions || divisions.length < 2) return null;
+  return (
+    <div className="space-y-3 pt-2" data-testid="section-division-offline-instructions">
+      <p className="text-xs text-muted-foreground">
+        Different details per division? Fill these in — a division left empty uses the text above.
+      </p>
+      {divisions.map((d) => {
+        const stored = String((d.customFields as any)?.offlinePaymentInstructions ?? "");
+        const value = drafts[d.id] ?? stored;
+        return (
+          <div key={d.id} className="space-y-1.5">
+            <Label htmlFor={`offline-${d.id}`}>{d.name}{d.code ? ` (${d.code})` : ""}</Label>
+            <Textarea id={`offline-${d.id}`} rows={3} maxLength={1500} value={value}
+              onChange={(e) => setDrafts((x) => ({ ...x, [d.id]: e.target.value }))}
+              placeholder="Empty = the company-wide text above" data-testid={`textarea-offline-${d.code ?? d.id}`} />
+            <div className="flex justify-end">
+              <Button size="sm" variant="outline" disabled={save.isPending || value === stored}
+                onClick={() => save.mutate({ id: d.id, text: value })} data-testid={`button-save-offline-${d.code ?? d.id}`}>
+                Save {d.code ?? d.name}
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function LeadVisibilityCard() {
   const { toast } = useToast();
   const { data, isError } = useQuery<{

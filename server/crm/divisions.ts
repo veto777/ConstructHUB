@@ -374,6 +374,9 @@ const divisionSchema = z.object({
     default: z.number().int().min(0).max(3000).nullable().optional(),
     cities: z.record(z.number().int().min(0).max(3000)).optional(),
   }).nullable().optional(),
+  // "How to pay by check or Zelle" for this division, stored at
+  // custom_fields->offlinePaymentInstructions; empty = use the org's.
+  offlinePaymentInstructions: z.string().max(1500).nullable().optional(),
 });
 
 export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): void {
@@ -417,7 +420,7 @@ export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): vo
     const isFirst = !(await db.select({ id: crmDivisions.id }).from(crmDivisions)
       .where(eq(crmDivisions.orgId, ctx.org.id)).limit(1)).length;
     // taxRates is PATCH-only (stored in custom_fields, not a column).
-    const { taxRates: _taxRates, ...createData } = parsed.data;
+    const { taxRates: _taxRates, offlinePaymentInstructions: _offline, ...createData } = parsed.data;
     const [row] = await db.insert(crmDivisions).values({
       ...createData,
       isHeadquarters: parsed.data.isHeadquarters ?? isFirst,
@@ -451,12 +454,15 @@ export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): vo
     }
     // taxRates merges INTO custom_fields (never a wholesale replace) — the
     // same rule as the org's notificationPrefs.
-    const { taxRates, ...patch } = parsed.data;
+    const { taxRates, offlinePaymentInstructions, ...patch } = parsed.data;
+    const cfPatch: Record<string, unknown> = {};
+    if (taxRates !== undefined) cfPatch.taxRates = taxRates;
+    if (offlinePaymentInstructions !== undefined) cfPatch.offlinePaymentInstructions = offlinePaymentInstructions?.trim() || null;
     const [row] = await db.update(crmDivisions)
       .set({
         ...patch,
-        ...(taxRates !== undefined
-          ? { customFields: { ...((existing.customFields as Record<string, unknown> | null) ?? {}), taxRates } }
+        ...(Object.keys(cfPatch).length
+          ? { customFields: { ...((existing.customFields as Record<string, unknown> | null) ?? {}), ...cfPatch } }
           : {}),
         updatedAt: new Date(),
       })

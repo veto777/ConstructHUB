@@ -260,6 +260,13 @@ function PayCard({ token, company, estimate, payInfo }: {
             Pay {money(amount)}
           </Button>
         )}
+        {payInfo?.offlineInstructions && (
+          <div className="mt-4 rounded-lg border bg-muted/30 p-3 text-sm" data-testid="text-offline-pay"
+            data-track="pay_offline_info" data-track-section="pay_offline_info">
+            <div className="font-medium">Prefer to pay by check or Zelle?</div>
+            <div className="mt-1 whitespace-pre-wrap text-muted-foreground">{payInfo.offlineInstructions}</div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

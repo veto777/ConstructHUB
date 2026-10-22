@@ -38,7 +38,8 @@ import { amountDueCents, hasPayInFull } from "@shared/estimate-totals";
 import { logActivity } from "./activity";
 import { getBaseUrl } from "../auth";
 import { financingLinksSchema, financingLinksOf, getPrimaryFinancing } from "./financing";
-import { reconcileSettingsOf, receiptSettingsOf, parseDayList, offlinePaymentInstructionsOf } from "@shared/payment-settings";
+import { reconcileSettingsOf, receiptSettingsOf, parseDayList, offlinePaymentInstructionsOf, offlinePaymentInstructionsFor } from "@shared/payment-settings";
+import { resolveEstimateDivision, resolveInvoiceDivision } from "./divisions";
 import { paymentWriteLimit, paymentSettingsLimit, publicPayLimit } from "./payment-guard";
 import { uploadToR2, getR2Url } from "../r2";
 import { providerFixture, type StripeFixture } from "../tutorials/fixtures";
@@ -815,7 +816,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       achAvailable: rails.ach,
       cardFee: cardFeeQuote(org, rails, dueCents),
       financing: getPrimaryFinancing(org),
-      offlineInstructions: offlinePaymentInstructionsOf(org?.customFields),
+      offlineInstructions: offlinePaymentInstructionsFor(org?.customFields, (await resolveInvoiceDivision(inv))?.customFields),
     });
   });
 
@@ -836,6 +837,8 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       financing: getPrimaryFinancing(org),
       cardAvailable: rails.card, achAvailable: rails.ach,
       cardFee: cardFeeQuote(org, rails, amount),
+      // Check / Zelle — the estimate's division's, else the org's.
+      offlineInstructions: offlinePaymentInstructionsFor(org?.customFields, (await resolveEstimateDivision(est))?.customFields),
     });
   });
 

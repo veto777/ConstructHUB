@@ -49,6 +49,8 @@ export function CrmDivisionsManager({ onOpenWorkspace, onlyId, title = "Division
     licenseNumber: "", licenseState: "", isHeadquarters: false,
     // Sales tax (custom_fields->taxRates): division default + per-city overrides.
     taxDefaultPct: "", taxCities: "",
+    // custom_fields->offlinePaymentInstructions: this division's check / Zelle text.
+    offlinePay: "",
   };
   const [divForm, setDivForm] = useState(emptyDivision);
   const [editingDivisionId, setEditingDivisionId] = useState<string | null>(null);
@@ -100,11 +102,12 @@ export function CrmDivisionsManager({ onOpenWorkspace, onlyId, title = "Division
       };
       if (editingDivisionId) {
         // taxRates is PATCH-only on the API (merged into custom_fields).
-        return (await apiRequest("PATCH", `/api/crm/divisions/${editingDivisionId}`, { ...body, taxRates })).json();
+        return (await apiRequest("PATCH", `/api/crm/divisions/${editingDivisionId}`,
+          { ...body, taxRates, offlinePaymentInstructions: emptyToNull(divForm.offlinePay) })).json();
       }
       const created = await (await apiRequest("POST", "/api/crm/divisions", body)).json();
-      if (hasTax && created?.id) {
-        await apiRequest("PATCH", `/api/crm/divisions/${created.id}`, { taxRates });
+      if ((hasTax || divForm.offlinePay.trim()) && created?.id) {
+        await apiRequest("PATCH", `/api/crm/divisions/${created.id}`, { taxRates, offlinePaymentInstructions: emptyToNull(divForm.offlinePay) });
       }
       return created;
     },
@@ -155,6 +158,7 @@ export function CrmDivisionsManager({ onOpenWorkspace, onlyId, title = "Division
       isHeadquarters: d.isHeadquarters === true,
       taxDefaultPct: taxRates?.default != null ? String(taxRates.default / 100) : "",
       taxCities: serializeCityRates(taxRates?.cities),
+      offlinePay: s((d.customFields as any)?.offlinePaymentInstructions),
     });
     setEditingDivisionId(d.id);
     requestAnimationFrame(() => {
@@ -286,6 +290,12 @@ export function CrmDivisionsManager({ onOpenWorkspace, onlyId, title = "Division
               <Label htmlFor="div-website">Website (optional)</Label>
               <Input id="div-website" data-testid="input-division-website" placeholder="https://…"
                 value={divForm.website} onChange={setD("website")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="div-offline-pay">How to pay by check or Zelle (this division)</Label>
+              <Textarea id="div-offline-pay" rows={3} maxLength={1500} data-testid="textarea-division-offline-pay"
+                placeholder={"Checks payable to …, mailed to …\nZelle: …\nEmpty = the company-wide text in Settings → Payments"}
+                value={divForm.offlinePay} onChange={(e) => setDivForm((d) => ({ ...d, offlinePay: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="div-tax-default">Sales tax — division default (%)</Label>

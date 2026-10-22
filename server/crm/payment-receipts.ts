@@ -23,7 +23,7 @@ import type { Express } from "express";
 import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { crmCustomers, crmEstimates, crmInvoices, crmOrgs, crmPayments } from "@shared/schema";
-import { receiptSettingsOf, paymentMethodLabel, offlinePaymentInstructionsOf } from "@shared/payment-settings";
+import { receiptSettingsOf, paymentMethodLabel, offlinePaymentInstructionsFor } from "@shared/payment-settings";
 import { estimateLedger, balanceAfterPayment, LEDGER_PAID_STATUSES, invoiceDueNowCents } from "@shared/estimate-ledger";
 import { requireOrg, requirePermission, requireAnyPermission } from "./tenancy";
 import { objectPolicy } from "./object-access";
@@ -462,7 +462,7 @@ export function registerCrmPaymentReceiptRoutes(app: Express, getDevUser: GetUse
       uninvoicedDeposits: payments
         .filter((p) => !p.invoiceId && (p.status === "succeeded" || p.status === "partially_refunded"))
         .map((p) => ({ id: p.id, amountCents: p.amountCents, refundedCents: p.refundedCents, status: p.status, paidAt: p.paidAt ?? p.createdAt })),
-      offlineInstructions: offlinePaymentInstructionsOf(ctx.org.customFields),
+      offlineInstructions: offlinePaymentInstructionsFor(ctx.org.customFields, (await resolveEstimateDivision(est))?.customFields),
       sms: orgCanTextClients(ctx.org.customFields),
     });
   });

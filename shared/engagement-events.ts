@@ -185,6 +185,7 @@ export function eventLine(name: string, detail: Record<string, any> | null): str
     case "pay_click": return `Clicked Pay${d ? ` (${d})` : ""}`;
     case "financing_open": return `Opened financing${d ? ` (${d})` : ""}`;
     case "pay_open": return "Opened the payment section";
+    case "pay_offline_info": return "Looked at how to pay by check or Zelle";
     case "photo_open": return `Opened a photo${d ? ` (${d})` : ""}`;
     case "back_to_estimate": return "Went back to the estimate";
     case "section_time": case "scroll_depth": return null;

@@ -42,7 +42,7 @@ import { estimateDocText, invoiceDocText } from "./doc-defaults";
 import { recordActivity, logActivity } from "./activity";
 import { stageIndex, stageOfProjectStatus } from "@shared/job-stage";
 import { advanceJobStage, customerCurrentProject } from "./job-stage-auto";
-import { offlinePaymentInstructionsOf } from "@shared/payment-settings";
+import { offlinePaymentInstructionsFor } from "@shared/payment-settings";
 import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER } from "./sms";
 import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
 import { notifyMembers } from "./notify";
@@ -2033,7 +2033,9 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     }
 
     const link = `${getBaseUrl(req)}/i/${inv.publicToken}`;
-    const branding = companyBranding(ctx.org, await resolveInvoiceDivision(inv));
+    const invDivision = await resolveInvoiceDivision(inv);
+    const branding = companyBranding(ctx.org, invDivision);
+    const offlineInstructions = offlinePaymentInstructionsFor(ctx.org.customFields, invDivision?.customFields);
     // "Sam at Acme has sent you…" — or just "Acme has sent you…" when the
     // sender has no display name (never "Acme at Acme").
     const senderName = (ctx.member.displayName ?? "").trim();
@@ -2060,8 +2062,8 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
             </p>
             <p style="font-size:13px;color:#666">Or paste this in your browser:<br>
               <span style="word-break:break-all">${link}</span></p>
-            ${offlinePaymentInstructionsOf(ctx.org.customFields) ? `<p style="font-size:14px;margin:18px 0 4px"><strong>Prefer to pay by check or Zelle?</strong></p>
-            <p style="font-size:14px;white-space:pre-wrap;margin:0 0 18px">${esc(offlinePaymentInstructionsOf(ctx.org.customFields))}</p>` : ""}
+            ${offlineInstructions ? `<p style="font-size:14px;margin:18px 0 4px"><strong>Prefer to pay by check or Zelle?</strong></p>
+            <p style="font-size:14px;white-space:pre-wrap;margin:0 0 18px">${esc(offlineInstructions)}</p>` : ""}
             <p style="font-size:13px;color:#666">Only you can open this link — it verifies ${esc(to)}.
               If it's forwarded to anyone else, they can't get in without access to your inbox.</p>
             <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">

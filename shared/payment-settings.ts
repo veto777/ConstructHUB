@@ -122,3 +122,11 @@ export function offlinePaymentInstructionsOf(customFields: unknown): string | nu
   const v = (customFields as Record<string, any> | null | undefined)?.payments?.offlineInstructions;
   return typeof v === "string" && v.trim() ? v.trim().slice(0, 1500) : null;
 }
+
+/** The division's own check/Zelle instructions (crm_divisions.custom_fields.offlinePaymentInstructions — WA and FL
+ *  bank differently), else the org's. Null when neither is set. */
+export function offlinePaymentInstructionsFor(orgCustomFields: unknown, divisionCustomFields?: unknown): string | null {
+  const v = (divisionCustomFields as Record<string, any> | null | undefined)?.offlinePaymentInstructions;
+  if (typeof v === "string" && v.trim()) return v.trim().slice(0, 1500);
+  return offlinePaymentInstructionsOf(orgCustomFields);
+}
