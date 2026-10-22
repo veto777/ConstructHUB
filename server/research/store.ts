@@ -246,13 +246,13 @@ export function orderView(row: ResearchOrderRow): ResearchOrderView {
 }
 
 export async function createOrder(o: {
-  userId: number; email: string; tier: ResearchTier; priceCents: number; input: ResearchOrderInput; preview: ResearchPreview; terms: string;
+  userId: number; email: string; tier: ResearchTier; priceCents: number; input: ResearchOrderInput; preview: ResearchPreview | null; terms: string;
 }): Promise<ResearchOrderRow> {
   await researchSchemaReady();
   const { rows } = await pool.query(
     `INSERT INTO research_orders (user_id, email, tier, price_cents, input, preview, agreed_at, agreed_terms)
      VALUES ($1, $2, $3, $4, $5, $6, now(), $7) RETURNING *`,
-    [o.userId, o.email, o.tier, o.priceCents, JSON.stringify(o.input), JSON.stringify(o.preview), o.terms],
+    [o.userId, o.email, o.tier, o.priceCents, JSON.stringify(o.input), o.preview ? JSON.stringify(o.preview) : null, o.terms],
   );
   return rows[0];
 }

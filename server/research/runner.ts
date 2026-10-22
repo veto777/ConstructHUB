@@ -35,7 +35,8 @@ import { BULK_ID_LIMIT, BULK_LIMIT, refreshDueSources, searchBulk, searchBulkBy,
 import { SAM_SOURCE_ID } from "./sam";
 import { setKnowledgeFact } from "../hub/knowledge";
 import type { LiveLicenseSearch } from "./states/types";
-import { crossReference, enforcementKey, LicenseSet, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
+import { crossReference, enforcementKey, LicenseSet, MAX_ID_SEARCHES, nameMatches, searchCustomerIds, subjectIds, type FinderResult, type LicenseFinder } from "./xref";
+import { readWebsites, websiteIds } from "./website";
 import { companyNamed, onePersonField, personMatches } from "./licenses";
 import { ALL_BULK_SOURCES, nationwideBulkSources, allBulkSourcesFor as bulkSourcesFor, allLicenseSourcesFor as licenseSourcesFor, hasLicenseSources, liveLicenseSearchesFor, noStatewideGcLicense } from "./registry";
 import { capNote, failureNote, noteOf } from "./notes";
@@ -53,6 +54,18 @@ const MAX_PERMITS_PER_SUBJECT = 1000;
 const POLL_MS = 5_000;
 /** A whole state sweep for one name must end: past this, unfinished portals are reported as not searched. */
 const SWEEP_BUDGET_MS = 90 * 60_000;
+/**
+ * A platform admin's order (no charge; up to 50 names in every state, shared/research-reports.ts RESEARCH_ADMIN_LIMITS)
+ * runs in the one research queue like a customer's. So it can't hold paying orders for days, its permit sweeps stop
+ * starting after this long: later names still get their license, identifier, website and record searches, and their
+ * portals are listed as not searched with the reason. A customer's order has no such budget (unchanged).
+ */
+export const ADMIN_SWEEP_BUDGET_MS = 12 * 3600_000;
+/** Identifier searches per name in an admin order (customers: MAX_ID_SEARCHES). */
+export const ADMIN_MAX_ID_SEARCHES = 150;
+
+/** An order a platform admin placed with no charge (routes.ts: price 0). Customers' orders always carry a price. */
+export const isAdminOrder = (o: { price_cents?: number | null }) => o.price_cents === 0;
 
 type Db = PermitDatabase;
 
@@ -370,8 +383,11 @@ function toPermitHit(row: any, trades: ResearchTrade[]): PermitHit {
   };
 }
 
-export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id" | "input">, log = (m: string) => console.log(`[research] order ${order.id}: ${m}`)): Promise<ResearchReport> {
+export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id" | "input"> & { price_cents?: number }, log = (m: string) => console.log(`[research] order ${order.id}: ${m}`)): Promise<ResearchReport> {
   const input = order.input;
+  const admin = isAdminOrder(order);
+  const started = Date.now();
+  const maxIdSearches = admin ? ADMIN_MAX_ID_SEARCHES : MAX_ID_SEARCHES;
   const portals = await portalsInStates(input.states);
   const subjects: ResearchSubjectReport[] = [];
   for (const subject of input.subjects) {
@@ -401,12 +417,19 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
     }
     // Files that cover every state (SAM.gov exclusions, by UEI or CAGE as a license number), once per subject.
     finders.push(...nationwideFinders());
-    // The customer's license numbers, phones and addresses: the subject's own records, found another way.
-    const ids = await searchCustomerIds(finders, subjectIds(subject), subject);
+    // The websites the customer gave: read for phones, addresses and license numbers (a site that fails is noted, never fatal).
+    const websites = subject.websites?.length ? await readWebsites(subject.websites).catch(() => []) : undefined;
+    if (websites?.length) log(`websites for "${subject.name}": ${websites.map((w) => `${w.host}: ${w.note}`).join(" | ")}`);
+    // The customer's license numbers, phones and addresses, then the websites': the subject's own records, found another way.
+    const ids = await searchCustomerIds(finders, [...subjectIds(subject), ...websiteIds(websites ?? [])], subject, maxIdSearches);
     for (const h of ids.licenses) own.add(h);
     if (ids.searches.length) log(`identifiers for "${subject.name}": ${ids.searches.map((x) => `${x.query}: ${x.found}`).join(", ")}`);
     const dbs = input.states.flatMap((s) => portals.get(s) ?? []);
-    const { coverage, rows } = await sweepPortals(order.user_id, subject.name, subject.kind, dbs, log);
+    const outOfTime = admin && Date.now() - started > ADMIN_SWEEP_BUDGET_MS;
+    if (outOfTime) log(`admin order past ${ADMIN_SWEEP_BUDGET_MS / 3600_000} h: skipping the permit sweep for "${subject.name}"`);
+    const { coverage, rows } = outOfTime
+      ? { coverage: dbs.map((d): PortalCoverage => ({ jurisdiction: d.jurisdiction, outcome: "not_searched", found: 0, message: `Not searched: this large order reached its ${ADMIN_SWEEP_BUDGET_MS / 3600_000}-hour permit-search budget before this name` })), rows: [] as any[] }
+      : await sweepPortals(order.user_id, subject.name, subject.kind, dbs, log);
     const dedup = new Map<string, PermitHit>();
     for (const row of rows) {
       if (!namesMatch(subject.name, row, subject.kind)) continue;
@@ -422,7 +445,7 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       : { complaints: [], courtCases: [], osha: [], enforcement: [], sources: [{ source: "Complaints, lawsuits, enforcement and OSHA records", scope: "", searched: false, note: "Searched for companies only, not for individual people" }] };
     log(`records for "${subject.name}": ${records.complaints.length} complaint(s), ${records.courtCases.length} federal case(s), ${records.osha.length} OSHA inspection(s), ${records.enforcement.length} enforcement record(s)`);
     const xref = await crossReference({
-      subject, own, finders, searchedIds: ids.searchedIds, idSearchesUsed: ids.used, ownEnforcement: records.enforcement,
+      subject, own, finders, searchedIds: ids.searchedIds, idSearchesUsed: ids.used, maxIdSearches, ownEnforcement: records.enforcement,
       enforcementSearch: (name) => searchEnforcement(name, input.states), log,
     });
     // A person never gets enforcement records, not even related ones (FCRA; checked again here after the cross-reference).
@@ -452,6 +475,7 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       name: subject.name, kind: subject.kind, licenses: own.list.map((h) => reportHit(h, subject.kind)), permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)),
       complaints: records.complaints, courtCases: records.courtCases, osha: records.osha, enforcement, recordSources: records.sources,
       identifierSearches: ids.searches, relatedLicenses, relatedEnforcement, relatedNotes: [...ids.notes, ...xref.notes],
+      ...(websites ? { websites } : {}),
     });
   }
   const allCoverage = subjects.flatMap((s) => s.portals);

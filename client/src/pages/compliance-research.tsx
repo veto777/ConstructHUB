@@ -25,24 +25,25 @@ import { runtimeRecordsPhrase, type CoverageRuntime } from "@shared/research-cov
 import {
   RESEARCH_TIERS, RESEARCH_TRADES, RESEARCH_TRADE_KEYS, RESEARCH_PATH, COMPLIANCE_PATH,
   RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA, researchTierFor,
-  RESEARCH_MAX_LICENSE_NUMBERS, RESEARCH_MAX_PHONES, RESEARCH_MAX_ADDRESSES, RELATED_TIES, cleanLicenseNumber, formatPhone, cleanAddress,
-  type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie, ENFORCEMENT_KINDS, anySearched, recordKindOf as kindOf, reportSummary, subjectLicensesSearched, previewRecordsLine, previewLicenseLine, identifierSearchLine,
+  RELATED_TIES, cleanLicenseNumber, formatPhone, cleanAddress, cleanWebsite, researchLimitsFor, STATE_CODES,
+  type ResearchLimits, type WebsiteRead, type ResearchOrderView, type ResearchReport, type ResearchTrade, type ResearchSubjectReport, type EnforcementCategory, type LicenseHit, type EnforcementHit, type RelatedTie, ENFORCEMENT_KINDS, anySearched, recordKindOf as kindOf, reportSummary, subjectLicensesSearched, previewRecordsLine, previewLicenseLine, identifierSearchLine,
 } from "@shared/research-reports";
 import { RESEARCH_COVERAGE_PATH } from "@shared/research-coverage";
 import { ComplianceFrame } from "./compliance";
 
-/** One name on the form; the identifiers are typed as text (license numbers and phones comma-separated, addresses one per line). */
-type Subject = { name: string; kind: "person" | "company"; licenses: string; phones: string; addresses: string; showIds: boolean };
-const blankSubject = (kind: Subject["kind"]): Subject => ({ name: "", kind, licenses: "", phones: "", addresses: "", showIds: false });
+/** One name on the form; the identifiers are typed as text (license numbers, phones and websites comma-separated, addresses one per line). */
+type Subject = { name: string; kind: "person" | "company"; licenses: string; phones: string; addresses: string; websites: string; showIds: boolean };
+const blankSubject = (kind: Subject["kind"]): Subject => ({ name: "", kind, licenses: "", phones: "", addresses: "", websites: "", showIds: false });
 const splitList = (v: string, sep: RegExp) => v.split(sep).map((x) => x.trim()).filter(Boolean);
 /** The identifiers as the API takes them, plus the entries the shared rules reject (shown under the field). */
-function subjectIds(s: Subject) {
+function subjectIds(s: Subject, limits: ResearchLimits) {
   const lists = {
-    licenseNumbers: { values: splitList(s.licenses, /[,;\n]/), check: cleanLicenseNumber, max: RESEARCH_MAX_LICENSE_NUMBERS },
-    phones: { values: splitList(s.phones, /[,;\n]/), check: formatPhone, max: RESEARCH_MAX_PHONES },
-    addresses: { values: splitList(s.addresses, /\n/), check: cleanAddress, max: RESEARCH_MAX_ADDRESSES },
+    licenseNumbers: { values: splitList(s.licenses, /[,;\n]/), check: cleanLicenseNumber, max: limits.licenseNumbers },
+    phones: { values: splitList(s.phones, /[,;\n]/), check: formatPhone, max: limits.phones },
+    addresses: { values: splitList(s.addresses, /\n/), check: cleanAddress, max: limits.addresses },
+    websites: { values: splitList(s.websites, /[,;\s]+/), check: cleanWebsite, max: limits.websites },
   };
-  const out: { licenseNumbers?: string[]; phones?: string[]; addresses?: string[] } = {};
+  const out: { licenseNumbers?: string[]; phones?: string[]; addresses?: string[]; websites?: string[] } = {};
   const problems: Partial<Record<keyof typeof lists, string>> = {};
   for (const [k, l] of Object.entries(lists) as [keyof typeof lists, (typeof lists)[keyof typeof lists]][]) {
     const bad = l.values.filter((v) => !l.check(v));
@@ -52,8 +53,6 @@ function subjectIds(s: Subject) {
   }
   return { ids: out, problems, count: Object.values(out).reduce((n, l) => n + (l?.length ?? 0), 0) };
 }
-const MAX_NAMES = RESEARCH_TIERS.extended.maxNames;
-const MAX_STATES = RESEARCH_TIERS.extended.maxStates;
 
 function Terms() {
   return (
@@ -69,6 +68,10 @@ export default function ResearchOrderPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  // A platform admin (the server decides, /api/auth/me): no tier, no price, every state, the admin ceilings (owner, 2026-10-22).
+  const isAdmin = user?.isPlatformAdmin === true;
+  const limits = researchLimitsFor(isAdmin);
+  const MAX_NAMES = limits.names, MAX_STATES = limits.states;
   // OSHA and SAM.gov are named only when the running server has them (A9; round 5, decision 11): not on first render.
   const { data: runtime } = useQuery<CoverageRuntime>({ queryKey: ["/api/research-reports/coverage-runtime"], retry: false, staleTime: 600_000 });
   const { data: orders } = useQuery<ResearchOrderView[]>({ queryKey: ["/api/research-reports/orders"], enabled: !!user });
@@ -83,15 +86,17 @@ export default function ResearchOrderPage() {
 
   const named = subjects.filter((s) => s.name.trim().length >= 2);
   const tier = researchTierFor(named.length, states.length);
-  const idsOk = named.every((s) => !Object.keys(subjectIds(s).problems).length);
-  const ready = !!tier && idsOk && agree.refund && agree.guarantee && agree.fcra;
+  const idsOk = named.every((s) => !Object.keys(subjectIds(s, limits).problems).length);
+  const adminReady = isAdmin && named.length >= 1 && named.length <= MAX_NAMES && states.length >= 1;
+  const ready = isAdmin ? adminReady && idsOk : !!tier && idsOk && agree.refund && agree.guarantee && agree.fcra;
   const setSubject = (i: number, patch: Partial<Subject>) => setSubjects((p) => p.map((x, j) => j === i ? { ...x, ...patch } : x));
 
   const create = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/research-reports/orders", {
-      subjects: named.map((s) => ({ name: s.name.trim(), kind: s.kind, ...subjectIds(s).ids })), states, trades,
+      subjects: named.map((s) => ({ name: s.name.trim(), kind: s.kind, ...subjectIds(s, limits).ids })), states, trades,
       sinceYear: /^\d{4}$/.test(sinceYear) ? Number(sinceYear) : null, purpose, notes,
-      agreeNonRefundable: agree.refund, agreeNoGuarantee: agree.guarantee, agreeNotFcra: agree.fcra,
+      // An admin runs the report for the team with no charge: the customer agreements don't apply (the form hides them).
+      agreeNonRefundable: isAdmin || agree.refund, agreeNoGuarantee: isAdmin || agree.guarantee, agreeNotFcra: isAdmin || agree.fcra,
     })).json() as Promise<ResearchOrderView>,
     onSuccess: (o) => navigate(`${RESEARCH_PATH}/orders/${o.id}`),
     onError: (err) => toast({ title: "Couldn't create the order", description: apiErrorMessage(err), variant: "destructive" }),
@@ -132,7 +137,7 @@ export default function ResearchOrderPage() {
       <section className="g-callout max-w-3xl" data-testid="section-research-what" aria-labelledby="research-how">
         <h2 id="research-how">How this works</h2>
         <ol className="mt-1 list-decimal space-y-1 pl-5">
-          <li>Add the names (Company or Person), pick up to {MAX_STATES} states and, if you like, the trades to list first. License numbers, phones and addresses you already know can be added at no extra charge.</li>
+          <li>Add the names (Company or Person), pick up to {MAX_STATES} states and, if you like, the trades to list first. License numbers, phones, addresses and websites you already know can be added at no extra charge.</li>
           <li>Tick the three agreements and continue. You see a free preview of what will be searched before you pay.</li>
           <li>Pay to start the research. The bot searches the state license records, every city and county permit portal we can reach in those states{runtimeRecordsPhrase(runtime) ? `, and for companies the complaint and enforcement records${runtimeRecordsPhrase(runtime)}` : ", and for companies the complaint and enforcement records"}; we email you when the report is ready.</li>
         </ol>
@@ -141,8 +146,17 @@ export default function ResearchOrderPage() {
         </div>
       </section>
 
+      {isAdmin && (
+        <div className="rounded-lg border border-primary p-4 max-w-3xl" data-testid="card-tier-admin">
+          <p className="font-semibold">Admin: unlimited, no charge</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Up to {MAX_NAMES} names in any number of states (all {MAX_STATES} if you like), up to {limits.licenseNumbers} license numbers, phones,
+            addresses and websites per name. No tier, no checkout: the report runs as soon as you submit.
+          </p>
+        </div>
+      )}
       {/* Picking a card shapes the form; the price always follows what's entered (one name in one state is Standard). */}
-      <div className="grid gap-3 sm:grid-cols-2 max-w-3xl" role="group" aria-label="Report size">
+      {!isAdmin && <div className="grid gap-3 sm:grid-cols-2 max-w-3xl" role="group" aria-label="Report size">
         {(Object.keys(RESEARCH_TIERS) as (keyof typeof RESEARCH_TIERS)[]).map((k) => (
           <button key={k} type="button" onClick={() => pickTier(k)} aria-pressed={tier === k}
             className={`rounded-lg border p-4 text-left transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tier === k ? "border-primary ring-1 ring-primary" : ""}`}
@@ -154,8 +168,8 @@ export default function ResearchOrderPage() {
             </p>
           </button>
         ))}
-      </div>
-      {wantExtended && tier === "standard" && (
+      </div>}
+      {!isAdmin && wantExtended && tier === "standard" && (
         <p className="text-sm text-muted-foreground max-w-3xl -mt-4" data-testid="text-extended-hint">
           Add a second name or a second state for the Extended report. With one name in one state you pay the Standard price.
         </p>
@@ -166,7 +180,7 @@ export default function ResearchOrderPage() {
           <legend className="font-semibold">Who should we look for?</legend>
           <p className="text-sm text-muted-foreground">Pick <strong>Person</strong> for an owner, officer or qualifier: we match the people named on licenses.</p>
           {subjects.map((s, i) => {
-            const { problems, count } = subjectIds(s);
+            const { problems, count } = subjectIds(s, limits);
             return (
             <div key={i} className="space-y-2 rounded-lg border p-3" data-testid={`subject-${i}`}>
               <div className="flex flex-col sm:flex-row gap-2">
@@ -190,24 +204,29 @@ export default function ResearchOrderPage() {
               <button type="button" className="inline-flex items-center gap-1 text-sm text-primary hover:underline" aria-expanded={s.showIds}
                 onClick={() => setSubject(i, { showIds: !s.showIds })} data-testid={`button-ids-${i}`}>
                 <ChevronDown className={`h-4 w-4 transition-transform ${s.showIds ? "rotate-180" : ""}`} aria-hidden="true" />
-                Also search by license number, phone or address{count ? ` (${count})` : ""} <span className="text-muted-foreground">(optional, no extra charge)</span>
+                Also search by license number, phone, address or website{count ? ` (${count})` : ""} <span className="text-muted-foreground">(optional, no extra charge)</span>
               </button>
               {s.showIds && (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor={`lic-${i}`}>License numbers <span className="font-normal text-muted-foreground">(up to {RESEARCH_MAX_LICENSE_NUMBERS}, comma-separated)</span></Label>
+                    <Label htmlFor={`lic-${i}`}>License numbers <span className="font-normal text-muted-foreground">(up to {limits.licenseNumbers}, comma-separated)</span></Label>
                     <Input id={`lic-${i}`} value={s.licenses} onChange={(e) => setSubject(i, { licenses: e.target.value })} placeholder="e.g. CGC1512345, EC13008123" maxLength={260} className="mt-1.5" data-testid={`input-licenses-${i}`} aria-invalid={!!problems.licenseNumbers} />
                     {problems.licenseNumbers && <p className="mt-1 text-xs text-destructive">{problems.licenseNumbers}</p>}
                   </div>
                   <div>
-                    <Label htmlFor={`tel-${i}`}>Phone numbers <span className="font-normal text-muted-foreground">(up to {RESEARCH_MAX_PHONES}, comma-separated)</span></Label>
+                    <Label htmlFor={`tel-${i}`}>Phone numbers <span className="font-normal text-muted-foreground">(up to {limits.phones}, comma-separated)</span></Label>
                     <Input id={`tel-${i}`} type="tel" value={s.phones} onChange={(e) => setSubject(i, { phones: e.target.value })} placeholder="e.g. (813) 555-0142" maxLength={100} className="mt-1.5" data-testid={`input-phones-${i}`} aria-invalid={!!problems.phones} />
                     {problems.phones && <p className="mt-1 text-xs text-destructive">{problems.phones}</p>}
                   </div>
                   <div className="sm:col-span-2">
-                    <Label htmlFor={`addr-${i}`}>Street addresses <span className="font-normal text-muted-foreground">(up to {RESEARCH_MAX_ADDRESSES}, one per line)</span></Label>
+                    <Label htmlFor={`addr-${i}`}>Street addresses <span className="font-normal text-muted-foreground">(up to {limits.addresses}, one per line)</span></Label>
                     <Textarea id={`addr-${i}`} rows={2} value={s.addresses} onChange={(e) => setSubject(i, { addresses: e.target.value })} placeholder="e.g. 123 Main St, Tampa FL 33602" maxLength={620} className="mt-1.5" data-testid={`input-addresses-${i}`} aria-invalid={!!problems.addresses} />
                     {problems.addresses && <p className="mt-1 text-xs text-destructive">{problems.addresses}. An address needs a house number and street.</p>}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label htmlFor={`web-${i}`}>Websites <span className="font-normal text-muted-foreground">(up to {limits.websites}, comma-separated; we read the homepage and its contact and about pages for phones, addresses and license numbers)</span></Label>
+                    <Input id={`web-${i}`} value={s.websites} onChange={(e) => setSubject(i, { websites: e.target.value })} placeholder="e.g. acme-electric.com" maxLength={isAdmin ? 4000 : 400} className="mt-1.5" data-testid={`input-websites-${i}`} aria-invalid={!!problems.websites} />
+                    {problems.websites && <p className="mt-1 text-xs text-destructive">{problems.websites}. A website is a public address like acme-electric.com.</p>}
                   </div>
                 </div>
               )}
@@ -222,7 +241,13 @@ export default function ResearchOrderPage() {
         </fieldset>
 
         <fieldset className="space-y-2">
-          <legend className="font-semibold">Which states? <span className="font-normal text-muted-foreground text-sm">(up to {MAX_STATES})</span></legend>
+          <legend className="font-semibold">Which states? <span className="font-normal text-muted-foreground text-sm">({isAdmin ? "any number" : `up to ${MAX_STATES}`})</span></legend>
+          {isAdmin && (
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setStates(US_STATES.map((x) => x.code).filter((c) => (STATE_CODES as readonly string[]).includes(c)))} data-testid="button-states-all">All states</Button>
+              {states.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => setStates([])} data-testid="button-states-clear">Clear</Button>}
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5" data-testid="list-states">
             {US_STATES.map((s) => (
               <button key={s.code} type="button" onClick={() => toggleState(s.code)} title={s.name} aria-pressed={states.includes(s.code)}
@@ -262,20 +287,22 @@ export default function ResearchOrderPage() {
           <p className="text-xs text-muted-foreground mt-1" data-testid="text-notes-help">Saved with the order and shown on its page, and in the email our team gets when it is paid ({notes.length}/500). It does not change the price or what the bot searches.</p>
         </div>
 
-        <fieldset className="space-y-3 rounded-lg border p-4">
+        {!isAdmin && <fieldset className="space-y-3 rounded-lg border p-4">
           <legend className="px-1 font-semibold">Before you pay</legend>
           <label className="flex items-start gap-2 text-sm"><Checkbox className="mt-0.5" checked={agree.refund} onCheckedChange={(v) => setAgree((a) => ({ ...a, refund: v === true }))} data-testid="checkbox-agree-refund" /><span>{RESEARCH_NONREFUNDABLE}</span></label>
           <label className="flex items-start gap-2 text-sm"><Checkbox className="mt-0.5" checked={agree.guarantee} onCheckedChange={(v) => setAgree((a) => ({ ...a, guarantee: v === true }))} data-testid="checkbox-agree-guarantee" /><span>{RESEARCH_NO_GUARANTEE}</span></label>
           <label className="flex items-start gap-2 text-sm"><Checkbox className="mt-0.5" checked={agree.fcra} onCheckedChange={(v) => setAgree((a) => ({ ...a, fcra: v === true }))} data-testid="checkbox-agree-fcra" /><span>{RESEARCH_NOT_FCRA}</span></label>
           <p className="text-xs text-muted-foreground">See our <Link href="/terms" className="underline">Terms of Use</Link>, section 10.</p>
-        </fieldset>
+        </fieldset>}
 
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={(!!user && !ready) || create.isPending} data-testid="button-research-continue">
             {create.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-            {!user ? "Sign in to continue" : tier && !idsOk ? "Fix the highlighted entries" : tier ? `Continue: ${RESEARCH_TIERS[tier].label}, ${formatUsd(RESEARCH_TIERS[tier].cents)}` : "Add a name and a state"}
+            {!user ? "Sign in to continue"
+              : isAdmin ? (adminReady && !idsOk ? "Fix the highlighted entries" : adminReady ? "Run report (admin, no charge)" : "Add a name and a state")
+              : tier && !idsOk ? "Fix the highlighted entries" : tier ? `Continue: ${RESEARCH_TIERS[tier].label}, ${formatUsd(RESEARCH_TIERS[tier].cents)}` : "Add a name and a state"}
           </Button>
-          <span className="text-xs text-muted-foreground">You'll see a free preview before you pay.</span>
+          <span className="text-xs text-muted-foreground">{isAdmin ? "Runs right away; nothing is charged." : "You'll see a free preview before you pay."}</span>
         </div>
       </form>
 
@@ -448,6 +475,34 @@ function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
 }
 
 const FOUND_BY: Partial<Record<LicenseHit["matchedOn"], string>> = { license: "Found by license number", phone: "Found by phone", address: "Found by address" };
+const ID_WORD: Partial<Record<LicenseHit["matchedOn"], string>> = { license: "license number", phone: "phone", address: "address" };
+/** "Found by phone", or for an identifier read off a website "Found from website acme.com (phone)". */
+const foundBy = (l: LicenseHit): string | undefined => (l.fromWebsite && ID_WORD[l.matchedOn] ? `Found from website ${l.fromWebsite} (${ID_WORD[l.matchedOn]})` : FOUND_BY[l.matchedOn]);
+
+/** What the bot read on each website the customer gave, or why it couldn't. */
+function SubjectWebsites({ s, i }: { s: ResearchSubjectReport; i: number }) {
+  if (!s.websites?.length) return null;
+  const list = (label: string, v: string[]) => (v.length ? <p><span className="text-muted-foreground">{label}:</span> {v.join(" · ")}</p> : null);
+  return (
+    <div className="space-y-2" data-testid={`section-websites-${i}`}>
+      <h3 className="font-semibold">Websites ({s.websites.length})</h3>
+      <p className="text-xs text-muted-foreground">We read each website's homepage and a few of its contact and about pages. The phones, addresses and license numbers found there were searched like the ones you gave; records found that way say which website they came from.</p>
+      <ul className="space-y-2">
+        {s.websites.map((w: WebsiteRead, j) => (
+          <li key={j} className="rounded-lg border p-3 text-sm space-y-1" data-testid={`website-${i}-${j}`}>
+            <p className="font-medium">{w.host} {w.read ? <CheckCircle2 className="inline h-3.5 w-3.5 text-green-600" aria-hidden="true" /> : <XCircle className="inline h-3.5 w-3.5 text-amber-600" aria-hidden="true" />}</p>
+            <p className="text-xs text-muted-foreground">{w.note}</p>
+            {list("Business names on the site", w.names)}
+            {list("Phones", w.phones)}
+            {list("Addresses", w.addresses)}
+            {list("License numbers", w.licenseNumbers)}
+            {w.pages.length > 0 && <p className="text-xs text-muted-foreground break-all">Pages read: {w.pages.join(", ")}</p>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /** Everyone named on a license, with their role ("Jane Doe, qualifier"). */
 function People({ l }: { l: LicenseHit }) {
@@ -469,7 +524,7 @@ function LicenseTable({ rows, testId, related }: { rows: LicenseHit[]; testId: s
           <tr className="border-b align-top">
             <td className="py-2 pr-3">{l.businessName ?? "—"}</td>
             <td className="pr-3"><People l={l} /></td>
-            <td className="pr-3 font-mono text-xs whitespace-nowrap">{l.licenseNumber ?? "—"}{!related && FOUND_BY[l.matchedOn] ? <span className="block font-sans text-muted-foreground">{FOUND_BY[l.matchedOn]}</span> : null}</td>
+            <td className="pr-3 font-mono text-xs whitespace-nowrap">{l.licenseNumber ?? "—"}{!related && foundBy(l) ? <span className="block font-sans text-muted-foreground">{foundBy(l)}</span> : null}</td>
             <td className="pr-3">{[l.licenseType, l.specialty].filter(Boolean).join(" · ") || "—"}</td><td className="pr-3">{l.status ?? "Status not stated"}{l.expires ? ` (exp. ${l.expires})` : ""}</td>
             <td className="pr-3">{l.address ?? l.city ?? "—"}{l.phone ? <span className="block whitespace-nowrap">{formatPhone(l.phone) ?? l.phone}</span> : null}</td>
             <td className="whitespace-nowrap"><a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">{l.state} data</a><span className="block text-xs text-muted-foreground max-w-[12rem] whitespace-normal">{l.source}</span></td>
@@ -484,7 +539,7 @@ function LicenseTable({ rows, testId, related }: { rows: LicenseHit[]; testId: s
             <p>{l.status ?? "Status not stated"}{l.expires ? ` (exp. ${l.expires})` : ""}</p>
             {(l.people?.length || l.principal) && <div className="text-xs"><People l={l} /></div>}
             {(l.address || l.city || l.phone) && <p className="text-xs text-muted-foreground">{[l.address ?? l.city, l.phone ? formatPhone(l.phone) ?? l.phone : null].filter(Boolean).join(" · ")}</p>}
-            {!related && FOUND_BY[l.matchedOn] && <p className="text-xs text-muted-foreground">{FOUND_BY[l.matchedOn]}</p>}
+            {!related && foundBy(l) && <p className="text-xs text-muted-foreground">{foundBy(l)}</p>}
             <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">{l.state}: {l.source}</a>
           </li>
         ))}
@@ -513,9 +568,9 @@ function RelatedRecords({ s, i }: { s: ResearchSubjectReport; i: number }) {
     <div className="space-y-3" data-testid={`section-related-${i}`}>
       {(yourLic.length > 0 || yourEnf.length > 0) && (
         <div className="space-y-1.5" data-testid={`related-yours-${i}`}>
-          <h3 className="font-semibold">Matched by the license number, phone or address you gave ({yourLic.length + yourEnf.length})</h3>
+          <h3 className="font-semibold">Matched by the license number, phone or address you gave{[...yourLic, ...yourEnf].some((h) => h.fromWebsite) ? " or we found on a website" : ""} ({yourLic.length + yourEnf.length})</h3>
           <p className="text-sm text-muted-foreground">
-            These records carry an identifier you gave us but a different name than {s.name}, so they are not shown as {s.name}'s
+            These records carry an identifier you gave us{[...yourLic, ...yourEnf].some((h) => h.fromWebsite) ? " (or one read off a website you gave)" : ""} but a different name than {s.name}, so they are not shown as {s.name}'s
             own. They may belong to someone else who shares that number or address.
           </p>
           {yourLic.length > 0 && <LicenseTable rows={yourLic} related testId={`table-related-yours-${i}`} />}
@@ -578,6 +633,8 @@ function SubjectReport({ s, i }: { s: ResearchSubjectReport; i: number }) {
         )}
         {s.licenses.length > 0 && <LicenseTable rows={s.licenses} testId={`table-licenses-${i}`} />}
       </div>
+
+      <SubjectWebsites s={s} i={i} />
 
       <RelatedRecords s={s} i={i} />
 
@@ -654,8 +711,8 @@ export function ResearchOrderStatusPage() {
               actions={<><StatusBadge status={o.status} />
                 {o.status === "complete" && <Button variant="outline" size="sm" className="print:hidden" onClick={() => window.print()} data-testid="button-print"><Printer className="mr-1.5 h-4 w-4" aria-hidden="true" /> Print / save PDF</Button>}</>}
             />
-            {o.input.subjects.filter((s) => s.licenseNumbers?.length || s.phones?.length || s.addresses?.length).map((s, j) => (
-              <p key={j} className="text-xs text-muted-foreground mt-2">{s.name}, also by: {[...(s.licenseNumbers ?? []).map((v) => `license ${v}`), ...(s.phones ?? []), ...(s.addresses ?? [])].join(" · ")}</p>
+            {o.input.subjects.filter((s) => s.licenseNumbers?.length || s.phones?.length || s.addresses?.length || s.websites?.length).map((s, j) => (
+              <p key={j} className="text-xs text-muted-foreground mt-2">{s.name}, also by: {[...(s.licenseNumbers ?? []).map((v) => `license ${v}`), ...(s.phones ?? []), ...(s.addresses ?? []), ...(s.websites ?? []).map((v) => `website ${v}`)].join(" · ")}</p>
             ))}
             {!!o.input.purpose && <p className="text-xs text-muted-foreground mt-2" data-testid="text-order-purpose">Purpose: {o.input.purpose}</p>}
             {!!o.input.notes && <p className="text-sm mt-2 whitespace-pre-wrap" data-testid="text-order-notes"><span className="font-semibold">Note with the order:</span> {o.input.notes}</p>}
@@ -689,7 +746,7 @@ export function ResearchOrderStatusPage() {
           )}
           {(o.status === "paid" || o.status === "researching") && (
             <div className="g-callout max-w-3xl" data-testid="text-researching">
-              <h2 className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Paid. The research bot is {o.status === "paid" ? "about to start" : "searching now"}.</h2>
+              <h2 className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> {o.priceCents === 0 ? "Admin run, no charge." : "Paid."} The research bot is {o.status === "paid" ? "about to start" : "searching now"}.</h2>
               <p>Big states can take a few hours; we'll email you when the report is ready, and this page refreshes itself.</p>
               {/* What will appear: the report's sections as the code renders them (SubjectReport). No sample content. */}
               <p className="mt-2">What the report will show for each name: License records, Related licenses and businesses (with what ties each one), Permits{o.input.subjects.some((s) => s.kind === "company") ? ", and for the company Consumer complaints, State enforcement and standing records, Federal court cases and OSHA inspections" : ""}, then the list of every portal that was searched or could not be. Every row links to the agency's or portal's own record; a source that did not run is shown as “not searched”, never as zero found.</p>

@@ -65,6 +65,22 @@ const text = (label: string, max: number) => z.string({ required_error: `${label
 export const RESEARCH_MAX_LICENSE_NUMBERS = 5;
 export const RESEARCH_MAX_PHONES = 3;
 export const RESEARCH_MAX_ADDRESSES = 3;
+/** Websites the bot reads for a name (homepage plus a few contact/about pages each), owner 2026-10-22. */
+export const RESEARCH_MAX_WEBSITES = 3;
+
+/** What one order may hold: names, states and identifiers per name. */
+export type ResearchLimits = { names: number; states: number; licenseNumbers: number; phones: number; addresses: number; websites: number };
+/** A customer's order: the Extended report's limits. */
+export const RESEARCH_LIMITS: ResearchLimits = {
+  names: RESEARCH_EXTENDED_MAX_NAMES, states: RESEARCH_EXTENDED_MAX_STATES,
+  licenseNumbers: RESEARCH_MAX_LICENSE_NUMBERS, phones: RESEARCH_MAX_PHONES, addresses: RESEARCH_MAX_ADDRESSES, websites: RESEARCH_MAX_WEBSITES,
+};
+/**
+ * A platform admin's order (owner, 2026-10-22: "for the ADMIN account there should be zero restrictions"): no tier and
+ * no charge, every state; the hard ceilings are only there against a runaway request.
+ */
+export const RESEARCH_ADMIN_LIMITS: ResearchLimits = { names: 50, states: STATE_CODES.length, licenseNumbers: 25, phones: 25, addresses: 25, websites: 25 };
+export const researchLimitsFor = (admin: boolean): ResearchLimits => (admin ? RESEARCH_ADMIN_LIMITS : RESEARCH_LIMITS);
 
 /** A list of optional identifiers: blanks dropped, each checked and normalized by shared/identifiers.ts, duplicates merged. */
 const idList = (label: string, max: number, max1: number, check: (v: string) => string | null, bad: string) =>
@@ -84,20 +100,51 @@ export const formatPhone = (v: string): string | null => { const n = normPhone(v
 /** A street address with a house number (a city alone is not one), spaces collapsed. */
 export const cleanAddress = (v: string): string | null => (addressKeys(v).length ? v.replace(/\s+/g, " ").trim() : null);
 
-export const researchSubjectSchema = z.object({
+/** Top-level names that never resolve on the public internet (RFC 2606, 6761, 6762, 8375 and common private zones). */
+const PRIVATE_TLDS = new Set(["local", "localhost", "localdomain", "internal", "intranet", "lan", "home", "corp", "private", "test", "example", "invalid", "onion", "arpa", "alt", "domain", "workgroup"]);
+/**
+ * A website as the bare host the bot reads ("https://www.Acme-Electric.com/contact?x=1" → "acme-electric.com"), or
+ * null for anything that isn't a public internet name: an IP address, localhost, a single word, a private or reserved
+ * top-level name, a URL with a login in it, a scheme other than http(s).
+ */
+export function cleanWebsite(v: string): string | null {
+  const raw = (v ?? "").trim();
+  if (!raw || raw.length > 300 || /\s/.test(raw)) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `http://${raw.replace(/^\/\//, "")}`;
+  let u: URL;
+  try { u = new URL(withScheme); } catch { return null; }
+  if (!/^https?:$/.test(u.protocol) || u.username || u.password) return null;
+  let host = u.hostname.toLowerCase().replace(/\.$/, "");
+  if (!host || host.startsWith("[") || host.includes(":")) return null; // IPv6 literal
+  if (/^\d+(\.\d+){0,3}$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) return null; // IPv4 literal (any form)
+  host = host.replace(/^www\d*\./, "");
+  if (host.length > 253) return null;
+  const labels = host.split(".");
+  if (labels.length < 2 || labels.some((l) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(l))) return null;
+  const tld = labels[labels.length - 1];
+  if (!/^(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})$/.test(tld) || PRIVATE_TLDS.has(tld)) return null;
+  if (labels.some((l) => l === "localhost")) return null;
+  return host;
+}
+
+const makeSubjectSchema = (l: ResearchLimits) => z.object({
   name: text("Name", 120).min(2, "Each name needs at least 2 characters"),
   /** "person" also covers owners: it matches the people named on licenses (owners, officers, qualifiers). */
   kind: z.enum(["person", "company"]),
   /** Optional ways to find the same contractor besides the name (orders before 2026-10-15 have none). */
-  licenseNumbers: idList("License number", RESEARCH_MAX_LICENSE_NUMBERS, 40, cleanLicenseNumber, "doesn't look like a license number (it needs at least 3 letters or digits, one of them a digit)"),
-  phones: idList("Phone number", RESEARCH_MAX_PHONES, 30, formatPhone, "isn't a 10-digit US phone number"),
-  addresses: idList("Address", RESEARCH_MAX_ADDRESSES, 200, cleanAddress, "needs a house number and street, e.g. 123 Main St, Tampa FL 33602"),
+  licenseNumbers: idList("License number", l.licenseNumbers, 40, cleanLicenseNumber, "doesn't look like a license number (it needs at least 3 letters or digits, one of them a digit)"),
+  phones: idList("Phone number", l.phones, 30, formatPhone, "isn't a 10-digit US phone number"),
+  addresses: idList("Address", l.addresses, 200, cleanAddress, "needs a house number and street, e.g. 123 Main St, Tampa FL 33602"),
+  /** Websites the bot reads for more phones, addresses and license numbers (orders before 2026-10-22 have none). */
+  websites: idList("Website", l.websites, 300, cleanWebsite, "isn't a public website address, e.g. acme-electric.com"),
 });
+
+export const researchSubjectSchema = makeSubjectSchema(RESEARCH_LIMITS);
 export type ResearchSubjectInput = z.infer<typeof researchSubjectSchema>;
 
-export const researchOrderSchema = z.object({
-  subjects: z.array(researchSubjectSchema).min(1, "Add at least one name").max(RESEARCH_EXTENDED_MAX_NAMES, `Up to ${RESEARCH_EXTENDED_MAX_NAMES} names per report`),
-  states: z.array(z.enum(STATE_CODES)).min(1, "Pick at least one state").max(RESEARCH_EXTENDED_MAX_STATES, `Up to ${RESEARCH_EXTENDED_MAX_STATES} states per report`),
+const makeOrderSchema = (l: ResearchLimits) => z.object({
+  subjects: z.array(makeSubjectSchema(l)).min(1, "Add at least one name").max(l.names, `Up to ${l.names} names per report`),
+  states: z.array(z.enum(STATE_CODES)).min(1, "Pick at least one state").max(l.states, `Up to ${l.states} states per report`),
   trades: z.array(z.enum(RESEARCH_TRADE_KEYS as [ResearchTrade, ...ResearchTrade[]])).max(RESEARCH_TRADE_KEYS.length).default([]),
   /** Only permits on or after this year are kept (rows without a date are kept and marked). */
   sinceYear: z.number().int().min(1980).max(2100).nullable().default(null),
@@ -108,6 +155,12 @@ export const researchOrderSchema = z.object({
   agreeNoGuarantee: z.literal(true, { errorMap: () => ({ message: "Please accept that results are not guaranteed" }) }),
   agreeNotFcra: z.literal(true, { errorMap: () => ({ message: "Please confirm you won't use the report for an FCRA purpose" }) }),
 });
+
+/** A customer's order. */
+export const researchOrderSchema = makeOrderSchema(RESEARCH_LIMITS);
+/** A platform admin's order: the same fields under RESEARCH_ADMIN_LIMITS (checked on the server by isPlatformAdmin). */
+export const researchAdminOrderSchema = makeOrderSchema(RESEARCH_ADMIN_LIMITS);
+export const researchOrderSchemaFor = (admin: boolean) => (admin ? researchAdminOrderSchema : researchOrderSchema);
 export type ResearchOrderInput = z.infer<typeof researchOrderSchema>;
 
 // ── What the API returns ─────────────────────────────────────────────────────────────────────────────────────────
@@ -130,6 +183,8 @@ export type LicenseHit = {
   relatedTie?: RelatedTie;
   /** Found only by a license number, phone or address the customer gave; it names someone else (absent before 2026-10-15). */
   byYourIdentifier?: boolean;
+  /** The website (bare host) whose license number, phone or address found this record (absent before 2026-10-22). */
+  fromWebsite?: string;
   /**
    * Who holds the license, as the publisher says (license class, entity type, an individual credential such as a
    * journeyman or qualifier card): "business", "individual", or null when the publisher doesn't say. Only a
@@ -199,6 +254,18 @@ export type EnforcementHit = {
   relatedTie?: RelatedTie;
   /** Found only by a license number, phone or address the customer gave (absent before 2026-10-15). */
   byYourIdentifier?: boolean;
+  /** The website (bare host) whose identifier found this record (absent before 2026-10-22). */
+  fromWebsite?: string;
+};
+
+/**
+ * What the bot read on one website the customer gave (owner, 2026-10-22): the pages it could read and the business
+ * names, phones, street addresses and license numbers on them. The phones, addresses and license numbers are then
+ * searched like the customer's own identifiers, each record found that way saying which website it came from.
+ */
+export type WebsiteRead = {
+  host: string; read: boolean; pages: string[]; note: string;
+  names: string[]; phones: string[]; addresses: string[]; licenseNumbers: string[];
 };
 
 /**
@@ -231,6 +298,8 @@ export type ResearchSubjectReport = {
   relatedEnforcement?: EnforcementHit[];
   /** What the cross-reference pass searched, and what it left out (caps, ties too common to mean anything). */
   relatedNotes?: string[];
+  /** What was read on each website the customer gave (absent before 2026-10-22, or when none was given). */
+  websites?: WebsiteRead[];
   /** Set when shownReport dropped records of a source withdrawn after the report was made (round 8, finding 4). */
   withdrawnNote?: string;
 };

@@ -1,7 +1,10 @@
 /**
  * Research report API (shared/research-reports.ts):
  *   POST /api/research-reports/orders           validate the request + the three agreements, price it on the server,
- *                                               store it with a free preview (awaiting payment)
+ *                                               store it with a free preview (awaiting payment). A platform admin's
+ *                                               order (owner, 2026-10-22: zero restrictions) is checked against
+ *                                               RESEARCH_ADMIN_LIMITS instead, needs no tier, and is queued at once
+ *                                               with no charge (the same admin-run path as /run)
  *   POST /api/research-reports/orders/:id/checkout   Stripe Checkout for that order (paid up front, non-refundable)
  *   GET  /api/research-reports/orders           my orders (an admin: everyone's, ?all=1)
  *   GET  /api/research-reports/orders/:id       one order, with the report when complete (owner or admin)
@@ -10,7 +13,7 @@
  *   GET  /api/research-reports/coverage-facets   public: what each loaded state file is indexed by (the coverage page)
  * The webhook side is fulfilResearchCheckout, called from server/stripe.ts applyOneTimeCheckout.
  */
-import type { Express, Request, Response } from "express";
+import type { Express, Request, RequestHandler, Response } from "express";
 import type Stripe from "stripe";
 import { stripe } from "../billing/client";
 import { appReturnBaseUrl } from "../site-context";
@@ -19,7 +22,7 @@ import { isPlatformAdmin } from "../admin";
 import { sendWithFallback } from "../email";
 import { escapeHtml, firstZodMessage } from "../route-guards";
 import {
-  researchOrderSchema, researchTierFor, RESEARCH_TIERS, RESEARCH_PATH,
+  researchOrderSchemaFor, researchTierFor, RESEARCH_TIERS, RESEARCH_PATH,
   RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_NOT_FCRA,
 } from "@shared/research-reports";
 import { buildPreview, drainResearchQueue } from "./runner";
@@ -32,7 +35,9 @@ const TERMS_SNAPSHOT = [RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_
 
 type Deps = { getOrCreateCustomer: (userId: number, email: string) => Promise<string>; sendStripeError: (res: Response, err: any) => unknown };
 
-const orderLimit = rateLimit("research-order", 10, 20, 3600_000);
+const customerOrderLimit = rateLimit("research-order", 10, 20, 3600_000);
+/** Customers: ten orders an hour. Platform admins aren't rate limited here (RESEARCH_ADMIN_LIMITS bounds each order). */
+const orderLimit: RequestHandler = (req, res, next) => (isPlatformAdmin((req as any).user) ? next() : customerOrderLimit(req, res, next));
 
 export function registerResearchRoutes(app: Express, deps: Deps) {
   const own = async (req: Request, res: Response) => {
@@ -48,12 +53,22 @@ export function registerResearchRoutes(app: Express, deps: Deps) {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Sign in to order a research report" });
-      const parsed = researchOrderSchema.safeParse(req.body ?? {});
+      const admin = isPlatformAdmin(user);
+      const parsed = researchOrderSchemaFor(admin).safeParse(req.body ?? {});
       if (!parsed.success) return res.status(400).json({ message: firstZodMessage(parsed.error) });
       const input = { ...parsed.data, subjects: parsed.data.subjects.map((s) => ({ ...s, name: s.name.replace(/\s+/g, " ") })) };
-      const tier = researchTierFor(input.subjects.length, new Set(input.states).size);
-      if (!tier) return res.status(400).json({ message: "That's more than one report covers. Split it into separate orders." });
       input.states = Array.from(new Set(input.states));
+      if (admin) {
+        // No tier, no preview (it would search every name in every state again before the run) and no charge: stored
+        // as an Extended order at $0 (tier stays a value checkout, emails and the page know) and queued at once.
+        const row = await createOrder({ userId: user.id, email: user.email, tier: "extended", priceCents: 0, input, preview: null, terms: TERMS_SNAPSHOT });
+        await markPaid(row.id, user.id, `admin-run-${row.id}`);
+        console.log(`[research] order ${row.id} placed by admin ${user.email} (${input.subjects.length} name(s), ${input.states.length} state(s)), no charge; queued`);
+        void drainResearchQueue().catch((err) => logError("[research] queue:", err));
+        return res.json(orderView((await getOrder(row.id)) ?? row));
+      }
+      const tier = researchTierFor(input.subjects.length, input.states.length);
+      if (!tier) return res.status(400).json({ message: "That's more than one report covers. Split it into separate orders." });
       const preview = await buildPreview(input);
       const row = await createOrder({ userId: user.id, email: user.email, tier, priceCents: RESEARCH_TIERS[tier].cents, input, preview, terms: TERMS_SNAPSHOT });
       res.json(orderView(row));

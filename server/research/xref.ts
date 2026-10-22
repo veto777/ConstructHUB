@@ -225,8 +225,8 @@ export async function searchById(finders: LicenseFinder[], q: IdQuery, kind: "pe
       searched++;
       if (!f.companiesOnly) licenseSearched++;
       if (r.note) capped.push(`${f.label}: ${r.note}`);
-      licenses.push(...r.licenses.map((h) => ({ ...h, matchedOn: q.type })));
-      enforcement.push(...r.enforcement);
+      licenses.push(...r.licenses.map((h) => ({ ...h, matchedOn: q.type, ...(q.from ? { fromWebsite: q.from } : {}) })));
+      enforcement.push(...(q.from ? r.enforcement.map((e) => ({ ...e, fromWebsite: q.from })) : r.enforcement));
     } catch (err: any) {
       failed.push(`${f.label}: ${failureReason(err).reason.slice(0, 120)}`); // an access refusal in plain words
     }
@@ -259,7 +259,12 @@ export type CustomerIdResult = {
  * the identifier as their tie, since the customer, not the record, links them to the name. An identifier shared by
  * more than MAX_BUSINESSES_PER_TIE businesses ties none of them: those records are left out and the notes say so.
  */
-export async function searchCustomerIds(finders: LicenseFinder[], ids: IdQuery[], subject: { name: string; kind: "person" | "company" }): Promise<CustomerIdResult> {
+/**
+ * Identifiers read off a website (q.from) are searched the same way, after the customer's own, and say where they came
+ * from ("matched by the phone found on the website acme.com"). `maxSearches` is MAX_ID_SEARCHES except for a platform
+ * admin's order (runner.ts).
+ */
+export async function searchCustomerIds(finders: LicenseFinder[], ids: IdQuery[], subject: { name: string; kind: "person" | "company" }, maxSearches = MAX_ID_SEARCHES): Promise<CustomerIdResult> {
   const { kind } = subject;
   const out: CustomerIdResult = { licenses: [], matched: [], enforcement: [], searches: [], searchedIds: new Set(), used: 0, notes: [] };
   const firstOf = new Map<string, IdQuery>();
@@ -274,26 +279,26 @@ export async function searchCustomerIds(finders: LicenseFinder[], ids: IdQuery[]
     }
     firstOf.set(key, q);
     if (out.searchedIds.has(key)) continue;
-    if (out.used >= MAX_ID_SEARCHES) { out.notes.push(`${describeId(q)} was not searched (limit of ${MAX_ID_SEARCHES} identifier searches per name).`); continue; }
+    if (out.used >= maxSearches) { out.notes.push(`${describeId(q)}${q.from ? ` (from the website ${q.from})` : ""} was not searched (limit of ${maxSearches} identifier searches per name).`); continue; }
     out.searchedIds.add(key);
     out.used++;
     const r = await searchById(finders, q, kind);
     const named = r.licenses.filter((h) => nameMatches(subject.name, kind, h));
     const others = r.licenses.filter((h) => !nameMatches(subject.name, kind, h));
     const enforcement = kind === "company" ? r.enforcement : [];
-    const via = `matched by the ${q.type === "license" ? "license number" : q.type} you gave (${q.value})`;
+    const via = `matched by the ${q.type === "license" ? "license number" : q.type} ${q.from ? `found on the website ${q.from}` : "you gave"} (${q.value})`;
     const viaFor = (addr: string | null | undefined) => q.type === "address" && addressMatch(q.value, addr) !== "confirmed" ? `possible match (address): ${via}` : via;
     out.licenses.push(...named);
     const spread = spreadOf(others, enforcement);
     if (spread > MAX_BUSINESSES_PER_TIE) {
-      out.notes.push(`${describeId(q)} is shared by ${spread} businesses, so it doesn't tie any one of them to this name; their records are left out.`);
+      out.notes.push(`${describeId(q)}${q.from ? ` (from the website ${q.from})` : ""} is shared by ${spread} businesses, so it doesn't tie any one of them to this name; their records are left out.`);
     } else {
       out.matched.push(...others.map((h) => ({ ...h, relatedTie: q.type, relatedVia: viaFor(h.address), byYourIdentifier: true })));
       out.enforcement.push(...enforcement.map((e) => ({ ...e, relatedTie: q.type, relatedVia: viaFor(e.address), byYourIdentifier: true })));
     }
     if (kind === "person" && r.enforcement.length) out.notes.push(`${r.enforcement.length} enforcement record(s) carrying ${describeId(q)} are not shown: enforcement records are searched for companies only.`);
     out.searches.push({
-      query: describeId(q),
+      query: q.from ? `${describeId(q)} (from the website ${q.from})` : describeId(q),
       found: named.length + (spread > MAX_BUSINESSES_PER_TIE ? 0 : others.length + enforcement.length),
       note: coverageNote(r),
       // 0 sources searched: the report says "Not searched", never "0 found" (round 2, decision 8).
@@ -323,6 +328,8 @@ export type XrefInput = {
   /** Identifier keys already searched (the customer's), and how many searches the subject has used. */
   searchedIds: Set<string>;
   idSearchesUsed: number;
+  /** The identifier searches one subject may use (MAX_ID_SEARCHES unless a platform admin's order raises it). */
+  maxIdSearches?: number;
   /** The subject's own enforcement records, so the pass doesn't list them again as related. */
   ownEnforcement?: EnforcementHit[];
   enforcementSearch: EnforcementSearch;
@@ -379,8 +386,9 @@ export async function crossReference(x: XrefInput): Promise<XrefResult> {
   for (const h of ownList) if (h.licenseNumber) push({ type: "license", value: h.licenseNumber }, h);
   for (const h of ownList) if (h.phone) push({ type: "phone", value: h.phone }, h);
   for (const h of ownList) if (h.address) push({ type: "address", value: h.address }, h);
-  const budget = Math.max(0, MAX_ID_SEARCHES - idSearches);
-  if (cands.length > budget) notes.push(`${cands.length - budget} more license number(s), phone(s) or address(es) on these records were not searched (limit of ${MAX_ID_SEARCHES} identifier searches per name).`);
+  const maxIds = x.maxIdSearches ?? MAX_ID_SEARCHES;
+  const budget = Math.max(0, maxIds - idSearches);
+  if (cands.length > budget) notes.push(`${cands.length - budget} more license number(s), phone(s) or address(es) on these records were not searched (limit of ${maxIds} identifier searches per name).`);
   for (const c of cands.slice(0, budget)) {
     idSearches++;
     const r = await searchById(finders, c.q, subject.kind);

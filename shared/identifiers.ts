@@ -11,7 +11,11 @@
  */
 
 export type IdKeys = { licenses?: (string | null | undefined)[]; phones?: (string | null | undefined)[]; addresses?: (string | null | undefined)[] };
-export type IdQuery = { type: "license" | "phone" | "address"; value: string };
+export type IdQuery = {
+  type: "license" | "phone" | "address"; value: string;
+  /** Read off this website (bare host) rather than given by the customer (research reports, 2026-10-22). */
+  from?: string;
+};
 
 export function normLicense(v: string | null | undefined): string | null {
   const t = (v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
