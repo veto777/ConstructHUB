@@ -23,6 +23,22 @@ function Chip({ ok, label, testid }: { ok: boolean; label: string; testid: strin
   );
 }
 
+/** Discount interest as three steps: opened the list → opened the additional ones → ticked one. */
+function DiscountInterest({ level }: { level: number }) {
+  const steps = ["Opened discounts", "Opened additional", "Ticked one"];
+  return (
+    <span className="inline-flex items-center rounded-full border overflow-hidden text-[11px] font-medium"
+      title="How far into the discounts they went" data-testid="chip-discounts" data-level={level}>
+      {steps.map((s, i) => (
+        <span key={s} className={cn("inline-flex items-center gap-1 px-2 py-0.5", i > 0 && "border-l",
+          level > i ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted/50 text-muted-foreground")}>
+          {level > i ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}{s}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function BehaviourChips({ summary, className }: { summary: VisitSummary; className?: string }) {
   const dev = summary.device ?? "";
   const DevIcon = /iPad|tablet/i.test(dev) ? Tablet : /iPhone|phone/i.test(dev) ? Smartphone : Monitor;
@@ -33,7 +49,7 @@ export function BehaviourChips({ summary, className }: { summary: VisitSummary; 
         testid="chip-terms" />
       <Chip ok={summary.pamphlets} label="Pamphlets" testid="chip-pamphlets" />
       <Chip ok={summary.model3d} label="3D model" testid="chip-3d" />
-      <Chip ok={summary.discountsViewed} label="Discounts" testid="chip-discounts" />
+      <DiscountInterest level={summary.discountLevel ?? (summary.discountsViewed ? 1 : 0)} />
       {summary.scrollPct != null && (
         <span className="text-[11px] text-muted-foreground" data-testid="chip-scroll">Scrolled {summary.scrollPct}%</span>
       )}

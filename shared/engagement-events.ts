@@ -59,6 +59,9 @@ export type VisitSummary = {
   pamphlets: boolean;
   model3d: boolean;
   discountsViewed: boolean;
+  /** How far into the discounts they went: 0 never opened, 1 opened the discounts list,
+   *  2 opened the additional discounts (bundle, price match), 3 ticked a discount. */
+  discountLevel: 0 | 1 | 2 | 3;
   approveStarted: boolean;
   scrollPct: number | null;
   device: string | null;
@@ -158,6 +161,7 @@ export function eventLine(name: string, detail: Record<string, any> | null): str
     case "option_tab": return `Looked at ${d ? `“${d}”` : "another option"}`;
     case "scope_toggle": return d ? `Ticked/unticked the scope “${d}”` : "Ticked/unticked a scope";
     case "discounts_open": return d === "close" ? "Closed the discounts list" : "Opened the discounts list (See available discounts)";
+    case "additional_discounts_open": return d === "close" ? "Closed the additional discounts" : "Opened additional discounts (bundle, price match)";
     case "options_combine": return d === "close" ? "Closed “combine scopes”" : "Opened “combine scopes”";
     case "option_view": return `Viewed ${d ? `“${d}”` : "an option"}`;
     case "approve_option": return `Clicked Approve on ${d ? `“${d}”` : "an option"}`;
@@ -211,7 +215,7 @@ export function buildVisitDetail(
     Math.max(0, Math.round(((sessStart.get(e.sessionId) ?? visitStart) - visitStart + Math.max(0, e.tMs)) / 1000));
 
   const summary: VisitSummary = {
-    readTerms: false, termsSecs: 0, pamphlets: false, model3d: false, discountsViewed: false,
+    readTerms: false, termsSecs: 0, pamphlets: false, model3d: false, discountsViewed: false, discountLevel: 0,
     approveStarted: false, scrollPct: null,
     device: deviceFromUserAgent(ordered.find((s) => s.userAgent)?.userAgent),
   };
@@ -246,7 +250,14 @@ export function buildVisitDetail(
     if (e.name === "terms_open") summary.readTerms = true;
     if (e.name === "attachment_open") summary.pamphlets = true;
     if (e.name.startsWith("model3d")) summary.model3d = true;
-    if (e.name.startsWith("discount")) summary.discountsViewed = true;
+    if (e.name.startsWith("discount") || e.name === "additional_discounts_open") summary.discountsViewed = true;
+    {
+      const d = typeof e.detail?.d === "string" ? e.detail.d : "";
+      const lvl = e.name === "discount_toggle" && parseOfferDetail(d).on !== false ? 3
+        : e.name === "additional_discounts_open" && d !== "close" ? 2
+        : e.name === "discounts_open" && d !== "close" ? 1 : 0;
+      if (lvl > summary.discountLevel) summary.discountLevel = lvl as VisitSummary["discountLevel"];
+    }
     if (e.name === "approve_open" || e.name === "approve_option") { approveOpen = true; summary.approveStarted = true; lastApproveAt = off; }
     if (e.name === "approve_submit") approveDone = true;
     if (e.name === "approve_cancel") lastApproveAt = off;
@@ -264,6 +275,7 @@ export function buildVisitDetail(
     if (v.secs < 2) continue;
     if (sec === "terms") summary.termsSecs += v.secs;
     if (sec === "discounts" && v.secs >= 2) summary.discountsViewed = true;
+    if (sec === "discounts_additional" && v.secs >= 2 && summary.discountLevel < 2) summary.discountLevel = 2;
     if (sec === "model3d") summary.model3d = true;
     lines.push({ offsetSecs: v.first, text: `Read ${sectionLabel(sec)} — ${formatSecs(v.secs)}`, name: "section_time" });
   }
@@ -310,11 +322,12 @@ export function mergeSummaries(list: VisitSummary[]): VisitSummary {
     pamphlets: m.pamphlets || s.pamphlets,
     model3d: m.model3d || s.model3d,
     discountsViewed: m.discountsViewed || s.discountsViewed,
+    discountLevel: Math.max(m.discountLevel, s.discountLevel ?? 0) as VisitSummary["discountLevel"],
     approveStarted: m.approveStarted || s.approveStarted,
     scrollPct: s.scrollPct == null ? m.scrollPct : Math.max(m.scrollPct ?? 0, s.scrollPct),
     device: m.device ?? s.device,
   }), {
-    readTerms: false, termsSecs: 0, pamphlets: false, model3d: false, discountsViewed: false,
+    readTerms: false, termsSecs: 0, pamphlets: false, model3d: false, discountsViewed: false, discountLevel: 0,
     approveStarted: false, scrollPct: null, device: null,
   });
 }

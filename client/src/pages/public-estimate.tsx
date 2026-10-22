@@ -369,6 +369,8 @@ export default function PublicEstimatePage() {
   const [viewOptionId, setViewOptionId] = useState<string | null>(null);
   // Optional discounts start folded behind "See available discounts" (owner, 2026-10-21).
   const [discountsOpen, setDiscountsOpen] = useState(false);
+  // …and inside it, the bundle / price match fold behind their own "See additional discounts".
+  const [additionalOpen, setAdditionalOpen] = useState(false);
   // "Want more than one option?" — the combine-scopes checklist under the option tabs.
   const [combineOpen, setCombineOpen] = useState(false);
   // Upsell scopes asked for in this visit (the server remembers earlier ones).
@@ -1369,8 +1371,8 @@ export default function PublicEstimatePage() {
                     onClick={() => setDiscountsOpen(!discountsOpen)}
                     data-track="discounts_open" data-track-detail={discountsOpen ? "close" : "open"}
                     data-testid="button-see-discounts">
-                    {discountsOpen ? "Hide discounts" : `See available discounts (${count})`}
-                    <ChevronDown className={`h-4 w-4 transition-transform ${discountsOpen ? "rotate-180" : ""}`} />
+                    <span>{discountsOpen ? "Hide discounts" : <>See available discounts ({count}) <span className="font-normal opacity-90">— click here</span></>}</span>
+                    <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${discountsOpen ? "rotate-180" : ""}`} />
                   </Button>
                 )}
                 {count > 0 && !discountsOpen && (sel ? sel.optionalDiscountBps : selBps) > 0 && (
@@ -1388,10 +1390,22 @@ export default function PublicEstimatePage() {
                 {(discountsOpen && additional.length > 0) || showUpsell ? (
                   <div className="space-y-3" data-testid="discounts-additional">
                     {discountsOpen && additional.length > 0 && (
-                      <>
-                        <div className="text-sm font-semibold pt-1">Additional discounts</div>
-                        {additional.map(offerRow)}
-                      </>
+                      <div className="space-y-3" data-track-section="discounts_additional">
+                        <Button variant={additionalOpen ? "secondary" : "default"} className="w-full sm:w-auto h-11 justify-between gap-3"
+                          aria-expanded={additionalOpen} aria-controls="discounts-additional-body"
+                          onClick={() => setAdditionalOpen(!additionalOpen)}
+                          data-track="additional_discounts_open" data-track-detail={additionalOpen ? "close" : "open"}
+                          data-testid="button-see-additional-discounts">
+                          <span>{additionalOpen ? "Hide additional discounts"
+                            : <>See additional discounts ({additional.length}) <span className="font-normal opacity-90">— click here</span></>}</span>
+                          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${additionalOpen ? "rotate-180" : ""}`} />
+                        </Button>
+                        {additionalOpen && (
+                          <div className="space-y-3" id="discounts-additional-body">
+                            {additional.map(offerRow)}
+                          </div>
+                        )}
+                      </div>
                     )}
                     {showUpsell && (
                       <div className="rounded-lg border-2 border-primary/40 bg-primary/5 p-4 space-y-3"

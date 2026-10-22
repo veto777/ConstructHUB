@@ -76,3 +76,23 @@ describe("engagement events → visit detail", () => {
     expect(mergeSummaries([]).readTerms).toBe(false);
   });
 });
+
+describe("discount interest level", () => {
+  const s = [{ id: "a", startedAt: t0, durationSecs: 60 }];
+  const lvl = (events: any[]) => buildVisitDetail(s, events.map((e, i) => ({ sessionId: "a", tMs: i * 1000, detail: null, ...e }))).summary.discountLevel;
+  it("climbs: none → opened → additional → ticked", () => {
+    expect(lvl([])).toBe(0);
+    expect(lvl([{ name: "discounts_open", detail: { d: "open" } }])).toBe(1);
+    expect(lvl([{ name: "discounts_open" }, { name: "additional_discounts_open", detail: { d: "open" } }])).toBe(2);
+    expect(lvl([{ name: "discounts_open" }, { name: "discount_toggle", detail: { d: "military:on" } }])).toBe(3);
+  });
+  it("closing or unticking does not count as interest", () => {
+    expect(lvl([{ name: "additional_discounts_open", detail: { d: "close" } }])).toBe(0);
+    expect(lvl([{ name: "discount_toggle", detail: { d: "military:off" } }])).toBe(0);
+  });
+  it("labels the additional dropdown and keeps the highest level across visits", () => {
+    expect(eventLine("additional_discounts_open", { d: "open" })).toBe("Opened additional discounts (bundle, price match)");
+    const base = buildVisitDetail(s, []).summary;
+    expect(mergeSummaries([{ ...base, discountLevel: 2 }, { ...base, discountLevel: 1 }]).discountLevel).toBe(2);
+  });
+});
