@@ -1377,7 +1377,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (docType === "estimate") {
       const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.publicToken, t)).limit(1);
       if (!est) return res.status(404).json({ message: "Not found" });
-      if (!est.sentAt || est.approvedAt || est.declinedAt) return res.json({ sessionId: null });
+      // An APPROVED estimate is still tracked — the Pay card lives there (pay_click, pay_offline_info) — but it never
+      // fires the "client is reviewing their bid" alert below: the sale is already made.
+      if (!est.sentAt || est.declinedAt) return res.json({ sessionId: null });
       if (!ids.includes(est.customerId)) return res.json({ sessionId: null });
       orgId = est.orgId; docId = est.id; estRow = est;
     } else {
@@ -1405,7 +1407,7 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     // Repeat session on an already-viewed estimate → the once-per-day
     // "client is reviewing their bid — call them" alert (fire-and-forget;
     // a failed alert must never break engagement tracking).
-    if (estRow && priorSessions >= 1 && estRow.firstViewedAt) {
+    if (estRow && !estRow.approvedAt && priorSessions >= 1 && estRow.firstViewedAt) {
       (async () => {
         const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, estRow!.orgId)).limit(1);
         const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, estRow!.customerId)).limit(1);

@@ -88,6 +88,8 @@ const SECTION_LABELS: Record<string, string> = {
   approve: "the approve / sign section",
   questions: "the ask-a-question box",
   payment: "the payment section",
+  pay_offline_info: "the check / Zelle instructions",
+  discounts_additional: "the additional discounts (bundle, price match)",
 };
 
 const humanize = (s: string) => s.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
