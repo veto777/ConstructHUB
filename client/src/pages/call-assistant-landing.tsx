@@ -231,7 +231,7 @@ export default function CallAssistantLandingPage() {
   // Signed out: create an account. Signed in: the Call Assistant dashboard on this platform (never the CRM).
   const primaryCta = (where: string) => user
     ? <Link href={CALL_ASSISTANT_PATH} data-testid={`link-ca-open-dashboard-${where}`} className={`${BTN_PRIMARY} ${BTN_LG}`}>Open your Call Assistant <ArrowRight className="h-4 w-4" /></Link>
-    : <Link href={`/auth?mode=signup&next=${encodeURIComponent(CALL_ASSISTANT_PATH)}`} data-testid={`link-ca-signup-${where}`} className={`${BTN_PRIMARY} ${BTN_LG}`}>Create Your Account <ArrowRight className="h-4 w-4" /></Link>;
+    : <Link href={`/auth?mode=signup&next=${encodeURIComponent(CALL_ASSISTANT_PATH)}`} rel="nofollow" data-testid={`link-ca-signup-${where}`} className={`${BTN_PRIMARY} ${BTN_LG}`}>Create Your Account <ArrowRight className="h-4 w-4" /></Link>;
   const salesCta = (className: string, testId: string) => (
     <button type="button" onClick={() => setSalesOpen(true)} className={`${className} ${BTN_LG}`} data-testid={testId}>
       {SALES_REP_LABEL}

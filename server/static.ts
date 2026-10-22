@@ -170,7 +170,8 @@ export function serveStatic(app: Express, distPath = path.resolve(__dirname, "pu
     res
       .type("text/plain")
       // Google only (owner, 2026-10-16); server/bot-firewall.ts enforces it for the bots that ignore this file.
-      .send(`User-agent: Googlebot\nUser-agent: Googlebot-Image\nUser-agent: Googlebot-Video\nUser-agent: Googlebot-News\nUser-agent: Storebot-Google\nUser-agent: Google-InspectionTool\nUser-agent: GoogleOther\nAllow: /\nDisallow: /api/\n${ADS_LANDING_PATHS.map((p) => `Disallow: ${p}\n`).join("")}\nUser-agent: AdsBot-Google\nUser-agent: AdsBot-Google-Mobile\nAllow: /\nDisallow: /api/\n\nUser-agent: *\nDisallow: /\n\nSitemap: ${BASE}/sitemap.xml\n`);
+      // /api/tutorials/media/ holds the public page images and video posters: Google may fetch those (GSC "Blocked by robots.txt").
+      .send(`User-agent: Googlebot\nUser-agent: Googlebot-Image\nUser-agent: Googlebot-Video\nUser-agent: Googlebot-News\nUser-agent: Storebot-Google\nUser-agent: Google-InspectionTool\nUser-agent: GoogleOther\nAllow: /\nAllow: /api/tutorials/media/\nDisallow: /api/\n${ADS_LANDING_PATHS.map((p) => `Disallow: ${p}\n`).join("")}\nUser-agent: AdsBot-Google\nUser-agent: AdsBot-Google-Mobile\nAllow: /\nDisallow: /api/\n\nUser-agent: *\nDisallow: /\n\nSitemap: ${BASE}/sitemap.xml\n`);
   });
 
   // The Google Ads landing doors (server/ads-landing.ts): the public page behind

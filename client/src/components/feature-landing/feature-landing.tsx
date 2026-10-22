@@ -82,7 +82,7 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
       </DashLink>
     )
     : (
-      <Link href={`/auth?mode=signup&next=${encodeURIComponent(signupNext(page))}`} className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid={`cta-feature-primary-${where}`} data-cta="signup">
+      <Link href={`/auth?mode=signup&next=${encodeURIComponent(signupNext(page))}`} rel="nofollow" className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid={`cta-feature-primary-${where}`} data-cta="signup">
         Create Your Account <ArrowRight className="h-4 w-4" />
       </Link>
     );

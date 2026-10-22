@@ -238,7 +238,7 @@ export default function GoogleBusinessPage() {
           </div>
           <div className="space-y-5">
             {tools.map((tool, i) => (
-              <Link key={tool.title} href={user ? tool.link : "/auth?mode=signup"}>
+              <Link key={tool.title} href={user ? tool.link : "/auth?mode=signup"} rel={user ? undefined : "nofollow"}>
                 <Card
                   className={`group bg-card ${tool.border} hover:border-border p-6 transition-all duration-300 hover:-translate-y-1 cursor-pointer animate-in-delay-${Math.min(i + 1, 5)}`}
                   data-testid={`card-tool-${i}`}

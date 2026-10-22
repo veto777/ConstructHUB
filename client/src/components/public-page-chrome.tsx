@@ -97,7 +97,7 @@ export function PublicPageFooter() {
               the support and legal pages (App.tsx), so Help is the support page there. */}
           <Link href="/support" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-help">Help</Link>
           <span aria-hidden className="opacity-40">·</span>
-          <Link href={reportIssueHref()} onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-report-issue">Report an issue</Link>
+          <Link href={reportIssueHref()} rel="nofollow" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-report-issue">Report an issue</Link>
           <span aria-hidden className="opacity-40">·</span>
           <a href="/terms" className="hover:text-mkt-navy-ink transition-colors">Terms</a>
           <span aria-hidden className="opacity-40">·</span>
@@ -121,7 +121,7 @@ export function PublicPageFooter() {
         <span aria-hidden className="opacity-40">·</span>
         <Link href="/features/guides" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-help">Help</Link>
         <span aria-hidden className="opacity-40">·</span>
-        <Link href={reportIssueHref()} onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-report-issue">Report an issue</Link>
+        <Link href={reportIssueHref()} rel="nofollow" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-report-issue">Report an issue</Link>
         <span aria-hidden className="opacity-40">·</span>
         <a href="mailto:support@constructhub.us" className="hover:text-mkt-navy-ink transition-colors">support@constructhub.us</a>
         <span aria-hidden className="opacity-40">·</span>

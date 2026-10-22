@@ -303,7 +303,7 @@ function SiteMobileMenu({ signedIn, signInHref }: { signedIn: boolean; signInHre
         </nav>
         <div className="mt-4 border-t pt-4 space-y-2">
           {!signedIn && (
-            <Link href={signInHref} onClick={close} className={row} data-testid="link-mobile-signin">Sign In</Link>
+            <Link href={signInHref} rel="nofollow" onClick={close} className={row} data-testid="link-mobile-signin">Sign In</Link>
           )}
           <div className="px-3 flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Theme</span>
@@ -353,10 +353,10 @@ export function SiteNavBar({ signedIn, next = "/", cart = true }: { signedIn: bo
           </Link>
         ) : (
           <>
-            <Link href={signInHref} onClick={toTop} className="hidden sm:inline-flex items-center whitespace-nowrap h-9 px-3 rounded-md text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors" data-testid="link-nav-signin">
+            <Link href={signInHref} rel="nofollow" onClick={toTop} className="hidden sm:inline-flex items-center whitespace-nowrap h-9 px-3 rounded-md text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors" data-testid="link-nav-signin">
               Sign In
             </Link>
-            <Link href="/auth?mode=signup" onClick={toTop} data-testid="link-nav-getstarted" className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-mkt-orange text-white text-sm font-semibold hover:bg-mkt-orange-hover transition-colors whitespace-nowrap">
+            <Link href="/auth?mode=signup" rel="nofollow" onClick={toTop} data-testid="link-nav-getstarted" className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-mkt-orange text-white text-sm font-semibold hover:bg-mkt-orange-hover transition-colors whitespace-nowrap">
               Get Started <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </>
