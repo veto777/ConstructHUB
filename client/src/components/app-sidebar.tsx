@@ -509,8 +509,9 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
             <CHLogo height={36} />
             <p className="sr-only" data-testid="text-app-title">The All-in-One Growth Platform for Contractors</p>
           </span>
-          {/* The mascot stands beside the mark on every ConstructHUB sidebar. */}
-
+          {/* The mascot stands beside the mark on every ConstructHUB sidebar (6ce8c7e8 dropped it by accident;
+              owner 2026-10-21: "Where's my gator on the top?"). */}
+          <StandingGator height={64} className="shrink-0 -my-2" />
         </Link>
       </SidebarHeader>
       <SidebarContent>
