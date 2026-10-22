@@ -7,7 +7,7 @@ import { pool } from "../db";
 
 export async function siteCapRefuses(user: number, domain: string, max: number, db: { query: typeof pool.query } = pool): Promise<boolean> {
   const { rows: [{ n, have }] } = await db.query("SELECT count(*)::int n, coalesce(bool_or(domain=$2), false) AS have FROM seo_sites WHERE user_id=$1", [user, domain]);
-  return !have && n >= max;
+  return !have && max >= 0 && n >= max; // -1: no cap (platform admins)
 }
 
 export type NewSiteSettings = { locationCode: number; languageCode: string; devices: string; serpDepth: number };

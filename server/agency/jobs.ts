@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { pool } from '../db';
-import { takeBudget } from '../growth-limits';
+import { takeAccountBudget } from '../growth-limits';
 import { logActivity } from '../account-events';
 import { GoogleError } from '../gbp/client';
 import { syncLocation, unlinkLocation, clientFor, discover } from '../gbp/service';
@@ -47,7 +47,7 @@ export async function queueBulk(a:AgencyAccess,raw:unknown) {
     const {rows:[count]}=await c.query(`SELECT count(*)::int n FROM ${locationJoin} WHERE ${match}`,params);
     if(count.n*Buffer.byteLength(JSON.stringify(payload))>64*1024*1024)throw new GoogleError('quota','This batch is too large. Use fewer content items or a smaller selection.',429);
     if(pending.n+count.n>20000) throw new GoogleError('quota','Queue is full (20,000 pending). Wait for existing work to finish.',429);
-    if(!await takeBudget(`agency-bulk:${a.owner}`,60)) throw new GoogleError('quota','Bulk request limit reached',429);
+    if(!await takeAccountBudget(a.owner, `agency-bulk:${a.owner}`,60)) throw new GoogleError('quota','Bulk request limit reached',429);
     const inserted=await c.query(`INSERT INTO agency_jobs(id,user_id,actor_id,location_id,action,payload,batch_id)
       SELECT gen_random_uuid(),l.user_id,$10,l.id,$11,$12,$13 FROM ${locationJoin} WHERE ${match} ON CONFLICT DO NOTHING RETURNING id`,[...params,a.actor,b.action,JSON.stringify(payload),b.requestKey]);
     await c.query('COMMIT');
@@ -108,7 +108,7 @@ export async function performJob(j:any) {
       const q=await reserveQuotaFor(j.user_id,'siteScans',1);
       if(!q.ok) throw new GoogleError('invalid',String(q.body.message??'Site Scan is not included with the current plan'),q.status);
       try {
-        if(!await takeBudget('sitescan:scan:'+j.user_id,5,1,86400000)) throw new GoogleError('quota','Daily Site Scan budget reached; deferred',429);
+        if(!await takeAccountBudget(j.user_id, 'sitescan:scan:'+j.user_id,5,1,86400000)) throw new GoogleError('quota','Daily Site Scan budget reached; deferred',429);
         return {id:await enqueueScan(j.user_id,siteUrl(p.website),150,1,p)};
       } catch(e) { await refundReservation(q.reservation,1); throw e; }
     }

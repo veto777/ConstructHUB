@@ -26,7 +26,7 @@ import { z } from 'zod';
 import type { Express, Request, Response } from 'express';
 import { pool } from '../db';
 import { logActivity, notifyUser } from '../account-events';
-import { takeBudget } from '../growth-limits';
+import { takeAccountBudget } from '../growth-limits';
 import { GoogleClient, GoogleError } from './client';
 import { clientFor, ownedLocation, withLocationLock, publicError } from './service';
 import { guardRow, snapshotOf, GUARD_FIELDS } from './guard';
@@ -233,7 +233,7 @@ export function registerListingEditorRoutes(app: Express, auth: (req: any, res: 
     app[method](path, async (req, res) => {
       const u = auth(req, res); if (!u) return;
       try {
-        if (method !== 'get' && !await takeBudget(`gbp-listing-route:${path}:user:${u.id}`, 30, 1, 600_000)) throw new GoogleError('quota', 'Too many requests. Try again later.', 429);
+        if (method !== 'get' && !await takeAccountBudget(u.id, `gbp-listing-route:${path}:user:${u.id}`, 30, 1, 600_000)) throw new GoogleError('quota', 'Too many requests. Try again later.', 429);
         await fn(req, res, u.id);
       } catch (e) {
         if (e instanceof z.ZodError) return void res.status(400).json({ message: 'Invalid input', issues: e.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message })) });

@@ -8,7 +8,7 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock('../db', () => ({ pool: { query: m.query, connect: m.connect }, db: {} }));
 vi.mock('./service', () => ({ ownedLocation: m.owned, clientFor: vi.fn() }));
-vi.mock('../growth-limits', () => ({ takeBudget: m.budget }));
+vi.mock('../growth-limits', () => ({ takeBudget: m.budget, takeAccountBudget: (_user: unknown, ...a: unknown[]) => (m.budget as any)(...a) }));
 vi.mock('../account-events', () => ({ notifyUser: m.notify, logActivity: m.activity }));
 vi.mock('../ops/issues', () => ({ recordFailure: vi.fn() }));
 import { enqueue, registerContentRoutes, runContentWorker } from './content';

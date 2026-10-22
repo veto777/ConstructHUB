@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { pool } from '../db';
 import { processPhoto } from '../photo-processor';
 import { uploadToR2, getFromR2, getR2Url } from '../r2';
-import { takeBudget } from '../growth-limits';
+import { takeAccountBudget } from '../growth-limits';
 import { ownedLocation } from './service';
 import { GoogleError } from './client';
 import { photosFor } from './content';
@@ -43,7 +43,7 @@ export function registerContentUpload(app: Express, auth: (req: any, res: any) =
         try {
             const loc = z.coerce.number().int().positive().parse(req.params.location);
             await ownedLocation(u.id, loc);
-            if (!await takeBudget(`gbp-content-upload:${u.id}`, 100, 1, 3600000))
+            if (!await takeAccountBudget(u.id, `gbp-content-upload:${u.id}`, 100, 1, 3600000))
                 return void res.status(429).json({ message: 'Hourly photo processing limit reached' });
             next();
         }
@@ -77,7 +77,7 @@ export function registerContentUpload(app: Express, auth: (req: any, res: any) =
             const loc = await ownedLocation(u.id, z.coerce.number().int().positive().parse(req.params.location)), b = options.parse(req.body), photos = await photosFor(u.id, b.photoIds || []);
             if (!photos.length)
                 throw new GoogleError('invalid', 'Select photos', 400);
-            if (!await takeBudget(`gbp-content-upload:${u.id}`, 100, photos.length, 3600000))
+            if (!await takeAccountBudget(u.id, `gbp-content-upload:${u.id}`, 100, photos.length, 3600000))
                 throw new GoogleError('quota', 'Hourly photo processing limit reached', 429);
             const saved = [];
             for (let i = 0; i < photos.length; i++) {

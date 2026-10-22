@@ -9,6 +9,7 @@ import { z } from "zod";
 import { hitPageInput, hitPage } from "./hit-pagination";
 import { and, desc, eq, lt, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
+import { atCap, countCap } from "../admin-unlimited";
 import { permitDatabases, permitWatches, permitWatchHits, permits, permitPollState, type PermitWatch } from "@shared/schema";
 import {
   TRADES, TRADE_KEYS, WATCH_KINDS, MAX_WATCHES_PER_USER, MAX_DATABASES_PER_WATCH, MAX_RADIUS_MILES,
@@ -195,7 +196,7 @@ export function registerPermitAlertRoutes(app: Express, getDevUser: GetUser): vo
   route("post", "", async (req, res, userId) => {
     const input = watchInput.parse(req.body ?? {});
     const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(permitWatches).where(eq(permitWatches.userId, userId));
-    if (n >= MAX_WATCHES_PER_USER) throw new WatchError(403, `You can keep up to ${MAX_WATCHES_PER_USER} watches`);
+    if (atCap(await countCap(userId, MAX_WATCHES_PER_USER), n)) throw new WatchError(403, `You can keep up to ${MAX_WATCHES_PER_USER} watches`);
     const jurisdictions = await loadJurisdictions(input.databaseIds);
     const prepared = await prepareWatch(input, jurisdictions);
     const [row] = await db.insert(permitWatches).values({

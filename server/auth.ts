@@ -253,7 +253,7 @@ export async function setupAuth(app: Express) {
   });
 
   app.use(["/api/auth/signup", "/api/auth/signup-lead", "/api/auth/finish-setup", "/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/2fa/login"],
-    rateLimit("growth-auth", 30, 60, 15 * 60_000), async (req, res, next) => {
+    rateLimit("growth-auth", 30, 60, 15 * 60_000, { admins: "limited" }), async (req, res, next) => {
       if (typeof req.body?.email === "string") {
         const account = createHash("sha256").update(req.body.email.trim().toLowerCase()).digest("hex");
         if (!(await takeBudget(`growth-auth:account:${account}`, 10, 1, 15 * 60_000))) return res.status(429).json({ message: "Too many attempts. Please try again later." });
@@ -261,7 +261,7 @@ export async function setupAuth(app: Express) {
       next();
     });
 
-  app.use(["/api/auth/2fa/setup", "/api/auth/2fa/verify", "/api/auth/2fa/disable", "/api/auth/change-password"], rateLimit("security-changes", 10, 30, 15 * 60_000));
+  app.use(["/api/auth/2fa/setup", "/api/auth/2fa/verify", "/api/auth/2fa/disable", "/api/auth/change-password"], rateLimit("security-changes", 10, 30, 15 * 60_000, { admins: "limited" }));
 
   // The three-step sign-up's lead capture (step 1 email, step 2 questions) and the Google
   // "Finish setting up" screen — after the rate limits above, which cover them.
@@ -411,7 +411,7 @@ export async function setupAuth(app: Express) {
       res.redirect(nextPath ?? (native ? "/" : "/?auth=success"));
     }
 
-  app.get("/api/auth/app-exchange", rateLimit("app-auth-exchange", 30, 60), async (req, res, next) => {
+  app.get("/api/auth/app-exchange", rateLimit("app-auth-exchange", 30, 60, undefined, { admins: "limited" }), async (req, res, next) => {
     res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
     try {
       const code = await consumeAppCode(req.query.code, appAuthHost(req), req.query.verifier);

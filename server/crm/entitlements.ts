@@ -27,6 +27,7 @@ import {
   CRM_PLANS, isCrmPlanKey, CRM_EXTRA_SEAT_MONTHLY_CENTS, crmAddonAvailableOn, crmPlanHasJobcam,
   type CrmPlanKey, type CrmPlanLimits,
 } from "../../shared/crm-plans";
+import { JOBCAM_STORAGE_TIERS_GB } from "../../shared/jobcam-storage";
 import { isPlatformAdminEmail } from "../admin";
 import { alacarteSchemaReady } from "../billing/alacarte-store";
 
@@ -145,6 +146,22 @@ async function loadCrmEntitlements(userId: number): Promise<CrmEntitlements> {
   return crmEntitlementsFromRow(row, isPlatformAdminEmail(row.email));
 }
 
+/**
+ * What a platform admin's CRM runs with (owner order 2026-10-22): the top
+ * plan's limits with every numeric allowance unlimited (-1) — seats, team
+ * text segments, texting numbers, API units — except JobCam storage, which is
+ * a size from the tier list (the largest one); the storage gate itself is
+ * skipped for admin orgs (server/jobcam/usage.ts). Pure.
+ */
+export function adminCrmLimits(): CrmPlanLimits {
+  const out = { ...CRM_PLANS.crm_elite.limits } as CrmPlanLimits;
+  for (const key of Object.keys(out) as (keyof CrmPlanLimits)[]) {
+    if (typeof out[key] === "number") (out as Record<string, unknown>)[key] = -1;
+  }
+  out.jobcamStorageGb = JOBCAM_STORAGE_TIERS_GB[JOBCAM_STORAGE_TIERS_GB.length - 1];
+  return out;
+}
+
 /** The entitlements one users ⟕ crm_subscriptions row gives. Pure — crm-plans.test.ts checks it. */
 export function crmEntitlementsFromRow(
   row: { beta_at?: Date | string | null; plan?: unknown; status?: string | null; extra_seats?: number | null; jobcam_addon?: boolean | null; jobcam_alacarte?: boolean | null; trial_end?: Date | string | null; current_period_end?: Date | string | null },
@@ -153,7 +170,7 @@ export function crmEntitlementsFromRow(
   // ConstructHUB staff and beta accounts use the CRM without a subscription.
   const top = CRM_PLANS.crm_elite;
   if (isAdmin) {
-    return { ...NO_CRM, plan: "crm_elite", limits: top.limits, seats: -1, jobcam: true, status: row.status ?? null, active: true, via: "admin" };
+    return { ...NO_CRM, plan: "crm_elite", limits: adminCrmLimits(), seats: -1, jobcam: true, status: row.status ?? null, active: true, via: "admin" };
   }
   if (row.beta_at) {
     return { ...NO_CRM, plan: "crm_elite", limits: top.limits, seats: -1, jobcam: true, status: row.status ?? null, active: true, via: "beta" };

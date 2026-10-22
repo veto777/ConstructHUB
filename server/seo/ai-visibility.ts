@@ -14,6 +14,7 @@
  */
 import { z } from "zod";
 import { pool } from "../db";
+import { atCap, countCap } from "../admin-unlimited";
 import { isCountryLabel } from "@shared/seo-markets";
 import { request, assertOk, normalizeBusinessName, safeHttpUrl, safeDomain } from "./dataforseo";
 
@@ -364,7 +365,7 @@ export async function trackedPrompts(siteId: number): Promise<{ id: number; prom
 export async function setTracked(userId: number, siteId: number, input: z.infer<typeof trackInput>): Promise<boolean> {
   if (!input.on) { await pool.query("DELETE FROM seo_ai_tracked WHERE site_id=$1 AND user_id=$2 AND lower(btrim(regexp_replace(prompt, '\\s+', ' ', 'g')))=lower($3)", [siteId, userId, input.prompt]); return true; }
   const { rows: [{ n, has }] } = await pool.query("SELECT count(*)::int n, bool_or(lower(prompt)=lower($2)) AS has FROM seo_ai_tracked WHERE site_id=$1", [siteId, input.prompt]);
-  if (!has && n >= MAX_TRACKED_PROMPTS) return false;
+  if (!has && atCap(await countCap(userId, MAX_TRACKED_PROMPTS), n)) return false;
   await pool.query(
     `INSERT INTO seo_ai_tracked(site_id, user_id, prompt, engines, next_at) VALUES($1,$2,$3,$4, now() + interval '30 days')
      ON CONFLICT (site_id, lower(prompt)) DO UPDATE SET engines=EXCLUDED.engines`, [siteId, userId, input.prompt, [...new Set(input.engines)]]);

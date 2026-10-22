@@ -11,6 +11,7 @@ import { ipKey } from "../growth-limits";
 import { monthlyLimit, quotaKey, refundReservation, reserveQuotaFor, resetsAt } from "../growth-quotas";
 import { getEntitlements, ownsAllowances } from "../entitlements";
 import { requirePlatformAdmin } from "../crm/admin";
+import { isPlatformAdmin } from "../admin";
 import { createHub } from "./routes";
 import { hubAiClient, hubModel, hubProviderInfo, hubTimeoutMs, logProvider, providerOk } from "./ai";
 import { isBuilder, originOk } from "./access";
@@ -31,6 +32,7 @@ export function registerHubRoutes(app: Express): void {
     ipKey,
     originOk,
     isBuilder,
+    unlimited: (req) => isPlatformAdmin(req.user),
     // The daily token counter on hub_usage_days: one row per UTC day, shared by every process, kept across restarts.
     tokens: new TokenMeter(pgUsage),
     // The plan's monthly Gabe questions (limits.gabeQuestions, -1 unlimited): a spent month

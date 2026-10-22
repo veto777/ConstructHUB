@@ -1,6 +1,8 @@
 import type { Request, RequestHandler } from "express";
 import { createHash } from "node:crypto";
 import { pool } from "./db";
+import { isPlatformAdmin } from "./admin";
+import { isPlatformAdminUserId } from "./admin-unlimited";
 import { z } from "zod";
 
 export const chatInput = z.object({
@@ -20,15 +22,33 @@ export async function takeBudget(key: string, limit: number, amount = 1, windowM
     WHERE growth_budgets.used+EXCLUDED.used <= $4 RETURNING used`, [key, String(period), amount, limit]);
   return result.rowCount === 1;
 }
+/**
+ * A budget that belongs to one account (its own work, its own cost): never
+ * refused for a platform admin (server/admin-unlimited.ts), takeBudget for
+ * everyone else. Budgets that protect third parties, the whole platform or an
+ * external provider's hard quota keep calling takeBudget directly.
+ */
+export async function takeAccountBudget(userId: number | null | undefined, key: string, limit: number, amount = 1, windowMs = 600_000): Promise<boolean> {
+  if (await isPlatformAdminUserId(userId)) return true;
+  return takeBudget(key, limit, amount, windowMs);
+}
 /** Read-only: how much of a budget the current window has used (0 when untouched). */
 export async function budgetUsed(key: string, windowMs = 600_000): Promise<number> {
   const period = Math.floor(Date.now() / windowMs);
   const result = await pool.query(`SELECT used FROM growth_budgets WHERE key=$1 AND period=$2`, [key, String(period)]);
   return Number(result.rows[0]?.used ?? 0);
 }
-export function rateLimit(name: string, perUser = 20, perIp = 50, windowMs = 600_000): RequestHandler {
+/**
+ * Per-user and per-IP request windows. A signed-in platform admin is not
+ * counted (owner order 2026-10-22) unless `opts.admins === "limited"`: the
+ * security windows (sign-in, re-authentication, 2FA, API-key changes) keep
+ * limiting everyone, because they guard the account itself.
+ */
+export function rateLimit(name: string, perUser = 20, perIp = 50, windowMs = 600_000, opts: { admins?: "unlimited" | "limited" } = {}): RequestHandler {
+  const adminsFree = opts.admins !== "limited";
   return async (req, res, next) => {
     try {
+      if (adminsFree && req.user && isPlatformAdmin(req.user)) return next();
       const ipAllowed = await takeBudget(`${name}:ip:${ipKey(req)}`, perIp, 1, windowMs);
       const userAllowed = !req.user || await takeBudget(`${name}:user:${req.user.id}`, perUser, 1, windowMs);
       if (!ipAllowed || !userAllowed) {

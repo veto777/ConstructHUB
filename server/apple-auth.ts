@@ -183,7 +183,7 @@ async function accountFor(claims: Record<string, any>, input: z.infer<typeof bod
 }
 
 export function registerAppleAuthRoutes(app: Express, opts: { keys?: AppleKeys } = {}): void {
-  app.use("/api/auth/apple", rateLimit("apple-signin", 20, 60));
+  app.use("/api/auth/apple", rateLimit("apple-signin", 20, 60, undefined, { admins: "limited" }));
   app.post("/api/auth/apple", async (req: Request, res: Response) => {
     res.set("Cache-Control", "no-store");
     if (!fromNativeApp(req)) return res.status(403).json({ code: "app_only", message: "Sign in with Apple is available in the ConstructHUB iPhone apps." });

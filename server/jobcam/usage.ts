@@ -67,18 +67,21 @@ export type JobcamStorageSnapshot = {
   /** Declared bytes on their way in: open uploads plus uploads the processor has not finished. */
   pendingBytes: number;
   tierGb: JobcamStorageTierGb;
+  /** The org's owner is a platform admin (owner order 2026-10-22): storage is never refused. */
+  unlimited?: boolean;
 };
 
 /**
  * The storage the org's CRM plan includes (CrmPlanLimits.jobcamStorageGb: 5 GB,
  * 1 TB on Elite). The org's own size (set by an admin) counts when it is larger.
  */
-async function planJobcamStorageGb(orgId: string, exec: Exec): Promise<number> {
+async function planJobcamStorageGb(orgId: string, exec: Exec): Promise<{ gb: number; unlimited: boolean }> {
   const { rows: [o] } = await exec.execute(sql`SELECT owner_user_id FROM crm_orgs WHERE id = ${orgId}`);
-  if (!o?.owner_user_id) return 0;
+  if (!o?.owner_user_id) return { gb: 0, unlimited: false };
   const crm = await getCrmEntitlements(Number(o.owner_user_id));
   // The JobCam-only shell (à la carte, no CRM plan) carries the included size, as the JobCam add-on does.
-  return crm.active ? crm.limits?.jobcamStorageGb ?? (crm.jobcamOnly ? JOBCAM_INCLUDED_GB : 0) : 0;
+  const gb = crm.active ? crm.limits?.jobcamStorageGb ?? (crm.jobcamOnly ? JOBCAM_INCLUDED_GB : 0) : 0;
+  return { gb, unlimited: crm.active && crm.via === "admin" };
 }
 
 /** The row every read assumes: an org that has never uploaded still has a size (the included one). */
@@ -109,14 +112,18 @@ export async function jobcamStorageSnapshot(orgId: string, opts: { exec?: Exec; 
         WHERE org_id = ${orgId} AND status = 'processing' AND deleted_at IS NULL)
     )::bigint AS pending`);
   const orgGb = jobcamTierOrIncluded(u?.storage_tier_gb);
-  const planGb = await planJobcamStorageGb(orgId, exec);
-  return { usedBytes: Number(u?.bytes ?? 0), pendingBytes: Number(p?.pending ?? 0), tierGb: jobcamTierOrIncluded(Math.max(orgGb, planGb)) };
+  const plan = await planJobcamStorageGb(orgId, exec);
+  return {
+    usedBytes: Number(u?.bytes ?? 0), pendingBytes: Number(p?.pending ?? 0), tierGb: jobcamTierOrIncluded(Math.max(orgGb, plan.gb)),
+    ...(plan.unlimited ? { unlimited: true } : {}),
+  };
 }
 
 export type JobcamStorageRefusal = ReturnType<typeof jobcamStorageLimitBody>;
 
 /** null when `addBytes` more fit, else the 403 limit_reached body. */
 export function jobcamStorageRefusal(snap: JobcamStorageSnapshot, addBytes: number): JobcamStorageRefusal | null {
+  if (snap.unlimited) return null;
   const args = { usedBytes: snap.usedBytes, pendingBytes: snap.pendingBytes, addBytes, tierGb: snap.tierGb };
   return jobcamStorageFits(args) ? null : jobcamStorageLimitBody(args);
 }
@@ -143,6 +150,10 @@ export async function withJobcamStorageRoom<T>(
 export async function getJobcamStorage(orgId: string) {
   const snap = await jobcamStorageSnapshot(orgId);
   const state = jobcamStorageState(snap.usedBytes, snap.tierGb, snap.pendingBytes);
+  if (snap.unlimited) {
+    // A platform admin's org: never warned, never full, nothing to grow into.
+    return { tierGb: state.tierGb, limitBytes: state.limitBytes, pendingBytes: state.pendingBytes, nextTierGb: null, warn: false, full: false, label: state.label, unlimited: true };
+  }
   return {
     tierGb: state.tierGb, limitBytes: state.limitBytes, pendingBytes: state.pendingBytes,
     nextTierGb: state.nextTierGb, warn: state.warn, full: state.full, label: state.label,

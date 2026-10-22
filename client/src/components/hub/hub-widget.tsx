@@ -501,7 +501,7 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
       ? "Quick answers about ConstructHUB"
       : allowance
         ? allowance.monthly === -1
-          ? "Unlimited questions (fair use)"
+          ? allowance.daily.limit === -1 ? "Unlimited questions" : "Unlimited questions (fair use)"
           : allowance.monthly === 0
             ? "Quick questions only on this account"
             : allowance.remaining === null ? "Monthly allowance unavailable" : `${Math.max(0, allowance.remaining).toLocaleString("en-US")} of ${allowance.monthly.toLocaleString("en-US")} questions left this month`
@@ -596,7 +596,7 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
               <p id={descId} className="text-xs text-white/85" data-testid="hub-allowance">
                 {headerLine}
               </p>
-              {!metaFailed && allowance && <p className="text-xs text-white/85" data-testid="hub-daily">Today: {allowance.daily.used.toLocaleString("en-US")} of {allowance.daily.limit.toLocaleString("en-US")} attempts used. Daily attempts include failures; monthly allowance counts answers.</p>}
+              {!metaFailed && allowance && allowance.daily.limit !== -1 && <p className="text-xs text-white/85" data-testid="hub-daily">Today: {allowance.daily.used.toLocaleString("en-US")} of {allowance.daily.limit.toLocaleString("en-US")} attempts used. Daily attempts include failures; monthly allowance counts answers.</p>}
             </div>
             {builder && messages.length > 0 && (
               <button type="button" onClick={() => { startOver(); focusComposer(); }}

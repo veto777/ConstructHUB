@@ -103,7 +103,7 @@ vi.mock("../entitlements", () => ({
 }));
 vi.mock("../admin", () => ({ isPlatformAdmin: (u: any) => u?.email === "owner@platform.test" }));
 vi.mock("../growth-quotas", () => ({ monthlyUsage: async () => ({}), reserveQuotaFor: async () => ({ ok: true }), refundReservation: async () => {}, resetsAt: () => "2026-11-01T00:00:00.000Z" }));
-vi.mock("../growth-limits", () => ({ takeBudget: async () => true }));
+vi.mock("../growth-limits", () => ({ takeBudget: async () => true, takeAccountBudget: async () => true }));
 const issues = vi.hoisted(() => ({ recorded: [] as { status: number; err: any }[] }));
 vi.mock("../ops/server-errors", () => ({ recordUnhandledError: (_req: any, _res: any, err: any, status: number) => { if (status >= 500) issues.recorded.push({ status, err }); } }));
 vi.mock("../ops/issues", () => ({ recordFailure: async () => {}, recordIssue: async () => {} }));

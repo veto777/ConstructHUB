@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { linkResolverFor, pairOf } from "./link-opportunities";
 import { pool } from "../db";
+import { atCap, countCap, overCap } from "../admin-unlimited";
 import { SeoCustomerError } from "./public-errors";
 import { safeHttpUrl } from "./dataforseo";
 
@@ -137,7 +138,7 @@ export type TaskCounts = { todo: number; doing: number; done: number; dropped: n
 export async function listTasks(userId: number, siteId: number, closedLimit = 100): Promise<{ tasks: Task[]; counts: TaskCounts; closedShown: number }> {
   const limit = Math.min(MAX_CLOSED_SHOWN, Math.max(1, Math.floor(closedLimit)));
   const [{ rows: open }, { rows: closed }, { rows: [c] }] = await Promise.all([
-    pool.query(`SELECT *, due_on::text AS due_on FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND ${OPEN} ORDER BY CASE status WHEN 'doing' THEN 0 ELSE 1 END, created_at DESC, id DESC LIMIT ${MAX_OPEN_TASKS + 50}`, [siteId, userId]),
+    pool.query(`SELECT *, due_on::text AS due_on FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND ${OPEN} ORDER BY CASE status WHEN 'doing' THEN 0 ELSE 1 END, created_at DESC, id DESC LIMIT ${(await countCap(userId, MAX_OPEN_TASKS)) < 0 ? "ALL" : MAX_OPEN_TASKS + 50}`, [siteId, userId]),
     pool.query(`SELECT *, due_on::text AS due_on FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND NOT (${OPEN}) ORDER BY coalesce(done_at, updated_at) DESC, id DESC LIMIT $3`, [siteId, userId, limit]),
     pool.query(
       `SELECT count(*) FILTER (WHERE status='todo')::int AS todo, count(*) FILTER (WHERE status='doing')::int AS doing, count(*) FILTER (WHERE status='done')::int AS done,
@@ -151,6 +152,8 @@ export async function listTasks(userId: number, siteId: number, closedLimit = 10
  * limit. The limit holds across requests: the site's row is locked for the count and the inserts.
  */
 export async function addTasks(userId: number, siteId: number, tasks: z.infer<typeof taskInput>[]): Promise<{ added: number; already: number }> {
+  // Read before the transaction: a second pool connection is never needed while the lock is held.
+  const openCap = await countCap(userId, MAX_OPEN_TASKS);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -191,7 +194,7 @@ export async function addTasks(userId: number, siteId: number, tasks: z.infer<ty
       known.add(t.source); return true;
     });
     const { rows: [{ n }] } = await client.query(`SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND ${OPEN}`, [siteId]);
-    if (n + fresh.length > MAX_OPEN_TASKS) throw new TaskError(`The plan holds up to ${MAX_OPEN_TASKS} open tasks${fresh.length > 1 ? ` and these would make ${n + fresh.length}` : ""}. Finish or drop some first.`, 403);
+    if (overCap(openCap, n + fresh.length)) throw new TaskError(`The plan holds up to ${MAX_OPEN_TASKS} open tasks${fresh.length > 1 ? ` and these would make ${n + fresh.length}` : ""}. Finish or drop some first.`, 403);
     let added = 0;
     for (const t of fresh) {
       const { rowCount } = await client.query(
@@ -208,6 +211,8 @@ export async function addTasks(userId: number, siteId: number, tasks: z.infer<ty
  * against the same limit as adding, under the same lock on the site's row, so the plan cannot be overfilled that way.
  */
 export async function updateTask(userId: number, taskId: number, patch: z.infer<typeof taskPatch>): Promise<Task> {
+  // Read before the transaction: a second pool connection is never needed while the lock is held.
+  const openCap = await countCap(userId, MAX_OPEN_TASKS);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -223,7 +228,7 @@ export async function updateTask(userId: number, taskId: number, patch: z.infer<
       const opening = (patch.status === "todo" || patch.status === "doing") && cur.status !== "todo" && cur.status !== "doing";
       if (opening) {
         const { rows: [{ n }] } = await client.query(`SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND ${OPEN}`, [mine.site_id]);
-        if (n >= MAX_OPEN_TASKS) throw new TaskError(`The plan holds up to ${MAX_OPEN_TASKS} open tasks. Finish or drop one before reopening this.`, 403);
+        if (atCap(openCap, n)) throw new TaskError(`The plan holds up to ${MAX_OPEN_TASKS} open tasks. Finish or drop one before reopening this.`, 403);
       }
     }
     const { rows: [row] } = await client.query(

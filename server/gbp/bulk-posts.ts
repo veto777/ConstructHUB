@@ -26,7 +26,7 @@ import { preparePhoto, seoName } from './content-upload';
 import { getR2Url } from '../r2';
 import { encryptToken, decryptToken } from './token-crypto';
 import { sendModuleRequired } from '../entitlements';
-import { takeBudget } from '../growth-limits';
+import { takeAccountBudget } from '../growth-limits';
 import { recordFailure } from '../ops/issues';
 import { fitChars } from '../ai-output';
 import { workerInterval } from "../workers";
@@ -308,7 +308,7 @@ async function queueItem(run: any, item: any, ai: DraftAI) {
     'Write it as a short, upbeat Google post about this photo: one or two sentences a customer would enjoy, under 300 characters, no hashtags.',
     run.instructions,
   ].filter(Boolean).join(' ');
-  if (!await takeBudget(`gbp-content-ai:${run.user_id}`, 100, 1, 86400000)) throw new GoogleError('quota', 'Daily AI budget reached; this post waits for tomorrow', 429);
+  if (!await takeAccountBudget(run.user_id, `gbp-content-ai:${run.user_id}`, 100, 1, 86400000)) throw new GoogleError('quota', 'Daily AI budget reached; this post waits for tomorrow', 429);
   const caption = fitChars(await ai(draftPrompt('post', loc, { instructions }, style), [publicPhotoUrl(photo.r2_key || '')]), 1500);
   const jobs = await enqueue(run.user_id, run.location_id, {
     requestKey: item.request_key,
@@ -368,7 +368,7 @@ export function registerBulkPostRoutes(app: Express, auth: (req: any, res: any) 
     try {
       const location = z.coerce.number().int().positive().parse(req.params.location);
       await ownedLocation(u.id, location);
-      if (method !== 'get' && !await takeBudget(`gbp-content:${u.id}`, 180)) return void res.status(429).json({ message: 'Content request limit reached' });
+      if (method !== 'get' && !await takeAccountBudget(u.id, `gbp-content:${u.id}`, 180)) return void res.status(429).json({ message: 'Content request limit reached' });
       res.json(await fn(req, u.id, location));
     } catch (e: any) {
       if (e instanceof AutoPostsRequired) return void sendModuleRequired(res, 'autoPosts');

@@ -14,7 +14,7 @@ vi.mock('../entitlements', async original => {
   const actual = await original<any>();
   return { ...actual, getEntitlements: async () => ({ accessPlan: state.plan, modules: PLANS[state.plan].modules, allowances: actual.allowancesFor(state.plan, { extra_seat: state.extras }) }) };
 });
-vi.mock('../growth-limits', () => ({ takeBudget: async () => true, rateLimit: vi.fn() }));
+vi.mock('../growth-limits', () => ({ takeBudget: async () => true, takeAccountBudget: async () => true, rateLimit: vi.fn() }));
 vi.mock('../account-events', () => ({ logActivity: vi.fn() }));
 vi.mock('../email', () => ({ sendWithFallback: vi.fn() }));
 import { registerAgencyRoutes, requestAccess } from './routes';

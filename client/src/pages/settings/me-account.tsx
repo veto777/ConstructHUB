@@ -824,7 +824,8 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
 
   return (
     <>
-      <Card className="border-border bg-card" data-testid="card-beta-access">
+      {/* A platform admin already has everything a trial code grants: no code to redeem (the generator is below). */}
+      <Card className="border-border bg-card" data-testid="card-beta-access" hidden={isAdmin}>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Gift className="h-5 w-5 text-emerald-500" />

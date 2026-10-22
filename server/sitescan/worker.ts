@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { pool } from "../db";
-import { takeBudget } from "../growth-limits";
+import { takeBudget, takeAccountBudget } from "../growth-limits";
 import { reserveQuotaFor, refundReservation, resetsAt, type QuotaReservation } from "../growth-quotas";
 import { notifyUser } from "../account-events";
 import {
@@ -249,7 +249,8 @@ export async function runSiteScanWorker(deps = workerDependencies) {
           continue;
         }
         if (
-          !(await takeBudget(
+          !(await takeAccountBudget(
+            job.user_id,
             "sitescan:psi:" + job.user_id,
             20,
             1,
@@ -491,7 +492,7 @@ export async function runSchedules() {
         continue;
       }
       held.push(quota.reservation);
-      if (await takeBudget("sitescan:scan:" + s.user_id, 5, 1, 86400_000)) {
+      if (await takeAccountBudget(s.user_id, "sitescan:scan:" + s.user_id, 5, 1, 86400_000)) {
         const profile = s.location_id
             ? await profileFor(s.user_id, s.location_id)
             : null,

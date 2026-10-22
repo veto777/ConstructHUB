@@ -18,7 +18,10 @@ import { greetingFor, relativeTime, shortDate } from "./format";
 function PlanChip({ account }: { account: DashboardAccount }) {
   const name = account.planName ?? "Your";
   let text: string, href: string, dot: string;
-  switch (account.status) {
+  // A platform admin runs with everything on, whatever subscription row the account holds.
+  if (account.isPlatformAdmin) {
+    text = "Platform admin · Unlimited"; href = "/settings?tab=limits"; dot = "bg-emerald-500";
+  } else switch (account.status) {
     case "trialing":
       text = account.trialEndsAt ? `${name} trial · ends ${relativeTime(account.trialEndsAt)}` : `${name} trial`;
       href = "/pricing"; dot = "bg-primary";

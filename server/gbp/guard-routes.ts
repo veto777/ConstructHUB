@@ -4,7 +4,7 @@ import type { Express, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { pool } from '../db';
-import { takeBudget } from '../growth-limits';
+import { takeAccountBudget } from '../growth-limits';
 import { GoogleError } from './client';
 import { publicError, ownedLocation } from './service';
 import { GUARD_FIELDS, guardRow, previewSnapshot, configureGuard, checkGuard, resolveChange, writeOwnerProfile } from './guard';
@@ -55,7 +55,7 @@ export function registerProfileGuardRoutes(app:Express,auth:(req:any,res:any)=>a
     app[method](path,async(req,res)=>{
       const u=auth(req,res);if(!u)return;
       try {
-        if(method!=='get'&&!await takeBudget(`gbp-guard-route:${path}:user:${u.id}`,path.endsWith('reauth')?5:30,1,600_000))throw new GoogleError('quota','Too many requests. Try again later.',429);
+        if(method!=='get'&&!await takeAccountBudget(u.id, `gbp-guard-route:${path}:user:${u.id}`,path.endsWith('reauth')?5:30,1,600_000))throw new GoogleError('quota','Too many requests. Try again later.',429);
         await fn(req,res,u.id);
       }catch(e){res.status(e instanceof z.ZodError?400:e instanceof GoogleError?e.status:500).json(e instanceof z.ZodError?{message:'Invalid input'}:publicError(e));}
     });

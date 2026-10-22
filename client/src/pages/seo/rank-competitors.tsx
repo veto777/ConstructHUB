@@ -72,7 +72,8 @@ export function CompetitorPanel({ site }: { site: SeoSite }) {
   const stale = !q.data || q.isError;
   // None of the chosen keywords was in the newest check: nothing measured (never "0%").
   const unmeasured = v.keywords === 0;
-  const full = v.competitors.length >= v.max;
+  // -1: no cap (platform admins).
+  const full = v.max >= 0 && v.competitors.length >= v.max;
   const top = Math.max(1, ...v.domains.map((d) => d.visibility));
   const explore = (domain: string) => seoLinks.explorer(domain);
   // The keywords these figures rest on: the page's tag and device, in the table.

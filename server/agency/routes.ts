@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { pool } from '../db';
 import { GoogleError } from '../gbp/client';
 import { grantStatus } from '../gbp/grants';
-import { takeBudget, rateLimit } from '../growth-limits';
+import { takeBudget, rateLimit, takeAccountBudget } from '../growth-limits';
 import { logActivity } from '../account-events';
 import { guardRecentAuthOk } from '../gbp/guard-routes';
 import { accessFor, agencyPlan, agencyPlanRequired, clientAccess, dashboard, filters, forbidden, listLocations, locationAccess, locationFilter, locationJoin, missing, positiveId, requireAdmin, requireAllClients, requireOwner, requireWrite, workspaceEntitled, teamEntitled, teamPlanRequired, type AgencyAccess } from './access';
@@ -64,7 +64,7 @@ export function registerAgencyRoutes(app:Express) {
     try {const a=await requestAccess(req);res.setHeader('Cache-Control','no-store');
       if(planGate==='team'&&!await teamEntitled(a.owner,a.actor))return void teamPlanRequired(res);
       if(planGate===true&&!await workspaceEntitled(a.owner,a.actor))return void agencyPlanRequired(res);
-      if(method!=='get'&&!await takeBudget(`agency-route:${a.actor}`,100))throw new GoogleError('quota','Request limit reached',429);
+      if(method!=='get'&&!await takeAccountBudget(a.actor, `agency-route:${a.actor}`,100))throw new GoogleError('quota','Request limit reached',429);
       await fn(req,res,a);
     }catch(e){res.status(e instanceof z.ZodError?400:e instanceof GoogleError?e.status:500).json({message:e instanceof z.ZodError?agencyInputMessage(e):e instanceof GoogleError?e.message:'Agency operation failed'});}
   });
@@ -262,7 +262,7 @@ export function registerAgencyRoutes(app:Express) {
     // Nothing to refresh without a connected Google account: say so instead of answering "queued".
     const {rows:[g]}=await pool.query('SELECT count(*)::int n FROM gbp_grants WHERE user_id=$1 AND NOT reconnect_required',[a.owner]);
     if(!g.n)throw new GoogleError('invalid','Connect the agency Google account first; there is no connected account to refresh',409);
-    if(!await takeBudget(`agency-discover:${a.owner}`,2,1,600000))throw new GoogleError('quota','Discovery is already queued or was recently requested',429);
+    if(!await takeAccountBudget(a.owner, `agency-discover:${a.owner}`,2,1,600000))throw new GoogleError('quota','Discovery is already queued or was recently requested',429);
     // Persist requests in the polling table; worker consumes discovery separately.
     await pool.query(`INSERT INTO agency_poll_grants(user_id,subject,next_at,refresh_requested) SELECT user_id,google_subject,now(),true FROM gbp_grants WHERE user_id=$1 AND NOT reconnect_required ON CONFLICT(user_id,subject) DO UPDATE SET next_at=now(),refresh_requested=true`,[a.owner]);
     res.status(202).json({queued:true});

@@ -19,7 +19,7 @@ import { randomUUID } from "node:crypto";
 import { Router, type Request } from "express";
 import { z } from "zod";
 import { pool } from "../../db";
-import { takeBudget } from "../../growth-limits";
+import { takeAccountBudget } from "../../growth-limits";
 import { reserveQuotaFor as reserveQuota, refundReservation } from "../../growth-quotas";
 import { logActivity } from "../../account-events";
 import { siteUrl } from "../../sitescan/http";
@@ -89,7 +89,7 @@ export async function startSiteScan(userId: number, raw: unknown, meta: { keyId:
     const retryAfterSeconds = Number.isFinite(resetsAt) ? Math.max(1, Math.ceil((resetsAt - Date.now()) / 1000)) : undefined;
     return { ok: false, status: 429, code: "quota_exceeded", message: text, detail: { scope: "feature", feature: "siteScans", ...detail }, retryAfterSeconds };
   }
-  if (!(await takeBudget("sitescan:scan:" + userId, DAILY_SCAN_CAP, 1, DAY))) {
+  if (!(await takeAccountBudget(userId, "sitescan:scan:" + userId, DAILY_SCAN_CAP, 1, DAY))) {
     await refundReservation(quota.reservation, 1);
     return { ok: false, status: 429, code: "rate_limited", message: `Daily scan budget reached (${DAILY_SCAN_CAP} per day).`, detail: { scope: "daily", limit: DAILY_SCAN_CAP }, retryAfterSeconds: DAY / 1000 };
   }

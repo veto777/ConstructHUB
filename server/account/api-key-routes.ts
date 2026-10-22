@@ -20,6 +20,7 @@
  */
 import type { Express, NextFunction, Request, Response } from "express";
 import { pool } from "../db";
+import { isPlatformAdmin } from "../admin";
 import { requireRecentAuth } from "../account-security";
 import { logActivity, notifyUser } from "../account-events";
 import { NOTIFICATION_KINDS, type NotificationKind } from "../notification-kinds";
@@ -102,7 +103,7 @@ export function normalizeRow(r: ApiKeyRowLike, fallbackUserId = 0): ApiKeyRow {
 export type CreateApiKeyInput = { name: string; scopes: ApiKeyScope[]; monthlyUnitLimit: number | null; expiresInDays: number | null };
 /** Lane 1's helper (server/account/api-keys.ts): mints the secret, stores its hash, returns both. */
 export type ApiKeyDeps = {
-  createApiKey(userId: number, input: CreateApiKeyInput): Promise<{ secret: string; row: ApiKeyRowLike }>;
+  createApiKey(userId: number, input: CreateApiKeyInput, opts?: { maxActive?: number }): Promise<{ secret: string; row: ApiKeyRowLike }>;
 };
 
 const iso = (v: Date | string | null | undefined) => (v == null ? null : new Date(v).toISOString());
@@ -223,7 +224,7 @@ function sendSecret(res: Response, status: number, body: unknown) {
 }
 
 export function registerApiKeyRoutes(app: Express, auth: (req: any, res: any) => any, deps: ApiKeyDeps) {
-  const guard = rateLimit("account-api-keys", 30, 60, 10 * 60_000);
+  const guard = rateLimit("account-api-keys", 30, 60, 10 * 60_000, { admins: "limited" });
   const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) =>
     (req: Request, res: Response, next: NextFunction) => { fn(req, res).catch(next); };
 
@@ -263,13 +264,16 @@ export function registerApiKeyRoutes(app: Express, auth: (req: any, res: any) =>
       });
     }
     const { rows: [{ n: used }] } = await pool.query<{ n: number }>("SELECT count(*)::int n FROM account_api_keys WHERE user_id=$1 AND revoked_at IS NULL", [u.id]);
-    if (used >= MAX_API_KEYS) {
+    const keyCap = isPlatformAdmin(u) ? -1 : MAX_API_KEYS;
+    if (keyCap >= 0 && used >= keyCap) {
       return void sendLimitReached(res, { limit: MAX_API_KEYS, used, feature: "api_keys", message: `An account can hold up to ${MAX_API_KEYS} active API keys. Revoke one you no longer use.` });
     }
     let minted: Awaited<ReturnType<ApiKeyDeps["createApiKey"]>>;
     try {
       // The helper re-checks the ceiling under the per-account lock (two requests at 24 keys cannot both succeed).
-      minted = await deps.createApiKey(u.id, { name, scopes, monthlyUnitLimit, expiresInDays });
+      minted = keyCap < 0
+        ? await deps.createApiKey(u.id, { name, scopes, monthlyUnitLimit, expiresInDays }, { maxActive: Number.MAX_SAFE_INTEGER })
+        : await deps.createApiKey(u.id, { name, scopes, monthlyUnitLimit, expiresInDays });
     } catch (e: any) {
       if (e?.code === "limit_reached" && e?.feature === "api_keys") {
         return void sendLimitReached(res, { limit: Number(e.limit) || MAX_API_KEYS, used: Number(e.used) || used, feature: "api_keys", message: String(e.message) });

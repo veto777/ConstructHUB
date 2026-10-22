@@ -317,6 +317,24 @@ describe("limits", () => {
     expect(fifth.headers.get("retry-after")).toBe("60");
   });
 
+  it("a platform admin (deps.unlimited) has no per-minute, refusal or daily window; the global cap still applies", async () => {
+    await env.close();
+    process.env.HUB_GLOBAL_DAILY_CAP = "10";
+    try {
+      env = setup({ unlimited: (req) => (req.user as any)?.id === 7 });
+      for (let i = 0; i < 12; i++) expect((await env.say("List your customers.", 7)).status).toBe(200);
+      for (let i = 0; i < 10; i++) expect((await env.say("How do I set up Click Guard?", 7)).status).toBe(200);
+      expect(env.budgetCalls.filter((k) => /^hub:u:7:|^hub-refuse:u:7|^hub:ip:/.test(k))).toEqual([]);
+      // The whole-Hub daily cap is shared by everyone and is not lifted.
+      expect((await env.say("How do I set up Click Guard?", 7)).status).toBe(503);
+      // Everyone else still has the per-minute window.
+      for (let i = 0; i < 4; i++) await env.say("List your customers.", 42);
+      expect((await env.say("List your customers.", 42)).status).toBe(429);
+    } finally {
+      delete process.env.HUB_GLOBAL_DAILY_CAP;
+    }
+  });
+
   it("RT75: after 10 refusals in a UTC day every chat is R_LIMIT, but presets still work", async () => {
     for (let i = 0; i < 10; i++) {
       if (i % 4 === 0) env.minute();

@@ -144,6 +144,11 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
                     <p className="text-xs text-destructive" role="alert">Your last payment didn't go through. Update your card in Manage billing.</p>
                   )}
                 </>
+              ) : entitlements?.isPlatformAdmin === true ? (
+                <>
+                  <p className="font-semibold text-primary" data-testid="text-current-plan">Platform admin — everything included</p>
+                  <p className="text-xs text-muted-foreground" data-testid="text-plan-admin">A platform admin account: every plan feature, add-on and limit is on and unlimited without a subscription.</p>
+                </>
               ) : (
                 <>
                   <p className="font-semibold text-primary" data-testid="text-current-plan">No active plan</p>
@@ -156,9 +161,11 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => navigate(view.interval === "year" ? "/pricing?interval=year" : "/pricing")} data-testid="button-upgrade">
-                {plan ? "Change plan" : "Choose a plan"}
-              </Button>
+              {(plan || entitlements?.isPlatformAdmin !== true) && (
+                <Button size="sm" onClick={() => navigate(view.interval === "year" ? "/pricing?interval=year" : "/pricing")} data-testid="button-upgrade">
+                  {plan ? "Change plan" : "Choose a plan"}
+                </Button>
+              )}
               {view.viaStripe && (
                 <Button variant="outline" size="sm" onClick={() => portalMutation.mutate()} disabled={portalMutation.isPending} data-testid="button-manage-billing">
                   {portalMutation.isPending ? "Opening…" : "Manage billing"}
@@ -371,7 +378,7 @@ export function UsageCard({ entitlements }: { entitlements: EntitlementsInfo }) 
       <CardContent className="space-y-4">
         {admin && (
           <p className="text-xs text-muted-foreground" data-testid="text-usage-admin">
-            Platform admin: every feature is on and every plan limit is unlimited on this account, whatever plan it holds. Per-day safety caps (for example 5 Site Scans a day) still apply.
+            Platform admin: every feature is on and every plan limit, daily budget and request limit is unlimited on this account, whatever plan it holds.
           </p>
         )}
         {locations && (

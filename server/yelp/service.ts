@@ -4,6 +4,7 @@
  * Also: daily rating/review snapshots (trend), a notification when the review count ticks up, and nearby competitors.
  */
 import { pool } from "../db";
+import { atCap, countCap } from "../admin-unlimited";
 import { notifyUser } from "../account-events";
 import { aiModel } from "../ai-config";
 import { aiClient, aiComplete, NO_TOOLS_RULE } from "../ai-output";
@@ -87,7 +88,7 @@ export async function search(userId: number, term: string, location: string): Pr
 export async function connect(userId: number, yelpId: string): Promise<YelpRow> {
   if (!yelpConfigured()) throw new YelpError(503, "Yelp isn't available here yet");
   const { rows } = await pool.query("SELECT count(*)::int AS n FROM yelp_businesses WHERE user_id=$1", [userId]);
-  if (rows[0].n >= 50) throw new YelpError(400, "You can connect up to 50 Yelp businesses");
+  if (atCap(await countCap(userId, 50), rows[0].n)) throw new YelpError(400, "You can connect up to 50 Yelp businesses");
   return fetchAndStore(userId, yelpId);
 }
 

@@ -34,6 +34,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
 import { isPlatformAdmin } from "../admin";
+import { atCap, countCap, overCap } from "../admin-unlimited";
 import { requirePlan, sendLimitReached, sendModuleRequired, raiseHint, plural, type Entitlements } from "../entitlements";
 import { monthlyUsage, reserveQuotaFor, refundReservation, resetsAt } from "../growth-quotas";
 import { budgetStatus, withBudget, SeoBudgetError, monthlySpendByAccount, monthlyBudgetUsd, monthKey, BUDGET_PAUSED_MESSAGE } from "./budget";
@@ -76,7 +77,7 @@ import { usageHistory } from "./usage";
 import { reportDeps } from "./site-report";
 import { buildSiteReport, renderReportPdf, reportHighlights, reportIsEmpty, getSchedule, saveSchedule, scheduleInput, MAX_RECIPIENTS } from "./site-report";
 import { sendSiteReport, validUnsubscribe, optOut, optedOut } from "./site-report-send";
-import { takeBudget } from "../growth-limits";
+import { takeBudget, takeAccountBudget } from "../growth-limits";
 import { shareOfVoice, latestChecks, trackedCompetitors, competitorInput as followInput, MAX_TRACKED_COMPETITORS } from "./voice";
 import { listingNamed } from "./dataforseo";
 import { contentInput, fetchContent, CONTENT_ESTIMATE_USD, CONTENT_TYPICAL_USD, type ContentPage } from "./content";
@@ -396,7 +397,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const domain = normalizeDomain(input.domain);
     if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
     // The cap counts only sites the account does not have yet (server/seo/site-cap.ts).
-    if (await siteCapRefuses(user, domain, MAX_SITES)) return res.status(403).json({ message: `Up to ${MAX_SITES} sites can be tracked.` });
+    if (await siteCapRefuses(user, domain, await countCap(user, MAX_SITES))) return res.status(403).json({ message: `Up to ${MAX_SITES} sites can be tracked.` });
     // A site the account already has is left exactly as it is and answered with existing: true (review w3-r2 M1,
     // server/seo/site-cap.ts addSiteOrExisting): an add never resets a tracked site's market, devices or SERP depth.
     const { site, existing } = await addSiteOrExisting(user, domain, input);
@@ -493,7 +494,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!place) return res.status(400).json({ message: "Pick the place from the list." });
     const { rows: existing } = await pool.query("SELECT keyword FROM seo_keywords WHERE site_id=$1 AND keyword=ANY($2::text[]) AND coalesce(location_code,0)=$3", [site.id, unique, place.code]);
     const adding = unique.length - existing.length;
-    if (n + adding > MAX_KEYWORDS_PER_SITE) return res.status(403).json({ message: `Up to ${MAX_KEYWORDS_PER_SITE} keywords per site.` });
+    if (overCap(await countCap(user, MAX_KEYWORDS_PER_SITE), n + adding)) return res.status(403).json({ message: `Up to ${MAX_KEYWORDS_PER_SITE} keywords per site.` });
     const { rows: [{ total }] } = await pool.query("SELECT count(*)::int total FROM seo_keywords WHERE user_id=$1", [user]);
     const limit = ent.allowances?.seoKeywords ?? 0;
     if (adding > 0 && !keywordsFit(ent.allowances, Number(total), adding)) {
@@ -731,7 +732,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // The saved pin and the scans so far. Spends nothing.
   route("get", "/api/seo/sites/:id/grid", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    res.json({ pin: readPin((site as { grid_pin?: unknown }).grid_pin), scans: await listScans(user, site.id), running: await runningScan(user, site.id), watches: await listWatches(user, site.id), maxWatches: MAX_WATCHES, sizes: GRID_SIZES, spacings: GRID_SPACINGS, depth: GRID_DEPTH, suggestion: site.business_name ?? "" });
+    res.json({ pin: readPin((site as { grid_pin?: unknown }).grid_pin), scans: await listScans(user, site.id), running: await runningScan(user, site.id), watches: await listWatches(user, site.id), maxWatches: await countCap(user, MAX_WATCHES), sizes: GRID_SIZES, spacings: GRID_SPACINGS, depth: GRID_DEPTH, suggestion: site.business_name ?? "" });
   });
   // Search Google Maps for the business, to choose the listing the grid is centred on. One small lookup.
   route("post", "/api/seo/sites/:id/grid/locate", async (req, res, user) => {
@@ -1123,7 +1124,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const open = plan.tasks.filter((t) => t.kind === "audit" && (t.status === "todo" || t.status === "doing"));
     let evidenceFailed = false;
     const crawl = open.length ? await auditEvidence(user, site.domain, open.map((t) => t.facts.crawlId).filter((x): x is string => typeof x === "string")).catch((e) => { evidenceFailed = true; console.warn(`[seo] crawl evidence for the action plan could not be read: ${e?.message ?? e}`); return null; }) : null;
-    res.json({ tasks: evidenceFailed ? markUnavailable(plan.tasks) : crawl ? markResolved(plan.tasks, crawl) : plan.tasks, counts: plan.counts, closedShown: plan.closedShown, closedMax: MAX_CLOSED_SHOWN, max: MAX_OPEN_TASKS });
+    res.json({ tasks: evidenceFailed ? markUnavailable(plan.tasks) : crawl ? markResolved(plan.tasks, crawl) : plan.tasks, counts: plan.counts, closedShown: plan.closedShown, closedMax: MAX_CLOSED_SHOWN, max: await countCap(user, MAX_OPEN_TASKS) });
   });
   route("post", "/api/seo/sites/:id/tasks", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
@@ -1295,7 +1296,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       aiHistory(user, site.id),
       pool.query("SELECT keyword, location_name AS location FROM seo_keywords WHERE site_id=$1 ORDER BY (location_name IS NOT NULL AND location_name <> 'United States') DESC, search_volume DESC NULLS LAST, id LIMIT 40", [site.id]),
     ]);
-    res.json({ businessName: site.business_name ?? null, domain: site.domain, prompts, suggestions: suggestPrompts(keywords), tracked: await trackedPrompts(site.id), maxTracked: MAX_TRACKED_PROMPTS });
+    res.json({ businessName: site.business_name ?? null, domain: site.domain, prompts, suggestions: suggestPrompts(keywords), tracked: await trackedPrompts(site.id), maxTracked: await countCap(user, MAX_TRACKED_PROMPTS) });
   });
   // The saved answers added up: named / used as a source now and month by month, other businesses named, websites drawn on. Saved rows only.
   route("get", "/api/seo/sites/:id/ai/summary", async (req, res, user) => {
@@ -1311,7 +1312,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const input = askInput.parse(req.body);
     if (!isConfigured()) return notReady(res);
     // This is a visibility check, not a chatbot: a generous ceiling on how many questions an account asks in an hour.
-    if (!(await takeBudget(`seo:ai:${user}`, 40, 1, 3_600_000))) return res.status(429).json({ message: "That is a lot of questions in one hour — try again in a little while." });
+    if (!(await takeAccountBudget(user, `seo:ai:${user}`, 40, 1, 3_600_000))) return res.status(429).json({ message: "That is a lot of questions in one hour — try again in a little while." });
     const engines = [...new Set(input.engines)];
     const out = await once(`ai:${user}:${site.id}:${engines.join(",")}:${cleanKeyword(input.prompt)}`, async () => {
       // The same question to the same assistants, saved in the last two minutes (a request that waited for this one in
@@ -1366,7 +1367,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (tag !== null && !tags.includes(tag)) return void res.status(400).json({ code: "bad_tag", message: "This site has no keywords with that tag." });
     const [competitors, { checks, checkedOn, tracked }] = await Promise.all([trackedCompetitors(site.id), latestChecks(site.id, device, tag)]);
     const voice = shareOfVoice(checks, site.domain, competitors, (e) => listingNamed(e, site.business_name));
-    res.json({ device, devices, tag, tags, checkedOn, tracked, competitors, max: MAX_TRACKED_COMPETITORS, hasPages: checks.some((c) => (c.serpTop?.length ?? 0) > 0), ...voice });
+    res.json({ device, devices, tag, tags, checkedOn, tracked, competitors, max: await countCap(user, MAX_TRACKED_COMPETITORS), hasPages: checks.some((c) => (c.serpTop?.length ?? 0) > 0), ...voice });
   });
   // One at a time per account, so two requests cannot both take the last place.
   route("post", "/api/seo/sites/:id/tracked-competitors", (req, res, user) => serial(`follow:${user}`, async () => {
@@ -1375,7 +1376,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!domain) return res.status(400).json({ message: "Enter the competitor's website like example.com" });
     if (domain === site.domain) return res.status(400).json({ message: "That is your own site." });
     const have = await trackedCompetitors(site.id);
-    if (!have.includes(domain) && have.length >= MAX_TRACKED_COMPETITORS) return res.status(403).json({ message: `You can follow up to ${MAX_TRACKED_COMPETITORS} competitors per site. Remove one first.` });
+    if (!have.includes(domain) && atCap(await countCap(user, MAX_TRACKED_COMPETITORS), have.length)) return res.status(403).json({ message: `You can follow up to ${MAX_TRACKED_COMPETITORS} competitors per site. Remove one first.` });
     await pool.query("INSERT INTO seo_site_competitors(site_id, domain) VALUES($1,$2) ON CONFLICT DO NOTHING", [site.id, domain]);
     res.status(201).json({ competitors: await trackedCompetitors(site.id) });
   }));

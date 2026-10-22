@@ -18,6 +18,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
+import { atCap, countCap } from "../admin-unlimited";
 import { getEntitlements, planPausedMessage } from "../entitlements";
 import { withBudget, SeoBudgetError } from "./budget";
 import { isConfigured, claimDeadline, type Deadline } from "./dataforseo";
@@ -123,6 +124,8 @@ export async function listWatches(userId: number, siteId: number): Promise<GridW
  */
 export async function saveWatch(userId: number, siteId: number, input: z.infer<typeof watchInput>): Promise<GridWatch> {
   const keyword = input.keyword.toLowerCase().replace(/\s+/g, " ").trim();
+  // Read before the transaction: a second pool connection is never needed while the lock is held.
+  const watchCap = await countCap(userId, MAX_WATCHES);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -131,7 +134,7 @@ export async function saveWatch(userId: number, siteId: number, input: z.infer<t
     const { rows: [base] } = await client.query("SELECT 1 FROM seo_grid_scans WHERE site_id=$1 AND user_id=$2 AND status='done' AND keyword=$3 AND size=$4 AND spacing=$5 LIMIT 1", [siteId, userId, keyword, input.size, input.spacing]);
     if (!base) throw new WatchError("Run this scan once first — a repeating scan is compared with the one before it.", 400);
     const { rows: [{ n }] } = await client.query("SELECT count(*)::int n FROM seo_grid_watches WHERE site_id=$1 AND NOT (lower(keyword)=$2 AND size=$3 AND spacing=$4)", [siteId, keyword, input.size, input.spacing]);
-    if (n >= MAX_WATCHES) throw new WatchError(`Up to ${MAX_WATCHES} scans can repeat for one site. Stop one you no longer need.`, 403);
+    if (atCap(watchCap, n)) throw new WatchError(`Up to ${MAX_WATCHES} scans can repeat for one site. Stop one you no longer need.`, 403);
     // The anchor is the moment the customer asked (a watch set on the 31st stays on the 31st); the first run is one period on.
     const anchor = new Date(), first = nextDue(anchor, input.every, anchor);
     const { rows: [row] } = await client.query(
@@ -348,7 +351,7 @@ export type GridReportLine = { scanId?: number; keyword: string; size: number; s
 export async function gridReportLines(userId: number, siteId: number): Promise<GridReportLine[]> {
   const same = `abs((x.scan->'center'->>'lat')::float8 - (st.grid_pin->>'lat')::float8) < 0.0001 AND abs((x.scan->'center'->>'lng')::float8 - (st.grid_pin->>'lng')::float8) < 0.0001
                 AND (x.scan->'center'->>'cid') IS NOT DISTINCT FROM (st.grid_pin->>'cid') AND ((st.grid_pin->>'cid') IS NOT NULL OR (x.scan->'center'->>'name') = (st.grid_pin->>'name'))`;
-  const { rows: watches } = await pool.query(`SELECT keyword, size, spacing::float8 AS spacing FROM seo_grid_watches WHERE site_id=$1 AND user_id=$2 ORDER BY created_at LIMIT ${MAX_WATCHES}`, [siteId, userId]);
+  const { rows: watches } = await pool.query(`SELECT keyword, size, spacing::float8 AS spacing FROM seo_grid_watches WHERE site_id=$1 AND user_id=$2 ORDER BY created_at LIMIT ${(await countCap(userId, MAX_WATCHES)) < 0 ? "ALL" : MAX_WATCHES}`, [siteId, userId]);
   const lines: GridReportLine[] = [];
   for (const w of watches) {
     const { rows } = await pool.query(

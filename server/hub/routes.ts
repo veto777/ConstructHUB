@@ -39,6 +39,12 @@ export type HubDeps = {
   originOk: (req: Request) => boolean;
   /** Signed in with a verified email (or the local dev bypass). */
   isBuilder: (req: Request) => boolean;
+  /**
+   * A platform admin (owner order 2026-10-22): the per-account windows — per
+   * minute, the refusal cooldown, per day and per IP — are not applied. The
+   * whole-Hub guards (token cap, global daily cap, breaker, concurrency) are.
+   */
+  unlimited?: (req: Request) => boolean;
   now?: () => number;
   /** Token counts per UTC day (cost guard); on hub_usage_days in production (index.ts), in memory by default. */
   tokens?: TokenMeter;
@@ -75,7 +81,7 @@ export type HubAllowance = {
   remaining: number | null;
   /** First instant of next month (UTC), ISO. */
   resetsAt: string;
-  /** Today's pace: the per-account daily cap and what today has used. */
+  /** Today's pace: the per-account daily cap (-1 = none, platform admins) and what today has used. */
   daily: { limit: number; used: number };
 };
 
@@ -138,7 +144,8 @@ export function createHub(deps: HubDeps) {
       const ownerId = await allowanceOwner(req, userId);
       const u = await deps.quota.usage(ownerId);
       if (!u) return null;
-      const daily = hubDailyLimits(u.limit === 0 ? null : u.limit);
+      // A platform admin has no daily cap (deps.unlimited): -1, like the monthly allowance.
+      const daily = deps.unlimited?.(req) === true ? { userDaily: -1 } : hubDailyLimits(u.limit === 0 ? null : u.limit);
       const dailyUsed = await deps.budget.used(keys.userDaily(userId), HUB_LIMITS.userDaily.windowMs);
       return {
         monthly: u.limit, used: u.used,
@@ -380,14 +387,15 @@ export function createHub(deps: HubDeps) {
       // 4.5 — today's token cap (cost guard): same "off site" answer, so the widget needs nothing new.
       if (await capped()) { note(tier, "offline", "token_cap", started); return void res.status(503).json({ reply: inApp ? REPLIES.R_APP_OFFLINE : REPLIES.R_OFFLINE, code: "offline" }); }
 
+      const unlimited = deps.unlimited?.(req) === true;
       // 5. per-minute (before the pre-filter, so probing is throttled too)
-      if (!(await deps.budget.take(keys.minute(userId), HUB_LIMITS.chatPerMinute.limit, HUB_LIMITS.chatPerMinute.windowMs))) {
+      if (!unlimited && !(await deps.budget.take(keys.minute(userId), HUB_LIMITS.chatPerMinute.limit, HUB_LIMITS.chatPerMinute.windowMs))) {
         note(tier, "limit", "minute", started);
         res.setHeader("Retry-After", "60");
         return void res.status(429).json({ reply: REPLIES.R_SLOWDOWN, code: "slowdown" });
       }
       // 6. refusal cooldown
-      if ((await deps.budget.used(keys.refusals(userId), HUB_LIMITS.refusalsPerDay.windowMs)) >= HUB_LIMITS.refusalsPerDay.limit) {
+      if (!unlimited && (await deps.budget.used(keys.refusals(userId), HUB_LIMITS.refusalsPerDay.windowMs)) >= HUB_LIMITS.refusalsPerDay.limit) {
         note(tier, "limit", "refusals", started);
         return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
       }
@@ -402,7 +410,7 @@ export function createHub(deps: HubDeps) {
       // gets one fixed answer, deterministically — the model (its knowledge pack holds the price
       // book) and the pre-filter's own replies never see it.
       if (inApp && appSalesQuestion(newMessage)) {
-        await deps.budget.take(keys.refusals(userId), HUB_LIMITS.refusalsPerDay.limit, HUB_LIMITS.refusalsPerDay.windowMs);
+        if (!unlimited) await deps.budget.take(keys.refusals(userId), HUB_LIMITS.refusalsPerDay.limit, HUB_LIMITS.refusalsPerDay.windowMs);
         note(tier, "prefilter", "app_pricing", started);
         return void signed(REPLIES.R_APP_PRICING, "refusal");
       }
@@ -411,7 +419,7 @@ export function createHub(deps: HubDeps) {
       const pre = prefilter(newMessage);
       if (pre.code !== "pass") {
         const override = inApp ? appPrefilterOverride(pre.reply, pre.link?.path) : null;
-        await deps.budget.take(keys.refusals(userId), HUB_LIMITS.refusalsPerDay.limit, HUB_LIMITS.refusalsPerDay.windowMs);
+        if (!unlimited) await deps.budget.take(keys.refusals(userId), HUB_LIMITS.refusalsPerDay.limit, HUB_LIMITS.refusalsPerDay.windowMs);
         note(tier, "prefilter", override ? "app_pricing" : pre.code, started);
         return void signed(override ? REPLIES.R_APP_PRICING : replyText(pre.reply, pre.link), "refusal");
       }
@@ -452,10 +460,10 @@ export function createHub(deps: HubDeps) {
         }
         // 10b. daily budgets — taken only now that a model call will happen (the finally below
         // releases the slot, and re-credits the monthly question when no call can be made)
-        if (!(await deps.budget.take(keys.userDaily(userId), daily.userDaily, HUB_LIMITS.userDaily.windowMs))) {
+        if (!unlimited && !(await deps.budget.take(keys.userDaily(userId), daily.userDaily, HUB_LIMITS.userDaily.windowMs))) {
           note(tier, "limit", "user_daily", started); return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
         }
-        if (!(await deps.budget.take(keys.ipDaily(deps.ipKey(req)), daily.ipDaily, HUB_LIMITS.ipDaily.windowMs))) {
+        if (!unlimited && !(await deps.budget.take(keys.ipDaily(deps.ipKey(req)), daily.ipDaily, HUB_LIMITS.ipDaily.windowMs))) {
           note(tier, "limit", "ip_daily", started); return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
         }
         if (!(await deps.budget.take(keys.globalDaily(), globalDailyCap(), HUB_LIMITS.userDaily.windowMs))) {

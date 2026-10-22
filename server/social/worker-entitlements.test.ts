@@ -8,7 +8,7 @@ vi.mock("../db", () => ({ pool: { query: mocks.query } }));
 vi.mock("../entitlements", () => ({ usersWithModule: mocks.usersWithModule, getEntitlements: mocks.getEntitlements }));
 vi.mock("./agency", () => ({ runAgencyWorker: vi.fn() }));
 vi.mock("./gbp-sources", () => ({ syncGbpSources: vi.fn() }));
-vi.mock("../growth-limits", () => ({ takeBudget: vi.fn() }));
+vi.mock("../growth-limits", () => { const takeBudget = vi.fn(); return { takeBudget, takeAccountBudget: (_user: unknown, ...a: unknown[]) => (takeBudget as any)(...a) }; });
 vi.mock("../account-events", () => ({ notifyUser: vi.fn(), logActivity: vi.fn() }));
 vi.mock("../ops/issues", () => ({ recordFailure: vi.fn() }));
 vi.mock("../ai-output", () => ({ aiClient: vi.fn(), aiComplete: vi.fn(), AiAnswerError: class extends Error {}, NO_TOOLS_RULE: "" }));

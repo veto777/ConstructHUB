@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { pool } from '../db';
-import { takeBudget } from '../growth-limits';
+import { takeAccountBudget } from '../growth-limits';
 import { logActivity, notifyUser } from '../account-events';
 import { GoogleError } from './client';
 import { ownedLocation, reply, withLocationLock } from './service';
@@ -127,7 +127,7 @@ export async function processReplies(userId:number,id:number,generate=generateRe
       AND r.google_review_id LIKE 'accounts/%/locations/%/reviews/%'
       AND a.ai_status IS NULL AND (r.review_date>=$3 OR (a.backfill AND $4)) ORDER BY r.id LIMIT 20`,[userId,id,config.future_since,s.scope==='existing']);
     for(const r of rows) {
-      if(!await takeBudget(`gbp-ai-reply:user:${userId}`,50,1,86400_000))break;
+      if(!await takeAccountBudget(userId, `gbp-ai-reply:user:${userId}`,50,1,86400_000))break;
       await pool.query("UPDATE gbp_review_automation SET ai_status='generating',ai_error=NULL WHERE review_id=$1 AND user_id=$2",[r.id,userId]);
       try {
         const text=await generate(s,r,l.business_name);

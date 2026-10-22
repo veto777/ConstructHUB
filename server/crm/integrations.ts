@@ -214,7 +214,7 @@ export type ApiCtx = { orgId: string; keyId: string; scopes: string[] };
 /** Resolve the billing owner's CRM subscription, never the acting seat's platform plan. */
 export async function requireCrmFeature(res: Response, ownerUserId: number, feature: "jobCosting" | "api") {
   const ent = await getCrmEntitlements(ownerUserId, { fresh: true });
-  if (ent.active && (feature === "jobCosting" ? ent.limits?.jobCosting : (ent.limits?.apiUnitsPerMonth ?? 0) > 0)) return ent;
+  if (ent.active && (feature === "jobCosting" ? ent.limits?.jobCosting : (ent.limits?.apiUnitsPerMonth ?? 0) !== 0)) return ent;
   res.status(402).json({
     code: "crm_plan_required", feature, requiredPlan: "crm_essentials",
     message: `${feature === "jobCosting" ? "Job costing and change orders require" : "CRM API access requires"} CRM Essentials or Max.`,
@@ -236,7 +236,10 @@ function ensureApiUsage() {
 }
 
 /** Read API: meter successful JSON before sending, using the platform's unit formula. */
-async function installCrmApiMeter(req: any, res: Response, ownerUserId: number, limit: number) {
+async function installCrmApiMeter(req: any, res: Response, ownerUserId: number, allowance: number) {
+  // -1 = unlimited (platform admins): use is still counted, never refused.
+  const unlimited = allowance < 0;
+  const limit = unlimited ? 2_147_483_647 : allowance;
   await ensureApiUsage();
   const month = apiMonthStart();
   const { rows: [usage] } = await pool.query(
@@ -269,7 +272,7 @@ async function installCrmApiMeter(req: any, res: Response, ownerUserId: number, 
             RETURNING units`, [ownerUserId, month, units, limit]);
           res.json = json;
           if (!charged) { if (!res.destroyed) refuse(); return; }
-          res.setHeader("X-Units-Remaining", String(limit - charged.units));
+          res.setHeader("X-Units-Remaining", unlimited ? "-1" : String(limit - charged.units));
         }
         if (!res.destroyed) json(body);
       } catch {

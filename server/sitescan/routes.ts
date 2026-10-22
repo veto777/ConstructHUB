@@ -4,8 +4,9 @@ import { z } from "zod";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import PDFDocument from "pdfkit";
 import { pool } from "../db";
+import { atCap, countCap } from "../admin-unlimited";
 import { hasModule, sendModuleRequired } from "../entitlements";
-import { takeBudget, rateLimit, ipKey } from "../growth-limits";
+import { takeBudget, rateLimit, ipKey, takeAccountBudget } from "../growth-limits";
 import { reserveQuotaFor, refundReservation } from "../growth-quotas";
 import { logActivity } from "../account-events";
 import { sendWithFallback } from "../email";
@@ -355,7 +356,7 @@ export function registerSiteScanRoutes(
     if (!j) return;
     const reservation = await reserveScans(res, user, 1);
     if (!reservation) return;
-    if (!(await takeBudget("sitescan:scan:" + user, 5, 1, 86400000))) {
+    if (!(await takeAccountBudget(user, "sitescan:scan:" + user, 5, 1, 86400000))) {
       await refundReservation(reservation, 1);
       return res
         .status(429)
@@ -433,7 +434,7 @@ export function registerSiteScanRoutes(
     }
     const reservation = await reserveScans(res, user, 1);
     if (!reservation) return;
-    if (!(await takeBudget("sitescan:scan:" + user, 5, 1, 86400_000))) {
+    if (!(await takeAccountBudget(user, "sitescan:scan:" + user, 5, 1, 86400_000))) {
       await refundReservation(reservation, 1);
       return res
         .status(429)
@@ -481,7 +482,7 @@ export function registerSiteScanRoutes(
     const draftKey = "sitescan:ai:" + user,
       callsKey = "sitescan:ai-calls:" + user,
       globalKey = "sitescan:ai-global";
-    if (!(await takeBudget(draftKey, 3, 1, DAY)))
+    if (!(await takeAccountBudget(user, draftKey, 3, 1, DAY)))
       return res
         .status(429)
         .json({ message: "Daily AI draft budget reached (3)." });
@@ -492,7 +493,7 @@ export function registerSiteScanRoutes(
         .status(409)
         .json({ message: "No readable pages are available for an AI plan." });
     }
-    const callsTaken = await takeBudget(callsKey, 20, batches.length, DAY);
+    const callsTaken = await takeAccountBudget(user, callsKey, 20, batches.length, DAY);
     if (
       !callsTaken ||
       !(await takeBudget(globalKey, 100, batches.length, DAY))
@@ -593,6 +594,8 @@ export function registerSiteScanRoutes(
     )
       return res.status(404).json({ message: "Synced profile not found" });
     if (body.enabled) {
+      // Read before the transaction: a second pool connection is never needed while the lock is held.
+      const scheduleCap = await countCap(user, 10);
       const c = await pool.connect();
       try {
         await c.query("BEGIN");
@@ -604,7 +607,7 @@ export function registerSiteScanRoutes(
           "SELECT count(*)::int n, bool_or(url=$2) AS existing FROM sitescan_schedules WHERE user_id=$1",
           [user, url],
         );
-        if (n.n >= 10 && !n.existing) {
+        if (atCap(scheduleCap, n.n) && !n.existing) {
           await c.query("ROLLBACK");
           return res
             .status(409)

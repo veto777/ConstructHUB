@@ -119,7 +119,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   const seo = useOptionalQuery<{ configured: boolean; usage: { keywords: UsageMeter }; credits?: { includedUsedCents: number; walletCents: number; notice?: string | null } }>("/api/seo/status", !!allowances && allowances.seoKeywords !== 0);
   const crmMe = useQuery<{ seats?: { used: number; limit: number }; crm?: { jobcam?: boolean } }>({ queryKey: ["/api/crm/me"], enabled: !!allowances });
   // JobCam storage (the CRM's job photos & video): the same numbers as the meter in JobCam.
-  const jobcam = useOptionalQuery<{ bytes: number; tierGb: number; limitBytes: number; nextTierGb: number | null; full: boolean }>(
+  const jobcam = useOptionalQuery<{ bytes: number; tierGb: number; limitBytes: number; nextTierGb: number | null; full: boolean; unlimited?: boolean }>(
     "/api/crm/jobcam/usage", !!allowances && crmMe.data?.crm?.jobcam === true);
   const templates = useQuery<unknown[]>({ queryKey: ["/api/review-templates"], enabled: !!allowances && allowances.reviewTemplates !== 0 });
   const apiKeys = useOptionalQuery<ApiKeysPlan>("/api/account/api-keys", hasApi);
@@ -298,7 +298,14 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           addon: allowances.clientTexting === "none" ? undefined : "texting_number",
         },
         // JobCam belongs to the CRM subscription, not this plan; larger storage sizes are requested, not bought.
-        crmMe.data?.crm?.jobcam === true ? {
+        crmMe.data?.crm?.jobcam === true && jobcam.data?.unlimited ? {
+          key: "jobcamStorage",
+          label: "JobCam storage",
+          included: "Unlimited",
+          used: jobcam.data.bytes,
+          usedText: formatJobcamUsage(jobcam.data.bytes, jobcam.data.tierGb).replace(/ of .*$/, " used"),
+          hint: "Job photos, videos and their previews. No storage limit on a platform admin account.",
+        } : crmMe.data?.crm?.jobcam === true ? {
           key: "jobcamStorage",
           label: "JobCam storage",
           included: jobcam.data ? formatJobcamTier(jobcam.data.tierGb) : "—",
@@ -454,12 +461,12 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                     (audit lane 1 G; owner 2026-10-04: as recommended). */}
                 {resets ? `Monthly counts reset ${resets.toLocaleString(undefined, { month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}.` : ""}
                 {admin
-                  ? " This is a platform admin account: every feature and add-on is on, and every plan limit is unlimited, whatever plan it holds. Per-day safety caps still apply (for example 5 Site Scans and 40 Gabe questions a day), and the Call Assistant keeps a ceiling on phone numbers." : ""}
+                  ? " This is a platform admin account: every feature and add-on is on, and every plan limit is unlimited, whatever plan it holds. Per-account daily budgets and request limits are off too. Still on for everyone: sign-in protections, platform-wide spend caps and outside providers' own quotas, and the Call Assistant keeps a ceiling on phone numbers (each one is a real carrier number)." : ""}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <GooglePill label="Billing" onClick={() => go("billing")} testId="button-limits-billing" />
-              <GooglePill variant="solid" label="Change plan" onClick={() => navigate("/pricing")} testId="button-limits-change-plan" />
+              {!admin && <GooglePill variant="solid" label="Change plan" onClick={() => navigate("/pricing")} testId="button-limits-change-plan" />}
             </div>
           </div>
         </CardContent>

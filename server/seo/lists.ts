@@ -12,6 +12,7 @@ import { marketLabel } from "@shared/seo-markets";
 import { z } from "zod";
 import { SeoCustomerError } from "./public-errors";
 import { pool } from "../db";
+import { atCap, countCap, overCap } from "../admin-unlimited";
 import { request, assertOk, taskItems } from "./dataforseo";
 import { estimateLabsUsd } from "./pricing";
 import { parseKeywordIdea, type KeywordIdeaRow } from "./reports";
@@ -134,7 +135,7 @@ export async function addToList(userId: number, input: z.infer<typeof listItemsI
     const { rows: [existing] } = await pool.query(`SELECT id, name, location_code AS "locationCode", language_code AS "languageCode" FROM seo_keyword_lists WHERE user_id=$1 AND lower(name)=lower($2)`, [userId, input.name]);
     if (existing) list = existing;
     else {
-      if (n >= MAX_LISTS) throw new ListError(`You can keep up to ${MAX_LISTS} lists. Delete one you no longer need.`, 403);
+      if (atCap(await countCap(userId, MAX_LISTS), n)) throw new ListError(`You can keep up to ${MAX_LISTS} lists. Delete one you no longer need.`, 403);
       const { rows: [created] } = await pool.query(
         `INSERT INTO seo_keyword_lists(user_id, name, location_code, language_code) VALUES($1,$2,$3,$4) ON CONFLICT (user_id, name) DO UPDATE SET name=EXCLUDED.name
          RETURNING id, name, location_code AS "locationCode", language_code AS "languageCode"`, [userId, input.name, input.locationCode, input.languageCode]);
@@ -149,7 +150,7 @@ export async function addToList(userId: number, input: z.infer<typeof listItemsI
   const { rows: [{ have }] } = await pool.query("SELECT count(*)::int have FROM seo_keyword_list_items WHERE list_id=$1", [list.id]);
   const { rows: already } = await pool.query("SELECT keyword FROM seo_keyword_list_items WHERE list_id=$1 AND keyword = ANY($2::text[])", [list.id, keywords]);
   const adding = keywords.length - already.length;
-  if (have + adding > MAX_LIST_ITEMS) throw new ListError(`A list holds up to ${MAX_LIST_ITEMS.toLocaleString("en-US")} keywords; this one has ${have}.`, 403);
+  if (overCap(await countCap(userId, MAX_LIST_ITEMS), have + adding)) throw new ListError(`A list holds up to ${MAX_LIST_ITEMS.toLocaleString("en-US")} keywords; this one has ${have}.`, 403);
   if (keywords.length) {
     const col = <T>(f: (i: (typeof input.items)[number]) => T) => keywords.map((k) => f(byKeyword.get(k)!));
     await pool.query(

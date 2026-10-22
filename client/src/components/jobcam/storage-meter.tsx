@@ -60,6 +60,17 @@ export function StorageFullNotice({ usage, dark = false, className }: { usage: J
 export function StorageMeter({ className }: { className?: string }) {
   const { data: usage } = useJobcamStorage();
   if (!usage || !usage.limitBytes) return null;
+  if (usage.unlimited) {
+    return (
+      <div className={cn("rounded-xl border border-border bg-card px-3 py-2.5", className)} data-testid="jobcam-storage-meter">
+        <div className="flex items-center gap-2 text-sm">
+          <HardDrive className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="font-medium">Storage</span>
+          <span className="ml-auto tabular-nums text-muted-foreground" data-testid="jobcam-storage-label">{formatJobcamGb(usage.bytes)} GB used · Unlimited</span>
+        </div>
+      </div>
+    );
+  }
   const state = jobcamStorageState(usage.bytes, usage.tierGb, usage.pendingBytes);
   const full = usage.full;
   const pct = Math.round(state.ratio * 100);

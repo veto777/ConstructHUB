@@ -60,6 +60,8 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
   const plan = view.live && view.planKey ? PLANS[view.planKey] : null;
   const interval: BillingInterval = view.interval ?? "month";
   const status = subscription?.status || "";
+  // A platform admin runs with everything on (server/entitlements.ts): no plan to choose.
+  const adminFree = entitlements?.isPlatformAdmin === true && !plan;
 
   const changePlan = onChangePlan ?? (() => navigate(view.interval === "year" ? "/pricing?interval=year" : "/pricing"));
   const manageBilling = onManageBilling ?? portal.open;
@@ -124,7 +126,7 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
         </div>
         {showActions && (
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={changePlan} data-testid="button-change-plan">{plan ? "Change plan" : "Choose a plan"}</Button>
+            {!adminFree && <Button size="sm" onClick={changePlan} data-testid="button-change-plan">{plan ? "Change plan" : "Choose a plan"}</Button>}
             {view.viaStripe && (
               <Button size="sm" variant="outline" onClick={manageBilling} disabled={portal.isPending} data-testid="button-manage-billing">
                 {portal.isPending ? "Opening…" : "Manage billing"}
@@ -142,6 +144,11 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
           <p className="text-sm text-destructive" role="alert" data-testid="text-subscription-error">
             Couldn't load your subscription. {apiErrorMessage(error)}
           </p>
+        ) : adminFree ? (
+          <div className="rounded-lg bg-muted/50 p-4 space-y-1" data-testid="text-admin-subscription">
+            <p className="text-sm font-medium">Platform admin — everything included</p>
+            <p className="text-xs text-muted-foreground">A platform admin account: every plan feature, add-on and limit is on and unlimited without a subscription.</p>
+          </div>
         ) : !plan ? (
           <div className="rounded-lg bg-muted/50 p-4 space-y-1" data-testid="text-no-subscription">
             <p className="text-sm font-medium">No active plan</p>

@@ -126,7 +126,7 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
     res.json({ method:user.totp_enabled?'totp':user.password_hash?'password':'email', google:!!user.google_id, apple:!!user.apple, email:maskEmail(user.email) });
   });
   // RecentAuthModal "Email a verification code": sends the 6-digit code; it lives in the session for 10 minutes, 5 attempts.
-  app.post('/api/auth/reauth/email', rateLimit('security-email',3,10,15*60_000), async(req,res)=>{
+  app.post('/api/auth/reauth/email', rateLimit('security-email',3,10,15*60_000, { admins: "limited" }), async(req,res)=>{
     const u=auth(req,res); if(!u) return;
     const {rows:[user]}=await pool.query('SELECT email,password_hash,totp_enabled FROM users WHERE id=$1',[u.id]);
     if(user.password_hash || user.totp_enabled) return res.status(400).json({message:'Use your password or authenticator.'});
@@ -137,7 +137,7 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
   });
   // RecentAuthModal "Verify and continue": checks password / TOTP / emailed code; on success marks the
   // session recently-authenticated so the guarded action proceeds.
-  app.post('/api/auth/reauth', rateLimit('security-verify',10,30,15*60_000), async(req,res)=>{
+  app.post('/api/auth/reauth', rateLimit('security-verify',10,30,15*60_000, { admins: "limited" }), async(req,res)=>{
     const u=auth(req,res); if(!u) return;
     const value=req.body?.value;
     if(typeof value!=='string' || value.length>256) return res.status(400).json({message:'Enter your verification.'});
@@ -171,7 +171,7 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
   });
   // "Generate new recovery codes" while 2FA is on: replaces all 10 codes in one transaction
   // (recent identity check required) and logs security.recovery_codes_changed.
-  app.post('/api/auth/2fa/recovery-codes',rateLimit('security-recovery',5,15),async(req,res)=>{
+  app.post('/api/auth/2fa/recovery-codes',rateLimit('security-recovery',5,15,undefined, { admins: "limited" }),async(req,res)=>{
     const u=auth(req,res);if(!u || !requireRecentAuth(req,res))return;
     const {rows:[user]}=await pool.query('SELECT totp_enabled FROM users WHERE id=$1',[u.id]);
     if(!user.totp_enabled)return res.status(400).json({message:'Enable two-factor sign-in first.'});

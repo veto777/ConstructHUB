@@ -2,7 +2,7 @@ import { syncGbpSources } from "./gbp-sources";
 import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "../db";
-import { takeBudget } from "../growth-limits";
+import { takeBudget, takeAccountBudget } from "../growth-limits";
 import { notifyUser, logActivity } from "../account-events";
 import {
   autoSchema,
@@ -553,7 +553,7 @@ export async function generateDue(
     throw new SocialError("Daily business AI budget reached",429);
   const configuredOwnerBudget=Number(process.env.SOCIAL_AI_OWNER_DAILY_BUDGET??20);
   const ownerBudget=Number.isInteger(configuredOwnerBudget)&&configuredOwnerBudget>=0&&configuredOwnerBudget<=100000?configuredOwnerBudget:20;
-  if (!(await takeBudget(`social-ai:${userId}`, businessId===null?s.aiDailyBudget:ownerBudget, 1, 86400000)))
+  if (!(await (businessId===null ? takeBudget(`social-ai:${userId}`, s.aiDailyBudget, 1, 86400000) : takeAccountBudget(userId, `social-ai:${userId}`, ownerBudget, 1, 86400000))))
     throw new SocialError("Daily social AI budget reached", 429);
   const text = await generate({
     business,

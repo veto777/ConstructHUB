@@ -122,6 +122,8 @@ export type JobcamUsageInfo = {
   bytes: number; mediaCount: number; photoCount: number; videoCount: number;
   tierGb: number; limitBytes: number; pendingBytes: number; nextTierGb: number | null;
   warn: boolean; full: boolean; label: string;
+  /** The workspace's owner is a platform admin: storage is never refused, so there is no meter. */
+  unlimited?: boolean;
   storageRequest: { requestedAt: string } | null;
   mode: "r2" | "local";
 };

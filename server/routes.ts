@@ -16,7 +16,7 @@ import { startResearchWorker } from "./research/runner";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { presentListing } from "./competitor-analysis";
-import { rateLimit, actorKey, takeBudget } from "./growth-limits";
+import { rateLimit, actorKey, takeBudget, takeAccountBudget } from "./growth-limits";
 import { findReviewSites, ReviewSiteFinderError } from "./review-site-finder";
 import { hiddenFromReviews, jobStagesForRequests, registerReviewPipelineRoutes } from "./crm/review-pipeline";
 import { HOMEOWNER_PICK_MAX, registerCrmPhotoPlatformRoutes, registerReviewProjectPhotoRoutes, resolveReviewCrmLink, reviewPhotoUrl } from "./crm/photo-library";
@@ -6051,7 +6051,7 @@ function main() {
       if (typeof highlights !== "string" || !highlights.trim() || highlights.length > 4000) {
         return res.status(400).json({ message: "Describe your own experience before creating a draft." });
       }
-      if (!(await takeBudget(`review-draft:owner:${request.userId}`, 50)) || !(await takeBudget(`review-draft:request:${request.id}`, 5, 1, 86400_000))) {
+      if (!(await takeAccountBudget(request.userId, `review-draft:owner:${request.userId}`, 50)) || !(await takeBudget(`review-draft:request:${request.id}`, 5, 1, 86400_000))) {
         return res.status(429).json({ message: "Draft limit reached. You can still write your own review directly on Google." });
       }
       let review: string;

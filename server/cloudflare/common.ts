@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { pool } from "../db";
-import { takeBudget } from "../growth-limits";
+import { takeAccountBudget } from "../growth-limits";
 export class ProviderError extends Error {
   constructor(
     message: string,
@@ -146,6 +146,6 @@ export async function mapLocations(
   );
 }
 export async function budget(user: number, name: string, amount = 1) {
-  if (!(await takeBudget(`edge:${name}:${user}`, 500, amount, 3600000)))
+  if (!(await takeAccountBudget(user, `edge:${name}:${user}`, 500, amount, 3600000)))
     throw new ProviderError("Hourly work budget reached", 429);
 }

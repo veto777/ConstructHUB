@@ -386,7 +386,7 @@ export default function SeoAiPage() {
           {(d.tracked?.length ?? 0) > 0 && (
             <section id="ai-tracked" className="mt-6 scroll-mt-4" data-testid="ai-tracked">
               <Heading className="!mb-1">Asked again every month</Heading>
-              <p className="g-text-2 mb-2 text-[13px]"><Link href={`${seoLinks.ai(site.id)}#ai-tracked`} className={QUIET_LINK}>{d.tracked!.length} of {d.maxTracked ?? 5} questions</Link> (the most this account can ask again every month). Each uses your included SEO data only, and is skipped in a month when that has run out.</p>
+              <p className="g-text-2 mb-2 text-[13px]"><Link href={`${seoLinks.ai(site.id)}#ai-tracked`} className={QUIET_LINK}>{d.maxTracked === -1 ? `${d.tracked!.length} questions` : `${d.tracked!.length} of ${d.maxTracked ?? 5} questions`}</Link>{d.maxTracked === -1 ? "" : " (the most this account can ask again every month)"}. Each uses your included SEO data only, and is skipped in a month when that has run out.</p>
               {/* A tracked question opens its answers by its id (?question=); an assistant on it opens that assistant's answers to it; the next date the question. */}
               <ul className="space-y-1 text-[13px]">
                 {d.tracked!.map((t) => (

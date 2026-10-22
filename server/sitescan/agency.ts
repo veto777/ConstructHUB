@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { pool } from "../db";
-import { takeBudget } from "../growth-limits";
+import { takeAccountBudget } from "../growth-limits";
 import { emptyState } from "./audit";
 import { siteUrl } from "./http";
 import type { Fix } from "./guidance";
@@ -85,7 +85,7 @@ export async function enqueueLocations(user: number, raw: unknown) {
   });
   // The bulk queue has its own explicit agency budget; provider budgets still apply in the worker.
   if (
-    !(await takeBudget("sitescan:bulk:" + user, 1000, records.length, 86400000))
+    !(await takeAccountBudget(user, "sitescan:bulk:" + user, 1000, records.length, 86400000))
   )
     return null;
   const result = await pool.query(

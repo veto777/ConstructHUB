@@ -55,6 +55,8 @@ export const accountBucket = (userId: number) => `user:${userId}`;
 export const rateLimitByKey: RequestHandler = (req, res, next) => {
   const ctx = req.publicApi;
   if (!ctx) return apiError(res, 401, "unauthorized", "Authenticate with an API key first.");
+  // Platform admins (owner order 2026-10-22): no request windows.
+  if (ctx.isPlatformAdmin) return next();
   const limit = Math.max(1, Math.floor(ctx.plan.ratePerMinute || DEFAULT_RATE_PER_MINUTE));
   const slot = takeRateSlot(keyBucket(ctx.key.id), limit);
   res.setHeader("X-RateLimit-Limit", String(limit));
