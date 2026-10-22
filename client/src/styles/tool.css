@@ -488,3 +488,168 @@ a.stat-chip:focus-visible { outline: 2px solid var(--tool-accent); outline-offse
 /* A bare select (no .g-input) took the browser's white box in dark mode. */
 .tool-shell .tool-page select.g-select { background-color: var(--tool-panel); color: var(--tool-text); border: 1px solid var(--tool-line-strong); border-radius: 5px; padding: 0 6px; }
 .tool-delta__period { margin-left: 4px; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--tool-text-2); white-space: nowrap; }
+
+/* ── Appearance shades in the CRM and tools ──────────────────────────────────────────────────────────────────────
+ * The header slider (theme-provider.tsx) sets data-shade 0–4 on <html>. index.css moves the app palette; these move
+ * the tool shell and the Google surface the CRM sits in, which carry their own tokens. Light keeps the tokens above;
+ * Soft is warm grey paper, Dusk a mid slate, Dim charcoal, Dark near-black — spaced wide so each step reads clearly
+ * (owner 2026-10-21: "bigger differences between all of the different views"). */
+html[data-shade="1"]:not(.dark) {
+  --tool-bg: #dcd8d1;
+  --tool-side: #d2cdc5;
+  --tool-panel: #eeeae3;
+  --tool-line: #c3bdb3;
+  --tool-line-strong: #a39d93;
+  --tool-text: #1f2328;
+  --tool-text-2: #474c52;
+  --tool-hover: rgb(60 40 20 / .08);
+  --tool-active: rgb(60 40 20 / .12);
+  --tool-seg-on: color-mix(in srgb, var(--tool-orange) 20%, #eeeae3);
+  --tool-seg-on-line: color-mix(in srgb, var(--tool-orange) 60%, #eeeae3);
+}
+html[data-shade="1"]:not(.dark) .g-surface {
+  --g-text: #1f2328;
+  --g-text-2: #474c52;
+  --g-divider: #c3bdb3;
+  --g-surface: #eeeae3;
+  --g-surface-2: #e5e0d8;
+  --g-chip: #dfd9d0;
+  --g-hover: #e5e0d8;
+  --background: 38 24% 91.2%;
+  --foreground: 213 13% 13.9%;
+  --card: 38 24% 91.2%;
+  --card-foreground: 213 13% 13.9%;
+  --card-border: 38 12% 73.3%;
+  --popover: 38 24% 91.2%;
+  --popover-foreground: 213 13% 13.9%;
+  --popover-border: 38 12% 73.3%;
+  --border: 38 12% 73.3%;
+  --input: 38 12% 73.3%;
+  --muted: 36 19% 84.5%;
+  --muted-foreground: 213 7% 30%;
+  --secondary: 36 19% 84.5%;
+  --secondary-foreground: 213 13% 13.9%;
+  --accent: 36 19% 84.5%;
+  --accent-foreground: 213 13% 13.9%;
+}
+html.dark[data-shade="2"] {
+  --tool-bg: #3f434a;
+  --tool-side: #454950;
+  --tool-panel: #4d525a;
+  --tool-line: #666c75;
+  --tool-line-strong: #838993;
+  --tool-text: #f5f6f8;
+  --tool-text-2: #d5d9df;
+  --tool-hover: rgb(255 255 255 / .09);
+  --tool-active: rgb(255 255 255 / .14);
+  --tool-seg-on: color-mix(in srgb, var(--tool-orange) 20%, #4d525a);
+  --tool-seg-on-line: color-mix(in srgb, var(--tool-orange) 60%, #4d525a);
+}
+html.dark[data-shade="2"] .g-surface {
+  --g-text: #f5f6f8;
+  --g-text-2: #d5d9df;
+  --g-divider: #666c75;
+  --g-surface: #4d525a;
+  --g-surface-2: #575c65;
+  --g-chip: #575c65;
+  --g-hover: #575c65;
+  --g-accent-soft: #55678a;
+  --g-blue: #a8c7fa;
+  --g-accent: #a8c7fa;
+  --g-accent-ink: #a8c7fa;
+  --primary: 217 89% 82%;
+  --ring: 217 89% 82%;
+  --background: 217 8% 32.7%;
+  --foreground: 220 18% 96.7%;
+  --card: 217 8% 32.7%;
+  --card-foreground: 220 18% 96.7%;
+  --card-border: 216 7% 42.9%;
+  --popover: 217 8% 32.7%;
+  --popover-foreground: 220 18% 96.7%;
+  --popover-border: 216 7% 42.9%;
+  --border: 216 7% 42.9%;
+  --input: 216 7% 42.9%;
+  --muted: 219 7% 36.9%;
+  --muted-foreground: 216 14% 85.5%;
+  --secondary: 219 7% 36.9%;
+  --secondary-foreground: 220 18% 96.7%;
+  --accent: 219 7% 36.9%;
+  --accent-foreground: 220 18% 96.7%;
+}
+html.dark[data-shade="3"] {
+  --tool-bg: #26282c;
+  --tool-side: #2b2d31;
+  --tool-panel: #313439;
+  --tool-line: #474b51;
+  --tool-line-strong: #676c73;
+  --tool-text: #e8eaed;
+  --tool-text-2: #adb2b8;
+  --tool-hover: rgb(255 255 255 / .07);
+  --tool-active: rgb(255 255 255 / .11);
+  --tool-seg-on: color-mix(in srgb, var(--tool-orange) 20%, #313439);
+  --tool-seg-on-line: color-mix(in srgb, var(--tool-orange) 60%, #313439);
+}
+html.dark[data-shade="3"] .g-surface {
+  --g-text: #e8eaed;
+  --g-text-2: #adb2b8;
+  --g-divider: #474b51;
+  --g-surface: #313439;
+  --g-surface-2: #3a3d43;
+  --g-chip: #3a3d43;
+  --g-hover: #3a3d43;
+  --background: 218 8% 20.8%;
+  --foreground: 216 12% 92%;
+  --card: 218 8% 20.8%;
+  --card-foreground: 216 12% 92%;
+  --card-border: 216 7% 29.8%;
+  --popover: 218 8% 20.8%;
+  --popover-foreground: 216 12% 92%;
+  --popover-border: 216 7% 29.8%;
+  --border: 216 7% 29.8%;
+  --input: 216 7% 29.8%;
+  --muted: 220 7% 24.5%;
+  --muted-foreground: 213 7% 70%;
+  --secondary: 220 7% 24.5%;
+  --secondary-foreground: 216 12% 92%;
+  --accent: 220 7% 24.5%;
+  --accent-foreground: 216 12% 92%;
+}
+html.dark[data-shade="4"] {
+  --tool-bg: #0a0b0c;
+  --tool-side: #0f1012;
+  --tool-panel: #141517;
+  --tool-line: #27292c;
+  --tool-line-strong: #45484d;
+  --tool-text: #e8eaed;
+  --tool-text-2: #969ba1;
+  --tool-hover: rgb(255 255 255 / .06);
+  --tool-active: rgb(255 255 255 / .10);
+  --tool-seg-on: color-mix(in srgb, var(--tool-orange) 20%, #141517);
+  --tool-seg-on-line: color-mix(in srgb, var(--tool-orange) 60%, #141517);
+}
+html.dark[data-shade="4"] .g-surface {
+  --g-text: #e8eaed;
+  --g-text-2: #969ba1;
+  --g-divider: #27292c;
+  --g-surface: #141517;
+  --g-surface-2: #1c1d20;
+  --g-chip: #1c1d20;
+  --g-hover: #1c1d20;
+  --g-accent-soft: #26324a;
+  --background: 220 7% 8.4%;
+  --foreground: 216 12% 92%;
+  --card: 220 7% 8.4%;
+  --card-foreground: 216 12% 92%;
+  --card-border: 216 6% 16.3%;
+  --popover: 220 7% 8.4%;
+  --popover-foreground: 216 12% 92%;
+  --popover-border: 216 6% 16.3%;
+  --border: 216 6% 16.3%;
+  --input: 216 6% 16.3%;
+  --muted: 225 7% 11.8%;
+  --muted-foreground: 213 6% 61%;
+  --secondary: 225 7% 11.8%;
+  --secondary-foreground: 216 12% 92%;
+  --accent: 225 7% 11.8%;
+  --accent-foreground: 216 12% 92%;
+}

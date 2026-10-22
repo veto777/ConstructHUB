@@ -485,58 +485,79 @@
 /*
  * ── Appearance shades ──────────────────────────────────────────────────────
  * The slider in the header (theme-provider.tsx) sets data-shade 0–4 on <html>: 0 is the light palette above,
- * 4 the dark one, and these three lift or lower the surface tokens in between. 1 (Soft) is light with dimmer
- * paper; 2 (Dusk) and 3 (Dim) carry the dark class with lighter navy surfaces. Text and accent tokens are left
- * alone so contrast holds; only backgrounds, borders and the sidebar move. Placed after the app/CRM palettes so
+ * 4 the dark one, and these rules lift or lower the surface tokens. 1 (Soft) is light on a darker warm paper;
+ * 2 (Dusk) and 3 (Dim) carry the dark class on slate and navy; 4 (Dark) drops to near-black. The steps are spaced
+ * wide on purpose (owner 2026-10-21: "bigger differences between all of the different views"). Accent tokens are
+ * left alone and muted text is retuned per shade so contrast holds; backgrounds, borders and the sidebar move. Placed after the app/CRM palettes so
  * they win at equal specificity, and keyed on html so they also beat .dark.app-theme.
  */
 html[data-shade="1"]:not(.dark) {
-  --background: 32 10% 91.5%;
-  --card: 32 12% 97%;
-  --card-border: 32 10% 83%;
-  --popover: 32 12% 97%;
-  --popover-border: 32 10% 81%;
-  --border: 32 10% 83%;
-  --input: 32 10% 79%;
-  --muted: 32 10% 88%;
-  --accent: 32 10% 88%;
-  --secondary: 32 10% 88.5%;
-  --muted-foreground: 222 10% 38%;
+  --background: 34 16% 85%;
+  --card: 36 22% 93%;
+  --card-border: 34 12% 74%;
+  --popover: 36 22% 94%;
+  --popover-border: 34 12% 72%;
+  --border: 34 12% 74%;
+  --input: 34 12% 68%;
+  --muted: 34 14% 81%;
+  --accent: 34 14% 81%;
+  --secondary: 34 14% 82%;
+  --muted-foreground: 222 12% 32%;
+  --sidebar: 215 40% 20%;
+  --sidebar-border: 215 34% 26%;
+  --sidebar-accent: 215 34% 26%;
 }
 html.dark[data-shade="2"] {
-  --background: 222 22% 27%;
-  --foreground: 210 20% 95%;
-  --card: 222 22% 30%;
-  --card-foreground: 210 20% 95%;
-  --card-border: 220 18% 38%;
-  --popover: 222 22% 30%;
-  --popover-foreground: 210 20% 95%;
-  --popover-border: 220 18% 39%;
-  --border: 220 18% 38%;
-  --input: 220 18% 42%;
-  --muted: 220 20% 34%;
-  --muted-foreground: 215 15% 80%; /* 4.5:1+ on the lifted muted/secondary washes (review 2026-10-18) */
-  --accent: 220 20% 34%;
-  --secondary: 220 20% 36%;
-  --sidebar: 222 26% 22%;
-  --sidebar-border: 220 20% 30%;
-  --sidebar-accent: 220 22% 29%;
+  --background: 218 14% 35%;
+  --foreground: 210 20% 97%;
+  --card: 218 14% 40%;
+  --card-foreground: 210 20% 97%;
+  --card-border: 216 12% 50%;
+  --popover: 218 14% 40%;
+  --popover-foreground: 210 20% 97%;
+  --popover-border: 216 12% 52%;
+  --border: 216 12% 50%;
+  --input: 216 12% 54%;
+  --muted: 216 13% 45%;
+  --muted-foreground: 215 15% 88%; /* 4.5:1+ on the lifted muted/secondary washes */
+  --accent: 216 13% 45%;
+  --secondary: 216 13% 46%;
+  --sidebar: 220 18% 26%;
+  --sidebar-border: 218 14% 34%;
+  --sidebar-accent: 218 15% 33%;
 }
 html.dark[data-shade="3"] {
-  --background: 222 26% 19%;
-  --card: 222 26% 22%;
-  --card-border: 220 22% 29%;
-  --popover: 222 26% 22%;
-  --popover-border: 220 22% 30%;
-  --border: 220 22% 29%;
-  --input: 220 22% 33%;
-  --muted: 220 22% 25%;
-  --muted-foreground: 215 15% 66%;
-  --accent: 220 22% 25%;
-  --secondary: 220 22% 27%;
-  --sidebar: 222 30% 15%;
-  --sidebar-border: 220 22% 23%;
-  --sidebar-accent: 220 24% 22%;
+  --background: 222 24% 21%;
+  --card: 222 24% 25%;
+  --card-border: 220 20% 33%;
+  --popover: 222 24% 25%;
+  --popover-border: 220 20% 34%;
+  --border: 220 20% 33%;
+  --input: 220 20% 37%;
+  --muted: 220 20% 29%;
+  --muted-foreground: 215 15% 72%;
+  --accent: 220 20% 29%;
+  --secondary: 220 20% 31%;
+  --sidebar: 222 28% 15%;
+  --sidebar-border: 220 22% 22%;
+  --sidebar-accent: 220 24% 21%;
+}
+/* 4 (Dark) goes near-black so it reads clearly darker than Dim. */
+html.dark[data-shade="4"] {
+  --background: 225 20% 6%;
+  --card: 225 16% 10%;
+  --card-border: 225 12% 18%;
+  --popover: 225 16% 11%;
+  --popover-border: 225 12% 20%;
+  --border: 225 12% 18%;
+  --input: 225 12% 22%;
+  --muted: 225 14% 14%;
+  --muted-foreground: 220 10% 64%;
+  --accent: 225 14% 14%;
+  --secondary: 225 14% 15%;
+  --sidebar: 225 24% 4%;
+  --sidebar-border: 225 14% 12%;
+  --sidebar-accent: 225 16% 11%;
 }
 
 /*
