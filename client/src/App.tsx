@@ -105,6 +105,7 @@ const SettingsPage = lazyPage(() => import("@/pages/settings"));
 const DevelopersPage = lazyPage(() => import("@/pages/developers"));
 const IpTrackerPage = lazyPage(() => import("@/pages/ip-tracker"));
 const CrmGatewayPage = lazyPage(() => import("@/pages/crm-gateway"));
+const GetStartedPage = lazyPage(() => import("@/pages/get-started"));
 const VpnShieldPage = lazyPage(() => import("@/pages/vpn-shield"));
 const ContractSignPage = lazyPage(() => import("@/pages/contract-sign"));
 const GoogleReviewsPage = lazyPage(() => import("@/pages/google-reviews"));
@@ -377,7 +378,9 @@ function DashboardRouter() {
       <Route path="/features" component={FeaturesCataloguePage} />
       {/* Google Ads landing doors: the same pages, reached only from an ad (server/ads-landing.ts). */}
       <Route path="/googleads-features" component={FeaturesCataloguePage} />
-      <Route path="/googleads-crm">{() => <FeatureAdLanding slug="crm" />}</Route>
+      <Route path="/googleads-crm" component={GetStartedPage} />
+      {/* The CRM's paid-ad landing page (pages/get-started.tsx); /googleads-crm is its Google Ads door. */}
+      <Route path="/get-started" component={GetStartedPage} />
       <Route path="/googleads-pricing" component={PricingPage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />
       {/* Every done-for-you service's page (shared/dfy-pages), inside the app frame when signed in. */}
@@ -539,7 +542,9 @@ function PublicRouter() {
       <Route path="/features" component={FeaturesCataloguePage} />
       {/* Google Ads landing doors: the same pages, reached only from an ad (server/ads-landing.ts). */}
       <Route path="/googleads-features" component={FeaturesCataloguePage} />
-      <Route path="/googleads-crm">{() => <FeatureAdLanding slug="crm" />}</Route>
+      <Route path="/googleads-crm" component={GetStartedPage} />
+      {/* The CRM's paid-ad landing page (pages/get-started.tsx); /googleads-crm is its Google Ads door. */}
+      <Route path="/get-started" component={GetStartedPage} />
       <Route path="/googleads-pricing" component={PricingPage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />
       <Route path="/done-for-you" component={DfyCataloguePage} />
@@ -868,8 +873,9 @@ function AppContent() {
     return (
       <>
         <PublicRouter />
-        {/* Gabe, the corner assistant (Hub widget): preset questions only for signed-out visitors (marketing pages). */}
-        <HubWidget surface="marketing" signedIn={false} />
+        {/* Gabe, the corner assistant (Hub widget): preset questions only for signed-out visitors (marketing pages).
+            Not on the ad landing page, which keeps one job: start the trial. */}
+        {location !== "/get-started" && location !== "/googleads-crm" && <HubWidget surface="marketing" signedIn={false} />}
       </>
     );
   }
@@ -1140,7 +1146,7 @@ function PlatformShell({ location, showAdsChat }: { location: string; showAdsCha
 }
 
 /** Marketing and sales pages: never inside the iPhone apps (they sell nothing). */
-const APP_SALES_PATHS = ["/pricing", "/googleads-features", "/googleads-crm", "/googleads-pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/compliance/research", "/contract", "/call-assistant-pricing", "/call-assistant/intro", "/crm-app", "/google-ads-guide"];
+const APP_SALES_PATHS = ["/pricing", "/get-started", "/googleads-features", "/googleads-crm", "/googleads-pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/compliance/research", "/contract", "/call-assistant-pricing", "/call-assistant/intro", "/crm-app", "/google-ads-guide"];
 
 function App() {
   return (

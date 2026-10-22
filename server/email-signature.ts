@@ -6,11 +6,12 @@
  * Social accounts come from shared/social-links.ts (checked URLs only); the phone is the ConstructHUB support line.
  */
 import { SOCIAL_LINKS } from "@shared/social-links";
+import { SUPPORT_PHONE, SUPPORT_PHONE_TEL } from "@shared/contact";
 
 export const SIGNATURE_SITE = "https://constructhub.us";
 export const SIGNATURE_EMAIL = "support@constructhub.us";
-export const SIGNATURE_PHONE = "+1 (832) 399-0560";
-const PHONE_TEL = "+18323990560";
+export const SIGNATURE_PHONE = SUPPORT_PHONE;
+const PHONE_TEL = SUPPORT_PHONE_TEL;
 const LOGO_URL = `${SIGNATURE_SITE}/chub-logo-square-text.png`;
 /** Social icon look: "dark" (dark-gray tiles, the default since 2026-10-14) or "color" (each network's brand color). */
 export const SIGNATURE_ICON_STYLE: "dark" | "color" = "dark";

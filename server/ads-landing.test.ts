@@ -3,6 +3,7 @@ import express from "express";
 import { adsVerdict, doorHtml, registerAdsLanding, ADS_LANDINGS, DEFAULT_ADS_LP_KEYS, type AdsRequestFacts } from "./ads-landing";
 import { googleTagSnippet, googleTagIds, withGoogleTag } from "./google-tag";
 import { MARKETING_ROUTES } from "@shared/seo";
+import { pageMetaFor } from "@shared/route-meta";
 
 const CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 const visitor = (over: Partial<AdsRequestFacts> = {}): AdsRequestFacts => ({
@@ -11,9 +12,12 @@ const visitor = (over: Partial<AdsRequestFacts> = {}): AdsRequestFacts => ({
 });
 
 describe("ad landing doors", () => {
-  it("each door serves a real, prerendered marketing page", () => {
-    expect(ADS_LANDINGS).toEqual({ "/googleads-features": "/features", "/googleads-crm": "/features/crm", "/googleads-pricing": "/pricing" });
-    for (const target of Object.values(ADS_LANDINGS)) expect(MARKETING_ROUTES).toContain(target);
+  it("each door serves a real public page: a prerendered marketing page, or the noindex CRM ad landing page", () => {
+    expect(ADS_LANDINGS).toEqual({ "/googleads-features": "/features", "/googleads-crm": "/get-started", "/googleads-pricing": "/pricing" });
+    for (const target of Object.values(ADS_LANDINGS)) {
+      if (target === "/get-started") expect(pageMetaFor(target)?.noindex).toBe(true);
+      else expect(MARKETING_ROUTES).toContain(target);
+    }
   });
 
   it("serves a US visitor who clicked an ad with the campaign key", () => {

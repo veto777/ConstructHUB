@@ -1,6 +1,6 @@
 /**
  * Google Ads landing doors — https://constructhub.us/googleads-features (= /features),
- * /googleads-crm (= /features/crm) and /googleads-pricing (= /pricing, the 2026-10-09 campaign). Owner order 2026-10-07: "the same system
+ * /googleads-crm (= /get-started, the CRM ad landing page, since 2026-10-21; was /features/crm) and /googleads-pricing (= /pricing, the 2026-10-09 campaign). Owner order 2026-10-07: "the same system
  * we created for the Alpine Google ads" (alpine wa-main server/ads-landing.ts),
  * for a NATIONWIDE campaign.
  *
@@ -28,8 +28,9 @@
  *      visitor's IP is NOT excluded afterwards: nationwide, several people at
  *      one contractor research from one office IP. ADS_LP_EXCLUDE_VISITORS=1
  *      turns that on.
- * The page served is the public page itself — same prerendered HTML, same
- * React page (client routes /googleads-features, /googleads-crm) — with its
+ * The page served is the public page itself — same prerendered HTML (or, for
+ * /get-started, which is noindex and not prerendered, the app shell with its own
+ * head), same React page (client routes /googleads-features, /googleads-crm) — with its
  * canonical on the public URL and noindex, and robots.txt disallows the doors,
  * so a door never competes with its page. Every hit is recorded in ads_lp_hits.
  *
@@ -59,7 +60,7 @@ import { banIp, boundedIntel, isLandingBanned, lookupIntel, rangeHit, startAdsIn
 /** door path → the public page it serves. */
 export const ADS_LANDINGS: Readonly<Record<string, string>> = {
   "/googleads-features": "/features",
-  "/googleads-crm": "/features/crm",
+  "/googleads-crm": "/get-started",
   "/googleads-pricing": "/pricing",
 };
 export const ADS_LANDING_PATHS: readonly string[] = Object.keys(ADS_LANDINGS);

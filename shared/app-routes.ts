@@ -33,6 +33,8 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/crm", "/crm/*",
   // Google Ads landing doors (server/ads-landing.ts).
   "/googleads-features", "/googleads-crm", "/googleads-pricing",
+  // The CRM's paid-ad landing page (client/src/pages/get-started.tsx).
+  "/get-started",
 ];
 
 function matches(pattern: string, path: string): boolean {

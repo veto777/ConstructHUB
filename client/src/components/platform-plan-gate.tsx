@@ -22,7 +22,7 @@ const AccountDeletePage = lazy(() => import("@/pages/account-delete"));
 
 /** Pages an account without a plan can still open: the sales pages, the legal pages, joining a team. */
 const OPEN_WITHOUT_PLAN = [
-  "/pricing", "/individual-pricing", "/googleads-pricing", "/googleads-features", "/googleads-crm",
+  "/pricing", "/individual-pricing", "/googleads-pricing", "/googleads-features", "/googleads-crm", "/get-started",
   "/features", "/done-for-you", "/master-class", "/master-class-landing", "/reinstatement",
   "/permits-landing", "/competitors-landing", "/google-ads-landing",
   "/invite", "/auth", "/privacy", "/terms", "/data-deletion", "/support", "/report-issue", "/developers",

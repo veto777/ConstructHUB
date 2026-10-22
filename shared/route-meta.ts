@@ -13,6 +13,7 @@
 import { FEATURE_PAGES, FEATURES_PATH, featurePagePath } from "./feature-pages";
 import { DFY_PAGES, DFY_PATH, dfyPagePath } from "./dfy-pages";
 import { STARTING_MONTHLY_CENTS, TRIAL_LABEL, formatUsd } from "./plan-copy";
+import { CRM_TRIAL_DAYS } from "./crm-plans";
 
 /** `noindex`: a public app page search engines should not list (the sign-in page); server/seo-html.ts writes the robots meta. */
 export type RouteMeta = { title: string; description: string; noindex?: true };
@@ -116,6 +117,14 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
  * already gives these pages in the browser tab (client/src/App.tsx PAGE_TITLES).
  */
 export const APP_PAGE_META: Readonly<Record<string, RouteMeta>> = {
+  // The CRM's paid-ad landing page (client/src/pages/get-started.tsx; the /googleads-crm door serves it too). An ad
+  // destination, not a page to rank: /features/crm is the CRM's indexed page, so this one stays out of the index.
+  "/get-started": {
+    title: "Contractor CRM — Start Your Free Trial | ConstructHUB",
+    description:
+      `Estimates homeowners sign online, invoices paid by card or ACH into your own Stripe account, and a client portal for every job. Start a ${CRM_TRIAL_DAYS}-day CRM trial.`,
+    noindex: true,
+  },
   "/auth": {
     title: "Sign In | ConstructHUB",
     description: "Sign in to your ConstructHUB account, or create one to choose a plan for your contracting business.",
