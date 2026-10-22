@@ -13,7 +13,8 @@ import { crmAttachments, crmCustomers, crmEstimates, crmInvoices, crmOrgs, crmPa
 import { requireOrg, requirePermission } from "./tenancy";
 import { objectPolicy } from "./object-access";
 import { requireDocSession } from "./portal";
-import { buildReceiptData, type ReceiptData } from "./receipts";
+import { type ReceiptData } from "./receipts";
+import { serveStaffReceipt, buildPaymentReceipt, paymentReceiptPage as paymentReceiptDocument, receiptsForEstimates } from "./payment-receipts";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -85,7 +86,8 @@ export async function receiptsForInvoices(orgId: string, invoices: { id: string;
   return rows.map((p) => {
     const inv = byId.get(p.invoiceId!)!;
     return {
-      paymentId: p.id, invoiceId: inv.id, invoiceNumber: inv.number,
+      paymentId: p.id, receiptNumber: p.receiptNumber ?? null, invoiceId: inv.id, invoiceNumber: inv.number,
+      estimateId: null as string | null, estimateNumber: null as string | null,
       amountCents: p.amountCents, method: p.method, paidAt: p.paidAt ?? p.createdAt, provider: p.provider,
       link: audience === "crm" ? `/api/crm/receipts/${p.id}.html` : `/api/public/invoices/${inv.publicToken}/receipts/${p.id}.html`,
     };
@@ -125,7 +127,9 @@ export function registerCrmClientDocumentRoutes(app: Express, getDevUser: GetUse
     const bidPdfByEstimate = new Map<string, typeof bidPdfs[number]>();
     for (const b of bidPdfs) if (b.refId && !bidPdfByEstimate.has(b.refId)) bidPdfByEstimate.set(b.refId, b);
     const fileOf = (a: { id: string; fileName: string } | undefined) => (a ? { id: a.id, fileName: a.fileName, downloadUrl: `/api/crm/attachments/${a.id}/file` } : null);
-    const receipts = await receiptsForInvoices(ctx.org.id, invoices, "crm");
+    // Payments on invoices AND deposits / pay-in-full taken on the estimate before any invoice, newest first.
+    const receipts = [...await receiptsForInvoices(ctx.org.id, invoices, "crm"), ...await receiptsForEstimates(ctx.org.id, estimates, "crm")]
+      .sort((a, b) => new Date(b.paidAt ?? 0).getTime() - new Date(a.paidAt ?? 0).getTime());
     res.json({
       customer: { id: cust.id, displayName: cust.displayName },
       estimates: estimates.map((e) => ({
@@ -162,17 +166,8 @@ export function registerCrmClientDocumentRoutes(app: Express, getDevUser: GetUse
     // Same gate as the Documents card that links here (seePrices + the invoice's object policy): a seat that can read
     // the amounts on the card can open the receipt behind them (Kimi audit — it used to demand manageInvoices too).
     if (!requirePermission(res, ctx, "seePrices")) return;
-    const [pay] = await db.select().from(crmPayments).where(and(eq(crmPayments.orgId, ctx.org.id), eq(crmPayments.id, String(req.params.id)))).limit(1);
-    if (!pay?.invoiceId) return res.status(404).json({ message: "Receipt not found" });
-    const [inv] = await db.select().from(crmInvoices).where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, pay.invoiceId))).limit(1);
-    if (!inv || !(await objectPolicy(ctx).visible("invoices", inv.id))) return res.status(404).json({ message: "Receipt not found" });
-    const r = await buildReceiptData(ctx.org, inv);
-    const html = r && paymentReceiptPage(r, pay.id);
-    if (!html) return res.status(404).json({ message: "Receipt not found" });
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Cache-Control", "private, no-store");
-    if (req.query.download === "1") res.setHeader("Content-Disposition", `attachment; filename="receipt-${inv.number ?? inv.id}-${pay.id.slice(0, 8)}.html"`);
-    res.send(html);
+    // Any payment — on an invoice or a deposit on the estimate — with its receipt number and the job's balance.
+    await serveStaffReceipt(ctx, req, res);
   });
 
   /** The client: the same receipt from their portal / invoice page, behind the document gate. */
@@ -184,8 +179,8 @@ export function registerCrmClientDocumentRoutes(app: Express, getDevUser: GetUse
       .where(and(eq(crmPayments.orgId, inv.orgId), eq(crmPayments.invoiceId, inv.id), eq(crmPayments.id, String(req.params.paymentId)), inArray(crmPayments.status, RECEIPT_STATUSES))).limit(1);
     if (!pay) return res.status(404).send("Not found");
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, inv.orgId)).limit(1);
-    const r = org && await buildReceiptData(org, inv);
-    const html = r && paymentReceiptPage(r, pay.id);
+    const r = org && await buildPaymentReceipt(org, pay);
+    const html = r && paymentReceiptDocument(r);
     if (!html) return res.status(404).send("Not found");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "private, no-store");

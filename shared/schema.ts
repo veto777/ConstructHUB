@@ -2299,6 +2299,9 @@ export const crmPayments = pgTable("crm_payments", {
   failureReason: text("failure_reason"),
   // Free-text memo on manually recorded (offline) payments — "check #1042".
   note: text("note"),
+  // The client-facing receipt number (R-1001…), allocated the first time the
+  // receipt is built (server/crm/payment-receipts.ts) and never changed.
+  receiptNumber: text("receipt_number"),
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

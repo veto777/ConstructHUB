@@ -69,6 +69,8 @@ import { DISCOUNT_PRESETS } from "@shared/discount-presets";
 import { SCOPE_CATEGORIES, SCOPE_CATEGORY_LABEL, bundleRuleOf, bundleRuleText, effectiveOffer, lineCategory } from "@shared/scope-category";
 import { HelpButton } from "@/components/help-button";
 import { confirmAction } from "@/components/confirm-dialog";
+import { EstimatePayments } from "@/components/crm-estimate-payments";
+import { MANUAL_PAYMENT_METHODS } from "@shared/payment-settings";
 import { InterestBadge, useClientInterest } from "@/components/crm-interest-badge";
 import { SortButtons, useTableSort, type SortColumn } from "@/components/sortable-th";
 
@@ -2426,6 +2428,11 @@ export default function CrmClientPage() {
 
               {/* Files pinned to this estimate — show on the client's gated page. */}
               <EstimateAttach estimateId={e.id} canManage={canEstimate} />
+
+              {/* Signed: the balance, payment requests, recorded payments and their receipts. */}
+              {e.approvedAt && canSeePrices && (
+                <EstimatePayments estimate={e} canTakePayment={canTakePayment} canInvoice={canInvoice} onChanged={refresh} />
+              )}
             </div>
           ))}
         </CardContent>
@@ -2492,7 +2499,19 @@ export default function CrmClientPage() {
                         return (
                           <span title={noSend ?? undefined} className="inline-flex">
                             <Button size="sm" variant={inv.sentAt ? "outline" : "default"}
-                              onClick={() => sendInvoice.mutate(inv.id)} disabled={!!noSend || sendInvoice.isPending}
+                              onClick={() => confirmAction({
+                                id: "send-invoice",
+                                title: `${inv.sentAt ? "Resend" : "Send"} ${inv.number ?? "this invoice"} to ${c.firstName ?? c.name ?? "the client"}?`,
+                                description: (
+                                  <span className="block space-y-1">
+                                    <span className="block">To: <strong>{c.email ?? "no email on file"}</strong></span>
+                                    <span className="block">{inv.number} · {inv.title}</span>
+                                    <span className="block">Amount due: <strong>{money(due)}</strong>{(inv.paidCents ?? 0) > 0 ? ` (of ${money(inv.totalCents)}; ${money(inv.paidCents)} already paid)` : ""}</span>
+                                  </span>
+                                ),
+                                confirmLabel: inv.sentAt ? "Yes, resend it" : "Yes, send it", destructive: false,
+                                onConfirm: () => sendInvoice.mutate(inv.id),
+                              })} disabled={!!noSend || sendInvoice.isPending}
                               data-testid={`button-send-invoice-${inv.id}`}>
                               <Send className="h-4 w-4 mr-2" /> {inv.sentAt ? "Resend" : "Send"}
                             </Button>
@@ -2835,13 +2854,7 @@ export default function CrmClientPage() {
               <Select value={payMethod} onValueChange={setPayMethod}>
                 <SelectTrigger data-testid="select-payment-method"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="check">Check</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="wire">Wire transfer</SelectItem>
-                  <SelectItem value="credit_card">Credit card</SelectItem>
-                  <SelectItem value="ach">Bank transfer</SelectItem>
-                  <SelectItem value="card">Card (taken another way)</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {MANUAL_PAYMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -2852,7 +2865,13 @@ export default function CrmClientPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => recordPayment.mutate()}
+            <Button onClick={() => confirmAction({
+                id: "record-invoice-payment",
+                title: `Record ${money(payAmountCents)} on ${payFor?.number ?? "this invoice"}?`,
+                description: `${MANUAL_PAYMENT_METHODS.find((m) => m.value === payMethod)?.label ?? payMethod}${payNote.trim() ? ` · ${payNote.trim()}` : ""}. A numbered receipt is emailed to the client automatically.`,
+                confirmLabel: "Yes, record it", destructive: false,
+                onConfirm: () => recordPayment.mutate(),
+              })}
               disabled={payAmountCents < 1 || recordPayment.isPending} data-testid="button-save-payment">
               {recordPayment.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Record {payAmountCents >= 1 ? money(payAmountCents) : "payment"}

@@ -57,6 +57,7 @@ import { registerCrmAttachmentRoutes } from "./attachments";
 import { registerCrmPunchListRoutes } from "./punch-list";
 import { registerCrmPhotoLibraryRoutes } from "./photo-library";
 import { registerCrmReceiptRoutes } from "./receipts";
+import { registerCrmPaymentReceiptRoutes } from "./payment-receipts";
 import { registerCrmClientDocumentRoutes } from "./client-documents";
 import { registerCrmQuickBidRoutes } from "./quickbid";
 import { registerCrmMessageRoutes } from "./messages";
@@ -465,6 +466,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmPhotoLibraryRoutes(app, getDevUser);
   // Receipts-to-date: preview + one-click send; auto-emailed after payments.
   registerCrmReceiptRoutes(app, getDevUser);
+  registerCrmPaymentReceiptRoutes(app, getDevUser);
   // The client's paper trail: estimates, signed contracts, invoices, a receipt per payment (CRM + portal).
   registerCrmClientDocumentRoutes(app, getDevUser);
   // Quick Bid: per-sqft SKUs priced from the client's latest measurement report.

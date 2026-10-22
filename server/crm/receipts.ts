@@ -11,27 +11,15 @@ import { invoiceRefundRows } from "./refund-summary";
 import type { Express } from "express";
 import { db } from "../db";
 import {
-  crmInvoices, crmInvoiceItems, crmPayments, crmCustomers, crmOrgs, crmEstimates,
+  crmInvoices, crmInvoiceItems, crmPayments, crmCustomers, crmOrgs,
 } from "@shared/schema";
-import { receiptSettingsOf } from "@shared/payment-settings";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { logActivity } from "./activity";
 import { companyBranding, resolveInvoiceDivision, type CompanyBranding } from "./divisions";
 import { sendWithFallback } from "../email";
-import { sendSms, normalizePhone, resolveSmsSender } from "./sms";
 import { logError } from "../ops/log";
-
-/** Where a client's receipt link points (the portal host; no request in a webhook or worker). */
-const portalOrigin = () => (process.env.PORTAL_URL || "https://portal.constructhub.us").replace(/\/+$/, "");
-
-/** The short text receipt (Settings → Payments → Receipts → by text). */
-async function textReceipt(org: typeof crmOrgs.$inferSelect, phone: string | null | undefined, body: string): Promise<boolean> {
-  const to = normalizePhone(phone);
-  if (!to || !resolveSmsSender(org.customFields)) return false;
-  const r = await sendSms(to, body.slice(0, 320), org.customFields, org.id).catch(() => ({ ok: false } as { ok: boolean }));
-  return r.ok === true;
-}
+import { sendPaymentReceipt } from "./payment-receipts";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -211,40 +199,18 @@ async function noteReceiptEmail(
  * never fail the payment that triggered it.
  */
 export async function autoSendPaymentReceipt(orgId: string, invoiceId: string): Promise<void> {
-  const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, orgId)).limit(1);
-  if (!org) return;
-  // Settings → Payments → Receipts: email (default on), text (opt-in), or neither ("auto receipts disabled").
-  const prefs = receiptSettingsOf(org.customFields);
-  if (!prefs.email && !prefs.sms) return;
   const [inv] = await db.select().from(crmInvoices)
     .where(and(eq(crmInvoices.orgId, orgId), eq(crmInvoices.id, invoiceId))).limit(1);
   if (!inv || (inv.paidCents ?? 0) <= 0) return;
-  const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, inv.customerId)).limit(1);
-  if (!cust) return;
-
-  const receipt = await buildReceiptData(org, inv);
-  if (!receipt) return;
-  if (prefs.email && cust.email) {
-    let emailed = false;
-    try {
-      await sendWithFallback({
-        to: cust.email,
-        subject: `Receipt from ${receipt.company.name} — ${inv.number ?? "your invoice"}${receipt.paidInFull ? " (paid in full)" : ""}`,
-        html: receiptHtml(receipt),
-        replyTo: receipt.company.email || undefined,
-      } as any);
-      emailed = true;
-    } catch (e: any) {
-      console.error("[crm] auto-receipt email failed:", String(e?.message || e).slice(0, 300));
-    }
-    await noteReceiptEmail(inv, cust.email, emailed).catch(() => {});
-  }
-  if (prefs.sms) {
-    const last = receipt.payments[receipt.payments.length - 1];
-    const line = last ? `${money(last.amountCents)}${last.method ? ` by ${(METHOD_LABELS[last.method] ?? last.method).toLowerCase()}` : ""}` : money(receipt.totalPaidCents);
-    await textReceipt(org, cust.phone,
-      `${receipt.company.name}: receipt — ${line} received on ${inv.number ?? "your invoice"}. ${receipt.paidInFull ? "Paid in full. " : `Balance ${money(receipt.balanceCents)}. `}${portalOrigin()}/i/${inv.publicToken}`);
-  }
+  // The payment that just landed: the newest received payment on the invoice. Its receipt (number, the job's
+  // balance after it, PAID IN FULL, the division letterhead) is what the client gets — Settings switches apply.
+  const [latest] = await db.select().from(crmPayments)
+    .where(and(eq(crmPayments.orgId, orgId), eq(crmPayments.invoiceId, invoiceId),
+      sql`${crmPayments.status} in ('succeeded', 'partially_refunded')`, sql`${crmPayments.amountCents} > 0`))
+    .orderBy(desc(crmPayments.paidAt), desc(crmPayments.createdAt)).limit(1);
+  if (!latest) return;
+  const out = await sendPaymentReceipt(orgId, latest.id);
+  if (out.to && out.receipt) await noteReceiptEmail(inv, out.to, out.emailed).catch(() => {});
 }
 
 /**
@@ -253,51 +219,8 @@ export async function autoSendPaymentReceipt(orgId: string, invoiceId: string): 
  * switches as the invoice receipt.
  */
 export async function autoSendDepositReceipt(orgId: string, paymentId: string): Promise<void> {
-  const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, orgId)).limit(1);
-  if (!org) return;
-  const prefs = receiptSettingsOf(org.customFields);
-  if (!prefs.email && !prefs.sms) return;
-  const [pay] = await db.select().from(crmPayments).where(and(eq(crmPayments.orgId, orgId), eq(crmPayments.id, paymentId))).limit(1);
-  if (!pay || !pay.estimateId || pay.amountCents <= 0) return;
-  const [est] = await db.select().from(crmEstimates).where(eq(crmEstimates.id, pay.estimateId)).limit(1);
-  const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, pay.customerId)).limit(1);
-  if (!est || !cust) return;
-  const company = { name: org.name, email: org.email ?? null, phone: org.phone ?? null };
-  const what = pay.purpose === "deposit" ? "deposit" : "payment";
-  const method = pay.method ? (METHOD_LABELS[pay.method] ?? pay.method) : null;
-  // A card fee passed through rides in the pending row's note ("Card processing fee $30.00 paid by the client on top.").
-  const feeMatch = /Card processing fee \$([\d,]+\.\d{2})/.exec(pay.note ?? "");
-  const feeCents = feeMatch ? Math.round(parseFloat(feeMatch[1].replace(/,/g, "")) * 100) : 0;
-  const chargedCents = pay.amountCents + feeCents;
-  const when = (pay.paidAt ?? pay.createdAt ?? new Date()).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  if (prefs.email && cust.email) {
-    try {
-      await sendWithFallback({
-        to: cust.email,
-        subject: `Receipt from ${company.name} — ${money(pay.amountCents)} ${what} on ${est.number ?? est.title}`,
-        replyTo: company.email || undefined,
-        html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px;color:#111">
-          <h2 style="margin:0 0 4px">${esc(company.name)}</h2>
-          <p style="margin:0 0 18px;color:#555">Receipt · ${esc(when)}</p>
-          <p style="font-size:16px">Hi ${esc(cust.firstName?.trim() || cust.displayName)}, thank you — we received your ${what}.</p>
-          <table style="border-collapse:collapse;width:100%;font-size:15px">
-            <tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555">For</td><td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right">${esc(est.number ? `${est.number} — ${est.title}` : est.title)}</td></tr>
-            <tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555">Amount</td><td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;font-weight:600">${money(pay.amountCents)}</td></tr>
-            ${feeCents > 0 ? `<tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555">Card processing fee</td><td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right">${money(feeCents)}</td></tr>
-            <tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555">Total charged</td><td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;font-weight:600">${money(chargedCents)}</td></tr>` : ""}
-            ${method ? `<tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#555">Paid by</td><td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right">${esc(method)}</td></tr>` : ""}
-          </table>
-          <p style="margin:22px 0 0;font-size:13px;color:#666">Questions? Reply to this email${company.phone ? ` or call ${esc(company.phone)}` : ""}.</p>
-        </div>`,
-      } as any);
-    } catch (e: any) {
-      console.error("[crm] deposit receipt email failed:", String(e?.message || e).slice(0, 300));
-    }
-  }
-  if (prefs.sms) {
-    await textReceipt(org, cust.phone,
-      `${company.name}: receipt — ${money(chargedCents)} ${what}${feeCents > 0 ? ` (incl. ${money(feeCents)} card fee)` : ""}${method ? ` by ${method.toLowerCase()}` : ""} received for ${est.number ?? est.title}. Thank you! ${portalOrigin()}/e/${est.publicToken}`);
-  }
+  // Same receipt as every other payment: number, division letterhead, the job's balance, PAID IN FULL.
+  await sendPaymentReceipt(orgId, paymentId);
 }
 
 export function registerCrmReceiptRoutes(app: Express, getDevUser: GetUser): void {

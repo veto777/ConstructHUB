@@ -42,6 +42,7 @@ import { estimateDocText, invoiceDocText } from "./doc-defaults";
 import { recordActivity, logActivity } from "./activity";
 import { stageIndex, stageOfProjectStatus } from "@shared/job-stage";
 import { advanceJobStage, customerCurrentProject } from "./job-stage-auto";
+import { offlinePaymentInstructionsOf } from "@shared/payment-settings";
 import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER } from "./sms";
 import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
 import { notifyMembers } from "./notify";
@@ -2003,6 +2004,8 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     const parsed = z.object({
       email: z.string().email().optional(),
       message: z.string().max(4000).optional(),
+      /** Also text the link to the client's cell (when the org can text clients). */
+      sms: z.boolean().optional(),
     }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Invalid send request" });
 
@@ -2057,6 +2060,8 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
             </p>
             <p style="font-size:13px;color:#666">Or paste this in your browser:<br>
               <span style="word-break:break-all">${link}</span></p>
+            ${offlinePaymentInstructionsOf(ctx.org.customFields) ? `<p style="font-size:14px;margin:18px 0 4px"><strong>Prefer to pay by check or Zelle?</strong></p>
+            <p style="font-size:14px;white-space:pre-wrap;margin:0 0 18px">${esc(offlinePaymentInstructionsOf(ctx.org.customFields))}</p>` : ""}
             <p style="font-size:13px;color:#666">Only you can open this link — it verifies ${esc(to)}.
               If it's forwarded to anyone else, they can't get in without access to your inbox.</p>
             <hr style="border:none;border-top:1px solid #e5e5e5;margin:24px 0">
@@ -2074,6 +2079,14 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
       logError("[crm] invoice send failed:", emailError);
     }
 
+    let texted = false;
+    const textTo = parsed.data.sms ? normalizePhone(cust.phone) : null;
+    if (textTo && orgCanTextClients(ctx.org.customFields)) {
+      const body = `${branding.name}: ${inv.number ?? "your invoice"} — ${money(due)} due. View & pay: ${link}`;
+      const r = await sendSms(textTo, body.slice(0, 320), ctx.org.customFields, ctx.org.id).catch(() => ({ ok: false } as { ok: boolean }));
+      texted = r.ok === true;
+    }
+
     const [row] = await db.update(crmInvoices).set({
       status: inv.status === "draft" ? "sent" : inv.status,
       sentAt: new Date(), sentToEmail: to, updatedAt: new Date(),
@@ -2081,7 +2094,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     await emitCrmEvent(ctx.org.id, "invoice.sent", { invoiceId: inv.id, to });
     logActivity(ctx, "invoice.sent", {
       entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
-      meta: { number: inv.number, to, emailed, resend: !!inv.sentAt },
+      meta: { number: inv.number, to, emailed, texted, resend: !!inv.sentAt },
     });
     // An invoice out means the work is under way: the job moves to In progress — from Job Scheduled. A deposit
     // invoice right after approval never skips the start date (the "call to schedule" reminder stays open).
@@ -2095,7 +2108,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
         projectId: invProject.id, customerId: inv.customerId, meta: { number: inv.number },
       });
     }
-    res.json({ invoice: row, link, emailed, emailError });
+    res.json({ invoice: row, link, emailed, emailError, texted });
   });
 
   /** Contractor preview: mint a 15-minute read-only grant for the client

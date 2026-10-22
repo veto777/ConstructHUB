@@ -38,7 +38,7 @@ import { amountDueCents, hasPayInFull } from "@shared/estimate-totals";
 import { logActivity } from "./activity";
 import { getBaseUrl } from "../auth";
 import { financingLinksSchema, financingLinksOf, getPrimaryFinancing } from "./financing";
-import { reconcileSettingsOf, receiptSettingsOf, parseDayList } from "@shared/payment-settings";
+import { reconcileSettingsOf, receiptSettingsOf, parseDayList, offlinePaymentInstructionsOf } from "@shared/payment-settings";
 import { paymentWriteLimit, paymentSettingsLimit, publicPayLimit } from "./payment-guard";
 import { uploadToR2, getR2Url } from "../r2";
 import { providerFixture, type StripeFixture } from "../tutorials/fixtures";
@@ -656,6 +656,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       reconcile: reconcileSettingsOf(ctx.org.customFields),
       receipts: receiptSettingsOf(ctx.org.customFields),
       financingLinks: financingLinksOf(ctx.org),
+      offlineInstructions: offlinePaymentInstructionsOf(ctx.org.customFields),
     });
   });
 
@@ -685,6 +686,8 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       // The client's automatic receipt: email, text, both or neither.
       receipts: z.object({ email: z.boolean(), sms: z.boolean() }).optional(),
       financingLinks: financingLinksSchema.optional(),
+      // "Pay by check or Zelle" — shown on payment requests and their emails.
+      offlineInstructions: z.string().max(1500).nullable().optional(),
     }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Invalid payment settings", issues: parsed.error.issues });
 
@@ -710,6 +713,9 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       }
       paymentsPatch.reconcile = { enabled: r.enabled, approvalDays, closeoutDays, photo: r.photo, notify: r.notify, channels: r.channels };
     }
+    if (parsed.data.offlineInstructions !== undefined) {
+      paymentsPatch.offlineInstructions = parsed.data.offlineInstructions?.trim() || null;
+    }
     let prefsPatch: Record<string, unknown> | null = null;
     if (parsed.data.receipts) {
       // One switch with the notifications grid: the paymentReceipt pref's email / sms channels (shared/payment-settings.ts).
@@ -734,7 +740,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       || ${parsed.data.financingLinks ? sql`jsonb_build_object('financingLinks', ${JSON.stringify(cf.financingLinks ?? [])}::jsonb)` : sql`'{}'::jsonb`}`;
     const [org] = await db.update(crmOrgs).set({ customFields: merged as any, updatedAt: new Date() })
       .where(eq(crmOrgs.id, ctx.org.id)).returning();
-    res.json({ payments: paymentSettingsOf(org), reconcile: reconcileSettingsOf(org.customFields), receipts: receiptSettingsOf(org.customFields), financingLinks: financingLinksOf(org) });
+    res.json({ payments: paymentSettingsOf(org), reconcile: reconcileSettingsOf(org.customFields), receipts: receiptSettingsOf(org.customFields), financingLinks: financingLinksOf(org), offlineInstructions: offlinePaymentInstructionsOf(org.customFields) });
   });
 
   // ── Company logo upload ───────────────────────────────────────────────────
@@ -809,6 +815,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
       achAvailable: rails.ach,
       cardFee: cardFeeQuote(org, rails, dueCents),
       financing: getPrimaryFinancing(org),
+      offlineInstructions: offlinePaymentInstructionsOf(org?.customFields),
     });
   });
 

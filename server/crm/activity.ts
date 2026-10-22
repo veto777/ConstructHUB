@@ -192,7 +192,9 @@ export function activityText(row: {
       case "estimate.extended": return `extended ${doc("estimate")}${m.days ? ` by ${m.days} day${m.days === 1 ? "" : "s"}` : ""}`;
       case "invoice.sent": return `sent ${doc("invoice")}${sentTo()}`;
       case "punchlist.walkthrough_done": return `completed the ${m.label ?? m.scope ?? ""} walkthrough${m.name ? ` on ${m.name}` : ""}`.replace(/\s+/g, " ").trim();
-      case "receipt.sent": return `sent a payment receipt for ${doc("invoice")}${m.to ? ` to ${m.to}` : ""}`;
+      case "receipt.sent": return m.receiptNumber
+        ? `sent receipt ${m.receiptNumber}${m.number ? ` for ${m.number}` : ""}${sentTo()}${m.paidInFull ? " — paid in full" : ""}`
+        : `sent a payment receipt for ${doc("invoice")}${m.to ? ` to ${m.to}` : ""}`;
       case "changeorder.created": return `created change order ${m.number ?? ""}${m.title ? ` (${m.title})` : ""}`.replace(/\s+/g, " ").trim();
       case "changeorder.sent": return `sent change order ${m.number ?? ""} to the client`.replace(/\s+/g, " ").trim();
       case "invoice.created": return `created invoice ${m.number ?? ""}`.trim();

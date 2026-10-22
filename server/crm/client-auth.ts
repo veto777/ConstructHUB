@@ -38,6 +38,8 @@ import { logEvent } from "./entities";
 import { themePayload } from "@shared/theme-colors";
 import { clientShareView } from "./hover-share";
 import { viewer3dOffered } from "./hover-model3d-offer";
+import { receiptsForEstimates } from "./payment-receipts";
+import { paymentMethodLabel } from "@shared/payment-settings";
 
 const COOKIE_NAME = "crm_client";
 const TOKEN_TTL_MS = 30 * 60 * 1000; // magic link: 30 minutes
@@ -509,6 +511,22 @@ export function registerCrmClientAuthRoutes(app: Express): void {
         .orderBy(desc(crmPayments.paidAt));
       for (const p of payRows) { const list = receiptsByInvoice.get(p.invoiceId!) ?? []; list.push(p); receiptsByInvoice.set(p.invoiceId!, list); }
     }
+    // Deposits / pay-in-full taken on a signed estimate before any invoice — each has its receipt too.
+    const estimateReceipts = (await Promise.all(orgIds.map((oid) =>
+      receiptsForEstimates(oid, estimates.filter((e) => e.orgId === oid && e.approvedAt), "portal")))).flat();
+    const estById = new Map(estimates.map((e) => [e.id, e]));
+    const invById = new Map(invoices.map((i) => [i.id, i]));
+    const allReceipts = [
+      ...[...receiptsByInvoice.values()].flat().map((p) => ({
+        paymentId: p.id, receiptNumber: p.receiptNumber ?? null, amountCents: p.amountCents, method: paymentMethodLabel(p.method),
+        paidAt: p.paidAt ?? p.createdAt, forLabel: invById.get(p.invoiceId!)?.number ?? "Invoice",
+        link: `/api/public/invoices/${invById.get(p.invoiceId!)?.publicToken}/receipts/${p.id}.html`,
+      })),
+      ...estimateReceipts.map((r) => ({
+        paymentId: r.paymentId, receiptNumber: r.receiptNumber, amountCents: r.amountCents, method: paymentMethodLabel(r.method),
+        paidAt: r.paidAt, forLabel: estById.get(r.estimateId)?.number ?? "Estimate", link: r.link,
+      })),
+    ].sort((a, b) => new Date(b.paidAt ?? 0).getTime() - new Date(a.paidAt ?? 0).getTime());
     // The org's financing links, primary first — the portal's Financing
     // section renders these and records the click before opening them.
     const financing = orgs.flatMap((o) => {
@@ -559,7 +577,10 @@ export function registerCrmClientAuthRoutes(app: Express): void {
         orgName: orgName.get(e.orgId) ?? null,
         link: `/e/${e.publicToken}`,
         attachments: (attsByEstimate.get(e.id) ?? []).map(clientFile),
+        receipts: estimateReceipts.filter((r) => r.estimateId === e.id),
       })),
+      // Every receipt (invoice payments and deposits), newest first — the portal's "Invoices & receipts".
+      receipts: allReceipts,
       invoices: invoices.map((i) => ({
         id: i.id, number: i.number, title: i.title, status: i.status,
         totalCents: i.totalCents,

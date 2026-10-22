@@ -488,6 +488,8 @@ export async function ensureCrmSchema(): Promise<void> {
     ALTER TABLE crm_appointments ADD COLUMN IF NOT EXISTS created_by_member_id varchar;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS invoice_id varchar;
     ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS note text;
+    ALTER TABLE crm_payments ADD COLUMN IF NOT EXISTS receipt_number text;
+    CREATE UNIQUE INDEX IF NOT EXISTS crm_payments_receipt_number_uniq ON crm_payments (org_id, receipt_number) WHERE receipt_number IS NOT NULL;
     ALTER TABLE crm_projects ADD COLUMN IF NOT EXISTS division_id varchar;
     ALTER TABLE crm_members ADD COLUMN IF NOT EXISTS division_id varchar;
     ALTER TABLE crm_invitations ADD COLUMN IF NOT EXISTS division_id varchar;

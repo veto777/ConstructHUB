@@ -567,8 +567,10 @@ export default function CrmSettingsPage() {
     email: true, sms: false,
   });
   const [rcptForm, setRcptForm] = useState({ email: true, sms: false });
+  const [offlineText, setOfflineText] = useState("");
   useEffect(() => {
     if (!paySettings) return;
+    setOfflineText(paySettings.offlineInstructions ?? "");
     setFeeForm({
       passFeeToClient: paySettings.payments?.passFeeToClient === true,
       surchargePct: paySettings.payments?.surchargeBps ? String(paySettings.payments.surchargeBps / 100) : "",
@@ -1767,6 +1769,26 @@ export default function CrmSettingsPage() {
                 onClick={() => savePaySettings.mutate({ receipts: { email: rcptForm.email, sms: rcptForm.sms } })}>
                 {savePaySettings.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Save receipts
+              </Button>
+            </div>
+          </div>
+
+          {/* Check / Zelle — how a client pays without a card or bank link. */}
+          <div className="mt-6 border-t pt-4 space-y-3" data-testid="section-offline-instructions">
+            <div>
+              <div className="text-sm font-medium">How to pay by check or Zelle</div>
+              <p className="text-xs text-muted-foreground">
+                Shown on every payment request and its email, next to the online payment button. For example: who checks are
+                payable to, where to mail them, and the Zelle email or phone. Leave it empty to show nothing.
+              </p>
+            </div>
+            <Textarea rows={4} maxLength={1500} value={offlineText} onChange={(e) => setOfflineText(e.target.value)}
+              placeholder={"Checks payable to …, mailed to …\nZelle: …"} data-testid="textarea-offline-instructions" />
+            <div className="flex justify-end">
+              <Button size="sm" disabled={savePaySettings.isPending} data-testid="button-save-offline-instructions"
+                onClick={() => savePaySettings.mutate({ offlineInstructions: offlineText.trim() || null })}>
+                {savePaySettings.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save
               </Button>
             </div>
           </div>
