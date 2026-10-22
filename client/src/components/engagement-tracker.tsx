@@ -55,10 +55,10 @@ export function useEngagementTracker(
     const t0 = Date.now();
     const queue: TrackEventIn[] = [];
     const now = () => Date.now() - t0;
-    const push = (e: Omit<TrackEventIn, "t">) => {
+    const push = (e: Omit<TrackEventIn, "t">, t = now()) => {
       if (!TRACK_NAME_RE.test(e.name)) return;
       if (queue.length >= 400) return; // a runaway page never floods the server
-      queue.push({ ...e, t: now() });
+      queue.push({ ...e, t });
     };
 
     // ── Section dwell ──────────────────────────────────────────────────────
@@ -68,6 +68,7 @@ export function useEngagementTracker(
     const sentSecs = new Map<string, number>();        // last total sent, whole secs
     const onScreen = new Map<string, Set<Element>>();  // name → elements visible now
     const since = new Map<string, number>();           // name → ms its clock last started
+    const firstSeen = new Map<string, number>();       // name → ms after load it first came on screen
     const sectionOf = (el: Element) => el.getAttribute("data-track-section") || "";
     const bank = (name: string, until: number) => {
       const from = since.get(name);
@@ -91,6 +92,7 @@ export function useEngagementTracker(
             set.add(en.target);
             onScreen.set(name, set);
             if (!since.has(name) && document.visibilityState === "visible") since.set(name, t);
+            if (!firstSeen.has(name)) firstSeen.set(name, t - t0);
           } else if (!on && set.has(en.target)) {
             set.delete(en.target);
             if (!set.size) { bank(name, t); since.delete(name); }
@@ -118,7 +120,8 @@ export function useEngagementTracker(
         const secs = Math.floor(ms / 1000);
         if (secs > 0 && secs !== sentSecs.get(name)) {
           sentSecs.set(name, secs);
-          push({ name: "section_time", section: name.slice(0, 40), secs });
+          // Stamped with when it first came on screen — the timeline lists it there.
+          push({ name: "section_time", section: name.slice(0, 40), secs }, firstSeen.get(name) ?? now());
         }
       }
     };
