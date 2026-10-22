@@ -504,14 +504,15 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
   return (
     <Sidebar sheet={sheet}>
       <SidebarHeader className="p-4 pb-3">
-        <Link href={user ? "/settings?tab=profile" : "/"} className="flex items-center justify-between gap-3 cursor-pointer" aria-label={user ? "Your profile" : "Home"} data-testid="link-logo-home">
-          <span className="flex flex-col min-w-0">
-            <CHLogo height={36} />
+        <Link href={user ? "/settings?tab=profile" : "/"} className="flex items-end gap-0.5 cursor-pointer" aria-label={user ? "Your profile" : "Home"} data-testid="link-logo-home">
+          <span className="flex flex-col min-w-0 mb-1.5">
+            <CHLogo height={40} />
             <p className="sr-only" data-testid="text-app-title">The All-in-One Growth Platform for Contractors</p>
           </span>
           {/* The mascot stands beside the mark on every ConstructHUB sidebar (6ce8c7e8 dropped it by accident;
-              owner 2026-10-21: "Where's my gator on the top?"). */}
-          <StandingGator height={64} className="shrink-0 -my-2" />
+              owner 2026-10-21: "Where's my gator on the top?"). Right against the logo's end, feet on its baseline —
+              pushed to the far edge it looked out of place (owner 2026-10-22). */}
+          <StandingGator height={56} className="shrink-0" />
         </Link>
       </SidebarHeader>
       <SidebarContent>
