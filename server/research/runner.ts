@@ -55,14 +55,14 @@ const POLL_MS = 5_000;
 /** A whole state sweep for one name must end: past this, unfinished portals are reported as not searched. */
 const SWEEP_BUDGET_MS = 90 * 60_000;
 /**
- * A platform admin's order (no charge; up to 50 names in every state, shared/research-reports.ts RESEARCH_ADMIN_LIMITS)
+ * A platform admin's order (no charge; any number of names in every state, shared/research-reports.ts RESEARCH_ADMIN_LIMITS)
  * runs in the one research queue like a customer's. So it can't hold paying orders for days, its permit sweeps stop
  * starting after this long: later names still get their license, identifier, website and record searches, and their
  * portals are listed as not searched with the reason. A customer's order has no such budget (unchanged).
  */
-export const ADMIN_SWEEP_BUDGET_MS = 12 * 3600_000;
+export const ADMIN_SWEEP_BUDGET_MS = Infinity; // no time budget for an admin order (owner: "everything for the ADMIN account is infinite")
 /** Identifier searches per name in an admin order (customers: MAX_ID_SEARCHES). */
-export const ADMIN_MAX_ID_SEARCHES = 150;
+export const ADMIN_MAX_ID_SEARCHES = Infinity;
 
 /** An order a platform admin placed with no charge (routes.ts: price 0). Customers' orders always carry a price. */
 export const isAdminOrder = (o: { price_cents?: number | null }) => o.price_cents === 0;

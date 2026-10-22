@@ -79,7 +79,8 @@ export const RESEARCH_LIMITS: ResearchLimits = {
  * A platform admin's order (owner, 2026-10-22: "for the ADMIN account there should be zero restrictions"): no tier and
  * no charge, every state; the hard ceilings are only there against a runaway request.
  */
-export const RESEARCH_ADMIN_LIMITS: ResearchLimits = { names: 50, states: STATE_CODES.length, licenseNumbers: 25, phones: 25, addresses: 25, websites: 25 };
+// No ceilings at all (owner, 2026-10-22: "make sure everything for the ADMIN account is infinite").
+export const RESEARCH_ADMIN_LIMITS: ResearchLimits = { names: Infinity, states: STATE_CODES.length, licenseNumbers: Infinity, phones: Infinity, addresses: Infinity, websites: Infinity };
 export const researchLimitsFor = (admin: boolean): ResearchLimits => (admin ? RESEARCH_ADMIN_LIMITS : RESEARCH_LIMITS);
 
 /** A list of optional identifiers: blanks dropped, each checked and normalized by shared/identifiers.ts, duplicates merged. */

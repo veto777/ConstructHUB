@@ -45,18 +45,18 @@ describe("order limits: customers unchanged, admins relaxed with hard ceilings",
     expect(r.subjects[0].websites).toEqual(["acme.com"]);
     expect(researchOrderSchema.safeParse({ ...base, states: ["FL"], subjects: [{ name: "Acme", kind: "company", websites: ["http://127.0.0.1"] }] }).success).toBe(false);
   });
-  it("an admin: 50 names, all 51 states, 25 of each identifier; nothing past the ceilings", () => {
-    expect(RESEARCH_ADMIN_LIMITS).toMatchObject({ names: 50, states: 51, licenseNumbers: 25, phones: 25, addresses: 25, websites: 25 });
+  it("an admin: no ceilings on names or identifiers, every state; bad values still refused", () => {
+    expect(RESEARCH_ADMIN_LIMITS).toMatchObject({ names: Infinity, states: 51, licenseNumbers: Infinity, phones: Infinity, addresses: Infinity, websites: Infinity });
     expect(researchOrderSchemaFor(true)).toBe(researchAdminOrderSchema);
     const all = [...STATE_CODES];
     expect(all).toHaveLength(51);
     expect(researchAdminOrderSchema.safeParse({ ...base, subjects: names(50), states: all }).success).toBe(true);
     expect(researchAdminOrderSchema.safeParse({ ...base, subjects: names(7), states: all.slice(0, 6) }).success).toBe(true);
-    expect(researchAdminOrderSchema.safeParse({ ...base, subjects: names(51), states: ["FL"] }).success).toBe(false);
+    expect(researchAdminOrderSchema.safeParse({ ...base, subjects: names(51), states: ["FL"] }).success).toBe(true);
     const phones = (n: number) => Array.from({ length: n }, (_, i) => `813555${String(1000 + i)}`);
     const one = (s: object) => researchAdminOrderSchema.safeParse({ ...base, states: ["FL"], subjects: [{ name: "Acme", kind: "company", ...s }] });
     expect(one({ phones: phones(25), websites: Array.from({ length: 25 }, (_, i) => `a${i}.com`) }).success).toBe(true);
-    expect(one({ phones: phones(26) }).success).toBe(false);
+    expect(one({ phones: phones(26) }).success).toBe(true);
     // Bad values are still bad for an admin.
     expect(one({ websites: ["localhost"] }).success).toBe(false);
   });

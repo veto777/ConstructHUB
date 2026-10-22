@@ -150,8 +150,8 @@ export default function ResearchOrderPage() {
         <div className="rounded-lg border border-primary p-4 max-w-3xl" data-testid="card-tier-admin">
           <p className="font-semibold">Admin: unlimited, no charge</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Up to {MAX_NAMES} names in any number of states (all {MAX_STATES} if you like), up to {limits.licenseNumbers} license numbers, phones,
-            addresses and websites per name. No tier, no checkout: the report runs as soon as you submit.
+            No limits: any number of names, every state, and any number of license numbers, phones, addresses and websites
+            per name. No tier, no checkout: the report runs as soon as you submit.
           </p>
         </div>
       )}
@@ -209,23 +209,23 @@ export default function ResearchOrderPage() {
               {s.showIds && (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor={`lic-${i}`}>License numbers <span className="font-normal text-muted-foreground">(up to {limits.licenseNumbers}, comma-separated)</span></Label>
-                    <Input id={`lic-${i}`} value={s.licenses} onChange={(e) => setSubject(i, { licenses: e.target.value })} placeholder="e.g. CGC1512345, EC13008123" maxLength={260} className="mt-1.5" data-testid={`input-licenses-${i}`} aria-invalid={!!problems.licenseNumbers} />
+                    <Label htmlFor={`lic-${i}`}>License numbers <span className="font-normal text-muted-foreground">({isFinite(limits.licenseNumbers) ? `up to ${limits.licenseNumbers}, ` : ""}comma-separated)</span></Label>
+                    <Input id={`lic-${i}`} value={s.licenses} onChange={(e) => setSubject(i, { licenses: e.target.value })} placeholder="e.g. CGC1512345, EC13008123" maxLength={isAdmin ? undefined : 260} className="mt-1.5" data-testid={`input-licenses-${i}`} aria-invalid={!!problems.licenseNumbers} />
                     {problems.licenseNumbers && <p className="mt-1 text-xs text-destructive">{problems.licenseNumbers}</p>}
                   </div>
                   <div>
-                    <Label htmlFor={`tel-${i}`}>Phone numbers <span className="font-normal text-muted-foreground">(up to {limits.phones}, comma-separated)</span></Label>
-                    <Input id={`tel-${i}`} type="tel" value={s.phones} onChange={(e) => setSubject(i, { phones: e.target.value })} placeholder="e.g. (813) 555-0142" maxLength={100} className="mt-1.5" data-testid={`input-phones-${i}`} aria-invalid={!!problems.phones} />
+                    <Label htmlFor={`tel-${i}`}>Phone numbers <span className="font-normal text-muted-foreground">({isFinite(limits.phones) ? `up to ${limits.phones}, ` : ""}comma-separated)</span></Label>
+                    <Input id={`tel-${i}`} type="tel" value={s.phones} onChange={(e) => setSubject(i, { phones: e.target.value })} placeholder="e.g. (813) 555-0142" maxLength={isAdmin ? undefined : 100} className="mt-1.5" data-testid={`input-phones-${i}`} aria-invalid={!!problems.phones} />
                     {problems.phones && <p className="mt-1 text-xs text-destructive">{problems.phones}</p>}
                   </div>
                   <div className="sm:col-span-2">
-                    <Label htmlFor={`addr-${i}`}>Street addresses <span className="font-normal text-muted-foreground">(up to {limits.addresses}, one per line)</span></Label>
-                    <Textarea id={`addr-${i}`} rows={2} value={s.addresses} onChange={(e) => setSubject(i, { addresses: e.target.value })} placeholder="e.g. 123 Main St, Tampa FL 33602" maxLength={620} className="mt-1.5" data-testid={`input-addresses-${i}`} aria-invalid={!!problems.addresses} />
+                    <Label htmlFor={`addr-${i}`}>Street addresses <span className="font-normal text-muted-foreground">({isFinite(limits.addresses) ? `up to ${limits.addresses}, ` : ""}one per line)</span></Label>
+                    <Textarea id={`addr-${i}`} rows={2} value={s.addresses} onChange={(e) => setSubject(i, { addresses: e.target.value })} placeholder="e.g. 123 Main St, Tampa FL 33602" maxLength={isAdmin ? undefined : 620} className="mt-1.5" data-testid={`input-addresses-${i}`} aria-invalid={!!problems.addresses} />
                     {problems.addresses && <p className="mt-1 text-xs text-destructive">{problems.addresses}. An address needs a house number and street.</p>}
                   </div>
                   <div className="sm:col-span-2">
-                    <Label htmlFor={`web-${i}`}>Websites <span className="font-normal text-muted-foreground">(up to {limits.websites}, comma-separated; we read the homepage and its contact and about pages for phones, addresses and license numbers)</span></Label>
-                    <Input id={`web-${i}`} value={s.websites} onChange={(e) => setSubject(i, { websites: e.target.value })} placeholder="e.g. acme-electric.com" maxLength={isAdmin ? 4000 : 400} className="mt-1.5" data-testid={`input-websites-${i}`} aria-invalid={!!problems.websites} />
+                    <Label htmlFor={`web-${i}`}>Websites <span className="font-normal text-muted-foreground">({isFinite(limits.websites) ? `up to ${limits.websites}, ` : ""}comma-separated; we read the homepage and its contact and about pages for phones, addresses and license numbers)</span></Label>
+                    <Input id={`web-${i}`} value={s.websites} onChange={(e) => setSubject(i, { websites: e.target.value })} placeholder="e.g. acme-electric.com" maxLength={isAdmin ? undefined : 400} className="mt-1.5" data-testid={`input-websites-${i}`} aria-invalid={!!problems.websites} />
                     {problems.websites && <p className="mt-1 text-xs text-destructive">{problems.websites}. A website is a public address like acme-electric.com.</p>}
                   </div>
                 </div>

@@ -36,7 +36,7 @@ const TERMS_SNAPSHOT = [RESEARCH_NONREFUNDABLE, RESEARCH_NO_GUARANTEE, RESEARCH_
 type Deps = { getOrCreateCustomer: (userId: number, email: string) => Promise<string>; sendStripeError: (res: Response, err: any) => unknown };
 
 const customerOrderLimit = rateLimit("research-order", 10, 20, 3600_000);
-/** Customers: ten orders an hour. Platform admins aren't rate limited here (RESEARCH_ADMIN_LIMITS bounds each order). */
+/** Customers: ten orders an hour. Platform admins aren't rate limited here (nor is the size of their orders: RESEARCH_ADMIN_LIMITS has no ceilings). */
 const orderLimit: RequestHandler = (req, res, next) => (isPlatformAdmin((req as any).user) ? next() : customerOrderLimit(req, res, next));
 
 export function registerResearchRoutes(app: Express, deps: Deps) {
