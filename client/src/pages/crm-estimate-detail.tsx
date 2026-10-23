@@ -801,7 +801,7 @@ export default function CrmEstimateDetailPage() {
                             <td className={cn(crmTable.tdRight, "hidden sm:table-cell tabular-nums")}>{money(i.unitPriceCents)}</td>
                           )}
                           {showMoney && (
-                            <td className={cn(crmTableCards.td, "flex items-baseline justify-between sm:text-right tabular-nums font-medium")}>
+                            <td className={cn(crmTableCards.td, "flex items-baseline justify-between sm:text-right tabular-nums font-medium whitespace-nowrap")}>
                               <span className="sm:hidden text-xs font-normal text-muted-foreground">Line total</span>
                               {money(Math.round(((i.unitPriceCents ?? 0) * (i.quantityMilli ?? 0)) / 1000))}
                             </td>

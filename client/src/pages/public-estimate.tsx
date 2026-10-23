@@ -1227,9 +1227,9 @@ export default function PublicEstimatePage() {
                 <div key={i.id} className="px-4 py-4 sm:px-5" data-testid="doc-line" data-track-section={`scope:${String(i.name ?? "").slice(0, 34)}`}>
                   <div className="sm:grid sm:grid-cols-[1fr_8rem_8rem_8rem] sm:gap-4 sm:items-baseline">
                     <div className="text-xl sm:text-2xl font-bold tracking-tight leading-snug min-w-0" data-testid="text-line-title">{i.name}</div>
-                    <div className="hidden sm:block text-right tabular-nums">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</div>
-                    <div className="hidden sm:block text-right tabular-nums">{money(i.unitPriceCents)}</div>
-                    <div className="hidden sm:block text-right tabular-nums font-semibold" data-testid="text-line-total">{money(i.lineTotalCents)}</div>
+                    <div className="hidden sm:block text-right tabular-nums whitespace-nowrap">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</div>
+                    <div className="hidden sm:block text-right tabular-nums whitespace-nowrap">{money(i.unitPriceCents)}</div>
+                    <div className="hidden sm:block text-right tabular-nums font-semibold whitespace-nowrap" data-testid="text-line-total">{money(i.lineTotalCents)}</div>
                     {/* Phone: one row under the title — "300 sf × $22.00 ……… $6,600.00". */}
                     <div className="sm:hidden mt-1 flex items-baseline justify-between gap-3 text-sm tabular-nums">
                       <span className="text-muted-foreground">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""} × {money(i.unitPriceCents)}</span>

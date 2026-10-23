@@ -357,7 +357,7 @@ export const crmTable = {
   th: "px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap",
   thRight: "px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap",
   td: "px-3 py-2.5 sm:px-4 sm:py-3 align-middle",
-  tdRight: "px-3 py-2.5 sm:px-4 sm:py-3 align-middle text-right tabular-nums",
+  tdRight: "px-3 py-2.5 sm:px-4 sm:py-3 align-middle text-right tabular-nums whitespace-nowrap",
   tr: "border-t transition-colors hover:bg-muted/40",
 };
 

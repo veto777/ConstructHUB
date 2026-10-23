@@ -233,9 +233,9 @@ export default function PublicInvoicePage() {
                         <div className="font-medium">{i.name}</div>
                         {i.description && <div className="text-xs text-muted-foreground mt-0.5">{i.description}</div>}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{money(i.unitPriceCents)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium">{money(i.lineTotalCents)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{qty(i.quantityMilli)}{i.unit ? ` ${i.unit}` : ""}</td>
+                      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{money(i.unitPriceCents)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-medium whitespace-nowrap">{money(i.lineTotalCents)}</td>
                     </tr>
                   ))}
                 </tbody>
