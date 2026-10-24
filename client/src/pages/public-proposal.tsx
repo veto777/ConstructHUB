@@ -111,6 +111,8 @@ function GroupPicker({ group, selected, locked, onToggle }: { group: ProposalGro
   );
 }
 
+const SCRIPT_FONT = `"Segoe Script", "Brush Script MT", "Snell Roundhand", "Apple Chancery", cursive`;
+
 function Summary({ content, itemIds, plan, setPlan, locked }: { content: ProposalContent; itemIds: string[]; plan: PaymentPlan; setPlan: (p: PaymentPlan) => void; locked: boolean }) {
   const t = priceSelection(content, itemIds, plan);
   const plans = allowedPlans(content, t.monthlyCents);
@@ -204,7 +206,8 @@ function PayPanel({ token, data }: { token: string; data: PublicProposal }) {
           {autoMonths ? ` for ${autoMonths} months in total` : ""}{method === "card" && fee > 0 ? " (including the card fee)" : ""}.
         </p>
       )}
-      <Button size="lg" className="w-full text-base text-white sm:w-auto" style={{ background: "var(--accent)" }} disabled={go.isPending || !data.stripeReady || data.preview} onClick={() => go.mutate()} data-testid="button-pay">
+      {data.isTest && <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Test copy: payment is turned off. On the real link the client pays here.</p>}
+      <Button size="lg" className="w-full text-base text-white sm:w-auto" style={{ background: "var(--accent)" }} disabled={go.isPending || !data.stripeReady || data.preview || data.isTest} onClick={() => go.mutate()} data-testid="button-pay">
         {go.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
         Pay {money(method === "card" ? t.dueTodayCents + fee : t.dueTodayCents)} securely
       </Button>
@@ -465,6 +468,17 @@ export default function PublicProposalPage() {
                 </div>
               );
             })()}
+            {content.countersign.name.trim() && (
+              <div className="rounded-xl border bg-slate-50/60 p-4" data-testid="countersign">
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Signed for {b.name}</div>
+                <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                  <div><div className="border-b border-slate-400 pb-1 text-3xl text-slate-900" style={{ fontFamily: SCRIPT_FONT }}>{content.countersign.name}</div>
+                    <div className="mt-1 text-xs text-slate-500">{content.countersign.name}{content.countersign.title ? `, ${content.countersign.title}` : ""}</div></div>
+                  <div><div className="border-b border-slate-400 pb-1 pt-3 text-sm text-slate-900">{new Date(data.countersignedAt ?? Date.now()).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>
+                    <div className="mt-1 text-xs text-slate-500">Date</div></div>
+                </div>
+              </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5"><Label htmlFor="sig-name">Full legal name</Label>
                 <Input id="sig-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" data-testid="input-sign-name" /></div>

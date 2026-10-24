@@ -48,6 +48,9 @@ export const PROPOSALS_DDL: readonly string[] = [
    )`,
   // CC'd on the offer email, the signed copy and the payment receipt (comma-separated).
   `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS recipient_cc text`,
+  // A test copy (the admin signs it like the client; payment is off) and when the company signed (first send).
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS is_test boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS countersigned_at timestamptz`,
   `CREATE INDEX IF NOT EXISTS proposals_kind_idx ON proposals (kind, updated_at DESC)`,
   `CREATE INDEX IF NOT EXISTS proposals_session_idx ON proposals (stripe_session_id) WHERE stripe_session_id IS NOT NULL`,
 ];

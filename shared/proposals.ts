@@ -121,6 +121,12 @@ export const proposalContentSchema = z.object({
    *  don't want the client scrutinizing the terms"); each: an initial per clause. */
   clauseInitials: z.enum(["once", "each"]).default("once"),
   terms: text(30_000).default(""),
+  /** The company's signature on the agreement: the admin's typed name, drawn by the system in script with the date
+   *  it was sent (owner, 2026-10-24). An offer can't be sent until it has a name. */
+  countersign: z.object({
+    name: text(120).default(""),
+    title: text(120).default("Authorized representative"),
+  }).default({}),
   payment: z.object({
     plan: z.enum(PAYMENT_PLANS).default("monthly"),
     achEnabled: z.boolean().default(true),
@@ -314,6 +320,8 @@ export type ProposalRow = {
   recipientName: string | null; recipientEmail: string | null; recipientCompany: string | null;
   /** Copied on the offer email, the signed agreement and the payment receipt. */
   recipientCc: string[];
+  /** A test copy the admin sent to themselves: signing and emails are real, payment is off. */
+  isTest: boolean;
   title: string; templateId: number | null; hasFile: boolean;
   contractTotalCents: number | null; dueTodayCents: number | null; paidCents: number | null;
   sentAt: string | null; viewedAt: string | null; signedAt: string | null; paidAt: string | null;
@@ -328,6 +336,8 @@ export type ProposalDetail = ProposalRow & {
   file: { name: string; bytes: number } | null;
   selection: ProposalSelection | null; totals: ProposalTotals | null;
   signature: { name: string; title: string; signedAt: string; ip: string | null } | null;
+  /** When the company signed (the first send). */
+  countersignedAt: string | null;
   payment: { method: "ach" | "card" | null; cardFeeCents: number; status: string | null; subscriptionId: string | null };
   events: ProposalEvent[];
 };
@@ -347,4 +357,6 @@ export type PublicProposal = {
   payment: { method: "ach" | "card" | null; cardFeeCents: number; status: string | null };
   stripeReady: boolean;
   preview: boolean;
+  isTest: boolean;
+  countersignedAt: string | null;
 };

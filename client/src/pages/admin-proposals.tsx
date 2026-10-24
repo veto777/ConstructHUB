@@ -24,6 +24,7 @@ import { GoogleSectionHeader } from "@/components/google";
 import { StatusPill, type PillTone } from "@/components/crm-ui";
 import { SamplePreview } from "@/components/sample-preview";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -246,7 +247,7 @@ function ProposalList() {
               <Link key={r.id} href={`/admin/proposals/${r.id}`} className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50" data-testid={`row-proposal-${r.id}`}>
                 <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{r.name}</div>
+                  <div className="truncate font-medium">{r.isTest && <span className="mr-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">TEST</span>}{r.name}</div>
                   <div className="truncate text-xs text-muted-foreground">
                     {r.kind === "offer" ? [r.recipientName, r.recipientCompany, r.recipientEmail].filter(Boolean).join(" · ") || "No recipient yet" : r.title || "Template"} · updated {ago(r.updatedAt)}
                   </div>
@@ -356,6 +357,8 @@ function GroupEditor({ group, onChange, onUp, onDown, onRemove }: { group: Propo
   );
 }
 
+const SCRIPT_FONT = `"Segoe Script", "Brush Script MT", "Snell Roundhand", "Apple Chancery", cursive`;
+
 function SendDialog({ p, open, onClose, beforeSend }: { p: ProposalDetail; open: boolean; onClose: () => void; beforeSend: () => Promise<void> }) {
   const { toast } = useToast();
   const [to, setTo] = useState(p.recipientEmail ?? "");
@@ -413,7 +416,7 @@ function ProposalEditor({ id }: { id: number }) {
 
   const locked = !!p && ["signed", "processing", "paid"].includes(p.status);
   const edit = (patch: Partial<ProposalContent>) => { setC((cur) => (cur ? { ...cur, ...patch } : cur)); setDirty(true); };
-  const editNested = <K extends "brand" | "payment">(k: K, patch: Partial<ProposalContent[K]>) => { setC((cur) => (cur ? { ...cur, [k]: { ...cur[k], ...patch } } : cur)); setDirty(true); };
+  const editNested = <K extends "brand" | "payment" | "countersign">(k: K, patch: Partial<ProposalContent[K]>) => { setC((cur) => (cur ? { ...cur, [k]: { ...cur[k], ...patch } } : cur)); setDirty(true); };
 
   const saveNow = async () => {
     if (!p || !c || locked) return;
@@ -451,12 +454,24 @@ function ProposalEditor({ id }: { id: number }) {
     onSuccess: (r) => toast({ title: "Proof sent", description: `The exact email your client gets went to ${r.to}. Its link is a preview: opening it isn't a client view, and it can't be signed or paid.` }),
     onError: (e) => toast({ title: "Couldn't send the proof", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  const test = useMutation({
+    mutationFn: async () => { if (dirty) await saveNow(); return (await apiRequest("POST", `/api/admin/proposals/${p!.id}/test`, {})).json() as Promise<{ to: string; link: string; id: number }>; },
+    onSuccess: (r) => { toast({ title: "Test sent", description: `Check ${r.to}: open it and sign like the client would. You'll get the client's signed copy and the owner's copy. Payment is off on test copies.` }); void invalidate(); },
+    onError: (e) => toast({ title: "Couldn't send the test", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const preview = useMemo(() => (c ? priceSelection(c, defaultSelection(c)) : null), [c]);
   const longestTerm = c ? Math.max(1, ...c.groups.flatMap((g) => g.items.filter((i) => i.billing === "monthly").map((i) => i.termMonths))) : 1;
 
   if (isLoading && !p) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading" /></div>;
   if (!p || !c) return <Gate error={error} retry={() => void refetch()} what="this proposal" />;
   const link = `${window.location.origin}/proposal/${p.publicToken}`;
+  const needsCountersign = p.kind === "offer" && c.countersign.name.trim().length < 2;
+  // The Branding contact can be the signer: ticking "Signer" puts their name on the company signature.
+  const contactSigns = !!c.brand.contactName.trim() && c.countersign.name.trim() === c.brand.contactName.trim();
+  const askCountersign = () => {
+    toast({ title: "Add your name first", description: `Fill in “Signed for ${c.brand.name}” at the bottom — it becomes the company signature.`, variant: "destructive" });
+    document.getElementById("countersign")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   const openPreview = async () => { if (dirty) await saveNow(); window.open(`/proposal/${p.publicToken}?preview=1`, "_blank", "noopener"); };
 
   return (
@@ -473,7 +488,8 @@ function ProposalEditor({ id }: { id: number }) {
           {p.kind === "offer" && <Button size="sm" variant="outline" onClick={() => void openPreview()} data-testid="button-preview-proposal"><Eye className="mr-1.5 h-4 w-4" />Preview</Button>}
           {p.kind === "offer" && <Button size="sm" variant="outline" onClick={() => { void navigator.clipboard.writeText(link); toast({ title: "Link copied", description: link }); }}><Copy className="mr-1.5 h-4 w-4" />Copy link</Button>}
           {p.kind === "offer" && <Button size="sm" variant="outline" onClick={() => proof.mutate()} disabled={proof.isPending} data-testid="button-proof-proposal">{proof.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}Send me a proof</Button>}
-          {p.kind === "offer" && !locked && !["void", "declined", "archived"].includes(p.status) && <Button size="sm" onClick={() => setSendOpen(true)} data-testid="button-send-proposal"><Mail className="mr-1.5 h-4 w-4" />{p.sentAt ? "Send again" : "Send"}</Button>}
+          {p.kind === "offer" && !p.isTest && <Button size="sm" variant="outline" onClick={() => (needsCountersign ? askCountersign() : test.mutate())} disabled={test.isPending} data-testid="button-test-proposal">{test.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileSignature className="mr-1.5 h-4 w-4" />}Send me a test to sign</Button>}
+          {p.kind === "offer" && !p.isTest && !locked && !["void", "declined", "archived"].includes(p.status) && <Button size="sm" onClick={() => (needsCountersign ? askCountersign() : setSendOpen(true))} data-testid="button-send-proposal"><Mail className="mr-1.5 h-4 w-4" />{p.sentAt ? "Send again" : "Send"}</Button>}
           {p.kind === "template" && <Button size="sm" onClick={() => action.mutate({ kind: "offer" })} disabled={action.isPending} data-testid="button-offer-from-template"><FileSignature className="mr-1.5 h-4 w-4" />Create offer</Button>}
           {p.signature && <Button asChild size="sm" variant="outline"><a href={`${url}/signed.pdf`} target="_blank" rel="noreferrer"><FileText className="mr-1.5 h-4 w-4" />Signed PDF</a></Button>}
           <Button size="sm" variant="outline" onClick={() => action.mutate({ kind: "duplicate" })} disabled={action.isPending}><Copy className="mr-1.5 h-4 w-4" />Duplicate</Button>
@@ -507,7 +523,10 @@ function ProposalEditor({ id }: { id: number }) {
               <div className="space-y-1.5"><Label>Accent color</Label>
                 <div className="flex gap-2"><input type="color" value={c.brand.accent} onChange={(e) => editNested("brand", { accent: e.target.value })} className="h-9 w-12 cursor-pointer rounded border" aria-label="Accent color" />
                   <Input value={c.brand.accent} onChange={(e) => /^#[0-9a-fA-F]{0,6}$/.test(e.target.value) && editNested("brand", { accent: e.target.value })} /></div></div>
-              <div className="space-y-1.5"><Label>Contact name</Label><Input value={c.brand.contactName} onChange={(e) => editNested("brand", { contactName: e.target.value })} /></div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2"><Label>Contact name</Label>
+                  {p.kind === "offer" && <label className="flex items-center gap-1.5 text-xs text-muted-foreground"><Checkbox checked={contactSigns} onCheckedChange={(v) => editNested("countersign", { name: v === true ? c.brand.contactName.trim() : "" })} disabled={!c.brand.contactName.trim()} data-testid="checkbox-contact-signs" />Signer</label>}</div>
+                <Input value={c.brand.contactName} onChange={(e) => { const v = e.target.value; setC((cur) => (cur ? { ...cur, brand: { ...cur.brand, contactName: v }, ...(contactSigns ? { countersign: { ...cur.countersign, name: v.trim() } } : {}) } : cur)); setDirty(true); }} /></div>
               <div className="space-y-1.5"><Label>Contact email</Label><Input value={c.brand.contactEmail} onChange={(e) => editNested("brand", { contactEmail: e.target.value })} /></div>
               <div className="space-y-1.5"><Label>Phone</Label><Input value={c.brand.phone} onChange={(e) => editNested("brand", { phone: e.target.value })} /></div>
               <div className="space-y-1.5"><Label>Website</Label><Input value={c.brand.website} onChange={(e) => editNested("brand", { website: e.target.value })} /></div>
@@ -613,6 +632,25 @@ function ProposalEditor({ id }: { id: number }) {
             actions={<Button variant="outline" size="sm" onClick={() => { if (!c.terms.trim() || window.confirm("Replace these terms with the standard service agreement?")) edit({ terms: standardTerms(c.brand.name) }); }} data-testid="button-standard-terms">Use the standard terms</Button>}>
             <Textarea rows={8} value={c.terms} onChange={(e) => edit({ terms: e.target.value })} data-testid="input-proposal-terms" />
           </Section>
+
+          {p.kind === "offer" && (
+            <div id="countersign">
+              <Section title={`Signed for ${c.brand.name}`} description="Your signature on the agreement. Your name is filled in; the system draws the signature and dates it when you send. Required before sending.">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5"><Label htmlFor="cs-name">Authorized representative</Label>
+                    <Input id="cs-name" value={c.countersign.name} onChange={(e) => editNested("countersign", { name: e.target.value })} className={needsCountersign ? "border-red-400" : ""} data-testid="input-countersign-name" /></div>
+                  <div className="space-y-1.5"><Label htmlFor="cs-title">Title</Label>
+                    <Input id="cs-title" value={c.countersign.title} onChange={(e) => editNested("countersign", { title: e.target.value })} data-testid="input-countersign-title" /></div>
+                </div>
+                <div className="mt-4 grid gap-4 rounded-lg border bg-muted/30 p-4 sm:grid-cols-2">
+                  <div><div className="text-xs text-muted-foreground">Representative signature</div>
+                    <div className="mt-1 min-h-[44px] border-b border-foreground/40 pb-1 text-3xl" style={{ fontFamily: SCRIPT_FONT }} data-testid="countersign-signature">{c.countersign.name.trim() || " "}</div></div>
+                  <div><div className="text-xs text-muted-foreground">Date</div>
+                    <div className="mt-1 min-h-[44px] border-b border-foreground/40 pb-1 pt-3 text-sm">{format(p.countersignedAt ? new Date(p.countersignedAt) : new Date(), "PPP")}{!p.countersignedAt && <span className="text-muted-foreground"> (set when you send)</span>}</div></div>
+                </div>
+              </Section>
+            </div>
+          )}
         </fieldset>
 
         <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">

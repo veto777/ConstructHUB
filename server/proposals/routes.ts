@@ -90,6 +90,7 @@ function toRow(r: any): ProposalRow {
     id: Number(r.id), kind: r.kind, name: r.name, status: r.status,
     recipientName: r.recipient_name, recipientEmail: r.recipient_email, recipientCompany: r.recipient_company,
     recipientCc: String(r.recipient_cc || "").split(",").map((s) => s.trim()).filter(Boolean),
+    isTest: r.is_test === true,
     title: content.title, templateId: r.template_id ? Number(r.template_id) : null, hasFile: r.file_id != null,
     contractTotalCents: totals?.contractTotalCents ?? null, dueTodayCents: totals?.dueTodayCents ?? null, paidCents: r.paid_cents ?? null,
     sentAt: iso(r.sent_at), viewedAt: iso(r.viewed_at), signedAt: iso(r.signed_at), paidAt: iso(r.paid_at),
@@ -116,6 +117,7 @@ function toDetail(r: any): ProposalDetail {
     file: r.file_id ? { name: r.file_name, bytes: Number(r.file_bytes) } : null,
     selection: r.selection ?? null, totals: r.totals ?? null,
     signature: sig ? { name: sig.name, title: sig.title ?? "", signedAt: sig.signedAt, ip: sig.ip ?? null } : null,
+    countersignedAt: iso(r.countersigned_at),
     payment: { method: r.payment_method ?? null, cardFeeCents: r.card_fee_cents ?? 0, status: r.payment_status ?? null, subscriptionId: r.stripe_subscription_id ?? null },
     events: Array.isArray(r.events) ? r.events : [],
   };
@@ -124,11 +126,24 @@ function toDetail(r: any): ProposalDetail {
 const isExpired = (r: any) => !!r.expires_at && new Date(r.expires_at).getTime() < Date.now();
 
 function signedPdfInput(r: any) {
+  const content = parseContent(r.content);
   return {
-    id: Number(r.id), content: parseContent(r.content), recipientName: r.recipient_name, recipientEmail: r.recipient_email,
+    id: Number(r.id), content, recipientName: r.recipient_name, recipientEmail: r.recipient_email,
     recipientCompany: r.recipient_company, totals: r.totals as ProposalTotals, signature: r.signature,
+    countersign: content.countersign.name.trim()
+      ? { name: content.countersign.name.trim(), title: content.countersign.title.trim(), at: iso(r.countersigned_at) ?? r.signature?.signedAt ?? new Date().toISOString() }
+      : null,
+    test: r.is_test === true,
     payment: { method: r.payment_method ?? null, status: r.payment_status ?? null, paidAt: iso(r.paid_at) },
   };
+}
+
+/** The admin's name for the company signature: their display name, else their email's name part. */
+function adminName(admin: any): string {
+  const d = String(admin?.displayName || "").trim();
+  if (d) return d.slice(0, 120);
+  const local = String(admin?.email || "").split("@")[0].replace(/[._-]+/g, " ").replace(/\d+/g, "").trim();
+  return local.replace(/\b\w/g, (ch) => ch.toUpperCase()).slice(0, 120);
 }
 
 /** Who hears about a signature or a payment: the admin who made the offer and the brand's contact address. */
@@ -184,7 +199,7 @@ async function notifySigned(r: any, base: string) {
   if (r.recipient_email) {
     await sendWithFallback({
       from: fromFor(content), to: r.recipient_email, cc: r.recipient_cc || undefined, replyTo: content.brand.contactEmail || undefined,
-      subject: `Signed: ${content.title || "your proposal"}`,
+      subject: `${r.is_test ? "[TEST] " : ""}Signed: ${content.title || "your proposal"}`,
       html: emailShell(content, `<p>Hi ${esc(r.recipient_name || "there")},</p><p>Thank you — your signed copy of <b>${esc(content.title || "the proposal")}</b> is attached.</p>${summary}
         <p>Due today: <b>${formatMoney(t.dueTodayCents, { cents: true })}</b> by bank transfer (ACH)${t.recurringCents ? `, then ${formatMoney(t.recurringCents, { cents: true })} each month` : ""}.</p>
         ${r.payment_status === "paid" || r.payment_status === "processing" ? "" : button(link, "Complete payment", content.brand.accent)}`),
@@ -195,7 +210,7 @@ async function notifySigned(r: any, base: string) {
   const admins = await adminRecipients(r);
   await sendWithFallback({
     from: fromFor(content), to: admins.join(", "),
-    subject: `Proposal signed — ${r.recipient_name || r.recipient_email || `#${r.id}`} (${formatMoney(t.contractTotalCents)})`,
+    subject: `${r.is_test ? "[TEST] " : ""}Proposal signed — ${r.recipient_name || r.recipient_email || `#${r.id}`} (${formatMoney(t.contractTotalCents)})`,
     html: emailShell(content, `<p><b>${esc(r.recipient_name || "The recipient")}</b>${r.recipient_company ? ` (${esc(r.recipient_company)})` : ""} signed <b>${esc(content.title || r.name)}</b>.</p>${summary}
       <p>Contract total ${formatMoney(t.contractTotalCents, { cents: true })} · due today ${formatMoney(t.dueTodayCents, { cents: true })}${t.recurringCents ? ` · then ${formatMoney(t.recurringCents, { cents: true })}/month` : ""}.</p>
       ${button(`${base}/admin/proposals/${r.id}`, "Open in ConstructHUB", content.brand.accent)}`),
@@ -322,7 +337,7 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     const { rows } = await pool.query(
       `SELECT p.* FROM proposals p WHERE ($1::text IS NULL OR kind = $1) AND status <> 'archived' OR ($2 AND status = 'archived')
        ORDER BY updated_at DESC LIMIT 500`, [kind.success ? kind.data ?? null : null, req.query.archived === "1"]);
-    const all = (await pool.query(`SELECT kind, status, totals, paid_cents, sent_at, viewed_at, signed_at FROM proposals WHERE status <> 'archived'`)).rows;
+    const all = (await pool.query(`SELECT kind, status, totals, paid_cents, sent_at, viewed_at, signed_at FROM proposals WHERE status <> 'archived' AND NOT is_test`)).rows;
     const offers = all.filter((r) => r.kind === "offer");
     const summary: ProposalSummary = {
       templates: all.filter((r) => r.kind === "template").length, offers: offers.length,
@@ -335,11 +350,15 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
   });
 
   app.get("/api/admin/proposals/:id", async (req, res) => {
-    if (!(await requirePlatformAdmin(req, res, getDevUser))) return;
+    const admin = await requirePlatformAdmin(req, res, getDevUser);
+    if (!admin) return;
     const id = idParam.safeParse(req.params.id);
     const r = id.success ? await loadById(id.data) : null;
     if (!r) return res.status(404).json({ message: "Proposal not found" });
-    res.json(toDetail(r));
+    const out = toDetail(r);
+    // The company signature starts as the admin's own name (saved with the next save).
+    if (out.kind === "offer" && !out.content.countersign.name.trim() && !r.signed_at) out.content.countersign.name = adminName(admin);
+    res.json(out);
   });
 
   app.post("/api/admin/proposals", async (req, res) => {
@@ -552,6 +571,8 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     const cc = [...new Set((body.data.cc ?? r.recipient_cc?.split(",") ?? []).map((s: string) => s.trim().toLowerCase()).filter((s: string) => s && s !== to))].join(", ");
     const content = parseContent(r.content);
     if (!content.groups.some((g) => g.items.length)) return res.status(400).json({ message: "Add at least one priced service before sending." });
+    if (content.countersign.name.trim().length < 2) return res.status(400).json({ message: `Add your name under “Signed for ${content.brand.name}” at the bottom of the page first.` });
+    if (r.is_test) return res.status(400).json({ message: "This is a test copy — send the real offer instead." });
     const base = getBaseUrl(req);
     const link = `${base}/proposal/${r.public_token}`;
     const subject = body.data.subject || `${content.title || "Your proposal"} — ${content.brand.name}`;
@@ -564,10 +585,44 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
       return res.status(502).json({ message: `The email could not be sent: ${String(e?.message || e).slice(0, 160)}` });
     }
     await pool.query(
-      `UPDATE proposals SET recipient_email = COALESCE(recipient_email, $2), recipient_cc = NULLIF($4, ''), sent_at = now(),
+      `UPDATE proposals SET recipient_email = COALESCE(recipient_email, $2), recipient_cc = NULLIF($4, ''), sent_at = now(), countersigned_at = COALESCE(countersigned_at, now()),
          status = CASE WHEN status IN ('draft', 'sent') THEN 'sent' ELSE status END, updated_at = now(), events = events || $3::jsonb
        WHERE id = $1`, [r.id, to, event("sent", cc ? `${to} · cc ${cc}` : to), cc]);
     res.json({ ...toDetail(await loadById(Number(r.id))), link });
+  });
+
+  // A test run: a copy of the offer sent to the admin as if they were the client. Signing it is real (the signed
+  // agreement goes to them as the client and as the owner); payment is turned off on test copies.
+  app.post("/api/admin/proposals/:id/test", async (req, res) => {
+    const admin = await requirePlatformAdmin(req, res, getDevUser);
+    if (!admin) return;
+    const id = idParam.safeParse(req.params.id);
+    const r = id.success ? await loadById(id.data) : null;
+    if (!r) return res.status(404).json({ message: "Proposal not found" });
+    if (r.kind !== "offer") return res.status(400).json({ message: "Make an offer from this template to test it." });
+    const content = parseContent(r.content);
+    if (!content.groups.some((g) => g.items.length)) return res.status(400).json({ message: "Add at least one priced service first." });
+    if (content.countersign.name.trim().length < 2) return res.status(400).json({ message: `Add your name under “Signed for ${content.brand.name}” at the bottom of the page first.` });
+    const to = String(admin.email || "").toLowerCase();
+    if (!to) return res.status(400).json({ message: "Your account has no email address." });
+    const { rows } = await pool.query(
+      `INSERT INTO proposals (kind, name, public_token, template_id, content, file_id, recipient_name, recipient_email, recipient_company,
+         created_by, is_test, status, sent_at, countersigned_at, events)
+       VALUES ('offer', $1, $2, $3, $4, $5, $6, $7, $8, $9, true, 'sent', now(), now(), $10::jsonb) RETURNING *`,
+      [`TEST — ${r.name}`.slice(0, 200), newToken(), r.template_id, JSON.stringify(content), r.file_id, r.recipient_name, to, r.recipient_company,
+        admin.id, event("created", `test copy of #${r.id}, sent to ${to}`)]);
+    const t = rows[0];
+    const link = `${getBaseUrl(req)}/proposal/${t.public_token}`;
+    try {
+      await sendWithFallback({
+        from: fromFor(content), to, replyTo: content.brand.contactEmail || undefined,
+        subject: `[TEST] ${content.title || "Your proposal"} — ${content.brand.name}`, ...offerEmail(t, content, link),
+      });
+    } catch (e: any) {
+      return res.status(502).json({ message: `The test email could not be sent: ${String(e?.message || e).slice(0, 160)}` });
+    }
+    await pool.query(`UPDATE proposals SET events = events || $2::jsonb WHERE id = $1`, [r.id, event("test_sent", `${to} · #${t.id}`)]);
+    res.json({ ok: true, to, link, id: Number(t.id) });
   });
 
   app.post("/api/admin/proposals/:id/proof", async (req, res) => {
@@ -633,7 +688,8 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
       selection: r.selection ?? null, totals: r.totals ?? null,
       signature: sig ? { name: sig.name, signedAt: sig.signedAt } : null,
       payment: { method: r.payment_method ?? null, cardFeeCents: r.card_fee_cents ?? 0, status: r.payment_status ?? null },
-      stripeReady: stripeConfigured(), preview,
+      stripeReady: stripeConfigured(), preview, isTest: r.is_test === true,
+      countersignedAt: iso(r.countersigned_at),
     };
     res.setHeader("X-Robots-Tag", "noindex");
     res.json(out);
@@ -709,6 +765,7 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     if (!r || ["archived", "void"].includes(r.status)) return res.status(404).json({ message: "This proposal is no longer available." });
     if (!r.signed_at || !r.totals) return res.status(409).json({ message: "Sign the proposal first." });
     if (["paid", "processing"].includes(r.status)) return res.status(409).json({ message: "This proposal is already paid." });
+    if (r.is_test) return res.status(409).json({ message: "This is a test copy — payment is turned off. On the real link the client pays here." });
     if (!stripeConfigured()) return res.status(503).json({ message: "Online payment isn't available right now. Please contact us to arrange payment." });
     const method = z.enum(["ach", "card"]).safeParse(req.body?.method);
     if (!method.success) return res.status(400).json({ message: "Choose bank transfer (ACH) or card." });

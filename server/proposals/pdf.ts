@@ -28,6 +28,10 @@ export type SignedPdfInput = {
   payment?: { method: "ach" | "card" | null; status: string | null; paidAt: string | null };
   /** The preview's copy: marked on every page, nothing was signed. */
   preview?: boolean;
+  /** The company's signature: the name drawn in script, with the date it was signed. */
+  countersign?: { name: string; title: string; at: string } | null;
+  /** A test copy: marked on every page. */
+  test?: boolean;
 };
 
 const money = (c: number) => formatMoney(c, { cents: true });
@@ -161,6 +165,18 @@ export function buildSignedProposalPdf(p: SignedPdfInput): Promise<Buffer> {
       .moveDown(0.3)
       .text(`Consent: “${p.signature.consent}”`, { width: W });
 
+    if (p.countersign) {
+      doc.moveDown(1.4);
+      if (doc.y > doc.page.height - 170) doc.addPage();
+      doc.fillColor(accent).font("Helvetica-Bold").fontSize(10).text(`SIGNED FOR ${p.content.brand.name.toUpperCase()}`, 54, doc.y);
+      doc.moveDown(0.4);
+      doc.fillColor(INK).font("Times-Italic").fontSize(24).text(p.countersign.name, 54, doc.y);
+      doc.moveTo(54, doc.y).lineTo(300, doc.y).strokeColor(INK).lineWidth(0.7).stroke();
+      doc.moveDown(0.3);
+      doc.fillColor(INK).font("Helvetica").fontSize(10).text(`${p.countersign.name}${p.countersign.title ? `, ${p.countersign.title}` : ""}`, 54, doc.y);
+      doc.fillColor(MUTED).fontSize(8.5).text(`Date: ${new Date(p.countersign.at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })}`, 54, doc.y);
+    }
+
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
@@ -173,7 +189,7 @@ export function buildSignedProposalPdf(p: SignedPdfInput): Promise<Buffer> {
         doc.opacity(1);
       }
       doc.fillColor(MUTED).font("Helvetica").fontSize(8)
-        .text(`${p.preview ? "PREVIEW — not signed · " : ""}${p.content.brand.name}${p.content.brand.website ? ` · ${p.content.brand.website}` : ""} · Proposal #${p.id} · Page ${i + 1} of ${range.count}`,
+        .text(`${p.preview ? "PREVIEW — not signed · " : p.test ? "TEST COPY · " : ""}${p.content.brand.name}${p.content.brand.website ? ` · ${p.content.brand.website}` : ""} · Proposal #${p.id} · Page ${i + 1} of ${range.count}`,
           54, doc.page.height - 40, { width: W, align: "center", lineBreak: false });
       doc.page.margins.bottom = bottom;
     }
