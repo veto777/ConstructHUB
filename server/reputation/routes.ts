@@ -22,7 +22,10 @@
  *     GET  /api/admin/reputation/cases/:id/brokers · POST …/brokers/scan { priority? } · PUT …/brokers/:key
  *     PUT  /api/admin/reputation/cases/:id/wiki
  *
- * The scheduled monitor (startReputationMonitor) re-checks active cases every `monitor_days` days.
+ *   signed-in users (their own name or business): server/reputation/account.ts, /api/reputation/me…
+ *
+ * The scheduled monitor (startReputationMonitor) re-checks active cases every `monitor_days` days, and account
+ * watches weekly.
  */
 import type { Express } from "express";
 import { createHash, randomBytes } from "crypto";
@@ -42,6 +45,7 @@ import {
 } from "@shared/reputation";
 import { scanName, findOnSite } from "./scan";
 import { draftRequest } from "./ai";
+import { checkDueWatches } from "./account";
 
 type GetUser = (req: any, res: any) => any;
 const DAY = 86_400_000;
@@ -71,7 +75,7 @@ let brokers: Broker[] | null = null;
 let playbooks: Playbook[] | null = null;
 export const getBrokers = () => (brokers ??= loadJson<Broker>("data-brokers.json"));
 export const getPlaybooks = () => (playbooks ??= loadJson<Playbook>("removal-playbooks.json"));
-const playbookByKey = (k: string | null) => (k ? getPlaybooks().find((p) => p.key === k) ?? getPlaybooks().find((p) => p.key.startsWith(k)) ?? null : null);
+export const playbookByKey = (k: string | null) => (k ? getPlaybooks().find((p) => p.key === k) ?? getPlaybooks().find((p) => p.key.startsWith(k)) ?? null : null);
 
 // ---------------------------------------------------------------------------------------------- items from a scan
 
@@ -184,7 +188,10 @@ async function createOffer(admin: { id: number }, rec: { name: string | null; em
 
 let monitorTimer: NodeJS.Timeout | null = null;
 let monitorBusy = false;
-/** Hourly: the one most overdue active case is re-checked (each case every monitor_days days; 0 = never). */
+/**
+ * Hourly: the one most overdue active case is re-checked (each case every monitor_days days; 0 = never), and up to
+ * WATCHES_PER_HOUR account watches that are a week old (server/reputation/account.ts).
+ */
 export function startReputationMonitor(): void {
   if (monitorTimer || !dataforseoConfigured()) return;
   monitorTimer = setInterval(async () => {
@@ -196,6 +203,7 @@ export function startReputationMonitor(): void {
            AND (last_checked_at IS NULL OR last_checked_at < now() - make_interval(days => monitor_days))
          ORDER BY last_checked_at NULLS FIRST LIMIT 1`);
       if (c) await checkCase(Number(c.id));
+      await checkDueWatches();
     } catch (e: any) { console.error("[reputation] monitor:", e?.message ?? e); }
     finally { monitorBusy = false; }
   }, 3600_000);
@@ -287,7 +295,7 @@ export function registerReputationRoutes(app: Express, getDevUser: GetUser): voi
   admin("get", "/api/admin/reputation/summary", async (_req, res) => {
     const q = async (sql: string) => (await pool.query(sql)).rows[0];
     res.json({
-      leads: await q(`SELECT count(*)::int AS total, count(*) FILTER (WHERE lead_status = 'new')::int AS new FROM rep_scans WHERE case_id IS NULL`),
+      leads: await q(`SELECT count(*)::int AS total, count(*) FILTER (WHERE lead_status = 'new')::int AS new FROM rep_scans WHERE case_id IS NULL AND (user_id IS NULL OR help_requested_at IS NOT NULL)`),
       cases: await q(`SELECT count(*) FILTER (WHERE status = 'active')::int AS active, count(*)::int AS total FROM rep_cases`),
       items: await q(`SELECT count(*) FILTER (WHERE i.sentiment = 'negative' AND i.status IN ('open','in_progress'))::int AS open_negatives,
                          count(*) FILTER (WHERE i.status = 'requested')::int AS requested,
@@ -306,9 +314,9 @@ export function registerReputationRoutes(app: Express, getDevUser: GetUser): voi
 
   admin("get", "/api/admin/reputation/leads", async (_req, res) => {
     const { rows } = await pool.query(
-      `SELECT id, query, kind, name, email, phone, score, lead_status, lead_notes, created_at, report->'counts' AS counts,
+      `SELECT id, query, kind, name, email, phone, score, lead_status, lead_notes, created_at, user_id, help_requested_at, report->'counts' AS counts,
               (SELECT id FROM rep_cases c WHERE c.origin_scan_id = s.id LIMIT 1) AS case_id
-         FROM rep_scans s WHERE case_id IS NULL ORDER BY created_at DESC LIMIT 300`);
+         FROM rep_scans s WHERE case_id IS NULL AND (user_id IS NULL OR help_requested_at IS NOT NULL) ORDER BY COALESCE(help_requested_at, created_at) DESC LIMIT 300`);
     res.json({ rows });
   });
 

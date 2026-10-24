@@ -392,6 +392,8 @@ export async function registerRoutes(
   await ensureReputationSchema();
   const { registerReputationRoutes, startReputationMonitor } = await import("./reputation/routes");
   registerReputationRoutes(app, getDevUser);
+  const { registerReputationAccountRoutes } = await import("./reputation/account");
+  registerReputationAccountRoutes(app, getDevUser);
   startReputationMonitor();
   // Proposals (/admin/proposals, /proposal/<token>): build, send, e-sign and collect payment on an offer (shared/proposals.ts).
   const { ensureProposalsSchema } = await import("./proposals/schema");

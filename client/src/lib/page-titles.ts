@@ -90,6 +90,7 @@ export const APP_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/compliance/research": "Research reports · Compliance Dept",
   "/compliance/research/orders/:id": "Research report · Compliance Dept",
   "/press-releases": "Press Releases",
+  "/my-reputation": "Reputation",
   "/google-business": "Google Business",
   "/google-ads": "Click Guard",
   "/google-ads/traffic": "Traffic sources · Click Guard",

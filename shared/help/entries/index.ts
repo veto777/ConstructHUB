@@ -201,6 +201,7 @@ export { default as e_ip_tracker_visitors } from "./tools/ip-tracker.visitors";
 export { default as e_master_class_enroll } from "./tools/master-class.enroll";
 export { default as e_master_class_modules } from "./tools/master-class.modules";
 export { default as e_master_class_state_guide } from "./tools/master-class.state-guide";
+export { default as e_my_reputation } from "./tools/my-reputation";
 export { default as e_seo_ai } from "./tools/seo.ai";
 export { default as e_seo_alerts } from "./tools/seo.alerts";
 export { default as e_seo_audit } from "./tools/seo.audit";

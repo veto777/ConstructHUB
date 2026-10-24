@@ -1,6 +1,7 @@
 /**
  * Reputation Desk tables (shared/reputation.ts). Idempotent DDL: boot runs it (server/routes.ts).
- *   rep_scans    every scan: the free public ones (a lead) and a case's checks
+ *   rep_scans    every scan: the free public ones (a lead), a case's checks and account users' own scans
+ *   rep_watches  a signed-in user's own name or business, watched from /my-reputation
  *   rep_cases    one client's restoration: the name searched, the terms, the plan
  *   rep_items    one thing to act on in a case: a search result, image, video, news story or prediction
  *   rep_assets   the owned assets built to push negatives down
@@ -49,6 +50,26 @@ export const REPUTATION_DDL: readonly string[] = [
      lead_notes text,
      created_at timestamptz NOT NULL DEFAULT now()
    )`,
+  // An account user's own scan (user_id) is a lead only once they ask for help (help_requested_at).
+  `ALTER TABLE rep_scans ADD COLUMN IF NOT EXISTS user_id integer`,
+  `ALTER TABLE rep_scans ADD COLUMN IF NOT EXISTS watch_id bigint`,
+  `ALTER TABLE rep_scans ADD COLUMN IF NOT EXISTS help_requested_at timestamptz`,
+  `CREATE INDEX IF NOT EXISTS rep_scans_watch_idx ON rep_scans (watch_id, created_at DESC) WHERE watch_id IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS rep_watches (
+     id bigserial PRIMARY KEY,
+     user_id integer NOT NULL,
+     query text NOT NULL,
+     kind text NOT NULL DEFAULT 'business',
+     owned_domains text[] NOT NULL DEFAULT '{}',
+     monitor boolean NOT NULL DEFAULT true,
+     last_scan_id bigint,
+     last_score integer,
+     last_checked_at timestamptz,
+     help_requested_at timestamptz,
+     created_at timestamptz NOT NULL DEFAULT now(),
+     updated_at timestamptz NOT NULL DEFAULT now()
+   )`,
+  `CREATE INDEX IF NOT EXISTS rep_watches_user_idx ON rep_watches (user_id)`,
   `CREATE INDEX IF NOT EXISTS rep_scans_case_idx ON rep_scans (case_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS rep_scans_leads_idx ON rep_scans (created_at DESC) WHERE case_id IS NULL`,
   `CREATE TABLE IF NOT EXISTS rep_items (

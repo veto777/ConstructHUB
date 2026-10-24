@@ -281,6 +281,8 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   // The Press Wire (owner, 2026-10-15): packages of press releases, written by the AI and sent to the wire.
   // Sold beside Call Assistant and SEO Suite, never tucked in Admin (owner, 2026-10-16).
   { title: "Press Releases", url: "/press-releases", icon: Newspaper, badge: "hot" },
+  // Reputation for every account (owner, 2026-10-24: "in the sidebar for all users"); the Desk stays in Admin.
+  { title: "Reputation", url: "/my-reputation", icon: ShieldCheck, badge: "new" },
   { title: "Cloudflare", url: "/cloudflare", icon: Cloud, logoComponent: CloudflareIcon },
   { title: "Search Console", url: "/search-console", icon: Search, logoComponent: SearchConsoleIcon },
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },

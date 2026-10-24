@@ -236,6 +236,7 @@ export const HELP_ROUTES: readonly HelpRouteRow[] = [
   {"key":"master-class.modules","route":"/master-class","group":"Tools","parent":"master-class"},
   {"key":"master-class.state-guide","route":"/master-class","group":"Tools","parent":"master-class"},
   {"key":"media-library","route":"/media-library","group":"Google Business"},
+  {"key":"my-reputation","route":"/my-reputation","group":"Tools"},
   {"key":"permit-alerts","route":"/permit-alerts","group":"Permits & Databases"},
   {"key":"photo-optimizer","route":"/photos","group":"Google Business"},
   {"key":"photos","route":"/gbp-photos","group":"Google Business"},

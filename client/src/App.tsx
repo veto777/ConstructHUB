@@ -147,6 +147,7 @@ const AdminBacklinksPage = lazyPage(() => import("@/pages/admin-backlinks"));
 const AdminPartnershipsPage = lazyPage(() => import("@/pages/admin-partnerships"));
 const AdminPressPage = lazyPage(() => import("@/pages/admin-press"));
 const PressReleasesPage = lazyPage(() => import("@/pages/press-releases"));
+const MyReputationPage = lazyPage(() => import("@/pages/my-reputation"));
 const AdminTicketsPage = lazyPage(() => import("@/pages/admin-tickets"));
 const AdminReferralsPage = lazyPage(() => import("@/pages/admin-referrals"));
 const AdminYoutubePage = lazyPage(() => import("@/pages/admin-youtube"));
@@ -345,6 +346,7 @@ function DashboardRouter() {
       <Route path="/compliance/research/orders/:id" component={ResearchOrderStatusPage} />
       {/* The Press Wire (owner, 2026-10-15): packages, the writer, each release's status, live link and report. */}
       <Route path="/press-releases" component={PressReleasesPage} />
+      <Route path="/my-reputation" component={MyReputationPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={GoogleAdsPage} />
       <Route path="/google-ads/traffic" component={GoogleAdsPage} />
@@ -596,7 +598,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/call-assistant", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings", "/site-scan/history",
-  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/reputation", "/admin/backlinks", "/admin/partnerships", "/admin/youtube",
+  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/reputation", "/my-reputation", "/admin/backlinks", "/admin/partnerships", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];
