@@ -286,7 +286,7 @@ export function standardTerms(brand: string): string {
     "9. Content and approvals. We publish statements about you or your business only after you approve them, and we label sponsored or client-owned content where the law or a platform's rules require it.",
     "10. Third-party costs. Advertising spend and any third-party fees not listed in this proposal are separate and are charged only with your approval.",
     "11. Ownership. Once paid in full, the websites, articles and other content we create for you are yours, and accounts created in your name belong to you.",
-    "12. Confidentiality. Each side keeps the other's non-public information confidential.",
+    `12. Confidentiality (both ways). All work under this agreement, including reputation restoration, is confidential between you and ${we}. You agree not to disclose, publish or share with anyone the details of what was done on your behalf (strategies, methods, platforms, outlets, content, removals, results, reports, pricing and communications), except to your own attorneys or accountants who are bound to keep them confidential. ${we} holds all of your information, including your identity, the matters addressed and everything shared during the work, in strict confidence as privileged client information and will not disclose it except where the law requires. These obligations continue after this agreement ends.`,
     `13. Limitation of liability. ${we}'s total liability under this agreement is limited to the fees you paid in the three months before the claim, and neither side is liable for indirect or consequential losses.`,
     "14. Electronic signature. Your electronic signature on this proposal has the same effect as a handwritten signature.",
   ].join("\n\n");
