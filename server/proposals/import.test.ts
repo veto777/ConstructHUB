@@ -60,3 +60,13 @@ describe("standard terms", () => {
     expect(t).toContain("Acme");
   });
 });
+
+describe("initial boxes", () => {
+  it("is one box for all the terms unless the proposal asks for one per clause", async () => {
+    const { initialTargets, proposalContentSchema } = await import("@shared/proposals");
+    const c = proposalContentSchema.parse({ clauses: [{ id: "c1", heading: "1" }, { id: "c2", heading: "2" }, { id: "c3", heading: "3", initials: false }] });
+    expect(initialTargets(c)).toEqual([{ id: "all", heading: "Program terms" }]);
+    expect(initialTargets({ ...c, clauseInitials: "each" }).map((t) => t.id)).toEqual(["c1", "c2"]);
+    expect(initialTargets({ ...c, clauses: [] })).toEqual([]);
+  });
+});

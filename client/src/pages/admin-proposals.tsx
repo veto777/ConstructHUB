@@ -444,16 +444,17 @@ function ProposalEditor({ id }: { id: number }) {
   });
   const removeFile = useMutation({ mutationFn: async () => (await apiRequest("DELETE", `${url}/file`)).json(), onSuccess: () => void invalidate() });
 
+  // Every hook sits above the early returns below (React needs the same hooks on every render).
+  const proof = useMutation({
+    mutationFn: async () => { if (dirty) await saveNow(); return (await apiRequest("POST", `/api/admin/proposals/${p!.id}/proof`, {})).json() as Promise<{ to: string }>; },
+    onSuccess: (r) => toast({ title: "Proof sent", description: `The exact email your client gets went to ${r.to}. Its link is a preview: opening it isn't a client view, and it can't be signed or paid.` }),
+    onError: (e) => toast({ title: "Couldn't send the proof", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const preview = useMemo(() => (c ? priceSelection(c, defaultSelection(c)) : null), [c]);
 
   if (isLoading && !p) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading" /></div>;
   if (!p || !c) return <Gate error={error} retry={() => void refetch()} what="this proposal" />;
   const link = `${window.location.origin}/proposal/${p.publicToken}`;
-  const proof = useMutation({
-    mutationFn: async () => { if (dirty) await saveNow(); return (await apiRequest("POST", `/api/admin/proposals/${p.id}/proof`, {})).json() as Promise<{ to: string }>; },
-    onSuccess: (r) => toast({ title: "Proof sent", description: `The exact email your client gets went to ${r.to}. Its link is a preview: opening it isn't a client view, and it can't be signed or paid.` }),
-    onError: (e) => toast({ title: "Couldn't send the proof", description: apiErrorMessage(e), variant: "destructive" }),
-  });
   const openPreview = async () => { if (dirty) await saveNow(); window.open(`/proposal/${p.publicToken}?preview=1`, "_blank", "noopener"); };
 
   return (
@@ -584,8 +585,10 @@ function ProposalEditor({ id }: { id: number }) {
             </div>
           </Section>
 
-          <Section title="Terms the client initials" description="Each clause gets an “Initial here” box on the signing step, like DocuSign; the client can't sign until every box is initialed. The initials and times print on the signed agreement.">
+          <Section title="Terms the client initials" description="The client initials before signing, like DocuSign, and can't sign until it's done. The initials and times print on the signed agreement with every term in full.">
             <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm"><Switch checked={c.clauseInitials !== "each"} onCheckedChange={(v) => edit({ clauseInitials: v ? "once" : "each" })} data-testid="switch-initial-once" />
+                One initial for all terms (the terms stay folded under “View the terms”)</label>
               {c.clauses.map((cl, i) => (
                 <div key={cl.id} className="space-y-2 rounded-lg border p-3" data-testid={`editor-clause-${i}`}>
                   <div className="flex flex-wrap items-center gap-2">

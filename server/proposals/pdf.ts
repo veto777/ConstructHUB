@@ -7,7 +7,7 @@
  * locked once signed — nothing is kept but the data it is made from.
  */
 import PDFDocument from "pdfkit";
-import { cardFeeCents, formatBps, formatMoney, type ProposalContent, type ProposalTotals } from "@shared/proposals";
+import { ALL_TERMS_ID, cardFeeCents, formatBps, formatMoney, type ProposalContent, type ProposalTotals } from "@shared/proposals";
 
 const INK = "#111827";
 const MUTED = "#6b7280";
@@ -104,22 +104,31 @@ export function buildSignedProposalPdf(p: SignedPdfInput): Promise<Buffer> {
 
     if (p.content.clauses.length) {
       doc.moveDown(1);
-      doc.fillColor(accent).font("Helvetica-Bold").fontSize(10).text("PROGRAM TERMS — INITIALED BY THE CLIENT");
-      doc.moveDown(0.3);
       const when = new Map((p.signature.initialed ?? []).map((x) => [x.id, x.at]));
+      const once = p.content.clauseInitials !== "each";
+      const box = (x: number, y: number, at: string | undefined) => {
+        doc.roundedRect(x, y, 78, 30, 3).dash(2, { space: 2 }).strokeColor(accent).lineWidth(0.8).stroke().undash();
+        doc.fillColor(INK).font("Times-Italic").fontSize(14).text(at ? p.signature.initials ?? "" : "", x, y + 3, { width: 78, align: "center" });
+        doc.fillColor(MUTED).font("Helvetica").fontSize(6.5).text(at ? new Date(at).toISOString().slice(0, 16).replace("T", " ") + " UTC" : "not initialed", x, y + 20, { width: 78, align: "center" });
+      };
+      if (doc.y > doc.page.height - 160) doc.addPage();
+      const yHead = doc.y;
+      doc.fillColor(accent).font("Helvetica-Bold").fontSize(10).text(once ? "PROGRAM TERMS — ACCEPTED WITH ONE INITIAL" : "PROGRAM TERMS — INITIALED BY THE CLIENT", 54, yHead, { width: W - 90 });
+      if (once && p.content.clauses.some((c) => c.initials)) {
+        doc.fillColor(MUTED).font("Helvetica").fontSize(8.5).text("The client initialed once to accept all of the terms below.", 54, doc.y, { width: W - 90 });
+        box(54 + W - 78, yHead, when.get(ALL_TERMS_ID));
+        doc.y = Math.max(doc.y, yHead + 34);
+      }
+      doc.moveDown(0.3);
       for (const c of p.content.clauses) {
         if (doc.y > doc.page.height - 120) doc.addPage();
         const y = doc.y;
-        doc.fillColor(INK).font("Helvetica-Bold").fontSize(9.5).text(c.heading, 54, y, { width: W - 90 });
-        if (c.body.trim()) doc.fillColor(INK).font("Helvetica").fontSize(9).text(c.body.trim(), 54, doc.y, { width: W - 90, lineGap: 1 });
+        const textW = once ? W : W - 90;
+        doc.fillColor(INK).font("Helvetica-Bold").fontSize(9.5).text(c.heading, 54, y, { width: textW });
+        if (c.body.trim()) doc.fillColor(INK).font("Helvetica").fontSize(9).text(c.body.trim(), 54, doc.y, { width: textW, lineGap: 1 });
         const yEnd = doc.y;
-        if (c.initials) {
-          const at = when.get(c.id);
-          doc.roundedRect(54 + W - 78, y, 78, 30, 3).dash(2, { space: 2 }).strokeColor(accent).lineWidth(0.8).stroke().undash();
-          doc.fillColor(INK).font("Times-Italic").fontSize(14).text(at ? p.signature.initials ?? "" : "", 54 + W - 78, y + 3, { width: 78, align: "center" });
-          doc.fillColor(MUTED).font("Helvetica").fontSize(6.5).text(at ? new Date(at).toISOString().slice(0, 16).replace("T", " ") + " UTC" : "not initialed", 54 + W - 78, y + 20, { width: 78, align: "center" });
-        }
-        doc.y = Math.max(yEnd, y + 34) + 6; doc.x = 54;
+        if (c.initials && !once) box(54 + W - 78, y, when.get(c.id));
+        doc.y = (once ? yEnd : Math.max(yEnd, y + 34)) + 6; doc.x = 54;
       }
     }
 

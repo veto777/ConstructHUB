@@ -45,7 +45,7 @@ import { stripe, stripeConfigured } from "../billing/client";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 import {
-  ESIGN_CONSENT, MAX_PDF_BYTES, PROPOSAL_KINDS, clausesToInitial, cardFeeCents, emptyContent, formatBps, formatMoney, priceSelection, proposalContentSchema,
+  ESIGN_CONSENT, MAX_PDF_BYTES, PROPOSAL_KINDS, initialTargets, cardFeeCents, emptyContent, formatBps, formatMoney, priceSelection, proposalContentSchema,
   selectionProblems, type ProposalContent, type ProposalDetail, type ProposalEvent, type ProposalRow, type ProposalStatus, type ProposalSummary,
   type ProposalTotals, type PublicProposal,
 } from "@shared/proposals";
@@ -296,11 +296,11 @@ function parseSignature(req: any, content: ProposalContent) {
   }
   const problems = selectionProblems(content, body.data.itemIds);
   if (problems.length) return { error: { message: problems[0], problems } };
-  const need = clausesToInitial(content);
+  const need = initialTargets(content);
   const done = new Map(body.data.initialed.map((x) => [x.id, x.at]));
   const missing = need.filter((c) => !done.has(c.id));
   if (need.length && (!body.data.initials || missing.length)) {
-    return { error: { message: `Initial every clause before signing${missing[0] ? ` — “${missing[0].heading || "a clause"}” is not initialed yet` : ""}.` } };
+    return { error: { message: need.length === 1 ? "Initial the program terms before signing." : `Initial every clause before signing${missing[0] ? ` — “${missing[0].heading || "a clause"}” is not initialed yet` : ""}.` } };
   }
   const now = new Date().toISOString();
   const clampAt = (at: string | undefined) => { const t = at ? Date.parse(at) : NaN; return Number.isFinite(t) && t <= Date.now() + 60_000 && t > Date.now() - 7 * 86_400_000 ? new Date(t).toISOString() : now; };

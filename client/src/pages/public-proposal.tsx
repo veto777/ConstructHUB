@@ -12,7 +12,7 @@ import { useRoute } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowDown, Info, Building2, CheckCircle2, Clock, CreditCard, Download, ExternalLink, FileText, Landmark, Loader2, Lock, PenLine, ShieldCheck, XCircle } from "lucide-react";
 import {
-  ESIGN_CONSENT, TAX_NOTE, allowedPlans, bodyBlocks, cardFeeCents, clausesToInitial, defaultSelection, formatBps, formatMoney, initialsOf, priceSelection, selectionProblems,
+  ESIGN_CONSENT, TAX_NOTE, allowedPlans, bodyBlocks, cardFeeCents, ALL_TERMS_ID, initialTargets, defaultSelection, formatBps, formatMoney, initialsOf, priceSelection, selectionProblems,
   type PaymentPlan, type ProposalContent, type ProposalGroup, type PublicProposal,
 } from "@shared/proposals";
 import { Button } from "@/components/ui/button";
@@ -299,11 +299,12 @@ export default function PublicProposalPage() {
       return has ? cur.filter((x) => x !== id) : [...cur, id];
     });
   };
-  const toInitial = clausesToInitial(content);
+  const toInitial = initialTargets(content);
+  const once = content.clauseInitials !== "each";
   // Every field the client must complete, in page order: the "Next" guide jumps to the first one left (DocuSign style).
   const fields = [
     { id: "choose", label: "Choose your services", done: problems.length === 0 },
-    ...toInitial.map((c, i) => ({ id: `clause-${c.id}`, label: `Initial term ${i + 1}`, done: !!initialed[c.id] })),
+    ...toInitial.map((c, i) => ({ id: `clause-${c.id}`, label: once ? "Initial the program terms" : `Initial term ${i + 1}`, done: !!initialed[c.id] })),
     { id: "sig-name", label: "Type your full name", done: name.trim().length >= 2 },
     { id: "signature", label: "Sign", done: !!sig },
     { id: "consent", label: "Agree to sign electronically", done: consent },
@@ -406,34 +407,59 @@ export default function PublicProposalPage() {
                 {problems.map((p) => <div key={p} className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{p}</div>)}
               </div>
             )}
-            {toInitial.length > 0 || content.clauses.length > 0 ? (
-              <div className="space-y-3" data-testid="section-clauses">
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div><h3 className="text-lg font-bold">Program terms</h3><p className="text-sm text-slate-500">Read each term and initial it in the box.</p></div>
-                  <div className="space-y-1"><Label htmlFor="sig-initials" className="text-xs">Your initials</Label>
-                    <Input id="sig-initials" value={initials} maxLength={6} className="h-9 w-24 text-center font-semibold uppercase" onChange={(e) => { setInitialsEdited(true); setInitials(e.target.value.toUpperCase()); }} data-testid="input-initials" /></div>
-                </div>
-                {content.clauses.map((c, i) => {
-                  const at = initialed[c.id];
+            {content.clauses.length > 0 && (() => {
+              const initialBox = (id: string) => {
+                  const at = initialed[id];
                   return (
+                    <button type="button" onClick={() => toggleInitial(id)} disabled={locked} aria-pressed={!!at}
+                      className={cn("flex h-16 w-24 shrink-0 flex-col items-center justify-center rounded-md border-2 border-dashed text-xs transition", at ? "bg-white" : "animate-pulse bg-amber-50 text-amber-800")}
+                      style={{ borderColor: at ? "var(--accent)" : "#f59e0b" }} data-testid={`initial-${id}`}>
+                      {at ? <><span className="font-serif text-2xl italic text-slate-900">{initials}</span><span className="text-[10px] text-slate-500">{new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></>
+                        : <><PenLine className="mb-0.5 h-4 w-4" />Initial here</>}
+                    </button>
+                  );
+                };
+              const initialsField = (
+                <div className="space-y-1"><Label htmlFor="sig-initials" className="text-xs">Your initials</Label>
+                  <Input id="sig-initials" value={initials} maxLength={6} className="h-9 w-24 text-center font-semibold uppercase" onChange={(e) => { setInitialsEdited(true); setInitials(e.target.value.toUpperCase()); }} data-testid="input-initials" /></div>
+              );
+              if (once) {
+                // One initial accepts every term; the terms stay folded away until the client opens them.
+                return (
+                  <div id={`clause-${ALL_TERMS_ID}`} className="flex flex-wrap items-center gap-4 rounded-xl border bg-slate-50/60 p-4" data-testid="section-clauses">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-slate-900">Program terms</div>
+                      <p className="text-sm text-slate-500">By initialing, you accept the program terms.</p>
+                      <details className="mt-1 text-sm">
+                        <summary className="cursor-pointer text-slate-500 underline-offset-2 hover:underline" data-testid="toggle-terms">View the terms</summary>
+                        <div className="mt-2 max-h-72 space-y-2 overflow-auto rounded-lg border bg-white p-3 text-xs leading-relaxed text-slate-600">
+                          {content.clauses.map((c) => <p key={c.id}><b className="text-slate-800">{c.heading}</b>{c.body ? ` ${c.body}` : ""}</p>)}
+                        </div>
+                      </details>
+                    </div>
+                    {initialsField}
+                    {toInitial.length > 0 && initialBox(ALL_TERMS_ID)}
+                  </div>
+                );
+              }
+              return (
+                <div className="space-y-3" data-testid="section-clauses">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div><h3 className="text-lg font-bold">Program terms</h3><p className="text-sm text-slate-500">Read each term and initial it in the box.</p></div>
+                    {initialsField}
+                  </div>
+                  {content.clauses.map((c, i) => (
                     <div key={c.id} id={`clause-${c.id}`} className="flex gap-4 rounded-xl border bg-slate-50/60 p-4" data-testid={`clause-${c.id}`}>
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold text-slate-900">{c.heading || `Term ${i + 1}`}</div>
                         {c.body && <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-600">{c.body}</p>}
                       </div>
-                      {c.initials && (
-                        <button type="button" onClick={() => toggleInitial(c.id)} disabled={locked} aria-pressed={!!at}
-                          className={cn("flex h-16 w-24 shrink-0 flex-col items-center justify-center rounded-md border-2 border-dashed text-xs transition", at ? "bg-white" : "animate-pulse bg-amber-50 text-amber-800")}
-                          style={{ borderColor: at ? "var(--accent)" : "#f59e0b" }} data-testid={`initial-${c.id}`}>
-                          {at ? <><span className="font-serif text-2xl italic text-slate-900">{initials}</span><span className="text-[10px] text-slate-500">{new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></>
-                            : <><PenLine className="mb-0.5 h-4 w-4" />Initial here</>}
-                        </button>
-                      )}
+                      {c.initials && initialBox(c.id)}
                     </div>
-                  );
-                })}
-              </div>
-            ) : null}
+                  ))}
+                </div>
+              );
+            })()}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5"><Label htmlFor="sig-name">Full legal name</Label>
                 <Input id="sig-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" data-testid="input-sign-name" /></div>

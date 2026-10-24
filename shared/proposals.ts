@@ -114,6 +114,9 @@ export const proposalContentSchema = z.object({
   groups: z.array(proposalGroupSchema).max(20).default([]),
   /** The contract clauses initialed one by one (shown in the signing step, printed with the initials). */
   clauses: z.array(proposalClauseSchema).max(40).default([]),
+  /** once: one initial for all the terms, which sit collapsed (owner, 2026-10-24: "one initial for all terms … we
+   *  don't want the client scrutinizing the terms"); each: an initial per clause. */
+  clauseInitials: z.enum(["once", "each"]).default("once"),
   terms: text(30_000).default(""),
   payment: z.object({
     plan: z.enum(PAYMENT_PLANS).default("monthly"),
@@ -264,6 +267,16 @@ export function standardTerms(brand: string): string {
 
 /** The clauses the client must initial before the signature unlocks. */
 export const clausesToInitial = (content: ProposalContent) => content.clauses.filter((c) => c.initials);
+
+/** The id of the single initial that covers every clause (clauseInitials "once"). */
+export const ALL_TERMS_ID = "all";
+
+/** The "Initial here" boxes the client must fill: one for all the terms, or one per clause. */
+export function initialTargets(content: ProposalContent): { id: string; heading: string }[] {
+  const each = clausesToInitial(content);
+  if (!each.length) return [];
+  return content.clauseInitials === "each" ? each.map((c) => ({ id: c.id, heading: c.heading })) : [{ id: ALL_TERMS_ID, heading: "Program terms" }];
+}
 
 /** Initials from a name: "Steve Tutty, MA, PhD" → "ST" (credentials after a comma are dropped). */
 export function initialsOf(name: string): string {
