@@ -19,13 +19,13 @@ describe("proposal from a PDF", () => {
   it("keeps the sections and drops empty ones", () => {
     expect(content.sections.map((s) => s.heading)).toEqual(["The opportunity"]);
   });
-  it("turns every priced service into an option with cents, unique ids and recommendations pre-selected", () => {
+  it("turns every priced service into an option with cents, unique ids and nothing pre-selected", () => {
     expect(content.groups.map((g) => g.name)).toEqual(["Press releases", "Reputation services"]);
     const pr = content.groups[0];
     expect(pr.select).toBe("one");
     expect(pr.items.map((i) => i.priceCents)).toEqual([855_000, 1_557_000, 129_750]);
     expect(new Set(pr.items.map((i) => i.id)).size).toBe(3);
-    expect(pr.items[1]).toMatchObject({ defaultSelected: true, badge: "Recommended" });
+    expect(pr.items[1]).toMatchObject({ defaultSelected: false, badge: "Recommended" });
     // a pick-one group keeps only its first recommendation, and an item without a price is dropped
     expect(pr.items[2]).toMatchObject({ defaultSelected: false, badge: "" });
     expect(content.groups[1].items).toHaveLength(1);

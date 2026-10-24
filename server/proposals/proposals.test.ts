@@ -16,8 +16,8 @@ const content = proposalContentSchema.parse({
 });
 
 describe("proposals pricing", () => {
-  it("pre-selects included and default items, one per pick-one group", () => {
-    expect(defaultSelection(content).sort()).toEqual(["foundation", "starter"]);
+  it("opens with only the included items selected", () => {
+    expect(defaultSelection(content).sort()).toEqual(["foundation"]);
   });
   it("monthly plan: one-time + first month today, then monthly", () => {
     const t = priceSelection(content, ["starter", "foundation"], "monthly");

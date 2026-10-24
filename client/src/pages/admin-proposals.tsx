@@ -317,7 +317,6 @@ function ItemEditor({ item, onChange, onUp, onDown, onRemove }: { item: Proposal
       <Textarea rows={3} value={item.bullets.join("\n")} onChange={(e) => set({ bullets: e.target.value.split("\n").slice(0, 40) })} placeholder={"What's included — one per line"} aria-label="What's included" />
       <Textarea rows={2} value={item.info} onChange={(e) => set({ info: e.target.value })} placeholder="The “i” on this option: why it's better than the one before" aria-label="Info" />
       <div className="flex flex-wrap gap-5 text-sm">
-        <label className="flex items-center gap-2"><Switch checked={item.defaultSelected} onCheckedChange={(v) => set({ defaultSelected: v })} /> Pre-selected</label>
         <label className="flex items-center gap-2"><Switch checked={item.included} onCheckedChange={(v) => set({ included: v })} /> Always included (can't be removed)</label>
         {item.billing === "monthly" && <span className="text-muted-foreground">Term total {formatMoney(item.priceCents * item.termMonths)}</span>}
       </div>
@@ -628,7 +627,7 @@ function ProposalEditor({ id }: { id: number }) {
             </Section>
           )}
           {preview && (
-            <Section title="Pre-selected totals" description="What the client sees before changing anything.">
+            <Section title="Opening totals" description="Nothing is pre-selected: the client starts with only the included services and picks the rest.">
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between"><span>One-time</span><span className="tabular-nums">{formatMoney(preview.oneTimeCents)}</span></div>
                 <div className="flex justify-between"><span>Monthly</span><span className="tabular-nums">{formatMoney(preview.monthlyCents)}/mo</span></div>

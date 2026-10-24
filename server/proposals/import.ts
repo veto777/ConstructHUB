@@ -66,16 +66,16 @@ export function toContent(raw: any, fallbackBrand: string): { content: ProposalC
         priceCents: Number.isFinite(price) && price >= 0 ? Math.min(100_000_000, Math.round(price * 100)) : 0,
         billing: monthly ? "monthly" : "one_time",
         termMonths: monthly ? Math.max(1, Math.min(60, Math.round(Number(i?.termMonths) || 1))) : 1,
-        defaultSelected: i?.recommended === true,
+        defaultSelected: false,
         included: false,
         badge: i?.recommended === true ? "Recommended" : "",
       };
     }),
   })).filter((g: any) => g.items.length).map((g: any) => {
-    // A pick-one group opens with at most one choice made.
+    // A pick-one group shows at most one "Recommended" badge.
     if (g.select !== "one") return g;
     let seen = false;
-    return { ...g, items: g.items.map((i: any) => { const keep = i.defaultSelected && !seen; if (i.defaultSelected) seen = true; return { ...i, defaultSelected: keep, badge: keep ? i.badge : "" }; }) };
+    return { ...g, items: g.items.map((i: any) => { const keep = !!i.badge && !seen; if (i.badge) seen = true; return { ...i, badge: keep ? i.badge : "" }; }) };
   });
   const ownTerms = (Array.isArray(raw?.proposalTerms) ? raw.proposalTerms : []).map((t: unknown) => str(t, 2000)).filter(Boolean);
   const own = ownTerms.length ? `TERMS FROM THIS PROPOSAL\n\n${ownTerms.map((t: string) => `- ${t}`).join("\n")}` : "";

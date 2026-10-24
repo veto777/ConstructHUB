@@ -168,14 +168,10 @@ export function allowedPlans(content: ProposalContent, totalsMonthlyCents: numbe
   return p === "choice" ? ["monthly", "full"] : [p];
 }
 
-/** The items selected when the page opens: included ones, then each item marked default (one per "one" group). */
+/** The items selected when the page opens: only the included ones — the client makes every choice (owner,
+ *  2026-10-24: "dont preselect anything when sending"). An item's defaultSelected is no longer used. */
 export function defaultSelection(content: ProposalContent): string[] {
-  const out: string[] = [];
-  for (const g of content.groups) {
-    const picks = g.items.filter((i) => i.included || i.defaultSelected);
-    out.push(...(g.select === "one" ? picks.slice(0, 1) : picks).map((i) => i.id));
-  }
-  return out;
+  return content.groups.flatMap((g) => g.items.filter((i) => i.included).map((i) => i.id));
 }
 
 /** Problems with a selection, in the recipient's words; empty when it can be signed. */
