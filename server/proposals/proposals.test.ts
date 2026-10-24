@@ -27,10 +27,19 @@ describe("proposals pricing", () => {
     expect(t.dueTodayCents).toBe(600_000);
     expect(t.recurringCents).toBe(250_000);
   });
-  it("full plan: the whole term today", () => {
+  it("full plan: the whole term today, less the 5% pay-in-full discount", () => {
     const t = priceSelection(content, ["pro", "foundation", "video"], "full");
-    expect(t.dueTodayCents).toBe(350_000 + 250_000 + 550_000 * 6);
+    const gross = 350_000 + 250_000 + 550_000 * 6;
+    expect(t.discountCents).toBe(gross * 0.05);
+    expect(t.dueTodayCents).toBe(gross * 0.95);
+    expect(t.contractTotalCents).toBe(gross * 0.95);
     expect(t.recurringCents).toBe(0);
+  });
+  it("the pay-in-full discount follows the proposal's percentage, and only when paying ahead", () => {
+    const c = proposalContentSchema.parse({ ...content, payment: { plan: "choice", fullPayDiscountBps: 1000 } });
+    expect(priceSelection(c, ["starter", "foundation"], "full").dueTodayCents).toBe((350_000 + 250_000 * 6) * 0.9);
+    expect(priceSelection(c, ["starter", "foundation"], "monthly").discountCents).toBe(0);
+    expect(priceSelection(c, ["foundation"], "full").discountCents).toBe(0);
   });
   it("only one-time items: always paid in full", () => {
     const c = proposalContentSchema.parse({ ...content, groups: [content.groups[1]] });

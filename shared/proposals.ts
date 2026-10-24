@@ -30,6 +30,9 @@ export type PaymentPlan = Exclude<PaymentPlanSetting, "choice">;
 
 export const DEFAULT_CARD_FEE_BPS = 300;
 export const MAX_CARD_FEE_BPS = 400;
+/** Off the whole contract when the client pays the full term today (owner, 2026-10-24: 5%, changeable per proposal). */
+export const DEFAULT_FULL_PAY_DISCOUNT_BPS = 500;
+export const MAX_FULL_PAY_DISCOUNT_BPS = 5000;
 export const MAX_PDF_BYTES = 25 * 1024 * 1024;
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -126,6 +129,8 @@ export const proposalContentSchema = z.object({
     cardFeeBps: z.number().int().min(0).max(MAX_CARD_FEE_BPS).default(DEFAULT_CARD_FEE_BPS),
     /** Monthly plan: end the subscription after this many months (null = continues month to month). */
     endAfterMonths: z.number().int().min(1).max(60).nullable().default(null),
+    /** Basis points off the contract when a term with monthly services is paid in full today (500 = 5%, 0 = none). */
+    fullPayDiscountBps: z.number().int().min(0).max(MAX_FULL_PAY_DISCOUNT_BPS).default(DEFAULT_FULL_PAY_DISCOUNT_BPS),
   }).default({}),
 });
 export type ProposalContent = z.infer<typeof proposalContentSchema>;
@@ -144,8 +149,11 @@ export type ProposalTotals = {
   lines: PricedLine[];
   oneTimeCents: number;
   monthlyCents: number;
-  /** One-time + every monthly item for its full term. */
+  /** One-time + every monthly item for its full term, less the pay-in-full discount. */
   contractTotalCents: number;
+  /** The pay-in-full discount taken off (0 on the monthly plan; absent on totals stored before it existed). */
+  discountCents?: number;
+  discountBps?: number;
   plan: PaymentPlan;
   /** What is charged now (before any card fee). */
   dueTodayCents: number;
@@ -198,15 +206,24 @@ export function priceSelection(content: ProposalContent, itemIds: readonly strin
   }
   const oneTimeCents = lines.filter((l) => l.billing === "one_time").reduce((s, l) => s + l.priceCents, 0);
   const monthlyCents = lines.filter((l) => l.billing === "monthly").reduce((s, l) => s + l.priceCents, 0);
-  const contractTotalCents = lines.reduce((s, l) => s + l.termTotalCents, 0);
+  const grossCents = lines.reduce((s, l) => s + l.termTotalCents, 0);
   const plans = allowedPlans(content, monthlyCents);
   const usePlan: PaymentPlan = plan && plans.includes(plan) ? plan : plans[0];
   const monthlyPlan = usePlan === "monthly" && monthlyCents > 0;
+  // Paying a monthly term up front earns the discount; a one-time-only order has nothing to pay ahead.
+  const discountBps = !monthlyPlan && monthlyCents > 0 ? content.payment.fullPayDiscountBps : 0;
+  const discountCents = fullPayDiscountCents(grossCents, discountBps);
+  const contractTotalCents = grossCents - discountCents;
   return {
-    lines, oneTimeCents, monthlyCents, contractTotalCents, plan: monthlyPlan ? "monthly" : "full",
+    lines, oneTimeCents, monthlyCents, contractTotalCents, discountCents, discountBps, plan: monthlyPlan ? "monthly" : "full",
     dueTodayCents: monthlyPlan ? oneTimeCents + monthlyCents : contractTotalCents,
     recurringCents: monthlyPlan ? monthlyCents : 0,
   };
+}
+
+/** The pay-in-full discount on an amount, rounded to the cent. */
+export function fullPayDiscountCents(amountCents: number, bps: number): number {
+  return bps > 0 ? Math.round((amountCents * bps) / 10_000) : 0;
 }
 
 /** The card fee on an amount: rounded to the cent, 0 when the proposal charges none. */

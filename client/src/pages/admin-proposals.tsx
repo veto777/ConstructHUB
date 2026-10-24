@@ -14,7 +14,7 @@ import {
   ArrowDown, ArrowLeft, ArrowUp, Archive, Copy, Eye, FilePlus2, FileSignature, FileText, Loader2, Lock, Mail, Plus, RotateCcw, Save, Send, Trash2, Upload, XCircle,
 } from "lucide-react";
 import {
-  DEFAULT_CARD_FEE_BPS, MAX_PDF_BYTES, PROPOSAL_STATUS_LABELS, defaultSelection, formatBps, formatMoney, priceSelection, standardTerms,
+  DEFAULT_CARD_FEE_BPS, DEFAULT_FULL_PAY_DISCOUNT_BPS, MAX_PDF_BYTES, PROPOSAL_STATUS_LABELS, defaultSelection, formatBps, formatMoney, priceSelection, standardTerms,
   type ProposalContent, type ProposalDetail, type ProposalGroup, type ProposalItem, type ProposalRow, type ProposalStatus, type ProposalSummary,
 } from "@shared/proposals";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -578,6 +578,9 @@ function ProposalEditor({ id }: { id: number }) {
                 <p className="text-xs text-muted-foreground">Default {formatBps(DEFAULT_CARD_FEE_BPS)}.</p></div>
               <div className="space-y-1.5"><Label>End the monthly billing after (months)</Label>
                 <Input type="number" min={1} max={60} value={c.payment.endAfterMonths ?? ""} placeholder="Keeps going month to month" onChange={(e) => editNested("payment", { endAfterMonths: e.target.value ? Math.max(1, Math.min(60, Number(e.target.value))) : null })} /></div>
+              <div className="space-y-1.5"><Label>Pay-in-full discount (%)</Label>
+                <Input type="number" step="0.5" min={0} max={50} value={c.payment.fullPayDiscountBps / 100} onChange={(e) => editNested("payment", { fullPayDiscountBps: Math.max(0, Math.min(5000, Math.round((Number(e.target.value) || 0) * 100))) })} data-testid="input-full-pay-discount" />
+                <p className="text-xs text-muted-foreground">Off the whole contract when the client pays the full term today. Default {formatBps(DEFAULT_FULL_PAY_DISCOUNT_BPS)}; 0 turns it off.</p></div>
               <div className="flex flex-col gap-3 pt-6 text-sm">
                 <label className="flex items-center gap-2"><Switch checked={c.payment.achEnabled} onCheckedChange={(v) => editNested("payment", { achEnabled: v })} /> Offer bank transfer (ACH)</label>
                 <label className="flex items-center gap-2"><Switch checked={c.payment.cardEnabled} onCheckedChange={(v) => editNested("payment", { cardEnabled: v })} /> Offer card</label>
@@ -614,6 +617,7 @@ function ProposalEditor({ id }: { id: number }) {
             <Section title="What they chose">
               <ul className="space-y-1 text-sm">{p.totals.lines.map((l) => <li key={l.itemId} className="flex justify-between gap-2"><span>{l.name}</span><span className="tabular-nums">{formatMoney(l.priceCents)}{l.billing === "monthly" ? "/mo" : ""}</span></li>)}</ul>
               <div className="mt-2 border-t pt-2 text-sm">
+                {(p.totals.discountCents ?? 0) > 0 && <div className="flex justify-between text-emerald-700"><span>Paid in full ({formatBps(p.totals.discountBps ?? 0)} off)</span><span>−{formatMoney(p.totals.discountCents ?? 0)}</span></div>}
                 <div className="flex justify-between font-semibold"><span>Contract total</span><span>{formatMoney(p.totals.contractTotalCents)}</span></div>
                 <div className="flex justify-between"><span>Due at signing</span><span>{formatMoney(p.totals.dueTodayCents)}</span></div>
                 {p.payment.method && <div className="flex justify-between"><span>Paid by</span><span>{p.payment.method === "ach" ? "ACH" : `Card (+${formatMoney(p.payment.cardFeeCents)})`}</span></div>}

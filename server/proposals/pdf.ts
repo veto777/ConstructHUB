@@ -88,6 +88,7 @@ export function buildSignedProposalPdf(p: SignedPdfInput): Promise<Buffer> {
     if (p.totals.oneTimeCents) row("One-time services", money(p.totals.oneTimeCents));
     if (p.totals.monthlyCents) row("Monthly services", `${money(p.totals.monthlyCents)} / month`);
     row("Sales tax", "$0.00 — professional services");
+    if (p.totals.discountCents) row(`Pay-in-full discount (${formatBps(p.totals.discountBps ?? 0)})`, `−${money(p.totals.discountCents)}`);
     row("Contract total (full term)", money(p.totals.contractTotalCents), true);
     doc.moveDown(0.3);
     row("Payment plan", p.totals.plan === "monthly" ? "First payment today, then monthly" : "Paid in full today");

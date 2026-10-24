@@ -115,6 +115,8 @@ function Summary({ content, itemIds, plan, setPlan, locked }: { content: Proposa
   const t = priceSelection(content, itemIds, plan);
   const plans = allowedPlans(content, t.monthlyCents);
   const bps = content.payment.cardEnabled ? content.payment.cardFeeBps : 0;
+  const fullBps = content.payment.fullPayDiscountBps;
+  const fullSave = plans.includes("full") ? priceSelection(content, itemIds, "full").discountCents ?? 0 : 0;
   return (
     <div className="rounded-2xl border bg-white p-5 shadow-sm" data-testid="card-summary">
       <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Your selection</h3>
@@ -132,6 +134,7 @@ function Summary({ content, itemIds, plan, setPlan, locked }: { content: Proposa
         {t.oneTimeCents > 0 && <Row label="One-time" value={money(t.oneTimeCents)} />}
         {t.monthlyCents > 0 && <Row label="Monthly" value={`${money(t.monthlyCents)}/mo`} />}
         <Row label="Sales tax" value="$0.00" />
+        {(t.discountCents ?? 0) > 0 && <Row label={`Paid in full (${formatBps(t.discountBps ?? 0)} off)`} value={`−${money(t.discountCents ?? 0)}`} />}
         <Row label="Contract total" value={money(t.contractTotalCents)} strong />
         <p className="text-[11px] text-slate-500">{TAX_NOTE}</p>
       </div>
@@ -142,6 +145,7 @@ function Summary({ content, itemIds, plan, setPlan, locked }: { content: Proposa
               className={cn("rounded-lg border-2 px-3 py-2 text-left text-xs", t.plan === p ? "font-semibold" : "border-slate-200 text-slate-600")}
               style={t.plan === p ? { borderColor: "var(--accent)" } : undefined} data-testid={`plan-${p}`}>
               {p === "monthly" ? "Pay monthly" : "Pay in full"}
+              {p === "full" && fullBps > 0 && <span className="block font-semibold text-emerald-700">Save {formatBps(fullBps)}{fullSave > 0 ? ` (${formatMoney(fullSave)})` : ""}</span>}
             </button>
           ))}
         </div>
@@ -503,6 +507,7 @@ export default function PublicProposalPage() {
             <p className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: b.accent }}>Step 3 · preview</p>
             <h2 className="text-2xl font-extrabold">Payment</h2>
             <p className="text-sm text-slate-600">On the real link the client goes straight to payment now. The signed agreement PDF opened in a new tab.</p>
+            {(previewTotals.discountCents ?? 0) > 0 && <Row label={`Paid in full (${formatBps(previewTotals.discountBps ?? 0)} off)`} value={`−${money(previewTotals.discountCents ?? 0)}`} />}
             <Row label="Due today (bank / ACH)" value={money(previewTotals.dueTodayCents)} strong />
             {content.payment.cardEnabled && content.payment.cardFeeBps > 0 && <Row label={`By card (+${formatBps(content.payment.cardFeeBps)})`} value={money(previewTotals.dueTodayCents + cardFeeCents(previewTotals.dueTodayCents, content.payment.cardFeeBps))} />}
             {previewTotals.recurringCents > 0 && <Row label="Then each month" value={money(previewTotals.recurringCents)} />}

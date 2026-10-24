@@ -748,11 +748,21 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
       } catch { /* an unknown or already-expired session: start fresh */ }
     }
 
+    let discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
+    if (!monthlyPlan && t.discountCents) {
+      const coupon = await stripe.coupons.create({
+        amount_off: t.discountCents, currency: "usd", duration: "once", max_redemptions: 1,
+        name: `Paid in full — ${formatBps(t.discountBps ?? 0)} off`.slice(0, 40), metadata: { proposalId: String(r.id) },
+      });
+      discounts = [{ coupon: coupon.id }];
+    }
+
     const base = getBaseUrl(req);
     const metadata = { type: "proposal", proposalId: String(r.id), method: method.data, cardFeeCents: String(feeToday) };
     const params: Stripe.Checkout.SessionCreateParams = {
       mode: monthlyPlan ? "subscription" : "payment",
       line_items: items,
+      ...(discounts ? { discounts } : {}),
       payment_method_types: method.data === "ach" ? ["us_bank_account"] : ["card"],
       ...(method.data === "ach" ? { payment_method_options: { us_bank_account: { financial_connections: { permissions: ["payment_method"] } } } } : {}),
       customer_email: r.recipient_email || undefined,
