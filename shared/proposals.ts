@@ -322,6 +322,8 @@ export type ProposalRow = {
   recipientCc: string[];
   /** A test copy the admin sent to themselves: signing and emails are real, payment is off. */
   isTest: boolean;
+  /** Opens by the client (after sending; one per IP per 30 minutes) and the latest one. */
+  viewCount: number; lastViewedAt: string | null;
   title: string; templateId: number | null; hasFile: boolean;
   contractTotalCents: number | null; dueTodayCents: number | null; paidCents: number | null;
   sentAt: string | null; viewedAt: string | null; signedAt: string | null; paidAt: string | null;

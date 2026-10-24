@@ -11,6 +11,10 @@ export const NOTIFICATION_KINDS = {
   "google.disconnected": { label: "A Google account was disconnected", inApp: true, email: true, security: true },
   "security.2fa_changed": { label: "Two-factor sign-in was turned on or off", inApp: true, email: true, security: true },
   "security.password_changed": { label: "Your password was changed", inApp: true, email: true, security: true },
+  // Proposals (server/proposals/routes.ts trackOpen): told the moment the client first opens it, like CRM estimates,
+  // and once a day when they come back to it.
+  "proposal.opened": { label: "A client opened your proposal", inApp: true, email: true },
+  "proposal.reopened": { label: "A client came back to your proposal", inApp: true, email: true },
   "gbp.profile_change": { label: "Your Google Business Profile changed outside ConstructHUB", inApp: true, email: true },
   "gbp.suggested_edit": { label: "Google or the public suggested an edit to your profile", inApp: true, email: true },
   "gbp.change_reverted": { label: "Profile Watch reverted a change", inApp: true, email: true },

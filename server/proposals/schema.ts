@@ -51,6 +51,12 @@ export const PROPOSALS_DDL: readonly string[] = [
   // A test copy (the admin signs it like the client; payment is off) and when the company signed (first send).
   `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS is_test boolean NOT NULL DEFAULT false`,
   `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS countersigned_at timestamptz`,
+  // Open tracking, like CRM estimates: opens counted once per IP per 30 minutes; the "came back" alert once a day.
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS view_count integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS last_viewed_at timestamptz`,
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS first_view_ip text`,
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS last_view_ip text`,
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS reopen_alerted_on date`,
   `CREATE INDEX IF NOT EXISTS proposals_kind_idx ON proposals (kind, updated_at DESC)`,
   `CREATE INDEX IF NOT EXISTS proposals_session_idx ON proposals (stripe_session_id) WHERE stripe_session_id IS NOT NULL`,
 ];

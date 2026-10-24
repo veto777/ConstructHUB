@@ -44,6 +44,7 @@ import { isPlatformAdminEmail } from "../admin";
 import { stripe, stripeConfigured } from "../billing/client";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
+import { notifyUser } from "../account-events";
 import {
   ESIGN_CONSENT, MAX_PDF_BYTES, PROPOSAL_KINDS, autoPayMonths, initialTargets, cardFeeCents, emptyContent, formatBps, formatMoney, priceSelection, proposalContentSchema,
   selectionProblems, type ProposalContent, type ProposalDetail, type ProposalEvent, type ProposalRow, type ProposalStatus, type ProposalSummary,
@@ -91,6 +92,7 @@ function toRow(r: any): ProposalRow {
     recipientName: r.recipient_name, recipientEmail: r.recipient_email, recipientCompany: r.recipient_company,
     recipientCc: String(r.recipient_cc || "").split(",").map((s) => s.trim()).filter(Boolean),
     isTest: r.is_test === true,
+    viewCount: Number(r.view_count ?? 0), lastViewedAt: iso(r.last_viewed_at),
     title: content.title, templateId: r.template_id ? Number(r.template_id) : null, hasFile: r.file_id != null,
     contractTotalCents: totals?.contractTotalCents ?? null, dueTodayCents: totals?.dueTodayCents ?? null, paidCents: r.paid_cents ?? null,
     sentAt: iso(r.sent_at), viewedAt: iso(r.viewed_at), signedAt: iso(r.signed_at), paidAt: iso(r.paid_at),
@@ -121,6 +123,56 @@ function toDetail(r: any): ProposalDetail {
     payment: { method: r.payment_method ?? null, cardFeeCents: r.card_fee_cents ?? 0, status: r.payment_status ?? null, subscriptionId: r.stripe_subscription_id ?? null },
     events: Array.isArray(r.events) ? r.events : [],
   };
+}
+
+const VIEW_DEDUPE_MIN = 30;
+const device = (ua: string) =>
+  /iphone/i.test(ua) ? "iPhone" : /ipad/i.test(ua) ? "iPad" : /android/i.test(ua) ? "Android" : /macintosh/i.test(ua) ? "Mac" : /windows/i.test(ua) ? "Windows" : "a browser";
+
+/**
+ * The client opened the link — tracked like CRM estimates (server/crm/portal.ts): only once it has been sent (so the
+ * admin's own clicks before sending don't count), one counted open per IP per 30 minutes, the creator told at once on
+ * the first open (bell + email) and once a day when the client comes back ("a good time to call").
+ */
+async function trackOpen(r: any, req: any): Promise<any> {
+  if (!r.sent_at || r.signed_at || ["void", "declined", "archived"].includes(r.status)) return r;
+  const ip = clientIp(req);
+  const ua = String(req.headers["user-agent"] || "");
+  const first = !r.viewed_at;
+  const recent = !first && ip && r.last_view_ip === ip && r.last_viewed_at && Date.now() - new Date(r.last_viewed_at).getTime() < VIEW_DEDUPE_MIN * 60_000;
+  const counted = first || !recent;
+  const newPlace = !first && ip && r.first_view_ip && ip !== r.first_view_ip;
+  const detail = `${device(ua)}${ip ? ` · ${ip}` : ""}${newPlace ? " · a different network than the first open (possibly forwarded)" : ""}`;
+  const { rows } = await pool.query(
+    `UPDATE proposals SET viewed_at = COALESCE(viewed_at, now()), last_viewed_at = now(), last_view_ip = $2,
+       first_view_ip = COALESCE(first_view_ip, $2), view_count = view_count + $3,
+       status = CASE WHEN status IN ('draft', 'sent') THEN 'viewed' ELSE status END,
+       events = CASE WHEN $3 = 1 THEN events || $4::jsonb ELSE events END
+     WHERE id = $1 RETURNING *`,
+    [r.id, ip, counted ? 1 : 0, event(first ? "opened" : "opened_again", detail)]);
+  const u = rows[0] ?? r;
+  if (!counted || !r.created_by) return u;
+  const who = r.recipient_name || r.recipient_email || "Your client";
+  const title = parseContent(r.content).title || r.name;
+  const link = `/admin/proposals/${r.id}`;
+  if (first) {
+    notifyUser(Number(r.created_by), "proposal.opened", {
+      title: `${who} opened your proposal`, body: `${title}
+Opened just now on ${device(ua)}.`, link, actionUrl: link, actionLabel: "Open the proposal",
+    }).catch((e: any) => console.error("[proposals] open alert failed:", e?.message));
+  } else {
+    // The once-a-day "they came back" alert: claimed in the database so two opens at once send one.
+    const claim = await pool.query(`UPDATE proposals SET reopen_alerted_on = CURRENT_DATE WHERE id = $1 AND reopen_alerted_on IS DISTINCT FROM CURRENT_DATE RETURNING id`, [r.id]);
+    if (claim.rowCount) {
+      notifyUser(Number(r.created_by), "proposal.reopened", {
+        title: `${who} came back to your proposal`,
+        body: `${title}
+Opened ${u.view_count} times so far, just now on ${device(ua)}${newPlace ? " from a different network than the first time (possibly forwarded)" : ""}. A good time to call.`,
+        link, actionUrl: link, actionLabel: "Open the proposal",
+      }).catch((e: any) => console.error("[proposals] reopen alert failed:", e?.message));
+    }
+  }
+  return u;
 }
 
 const isExpired = (r: any) => !!r.expires_at && new Date(r.expires_at).getTime() < Date.now();
@@ -674,10 +726,8 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     let r = await loadByToken(String(req.params.token || ""));
     if (!r || r.status === "archived") return res.status(404).json({ message: "This proposal link is not valid." });
     const preview = (req.query.preview === "1" && isPlatformAdminEmail(req.user?.email)) || isPreviewKey(r.public_token, req.query.preview);
-    if (!preview && !r.viewed_at && !["void"].includes(r.status)) {
-      await pool.query(
-        `UPDATE proposals SET viewed_at = now(), status = CASE WHEN status IN ('draft', 'sent') THEN 'viewed' ELSE status END,
-           events = events || $2::jsonb WHERE id = $1`, [r.id, event("opened", clientIp(req) ?? undefined)]);
+    if (!preview && !r.is_test) {
+      await trackOpen(r, req);
       r = await loadById(Number(r.id));
     }
     r = await refreshFromStripe(r);

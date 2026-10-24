@@ -252,6 +252,7 @@ function ProposalList() {
                     {r.kind === "offer" ? [r.recipientName, r.recipientCompany, r.recipientEmail].filter(Boolean).join(" · ") || "No recipient yet" : r.title || "Template"} · updated {ago(r.updatedAt)}
                   </div>
                 </div>
+                {r.viewCount > 0 && !r.signedAt && <span className="hidden text-xs text-muted-foreground md:inline" title={r.lastViewedAt ? `Last opened ${format(new Date(r.lastViewedAt), "PPp")}` : undefined}>opened {r.viewCount}×</span>}
                 {r.contractTotalCents != null && <span className="hidden text-sm tabular-nums sm:inline">{formatMoney(r.contractTotalCents)}</span>}
                 {r.kind === "offer" ? <StatusPill tone={STATUS_TONE[r.status]}>{PROPOSAL_STATUS_LABELS[r.status]}</StatusPill> : <StatusPill tone="neutral" dot={false}>Template</StatusPill>}
               </Link>
@@ -435,7 +436,7 @@ function SendDialog({ p, c, who, expires, open, onClose, beforeSend }: {
 }
 
 const EVENT_LABEL: Record<string, string> = {
-  created: "Created", document_attached: "PDF attached", document_removed: "PDF removed", sent: "Sent", opened: "Opened by the recipient",
+  created: "Created", document_attached: "PDF attached", document_removed: "PDF removed", sent: "Sent", opened: "Opened by the client", opened_again: "Opened again", test_sent: "Test sent", proof_sent: "Proof sent",
   signed: "Signed", declined: "Declined", checkout_started: "Went to payment", ach_started: "ACH payment started (clearing)", paid: "Paid",
   payment_failed: "Payment failed", void: "Voided", archived: "Archived", restored: "Restored",
 };
@@ -524,6 +525,7 @@ function ProposalEditor({ id }: { id: number }) {
       <div className="flex flex-wrap items-center gap-2">
         <Button asChild variant="ghost" size="sm"><Link href="/admin/proposals"><ArrowLeft className="mr-1.5 h-4 w-4" />Proposals</Link></Button>
         {p.kind === "offer" ? <StatusPill tone={STATUS_TONE[p.status]}>{PROPOSAL_STATUS_LABELS[p.status]}</StatusPill> : <StatusPill tone="neutral" dot={false}>Template</StatusPill>}
+        {p.viewCount > 0 && <span className="text-xs text-muted-foreground" data-testid="text-open-count">Opened {p.viewCount} time{p.viewCount === 1 ? "" : "s"}{p.lastViewedAt ? ` · last ${ago(p.lastViewedAt)}` : ""}</span>}
         {dirty && <span className="text-xs text-amber-600">Unsaved changes</span>}
       </div>
       <GoogleSectionHeader as="h1" helpKey="admin-proposals" title={p.name}
