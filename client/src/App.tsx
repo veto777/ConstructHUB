@@ -140,6 +140,7 @@ const SeoCompetitorsPage = lazyPage(() => import("@/pages/seo/competitors"));
 const AdminAccessPage = lazyPage(() => import("@/pages/admin-access"));
 const AdminCodeApiPage = lazyPage(() => import("@/pages/admin-code-api"));
 const AdminIssuesPage = lazyPage(() => import("@/pages/admin-issues"));
+const AdminProposalsPage = lazyPage(() => import("@/pages/admin-proposals"));
 const AdminBacklinksPage = lazyPage(() => import("@/pages/admin-backlinks"));
 const AdminPartnershipsPage = lazyPage(() => import("@/pages/admin-partnerships"));
 const AdminPressPage = lazyPage(() => import("@/pages/admin-press"));
@@ -180,6 +181,7 @@ const PublicPortalPage = lazyPage(() => import("@/pages/public-portal"));
 const PublicInvoicePage = lazyPage(() => import("@/pages/public-invoice"));
 const PublicChangeOrderPage = lazyPage(() => import("@/pages/public-change-order"));
 const PublicLeadFormPage = lazyPage(() => import("@/pages/public-lead-form"));
+const PublicProposalPage = lazyPage(() => import("@/pages/public-proposal"));
 const ClientPortalPage = lazyPage(() => import("@/pages/client-portal"));
 // JobCam: job-site photos/video (feeds, camera, the client-facing share page).
 const JobcamRecentPage = lazyPage(() => import("@/pages/jobcam/index"));
@@ -396,6 +398,9 @@ function DashboardRouter() {
       <Route path="/admin/code-api" component={AdminCodeApiPage} />
       {/* Platform admins: the issue desk — captured failures and Claude's reports (the API answers 403 to anyone else). */}
       <Route path="/admin/issues" component={AdminIssuesPage} />
+      {/* Platform admins: proposal templates and offers — send, e-sign, ACH/card payment (the API answers 403 to anyone else). */}
+      <Route path="/admin/proposals" component={AdminProposalsPage} />
+      <Route path="/admin/proposals/:id" component={AdminProposalsPage} />
       <Route path="/admin/backlinks" component={AdminBacklinksPage} />
       <Route path="/admin/partnerships" component={AdminPartnershipsPage} />
       {/* Platform admins: the Press Wire desk — releases, the pressrelease@ mailbox, setup (the API answers 403 to anyone else). */}
@@ -582,7 +587,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/call-assistant", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings", "/site-scan/history",
-  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/backlinks", "/admin/partnerships", "/admin/youtube",
+  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/backlinks", "/admin/partnerships", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];
@@ -602,10 +607,10 @@ function SignedOutFallback() {
 
 /** Tab titles for the growth app; pages that set their own title are left alone. */
 const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
-const SELF_TITLED = ["/media-library", "/privacy", "/data-deletion", "/terms", "/support", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/youtube"];
+const SELF_TITLED = ["/media-library", "/privacy", "/data-deletion", "/terms", "/support", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/youtube"];
 /** Feature and service pages title themselves from their content (seo.title). */
 const isSelfTitled = (location: string) =>
-  SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/done-for-you/");
+  SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/admin/proposals/") || location.startsWith("/proposal/") || location.startsWith("/done-for-you/");
 
 /** The sidebar's collapsed/expanded choice (ui/sidebar.tsx writes this cookie) survives a reload. */
 function sidebarDefaultOpen(): boolean {
@@ -851,7 +856,7 @@ function AppContent() {
   // Signed out, the app is the sign-in screen (plus the legal pages and the links customers open from email);
   // signed in, the sales pages go back to Home.
   if (inNativeApp() && !portal) {
-    const open = ["/auth", "/reset-password", "/verify", "/privacy", "/data-deletion", "/terms", "/support", "/report-issue", "/crm-privacy", "/crm-terms", "/invite/", "/e/", "/i/", "/co/", "/portal/", "/lead-form/", "/review/"]
+    const open = ["/auth", "/reset-password", "/verify", "/privacy", "/data-deletion", "/terms", "/support", "/report-issue", "/crm-privacy", "/crm-terms", "/invite/", "/e/", "/i/", "/co/", "/portal/", "/lead-form/", "/proposal/", "/review/"]
       .some((p) => location === p || location.startsWith(p.endsWith("/") ? p : `${p}`));
     if (!user && !open) return <Redirect to="/auth" />;
     if (user && APP_SALES_PATHS.some((p) => location === p || location.startsWith(`${p}/`))) return <Redirect to="/" />;
@@ -865,6 +870,8 @@ function AppContent() {
   if (location.startsWith("/jc/")) return <JobcamSharePage />;
   if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
   if (location.startsWith("/portal/")) return <PublicPortalPage />;
+  // A proposal a platform admin sent (pages/public-proposal.tsx): the recipient reviews, signs and pays.
+  if (location.startsWith("/proposal/")) return <PublicProposalPage />;
 
   if (!user) {
     // On the portal, an anonymous visitor gets the sign-in screen. Never the

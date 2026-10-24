@@ -23,6 +23,7 @@ export const HELP_ROUTES: readonly HelpRouteRow[] = [
   {"key":"admin-feature-pages","route":"/admin/feature-pages","group":"Tools"},
   {"key":"admin-issues","route":"/admin/issues","group":"Tools"},
   {"key":"admin-partnerships","route":"/admin/partnerships","group":"Tools"},
+  {"key":"admin-proposals","route":"/admin/proposals","group":"Tools"},
   {"key":"admin-referrals","route":"/admin/referrals","group":"Tools"},
   {"key":"admin-tickets","route":"/admin/tickets","group":"Tools"},
   {"key":"admin-youtube","route":"/admin/youtube","group":"Tools"},

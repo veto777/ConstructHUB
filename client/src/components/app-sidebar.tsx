@@ -9,7 +9,7 @@ import { Ticket, Gift,
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Code2, Bug, Link2, PlayCircle, PenLine,
+  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Code2, Bug, FileSignature, Link2, PlayCircle, PenLine,
   ListChecks, ClipboardCheck, Handshake, Newspaper
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
@@ -701,6 +701,17 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
                     <Link href="/admin/code-api" data-testid="link-nav-admin-code-api" className="flex items-center gap-2 w-full">
                       <Code2 className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                       <span>Code API</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* Proposals: templates and offers clients choose from, e-sign and pay (ACH free, card + fee). */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/proposals" || location.startsWith("/admin/proposals/")}>
+                    <Link href="/admin/proposals" data-testid="link-nav-admin-proposals" className="flex items-center gap-2 w-full">
+                      <FileSignature className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                      <span>Proposals</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

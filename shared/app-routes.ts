@@ -21,12 +21,14 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/free-site-scan", "/site-scan/report/*", "/master-class", "/master-class-landing", "/google-ads", "/ads-manager",
   "/google-ads-landing", "/permits-landing", "/google-ads-guide/:section", "/lsa-leads", "/lsa-account-manager", "/google-ads/traffic", "/google-ads/signals", "/google-ads/tools", "/google-ads/settings", "/google-ads/script", "/ads-manager/accounts", "/ads-manager/invitations", "/ads-manager/previews", "/ads-manager/queue", "/ads-manager/audit", "/ads-manager/landing-door", "/lsa-account-manager/accounts", "/lsa-account-manager/invitations", "/lsa-account-manager/audit",
   "/press-releases", "/admin/press",
-  "/ip-tracker", "/crm-app", "/admin", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/backlinks", "/admin/partnerships", "/admin/directories", "/admin/youtube", "/admin/tickets", "/admin/tickets/:id", "/admin/referrals",
+  "/ip-tracker", "/crm-app", "/admin", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/proposals/:id", "/admin/backlinks", "/admin/partnerships", "/admin/directories", "/admin/youtube", "/admin/tickets", "/admin/tickets/:id", "/admin/referrals",
   "/vpn-shield", "/individual-pricing", "/google-reviews", "/yelp", "/google-reviews/reviews", "/google-reviews/profiles", "/google-reviews/settings", "/call-assistant/calls", "/call-assistant/intro", "/call-assistant/numbers", "/call-assistant/studio", "/call-assistant/simulator", "/settings", "/settings/billing", "/settings/api", "/account/delete",
   "/compliance/research/orders/:id", "/developers", "/crm-terms", "/crm-privacy", "/data-deletion", "/invite/:code", "/report-issue",
   // Pages a contractor's own customer opens from a link.
   "/review/:token", "/review/:token/unsubscribe", "/contract/sign/:token", "/e/:token", "/i/:token", "/co/:token",
   "/lead-form/:token", "/portal/:token",
+  // A proposal a platform admin sent (server/proposals).
+  "/proposal/:token",
   // JobCam share pages (gallery / timeline links; the portal host serves them, the main site must not 404 one).
   "/jc/:token",
   // The CRM's paths (the portal's own host serves them; the main site hands them over).

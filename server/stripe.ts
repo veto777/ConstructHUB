@@ -817,6 +817,12 @@ export function registerStripeRoutes(app: Express) {
       let sendBillingEmail = true;
 
       try { // wraps the switch: a throw below releases the event claim first
+      // A proposal's checkout (server/proposals): the recipient has no account; its own handler records it.
+      if (event.type.startsWith("checkout.session.") && (event.data.object as Stripe.Checkout.Session).metadata?.type === "proposal") {
+        const { applyProposalCheckout } = await import("./proposals/routes");
+        await applyProposalCheckout(event.data.object as Stripe.Checkout.Session, event.type);
+        sendBillingEmail = false;
+      } else
       switch (event.type) {
         case "checkout.session.completed": {
           const session = event.data.object as Stripe.Checkout.Session;

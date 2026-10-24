@@ -387,6 +387,11 @@ export async function registerRoutes(
   }
   const { registerOpsIssueRoutes } = await import("./ops/routes");
   registerOpsIssueRoutes(app, getDevUser);
+  // Proposals (/admin/proposals, /proposal/<token>): build, send, e-sign and collect payment on an offer (shared/proposals.ts).
+  const { ensureProposalsSchema } = await import("./proposals/schema");
+  await ensureProposalsSchema();
+  const { registerProposalRoutes } = await import("./proposals/routes");
+  registerProposalRoutes(app, getDevUser);
   const { ensureGbpSchema } = await import("./gbp/schema");
   await ensureGbpSchema();
   const { ensureAgencySchema } = await import("./agency/schema");
