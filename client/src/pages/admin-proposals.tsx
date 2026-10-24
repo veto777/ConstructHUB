@@ -359,31 +359,76 @@ function GroupEditor({ group, onChange, onUp, onDown, onRemove }: { group: Propo
 
 const SCRIPT_FONT = `"Segoe Script", "Brush Script MT", "Snell Roundhand", "Apple Chancery", cursive`;
 
-function SendDialog({ p, open, onClose, beforeSend }: { p: ProposalDetail; open: boolean; onClose: () => void; beforeSend: () => Promise<void> }) {
+function SendDialog({ p, c, who, expires, open, onClose, beforeSend }: {
+  p: ProposalDetail; c: ProposalContent; who: { name: string; company: string; email: string }; expires: string;
+  open: boolean; onClose: () => void; beforeSend: () => Promise<void>;
+}) {
   const { toast } = useToast();
-  const [to, setTo] = useState(p.recipientEmail ?? "");
+  const [to, setTo] = useState(who.email);
   const [cc, setCc] = useState(p.recipientCc.join(", "));
-  const [subject, setSubject] = useState(`${p.content.title || "Your proposal"} — ${p.content.brand.name}`);
-  const [message, setMessage] = useState(p.content.intro);
-  useEffect(() => { if (open) { setTo(p.recipientEmail ?? ""); setCc(p.recipientCc.join(", ")); setSubject(`${p.content.title || "Your proposal"} — ${p.content.brand.name}`); setMessage(p.content.intro); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [subject, setSubject] = useState(`${c.title || "Your proposal"} — ${c.brand.name}`);
+  const [message, setMessage] = useState(c.intro);
+  // Send is two steps: the email, then a confirmation of everything that goes out (owner, 2026-10-24).
+  const [step, setStep] = useState<"edit" | "confirm">("edit");
+  useEffect(() => { if (open) { setTo(who.email); setCc(p.recipientCc.join(", ")); setSubject(`${c.title || "Your proposal"} — ${c.brand.name}`); setMessage(c.intro); setStep("edit"); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const ccList = cc.split(/[,;\s]+/).filter(Boolean);
   const send = useMutation({
     mutationFn: async () => { await beforeSend(); return (await apiRequest("POST", `/api/admin/proposals/${p.id}/send`, { to, cc: ccList, subject, message })).json(); },
     onSuccess: () => { toast({ title: "Proposal sent", description: `Emailed to ${to}${ccList.length ? `, cc ${ccList.join(", ")}` : ""}.` }); void invalidate(); onClose(); },
     onError: (e) => toast({ title: "Couldn't send", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  const pay = c.payment;
+  const options = c.groups.reduce((n, g) => n + g.items.length, 0);
+  const longest = Math.max(1, ...c.groups.flatMap((g) => g.items.filter((i) => i.billing === "monthly").map((i) => i.termMonths)));
+  const warnings = [
+    !who.name.trim() && "No client name — the agreement and email will say “there”.",
+    who.email && to.trim().toLowerCase() !== who.email.trim().toLowerCase() && `Sending to ${to}, not the client email on file (${who.email}).`,
+    !p.file && "No PDF attached.",
+    expires && new Date(`${expires}T23:59:59`).getTime() < Date.now() && "The expiry date has already passed — the client won't be able to sign.",
+  ].filter(Boolean) as string[];
+  const row = (label: string, value: React.ReactNode) => (
+    <div className="flex gap-3 py-1.5"><dt className="w-36 shrink-0 text-muted-foreground">{label}</dt><dd className="min-w-0 flex-1 break-words font-medium">{value || <span className="text-muted-foreground">—</span>}</dd></div>
+  );
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Send for signature</DialogTitle><DialogDescription>Emails a secure link from support@constructhub.us under the {p.content.brand.name} name. Replies go to {p.content.brand.contactEmail || "support@constructhub.us"}.</DialogDescription></DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5"><Label htmlFor="sd-to">To</Label><Input id="sd-to" type="email" value={to} onChange={(e) => setTo(e.target.value)} data-testid="input-send-to" /></div>
-          <div className="space-y-1.5"><Label htmlFor="sd-cc">CC (optional)</Label><Input id="sd-cc" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="name@example.com, …" data-testid="input-send-cc" />
-            <p className="text-xs text-muted-foreground">Separate several with commas. They also get the signed agreement and the payment receipt.</p></div>
-          <div className="space-y-1.5"><Label htmlFor="sd-sub">Subject</Label><Input id="sd-sub" value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
-          <div className="space-y-1.5"><Label htmlFor="sd-msg">Message</Label><Textarea id="sd-msg" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} /></div>
-        </div>
-        <DialogFooter><Button onClick={() => send.mutate()} disabled={send.isPending || !to} data-testid="button-send-confirm">{send.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}Send</Button></DialogFooter>
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+        {step === "edit" ? (<>
+          <DialogHeader><DialogTitle>Send for signature</DialogTitle><DialogDescription>Emails a secure link from support@constructhub.us under the {c.brand.name} name. Replies go to {c.brand.contactEmail || "support@constructhub.us"}.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label htmlFor="sd-to">To</Label><Input id="sd-to" type="email" value={to} onChange={(e) => setTo(e.target.value)} data-testid="input-send-to" /></div>
+            <div className="space-y-1.5"><Label htmlFor="sd-cc">CC (optional)</Label><Input id="sd-cc" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="name@example.com, …" data-testid="input-send-cc" />
+              <p className="text-xs text-muted-foreground">Separate several with commas. They also get the signed agreement and the payment receipt.</p></div>
+            <div className="space-y-1.5"><Label htmlFor="sd-sub">Subject</Label><Input id="sd-sub" value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label htmlFor="sd-msg">Message</Label><Textarea id="sd-msg" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} /></div>
+          </div>
+          <DialogFooter><Button onClick={() => setStep("confirm")} disabled={!to.trim()} data-testid="button-send-review"><Send className="mr-1.5 h-4 w-4" />Review &amp; send</Button></DialogFooter>
+        </>) : (<>
+          <DialogHeader><DialogTitle>Confirm before sending</DialogTitle><DialogDescription>Check that everything is right. The client gets the link as soon as you confirm.</DialogDescription></DialogHeader>
+          {warnings.length > 0 && (
+            <div className="space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="send-warnings">
+              {warnings.map((w) => <div key={w}>⚠ {w}</div>)}
+            </div>
+          )}
+          <dl className="divide-y text-sm" data-testid="send-confirm-summary">
+            {row("Client", [who.name, who.company].filter(Boolean).join(", "))}
+            {row("To", to)}
+            {row("CC", ccList.join(", "))}
+            {row("Subject", subject)}
+            {row("Proposal", c.title)}
+            {row("Options offered", `${options} in ${c.groups.length} group${c.groups.length === 1 ? "" : "s"}`)}
+            {row("Payment", `${pay.plan === "choice" ? "Client chooses monthly or pay in full" : pay.plan === "full" ? "Pay in full" : "Monthly"}${pay.fullPayDiscountBps && pay.plan !== "monthly" ? ` · ${formatBps(pay.fullPayDiscountBps)} off for paying in full` : ""}`)}
+            {row("Methods", [pay.achEnabled && "Bank transfer (no fee)", pay.cardEnabled && `Card (+${formatBps(pay.cardFeeBps)})`].filter(Boolean).join(" · "))}
+            {row("Auto-pay", pay.endAfterMonths ? `Monthly for ${Math.max(pay.endAfterMonths, longest)} months, then stops` : "Monthly until cancelled")}
+            {row("Signed for " + c.brand.name, `${c.countersign.name}${c.countersign.title ? `, ${c.countersign.title}` : ""}`)}
+            {row("Replies go to", c.brand.contactEmail || "support@constructhub.us")}
+            {row("Expires", expires ? format(new Date(`${expires}T12:00:00`), "PPP") : "Never")}
+            {row("Attached PDF", p.file?.name ?? "")}
+          </dl>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setStep("edit")} disabled={send.isPending}><ArrowLeft className="mr-1.5 h-4 w-4" />Back</Button>
+            <Button onClick={() => send.mutate()} disabled={send.isPending} data-testid="button-send-confirm">{send.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}Confirm &amp; send</Button>
+          </DialogFooter>
+        </>)}
       </DialogContent>
     </Dialog>
   );
@@ -684,7 +729,7 @@ function ProposalEditor({ id }: { id: number }) {
           </Section>
         </aside>
       </div>
-      {p.kind === "offer" && <SendDialog p={p} open={sendOpen} onClose={() => setSendOpen(false)} beforeSend={async () => { if (dirty) await saveNow(); }} />}
+      {p.kind === "offer" && <SendDialog p={p} c={c} who={{ name: rname, company: rco, email: remail }} expires={expires} open={sendOpen} onClose={() => setSendOpen(false)} beforeSend={async () => { if (dirty) await saveNow(); }} />}
     </AppPage>
   );
 }
