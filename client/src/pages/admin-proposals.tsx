@@ -452,6 +452,7 @@ function ProposalEditor({ id }: { id: number }) {
     onError: (e) => toast({ title: "Couldn't send the proof", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const preview = useMemo(() => (c ? priceSelection(c, defaultSelection(c)) : null), [c]);
+  const longestTerm = c ? Math.max(1, ...c.groups.flatMap((g) => g.items.filter((i) => i.billing === "monthly").map((i) => i.termMonths))) : 1;
 
   if (isLoading && !p) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading" /></div>;
   if (!p || !c) return <Gate error={error} retry={() => void refetch()} what="this proposal" />;
@@ -577,8 +578,9 @@ function ProposalEditor({ id }: { id: number }) {
               <div className="space-y-1.5"><Label>Card fee (%)</Label>
                 <Input type="number" step="0.1" min={0} max={4} value={c.payment.cardFeeBps / 100} onChange={(e) => editNested("payment", { cardFeeBps: Math.max(0, Math.min(400, Math.round((Number(e.target.value) || 0) * 100))) })} data-testid="input-card-fee" />
                 <p className="text-xs text-muted-foreground">Default {formatBps(DEFAULT_CARD_FEE_BPS)}.</p></div>
-              <div className="space-y-1.5"><Label>End the monthly billing after (months)</Label>
-                <Input type="number" min={1} max={60} value={c.payment.endAfterMonths ?? ""} placeholder="Keeps going month to month" onChange={(e) => editNested("payment", { endAfterMonths: e.target.value ? Math.max(1, Math.min(60, Number(e.target.value))) : null })} /></div>
+              <div className="space-y-1.5"><Label>Stop auto-pay after (months)</Label>
+                <Input type="number" min={1} max={60} value={c.payment.endAfterMonths ?? ""} placeholder="Never — bills every month until cancelled" onChange={(e) => editNested("payment", { endAfterMonths: e.target.value ? Math.max(1, Math.min(60, Number(e.target.value))) : null })} data-testid="input-end-after" />
+                <p className="text-xs text-muted-foreground">Monthly services are charged automatically each month to the client's bank (ACH) or card, whichever they pay with. Leave blank to keep billing until cancelled; a number stops it after that many months. It never stops before a package's minimum term{longestTerm > 1 ? ` (${longestTerm} months here)` : ""}.</p></div>
               <div className="space-y-1.5"><Label>Pay-in-full discount (%)</Label>
                 <Input type="number" step="0.5" min={0} max={50} value={c.payment.fullPayDiscountBps / 100} onChange={(e) => editNested("payment", { fullPayDiscountBps: Math.max(0, Math.min(5000, Math.round((Number(e.target.value) || 0) * 100))) })} data-testid="input-full-pay-discount" />
                 <p className="text-xs text-muted-foreground">Off the whole contract when the client pays the full term today. Default {formatBps(DEFAULT_FULL_PAY_DISCOUNT_BPS)}; 0 turns it off.</p></div>

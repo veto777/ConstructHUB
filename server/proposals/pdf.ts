@@ -7,7 +7,7 @@
  * locked once signed — nothing is kept but the data it is made from.
  */
 import PDFDocument from "pdfkit";
-import { ALL_TERMS_ID, cardFeeCents, formatBps, formatMoney, type ProposalContent, type ProposalTotals } from "@shared/proposals";
+import { ALL_TERMS_ID, autoPayMonths, cardFeeCents, formatBps, formatMoney, type ProposalContent, type ProposalTotals } from "@shared/proposals";
 
 const INK = "#111827";
 const MUTED = "#6b7280";
@@ -97,7 +97,8 @@ export function buildSignedProposalPdf(p: SignedPdfInput): Promise<Buffer> {
     if (p.content.payment.cardEnabled && bps > 0) {
       row(`Due today by card (incl. ${formatBps(bps)} card fee)`, money(p.totals.dueTodayCents + cardFeeCents(p.totals.dueTodayCents, bps)));
     }
-    if (p.totals.recurringCents) row("Then each month", `${money(p.totals.recurringCents)}${p.content.payment.endAfterMonths ? ` for ${p.content.payment.endAfterMonths - 1} more month(s)` : ""}`);
+    const autoMonths = autoPayMonths(p.content, p.totals);
+    if (p.totals.recurringCents) row("Then each month (auto-pay)", `${money(p.totals.recurringCents)}${autoMonths ? ` for ${autoMonths - 1} more month(s)` : " until cancelled"}`);
     if (p.payment?.method) {
       row("Paid by", p.payment.method === "ach" ? "Bank transfer (ACH)" : "Card");
       if (p.payment.paidAt) row("Payment status", `${p.payment.status ?? "paid"} · ${new Date(p.payment.paidAt).toUTCString()}`);

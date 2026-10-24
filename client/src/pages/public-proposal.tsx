@@ -12,7 +12,7 @@ import { useRoute } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowDown, Info, Building2, CheckCircle2, Clock, CreditCard, Download, ExternalLink, FileText, Landmark, Loader2, Lock, PenLine, ShieldCheck, XCircle } from "lucide-react";
 import {
-  ESIGN_CONSENT, TAX_NOTE, allowedPlans, bodyBlocks, cardFeeCents, ALL_TERMS_ID, initialTargets, defaultSelection, formatBps, formatMoney, initialsOf, priceSelection, selectionProblems,
+  ESIGN_CONSENT, TAX_NOTE, allowedPlans, autoPayMonths, bodyBlocks, cardFeeCents, ALL_TERMS_ID, initialTargets, defaultSelection, formatBps, formatMoney, initialsOf, priceSelection, selectionProblems,
   type PaymentPlan, type ProposalContent, type ProposalGroup, type PublicProposal,
 } from "@shared/proposals";
 import { Button } from "@/components/ui/button";
@@ -169,6 +169,7 @@ function PayPanel({ token, data }: { token: string; data: PublicProposal }) {
   const t = data.totals!;
   const pay = data.content.payment;
   const fee = pay.cardEnabled ? cardFeeCents(t.dueTodayCents, pay.cardFeeBps) : 0;
+  const autoMonths = autoPayMonths(data.content, t);
   const [method, setMethod] = useState<"ach" | "card">(pay.achEnabled ? "ach" : "card");
   const go = useMutation({
     mutationFn: () => call<{ url: string }>("POST", `/api/public/proposals/${token}/checkout`, { method }),
@@ -199,8 +200,8 @@ function PayPanel({ token, data }: { token: string; data: PublicProposal }) {
       </div>
       {t.recurringCents > 0 && (
         <p className="text-sm text-slate-600">
-          After today, {money(t.recurringCents + (method === "card" ? cardFeeCents(t.recurringCents, pay.cardFeeBps) : 0))} is charged automatically each month
-          {pay.endAfterMonths ? ` until the ${pay.endAfterMonths}-month term ends` : ""}{method === "card" && fee > 0 ? " (including the card fee)" : ""}.
+          Auto-pay: after today, {money(t.recurringCents + (method === "card" ? cardFeeCents(t.recurringCents, pay.cardFeeBps) : 0))} is charged automatically each month to the {method === "card" ? "card" : "bank account"} you use today
+          {autoMonths ? ` for ${autoMonths} months in total` : ""}{method === "card" && fee > 0 ? " (including the card fee)" : ""}.
         </p>
       )}
       <Button size="lg" className="w-full text-base text-white sm:w-auto" style={{ background: "var(--accent)" }} disabled={go.isPending || !data.stripeReady || data.preview} onClick={() => go.mutate()} data-testid="button-pay">

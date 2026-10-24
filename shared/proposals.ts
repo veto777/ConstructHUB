@@ -127,7 +127,7 @@ export const proposalContentSchema = z.object({
     cardEnabled: z.boolean().default(true),
     /** Basis points added on top of a card payment (300 = 3%). ACH never pays it. */
     cardFeeBps: z.number().int().min(0).max(MAX_CARD_FEE_BPS).default(DEFAULT_CARD_FEE_BPS),
-    /** Monthly plan: end the subscription after this many months (null = continues month to month). */
+    /** Monthly plan: stop auto-pay after this many months (null = keeps billing until cancelled); see autoPayMonths. */
     endAfterMonths: z.number().int().min(1).max(60).nullable().default(null),
     /** Basis points off the contract when a term with monthly services is paid in full today (500 = 5%, 0 = none). */
     fullPayDiscountBps: z.number().int().min(0).max(MAX_FULL_PAY_DISCOUNT_BPS).default(DEFAULT_FULL_PAY_DISCOUNT_BPS),
@@ -215,6 +215,14 @@ export function priceSelection(content: ProposalContent, itemIds: readonly strin
     dueTodayCents: monthlyPlan ? oneTimeCents + monthlyCents : contractTotalCents,
     recurringCents: monthlyPlan ? monthlyCents : 0,
   };
+}
+
+/** How many months auto-pay charges on the monthly plan (null = every month until cancelled). Never fewer than
+ *  the longest selected package term: a 6-month commitment is always billed for 6 months. */
+export function autoPayMonths(content: ProposalContent, totals: Pick<ProposalTotals, "lines">): number | null {
+  const end = content.payment.endAfterMonths;
+  if (!end) return null;
+  return Math.max(end, ...totals.lines.filter((l) => l.billing === "monthly").map((l) => l.termMonths));
 }
 
 /** The pay-in-full discount on an amount, rounded to the cent. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardFeeCents, defaultSelection, priceSelection, proposalContentSchema, selectionProblems } from "@shared/proposals";
+import { autoPayMonths, cardFeeCents, defaultSelection, priceSelection, proposalContentSchema, selectionProblems } from "@shared/proposals";
 
 const content = proposalContentSchema.parse({
   payment: { plan: "choice", cardFeeBps: 300 },
@@ -48,6 +48,13 @@ describe("proposals pricing", () => {
   it("a plan the proposal does not allow falls back to the allowed one", () => {
     const c = proposalContentSchema.parse({ ...content, payment: { plan: "monthly" } });
     expect(priceSelection(c, ["starter", "foundation"], "full").plan).toBe("monthly");
+  });
+  it("auto-pay never stops before the longest package term", () => {
+    const c = (end: number | null) => proposalContentSchema.parse({ ...content, payment: { plan: "monthly", endAfterMonths: end } });
+    const t = priceSelection(c(1), ["starter", "foundation"], "monthly");
+    expect(autoPayMonths(c(1), t)).toBe(6);
+    expect(autoPayMonths(c(12), t)).toBe(12);
+    expect(autoPayMonths(c(null), t)).toBeNull();
   });
   it("rejects bad selections", () => {
     expect(selectionProblems(content, ["starter", "pro", "foundation"])).toContain("Choose only one option in “SEO program”.");

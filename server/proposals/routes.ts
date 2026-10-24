@@ -45,7 +45,7 @@ import { stripe, stripeConfigured } from "../billing/client";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 import {
-  ESIGN_CONSENT, MAX_PDF_BYTES, PROPOSAL_KINDS, initialTargets, cardFeeCents, emptyContent, formatBps, formatMoney, priceSelection, proposalContentSchema,
+  ESIGN_CONSENT, MAX_PDF_BYTES, PROPOSAL_KINDS, autoPayMonths, initialTargets, cardFeeCents, emptyContent, formatBps, formatMoney, priceSelection, proposalContentSchema,
   selectionProblems, type ProposalContent, type ProposalDetail, type ProposalEvent, type ProposalRow, type ProposalStatus, type ProposalSummary,
   type ProposalTotals, type PublicProposal,
 } from "@shared/proposals";
@@ -252,8 +252,8 @@ export async function applyProposalCheckout(session: Stripe.Checkout.Session, ev
       session.metadata?.method ?? null, Number(session.metadata?.cardFeeCents || 0),
       event(state === "paid" ? "paid" : state === "processing" ? "ach_started" : "payment_failed", session.amount_total != null ? formatMoney(session.amount_total, { cents: true }) : undefined)]);
   const updated = rows[0];
-  // A fixed term: the subscription ends by itself after the agreed number of months.
-  const months = parseContent(r.content).payment.endAfterMonths;
+  // A fixed term: the subscription ends by itself after the agreed number of months (never before the package term).
+  const months = r.totals ? autoPayMonths(parseContent(r.content), r.totals as ProposalTotals) : null;
   if (subId && months && state !== "failed" && stripeConfigured()) {
     const cancelAt = new Date();
     cancelAt.setMonth(cancelAt.getMonth() + months);
