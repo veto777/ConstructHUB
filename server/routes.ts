@@ -387,6 +387,12 @@ export async function registerRoutes(
   }
   const { registerOpsIssueRoutes } = await import("./ops/routes");
   registerOpsIssueRoutes(app, getDevUser);
+  // The Reputation Desk (/admin/reputation, /reputation): free scans, restoration cases and their scheduled re-checks.
+  const { ensureReputationSchema } = await import("./reputation/schema");
+  await ensureReputationSchema();
+  const { registerReputationRoutes, startReputationMonitor } = await import("./reputation/routes");
+  registerReputationRoutes(app, getDevUser);
+  startReputationMonitor();
   // Proposals (/admin/proposals, /proposal/<token>): build, send, e-sign and collect payment on an offer (shared/proposals.ts).
   const { ensureProposalsSchema } = await import("./proposals/schema");
   await ensureProposalsSchema();

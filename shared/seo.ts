@@ -50,6 +50,7 @@ export const MARKETING_ROUTES: readonly string[] = [
   DFY_PATH,
   ...READY_DFY_PAGES.map(dfyPagePath),
   REINSTATEMENT_PATH,
+  "/reputation",
   "/compliance",
   "/compliance/research",
   "/compliance/research/coverage",
@@ -98,6 +99,7 @@ export function routeSourceFile(path: string): string | null {
     [CALL_ASSISTANT_PATH]: "client/src/pages/call-assistant-landing.tsx",
     [DFY_PATH]: "client/src/pages/done-for-you.tsx",
     [REINSTATEMENT_PATH]: "client/src/pages/reinstatement.tsx",
+    "/reputation": "client/src/pages/reputation.tsx",
     "/compliance": "shared/compliance/state-agencies.json",
     "/compliance/research": "client/src/pages/compliance-research.tsx",
     // The page's content is the source registry: dated by the last change to any state pack.

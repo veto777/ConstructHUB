@@ -716,6 +716,17 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+              {/* Reputation Desk: free-scan leads and reputation restoration cases. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/reputation" || location.startsWith("/admin/reputation/")}>
+                    <Link href="/admin/reputation" data-testid="link-nav-admin-reputation" className="flex items-center gap-2 w-full">
+                      <ShieldCheck className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                      <span>Reputation</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               {/* Backlinks database (prototype): link sources found, vetted and pitched automatically. */}
               {user?.isPlatformAdmin === true && (
                 <SidebarMenuItem>

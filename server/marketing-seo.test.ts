@@ -145,13 +145,13 @@ describe("done-for-you registry", () => {
     for (const key of keys) expect(featurePageByKey(key), key).toBeUndefined();
   });
 
-  it("covers every done-for-you catalog item exactly once, and the existing reinstatement page", () => {
+  it("covers every done-for-you catalog item exactly once, and the hand-built reinstatement and reputation pages", () => {
     const ids = DFY_PAGES.flatMap((p) => p.catalogIds);
     expect(new Set(ids).size).toBe(ids.length);
     expect([...ids].sort()).toEqual(Object.keys(DFY_CATALOG).sort());
-    expect(EXTERNAL_DFY_PAGES.map((e) => e.path)).toEqual(["/reinstatement"]);
+    expect(EXTERNAL_DFY_PAGES.map((e) => e.path)).toEqual(["/reinstatement", "/reputation"]);
     for (const e of EXTERNAL_DFY_PAGES) expect(routeExists(e.path), e.path).toBe(true);
-    expect(DFY_CATALOGUE.map((e) => e.path)).toEqual([...DFY_PAGES.map(dfyPagePath), "/reinstatement"]);
+    expect(DFY_CATALOGUE.map((e) => e.path)).toEqual([...DFY_PAGES.map(dfyPagePath), "/reinstatement", "/reputation"]);
   });
 
   it("holds every ready page to the writing guide's shape, with real sources, icons and related pages", () => {

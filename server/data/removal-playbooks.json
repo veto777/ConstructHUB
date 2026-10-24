@@ -1,0 +1,1812 @@
+[
+  {
+    "key": "google-results-about-you",
+    "category": "search_engine",
+    "platform": "Google Search",
+    "title": "Remove personal contact info / ID numbers via 'Results about you'",
+    "whenItApplies": "A Google Search result shows the subject's own phone number, home address, email address, or (where supported) SSN, passport number or driver's license number. Feature rolling out to users over 18 in certain markets.",
+    "notEligible": "Info the subject controls themselves (own social profile/blog); results from pages Google deems valuable to the public (educational or government institutions, newspapers); professional info (use the detailed removal form if posted with intent to harm); requests for someone else filed from your own account may be denied.",
+    "requestUrl": "https://myactivity.google.com/results-about-you",
+    "contact": null,
+    "whoMustSubmit": "subject",
+    "evidence": [
+      "Name and the exact contact info as it appears on the result (e.g. nickname or old address as shown)",
+      "The result URL(s)",
+      "Signed-in Google Account (status updates go to its email)"
+    ],
+    "steps": [
+      "Open Results about you (Google app: profile menu > Results about you; web: myactivity.google.com/results-about-you) and select Get started/Settings",
+      "Enter name and personal contact info to monitor; optionally enable email/app notifications",
+      "Review matches in the 'To review' tab; select a result > Request to remove",
+      "Alternatively from a Search result: More (three dots) > Remove result > It shows my personal info > Contact info, complete the flow",
+      "Track status (In progress / Approved / Denied / Undone) under 'Removal requests'",
+      "If denied, read the stated reason; if the source site owner removes the data, use the Refresh Outdated Content tool"
+    ],
+    "timeline": "Notifications of matches and the submission confirmation email arrive 'within a few hours'; Google notes a possible delay between approval and the result disappearing. No overall review SLA stated.",
+    "fees": "None stated (free Google feature).",
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/websearch/answer/12719076?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-personal-info-doxxing",
+    "category": "search_engine",
+    "platform": "Google Search",
+    "title": "Remove private PII and doxxing content (detailed removal request form)",
+    "whenItApplies": "Result URL shows the subject's confidential PII: government ID numbers (SSN, tax ID, resident ID), bank/credit card numbers, images of signature or ID, private records such as medical records, confidential usernames/passwords, address/phone/email; OR doxxing: personal info with explicit/implicit threats or calls to harass, or a significant amount of aggregated personal info without legitimate purpose.",
+    "notEligible": "Content that is newsworthy / of public interest may be kept. Google only removes from Search results, not from the host site.",
+    "requestUrl": "https://support.google.com/websearch/contact/content_removal_form",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "Exact URL(s) of each page containing the info (only listed URLs are reviewed)",
+      "Screenshots showing the info (may be cropped)",
+      "For doxxing: evidence of threats/calls to harm, or of aggregation"
+    ],
+    "steps": [
+      "Collect each page URL and screenshots",
+      "Open the content removal form and select the personal-info/doxxing path",
+      "Enter the subject's details and the URLs; upload screenshots",
+      "Submit; watch for Google's email decision",
+      "Outcome may be full removal or query-based removal (hidden only for queries containing the subject's name)",
+      "Separately ask the website owner to delete the content at source"
+    ],
+    "timeline": null,
+    "fees": "None stated.",
+    "letterOutline": [
+      "Subject identification and relationship of submitter (self or representative)",
+      "Policy invoked: personally identifiable information / doxxing",
+      "List of URLs with the exact PII shown on each",
+      "Why it is confidential or how it is used to threaten/harass",
+      "Request for removal from Google Search results",
+      "Contact details for follow-up"
+    ],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/websearch/answer/9673730?hl=en",
+      "https://support.google.com/websearch/answer/3143948?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-outdated-content",
+    "category": "search_engine",
+    "platform": "Google Search",
+    "title": "Refresh Outdated Content tool (page/image removed or changed at source)",
+    "whenItApplies": "You do not own the page, and the page or image no longer exists or the sensitive content has been significantly changed/removed, but Google still shows the old snippet or cached result.",
+    "notEligible": "Content still live on the page; info you think is wrong/harmful but still present; you are a verified Search Console owner (use the Removals tool instead); you just want a recrawl; you want permanent removal of a live URL.",
+    "requestUrl": "https://search.google.com/search-console/remove-outdated-content",
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [
+      "Exact result URL (right-click > Copy link address from Google results)",
+      "For images: image URL plus containing page URL (separate request per page)",
+      "If page still exists: 1-2 words from the old snippet that no longer appear live"
+    ],
+    "steps": [
+      "Confirm the content has been removed or changed at source",
+      "Sign in with a Google Account and open the Refresh Outdated Content tool",
+      "Select New request (Page or Image) and paste the URL in the required format",
+      "Submit; supply removed snippet words if prompted",
+      "Check status in the request queue (Pending/Approved/Denied/Expired/Cancelled)",
+      "Submit separate requests for every duplicate URL variant still appearing"
+    ],
+    "timeline": "Pending processing 'can take a few days'. Approved requests expire after 180 days or when the URL no longer exists.",
+    "fees": "None stated.",
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/webmasters/answer/7041154?hl=en",
+      "https://support.google.com/websearch/answer/6349986?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-legal-removal",
+    "category": "search_engine",
+    "platform": "Google Search",
+    "title": "Legal removal request (defamation, court orders, local-law claims)",
+    "whenItApplies": "Content believed to violate the law or the requester's rights (e.g. defamation, court orders, trademark, other local-law claims) that is not covered by Google's personal-content policies.",
+    "notEligible": "Google may decline; removal applies only to Google products; content remains on the source site.",
+    "requestUrl": "https://support.google.com/legal/troubleshooter/1114905?hl=en",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "Specific URL(s) of the content (not homepage)",
+      "Specific statements/content that is unlawful and why",
+      "Background needed for evaluation (e.g. court order copy if available)"
+    ],
+    "steps": [
+      "Try flagging under product policies first if applicable",
+      "Open the Legal Help troubleshooter, select Google Search and the legal reason",
+      "Provide specific URLs, quote the content, and explain the legal basis",
+      "Submit; save the confirmation email and reference number",
+      "Monitor email for questions; file a separate notice per Google product"
+    ],
+    "timeline": "Google states it endeavours to respond 'as soon as we can'; no fixed timeline.",
+    "fees": "None stated.",
+    "letterOutline": [
+      "Requester identity and authority",
+      "Google product and exact URLs",
+      "Quoted statements alleged to be unlawful",
+      "Legal basis (jurisdiction, law, any court order)",
+      "Why statements are false/unlawful and the harm caused",
+      "Declaration of accuracy and contact details"
+    ],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/legal/answer/3110420?hl=en",
+      "https://support.google.com/legal/troubleshooter/1114905?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-rtbf-eu",
+    "category": "search_engine",
+    "platform": "Google Search",
+    "title": "EU/UK 'Right to be Forgotten' privacy delisting request",
+    "whenItApplies": "Requester in a jurisdiction where European data-protection delisting rights apply, seeking delisting of results for their name that are inaccurate, inadequate, irrelevant or excessive.",
+    "notEligible": null,
+    "requestUrl": "https://reportcontent.google.com/forms/rtbf",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "URLs to delist",
+      "Explanation of why each is inaccurate/irrelevant/outdated",
+      "Proof of identity / authority as requested by form"
+    ],
+    "steps": [
+      "Review Google's Right to be Forgotten overview",
+      "Complete the RTBF form with URLs and justification",
+      "Await Google's balancing decision by email"
+    ],
+    "timeline": null,
+    "fees": "None stated.",
+    "letterOutline": [
+      "Requester identity and country",
+      "Name query used",
+      "URL list",
+      "Per-URL reasoning (inaccurate, outdated, irrelevant, excessive)",
+      "Public-role context, if any"
+    ],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/legal/answer/10769224?hl=en",
+      "https://reportcontent.google.com/forms/rtbf"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Form page loads (sign-in UI); field-level requirements not readable without JS. Final egress re-check failed (TLS resets) for: https://support.google.com/legal/answer/10769224?hl=en; these pages returned 200 and were read earlier this session."
+  },
+  {
+    "key": "google-ncii",
+    "category": "ncii",
+    "platform": "Google Search",
+    "title": "Remove personal sexual content (real NCII / 'revenge porn')",
+    "whenItApplies": "Search results showing the subject nude, in a sexual act or intimate state, where the subject did not consent to the imagery/act, or consented but the content is not commercialized; also pages wrongly associating the subject's name with sexual content.",
+    "notEligible": "Commercialized content the subject consented to. Newsworthy/public-interest content may be retained.",
+    "requestUrl": "https://support.google.com/websearch/contact/content_removal_form",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "URLs of pages/images (only those URLs reviewed)",
+      "Screenshots (can be edited to show only the face)",
+      "Never include imagery of anyone under 18"
+    ],
+    "steps": [
+      "Option A (Image Search): sign in, open the image, More > Remove result > 'It shows a sexual image of me', choose real or AI-generated, answer prompts, add further images, opt into duplicate/future-search protections",
+      "Option B: use the content removal form 'Start removal request'",
+      "Track requests in Results about you > Removal requests",
+      "Request removal at the source host and via StopNCII.org for partner platforms"
+    ],
+    "timeline": null,
+    "fees": "None stated.",
+    "letterOutline": [
+      "Subject identity (representative allowed)",
+      "Policy: personal sexual content shared without consent",
+      "URL list",
+      "Statement of non-consent / non-commercial nature",
+      "Request duplicate removal"
+    ],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/websearch/answer/16305143?hl=en",
+      "https://support.google.com/websearch/answer/16854698?hl=en",
+      "https://support.google.com/websearch/answer/13650142?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-fake-explicit",
+    "category": "ncii",
+    "platform": "Google Search",
+    "title": "Remove involuntary fake / AI-generated sexual imagery (deepfakes)",
+    "whenItApplies": "All three: subject is identifiable; content is fake and falsely depicts subject nude or sexually explicit; distributed without consent.",
+    "notEligible": "Content not depicting an identifiable person, or not sexual/nude.",
+    "requestUrl": "https://support.google.com/websearch/contact/content_removal_form",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "URLs of the pages/images",
+      "Screenshots",
+      "Statement that content is fabricated and non-consensual"
+    ],
+    "steps": [
+      "Use the Image Search viewer flow (select AI-generated/fake option) or the content removal form",
+      "Opt into duplicate removal and future-search protections",
+      "Track in Results about you"
+    ],
+    "timeline": null,
+    "fees": "None stated.",
+    "letterOutline": [
+      "Subject identity",
+      "Policy: involuntary fake pornography",
+      "URLs",
+      "Why identifiable, fabricated and non-consensual"
+    ],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/websearch/answer/16305143?hl=en",
+      "https://support.google.com/websearch/answer/16854698?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-exploitative-removal-sites",
+    "category": "mugshot",
+    "platform": "Google Search",
+    "title": "Content on sites with exploitative removal practices (pay-to-remove, incl. mugshot sites)",
+    "whenItApplies": "All three: requester is the subject of the URL; the site is not a business review site; the site requires payment to it or other agencies to remove the content.",
+    "notEligible": "Business review sites; content about businesses (Google only removes content about people).",
+    "requestUrl": "https://support.google.com/websearch/contact/content_removal_form",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "URLs mentioning the subject",
+      "Additional info showing how the site is exploitative (e.g. screenshots of the removal-fee page/price demand)"
+    ],
+    "steps": [
+      "Screenshot the site's pay-for-removal offer",
+      "Submit the content removal form (exploitative removal practices option) with URLs",
+      "Await email decision"
+    ],
+    "timeline": null,
+    "fees": "None stated.",
+    "letterOutline": [
+      "Subject identity",
+      "Policy: sites with exploitative removal practices",
+      "URL list",
+      "Evidence that payment is demanded for removal"
+    ],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/websearch/answer/9172218?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-images-of-minors",
+    "category": "search_engine",
+    "platform": "Google Search / Google Images",
+    "title": "Remove non-explicit images of minors",
+    "whenItApplies": "Image URLs depicting an individual under 18 (or who died before 18), submitted by that person or a representative (parent, relative); image not from a social account/page the subject manages.",
+    "notEligible": "Webpage URLs with both text and images; newsworthy/public-interest images may be excepted.",
+    "requestUrl": "https://support.google.com/websearch/contact/content_removal_form",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "Image URLs only",
+      "Screenshots"
+    ],
+    "steps": [
+      "Collect image URLs",
+      "Submit the content removal form (images of minors)",
+      "Removed images stop appearing in Image Search and as thumbnails"
+    ],
+    "timeline": null,
+    "fees": "None stated.",
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/websearch/answer/10949130?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-csam",
+    "category": "ncii",
+    "platform": "Google Search",
+    "title": "Report child sexual abuse imagery",
+    "whenItApplies": "Nude or sexual content showing anyone under 18. Anyone can report.",
+    "notEligible": null,
+    "requestUrl": "https://support.google.com/websearch/answer/15300563?hl=en",
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [
+      "URL only. Do NOT take, keep, or share screenshots of CSAM."
+    ],
+    "steps": [
+      "Follow Google's CSAM reporting page",
+      "Also report to NCMEC; for under-18 imagery see Take It Down (takeitdown.ncmec.org) as referenced by StopNCII"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/websearch/answer/15300563?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-images-general",
+    "category": "search_engine",
+    "platform": "Google Images",
+    "title": "Remove an image from Google Images (general route)",
+    "whenItApplies": "Any image you want gone from Google Images; Google generally requires removal at the source site first.",
+    "notEligible": "Google cannot remove images from third-party websites.",
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [
+      "Image URL and containing page URL"
+    ],
+    "steps": [
+      "Contact the site owner (Contact page, Whois registrant/admin email, or hosting company)",
+      "For social media images, report to the platform",
+      "Once removed/changed at source, use Refresh Outdated Content (image request)",
+      "If the image fits a personal-content policy (sexual, minors, PII, exploitative sites), use those forms instead"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/websearch/answer/4628134?hl=en",
+      "https://support.google.com/websearch/answer/13652412?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-autocomplete",
+    "category": "autocomplete",
+    "platform": "Google Search",
+    "title": "Report inappropriate autocomplete predictions",
+    "whenItApplies": "A prediction violates Google Search content policies (dangerous, harassing, hateful, sexually explicit, terrorist, violence/gore, vulgar) or autocomplete-specific policies: elections claims; hazardous health claims; sensitive and disparaging terms associated with named individuals (harassment, bullying, threats, sexualization, exposing private info); accusations of serious malevolent acts against individuals/groups without well-established evidence.",
+    "notEligible": "Exceptions for artistic, educational, historical, documentary, scientific or current-affairs context. Google may not remove a reported prediction.",
+    "requestUrl": "https://www.google.com/",
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [
+      "The exact query typed and the prediction shown",
+      "Which policy it violates"
+    ],
+    "steps": [
+      "On google.com type the query to surface the prediction",
+      "Click 'Report inappropriate predictions' under the predictions",
+      "Select the prediction and feedback reason; submit",
+      "For predictions believed unlawful, use the Legal Help troubleshooter form"
+    ],
+    "timeline": null,
+    "fees": "None stated.",
+    "letterOutline": [
+      "(Legal route only) Requester identity",
+      "Query and prediction text",
+      "Legal basis",
+      "Requested action"
+    ],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/websearch/answer/7368877?hl=en",
+      "https://support.google.com/websearch/answer/106230?hl=en",
+      "https://support.google.com/websearch/answer/10622781?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "bing-report-concern",
+    "category": "search_engine",
+    "platform": "Bing / Microsoft",
+    "title": "Report a concern to Microsoft (Bing content concerns)",
+    "whenItApplies": "Content or conduct on Microsoft services, including Bing, believed to violate Microsoft policies/terms.",
+    "notEligible": null,
+    "requestUrl": "https://www.microsoft.com/en-us/concern/bing",
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [
+      "Use in-product reporting where available",
+      "Otherwise open Report a Concern and select Continue; privacy concerns go to microsoft.com/concern/privacy"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://www.microsoft.com/en-us/concern/bing"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "URL lands on Microsoft Digital Safety 'Report a concern' wizard (verified live). Bing-specific categories (defamation, outdated cache) could not be read: wizard is JS-driven. Bing defamation route unverified."
+  },
+  {
+    "key": "bing-ncii",
+    "category": "ncii",
+    "platform": "Bing / Microsoft",
+    "title": "Report non-consensual intimate imagery to Microsoft/Bing",
+    "whenItApplies": "Intimate imagery shared without consent appearing in Bing or Microsoft consumer services.",
+    "notEligible": null,
+    "requestUrl": "https://www.microsoft.com/en-us/concern/revengeporn",
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [
+      "Submit via Microsoft's report-a-concern NCII path",
+      "Also create a StopNCII.org case: StopNCII states Microsoft uses validated StopNCII hashes in Bing (and, as of May 2026, consumer services incl. GroupMe, Teams Free, OneDrive, Xbox)"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://www.microsoft.com/en-us/concern/revengeporn",
+      "https://stopncii.org/partners/industry-partners/"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Form fields not readable (JS wizard)."
+  },
+  {
+    "key": "bing-outdated-content",
+    "category": "search_engine",
+    "platform": "Bing",
+    "title": "Bing Content Removal Tool (outdated/removed pages and cache)",
+    "whenItApplies": "Page already removed or changed at source but still shown in Bing results/cache.",
+    "notEligible": null,
+    "requestUrl": "https://www.bing.com/webmasters/tools/contentremoval",
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [
+      "Sign in (tool redirects to Bing sign-in)",
+      "Submit the URL of the removed/changed page"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://www.bing.com/webmasters/tools/contentremoval"
+    ],
+    "verifiedLive": false,
+    "checkedAt": "2026-10-24",
+    "notes": "Tool URL redirects to Bing sign-in (exists). Help page bing.com/webmasters/help/bing-content-removal-tool-cb6c294d is a JS app; eligibility/timeline text not verified."
+  },
+  {
+    "key": "youtube-privacy",
+    "category": "video",
+    "platform": "YouTube",
+    "title": "Privacy complaint (image, full name, PII, AI-altered likeness)",
+    "whenItApplies": "Video/comment/channel shares the subject's image or full name, contact/ID/financial info without permission, or AI-altered/synthetic content realistically depicting their face or voice. Subject must be uniquely identifiable.",
+    "notEligible": "Not uniquely identifiable (first name without context, fleeting image). Third-party claims not accepted from other family members (spouse, sibling, cousin) or coworkers/employees. Public interest, newsworthiness, consent and public availability are weighed; parody/satire considered for synthetic content.",
+    "requestUrl": "https://support.google.com/youtube/contact/privacy_complaint",
+    "contact": null,
+    "whoMustSubmit": "subject",
+    "evidence": [
+      "Video URL (not required when reporting a whole channel)",
+      "Timestamps of every appearance",
+      "Description of what the subject wears/does to distinguish them",
+      "For comments: note in description plus commenter username"
+    ],
+    "steps": [
+      "Consider whether harassment policy fits better",
+      "Attempt contact with uploader (optional)",
+      "File the privacy complaint form",
+      "YouTube may give the uploader time to trim/blur/remove; if not removed, YouTube reviews",
+      "Making a video private is not an acceptable fix for the uploader"
+    ],
+    "timeline": "YouTube may give the creator an unspecified period to remove/edit before review; no duration stated on the fetched page.",
+    "fees": "None stated.",
+    "letterOutline": [
+      "Complainant identity (first-party, or permitted representative: parent/guardian, legal representative, close family of deceased, vulnerable individual)",
+      "Content URL(s)",
+      "Timestamps and identifying description",
+      "Private info exposed / synthetic nature",
+      "Request removal"
+    ],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/youtube/answer/142443?hl=en",
+      "https://support.google.com/youtube/answer/7671399?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "youtube-harassment",
+    "category": "video",
+    "platform": "YouTube",
+    "title": "Harassment & cyberbullying report",
+    "whenItApplies": "Content sharing/threatening to share non-public PII, threats against identifiable individuals, brigading, stalking, unwanted sexualization, repeated insults based on intrinsic attributes, mocking death/serious injury, staged 'sting' accusations without law enforcement.",
+    "notEligible": null,
+    "requestUrl": "https://support.google.com/youtube/answer/2802027",
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [
+      "Video/comment/channel URLs",
+      "Timestamps"
+    ],
+    "steps": [
+      "Report the video, comment or channel via YouTube's reporting flow",
+      "For many items, report the channel",
+      "For specific threats, contact local law enforcement"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/youtube/answer/2802268?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "youtube-defamation",
+    "category": "video",
+    "platform": "YouTube",
+    "title": "Defamation / legal complaint (United States)",
+    "whenItApplies": "Statement in a YouTube video believed false and reputation-damaging.",
+    "notEligible": "For the US, YouTube states it does not remove videos on allegations of defamation (citing CDA 230(c)); it may comply with a court order requiring the creator to remove the posting.",
+    "requestUrl": "https://support.google.com/youtube/answer/6154230?hl=en",
+    "contact": "Court orders by mail: YouTube, Inc., Attn Legal Support, 901 Cherry Ave., Second Floor, San Bruno, CA 94066",
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "Specific, strongly supported claim: why statements are untrue and how they damage reputation",
+      "Court order (US route)"
+    ],
+    "steps": [
+      "Contact the uploader directly",
+      "Consider privacy or harassment policy routes",
+      "Select country of dispute on the defamation page and follow its directions (some countries require a court order)",
+      "US: obtain a court order against the creator and forward to YouTube Legal Support"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [
+      "Claimant identity and authority",
+      "Video URL(s) and timestamps",
+      "Exact statements alleged defamatory",
+      "Why false and resulting harm",
+      "Court order reference (US)"
+    ],
+    "statutes": [
+      "47 U.S.C. § 230(c)"
+    ],
+    "sources": [
+      "https://support.google.com/youtube/answer/6154230?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "youtube-copyright",
+    "category": "copyright",
+    "platform": "YouTube",
+    "title": "Copyright removal request (webform or email)",
+    "whenItApplies": "Copyright owner's content is on YouTube without permission.",
+    "notEligible": "Fair use, public domain or other exceptions; requester must confirm consideration. False submissions may lead to termination/legal consequences.",
+    "requestUrl": "https://www.youtube.com/copyright_complaint_form?contact_type=hc",
+    "contact": "copyright@youtube.com (full info in email body, not attachment); fax/mail also accepted",
+    "whoMustSubmit": "rights_holder",
+    "evidence": [
+      "Contact info",
+      "Description of copyrighted work (or representative list)",
+      "Direct links in YouTube's required URL formats",
+      "Two statements: good-faith belief; accuracy under penalty of perjury",
+      "Physical or electronic signature"
+    ],
+    "steps": [
+      "Assess fair use/exceptions",
+      "Submit via YouTube Studio (Content detection) or the webform; non-video content by email/fax/mail",
+      "Optionally schedule removal to take effect in 7 days (uploader can avoid a strike)",
+      "Optionally select 'prevent copies'",
+      "Note: some info is shared with the uploader; an attorney can file to limit disclosure"
+    ],
+    "timeline": "Optional scheduled requests take effect in 7 days; otherwise not stated.",
+    "fees": "None stated.",
+    "letterOutline": [
+      "Copyright owner name and contact",
+      "Identification of the copyrighted work",
+      "URLs of infringing content",
+      "Good-faith statement",
+      "Accuracy and authority statement under penalty of perjury",
+      "Signature"
+    ],
+    "statutes": [
+      "17 U.S.C. § 512(c)(3)"
+    ],
+    "sources": [
+      "https://support.google.com/youtube/answer/2807622?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "dmca-notice-elements",
+    "category": "copyright",
+    "platform": "Any US online service provider",
+    "title": "Elements of a valid DMCA takedown notice (17 U.S.C. § 512(c)(3)(A))",
+    "whenItApplies": "Copyrighted material hosted by a service provider without authorization; notice goes to the provider's designated agent.",
+    "notEligible": "Non-copyright claims (defamation, privacy, names) are not DMCA matters; Google reports rejecting such abusive notices. Knowing material misrepresentation creates liability under § 512(f).",
+    "requestUrl": null,
+    "contact": "The service provider's DMCA designated agent (see Copyright Office directory)",
+    "whoMustSubmit": "rights_holder",
+    "evidence": [
+      "(i) Physical or electronic signature of a person authorized to act for the owner",
+      "(ii) Identification of the copyrighted work (or representative list for multiple works on one site)",
+      "(iii) Identification of the infringing material and information reasonably sufficient to locate it",
+      "(iv) Complainant contact info: address, telephone, and email if available",
+      "(v) Statement of good-faith belief that use is not authorized by owner, agent, or law",
+      "(vi) Statement that the notice is accurate and, under penalty of perjury, that complainant is authorized to act for the owner"
+    ],
+    "steps": [
+      "Confirm ownership/authority and consider fair use",
+      "Locate the host and its designated agent",
+      "Draft notice with all six elements",
+      "Send to the designated agent (or provider webform)",
+      "If a counter-notice is received, provider restores material in 10-14 business days unless you notify it that you filed a court action"
+    ],
+    "timeline": "Statute requires providers to respond 'expeditiously'; counter-notice restoration window is not less than 10 nor more than 14 business days after receipt (§ 512(g)(2)(C)).",
+    "fees": "None (statutory notice).",
+    "letterOutline": [
+      "Header: DMCA Notice of Claimed Infringement, addressed to designated agent",
+      "Identification of copyrighted work(s)",
+      "Infringing material URLs/location",
+      "Complainant contact information",
+      "Good-faith belief statement",
+      "Accuracy and authority statement under penalty of perjury",
+      "Signature and date"
+    ],
+    "statutes": [
+      "17 U.S.C. § 512(c)(3)",
+      "17 U.S.C. § 512(f)",
+      "17 U.S.C. § 512(g)(2)-(3)"
+    ],
+    "sources": [
+      "https://www.copyright.gov/title17/92chap5.html"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "dmca-agent-directory",
+    "category": "copyright",
+    "platform": "U.S. Copyright Office",
+    "title": "Find a host's DMCA designated agent",
+    "whenItApplies": "You need the designated agent contact for a service provider before sending a § 512(c)(3) notice.",
+    "notEligible": null,
+    "requestUrl": "https://dmca.copyright.gov/osp/",
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [],
+    "steps": [
+      "Identify the host (Whois / hosting provider)",
+      "Search the DMCA Designated Agent Directory by provider name",
+      "Use the listed agent's contact; if absent, use the provider's published copyright contact"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://www.copyright.gov/dmca-directory/",
+      "https://dmca.copyright.gov/osp/"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "google-dmca-search",
+    "category": "copyright",
+    "platform": "Google Search",
+    "title": "Google copyright removal (DMCA) for Search results",
+    "whenItApplies": "Search results link to content infringing your copyright.",
+    "notEligible": "Requests for non-infringing content (reviews, names, court records, negative comments) are declined; Google may forward notices to Lumen for publication.",
+    "requestUrl": "https://reportcontent.google.com/forms/dmca_search",
+    "contact": null,
+    "whoMustSubmit": "rights_holder",
+    "evidence": [
+      "All § 512(c)(3) elements (form prompts)",
+      "Specific infringing URLs"
+    ],
+    "steps": [
+      "Use the Legal Help troubleshooter or the dmca_search form",
+      "Submit specific URLs; Google accepts URLs even if not currently indexed",
+      "Track via sign-in dashboard (Search Console DMCA dashboard at google.com/webmasters/tools/dmca-dashboard requires sign-in)",
+      "Site owners can counter-notify (support.google.com/legal/contact/lr_counternotice?product=websearch)"
+    ],
+    "timeline": "Google states average processing time for web-form Search requests is approximately 6 hours (varies).",
+    "fees": "None stated.",
+    "letterOutline": [],
+    "statutes": [
+      "17 U.S.C. § 512"
+    ],
+    "sources": [
+      "https://support.google.com/legal/answer/1120734?hl=en",
+      "https://support.google.com/transparencyreport/answer/7347743?hl=en",
+      "https://reportcontent.google.com/forms/dmca_search",
+      "https://www.google.com/webmasters/tools/dmca-dashboard"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Dashboard URL redirects to Google sign-in (exists); dashboard contents not inspected. Final egress re-check failed (TLS resets) for: https://support.google.com/legal/answer/1120734?hl=en, https://www.google.com/webmasters/tools/dmca-dashboard; these pages returned 200 and were read earlier this session."
+  },
+  {
+    "key": "stopncii",
+    "category": "ncii",
+    "platform": "StopNCII.org (SWGfL / Revenge Porn Helpline)",
+    "title": "StopNCII.org hash-based blocking across partner platforms",
+    "whenItApplies": "Requester is the person in the image; was 18+ when taken and is currently 18+; still possesses the image/video; is nude, semi-nude or engaged in a sexual act in it. Works for content already shared or threatened.",
+    "notEligible": "Under-18 imagery (use Take It Down, takeitdown.ncmec.org). Only removes from participating platforms, not the whole internet. Edited/cropped variants may not match.",
+    "requestUrl": "https://stopncii.org/create-your-case/",
+    "contact": "stopncii@swgfl.org.uk (general questions; cannot recover case numbers/PINs)",
+    "whoMustSubmit": "subject",
+    "evidence": [
+      "The original image/video on the device (hashed locally; not uploaded)"
+    ],
+    "steps": [
+      "Go to Create Your Case and confirm eligibility",
+      "Select images/videos; hashes are generated on-device",
+      "Record case number and PIN (unrecoverable if lost)",
+      "Partners match hashes and remove content violating their policies",
+      "Check status or withdraw via Check Case Status",
+      "To add images, open a new case"
+    ],
+    "timeline": "Hash created immediately; partner moderation timing not stated.",
+    "fees": "Free.",
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://stopncii.org/",
+      "https://stopncii.org/how-it-works/",
+      "https://stopncii.org/faq/",
+      "https://stopncii.org/partners/industry-partners/"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Partner page links include Facebook/Instagram (Meta), Microsoft/Bing, Reddit, OnlyFans, Pornhub, Snap, Patreon, Redgifs, Vivastreet, X, Bluesky, FetLife, XVideos, F2F, Playhouse, Tik.porn, Depop (inferred from partner links; logos not text-readable)."
+  },
+  {
+    "key": "meta-ncii",
+    "category": "ncii",
+    "platform": "Facebook / Instagram (Meta)",
+    "title": "Non-consensual intimate imagery under Meta's Adult Sexual Exploitation policy",
+    "whenItApplies": "Sharing/threatening/offering/asking for NCII meeting all three: imagery non-commercial and made in a private setting; person (near) nude, sexual or sexually suggestive (incl. AI-generated); lack of consent indicated by vengeful context, independent sources (law enforcement records, media), or a report from the person depicted (or someone sharing their name).",
+    "notEligible": null,
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": "subject",
+    "evidence": [
+      "Links to posts/profiles",
+      "Report from the depicted person where possible"
+    ],
+    "steps": [
+      "Report the post in-app",
+      "Create a StopNCII.org case (Meta is a StopNCII partner)"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://transparency.meta.com/policies/community-standards/adult-sexual-exploitation/",
+      "https://stopncii.org/partners/industry-partners/"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Facebook/Instagram NCII-specific help/contact form URLs not verified (help center JS-rendered)."
+  },
+  {
+    "key": "reddit-ncii",
+    "category": "ncii",
+    "platform": "Reddit",
+    "title": "Reddit Rule 3: non-consensual intimate media and private information",
+    "whenItApplies": "Intimate or sexually explicit media posted or threatened without consent; posting personal/confidential info.",
+    "notEligible": null,
+    "requestUrl": "https://www.reddit.com/report",
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [
+      "Report via reddit.com/report (linked from Reddit Help)",
+      "Also create a StopNCII.org case (Reddit is a partner)"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://redditinc.com/policies/reddit-rules",
+      "https://support.reddithelp.com/hc/en-us/articles/360043066452",
+      "https://stopncii.org/partners/industry-partners/"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "reddit.com/report URL is cited by Reddit Help; direct fetch was bot-challenged. Reddit's dedicated NCII help article was Cloudflare-blocked."
+  },
+  {
+    "key": "x-ncii",
+    "category": "ncii",
+    "platform": "X (Twitter)",
+    "title": "X non-consensual nudity policy report",
+    "whenItApplies": "Content that sexualizes or exposes an identifiable real adult without explicit consent: hidden-camera/creepshots, NCII, AI/deepfake sexualized media, intimate private-setting media, threats to share, bounties.",
+    "notEligible": "Clear consent signals; public/commercial settings and events; widely published celebrity photos; satire/non-sexual edits of public figures; consensual adult content marked as Adult Content.",
+    "requestUrl": "https://help.x.com/en/forms/safety-and-sensitive-content/private-information",
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [
+      "Post URLs",
+      "Where consent is unclear, X may need to hear from the depicted person or authorized representative"
+    ],
+    "steps": [
+      "In-app: Report post > Private or Non-Consensual Content > choose who you report for",
+      "Desktop: private information report form",
+      "X may limit visibility pending victim confirmation",
+      "Appeals via help.x.com/en/forms/account-access/appeals"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://help.x.com/en/rules-and-policies/intimate-media",
+      "https://stopncii.org/partners/industry-partners/"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "tiktok-ncii",
+    "category": "ncii",
+    "platform": "TikTok",
+    "title": "TikTok intimate privacy violation report",
+    "whenItApplies": "Content showing/promoting sexual abuse or exploitation of adults, including intimate privacy violations.",
+    "notEligible": null,
+    "requestUrl": "https://www.tiktok.com/legal/report/privacy?lang=en",
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [
+      "Report in-app",
+      "Or use TikTok's privacy report page linked from its Community Guidelines ('If you think your intimate privacy has been violated on TikTok, report it to us here')"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://www.tiktok.com/safety/en/policies-and-engagement/safety-civility",
+      "https://www.tiktok.com/legal/report/privacy"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "pornhub-content-removal",
+    "category": "ncii",
+    "platform": "Pornhub (Aylo)",
+    "title": "Pornhub content removal request",
+    "whenItApplies": "Content violating Pornhub's Non-Consensual Content (NCC) or CSAM policies; performer withdrawing consent or consent agreement violated; otherwise illegal. Reasons include no consent to recording/distribution, doxxing, deepfake/AI-manipulated likeness, limited-use permission exceeded, invalid consent.",
+    "notEligible": null,
+    "requestUrl": "https://www.pornhub.com/content-removal",
+    "contact": null,
+    "whoMustSubmit": "subject",
+    "evidence": [
+      "Content URLs (or title/username/details if URLs unavailable)",
+      "Timestamps/details",
+      "Valid email (verification required)",
+      "Typed name attesting you are the person named"
+    ],
+    "steps": [
+      "Complete the content removal form",
+      "Confirm the request via the emailed verification link",
+      "Per Pornhub, valid reported URLs are disabled immediately upon verification",
+      "Anonymous reporting available for CSAM/NCC; also file StopNCII (Pornhub is a partner)"
+    ],
+    "timeline": "Pornhub states valid URLs are 'immediately disabled' once the verification email link is clicked.",
+    "fees": "None stated.",
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://www.pornhub.com/content-removal",
+      "https://stopncii.org/partners/industry-partners/"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "xvideos-abuse-report",
+    "category": "ncii",
+    "platform": "XVideos (WebGroup)",
+    "title": "XVideos abuse reporting form (non-consensual acts / minors)",
+    "whenItApplies": "Content depicting non-consensual sexual acts or anyone under 18.",
+    "notEligible": null,
+    "requestUrl": "https://info.xvideos.com/takedown-amateur",
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [],
+    "steps": [
+      "Submit the abuse reporting form",
+      "Also file StopNCII case (XVideos listed as partner)"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://info.xvideos.net/legal/tos/"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "xhamster-dmca-abuse",
+    "category": "ncii",
+    "platform": "xHamster",
+    "title": "xHamster DMCA agent / abuse contact",
+    "whenItApplies": "Copyright infringement (DMCA designated agent); other abuse via contact form.",
+    "notEligible": null,
+    "requestUrl": "https://xhamster.com/info/contact?subject=abuse",
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [
+      "DMCA elements per 17 U.S.C. § 512(c)(3) for copyright notices"
+    ],
+    "steps": [
+      "For own-recorded intimate content, a DMCA notice to the designated agent may apply",
+      "Use the abuse contact for non-consent"
+    ],
+    "timeline": "Counter-notified material replaced within 10-14 days per its DMCA page.",
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [
+      "17 U.S.C. § 512"
+    ],
+    "sources": [
+      "https://xhamster.com/info/dmca"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "NCII-specific policy text not located; only DMCA page and abuse contact link verified."
+  },
+  {
+    "key": "mugshot-state-laws",
+    "category": "mugshot",
+    "platform": "US state law",
+    "title": "State laws restricting mugshot sites that charge removal fees",
+    "whenItApplies": "A commercial site publishes a booking photo and demands payment for removal.",
+    "notEligible": null,
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": "subject",
+    "evidence": [],
+    "steps": [
+      "Identify the state where the site operates/the subject resides",
+      "Check the applicable statute (below) and send a written removal demand citing it",
+      "If the site demands payment, also file the Google exploitative-removal-practices request"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [
+      "Minn. Stat. § 332.70 (VERIFIED: business screening services must investigate disputes without charge, correct records, and promptly delete sealed/expunged/pardoned records; notify subject within 30 days; $1,000 or actual damages)",
+      "Cal. Civ. Code § 1798.91.1 (UNVERIFIED: official site bot-challenged)",
+      "Or. Rev. Stat. § 646A.806 (UNVERIFIED: official site unreachable via egress)",
+      "815 ILCS 505/2QQQ (Illinois) (UNVERIFIED: official site unreachable via egress)",
+      "Tex. Bus. & Com. Code ch. 109 (UNVERIFIED: official site unreachable via egress)",
+      "Fla. Stat. § 901.43 (UNVERIFIED: official site unreachable via egress)",
+      "Utah Code § 17-22-30 (UNVERIFIED: section page exists on le.utah.gov but text did not load)",
+      "Ga. Code (O.C.G.A.) § 35-1-19 (UNVERIFIED: not fetched from an official source)"
+    ],
+    "sources": [
+      "https://www.revisor.mn.gov/statutes/cite/332.70",
+      "https://le.utah.gov/xcode/Title17/Chapter22/17-22-S30.html"
+    ],
+    "verifiedLive": false,
+    "checkedAt": "2026-10-24",
+    "notes": "Only Minnesota text verified. Other citations come from prior knowledge and must be confirmed on official legislature sites before use; many US state legislature sites blocked or timed out on the non-US egress exits."
+  },
+  {
+    "key": "mugshot-expungement-route",
+    "category": "mugshot",
+    "platform": "Courts / data brokers / Google",
+    "title": "Expungement/sealing-based removal route",
+    "whenItApplies": "Subject has obtained (or can obtain) expungement, sealing or pardon of the arrest/charge record.",
+    "notEligible": null,
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": "subject",
+    "evidence": [
+      "Certified expungement/sealing order or pardon",
+      "URLs where the booking photo/record appears"
+    ],
+    "steps": [
+      "Obtain the expungement/sealing order through the relevant court (state-specific)",
+      "Send the order with a deletion demand to each site/screening service (Minn. Stat. § 332.70 requires prompt deletion of sealed/expunged/pardoned records by business screening services)",
+      "Where a site demands payment, file Google's exploitative removal practices request",
+      "After the source page is removed, use Google Refresh Outdated Content and Bing Content Removal Tool"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [
+      "Subject identity and record identifiers",
+      "Copy of expungement/sealing order",
+      "URL(s) of the record/photo",
+      "Statutory basis for deletion (state-specific)",
+      "Deadline and contact details"
+    ],
+    "statutes": [
+      "Minn. Stat. § 332.70 subd. 3, 3a"
+    ],
+    "sources": [
+      "https://www.revisor.mn.gov/statutes/cite/332.70",
+      "https://support.google.com/websearch/answer/9172218?hl=en",
+      "https://support.google.com/webmasters/answer/7041154?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Court-side expungement procedure varies by state; not documented here."
+  },
+  {
+    "key": "ripoff-report-policy",
+    "category": "complaint_site",
+    "platform": "Ripoff Report",
+    "title": "Ripoff Report no-removal policy, free rebuttal, V.I.P. Arbitration, Corporate Advocacy Program",
+    "whenItApplies": "Business or individual named in a Ripoff Report.",
+    "notEligible": "Ripoff Report states it does not remove reports in their entirety: not for defamation claims, not on author request, not for money, not on settlement agreements; it has fought default-judgment-based removal orders. Editorial redactions possible for Terms of Service violations.",
+    "requestUrl": "https://www.ripoffreport.com/arbitration",
+    "contact": "Arbitration@RipoffReport.com; PO Box 310, Tempe, Arizona 85280; (602) 518-4357 / (602) 359-4357",
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "For arbitration: Complaint form identifying specific false statements of fact (opinions cannot be disputed); proof of falsity (complainant bears burden)"
+    ],
+    "steps": [
+      "Option 1: post a free Rebuttal/Comment/Update",
+      "Option 2: V.I.P. Arbitration: submit Complaint form; author may respond; neutral arbitrator (one a retired judge) decides; proven-false statements redacted, report stays, title updated and arbitrator's decision posted above report",
+      "Option 3: Corporate Advocacy Program (business remediation program; apply online)",
+      "Legal action against the author (not the site, given CDA 230) remains possible"
+    ],
+    "timeline": null,
+    "fees": "Rebuttals free. V.I.P. Arbitration: paid ('there is a cost ... covers the arbitrator's fees and our administrative costs'); amount not stated on fetched pages. Corporate Advocacy Program price not stated on fetched page.",
+    "letterOutline": [
+      "Report URL and title",
+      "Each specific factual statement disputed",
+      "Evidence of falsity per statement",
+      "Relief sought: redaction under V.I.P. Arbitration",
+      "Contact and representative details"
+    ],
+    "statutes": [
+      "47 U.S.C. § 230"
+    ],
+    "sources": [
+      "https://www.ripoffreport.com/faqs",
+      "https://www.ripoffreport.com/want-to-sue-ripoff",
+      "https://www.ripoffreport.com/corporate-advocacy-program"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "ripoffreport.com/arbitration page itself was bot-challenged; arbitration details come from the official 'want-to-sue-ripoff' FAQ, which also links https://www.ripoffreport.com/remove-a-report/vip-arbitration-program/ed-magedson-explains-7ad2e.htm."
+  },
+  {
+    "key": "complaintsboard",
+    "category": "complaint_site",
+    "platform": "ComplaintsBoard",
+    "title": "ComplaintsBoard removal/edit rules",
+    "whenItApplies": "Complaint or comment on ComplaintsBoard.com.",
+    "notEligible": "Complaints not removed unless an officially signed court order is received or they violate the Complaint Guidelines; ComplaintsBoard states it does not offer business listing or complaint removals and makes no exceptions; deleting a whole complaint/major portion via edit is not allowed.",
+    "requestUrl": null,
+    "contact": "support@complaintsboard.com",
+    "whoMustSubmit": "anyone",
+    "evidence": [
+      "Link to the complaint/comment",
+      "Exact text of personal info to remove (e.g. 'Please remove the following: Joe Blow, +1..., 00001 New York, NY')",
+      "Authors must write from the email used to file"
+    ],
+    "steps": [
+      "For personal data: email support with the link and exact strings to remove",
+      "Authors can mark complaints 'resolved' (stops affecting business rating)",
+      "Content-guideline violations: report for review",
+      "Otherwise obtain a signed court order"
+    ],
+    "timeline": null,
+    "fees": "ComplaintsBoard states its services are free.",
+    "letterOutline": [
+      "Complaint URL",
+      "Exact personal information strings to remove",
+      "Requester relationship (author/subject)",
+      "Court order attached if seeking full removal"
+    ],
+    "statutes": [],
+    "sources": [
+      "https://www.complaintsboard.com/faq"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "pissedconsumer",
+    "category": "complaint_site",
+    "platform": "PissedConsumer",
+    "title": "PissedConsumer review removal / dispute",
+    "whenItApplies": "Content about the subject on PissedConsumer.",
+    "notEligible": null,
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [],
+    "verifiedLive": false,
+    "checkedAt": "2026-10-24",
+    "notes": "UNVERIFIED: official site unreachable through the egress exits (timeouts). No policy facts recorded."
+  },
+  {
+    "key": "thedirty",
+    "category": "complaint_site",
+    "platform": "TheDirty",
+    "title": "TheDirty post removal",
+    "whenItApplies": "Content about the subject on TheDirty.",
+    "notEligible": null,
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [],
+    "verifiedLive": false,
+    "checkedAt": "2026-10-24",
+    "notes": "UNVERIFIED: official site unreachable through the egress exits (timeouts). No policy facts recorded."
+  },
+  {
+    "key": "google-business-reviews",
+    "category": "review_site",
+    "platform": "Google Business Profile / Maps",
+    "title": "Report a policy-violating Google review; one-time appeal",
+    "whenItApplies": "Review violates Maps user-generated content policy: fake/misleading, conflict of interest (current/former employees, competitors, contractual relationships), incentivized, rating manipulation, PII/doxxing, harassment, hate, obscene/profane, off-topic, etc.",
+    "notEligible": "Google does not remove reviews just because the business disagrees or dislikes them; it does not mediate business/customer disputes.",
+    "requestUrl": "https://support.google.com/business/workflow/9945796?hl=en",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "Review identification",
+      "Policy reason (e.g. Spam, Conflict of interest, Profanity)"
+    ],
+    "steps": [
+      "From the Business Profile: next to the review select Report and choose a reason",
+      "Or Reviews Management Tool: Confirm account > Report a new review for removal",
+      "Check status: Decision pending / Report reviewed - no policy violation / Escalated",
+      "If no violation found: submit one-time appeal (up to 10 reviews per appeal)",
+      "Report policy-violating user profiles via Google Maps app",
+      "Extortion scams involving negative reviews have a separate reporting path"
+    ],
+    "timeline": "Review evaluation 'typically takes several days'.",
+    "fees": "None stated.",
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://support.google.com/business/answer/4596773?hl=en",
+      "https://support.google.com/contributionpolicy/answer/7400114?hl=en",
+      "https://support.google.com/business/workflow/9945796?hl=en"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Final egress re-check failed (TLS resets) for: https://support.google.com/contributionpolicy/answer/7400114?hl=en; these pages returned 200 and were read earlier this session."
+  },
+  {
+    "key": "yelp-report-review",
+    "category": "review_site",
+    "platform": "Yelp",
+    "title": "Report a review under Yelp Content Guidelines",
+    "whenItApplies": "Review violates guidelines: relevance, inappropriate content (threats, harassment, lewdness, hate), conflicts of interest, privacy (close-up photos of patrons, full names of non-public people), promotional content, non-original or AI-generated content.",
+    "notEligible": "Yelp generally lets users stand behind what they write.",
+    "requestUrl": "https://biz.yelp.com",
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [],
+    "steps": [
+      "Business owners: claim the page; in Yelp for Business > Reviews, three-dot More Options > Report Review",
+      "Consumers: logged in, on the business page or user profile, More Options > Report review",
+      "Track status by hovering the flag icon; decision emailed"
+    ],
+    "timeline": "Moderator evaluation 'may take several days'.",
+    "fees": "None stated.",
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://www.yelp.com/guidelines",
+      "https://www.yelp-support.com/article/How-do-I-report-a-review?l=en_US"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "trustpilot-flag",
+    "category": "review_site",
+    "platform": "Trustpilot",
+    "title": "Flag a review breaching Trustpilot guidelines",
+    "whenItApplies": "Fake reviews (not reflecting a genuine experience), incentivized reviews, harmful/illegal/promotional content, sensitive personal data, not based on own experience.",
+    "notEligible": null,
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [],
+    "steps": [
+      "Flag the review on Trustpilot (businesses: see 'For which reasons can businesses flag service reviews' support article)",
+      "Report unfair review-invitation practices via the Community Reporting form"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://legal.trustpilot.com/for-reviewers/guidelines-for-reviewers"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Flag reasons article https://support.trustpilot.com/hc/en-us/articles/207312357 is linked from the official guidelines but was not fetched."
+  },
+  {
+    "key": "bbb-complaint-review",
+    "category": "review_site",
+    "platform": "BBB",
+    "title": "BBB complaint / customer review dispute",
+    "whenItApplies": "Complaint or customer review on a BBB business profile.",
+    "notEligible": null,
+    "requestUrl": "https://www.bbb.org/file-a-complaint",
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://www.bbb.org/file-a-complaint"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Only the File a Complaint page was reachable; BBB review/complaint dispute process pages were Cloudflare-blocked. Process details UNVERIFIED."
+  },
+  {
+    "key": "glassdoor",
+    "category": "review_site",
+    "platform": "Glassdoor",
+    "title": "Glassdoor review guidelines and flagging",
+    "whenItApplies": "Content about the subject on Glassdoor.",
+    "notEligible": null,
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [],
+    "verifiedLive": false,
+    "checkedAt": "2026-10-24",
+    "notes": "UNVERIFIED: official pages bot-challenged or unreachable via egress exits. No policy facts recorded."
+  },
+  {
+    "key": "indeed-reviews",
+    "category": "review_site",
+    "platform": "Indeed",
+    "title": "Indeed company review guidelines and reporting",
+    "whenItApplies": "Content about the subject on Indeed.",
+    "notEligible": null,
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [],
+    "verifiedLive": false,
+    "checkedAt": "2026-10-24",
+    "notes": "UNVERIFIED: official pages bot-challenged or unreachable via egress exits. No policy facts recorded."
+  },
+  {
+    "key": "justia",
+    "category": "complaint_site",
+    "platform": "Justia",
+    "title": "Justia court-record / listing removal",
+    "whenItApplies": "Content about the subject on Justia.",
+    "notEligible": null,
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [],
+    "verifiedLive": false,
+    "checkedAt": "2026-10-24",
+    "notes": "UNVERIFIED: official pages bot-challenged or unreachable via egress exits. No policy facts recorded."
+  },
+  {
+    "key": "facebook-defamation",
+    "category": "social",
+    "platform": "Facebook",
+    "title": "Facebook defamation report form",
+    "whenItApplies": "Content on Facebook believed defamatory.",
+    "notEligible": "Facebook states it is not in a position to adjudicate truth and, consistent with CDA 230(c), generally cannot act without a court order establishing unlawfulness (US).",
+    "requestUrl": "https://www.facebook.com/help/contact/430253071144967",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "URL for each piece of content",
+      "Specific statements alleged defamatory and why",
+      "Country where legal rights claimed",
+      "Court order where required"
+    ],
+    "steps": [
+      "Select type of unlawfulness and country",
+      "State on whose behalf you report (self, organization, attorney/representative)",
+      "Provide URLs and explanation per item",
+      "Contact the poster; obtain a court order if needed"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [
+      "Reporter identity and authority (injured person or authorized representative)",
+      "Country of claim",
+      "URL list",
+      "Specific statements and why defamatory",
+      "Court order (if obtained)"
+    ],
+    "statutes": [
+      "47 U.S.C. § 230(c)"
+    ],
+    "sources": [
+      "https://www.facebook.com/help/contact/430253071144967"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "facebook-privacy",
+    "category": "social",
+    "platform": "Facebook",
+    "title": "Facebook privacy violation (photo/video) report",
+    "whenItApplies": "Photo or video on Facebook believed to violate the subject's privacy; private info that could lead to physical/financial harm (Meta Privacy Violations policy).",
+    "notEligible": "Meta may allow private info that became public through news, court filings, press releases.",
+    "requestUrl": "https://www.facebook.com/help/contact/954059743194940",
+    "contact": null,
+    "whoMustSubmit": "subject",
+    "evidence": [],
+    "steps": [
+      "Remove/report unwanted tags",
+      "Use the privacy violation form linked from 'Reporting a Privacy Violation'",
+      "Parents of children under 13 / representatives of incapacitated persons use the privacy contact form (facebook.com/help/contact/516343134409068)"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://www.facebook.com/help/1561472897490627",
+      "https://transparency.meta.com/policies/community-standards/privacy-violations/",
+      "https://www.facebook.com/help/1380418588640631"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Privacy form ID extracted from the help article markup; form page itself not separately fetched."
+  },
+  {
+    "key": "instagram-privacy",
+    "category": "social",
+    "platform": "Instagram",
+    "title": "Instagram exposed private information report",
+    "whenItApplies": "Photo/video or post exposing the reporter's private/confidential information on Instagram.",
+    "notEligible": "Instagram cannot remove info posted publicly elsewhere; acts only if associated with the reporter or with documentation of authority.",
+    "requestUrl": "https://help.instagram.com/contact/512241091300432",
+    "contact": null,
+    "whoMustSubmit": "subject",
+    "evidence": [],
+    "steps": [
+      "Optionally ask the poster to remove it",
+      "Report via the privacy form; reports are anonymous except IP reports"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://help.instagram.com/122717417885747"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "meta-bullying",
+    "category": "social",
+    "platform": "Facebook / Instagram",
+    "title": "Meta Bullying & Harassment policy",
+    "whenItApplies": "Targeted harassment; private adults must self-report for some protections.",
+    "notEligible": null,
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": "subject",
+    "evidence": [],
+    "steps": [
+      "Report in-app; self-report where the policy requires it"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://transparency.meta.com/policies/community-standards/bullying-harassment/"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": "Facebook/Instagram review (Recommendations) reporting flow not verified."
+  },
+  {
+    "key": "reddit-privacy",
+    "category": "social",
+    "platform": "Reddit",
+    "title": "Reddit personal information violation",
+    "whenItApplies": "Posting someone's personal information or links to it (incl. legible Facebook screenshots). Public-figure professional contact info may be an exception.",
+    "notEligible": null,
+    "requestUrl": "https://www.reddit.com/report",
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [],
+    "steps": [
+      "Report via reddit.com/report (Personal Information)",
+      "Contact Reddit support if unresolved"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://support.reddithelp.com/hc/en-us/articles/360043066452",
+      "https://redditinc.com/policies/reddit-rules"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "x-private-info",
+    "category": "social",
+    "platform": "X (Twitter)",
+    "title": "X private information & media policy",
+    "whenItApplies": "Posting/threatening to expose home address/location, ID documents, non-public contact info, identity of an anonymous user; private media of individuals shared without consent.",
+    "notEligible": "Publicly available info shared non-abusively; business locations; media of public interest/newsworthy.",
+    "requestUrl": "https://help.x.com/en/forms/safety-and-sensitive-content/private-information",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "Post URLs",
+      "Private media: first-person report (or authorized/legal representative)"
+    ],
+    "steps": [
+      "Report via the private information form or in-app",
+      "Anyone may report clearly abusive sharing; otherwise X may need the owner or authorized representative"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://help.x.com/en/rules-and-policies/personal-information",
+      "https://help.x.com/en/forms/safety-and-sensitive-content/private-information"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "x-abuse-copyright",
+    "category": "social",
+    "platform": "X (Twitter)",
+    "title": "X abuse/harassment and copyright (DMCA) reports",
+    "whenItApplies": "Abusive behavior/harassment; or copyright infringement (profile/header images, media, posts).",
+    "notEligible": null,
+    "requestUrl": "https://help.x.com/en/forms/ipi",
+    "contact": null,
+    "whoMustSubmit": "anyone",
+    "evidence": [],
+    "steps": [
+      "Harassment: report via abuse form; X may need to hear from the target",
+      "Copyright: Intellectual Property form > report copyright infringement (DMCA), counter-notice and retraction options available"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [
+      "17 U.S.C. § 512"
+    ],
+    "sources": [
+      "https://help.x.com/en/rules-and-policies/abusive-behavior",
+      "https://help.x.com/en/forms/safety-and-sensitive-content/abuse",
+      "https://help.x.com/en/forms/ipi",
+      "https://help.x.com/en/rules-and-policies/copyright-policy"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "tiktok-privacy-harassment",
+    "category": "social",
+    "platform": "TikTok",
+    "title": "TikTok privacy, harassment and copyright reports",
+    "whenItApplies": "Harassment/bullying incl. doxing; sharing personal information that could lead to harm (identity theft, stalking, fraud); copyright infringement.",
+    "notEligible": "More critical commentary allowed about public figures.",
+    "requestUrl": "https://www.tiktok.com/legal/report/feedback",
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [
+      "Report in-app or via 'Report a problem' > Report a potential violation",
+      "Privacy: tiktok.com/legal/report/privacy",
+      "Copyright: Copyright Infringement Report online form (ipr.tiktokforbusiness.com/legal/report/Copyright) with option to prevent re-uploads"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [
+      "17 U.S.C. § 512"
+    ],
+    "sources": [
+      "https://www.tiktok.com/safety/en/policies-and-engagement/overview",
+      "https://www.tiktok.com/legal/report/feedback",
+      "https://www.tiktok.com/legal/page/global/copyright-policy/en",
+      "https://www.tiktok.com/legal/report/privacy"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "wikipedia-paid-disclosure",
+    "category": "wikipedia",
+    "platform": "Wikipedia / Wikimedia",
+    "title": "Paid-contribution disclosure (Wikimedia Terms of Use + WP:PAID)",
+    "whenItApplies": "Anyone editing for compensation (incl. reputation agencies and their clients).",
+    "notEligible": "Undisclosed paid editing violates the Terms of Use; violators agree to binding 'Med-Arb'.",
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "Disclosure of employer, client, and affiliation"
+    ],
+    "steps": [
+      "Disclose employer, client, intended beneficiary and affiliation on user page, talk page, or edit summary of each paid contribution (en.wiki: {{paid|employer=...|client=...}} / {{connected contributor (paid)}})",
+      "Link from user page to all accounts on sites where paid editing is advertised/solicited",
+      "Link to Wikipedia account(s) in off-wiki ads and in communications with each client",
+      "Do not log out to edit"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use",
+      "https://en.wikipedia.org/wiki/Wikipedia:Paid-contribution_disclosure"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "wikipedia-coi",
+    "category": "wikipedia",
+    "platform": "Wikipedia",
+    "title": "Conflict of interest guideline (WP:COI)",
+    "whenItApplies": "Subject, employee, agent or anyone with a COI regarding an article.",
+    "notEligible": "COI editors are strongly discouraged from editing affected articles directly; must not act as AfC/NPP reviewer of affected articles; no one controls articles.",
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [],
+    "steps": [
+      "Disclose COI",
+      "Propose changes on the article talk page with {{edit COI}}",
+      "Put new articles through Articles for Creation",
+      "Keep discussions concise; editors may decline requests",
+      "See Guide to effective COI edit requests"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://en.wikipedia.org/wiki/Wikipedia:Conflict_of_interest"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "wikipedia-edit-request",
+    "category": "wikipedia",
+    "platform": "Wikipedia",
+    "title": "Edit request for article subjects (talk page / {{edit COI}})",
+    "whenItApplies": "Subject or representative wants factual corrections or additions.",
+    "notEligible": null,
+    "requestUrl": "https://en.wikipedia.org/wiki/Wikipedia:Edit_requests",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [
+      "Reliable, published, independent sources supporting each change"
+    ],
+    "steps": [
+      "Open the article's Talk page > New section",
+      "State exact change requested ('change X to Y'), with citations",
+      "Add {{edit COI}} (COI/paid) to queue it; optionally use the Edit Request Wizard",
+      "Wait for a volunteer; requests may be declined"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [
+      "COI/paid disclosure",
+      "Exact text to change/add/remove",
+      "Reliable source citations",
+      "Policy rationale (e.g. BLP, verifiability)"
+    ],
+    "statutes": [],
+    "sources": [
+      "https://en.wikipedia.org/wiki/Wikipedia:Edit_requests",
+      "https://en.wikipedia.org/wiki/Template:Edit_COI",
+      "https://en.wikipedia.org/wiki/Wikipedia:Contact_us/Article_subjects"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "wikipedia-blp",
+    "category": "wikipedia",
+    "platform": "Wikipedia",
+    "title": "Biographies of living persons (WP:BLP) issues",
+    "whenItApplies": "Unsourced or poorly sourced contentious material about a living person.",
+    "notEligible": "Editors in a significant dispute with the subject should not edit their biography.",
+    "requestUrl": "https://en.wikipedia.org/wiki/Wikipedia:Biographies_of_living_persons/Noticeboard",
+    "contact": "info-en-q@wikimedia.org (Volunteer Response Team, for legal or serious concerns; include article link and details)",
+    "whoMustSubmit": "agent_ok",
+    "evidence": [],
+    "steps": [
+      "Cite WP:BLP: contentious unsourced/poorly sourced material should be removed immediately",
+      "Raise on article talk page or BLP Noticeboard",
+      "For serious/legal concerns email VRT"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://en.wikipedia.org/wiki/Wikipedia:Biographies_of_living_persons",
+      "https://en.wikipedia.org/wiki/Wikipedia:Contact_us/Article_subjects"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "wikipedia-afc",
+    "category": "wikipedia",
+    "platform": "Wikipedia",
+    "title": "Articles for Creation (AfC)",
+    "whenItApplies": "New article drafts, required route for COI/paid editors; new or unregistered editors who cannot create mainspace articles.",
+    "notEligible": null,
+    "requestUrl": "https://en.wikipedia.org/wiki/Wikipedia:Article_wizard",
+    "contact": null,
+    "whoMustSubmit": "agent_ok",
+    "evidence": [],
+    "steps": [
+      "Create draft via Article Wizard",
+      "Focus on references establishing notability",
+      "Submit for review; volunteers review"
+    ],
+    "timeline": "No fixed waiting time; not reviewed in submission order.",
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://en.wikipedia.org/wiki/Wikipedia:Articles_for_creation"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  },
+  {
+    "key": "wikipedia-notability",
+    "category": "wikipedia",
+    "platform": "Wikipedia",
+    "title": "Notability tests (WP:GNG, WP:BIO, WP:CORP/NCORP)",
+    "whenItApplies": "Before drafting or defending an article.",
+    "notEligible": "Trivial/incidental coverage, press releases, company sites, routine announcements do not establish notability; organizations not notable via association.",
+    "requestUrl": null,
+    "contact": null,
+    "whoMustSubmit": null,
+    "evidence": [],
+    "steps": [
+      "GNG: significant coverage in reliable sources independent of the subject",
+      "BIO: significant coverage in multiple published, reliable, intellectually independent secondary sources",
+      "CORP: each source must contain significant, in-depth coverage, be completely independent, reliable, and secondary"
+    ],
+    "timeline": null,
+    "fees": null,
+    "letterOutline": [],
+    "statutes": [],
+    "sources": [
+      "https://en.wikipedia.org/wiki/Wikipedia:Notability",
+      "https://en.wikipedia.org/wiki/Wikipedia:Notability_(people)",
+      "https://en.wikipedia.org/wiki/Wikipedia:Notability_(organizations_and_companies)"
+    ],
+    "verifiedLive": true,
+    "checkedAt": "2026-10-24",
+    "notes": null
+  }
+]

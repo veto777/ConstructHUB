@@ -42,6 +42,15 @@ export const EXTERNAL_DFY_PAGES: readonly ExternalDfyPage[] = [
     icon: "shield-alert",
     blurb: "Help with a suspended Google Business Profile",
   },
+  {
+    key: "reputationRestoration",
+    title: "Reputation Restoration",
+    lede: "Negative search results removed where they qualify and pushed down where they don't, plus autocomplete cleanup and people-search opt-outs. Starts with a free scan.",
+    path: "/reputation",
+    pricing: { kind: "sales", topic: "Reputation restoration" },
+    icon: "shield-alert",
+    blurb: "Remove and push down bad search results",
+  },
 ];
 
 /** /done-for-you/<slug> */

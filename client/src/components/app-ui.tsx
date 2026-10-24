@@ -66,7 +66,7 @@ const PAGE_ICONS: [string, LucideIcon, Accent][] = [
   ["/cloudflare", Cloud, "orange"], ["/search-console", LineChart, "orange"], ["/site-scan", ScanSearch, "orange"], ["/seo", TrendingUp, "orange"],
   ["/vpn-shield", ShieldCheck, "orange"], ["/ip-tracker", Fingerprint, "orange"], ["/social-media", Megaphone, "orange"],
   ["/guides", BookOpen, "orange"], ["/master-class", GraduationCap, "orange"], ["/settings", Settings, "orange"],
-  ["/admin/access", KeyRound, "orange"], ["/admin/code-api", Code2, "orange"], ["/admin/issues", Bug, "orange"], ["/admin/proposals", FileSignature, "orange"], ["/admin/tickets", Ticket, "orange"], ["/admin/referrals", Gift, "orange"], ["/admin/feature-pages", LayoutGrid, "orange"],
+  ["/admin/access", KeyRound, "orange"], ["/admin/code-api", Code2, "orange"], ["/admin/issues", Bug, "orange"], ["/admin/reputation", ShieldCheck, "orange"], ["/admin/proposals", FileSignature, "orange"], ["/admin/tickets", Ticket, "orange"], ["/admin/referrals", Gift, "orange"], ["/admin/feature-pages", LayoutGrid, "orange"],
   ["/crm-app", Kanban, "orange"], ["/", LayoutDashboard, "orange"],
 ];
 function pageIconFor(path: string): { icon: LucideIcon; accent: Accent } | null {

@@ -176,6 +176,7 @@ export { default as e_admin_issues } from "./tools/admin-issues";
 export { default as e_admin_partnerships } from "./tools/admin-partnerships";
 export { default as e_admin_proposals } from "./tools/admin-proposals";
 export { default as e_admin_referrals } from "./tools/admin-referrals";
+export { default as e_admin_reputation } from "./tools/admin-reputation";
 export { default as e_admin_tickets } from "./tools/admin-tickets";
 export { default as e_admin_youtube } from "./tools/admin-youtube";
 export { default as e_call_assistant_calls } from "./tools/call-assistant.calls";

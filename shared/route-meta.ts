@@ -67,6 +67,11 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
     description:
       "Every official source a research report checks in each state: license boards, discipline, stop-work orders, debarments, and how each one is searched.",
   },
+  "/reputation": {
+    title: "Reputation Restoration — Remove & Push Down Negative Results | ConstructHUB",
+    description:
+      "Free reputation scan, then removals, negative results pushed off page one, autocomplete cleanup and people-search opt-outs for people and businesses.",
+  },
   "/reinstatement": {
     title: "Request GBP Reinstatement Help | ConstructHUB",
     description:

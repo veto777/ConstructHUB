@@ -43,6 +43,9 @@ const APP_EXEMPT: Record<string, string> = {
   "/googleads-features": "Google Ads landing alias of /features",
   "/googleads-crm": "Google Ads landing page",
   "/googleads-pricing": "Google Ads landing alias of /pricing",
+  "/admin/proposals/:id": "editor titles itself from the proposal",
+  "/admin/reputation/:id": "case page titles itself from the case",
+  "/reputation/report/:token": "scan report titles itself",
 };
 
 const CRM_EXEMPT: Record<string, string> = {

@@ -127,6 +127,7 @@ export const APP_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/admin/code-api": "Code API · Admin",
   "/admin/issues": "Issues · Admin",
   "/admin/backlinks": "Backlinks · Admin",
+  "/admin/reputation": "Reputation Desk · Admin",
   "/admin/proposals": "Proposals · Admin",
   "/admin/partnerships": "Partnerships · Admin",
   "/admin/press": "Press Wire desk · Admin",

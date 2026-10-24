@@ -140,6 +140,8 @@ const SeoCompetitorsPage = lazyPage(() => import("@/pages/seo/competitors"));
 const AdminAccessPage = lazyPage(() => import("@/pages/admin-access"));
 const AdminCodeApiPage = lazyPage(() => import("@/pages/admin-code-api"));
 const AdminIssuesPage = lazyPage(() => import("@/pages/admin-issues"));
+const AdminReputationPage = lazyPage(() => import("@/pages/admin-reputation"));
+const ReputationPage = lazyPage(() => import("@/pages/reputation"));
 const AdminProposalsPage = lazyPage(() => import("@/pages/admin-proposals"));
 const AdminBacklinksPage = lazyPage(() => import("@/pages/admin-backlinks"));
 const AdminPartnershipsPage = lazyPage(() => import("@/pages/admin-partnerships"));
@@ -335,6 +337,8 @@ function DashboardRouter() {
       <Route path="/seo/competitors" component={SeoCompetitorsPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
+      <Route path="/reputation" component={ReputationPage} />
+      <Route path="/reputation/report/:token" component={ReputationPage} />
       <Route path="/compliance" component={CompliancePage} />
       <Route path="/compliance/research/coverage" component={ResearchCoveragePage} />
       <Route path="/compliance/research" component={ResearchOrderPage} />
@@ -398,6 +402,9 @@ function DashboardRouter() {
       <Route path="/admin/code-api" component={AdminCodeApiPage} />
       {/* Platform admins: the issue desk — captured failures and Claude's reports (the API answers 403 to anyone else). */}
       <Route path="/admin/issues" component={AdminIssuesPage} />
+      {/* Platform admins: the Reputation Desk — free-scan leads and restoration cases (the API answers 403 to anyone else). */}
+      <Route path="/admin/reputation" component={AdminReputationPage} />
+      <Route path="/admin/reputation/:id" component={AdminReputationPage} />
       {/* Platform admins: proposal templates and offers — send, e-sign, ACH/card payment (the API answers 403 to anyone else). */}
       <Route path="/admin/proposals" component={AdminProposalsPage} />
       <Route path="/admin/proposals/:id" component={AdminProposalsPage} />
@@ -512,6 +519,8 @@ function PublicRouter() {
       <Route path="/site-scan" component={FreeSiteScanPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
+      <Route path="/reputation" component={ReputationPage} />
+      <Route path="/reputation/report/:token" component={ReputationPage} />
       <Route path="/compliance" component={CompliancePage} />
       <Route path="/compliance/research/coverage" component={ResearchCoveragePage} />
       <Route path="/compliance/research" component={ResearchOrderPage} />
@@ -587,7 +596,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/call-assistant", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings", "/site-scan/history",
-  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/backlinks", "/admin/partnerships", "/admin/youtube",
+  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/reputation", "/admin/backlinks", "/admin/partnerships", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];
@@ -610,7 +619,7 @@ const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
 const SELF_TITLED = ["/media-library", "/privacy", "/data-deletion", "/terms", "/support", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/youtube"];
 /** Feature and service pages title themselves from their content (seo.title). */
 const isSelfTitled = (location: string) =>
-  SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/admin/proposals/") || location.startsWith("/proposal/") || location.startsWith("/done-for-you/");
+  SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/admin/proposals/") || location.startsWith("/proposal/") || location === "/reputation" || location.startsWith("/reputation/") || location.startsWith("/admin/reputation/") || location.startsWith("/done-for-you/");
 
 /** The sidebar's collapsed/expanded choice (ui/sidebar.tsx writes this cookie) survives a reload. */
 function sidebarDefaultOpen(): boolean {
@@ -824,6 +833,8 @@ function AppContent() {
   useSeoHead(location, !portal && !clientPortal);
 
   if (location === "/free-site-scan") return <FreeSiteScanPage />;
+  // Reputation restoration and its free scan / report (pages/reputation.tsx): full-bleed for everyone.
+  if (location === "/reputation" || location.startsWith("/reputation/report/")) return <ReputationPage />;
   if (location.startsWith("/site-scan/report/")) return <SharedSiteScanPage />;
 
   // The client portal never touches the platform session: a homeowner has no
