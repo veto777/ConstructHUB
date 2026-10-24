@@ -12,9 +12,8 @@ import {
   ShieldCheck, Star, UserX, BookOpen, TrendingUp, Youtube,
 } from "lucide-react";
 import {
-  REP_PLANS, REP_TERM_MONTHS, annualCents, type RepScanReport, type RepSubjectKind,
+  REP_PLANS, REP_TERM_MONTHS, type RepScanReport, type RepSubjectKind,
 } from "@shared/reputation";
-import { formatMoney } from "@shared/proposals";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { BTN_LG, BTN_PRIMARY, H2, Kicker, LEAD, useDocumentTitle } from "@/components/feature-landing/primitives";
 import { Input } from "@/components/ui/input";
@@ -253,20 +252,18 @@ export default function ReputationPage() {
           <div className="mx-auto max-w-6xl">
             <Kicker n="02" className="!text-mkt-orange [&>span:nth-child(2)]:!text-mkt-navy-muted">Plans for individuals</Kicker>
             <h2 className="font-display mt-5 text-[2.1rem] font-semibold leading-[1.05] tracking-[-0.02em] sm:text-[2.6rem]">Pick the plan that fits the damage</h2>
-            <p className="mt-3 text-[17px] text-mkt-navy-muted">{REP_TERM_MONTHS}-month plans, billed monthly — or prepay the year and save 10%. Business and executive programs are quoted after a free review.</p>
+            <p className="mt-3 text-[17px] text-mkt-navy-muted">{REP_TERM_MONTHS}-month plans, priced on a free call once we have seen your results. Business and executive programs are quoted the same way.</p>
             <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
               {REP_PLANS.map((p) => (
                 <div key={p.key} className={cn("relative flex flex-col rounded-2xl border p-6", "badge" in p ? "border-mkt-orange bg-[color:color-mix(in_srgb,var(--mkt-orange)_10%,transparent)]" : "border-mkt-navy-rule")} data-testid={`plan-${p.key}`}>
                   {"badge" in p && <span className="absolute -top-3 left-6 rounded-full bg-mkt-orange px-3 py-0.5 text-xs font-semibold text-white">{p.badge}</span>}
                   <h3 className="font-display text-xl font-semibold">{p.name}</h3>
                   <p className="text-sm text-mkt-navy-muted">{p.fit}</p>
-                  <div className="mt-4"><span className="font-display text-[2.2rem] font-semibold">{formatMoney(p.monthlyCents)}</span><span className="text-mkt-navy-muted"> /month</span></div>
-                  <div className="text-xs text-mkt-navy-muted">or {formatMoney(annualCents(p.monthlyCents))} prepaid for the year</div>
-                  <div className="mt-3 text-sm font-semibold text-mkt-orange">{p.negatives}</div>
+                  <div className="mt-4 text-sm font-semibold text-mkt-orange">{p.negatives}</div>
                   <ul className="mt-3 flex-1 space-y-2 text-[14px]">
                     {p.includes.map((i) => <li key={i} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-mkt-orange" />{i}</li>)}
                   </ul>
-                  <a href="#scan" className={`${BTN_PRIMARY} mt-5 h-11 justify-center`}>Start with a free scan</a>
+                  <a href="mailto:support@constructhub.us?subject=Reputation%20plan%20pricing" className={`${BTN_PRIMARY} mt-5 h-11 justify-center`}>Talk to sales for pricing</a>
                 </div>
               ))}
             </div>

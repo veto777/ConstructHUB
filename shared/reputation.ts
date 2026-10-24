@@ -192,20 +192,17 @@ export const normalizeQuery = (q: string) => q.replace(/\s+/g, " ").trim().slice
 // ---------------------------------------------------------------------------------------------- plans
 
 /**
- * Individual restoration plans (12-month term; prepaying the year takes 10% off). Starting prices follow the
- * market's published individual tiers (owner order 2026-10-23: "copy this business model"); the owner can change
- * them here and in the proposal template. Business and enterprise work is quoted.
+ * Individual restoration plans (12-month term). What each covers is public; the prices are not (owner, 2026-10-24)
+ * and live in server/reputation/prices.ts and the proposal template. Business and enterprise work is quoted.
  */
 export const REP_PLANS = [
-  { key: "foundation", name: "Foundation", monthlyCents: 150_000, negatives: "1–2 negative results", fit: "A single bad result or a thin presence",
+  { key: "foundation", name: "Foundation", negatives: "1–2 negative results", fit: "A single bad result or a thin presence",
     includes: ["Reputation audit and monthly report", "Owned assets: personal or business site and core profiles", "Ongoing content to push results down", "Ongoing monitoring of your results"] },
-  { key: "restore", name: "Restore", monthlyCents: 250_000, negatives: "3–4 negative results", fit: "A few problems on page 1",
+  { key: "restore", name: "Restore", negatives: "3–4 negative results", fit: "A few problems on page 1",
     includes: ["Everything in Foundation", "Autocomplete cleanup", "People-search opt-outs", "More placements each month"] },
-  { key: "restore-pro", name: "Restore Pro", monthlyCents: 350_000, negatives: "5–6 negative results", fit: "Serious damage across page 1", badge: "Most chosen",
+  { key: "restore-pro", name: "Restore Pro", negatives: "5–6 negative results", fit: "Serious damage across page 1", badge: "Most chosen",
     includes: ["Everything in Restore", "Search ads on your name while results move", "Image and video cleanup", "Monthly strategy call"] },
-  { key: "total", name: "Total Restoration", monthlyCents: 500_000, negatives: "7+ negative results", fit: "Severe or widespread damage",
+  { key: "total", name: "Total Restoration", negatives: "7+ negative results", fit: "Severe or widespread damage",
     includes: ["Everything in Restore Pro", "Top-priority team", "Highest content and placement volume", "Multiple search terms"] },
 ] as const;
 export const REP_TERM_MONTHS = 12;
-export const REP_PREPAY_DISCOUNT = 0.1;
-export const annualCents = (monthly: number) => Math.round(monthly * REP_TERM_MONTHS * (1 - REP_PREPAY_DISCOUNT));

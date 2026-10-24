@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { annualCents, heuristicSentiment, playbookFor, positionWeight, reputationScore, scoreGrade } from "@shared/reputation";
+import { heuristicSentiment, playbookFor, positionWeight, reputationScore, scoreGrade } from "@shared/reputation";
+import { annualCents } from "./prices";
 import { parseSerp } from "./scan";
 import { brokerRequestText, itemKey } from "./routes";
 
