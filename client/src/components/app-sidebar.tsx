@@ -283,6 +283,8 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "Press Releases", url: "/press-releases", icon: Newspaper, badge: "hot" },
   // Reputation for every account (owner, 2026-10-24: "in the sidebar for all users"); the Desk stays in Admin.
   { title: "Reputation", url: "/my-reputation", icon: ShieldCheck, badge: "new" },
+  // The public reputation restoration page (pages/reputation.tsx), for every account (owner, 2026-10-24).
+  { title: "Reputation Restoration", url: "/reputation", icon: ShieldCheck, badge: "hot" },
   { title: "Cloudflare", url: "/cloudflare", icon: Cloud, logoComponent: CloudflareIcon },
   { title: "Search Console", url: "/search-console", icon: Search, logoComponent: SearchConsoleIcon },
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },
