@@ -5,18 +5,26 @@
  *     GET    /api/admin/proposals?kind=template|offer         rows + summary
  *     GET    /api/admin/proposals/:id                         the editor's detail
  *     POST   /api/admin/proposals { kind, fromId?, name? }    new blank, or a copy (a template → an offer)
+ *     POST   /api/admin/proposals/import { kind, fileName, dataBase64, recipient*? } → { jobId }   built from the
+ *            admin's own PDF in the background (server/proposals/import.ts: sections, pickable packages, the
+ *            PDF's terms + the standard agreement); GET /api/admin/proposals/import/:jobId → { status, proposalId?, error? }
  *     PUT    /api/admin/proposals/:id { name?, recipient*, content?, expiresAt? }   refused once signed
  *     POST   /api/admin/proposals/:id/file { name, dataBase64 }   attach / replace the PDF
  *     DELETE /api/admin/proposals/:id/file
  *     GET    /api/admin/proposals/:id/file                    the attached PDF
  *     GET    /api/admin/proposals/:id/signed.pdf              the signed copy
  *     POST   /api/admin/proposals/:id/send { to?, cc?, subject?, message? }   emails the link (offers)
+ *     POST   /api/admin/proposals/:id/proof { subject?, message? }   the same email, to the admin only, "[PROOF] " subject,
+ *            with a preview link (no view recorded, can't sign or pay) — like the CRM's "Send me a proof"
  *     POST   /api/admin/proposals/:id/status { status: void | archived | draft }
  *
  *   recipient (the token in the emailed link is the key; no account):
- *     GET  /api/public/proposals/:token[?preview=1]   the page (a platform admin's preview records no view)
+ *     GET  /api/public/proposals/:token[?preview=1|<key>]   the page (an admin's preview, or a proof email's signed key,
+ *          records no view)
  *     GET  /api/public/proposals/:token/document      the attached PDF, inline
- *     POST /api/public/proposals/:token/sign { itemIds, plan, name, title?, signatureDataUrl?, consent }
+ *     POST /api/public/proposals/:token/sign { itemIds, plan, name, title?, signatureDataUrl?, initials?, initialed[], consent }
+ *     POST /api/public/proposals/:token/preview-sign   (preview links only) the same checks → the signed agreement PDF it
+ *          would produce; nothing stored or sent
  *     POST /api/public/proposals/:token/decline { reason? }
  *     POST /api/public/proposals/:token/checkout { method: ach | card }   → Stripe Checkout url
  *     GET  /api/public/proposals/:token/signed.pdf
@@ -28,7 +36,7 @@
  */
 import type { Express } from "express";
 import type Stripe from "stripe";
-import { randomBytes } from "crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { pool } from "../db";
 import { requirePlatformAdmin } from "../crm/admin";
@@ -37,11 +45,12 @@ import { stripe, stripeConfigured } from "../billing/client";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 import {
-  ESIGN_CONSENT, MAX_PDF_BYTES, PROPOSAL_KINDS, cardFeeCents, emptyContent, formatBps, formatMoney, priceSelection, proposalContentSchema,
+  ESIGN_CONSENT, MAX_PDF_BYTES, PROPOSAL_KINDS, clausesToInitial, cardFeeCents, emptyContent, formatBps, formatMoney, priceSelection, proposalContentSchema,
   selectionProblems, type ProposalContent, type ProposalDetail, type ProposalEvent, type ProposalRow, type ProposalStatus, type ProposalSummary,
   type ProposalTotals, type PublicProposal,
 } from "@shared/proposals";
 import { buildSignedProposalPdf } from "./pdf";
+import { ImportError, proposalFromPdf } from "./import";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -50,6 +59,14 @@ const idParam = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 const newToken = () => randomBytes(24).toString("base64url");
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+/** The proof email's preview link: a key only this server can make for this token (the CRM's preview grant). */
+const PREVIEW_SECRET = process.env.SESSION_SECRET || randomBytes(32).toString("hex");
+export const previewKey = (token: string) => createHmac("sha256", PREVIEW_SECRET).update(`proposal-preview:${token}`).digest("base64url").slice(0, 32);
+const isPreviewKey = (token: string, key: unknown) => {
+  if (typeof key !== "string" || key.length !== 32) return false;
+  const a = Buffer.from(key), b = Buffer.from(previewKey(token));
+  return a.length === b.length && timingSafeEqual(a, b);
+};
 const clientIp = (req: any): string | null => String(req.headers["cf-connecting-ip"] || req.ip || "").slice(0, 64) || null;
 
 function parseContent(raw: unknown): ProposalContent {
@@ -142,6 +159,18 @@ const button = (href: string, label: string, accent: string) =>
   `<p style="margin:24px 0"><a href="${esc(href)}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;font-weight:700;padding:13px 26px;border-radius:8px">${esc(label)}</a></p>`;
 const fromFor = (content: ProposalContent) => `"${content.brand.name.replace(/["<>]/g, "")}" <support@constructhub.us>`;
 const paragraphs = (s: string) => s.trim().split(/\n\s*\n/).map((p) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+
+/** The client's "Review & sign" email — one builder for the real send and the proof, so the proof can't drift. */
+function offerEmail(r: any, content: ProposalContent, link: string, message?: string) {
+  const note = message?.trim() || content.intro.trim();
+  return {
+    html: emailShell(content, `<p>Hi ${esc(r.recipient_name || "there")},</p>${note ? paragraphs(note) : ""}
+      <p>Your proposal <b>${esc(content.title || r.name)}</b> is ready. Open it to review the details, choose the services you want, sign and pay securely online.</p>
+      ${button(link, "Review & sign", content.brand.accent)}
+      <p style="font-size:13px;color:#6b7280">Bank transfer (ACH) has no fee.${content.payment.cardEnabled && content.payment.cardFeeBps ? ` Card payments add a ${formatBps(content.payment.cardFeeBps)} processing fee.` : ""}</p>`),
+    text: `${note ? `${note}\n\n` : ""}Review and sign your proposal: ${link}`,
+  };
+}
 
 async function notifySigned(r: any, base: string) {
   const content = parseContent(r.content);
@@ -246,6 +275,44 @@ async function refreshFromStripe(r: any): Promise<any> {
   return r;
 }
 
+/**
+ * The signing request, checked: the selection, the name, the drawn or typed signature, the e-sign consent, and an
+ * initial on every clause that asks for one. Shared by the real signing and the preview's.
+ */
+function parseSignature(req: any, content: ProposalContent) {
+  const body = z.object({
+    itemIds: z.array(z.string().max(40)).max(200),
+    plan: z.enum(["monthly", "full"]).optional(),
+    name: z.string().trim().min(2).max(120),
+    title: z.string().trim().max(120).optional(),
+    signatureDataUrl: z.string().max(400_000).regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/).optional(),
+    initials: z.string().trim().max(6).optional(),
+    initialed: z.array(z.object({ id: z.string().max(40), at: z.string().max(40) })).max(40).default([]),
+    consent: z.literal(true),
+  }).safeParse(req.body);
+  if (!body.success) {
+    const field = body.error.issues[0]?.path[0];
+    return { error: { message: field === "consent" ? "Tick the box to agree to sign electronically." : field === "name" ? "Type your full name." : "Check your selection and signature." } };
+  }
+  const problems = selectionProblems(content, body.data.itemIds);
+  if (problems.length) return { error: { message: problems[0], problems } };
+  const need = clausesToInitial(content);
+  const done = new Map(body.data.initialed.map((x) => [x.id, x.at]));
+  const missing = need.filter((c) => !done.has(c.id));
+  if (need.length && (!body.data.initials || missing.length)) {
+    return { error: { message: `Initial every clause before signing${missing[0] ? ` — “${missing[0].heading || "a clause"}” is not initialed yet` : ""}.` } };
+  }
+  const now = new Date().toISOString();
+  const clampAt = (at: string | undefined) => { const t = at ? Date.parse(at) : NaN; return Number.isFinite(t) && t <= Date.now() + 60_000 && t > Date.now() - 7 * 86_400_000 ? new Date(t).toISOString() : now; };
+  const totals = priceSelection(content, body.data.itemIds, body.data.plan);
+  const signature = {
+    name: body.data.name, title: body.data.title ?? "", imageDataUrl: body.data.signatureDataUrl ?? null,
+    signedAt: now, ip: clientIp(req), userAgent: String(req.headers["user-agent"] || "").slice(0, 300), consent: ESIGN_CONSENT,
+    ...(need.length ? { initials: body.data.initials!.slice(0, 6), initialed: need.map((c) => ({ id: c.id, at: clampAt(done.get(c.id)) })) } : {}),
+  };
+  return { body: body.data, totals, signature };
+}
+
 export function registerProposalRoutes(app: Express, getDevUser: GetUser): void {
   // ---------- admin ----------
   app.get("/api/admin/proposals", async (req, res) => {
@@ -297,6 +364,60 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
       [body.data.kind, name.slice(0, 200), newToken(), templateId, JSON.stringify(content), fileId, admin.id,
         event("created", body.data.fromId ? `copied from #${body.data.fromId}` : undefined)]);
     res.status(201).json(toDetail(await loadById(Number(rows[0].id))));
+  });
+
+  // Building from a PDF takes minutes (the AI lays out the whole document), longer than a proxied request may stay
+  // open, so it runs in the background and the page polls the job.
+  const importJobs = new Map<string, { status: "running" | "done" | "failed"; proposalId?: number; error?: string; adminId: number; at: number }>();
+  app.post("/api/admin/proposals/import", async (req, res) => {
+    const admin = await requirePlatformAdmin(req, res, getDevUser);
+    if (!admin) return;
+    const body = z.object({
+      kind: z.enum(PROPOSAL_KINDS), fileName: z.string().trim().min(1).max(200), dataBase64: z.string().min(10),
+      recipientName: z.string().trim().max(200).optional(), recipientEmail: z.string().trim().max(200).email().or(z.literal("")).optional(),
+      recipientCompany: z.string().trim().max(200).optional(),
+    }).safeParse(req.body);
+    if (!body.success) return res.status(400).json({ message: body.error.issues[0]?.message ?? "Attach a PDF" });
+    const buf = Buffer.from(body.data.dataBase64.replace(/^data:[^,]*,/, ""), "base64");
+    if (buf.length > MAX_PDF_BYTES) return res.status(413).json({ message: `The PDF is larger than ${MAX_PDF_BYTES / 1024 / 1024} MB.` });
+    if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") return res.status(400).json({ message: "That file is not a PDF." });
+    if ([...importJobs.values()].filter((j) => j.status === "running").length >= 3) return res.status(429).json({ message: "Three PDFs are already being read. Try again in a few minutes." });
+    for (const [k, j] of importJobs) if (Date.now() - j.at > 3600_000) importJobs.delete(k);
+    const jobId = randomBytes(12).toString("base64url");
+    const job: { status: "running" | "done" | "failed"; proposalId?: number; error?: string; adminId: number; at: number } = { status: "running", adminId: admin.id, at: Date.now() };
+    importJobs.set(jobId, job);
+    res.status(202).json({ jobId });
+    const d = body.data;
+    void (async () => {
+      try {
+        const made = await proposalFromPdf(buf, "ConstructHUB");
+        const fileName = d.fileName.toLowerCase().endsWith(".pdf") ? d.fileName : `${d.fileName}.pdf`;
+        const f = await pool.query(`INSERT INTO proposal_files (name, bytes, data) VALUES ($1, $2, $3) RETURNING id`, [fileName, buf.length, buf]);
+        const rName = d.recipientName || made.recipient.name || null;
+        const rCompany = d.recipientCompany || made.recipient.company || null;
+        const rEmail = (d.recipientEmail || (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(made.recipient.email) ? made.recipient.email : "")).toLowerCase() || null;
+        const name = (d.kind === "offer" && rName ? `${rName}${rCompany ? ` — ${rCompany}` : ""}` : made.content.title || fileName.replace(/\.pdf$/i, "")).slice(0, 200);
+        const offer = d.kind === "offer";
+        const { rows } = await pool.query(
+          `INSERT INTO proposals (kind, name, public_token, content, file_id, recipient_name, recipient_email, recipient_company, created_by, events)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb) RETURNING id`,
+          [d.kind, name, newToken(), JSON.stringify(made.content), f.rows[0].id, offer ? rName : null, offer ? rEmail : null, offer ? rCompany : null, admin.id,
+            event("created", `from ${fileName} (${made.pages} pages, ${made.content.groups.reduce((n, g) => n + g.items.length, 0)} options; laid out by ${made.provider})`)]);
+        job.status = "done"; job.proposalId = Number(rows[0].id);
+      } catch (e: any) {
+        job.status = "failed";
+        job.error = e instanceof ImportError ? e.message : "Something went wrong building the proposal. Please try again.";
+        if (!(e instanceof ImportError)) console.error("[proposals] import failed:", e?.message ?? e);
+      }
+    })();
+  });
+
+  app.get("/api/admin/proposals/import/:jobId", async (req, res) => {
+    const admin = await requirePlatformAdmin(req, res, getDevUser);
+    if (!admin) return;
+    const job = importJobs.get(String(req.params.jobId));
+    if (!job || job.adminId !== admin.id) return res.status(404).json({ message: "That upload isn't running any more. Please upload the PDF again." });
+    res.json({ status: job.status, proposalId: job.proposalId ?? null, error: job.error ?? null });
   });
 
   app.put("/api/admin/proposals/:id", async (req, res) => {
@@ -431,16 +552,10 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     const base = getBaseUrl(req);
     const link = `${base}/proposal/${r.public_token}`;
     const subject = body.data.subject || `${content.title || "Your proposal"} — ${content.brand.name}`;
-    const note = body.data.message?.trim() || content.intro.trim();
     try {
       await sendWithFallback({
         from: fromFor(content), to, cc: body.data.cc?.length ? body.data.cc.join(", ") : undefined,
-        replyTo: content.brand.contactEmail || undefined, subject,
-        html: emailShell(content, `<p>Hi ${esc(r.recipient_name || "there")},</p>${note ? paragraphs(note) : ""}
-          <p>Your proposal <b>${esc(content.title || r.name)}</b> is ready. Open it to review the details, choose the services you want, sign and pay securely online.</p>
-          ${button(link, "Review & sign", content.brand.accent)}
-          <p style="font-size:13px;color:#6b7280">Bank transfer (ACH) has no fee.${content.payment.cardEnabled && content.payment.cardFeeBps ? ` Card payments add a ${formatBps(content.payment.cardFeeBps)} processing fee.` : ""}</p>`),
-        text: `${note ? `${note}\n\n` : ""}Review and sign your proposal: ${link}`,
+        replyTo: content.brand.contactEmail || undefined, subject, ...offerEmail(r, content, link, body.data.message),
       });
     } catch (e: any) {
       return res.status(502).json({ message: `The email could not be sent: ${String(e?.message || e).slice(0, 160)}` });
@@ -450,6 +565,31 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
          status = CASE WHEN status IN ('draft', 'sent') THEN 'sent' ELSE status END, updated_at = now(), events = events || $3::jsonb
        WHERE id = $1`, [r.id, to, event("sent", [to, ...(body.data.cc ?? [])].join(", "))]);
     res.json({ ...toDetail(await loadById(Number(r.id))), link });
+  });
+
+  app.post("/api/admin/proposals/:id/proof", async (req, res) => {
+    const admin = await requirePlatformAdmin(req, res, getDevUser);
+    if (!admin) return;
+    const id = idParam.safeParse(req.params.id);
+    const r = id.success ? await loadById(id.data) : null;
+    if (!r) return res.status(404).json({ message: "Proposal not found" });
+    if (r.kind !== "offer") return res.status(400).json({ message: "Make an offer from this template to send a proof." });
+    const body = z.object({ subject: z.string().trim().max(200).optional(), message: z.string().max(5000).optional() }).safeParse(req.body ?? {});
+    if (!body.success) return res.status(400).json({ message: "Invalid proof" });
+    const to = String(admin.email || "").toLowerCase();
+    if (!to) return res.status(400).json({ message: "Your account has no email address." });
+    const content = parseContent(r.content);
+    const link = `${getBaseUrl(req)}/proposal/${r.public_token}?preview=${previewKey(r.public_token)}`;
+    try {
+      await sendWithFallback({
+        from: fromFor(content), to, replyTo: content.brand.contactEmail || undefined,
+        subject: `[PROOF] ${body.data.subject || `${content.title || "Your proposal"} — ${content.brand.name}`}`, ...offerEmail(r, content, link, body.data.message),
+      });
+    } catch (e: any) {
+      return res.status(502).json({ message: `The proof could not be sent: ${String(e?.message || e).slice(0, 160)}` });
+    }
+    await addEvent(Number(r.id), "proof_sent", to);
+    res.json({ ok: true, to });
   });
 
   app.post("/api/admin/proposals/:id/status", async (req, res) => {
@@ -475,7 +615,7 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
   app.get("/api/public/proposals/:token", async (req: any, res) => {
     let r = await loadByToken(String(req.params.token || ""));
     if (!r || r.status === "archived") return res.status(404).json({ message: "This proposal link is not valid." });
-    const preview = req.query.preview === "1" && isPlatformAdminEmail(req.user?.email);
+    const preview = (req.query.preview === "1" && isPlatformAdminEmail(req.user?.email)) || isPreviewKey(r.public_token, req.query.preview);
     if (!preview && !r.viewed_at && !["void"].includes(r.status)) {
       await pool.query(
         `UPDATE proposals SET viewed_at = now(), status = CASE WHEN status IN ('draft', 'sent') THEN 'viewed' ELSE status END,
@@ -514,35 +654,34 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     if (r.signed_at) return res.status(409).json({ message: "This proposal is already signed." });
     if (r.status === "declined") return res.status(409).json({ message: "This proposal was declined. Contact us for a new one." });
     if (isExpired(r)) return res.status(410).json({ message: "This proposal has expired. Contact us for an updated one." });
-    const body = z.object({
-      itemIds: z.array(z.string().max(40)).max(200),
-      plan: z.enum(["monthly", "full"]).optional(),
-      name: z.string().trim().min(2).max(120),
-      title: z.string().trim().max(120).optional(),
-      signatureDataUrl: z.string().max(400_000).regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/).optional(),
-      consent: z.literal(true),
-    }).safeParse(req.body);
-    if (!body.success) {
-      const field = body.error.issues[0]?.path[0];
-      return res.status(400).json({ message: field === "consent" ? "Tick the box to agree to sign electronically." : field === "name" ? "Type your full name." : "Check your selection and signature." });
-    }
-    const content = parseContent(r.content);
-    const problems = selectionProblems(content, body.data.itemIds);
-    if (problems.length) return res.status(400).json({ message: problems[0], problems });
-    const totals = priceSelection(content, body.data.itemIds, body.data.plan);
-    const signature = {
-      name: body.data.name, title: body.data.title ?? "", imageDataUrl: body.data.signatureDataUrl ?? null,
-      signedAt: new Date().toISOString(), ip: clientIp(req), userAgent: String(req.headers["user-agent"] || "").slice(0, 300), consent: ESIGN_CONSENT,
-    };
+    const parsed = parseSignature(req, parseContent(r.content));
+    if ("error" in parsed) return res.status(400).json(parsed.error);
+    const { body, totals, signature } = parsed;
     const { rows } = await pool.query(
       `UPDATE proposals SET status = 'signed', signed_at = now(), selection = $2::jsonb, totals = $3::jsonb, signature = $4::jsonb,
          viewed_at = COALESCE(viewed_at, now()), updated_at = now(), events = events || $5::jsonb
        WHERE id = $1 AND signed_at IS NULL RETURNING *`,
-      [r.id, JSON.stringify({ itemIds: body.data.itemIds, plan: totals.plan }), JSON.stringify(totals), JSON.stringify(signature),
-        event("signed", `${body.data.name} · ${formatMoney(totals.contractTotalCents)} · ${signature.ip ?? ""}`)]);
+      [r.id, JSON.stringify({ itemIds: body.itemIds, plan: totals.plan }), JSON.stringify(totals), JSON.stringify(signature),
+        event("signed", `${body.name} · ${formatMoney(totals.contractTotalCents)} · ${signature.ip ?? ""}`)]);
     if (!rows[0]) return res.status(409).json({ message: "This proposal is already signed." });
     void notifySigned(rows[0], getBaseUrl(req));
     res.json({ ok: true, totals });
+  });
+
+  // The preview's "sign": everything the real signing checks, then the signed agreement it would produce — nothing is
+  // stored, no one is emailed (an admin's preview, or a proof email's preview key).
+  app.post("/api/public/proposals/:token/preview-sign", async (req: any, res) => {
+    const r = await loadByToken(String(req.params.token || ""));
+    if (!r) return res.status(404).json({ message: "This proposal link is not valid." });
+    const preview = (req.query.preview === "1" && isPlatformAdminEmail(req.user?.email)) || isPreviewKey(r.public_token, req.query.preview);
+    if (!preview) return res.status(403).json({ message: "Preview signing is only for the proposal's preview link." });
+    const parsed = parseSignature(req, parseContent(r.content));
+    if ("error" in parsed) return res.status(400).json(parsed.error);
+    const pdf = await buildSignedProposalPdf({ ...signedPdfInput({ ...r, totals: parsed.totals, signature: parsed.signature, payment_method: null, payment_status: null, paid_at: null }), preview: true });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="proposal-${r.id}-preview.pdf"`);
+    res.setHeader("Cache-Control", "no-store");
+    res.end(pdf);
   });
 
   app.post("/api/public/proposals/:token/decline", async (req, res) => {

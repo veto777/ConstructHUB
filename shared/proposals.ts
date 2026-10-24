@@ -52,6 +52,8 @@ export const proposalItemSchema = z.object({
   included: z.boolean().default(false),
   /** A short tag shown on the card ("Recommended"). */
   badge: text(40).default(""),
+  /** The little "i" on the card: why this option is worth it / better than the one before (owner, 2026-10-24). */
+  info: text(2000).default(""),
 });
 export type ProposalItem = z.infer<typeof proposalItemSchema>;
 
@@ -63,6 +65,8 @@ export const proposalGroupSchema = z.object({
   select: z.enum(["one", "many"]).default("many"),
   /** At least one item in this group must be chosen. */
   required: z.boolean().default(false),
+  /** The little "i" beside the group's heading: what this choice is and how the options compare. */
+  info: text(2000).default(""),
   items: z.array(proposalItemSchema).max(40),
 });
 export type ProposalGroup = z.infer<typeof proposalGroupSchema>;
@@ -76,6 +80,21 @@ export const proposalSectionSchema = z.object({
   body: text(20_000).default(""),
 });
 export type ProposalSection = z.infer<typeof proposalSectionSchema>;
+
+/**
+ * A contract clause the client initials one by one before signing, like DocuSign's "Initial here" (owner,
+ * 2026-10-24: "check the boxes or sign the dotted areas"). initials false shows the clause without a box.
+ */
+export const proposalClauseSchema = z.object({
+  id,
+  heading: text(300).default(""),
+  body: text(5000).default(""),
+  initials: z.boolean().default(true),
+});
+export type ProposalClause = z.infer<typeof proposalClauseSchema>;
+
+/** Proposals sell services: no sales tax is ever added (owner, 2026-10-24). Shown in the totals and the signed copy. */
+export const TAX_NOTE = "Professional services — no sales tax is added.";
 
 export const proposalContentSchema = z.object({
   brand: z.object({
@@ -93,6 +112,8 @@ export const proposalContentSchema = z.object({
   intro: text(5000).default(""),
   sections: z.array(proposalSectionSchema).max(40).default([]),
   groups: z.array(proposalGroupSchema).max(20).default([]),
+  /** The contract clauses initialed one by one (shown in the signing step, printed with the initials). */
+  clauses: z.array(proposalClauseSchema).max(40).default([]),
   terms: text(30_000).default(""),
   payment: z.object({
     plan: z.enum(PAYMENT_PLANS).default("monthly"),
@@ -215,6 +236,41 @@ export function bodyBlocks(body: string): BodyBlock[] {
 }
 
 /** The consent the recipient ticks before signing; stored word for word with the signature. */
+/**
+ * The general service agreement every proposal made from a PDF carries (owner, 2026-10-24: "nothing is guaranteed
+ * and there are no refunds, but the results will show and the work will always be proven that it's done"). The
+ * admin edits it per proposal; "Use the standard terms" in the editor puts it back.
+ */
+export function standardTerms(brand: string): string {
+  const we = brand.trim() || "the provider";
+  return [
+    "SERVICE AGREEMENT — GENERAL TERMS",
+    `1. The agreement. By signing, you (the client) engage ${we} ("we") for the services you selected in this proposal, at the prices and terms shown. This proposal, your selections and these terms are the whole agreement between us.`,
+    "2. No guarantees. Search engines, platforms, publishers, reviewers and the public decide rankings, placements, removals and outcomes, and we do not control them. We do not guarantee any particular ranking, position, removal, review, traffic, lead, sale or other result, or any timeframe. Timelines and targets in this proposal are estimates.",
+    "3. Results you can see. We track your search results, rankings and visibility throughout the engagement and report them to you, so progress is always visible.",
+    "4. Proof of work. Every deliverable is documented. Each month you receive a report of the work completed — links to the live pages, articles, profiles and listings; distribution and placement reports; copies of requests submitted; change logs; and ranking snapshots — so every item can be verified as done.",
+    "5. No refunds. All payments are final and non-refundable, including one-time, setup and monthly fees, once work for that period has begun, whether or not you use the services and regardless of results.",
+    "6. Term and billing. One-time services are billed when you sign. Monthly services run for the minimum term shown and are billed automatically each month. After the minimum term, monthly services continue until either side cancels with 30 days' written notice.",
+    "7. Payment. Bank transfer (ACH) carries no fee; card payments add the card fee shown at checkout. If a payment fails or is late, work may pause until it is made. You agree to contact us first about any billing question; disputing a charge for work that was delivered as described is a breach of this agreement.",
+    "8. Your part. You provide accurate information, the access we need, and timely approvals. Delays caused by missing information, access or approvals do not pause billing or create a right to a refund. You confirm that everything you give us to publish is true and that you have the right to use it.",
+    "9. Content and approvals. We publish statements about you or your business only after you approve them, and we label sponsored or client-owned content where the law or a platform's rules require it.",
+    "10. Third-party costs. Advertising spend and any third-party fees not listed in this proposal are separate and are charged only with your approval.",
+    "11. Ownership. Once paid in full, the websites, articles and other content we create for you are yours, and accounts created in your name belong to you.",
+    "12. Confidentiality. Each side keeps the other's non-public information confidential.",
+    `13. Limitation of liability. ${we}'s total liability under this agreement is limited to the fees you paid in the three months before the claim, and neither side is liable for indirect or consequential losses.`,
+    "14. Electronic signature. Your electronic signature on this proposal has the same effect as a handwritten signature.",
+  ].join("\n\n");
+}
+
+/** The clauses the client must initial before the signature unlocks. */
+export const clausesToInitial = (content: ProposalContent) => content.clauses.filter((c) => c.initials);
+
+/** Initials from a name: "Steve Tutty, MA, PhD" → "ST" (credentials after a comma are dropped). */
+export function initialsOf(name: string): string {
+  const words = name.split(",")[0].trim().split(/\s+/).filter((w) => /^[A-Za-z]/.test(w) && !/^(dr|mr|mrs|ms|mx)\.?$/i.test(w));
+  return words.map((w) => w[0].toUpperCase()).join("").slice(0, 4);
+}
+
 export const ESIGN_CONSENT =
   "I agree to sign electronically. My electronic signature has the same effect as a handwritten signature, and I accept the selected services, prices and terms of this proposal.";
 

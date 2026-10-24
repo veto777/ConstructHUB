@@ -14,7 +14,7 @@ import {
   ArrowDown, ArrowLeft, ArrowUp, Archive, Copy, Eye, FilePlus2, FileSignature, FileText, Loader2, Lock, Mail, Plus, RotateCcw, Save, Send, Trash2, Upload, XCircle,
 } from "lucide-react";
 import {
-  DEFAULT_CARD_FEE_BPS, MAX_PDF_BYTES, PROPOSAL_STATUS_LABELS, defaultSelection, formatBps, formatMoney, priceSelection,
+  DEFAULT_CARD_FEE_BPS, MAX_PDF_BYTES, PROPOSAL_STATUS_LABELS, defaultSelection, formatBps, formatMoney, priceSelection, standardTerms,
   type ProposalContent, type ProposalDetail, type ProposalGroup, type ProposalItem, type ProposalRow, type ProposalStatus, type ProposalSummary,
 } from "@shared/proposals";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -107,6 +107,62 @@ function NewOfferDialog({ open, onClose, templates }: { open: boolean; onClose: 
   );
 }
 
+/** Upload your own proposal PDF: the server lays it out as sections and pickable packages plus the contract terms. */
+function ImportPdfDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const [, go] = useLocation();
+  const [file, setFile] = useState<File | null>(null);
+  const [kind, setKind] = useState<"offer" | "template">("offer");
+  const [rname, setRname] = useState(""); const [remail, setRemail] = useState(""); const [rco, setRco] = useState("");
+  const run = useMutation({
+    mutationFn: async () => {
+      if (!file) throw new Error("Choose a PDF");
+      if (file.size > MAX_PDF_BYTES) throw new Error(`The PDF is larger than ${MAX_PDF_BYTES / 1024 / 1024} MB.`);
+      const dataBase64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(new Error("Couldn't read the file")); r.readAsDataURL(file); });
+      const { jobId } = await (await apiRequest("POST", "/api/admin/proposals/import", { kind, fileName: file.name, dataBase64, ...(kind === "offer" ? { recipientName: rname || undefined, recipientEmail: remail || undefined, recipientCompany: rco || undefined } : {}) })).json() as { jobId: string };
+      // The server reads the PDF in the background (it can take a few minutes); check every few seconds.
+      for (const stop = Date.now() + 15 * 60_000; Date.now() < stop;) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const j = await getJson<{ status: "running" | "done" | "failed"; proposalId: number | null; error: string | null }>(`/api/admin/proposals/import/${jobId}`);
+        if (j.status === "failed") throw new Error(j.error || "Couldn't build the proposal");
+        if (j.status === "done" && j.proposalId) return getJson<ProposalDetail>(`/api/admin/proposals/${j.proposalId}`);
+      }
+      throw new Error("Reading the PDF is taking too long. Check the Offers list in a few minutes.");
+    },
+    onSuccess: (m) => {
+      void invalidate(); onClose(); go(`/admin/proposals/${m.id}`);
+      toast({ title: "Proposal built from your PDF", description: `${m.content.sections.length} sections and ${m.content.groups.reduce((n, g) => n + g.items.length, 0)} options. Check the prices and wording, then send.` });
+    },
+    onError: (e) => toast({ title: "Couldn't build the proposal", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && !run.isPending && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Upload your proposal PDF</DialogTitle><DialogDescription>We turn it into the online proposal: your pages become sections, every priced service becomes an option the client can pick, and the contract terms are added (nothing guaranteed, no refunds, results tracked and every piece of work proven monthly). When the client signs, they and you get the signed service agreement as a PDF, like CRM contracts. You review everything — and can send yourself a proof — before it goes out.</DialogDescription></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5"><Label htmlFor="imp-file">Proposal PDF</Label>
+            <Input id="imp-file" type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} data-testid="input-import-pdf" /></div>
+          <div className="space-y-1.5"><Label>Make it</Label>
+            <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
+              <SelectTrigger data-testid="select-import-kind"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="offer">An offer for one client</SelectItem><SelectItem value="template">A template to reuse</SelectItem></SelectContent>
+            </Select></div>
+          {kind === "offer" && <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5"><Label htmlFor="imp-name">Client name</Label><Input id="imp-name" value={rname} onChange={(e) => setRname(e.target.value)} placeholder="From the PDF if left blank" /></div>
+              <div className="space-y-1.5"><Label htmlFor="imp-co">Company</Label><Input id="imp-co" value={rco} onChange={(e) => setRco(e.target.value)} /></div>
+            </div>
+            <div className="space-y-1.5"><Label htmlFor="imp-email">Client email</Label><Input id="imp-email" type="email" value={remail} onChange={(e) => setRemail(e.target.value)} /></div>
+          </>}
+        </div>
+        <DialogFooter><Button onClick={() => run.mutate()} disabled={run.isPending || !file} data-testid="button-import-pdf">
+          {run.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Reading your PDF… this can take a few minutes</> : <><Upload className="mr-1.5 h-4 w-4" />Build the proposal</>}
+        </Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function SampleRows() {
   const rows = [
     { name: "Starter SEO — Example Dental", status: "paid" as const, total: 1_500_000, who: "Dr. Example" },
@@ -134,6 +190,7 @@ function ProposalList() {
   const [, go] = useLocation();
   const [tab, setTab] = useState<"offer" | "template" | "archived">("offer");
   const [newOffer, setNewOffer] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const url = tab === "archived" ? "/api/admin/proposals?archived=1" : `/api/admin/proposals?kind=${tab}`;
   const { data, error, isLoading, refetch } = useQuery<{ rows: ProposalRow[]; summary: ProposalSummary }>({ queryKey: [url], queryFn: () => getJson(url) });
   const { data: tpl } = useQuery<{ rows: ProposalRow[] }>({ queryKey: ["/api/admin/proposals?kind=template"], queryFn: () => getJson("/api/admin/proposals?kind=template"), enabled: !!data });
@@ -154,7 +211,8 @@ function ProposalList() {
         description="Build a proposal once, send a custom offer to each client, and let them pick services, e-sign and pay online — ACH with no fee, card with a fee added."
         actions={<div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => newTemplate.mutate()} disabled={newTemplate.isPending} data-testid="button-new-template"><FilePlus2 className="mr-1.5 h-4 w-4" />New template</Button>
-          <Button size="sm" onClick={() => setNewOffer(true)} data-testid="button-new-offer"><Plus className="mr-1.5 h-4 w-4" />New offer</Button>
+          <Button variant="outline" size="sm" onClick={() => setNewOffer(true)} data-testid="button-new-offer"><Plus className="mr-1.5 h-4 w-4" />New offer</Button>
+          <Button size="sm" onClick={() => setImportOpen(true)} data-testid="button-import-proposal"><Upload className="mr-1.5 h-4 w-4" />Upload your PDF</Button>
         </div>} flush />
       <div className="min-w-0 space-y-4">
         <StatGrid cols={4}>
@@ -166,7 +224,8 @@ function ProposalList() {
 
         <Section title="How this works" description="Templates hold your packages and prices; an offer is a copy you tailor for one client.">
           <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-            <li>Make a <b>template</b>: branding, written sections, the PDF you'd normally send, and packages of priced services (choose-one tiers or add-ons).</li>
+            <li>Fastest: <b>Upload your PDF</b> — your proposal becomes the online version with pickable options and the contract terms. Check it, then send.</li>
+            <li>Or make a <b>template</b>: branding, written sections, the PDF you'd normally send, and packages of priced services (choose-one tiers or add-ons).</li>
             <li>Click <b>New offer</b>, pick the template and the client, then change anything — prices, packages, wording — for that client only.</li>
             <li><b>Send</b> emails a secure link. The client chooses services, signs on screen and pays: bank transfer (ACH) free, card with the card fee added. You get an email at each step.</li>
           </ol>
@@ -200,6 +259,7 @@ function ProposalList() {
         )}
       </div>
       <NewOfferDialog open={newOffer} onClose={() => setNewOffer(false)} templates={tpl?.rows ?? []} />
+      <ImportPdfDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </AppPage>
   );
 }
@@ -255,6 +315,7 @@ function ItemEditor({ item, onChange, onUp, onDown, onRemove }: { item: Proposal
       </div>
       <Textarea rows={2} value={item.description} onChange={(e) => set({ description: e.target.value })} placeholder="Short description" aria-label="Description" />
       <Textarea rows={3} value={item.bullets.join("\n")} onChange={(e) => set({ bullets: e.target.value.split("\n").slice(0, 40) })} placeholder={"What's included — one per line"} aria-label="What's included" />
+      <Textarea rows={2} value={item.info} onChange={(e) => set({ info: e.target.value })} placeholder="The “i” on this option: why it's better than the one before" aria-label="Info" />
       <div className="flex flex-wrap gap-5 text-sm">
         <label className="flex items-center gap-2"><Switch checked={item.defaultSelected} onCheckedChange={(v) => set({ defaultSelected: v })} /> Pre-selected</label>
         <label className="flex items-center gap-2"><Switch checked={item.included} onCheckedChange={(v) => set({ included: v })} /> Always included (can't be removed)</label>
@@ -274,6 +335,7 @@ function GroupEditor({ group, onChange, onUp, onDown, onRemove }: { group: Propo
         <OrderButtons onUp={onUp} onDown={onDown} onRemove={onRemove} label={group.name || "group"} />
       </div>
       <Textarea rows={2} value={group.description} onChange={(e) => set({ description: e.target.value })} placeholder="What the client is choosing here" aria-label="Group description" />
+      <Textarea rows={2} value={group.info} onChange={(e) => set({ info: e.target.value })} placeholder="The “i” beside this heading: how the options compare" aria-label="Group info" />
       <div className="flex flex-wrap items-center gap-5 text-sm">
         <div className="flex items-center gap-2"><span className="text-muted-foreground">Client can choose</span>
           <Select value={group.select} onValueChange={(v) => set({ select: v as ProposalGroup["select"] })}>
@@ -288,7 +350,7 @@ function GroupEditor({ group, onChange, onUp, onDown, onRemove }: { group: Propo
             onUp={() => setItems(move(group.items, i, -1))} onDown={() => setItems(move(group.items, i, 1))} onRemove={() => setItems(group.items.filter((_, j) => j !== i))} />
         ))}
       </div>
-      <Button type="button" variant="outline" size="sm" onClick={() => setItems([...group.items, { id: rid(), name: "New service", description: "", bullets: [], priceCents: 0, billing: "one_time", termMonths: 1, defaultSelected: false, included: false, badge: "" }])} data-testid={`button-add-item-${group.id}`}>
+      <Button type="button" variant="outline" size="sm" onClick={() => setItems([...group.items, { id: rid(), name: "New service", description: "", bullets: [], priceCents: 0, billing: "one_time", termMonths: 1, defaultSelected: false, included: false, badge: "", info: "" }])} data-testid={`button-add-item-${group.id}`}>
         <Plus className="mr-1.5 h-4 w-4" /> Add service
       </Button>
     </div>
@@ -387,6 +449,11 @@ function ProposalEditor({ id }: { id: number }) {
   if (isLoading && !p) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading" /></div>;
   if (!p || !c) return <Gate error={error} retry={() => void refetch()} what="this proposal" />;
   const link = `${window.location.origin}/proposal/${p.publicToken}`;
+  const proof = useMutation({
+    mutationFn: async () => { if (dirty) await saveNow(); return (await apiRequest("POST", `/api/admin/proposals/${p.id}/proof`, {})).json() as Promise<{ to: string }>; },
+    onSuccess: (r) => toast({ title: "Proof sent", description: `The exact email your client gets went to ${r.to}. Its link is a preview: opening it isn't a client view, and it can't be signed or paid.` }),
+    onError: (e) => toast({ title: "Couldn't send the proof", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const openPreview = async () => { if (dirty) await saveNow(); window.open(`/proposal/${p.publicToken}?preview=1`, "_blank", "noopener"); };
 
   return (
@@ -402,6 +469,7 @@ function ProposalEditor({ id }: { id: number }) {
           {!locked && <Button size="sm" variant={dirty ? "default" : "outline"} onClick={() => save.mutate()} disabled={save.isPending} data-testid="button-save-proposal">{save.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}Save</Button>}
           {p.kind === "offer" && <Button size="sm" variant="outline" onClick={() => void openPreview()} data-testid="button-preview-proposal"><Eye className="mr-1.5 h-4 w-4" />Preview</Button>}
           {p.kind === "offer" && <Button size="sm" variant="outline" onClick={() => { void navigator.clipboard.writeText(link); toast({ title: "Link copied", description: link }); }}><Copy className="mr-1.5 h-4 w-4" />Copy link</Button>}
+          {p.kind === "offer" && <Button size="sm" variant="outline" onClick={() => proof.mutate()} disabled={proof.isPending} data-testid="button-proof-proposal">{proof.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}Send me a proof</Button>}
           {p.kind === "offer" && !locked && !["void", "declined", "archived"].includes(p.status) && <Button size="sm" onClick={() => setSendOpen(true)} data-testid="button-send-proposal"><Mail className="mr-1.5 h-4 w-4" />{p.sentAt ? "Send again" : "Send"}</Button>}
           {p.kind === "template" && <Button size="sm" onClick={() => action.mutate({ kind: "offer" })} disabled={action.isPending} data-testid="button-offer-from-template"><FileSignature className="mr-1.5 h-4 w-4" />Create offer</Button>}
           {p.signature && <Button asChild size="sm" variant="outline"><a href={`${url}/signed.pdf`} target="_blank" rel="noreferrer"><FileText className="mr-1.5 h-4 w-4" />Signed PDF</a></Button>}
@@ -489,7 +557,7 @@ function ProposalEditor({ id }: { id: number }) {
                 <GroupEditor key={g.id} group={g} onChange={(n) => edit({ groups: c.groups.map((x, j) => (j === i ? n : x)) })}
                   onUp={() => edit({ groups: move(c.groups, i, -1) })} onDown={() => edit({ groups: move(c.groups, i, 1) })} onRemove={() => edit({ groups: c.groups.filter((_, j) => j !== i) })} />
               ))}
-              <Button type="button" variant="outline" onClick={() => edit({ groups: [...c.groups, { id: rid(), name: "New package group", description: "", select: "one", required: false, items: [] }] })} data-testid="button-add-group"><Plus className="mr-1.5 h-4 w-4" />Add package group</Button>
+              <Button type="button" variant="outline" onClick={() => edit({ groups: [...c.groups, { id: rid(), name: "New package group", description: "", select: "one", required: false, info: "", items: [] }] })} data-testid="button-add-group"><Plus className="mr-1.5 h-4 w-4" />Add package group</Button>
             </div>
           </Section>
 
@@ -516,7 +584,24 @@ function ProposalEditor({ id }: { id: number }) {
             </div>
           </Section>
 
-          <Section title="Terms & conditions" description="Shown before signing and printed on the signed copy.">
+          <Section title="Terms the client initials" description="Each clause gets an “Initial here” box on the signing step, like DocuSign; the client can't sign until every box is initialed. The initials and times print on the signed agreement.">
+            <div className="space-y-3">
+              {c.clauses.map((cl, i) => (
+                <div key={cl.id} className="space-y-2 rounded-lg border p-3" data-testid={`editor-clause-${i}`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input className="min-w-0 flex-1 font-semibold" value={cl.heading} onChange={(e) => edit({ clauses: c.clauses.map((x, j) => (j === i ? { ...x, heading: e.target.value } : x)) })} placeholder="1. Initial commitment" aria-label="Clause heading" />
+                    <label className="flex items-center gap-2 text-sm"><Switch checked={cl.initials} onCheckedChange={(v) => edit({ clauses: c.clauses.map((x, j) => (j === i ? { ...x, initials: v } : x)) })} /> Initials</label>
+                    <OrderButtons label={cl.heading || "clause"} onUp={() => edit({ clauses: move(c.clauses, i, -1) })} onDown={() => edit({ clauses: move(c.clauses, i, 1) })} onRemove={() => edit({ clauses: c.clauses.filter((_, j) => j !== i) })} />
+                  </div>
+                  <Textarea rows={3} value={cl.body} onChange={(e) => edit({ clauses: c.clauses.map((x, j) => (j === i ? { ...x, body: e.target.value } : x)) })} aria-label="Clause text" />
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" onClick={() => edit({ clauses: [...c.clauses, { id: rid(), heading: "", body: "", initials: true }] })} data-testid="button-add-clause"><Plus className="mr-1.5 h-4 w-4" />Add clause</Button>
+            </div>
+          </Section>
+
+          <Section title="Terms & conditions" description="The contract: shown before signing and printed on the signed copy."
+            actions={<Button variant="outline" size="sm" onClick={() => { if (!c.terms.trim() || window.confirm("Replace these terms with the standard service agreement?")) edit({ terms: standardTerms(c.brand.name) }); }} data-testid="button-standard-terms">Use the standard terms</Button>}>
             <Textarea rows={8} value={c.terms} onChange={(e) => edit({ terms: e.target.value })} data-testid="input-proposal-terms" />
           </Section>
         </fieldset>

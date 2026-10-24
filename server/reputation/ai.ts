@@ -9,17 +9,20 @@ import { SENTIMENTS, CONTROLS, type Control, type ItemKind, type RepSubjectKind,
 
 export const repAiDeps = { fetch: (url: string, init: RequestInit) => fetch(url, init), env: () => process.env };
 
-async function ask(p: MediaAiProvider, system: string, user: string, json: boolean): Promise<string> {
+type AskOpts = { maxTokens?: number; timeoutMs?: number };
+
+async function ask(p: MediaAiProvider, system: string, user: string, json: boolean, o: AskOpts = {}): Promise<string> {
+  const maxTokens = o.maxTokens ?? 4000;
   const init: RequestInit = p.style === "anthropic"
     ? { method: "POST", headers: { "x-api-key": p.key, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-        body: JSON.stringify({ model: p.model, max_tokens: 4000, system, messages: [{ role: "user", content: user }] }) }
+        body: JSON.stringify({ model: p.model, max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }) }
     : { method: "POST", headers: { Authorization: `Bearer ${p.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: p.model, ...(json ? { response_format: { type: "json_object" } } : {}),
-          ...(p.name === "OpenAI" ? { max_completion_tokens: 4000 } : { max_tokens: 4000 }),
+          ...(p.name === "OpenAI" ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
           messages: [{ role: "system", content: system }, { role: "user", content: user }],
         }) };
-  const res = await repAiDeps.fetch(p.url, { ...init, signal: AbortSignal.timeout(p.name.startsWith("TruthCoder") ? 120_000 : 60_000) });
+  const res = await repAiDeps.fetch(p.url, { ...init, signal: AbortSignal.timeout(o.timeoutMs ?? (p.name.startsWith("TruthCoder") ? 120_000 : 60_000)) });
   if (!res.ok) throw new Error(`${p.name} ${res.status}: ${(await res.text()).slice(0, 160)}`);
   const data: any = await res.json();
   return p.style === "anthropic"
@@ -27,13 +30,14 @@ async function ask(p: MediaAiProvider, system: string, user: string, json: boole
     : String(data?.choices?.[0]?.message?.content ?? "");
 }
 
-async function firstAnswer(system: string, user: string, json: boolean): Promise<{ text: string; provider: string }> {
+/** The first provider that answers (also used by the proposal importer, server/proposals/import.ts). */
+export async function firstAnswer(system: string, user: string, json: boolean, o: AskOpts = {}): Promise<{ text: string; provider: string }> {
   const providers = mediaAiProviders(repAiDeps.env());
   if (!providers.length) throw new Error("No AI provider is configured.");
   const errors: string[] = [];
   for (const p of providers) {
     try {
-      const text = await ask(p, system, user, json);
+      const text = await ask(p, system, user, json, o);
       if (text.trim()) return { text, provider: `${p.name} (${p.model})` };
     } catch (e: any) { errors.push(String(e?.message ?? e).slice(0, 160)); }
   }
