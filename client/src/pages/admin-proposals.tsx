@@ -360,13 +360,14 @@ function GroupEditor({ group, onChange, onUp, onDown, onRemove }: { group: Propo
 function SendDialog({ p, open, onClose, beforeSend }: { p: ProposalDetail; open: boolean; onClose: () => void; beforeSend: () => Promise<void> }) {
   const { toast } = useToast();
   const [to, setTo] = useState(p.recipientEmail ?? "");
-  const [cc, setCc] = useState("");
+  const [cc, setCc] = useState(p.recipientCc.join(", "));
   const [subject, setSubject] = useState(`${p.content.title || "Your proposal"} — ${p.content.brand.name}`);
   const [message, setMessage] = useState(p.content.intro);
-  useEffect(() => { if (open) { setTo(p.recipientEmail ?? ""); setSubject(`${p.content.title || "Your proposal"} — ${p.content.brand.name}`); setMessage(p.content.intro); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) { setTo(p.recipientEmail ?? ""); setCc(p.recipientCc.join(", ")); setSubject(`${p.content.title || "Your proposal"} — ${p.content.brand.name}`); setMessage(p.content.intro); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ccList = cc.split(/[,;\s]+/).filter(Boolean);
   const send = useMutation({
-    mutationFn: async () => { await beforeSend(); return (await apiRequest("POST", `/api/admin/proposals/${p.id}/send`, { to, cc: cc.split(/[,\s]+/).filter(Boolean), subject, message })).json(); },
-    onSuccess: () => { toast({ title: "Proposal sent", description: `Emailed to ${to}.` }); void invalidate(); onClose(); },
+    mutationFn: async () => { await beforeSend(); return (await apiRequest("POST", `/api/admin/proposals/${p.id}/send`, { to, cc: ccList, subject, message })).json(); },
+    onSuccess: () => { toast({ title: "Proposal sent", description: `Emailed to ${to}${ccList.length ? `, cc ${ccList.join(", ")}` : ""}.` }); void invalidate(); onClose(); },
     onError: (e) => toast({ title: "Couldn't send", description: apiErrorMessage(e), variant: "destructive" }),
   });
   return (
@@ -375,7 +376,8 @@ function SendDialog({ p, open, onClose, beforeSend }: { p: ProposalDetail; open:
         <DialogHeader><DialogTitle>Send for signature</DialogTitle><DialogDescription>Emails a secure link from support@constructhub.us under the {p.content.brand.name} name. Replies go to {p.content.brand.contactEmail || "support@constructhub.us"}.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5"><Label htmlFor="sd-to">To</Label><Input id="sd-to" type="email" value={to} onChange={(e) => setTo(e.target.value)} data-testid="input-send-to" /></div>
-          <div className="space-y-1.5"><Label htmlFor="sd-cc">CC (optional)</Label><Input id="sd-cc" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="name@example.com, …" /></div>
+          <div className="space-y-1.5"><Label htmlFor="sd-cc">CC (optional)</Label><Input id="sd-cc" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="name@example.com, …" data-testid="input-send-cc" />
+            <p className="text-xs text-muted-foreground">Separate several with commas. They also get the signed agreement and the payment receipt.</p></div>
           <div className="space-y-1.5"><Label htmlFor="sd-sub">Subject</Label><Input id="sd-sub" value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
           <div className="space-y-1.5"><Label htmlFor="sd-msg">Message</Label><Textarea id="sd-msg" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} /></div>
         </div>

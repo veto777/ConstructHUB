@@ -89,6 +89,7 @@ function toRow(r: any): ProposalRow {
   return {
     id: Number(r.id), kind: r.kind, name: r.name, status: r.status,
     recipientName: r.recipient_name, recipientEmail: r.recipient_email, recipientCompany: r.recipient_company,
+    recipientCc: String(r.recipient_cc || "").split(",").map((s) => s.trim()).filter(Boolean),
     title: content.title, templateId: r.template_id ? Number(r.template_id) : null, hasFile: r.file_id != null,
     contractTotalCents: totals?.contractTotalCents ?? null, dueTodayCents: totals?.dueTodayCents ?? null, paidCents: r.paid_cents ?? null,
     sentAt: iso(r.sent_at), viewedAt: iso(r.viewed_at), signedAt: iso(r.signed_at), paidAt: iso(r.paid_at),
@@ -182,7 +183,7 @@ async function notifySigned(r: any, base: string) {
   const summary = `<ul style="padding-left:18px">${t.lines.map((l) => `<li>${esc(l.name)} — ${l.billing === "monthly" ? `${formatMoney(l.priceCents)}/mo` : formatMoney(l.priceCents)}</li>`).join("")}</ul>`;
   if (r.recipient_email) {
     await sendWithFallback({
-      from: fromFor(content), to: r.recipient_email, replyTo: content.brand.contactEmail || undefined,
+      from: fromFor(content), to: r.recipient_email, cc: r.recipient_cc || undefined, replyTo: content.brand.contactEmail || undefined,
       subject: `Signed: ${content.title || "your proposal"}`,
       html: emailShell(content, `<p>Hi ${esc(r.recipient_name || "there")},</p><p>Thank you — your signed copy of <b>${esc(content.title || "the proposal")}</b> is attached.</p>${summary}
         <p>Due today: <b>${formatMoney(t.dueTodayCents, { cents: true })}</b> by bank transfer (ACH)${t.recurringCents ? `, then ${formatMoney(t.recurringCents, { cents: true })} each month` : ""}.</p>
@@ -217,7 +218,7 @@ async function notifyPaid(r: any, state: "paid" | "processing" | "failed") {
   }).catch((e: any) => console.error("[proposals] payment email failed:", e?.message));
   if (state === "paid" && r.recipient_email) {
     await sendWithFallback({
-      from: fromFor(content), to: r.recipient_email, replyTo: content.brand.contactEmail || undefined,
+      from: fromFor(content), to: r.recipient_email, cc: r.recipient_cc || undefined, replyTo: content.brand.contactEmail || undefined,
       subject: `Payment received — ${content.title || "thank you"}`,
       html: emailShell(content, `<p>Hi ${esc(r.recipient_name || "there")},</p><p>We received your payment of <b>${amount}</b>. We'll be in touch to schedule kickoff.</p>`),
       text: `We received your payment of ${amount}.`,
@@ -547,6 +548,8 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     if (!body.success) return res.status(400).json({ message: "Check the email addresses" });
     const to = (body.data.to || r.recipient_email || "").toLowerCase();
     if (!to) return res.status(400).json({ message: "Add the recipient's email first." });
+    // The CC list is kept with the offer: the same people get the signed copy and the receipt.
+    const cc = [...new Set((body.data.cc ?? r.recipient_cc?.split(",") ?? []).map((s: string) => s.trim().toLowerCase()).filter((s: string) => s && s !== to))].join(", ");
     const content = parseContent(r.content);
     if (!content.groups.some((g) => g.items.length)) return res.status(400).json({ message: "Add at least one priced service before sending." });
     const base = getBaseUrl(req);
@@ -554,16 +557,16 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     const subject = body.data.subject || `${content.title || "Your proposal"} — ${content.brand.name}`;
     try {
       await sendWithFallback({
-        from: fromFor(content), to, cc: body.data.cc?.length ? body.data.cc.join(", ") : undefined,
+        from: fromFor(content), to, cc: cc || undefined,
         replyTo: content.brand.contactEmail || undefined, subject, ...offerEmail(r, content, link, body.data.message),
       });
     } catch (e: any) {
       return res.status(502).json({ message: `The email could not be sent: ${String(e?.message || e).slice(0, 160)}` });
     }
     await pool.query(
-      `UPDATE proposals SET recipient_email = COALESCE(recipient_email, $2), sent_at = now(),
+      `UPDATE proposals SET recipient_email = COALESCE(recipient_email, $2), recipient_cc = NULLIF($4, ''), sent_at = now(),
          status = CASE WHEN status IN ('draft', 'sent') THEN 'sent' ELSE status END, updated_at = now(), events = events || $3::jsonb
-       WHERE id = $1`, [r.id, to, event("sent", [to, ...(body.data.cc ?? [])].join(", "))]);
+       WHERE id = $1`, [r.id, to, event("sent", cc ? `${to} · cc ${cc}` : to), cc]);
     res.json({ ...toDetail(await loadById(Number(r.id))), link });
   });
 

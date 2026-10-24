@@ -308,6 +308,8 @@ export const ESIGN_CONSENT =
 export type ProposalRow = {
   id: number; kind: ProposalKind; name: string; status: ProposalStatus;
   recipientName: string | null; recipientEmail: string | null; recipientCompany: string | null;
+  /** Copied on the offer email, the signed agreement and the payment receipt. */
+  recipientCc: string[];
   title: string; templateId: number | null; hasFile: boolean;
   contractTotalCents: number | null; dueTodayCents: number | null; paidCents: number | null;
   sentAt: string | null; viewedAt: string | null; signedAt: string | null; paidAt: string | null;
