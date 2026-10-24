@@ -45,6 +45,7 @@ import { stripe, stripeConfigured } from "../billing/client";
 import { getBaseUrl } from "../auth";
 import { sendWithFallback } from "../email";
 import { notifyUser } from "../account-events";
+import { normalizePhone, sendSms } from "../crm/sms";
 import {
   ESIGN_CONSENT, MAX_PDF_BYTES, PROPOSAL_KINDS, autoPayMonths, initialTargets, cardFeeCents, emptyContent, formatBps, formatMoney, priceSelection, proposalContentSchema,
   selectionProblems, type ProposalContent, type ProposalDetail, type ProposalEvent, type ProposalRow, type ProposalStatus, type ProposalSummary,
@@ -125,6 +126,23 @@ function toDetail(r: any): ProposalDetail {
   };
 }
 
+/**
+ * A text to the owner who made the offer (owner, 2026-10-24: "use the text alert too for me the owner"): opened, came
+ * back, signed, paid. Their mobile on file — the account's, else their CRM membership's or CRM org's — over the
+ * platform sender ("*": honours STOP, unmetered).
+ */
+async function textOwner(r: any, body: string): Promise<void> {
+  if (!r.created_by) return;
+  const { rows } = await pool.query(
+    `SELECT phone AS p FROM users WHERE id = $1
+     UNION ALL SELECT COALESCE(sms_consent_phone, phone) FROM crm_members WHERE user_id = $1 AND status = 'active'
+     UNION ALL SELECT phone FROM crm_orgs WHERE owner_user_id = $1`, [r.created_by]).catch(() => ({ rows: [] as any[] }));
+  const to = rows.map((x: any) => normalizePhone(x.p)).find(Boolean);
+  if (!to) return;
+  const res = await sendSms(to, `${r.is_test && !body.includes("[TEST]") ? "[TEST] " : ""}${body}`.slice(0, 480), undefined, "*").catch((e: any) => ({ ok: false, error: e?.message }));
+  if (!res.ok) console.warn("[proposals] owner text not sent:", (res as any).error);
+}
+
 const VIEW_DEDUPE_MIN = 30;
 const device = (ua: string) =>
   /iphone/i.test(ua) ? "iPhone" : /ipad/i.test(ua) ? "iPad" : /android/i.test(ua) ? "Android" : /macintosh/i.test(ua) ? "Mac" : /windows/i.test(ua) ? "Windows" : "a browser";
@@ -152,10 +170,12 @@ async function trackOpen(r: any, req: any): Promise<any> {
     [r.id, ip, counted ? 1 : 0, event(first ? "opened" : "opened_again", detail)]);
   const u = rows[0] ?? r;
   if (!counted || !r.created_by) return u;
-  const who = r.recipient_name || r.recipient_email || "Your client";
+  const who = `${r.is_test ? "[TEST] " : ""}${r.recipient_name || r.recipient_email || "Your client"}`;
   const title = parseContent(r.content).title || r.name;
   const link = `/admin/proposals/${r.id}`;
+  const adminLink = `${process.env.APP_URL || "https://constructhub.us"}${link}`;
   if (first) {
+    void textOwner(r, `👀 ${who} just opened your proposal "${title}" on ${device(ua)}. ${adminLink}`);
     notifyUser(Number(r.created_by), "proposal.opened", {
       title: `${who} opened your proposal`, body: `${title}
 Opened just now on ${device(ua)}.`, link, actionUrl: link, actionLabel: "Open the proposal",
@@ -164,6 +184,7 @@ Opened just now on ${device(ua)}.`, link, actionUrl: link, actionLabel: "Open th
     // The once-a-day "they came back" alert: claimed in the database so two opens at once send one.
     const claim = await pool.query(`UPDATE proposals SET reopen_alerted_on = CURRENT_DATE WHERE id = $1 AND reopen_alerted_on IS DISTINCT FROM CURRENT_DATE RETURNING id`, [r.id]);
     if (claim.rowCount) {
+      void textOwner(r, `🔁 ${who} came back to "${title}" (opened ${u.view_count}×)${newPlace ? " from a different network — possibly forwarded" : ""}. Good time to call. ${adminLink}`);
       notifyUser(Number(r.created_by), "proposal.reopened", {
         title: `${who} came back to your proposal`,
         body: `${title}
@@ -259,6 +280,7 @@ async function notifySigned(r: any, base: string) {
       attachments,
     }).catch((e: any) => console.error("[proposals] signed email to recipient failed:", e?.message));
   }
+  void textOwner(r, `✅ ${r.recipient_name || r.recipient_email || "Your client"} signed "${content.title || r.name}" — ${formatMoney(t.contractTotalCents)} contract, ${formatMoney(t.dueTodayCents)} due today. ${base}/admin/proposals/${r.id}`);
   const admins = await adminRecipients(r);
   await sendWithFallback({
     from: fromFor(content), to: admins.join(", "),
@@ -276,6 +298,7 @@ async function notifyPaid(r: any, state: "paid" | "processing" | "failed") {
   const admins = await adminRecipients(r);
   const amount = formatMoney(r.paid_cents ?? 0, { cents: true });
   const label = state === "paid" ? `Payment received — ${amount}` : state === "processing" ? `ACH payment started — ${amount} (clearing)` : "Payment failed";
+  void textOwner(r, `${state === "paid" ? "💰" : state === "processing" ? "🏦" : "⚠️"} ${label}: ${r.recipient_name || r.recipient_email || `proposal #${r.id}`}.`);
   await sendWithFallback({
     from: fromFor(content), to: admins.join(", "),
     subject: `${label}: ${r.recipient_name || r.recipient_email || `proposal #${r.id}`}`,
@@ -726,7 +749,8 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     let r = await loadByToken(String(req.params.token || ""));
     if (!r || r.status === "archived") return res.status(404).json({ message: "This proposal link is not valid." });
     const preview = (req.query.preview === "1" && isPlatformAdminEmail(req.user?.email)) || isPreviewKey(r.public_token, req.query.preview);
-    if (!preview && !r.is_test) {
+    // Test copies are tracked too, so a test shows the alerts the owner will get (marked [TEST]).
+    if (!preview) {
       await trackOpen(r, req);
       r = await loadById(Number(r.id));
     }
