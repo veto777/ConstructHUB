@@ -46,7 +46,9 @@ platform. No upfront fees, platform minimums, setup fees or prepayment.`;
 const PRICE_FIELDS = `- prices: every price THEY quoted, one item per price line (empty list if none). category: one of ${MEDIA_PRICE_CATEGORIES.join(", ")};
   product: what it buys, in their words ("Corporate Package bundle", "Sponsored guest post", "Featured listing"); price: the amount
   in US dollars as a number, exactly as they wrote it (null when they describe a paid offer without a number); quantity: how many
-  items that price buys (15 for "15 releases for $999", null for one); unit: one of ${MEDIA_PRICE_UNITS.map((u) => `"${u}"`).join(", ")}
+  items that price buys IN TOTAL (15 for "15 releases for $999", null for one). When they quote a price PER ITEM that applies
+  inside a bundle ("40 releases: $356.25 per release, $14,250 total"), price is the per-item amount (356.25), quantity is null and
+  the bundle size goes in the product ("Budget release, 40-release bundle") — never the per-item price with the bundle size; unit: one of ${MEDIA_PRICE_UNITS.map((u) => `"${u}"`).join(", ")}
   ("each" = a one-off price per item; "per listing / month" = per managed listing per month); notes: a short condition (discount,
   validity, what is included), null if none. Never compute or invent a price; only copy theirs.
 - api: one sentence on whether they have an API or bulk/feed access for us and on what terms (null if the thread doesn't say);
@@ -139,10 +141,31 @@ const amountForms = (n: number): string[] => {
   const grouped = n.toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
   return [fixed, grouped, ...(whole ? [whole, `${grouped}.00`] : []), ...(n < 1 ? [fixed.slice(1)] : [])];
 };
+const writtenIn = (hay: string, n: number) => amountForms(n).some((f) => new RegExp(`(^|[^\\d.,])${f.replace(/[.,]/g, "\\$&")}(?![\\d]|[.,]\\d)`).test(hay));
+// Only the product name: notes often say "about $67 per release" next to a real bundle total (EIN).
+const PER_ITEM_WORDS = /\bper\s+(press\s+)?(release|item|unit|listing|post|article)\b|\beach\b/i;
+/**
+ * A per-item price quoted inside a bundle ("40 releases · $356.25 per release · $14,250 total") is a price for ONE
+ * item, not for the bundle: 2026-10-25 the model stored "$213.75 for 200 releases" and the page showed ACCESS at
+ * $1.07 a release. The quantity is dropped (the bundle size moves into the product name) when the bundle total
+ * (price × quantity) is also written in their email, when the amount is followed by "per release" / "each", or
+ * when the product name says the price is per item.
+ */
+export function perItemInBundle(p: QuotedPrice, hay: string): boolean {
+  if (p.price == null || !p.quantity || p.quantity < 2) return false;
+  if (writtenIn(hay, Math.round(p.price * p.quantity * 100) / 100)) return true;
+  if (PER_ITEM_WORDS.test(p.product)) return true;
+  return amountForms(p.price).some((f) => new RegExp(`(^|[^\\d.,])\\$?\\s?${f.replace(/[.,]/g, "\\$&")}(?![\\d]|[.,]\\d)\\s*(USD\\s*)?(each\\b|\\/\\s*(release|item|unit|listing|post)\\b|per\\s+(press\\s+)?(release|item|unit|listing|post)\\b)`, "i").test(hay));
+}
+
 /** A price is kept only when its amount is written in their emails: nothing the model computed or made up. */
 export function keepQuotedPrices(prices: QuotedPrice[], theirText: string): QuotedPrice[] {
   const hay = theirText.replace(/\s+/g, " ");
-  return prices.filter((p) => p.price == null || amountForms(p.price).some((f) => new RegExp(`(^|[^\\d.,])${f.replace(/[.,]/g, "\\$&")}(?![\\d]|[.,]\\d)`).test(hay)));
+  return prices
+    .filter((p) => p.price == null || writtenIn(hay, p.price))
+    .map((p) => (perItemInBundle(p, hay)
+      ? { ...p, quantity: null, product: p.product.includes(String(p.quantity)) ? p.product : `${p.product}, ${p.quantity}-item bundle` }
+      : p));
 }
 
 const terms = (j: any): PartnerTerms => ({ costTerms: str(j.cost_terms, 600), prices: parsePrices(j.prices), apiTerms: str(j.api, 400), minCommitment: str(j.minimum, 400) });
