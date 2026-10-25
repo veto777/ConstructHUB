@@ -11,10 +11,10 @@ import { Link, useLocation, useRoute } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict, format } from "date-fns";
 import {
-  ArrowDown, ArrowLeft, ArrowUp, Archive, Copy, Eye, FilePlus2, FileSignature, FileText, Loader2, Lock, Mail, Plus, RotateCcw, Save, Send, Trash2, Upload, XCircle,
+  ArrowDown, ArrowLeft, ArrowUp, Archive, BellOff, BellRing, Copy, Eye, FilePlus2, FileSignature, FileText, Loader2, Lock, Mail, Plus, Receipt, RotateCcw, Save, Send, Trash2, Upload, XCircle,
 } from "lucide-react";
 import {
-  DEFAULT_CARD_FEE_BPS, DEFAULT_FULL_PAY_DISCOUNT_BPS, MAX_PDF_BYTES, PROPOSAL_STATUS_LABELS, autoPayLines, autoPaySchedule, defaultSelection, formatBps, formatMoney, priceSelection, standardTerms,
+  DEFAULT_CARD_FEE_BPS, DEFAULT_FULL_PAY_DISCOUNT_BPS, MAX_PDF_BYTES, MIN_PAYMENT_CENTS, PROPOSAL_STATUS_LABELS, REMINDER_EVERY_HOURS, autoPayLines, autoPaySchedule, defaultSelection, formatBps, formatMoney, priceSelection, standardTerms,
   type ProposalContent, type ProposalDetail, type ProposalGroup, type ProposalItem, type ProposalRow, type ProposalStatus, type ProposalSummary,
 } from "@shared/proposals";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -420,7 +420,7 @@ function SendDialog({ p, c, who, expires, open, onClose, beforeSend }: {
             {row("Options offered", `${options} in ${c.groups.length} group${c.groups.length === 1 ? "" : "s"}`)}
             {row("Payment", `${pay.plan === "choice" ? "Client chooses monthly or pay in full" : pay.plan === "full" ? "Pay in full" : "Monthly"}${pay.fullPayDiscountBps && pay.plan !== "monthly" ? ` · ${formatBps(pay.fullPayDiscountBps)} off for paying in full` : ""}`)}
             {row("Methods", [pay.achEnabled && "Bank transfer (no fee)", pay.cardEnabled && `Card (+${formatBps(pay.cardFeeBps)})`].filter(Boolean).join(" · "))}
-            {row("Auto-pay", pay.endAfterMonths ? `Each service for its own term; the longest run ${Math.max(pay.endAfterMonths, longest)} months, then stop` : "Each service for its own term; the longest keep billing until cancelled")}
+            {row("Auto-pay", pay.endAfterMonths ? `Each service for its own term; the longest run ${Math.max(pay.endAfterMonths, longest)} months, then stop` : "Each service for its own term; the longest keep billing every month")}
             {row("Signed for " + c.brand.name, `${c.countersign.name}${c.countersign.title ? `, ${c.countersign.title}` : ""}`)}
             {row("Replies go to", c.brand.contactEmail || "support@constructhub.us")}
             {row("Expires", expires ? format(new Date(`${expires}T12:00:00`), "PPP") : "Never")}
@@ -441,7 +441,74 @@ const EVENT_LABEL: Record<string, string> = {
   signed: "Signed", declined: "Declined", checkout_started: "Went to payment", ach_started: "ACH payment started (clearing)", paid: "Paid",
   payment_received: "Payment received", autopay_scheduled: "Auto-pay scheduled", autopay_missing: "Auto-pay not set up", overpaid: "Overpaid",
   payment_failed: "Payment failed", void: "Voided", archived: "Archived", restored: "Restored",
+  invoice_sent: "Invoice sent", reminder_sent: "Payment reminder sent (invoice)", invoice_failed: "Invoice not sent", reminders_paused: "Daily invoices paused", reminders_resumed: "Daily invoices resumed",
 };
+
+/**
+ * What's still due today, invoiced (owner, 2026-10-25): send an invoice for all of it or part of it, see what went
+ * out, and pause the daily one that starts a day after the client's first payment.
+ */
+function InvoicePanel({ p }: { p: ProposalDetail }) {
+  const { toast } = useToast();
+  const bal = p.balance!;
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [message, setMessage] = useState("");
+  const amount = typed.trim() ? Math.round(Number(typed.replace(/[$,\s]/g, "")) * 100) : bal.remainingCents;
+  const floor = Math.min(MIN_PAYMENT_CENTS, bal.remainingCents);
+  const problem = !Number.isFinite(amount) || amount < floor ? `At least ${formatMoney(floor, { cents: true })}.` : amount > bal.remainingCents ? `At most ${formatMoney(bal.remainingCents, { cents: true })} (what's left).` : null;
+  const partPaid = bal.paidCents + bal.pendingCents > 0;
+  const send = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/admin/proposals/${p.id}/invoice`, { amountCents: amount, message: message.trim() || undefined })).json(),
+    onSuccess: () => { toast({ title: "Invoice sent", description: `${formatMoney(amount, { cents: true })} to ${p.recipientEmail}${p.recipientCc.length ? ` (cc ${p.recipientCc.join(", ")})` : ""}.` }); setOpen(false); setTyped(""); setMessage(""); void invalidate(); },
+    onError: (e) => toast({ title: "Couldn't send the invoice", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const pause = useMutation({
+    mutationFn: async (paused: boolean) => (await apiRequest("POST", `/api/admin/proposals/${p.id}/reminders`, { paused })).json(),
+    onSuccess: () => void invalidate(),
+    onError: (e) => toast({ title: "Couldn't change the daily invoice", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const auto = p.isTest ? "Off on test copies."
+    : p.invoices.paused ? "Paused — no automatic invoices."
+    : partPaid ? `On — an invoice for what's left every ${REMINDER_EVERY_HOURS} hours (9am–6pm Pacific) until it's paid.`
+    : "Starts a day after the client's first payment, then daily until it's paid.";
+  return (
+    <Section title="Invoices" description={`${formatMoney(bal.remainingCents, { cents: true })} still due today.`}>
+      <div className="space-y-2 text-sm" data-testid="panel-invoices">
+        <div className="flex gap-2">{p.invoices.paused ? <BellOff className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /> : <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />}<span>Daily invoice: {auto}</span></div>
+        <div className="text-xs text-muted-foreground">{p.invoices.count ? `${p.invoices.count} sent · last ${format(new Date(p.invoices.lastAt!), "PPp")}` : "None sent yet."}</div>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button size="sm" onClick={() => setOpen(true)} disabled={!p.recipientEmail} data-testid="button-send-invoice"><Receipt className="mr-1.5 h-4 w-4" />Send invoice</Button>
+          {!p.isTest && <Button size="sm" variant="outline" onClick={() => pause.mutate(!p.invoices.paused)} disabled={pause.isPending} data-testid="button-pause-invoices">
+            {p.invoices.paused ? <><BellRing className="mr-1.5 h-4 w-4" />Resume daily</> : <><BellOff className="mr-1.5 h-4 w-4" />Pause daily</>}</Button>}
+        </div>
+      </div>
+      <Dialog open={open} onOpenChange={(v) => !send.isPending && setOpen(v)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send an invoice</DialogTitle>
+            <DialogDescription>Emails {p.recipientEmail}{p.recipientCc.length ? ` (cc ${p.recipientCc.join(", ")})` : ""} an invoice PDF and a link to pay — any amount, on any card or bank account.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-amount">Amount due now</Label>
+              <Input id="inv-amount" inputMode="decimal" placeholder={`${(bal.remainingCents / 100).toFixed(2)} — everything left`} value={typed} onChange={(e) => setTyped(e.target.value)} data-testid="input-invoice-amount" />
+              {problem ? <p className="text-xs text-red-600">{problem}</p> : <p className="text-xs text-muted-foreground">Leave blank for all {formatMoney(bal.remainingCents, { cents: true })}. A smaller amount fills in the pay page; the client can still pay more.</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-message">Note (optional)</Label>
+              <Textarea id="inv-message" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Shown above the invoice in the email." />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" asChild disabled={!!problem}><a href={`/api/admin/proposals/${p.id}/invoice.pdf?amountCents=${problem ? "" : amount}`} target="_blank" rel="noreferrer"><Eye className="mr-1.5 h-4 w-4" />Preview PDF</a></Button>
+            <Button onClick={() => send.mutate()} disabled={!!problem || send.isPending} data-testid="button-invoice-confirm">{send.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}Send {problem ? "" : formatMoney(amount, { cents: true })}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Section>
+  );
+}
 
 function ProposalEditor({ id }: { id: number }) {
   const { toast } = useToast();
@@ -647,8 +714,8 @@ function ProposalEditor({ id }: { id: number }) {
                 <Input type="number" step="0.1" min={0} max={4} value={c.payment.cardFeeBps / 100} onChange={(e) => editNested("payment", { cardFeeBps: Math.max(0, Math.min(400, Math.round((Number(e.target.value) || 0) * 100))) })} data-testid="input-card-fee" />
                 <p className="text-xs text-muted-foreground">Default {formatBps(DEFAULT_CARD_FEE_BPS)}.</p></div>
               <div className="space-y-1.5"><Label>Stop auto-pay after (months)</Label>
-                <Input type="number" min={1} max={60} value={c.payment.endAfterMonths ?? ""} placeholder="Never — bills every month until cancelled" onChange={(e) => editNested("payment", { endAfterMonths: e.target.value ? Math.max(1, Math.min(60, Number(e.target.value))) : null })} data-testid="input-end-after" />
-                <p className="text-xs text-muted-foreground">Monthly services are charged automatically each month to the client's bank (ACH) or card, whichever they pay with. Leave blank to keep billing until cancelled; a number stops it after that many months. It never stops before a package's minimum term{longestTerm > 1 ? ` (${longestTerm} months here)` : ""}.</p></div>
+                <Input type="number" min={1} max={60} value={c.payment.endAfterMonths ?? ""} placeholder="Never — bills every month" onChange={(e) => editNested("payment", { endAfterMonths: e.target.value ? Math.max(1, Math.min(60, Number(e.target.value))) : null })} data-testid="input-end-after" />
+                <p className="text-xs text-muted-foreground">Monthly services are charged automatically each month to the client's bank (ACH) or card, whichever they pay with. Leave blank to keep billing every month; a number stops it after that many months. It never stops before a package's minimum term{longestTerm > 1 ? ` (${longestTerm} months here)` : ""}.</p></div>
               <div className="space-y-1.5"><Label>Pay-in-full discount (%)</Label>
                 <Input type="number" step="0.5" min={0} max={50} value={c.payment.fullPayDiscountBps / 100} onChange={(e) => editNested("payment", { fullPayDiscountBps: Math.max(0, Math.min(5000, Math.round((Number(e.target.value) || 0) * 100))) })} data-testid="input-full-pay-discount" />
                 <p className="text-xs text-muted-foreground">Off the whole contract when the client pays the full term today. Default {formatBps(DEFAULT_FULL_PAY_DISCOUNT_BPS)}; 0 turns it off.</p></div>
@@ -725,6 +792,7 @@ function ProposalEditor({ id }: { id: number }) {
               </div>
             </Section>
           )}
+          {p.kind === "offer" && p.signature && p.balance && p.balance.remainingCents > 0 && !["void", "archived", "declined"].includes(p.status) && <InvoicePanel p={p} />}
           {preview && (
             <Section title="Opening totals" description="Nothing is pre-selected: the client starts with only the included services and picks the rest.">
               <div className="space-y-1 text-sm">

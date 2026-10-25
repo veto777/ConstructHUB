@@ -174,9 +174,14 @@ function PayPanel({ token, data }: { token: string; data: PublicProposal }) {
   const bal = data.balance ?? { dueTodayCents: t.dueTodayCents, paidCents: 0, pendingCents: 0, remainingCents: t.dueTodayCents };
   const left = bal.remainingCents;
   const [method, setMethod] = useState<"ach" | "card">(pay.achEnabled ? "ach" : "card");
-  // Dollars as typed; the whole balance unless the client changes it (owner, 2026-10-25: any amount up to what's left).
-  const [typed, setTyped] = useState(() => (left / 100).toFixed(2));
-  useEffect(() => { setTyped((left / 100).toFixed(2)); }, [left]);
+  // Dollars as typed; the whole balance unless the client changes it (owner, 2026-10-25: any amount up to what's left),
+  // or the amount an invoice asked for (its link carries ?amount=<cents>).
+  const startAt = () => {
+    const asked = Number(new URLSearchParams(window.location.search).get("amount"));
+    return ((Number.isInteger(asked) && asked > 0 && asked <= left ? asked : left) / 100).toFixed(2);
+  };
+  const [typed, setTyped] = useState(startAt);
+  useEffect(() => { setTyped(startAt()); }, [left]); // eslint-disable-line react-hooks/exhaustive-deps
   const amount = Math.round(Number(typed.replace(/[$,\s]/g, "")) * 100);
   const floor = Math.min(MIN_PAYMENT_CENTS, left);
   const problem = !Number.isFinite(amount) || amount < floor ? `Enter at least ${money(floor)}.` : amount > left ? `You can pay up to ${money(left)}.` : null;
@@ -212,11 +217,13 @@ function PayPanel({ token, data }: { token: string; data: PublicProposal }) {
         </ul>
       )}
       <div className="space-y-2">
-        <Label htmlFor="pay-amount" className="text-sm font-semibold text-slate-900">Amount to pay now</Label>
+        <Label htmlFor="pay-amount" className="text-sm font-semibold text-slate-900">Amount to pay now <span className="font-normal text-slate-500">— type any amount up to {money(left)}</span></Label>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-48">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
-            <Input id="pay-amount" inputMode="decimal" className="pl-7 text-lg tabular-nums" value={typed} onChange={(e) => setTyped(e.target.value)} aria-invalid={!!problem} data-testid="input-pay-amount" />
+          <div className="relative w-56">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg font-semibold text-slate-700">$</span>
+            <Input id="pay-amount" inputMode="decimal" className="h-12 border-2 bg-white pl-7 pr-10 text-lg font-semibold tabular-nums text-slate-900 shadow-sm focus-visible:ring-0" style={{ borderColor: "var(--accent)" }}
+              value={typed} onChange={(e) => setTyped(e.target.value)} onFocus={(e) => e.target.select()} aria-invalid={!!problem} data-testid="input-pay-amount" />
+            <PenLine className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           </div>
           <Button type="button" variant="outline" size="sm" onClick={() => setTyped((left / 100).toFixed(2))} data-testid="button-pay-all">All {money(left)}</Button>
           {left > TYPICAL_CARD_LIMIT_CENTS && <Button type="button" variant="outline" size="sm" onClick={() => split(Math.ceil(left / TYPICAL_CARD_LIMIT_CENTS))} data-testid="button-pay-split">Split in {Math.ceil(left / TYPICAL_CARD_LIMIT_CENTS)}</Button>}
@@ -290,6 +297,13 @@ export default function PublicProposalPage() {
   const [initialed, setInitialed] = useState<Record<string, string>>({});
   const [previewSigned, setPreviewSigned] = useState(false);
   useEffect(() => { if (!initialsEdited) setInitials(initialsOf(name)); }, [name, initialsEdited]);
+  // An invoice's link ends in #pay: the section renders after the data loads, so scroll to it then (once).
+  const [jumped, setJumped] = useState(false);
+  useEffect(() => {
+    if (jumped || !data || window.location.hash !== "#pay") return;
+    setJumped(true);
+    setTimeout(() => document.getElementById("pay")?.scrollIntoView({ behavior: "smooth" }), 200);
+  }, [data, jumped]);
 
   useEffect(() => {
     if (!data) return;
@@ -608,9 +622,15 @@ function StatusBanner({ data, returnedPaid, token }: { data: PublicProposal; ret
   if (data.status === "void") return box("border-slate-300 bg-slate-100 text-slate-700", XCircle, "This proposal was withdrawn", "Contact us for an updated proposal.");
   if (data.status === "declined") return box("border-slate-300 bg-slate-100 text-slate-700", XCircle, "You declined this proposal", "Changed your mind? Contact us and we'll send a new one.");
   if (data.expired) return box("border-amber-300 bg-amber-50 text-amber-900", Clock, "This proposal has expired", "Contact us for an updated proposal.");
-  if (data.status === "partial" && data.balance) return box("border-sky-300 bg-sky-50 text-sky-900", returnedPaid ? Loader2 : CheckCircle2,
-    returnedPaid ? "Payment received" : "Partly paid — thank you",
-    `${money(data.balance.paidCents + data.balance.pendingCents)} of ${money(data.balance.dueTodayCents)} paid. ${money(data.balance.remainingCents)} left to pay today, below.`, signedCopy);
+  // Part paid: what's left is due now (owner, 2026-10-25) — the pay panel below takes the next payment, any amount.
+  if (data.status === "partial" && data.balance) return box("border-amber-300 bg-amber-50 text-amber-950", returnedPaid ? CheckCircle2 : AlertTriangle,
+    `${returnedPaid ? "Payment received — " : ""}${money(data.balance.remainingCents)} still due`,
+    `${money(data.balance.paidCents + data.balance.pendingCents)} of ${money(data.balance.dueTodayCents)} paid. Please pay the remaining ${money(data.balance.remainingCents)} as soon as possible — type any amount below and pay as many times as you need, on any card or bank account.`,
+    <div className="mt-2 flex flex-wrap gap-2">
+      <Button asChild size="sm" className="text-white" style={{ background: "var(--accent)" }}><a href="#pay" data-testid="button-pay-more">Make another payment</a></Button>
+      <Button asChild variant="outline" size="sm"><a href={`/api/public/proposals/${token}/invoice.pdf`} target="_blank" rel="noreferrer"><FileText className="mr-1.5 h-3.5 w-3.5" /> Statement (PDF)</a></Button>
+      {data.signature && <Button asChild variant="outline" size="sm"><a href={`/api/public/proposals/${token}/signed.pdf`} target="_blank" rel="noreferrer"><Download className="mr-1.5 h-3.5 w-3.5" /> Signed copy (PDF)</a></Button>}
+    </div>);
   if (data.status === "payment_failed") return box("border-red-300 bg-red-50 text-red-900", AlertTriangle, "The last payment didn't go through", "Please try again below, or choose another payment method.", signedCopy);
   if (data.signature) return box("border-sky-300 bg-sky-50 text-sky-900", returnedPaid ? Loader2 : Building2,
     returnedPaid ? "Confirming your payment…" : `Signed by ${data.signature.name}`,

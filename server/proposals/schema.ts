@@ -77,6 +77,11 @@ export const PROPOSALS_DDL: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS proposal_payments_proposal_idx ON proposal_payments (proposal_id, created_at)`,
   `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS stripe_schedule_id text`,
   `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS autopay_starts_at timestamptz`,
+  // Invoices for what's still due today (shared/proposals.ts invoiceLines): sent by the admin, or every day once
+  // part of it is paid (runProposalReminders) unless paused.
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS invoice_count integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS last_invoice_at timestamptz`,
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS reminders_paused boolean NOT NULL DEFAULT false`,
   `CREATE INDEX IF NOT EXISTS proposals_kind_idx ON proposals (kind, updated_at DESC)`,
   `CREATE INDEX IF NOT EXISTS proposals_session_idx ON proposals (stripe_session_id) WHERE stripe_session_id IS NOT NULL`,
 ];

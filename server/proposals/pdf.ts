@@ -7,7 +7,7 @@
  * locked once signed — nothing is kept but the data it is made from.
  */
 import PDFDocument from "pdfkit";
-import { ALL_TERMS_ID, autoPayLines, autoPaySchedule, cardFeeCents, formatBps, formatMoney, type ProposalContent, type ProposalTotals } from "@shared/proposals";
+import { ALL_TERMS_ID, autoPayLines, autoPaySchedule, cardFeeCents, formatBps, formatMoney, invoiceLines, type PaymentBalance, type ProposalContent, type ProposalPayment, type ProposalTotals } from "@shared/proposals";
 
 const INK = "#111827";
 const MUTED = "#6b7280";
@@ -92,7 +92,7 @@ export function buildSignedProposalPdf(p: SignedPdfInput): Promise<Buffer> {
     if (p.totals.oneTimeCents) row("One-time services", money(p.totals.oneTimeCents));
     if (p.totals.monthlyCents) row("Monthly services", `${money(p.totals.monthlyCents)} / month`);
     row("Sales tax", "$0.00 — professional services");
-    if (p.totals.discountCents) row(`Pay-in-full discount (${formatBps(p.totals.discountBps ?? 0)})`, `−${money(p.totals.discountCents)}`);
+    if (p.totals.discountCents) row(`Pay-in-full discount (${formatBps(p.totals.discountBps ?? 0)})`, `-${money(p.totals.discountCents)}`);
     row("Contract total (full term)", money(p.totals.contractTotalCents), true);
     doc.moveDown(0.3);
     row("Payment plan", p.totals.plan === "monthly" ? "First payment today, then monthly" : "Paid in full today");
@@ -196,6 +196,114 @@ export function buildSignedProposalPdf(p: SignedPdfInput): Promise<Buffer> {
           54, doc.page.height - 40, { width: W, align: "center", lineBreak: false });
       doc.page.margins.bottom = bottom;
     }
+    doc.end();
+  });
+}
+
+export type InvoicePdfInput = {
+  id: number;
+  number: string;
+  /** The pay page's download: a statement of the balance today (no invoice number of its own). */
+  statement?: boolean;
+  issuedAt: Date;
+  content: ProposalContent;
+  recipientName: string | null;
+  recipientEmail: string | null;
+  recipientCompany: string | null;
+  totals: ProposalTotals;
+  payments: ProposalPayment[];
+  balance: PaymentBalance;
+  /** What this invoice asks for now (at most balance.remainingCents). */
+  amountDueCents: number;
+  payUrl: string;
+  test?: boolean;
+};
+
+/**
+ * An invoice for what is still due today (shared/proposals.ts invoiceLines): what was signed for, every payment made
+ * so far, the amount due now, and the link to pay it. Built on demand; nothing is stored but the count and the date.
+ */
+export function buildInvoicePdf(p: InvoicePdfInput): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "LETTER", margin: 54, info: { Title: `${p.statement ? "Statement" : "Invoice"} ${p.number}` } });
+    const chunks: Buffer[] = [];
+    doc.on("data", (c: Buffer) => chunks.push(c));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+    const accent = p.content.brand.accent || "#F97316";
+    const W = doc.page.width - 108;
+    const b = p.content.brand;
+    const date = (d: Date | string) => new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" });
+
+    doc.rect(0, 0, doc.page.width, 6).fill(accent);
+    doc.fillColor(INK).font("Helvetica-Bold").fontSize(11).text(b.name.toUpperCase(), 54, 30);
+    doc.fillColor(INK).font("Helvetica-Bold").fontSize(22).text(`${p.statement ? "STATEMENT" : "INVOICE"}${p.test ? " (TEST)" : ""}`, 54, 26, { width: W, align: "right" });
+    doc.fillColor(MUTED).font("Helvetica").fontSize(9).text([b.contactName, b.contactEmail, b.phone, b.website].filter(Boolean).join(" · "), 54, 46, { width: W - 200 });
+    doc.y = 90;
+
+    const top = doc.y;
+    doc.fillColor(MUTED).fontSize(9).text("BILL TO", 54, top);
+    doc.fillColor(INK).fontSize(11).text([p.recipientName, p.recipientCompany].filter(Boolean).join(", ") || "—", 54, doc.y, { width: W / 2 });
+    if (p.recipientEmail) doc.fillColor(MUTED).fontSize(9.5).text(p.recipientEmail, 54, doc.y, { width: W / 2 });
+    const left = doc.y;
+    const meta = (label: string, value: string, y: number) => {
+      doc.fillColor(MUTED).font("Helvetica").fontSize(9).text(label, 54 + W / 2, y, { width: W / 4 });
+      doc.fillColor(INK).font("Helvetica-Bold").fontSize(9.5).text(value, 54 + (3 * W) / 4, y, { width: W / 4, align: "right" });
+    };
+    meta(p.statement ? "Statement" : "Invoice", p.number, top);
+    meta("Date", date(p.issuedAt), top + 15);
+    meta("Due", "Upon receipt", top + 30);
+    meta("For", `Proposal #${p.id}`, top + 45);
+    doc.y = Math.max(left, top + 62) + 14; doc.x = 54;
+
+    doc.fillColor(INK).font("Helvetica-Bold").fontSize(13).text(p.content.title || "Proposal", 54, doc.y, { width: W });
+    doc.moveDown(0.6);
+    const rule = () => { const y = doc.y; doc.moveTo(54, y).lineTo(54 + W, y).strokeColor(LINE).lineWidth(1).stroke(); doc.moveDown(0.4); };
+    const row = (label: string, detail: string, value: string, bold = false) => {
+      if (doc.y > doc.page.height - 90) doc.addPage();
+      const y = doc.y;
+      doc.fillColor(INK).font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(10).text(label, 54, y, { width: W - 270 });
+      const yEnd = doc.y;
+      if (detail) doc.fillColor(MUTED).font("Helvetica").fontSize(9).text(detail, 54 + W - 265, y + 1, { width: 140 });
+      doc.fillColor(INK).font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(10).text(value, 54 + W - 120, y, { width: 120, align: "right" });
+      doc.y = Math.max(yEnd, doc.y) + 3; doc.x = 54;
+    };
+    doc.fillColor(accent).font("Helvetica-Bold").fontSize(9).text("DUE AT SIGNING", 54, doc.y);
+    doc.moveDown(0.3); rule();
+    for (const l of invoiceLines(p.totals)) row(l.name, l.detail, l.cents < 0 ? `-${money(-l.cents)}` : money(l.cents));
+    rule();
+    row("Total due at signing", "", money(p.totals.dueTodayCents), true);
+    row("Sales tax", "Professional services", "$0.00");
+
+    const done = p.payments.filter((x) => x.status === "paid" || x.status === "processing");
+    if (done.length) {
+      doc.moveDown(0.8);
+      doc.fillColor(accent).font("Helvetica-Bold").fontSize(9).text("PAYMENTS RECEIVED", 54, doc.y);
+      doc.moveDown(0.3); rule();
+      done.forEach((x, i) => row(
+        `Payment ${i + 1} · ${x.method === "card" ? "Card" : "Bank transfer (ACH)"}${x.cardLast4 ? ` ending ${x.cardLast4}` : ""}`,
+        `${date(x.paidAt ?? x.createdAt)}${x.status === "processing" ? " · clearing" : ""}`,
+        `-${money(x.amountCents)}`,
+      ));
+      rule();
+    }
+    doc.moveDown(0.6);
+    const y = doc.y;
+    doc.roundedRect(54, y, W, 46, 6).fill("#f9fafb");
+    doc.fillColor(INK).font("Helvetica-Bold").fontSize(12).text(p.amountDueCents < p.balance.remainingCents ? "AMOUNT DUE NOW" : "BALANCE DUE", 70, y + 16, { width: W / 2 });
+    doc.fillColor(accent).font("Helvetica-Bold").fontSize(18).text(money(p.amountDueCents), 54 + W / 2, y + 13, { width: W / 2 - 16, align: "right" });
+    doc.y = y + 56; doc.x = 54;
+    if (p.amountDueCents < p.balance.remainingCents) doc.fillColor(MUTED).font("Helvetica").fontSize(9).text(`Total still owed at signing: ${money(p.balance.remainingCents)}.`, 54, doc.y, { width: W });
+    doc.moveDown(0.6);
+    doc.fillColor(INK).font("Helvetica-Bold").fontSize(10).text("Please pay as soon as possible.", 54, doc.y, { width: W });
+    doc.fillColor(INK).font("Helvetica").fontSize(9.5).text("Pay online in one or more payments, on any card or bank account:", 54, doc.y, { width: W });
+    doc.fillColor(accent).font("Helvetica").fontSize(9.5).text(p.payUrl, 54, doc.y, { width: W, link: p.payUrl, underline: true });
+    const bps = p.content.payment.cardEnabled ? p.content.payment.cardFeeBps : 0;
+    doc.fillColor(MUTED).font("Helvetica").fontSize(9).text(`Bank transfer (ACH) has no fee.${bps > 0 ? ` Card payments add a ${formatBps(bps)} processing fee.` : ""}`, 54, doc.y + 4, { width: W });
+
+    doc.page.margins.bottom = 0;
+    doc.fillColor(MUTED).font("Helvetica").fontSize(8)
+      .text(`${p.test ? "TEST COPY · " : ""}${b.name}${b.website ? ` · ${b.website}` : ""} · ${p.statement ? "Statement" : "Invoice"} ${p.number}`, 54, doc.page.height - 40, { width: W, align: "center", lineBreak: false });
     doc.end();
   });
 }

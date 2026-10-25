@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, autoPayLines, autoPayMonths, autoPaySchedule, cardFeeCents, defaultSelection, paymentBalance, priceSelection, proposalContentSchema, selectionProblems } from "@shared/proposals";
+import { addMonths, autoPayLines, autoPayMonths, autoPaySchedule, cardFeeCents, defaultSelection, invoiceLines, invoiceNumber, paymentBalance, priceSelection, proposalContentSchema, selectionProblems } from "@shared/proposals";
 
 const content = proposalContentSchema.parse({
   payment: { plan: "choice", cardFeeBps: 300 },
@@ -68,7 +68,7 @@ describe("proposals pricing", () => {
     expect(cardFeeCents(12_345, 300)).toBe(370);
     expect(cardFeeCents(600_000, 0)).toBe(0);
   });
-  it("auto-pay bills each monthly service for its own term, the longest until cancelled (the Tutty contract)", () => {
+  it("auto-pay bills each monthly service for its own term, the longest ongoing (the Tutty contract)", () => {
     const c = proposalContentSchema.parse({ payment: { plan: "monthly", cardFeeBps: 300 }, groups: [
       { id: "on", name: "Onboarding", items: [{ id: "fee", name: "Onboarding", priceCents: 350_000, included: true }] },
       { id: "seo", name: "SEO", items: [{ id: "starter", name: "Starter SEO", priceCents: 250_000, billing: "monthly", termMonths: 6 }] },
@@ -79,8 +79,8 @@ describe("proposals pricing", () => {
     expect(t.contractTotalCents).toBe(350_000 + 250_000 * 6 + 100_000);
     const open = autoPaySchedule(c, t);
     expect(open).toEqual([{ fromMonth: 2, toMonth: null, lines: [{ itemId: "starter", name: "Starter SEO", priceCents: 250_000 }], cents: 250_000 }]);
-    expect(autoPayLines(open)).toEqual(["Month 2 on, until cancelled: $2,500.00/mo"]);
-    expect(autoPayLines(open, 300)).toEqual(["Month 2 on, until cancelled: $2,575.00/mo"]);
+    expect(autoPayLines(open)).toEqual(["Month 2 onward: $2,500.00/mo"]);
+    expect(autoPayLines(open, 300)).toEqual(["Month 2 onward: $2,575.00/mo"]);
     // A fixed end: months 2–6 are the contract; dueToday + those = the contract total.
     const fixed = autoPaySchedule(proposalContentSchema.parse({ ...c, payment: { plan: "monthly", endAfterMonths: 6 } }), t);
     expect(fixed).toEqual([{ fromMonth: 2, toMonth: 6, lines: [{ itemId: "starter", name: "Starter SEO", priceCents: 250_000 }], cents: 250_000 }]);
@@ -96,6 +96,19 @@ describe("proposals pricing", () => {
     const ph = autoPaySchedule(c, priceSelection(c, ["a", "b"], "monthly"));
     expect(ph.map((p) => [p.fromMonth, p.toMonth, p.cents])).toEqual([[2, 3, 150_00], [4, 6, 100_00]]);
     expect(autoPaySchedule(c, priceSelection(c, ["a", "b"], "full"))).toEqual([]);
+  });
+  it("invoice lines add up to what was due at signing, on either plan", () => {
+    const sum = (t: ReturnType<typeof priceSelection>) => invoiceLines(t).reduce((a, l) => a + l.cents, 0);
+    const monthly = priceSelection(content, ["starter", "foundation", "video"], "monthly");
+    expect(invoiceLines(monthly).map((l) => l.detail)).toEqual(["Month 1 of 6", "One-time", "One-time"]);
+    expect(sum(monthly)).toBe(monthly.dueTodayCents);
+    const full = proposalContentSchema.parse({ ...content, payment: { plan: "choice", fullPayDiscountBps: 500 } });
+    const t = priceSelection(full, ["starter", "foundation"], "full");
+    expect(t.discountCents).toBeGreaterThan(0);
+    expect(invoiceLines(t).at(-1)!.cents).toBe(-(t.discountCents ?? 0));
+    expect(sum(t)).toBe(t.dueTodayCents);
+    expect(invoiceNumber(2, 0)).toBe("INV-2-1");
+    expect(invoiceNumber(2, 3)).toBe("INV-2-3");
   });
   it("balance: paid and clearing payments count; failed ones don't", () => {
     const b = paymentBalance(1_555_000, [

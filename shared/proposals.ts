@@ -139,7 +139,7 @@ export const proposalContentSchema = z.object({
     cardEnabled: z.boolean().default(true),
     /** Basis points added on top of a card payment (300 = 3%). ACH never pays it. */
     cardFeeBps: z.number().int().min(0).max(MAX_CARD_FEE_BPS).default(DEFAULT_CARD_FEE_BPS),
-    /** Monthly plan: stop auto-pay after this many months (null = keeps billing until cancelled); see autoPayMonths. */
+    /** Monthly plan: stop auto-pay after this many months (null = keeps billing every month); see autoPayMonths. */
     endAfterMonths: z.number().int().min(1).max(60).nullable().default(null),
     /** Basis points off the contract when a term with monthly services is paid in full today (500 = 5%, 0 = none). */
     fullPayDiscountBps: z.number().int().min(0).max(MAX_FULL_PAY_DISCOUNT_BPS).default(DEFAULT_FULL_PAY_DISCOUNT_BPS),
@@ -229,7 +229,7 @@ export function priceSelection(content: ProposalContent, itemIds: readonly strin
   };
 }
 
-/** How many months auto-pay charges on the monthly plan (null = every month until cancelled). Never fewer than
+/** How many months auto-pay charges on the monthly plan (null = every month, no end date). Never fewer than
  *  the longest selected package term: a 6-month commitment is always billed for 6 months. */
 export function autoPayMonths(content: ProposalContent, totals: Pick<ProposalTotals, "lines">): number | null {
   const end = content.payment.endAfterMonths;
@@ -240,7 +240,7 @@ export function autoPayMonths(content: ProposalContent, totals: Pick<ProposalTot
 /** A stretch of auto-pay months that each charge the same services (month 1 is part of what's due today). */
 export type AutoPayPhase = {
   fromMonth: number;
-  /** null: every month until cancelled. */
+  /** null: every month, no end date. */
   toMonth: number | null;
   lines: { itemId: string; name: string; priceCents: number }[];
   cents: number;
@@ -249,7 +249,7 @@ export type AutoPayPhase = {
 /**
  * What auto-pay charges after today on the monthly plan, month by month, as the contract reads: each monthly
  * service for its own term (a 1-month add-on is paid today and never again). The longest-term services then keep
- * going — until cancelled (endAfterMonths null), or to endAfterMonths. Empty when nothing recurs.
+ * going — every month (endAfterMonths null), or to endAfterMonths. Empty when nothing recurs.
  */
 export function autoPaySchedule(content: ProposalContent, totals: Pick<ProposalTotals, "lines" | "plan">): AutoPayPhase[] {
   if (totals.plan !== "monthly") return [];
@@ -283,7 +283,7 @@ export function addMonths(d: Date, n: number): Date {
 /** "Months 2–6: $2,500/mo" style lines for the page, the emails and the signed PDF. */
 export function autoPayLines(phases: readonly AutoPayPhase[], feeBps = 0): string[] {
   return phases.map((p) => {
-    const when = p.toMonth === null ? `Month ${p.fromMonth} on, until cancelled` : p.fromMonth === p.toMonth ? `Month ${p.fromMonth}` : `Months ${p.fromMonth}–${p.toMonth}`;
+    const when = p.toMonth === null ? `Month ${p.fromMonth} onward` : p.fromMonth === p.toMonth ? `Month ${p.fromMonth}` : `Months ${p.fromMonth}–${p.toMonth}`;
     return `${when}: ${formatMoney(p.cents + cardFeeCents(p.cents, feeBps), { cents: true })}/mo`;
   });
 }
@@ -303,6 +303,28 @@ export function paymentBalance(dueTodayCents: number, payments: readonly Pick<Pr
   const paidCents = sum("paid"), pendingCents = sum("processing");
   return { dueTodayCents, paidCents, pendingCents, remainingCents: Math.max(0, dueTodayCents - paidCents - pendingCents) };
 }
+
+/**
+ * Invoices for what's still due today (owner, 2026-10-25): once a client has paid part of it, an invoice for the rest
+ * goes out every REMINDER_EVERY_HOURS until it's paid (business hours, Pacific), and the admin can send one for any
+ * amount up to what's left. Each invoice links to the proposal's pay page, where any amount can be paid again.
+ */
+export const REMINDER_EVERY_HOURS = 24;
+export type InvoiceLine = { name: string; detail: string; cents: number };
+
+/** What due-today is made of, as signed; the lines always add up to totals.dueTodayCents. */
+export function invoiceLines(t: ProposalTotals): InvoiceLine[] {
+  const monthlyPlan = t.plan === "monthly";
+  const out: InvoiceLine[] = t.lines.map((l) => l.billing === "one_time"
+    ? { name: l.name, detail: "One-time", cents: l.priceCents }
+    : monthlyPlan
+      ? { name: l.name, detail: l.termMonths > 1 ? `Month 1 of ${l.termMonths}` : "Month 1", cents: l.priceCents }
+      : { name: l.name, detail: `${l.termMonths} ${l.termMonths === 1 ? "month" : "months"} × ${formatMoney(l.priceCents, { cents: true })}`, cents: l.termTotalCents });
+  if (!monthlyPlan && (t.discountCents ?? 0) > 0) out.push({ name: `Paid in full (${formatBps(t.discountBps ?? 0)} off)`, detail: "Discount", cents: -(t.discountCents ?? 0) });
+  return out;
+}
+
+export const invoiceNumber = (proposalId: number, n: number) => `INV-${proposalId}-${Math.max(1, n)}`;
 
 /** The pay-in-full discount on an amount, rounded to the cent. */
 export function fullPayDiscountCents(amountCents: number, bps: number): number {
@@ -419,6 +441,8 @@ export type ProposalDetail = ProposalRow & {
   balance: PaymentBalance | null;
   /** When auto-pay's first monthly charge is (set once what's due today is paid). */
   autoPayStartsAt: string | null;
+  /** Invoices for what's left today: how many went out, the last one, and whether the automatic ones are paused. */
+  invoices: { count: number; lastAt: string | null; paused: boolean };
   events: ProposalEvent[];
 };
 

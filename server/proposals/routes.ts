@@ -17,6 +17,9 @@
  *     POST   /api/admin/proposals/:id/proof { subject?, message? }   the same email, to the admin only, "[PROOF] " subject,
  *            with a preview link (no view recorded, can't sign or pay) — like the CRM's "Send me a proof"
  *     POST   /api/admin/proposals/:id/status { status: void | archived | draft }
+ *     POST   /api/admin/proposals/:id/invoice { amountCents?, message? }   emails an invoice for what's left today (or
+ *            part of it) with the PDF and a pay link; GET /api/admin/proposals/:id/invoice.pdf[?amountCents=] previews it
+ *     POST   /api/admin/proposals/:id/reminders { paused }   pauses / resumes the daily invoice (runProposalReminders)
  *
  *   recipient (the token in the emailed link is the key; no account):
  *     GET  /api/public/proposals/:token[?preview=1|<key>]   the page (an admin's preview, or a proof email's signed key,
@@ -29,6 +32,7 @@
  *     POST /api/public/proposals/:token/checkout { method: ach | card, amountCents? }   → Stripe Checkout url for one
  *          payment toward what's due today: any amount from MIN_PAYMENT_CENTS up to what's left (default: all of it)
  *     GET  /api/public/proposals/:token/signed.pdf
+ *     GET  /api/public/proposals/:token/invoice.pdf   a statement of what's still due today (not a numbered invoice)
  *
  * Every total is recomputed here from the stored content (priceSelection); the browser only sends item ids.
  * Payment goes to the platform's own Stripe account: ACH (us_bank_account) with no fee, or card with the
@@ -54,11 +58,12 @@ import { sendWithFallback } from "../email";
 import { notifyUser } from "../account-events";
 import { normalizePhone, sendSms } from "../crm/sms";
 import {
-  ESIGN_CONSENT, MAX_PDF_BYTES, MIN_PAYMENT_CENTS, PROPOSAL_KINDS, autoPayLines, autoPayMonths, autoPaySchedule, initialTargets, cardFeeCents, emptyContent, formatBps,
+  ESIGN_CONSENT, MAX_PDF_BYTES, MIN_PAYMENT_CENTS, PROPOSAL_KINDS, REMINDER_EVERY_HOURS, invoiceNumber, autoPayLines, autoPayMonths, autoPaySchedule, initialTargets, cardFeeCents, emptyContent, formatBps,
   addMonths, formatMoney, paymentBalance, priceSelection, proposalContentSchema, selectionProblems, type PaymentBalance, type ProposalContent, type ProposalDetail,
   type ProposalEvent, type ProposalPayment, type ProposalPaymentStatus, type ProposalRow, type ProposalStatus, type ProposalSummary, type ProposalTotals, type PublicProposal,
 } from "@shared/proposals";
-import { buildSignedProposalPdf } from "./pdf";
+import { buildInvoicePdf, buildSignedProposalPdf } from "./pdf";
+import { workerInterval } from "../workers";
 import { ImportError, proposalFromPdf } from "./import";
 
 type GetUser = (req: any, res: any) => any;
@@ -147,6 +152,7 @@ function toDetail(r: any): ProposalDetail {
     countersignedAt: iso(r.countersigned_at),
     payment: { method: r.payment_method ?? null, cardFeeCents: r.card_fee_cents ?? 0, status: r.payment_status ?? null, subscriptionId: r.stripe_subscription_id ?? null, scheduleId: r.stripe_schedule_id ?? null },
     payments: toPayments(r), balance: balanceOf(r), autoPayStartsAt: iso(r.autopay_starts_at),
+    invoices: { count: Number(r.invoice_count ?? 0), lastAt: iso(r.last_invoice_at), paused: r.reminders_paused === true },
     events: Array.isArray(r.events) ? r.events : [],
   };
 }
@@ -349,7 +355,7 @@ async function notifyPayment(r: any, part: any, state: "paid" | "processing" | "
       subject: `Payment received — ${content.title || "thank you"}`,
       html: emailShell(content, `<p>Hi ${esc(r.recipient_name || "there")},</p><p>We received your payment of <b>${charged}</b> by ${esc(how)}.</p>
         ${bal.remainingCents > 0
-          ? `<p>Paid so far: ${formatMoney(bal.paidCents + bal.pendingCents, { cents: true })} of ${formatMoney(bal.dueTodayCents, { cents: true })}. Still due: <b>${formatMoney(bal.remainingCents, { cents: true })}</b> — you can pay it in one or more payments, on any card or bank account.</p>${button(link, "Pay the rest", content.brand.accent)}`
+          ? `<p>Paid so far: ${formatMoney(bal.paidCents + bal.pendingCents, { cents: true })} of ${formatMoney(bal.dueTodayCents, { cents: true })}. Still due: <b>${formatMoney(bal.remainingCents, { cents: true })}</b>. Please pay the rest as soon as possible — in one or more payments, on any card or bank account.</p>${button(`${link}#pay`, "Pay the rest", content.brand.accent)}`
           : `<p>That completes what was due today. We'll be in touch to schedule kickoff.</p>`}`),
       text: `We received your payment of ${charged}. ${bal.remainingCents > 0 ? `Still due: ${formatMoney(bal.remainingCents, { cents: true })} — ${link}` : "That completes what was due today."}`,
     }).catch((e: any) => console.error("[proposals] receipt email failed:", e?.message));
@@ -377,6 +383,119 @@ async function notifyPaid(r: any, state: "paid" | "processing" | "failed") {
       text: `We received your payment of ${amount}.`,
     }).catch((e: any) => console.error("[proposals] receipt email failed:", e?.message));
   }
+}
+
+/** The pay page an invoice links to: the amount filled in when it asks for less than what's left. */
+function payLink(r: any, amountCents: number, bal: PaymentBalance): string {
+  return `${APP_BASE_URL()}/proposal/${r.public_token}${amountCents < bal.remainingCents ? `?amount=${amountCents}` : ""}#pay`;
+}
+
+function invoicePdf(r: any, number: string, amountCents: number, bal: PaymentBalance, statement = false): Promise<Buffer> {
+  return buildInvoicePdf({
+    id: Number(r.id), number, statement, issuedAt: new Date(), content: parseContent(r.content),
+    recipientName: r.recipient_name, recipientEmail: r.recipient_email, recipientCompany: r.recipient_company,
+    totals: r.totals as ProposalTotals, payments: toPayments(r), balance: bal, amountDueCents: amountCents,
+    payUrl: payLink(r, amountCents, bal), test: r.is_test === true,
+  });
+}
+
+/**
+ * Emails an invoice for what's still due today (or part of it): the PDF attached, the balance, and a pay link
+ * (owner, 2026-10-25: "they will get emails that the deposit amount is still not paid and needs to be paid asap").
+ * `number` is the invoice's sequence on this proposal, already counted by the caller. Throws when the send fails.
+ */
+async function sendInvoice(r: any, opts: { number: number; amountCents: number; reminder: boolean; message?: string }): Promise<void> {
+  const content = parseContent(r.content);
+  const bal = balanceOf(r)!;
+  const no = invoiceNumber(Number(r.id), opts.number);
+  const amount = formatMoney(opts.amountCents, { cents: true });
+  const title = content.title || r.name;
+  const link = payLink(r, opts.amountCents, bal);
+  const paid = bal.paidCents + bal.pendingCents;
+  const pdf = await invoicePdf(r, no, opts.amountCents, bal);
+  const lead = opts.reminder
+    ? `<p>This is a reminder that the payment due at signing for <b>${esc(title)}</b> is not fully paid. <b>${amount} is still due</b> and needs to be paid as soon as possible.</p>`
+    : `<p>Here is invoice <b>${esc(no)}</b> for <b>${esc(title)}</b>. Amount due: <b>${amount}</b>. Please pay as soon as possible.</p>`;
+  const table = `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:14px;margin:8px 0 4px">
+      <tr><td style="padding:6px 0;color:#6b7280">Due at signing</td><td align="right">${formatMoney(bal.dueTodayCents, { cents: true })}</td></tr>
+      ${paid > 0 ? `<tr><td style="padding:6px 0;color:#6b7280">Paid so far</td><td align="right">−${formatMoney(paid, { cents: true })}</td></tr>` : ""}
+      <tr><td style="padding:8px 0;border-top:1px solid #e5e7eb;font-weight:700">Still due</td><td align="right" style="border-top:1px solid #e5e7eb;font-weight:700">${formatMoney(bal.remainingCents, { cents: true })}</td></tr>
+    </table>`;
+  const fee = content.payment.cardEnabled && content.payment.cardFeeBps ? ` Card payments add a ${formatBps(content.payment.cardFeeBps)} processing fee.` : "";
+  await sendWithFallback({
+    from: fromFor(content), to: r.recipient_email, cc: r.recipient_cc || undefined, replyTo: content.brand.contactEmail || undefined,
+    subject: `${r.is_test ? "[TEST] " : ""}${opts.reminder ? `Payment reminder: ${amount} still due` : `Invoice ${no}: ${amount} due`} — ${title}`,
+    html: emailShell(content, `<p>Hi ${esc(r.recipient_name || "there")},</p>${opts.message?.trim() ? paragraphs(opts.message) : ""}${lead}${table}
+      ${button(link, `Pay ${amount} now`, content.brand.accent)}
+      <p style="font-size:13px;color:#6b7280">You can pay in one or more payments, on any card or bank account. Bank transfer (ACH) has no fee.${fee} Invoice ${esc(no)} is attached.</p>`),
+    text: `${opts.reminder ? `Reminder: ${amount} is still due` : `Invoice ${no}: ${amount} due`} for ${title}. Please pay as soon as possible: ${link}`,
+    attachments: [{ filename: `Invoice ${no}.pdf`, content: pdf, contentType: "application/pdf" }],
+  }, false, { failover: "definite" }); // numbered: never sent twice by the backup account
+}
+
+/** A send that certainly failed gives its number and slot back (so the next tick retries); an ambiguous one keeps them. */
+async function releaseInvoiceClaim(id: number, n: number, prevAt: Date | string | null) {
+  await pool.query(`UPDATE proposals SET invoice_count = invoice_count - 1, last_invoice_at = $3 WHERE id = $1 AND invoice_count = $2`, [id, n, prevAt ?? null]);
+}
+
+/** Pacific business hours (the brands are run from WA): automatic invoices only go out 9:00–17:59. */
+function pacificBusinessHours(now: Date): boolean {
+  const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", hourCycle: "h23" }).format(now));
+  return h >= 9 && h < 18;
+}
+
+/**
+ * The daily invoice: a client who has paid part of what's due today and not the rest gets an invoice for the rest
+ * every REMINDER_EVERY_HOURS — the first a day after their last payment (the receipt already said what's left) —
+ * until it's paid, the proposal is voided, or the admin pauses it. Never for test copies. The claim
+ * (last_invoice_at) is taken in one UPDATE, so two server processes never send the same one.
+ */
+export async function runProposalReminders(now = new Date()): Promise<number> {
+  if (!pacificBusinessHours(now)) return 0;
+  const { rows } = await pool.query(
+    `SELECT p.id FROM proposals p
+      WHERE p.kind = 'offer' AND NOT p.is_test AND NOT p.reminders_paused AND p.signed_at IS NOT NULL
+        AND p.status IN ('partial', 'payment_failed') AND COALESCE(p.recipient_email, '') <> ''
+        AND (p.last_invoice_at IS NULL OR p.last_invoice_at < $1::timestamptz - make_interval(hours => $2))
+        AND EXISTS (SELECT 1 FROM proposal_payments pp WHERE pp.proposal_id = p.id AND pp.status IN ('paid', 'processing'))
+        AND NOT EXISTS (SELECT 1 FROM proposal_payments pp WHERE pp.proposal_id = p.id AND (
+              (pp.status IN ('paid', 'processing') AND COALESCE(pp.paid_at, pp.created_at) > $1::timestamptz - make_interval(hours => $2))
+              OR (pp.status = 'open' AND pp.created_at > $1::timestamptz - interval '1 hour')))
+      ORDER BY p.id LIMIT 20`, [now.toISOString(), REMINDER_EVERY_HOURS]);
+  let sent = 0;
+  for (const { id } of rows) {
+    try {
+      let r = await loadById(Number(id));
+      if (!r) continue;
+      r = await refreshFromStripe(r); // a payment the webhook hasn't delivered yet still counts
+      const bal = balanceOf(r);
+      if (!bal || bal.remainingCents <= 0 || bal.paidCents + bal.pendingCents <= 0 || !["partial", "payment_failed"].includes(r.status)) continue;
+      const claim = await pool.query(
+        `UPDATE proposals SET last_invoice_at = $2, invoice_count = invoice_count + 1 WHERE id = $1
+           AND (last_invoice_at IS NULL OR last_invoice_at < $2::timestamptz - make_interval(hours => $3)) AND NOT reminders_paused RETURNING invoice_count`,
+        [r.id, now.toISOString(), REMINDER_EVERY_HOURS]);
+      if (!claim.rows[0]) continue;
+      const n = Number(claim.rows[0].invoice_count);
+      try {
+        await sendInvoice(r, { number: n, amountCents: bal.remainingCents, reminder: true });
+        await addEvent(Number(r.id), "reminder_sent", `${invoiceNumber(Number(r.id), n)} · ${formatMoney(bal.remainingCents, { cents: true })} still due · ${r.recipient_email}`);
+        sent++;
+      } catch (e: any) {
+        console.error(`[proposals] reminder for #${r.id} failed:`, e?.message || e);
+        if (!e?.ambiguous) await releaseInvoiceClaim(Number(r.id), n, r.last_invoice_at);
+        await addEvent(Number(r.id), "invoice_failed", `${e?.ambiguous ? "may have been delivered — not retried" : "will retry"} · ${String(e?.message || e).slice(0, 160)}`);
+      }
+    } catch (e: any) { console.error(`[proposals] reminder check for #${id} failed:`, e?.message || e); }
+  }
+  return sent;
+}
+
+let remindersStarted = false;
+/** Once per process: every 15 minutes, so a due invoice goes out within a quarter hour of 9:00 Pacific. */
+export function startProposalReminders(): void {
+  if (remindersStarted || process.env.NODE_ENV === "test" || process.env.VITEST) return;
+  remindersStarted = true;
+  workerInterval("Proposal payment reminders", () => runProposalReminders(), 15 * 60_000, { firstAfterMs: 2 * 60_000 });
 }
 
 /** checkout.session.* for a proposal (server/stripe.ts): paid → paid; completed but unpaid (ACH) → processing; failed → payment_failed. */
@@ -626,6 +745,7 @@ function parseSignature(req: any, content: ProposalContent) {
 }
 
 export function registerProposalRoutes(app: Express, getDevUser: GetUser): void {
+  startProposalReminders();
   // ---------- admin ----------
   app.get("/api/admin/proposals", async (req, res) => {
     if (!(await requirePlatformAdmin(req, res, getDevUser))) return;
@@ -965,6 +1085,71 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     res.json(toDetail(await loadById(Number(r.id))));
   });
 
+  // An invoice for what's still due today, or part of it (owner, 2026-10-25: "allow payments in the form of invoices").
+  const invoiceTarget = async (req: any, res: any) => {
+    if (!(await requirePlatformAdmin(req, res, getDevUser))) return null;
+    const id = idParam.safeParse(req.params.id);
+    let r = id.success ? await loadById(id.data) : null;
+    if (!r || r.kind !== "offer") { res.status(404).json({ message: "Proposal not found" }); return null; }
+    if (!r.signed_at || !r.totals) { res.status(409).json({ message: "An invoice is for a signed proposal." }); return null; }
+    if (["void", "archived", "declined"].includes(r.status)) { res.status(409).json({ message: "This proposal is closed." }); return null; }
+    r = await refreshFromStripe(r);
+    const bal = balanceOf(r)!;
+    if (bal.remainingCents <= 0) { res.status(409).json({ message: bal.pendingCents ? "Nothing is left to pay — a bank transfer is clearing." : "Nothing is left to pay today." }); return null; }
+    const raw = req.body?.amountCents ?? req.query?.amountCents;
+    const amount = raw == null || raw === "" ? bal.remainingCents : Number(raw);
+    const floor = Math.min(MIN_PAYMENT_CENTS, bal.remainingCents);
+    if (!Number.isInteger(amount) || amount < floor || amount > bal.remainingCents) {
+      res.status(400).json({ message: `Enter an amount from ${formatMoney(floor, { cents: true })} to ${formatMoney(bal.remainingCents, { cents: true })}.` });
+      return null;
+    }
+    return { r, bal, amount };
+  };
+
+  app.get("/api/admin/proposals/:id/invoice.pdf", async (req, res) => {
+    const t = await invoiceTarget(req, res);
+    if (!t) return;
+    const pdf = await invoicePdf(t.r, invoiceNumber(Number(t.r.id), Number(t.r.invoice_count ?? 0) + 1), t.amount, t.bal);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="invoice-${t.r.id}.pdf"`);
+    res.send(pdf);
+  });
+
+  app.post("/api/admin/proposals/:id/invoice", async (req, res) => {
+    const t = await invoiceTarget(req, res);
+    if (!t) return;
+    if (!t.r.recipient_email) return res.status(400).json({ message: "Add the client's email first." });
+    const message = typeof req.body?.message === "string" ? req.body.message.slice(0, 4000) : undefined;
+    // Not two in a row: a second click, or the daily invoice that just went out, holds this one for two minutes.
+    const { rows } = await pool.query(
+      `UPDATE proposals SET invoice_count = invoice_count + 1, last_invoice_at = now() WHERE id = $1
+         AND (last_invoice_at IS NULL OR last_invoice_at < now() - interval '2 minutes') RETURNING invoice_count`, [t.r.id]);
+    if (!rows[0]) return res.status(409).json({ message: "An invoice went out in the last two minutes. Check the activity, then send again if you still need to." });
+    const n = Number(rows[0].invoice_count);
+    try {
+      await sendInvoice(t.r, { number: n, amountCents: t.amount, reminder: false, message });
+    } catch (e: any) {
+      if (!e?.ambiguous) await releaseInvoiceClaim(Number(t.r.id), n, t.r.last_invoice_at);
+      await addEvent(Number(t.r.id), "invoice_failed", `${e?.ambiguous ? "may have been delivered" : "not sent"} · ${String(e?.message || e).slice(0, 160)}`);
+      return res.status(502).json({ message: e?.ambiguous
+        ? "The mail server stopped answering mid-send, so the invoice may have arrived. Check with the client before sending again."
+        : `The invoice could not be sent: ${String(e?.message || e).slice(0, 160)}` });
+    }
+    await addEvent(Number(t.r.id), "invoice_sent", `${invoiceNumber(Number(t.r.id), n)} · ${formatMoney(t.amount, { cents: true })} · ${t.r.recipient_email}`);
+    res.json(toDetail(await loadById(Number(t.r.id))));
+  });
+
+  app.post("/api/admin/proposals/:id/reminders", async (req, res) => {
+    if (!(await requirePlatformAdmin(req, res, getDevUser))) return;
+    const id = idParam.safeParse(req.params.id);
+    const body = z.object({ paused: z.boolean() }).safeParse(req.body);
+    if (!id.success || !body.success) return res.status(400).json({ message: "Bad request" });
+    const { rowCount } = await pool.query(`UPDATE proposals SET reminders_paused = $2, events = events || $3::jsonb WHERE id = $1 AND kind = 'offer'`,
+      [id.data, body.data.paused, event(body.data.paused ? "reminders_paused" : "reminders_resumed")]);
+    if (!rowCount) return res.status(404).json({ message: "Proposal not found" });
+    res.json(toDetail(await loadById(id.data)));
+  });
+
   // ---------- recipient ----------
   app.get("/api/public/proposals/:token", async (req: any, res) => {
     let r = await loadByToken(String(req.params.token || ""));
@@ -995,6 +1180,20 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     const r = await loadByToken(String(req.params.token || ""));
     if (!r || ["archived", "void"].includes(r.status)) return res.status(404).json({ message: "This proposal link is not valid." });
     await sendFile(res, r.file_id ? Number(r.file_id) : null, req.query.download === "1");
+  });
+
+  app.get("/api/public/proposals/:token/invoice.pdf", async (req, res) => {
+    let r = await loadByToken(String(req.params.token || ""));
+    if (!r || ["archived", "void", "declined"].includes(r.status) || !r.signed_at || !r.totals) return res.status(404).json({ message: "No invoice for this proposal." });
+    r = await refreshFromStripe(r);
+    const bal = balanceOf(r)!;
+    if (bal.remainingCents <= 0) return res.status(404).json({ message: "Nothing is left to pay." });
+    // A statement of today's balance, not a numbered invoice: its amount changes with every payment.
+    const pdf = await invoicePdf(r, `S-${r.id}-${new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date()).replace(/-/g, "")}`, bal.remainingCents, bal, true);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="statement-${r.id}.pdf"`);
+    res.setHeader("X-Robots-Tag", "noindex");
+    res.send(pdf);
   });
 
   app.get("/api/public/proposals/:token/signed.pdf", async (req, res) => {
