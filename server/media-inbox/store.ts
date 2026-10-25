@@ -1,8 +1,8 @@
 /** The media inbox's database access (./schema.ts). */
 import { pool } from "../db";
-import type { MediaDecision } from "./ai";
+import type { MediaDecision, PartnerTerms, QuotedPrice } from "./ai";
 import type { Inbound } from "./mailbox";
-import type { MediaPartnerKind, MediaQueueRow, MediaSettings } from "@shared/media-inbox";
+import type { MediaPartnerKind, MediaPriceCategory, MediaPriceRow, MediaPriceUnit, MediaQueueRow, MediaSettings } from "@shared/media-inbox";
 
 export const storeDeps = { db: () => pool };
 const db = () => storeDeps.db();
@@ -25,8 +25,11 @@ export async function markPass(mailbox: string, error: string | null) {
      ON CONFLICT (mailbox) DO UPDATE SET last_pass_at = now(), last_pass_error = $2`, [mailbox, error]);
 }
 
-/** Store an inbound email once (by Message-ID). `reason` set = a machine sender, logged as automated. */
-export async function saveInbound(mailbox: string, m: Inbound, reason: string | null): Promise<boolean> {
+/**
+ * Store an inbound email once (by Message-ID). `reason` set = a machine sender, logged as automated. `logged` (support@)
+ * keeps it on a company's record without ever answering it. Returns the new row's id (null when already stored).
+ */
+export async function saveInbound(mailbox: string, m: Inbound, reason: string | null, o: { logged?: { partnerId: number; reason: string } } = {}): Promise<number | null> {
   // A reply to an email we sent joins that email's thread and company (our first-contact emails have no Gmail thread id).
   const known = m.references.length
     ? (await db().query(`SELECT thread_key, partner_id FROM media_messages WHERE message_id = ANY($1) ORDER BY id LIMIT 1`, [m.references])).rows[0]
@@ -35,8 +38,8 @@ export async function saveInbound(mailbox: string, m: Inbound, reason: string | 
     `INSERT INTO media_messages (mailbox, message_id, thread_key, direction, from_email, from_name, to_email, cc, subject, body, references_ids, received_at, status, reason, partner_id)
      VALUES ($1, $2, $3, 'in', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (message_id) DO NOTHING RETURNING id`,
     [mailbox, m.messageId, known?.thread_key ?? m.threadKey, m.fromEmail, m.fromName, m.to, m.cc, m.subject.slice(0, 500), m.body, m.references.join(" "), m.date,
-      reason ? "automated" : "new", reason, known?.partner_id ?? null]);
-  return Boolean(r.rows[0]);
+      o.logged ? "logged" : reason ? "automated" : "new", o.logged?.reason ?? reason, o.logged?.partnerId ?? known?.partner_id ?? null]);
+  return r.rows[0]?.id ?? null;
 }
 
 export type PendingMessage = {
@@ -148,9 +151,9 @@ export async function upsertPartner(p: { domain: string | null; contactEmail: st
   const company = d.company ?? p.domain ?? p.contactEmail;
   if (!found.rows[0]) {
     const r = await db().query(
-      `INSERT INTO media_partners (company, domain, kind, status, contact_name, contact_email, summary, agreement, to_finalize, cost_terms, owner_question, agreed_at, last_message_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CASE WHEN $4 = 'agreed' THEN now() END, now()) RETURNING *`,
-      [company, p.domain, d.kind, d.stage, p.contactName, p.contactEmail, d.summary, d.agreement, d.toFinalize, d.costTerms, d.ownerQuestion]);
+      `INSERT INTO media_partners (company, domain, kind, status, contact_name, contact_email, summary, agreement, to_finalize, cost_terms, owner_question, agreed_at, last_message_at, api_terms, min_commitment)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CASE WHEN $4 = 'agreed' THEN now() END, now(), $12, $13) RETURNING *`,
+      [company, p.domain, d.kind, d.stage, p.contactName, p.contactEmail, d.summary, d.agreement, d.toFinalize, d.costTerms, d.ownerQuestion, d.apiTerms, d.minCommitment]);
     return { partner: partnerRow(r.rows[0]), newlyAgreed: d.stage === "agreed" };
   }
   const cur = found.rows[0];
@@ -160,8 +163,9 @@ export async function upsertPartner(p: { domain: string | null; contactEmail: st
        contact_name = COALESCE(contact_name, $5), contact_email = COALESCE(contact_email, $6), summary = COALESCE(NULLIF($7, ''), summary),
        agreement = COALESCE($8, agreement), to_finalize = COALESCE($9, to_finalize), cost_terms = COALESCE($10, cost_terms),
        owner_question = $11, agreed_at = CASE WHEN $4 = 'agreed' AND agreed_at IS NULL THEN now() ELSE agreed_at END,
+       api_terms = COALESCE($12, api_terms), min_commitment = COALESCE($13, min_commitment),
        last_message_at = now(), updated_at = now() WHERE id = $1 RETURNING *`,
-    [cur.id, d.company, d.kind, next, p.contactName, p.contactEmail, d.summary, d.agreement, d.toFinalize, d.costTerms, d.ownerQuestion]);
+    [cur.id, d.company, d.kind, next, p.contactName, p.contactEmail, d.summary, d.agreement, d.toFinalize, d.costTerms, d.ownerQuestion, d.apiTerms, d.minCommitment]);
   return { partner: partnerRow(r.rows[0]), newlyAgreed: next === "agreed" && cur.status !== "agreed" && cur.status !== "finalized" };
 }
 
@@ -239,6 +243,7 @@ export async function listPartners(status?: string) {
     summary: x.summary, agreement: x.agreement, toFinalize: x.to_finalize, costTerms: x.cost_terms, ownerQuestion: x.owner_question,
     agreedAt: x.agreed_at ? new Date(x.agreed_at).toISOString() : null, addedTo: x.added_to,
     lastMessageAt: x.last_message_at ? new Date(x.last_message_at).toISOString() : null, messages: x.messages, notes: x.notes ?? null,
+    apiTerms: x.api_terms ?? null, minCommitment: x.min_commitment ?? null,
   }));
 }
 
@@ -263,14 +268,17 @@ export async function getPartner(id: number): Promise<PartnerRow | null> {
   return r.rows[0] ? partnerRow(r.rows[0]) : null;
 }
 
-export async function updatePartner(id: number, f: { status?: string; kind?: string; toFinalize?: string | null; ownerQuestion?: string | null; domain?: string | null; notes?: string | null }) {
+export async function updatePartner(id: number, f: { status?: string; kind?: string; toFinalize?: string | null; ownerQuestion?: string | null; domain?: string | null; notes?: string | null; apiTerms?: string | null; minCommitment?: string | null; costTerms?: string | null }) {
   await db().query(
     `UPDATE media_partners SET status = COALESCE($2, status), kind = COALESCE($3, kind),
        to_finalize = CASE WHEN $4::boolean THEN $5 ELSE to_finalize END, owner_question = CASE WHEN $6::boolean THEN $7 ELSE owner_question END,
        domain = CASE WHEN $8::boolean THEN $9 ELSE domain END, notes = CASE WHEN $10::boolean THEN $11 ELSE notes END,
+       api_terms = CASE WHEN $12::boolean THEN $13 ELSE api_terms END, min_commitment = CASE WHEN $14::boolean THEN $15 ELSE min_commitment END,
+       cost_terms = CASE WHEN $16::boolean THEN $17 ELSE cost_terms END,
        agreed_at = CASE WHEN $2 IN ('agreed','finalized') AND agreed_at IS NULL THEN now() ELSE agreed_at END, updated_at = now() WHERE id = $1`,
     [id, f.status ?? null, f.kind ?? null, f.toFinalize !== undefined, f.toFinalize ?? null, f.ownerQuestion !== undefined, f.ownerQuestion ?? null,
-      f.domain !== undefined, f.domain ?? null, f.notes !== undefined, f.notes ?? null]);
+      f.domain !== undefined, f.domain ?? null, f.notes !== undefined, f.notes ?? null, f.apiTerms !== undefined, f.apiTerms ?? null,
+      f.minCommitment !== undefined, f.minCommitment ?? null, f.costTerms !== undefined, f.costTerms ?? null]);
 }
 
 /** Every email with one company, oldest first (what the AI reads when drafting a reply from the admin page). */
@@ -622,4 +630,89 @@ export async function stopPartner(id: number): Promise<string[]> {
 export async function holdNew(): Promise<number> {
   const r = await db().query(`UPDATE media_messages SET status = 'needs_owner', reason = 'Automatic replies are off — answer it from the company page' WHERE direction = 'in' AND status = 'new'`);
   return r.rowCount ?? 0;
+}
+
+// ── partner pricing (owner, 2026-10-25: "a separate area for the list of companies and their costs") ─────────────────
+
+/**
+ * Record the prices a company quoted. A price already on file (same category and amount for the same quantity, or the
+ * same product) is not added again, so a thread read twice, or a price an admin typed in, never doubles up.
+ */
+export async function savePrices(partnerId: number, prices: QuotedPrice[], source: string, quotedAt: Date = new Date()): Promise<number> {
+  let added = 0;
+  for (const p of prices) {
+    const r = await db().query(
+      `INSERT INTO media_partner_prices (partner_id, category, product, price, quantity, unit, notes, source, quoted_at)
+       SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9::date
+        WHERE NOT EXISTS (SELECT 1 FROM media_partner_prices x WHERE x.partner_id = $1 AND COALESCE(x.quantity, 1) = COALESCE($5::int, 1)
+          AND ((x.category = $2 AND x.price IS NOT DISTINCT FROM $4::numeric AND $4::numeric IS NOT NULL) OR lower(x.product) = lower($3)))
+       RETURNING id`,
+      [partnerId, p.category, p.product, p.price, p.quantity, p.unit, p.notes, source, quotedAt.toISOString().slice(0, 10)]);
+    if (r.rows[0]) added++;
+  }
+  return added;
+}
+
+/** A company's terms from a reading of its emails: prices itemized, API and minimum kept when the reading has them. */
+export async function saveTerms(partnerId: number, t: PartnerTerms, source: string, quotedAt?: Date): Promise<number> {
+  await db().query(
+    `UPDATE media_partners SET cost_terms = COALESCE($2, cost_terms), api_terms = COALESCE($3, api_terms), min_commitment = COALESCE($4, min_commitment),
+       updated_at = now() WHERE id = $1`, [partnerId, t.costTerms, t.apiTerms, t.minCommitment]);
+  return t.prices.length ? savePrices(partnerId, t.prices, source, quotedAt) : 0;
+}
+
+const priceRow = (x: any): MediaPriceRow => ({
+  id: x.id, partnerId: x.partner_id, category: x.category, product: x.product, price: x.price == null ? null : Number(x.price),
+  quantity: x.quantity ?? null, unit: x.unit, notes: x.notes ?? null, source: x.source, quotedAt: new Date(x.quoted_at).toISOString().slice(0, 10),
+  company: x.company, domain: x.domain, status: x.status, contactName: x.contact_name ?? null, contactEmail: x.contact_email ?? null,
+  apiTerms: x.api_terms ?? null, minCommitment: x.min_commitment ?? null,
+});
+
+/** Every price on file with its company, cheapest per item first within a category. */
+export async function listPrices(): Promise<MediaPriceRow[]> {
+  const r = await db().query(
+    `SELECT x.*, p.company, p.domain, p.status, p.contact_name, p.contact_email, p.api_terms, p.min_commitment
+       FROM media_partner_prices x JOIN media_partners p ON p.id = x.partner_id
+      ORDER BY x.category, p.company, x.price / GREATEST(COALESCE(x.quantity, 1), 1) NULLS LAST, x.id`);
+  return r.rows.map(priceRow);
+}
+
+/** Companies that mentioned money but have no itemized price yet (their words are shown as they wrote them). */
+export async function unpricedTerms() {
+  const r = await db().query(
+    `SELECT id, company, domain, kind, status, cost_terms, api_terms, min_commitment FROM media_partners p
+      WHERE (cost_terms IS NOT NULL OR api_terms IS NOT NULL) AND NOT EXISTS (SELECT 1 FROM media_partner_prices x WHERE x.partner_id = p.id)
+      ORDER BY company`);
+  return r.rows.map((x) => ({ id: x.id, company: x.company, domain: x.domain, kind: x.kind, status: x.status, costTerms: x.cost_terms, apiTerms: x.api_terms, minCommitment: x.min_commitment }));
+}
+
+export type PriceInput = { partnerId: number; category: MediaPriceCategory; product: string; price: number | null; quantity: number | null; unit: MediaPriceUnit; notes: string | null; quotedAt?: string };
+
+export async function addPrice(p: PriceInput): Promise<number> {
+  const r = await db().query(
+    `INSERT INTO media_partner_prices (partner_id, category, product, price, quantity, unit, notes, source, quoted_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'admin', COALESCE($8::date, current_date)) RETURNING id`,
+    [p.partnerId, p.category, p.product, p.price, p.quantity, p.unit, p.notes, p.quotedAt ?? null]);
+  return r.rows[0].id;
+}
+
+export async function updatePrice(id: number, p: Omit<PriceInput, "partnerId">): Promise<boolean> {
+  const r = await db().query(
+    `UPDATE media_partner_prices SET category = $2, product = $3, price = $4, quantity = $5, unit = $6, notes = $7,
+       quoted_at = COALESCE($8::date, quoted_at), updated_at = now() WHERE id = $1 RETURNING id`,
+    [id, p.category, p.product, p.price, p.quantity, p.unit, p.notes, p.quotedAt ?? null]);
+  return Boolean(r.rows[0]);
+}
+
+export async function deletePrice(id: number): Promise<boolean> {
+  return Boolean((await db().query(`DELETE FROM media_partner_prices WHERE id = $1 RETURNING id`, [id])).rows[0]);
+}
+
+/** A company first met on support@ (a price request answered there), or added by an admin: created as "talking". */
+export async function partnerFromSupport(p: { company: string; domain: string | null; kind: MediaPartnerKind; contactEmail: string | null; contactName: string | null; summary: string }): Promise<number> {
+  const r = await db().query(
+    `INSERT INTO media_partners (company, domain, kind, contact_name, contact_email, summary, last_message_at) VALUES ($1, $2, $3, $4, $5, $6, now())
+     ON CONFLICT (domain) DO UPDATE SET last_message_at = now(), updated_at = now() RETURNING id`,
+    [p.company, p.domain, p.kind, p.contactName, p.contactEmail, p.summary || null]);
+  return r.rows[0].id;
 }

@@ -131,6 +131,7 @@ export const APP_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/admin/reputation": "Reputation Desk · Admin",
   "/admin/proposals": "Proposals · Admin",
   "/admin/partnerships": "Partnerships · Admin",
+  "/admin/partnerships/pricing": "Partner pricing · Admin",
   "/admin/press": "Press Wire desk · Admin",
   "/admin/directories": "Directory Sync · Admin",
   "/admin/tickets": "Support tickets · Admin",

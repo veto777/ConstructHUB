@@ -5,9 +5,10 @@
  * cost money waits for the owner. Platform admins only.
  */
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { format, formatDistanceToNowStrict } from "date-fns";
-import { Handshake, Inbox, Loader2, Lock, Mail, MessageSquare, Play, Scale, Send, Sparkles, StickyNote } from "lucide-react";
+import { Handshake, Inbox, Loader2, Lock, Mail, MessageSquare, Play, Receipt, Scale, Send, Sparkles, StickyNote } from "lucide-react";
 import {
   MEDIA_INBOX_LAWS, MEDIA_INBOX_PARAMETERS, MEDIA_MESSAGE_STATUS_LABELS, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_KIND_LABELS, MEDIA_PARTNER_STATUSES, MEDIA_PARTNER_STATUS_LABELS,
   type MediaMessage, type MediaMessageStatus, type MediaPartner, type MediaPartnerKind, type MediaPartnerStatus,
@@ -35,7 +36,7 @@ type Summary = {
 type MessagesPayload = { rows: MediaMessage[]; total: number };
 
 const PARTNER_TONE: Record<MediaPartnerStatus, PillTone> = { talking: "info", agreed: "teal", finalized: "success", declined: "neutral" };
-const MESSAGE_TONE: Record<MediaMessageStatus, PillTone> = { new: "info", replied: "success", needs_owner: "warning", automated: "neutral", failed: "danger" };
+const MESSAGE_TONE: Record<MediaMessageStatus, PillTone> = { new: "info", replied: "success", needs_owner: "warning", automated: "neutral", failed: "danger", logged: "neutral" };
 const PAGE = 50;
 const n = (v: number | undefined) => (v ?? 0).toLocaleString("en-US");
 const ago = (iso: string | null) => (iso ? `${formatDistanceToNowStrict(new Date(iso))} ago` : "—");
@@ -121,10 +122,11 @@ function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onCl
               <ContactBox partner={partner} onSave={(b) => save.mutate(b)} saving={save.isPending} />
               <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2">
                 <dt className="font-medium text-foreground/70">Agreement</dt><dd>{partner.agreement ?? "—"}</dd>
-                <dt className="font-medium text-foreground/70">Their prices</dt><dd>{partner.costTerms ?? "None mentioned"}</dd>
+                <dt className="font-medium text-foreground/70">Their prices</dt><dd>{partner.costTerms ?? "None mentioned"} <Link href="/admin/partnerships/pricing" className="text-primary hover:underline">Partner pricing</Link></dd>
                 <dt className="font-medium text-foreground/70">Added to</dt><dd>{partner.addedTo ?? "Not yet (added when agreed)"}</dd>
                 <dt className="font-medium text-foreground/70">Agreed</dt><dd>{partner.agreedAt ? ago(partner.agreedAt) : "—"}</dd>
               </dl>
+              <TermsBox partner={partner} onSave={(b) => save.mutate(b)} saving={save.isPending} />
               <div>
                 <div className="mb-1 font-medium">What we need to finalize</div>
                 <Textarea className="bg-background" rows={3} value={toFinalize ?? partner.toFinalize ?? ""} onChange={(e) => setToFinalize(e.target.value)} data-testid="input-partner-finalize" />
@@ -197,6 +199,20 @@ function ContactBox({ partner, onSave, saving }: { partner: MediaPartner; onSave
           })} data-testid="button-save-partner-contact">Save details</Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Their API and minimum terms (read from their emails; editable). Shown with their prices on Partner pricing. */
+function TermsBox({ partner, onSave, saving }: { partner: MediaPartner; onSave: (b: Record<string, unknown>) => void; saving: boolean }) {
+  const init = { apiTerms: partner.apiTerms ?? "", minCommitment: partner.minCommitment ?? "" };
+  const [f, setF] = useState(init);
+  const dirty = JSON.stringify(f) !== JSON.stringify(init);
+  return (
+    <div className="grid gap-2 sm:grid-cols-2" data-testid="form-partner-terms">
+      <Input className="bg-background" aria-label="API" placeholder="API (e.g. none, web form only)" value={f.apiTerms} onChange={(e) => setF({ ...f, apiTerms: e.target.value })} />
+      <Input className="bg-background" aria-label="Minimum" placeholder="Minimum, contract or prepayment" value={f.minCommitment} onChange={(e) => setF({ ...f, minCommitment: e.target.value })} />
+      {dirty && <div className="sm:col-span-2"><Button size="sm" disabled={saving} onClick={() => onSave({ apiTerms: f.apiTerms.trim() || null, minCommitment: f.minCommitment.trim() || null })}>Save terms</Button></div>}
     </div>
   );
 }
@@ -316,7 +332,11 @@ export default function AdminPartnershipsPage() {
   const [partnerTab, setPartnerTab] = useState<"all" | MediaPartnerStatus>("all");
   const [mailTab, setMailTab] = useState<"all" | "out" | "in" | "needs_owner" | "declined">("all");
   const [page, setPage] = useState(0);
-  const [openId, setOpenId] = useState<number | null>(null);
+  // ?open=<company id> opens that company (links from Partner pricing).
+  const [openId, setOpenId] = useState<number | null>(() => {
+    const v = Number(new URLSearchParams(window.location.search).get("open"));
+    return Number.isInteger(v) && v > 0 ? v : null;
+  });
 
   const { data: s, error, isLoading, refetch } = useQuery<Summary>({ queryKey: ["/api/admin/media-inbox/summary"], queryFn: () => getJson("/api/admin/media-inbox/summary"), retry: false });
   const partnersUrl = `/api/admin/media-inbox/partners${partnerTab === "all" ? "" : `?status=${partnerTab}`}`;
@@ -370,9 +390,14 @@ export default function AdminPartnershipsPage() {
         </StatGrid>
 
         <Section title="Companies" icon={Handshake} actions={
-          <Button size="sm" variant="outline" disabled={run.isPending} onClick={() => run.mutate()} data-testid="button-media-run">
-            {run.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}Check now
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/admin/partnerships/pricing" data-testid="link-partner-pricing"><Receipt className="mr-2 h-4 w-4" />Partner pricing</Link>
+            </Button>
+            <Button size="sm" variant="outline" disabled={run.isPending} onClick={() => run.mutate()} data-testid="button-media-run">
+              {run.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}Check now
+            </Button>
+          </div>
         }>
           <Tabs value={partnerTab} onValueChange={(v) => setPartnerTab(v as typeof partnerTab)} className="mb-3">
             <TabsList className="h-auto flex-wrap">

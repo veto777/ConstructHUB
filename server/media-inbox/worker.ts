@@ -16,12 +16,12 @@ import { promises as dns } from "node:dns";
 import { MEDIA_INBOX_PARAMETERS, STOP_LINE_RE, type MediaSettings, type MediaTemplateKind } from "@shared/media-inbox";
 import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
-import { classifySites, decide, extractNextStep, mediaAiConfigured, planForm } from "./ai";
+import { classifySites, decide, extractNextStep, keepQuotedPrices, mediaAiConfigured, planForm, readTerms } from "./ai";
 import { closeBrowser, readPage, submitGoogleForm, submitHtmlForm } from "./browse";
-import { asksIfAi, companyDomain, firstNameOf, formMessage, holdingReply, personWillReply, isOptOut, machineReason, replyProblem, replySubject } from "./guard";
+import { asksIfAi, companyDomain, firstNameOf, formMessage, holdingReply, personWillReply, isOptOut, machineReason, replyProblem, replySubject, supportSkip } from "./guard";
 import { pickEmail, siteName } from "../backlinks/outreach";
 import { isSuppressed } from "../backlinks/store";
-import { fetchSince, mailboxConfig, mailboxConfigured, sendMail } from "./mailbox";
+import { fetchSince, mailboxConfig, mailboxConfigured, sendMail, supportMailboxConfig } from "./mailbox";
 import { checkMailbox } from "./verify";
 import * as store from "./store";
 import { workerInterval } from "../workers";
@@ -49,7 +49,7 @@ export async function acceptsMail(domain: string): Promise<boolean> {
     return !["ENOTFOUND", "ENODATA", "ESERVFAIL", "NXDOMAIN"].includes(e?.code);
   }
 }
-export const workerDeps = { fetchSince, sendMail, decide, extractNextStep, acceptsMail, checkMailbox };
+export const workerDeps = { fetchSince, sendMail, decide, extractNextStep, readTerms, acceptsMail, checkMailbox };
 
 /** Addresses that are never a cold contact even when a site lists them (2026-10-17: applicationsprogramming@ bounced). */
 export const NOT_A_CONTACT = /^(applications?|programming|applicationsprogramming|eeo|hr|humanresources|recruit\w*|careers?|jobs?|employment|accounting|accountspayable|ap|ar|billing|invoices?|legal|compliance|privacy|webmaster|hostmaster|security|abuse|unsubscribe|subscriptions?|circulation|delivery)@/i;
@@ -166,6 +166,48 @@ export async function readInbox(): Promise<{ read: number; automated: number }> 
   return { read, automated };
 }
 
+/** Where support@ is first read from: the day the press-wire and listings price requests went out from it. */
+export const SUPPORT_FIRST_SINCE = new Date("2026-10-12T00:00:00Z");
+/** Emails the AI reads per pass on support@ (the first pass catches up from SUPPORT_FIRST_SINCE over a few passes). */
+export const SUPPORT_READS_PER_PASS = 25;
+
+/**
+ * Step 1b: partners' answers on support@ (owner, 2026-10-25: EIN Presswire's price list sat there unseen). Read-only:
+ * nothing is marked read or answered. An email from a company we already work with, or one the AI reads as a vendor or
+ * partner quoting terms, goes on that company's record as "On support@" with its prices; customers' mail is left alone.
+ */
+export async function readSupport(): Promise<{ read: number; logged: number; prices: number }> {
+  const box = supportMailboxConfig();
+  const out = { read: 0, logged: 0, prices: 0 };
+  if (!box.user || !box.pass) return out;
+  const state = await store.getState(box.user);
+  const { uidValidity, messages } = await workerDeps.fetchSince(state.lastUid, state.uidValidity, { mailbox: box, readOnly: true, firstSince: SUPPORT_FIRST_SINCE });
+  let top = state.uidValidity === uidValidity ? state.lastUid : 0;
+  let reads = 0;
+  try {
+    for (const m of messages.sort((a, b) => a.uid - b.uid)) {
+      out.read++;
+      const domain = companyDomain(m.fromEmail);
+      const known = await store.partnerIdForEmail(m.fromEmail, domain);
+      if (supportSkip(m) || (!known && !domain) || !m.body.trim()) { top = Math.max(top, m.uid); continue; }
+      if (++reads > SUPPORT_READS_PER_PASS) break;
+      const r = await workerDeps.readTerms([{ direction: "in", from: m.fromEmail, at: m.date.toISOString(), subject: m.subject, body: m.body }]);
+      if (known || r.partner) {
+        const partnerId = known ?? await store.partnerFromSupport({ company: r.company ?? domain!, domain, kind: r.kind, contactEmail: m.fromEmail, contactName: m.fromName, summary: r.summary });
+        if (await store.saveInbound(box.user, m, null, { logged: { partnerId, reason: `Received on support@ — ${r.summary || "read for prices"} (${r.provider})` } })) {
+          out.logged++;
+          out.prices += await store.saveTerms(partnerId, { ...r, prices: keepQuotedPrices(r.prices, m.body) }, "support@", m.date);
+        }
+      }
+      top = Math.max(top, m.uid);
+    }
+  } finally {
+    // Up to the last email handled: one the AI could not read is tried again next pass.
+    if (uidValidity) await store.saveState(box.user, uidValidity, top);
+  }
+  return out;
+}
+
 /** Step 2 + 3: answer every waiting email. */
 export async function answerPending(): Promise<{ replied: number; held: number; failed: number; optedOut: number }> {
   const mailbox = mailboxConfig().user;
@@ -185,10 +227,13 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
         out.held++;
         continue;
       }
-      const d = await workerDeps.decide(await store.thread(m.threadKey, m.id));
+      const th = await store.thread(m.threadKey, m.id);
+      const d = await workerDeps.decide(th);
       if (d.relevant) {
         newlyAgreed = await store.upsertPartner({ domain: companyDomain(m.fromEmail), contactEmail: m.fromEmail, contactName: m.fromName, d });
         partnerId = newlyAgreed.partner.id;
+        // Their prices, itemized for the Partner pricing page (only amounts they actually wrote).
+        await store.savePrices(partnerId, keepQuotedPrices(d.prices, th.filter((x) => x.direction === "in").map((x) => x.body).join("\n")), "media@");
       }
       // "Thanks / sounds good": nothing to answer (2026-10-15: Homes&Exterior's thank-you hit the loop limit).
       if (d.noReplyNeeded && !asksIfAi(m.body)) {
@@ -476,6 +521,7 @@ export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; r
     try {
       const settings = await currentSettings();
       const r = await readInbox();
+      await readSupport().catch((e) => console.error(`[media-inbox] reading support@ failed: ${e?.message ?? e}`));
       // Automatic replies off: new emails wait for the admin (answered from the company page).
       const a = settings.autoReplies ? await answerPending() : { replied: 0, held: await store.holdNew(), failed: 0, optedOut: 0 };
       const ar = await readAutoReplies();

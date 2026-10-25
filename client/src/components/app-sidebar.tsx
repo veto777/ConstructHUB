@@ -10,7 +10,7 @@ import { Ticket, Gift,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
   KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Code2, Bug, FileSignature, Link2, PlayCircle, PenLine,
-  ListChecks, ClipboardCheck, Handshake, Newspaper
+  ListChecks, ClipboardCheck, Handshake, Receipt, Newspaper
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import { lockedLanding, toolAccess, type ToolAccessContext } from "@/lib/tool-access";
@@ -759,6 +759,17 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
                     <Link href="/admin/partnerships" data-testid="link-nav-admin-partnerships" className="flex items-center gap-2 w-full">
                       <Handshake className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                       <span>Partnerships</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* Partner pricing: every price a wire, directory or publisher quoted us, side by side. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/partnerships/pricing"}>
+                    <Link href="/admin/partnerships/pricing" data-testid="link-nav-admin-partner-pricing" className="flex items-center gap-2 w-full">
+                      <Receipt className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                      <span>Partner Pricing</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

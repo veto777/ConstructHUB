@@ -147,6 +147,7 @@ const ReputationPage = lazyPage(() => import("@/pages/reputation"));
 const AdminProposalsPage = lazyPage(() => import("@/pages/admin-proposals"));
 const AdminBacklinksPage = lazyPage(() => import("@/pages/admin-backlinks"));
 const AdminPartnershipsPage = lazyPage(() => import("@/pages/admin-partnerships"));
+const AdminPartnerPricingPage = lazyPage(() => import("@/pages/admin-partner-pricing"));
 const AdminPressPage = lazyPage(() => import("@/pages/admin-press"));
 const PressReleasesPage = lazyPage(() => import("@/pages/press-releases"));
 const MyReputationPage = lazyPage(() => import("@/pages/my-reputation"));
@@ -414,6 +415,7 @@ function DashboardRouter() {
       <Route path="/admin/proposals/:id" component={AdminProposalsPage} />
       <Route path="/admin/backlinks" component={AdminBacklinksPage} />
       <Route path="/admin/partnerships" component={AdminPartnershipsPage} />
+      <Route path="/admin/partnerships/pricing" component={AdminPartnerPricingPage} />
       {/* Platform admins: the Press Wire desk — releases, the pressrelease@ mailbox, setup (the API answers 403 to anyone else). */}
       <Route path="/admin/press" component={AdminPressPage} />
       <Route path="/admin/listings"><Redirect to={"/admin/directories" + window.location.search} /></Route>
@@ -600,7 +602,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/call-assistant", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings", "/site-scan/history",
-  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/reputation", "/my-reputation", "/admin/backlinks", "/admin/partnerships", "/admin/youtube",
+  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/reputation", "/my-reputation", "/admin/backlinks", "/admin/partnerships", "/admin/partnerships/pricing", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];

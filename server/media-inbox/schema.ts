@@ -40,6 +40,23 @@ ALTER TABLE backlink_sources ADD COLUMN IF NOT EXISTS partner_class text, ADD CO
 ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS notes text;
 -- The admin's controls (owner, 2026-10-15: "everything has to be manageable through here"): one JSON row.
 CREATE TABLE IF NOT EXISTS media_settings (id integer PRIMARY KEY DEFAULT 1 CHECK (id = 1), value jsonb NOT NULL DEFAULT '{}', updated_at timestamptz NOT NULL DEFAULT now());
+-- Partner pricing (owner, 2026-10-25): every price a company quoted, one row each, plus their API and minimum terms.
+ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS api_terms text, ADD COLUMN IF NOT EXISTS min_commitment text;
+CREATE TABLE IF NOT EXISTS media_partner_prices (
+ id serial PRIMARY KEY, partner_id integer NOT NULL REFERENCES media_partners(id) ON DELETE CASCADE,
+ category text NOT NULL CHECK(category IN ('press_release','listing','article','advertising','other')),
+ product text NOT NULL, price numeric(12,2), quantity integer, unit text NOT NULL DEFAULT 'each', notes text,
+ source text NOT NULL DEFAULT 'admin', quoted_at date NOT NULL DEFAULT current_date,
+ created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS media_partner_prices_partner ON media_partner_prices(partner_id);
+-- A partner's email to support@ is kept as "logged" (never answered from here).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'media_messages_status_check' AND pg_get_constraintdef(oid) LIKE '%logged%') THEN
+    ALTER TABLE media_messages DROP CONSTRAINT IF EXISTS media_messages_status_check;
+    ALTER TABLE media_messages ADD CONSTRAINT media_messages_status_check CHECK (status IN ('new','replied','needs_owner','automated','failed','logged'));
+  END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS media_inbox_state (
  mailbox text PRIMARY KEY, uid_validity text, last_uid bigint NOT NULL DEFAULT 0,
  last_pass_at timestamptz, last_pass_error text

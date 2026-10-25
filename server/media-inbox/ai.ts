@@ -10,7 +10,10 @@
  * enforced again in ./guard.ts whichever model answered.
  */
 import { aiModel } from "../ai-config";
-import { MEDIA_INBOX_LAWS, MEDIA_INBOX_PARAMETERS, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_STATUSES, type MediaPartnerKind, type MediaPartnerStatus } from "@shared/media-inbox";
+import {
+  MEDIA_INBOX_LAWS, MEDIA_INBOX_PARAMETERS, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_STATUSES, MEDIA_PRICE_CATEGORIES, MEDIA_PRICE_UNITS,
+  type MediaPartnerKind, type MediaPartnerStatus, type MediaPriceCategory, type MediaPriceUnit,
+} from "@shared/media-inbox";
 
 export const MEDIA_OPENAI_DEFAULT_MODEL = "gpt-5.4-mini";
 export const MEDIA_ANTHROPIC_DEFAULT_MODEL = "claude-haiku-5-5";
@@ -38,6 +41,16 @@ We are building direct relationships with directories, article and guest-post si
 contractors can be listed and featured. We expect to start with 50–200 contractor locations and grow from there.
 How we pay partners: only per listing or per placement, and only after one of our customers has purchased it on our
 platform. No upfront fees, platform minimums, setup fees or prepayment.`;
+
+/** The structured price fields every reading of a partner's thread returns (the Partner pricing page). */
+const PRICE_FIELDS = `- prices: every price THEY quoted, one item per price line (empty list if none). category: one of ${MEDIA_PRICE_CATEGORIES.join(", ")};
+  product: what it buys, in their words ("Corporate Package bundle", "Sponsored guest post", "Featured listing"); price: the amount
+  in US dollars as a number, exactly as they wrote it (null when they describe a paid offer without a number); quantity: how many
+  items that price buys (15 for "15 releases for $999", null for one); unit: one of ${MEDIA_PRICE_UNITS.map((u) => `"${u}"`).join(", ")}
+  ("each" = a one-off price per item; "per listing / month" = per managed listing per month); notes: a short condition (discount,
+  validity, what is included), null if none. Never compute or invent a price; only copy theirs.
+- api: one sentence on whether they have an API or bulk/feed access for us and on what terms (null if the thread doesn't say);
+  minimum: any minimum spend, contract, prepayment or credit expiry they require (null if none mentioned).`;
 
 const SYSTEM = `You answer email for the ConstructHUB Media Team (media@constructhub.us). Its only purpose is building relationships
 with directories, article sites, news media and link publishers (PBNs).
@@ -81,18 +94,58 @@ Also judge the relationship from the whole thread:
   even if steps remain), or "declined";
 - agreement: one sentence on what was agreed (null if nothing); to_finalize: what is still needed to finalize (null if nothing);
 - cost_terms: any money they mentioned, quoted exactly (null if none); owner_question: the decision the owner must make (null if none).
+${PRICE_FIELDS}
 
 Return JSON only:
 {"reply": string, "relevant": boolean, "needs_owner": boolean, "no_reply_needed": boolean, "owner_question": string|null, "company": string|null,
- "kind": string, "stage": string, "summary": string, "agreement": string|null, "to_finalize": string|null, "cost_terms": string|null}`;
+ "kind": string, "stage": string, "summary": string, "agreement": string|null, "to_finalize": string|null, "cost_terms": string|null,
+ "prices": [{"category": string, "product": string, "price": number|null, "quantity": number|null, "unit": string, "notes": string|null}],
+ "api": string|null, "minimum": string|null}`;
 
 export type ThreadMessage = { direction: "in" | "out"; from: string; at: string; subject: string; body: string };
+export type QuotedPrice = { category: MediaPriceCategory; product: string; price: number | null; quantity: number | null; unit: MediaPriceUnit; notes: string | null };
+/** What a partner's emails say about money and access (every reading of a thread returns these). */
+export type PartnerTerms = { costTerms: string | null; prices: QuotedPrice[]; apiTerms: string | null; minCommitment: string | null };
 export type MediaDecision = {
   reply: string; relevant: boolean; needsOwner: boolean; noReplyNeeded: boolean; ownerQuestion: string | null; company: string | null;
-  kind: MediaPartnerKind; stage: MediaPartnerStatus; summary: string; agreement: string | null; toFinalize: string | null; costTerms: string | null;
-};
+  kind: MediaPartnerKind; stage: MediaPartnerStatus; summary: string; agreement: string | null; toFinalize: string | null;
+} & PartnerTerms;
 
 const str = (v: unknown, max = 2000): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+
+/** The model's price list, clamped (bad items dropped). */
+export function parsePrices(v: unknown): QuotedPrice[] {
+  if (!Array.isArray(v)) return [];
+  const out: QuotedPrice[] = [];
+  for (const x of v.slice(0, 40)) {
+    const product = str(x?.product, 200);
+    if (!product) continue;
+    const price = typeof x.price === "number" && Number.isFinite(x.price) && x.price >= 0 && x.price < 10_000_000 ? Math.round(x.price * 100) / 100 : null;
+    const quantity = Number.isInteger(x.quantity) && x.quantity > 1 && x.quantity < 1_000_000 ? x.quantity : null;
+    out.push({
+      category: (MEDIA_PRICE_CATEGORIES as readonly string[]).includes(x.category) ? x.category : "other",
+      product, price, quantity,
+      unit: (MEDIA_PRICE_UNITS as readonly string[]).includes(x.unit) ? x.unit : "each",
+      notes: str(x.notes, 300),
+    });
+  }
+  return out;
+}
+
+/** The ways an amount can be written ("1999", "1,999", "1,999.00", "0.12", ".12"). */
+const amountForms = (n: number): string[] => {
+  const fixed = n.toFixed(2);
+  const whole = Number.isInteger(n) ? String(n) : null;
+  const grouped = n.toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
+  return [fixed, grouped, ...(whole ? [whole, `${grouped}.00`] : []), ...(n < 1 ? [fixed.slice(1)] : [])];
+};
+/** A price is kept only when its amount is written in their emails: nothing the model computed or made up. */
+export function keepQuotedPrices(prices: QuotedPrice[], theirText: string): QuotedPrice[] {
+  const hay = theirText.replace(/\s+/g, " ");
+  return prices.filter((p) => p.price == null || amountForms(p.price).some((f) => new RegExp(`(^|[^\\d.,])${f.replace(/[.,]/g, "\\$&")}(?![\\d]|[.,]\\d)`).test(hay)));
+}
+
+const terms = (j: any): PartnerTerms => ({ costTerms: str(j.cost_terms, 600), prices: parsePrices(j.prices), apiTerms: str(j.api, 400), minCommitment: str(j.minimum, 400) });
 
 /** Parse and clamp the model's JSON; throws on anything unusable (the worker retries, then holds). */
 export function parseDecision(raw: string): MediaDecision {
@@ -104,7 +157,7 @@ export function parseDecision(raw: string): MediaDecision {
   return {
     reply, relevant: j.relevant !== false, needsOwner: j.needs_owner === true, noReplyNeeded: j.no_reply_needed === true && j.needs_owner !== true, ownerQuestion: str(j.owner_question, 500),
     company: str(j.company, 120), kind, stage: stage as (typeof MEDIA_PARTNER_STATUSES)[number], summary: str(j.summary, 600) ?? "",
-    agreement: str(j.agreement, 600), toFinalize: str(j.to_finalize, 600), costTerms: str(j.cost_terms, 600),
+    agreement: str(j.agreement, 600), toFinalize: str(j.to_finalize, 600), ...terms(j),
   };
 }
 
@@ -153,6 +206,30 @@ export async function decide(thread: ThreadMessage[], env: NodeJS.ProcessEnv = p
     catch (e: any) { errors.push(`${p.name}: ${String(e?.message ?? e).slice(0, 200)}`); }
   }
   throw new Error(`Every AI provider failed — ${errors.join(" · ")}`);
+}
+
+const TERMS_SYSTEM = `You read email that companies sent to support@constructhub.us. ConstructHUB is software for US contractors and asked
+press-release wires, listings networks, directories and publishers for agency / reseller / partner pricing.
+Decide whether the last email is from such a company (a vendor or partner answering about prices, terms, APIs or a partnership)
+and record its terms. A customer asking for help with the software, a newsletter, a cold sales pitch for marketing services, a
+receipt or an account notice is NOT one: partner = false.
+- company: their company name; kind: one of ${MEDIA_PARTNER_KINDS.join(", ")} (a press-release wire is "news");
+- summary: one sentence on where things stand;
+- cost_terms: any money they mentioned, quoted exactly (null if none).
+${PRICE_FIELDS}
+Return JSON only: {"partner": boolean, "company": string|null, "kind": string, "summary": string, "cost_terms": string|null,
+ "prices": [{"category": string, "product": string, "price": number|null, "quantity": number|null, "unit": string, "notes": string|null}],
+ "api": string|null, "minimum": string|null}`;
+
+export type SupportReading = PartnerTerms & { partner: boolean; company: string | null; kind: MediaPartnerKind; summary: string; provider: string };
+
+/** Read a support@ email for a partner's terms (nothing is ever answered from here). */
+export async function readTerms(thread: ThreadMessage[], env: NodeJS.ProcessEnv = process.env): Promise<SupportReading> {
+  const user = `The thread, oldest first. Read the last email.\n\n${threadPrompt(thread)}`;
+  return askJson(user, TERMS_SYSTEM, (j) => ({
+    partner: j.partner === true, company: str(j.company, 120),
+    kind: (MEDIA_PARTNER_KINDS as readonly string[]).includes(j.kind) ? j.kind : "other", summary: str(j.summary, 600) ?? "", ...terms(j),
+  }), env);
 }
 
 const DRAFT_SYSTEM = `You draft an email reply for an admin of the ConstructHUB Media Team (media@constructhub.us) to review, edit and send.

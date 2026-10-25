@@ -21,12 +21,14 @@ export const MEDIA_PARTNER_STATUS_LABELS: Record<MediaPartnerStatus, string> = {
 /**
  * new: waiting for the next pass · replied: answered · needs_owner: answered with a holding reply, an owner decision is
  * waiting (money, a meeting time, a contract) · automated: a machine sender (no-reply, bounce, newsletter, out-of-office),
- * logged and shown, never answered · failed: could not be answered after retries (a holding reply was sent).
+ * logged and shown, never answered · failed: could not be answered after retries (a holding reply was sent) ·
+ * logged: a partner's email to support@ (where the 2026-10-13 price requests went), kept on the company's record and read
+ * for prices, never answered from here.
  */
-export const MEDIA_MESSAGE_STATUSES = ["new", "replied", "needs_owner", "automated", "failed"] as const;
+export const MEDIA_MESSAGE_STATUSES = ["new", "replied", "needs_owner", "automated", "failed", "logged"] as const;
 export type MediaMessageStatus = (typeof MEDIA_MESSAGE_STATUSES)[number];
 export const MEDIA_MESSAGE_STATUS_LABELS: Record<MediaMessageStatus, string> = {
-  new: "Waiting", replied: "Replied", needs_owner: "Needs owner", automated: "Automated (no reply)", failed: "Failed",
+  new: "Waiting", replied: "Replied", needs_owner: "Needs owner", automated: "Automated (no reply)", failed: "Failed", logged: "On support@",
 };
 
 export const MEDIA_SIGNATURE_TEAM = "Construct HUB Media Team";
@@ -52,7 +54,43 @@ export type MediaPartner = {
   messages: number;
   /** The admin's own notes on this company (never sent). */
   notes: string | null;
+  /** Whether they have an API, as they described it ("No public API — web form only"). */
+  apiTerms: string | null;
+  /** Minimums, contracts, prepayment, credit expiry. */
+  minCommitment: string | null;
 };
+
+/**
+ * Partner pricing (owner, 2026-10-25: "a separate area for the list of companies and their costs … make it all organized"):
+ * one row per price a company quoted, read from their emails (media@ and support@) or entered by an admin.
+ * price is what is paid for `quantity` items (a bundle of 15 releases for $999 is price 999, quantity 15); null = they
+ * described the offer without a number.
+ */
+export const MEDIA_PRICE_CATEGORIES = ["press_release", "listing", "article", "advertising", "other"] as const;
+export type MediaPriceCategory = (typeof MEDIA_PRICE_CATEGORIES)[number];
+export const MEDIA_PRICE_CATEGORY_LABELS: Record<MediaPriceCategory, string> = {
+  press_release: "Press release distribution", listing: "Directory listings", article: "Articles & guest posts",
+  advertising: "Sponsored content & advertising", other: "Other",
+};
+export const MEDIA_PRICE_UNITS = ["each", "per month", "per year", "one-time", "per listing / month"] as const;
+export type MediaPriceUnit = (typeof MEDIA_PRICE_UNITS)[number];
+export type MediaPrice = {
+  id: number;
+  partnerId: number;
+  category: MediaPriceCategory;
+  product: string;
+  price: number | null;
+  quantity: number | null;
+  unit: MediaPriceUnit;
+  notes: string | null;
+  source: string;
+  quotedAt: string;
+};
+/** A price row with the company it belongs to (the pricing page). */
+export type MediaPriceRow = MediaPrice & Pick<MediaPartner, "company" | "domain" | "status" | "contactName" | "contactEmail" | "apiTerms" | "minCommitment">;
+/** Price per item: a bundle's price over its size. */
+export const perItem = (p: Pick<MediaPrice, "price" | "quantity">): number | null =>
+  p.price == null ? null : p.quantity && p.quantity > 1 ? Math.round((p.price / p.quantity) * 100) / 100 : p.price;
 
 export type MediaMessage = {
   id: number;

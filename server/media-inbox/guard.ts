@@ -35,6 +35,16 @@ export function machineReason(h: InboundHeaders): string | null {
   return null;
 }
 
+/**
+ * support@ mail that is never a partner's answer: our own, system senders, auto-replies. Mailing-list headers are not
+ * used here: help desks (EIN Presswire's Help Scout) put them on their agents' real answers.
+ */
+export function supportSkip(h: Pick<InboundHeaders, "fromEmail" | "subject" | "autoSubmitted">): boolean {
+  const from = h.fromEmail.trim().toLowerCase();
+  return !from || /@constructhub\.us$/.test(from) || MACHINE_LOCAL.test(from) || MACHINE_DOMAINS.test(from) || AUTO_SUBJECT.test(h.subject.trim())
+    || Boolean(h.autoSubmitted && !/^no$/i.test(h.autoSubmitted.trim()));
+}
+
 const MONEY_AMOUNT = /(\$|€|£|usd\b|eur\b|dollars?\b)\s?\d|\d[\d,.]*\s?(\$|€|£|usd\b|eur\b|dollars?\b)/i;
 const MONEY_COMMIT = /\b(we|i|our team)(['’](d|ll))?\s+(will\s+|can\s+|would\s+)?(agree to|be happy to|are happy to|accept to)?\s*(pay|purchase|buy|prepay|sign|commit|subscribe|wire|transfer|cover)\b/i;
 const PAYMENT_WORDS = /\b(credit card|debit card|card details|invoice (us|me)|send (us|me) (an|the) invoice|paypal|wire transfer|bank (details|transfer)|payment (link|details|method)|deposit|card[ -]on[ -]file|order form)\b/i;

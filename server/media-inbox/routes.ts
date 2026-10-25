@@ -17,10 +17,17 @@
  *   POST /api/admin/media-inbox/queue/:id/send                  send it now (same safety checks)
  *   POST /api/admin/media-inbox/partners/:id/stop               stop emailing a company
  *   POST /api/admin/media-inbox/run                             a pass now
+ *   GET  /api/admin/media-inbox/prices                          Partner pricing: every itemized price + companies with terms not itemized yet
+ *   POST /api/admin/media-inbox/prices {partnerId, category, product, price, quantity, unit, notes, quotedAt?}   add a price
+ *   POST /api/admin/media-inbox/prices/:id {…same, no partnerId}   edit a price · POST …/prices/:id/delete   remove it
+ *   POST /api/admin/media-inbox/partners {company, domain?, kind, contactEmail?, contactName?}   add a company (e.g. one met on support@)
  */
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
-import { MEDIA_MESSAGE_STATUSES, MEDIA_OUTREACH_MODES, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_STATUSES, MEDIA_TEMPLATE_KINDS, STOP_LINE_RE, type MediaSettings } from "@shared/media-inbox";
+import {
+  MEDIA_MESSAGE_STATUSES, MEDIA_OUTREACH_MODES, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_STATUSES, MEDIA_PRICE_CATEGORIES, MEDIA_PRICE_UNITS, MEDIA_TEMPLATE_KINDS,
+  STOP_LINE_RE, type MediaSettings,
+} from "@shared/media-inbox";
 import { requirePlatformAdmin } from "../crm/admin";
 import { draftReply, mediaAiConfigured } from "./ai";
 import { companyDomain, replySubject } from "./guard";
@@ -49,6 +56,27 @@ const partnerBody = z.object({
   company: z.string().trim().min(1).max(120).optional(),
   contactName: z.string().trim().max(120).nullable().optional(),
   contactEmail: z.string().trim().email().max(200).nullable().optional(),
+  apiTerms: z.string().trim().max(1000).nullable().optional(),
+  minCommitment: z.string().trim().max(1000).nullable().optional(),
+  costTerms: z.string().trim().max(2000).nullable().optional(),
+}).strict();
+const priceFields = {
+  category: z.enum(MEDIA_PRICE_CATEGORIES),
+  product: z.string().trim().min(1).max(200),
+  price: z.number().min(0).max(10_000_000).nullable(),
+  quantity: z.number().int().min(2).max(1_000_000).nullable(),
+  unit: z.enum(MEDIA_PRICE_UNITS),
+  notes: z.string().trim().max(500).nullable(),
+  quotedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+};
+const priceBody = z.object(priceFields).strict();
+const priceAdd = z.object({ ...priceFields, partnerId: z.number().int().positive() }).strict();
+const partnerAdd = z.object({
+  company: z.string().trim().min(1).max(120),
+  domain: z.string().trim().toLowerCase().regex(domainRe).max(200).nullable().optional(),
+  kind: z.enum(MEDIA_PARTNER_KINDS),
+  contactEmail: z.string().trim().toLowerCase().email().max(200).nullable().optional(),
+  contactName: z.string().trim().max(120).nullable().optional(),
 }).strict();
 const template = z.object({ subject: z.string().trim().min(1).max(200), body: z.string().trim().min(20).max(10_000) })
   .refine((t) => STOP_LINE_RE.test(t.body), { message: 'The email must keep a stop line (e.g. reply "stop" and we won\'t email you again)' });
@@ -130,6 +158,56 @@ export function registerMediaInboxRoutes(app: Express, getDevUser: GetUser): voi
     const q = messagesQuery.safeParse(req.query);
     if (!q.success) return res.status(400).json({ message: "Unknown filter" });
     try { res.json(await store.listMessages(q.data)); } catch (e) { failed(res, "list the emails", e); }
+  });
+
+  app.get("/api/admin/media-inbox/prices", async (req, res) => {
+    if (!(await admin(req, res))) return;
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      const [rows, unpriced] = await Promise.all([store.listPrices(), store.unpricedTerms()]);
+      res.json({ rows, unpriced });
+    } catch (e) { failed(res, "load the prices", e); }
+  });
+
+  app.post("/api/admin/media-inbox/prices", async (req, res) => {
+    if (!(await admin(req, res))) return;
+    const body = priceAdd.safeParse(req.body);
+    if (!body.success) return res.status(400).json({ message: "Check the fields and try again" });
+    try {
+      if (!(await store.getPartner(body.data.partnerId))) return res.status(404).json({ message: "Company not found" });
+      res.json({ ok: true, id: await store.addPrice(body.data) });
+    } catch (e) { failed(res, "add the price", e); }
+  });
+
+  app.post("/api/admin/media-inbox/prices/:id", async (req, res) => {
+    if (!(await admin(req, res))) return;
+    const id = idParam.safeParse(req.params.id);
+    const body = priceBody.safeParse(req.body);
+    if (!id.success || !body.success) return res.status(400).json({ message: "Check the fields and try again" });
+    try {
+      if (!(await store.updatePrice(id.data, body.data))) return res.status(404).json({ message: "Not found" });
+      res.json({ ok: true });
+    } catch (e) { failed(res, "save the price", e); }
+  });
+
+  app.post("/api/admin/media-inbox/prices/:id/delete", async (req, res) => {
+    if (!(await admin(req, res))) return;
+    const id = idParam.safeParse(req.params.id);
+    if (!id.success) return res.status(400).json({ message: "Unknown price" });
+    try {
+      if (!(await store.deletePrice(id.data))) return res.status(404).json({ message: "Not found" });
+      res.json({ ok: true });
+    } catch (e) { failed(res, "remove the price", e); }
+  });
+
+  app.post("/api/admin/media-inbox/partners", async (req, res) => {
+    if (!(await admin(req, res))) return;
+    const body = partnerAdd.safeParse(req.body);
+    if (!body.success) return res.status(400).json({ message: "Check the fields and try again" });
+    try {
+      const b = body.data;
+      res.json({ ok: true, id: await store.partnerFromSupport({ company: b.company, domain: b.domain ?? null, kind: b.kind, contactEmail: b.contactEmail ?? null, contactName: b.contactName ?? null, summary: "" }) });
+    } catch (e) { failed(res, "add the company", e); }
   });
 
   app.post("/api/admin/media-inbox/partners/:id", async (req, res) => {

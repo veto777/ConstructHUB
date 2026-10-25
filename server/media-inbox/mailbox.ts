@@ -15,6 +15,11 @@ export const mailboxConfig = (env: NodeJS.ProcessEnv = process.env) => ({
   user: env.MEDIA_EMAIL?.trim() ?? "",
   pass: (env.MEDIA_APP_PASSWORD ?? "").replace(/\s+/g, ""),
 });
+/** support@, read-only: where the 2026-10-13 press-wire and listings price requests went, so their answers land there. */
+export const supportMailboxConfig = (env: NodeJS.ProcessEnv = process.env) => ({
+  user: env.SMTP_EMAIL?.trim() ?? "",
+  pass: (env.SMTP_APP_PASSWORD ?? "").replace(/\s+/g, ""),
+});
 export const mailboxConfigured = (env: NodeJS.ProcessEnv = process.env) => {
   const c = mailboxConfig(env);
   return Boolean(c.user && c.pass);
@@ -53,6 +58,32 @@ export function stripQuoted(text: string): string {
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+/** Plain text from an HTML email: block ends become line breaks, tags go, common entities are decoded. */
+export function htmlToPlain(html: string): string {
+  return html
+    .replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|tr|h[1-6]|blockquote|table)>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "- ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
+/**
+ * What a person wrote in an email. Some clients send an empty text part next to the real HTML one (Reputation,
+ * 2026-10-22, was stored blank); a reply that is only an attachment (Industry Today's PDF, 2026-10-21) says so.
+ */
+export function inboundBody(p: { text?: string; html?: string | false; attachments?: { filename?: string; contentDisposition?: string }[] }): string {
+  const text = p.text?.trim() ? p.text : typeof p.html === "string" ? htmlToPlain(p.html) : "";
+  const files = (p.attachments ?? []).filter((a) => a.filename && a.contentDisposition !== "inline").map((a) => a.filename!);
+  const body = stripQuoted(text);
+  return [body, files.length ? `[Attached: ${files.join(", ")}]` : ""].filter(Boolean).join("\n\n").slice(0, 20_000);
+}
+
 const addrText = (a: AddressObject | AddressObject[] | undefined) => (a ? (Array.isArray(a) ? a.map((x) => x.text).join(", ") : a.text) : null);
 const headerText = (v: unknown): string | null => {
   if (v == null) return null;
@@ -61,18 +92,26 @@ const headerText = (v: unknown): string | null => {
   return JSON.stringify(v);
 };
 
-/** Every message past `lastUid` (a new UIDVALIDITY starts over). */
-export async function fetchSince(lastUid: number, uidValidity: string | null): Promise<{ uidValidity: string; messages: Inbound[] }> {
-  const c = mailboxConfig();
+/**
+ * Every message past `lastUid` (a new UIDVALIDITY starts over). media@ marks what it stored as read; `readOnly` (support@,
+ * which people work in Gmail) leaves the flags alone. `firstSince` is where a mailbox read for the first time starts.
+ */
+export async function fetchSince(lastUid: number, uidValidity: string | null, o: { mailbox?: { user: string; pass: string }; readOnly?: boolean; firstSince?: Date } = {}): Promise<{ uidValidity: string; messages: Inbound[] }> {
+  const c = o.mailbox ?? mailboxConfig();
   const client = new ImapFlow({ host: "imap.gmail.com", port: 993, secure: true, auth: { user: c.user, pass: c.pass }, logger: false });
   await client.connect();
   const messages: Inbound[] = [];
   let validity = "";
   try {
-    const lock = await client.getMailboxLock("INBOX");
+    const lock = await client.getMailboxLock("INBOX", { readOnly: Boolean(o.readOnly) });
     try {
       validity = String((client.mailbox as any)?.uidValidity ?? "");
-      const from = uidValidity && uidValidity !== validity ? 1 : lastUid + 1;
+      let from = uidValidity && uidValidity !== validity ? 1 : lastUid + 1;
+      if (from === 1 && o.firstSince) {
+        const uids = (await client.search({ since: o.firstSince }, { uid: true })) || [];
+        if (!uids.length) return { uidValidity: validity, messages };
+        from = Math.min(...uids);
+      }
       for await (const m of client.fetch(`${from}:*`, { uid: true, source: true, threadId: true }, { uid: true })) {
         if (m.uid < from || !m.source) continue;
         const p = await simpleParser(m.source);
@@ -87,7 +126,7 @@ export async function fetchSince(lastUid: number, uidValidity: string | null): P
           to: addrText(p.to),
           cc: addrText(p.cc),
           subject: p.subject ?? "",
-          body: stripQuoted(p.text ?? "").slice(0, 20_000),
+          body: inboundBody(p),
           references: [...refs, ...(p.inReplyTo && !refs.includes(p.inReplyTo) ? [p.inReplyTo] : [])],
           date: p.date ?? new Date(),
           autoSubmitted: headerText(p.headers.get("auto-submitted")),
@@ -97,7 +136,7 @@ export async function fetchSince(lastUid: number, uidValidity: string | null): P
         });
       }
       // Read in Gmail once stored here (owner, 2026-10-14: an unread email looks ignored). Stored = it will be handled.
-      if (messages.length) {
+      if (messages.length && !o.readOnly) {
         const ok = await client.messageFlagsAdd(messages.map((m) => m.uid).join(","), ["\\Seen"], { uid: true })
           .catch((e) => { console.error(`[media-inbox] marking read in Gmail failed: ${e?.message ?? e}`); return false; });
         if (!ok) console.error(`[media-inbox] Gmail did not mark UIDs ${messages.map((m) => m.uid).join(",")} read`);
