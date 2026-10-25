@@ -4,14 +4,15 @@
  * every email sent and received. The server reads media@ every 30 minutes and answers each email; anything that would
  * cost money waits for the owner. Platform admins only.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { format, formatDistanceToNowStrict } from "date-fns";
-import { Handshake, Inbox, Loader2, Lock, Mail, MessageSquare, Play, Receipt, Scale, Send, Sparkles, StickyNote } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, FileText, Handshake, Inbox, Loader2, Lock, Mail, MessageSquare, Play, Receipt, RefreshCw, Scale, Search, Send, Settings2, Sparkles, StickyNote } from "lucide-react";
 import {
-  MEDIA_INBOX_LAWS, MEDIA_INBOX_PARAMETERS, MEDIA_MESSAGE_STATUS_LABELS, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_KIND_LABELS, MEDIA_PARTNER_STATUSES, MEDIA_PARTNER_STATUS_LABELS,
-  type MediaMessage, type MediaMessageStatus, type MediaPartner, type MediaPartnerKind, type MediaPartnerStatus,
+  MEDIA_BRIEF_LABELS, MEDIA_INBOX_LAWS, MEDIA_INBOX_PARAMETERS, MEDIA_MESSAGE_STATUS_LABELS, MEDIA_PARTNER_GROUPS, MEDIA_PARTNER_GROUP_LABELS, MEDIA_PARTNER_KINDS,
+  MEDIA_PARTNER_KIND_LABELS, MEDIA_PARTNER_STATUSES, MEDIA_PARTNER_STATUS_LABELS, partnerGroup,
+  type MediaMessage, type MediaMessageStatus, type MediaPartner, type MediaPartnerGroup, type MediaPartnerKind, type MediaPartnerStatus,
 } from "@shared/media-inbox";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -70,8 +71,57 @@ function Panel({ title, icon: Icon, tone = "plain", children, testId }: { title:
   );
 }
 
-function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onClose: () => void }) {
+/** The company's summary (owner, 2026-10-25): written by the AI from the emails and notes, rewritten when one arrives. */
+function BriefPanel({ partner }: { partner: MediaPartner }) {
   const { toast } = useToast();
+  const write = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/admin/media-inbox/partners/${partner.id}/brief`, {})).json(),
+    onSuccess: () => { toast({ title: "Summary updated" }); void refresh(); },
+    onError: (e) => toast({ title: "No summary", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const b = partner.brief;
+  return (
+    <Panel title="Summary" icon={FileText} testId="panel-partner-brief">
+      {b ? (
+        <div className="space-y-2">
+          <p className="font-medium">{b.who}</p>
+          <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1.5">
+            {(Object.keys(MEDIA_BRIEF_LABELS) as (keyof typeof MEDIA_BRIEF_LABELS)[]).filter((k) => b[k]).map((k) => (
+              <div key={k} className="contents"><dt className="font-medium text-foreground/70">{MEDIA_BRIEF_LABELS[k]}</dt><dd>{b[k]}</dd></div>
+            ))}
+          </dl>
+        </div>
+      ) : <p className="text-muted-foreground">No summary yet. It is written from the emails once they answer, or now:</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-foreground/70">
+        {partner.briefUpdatedAt && <span>Updated {ago(partner.briefUpdatedAt)} · rewritten when a new email comes in or goes out</span>}
+        <Button size="sm" variant="outline" disabled={write.isPending} onClick={() => write.mutate()} data-testid="button-partner-brief">
+          {write.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}{b ? "Refresh summary" : "Write summary"}
+        </Button>
+      </div>
+    </Panel>
+  );
+}
+
+const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+
+type SheetNav = { index: number; total: number; prev: (() => void) | null; next: (() => void) | null };
+
+function PartnerSheet({ partner, nav, onClose }: { partner: MediaPartner | null; nav: SheetNav; onClose: () => void }) {
+  const { toast } = useToast();
+  const scroller = useRef<HTMLDivElement | null>(null);
+  // Owner 2026-10-25: "allow scrolling between potentials" — J/K or ←/→ move through the list in its current order.
+  useEffect(() => {
+    if (!partner) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if ((k === "j" || k === "arrowright") && nav.next) { e.preventDefault(); nav.next(); }
+      else if ((k === "k" || k === "arrowleft") && nav.prev) { e.preventDefault(); nav.prev(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [partner, nav]);
+  useEffect(() => { scroller.current?.scrollTo({ top: 0 }); }, [partner?.id]);
   const [toFinalize, setToFinalize] = useState<string | null>(null);
   const msgsUrl = partner ? `/api/admin/media-inbox/messages?partnerId=${partner.id}&limit=100` : null;
   const { data: msgs } = useQuery<MessagesPayload>({ queryKey: [msgsUrl], queryFn: () => getJson(msgsUrl!), enabled: !!msgsUrl });
@@ -88,12 +138,18 @@ function PartnerSheet({ partner, onClose }: { partner: MediaPartner | null; onCl
   return (
     <Sheet open onOpenChange={(o) => { if (!o) onClose(); }}>
       {/* Only the close button or Esc closes it: a stray click outside never throws away a half-written reply. */}
-      <SheetContent className="w-full overflow-y-auto bg-muted/40 sm:max-w-2xl" onInteractOutside={(e) => e.preventDefault()} data-testid="sheet-partner">
+      <SheetContent ref={scroller} className="w-full overflow-y-auto bg-muted/40 sm:max-w-2xl" onInteractOutside={(e) => e.preventDefault()} data-testid="sheet-partner">
+        <div className="mb-3 flex items-center gap-2 pr-8 text-xs text-foreground/70" data-testid="nav-partner">
+          <Button size="sm" variant="outline" disabled={!nav.prev} onClick={() => nav.prev?.()} aria-label="Previous company" data-testid="button-partner-prev"><ChevronUp className="mr-1 h-4 w-4" />Previous</Button>
+          <Button size="sm" variant="outline" disabled={!nav.next} onClick={() => nav.next?.()} aria-label="Next company" data-testid="button-partner-next">Next<ChevronDown className="ml-1 h-4 w-4" /></Button>
+          <span>{nav.index >= 0 ? `${n(nav.index + 1)} of ${n(nav.total)}` : "Not in the list below"} · J / K to move</span>
+        </div>
         <SheetHeader>
           <SheetTitle className="flex flex-wrap items-center gap-2 text-xl">{partner.company}<StatusPill tone={PARTNER_TONE[partner.status]}>{MEDIA_PARTNER_STATUS_LABELS[partner.status]}</StatusPill></SheetTitle>
           <SheetDescription className="text-sm text-foreground/70">{[partner.domain, MEDIA_PARTNER_KIND_LABELS[partner.kind], partner.contactEmail].filter(Boolean).join(" · ")}</SheetDescription>
         </SheetHeader>
         <div className="mt-4 space-y-4 text-sm text-foreground">
+          <BriefPanel partner={partner} />
           {partner.ownerQuestion && (
             <Panel title="Your call" tone="alert" testId="panel-partner-your-call"><p className="text-sm">{partner.ownerQuestion}</p></Panel>
           )}
@@ -326,21 +382,61 @@ function SendBox() {
   );
 }
 
+/** The row a company gets in every list: its summary's next step (or who they are) under the facts. */
+function CompanyRow({ p, onOpen }: { p: MediaPartner; onOpen: () => void }) {
+  const line = p.ownerQuestion ? `Your call: ${p.ownerQuestion}`
+    : p.status === "agreed" && p.toFinalize ? `To finalize: ${p.toFinalize}`
+    : p.status === "declined" ? `Why closed: ${p.summary ?? "no reason recorded — open it to read the emails"}`
+    : p.brief ? (p.brief.next ? `Next: ${p.brief.next}` : p.brief.who)
+    : p.summary ?? undefined;
+  return (
+    <GoogleListRow
+      as="li" size="md" testId={`row-partner-${p.id}`} title={p.company} onOpen={onOpen}
+      badges={<>
+        <StatusPill tone={PARTNER_TONE[p.status]}>{MEDIA_PARTNER_STATUS_LABELS[p.status]}</StatusPill>
+        {p.waiting > 0 && <StatusPill tone="warning">Waiting for you</StatusPill>}
+      </>}
+      meta={[
+        MEDIA_PARTNER_GROUP_LABELS[partnerGroup(p)],
+        p.domain && p.domain !== p.company ? p.domain : null,
+        p.contactEmail,
+        `${p.messages} emails`,
+        `last ${ago(p.lastMessageAt)}`,
+      ]}
+      line={line}
+    />
+  );
+}
+
+type View = "active" | "silent" | "all";
+const VIEW_LABELS: Record<View, string> = { active: "In conversation", silent: "No reply yet", all: "Everyone" };
+/** In conversation = a person wrote back, or we agreed. The 700+ outlets that never answered sit under "No reply yet". */
+const isActive = (p: MediaPartner) => p.humanReplies > 0 || p.status === "agreed" || p.status === "finalized";
+
 export default function AdminPartnershipsPage() {
   useDocumentTitle("Partnerships");
   const { toast } = useToast();
   const [partnerTab, setPartnerTab] = useState<"all" | MediaPartnerStatus>("all");
+  const [view, setView] = useState<View>("active");
+  const [q, setQ] = useState("");
+  const [silentOpen, setSilentOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
   const [mailTab, setMailTab] = useState<"all" | "out" | "in" | "needs_owner" | "declined">("all");
   const [page, setPage] = useState(0);
-  // ?open=<company id> opens that company (links from Partner pricing).
+  // ?open=<company id> opens that company (links from Partner pricing); kept in the URL while moving between companies.
   const [openId, setOpenId] = useState<number | null>(() => {
     const v = Number(new URLSearchParams(window.location.search).get("open"));
     return Number.isInteger(v) && v > 0 ? v : null;
   });
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    if (openId) u.searchParams.set("open", String(openId)); else u.searchParams.delete("open");
+    window.history.replaceState(window.history.state, "", u);
+  }, [openId]);
 
   const { data: s, error, isLoading, refetch } = useQuery<Summary>({ queryKey: ["/api/admin/media-inbox/summary"], queryFn: () => getJson("/api/admin/media-inbox/summary"), retry: false });
-  const partnersUrl = `/api/admin/media-inbox/partners${partnerTab === "all" ? "" : `?status=${partnerTab}`}`;
-  const { data: partners } = useQuery<MediaPartner[]>({ queryKey: [partnersUrl], queryFn: () => getJson(partnersUrl), enabled: !!s });
+  // Every company once; the page groups and filters them here.
+  const { data: partners } = useQuery<MediaPartner[]>({ queryKey: ["/api/admin/media-inbox/partners"], queryFn: () => getJson("/api/admin/media-inbox/partners"), enabled: !!s });
   const mp = new URLSearchParams({ limit: String(PAGE), offset: String(page * PAGE) });
   if (mailTab === "out" || mailTab === "in") mp.set("direction", mailTab);
   if (mailTab === "needs_owner") mp.set("status", "needs_owner");
@@ -352,9 +448,26 @@ export default function AdminPartnershipsPage() {
     onSuccess: (r: any) => { toast({ title: r.ok ? `Checked: ${r.read ?? 0} new, ${r.replied ?? 0} replied, ${r.held ?? 0} waiting for you` : "Not run", description: r.skipped }); void refresh(); },
     onError: (e) => toast({ title: "Could not run", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  // A company opened from the email list may sit outside the current tab: look it up in the full list.
-  const { data: allPartners } = useQuery<MediaPartner[]>({ queryKey: ["/api/admin/media-inbox/partners"], queryFn: () => getJson("/api/admin/media-inbox/partners"), enabled: !!s && openId !== null });
-  const open = useMemo(() => partners?.find((p) => p.id === openId) ?? allPartners?.find((p) => p.id === openId) ?? null, [partners, allPartners, openId]);
+
+  const all = partners ?? [];
+  const waiting = useMemo(() => all.filter((p) => p.waiting > 0 || (p.ownerQuestion && p.status !== "declined" && p.humanReplies > 0)), [all]);
+  const term = q.trim().toLowerCase();
+  const matches = useMemo(() => all.filter((p) => (partnerTab === "all" || p.status === partnerTab)
+    && (!term || [p.company, p.domain, p.contactEmail, p.contactName].some((v) => v?.toLowerCase().includes(term)))), [all, partnerTab, term]);
+  const shown = useMemo(() => matches.filter((p) => view === "all" || (view === "active") === isActive(p)), [matches, view]);
+  const silent = useMemo(() => (view === "active" ? matches.filter((p) => !isActive(p)) : []), [matches, view]);
+  const groups = (rows: MediaPartner[]) => MEDIA_PARTNER_GROUPS.map((g) => ({ g, rows: rows.filter((p) => partnerGroup(p) === g) })).filter((x) => x.rows.length);
+  const shownGroups = useMemo(() => groups(shown), [shown]); // eslint-disable-line react-hooks/exhaustive-deps
+  const silentGroups = useMemo(() => groups(silent), [silent]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Previous / next follow what is on screen, top to bottom.
+  const order = useMemo(() => [...shownGroups.flatMap((x) => x.rows), ...(silentOpen ? silentGroups.flatMap((x) => x.rows) : [])], [shownGroups, silentGroups, silentOpen]);
+  const open = useMemo(() => all.find((p) => p.id === openId) ?? null, [all, openId]);
+  const at = open ? order.findIndex((p) => p.id === open.id) : -1;
+  const nav: SheetNav = {
+    index: at, total: order.length,
+    prev: at > 0 ? () => setOpenId(order[at - 1].id) : null,
+    next: at + 1 < order.length && order.length ? () => setOpenId(order[at + 1].id) : null,
+  };
 
   if (isLoading && !s) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading" /></div>;
   if (!s) {
@@ -370,9 +483,12 @@ export default function AdminPartnershipsPage() {
 
   const pages = Math.max(1, Math.ceil((msgs?.total ?? 0) / PAGE));
   const received = Object.entries(s.counts).reduce((a, [, v]) => a + (v ?? 0), 0);
+  const inConversation = all.filter((p) => isActive(p) && p.status === "talking").length;
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const openSetup = () => { setSetupOpen(true); setTimeout(() => jump("partnerships-setup"), 50); };
   return (
     <AppPage testId="page-admin-partnerships">
-      <GoogleSectionHeader as="h1" title="Partnerships" description={`Relationships with directories, article sites, news media and PBNs — run from ${s.mailbox ?? "media@constructhub.us"}.`} flush />
+      <GoogleSectionHeader as="h1" title="Partnerships" description={`Relationships with directories, press-release wires, article sites and news media — run from ${s.mailbox ?? "media@constructhub.us"}.`} flush />
       <div className="min-w-0 space-y-4">
         {(!s.configured || !s.enabled) && (
           <Notice tone="info" title="Inbox automation" testId="notice-partnerships-config">
@@ -380,16 +496,28 @@ export default function AdminPartnershipsPage() {
           </Notice>
         )}
         {s.lastPassError && <Notice tone="warning" title="Last check failed">{s.lastPassError}</Notice>}
-        <StatGrid cols={5}>
-          <Stat label="Agreed — to finalize" value={n(s.partners.agreed)} onClick={() => setPartnerTab("agreed")} selected={partnerTab === "agreed"} testId="stat-partners-agreed" />
-          <Stat label="Finalized" value={n(s.partners.finalized)} onClick={() => setPartnerTab("finalized")} selected={partnerTab === "finalized"} />
-          <Stat label="Talking" value={n(s.partners.talking)} onClick={() => setPartnerTab("talking")} selected={partnerTab === "talking"} />
-          <Stat label="Emails sent" value={n(s.sent)} hint={`${n(received)} received`} onClick={() => setMailTab("out")} />
-          <Stat label="Directories queued" value={n(s.queue.queued)} hint={`${n(s.queue.sentToday)} of ${n(s.queue.perDay)} sent today · ${n(s.queue.sent)} so far`} onClick={() => document.querySelector("[data-testid=list-queue]")?.scrollIntoView({ behavior: "smooth", block: "start" })} testId="stat-partners-queue" />
-          <Stat label="Waiting for you" value={n(s.counts.needs_owner)} tone={s.counts.needs_owner ? "bad" : "default"} onClick={() => setMailTab("needs_owner")} hint={`checked ${ago(s.lastPassAt)}`} />
+        <StatGrid cols={4}>
+          <Stat label="Waiting for you" value={n(waiting.length)} tone={waiting.length ? "bad" : "default"} hint={`${n(s.counts.needs_owner)} emails`} onClick={() => jump("partnerships-waiting")} testId="stat-partners-waiting" />
+          <Stat label="In conversation" value={n(inConversation)} hint="a person wrote back" onClick={() => { setView("active"); setPartnerTab("talking"); jump("partnerships-companies"); }} selected={view === "active" && partnerTab === "talking"} />
+          <Stat label="Agreed — to finalize" value={n(s.partners.agreed)} onClick={() => { setView("all"); setPartnerTab("agreed"); jump("partnerships-companies"); }} selected={partnerTab === "agreed"} testId="stat-partners-agreed" />
+          <Stat label="Finalized" value={n(s.partners.finalized)} onClick={() => { setView("all"); setPartnerTab("finalized"); jump("partnerships-companies"); }} selected={partnerTab === "finalized"} />
         </StatGrid>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs text-muted-foreground" data-testid="text-partnerships-sending">
+          <span>Sending: {n(s.sent)} emails sent · {n(received)} received</span>
+          <button type="button" className="underline-offset-2 hover:underline" onClick={openSetup} data-testid="stat-partners-queue">{n(s.queue.queued)} queued · {n(s.queue.sentToday)} of {n(s.queue.perDay)} sent today</button>
+          <span>checked {ago(s.lastPassAt)}</span>
+        </p>
 
-        <Section title="Companies" icon={Handshake} actions={
+        <Section title="Waiting for you" icon={AlertCircle} id="partnerships-waiting" testId="section-partners-waiting"
+          description="Companies with an email or a decision that needs you: meetings, contracts, prices and anything the inbox would not answer on its own.">
+          {waiting.length ? (
+            <GoogleList as="ul" testId="list-partners-waiting">
+              {waiting.map((p) => <CompanyRow key={p.id} p={p} onOpen={() => setOpenId(p.id)} />)}
+            </GoogleList>
+          ) : <p className="text-sm text-muted-foreground">Nothing waiting. New ones appear here as the inbox is checked.</p>}
+        </Section>
+
+        <Section title="Companies" icon={Handshake} id="partnerships-companies" actions={
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" asChild>
               <Link href="/admin/partnerships/pricing" data-testid="link-partner-pricing"><Receipt className="mr-2 h-4 w-4" />Partner pricing</Link>
@@ -399,38 +527,35 @@ export default function AdminPartnershipsPage() {
             </Button>
           </div>
         }>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <Input className="w-64 pl-8" aria-label="Search companies" placeholder="Search company, website or email" value={q} onChange={(e) => setQ(e.target.value)} data-testid="input-partners-search" />
+            </div>
+            <Select value={view} onValueChange={(v) => setView(v as View)}>
+              <SelectTrigger className="w-48" aria-label="Show" data-testid="select-partners-view"><SelectValue /></SelectTrigger>
+              <SelectContent>{(Object.keys(VIEW_LABELS) as View[]).map((v) => <SelectItem key={v} value={v}>{VIEW_LABELS[v]}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
           <Tabs value={partnerTab} onValueChange={(v) => setPartnerTab(v as typeof partnerTab)} className="mb-3">
             <TabsList className="h-auto flex-wrap">
-              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="all">All statuses</TabsTrigger>
               {MEDIA_PARTNER_STATUSES.map((st) => <TabsTrigger key={st} value={st}>{MEDIA_PARTNER_STATUS_LABELS[st]} ({n(s.partners[st])})</TabsTrigger>)}
             </TabsList>
           </Tabs>
-          {/* Google's list format (owner 2026-10-15, the SEO Suite look): hairline rows with the key facts; the title opens the company. */}
-          <GoogleList as="ul" testId="list-partners">
-            {(partners ?? []).map((p) => (
-              <GoogleListRow
-                as="li"
-                size="md"
-                key={p.id}
-                testId={`row-partner-${p.id}`}
-                title={p.company}
-                onOpen={() => setOpenId(p.id)}
-                badges={<StatusPill tone={PARTNER_TONE[p.status]}>{MEDIA_PARTNER_STATUS_LABELS[p.status]}</StatusPill>}
-                meta={[
-                  p.domain && p.domain !== p.company ? p.domain : null,
-                  p.contactEmail,
-                  MEDIA_PARTNER_KIND_LABELS[p.kind],
-                  `${p.messages} emails`,
-                  `last ${ago(p.lastMessageAt)}`,
-                  p.addedTo ? `in the ${p.addedTo.toLowerCase()}` : null,
-                ]}
-                line={p.status === "agreed" && p.toFinalize ? `To finalize: ${p.toFinalize}` : p.status === "declined" ? `Why closed: ${p.summary ?? p.ownerQuestion ?? "no reason recorded — open it to read the emails"}` : p.ownerQuestion ? `Your call: ${p.ownerQuestion}` : undefined}
-              />
-            ))}
-          </GoogleList>
-          {partners && !partners.length && (
-            <div className="g-callout" data-testid="empty-partners"><h3>No companies yet</h3><p>They appear here as emails come in or go out of media@.</p></div>
-          )}
+          {/* Grouped by what the company is (wires, directories, article sites, news media, vendors); each group in Google's list format. */}
+          <div className="space-y-5" data-testid="list-partners">
+            {shownGroups.map(({ g, rows }) => <CompanyGroup key={g} g={g} rows={rows} onOpen={setOpenId} />)}
+            {partners && !shown.length && (
+              <div className="g-callout" data-testid="empty-partners"><h3>{term ? "No company matches" : "No companies here"}</h3><p>{view === "active" ? "Companies show here once a person writes back. Try “Everyone” or “No reply yet”." : "They appear here as emails come in or go out of media@."}</p></div>
+            )}
+            {silent.length > 0 && (
+              <details className="rounded-lg border bg-muted/30" open={silentOpen} onToggle={(e) => setSilentOpen((e.target as HTMLDetailsElement).open)} data-testid="group-partners-silent">
+                <summary className="cursor-pointer select-none px-3 py-2.5 text-sm font-medium">No reply yet ({n(silent.length)}) <span className="font-normal text-muted-foreground">— contacted, nobody has written back</span></summary>
+                {silentOpen && <div className="space-y-5 px-3 pb-3">{silentGroups.map(({ g, rows }) => <CompanyGroup key={g} g={g} rows={rows} onOpen={setOpenId} />)}</div>}
+              </details>
+            )}
+          </div>
         </Section>
 
         <Section title="Emails" icon={Mail}>
@@ -458,34 +583,53 @@ export default function AdminPartnershipsPage() {
           )}
         </Section>
 
-        <QueueSection />
-        <SettingsSection />
-
-        <Section title="Inbox laws" icon={Scale} description="What the AI answering media@ must follow. Laws marked “Checked in code” are verified on every reply before it is sent, whichever model wrote it; a reply that breaks one is replaced by a holding reply and waits for you.">
-          <ol className="list-decimal space-y-1.5 pl-5 text-sm" data-testid="list-inbox-laws">
-            {MEDIA_INBOX_LAWS.map((l) => (
-              <li key={l.law}>
-                {l.law}{" "}
-                <StatusPill tone={l.enforced === "code" ? "success" : "neutral"} dot={false}>{l.enforced === "code" ? "Checked in code" : "Instruction"}</StatusPill>
-              </li>
-            ))}
-          </ol>
-          <dl className="mt-4 grid grid-cols-[minmax(0,14rem)_1fr] gap-x-3 gap-y-1.5 text-sm" data-testid="list-inbox-parameters">
-            <dt className="text-muted-foreground">Checks the inbox</dt><dd>every {s.intervalMin} minutes</dd>
-            <dt className="text-muted-foreground">Reply length</dt><dd>under {MEDIA_INBOX_PARAMETERS.maxReplyWords} words (never sent over {MEDIA_INBOX_PARAMETERS.hardReplyWordLimit})</dd>
-            <dt className="text-muted-foreground">Replies to one sender</dt><dd>at most {MEDIA_INBOX_PARAMETERS.maxRepliesPerSenderPerDay} a day (stops loops with other auto-responders)</dd>
-            <dt className="text-muted-foreground">If the AI fails</dt><dd>{MEDIA_INBOX_PARAMETERS.aiAttemptsBeforeHolding} tries, then a holding reply</dd>
-            <dt className="text-muted-foreground">No answer</dt><dd>a follow-up after {MEDIA_INBOX_PARAMETERS.followUpAfterDays} days; {MEDIA_INBOX_PARAMETERS.followUpAfterDays} more days → a new contact from their website (up to {MEDIA_INBOX_PARAMETERS.maxContactsPerCompany} addresses per company)</dd>
-            <dt className="text-muted-foreground">New directories</dt><dd>{s.queue.perDay} first-contact emails a day from the queue (vetted directories that publish an email), spread across the day</dd>
-            <dt className="text-muted-foreground">AI order</dt><dd>{MEDIA_INBOX_PARAMETERS.aiOrder.join(" → ")}</dd>
-          </dl>
-        </Section>
-
-        <Section title="Email a company" description="First contact from media@. Replies are answered automatically every 30 minutes; nothing that costs money is agreed.">
-          <SendBox />
-        </Section>
+        {/* Setup, not daily work: collapsed until opened. */}
+        <details id="partnerships-setup" className="rounded-xl border bg-card" open={setupOpen} onToggle={(e) => setSetupOpen((e.target as HTMLDetailsElement).open)} data-testid="section-partnerships-setup">
+          <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-base font-semibold sm:px-5">
+            <Settings2 className="h-4 w-4" aria-hidden="true" />Sending setup
+            <span className="text-sm font-normal text-muted-foreground">— send queue ({n(s.queue.queued)}), settings, first-contact emails, inbox laws, email a company</span>
+          </summary>
+          {setupOpen && (
+            <div className="space-y-4 p-3 sm:p-4">
+              <QueueSection />
+              <SettingsSection />
+              <Section title="Inbox laws" icon={Scale} description="What the AI answering media@ must follow. Laws marked “Checked in code” are verified on every reply before it is sent, whichever model wrote it; a reply that breaks one is replaced by a holding reply and waits for you.">
+                <ol className="list-decimal space-y-1.5 pl-5 text-sm" data-testid="list-inbox-laws">
+                  {MEDIA_INBOX_LAWS.map((l) => (
+                    <li key={l.law}>
+                      {l.law}{" "}
+                      <StatusPill tone={l.enforced === "code" ? "success" : "neutral"} dot={false}>{l.enforced === "code" ? "Checked in code" : "Instruction"}</StatusPill>
+                    </li>
+                  ))}
+                </ol>
+                <dl className="mt-4 grid grid-cols-[minmax(0,14rem)_1fr] gap-x-3 gap-y-1.5 text-sm" data-testid="list-inbox-parameters">
+                  <dt className="text-muted-foreground">Checks the inbox</dt><dd>every {s.intervalMin} minutes</dd>
+                  <dt className="text-muted-foreground">Reply length</dt><dd>under {MEDIA_INBOX_PARAMETERS.maxReplyWords} words (never sent over {MEDIA_INBOX_PARAMETERS.hardReplyWordLimit})</dd>
+                  <dt className="text-muted-foreground">Replies to one sender</dt><dd>at most {MEDIA_INBOX_PARAMETERS.maxRepliesPerSenderPerDay} a day (stops loops with other auto-responders)</dd>
+                  <dt className="text-muted-foreground">No duplicates</dt><dd>one answer and one follow-up per company per check; nothing automatic to an address emailed in the last 30 minutes, and never the same email twice in 14 days</dd>
+                  <dt className="text-muted-foreground">If the AI fails</dt><dd>{MEDIA_INBOX_PARAMETERS.aiAttemptsBeforeHolding} tries, then a holding reply</dd>
+                  <dt className="text-muted-foreground">No answer</dt><dd>a follow-up after {MEDIA_INBOX_PARAMETERS.followUpAfterDays} days; {MEDIA_INBOX_PARAMETERS.followUpAfterDays} more days → a new contact from their website (up to {MEDIA_INBOX_PARAMETERS.maxContactsPerCompany} addresses per company)</dd>
+                  <dt className="text-muted-foreground">New directories</dt><dd>{s.queue.perDay} first-contact emails a day from the queue (vetted directories that publish an email), spread across the day</dd>
+                  <dt className="text-muted-foreground">AI order</dt><dd>{MEDIA_INBOX_PARAMETERS.aiOrder.join(" → ")}</dd>
+                </dl>
+              </Section>
+              <Section title="Email a company" description="First contact from media@. Replies are answered automatically every 30 minutes; nothing that costs money is agreed.">
+                <SendBox />
+              </Section>
+            </div>
+          )}
+        </details>
       </div>
-      <PartnerSheet partner={open} onClose={() => setOpenId(null)} />
+      <PartnerSheet partner={open} nav={nav} onClose={() => setOpenId(null)} />
     </AppPage>
+  );
+}
+
+function CompanyGroup({ g, rows, onOpen }: { g: MediaPartnerGroup; rows: MediaPartner[]; onOpen: (id: number) => void }) {
+  return (
+    <div data-testid={`group-partners-${g}`}>
+      <h3 className="mb-1 text-sm font-semibold text-foreground/80">{MEDIA_PARTNER_GROUP_LABELS[g]} <span className="font-normal text-muted-foreground">({n(rows.length)})</span></h3>
+      <GoogleList as="ul">{rows.map((p) => <CompanyRow key={p.id} p={p} onOpen={() => onOpen(p.id)} />)}</GoogleList>
+    </div>
   );
 }
