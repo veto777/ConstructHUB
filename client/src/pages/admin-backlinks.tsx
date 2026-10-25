@@ -7,10 +7,10 @@
  * Platform admins only (403 to anyone else; the second factor is handled like /admin/issues). Nothing here is
  * shown to customers.
  */
-import { useMemo, useState } from "react";
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict, format } from "date-fns";
-import { CheckCircle2, ExternalLink, Link2, Loader2, Lock, Mail, Play, RotateCcw, Upload } from "lucide-react";
+import { ArrowDown, Ban, CheckCircle2, ExternalLink, Link2, Loader2, Lock, Mail, Maximize2, Play, RotateCcw, Upload, X, XCircle } from "lucide-react";
 import {
   BACKLINK_ADMIN_STATUSES, BACKLINK_KINDS, BACKLINK_KIND_LABELS, BACKLINK_STATUSES, BACKLINK_STATUS_LABELS, BACKLINK_TIERS, PBN_POLICY, ANCHOR_POLICY, toDr, reasonWithDr,
   type BacklinkKind, type BacklinkSource, type BacklinkSourceRow, type BacklinkStatus, type BacklinkSummary,
@@ -132,30 +132,114 @@ function ImportBox() {
   );
 }
 
-function SourceSheet({ id, onClose }: { id: number | null; onClose: () => void }) {
+const refreshBacklinks = () => void queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/admin/backlinks") });
+const sourceKey = (id: number | null) => ["/api/admin/backlinks/sources", String(id)];
+const useSource = (id: number | null, enabled = true) => useQuery<BacklinkSource>({
+  queryKey: sourceKey(id), enabled: id !== null && enabled, queryFn: () => getJson(`/api/admin/backlinks/sources/${id}`),
+});
+
+/** What Approve does, in the owner's words (2026-10-25: "what does it approve exactly?"). */
+function approveHelp(sendingOn: boolean) {
+  return sendingOn
+    ? "Approve queues this exact email. The worker sends approved emails from the outreach mailbox, up to the daily cap, and the site moves to Contacted."
+    : "Approve queues this exact email; nothing is sent yet. Sending is off until the separate outreach mailbox and the postal address are set. Then approved emails go out from that mailbox, up to 30 a day, and the site moves to Contacted.";
+}
+
+/** The status and approve actions for one source. `onDone` runs after a change succeeds (review mode moves on). */
+function useSourceActions(id: number | null, onDone?: (what: string) => void) {
   const { toast } = useToast();
-  const { data: s, isLoading } = useQuery<BacklinkSource>({
-    queryKey: ["/api/admin/backlinks/sources", String(id)], enabled: id !== null, queryFn: () => getJson(`/api/admin/backlinks/sources/${id}`),
-  });
-  const refresh = () => void queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/admin/backlinks") });
-  const [price, setPrice] = useState("");
   const setStatus = useMutation({
-    mutationFn: async (status: string) => (await apiRequest("POST", `/api/admin/backlinks/sources/${id}/status`, {
-      status, ...(price.trim() ? { priceUsd: Number(price) } : {}),
-    })).json(),
-    onSuccess: () => { setPrice(""); refresh(); },
+    mutationFn: async (v: { status: string; priceUsd?: number }) => (await apiRequest("POST", `/api/admin/backlinks/sources/${id}/status`, v)).json(),
+    onSuccess: (_r, v) => { refreshBacklinks(); onDone?.(BACKLINK_STATUS_LABELS[v.status as BacklinkStatus] ?? v.status); },
     onError: (e) => toast({ title: "Could not update", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const recheck = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/admin/backlinks/sources/${id}/recheck`, {})).json(),
-    onSuccess: () => { toast({ title: "Queued for vetting" }); refresh(); },
+    onSuccess: () => { toast({ title: "Queued for vetting" }); refreshBacklinks(); },
     onError: (e) => toast({ title: "Could not re-check", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const approve = useMutation({
     mutationFn: async (oid: number) => (await apiRequest("POST", `/api/admin/backlinks/outreach/${oid}/approve`, {})).json(),
-    onSuccess: () => { toast({ title: "Approved", description: "It is sent when sending is switched on." }); refresh(); },
+    onSuccess: () => { refreshBacklinks(); if (onDone) onDone("Email approved"); else toast({ title: "Email approved", description: "It is sent when sending is switched on." }); },
     onError: (e) => toast({ title: "Could not approve", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  return { setStatus, recheck, approve, busy: setStatus.isPending || approve.isPending };
+}
+
+function SourceDetail({ s, sendingOn, actions }: { s: BacklinkSource; sendingOn: boolean; actions: ReturnType<typeof useSourceActions> }) {
+  const [price, setPrice] = useState("");
+  const { setStatus, recheck, approve } = actions;
+  const set = (status: string) => { setStatus.mutate({ status, ...(price.trim() ? { priceUsd: Number(price) } : {}) }); setPrice(""); };
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusPill tone={STATUS_TONE[s.status]}>{BACKLINK_STATUS_LABELS[s.status]}</StatusPill>
+        {s.tier && <StatusPill tone={TIER_TONE[s.tier]}>Tier {s.tier}{s.score != null ? ` · ${s.score}` : ""}</StatusPill>}
+        <StatusPill tone="neutral" dot={false}>Links: {s.linkType}</StatusPill>
+        {s.metrics?.rank != null && <StatusPill tone="neutral" dot={false}>DR {toDr(s.metrics.rank)}</StatusPill>}
+      </div>
+      {s.kind === "pbn" && <Notice tone="warning" title="Blocked">{PBN_POLICY}</Notice>}
+      <div>
+        <h3 className="mb-1 text-sm font-semibold">Why this grade</h3>
+        <ul className="space-y-0.5 text-sm text-muted-foreground">{s.reasons.length ? s.reasons.map((r) => <li key={r}>{reasonWithDr(r)}</li>) : <li>Not vetted yet.</li>}</ul>
+      </div>
+      {s.signals && (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+          <span className="text-muted-foreground">Page title</span><span className="truncate">{s.signals.title ?? "—"}</span>
+          <span className="text-muted-foreground">Words</span><span>{n(s.signals.words)}</span>
+          <span className="text-muted-foreground">Outbound links</span><span>{n(s.signals.outboundLinks)} ({s.signals.rel.dofollow} follow · {s.signals.rel.nofollow} nofollow · {s.signals.rel.sponsored} sponsored)</span>
+          <span className="text-muted-foreground">Takes submissions</span><span>{s.signals.submissionHints.join(", ") || "not shown"}</span>
+          <span className="text-muted-foreground">Contact</span>
+          <span className="break-all">{s.contactEmails.join(", ") || (s.contactUrl ? <a className="underline" href={s.contactUrl} target="_blank" rel="noreferrer noopener">contact page</a> : "none published")}</span>
+          {s.metrics && (<><span className="text-muted-foreground">Referring domains</span><span>{s.metrics.referringDomains ?? "—"} · spam {s.metrics.spamScore ?? "—"}/100</span>
+            <span className="text-muted-foreground">Google visits / month</span><span>{s.metrics.organicTraffic == null ? "not measured" : `about ${n(Math.round(s.metrics.organicTraffic))}`}</span></>)}
+        </div>
+      )}
+      {s.outreach.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold">Pitch email</h3>
+          <p className="text-xs text-muted-foreground">{ANCHOR_POLICY}</p>
+          {s.outreach.map((o) => (
+            <div key={o.id} className="rounded-lg border p-3 text-sm" data-testid={`outreach-${o.id}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 break-all"><Mail className="h-3.5 w-3.5 shrink-0" />{o.toEmail}</span>
+                <StatusPill tone={o.status === "draft" ? "warning" : o.status === "sent" ? "success" : "info"}>{o.status === "draft" ? "Waiting for approval" : o.status === "approved" ? "Approved, not sent yet" : o.status}</StatusPill>
+              </div>
+              <p className="mt-2 font-medium">{o.subject}</p>
+              <pre className="mt-1 whitespace-pre-wrap font-sans text-muted-foreground">{o.body}</pre>
+              {o.status === "draft" && (
+                <div className="mt-2 space-y-1">
+                  <Button size="sm" disabled={approve.isPending} onClick={() => approve.mutate(o.id)} data-testid={`button-outreach-approve-${o.id}`}><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Approve this email</Button>
+                  <p className="text-xs text-muted-foreground" data-testid={`text-outreach-approve-help-${o.id}`}>{approveHelp(sendingOn)}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold">Set status</h3>
+        <p className="text-xs text-muted-foreground">Moves the site in the pipeline. It never sends an email.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input className="w-32" inputMode="decimal" aria-label="Price in dollars (optional)" placeholder="Price $ (opt.)" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} data-testid="input-backlink-price" />
+          {BACKLINK_ADMIN_STATUSES.filter((x) => x !== s.status).map((x) => (
+            <Button key={x} size="sm" variant="outline" disabled={setStatus.isPending} onClick={() => set(x)} data-testid={`button-backlink-status-${x}`}>{BACKLINK_STATUS_LABELS[x]}</Button>
+          ))}
+          <Button size="sm" variant="ghost" disabled={recheck.isPending || s.status === "vetting"} onClick={() => recheck.mutate()} data-testid="button-backlink-recheck"><RotateCcw className="mr-1.5 h-3.5 w-3.5" />Re-check</Button>
+        </div>
+        {s.priceUsd != null && <p className="text-sm text-muted-foreground">Agreed price: ${s.priceUsd}{s.turnaroundDays != null ? ` · ${s.turnaroundDays} days` : ""}</p>}
+      </div>
+      <div>
+        <h3 className="mb-1 text-sm font-semibold">History</h3>
+        <ul className="space-y-0.5 text-xs text-muted-foreground">{s.events.map((e, i) => <li key={i}>{format(new Date(e.at), "MMM d, h:mm a")} — {e.type.replace(/_/g, " ")}</li>)}</ul>
+      </div>
+    </div>
+  );
+}
+
+function SourceSheet({ id, sendingOn, onClose }: { id: number | null; sendingOn: boolean; onClose: () => void }) {
+  const { data: s, isLoading } = useSource(id);
+  const actions = useSourceActions(id);
   return (
     <Sheet open={id !== null} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="sheet-backlink-source">
@@ -168,67 +252,148 @@ function SourceSheet({ id, onClose }: { id: number | null; onClose: () => void }
               </SheetTitle>
               <SheetDescription>{BACKLINK_KIND_LABELS[s.kind]} · found {ago(s.createdAt)}{s.discoveredVia ? ` by “${s.discoveredVia}”` : ""}</SheetDescription>
             </SheetHeader>
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusPill tone={STATUS_TONE[s.status]}>{BACKLINK_STATUS_LABELS[s.status]}</StatusPill>
-              {s.tier && <StatusPill tone={TIER_TONE[s.tier]}>Tier {s.tier}{s.score != null ? ` · ${s.score}` : ""}</StatusPill>}
-              <StatusPill tone="neutral" dot={false}>Links: {s.linkType}</StatusPill>
-              {s.metrics?.rank != null && <StatusPill tone="neutral" dot={false}>DR {toDr(s.metrics.rank)}</StatusPill>}
-            </div>
-            {s.kind === "pbn" && <Notice tone="warning" title="Blocked">{PBN_POLICY}</Notice>}
-            <div>
-              <h3 className="mb-1 text-sm font-semibold">Why this grade</h3>
-              <ul className="space-y-0.5 text-sm text-muted-foreground">{s.reasons.length ? s.reasons.map((r) => <li key={r}>{reasonWithDr(r)}</li>) : <li>Not vetted yet.</li>}</ul>
-            </div>
-            {s.signals && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                <span className="text-muted-foreground">Page title</span><span className="truncate">{s.signals.title ?? "—"}</span>
-                <span className="text-muted-foreground">Words</span><span>{n(s.signals.words)}</span>
-                <span className="text-muted-foreground">Outbound links</span><span>{n(s.signals.outboundLinks)} ({s.signals.rel.dofollow} follow · {s.signals.rel.nofollow} nofollow · {s.signals.rel.sponsored} sponsored)</span>
-                <span className="text-muted-foreground">Takes submissions</span><span>{s.signals.submissionHints.join(", ") || "not shown"}</span>
-                <span className="text-muted-foreground">Contact</span>
-                <span className="break-all">{s.contactEmails.join(", ") || (s.contactUrl ? <a className="underline" href={s.contactUrl} target="_blank" rel="noreferrer noopener">contact page</a> : "none published")}</span>
-                {s.metrics && (<><span className="text-muted-foreground">Referring domains</span><span>{s.metrics.referringDomains ?? "—"} · spam {s.metrics.spamScore ?? "—"}/100</span>
-                  <span className="text-muted-foreground">Google visits / month</span><span>{s.metrics.organicTraffic == null ? "not measured" : `about ${n(Math.round(s.metrics.organicTraffic))}`}</span></>)}
-              </div>
-            )}
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Set status</h3>
-              <div className="flex flex-wrap items-center gap-2">
-                <Input className="w-32" inputMode="decimal" aria-label="Price in dollars (optional)" placeholder="Price $ (opt.)" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} data-testid="input-backlink-price" />
-                {BACKLINK_ADMIN_STATUSES.filter((x) => x !== s.status).map((x) => (
-                  <Button key={x} size="sm" variant="outline" disabled={setStatus.isPending} onClick={() => setStatus.mutate(x)} data-testid={`button-backlink-status-${x}`}>{BACKLINK_STATUS_LABELS[x]}</Button>
-                ))}
-                <Button size="sm" variant="ghost" disabled={recheck.isPending || s.status === "vetting"} onClick={() => recheck.mutate()} data-testid="button-backlink-recheck"><RotateCcw className="mr-1.5 h-3.5 w-3.5" />Re-check</Button>
-              </div>
-              {s.priceUsd != null && <p className="text-sm text-muted-foreground">Agreed price: ${s.priceUsd}{s.turnaroundDays != null ? ` · ${s.turnaroundDays} days` : ""}</p>}
-            </div>
-            {s.outreach.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold">Outreach</h3>
-                <p className="text-xs text-muted-foreground">{ANCHOR_POLICY}</p>
-                {s.outreach.map((o) => (
-                  <div key={o.id} className="rounded-lg border p-3 text-sm" data-testid={`outreach-${o.id}`}>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5 break-all"><Mail className="h-3.5 w-3.5 shrink-0" />{o.toEmail}</span>
-                      <StatusPill tone={o.status === "draft" ? "warning" : o.status === "sent" ? "success" : "info"}>{o.status}</StatusPill>
-                    </div>
-                    <p className="mt-2 font-medium">{o.subject}</p>
-                    <pre className="mt-1 whitespace-pre-wrap font-sans text-muted-foreground">{o.body}</pre>
-                    {o.status === "draft" && (
-                      <Button size="sm" className="mt-2" disabled={approve.isPending} onClick={() => approve.mutate(o.id)} data-testid={`button-outreach-approve-${o.id}`}><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Approve</Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            <div>
-              <h3 className="mb-1 text-sm font-semibold">History</h3>
-              <ul className="space-y-0.5 text-xs text-muted-foreground">{s.events.map((e, i) => <li key={i}>{format(new Date(e.at), "MMM d, h:mm a")} — {e.type.replace(/_/g, " ")}</li>)}</ul>
-            </div>
+            <SourceDetail s={s} sendingOn={sendingOn} actions={actions} />
           </div>
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+const REVIEW_PAGE = 200;
+const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+
+/** One full-screen slide in review mode. Details load only for the slide on screen and its neighbours. */
+function ReviewSlide({ row, index, total, near, decided, sendingOn, slideRef }: {
+  row: BacklinkSourceRow; index: number; total: number; near: boolean; decided: string | undefined; sendingOn: boolean; slideRef: (el: HTMLElement | null) => void;
+}) {
+  const { data: s } = useSource(row.id, near);
+  const actions = useSourceActions(row.id);
+  return (
+    <section ref={slideRef} data-index={index} className="min-h-full snap-start border-b px-4 py-8 sm:px-8" data-testid={`review-slide-${row.id}`}>
+      <div className="mx-auto max-w-3xl space-y-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="flex items-center gap-2 break-all text-2xl font-semibold">
+            {row.domain}
+            <a href={`https://${row.domain}/`} target="_blank" rel="noreferrer noopener" aria-label="Open the site"><ExternalLink className="h-4 w-4 text-muted-foreground" /></a>
+          </h2>
+          <span className="text-sm tabular-nums text-muted-foreground">{n(index + 1)} of {n(total)}</span>
+        </div>
+        <p className="text-sm text-muted-foreground">{BACKLINK_KIND_LABELS[row.kind]}{row.niches.length ? ` · ${row.niches.slice(0, 3).join(", ")}` : ""}{s ? ` · found ${ago(s.createdAt)}${s.discoveredVia ? ` by “${s.discoveredVia}”` : ""}` : ""}</p>
+        {decided && <Notice tone="success" title={`Done: ${decided}`} testId={`notice-review-decided-${row.id}`}>Scroll on, or change it below.</Notice>}
+        {row.rejectReason && <p className="text-sm text-muted-foreground">Rejected: {reasonWithDr(row.rejectReason)}</p>}
+        {s ? <SourceDetail s={s} sendingOn={sendingOn} actions={actions} /> : <Loader2 className="mx-auto mt-10 h-5 w-5 animate-spin text-muted-foreground" aria-label="Loading" />}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Review mode (owner 2026-10-25: "a full screen where you scroll from potential to next one"): the current filter's
+ * sources one per screen. The bar at the bottom decides the source on screen and moves to the next one.
+ * Keys: ↓/J next · ↑/K back · A approve email · R reject · D do not contact · Esc close.
+ */
+function ReviewMode({ params, sendingOn, onClose }: { params: URLSearchParams; sendingOn: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const base = useMemo(() => { const p = new URLSearchParams(params); p.delete("offset"); p.set("limit", String(REVIEW_PAGE)); return p.toString(); }, [params]);
+  // Its own key (not /api/admin/backlinks…) so a decision doesn't reshuffle the slides under the reader.
+  const list = useInfiniteQuery<ListPayload>({
+    queryKey: ["backlinks-review", base], initialPageParam: 0,
+    queryFn: ({ pageParam }) => getJson(`/api/admin/backlinks/sources?${base}&offset=${pageParam}`),
+    getNextPageParam: (last, all) => { const got = all.reduce((t, p) => t + p.rows.length, 0); return got < last.total && last.rows.length ? got : undefined; },
+  });
+  const rows = useMemo(() => list.data?.pages.flatMap((p) => p.rows) ?? [], [list.data]);
+  const total = list.data?.pages[0]?.total ?? 0;
+  const [current, setCurrent] = useState(0);
+  const [decided, setDecided] = useState<Record<number, string>>({});
+  const scroller = useRef<HTMLDivElement | null>(null);
+  const slides = useRef<(HTMLElement | null)[]>([]);
+
+  // The slide crossing the middle of the screen is the current one.
+  useEffect(() => {
+    const root = scroller.current;
+    if (!root) return;
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) setCurrent(Number((e.target as HTMLElement).dataset.index));
+    }, { root, rootMargin: "-50% 0px -50% 0px" });
+    slides.current.slice(0, rows.length).forEach((el) => el && io.observe(el));
+    return () => io.disconnect();
+  }, [rows.length]);
+  useEffect(() => {
+    if (current >= rows.length - 10 && list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
+  }, [current, rows.length, list]);
+
+  const goTo = useCallback((i: number) => {
+    const el = slides.current[Math.max(0, Math.min(i, rows.length - 1))];
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [rows.length]);
+  const row = rows[current] ?? null;
+  const { data: s } = useSource(row?.id ?? null);
+  const draft = s?.outreach.find((o) => o.status === "draft") ?? null;
+  const done = useCallback((what: string) => {
+    if (row) setDecided((d) => ({ ...d, [row.id]: what }));
+    toast({ title: `${row?.domain ?? "Source"}: ${what}` });
+    goTo(current + 1);
+  }, [row, current, goTo, toast]);
+  const actions = useSourceActions(row?.id ?? null, done);
+  const act = useCallback((key: "approve" | "reject" | "dnc") => {
+    if (!row || actions.busy) return;
+    if (key === "approve") { if (draft) actions.approve.mutate(draft.id); }
+    else actions.setStatus.mutate({ status: key === "reject" ? "rejected" : "do_not_contact" });
+  }, [row, actions, draft]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "escape") onClose();
+      else if (k === "arrowdown" || k === "j") { e.preventDefault(); goTo(current + 1); }
+      else if (k === "arrowup" || k === "k") { e.preventDefault(); goTo(current - 1); }
+      else if (k === "a") act("approve");
+      else if (k === "r") act("reject");
+      else if (k === "d") act("dnc");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [current, goTo, act, onClose]);
+  useEffect(() => { const prev = document.body.style.overflow; document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = prev; }; }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-background" role="dialog" aria-modal="true" aria-label="Review sources" data-testid="review-backlinks">
+      <div className="flex items-center gap-3 border-b px-4 py-2.5 sm:px-6">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold">Review sources</div>
+          <div className="truncate text-xs text-muted-foreground">{total ? `${n(Math.min(current + 1, total))} of ${n(total)}` : "Loading…"} · {Object.keys(decided).length} decided · ↓ next · ↑ back · A approve · R reject · D do not contact · Esc close</div>
+        </div>
+        <Button size="sm" variant="ghost" onClick={onClose} aria-label="Close review" data-testid="button-review-close"><X className="h-4 w-4" /></Button>
+      </div>
+      <div ref={scroller} className="min-h-0 flex-1 snap-y snap-proximity overflow-y-auto" data-testid="review-scroller">
+        {rows.map((r, i) => (
+          <ReviewSlide key={r.id} row={r} index={i} total={total} near={Math.abs(i - current) <= 1} decided={decided[r.id]} sendingOn={sendingOn}
+            slideRef={(el) => { slides.current[i] = el; }} />
+        ))}
+        {list.isFetchingNextPage && <Loader2 className="mx-auto my-8 h-5 w-5 animate-spin text-muted-foreground" aria-label="Loading more" />}
+        {list.data && !rows.length && <p className="px-4 py-20 text-center text-sm text-muted-foreground">Nothing matches these filters.</p>}
+        {list.data && rows.length > 0 && !list.hasNextPage && <p className="px-4 py-12 text-center text-sm text-muted-foreground">That's all {n(total)}. <button type="button" className="underline" onClick={onClose}>Close review</button></p>}
+      </div>
+      <div className="border-t bg-card px-4 py-3 sm:px-6" data-testid="review-decision-bar">
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-2">
+          <Button disabled={!draft || actions.busy} onClick={() => act("approve")} title={approveHelp(sendingOn)} data-testid="button-review-approve">
+            <CheckCircle2 className="mr-1.5 h-4 w-4" />{draft ? "Approve email" : "No email to approve"}<kbd className="ml-2 text-xs opacity-70">A</kbd>
+          </Button>
+          <Button variant="outline" disabled={!row || actions.busy || s?.status === "rejected"} onClick={() => act("reject")} data-testid="button-review-reject">
+            <XCircle className="mr-1.5 h-4 w-4" />Reject site<kbd className="ml-2 text-xs opacity-70">R</kbd>
+          </Button>
+          <Button variant="outline" disabled={!row || actions.busy || s?.status === "do_not_contact"} onClick={() => act("dnc")} data-testid="button-review-dnc">
+            <Ban className="mr-1.5 h-4 w-4" />Do not contact<kbd className="ml-2 text-xs opacity-70">D</kbd>
+          </Button>
+          <Button variant="ghost" disabled={current + 1 >= rows.length} onClick={() => goTo(current + 1)} data-testid="button-review-next">
+            Skip<ArrowDown className="ml-1.5 h-4 w-4" />
+          </Button>
+          <p className="w-full text-xs text-muted-foreground">{draft ? approveHelp(sendingOn) : "Each choice saves and moves to the next site. Skip leaves this one as it is."}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -241,6 +406,7 @@ export default function AdminBacklinksPage() {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [reviewing, setReviewing] = useState(false);
 
   const { data: s, error, isLoading, refetch } = useQuery<BacklinkSummary>({
     queryKey: ["/api/admin/backlinks/summary"], queryFn: () => getJson("/api/admin/backlinks/summary"),
@@ -305,7 +471,8 @@ export default function AdminBacklinksPage() {
           <RunButtons />
         </Section>
 
-        <Section title="Sources" icon={Link2} id="backlinks-sources">
+        <Section title="Sources" icon={Link2} id="backlinks-sources"
+          actions={<Button size="sm" disabled={!list?.total} onClick={() => setReviewing(true)} data-testid="button-backlinks-review"><Maximize2 className="mr-1.5 h-3.5 w-3.5" />Review one by one{list?.total ? ` (${n(list.total)})` : ""}</Button>}>
           {/* Rejected sources (tier X) live on their own tab, each with the reason it was rejected. */}
           <Tabs value={view} onValueChange={(v) => { setView(v as "kept" | "rejected"); setTier("all"); setStatusFilter("all"); setPage(0); }} className="mb-3">
             <TabsList>
@@ -360,7 +527,8 @@ export default function AdminBacklinksPage() {
           <ImportBox />
         </Section>
       </div>
-      <SourceSheet id={openId} onClose={() => setOpenId(null)} />
+      <SourceSheet id={openId} sendingOn={s.config.outreachSend} onClose={() => setOpenId(null)} />
+      {reviewing && <ReviewMode params={params} sendingOn={s.config.outreachSend} onClose={() => { setReviewing(false); refreshBacklinks(); }} />}
     </AppPage>
   );
 }

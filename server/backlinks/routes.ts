@@ -152,6 +152,7 @@ export function registerBacklinkRoutes(app: Express, getDevUser: GetUser): void 
     try {
       const d = await store.approveDraft(id.data, a.id);
       if (!d) return res.status(409).json({ message: "That draft was already approved or sent." });
+      if ("duplicate" in d) return res.status(409).json({ message: `Not approved: ${d.duplicate}. It is held as a duplicate and will never be sent.` });
       res.json(d);
     } catch (e) { failed(res, "approve the draft", e); }
   });

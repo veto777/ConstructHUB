@@ -16,7 +16,7 @@ import { botTellProblem } from "../outbound-guard";
 import { signatureText } from "../email-signature";
 import type { BacklinkKind, BacklinkSignals } from "@shared/backlinks";
 import { pool } from "../db";
-import { isSuppressed } from "./store";
+import { isSuppressed, markDuplicate, pitchConflict } from "./store";
 
 export const PITCHED_KINDS: readonly BacklinkKind[] = ["guest_post", "resource_page", "editorial", "press_release"];
 
@@ -116,7 +116,9 @@ export async function sendApproved(c: OutreachConfig = outreachConfig()): Promis
   const today = Number((await pool.query(`SELECT count(*)::int n FROM backlink_outreach WHERE sent_at >= date_trunc('day', now())`)).rows[0]?.n ?? 0);
   const room = Math.max(0, c.daily - today);
   if (!room) return { sent: 0, skipped: 0, blocked: null };
-  const rows = (await pool.query(`SELECT id, source_id, to_email, subject, body FROM backlink_outreach WHERE status = 'approved' ORDER BY approved_at LIMIT $1`, [room])).rows;
+  const rows = (await pool.query(
+    `SELECT o.id, o.source_id, o.to_email, o.subject, o.body, s.domain FROM backlink_outreach o JOIN backlink_sources s ON s.id = o.source_id
+      WHERE o.status = 'approved' ORDER BY o.approved_at LIMIT $1`, [room])).rows;
   const t = sendDeps.transport(c);
   let sent = 0, skipped = 0;
   for (const r of rows) {
@@ -125,6 +127,9 @@ export async function sendApproved(c: OutreachConfig = outreachConfig()): Promis
       skipped++;
       continue;
     }
+    // Owner 2026-10-25: duplicates never go out. Checked again at the door, since approvals can race.
+    const clash = await pitchConflict(r.to_email, r.domain, "send", r.id);
+    if (clash) { await markDuplicate(r.id, r.source_id, clash); skipped++; continue; }
     // OWNER LAW 2026-10-15 (server/outbound-guard.ts): a pitch that gives a bot away is held, never sent.
     const tell = botTellProblem(`${r.subject}\n${r.body}`);
     if (tell) {
