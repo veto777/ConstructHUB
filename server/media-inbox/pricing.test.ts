@@ -48,6 +48,28 @@ describe("keepQuotedPrices — only amounts they wrote", () => {
   it("keeps an offer without a number", () => expect(keepQuotedPrices([p(null)], "paid releases available")).toHaveLength(1));
 });
 
+// Nicole's table on support@ (ACCESS Newswire, 2026-10-16): a per-release price inside each bundle, then the total.
+const ACCESS = `Bundle Discount Price per Release Total 40 releases 25% off $356.25 $14,250 80 releases 35% off $308.75 $24,700
+200 releases 55% off $213.75 $42,750`;
+
+describe("keepQuotedPrices — a per-item price inside a bundle is not the bundle's price", () => {
+  const q = (product: string, price: number, quantity: number | null) => ({ category: "press_release" as const, product, price, quantity, unit: "each" as const, notes: null });
+  it("drops the bundle size when the total is also written (ACCESS, 2026-10-25: $213.75 for 200 read as $1.07 each)", () => {
+    expect(keepQuotedPrices([q("Budget Distribution", 213.75, 200), q("40 releases bundle", 356.25, 40)], ACCESS)).toEqual([
+      q("Budget Distribution, 200-item bundle", 213.75, null),
+      q("40 releases bundle", 356.25, null),
+    ]);
+  });
+  it("drops it when the amount is written per release or each", () => {
+    expect(keepQuotedPrices([q("Budget release", 365.25, 40)], "the 40-release bundle is $365.25 per release")[0].quantity).toBeNull();
+    expect(keepQuotedPrices([q("Guest posts", 90, 10)], "ten posts at $90 each")[0].quantity).toBeNull();
+  });
+  it("drops it when the product says per release", () => expect(keepQuotedPrices([q("Price per release, 80 bundle", 308.75, 80)], ACCESS)[0].quantity).toBeNull());
+  it("keeps a real bundle total (EIN, 2026-10-14)", () => {
+    expect(keepQuotedPrices([q("Corporate Package bundle", 999, 15), q("Release bundle", 19999, 800)], EIN).map((x) => x.quantity)).toEqual([15, 800]);
+  });
+});
+
 describe("perItem", () => {
   it("divides a bundle by its size", () => expect(perItem({ price: 999, quantity: 15 })).toBe(66.6));
   it("is the price for one item", () => expect(perItem({ price: 1205, quantity: null })).toBe(1205));

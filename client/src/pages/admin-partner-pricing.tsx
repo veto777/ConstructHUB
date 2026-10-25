@@ -4,9 +4,9 @@
  * one row each, grouped by what it buys and sorted cheapest per item first so wires and tiers compare side by side.
  * Prices are read from their emails on media@ and support@ (server/media-inbox/worker.ts) or typed in here. Platform admins only.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { ArrowLeft, Loader2, Lock, MessageSquare, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
 import {
@@ -40,6 +40,19 @@ const today = () => new Date().toISOString().slice(0, 10);
 const emptyDraft = (o: Partial<Draft> = {}): Draft => ({ partnerId: null, category: "press_release", product: "", price: "", quantity: "", unit: "each", notes: "", quotedAt: today(), ...o });
 /** A company's conversation on the Partnerships page. */
 const conversationHref = (partnerId: number) => `/admin/partnerships?open=${partnerId}`;
+/** Owner, 2026-10-25: "make sure all the containers you can click". A whole card or row opens the company; buttons inside it keep their own action. */
+const stop = (e: MouseEvent) => e.stopPropagation();
+const opensOn = (open: () => void) => ({
+  role: "button" as const, tabIndex: 0, onClick: open,
+  onKeyDown: (e: KeyboardEvent) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } },
+});
+const cardId = (partnerId: number) => `pricing-card-${partnerId}`;
+/** What the per-item column shows: a bundle over its size, a one-off price as it is, "Free" for $0. Monthly fees have no per-item price. */
+const perItemLabel = (r: MediaPriceRow) => {
+  if (!r.quantity && r.unit !== "each" && r.unit !== "one-time") return "—";
+  const v = perItem(r);
+  return v === 0 ? "Free" : money(v);
+};
 
 /** One company's prices in a category, with its API and minimum terms. */
 type Group = { partnerId: number; company: string; domain: string | null; status: MediaPartnerStatus; contact: string | null; apiTerms: string | null; minCommitment: string | null; rows: MediaPriceRow[]; best: number | null };
@@ -57,20 +70,21 @@ function groupRows(rows: MediaPriceRow[]): Group[] {
   return [...by.values()].sort((a, b) => (a.best ?? Infinity) - (b.best ?? Infinity) || a.company.localeCompare(b.company));
 }
 
-function PriceTable({ g, lowest, onEdit, onDelete }: { g: Group; lowest: number | null; onEdit: (r: MediaPriceRow) => void; onDelete: (r: MediaPriceRow) => void }) {
+function PriceTable({ g, lowest, onOpen, onEdit, onDelete }: { g: Group; lowest: number | null; onOpen: () => void; onEdit: (r: MediaPriceRow) => void; onDelete: (r: MediaPriceRow) => void }) {
   return (
-    <div className="rounded-xl border bg-card p-4" data-testid={`card-pricing-${g.partnerId}`}>
+    <div id={cardId(g.partnerId)} {...opensOn(onOpen)} aria-label={`Open ${g.company}`}
+      className="cursor-pointer scroll-mt-24 rounded-xl border bg-card p-4 transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid={`card-pricing-${g.partnerId}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
             {g.company}
             <StatusPill tone={PARTNER_TONE[g.status]}>{MEDIA_PARTNER_STATUS_LABELS[g.status]}</StatusPill>
-            {g.best != null && lowest != null && g.best === lowest && <StatusPill tone="success" dot={false}>Lowest per item</StatusPill>}
+            {g.best != null && lowest != null && g.best === lowest && <StatusPill tone="success" dot={false}>{lowest === 0 ? "Free" : "Lowest per item"}</StatusPill>}
           </h3>
           <p className="text-xs text-foreground/70">{[g.domain, g.contact].filter(Boolean).join(" · ")}</p>
         </div>
         <Button size="sm" variant="outline" asChild>
-          <Link href={conversationHref(g.partnerId)} data-testid={`link-pricing-conversation-${g.partnerId}`}><MessageSquare className="mr-2 h-4 w-4" />Conversation</Link>
+          <Link href={conversationHref(g.partnerId)} onClick={stop} data-testid={`link-pricing-conversation-${g.partnerId}`}><MessageSquare className="mr-2 h-4 w-4" />Conversation</Link>
         </Button>
       </div>
       <dl className="mt-2 grid grid-cols-[5.5rem_1fr] gap-x-3 gap-y-1 text-sm">
@@ -94,10 +108,10 @@ function PriceTable({ g, lowest, onEdit, onDelete }: { g: Group; lowest: number 
               <tr key={r.id} className="border-b last:border-0 align-top" data-testid={`row-price-${r.id}`}>
                 <td className="py-2 pr-3 font-medium">{r.product}{r.quantity ? <span className="font-normal text-foreground/70"> · {r.quantity.toLocaleString("en-US")} items</span> : null}</td>
                 <td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{money(r.price)} <span className="text-xs text-foreground/60">{UNIT_LABELS[r.unit]}</span></td>
-                <td className="whitespace-nowrap py-2 pr-3 text-right font-semibold tabular-nums">{r.quantity ? money(perItem(r)) : "—"}</td>
+                <td className="whitespace-nowrap py-2 pr-3 text-right font-semibold tabular-nums">{perItemLabel(r)}</td>
                 <td className="py-2 pr-3 text-foreground/80">{r.notes ?? ""}</td>
                 <td className="whitespace-nowrap py-2 pr-3 text-xs text-foreground/70">{format(new Date(`${r.quotedAt}T12:00:00`), "MMM d, yyyy")}<br />{r.source}</td>
-                <td className="whitespace-nowrap py-1 text-right">
+                <td className="whitespace-nowrap py-1 text-right" onClick={stop}>
                   <Button size="icon" variant="ghost" aria-label={`Edit ${r.product}`} onClick={() => onEdit(r)}><Pencil className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" aria-label={`Remove ${r.product}`} onClick={() => onDelete(r)}><Trash2 className="h-4 w-4" /></Button>
                 </td>
@@ -191,6 +205,13 @@ export default function AdminPartnerPricingPage() {
   const { toast } = useToast();
   const [tab, setTab] = useState<"all" | MediaPriceCategory>("all");
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [, navigate] = useLocation();
+  const open = (partnerId: number) => navigate(conversationHref(partnerId));
+  /** Switch tab, then bring a card or section into view once it has rendered. */
+  const show = (t: typeof tab, selector: string | null) => {
+    setTab(t);
+    if (selector) window.setTimeout(() => document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  };
   const { data, error, isLoading, refetch } = useQuery<PricesPayload>({ queryKey: [PRICES_URL], queryFn: () => getJson(PRICES_URL), retry: false });
   const { data: partners } = useQuery<MediaPartner[]>({ queryKey: ["/api/admin/media-inbox/partners"], queryFn: () => getJson("/api/admin/media-inbox/partners"), enabled: !!data });
   const remove = useMutation({
@@ -218,7 +239,10 @@ export default function AdminPartnerPricingPage() {
   }
 
   const companies = new Set(data.rows.map((r) => r.partnerId)).size;
-  const cheapestRelease = Math.min(...(byCategory.get("press_release") ?? []).filter((r) => r.unit === "each" || r.unit === "one-time").map((r) => perItem(r) ?? Infinity));
+  // A row without a price never counts as the cheapest.
+  const releaseRows = (byCategory.get("press_release") ?? []).filter((r) => r.price != null && (r.unit === "each" || r.unit === "one-time"));
+  const cheapestRow = releaseRows.reduce<MediaPriceRow | null>((m, r) => (m == null || (perItem(r) ?? Infinity) < (perItem(m) ?? Infinity) ? r : m), null);
+  const cheapestRelease = cheapestRow ? perItem(cheapestRow) ?? Infinity : Infinity;
   const shown = MEDIA_PRICE_CATEGORIES.filter((c) => (tab === "all" || tab === c) && byCategory.get(c)?.length);
   const edit = (r: MediaPriceRow) => setDraft({ id: r.id, partnerId: r.partnerId, category: r.category, product: r.product, price: r.price == null ? "" : String(r.price), quantity: r.quantity ? String(r.quantity) : "", unit: r.unit, notes: r.notes ?? "", quotedAt: r.quotedAt });
 
@@ -228,10 +252,11 @@ export default function AdminPartnerPricingPage() {
       <GoogleSectionHeader as="h1" title="Partner pricing" description="Every price a wire, directory, article site or news outlet has quoted us, one row each and cheapest per item first. Read from their emails to media@ and support@, or added here." flush />
       <div className="min-w-0 space-y-4">
         <StatGrid cols={4}>
-          <Stat label="Companies with prices" value={companies.toLocaleString("en-US")} />
-          <Stat label="Prices on file" value={data.rows.length.toLocaleString("en-US")} />
-          <Stat label="Cheapest press release" value={Number.isFinite(cheapestRelease) ? money(cheapestRelease) : "—"} hint="per release, at its bundle size" onClick={() => setTab("press_release")} />
-          <Stat label="Terms not itemized" value={data.unpriced.length.toLocaleString("en-US")} hint="their words, below" onClick={() => document.querySelector("[data-testid=section-unpriced]")?.scrollIntoView({ behavior: "smooth", block: "start" })} />
+          <Stat label="Companies with prices" value={companies.toLocaleString("en-US")} onClick={() => show("all", null)} testId="stat-pricing-companies" />
+          <Stat label="Prices on file" value={data.rows.length.toLocaleString("en-US")} onClick={() => show("all", null)} testId="stat-pricing-prices" />
+          <Stat label="Cheapest press release" value={Number.isFinite(cheapestRelease) ? money(cheapestRelease) : "—"} hint={cheapestRow ? `${cheapestRow.company}, per release at its bundle size` : "per release, at its bundle size"}
+            onClick={() => show("press_release", cheapestRow ? `#${cardId(cheapestRow.partnerId)}` : null)} testId="stat-pricing-cheapest" />
+          <Stat label="Terms not itemized" value={data.unpriced.length.toLocaleString("en-US")} hint="their words, below" onClick={() => show(tab, "[data-testid=section-unpriced]")} testId="stat-pricing-unpriced" />
         </StatGrid>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -255,7 +280,7 @@ export default function AdminPartnerPricingPage() {
             <Section key={c} title={MEDIA_PRICE_CATEGORY_LABELS[c]} icon={Receipt} testId={`section-pricing-${c}`}
               description={`${groups.length} ${groups.length === 1 ? "company" : "companies"}, cheapest per item first. Per item = a bundle's price over its size.`}>
               <div className="space-y-3">
-                {groups.map((g) => <PriceTable key={g.partnerId} g={g} lowest={lowest} onEdit={edit} onDelete={(r) => { if (window.confirm(`Remove “${r.product}” from ${r.company}?`)) remove.mutate(r.id); }} />)}
+                {groups.map((g) => <PriceTable key={g.partnerId} g={g} lowest={lowest} onOpen={() => open(g.partnerId)} onEdit={edit} onDelete={(r) => { if (window.confirm(`Remove “${r.product}” from ${r.company}?`)) remove.mutate(r.id); }} />)}
               </div>
             </Section>
           );
@@ -265,7 +290,8 @@ export default function AdminPartnerPricingPage() {
           <Section title="Terms not itemized yet" testId="section-unpriced" description="Companies that mentioned money, an API or a minimum without a price we could put in a row. Their words, as they wrote them.">
             <ul className="divide-y text-sm">
               {data.unpriced.map((u) => (
-                <li key={u.id} className="flex flex-wrap items-start justify-between gap-2 py-3" data-testid={`row-unpriced-${u.id}`}>
+                <li key={u.id} {...opensOn(() => open(u.id))} aria-label={`Open ${u.company}`}
+                  className="-mx-2 flex cursor-pointer flex-wrap items-start justify-between gap-2 rounded-lg px-2 py-3 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid={`row-unpriced-${u.id}`}>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 font-semibold">{u.company}<StatusPill tone={PARTNER_TONE[u.status]}>{MEDIA_PARTNER_STATUS_LABELS[u.status]}</StatusPill></div>
                     <div className="text-xs text-foreground/70">{[u.domain, MEDIA_PARTNER_KIND_LABELS[u.kind]].filter(Boolean).join(" · ")}</div>
@@ -273,7 +299,7 @@ export default function AdminPartnerPricingPage() {
                     {u.apiTerms && <p className="mt-1 text-foreground/80">API: {u.apiTerms}</p>}
                     {u.minCommitment && <p className="mt-1 text-foreground/80">Minimum: {u.minCommitment}</p>}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2" onClick={stop}>
                     <Button size="sm" variant="outline" asChild><Link href={conversationHref(u.id)}>Conversation</Link></Button>
                     <Button size="sm" onClick={() => setDraft(emptyDraft({ partnerId: u.id, category: u.kind === "directory" ? "listing" : u.kind === "article" ? "article" : "other" }))}>Add price</Button>
                   </div>
