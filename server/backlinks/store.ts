@@ -385,6 +385,48 @@ export async function isSuppressed(email: string): Promise<boolean> {
   return !!r.rows[0];
 }
 
+/** Free mailboxes many unrelated sites share: an address there says nothing about the company behind it. */
+const FREEMAIL = /^(gmail|googlemail|yahoo|ymail|outlook|hotmail|live|msn|aol|icloud|me|mac|proton|protonmail|pm|gmx|zoho|mail|yandex)\.[a-z.]+$/i;
+/** The company part of an address (editor@news.example.com → news.example.com), or null for a free mailbox. */
+export function companyDomain(email: string): string | null {
+  const d = email.toLowerCase().split("@")[1]?.trim() ?? "";
+  return d && !FREEMAIL.test(d) ? d : null;
+}
+
+/**
+ * Why this address or site must not get a pitch, or null (owner 2026-10-25: "make sure duplicates don't get emailed
+ * out"). One pitch per address and per company domain, ever, and none to anyone already in a media@ conversation or
+ * to a site that is already a Partnerships company. `when` is "draft" (any earlier pitch blocks), or "approve"/"send"
+ * (another pitch that was approved or sent blocks; `exceptId` is the pitch being approved or sent).
+ */
+export async function pitchConflict(toEmail: string, siteDomain: string, when: "draft" | "approve" | "send", exceptId = 0): Promise<string | null> {
+  const e = toEmail.toLowerCase().trim();
+  const company = companyDomain(e);
+  const live = when === "draft" ? ["draft", "approved", "sent"] : ["approved", "sent"];
+  const pitched = await db().query(
+    `SELECT id, to_email FROM backlink_outreach WHERE id <> $1 AND status = ANY($2)
+       AND (lower(to_email) = $3 OR ($4::text IS NOT NULL AND split_part(lower(to_email), '@', 2) = $4)) ORDER BY id LIMIT 1`,
+    [exceptId, live, e, company]);
+  if (pitched.rows[0]) return `Already pitched ${pitched.rows[0].to_email} (pitch #${pitched.rows[0].id})`;
+  // Partnerships (media@) lives in the same database in production; skipped where its tables don't exist.
+  const media = (await db().query(`SELECT to_regclass('media_messages') IS NOT NULL AS m, to_regclass('media_partners') IS NOT NULL AS p`)).rows[0];
+  if (media?.m) {
+    const r = await db().query(`SELECT 1 FROM media_messages WHERE direction = 'out' AND lower(to_email) = $1 LIMIT 1`, [e]);
+    if (r.rows[0]) return `${e} is already in a Partnerships conversation`;
+  }
+  if (media?.p) {
+    const r = await db().query(`SELECT company FROM media_partners WHERE lower(domain) = ANY($1) LIMIT 1`, [[siteDomain.toLowerCase(), company].filter(Boolean)]);
+    if (r.rows[0]) return `${r.rows[0].company} is already a Partnerships company`;
+  }
+  return null;
+}
+
+/** Hold a pitch that would duplicate another one: it is never sent. */
+export async function markDuplicate(id: number, sourceId: number, reason: string) {
+  await db().query(`UPDATE backlink_outreach SET status = 'duplicate' WHERE id = $1 AND status IN ('draft','approved')`, [id]);
+  await event(sourceId, "outreach_duplicate", { reason });
+}
+
 export async function saveDraft(sourceId: number, toEmail: string, subject: string, body: string): Promise<BacklinkOutreach> {
   const r = await db().query(
     `INSERT INTO backlink_outreach (source_id, to_email, subject, body) VALUES ($1, $2, $3, $4) RETURNING *`, [sourceId, toEmail, subject, body]);
@@ -392,7 +434,11 @@ export async function saveDraft(sourceId: number, toEmail: string, subject: stri
   return toOutreach(r.rows[0]);
 }
 
-export async function approveDraft(id: number, by: number): Promise<BacklinkOutreach | null> {
+export async function approveDraft(id: number, by: number): Promise<BacklinkOutreach | { duplicate: string } | null> {
+  const d = (await db().query(`SELECT o.id, o.source_id, o.to_email, s.domain FROM backlink_outreach o JOIN backlink_sources s ON s.id = o.source_id WHERE o.id = $1 AND o.status = 'draft'`, [id])).rows[0];
+  if (!d) return null;
+  const clash = await pitchConflict(d.to_email, d.domain, "approve", id);
+  if (clash) { await markDuplicate(id, d.source_id, clash); return { duplicate: clash }; }
   const r = await db().query(`UPDATE backlink_outreach SET status = 'approved', approved_at = now(), approved_by = $2 WHERE id = $1 AND status = 'draft' RETURNING *`, [id, by]);
   if (!r.rows[0]) return null;
   await event(r.rows[0].source_id, "outreach_approved", { by });

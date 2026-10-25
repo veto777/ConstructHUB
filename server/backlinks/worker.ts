@@ -188,7 +188,7 @@ export async function runDrafts(n = 20): Promise<{ drafted: number }> {
   for (const s of await store.needingDraft(n)) {
     if (!PITCHED_KINDS.includes(s.kind)) continue;
     const to = pickEmail(s.emails);
-    if (!to || (await store.isSuppressed(to))) continue;
+    if (!to || (await store.isSuppressed(to)) || (await store.pitchConflict(to, s.domain, "draft"))) continue;
     const { subject, body } = composePitch(s.kind, s.domain, s.signals, name);
     await store.saveDraft(s.id, to, subject, body);
     drafted++;

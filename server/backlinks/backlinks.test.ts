@@ -5,6 +5,7 @@ import { contactLinks, findContacts } from "./contacts";
 import { listPages, relatedSites } from "./expand";
 import { composePitch, siteName, pickEmail, sendBlocker, outreachConfig, withFooter } from "./outreach";
 import { fetchMetrics, metricsDeps } from "./metrics";
+import { companyDomain, pitchConflict, storeDeps } from "./store";
 import type { BacklinkSignals } from "@shared/backlinks";
 
 const page = (body: string, url = "https://homefixblog.com/write-for-us/") => analyzePage({ url, status: 200, body });
@@ -439,5 +440,36 @@ describe("a chamber reached through its home page (expansion, imports)", () => {
       expect(s.directoryUrl ?? null).toBeNull();
       expect(gradeSource("directory", s, null).tier).toBe("X");
     });
+  });
+});
+
+describe("duplicates never get a pitch (owner 2026-10-25)", () => {
+  // A fake database: answers each query by the first pattern it matches and records what was asked.
+  const fakeDb = (answers: [RegExp, unknown[]][]) => {
+    const asked: { sql: string; params: unknown[] }[] = [];
+    return { asked, db: { query: async (sql: string, params: unknown[] = []) => { asked.push({ sql, params }); return { rows: answers.find(([re]) => re.test(sql))?.[1] ?? [] }; } } };
+  };
+  const withDb = async <T,>(db: unknown, fn: () => Promise<T>) => { const was = storeDeps.db; storeDeps.db = db as typeof storeDeps.db; try { return await fn(); } finally { storeDeps.db = was; } };
+
+  it("treats free mailboxes as people, not companies", () => {
+    expect(companyDomain("homedecorlinks@gmail.com")).toBeNull();
+    expect(companyDomain("x@proton.me")).toBeNull();
+    expect(companyDomain("Editor@News.Example.com")).toBe("news.example.com");
+  });
+  it("blocks an address or company that was already pitched", async () => {
+    const f = fakeDb([[/FROM backlink_outreach/, [{ id: 7, to_email: "editor@example.com" }]]]);
+    expect(await withDb(f.db, () => pitchConflict("news@example.com", "example.com", "draft"))).toMatch(/Already pitched editor@example.com/);
+    expect(f.asked[0].params).toEqual([0, ["draft", "approved", "sent"], "news@example.com", "example.com"]);
+  });
+  it("only counts approved or sent pitches at approval and sending, never the pitch itself", async () => {
+    const f = fakeDb([[/to_regclass/, [{ m: false, p: false }]]]);
+    expect(await withDb(f.db, () => pitchConflict("a@gmail.com", "blog.com", "send", 42))).toBeNull();
+    expect(f.asked[0].params).toEqual([42, ["approved", "sent"], "a@gmail.com", null]);
+  });
+  it("blocks anyone already in a Partnerships conversation and Partnerships companies", async () => {
+    const talked = fakeDb([[/to_regclass/, [{ m: true, p: true }]], [/FROM media_messages/, [{ "?column?": 1 }]]]);
+    expect(await withDb(talked.db, () => pitchConflict("editor@cfu.org", "cfu.org", "draft"))).toMatch(/Partnerships conversation/);
+    const partner = fakeDb([[/to_regclass/, [{ m: true, p: true }]], [/FROM media_partners/, [{ company: "CFU" }]]]);
+    expect(await withDb(partner.db, () => pitchConflict("other@cfu.org", "cfu.org", "draft"))).toMatch(/CFU is already a Partnerships company/);
   });
 });
