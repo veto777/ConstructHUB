@@ -102,6 +102,10 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
     {"src":"/feature-shots/permits-1.webp","alt":"The permit search form set to a keyword search for roof across the two searchable permit portals in Denver County, Colorado.","caption":"Search live permit portals by address, keyword, name or permit number","url":"constructhub.us/search","width":1600,"height":1000},
     {"src":"/feature-shots/permits-2.webp","alt":"The search area picker for Colorado listing each county with its number of searchable permit portals and the cities under it.","caption":"Pick a state, county or city to search","url":"constructhub.us/search","width":1600,"height":1000},
   ],
+  "pressReleases": [
+    {"src":"/feature-shots/pressReleases-1.webp","alt":"Press Releases page with the account credits, live releases and autopilot status, and a sample finished release from a fictional roofing company opening a second crew.","caption":"Your releases, credits and a sample of the finished release","url":"constructhub.us/press-releases","width":1600,"height":1000},
+    {"src":"/feature-shots/pressReleases-2.webp","alt":"The three distribution packages, Standard, Plus and Premium, each with what it reaches and a choice of one release or the 12-Month Program.","caption":"Standard, Plus and Premium distribution packages","url":"constructhub.us/press-releases","width":1600,"height":1000},
+  ],
   "profileGuard": [
     {"src":"/feature-shots/profileGuard-1.webp","alt":"Profile Watch for the Denver location listing detected Google profile edits, such as a changed website and category, with the approved value beside the detected value and Approve or Reject buttons.","caption":"Profile Watch catches edits to your Google profile","url":"constructhub.us/locations?location=910001&tab=guard","width":1600,"height":1000},
     {"src":"/feature-shots/profileGuard-2.webp","alt":"GMB Edit Monitor with watched Google listings and the edit history of Summit Roofing Co., showing before and after values for website, category and phone changes.","caption":"Edit history with before and after values","url":"constructhub.us/gmb-monitor","width":1600,"height":1000},
@@ -148,5 +152,8 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
   "vpnShield": [
     {"src":"/feature-shots/vpnShield-1.webp","alt":"VPN Shield overview with total VPN or proxy detections, detections today, visits blocked and unique VPN IP addresses, plus a breakdown of detections by country.","caption":"VPN and proxy traffic at a glance","url":"constructhub.us/vpn-shield","width":1600,"height":1000},
     {"src":"/feature-shots/vpnShield-2.webp","alt":"VPN Shield flagged visits list showing each IP address with its detection method (datacenter IP range, WebRTC leak, VPN extension), whether it was blocked or only logged, location and time.","caption":"Each flagged visit with how it was detected","url":"constructhub.us/vpn-shield?tab=blocked","width":1600,"height":1000},
+  ],
+  "yelp": [
+    {"src":"/feature-shots/yelp-1.webp","alt":"Yelp page for a sample roofing business with its star rating, total reviews, reviews gained in the last 30 days and connected businesses, above its latest reviews, each with a button to draft a reply with AI.","caption":"Rating, review count and the latest reviews with AI reply drafts","url":"constructhub.us/yelp","width":1600,"height":1000},
   ],
 };

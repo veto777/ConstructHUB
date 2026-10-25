@@ -1,0 +1,45 @@
+[
+ {
+  "key": "pressReleases",
+  "n": 1,
+  "route": "/press-releases",
+  "wait": "Good work",
+  "alt": "Press Releases page with the account credits, live releases and autopilot status, and a sample finished release from a fictional roofing company opening a second crew.",
+  "caption": "Your releases, credits and a sample of the finished release"
+ },
+ {
+  "key": "pressReleases",
+  "n": 2,
+  "route": "/press-releases",
+  "wait": "Choose your reach",
+  "actions": [
+   {
+    "scroll": "[data-testid=press-packages]"
+   },
+   {
+    "evaluate": "document.querySelector(\"[data-testid=press-packages]\").scrollIntoView({ block: \"center\" })"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "alt": "The three distribution packages, Standard, Plus and Premium, each with what it reaches and a choice of one release or the 12-Month Program.",
+  "caption": "Standard, Plus and Premium distribution packages"
+ },
+ {
+  "key": "yelp",
+  "n": 1,
+  "route": "/yelp",
+  "wait": "Latest reviews",
+  "actions": [
+   {
+    "evaluate": "[...document.querySelectorAll(\"h2,h3\")].filter(h => /competitor|nearby/i.test(h.textContent)).concat([...document.querySelectorAll(\"h3\")].filter(h => /Latest reviews/.test(h.textContent)))[0].scrollIntoView({ block: \"start\" })"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "alt": "Yelp page for a sample roofing business with its star rating, total reviews, reviews gained in the last 30 days and connected businesses, above its latest reviews, each with a button to draft a reply with AI.",
+  "caption": "Rating, review count and the latest reviews with AI reply drafts"
+ }
+]

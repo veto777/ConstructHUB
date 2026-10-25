@@ -12,6 +12,7 @@ import {
 } from "../plans";
 import { CRM_ADDONS, CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS } from "../crm-plans";
 import { SALES_HREF, SALES_REP_LABEL, formatUsd, joinNames, plansWhere, priceOrSalesRep } from "../plan-copy";
+import { PRESS_CREDIT_MONTHS, PRESS_PROGRAM_CREDITS, PRESS_PROGRAM_PAID, PRESS_RELEASE_PRICE_CENTS, PRESS_TIERS, PRESS_TIER_LABEL } from "../press";
 import type { FeatureAllowance, FeaturePricing } from "./types";
 
 export type FeaturePriceRow = { label: string; value: string; included: boolean };
@@ -194,6 +195,21 @@ export function featurePriceSummary(spec: FeaturePricing): FeaturePriceSummary {
         price: priceOrSalesRep(cents), per: showsPrice(cents) ? " one-time" : "",
         priceNote: "Paid once per project, not a subscription.",
         rows: [], plans: [], comingSoon: false, link: { label: "See services", href: SALES_HREF }, note,
+      };
+    }
+    case "press": {
+      const tiers = PRESS_TIERS.map((t) => ({ tier: t, cents: PRESS_RELEASE_PRICE_CENTS[t] }));
+      const cheapest = tiers.reduce((a, b) => (b.cents < a.cents ? b : a));
+      return {
+        headline: "Per release, with any plan",
+        price: formatUsd(cheapest.cents), per: " a release", from: true,
+        priceNote: `${joinNames(tiers.map((t) => `${PRESS_TIER_LABEL[t.tier]} ${formatUsd(t.cents)}`))} a release, paid once. ` +
+          `The 12-Month Program: pay for ${PRESS_PROGRAM_PAID} releases of one package and get ${PRESS_PROGRAM_CREDITS}, used within ${PRESS_CREDIT_MONTHS} months.`,
+        rows: tiers.flatMap((t) => [
+          { label: `${PRESS_TIER_LABEL[t.tier]}: one release`, value: formatUsd(t.cents), included: true },
+          { label: `${PRESS_TIER_LABEL[t.tier]}: 12-Month Program (${PRESS_PROGRAM_CREDITS} releases)`, value: formatUsd(t.cents * PRESS_PROGRAM_PAID), included: true },
+        ]),
+        plans: [], comingSoon: false, link: { label: "See plans", href: "/pricing" }, note,
       };
     }
     case "sales":

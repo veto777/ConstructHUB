@@ -2,7 +2,7 @@ import { SocialLinks } from "@/components/social-links";
 import { PaymentNeededBanner } from "@/components/payment-needed-banner";
 import { NotificationBell } from "@/components/account-security";
 import { AdminLandingLink } from "@/components/admin-landing-link";
-import { CALL_ASSISTANT_INTRO_PREVIEW_PATH } from "@shared/feature-pages";
+import { CALL_ASSISTANT_INTRO_PREVIEW_PATH, FEATURES_PATH, featurePageBySlug } from "@shared/feature-pages";
 import { RecentAuthModal } from "@/components/recent-auth";
 import { Switch, Route, useLocation, Link, Redirect } from "wouter";
 import { Suspense, useEffect, type ComponentType } from "react";
@@ -45,6 +45,8 @@ import HomePage from "@/pages/home";
 import AdsConsultantChat from "@/components/ads-consultant-chat";
 import HubWidget from "@/components/hub/hub-widget";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
+import { signedOutLanding } from "@/lib/signed-out-landing";
+import { featureVisible } from "@/components/feature-landing/feature-landing";
 import { copyrightNotice } from "@/lib/marketing";
 import { reportIssueHref } from "@/lib/report-issue-link";
 import { useSeoHead } from "@/lib/seo-head";
@@ -605,15 +607,23 @@ const SIGNED_IN_ONLY = [
 
 function SignedOutFallback() {
   const [location, setLocation] = useLocation();
-  const needsAccount = SIGNED_IN_ONLY.some(p => location === p || location.startsWith(`${p}/`));
+  // A tool's URL shows a potential client that tool's landing page and sign-up, not the sign-in form
+  // (lib/signed-out-landing.ts). A flagged-off feature's page is a 404, so those keep going to sign in.
+  const landing = signedOutLanding(location);
+  const landingSlug = landing?.startsWith(`${FEATURES_PATH}/`) ? landing.slice(FEATURES_PATH.length + 1) : null;
+  const landingPage = landingSlug ? featurePageBySlug(landingSlug) : undefined;
+  const toLanding = landing && (!landingSlug || (landingPage && featureVisible(landingPage.flag))) ? landing : null;
+  const needsAccount = !toLanding && SIGNED_IN_ONLY.some(p => location === p || location.startsWith(`${p}/`));
   useEffect(() => {
-    if (needsAccount) {
+    if (toLanding) {
+      setLocation(toLanding, { replace: true });
+    } else if (needsAccount) {
       const next = `${location}${window.location.search}`;
       setLocation(`/auth?next=${encodeURIComponent(next)}`, { replace: true });
     }
   }, [needsAccount, location, setLocation]);
   if (location === "/admin") return <PortalAdminRedirect />;
-  return needsAccount ? null : <NotFound />;
+  return toLanding || needsAccount ? null : <NotFound />;
 }
 
 /** Tab titles for the growth app; pages that set their own title are left alone. */

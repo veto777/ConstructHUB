@@ -38,6 +38,8 @@ const EXPECTED_KEYS = [
   "gbp", "reviews", "profileGuard", "rankingGrid", "gbpContent", "social", "siteScan", "media",
   // The SEO suite (a stub: the à la carte SEO items' Compare page, shared/alacarte.ts).
   "seo",
+  // No dashboard tile: sidebar tools with their own landing page (owner, 2026-10-25: every feature gets one).
+  "pressReleases", "yelp",
   "clickGuard", "ipTracker", "vpnShield", "cloudflare", "searchConsole", "domains", "mailAlerts",
   "permits", "property", "competitors", "adsManager", "lsaLeads",
   "crm", "crmSchedule", "crmLeads", "texting", "jobcam", "agency",

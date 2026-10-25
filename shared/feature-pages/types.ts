@@ -80,6 +80,8 @@ export type FeaturePricing = (
   | { kind: "service"; service: "gbpReinstatement" }
   /** Quoted by a sales rep (anything at or above the sales threshold). */
   | { kind: "sales"; topic: string }
+  /** Press Releases: bought per release on top of any plan, priced from shared/press.ts (one release, or the 12-month program). */
+  | { kind: "press" }
 ) & {
   /** One extra plain sentence under the price (no $ amounts — the test rejects them). */
   note?: string;
