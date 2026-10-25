@@ -57,6 +57,9 @@ DO $$ BEGIN
     ALTER TABLE media_messages ADD CONSTRAINT media_messages_status_check CHECK (status IN ('new','replied','needs_owner','automated','failed','logged'));
   END IF;
 END $$;
+-- Each company's brief (owner, 2026-10-25: "summaries for each client … update them when new info is released"),
+-- rewritten by the AI from the emails and notes whenever a new email is stored for the company.
+ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS brief jsonb, ADD COLUMN IF NOT EXISTS brief_updated_at timestamptz;
 CREATE TABLE IF NOT EXISTS media_inbox_state (
  mailbox text PRIMARY KEY, uid_validity text, last_uid bigint NOT NULL DEFAULT 0,
  last_pass_at timestamptz, last_pass_error text

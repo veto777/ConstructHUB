@@ -15,11 +15,18 @@ export type InboundHeaders = {
   precedence?: string | null;
   listUnsubscribe?: string | null;
   listId?: string | null;
+  autoReply?: string | null;
 };
 
 const MACHINE_LOCAL = /^(no-?reply|do-?not-?reply|donotreply|mailer-daemon|postmaster|bounces?|notifications?|alerts?|news(letter)?|digest|updates?|automated|system)([+._-].*)?@/i;
 const MACHINE_DOMAINS = /@(accounts\.google\.com|google\.com|googlemail\.com|bounce\.|.*\.bounce\.|mailchimp|mcsv\.net|sendgrid\.net|amazonses\.com)/i;
 const AUTO_SUBJECT = /^(auto(matic)?[ -]?reply|out of (the )?office|undeliverable|delivery status notification|mail delivery (failed|subsystem)|returned mail|away from)/i;
+/**
+ * Help-desk and website acknowledgements ("Thanks for your message", "We received your request"): never answered
+ * (2026-10-17: four answers to MHFL Sentinel's auto-acknowledgements in 45 minutes). They start "Automatic message" so
+ * readAutoReplies still reads them for a next step. A person's reply to our reply has "Re:" in front and is not one.
+ */
+const AUTO_ACK_SUBJECT = /^(thanks?( you)? for (your (message|email|e-mail|inquiry|enquiry|request|submission|interest)|contacting|reaching out|getting in touch|writing)|we('ve| have)? (received|got) your|your (message|email|request|inquiry|enquiry|submission|ticket) (has been|was|is) (received|submitted|logged)|auto(matic)?[- ]?(response|acknowledge?ment)|auto:)/i;
 
 /** Why an email gets no reply, or null when a person wrote it. */
 export function machineReason(h: InboundHeaders): string | null {
@@ -28,6 +35,9 @@ export function machineReason(h: InboundHeaders): string | null {
   if (/@constructhub\.us$/.test(from)) return "Sent from one of our own mailboxes";
   if (h.autoSubmitted && !/^no$/i.test(h.autoSubmitted.trim())) return `Automatic message (Auto-Submitted: ${h.autoSubmitted.trim()})`;
   if (AUTO_SUBJECT.test(h.subject.trim())) return "Automatic reply or bounce";
+  if (AUTO_ACK_SUBJECT.test(h.subject.trim())) return `Automatic message (an acknowledgement: "${h.subject.trim().slice(0, 80)}")`;
+  if (h.autoReply?.trim()) return `Automatic message (X-Autoreply: ${h.autoReply.trim().slice(0, 40)})`;
+  if (h.precedence && /^auto[_-]?reply$/i.test(h.precedence.trim())) return "Automatic message (Precedence: auto_reply)";
   if (MACHINE_LOCAL.test(from)) return "Sent from a no-reply / system address";
   if (MACHINE_DOMAINS.test(from)) return "Sent by a mail system, not a person";
   if (h.precedence && /^(bulk|list|junk)$/i.test(h.precedence.trim())) return "Bulk or mailing-list email";
@@ -122,4 +132,46 @@ export const CLAIMS_HUMAN = /\b(i('| a)?m|we('| a)?re|this is) (a )?(real|actual
 /** A person on the team will answer (true: the email waits for the owner). */
 export function personWillReply(firstName: string | null): string {
   return `${firstName ? `Hi ${firstName},` : "Hi,"}\n\nThanks for your message. A member of our team will get back to you personally.\n\nBest regards,`;
+}
+
+// ── duplicate sends (owner, 2026-10-25: "make sure duplicates don't get emailed out") ─────────────────────────────────
+
+/** No automatic email to an address we emailed from media@ this recently (follow-ups for several threads went seconds apart). */
+export const RECENT_SEND_MINUTES = 30;
+/** …nor the same email again within this many days (a second holding reply, the same follow-up). */
+export const SAME_EMAIL_DAYS = 14;
+
+/** An email's words for comparing: no greeting line, no case or spacing, the first 200 characters. */
+export function emailFingerprint(body: string): string {
+  return body.trim().replace(/^(hi|hello|dear)\b[^\n]*\n+/i, "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
+/**
+ * Why an automatic email to this address would be a duplicate, or null. `recent` = what media@ sent that address in the
+ * last SAME_EMAIL_DAYS. "soon" waits for a later pass; "same" is never sent.
+ */
+export function duplicateProblem(body: string, recent: { at: Date; body: string }[], now: Date = new Date()): { kind: "soon" | "same"; why: string } | null {
+  const fp = emailFingerprint(body);
+  const same = recent.find((r) => fp && emailFingerprint(r.body) === fp && now.getTime() - r.at.getTime() < SAME_EMAIL_DAYS * 86_400_000);
+  if (same) return { kind: "same", why: `The same email already went to this address on ${same.at.toISOString().slice(0, 10)}` };
+  const soon = recent.find((r) => now.getTime() - r.at.getTime() < RECENT_SEND_MINUTES * 60_000);
+  if (soon) return { kind: "soon", why: `We emailed this address less than ${RECENT_SEND_MINUTES} minutes ago` };
+  return null;
+}
+
+/** Who an email is from, as one key per company: its company record, else its domain, else the address. */
+export const companyKey = (m: { partnerId: number | null; fromEmail: string }) =>
+  m.partnerId ? `p:${m.partnerId}` : companyDomain(m.fromEmail) ? `d:${companyDomain(m.fromEmail)}` : `e:${m.fromEmail.toLowerCase()}`;
+
+/**
+ * One answer per company per pass (2026-10-18: CFU and ABC15 each got three replies minutes apart, one per email):
+ * the latest email from each company is answered; the earlier ones are folded into that answer. Input oldest first.
+ */
+export function latestPerCompany<T extends { partnerId: number | null; fromEmail: string }>(pending: T[]): { answer: T; folded: T[] }[] {
+  const groups = new Map<string, T[]>();
+  for (const m of pending) {
+    const k = companyKey(m);
+    groups.set(k, [...(groups.get(k) ?? []), m]);
+  }
+  return [...groups.values()].map((g) => ({ answer: g[g.length - 1], folded: g.slice(0, -1) }));
 }

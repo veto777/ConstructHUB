@@ -16,9 +16,9 @@ import { promises as dns } from "node:dns";
 import { MEDIA_INBOX_PARAMETERS, STOP_LINE_RE, type MediaSettings, type MediaTemplateKind } from "@shared/media-inbox";
 import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
-import { classifySites, decide, extractNextStep, keepQuotedPrices, mediaAiConfigured, planForm, readTerms } from "./ai";
+import { classifySites, decide, extractNextStep, keepQuotedPrices, mediaAiConfigured, planForm, readTerms, writeBrief } from "./ai";
 import { closeBrowser, readPage, submitGoogleForm, submitHtmlForm } from "./browse";
-import { asksIfAi, companyDomain, firstNameOf, formMessage, holdingReply, personWillReply, isOptOut, machineReason, replyProblem, replySubject, supportSkip } from "./guard";
+import { asksIfAi, companyDomain, duplicateProblem, firstNameOf, formMessage, holdingReply, latestPerCompany, personWillReply, isOptOut, machineReason, replyProblem, replySubject, SAME_EMAIL_DAYS, supportSkip } from "./guard";
 import { pickEmail, siteName } from "../backlinks/outreach";
 import { isSuppressed } from "../backlinks/store";
 import { fetchSince, mailboxConfig, mailboxConfigured, sendMail, supportMailboxConfig } from "./mailbox";
@@ -49,7 +49,21 @@ export async function acceptsMail(domain: string): Promise<boolean> {
     return !["ENOTFOUND", "ENODATA", "ESERVFAIL", "NXDOMAIN"].includes(e?.code);
   }
 }
-export const workerDeps = { fetchSince, sendMail, decide, extractNextStep, readTerms, acceptsMail, checkMailbox };
+export const workerDeps = { fetchSince, sendMail, decide, extractNextStep, readTerms, acceptsMail, checkMailbox, writeBrief };
+
+/** An automatic email that would repeat one we just sent (guard.ts duplicateProblem). */
+export class DuplicateSend extends Error {
+  constructor(readonly kind: "soon" | "same", why: string) { super(why); }
+}
+/**
+ * The door every AUTOMATIC email from media@ goes through (owner, 2026-10-25: "make sure duplicates don't get emailed
+ * out"). An admin's own send from the page (routes.ts) is deliberate and goes straight to sendMail.
+ */
+export async function sendAutomatic(m: Parameters<typeof sendMail>[0]): Promise<string> {
+  const dup = duplicateProblem(m.body, await store.recentOutboundTo(m.to, SAME_EMAIL_DAYS));
+  if (dup) throw new DuplicateSend(dup.kind, dup.why);
+  return workerDeps.sendMail(m);
+}
 
 /** Addresses that are never a cold contact even when a site lists them (2026-10-17: applicationsprogramming@ bounced). */
 export const NOT_A_CONTACT = /^(applications?|programming|applicationsprogramming|eeo|hr|humanresources|recruit\w*|careers?|jobs?|employment|accounting|accountspayable|ap|ar|billing|invoices?|legal|compliance|privacy|webmaster|hostmaster|security|abuse|unsubscribe|subscriptions?|circulation|delivery)@/i;
@@ -102,7 +116,7 @@ export async function actOnNextSteps(): Promise<{ acted: number; emailed: number
             const first = await store.firstOutbound(a.partnerId);
             const subject = first?.subject ?? `Partnership: ${a.company} and ConstructHUB`;
             const body = newContactBody(a.company, first?.body ?? firstContactBody(a.company));
-            const messageId = await workerDeps.sendMail({ to: a.contact, subject, body });
+            const messageId = await sendAutomatic({ to: a.contact, subject, body });
             await store.saveOutbound(mailbox, { messageId, threadKey: null, to: a.contact, subject, body, partnerId: a.partnerId, purpose: "outreach" });
             done.push(`Emailed ${a.contact} (their ${a.contactRole} address) on ${today()}`);
             toFinalize = `Waiting for ${a.contact} to answer (emailed ${today()}).`;
@@ -139,7 +153,7 @@ export async function actOnNextSteps(): Promise<{ acted: number; emailed: number
           }
         }
       } catch (e: any) {
-        done.push(`Failed: ${String(e?.message ?? e).slice(0, 200)}`);
+        done.push(e instanceof DuplicateSend ? `Not sent: ${e.message}` : `Failed: ${String(e?.message ?? e).slice(0, 200)}`);
         console.error(`[media-inbox] next step for ${a.company} failed: ${e?.message ?? e}`);
       }
       await store.recordAction(a.id, a.partnerId, { result: done.join(" · ") || "Nothing to do", toFinalize: toFinalize ?? done.at(-1) ?? null, costTerms, ownerQuestion });
@@ -208,17 +222,20 @@ export async function readSupport(): Promise<{ read: number; logged: number; pri
   return out;
 }
 
-/** Step 2 + 3: answer every waiting email. */
+/**
+ * Step 2 + 3: answer every waiting email — one answer per company per pass. Its latest email is answered with the
+ * whole conversation in view; earlier waiting emails from the same company are marked answered by that reply.
+ */
 export async function answerPending(): Promise<{ replied: number; held: number; failed: number; optedOut: number }> {
   const mailbox = mailboxConfig().user;
   const out = { replied: 0, held: 0, failed: 0, optedOut: 0 };
-  for (const m of await store.pending(ANSWER_BATCH)) {
+  for (const { answer: m, folded } of latestPerCompany(await store.pending(ANSWER_BATCH))) {
     const first = firstNameOf(m.fromName);
     let body: string, status: "replied" | "needs_owner" | "failed", reason: string | null = null, partnerId: number | null = null;
     let newlyAgreed: Awaited<ReturnType<typeof store.upsertPartner>> | null = null;
     try {
-      if (isOptOut(m.body)) {
-        await store.optOut(m.id, m.fromEmail, m.partnerId ?? (await store.partnerIdForEmail(m.fromEmail, companyDomain(m.fromEmail))));
+      if (isOptOut(m.body) || folded.some((f) => isOptOut(f.body))) {
+        for (const x of [...folded, m]) await store.optOut(x.id, x.fromEmail, m.partnerId ?? (await store.partnerIdForEmail(m.fromEmail, companyDomain(m.fromEmail))));
         out.optedOut++;
         continue;
       }
@@ -227,7 +244,11 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
         out.held++;
         continue;
       }
-      const th = await store.thread(m.threadKey, m.id);
+      // Their earlier waiting emails may sit in other threads (CFU, 2026-10-18): the answer reads them too.
+      const own = await store.thread(m.threadKey, m.id);
+      const extra = folded.filter((f) => !own.some((x) => x.direction === "in" && x.body === f.body))
+        .map((f) => ({ direction: "in" as const, from: f.fromEmail, at: f.receivedAt, subject: f.subject, body: f.body }));
+      const th = [...extra, ...own].sort((a, b) => a.at.localeCompare(b.at));
       const d = await workerDeps.decide(th);
       if (d.relevant) {
         newlyAgreed = await store.upsertPartner({ domain: companyDomain(m.fromEmail), contactEmail: m.fromEmail, contactName: m.fromName, d });
@@ -238,6 +259,7 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
       // "Thanks / sounds good": nothing to answer (2026-10-15: Homes&Exterior's thank-you hit the loop limit).
       if (d.noReplyNeeded && !asksIfAi(m.body)) {
         await store.finishMessage(m.id, "replied", `No reply needed: ${d.summary || "they closed the loop"} — read by ${d.provider}`, null, partnerId);
+        await store.markFolded(folded.map((f) => f.id), null, partnerId);
         out.replied++;
         continue;
       }
@@ -250,9 +272,21 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
       body = holdingReply(first); status = "failed"; reason = `Could not draft an answer: ${String(e?.message ?? e).slice(0, 300)}`;
     }
     const subject = replySubject(m.subject);
-    const messageId = await workerDeps.sendMail({ to: m.fromEmail, cc: m.cc, subject, body, inReplyTo: m.messageId, references: m.references });
+    let messageId: string;
+    try {
+      messageId = await sendAutomatic({ to: m.fromEmail, cc: m.cc, subject, body, inReplyTo: m.messageId, references: m.references });
+    } catch (e) {
+      if (!(e instanceof DuplicateSend)) throw e;
+      // Just emailed them: answer on a later pass. The same email again (a second holding reply): never — it waits for the owner.
+      if (e.kind === "same") {
+        await store.finishMessage(m.id, "needs_owner", [`Not sent: ${e.message}`, reason].filter(Boolean).join(" — "), null, partnerId);
+        out.held++;
+      }
+      continue;
+    }
     const replyId = await store.saveOutbound(mailbox, { messageId, threadKey: m.threadKey, to: m.fromEmail, cc: m.cc, subject, body, partnerId, purpose: "reply" });
     await store.finishMessage(m.id, status, reason, replyId || null, partnerId);
+    await store.markFolded(folded.map((f) => f.id), replyId || null, partnerId);
     if (newlyAgreed?.newlyAgreed) await store.addAgreedPartner(newlyAgreed.partner);
     if (status === "replied") out.replied++; else if (status === "needs_owner") out.held++; else out.failed++;
   }
@@ -283,12 +317,24 @@ export const followDeps = {
 export async function followUpSilent(): Promise<{ followedUp: number; newContacts: number; exhausted: number }> {
   const mailbox = mailboxConfig().user;
   const out = { followedUp: 0, newContacts: 0, exhausted: 0 };
-  for (const t of await store.silentThreads(MEDIA_INBOX_PARAMETERS.followUpAfterDays)) {
+  const days = MEDIA_INBOX_PARAMETERS.followUpAfterDays;
+  // One follow-up per company per pass, and none while another thread with them is fresh (2026-10-22: MHFL Sentinel,
+  // GlobeNewswire and CFU each got two or three follow-ups seconds apart, one per thread).
+  const actedOn = new Set<number>();
+  for (const t of await store.silentThreads(days)) {
     if (await isSuppressed(t.to)) { await store.markFollowedUp(t.lastId); continue; }
+    if (actedOn.has(t.partnerId) || (await store.emailedPartnerSince(t.partnerId, days, t.lastId))) { await store.markFollowedUp(t.lastId); continue; }
+    actedOn.add(t.partnerId);
     if (t.followups === 0) {
       const body = followUpBody(t.to.toLowerCase() === (t.triedEmails[0] ?? "") ? firstNameOf(t.contactName) : null, t.company, t.firstBody);
       const subject = replySubject(t.firstSubject);
-      const messageId = await workerDeps.sendMail({ to: t.to, cc: t.cc, subject, body, inReplyTo: t.lastMessageId, references: t.references });
+      let messageId: string;
+      try { messageId = await sendAutomatic({ to: t.to, cc: t.cc, subject, body, inReplyTo: t.lastMessageId, references: t.references }); }
+      catch (e) {
+        if (!(e instanceof DuplicateSend)) throw e;
+        if (e.kind === "same") await store.markFollowedUp(t.lastId);
+        continue;
+      }
       await store.saveOutbound(mailbox, { messageId, threadKey: t.threadKey, to: t.to, cc: t.cc, subject, body, partnerId: t.partnerId, purpose: "followup" });
       await store.markFollowedUp(t.lastId);
       out.followedUp++;
@@ -315,7 +361,9 @@ export async function followUpSilent(): Promise<{ followedUp: number; newContact
       continue;
     }
     const body = newContactBody(t.company, t.firstBody);
-    const messageId = await workerDeps.sendMail({ to: next, subject: t.firstSubject, body });
+    let messageId: string;
+    try { messageId = await sendAutomatic({ to: next, subject: t.firstSubject, body }); }
+    catch (e) { if (e instanceof DuplicateSend) continue; throw e; }
     await store.saveOutbound(mailbox, { messageId, threadKey: null, to: next, subject: t.firstSubject, body, partnerId: t.partnerId, purpose: "outreach" });
     out.newContacts++;
   }
@@ -458,6 +506,7 @@ export async function sendOne(q: QueueItem, s: MediaSettings): Promise<string | 
   if (!/^[^\s@<>:/,;{}()]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(q.to_email)) return skip("Not a valid email address");
   if (await isSuppressed(q.to_email) || machineReason({ fromEmail: q.to_email, subject: "" })) return skip("Suppressed or not a person's address");
   if (await store.partnerIdForEmail(q.to_email, q.domain)) return skip("Already in contact");
+  if (await store.alreadyEmailed(q.to_email, q.domain)) return skip("Already emailed this address or someone at this domain");
   if (await store.hasBounced(q.to_email)) return skip("This address bounced before");
   const mailDomain = q.to_email.split("@")[1] ?? "";
   if (!(await workerDeps.acceptsMail(mailDomain))) return skip(`${mailDomain} has no mail server (no MX record)`);
@@ -465,7 +514,9 @@ export async function sendOne(q: QueueItem, s: MediaSettings): Promise<string | 
   const refused = await mailboxRefused(q.to_email);
   if (refused) return skip(refused);
   const e = queueEmail(q.kind, q.company, s);
-  const messageId = await workerDeps.sendMail({ to: q.to_email, subject: e.subject, body: e.body });
+  let messageId: string;
+  try { messageId = await sendAutomatic({ to: q.to_email, subject: e.subject, body: e.body }); }
+  catch (err) { if (err instanceof DuplicateSend) return skip(`Not sent: ${err.message}`); throw err; }
   const partnerId = await store.partnerForOutreach(q.company, q.domain, e.kind, q.to_email);
   await store.saveOutbound(mailboxConfig().user, { messageId, threadKey: null, to: q.to_email, subject: e.subject, body: e.body, partnerId, purpose: "outreach" });
   await store.finishQueued(q.id, "sent", null);
@@ -507,6 +558,30 @@ export async function sendQueued(): Promise<{ queued: number; sent: number; skip
   return { queued, sent, skipped };
 }
 
+/** Briefs rewritten per pass: the companies with a new email since their brief (the backfill route does the rest). */
+export const BRIEFS_PER_PASS = 10;
+
+/**
+ * Step 6: keep each company's brief current (owner, 2026-10-25). A company gets a new brief when an email to or from
+ * it was stored after its last brief, or its record changed. `limit` caps the AI calls.
+ */
+export async function refreshBriefs(limit: number = BRIEFS_PER_PASS, ids?: number[]): Promise<{ written: number; failed: number }> {
+  const out = { written: 0, failed: 0 };
+  for (const id of ids ?? (await store.staleBriefs(limit))) {
+    const input = await store.briefInput(id);
+    if (!input || !input.thread.length) continue;
+    try {
+      const { provider: _p, ...brief } = await workerDeps.writeBrief(input.partner, input.thread);
+      await store.saveBrief(id, brief);
+      out.written++;
+    } catch (e: any) {
+      out.failed++;
+      console.error(`[media-inbox] brief for company ${id} failed: ${e?.message ?? e}`);
+    }
+  }
+  return out;
+}
+
 const LOCK_KEY = 0x6d656469; // "medi"
 let running = false;
 
@@ -528,6 +603,7 @@ export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; r
       const act = await actOnNextSteps();
       const f = settings.followUps ? await followUpSilent() : { followedUp: 0, newContacts: 0, exhausted: 0 };
       const q = await sendQueued();
+      await refreshBriefs().catch((e) => console.error(`[media-inbox] briefs failed: ${e?.message ?? e}`));
       await store.markPass(mailboxConfig().user, null);
       return { ok: true, read: r.read, ...a, autoRepliesRead: ar.read, nextSteps: act, ...f, newlyQueued: q.queued, outreachSent: q.sent };
     } catch (e: any) {

@@ -41,6 +41,7 @@ export type Inbound = {
   precedence: string | null;
   listUnsubscribe: string | null;
   listId: string | null;
+  autoReply: string | null;
 };
 
 /** The new part of a reply: drops the quoted history ("On … wrote:", "> " lines, Outlook's "From: … Sent:" block). */
@@ -133,6 +134,7 @@ export async function fetchSince(lastUid: number, uidValidity: string | null, o:
           precedence: headerText(p.headers.get("precedence")),
           listUnsubscribe: headerText(p.headers.get("list-unsubscribe")),
           listId: headerText(p.headers.get("list-id")),
+          autoReply: headerText(p.headers.get("x-autoreply") ?? p.headers.get("x-autorespond") ?? p.headers.get("x-autoreply-from")),
         });
       }
       // Read in Gmail once stored here (owner, 2026-10-14: an unread email looks ignored). Stored = it will be handled.

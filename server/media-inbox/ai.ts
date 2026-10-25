@@ -12,7 +12,7 @@
 import { aiModel } from "../ai-config";
 import {
   MEDIA_INBOX_LAWS, MEDIA_INBOX_PARAMETERS, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_STATUSES, MEDIA_PRICE_CATEGORIES, MEDIA_PRICE_UNITS,
-  type MediaPartnerKind, type MediaPartnerStatus, type MediaPriceCategory, type MediaPriceUnit,
+  type MediaBrief, type MediaPartnerKind, type MediaPartnerStatus, type MediaPriceCategory, type MediaPriceUnit,
 } from "@shared/media-inbox";
 
 export const MEDIA_OPENAI_DEFAULT_MODEL = "gpt-5.4-mini";
@@ -327,6 +327,35 @@ export async function extractNextStep(thread: ThreadMessage[], env: NodeJS.Proce
       link, contact, contactRole: contact && (CONTACT_ROLES as readonly string[]).includes(j.contact_role) ? j.contact_role : contact ? "other" : null,
       summary: typeof j.summary === "string" ? j.summary.trim().slice(0, 400) : "",
     };
+  }, env);
+}
+
+const BRIEF_SYSTEM = `You keep a short brief of one company the ConstructHUB Media Team is talking to (directories, press-release wires,
+article sites, news media, vendors). The admin reads it instead of the whole email thread.
+Use ONLY what the emails and the admin's notes say. Never guess, never add outside knowledge, never invent a price, name,
+date, promise or next step. When the emails don't say something, use null. Plain short sentences, no marketing words.
+Return JSON only: {"who": string, "offer": string|null, "terms": string|null, "agreed": string|null, "open": string|null, "next": string|null}
+- who: one sentence — who they are and who we talk to there (name and role if given).
+- offer: what they offer us (listings, releases, articles, an API, a partner program).
+- terms: prices, minimums, contracts, API terms, exactly as they wrote them (amounts copied, never computed).
+- agreed: what both sides have agreed so far.
+- open: questions or decisions still open, and who they wait on (us, them, or the owner).
+- next: the single next step and who takes it, with the date of the newest email it depends on (YYYY-MM-DD).`;
+
+/** The company's brief from its emails and notes (our API first). Facts only; null where the emails are silent. */
+export async function writeBrief(
+  partner: { company: string; domain: string | null; status: string; kind: string; notes: string | null },
+  thread: ThreadMessage[], env: NodeJS.ProcessEnv = process.env,
+): Promise<MediaBrief & { provider: string }> {
+  const user = [
+    `COMPANY: ${partner.company}${partner.domain ? ` (${partner.domain})` : ""} · status ${partner.status} · ${partner.kind}`,
+    partner.notes?.trim() ? `ADMIN'S NOTES:\n${partner.notes.trim()}` : null,
+    `EVERY EMAIL WITH THEM, oldest first ("US" = ConstructHUB):\n\n${threadPrompt(thread.slice(-40))}`,
+  ].filter(Boolean).join("\n\n");
+  return askJson(user, BRIEF_SYSTEM, (j) => {
+    const who = str(j.who, 400);
+    if (!who) throw new Error("The model returned no brief");
+    return { who, offer: str(j.offer, 500), terms: str(j.terms, 700), agreed: str(j.agreed, 500), open: str(j.open, 500), next: str(j.next, 400) };
   }, env);
 }
 

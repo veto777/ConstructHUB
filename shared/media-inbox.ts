@@ -35,6 +35,19 @@ export const MEDIA_SIGNATURE_TEAM = "Construct HUB Media Team";
 /** The name media@ signs with and sends from (owner, 2026-10-14: "these people think we are bots because there is no name"). */
 export const MEDIA_SIGNER = { name: "Leah Peterson", title: "Partnerships" };
 
+/** A company's brief: only what its emails and our notes say (owner, 2026-10-25). Null fields = the emails don't say. */
+export type MediaBrief = {
+  who: string;
+  offer: string | null;
+  terms: string | null;
+  agreed: string | null;
+  open: string | null;
+  next: string | null;
+};
+export const MEDIA_BRIEF_LABELS: Record<Exclude<keyof MediaBrief, "who">, string> = {
+  offer: "What they offer", terms: "Prices and terms", agreed: "Agreed", open: "Still open", next: "Next step",
+};
+
 export type MediaPartner = {
   id: number;
   company: string;
@@ -58,6 +71,13 @@ export type MediaPartner = {
   apiTerms: string | null;
   /** Minimums, contracts, prepayment, credit expiry. */
   minCommitment: string | null;
+  /** The AI's brief of the whole relationship, rewritten when a new email arrives or goes out (null until written). */
+  brief: MediaBrief | null;
+  briefUpdatedAt: string | null;
+  /** Emails a person at the company wrote us (auto-replies and bounces not counted). */
+  humanReplies: number;
+  /** Their emails waiting for the owner (needs_owner / failed). */
+  waiting: number;
 };
 
 /**
@@ -187,3 +207,19 @@ export type MediaQueueRow = {
 };
 /** Every first-contact email must offer a way out (the stop line). */
 export const STOP_LINE_RE = /reply\s+["“]?stop/i;
+
+/** Press-release wires (kind "news" in the data, but a vendor we buy from, not an outlet we pitch). */
+export const WIRE_DOMAINS = /(^|\.)(accessnewswire|accesswire|einpresswire|einnews|globenewswire|notified|prnewswire|businesswire|newswire|prweb|newsfile(corp)?|issuewire|prlog|send2press|1888pressrelease|marketersmedia|cision)\.[a-z.]+$/i;
+export const MEDIA_PARTNER_GROUPS = ["wire", "directory", "article", "news", "other"] as const;
+export type MediaPartnerGroup = (typeof MEDIA_PARTNER_GROUPS)[number];
+export const MEDIA_PARTNER_GROUP_LABELS: Record<MediaPartnerGroup, string> = {
+  wire: "Press-release wires", directory: "Directories", article: "Article & guest-post sites", news: "News media", other: "Vendors & other",
+};
+/** Which group the Partnerships page files a company under. */
+export function partnerGroup(p: Pick<MediaPartner, "kind" | "domain" | "company">): MediaPartnerGroup {
+  if ((p.domain && WIRE_DOMAINS.test(p.domain)) || /news ?wire|press ?wire|globenewswire/i.test(p.company)) return "wire";
+  if (p.kind === "directory") return "directory";
+  if (p.kind === "article" || p.kind === "pbn") return "article";
+  if (p.kind === "news") return "news";
+  return "other";
+}

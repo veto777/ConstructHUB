@@ -2,7 +2,7 @@
 import { pool } from "../db";
 import type { MediaDecision, PartnerTerms, QuotedPrice } from "./ai";
 import type { Inbound } from "./mailbox";
-import type { MediaPartnerKind, MediaPriceCategory, MediaPriceRow, MediaPriceUnit, MediaQueueRow, MediaSettings } from "@shared/media-inbox";
+import type { MediaBrief, MediaPartnerKind, MediaPriceCategory, MediaPriceRow, MediaPriceUnit, MediaQueueRow, MediaSettings } from "@shared/media-inbox";
 
 export const storeDeps = { db: () => pool };
 const db = () => storeDeps.db();
@@ -44,16 +44,17 @@ export async function saveInbound(mailbox: string, m: Inbound, reason: string | 
 
 export type PendingMessage = {
   id: number; body: string; partnerId: number | null; messageId: string; threadKey: string | null; fromEmail: string; fromName: string | null; cc: string | null;
-  subject: string; references: string[]; attempts: number;
+  subject: string; references: string[]; attempts: number; receivedAt: string;
 };
 
 export async function pending(limit: number): Promise<PendingMessage[]> {
   const r = await db().query(
-    `SELECT id, body, partner_id, message_id, thread_key, from_email, from_name, cc, subject, references_ids, attempts FROM media_messages
+    `SELECT id, body, partner_id, message_id, thread_key, from_email, from_name, cc, subject, references_ids, attempts, received_at FROM media_messages
       WHERE direction = 'in' AND status = 'new' ORDER BY received_at LIMIT $1`, [limit]);
   return r.rows.map((x) => ({
     id: x.id, body: x.body ?? "", partnerId: x.partner_id, messageId: x.message_id, threadKey: x.thread_key, fromEmail: x.from_email, fromName: x.from_name, cc: x.cc,
     subject: x.subject, references: String(x.references_ids ?? "").split(/\s+/).filter(Boolean), attempts: x.attempts,
+    receivedAt: new Date(x.received_at).toISOString(),
   }));
 }
 
@@ -72,6 +73,43 @@ export async function bumpAttempt(id: number, error: string) {
 export async function repliesToday(email: string): Promise<number> {
   const r = await db().query(`SELECT count(*)::int n FROM media_messages WHERE direction = 'out' AND lower(to_email) = lower($1) AND received_at > now() - interval '24 hours'`, [email]);
   return Number(r.rows[0]?.n ?? 0);
+}
+
+/** What media@ sent this address in the last `days` (guard.ts duplicateProblem compares against it). */
+export async function recentOutboundTo(email: string, days: number): Promise<{ at: Date; body: string }[]> {
+  const r = await db().query(
+    `SELECT received_at, body FROM media_messages WHERE direction = 'out' AND lower(to_email) = lower($1) AND received_at > now() - make_interval(days => $2)
+      ORDER BY received_at DESC LIMIT 50`, [email, days]);
+  return r.rows.map((x) => ({ at: new Date(x.received_at), body: x.body ?? "" }));
+}
+
+/** Did we email this company (any address, any thread) in the last `days`, other than email `exceptId`? */
+export async function emailedPartnerSince(partnerId: number, days: number, exceptId: number): Promise<boolean> {
+  const r = await db().query(
+    `SELECT 1 FROM media_messages WHERE partner_id = $1 AND direction = 'out' AND id <> $3 AND received_at > now() - make_interval(days => $2) LIMIT 1`,
+    [partnerId, days, exceptId]);
+  return Boolean(r.rows[0]);
+}
+
+/**
+ * Was this address, or anyone at its domain, already emailed from media@ or support@ (any conversation we keep)?
+ * First contact never goes to them (2026-10-25: queued companies that were already in a conversation).
+ */
+export async function alreadyEmailed(email: string, domain: string | null): Promise<boolean> {
+  const r = await db().query(
+    `SELECT 1 FROM media_messages WHERE direction = 'out' AND (lower(to_email) = lower($1)
+        OR ($2::text IS NOT NULL AND (split_part(lower(to_email), '@', 2) = $2 OR split_part(lower(to_email), '@', 2) LIKE '%.' || $2))) LIMIT 1`,
+    [email, domain]);
+  return Boolean(r.rows[0]);
+}
+
+/** Earlier emails from a company answered together with its latest one (one answer per company per pass). */
+export async function markFolded(ids: number[], replyId: number | null, partnerId: number | null) {
+  if (!ids.length) return;
+  await db().query(
+    `UPDATE media_messages SET status = 'replied', reply_id = $2, partner_id = COALESCE($3, partner_id),
+       reason = concat_ws(' · ', reason, 'Answered together with their later email') WHERE id = ANY($1) AND status = 'new'`,
+    [ids, replyId, partnerId]);
 }
 
 export type OutboundPurpose = "reply" | "outreach" | "followup";
@@ -235,7 +273,10 @@ export async function summary(mailbox: string) {
 
 export async function listPartners(status?: string) {
   const r = await db().query(
-    `SELECT p.*, (SELECT count(*)::int FROM media_messages m WHERE m.partner_id = p.id) AS messages FROM media_partners p
+    `SELECT p.*, (SELECT count(*)::int FROM media_messages m WHERE m.partner_id = p.id) AS messages,
+            (SELECT count(*)::int FROM media_messages m WHERE m.partner_id = p.id AND m.direction = 'in' AND m.status <> 'automated') AS human_in,
+            (SELECT count(*)::int FROM media_messages m WHERE m.partner_id = p.id AND m.direction = 'in' AND m.status IN ('needs_owner', 'failed')) AS waiting
+       FROM media_partners p
       WHERE ($1::text IS NULL OR p.status = $1) ORDER BY CASE p.status WHEN 'agreed' THEN 0 WHEN 'talking' THEN 1 WHEN 'finalized' THEN 2 ELSE 3 END, p.last_message_at DESC NULLS LAST`,
     [status ?? null]);
   return r.rows.map((x) => ({
@@ -244,6 +285,8 @@ export async function listPartners(status?: string) {
     agreedAt: x.agreed_at ? new Date(x.agreed_at).toISOString() : null, addedTo: x.added_to,
     lastMessageAt: x.last_message_at ? new Date(x.last_message_at).toISOString() : null, messages: x.messages, notes: x.notes ?? null,
     apiTerms: x.api_terms ?? null, minCommitment: x.min_commitment ?? null,
+    humanReplies: x.human_in ?? 0, waiting: x.waiting ?? 0,
+    brief: x.brief ?? null, briefUpdatedAt: x.brief_updated_at ? new Date(x.brief_updated_at).toISOString() : null,
   }));
 }
 
@@ -715,4 +758,35 @@ export async function partnerFromSupport(p: { company: string; domain: string | 
      ON CONFLICT (domain) DO UPDATE SET last_message_at = now(), updated_at = now() RETURNING id`,
     [p.company, p.domain, p.kind, p.contactName, p.contactEmail, p.summary || null]);
   return r.rows[0].id;
+}
+
+// ── briefs (owner, 2026-10-25: a summary of every company we talk to, kept current) ─────────────────────────────────
+
+/**
+ * Companies whose brief is missing or older than their newest email. Only companies where a person wrote back (an
+ * inbound email that is not automated) get one: a cold email nobody answered has nothing to summarise.
+ */
+export async function staleBriefs(limit: number): Promise<number[]> {
+  const r = await db().query(
+    `SELECT p.id FROM media_partners p
+      WHERE EXISTS (SELECT 1 FROM media_messages m WHERE m.partner_id = p.id AND m.direction = 'in' AND m.status <> 'automated')
+        AND (p.brief_updated_at IS NULL OR EXISTS (SELECT 1 FROM media_messages m WHERE m.partner_id = p.id AND m.created_at > p.brief_updated_at)
+             OR p.updated_at > p.brief_updated_at)
+      ORDER BY p.last_message_at DESC NULLS LAST LIMIT $1`, [limit]);
+  return r.rows.map((x) => x.id as number);
+}
+
+/** What the brief is written from: the company record, the admin's notes and every email, oldest first. */
+export async function briefInput(partnerId: number) {
+  const p = (await db().query(`SELECT * FROM media_partners WHERE id = $1`, [partnerId])).rows[0];
+  if (!p) return null;
+  return {
+    partner: { company: p.company as string, domain: p.domain as string | null, status: p.status as string, kind: p.kind as string, notes: (p.notes ?? null) as string | null },
+    thread: await partnerThread(partnerId),
+  };
+}
+
+export async function saveBrief(partnerId: number, brief: MediaBrief) {
+  // updated_at is left alone so saving a brief never makes it look stale.
+  await db().query(`UPDATE media_partners SET brief = $2::jsonb, brief_updated_at = now() WHERE id = $1`, [partnerId, JSON.stringify(brief)]);
 }

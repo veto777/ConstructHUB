@@ -21,6 +21,8 @@
  *   POST /api/admin/media-inbox/prices {partnerId, category, product, price, quantity, unit, notes, quotedAt?}   add a price
  *   POST /api/admin/media-inbox/prices/:id {…same, no partnerId}   edit a price · POST …/prices/:id/delete   remove it
  *   POST /api/admin/media-inbox/partners {company, domain?, kind, contactEmail?, contactName?}   add a company (e.g. one met on support@)
+ *   POST /api/admin/media-inbox/partners/:id/brief              rewrite that company's brief now
+ *   POST /api/admin/media-inbox/briefs {limit?}                 backfill: write the briefs that are missing or stale (default 100, max 500)
  */
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
@@ -33,7 +35,7 @@ import { draftReply, mediaAiConfigured } from "./ai";
 import { companyDomain, replySubject } from "./guard";
 import { mailboxConfig, mailboxConfigured, sendMail } from "./mailbox";
 import * as store from "./store";
-import { allowanceFor, currentSettings, mediaWorkerConfig, queueEmail, QUEUE_TEMPLATES, runMediaPass, sendOne } from "./worker";
+import { allowanceFor, currentSettings, mediaWorkerConfig, queueEmail, QUEUE_TEMPLATES, refreshBriefs, runMediaPass, sendOne } from "./worker";
 
 type GetUser = (req: any, res: any) => any;
 const idParam = z.coerce.number().int().positive().max(2_147_483_647);
@@ -224,6 +226,28 @@ export function registerMediaInboxRoutes(app: Express, getDevUser: GetUser): voi
       const added = p && (p.status === "agreed" || p.status === "finalized") ? await store.addAgreedPartner(p) : null;
       res.json({ ok: true, addedTo: added?.addedTo ?? p?.addedTo ?? null, note: added?.note ?? null });
     } catch (e) { failed(res, "update the company", e); }
+  });
+
+  app.post("/api/admin/media-inbox/partners/:id/brief", async (req, res) => {
+    if (!(await admin(req, res))) return;
+    const id = idParam.safeParse(req.params.id);
+    if (!id.success) return res.status(400).json({ message: "Unknown company" });
+    if (!mediaAiConfigured()) return res.status(409).json({ message: "No AI key configured for the media inbox" });
+    try {
+      if (!(await store.getPartner(id.data))) return res.status(404).json({ message: "Not found" });
+      const r = await refreshBriefs(1, [id.data]);
+      if (!r.written) return res.status(502).json({ message: "The AI could not write a brief (or there are no emails yet). Try again." });
+      res.json({ ok: true });
+    } catch (e) { failed(res, "write the brief", e); }
+  });
+
+  // One-off backfill (2026-10-25): briefs for every company a person answered. Stale ones are rewritten on each pass anyway.
+  app.post("/api/admin/media-inbox/briefs", async (req, res) => {
+    if (!(await admin(req, res))) return;
+    const limit = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100) }).safeParse(req.body ?? {});
+    if (!limit.success) return res.status(400).json({ message: "limit must be 1–500" });
+    if (!mediaAiConfigured()) return res.status(409).json({ message: "No AI key configured for the media inbox" });
+    try { res.json({ ok: true, ...(await refreshBriefs(limit.data.limit)) }); } catch (e) { failed(res, "write the briefs", e); }
   });
 
   app.post("/api/admin/media-inbox/partners/:id/draft", async (req, res) => {
