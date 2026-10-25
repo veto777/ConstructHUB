@@ -7,7 +7,7 @@
  * locked once signed — nothing is kept but the data it is made from.
  */
 import PDFDocument from "pdfkit";
-import { ALL_TERMS_ID, autoPayMonths, cardFeeCents, formatBps, formatMoney, type ProposalContent, type ProposalTotals } from "@shared/proposals";
+import { ALL_TERMS_ID, autoPayLines, autoPaySchedule, cardFeeCents, formatBps, formatMoney, type ProposalContent, type ProposalTotals } from "@shared/proposals";
 
 const INK = "#111827";
 const MUTED = "#6b7280";
@@ -96,13 +96,16 @@ export function buildSignedProposalPdf(p: SignedPdfInput): Promise<Buffer> {
     row("Contract total (full term)", money(p.totals.contractTotalCents), true);
     doc.moveDown(0.3);
     row("Payment plan", p.totals.plan === "monthly" ? "First payment today, then monthly" : "Paid in full today");
-    row("Due today (bank transfer / ACH)", money(p.totals.dueTodayCents), true);
+    row("Due today (bank transfer / ACH; one or more payments)", money(p.totals.dueTodayCents), true);
     const bps = p.content.payment.cardFeeBps;
     if (p.content.payment.cardEnabled && bps > 0) {
       row(`Due today by card (incl. ${formatBps(bps)} card fee)`, money(p.totals.dueTodayCents + cardFeeCents(p.totals.dueTodayCents, bps)));
     }
-    const autoMonths = autoPayMonths(p.content, p.totals);
-    if (p.totals.recurringCents) row("Then each month (auto-pay)", `${money(p.totals.recurringCents)}${autoMonths ? ` for ${autoMonths - 1} more month(s)` : " until cancelled"}`);
+    // Each monthly service for its own term (autoPaySchedule), bank prices; a card adds its fee.
+    for (const line of autoPayLines(autoPaySchedule(p.content, p.totals))) {
+      const [when, amount] = line.split(": ");
+      row(`Auto-pay · ${when}`, amount);
+    }
     if (p.payment?.method) {
       row("Paid by", p.payment.method === "ach" ? "Bank transfer (ACH)" : "Card");
       if (p.payment.paidAt) row("Payment status", `${p.payment.status ?? "paid"} · ${new Date(p.payment.paidAt).toUTCString()}`);

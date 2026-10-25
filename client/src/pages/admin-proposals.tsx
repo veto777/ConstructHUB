@@ -14,7 +14,7 @@ import {
   ArrowDown, ArrowLeft, ArrowUp, Archive, Copy, Eye, FilePlus2, FileSignature, FileText, Loader2, Lock, Mail, Plus, RotateCcw, Save, Send, Trash2, Upload, XCircle,
 } from "lucide-react";
 import {
-  DEFAULT_CARD_FEE_BPS, DEFAULT_FULL_PAY_DISCOUNT_BPS, MAX_PDF_BYTES, PROPOSAL_STATUS_LABELS, defaultSelection, formatBps, formatMoney, priceSelection, standardTerms,
+  DEFAULT_CARD_FEE_BPS, DEFAULT_FULL_PAY_DISCOUNT_BPS, MAX_PDF_BYTES, PROPOSAL_STATUS_LABELS, autoPayLines, autoPaySchedule, defaultSelection, formatBps, formatMoney, priceSelection, standardTerms,
   type ProposalContent, type ProposalDetail, type ProposalGroup, type ProposalItem, type ProposalRow, type ProposalStatus, type ProposalSummary,
 } from "@shared/proposals";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -33,11 +33,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { cn } from "@/lib/utils";
 import { appPageTitle } from "@/lib/page-titles";
 import { VerificationCancelled } from "@/components/recent-auth";
 
 const STATUS_TONE: Record<ProposalStatus, PillTone> = {
-  draft: "neutral", sent: "info", viewed: "violet", signed: "warning", processing: "teal", paid: "success",
+  draft: "neutral", sent: "info", viewed: "violet", signed: "warning", partial: "teal", processing: "teal", paid: "success",
   payment_failed: "danger", declined: "danger", void: "neutral", archived: "neutral",
 };
 const getJson = async <T,>(url: string): Promise<T> => (await apiRequest("GET", url)).json();
@@ -419,7 +420,7 @@ function SendDialog({ p, c, who, expires, open, onClose, beforeSend }: {
             {row("Options offered", `${options} in ${c.groups.length} group${c.groups.length === 1 ? "" : "s"}`)}
             {row("Payment", `${pay.plan === "choice" ? "Client chooses monthly or pay in full" : pay.plan === "full" ? "Pay in full" : "Monthly"}${pay.fullPayDiscountBps && pay.plan !== "monthly" ? ` · ${formatBps(pay.fullPayDiscountBps)} off for paying in full` : ""}`)}
             {row("Methods", [pay.achEnabled && "Bank transfer (no fee)", pay.cardEnabled && `Card (+${formatBps(pay.cardFeeBps)})`].filter(Boolean).join(" · "))}
-            {row("Auto-pay", pay.endAfterMonths ? `Monthly for ${Math.max(pay.endAfterMonths, longest)} months, then stops` : "Monthly until cancelled")}
+            {row("Auto-pay", pay.endAfterMonths ? `Each service for its own term; the longest run ${Math.max(pay.endAfterMonths, longest)} months, then stop` : "Each service for its own term; the longest keep billing until cancelled")}
             {row("Signed for " + c.brand.name, `${c.countersign.name}${c.countersign.title ? `, ${c.countersign.title}` : ""}`)}
             {row("Replies go to", c.brand.contactEmail || "support@constructhub.us")}
             {row("Expires", expires ? format(new Date(`${expires}T12:00:00`), "PPP") : "Never")}
@@ -438,6 +439,7 @@ function SendDialog({ p, c, who, expires, open, onClose, beforeSend }: {
 const EVENT_LABEL: Record<string, string> = {
   created: "Created", document_attached: "PDF attached", document_removed: "PDF removed", sent: "Sent", opened: "Opened by the client", opened_again: "Opened again", test_sent: "Test sent", proof_sent: "Proof sent",
   signed: "Signed", declined: "Declined", checkout_started: "Went to payment", ach_started: "ACH payment started (clearing)", paid: "Paid",
+  payment_received: "Payment received", autopay_scheduled: "Auto-pay scheduled", autopay_missing: "Auto-pay not set up", overpaid: "Overpaid",
   payment_failed: "Payment failed", void: "Voided", archived: "Archived", restored: "Restored",
 };
 
@@ -460,7 +462,7 @@ function ProposalEditor({ id }: { id: number }) {
     setExpires(p.expiresAt ? p.expiresAt.slice(0, 10) : ""); setC(p.content); setDirty(false);
   }, [p?.id, p?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const locked = !!p && ["signed", "processing", "paid"].includes(p.status);
+  const locked = !!p && ["signed", "partial", "processing", "paid"].includes(p.status);
   const edit = (patch: Partial<ProposalContent>) => { setC((cur) => (cur ? { ...cur, ...patch } : cur)); setDirty(true); };
   const editNested = <K extends "brand" | "payment" | "countersign">(k: K, patch: Partial<ProposalContent[K]>) => { setC((cur) => (cur ? { ...cur, [k]: { ...cur[k], ...patch } } : cur)); setDirty(true); };
 
@@ -540,7 +542,7 @@ function ProposalEditor({ id }: { id: number }) {
           {p.kind === "template" && <Button size="sm" onClick={() => action.mutate({ kind: "offer" })} disabled={action.isPending} data-testid="button-offer-from-template"><FileSignature className="mr-1.5 h-4 w-4" />Create offer</Button>}
           {p.signature && <Button asChild size="sm" variant="outline"><a href={`${url}/signed.pdf`} target="_blank" rel="noreferrer"><FileText className="mr-1.5 h-4 w-4" />Signed PDF</a></Button>}
           <Button size="sm" variant="outline" onClick={() => action.mutate({ kind: "duplicate" })} disabled={action.isPending}><Copy className="mr-1.5 h-4 w-4" />Duplicate</Button>
-          {p.kind === "offer" && !["void", "paid", "processing", "archived"].includes(p.status) && <Button size="sm" variant="outline" onClick={() => action.mutate({ kind: "status", status: "void" })}><XCircle className="mr-1.5 h-4 w-4" />Void</Button>}
+          {p.kind === "offer" && !["void", "paid", "partial", "processing", "archived"].includes(p.status) && <Button size="sm" variant="outline" onClick={() => action.mutate({ kind: "status", status: "void" })}><XCircle className="mr-1.5 h-4 w-4" />Void</Button>}
           {p.status !== "archived" ? <Button size="sm" variant="ghost" onClick={() => action.mutate({ kind: "status", status: "archived" })}><Archive className="mr-1.5 h-4 w-4" />Archive</Button>
             : <Button size="sm" variant="ghost" onClick={() => action.mutate({ kind: "status", status: "draft" })}><RotateCcw className="mr-1.5 h-4 w-4" />Restore</Button>}
         </div>} flush />
@@ -708,7 +710,17 @@ function ProposalEditor({ id }: { id: number }) {
                 {(p.totals.discountCents ?? 0) > 0 && <div className="flex justify-between text-emerald-700"><span>Paid in full ({formatBps(p.totals.discountBps ?? 0)} off)</span><span>−{formatMoney(p.totals.discountCents ?? 0)}</span></div>}
                 <div className="flex justify-between font-semibold"><span>Contract total</span><span>{formatMoney(p.totals.contractTotalCents)}</span></div>
                 <div className="flex justify-between"><span>Due at signing</span><span>{formatMoney(p.totals.dueTodayCents)}</span></div>
-                {p.payment.method && <div className="flex justify-between"><span>Paid by</span><span>{p.payment.method === "ach" ? "ACH" : `Card (+${formatMoney(p.payment.cardFeeCents)})`}</span></div>}
+                {p.payments.length > 0 ? (<>
+                  {p.payments.map((x, i) => (
+                    <div key={x.id} className={cn("flex justify-between gap-2", x.status === "failed" && "text-red-600 line-through")}>
+                      <span>Payment {i + 1} · {x.method === "ach" ? "ACH" : "Card"}{x.cardLast4 ? ` ••${x.cardLast4}` : ""}{x.status === "processing" ? " (clearing)" : x.status === "failed" ? " (failed)" : ""}</span>
+                      <span className="tabular-nums">{formatMoney(x.amountCents, { cents: true })}{x.feeCents ? ` +${formatMoney(x.feeCents, { cents: true })} fee` : ""}</span>
+                    </div>
+                  ))}
+                  {p.balance && <div className="flex justify-between font-semibold"><span>Left to pay today</span><span className="tabular-nums">{formatMoney(p.balance.remainingCents, { cents: true })}</span></div>}
+                </>) : p.payment.method && <div className="flex justify-between"><span>Paid by</span><span>{p.payment.method === "ach" ? "ACH" : `Card (+${formatMoney(p.payment.cardFeeCents)})`}</span></div>}
+                {p.totals && autoPayLines(autoPaySchedule(p.content, p.totals)).map((l) => { const [when, v] = l.split(": "); return <div key={when} className="flex justify-between text-muted-foreground"><span>Auto-pay · {when}</span><span>{v}</span></div>; })}
+                {p.autoPayStartsAt && <div className="text-xs text-muted-foreground">Auto-pay starts {format(new Date(p.autoPayStartsAt), "PPP")}</div>}
                 {p.signature && <div className="mt-1 text-xs text-muted-foreground">Signed by {p.signature.name} · {format(new Date(p.signature.signedAt), "PPp")}{p.signature.ip ? ` · ${p.signature.ip}` : ""}</div>}
               </div>
             </Section>

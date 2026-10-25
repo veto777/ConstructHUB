@@ -57,6 +57,26 @@ export const PROPOSALS_DDL: readonly string[] = [
   `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS first_view_ip text`,
   `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS last_view_ip text`,
   `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS reopen_alerted_on date`,
+  // What's due today can be paid in parts (owner, 2026-10-25): one row per Stripe Checkout, any amount up to what's
+  // left, each on its own card or bank account. amount_cents is before the card fee. Auto-pay is a subscription
+  // schedule made once it's all paid (shared/proposals.ts autoPaySchedule), starting a month later.
+  `CREATE TABLE IF NOT EXISTS proposal_payments (
+     id bigserial PRIMARY KEY,
+     proposal_id bigint NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
+     stripe_session_id text NOT NULL UNIQUE,
+     method text NOT NULL CHECK (method IN ('ach', 'card')),
+     amount_cents integer NOT NULL CHECK (amount_cents > 0),
+     fee_cents integer NOT NULL DEFAULT 0,
+     status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'processing', 'paid', 'failed', 'expired')),
+     payment_intent_id text,
+     payment_method_id text,
+     card_last4 text,
+     created_at timestamptz NOT NULL DEFAULT now(),
+     paid_at timestamptz
+   )`,
+  `CREATE INDEX IF NOT EXISTS proposal_payments_proposal_idx ON proposal_payments (proposal_id, created_at)`,
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS stripe_schedule_id text`,
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS autopay_starts_at timestamptz`,
   `CREATE INDEX IF NOT EXISTS proposals_kind_idx ON proposals (kind, updated_at DESC)`,
   `CREATE INDEX IF NOT EXISTS proposals_session_idx ON proposals (stripe_session_id) WHERE stripe_session_id IS NOT NULL`,
 ];

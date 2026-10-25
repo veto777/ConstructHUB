@@ -2,7 +2,8 @@
  * Proposals (/admin/proposals): an admin builds a proposal — a template it can reuse, or an offer made for one
  * recipient — with its own branding, written sections, an attached PDF and packages of priced services. The
  * recipient opens the emailed link (/proposal/<token>), picks what they want, signs and pays: ACH with no fee,
- * or card with the proposal's card fee (3% unless changed) added on top.
+ * or card with the proposal's card fee (3% unless changed) added on top — in one payment or several, of any amount
+ * up to what's left, each on any card or bank account; auto-pay (autoPaySchedule) starts once it's all paid.
  *
  * Shared by the server (server/proposals/*, which recomputes every total from the stored content — a price
  * never comes from the browser) and both pages (live totals while choosing).
@@ -12,12 +13,17 @@ import { z } from "zod";
 export const PROPOSAL_KINDS = ["template", "offer"] as const;
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
 
-export const PROPOSAL_STATUSES = ["draft", "sent", "viewed", "signed", "processing", "paid", "payment_failed", "declined", "void", "archived"] as const;
+export const PROPOSAL_STATUSES = ["draft", "sent", "viewed", "signed", "partial", "processing", "paid", "payment_failed", "declined", "void", "archived"] as const;
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
 export const PROPOSAL_STATUS_LABELS: Record<ProposalStatus, string> = {
-  draft: "Draft", sent: "Sent", viewed: "Opened", signed: "Signed — not paid", processing: "Paid — ACH clearing",
+  draft: "Draft", sent: "Sent", viewed: "Opened", signed: "Signed — not paid", partial: "Partly paid", processing: "Paid — ACH clearing",
   paid: "Paid", payment_failed: "Payment failed", declined: "Declined", void: "Voided", archived: "Archived",
 };
+
+/** The smallest payment the client can make toward what is due today (Stripe's own minimum charge). */
+export const MIN_PAYMENT_CENTS = 50;
+/** A hint shown with the amount: most cards cap a single charge around here (owner, 2026-10-25). Not a limit. */
+export const TYPICAL_CARD_LIMIT_CENTS = 1_000_000;
 
 export const BILLING_TYPES = ["one_time", "monthly"] as const;
 export type BillingType = (typeof BILLING_TYPES)[number];
@@ -231,6 +237,73 @@ export function autoPayMonths(content: ProposalContent, totals: Pick<ProposalTot
   return Math.max(end, ...totals.lines.filter((l) => l.billing === "monthly").map((l) => l.termMonths));
 }
 
+/** A stretch of auto-pay months that each charge the same services (month 1 is part of what's due today). */
+export type AutoPayPhase = {
+  fromMonth: number;
+  /** null: every month until cancelled. */
+  toMonth: number | null;
+  lines: { itemId: string; name: string; priceCents: number }[];
+  cents: number;
+};
+
+/**
+ * What auto-pay charges after today on the monthly plan, month by month, as the contract reads: each monthly
+ * service for its own term (a 1-month add-on is paid today and never again). The longest-term services then keep
+ * going — until cancelled (endAfterMonths null), or to endAfterMonths. Empty when nothing recurs.
+ */
+export function autoPaySchedule(content: ProposalContent, totals: Pick<ProposalTotals, "lines" | "plan">): AutoPayPhase[] {
+  if (totals.plan !== "monthly") return [];
+  const monthly = totals.lines.filter((l) => l.billing === "monthly");
+  if (!monthly.length) return [];
+  const longest = Math.max(...monthly.map((l) => l.termMonths));
+  const end = content.payment.endAfterMonths;
+  const last = end == null ? null : Math.max(end, longest);
+  // Only a multi-month package carries on past its term; a plan of 1-month services is done once today is paid.
+  const active = (m: number) => monthly.filter((l) => l.termMonths >= m || (l.termMonths === longest && longest > 1 && (last === null || m <= last)));
+  const phases: AutoPayPhase[] = [];
+  const upTo = last ?? longest + 1;
+  for (let m = 2; m <= upTo; m++) {
+    const lines = active(m).map((l) => ({ itemId: l.itemId, name: l.name, priceCents: l.priceCents }));
+    if (!lines.length) continue;
+    const prev = phases[phases.length - 1];
+    if (prev && prev.toMonth === m - 1 && prev.lines.map((l) => l.itemId).join() === lines.map((l) => l.itemId).join()) prev.toMonth = m;
+    else phases.push({ fromMonth: m, toMonth: m, lines, cents: lines.reduce((s, l) => s + l.priceCents, 0) });
+  }
+  if (last === null && phases.length) phases[phases.length - 1].toMonth = null;
+  return phases;
+}
+
+/** d plus n calendar months, the day clamped to the month's last (Jan 31 + 1 → Feb 28, never Mar 3). */
+export function addMonths(d: Date, n: number): Date {
+  const y = d.getUTCFullYear(), m = d.getUTCMonth() + n;
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m, Math.min(d.getUTCDate(), last), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
+}
+
+/** "Months 2–6: $2,500/mo" style lines for the page, the emails and the signed PDF. */
+export function autoPayLines(phases: readonly AutoPayPhase[], feeBps = 0): string[] {
+  return phases.map((p) => {
+    const when = p.toMonth === null ? `Month ${p.fromMonth} on, until cancelled` : p.fromMonth === p.toMonth ? `Month ${p.fromMonth}` : `Months ${p.fromMonth}–${p.toMonth}`;
+    return `${when}: ${formatMoney(p.cents + cardFeeCents(p.cents, feeBps), { cents: true })}/mo`;
+  });
+}
+
+/** One payment toward what is due today. The client picks the amount (owner, 2026-10-25: any amount up to what's
+ *  left), and each one can use a different card or bank account. amountCents is before the card fee. */
+export type ProposalPaymentStatus = "open" | "processing" | "paid" | "failed" | "expired";
+export type ProposalPayment = {
+  id: number; method: "ach" | "card"; amountCents: number; feeCents: number; status: ProposalPaymentStatus;
+  cardLast4: string | null; createdAt: string; paidAt: string | null;
+};
+export type PaymentBalance = { dueTodayCents: number; paidCents: number; pendingCents: number; remainingCents: number };
+
+/** Paid = settled; pending = ACH still clearing (counts toward the balance, like a paid one, until it fails). */
+export function paymentBalance(dueTodayCents: number, payments: readonly Pick<ProposalPayment, "amountCents" | "status">[]): PaymentBalance {
+  const sum = (s: ProposalPaymentStatus) => payments.filter((p) => p.status === s).reduce((a, p) => a + p.amountCents, 0);
+  const paidCents = sum("paid"), pendingCents = sum("processing");
+  return { dueTodayCents, paidCents, pendingCents, remainingCents: Math.max(0, dueTodayCents - paidCents - pendingCents) };
+}
+
 /** The pay-in-full discount on an amount, rounded to the cent. */
 export function fullPayDiscountCents(amountCents: number, bps: number): number {
   return bps > 0 ? Math.round((amountCents * bps) / 10_000) : 0;
@@ -340,7 +413,12 @@ export type ProposalDetail = ProposalRow & {
   signature: { name: string; title: string; signedAt: string; ip: string | null } | null;
   /** When the company signed (the first send). */
   countersignedAt: string | null;
-  payment: { method: "ach" | "card" | null; cardFeeCents: number; status: string | null; subscriptionId: string | null };
+  payment: { method: "ach" | "card" | null; cardFeeCents: number; status: string | null; subscriptionId: string | null; scheduleId: string | null };
+  /** Every payment toward what's due today (one or several, any card or bank) and what is left. */
+  payments: ProposalPayment[];
+  balance: PaymentBalance | null;
+  /** When auto-pay's first monthly charge is (set once what's due today is paid). */
+  autoPayStartsAt: string | null;
   events: ProposalEvent[];
 };
 
@@ -357,6 +435,9 @@ export type PublicProposal = {
   selection: ProposalSelection | null; totals: ProposalTotals | null;
   signature: { name: string; signedAt: string } | null;
   payment: { method: "ach" | "card" | null; cardFeeCents: number; status: string | null };
+  payments: ProposalPayment[];
+  balance: PaymentBalance | null;
+  autoPayStartsAt: string | null;
   stripeReady: boolean;
   preview: boolean;
   isTest: boolean;

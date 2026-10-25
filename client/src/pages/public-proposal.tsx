@@ -3,7 +3,8 @@
  * read it (the written sections and the attached PDF), choose the services they want with live totals, initial each
  * contract clause in its "Initial here" box and sign (typed name + drawn or typed signature + e-sign consent) — a
  * "Next" guide walks them field to field like DocuSign — then pay the tallied total: bank transfer (ACH) with no
- * fee, or card with the proposal's card fee on top. No sales tax (services). A preview link can be filled in and
+ * fee, or card with the proposal's card fee on top — all at once or in parts of any amount up to what's left, each
+ * on its own card or bank account (cards often cap a charge near $10k). No sales tax (services). A preview link can be filled in and
  * "signed" end to end: nothing is recorded, and signing opens the agreement PDF it would produce.
  * Opens full-bleed on any host, signed in or not (App.tsx).
  */
@@ -12,7 +13,7 @@ import { useRoute } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowDown, Info, Building2, CheckCircle2, Clock, CreditCard, Download, ExternalLink, FileText, Landmark, Loader2, Lock, PenLine, ShieldCheck, XCircle } from "lucide-react";
 import {
-  ESIGN_CONSENT, TAX_NOTE, allowedPlans, autoPayMonths, bodyBlocks, cardFeeCents, ALL_TERMS_ID, initialTargets, defaultSelection, formatBps, formatMoney, initialsOf, priceSelection, selectionProblems,
+  ESIGN_CONSENT, MIN_PAYMENT_CENTS, TAX_NOTE, TYPICAL_CARD_LIMIT_CENTS, allowedPlans, autoPayLines, autoPaySchedule, bodyBlocks, cardFeeCents, ALL_TERMS_ID, initialTargets, defaultSelection, formatBps, formatMoney, initialsOf, priceSelection, selectionProblems,
   type PaymentPlan, type ProposalContent, type ProposalGroup, type PublicProposal,
 } from "@shared/proposals";
 import { Button } from "@/components/ui/button";
@@ -156,7 +157,7 @@ function Summary({ content, itemIds, plan, setPlan, locked }: { content: Proposa
         <div className="mt-4 rounded-xl p-3" style={{ background: "color-mix(in srgb, var(--accent) 8%, white)" }}>
           <Row label="Due today (bank / ACH)" value={money(t.dueTodayCents)} strong />
           {bps > 0 && <Row label={`By card (+${formatBps(bps)})`} value={money(t.dueTodayCents + cardFeeCents(t.dueTodayCents, bps))} />}
-          {t.recurringCents > 0 && <Row label="Then each month" value={money(t.recurringCents)} />}
+          {autoPayLines(autoPaySchedule(content, t)).map((l) => { const [when, v] = l.split(": "); return <Row key={when} label={`Auto-pay · ${when}`} value={v} />; })}
         </div>
       )}
     </div>
@@ -170,23 +171,67 @@ function PayPanel({ token, data }: { token: string; data: PublicProposal }) {
   const { toast } = useToast();
   const t = data.totals!;
   const pay = data.content.payment;
-  const fee = pay.cardEnabled ? cardFeeCents(t.dueTodayCents, pay.cardFeeBps) : 0;
-  const autoMonths = autoPayMonths(data.content, t);
+  const bal = data.balance ?? { dueTodayCents: t.dueTodayCents, paidCents: 0, pendingCents: 0, remainingCents: t.dueTodayCents };
+  const left = bal.remainingCents;
   const [method, setMethod] = useState<"ach" | "card">(pay.achEnabled ? "ach" : "card");
+  // Dollars as typed; the whole balance unless the client changes it (owner, 2026-10-25: any amount up to what's left).
+  const [typed, setTyped] = useState(() => (left / 100).toFixed(2));
+  useEffect(() => { setTyped((left / 100).toFixed(2)); }, [left]);
+  const amount = Math.round(Number(typed.replace(/[$,\s]/g, "")) * 100);
+  const floor = Math.min(MIN_PAYMENT_CENTS, left);
+  const problem = !Number.isFinite(amount) || amount < floor ? `Enter at least ${money(floor)}.` : amount > left ? `You can pay up to ${money(left)}.` : null;
+  const amt = problem ? 0 : amount;
+  const fee = pay.cardEnabled ? cardFeeCents(amt, pay.cardFeeBps) : 0;
+  const charge = method === "card" ? amt + fee : amt;
+  const phases = autoPaySchedule(data.content, t);
+  const autoLines = autoPayLines(phases, method === "card" ? pay.cardFeeBps : 0);
+  const done = data.payments.filter((p) => p.status === "paid" || p.status === "processing");
   const go = useMutation({
-    mutationFn: () => call<{ url: string }>("POST", `/api/public/proposals/${token}/checkout`, { method }),
+    mutationFn: () => call<{ url: string }>("POST", `/api/public/proposals/${token}/checkout`, { method, amountCents: amt }),
     onSuccess: (r) => { window.location.href = r.url; },
     onError: (e: Error) => toast({ title: "Couldn't start payment", description: e.message, variant: "destructive" }),
   });
+  // The first part carries the odd cents, so the parts add up to exactly what's left.
+  const split = (parts: number) => setTyped(((left - (parts - 1) * Math.floor(left / parts)) / 100).toFixed(2));
   return (
     <div className="space-y-4" data-testid="panel-pay">
+      <div className="rounded-xl p-3 text-sm" style={{ background: "color-mix(in srgb, var(--accent) 8%, white)" }} data-testid="pay-balance">
+        <Row label="Due today" value={money(bal.dueTodayCents)} />
+        {bal.paidCents > 0 && <Row label="Paid so far" value={`−${money(bal.paidCents)}`} />}
+        {bal.pendingCents > 0 && <Row label="Bank transfer clearing" value={`−${money(bal.pendingCents)}`} />}
+        <Row label="Left to pay today" value={money(left)} strong />
+      </div>
+      {done.length > 0 && (
+        <ul className="divide-y rounded-xl border text-sm" data-testid="list-payments">
+          {done.map((p, i) => (
+            <li key={p.id} className="flex justify-between gap-3 px-3 py-2">
+              <span className="text-slate-700">Payment {i + 1} · {p.method === "card" ? "Card" : "Bank"}{p.cardLast4 ? ` ••${p.cardLast4}` : ""}{p.status === "processing" ? " · clearing" : ""}</span>
+              <span className="tabular-nums font-medium text-slate-900">{money(p.amountCents + p.feeCents)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="space-y-2">
+        <Label htmlFor="pay-amount" className="text-sm font-semibold text-slate-900">Amount to pay now</Label>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-48">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+            <Input id="pay-amount" inputMode="decimal" className="pl-7 text-lg tabular-nums" value={typed} onChange={(e) => setTyped(e.target.value)} aria-invalid={!!problem} data-testid="input-pay-amount" />
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setTyped((left / 100).toFixed(2))} data-testid="button-pay-all">All {money(left)}</Button>
+          {left > TYPICAL_CARD_LIMIT_CENTS && <Button type="button" variant="outline" size="sm" onClick={() => split(Math.ceil(left / TYPICAL_CARD_LIMIT_CENTS))} data-testid="button-pay-split">Split in {Math.ceil(left / TYPICAL_CARD_LIMIT_CENTS)}</Button>}
+        </div>
+        {problem ? <p className="text-sm text-red-600" data-testid="text-amount-problem">{problem}</p> : (
+          <p className="text-xs text-slate-500">Pay all of it now, or part now and the rest in more payments, on the same or a different card or bank account.{left > TYPICAL_CARD_LIMIT_CENTS ? ` Many cards stop a single charge near ${formatMoney(TYPICAL_CARD_LIMIT_CENTS)}, so splitting can help.` : ""}</p>
+        )}
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {pay.achEnabled && (
           <button type="button" onClick={() => setMethod("ach")} className={cn("rounded-xl border-2 bg-white p-4 text-left", method === "ach" ? "shadow-md" : "border-slate-200")}
             style={method === "ach" ? { borderColor: "var(--accent)" } : undefined} data-testid="method-ach">
             <div className="flex items-center gap-2 font-semibold text-slate-900"><Landmark className="h-5 w-5" style={{ color: "var(--accent)" }} /> Bank transfer (ACH)
               <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">No fee</span></div>
-            <div className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(t.dueTodayCents)}</div>
+            <div className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(amt)}</div>
             <p className="mt-1 text-xs text-slate-500">Connect your bank securely through Stripe. Clears in about 3–5 business days.</p>
           </button>
         )}
@@ -194,22 +239,22 @@ function PayPanel({ token, data }: { token: string; data: PublicProposal }) {
           <button type="button" onClick={() => setMethod("card")} className={cn("rounded-xl border-2 bg-white p-4 text-left", method === "card" ? "shadow-md" : "border-slate-200")}
             style={method === "card" ? { borderColor: "var(--accent)" } : undefined} data-testid="method-card">
             <div className="flex items-center gap-2 font-semibold text-slate-900"><CreditCard className="h-5 w-5" style={{ color: "var(--accent)" }} /> Credit or debit card
-              {fee > 0 && <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">+{formatBps(pay.cardFeeBps)} fee</span>}</div>
-            <div className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(t.dueTodayCents + fee)}</div>
+              {pay.cardFeeBps > 0 && <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">+{formatBps(pay.cardFeeBps)} fee</span>}</div>
+            <div className="mt-2 text-2xl font-bold tabular-nums text-slate-900">{money(amt + fee)}</div>
             <p className="mt-1 text-xs text-slate-500">{fee > 0 ? `Includes a ${money(fee)} card processing fee. Pay by bank transfer to avoid it.` : "Paid instantly."}</p>
           </button>
         )}
       </div>
-      {t.recurringCents > 0 && (
-        <p className="text-sm text-slate-600">
-          Auto-pay: after today, {money(t.recurringCents + (method === "card" ? cardFeeCents(t.recurringCents, pay.cardFeeBps) : 0))} is charged automatically each month to the {method === "card" ? "card" : "bank account"} you use today
-          {autoMonths ? ` for ${autoMonths} months in total` : ""}{method === "card" && fee > 0 ? " (including the card fee)" : ""}.
-        </p>
+      {autoLines.length > 0 && (
+        <div className="text-sm text-slate-600" data-testid="text-autopay">
+          <p>Auto-pay starts one month after what's due today is fully paid, on the {method === "card" ? "card" : "bank account"} you use for the last payment{method === "card" && pay.cardFeeBps > 0 ? " (including the card fee)" : ""}:</p>
+          <ul className="mt-1 list-disc pl-5">{autoLines.map((l) => <li key={l}>{l}</li>)}</ul>
+        </div>
       )}
       {data.isTest && <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Test copy: payment is turned off. On the real link the client pays here.</p>}
-      <Button size="lg" className="w-full text-base text-white sm:w-auto" style={{ background: "var(--accent)" }} disabled={go.isPending || !data.stripeReady || data.preview || data.isTest} onClick={() => go.mutate()} data-testid="button-pay">
+      <Button size="lg" className="w-full text-base text-white sm:w-auto" style={{ background: "var(--accent)" }} disabled={go.isPending || !data.stripeReady || data.preview || data.isTest || !!problem} onClick={() => go.mutate()} data-testid="button-pay">
         {go.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
-        Pay {money(method === "card" ? t.dueTodayCents + fee : t.dueTodayCents)} securely
+        Pay {money(charge)} securely
       </Button>
       {!data.stripeReady && <p className="text-sm text-red-600">Online payment isn't available right now — contact us to arrange payment.</p>}
       <p className="flex items-center gap-1.5 text-xs text-slate-500"><ShieldCheck className="h-3.5 w-3.5" /> Payments are processed by Stripe. We never see your bank login or card number.</p>
@@ -511,7 +556,7 @@ export default function PublicProposalPage() {
           <section id="pay" className="max-w-3xl space-y-5 rounded-2xl border bg-white p-5 shadow-sm sm:p-8" data-testid="section-pay">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: b.accent }}>Step 3</p>
-              <h2 className="text-2xl font-extrabold">Choose how to pay</h2>
+              <h2 className="text-2xl font-extrabold">{data.balance && data.balance.paidCents + data.balance.pendingCents > 0 ? "Pay the rest" : "Choose how to pay"}</h2>
             </div>
             <PayPanel token={token} data={data} />
           </section>
@@ -525,7 +570,8 @@ export default function PublicProposalPage() {
             {(previewTotals.discountCents ?? 0) > 0 && <Row label={`Paid in full (${formatBps(previewTotals.discountBps ?? 0)} off)`} value={`−${money(previewTotals.discountCents ?? 0)}`} />}
             <Row label="Due today (bank / ACH)" value={money(previewTotals.dueTodayCents)} strong />
             {content.payment.cardEnabled && content.payment.cardFeeBps > 0 && <Row label={`By card (+${formatBps(content.payment.cardFeeBps)})`} value={money(previewTotals.dueTodayCents + cardFeeCents(previewTotals.dueTodayCents, content.payment.cardFeeBps))} />}
-            {previewTotals.recurringCents > 0 && <Row label="Then each month" value={money(previewTotals.recurringCents)} />}
+            {autoPayLines(autoPaySchedule(content, previewTotals)).map((l) => { const [when, v] = l.split(": "); return <Row key={when} label={`Auto-pay · ${when}`} value={v} />; })}
+            <p className="text-xs text-slate-500">The client can pay what's due today all at once, or in parts of any amount on any card or bank account.</p>
             <Row label="Sales tax" value="$0.00" />
             <Button variant="outline" size="sm" onClick={() => { setPreviewSigned(false); setInitialed({}); }}>Start the preview again</Button>
           </section>
@@ -562,6 +608,9 @@ function StatusBanner({ data, returnedPaid, token }: { data: PublicProposal; ret
   if (data.status === "void") return box("border-slate-300 bg-slate-100 text-slate-700", XCircle, "This proposal was withdrawn", "Contact us for an updated proposal.");
   if (data.status === "declined") return box("border-slate-300 bg-slate-100 text-slate-700", XCircle, "You declined this proposal", "Changed your mind? Contact us and we'll send a new one.");
   if (data.expired) return box("border-amber-300 bg-amber-50 text-amber-900", Clock, "This proposal has expired", "Contact us for an updated proposal.");
+  if (data.status === "partial" && data.balance) return box("border-sky-300 bg-sky-50 text-sky-900", returnedPaid ? Loader2 : CheckCircle2,
+    returnedPaid ? "Payment received" : "Partly paid — thank you",
+    `${money(data.balance.paidCents + data.balance.pendingCents)} of ${money(data.balance.dueTodayCents)} paid. ${money(data.balance.remainingCents)} left to pay today, below.`, signedCopy);
   if (data.status === "payment_failed") return box("border-red-300 bg-red-50 text-red-900", AlertTriangle, "The last payment didn't go through", "Please try again below, or choose another payment method.", signedCopy);
   if (data.signature) return box("border-sky-300 bg-sky-50 text-sky-900", returnedPaid ? Loader2 : Building2,
     returnedPaid ? "Confirming your payment…" : `Signed by ${data.signature.name}`,
