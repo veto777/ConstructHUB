@@ -49,15 +49,16 @@ export const PRESS_TIER_LABEL: Record<PressTier, string> = { budget: "Standard",
 /** The tier as the wire names it (the submission email only). */
 export const PRESS_WIRE_TIER_NAME: Record<PressTier, string> = { budget: "Budget", national: "National", premium: "Premium" };
 
-/** Each tier's card: only what the wire's sheets and its 2026-10-16 email say. */
+/** Each tier's card: only what the wire's sheets and its 2026-10-16 email say. `pickups` is the reach line as shown
+ *  (Standard: about 100 guaranteed posts, owner 2026-10-25; it was "typically 350–500 sites"). */
 export type PressTierInfo = { tier: PressTier; tagline: string; pickups: string | null; perks: string[] };
 export const PRESS_TIER_INFO: Record<PressTier, PressTierInfo> = {
   budget: {
-    tier: "budget", tagline: "Your news on the wire, online and regional", pickups: "350–500",
-    perks: ["330+ named outlets: Yahoo Finance, Yahoo News, Digital Journal, StreetInsider, regional papers and radio", "Typically 350–500 sites run it"],
+    tier: "budget", tagline: "Your news on the wire, online and regional", pickups: "About 100 guaranteed posts",
+    perks: ["330+ named outlets: Yahoo Finance, Yahoo News, Digital Journal, StreetInsider, regional papers and radio", "About 100 guaranteed posts"],
   },
   national: {
-    tier: "national", tagline: "The nation's newsrooms, wire services and business press", pickups: "450–700",
+    tier: "national", tagline: "The nation's newsrooms, wire services and business press", pickups: "Typically 450–700 sites run it",
     perks: ["5,000+ newsrooms: the Associated Press, Reuters, Dow Jones, Bloomberg Radio, CNBC, Fox News Channel, USA Today", "Major newspapers: The New York Times, The Wall Street Journal, The Washington Post, Los Angeles Times", "Finance sites and terminals: Yahoo Finance, MarketWatch, Morningstar, FactSet, Refinitiv", "Typically 450–700 sites run it"],
   },
   premium: {

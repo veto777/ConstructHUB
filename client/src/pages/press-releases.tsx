@@ -163,7 +163,7 @@ function Reach({ counts, onOpen }: { counts: Record<PressTier, number> | null; o
               <td className={cn(appTable.td, appTableCards.td, "font-medium sm:whitespace-nowrap")}>{tierWord(t)}</td>
               <td className={cn(appTable.td, appTableCards.td, "sm:whitespace-nowrap")}>
                 <span className="tabular-nums">{counts ? `${n(counts[t])} outlets` : "…"}</span>
-                {PRESS_TIER_INFO[t].pickups && <div className="text-xs text-muted-foreground">Typically {PRESS_TIER_INFO[t].pickups} sites run it</div>}
+                {PRESS_TIER_INFO[t].pickups && <div className="text-xs text-muted-foreground">{PRESS_TIER_INFO[t].pickups}</div>}
               </td>
               <td className={cn(appTable.td, appTableCards.td, "text-muted-foreground")}>{PRESS_HEADLINE_OUTLETS[t].slice(0, 6).join(", ")}<span className="mt-1 block text-xs">+ {PRESS_HEADLINE_OUTLETS[t].length - 6} more headline outlets</span></td>
               <td className={cn(appTable.td, appTableCards.td, "sm:text-right")}>
