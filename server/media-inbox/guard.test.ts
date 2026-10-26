@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { botTellProblem, asksIfAi, companyDomain, firstNameOf, formLetterPhrase, formMessage, holdingReply, personWillReply, machineReason, replyProblem, replySubject } from "./guard";
+import { answerProblem, botTellProblem, asksIfAi, companyDomain, firstNameOf, formLetterPhrase, formMessage, holdingReply, personWillReply, machineReason, replyProblem, replySubject } from "./guard";
 import { QUEUE_TEMPLATES } from "./worker";
 import { parseGoogleForm } from "./browse";
 import { parseDecision } from "./ai";
@@ -300,4 +300,9 @@ describe("mail leaves at human hours (owner 2026-10-26)", () => {
     for (const m of mins) { expect(m).toBeGreaterThanOrEqual(40); expect(m).toBeLessThanOrEqual(150); }
     expect(new Set(mins).size).toBeGreaterThan(2);
   });
+});
+
+describe("a reply never carries the first email's stop line (LocolDeal 2026-10-26)", () => {
+  it("refuses it mid-thread", () => expect(answerProblem("Hi Jess,\n\nSounds good.\n\nIf this isn't something you handle, reply \"stop\" and we won't email you again.\n\nBest regards,")).toMatch(/stop/));
+  it("passes a plain reply", () => expect(answerProblem("Hi Jess,\n\nSounds good, talk soon.\n\nBest regards,")).toBeNull());
 });

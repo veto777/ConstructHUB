@@ -96,6 +96,11 @@ export function replyProblem(reply: string): string | null {
   return null;
 }
 
+/** A reply inside a conversation: the laws, and never the first email's "reply stop" line (LocolDeal got it mid-thread, 2026-10-26). */
+export function answerProblem(reply: string): string | null {
+  return replyProblem(reply) ?? (/\breply ["“']?stop\b/i.test(reply) ? "The reply carries the first email's \"reply stop\" line" : null);
+}
+
 /** The safe answer when the drafted reply is refused, the model fails, or a decision belongs to the owner. */
 export function holdingReply(firstName: string | null): string {
   const hi = firstName ? `Hi ${firstName},` : "Hi,";

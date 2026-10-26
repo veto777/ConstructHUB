@@ -18,7 +18,7 @@ import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
 import { classifySites, decide, extractNextStep, keepQuotedPrices, mediaAiConfigured, planForm, readTerms, writeBrief } from "./ai";
 import { closeBrowser, readPage, submitGoogleForm, submitHtmlForm } from "./browse";
-import { asksIfAi, companyDomain, duplicateProblem, firstNameOf, formMessage, holdingReply, latestPerCompany, personWillReply, isOptOut, machineReason, replyProblem, replySubject, SAME_EMAIL_DAYS, supportSkip } from "./guard";
+import { answerProblem, asksIfAi, companyDomain, duplicateProblem, firstNameOf, formMessage, holdingReply, latestPerCompany, personWillReply, isOptOut, machineReason, replyProblem, replySubject, SAME_EMAIL_DAYS, supportSkip } from "./guard";
 import { pickEmail, siteName } from "../backlinks/outreach";
 import { isSuppressed } from "../backlinks/store";
 import { fetchSince, mailboxConfig, mailboxConfigured, sendMail, supportMailboxConfig } from "./mailbox";
@@ -280,11 +280,11 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
         out.replied++;
         continue;
       }
-      let problem = replyProblem(d.reply);
+      let problem = answerProblem(d.reply);
       // One rewrite when the draft breaks a rule (a form-letter phrase, a word about AI…): the model is told what was wrong.
       if (problem && !asksIfAi(m.body)) {
         const again = await workerDeps.decide(th, undefined, problem).catch(() => null);
-        if (again && !replyProblem(again.reply) && !again.noReplyNeeded) {
+        if (again && !answerProblem(again.reply) && !again.noReplyNeeded) {
           d = { ...d, reply: again.reply, needsOwner: again.needsOwner, ownerQuestion: again.ownerQuestion ?? d.ownerQuestion, provider: again.provider };
           problem = null;
         }
