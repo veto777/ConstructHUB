@@ -38,7 +38,7 @@ import {
 import { CONNECTABLE, outstandConfigured, webhookSigned } from "./outstand";
 import { blueskyOauthConfigured, blueskyClientMetadata, blueskyJwks } from "./bluesky-oauth";
 import { NativeClient, nativeNetworksFor, receiveUpload, NATIVE_UPLOAD_MAX_BYTES } from "./native";
-import { accountStats, postStats, comments as postComments, replyComment, hideComment, deleteComment, deletePost } from "./insights";
+import { accountStats, postStats, comments as postComments, addComment, replyComment, hideComment, deleteComment, deletePost } from "./insights";
 import { putToR2Key } from "../r2";
 import { registerDeletionRoutes } from "./deletion";
 import { registerTikTokWebhook } from "./tiktok-webhook";
@@ -302,6 +302,11 @@ export function registerSocialRoutes(
   route("get", "/native/posts/:postId/comments", async (req, res, id, businessId) => {
     const client = await direct(req, id, businessId);
     res.json(await postComments(client, (await nativePost(id, businessId, String(req.params.postId))).submission_id, typeof req.query.after === "string" ? req.query.after : null));
+  });
+  route("post", "/native/posts/:postId/comments", async (req, res, id, businessId) => {
+    const { message } = z.object({ message: z.string().trim().min(1, "Write a comment first").max(2200) }).strict().parse(req.body);
+    const client = await direct(req, id, businessId);
+    res.json(await addComment(client, (await nativePost(id, businessId, String(req.params.postId))).submission_id, message));
   });
   route("post", "/native/posts/:postId/comments/:commentId/reply", async (req, res, id, businessId) => {
     const { message } = z.object({ message: z.string().trim().min(1, "Write a reply first").max(2200) }).strict().parse(req.body);

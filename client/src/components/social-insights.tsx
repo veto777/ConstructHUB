@@ -3,7 +3,7 @@
  * (server/social/insights.ts). Owner, 2026-10-12: customers need followers, stats, likes and deleting videos.
  *
  *   SocialAccountStats   one tile per connected account: followers, and reach / views / engagement over 7 or 28 days
- *   SocialPostInsights   on a published post: likes, comments, shares, views; its comments (reply, hide, delete); delete the post
+ *   SocialPostInsights   on a published post: likes, comments, shares, views; its comments (add, reply, hide, delete); delete the post
  */
 import { useState } from "react";
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -151,6 +151,7 @@ export function SocialPostInsights({ post }: { post: any }) {
 
 function PostComments({ base, scope, postId }: { base: string; scope: string; postId: string }) {
   const { toast } = useToast();
+  const [draft, setDraft] = useState("");
   const qc = useQueryClient();
   const list = useInfiniteQuery<{ comments: Comment[]; note: string | null; next: string | null }>({
     queryKey: [base, "comments"], retry: false, initialPageParam: "",
@@ -162,22 +163,30 @@ function PostComments({ base, scope, postId }: { base: string; scope: string; po
   });
   const refresh = () => { void qc.invalidateQueries({ queryKey: [base, "comments"] }); void qc.invalidateQueries({ queryKey: [base, "stats"] }); };
   const act = useMutation({
-    mutationFn: async (a: { kind: "reply" | "hide" | "delete"; id: string; message?: string; hidden?: boolean }) => {
+    mutationFn: async (a: { kind: "add" | "reply" | "hide" | "delete"; id: string; message?: string; hidden?: boolean }) => {
+      if (a.kind === "add") return (await apiRequest("POST", `${base}/comments${scope}`, { message: a.message })).json();
       const path = `${base}/comments/${encodeURIComponent(a.id)}`;
       if (a.kind === "reply") return (await apiRequest("POST", `${path}/reply${scope}`, { message: a.message })).json();
       if (a.kind === "hide") return (await apiRequest("POST", `${path}/hide${scope}`, { hidden: a.hidden })).json();
       return (await apiRequest("DELETE", `${path}${scope}`)).json();
     },
-    onSuccess: (_d, a) => { refresh(); toast({ title: a.kind === "reply" ? "Reply posted" : a.kind === "hide" ? (a.hidden ? "Comment hidden" : "Comment shown") : "Comment deleted" }); },
+    onSuccess: (_d, a) => { refresh(); toast({ title: a.kind === "add" ? "Comment posted" : a.kind === "reply" ? "Reply posted" : a.kind === "hide" ? (a.hidden ? "Comment hidden" : "Comment shown") : "Comment deleted" }); },
     onError: (e) => toast({ title: "That didn't work", description: apiErrorMessage(e), variant: "destructive" }),
   });
   if (list.isLoading) return <p className="text-sm g-text-2">Loading comments…</p>;
   if (list.isError) return <p role="alert" className="text-sm g-closed">{apiErrorMessage(list.error)}</p>;
   const first = list.data?.pages[0];
   const all = list.data?.pages.flatMap((p) => p.comments) ?? [];
+  const send = () => { act.mutate({ kind: "add", id: "", message: draft }, { onSuccess: () => setDraft("") }); };
   return (
     <div className="space-y-2 rounded-lg border p-3" data-testid={`comments-${postId}`}>
       {first?.note && <p className="text-sm g-text-2">{first.note}</p>}
+      {!first?.note && (
+        <div className="space-y-2 border-b pb-3">
+          <Textarea aria-label="Write a comment" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Comment on this post as your business…" data-testid={`input-add-comment-${postId}`} />
+          <GooglePill size="sm" variant="solid" label="Post comment" disabled={act.isPending || !draft.trim()} onClick={send} testId={`button-add-comment-${postId}`} />
+        </div>
+      )}
       {!first?.note && all.length === 0 && <p className="text-sm g-text-2">No comments yet.</p>}
       {all.map((c) => <CommentRow key={c.id} c={c} busy={act.isPending} act={(a) => act.mutate(a)} />)}
       {list.hasNextPage && <GooglePill size="sm" label={list.isFetchingNextPage ? "Loading…" : "Load more comments"} disabled={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()} testId={`button-more-comments-${postId}`} />}
