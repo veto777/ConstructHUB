@@ -249,7 +249,7 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
       const extra = folded.filter((f) => !own.some((x) => x.direction === "in" && x.body === f.body))
         .map((f) => ({ direction: "in" as const, from: f.fromEmail, at: f.receivedAt, subject: f.subject, body: f.body }));
       const th = [...extra, ...own].sort((a, b) => a.at.localeCompare(b.at));
-      const d = await workerDeps.decide(th);
+      let d = await workerDeps.decide(th);
       if (d.relevant) {
         newlyAgreed = await store.upsertPartner({ domain: companyDomain(m.fromEmail), contactEmail: m.fromEmail, contactName: m.fromName, d });
         partnerId = newlyAgreed.partner.id;
@@ -263,7 +263,15 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
         out.replied++;
         continue;
       }
-      const problem = replyProblem(d.reply);
+      let problem = replyProblem(d.reply);
+      // One rewrite when the draft breaks a rule (a form-letter phrase, a word about AI…): the model is told what was wrong.
+      if (problem && !asksIfAi(m.body)) {
+        const again = await workerDeps.decide(th, undefined, problem).catch(() => null);
+        if (again && !replyProblem(again.reply) && !again.noReplyNeeded) {
+          d = { ...d, reply: again.reply, needsOwner: again.needsOwner, ownerQuestion: again.ownerQuestion ?? d.ownerQuestion, provider: again.provider };
+          problem = null;
+        }
+      }
       if (asksIfAi(m.body)) { body = personWillReply(first); status = "needs_owner"; reason = "They asked whether we are an AI or a person — a person on the team answers this one"; }
       else if (problem) { body = holdingReply(first); status = "needs_owner"; reason = [problem, d.ownerQuestion, `Drafted by ${d.provider}`].filter(Boolean).join(" — "); }
       else { body = d.reply; status = d.needsOwner ? "needs_owner" : "replied"; reason = [d.needsOwner ? d.ownerQuestion ?? "Owner decision needed" : null, `Answered by ${d.provider}`].filter(Boolean).join(" — "); }

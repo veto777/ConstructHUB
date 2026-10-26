@@ -16,13 +16,15 @@ const HARD_AI = /\b(as an ai|an ai (language )?model|i('| a)?m an ai|we('| a)?re
 
 /** Our own outreach adds: anything "automated", a script or bot of ours, and naming an AI provider. */
 const STRICT_TELL = /\bautomat(ed|ion|ically)\b|\b(our|a|the) (bot|script|crawler|scraper|spider)s?\b|\bprogrammatic(ally)?\b/i;
-const STRICT_AI = /\b(chatgpt|openai|truthcoder|anthropic|claude)\b/i;
+const STRICT_AI = /\b(chatgpt|openai|truthcoder|anthropic|claude|gpt|llm)\b|\bai[- ](generated|written|content|tools?|overviews?|writers?|writing|detect\w*)\b|\bartificial intelligence\b/i;
+/** Owner 2026-10-26: a reply to Planning Tank echoed their "no AI-generated content" rule back. "AI" as a word, in capitals. */
+const AI_WORD = /\bAI\b/;
 
 export type BotTellLevel = "strict" | "hard";
 
 /** Why outgoing text would tell an outsider a bot, a script or an AI is behind it, or null when it reads clean. */
 export function botTellProblem(text: string, level: BotTellLevel = "strict"): string | null {
-  if (HARD_AI.test(text) || (level === "strict" && STRICT_AI.test(text))) return "The email talks about being an AI or names an AI provider";
+  if (HARD_AI.test(text) || (level === "strict" && (STRICT_AI.test(text) || AI_WORD.test(text)))) return "The email talks about being an AI or names an AI provider";
   const m = text.match(HARD_TELL) ?? (level === "strict" ? text.match(STRICT_TELL) : null);
   return m ? `The email gives away that a bot or a script is behind it ("${m[0]}")` : null;
 }

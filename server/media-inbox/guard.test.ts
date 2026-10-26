@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { botTellProblem, asksIfAi, companyDomain, firstNameOf, formMessage, holdingReply, personWillReply, machineReason, replyProblem, replySubject } from "./guard";
+import { botTellProblem, asksIfAi, companyDomain, firstNameOf, formLetterPhrase, formMessage, holdingReply, personWillReply, machineReason, replyProblem, replySubject } from "./guard";
 import { QUEUE_TEMPLATES } from "./worker";
 import { parseGoogleForm } from "./browse";
 import { parseDecision } from "./ai";
@@ -265,4 +265,23 @@ describe("botTellProblem — OWNER LAW 2026-10-15: nothing we send gives away a 
   it("every first-contact template passes", () => {
     for (const t of Object.values(QUEUE_TEMPLATES)) expect(botTellProblem(`${t.subject}\n${t.body("Acme News")}`)).toBeNull();
   });
+});
+
+describe("replies never read like a form letter (owner 2026-10-26)", () => {
+  const planningTank = `Hi,\n\nThanks for confirming the pricing and clarifying the requirements. We are comfortable with the per-placement model; placements are paid only once one of our customers purchases them through our platform.\n\nWe will ensure all images are resized, optimized, renamed, and include alt text as requested. We also note that AI-generated or spun content is not accepted. Let us know if you need anything else from us before we send the first batch.\n\nBest regards,`;
+  it("refuses the 2026-10-26 Planning Tank reply", () => expect(replyProblem(planningTank)).not.toBeNull());
+  it("refuses any word about AI, even echoing their rules", () => {
+    expect(botTellProblem("Got it, no AI-generated content.")).not.toBeNull();
+    expect(botTellProblem("We know AI is changing search.")).not.toBeNull();
+  });
+  it("catches each stock phrase", () => {
+    for (const s of ["We will ensure every article fits.", "To summarize, no API.", "We've noted the guidelines.", "This will help us align our workflow.", "Let us know if you need anything else.", "Don't hesitate to reach out.", "Sounds good; we'll send topics."])
+      expect(formLetterPhrase(s)).not.toBeNull();
+  });
+  it("lets a plain, human reply through", () => {
+    const ok = "Hi Brock,\n\nGot it, thanks. We'll put together a few topic ideas and send them over this week. Is there a word count you prefer?\n\nBest regards,";
+    expect(replyProblem(ok)).toBeNull();
+    expect(formLetterPhrase("Maintain good relations and fair pricing")).toBeNull();
+  });
+  it("keeps the fixed holding reply and follow-up clean", () => expect(replyProblem(holdingReply("Jane"))).toBeNull());
 });

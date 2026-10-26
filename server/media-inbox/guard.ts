@@ -67,6 +67,17 @@ export { botTellProblem } from "../outbound-guard";
 import { botTellProblem } from "../outbound-guard";
 
 
+/**
+ * Owner 2026-10-26, on an auto-reply to Planning Tank: "make sure you dont sound like a bot". The stock phrases of a form
+ * letter: echoing their rules back ("We will ensure…", "We also note that…"), recaps, workflow talk and the closing
+ * "let us know if you need anything else" (which only invites another round). Semicolons too: nobody types them in email.
+ */
+const FORM_LETTER = /\b(we|we'll|we will|we would like to|this will) (ensure|guarantee)\b|\bto summari[sz]e\b|\bwe(['’]ve| have)? (also )?not(ed|e) (that|your|the|all)\b|\bas (you )?requested\b|\balign (our|with)\b|\bstreamline\b|\bkick (off|start) the\b|\blet us know if (you need|there(['’]s| is)) anything else\b|\b(do not|don['’]t) hesitate\b|\bthanks?( you)? for (confirming|clarifying|sharing)\b[^.\n]{0,80}\band (confirming|clarifying|sharing)\b|\bplease be advised\b|\bwe are comfortable with\b|;/i;
+/** The form-letter phrase a reply uses, or null. */
+export function formLetterPhrase(reply: string): string | null {
+  return reply.match(FORM_LETTER)?.[0] ?? null;
+}
+
 /** Why a drafted reply must not go out, or null when it is safe (the laws marked `code` in shared/media-inbox.ts). */
 export function replyProblem(reply: string): string | null {
   if (!reply.trim()) return "Empty reply";
@@ -75,6 +86,8 @@ export function replyProblem(reply: string): string | null {
   const tell = botTellProblem(reply);
   if (tell) return tell;
   if (CLAIMS_HUMAN.test(reply)) return "The reply claims a person wrote it";
+  const stiff = formLetterPhrase(reply);
+  if (stiff) return `The reply reads like a form letter ("${stiff}")`;
   if (MONEY_AMOUNT.test(reply)) return "The reply mentions an amount of money";
   if (MONEY_COMMIT.test(reply)) return "The reply commits us to paying, buying or signing";
   if (PAYMENT_WORDS.test(reply)) return "The reply talks about payment details";
