@@ -177,6 +177,10 @@ export const MEDIA_INBOX_PARAMETERS = {
   maxContactsPerCompany: 3,
   newContactsPerDay: 50,
   aiOrder: ["TruthCoder", "TruthCoder 2.0", "OpenAI", "Anthropic"],
+  /** Owner 2026-10-26 ("dont sound like a bot"): replies went out ~16 min after theirs, often at 2-4am. Mail now leaves
+   *  only in US Central office hours on weekdays, and a reply waits 40-150 minutes (varies per email) after theirs. */
+  officeHours: { timeZone: "America/Chicago", fromHour: 8, toHour: 18 },
+  replyDelayMin: { min: 40, max: 150 },
 } as const;
 
 /** What the admin controls on /admin/partnerships (stored in media_settings; unset fields fall back to the server's env). */

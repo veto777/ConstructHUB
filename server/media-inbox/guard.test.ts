@@ -285,3 +285,19 @@ describe("replies never read like a form letter (owner 2026-10-26)", () => {
   });
   it("keeps the fixed holding reply and follow-up clean", () => expect(replyProblem(holdingReply("Jane"))).toBeNull());
 });
+
+import { inOfficeHours, replyDueAt } from "./worker";
+describe("mail leaves at human hours (owner 2026-10-26)", () => {
+  it("sends on weekdays 8am-6pm Central only", () => {
+    expect(inOfficeHours(new Date("2026-10-26T15:00:00Z"))).toBe(true);   // Mon 10am CDT
+    expect(inOfficeHours(new Date("2026-10-26T08:00:00Z"))).toBe(false);  // Mon 3am CDT
+    expect(inOfficeHours(new Date("2026-10-26T23:30:00Z"))).toBe(false);  // Mon 6:30pm CDT
+    expect(inOfficeHours(new Date("2026-10-24T16:00:00Z"))).toBe(false);  // Saturday
+  });
+  it("waits 40-150 minutes, differently per email", () => {
+    const at = "2026-10-26T15:00:00Z";
+    const mins = [1, 2, 3, 1793, 1801].map((id) => (replyDueAt(id, at).getTime() - Date.parse(at)) / 60000);
+    for (const m of mins) { expect(m).toBeGreaterThanOrEqual(40); expect(m).toBeLessThanOrEqual(150); }
+    expect(new Set(mins).size).toBeGreaterThan(2);
+  });
+});

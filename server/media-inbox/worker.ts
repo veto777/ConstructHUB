@@ -226,10 +226,27 @@ export async function readSupport(): Promise<{ read: number; logged: number; pri
  * Step 2 + 3: answer every waiting email — one answer per company per pass. Its latest email is answered with the
  * whole conversation in view; earlier waiting emails from the same company are marked answered by that reply.
  */
+/** Weekday office hours in US Central: the only time media@ sends on its own. */
+export function inOfficeHours(now = new Date()): boolean {
+  const { timeZone, fromHour, toHour } = MEDIA_INBOX_PARAMETERS.officeHours;
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(now);
+  const day = parts.find((p) => p.type === "weekday")?.value ?? "";
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? -1);
+  return !["Sat", "Sun"].includes(day) && hour >= fromHour && hour < toHour;
+}
+
+/** When a reply to this email may go out: a delay between the bounds that differs from email to email. */
+export function replyDueAt(messageId: number, receivedAt: string | Date): Date {
+  const { min, max } = MEDIA_INBOX_PARAMETERS.replyDelayMin;
+  const minutes = min + ((messageId * 2654435761) >>> 0) % (max - min + 1);
+  return new Date(new Date(receivedAt).getTime() + minutes * 60_000);
+}
+
 export async function answerPending(): Promise<{ replied: number; held: number; failed: number; optedOut: number }> {
   const mailbox = mailboxConfig().user;
   const out = { replied: 0, held: 0, failed: 0, optedOut: 0 };
   for (const { answer: m, folded } of latestPerCompany(await store.pending(ANSWER_BATCH))) {
+    if (replyDueAt(m.id, m.receivedAt).getTime() > Date.now()) continue; // too soon: a later pass answers it
     const first = firstNameOf(m.fromName);
     let body: string, status: "replied" | "needs_owner" | "failed", reason: string | null = null, partnerId: number | null = null;
     let newlyAgreed: Awaited<ReturnType<typeof store.upsertPartner>> | null = null;
@@ -606,11 +623,14 @@ export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; r
       const r = await readInbox();
       await readSupport().catch((e) => console.error(`[media-inbox] reading support@ failed: ${e?.message ?? e}`));
       // Automatic replies off: new emails wait for the admin (answered from the company page).
-      const a = settings.autoReplies ? await answerPending() : { replied: 0, held: await store.holdNew(), failed: 0, optedOut: 0 };
+      // Outside office hours nothing leaves on its own: new emails stay waiting for the next open pass.
+      const open = inOfficeHours();
+      const a = !settings.autoReplies ? { replied: 0, held: await store.holdNew(), failed: 0, optedOut: 0 }
+        : open ? await answerPending() : { replied: 0, held: 0, failed: 0, optedOut: 0 };
       const ar = await readAutoReplies();
       const act = await actOnNextSteps();
-      const f = settings.followUps ? await followUpSilent() : { followedUp: 0, newContacts: 0, exhausted: 0 };
-      const q = await sendQueued();
+      const f = settings.followUps && open ? await followUpSilent() : { followedUp: 0, newContacts: 0, exhausted: 0 };
+      const q = open ? await sendQueued() : { queued: 0, sent: 0 };
       await refreshBriefs().catch((e) => console.error(`[media-inbox] briefs failed: ${e?.message ?? e}`));
       await store.markPass(mailboxConfig().user, null);
       return { ok: true, read: r.read, ...a, autoRepliesRead: ar.read, nextSteps: act, ...f, newlyQueued: q.queued, outreachSent: q.sent };
