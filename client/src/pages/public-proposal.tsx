@@ -277,6 +277,7 @@ export default function PublicProposalPage() {
   // "1" with an admin session (the editor's Preview), or the signed key in a "Send me a proof" email.
   const preview = search.get("preview");
   const returnedPaid = search.get("paid") === "1";
+  const returnedUnpaid = search.get("paid") === "0";
   const url = `/api/public/proposals/${token}${preview ? `?preview=${encodeURIComponent(preview)}` : ""}`;
   const [pollUntil] = useState(() => (returnedPaid ? Date.now() + 90_000 : 0));
   const { data, error, isLoading, refetch } = useQuery<PublicProposal>({
@@ -412,6 +413,14 @@ export default function PublicProposalPage() {
         </section>
 
         <StatusBanner data={data} returnedPaid={returnedPaid} token={token} />
+        {/* Back from Checkout without paying: most often the card issuer's verification (3-D Secure) said no. */}
+        {returnedUnpaid && data.signature && !["paid", "processing"].includes(data.status) && (
+          <div className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950" data-testid="banner-not-paid">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div className="text-sm"><div className="font-semibold">No payment was taken</div>
+              If your card couldn't be verified, nothing was charged. You can pay by bank transfer (ACH) below with no fee, pay a smaller amount now and the rest after, or call the number on the back of your card, ask them to approve the payment to ConstructHUB, and try again.</div>
+          </div>
+        )}
 
         {content.intro && <section className="max-w-3xl"><Body text={content.intro} /></section>}
 

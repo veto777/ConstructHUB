@@ -1320,16 +1320,35 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
       if (fee > 0) items.push({ quantity: 1, price_data: { currency: "usd", unit_amount: fee, product_data: { name: `Card processing fee (${formatBps(bps)})`, description: "Covers card processing. Pay by bank transfer (ACH) to avoid this fee." } } });
       const base = getBaseUrl(req);
       const metadata = { type: "proposal", part: "1", proposalId: String(r.id), method: method.data, amountCents: String(asked), cardFeeCents: String(fee) };
+      const card = method.data === "card";
+      // Only the payment that finishes today's balance saves the method for auto-pay: asking to keep a card for future
+      // charges makes issuers' 3-D Secure (AMEX SafeKey) stricter, and a part payment's card is never the one billed.
+      const saveForAutoPay = autoPay && (!card || asked === bal.remainingCents);
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer,
         line_items: items,
-        payment_method_types: method.data === "ach" ? ["us_bank_account"] : ["card"],
-        ...(method.data === "ach" ? { payment_method_options: { us_bank_account: { financial_connections: { permissions: ["payment_method"] } } } } : {}),
+        payment_method_types: card ? ["card"] : ["us_bank_account"],
+        payment_method_options: card
+          // A one-time code from the bank instead of its silent risk check, which turns down a large first charge
+          // from a new merchant (owner, 2026-10-26: AMEX failed authentication in 2s with no code shown).
+          ? { card: { request_three_d_secure: "challenge" } }
+          : { us_bank_account: { financial_connections: { permissions: ["payment_method"] } } },
+        // The full billing address and phone go to the issuer's authentication and the street/ZIP checks.
+        ...(card ? {
+          billing_address_collection: "required" as const,
+          phone_number_collection: { enabled: true },
+          customer_update: { address: "auto" as const, name: "auto" as const },
+          custom_text: { submit: { message: "Your card issuer may ask you to confirm this payment with a code sent to your phone or email. Keep that handy." } },
+        } : {}),
         success_url: `${base}/proposal/${r.public_token}?paid=1`,
         cancel_url: `${base}/proposal/${r.public_token}?paid=0`,
         metadata,
-        payment_intent_data: { metadata, description: title, ...(autoPay ? { setup_future_usage: "off_session" as const } : {}) },
+        payment_intent_data: {
+          metadata, description: title, ...(saveForAutoPay ? { setup_future_usage: "off_session" as const } : {}),
+          // "CONSTRUCTHUB* PROP 7" on the card statement (22 characters at most with the prefix).
+          ...(card ? { statement_descriptor_suffix: `PROP ${r.id}`.slice(0, 8) } : {}),
+        },
       });
       await pool.query(`INSERT INTO proposal_payments (proposal_id, stripe_session_id, method, amount_cents, fee_cents) VALUES ($1, $2, $3, $4, $5)`,
         [r.id, session.id, method.data, asked, fee]);
