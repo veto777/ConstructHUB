@@ -1,11 +1,11 @@
 /**
  * ConstructHUB Direct — what posting alone never showed (owner, 2026-10-12: "you cant see followers, stats, likes, or
- * delete videos"): account stats, per-post stats, comments (read, reply, hide, delete) and deleting a published post,
+ * delete videos"): account stats, per-post stats, comments (add, read, reply, hide, delete) and deleting a published post,
  * for the accounts connected through our own apps (server/social/native.ts). Each network says what it allows:
  *
- *   Facebook Page   followers, reach/views/engagement; post reactions/comments/shares/reach; comments reply/hide/delete; delete post
+ *   Facebook Page   followers, reach/views/engagement; post reactions/comments/shares/reach; comments add/reply/hide/delete; delete post
  *   Instagram       followers/following/posts, reach/views/interactions; post likes/comments/reach/views/saves/shares;
- *                   comments reply/hide/delete; delete post (Facebook login: instagram_manage_contents)
+ *                   comments add/reply/hide/delete; delete post
  *   Threads         followers, views/likes/replies/reposts/quotes; replies reply/hide; delete post
  *   TikTok          followers/following/likes/videos; video likes/comments/shares/views (public videos only);
  *                   no comments and no deleting through the API
@@ -295,6 +295,30 @@ export async function replyComment(client: NativeClient, submissionId: string, c
   const d = row.platform === "facebook"
     ? await g("meta", "POST", `${cid}/comments`, { message: text }, token)
     : await g(api === "ig_login" ? "ig_login" : "meta", "POST", `${cid}/replies`, { message: text }, token);
+  forgetPost(client.tenant, submissionId);
+  return { id: String(d.id) };
+}
+
+/** Comment on the post itself as the business (Facebook Page, Instagram, Threads). */
+export async function addComment(client: NativeClient, submissionId: string, message: string) {
+  const text = message.trim();
+  if (!text) throw new SocialError("Write a comment first");
+  const { sub, row, token, api } = await live(client, submissionId);
+  const postId = String(sub.external_id ?? "");
+  if (api === "x") throw new SocialError("Manage replies on X.");
+  if (api === "tiktok") throw new SocialError(NO_TIKTOK_COMMENTS);
+  if (api !== "threads" && api !== "meta" && api !== "ig_login") throw new SocialError("Comment on the network itself.");
+  if (api === "threads") {
+    if (text.length > 500) throw new SocialError("Threads replies are at most 500 characters");
+    const c = await g("threads", "POST", `${row.external_id}/threads`, { media_type: "TEXT", text, reply_to_id: postId }, token);
+    let pub: any = null;
+    for (let i = 0; i < 4 && !pub; i++) {
+      pub = await g("threads", "POST", `${row.external_id}/threads_publish`, { creation_id: c.id }, token).catch(async (e) => { if (i === 3) throw e; await new Promise((r) => setTimeout(r, 1500)); return null; });
+    }
+    forgetPost(client.tenant, submissionId);
+    return { id: String(pub.id) };
+  }
+  const d = await g(api === "ig_login" ? "ig_login" : "meta", "POST", `${postId}/comments`, { message: text }, token);
   forgetPost(client.tenant, submissionId);
   return { id: String(d.id) };
 }
