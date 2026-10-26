@@ -13,7 +13,8 @@
  * Not checked: requests that never went through Cloudflare (the deploy's local checks, the tower), webhooks and
  * the machine-to-machine paths other services call (Stripe, SignalWire, inbound mail, Telegram, the Click Guard /
  * VPN Shield scripts on customers' sites and the Google Ads script, /.well-known, robots.txt), the public tutorial
- * media the social networks' fetchers download (/api/tutorials/media), and the paid
+ * media and the customers' post media the social networks' fetchers download (/api/tutorials/media,
+ * /api/files/social), and the paid
  * Public/Code API when it carries its key (it has its own keys and limits).
  */
 import type { NextFunction, Request, Response } from "express";
@@ -24,6 +25,9 @@ const MACHINE_PATHS: readonly RegExp[] = [
   // Public tutorial media (walkthrough cuts, Instagram Stories): Instagram, TikTok, LinkedIn and Blotato fetch these
   // with their own fetchers, never a browser. Blocking them (2026-10-17..19) silently failed every scheduled post.
   /^\/api\/tutorials\/media\//,
+  // A customer's post media (/api/files/social/<random token>/…): Facebook and Instagram download each photo or video
+  // from here when it is published. Blocking them (2026-10-16..26) failed every Facebook/Instagram media post.
+  /^\/api\/files\/social\//,
   /^\/voice\//,
   /webhook/i,
   /^\/api\/inbound-mail/,

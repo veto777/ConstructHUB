@@ -65,5 +65,7 @@ describe("bot firewall", () => {
 it("public tutorial media is open to the social networks' fetchers", () => {
   expect(classifyRequest("/api/tutorials/media/crm-clients.social-vertical.0123abcd.mp4", "facebookexternalhit/1.1")).toBe("machine");
   expect(classifyRequest("/api/tutorials/media/story-tut-crm-pricebook.4a0254f3.mp4", "curl/8.5.0")).toBe("machine");
+  expect(classifyRequest("/api/files/social/a8132d899a79405ba0bb6c2888be5eaa/media.jpg", "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)")).toBe("machine");
+  expect(classifyRequest("/api/files/other/a8132d899a79405ba0bb6c2888be5eaa/media.jpg", "facebookexternalhit/1.1")).toBe("bot");
   expect(classifyRequest("/api/tutorials", "curl/8.5.0")).toBe("bot");
 });
