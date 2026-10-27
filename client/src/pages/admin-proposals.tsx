@@ -463,7 +463,7 @@ function ChargePanel({ p }: { p: ProposalDetail }) {
   const cap = plan ? Math.max(0, total - paidIn) : bal.remainingCents;
   const next = plan ? planNextDue(plan, paidIn) : null;
   const suggested = bal.remainingCents > 0 ? bal.remainingCents : next?.cents ?? cap;
-  const feeBps = p.content.payment.cardFeeBps;
+  const feeBps = p.content.payment.cardEnabled ? p.content.payment.cardFeeBps : 0; // the server's rule
   const [typed, setTyped] = useState("");
   const amount = typed.trim() ? cents(typed) : suggested;
   const problem = !Number.isFinite(amount) || amount < Math.min(MIN_PAYMENT_CENTS, cap) ? `At least ${formatMoney(Math.min(MIN_PAYMENT_CENTS, cap), { cents: true })}.` : amount > cap ? `At most ${formatMoney(cap, { cents: true })}.` : null;
@@ -901,7 +901,8 @@ function ProposalEditor({ id }: { id: number }) {
           )}
         </fieldset>
 
-        <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+        {/* Pinned while the editor scrolls, but never taller than the window: it scrolls on its own (the charge panel sits at the bottom). */}
+        <aside className="space-y-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:self-start lg:overflow-y-auto lg:pb-2 lg:pr-1">
           {p.kind === "offer" && p.totals && (
             <Section title="What they chose">
               <ul className="space-y-1 text-sm">{p.totals.lines.map((l) => <li key={l.itemId} className="flex justify-between gap-2"><span>{l.name}</span><span className="tabular-nums">{formatMoney(l.priceCents)}{l.billing === "monthly" ? "/mo" : ""}</span></li>)}</ul>
