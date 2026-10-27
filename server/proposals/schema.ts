@@ -84,6 +84,12 @@ export const PROPOSALS_DDL: readonly string[] = [
   `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS reminders_paused boolean NOT NULL DEFAULT false`,
   `CREATE INDEX IF NOT EXISTS proposals_kind_idx ON proposals (kind, updated_at DESC)`,
   `CREATE INDEX IF NOT EXISTS proposals_session_idx ON proposals (stripe_session_id) WHERE stripe_session_id IS NOT NULL`,
+  // Payments the admin runs for the client from a signed card authorization (owner, 2026-10-27): a new card through
+  // Stripe Checkout (source 'admin'), or a saved card charged off-session — a PaymentIntent with no Checkout session.
+  // payment_plan replaces what was due at signing (shared/proposals.ts PaymentPlan).
+  `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS payment_plan jsonb`,
+  `ALTER TABLE proposal_payments ALTER COLUMN stripe_session_id DROP NOT NULL`,
+  `ALTER TABLE proposal_payments ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'client'`,
 ];
 
 export async function ensureProposalsSchema(q?: Queryable): Promise<void> {

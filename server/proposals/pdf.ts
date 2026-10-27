@@ -7,7 +7,7 @@
  * locked once signed — nothing is kept but the data it is made from.
  */
 import PDFDocument from "pdfkit";
-import { ALL_TERMS_ID, autoPayLines, autoPaySchedule, cardFeeCents, formatBps, formatMoney, invoiceLines, type PaymentBalance, type ProposalContent, type ProposalPayment, type ProposalTotals } from "@shared/proposals";
+import { ALL_TERMS_ID, autoPayLines, autoPaySchedule, cardFeeCents, formatBps, formatMoney, invoiceLines, isoDay, planInvoiceLines, type PaymentBalance, type InstallmentPlan, type ProposalContent, type ProposalPayment, type ProposalTotals } from "@shared/proposals";
 
 const INK = "#111827";
 const MUTED = "#6b7280";
@@ -207,6 +207,8 @@ export type InvoicePdfInput = {
   statement?: boolean;
   issuedAt: Date;
   content: ProposalContent;
+  /** The admin's payment plan, when one replaced what was due at signing. */
+  plan?: InstallmentPlan | null;
   recipientName: string | null;
   recipientEmail: string | null;
   recipientCompany: string | null;
@@ -268,11 +270,13 @@ export function buildInvoicePdf(p: InvoicePdfInput): Promise<Buffer> {
       doc.fillColor(INK).font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(10).text(value, 54 + W - 120, y, { width: 120, align: "right" });
       doc.y = Math.max(yEnd, doc.y) + 3; doc.x = 54;
     };
-    doc.fillColor(accent).font("Helvetica-Bold").fontSize(9).text("DUE AT SIGNING", 54, doc.y);
+    // A payment plan replaces what was due at signing: its installments due so far, against the contract total.
+    doc.fillColor(accent).font("Helvetica-Bold").fontSize(9).text(p.plan ? "PAYMENT PLAN — DUE SO FAR" : "DUE AT SIGNING", 54, doc.y);
     doc.moveDown(0.3); rule();
-    for (const l of invoiceLines(p.totals)) row(l.name, l.detail, l.cents < 0 ? `-${money(-l.cents)}` : money(l.cents));
+    for (const l of p.plan ? planInvoiceLines(p.plan, isoDay(p.issuedAt)) : invoiceLines(p.totals)) row(l.name, l.detail, l.cents < 0 ? `-${money(-l.cents)}` : money(l.cents));
     rule();
-    row("Total due at signing", "", money(p.totals.dueTodayCents), true);
+    if (p.plan) row("Total due so far", `Contract total ${money(p.totals.contractTotalCents)}`, money(p.balance.dueTodayCents), true);
+    else row("Total due at signing", "", money(p.totals.dueTodayCents), true);
     row("Sales tax", "Professional services", "$0.00");
 
     const done = p.payments.filter((x) => x.status === "paid" || x.status === "processing");
@@ -293,7 +297,7 @@ export function buildInvoicePdf(p: InvoicePdfInput): Promise<Buffer> {
     doc.fillColor(INK).font("Helvetica-Bold").fontSize(12).text(p.amountDueCents < p.balance.remainingCents ? "AMOUNT DUE NOW" : "BALANCE DUE", 70, y + 16, { width: W / 2 });
     doc.fillColor(accent).font("Helvetica-Bold").fontSize(18).text(money(p.amountDueCents), 54 + W / 2, y + 13, { width: W / 2 - 16, align: "right" });
     doc.y = y + 56; doc.x = 54;
-    if (p.amountDueCents < p.balance.remainingCents) doc.fillColor(MUTED).font("Helvetica").fontSize(9).text(`Total still owed at signing: ${money(p.balance.remainingCents)}.`, 54, doc.y, { width: W });
+    if (p.amountDueCents < p.balance.remainingCents) doc.fillColor(MUTED).font("Helvetica").fontSize(9).text(`Total still owed ${p.plan ? "so far" : "at signing"}: ${money(p.balance.remainingCents)}.`, 54, doc.y, { width: W });
     doc.moveDown(0.6);
     doc.fillColor(INK).font("Helvetica-Bold").fontSize(10).text("Please pay as soon as possible.", 54, doc.y, { width: W });
     doc.fillColor(INK).font("Helvetica").fontSize(9.5).text("Pay online in one or more payments, on any card or bank account:", 54, doc.y, { width: W });

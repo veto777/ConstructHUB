@@ -294,6 +294,8 @@ export type ProposalPaymentStatus = "open" | "processing" | "paid" | "failed" | 
 export type ProposalPayment = {
   id: number; method: "ach" | "card"; amountCents: number; feeCents: number; status: ProposalPaymentStatus;
   cardLast4: string | null; createdAt: string; paidAt: string | null;
+  /** "admin": run by us for the client from their card authorization. */
+  source?: "client" | "admin";
 };
 export type PaymentBalance = { dueTodayCents: number; paidCents: number; pendingCents: number; remainingCents: number };
 
@@ -302,6 +304,53 @@ export function paymentBalance(dueTodayCents: number, payments: readonly Pick<Pr
   const sum = (s: ProposalPaymentStatus) => payments.filter((p) => p.status === s).reduce((a, p) => a + p.amountCents, 0);
   const paidCents = sum("paid"), pendingCents = sum("processing");
   return { dueTodayCents, paidCents, pendingCents, remainingCents: Math.max(0, dueTodayCents - paidCents - pendingCents) };
+}
+
+/**
+ * A payment plan set by the admin after signing (owner, 2026-10-27: Dr. Tutty pays the contract total in 6 equal
+ * payments, 2 up front, then one a month, always a month ahead). It replaces what was due at signing: "due today"
+ * becomes every installment whose date has come, there is no auto-pay, and the proposal stays partly paid until
+ * the whole plan is paid. Dates are calendar days, Pacific (the brands run from WA). The installments always add
+ * up to the contract total.
+ */
+export type PlanInstallment = { dueOn: string; cents: number };
+export type InstallmentPlan = { installments: PlanInstallment[]; createdAt: string };
+
+export const isoDay = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+
+/** totalCents in `count` equal payments (the last takes the rounding), `upFront` of them due on `startDay`, then one a month. */
+export function evenPlan(totalCents: number, count: number, upFront: number, startDay: string): PlanInstallment[] {
+  const part = Math.floor(totalCents / count);
+  const start = new Date(`${startDay}T12:00:00Z`);
+  return Array.from({ length: count }, (_, i) => ({
+    dueOn: addMonths(start, Math.max(0, i - upFront + 1)).toISOString().slice(0, 10),
+    cents: i === count - 1 ? totalCents - part * (count - 1) : part,
+  }));
+}
+
+/** What the plan says is due by `today` (YYYY-MM-DD). */
+export function planDueCents(plan: InstallmentPlan, today: string): number {
+  return plan.installments.filter((x) => x.dueOn <= today).reduce((s, x) => s + x.cents, 0);
+}
+
+/** The first payment the plan still needs once coveredCents has been paid: what's left of it and when it's due. */
+export function planNextDue(plan: InstallmentPlan, coveredCents: number): PlanInstallment | null {
+  let sum = 0;
+  for (const x of plan.installments) {
+    sum += x.cents;
+    if (sum > coveredCents) return { dueOn: x.dueOn, cents: Math.min(x.cents, sum - coveredCents) };
+  }
+  return null;
+}
+
+/** Why a plan can't be saved for a contract of totalCents, or null. */
+export function planProblem(installments: readonly PlanInstallment[], totalCents: number): string | null {
+  if (!installments.length || installments.length > 60) return "A plan has 1 to 60 payments.";
+  const realDay = (d: string) => { const ms = /^\d{4}-\d{2}-\d{2}$/.test(d) ? Date.parse(`${d}T12:00:00Z`) : NaN; return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === d; };
+  if (installments.some((x) => !realDay(x.dueOn) || !Number.isInteger(x.cents) || x.cents < 50)) return "Every payment needs a real date and an amount of at least $0.50.";
+  if (installments.some((x, i) => i > 0 && x.dueOn < installments[i - 1].dueOn)) return "Put the payments in date order.";
+  const sum = installments.reduce((s, x) => s + x.cents, 0);
+  return sum === totalCents ? null : `The payments add up to ${formatMoney(sum, { cents: true })}, not the contract total of ${formatMoney(totalCents, { cents: true })}.`;
 }
 
 /**
@@ -322,6 +371,16 @@ export function invoiceLines(t: ProposalTotals): InvoiceLine[] {
       : { name: l.name, detail: `${l.termMonths} ${l.termMonths === 1 ? "month" : "months"} × ${formatMoney(l.priceCents, { cents: true })}`, cents: l.termTotalCents });
   if (!monthlyPlan && (t.discountCents ?? 0) > 0) out.push({ name: `Paid in full (${formatBps(t.discountBps ?? 0)} off)`, detail: "Discount", cents: -(t.discountCents ?? 0) });
   return out;
+}
+
+/** A plan's invoice lines: every installment due by `today`, as "Payment 3 of 6 · due Nov 27, 2026". */
+export function planInvoiceLines(plan: InstallmentPlan, today: string): InvoiceLine[] {
+  const n = plan.installments.length;
+  return plan.installments.flatMap((x, i) => x.dueOn <= today ? [{
+    name: `Payment ${i + 1} of ${n}`,
+    detail: `Due ${new Date(`${x.dueOn}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`,
+    cents: x.cents,
+  }] : []);
 }
 
 export const invoiceNumber = (proposalId: number, n: number) => `INV-${proposalId}-${Math.max(1, n)}`;
@@ -443,6 +502,7 @@ export type ProposalDetail = ProposalRow & {
   autoPayStartsAt: string | null;
   /** Invoices for what's left today: how many went out, the last one, and whether the automatic ones are paused. */
   invoices: { count: number; lastAt: string | null; paused: boolean };
+  paymentPlan: InstallmentPlan | null;
   events: ProposalEvent[];
 };
 
@@ -462,6 +522,7 @@ export type PublicProposal = {
   payments: ProposalPayment[];
   balance: PaymentBalance | null;
   autoPayStartsAt: string | null;
+  paymentPlan: InstallmentPlan | null;
   stripeReady: boolean;
   preview: boolean;
   isTest: boolean;
