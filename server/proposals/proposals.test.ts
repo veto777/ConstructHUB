@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, autoPayLines, autoPayMonths, autoPaySchedule, cardFeeCents, defaultSelection, invoiceLines, invoiceNumber, paymentBalance, priceSelection, proposalContentSchema, selectionProblems } from "@shared/proposals";
+import { addMonths, evenPlan, planDueCents, planInvoiceLines, planNextDue, planProblem, autoPayLines, autoPayMonths, autoPaySchedule, cardFeeCents, defaultSelection, invoiceLines, invoiceNumber, paymentBalance, priceSelection, proposalContentSchema, selectionProblems } from "@shared/proposals";
 
 const content = proposalContentSchema.parse({
   payment: { plan: "choice", cardFeeBps: 300 },
@@ -126,5 +126,53 @@ describe("proposals pricing", () => {
   it("adding months clamps the day to the month's end", () => {
     expect(addMonths(new Date("2026-01-31T12:00:00Z"), 1).toISOString()).toBe("2026-02-28T12:00:00.000Z");
     expect(addMonths(new Date("2026-10-25T06:00:00Z"), 5).toISOString()).toBe("2027-03-25T06:00:00.000Z");
+  });
+});
+
+describe("payment plans", () => {
+  // Dr. Tutty, 2026-10-27: $52,070 in 6 equal payments, 2 up front, then one a month — always a month ahead.
+  const list = evenPlan(5_207_000, 6, 2, "2026-10-27");
+  const plan = { installments: list, createdAt: "2026-10-27T15:00:00Z" };
+
+  it("splits the total evenly, the last payment taking the rounding", () => {
+    expect(list.map((x) => x.cents)).toEqual([867_833, 867_833, 867_833, 867_833, 867_833, 867_835]);
+    expect(list.reduce((s, x) => s + x.cents, 0)).toBe(5_207_000);
+    expect(planProblem(list, 5_207_000)).toBeNull();
+  });
+
+  it("puts the up-front payments on the first day, then one a month from the month after", () => {
+    expect(list.map((x) => x.dueOn)).toEqual(["2026-10-27", "2026-10-27", "2026-11-27", "2026-12-27", "2027-01-27", "2027-02-27"]);
+  });
+
+  it("is due what has come due by the day", () => {
+    expect(planDueCents(plan, "2026-10-26")).toBe(0);
+    expect(planDueCents(plan, "2026-10-27")).toBe(1_735_666);
+    expect(planDueCents(plan, "2026-11-27")).toBe(2_603_499);
+    expect(planDueCents(plan, "2027-03-01")).toBe(5_207_000);
+    expect(paymentBalance(planDueCents(plan, "2026-11-27"), [{ amountCents: 1_735_666, status: "paid" }]).remainingCents).toBe(867_833);
+  });
+
+  it("names the next payment, or what's left of it", () => {
+    expect(planNextDue(plan, 1_735_666)).toEqual({ dueOn: "2026-11-27", cents: 867_833 });
+    expect(planNextDue(plan, 1_800_000)).toEqual({ dueOn: "2026-11-27", cents: 803_499 });
+    expect(planNextDue(plan, 5_207_000)).toBeNull();
+  });
+
+  it("invoices only the payments due so far", () => {
+    expect(planInvoiceLines(plan, "2026-11-27").map((l) => `${l.name} · ${l.detail}`)).toEqual([
+      "Payment 1 of 6 · Due Oct 27, 2026", "Payment 2 of 6 · Due Oct 27, 2026", "Payment 3 of 6 · Due Nov 27, 2026",
+    ]);
+  });
+
+  it("refuses a plan that doesn't add up or is out of order", () => {
+    expect(planProblem(list.slice(1), 5_207_000)).toMatch(/add up to/);
+    expect(planProblem([list[2], list[0], ...list.slice(3), list[1]], 5_207_000)).toMatch(/date order/);
+    expect(planProblem([{ dueOn: "2026-10-27", cents: 10 }], 10)).toMatch(/at least/);
+    expect(planProblem([{ dueOn: "2026-02-31", cents: 5_207_000 }], 5_207_000)).toMatch(/real date/);
+    expect(planProblem([{ dueOn: "2027-13-01", cents: 5_207_000 }], 5_207_000)).toMatch(/real date/);
+  });
+
+  it("clamps a month-end start to each month's last day", () => {
+    expect(evenPlan(300_00, 3, 1, "2027-01-31").map((x) => x.dueOn)).toEqual(["2027-01-31", "2027-02-28", "2027-03-31"]);
   });
 });

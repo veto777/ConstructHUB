@@ -11,10 +11,10 @@ import { Link, useLocation, useRoute } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict, format } from "date-fns";
 import {
-  ArrowDown, ArrowLeft, ArrowUp, Archive, BellOff, BellRing, Copy, Eye, FilePlus2, FileSignature, FileText, Loader2, Lock, Mail, Plus, Receipt, RotateCcw, Save, Send, Trash2, Upload, XCircle,
+  ArrowDown, ArrowLeft, ArrowUp, Archive, BellOff, BellRing, CalendarClock, Copy, CreditCard, Eye, FilePlus2, FileSignature, FileText, Loader2, Lock, Mail, Plus, Receipt, RotateCcw, Save, Send, Trash2, Upload, XCircle,
 } from "lucide-react";
 import {
-  DEFAULT_CARD_FEE_BPS, DEFAULT_FULL_PAY_DISCOUNT_BPS, MAX_PDF_BYTES, MIN_PAYMENT_CENTS, PROPOSAL_STATUS_LABELS, REMINDER_EVERY_HOURS, autoPayLines, autoPaySchedule, defaultSelection, formatBps, formatMoney, priceSelection, standardTerms,
+  DEFAULT_CARD_FEE_BPS, DEFAULT_FULL_PAY_DISCOUNT_BPS, MAX_PDF_BYTES, MIN_PAYMENT_CENTS, PROPOSAL_STATUS_LABELS, REMINDER_EVERY_HOURS, autoPayLines, autoPaySchedule, cardFeeCents, defaultSelection, evenPlan, formatBps, formatMoney, isoDay, planNextDue, priceSelection, standardTerms,
   type ProposalContent, type ProposalDetail, type ProposalGroup, type ProposalItem, type ProposalRow, type ProposalStatus, type ProposalSummary,
 } from "@shared/proposals";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -442,7 +442,139 @@ const EVENT_LABEL: Record<string, string> = {
   payment_received: "Payment received", autopay_scheduled: "Auto-pay scheduled", autopay_missing: "Auto-pay not set up", overpaid: "Overpaid",
   payment_failed: "Payment failed", void: "Voided", archived: "Archived", restored: "Restored",
   invoice_sent: "Invoice sent", reminder_sent: "Payment reminder sent (invoice)", invoice_failed: "Invoice not sent", reminders_paused: "Daily invoices paused", reminders_resumed: "Daily invoices resumed",
+  plan_set: "Payment plan set", plan_removed: "Payment plan removed",
 };
+
+type SavedCard = { id: string; brand: string; last4: string; expMonth: number | null; expYear: number | null; name: string | null };
+const dayText = (day: string) => format(new Date(`${day}T12:00:00`), "MMM d, yyyy");
+const cents = (typed: string) => Math.round(Number(typed.replace(/[$,\s]/g, "")) * 100);
+
+/**
+ * Payments we run for the client (owner, 2026-10-27): from their signed card authorization form, on a payment plan
+ * that replaces what was due at signing. A new card is typed into Stripe Checkout here (it never touches our
+ * server) and saved; later payments charge the saved card in one click.
+ */
+function ChargePanel({ p }: { p: ProposalDetail }) {
+  const { toast } = useToast();
+  const bal = p.balance!;
+  const total = p.totals!.contractTotalCents;
+  const plan = p.paymentPlan;
+  const paidIn = bal.paidCents + bal.pendingCents;
+  const cap = plan ? Math.max(0, total - paidIn) : bal.remainingCents;
+  const next = plan ? planNextDue(plan, paidIn) : null;
+  const suggested = bal.remainingCents > 0 ? bal.remainingCents : next?.cents ?? cap;
+  const feeBps = p.content.payment.cardFeeBps;
+  const [typed, setTyped] = useState("");
+  const amount = typed.trim() ? cents(typed) : suggested;
+  const problem = !Number.isFinite(amount) || amount < Math.min(MIN_PAYMENT_CENTS, cap) ? `At least ${formatMoney(Math.min(MIN_PAYMENT_CENTS, cap), { cents: true })}.` : amount > cap ? `At most ${formatMoney(cap, { cents: true })}.` : null;
+  const fee = problem ? 0 : cardFeeCents(amount, feeBps);
+  const [confirm, setConfirm] = useState<SavedCard | null>(null);
+  const [planOpen, setPlanOpen] = useState(false);
+  const cardsUrl = `/api/admin/proposals/${p.id}/cards`;
+  const { data: cards = [], isLoading: cardsLoading } = useQuery<SavedCard[]>({ queryKey: [cardsUrl], queryFn: () => getJson(cardsUrl) });
+
+  useEffect(() => { // back from Stripe Checkout
+    const q = new URLSearchParams(window.location.search).get("charged");
+    if (!q) return;
+    toast(q === "1" ? { title: "Card charged", description: "Stripe took the payment and saved the card for the next ones." } : { title: "No charge made", description: "The Stripe page was closed before paying." });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+
+  const charge = useMutation({
+    mutationFn: async (paymentMethodId?: string) => (await apiRequest("POST", `/api/admin/proposals/${p.id}/charge`, { amountCents: amount, paymentMethodId })).json(),
+    onSuccess: (j: { url?: string; result?: string }) => {
+      if (j.url) { window.location.href = j.url; return; }
+      toast({ title: j.result === "processing" ? "Charge started" : "Card charged", description: `${formatMoney(amount + fee, { cents: true })} incl. the ${formatBps(feeBps)} card fee.` });
+      setConfirm(null); setTyped(""); void invalidate();
+    },
+    onError: (e) => { toast({ title: "The charge didn't go through", description: apiErrorMessage(e), variant: "destructive" }); setConfirm(null); void invalidate(); },
+  });
+
+  let covered = 0;
+  return (
+    <Section title="Charge the client's card" description={plan ? `Payment plan · ${formatMoney(bal.remainingCents, { cents: true })} due now · ${formatMoney(cap, { cents: true })} left on the contract.` : `${formatMoney(bal.remainingCents, { cents: true })} due today. Use this with a signed card authorization from the client.`}>
+      <div className="space-y-3 text-sm" data-testid="panel-charge">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 font-medium"><CalendarClock className="h-4 w-4" />Payment plan</span>
+            <Button size="sm" variant="ghost" onClick={() => setPlanOpen(true)} data-testid="button-edit-plan">{plan ? "Change" : "Set up"}</Button></div>
+          {plan ? (
+            <ul className="space-y-0.5" data-testid="plan-installments">{plan.installments.map((x, i) => {
+              covered += x.cents;
+              const done = covered <= bal.paidCents + bal.pendingCents;
+              const due = x.dueOn <= isoDay(new Date());
+              return <li key={i} className={cn("flex justify-between gap-2", done ? "text-emerald-700" : due ? "font-medium text-amber-700" : "text-muted-foreground")}>
+                <span>{i + 1}. {dayText(x.dueOn)}{done ? " · paid" : due ? " · due" : ""}</span><span className="tabular-nums">{formatMoney(x.cents, { cents: true })}</span></li>;
+            })}</ul>
+          ) : <p className="text-xs text-muted-foreground">None — the client owes what was due at signing. A plan splits the contract total into dated payments (no auto-pay; you charge each one).</p>}
+        </div>
+        {cap > 0 && (<div className="space-y-2 border-t pt-3">
+          <Label htmlFor="charge-amount">Amount to charge (before the {formatBps(feeBps)} card fee)</Label>
+          <Input id="charge-amount" inputMode="decimal" placeholder={(suggested / 100).toFixed(2)} value={typed} onChange={(e) => setTyped(e.target.value)} data-testid="input-charge-amount" />
+          {problem ? <p className="text-xs text-red-600">{problem}</p> : <p className="text-xs text-muted-foreground">Card is charged {formatMoney(amount + fee, { cents: true })} ({formatMoney(amount, { cents: true })} + {formatMoney(fee, { cents: true })} fee).{next && bal.remainingCents <= 0 ? ` Next payment on the plan: ${dayText(next.dueOn)}.` : ""}</p>}
+          <div className="space-y-1.5">
+            {cardsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : cards.map((c) => (
+              <div key={c.id} className="flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
+                <span className="flex items-center gap-1.5"><CreditCard className="h-4 w-4" />{c.brand.toUpperCase()} ••{c.last4}{c.expMonth ? ` · ${String(c.expMonth).padStart(2, "0")}/${String(c.expYear ?? "").slice(-2)}` : ""}</span>
+                <Button size="sm" onClick={() => setConfirm(c)} disabled={!!problem || charge.isPending} data-testid="button-charge-saved">Charge</Button>
+              </div>
+            ))}
+            <Button size="sm" variant={cards.length ? "outline" : "default"} onClick={() => charge.mutate(undefined)} disabled={!!problem || charge.isPending} data-testid="button-charge-new">
+              {charge.isPending && !confirm ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CreditCard className="mr-1.5 h-4 w-4" />}Charge a new card</Button>
+            <p className="text-xs text-muted-foreground">Opens Stripe's secure card page: type the card and billing address from the client's authorization form. The card is saved for the next payments. If the bank asks for a code, it goes to the cardholder.</p>
+          </div>
+        </div>)}
+      </div>
+      <Dialog open={!!confirm} onOpenChange={(v) => !v && !charge.isPending && setConfirm(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Charge {formatMoney(amount + fee, { cents: true })}?</DialogTitle>
+            <DialogDescription>{confirm?.brand.toUpperCase()} ••{confirm?.last4} is charged now: {formatMoney(amount, { cents: true })} + {formatMoney(fee, { cents: true })} card fee. {p.recipientEmail ? `${p.recipientEmail} gets a receipt.` : ""}</DialogDescription></DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirm(null)} disabled={charge.isPending}>Cancel</Button>
+            <Button onClick={() => confirm && charge.mutate(confirm.id)} disabled={charge.isPending} data-testid="button-charge-confirm">{charge.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CreditCard className="mr-1.5 h-4 w-4" />}Charge now</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {planOpen && <PlanDialog p={p} onClose={() => setPlanOpen(false)} />}
+    </Section>
+  );
+}
+
+/** Equal payments of the contract total: how many, how many up front, then one a month from the first date. */
+function PlanDialog({ p, onClose }: { p: ProposalDetail; onClose: () => void }) {
+  const { toast } = useToast();
+  const total = p.totals!.contractTotalCents;
+  const [count, setCount] = useState(String(p.paymentPlan?.installments.length ?? 6));
+  const [upFront, setUpFront] = useState("2");
+  const [start, setStart] = useState(isoDay(new Date()));
+  const n = Math.trunc(Number(count)), u = Math.trunc(Number(upFront));
+  const bad = !(n >= 1 && n <= 60) ? "1 to 60 payments." : !(u >= 1 && u <= n) ? "Up front: at least 1, at most every payment." : !/^\d{4}-\d{2}-\d{2}$/.test(start) ? "Pick the first date." : null;
+  const list = bad ? [] : evenPlan(total, n, u, start);
+  const save = useMutation({
+    mutationFn: async (installments: typeof list | null) => (await apiRequest("PUT", `/api/admin/proposals/${p.id}/plan`, { installments })).json(),
+    onSuccess: (_d, v) => { toast({ title: v ? "Payment plan saved" : "Payment plan removed" }); void invalidate(); onClose(); },
+    onError: (e) => toast({ title: "Couldn't save the plan", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  return (
+    <Dialog open onOpenChange={(v) => !v && !save.isPending && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Payment plan</DialogTitle>
+          <DialogDescription>Splits the contract total of {formatMoney(total, { cents: true })} into equal payments. It replaces the {formatMoney(p.totals!.dueTodayCents, { cents: true })} due at signing; there's no auto-pay — you charge each payment here.</DialogDescription></DialogHeader>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-1"><Label htmlFor="pl-n">Payments</Label><Input id="pl-n" inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value)} data-testid="input-plan-count" /></div>
+          <div className="space-y-1"><Label htmlFor="pl-u">Up front</Label><Input id="pl-u" inputMode="numeric" value={upFront} onChange={(e) => setUpFront(e.target.value)} data-testid="input-plan-upfront" /></div>
+          <div className="space-y-1"><Label htmlFor="pl-s">First date</Label><Input id="pl-s" type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+        </div>
+        {bad ? <p className="text-xs text-red-600">{bad}</p> : (
+          <ul className="space-y-0.5 text-sm" data-testid="plan-preview">{list.map((x, i) => <li key={i} className="flex justify-between"><span>{i + 1}. {dayText(x.dueOn)}{i < u ? " · up front" : ""}</span><span className="tabular-nums">{formatMoney(x.cents, { cents: true })}</span></li>)}</ul>
+        )}
+        <DialogFooter className="gap-2">
+          {p.paymentPlan && <Button variant="outline" onClick={() => save.mutate(null)} disabled={save.isPending}>Remove plan</Button>}
+          <Button onClick={() => save.mutate(list)} disabled={!!bad || save.isPending} data-testid="button-plan-save">{save.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}Save plan</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 /**
  * What's still due today, invoiced (owner, 2026-10-25): send an invoice for all of it or part of it, see what went
@@ -776,23 +908,25 @@ function ProposalEditor({ id }: { id: number }) {
               <div className="mt-2 border-t pt-2 text-sm">
                 {(p.totals.discountCents ?? 0) > 0 && <div className="flex justify-between text-emerald-700"><span>Paid in full ({formatBps(p.totals.discountBps ?? 0)} off)</span><span>−{formatMoney(p.totals.discountCents ?? 0)}</span></div>}
                 <div className="flex justify-between font-semibold"><span>Contract total</span><span>{formatMoney(p.totals.contractTotalCents)}</span></div>
-                <div className="flex justify-between"><span>Due at signing</span><span>{formatMoney(p.totals.dueTodayCents)}</span></div>
+                <div className={cn("flex justify-between", p.paymentPlan && "text-muted-foreground line-through")}><span>Due at signing</span><span>{formatMoney(p.totals.dueTodayCents)}</span></div>
+                {p.paymentPlan && <div className="flex justify-between"><span>Payment plan</span><span>{p.paymentPlan.installments.length} payments</span></div>}
                 {p.payments.length > 0 ? (<>
                   {p.payments.map((x, i) => (
                     <div key={x.id} className={cn("flex justify-between gap-2", x.status === "failed" && "text-red-600 line-through")}>
-                      <span>Payment {i + 1} · {x.method === "ach" ? "ACH" : "Card"}{x.cardLast4 ? ` ••${x.cardLast4}` : ""}{x.status === "processing" ? " (clearing)" : x.status === "failed" ? " (failed)" : ""}</span>
+                      <span>Payment {i + 1} · {x.method === "ach" ? "ACH" : "Card"}{x.cardLast4 ? ` ••${x.cardLast4}` : ""}{x.source === "admin" ? " · by us" : ""}{x.status === "processing" ? " (clearing)" : x.status === "failed" ? " (failed)" : ""}</span>
                       <span className="tabular-nums">{formatMoney(x.amountCents, { cents: true })}{x.feeCents ? ` +${formatMoney(x.feeCents, { cents: true })} fee` : ""}</span>
                     </div>
                   ))}
-                  {p.balance && <div className="flex justify-between font-semibold"><span>Left to pay today</span><span className="tabular-nums">{formatMoney(p.balance.remainingCents, { cents: true })}</span></div>}
+                  {p.balance && <div className="flex justify-between font-semibold"><span>{p.paymentPlan ? "Due now" : "Left to pay today"}</span><span className="tabular-nums">{formatMoney(p.balance.remainingCents, { cents: true })}</span></div>}
                 </>) : p.payment.method && <div className="flex justify-between"><span>Paid by</span><span>{p.payment.method === "ach" ? "ACH" : `Card (+${formatMoney(p.payment.cardFeeCents)})`}</span></div>}
-                {p.totals && autoPayLines(autoPaySchedule(p.content, p.totals)).map((l) => { const [when, v] = l.split(": "); return <div key={when} className="flex justify-between text-muted-foreground"><span>Auto-pay · {when}</span><span>{v}</span></div>; })}
+                {p.totals && !p.paymentPlan && autoPayLines(autoPaySchedule(p.content, p.totals)).map((l) => { const [when, v] = l.split(": "); return <div key={when} className="flex justify-between text-muted-foreground"><span>Auto-pay · {when}</span><span>{v}</span></div>; })}
                 {p.autoPayStartsAt && <div className="text-xs text-muted-foreground">Auto-pay starts {format(new Date(p.autoPayStartsAt), "PPP")}</div>}
                 {p.signature && <div className="mt-1 text-xs text-muted-foreground">Signed by {p.signature.name} · {format(new Date(p.signature.signedAt), "PPp")}{p.signature.ip ? ` · ${p.signature.ip}` : ""}</div>}
               </div>
             </Section>
           )}
           {p.kind === "offer" && p.signature && p.balance && p.balance.remainingCents > 0 && !["void", "archived", "declined"].includes(p.status) && <InvoicePanel p={p} />}
+          {p.kind === "offer" && p.signature && p.balance && !p.isTest && !["void", "archived", "declined"].includes(p.status) && <ChargePanel p={p} />}
           {preview && (
             <Section title="Opening totals" description="Nothing is pre-selected: the client starts with only the included services and picks the rest.">
               <div className="space-y-1 text-sm">

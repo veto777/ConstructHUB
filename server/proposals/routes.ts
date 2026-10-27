@@ -59,7 +59,7 @@ import { notifyUser } from "../account-events";
 import { normalizePhone, sendSms } from "../crm/sms";
 import {
   ESIGN_CONSENT, MAX_PDF_BYTES, MIN_PAYMENT_CENTS, PROPOSAL_KINDS, REMINDER_EVERY_HOURS, invoiceNumber, autoPayLines, autoPayMonths, autoPaySchedule, initialTargets, cardFeeCents, emptyContent, formatBps,
-  addMonths, formatMoney, paymentBalance, priceSelection, proposalContentSchema, selectionProblems, type PaymentBalance, type ProposalContent, type ProposalDetail,
+  addMonths, formatMoney, isoDay, paymentBalance, planDueCents, planNextDue, planProblem, priceSelection, proposalContentSchema, selectionProblems, type PaymentBalance, type InstallmentPlan, type ProposalContent, type ProposalDetail,
   type ProposalEvent, type ProposalPayment, type ProposalPaymentStatus, type ProposalRow, type ProposalStatus, type ProposalSummary, type ProposalTotals, type PublicProposal,
 } from "@shared/proposals";
 import { buildInvoicePdf, buildSignedProposalPdf } from "./pdf";
@@ -122,13 +122,32 @@ function toPayments(r: any): ProposalPayment[] {
   const list = Array.isArray(r.payments_json) ? r.payments_json : [];
   return list.filter((x: any) => x.status !== "expired" && x.status !== "open").map((x: any) => ({
     id: Number(x.id), method: x.method, amountCents: Number(x.amount_cents), feeCents: Number(x.fee_cents ?? 0), status: x.status as ProposalPaymentStatus,
-    cardLast4: x.card_last4 ?? null, createdAt: iso(x.created_at)!, paidAt: iso(x.paid_at),
+    cardLast4: x.card_last4 ?? null, createdAt: iso(x.created_at)!, paidAt: iso(x.paid_at), source: x.source === "admin" ? "admin" : "client",
   }));
 }
+/** The admin's payment plan (shared/proposals.ts InstallmentPlan), if one replaced what was due at signing. */
+const planOf = (r: any): InstallmentPlan | null => (r.payment_plan && Array.isArray(r.payment_plan.installments) ? r.payment_plan : null);
+
+/** Due today = what was due at signing, or with a plan every installment whose date has come. */
 function balanceOf(r: any): PaymentBalance | null {
   const t = r.totals as ProposalTotals | null;
-  return t ? paymentBalance(t.dueTodayCents, toPayments(r)) : null;
+  if (!t) return null;
+  const plan = planOf(r);
+  return paymentBalance(plan ? planDueCents(plan, isoDay(new Date())) : t.dueTodayCents, toPayments(r));
 }
+
+/** On a plan, nothing is "paid" until the whole contract is; up to date in between is still partly paid. */
+function planOpen(r: any, bal: PaymentBalance): boolean {
+  return !!planOf(r) && bal.paidCents + bal.pendingCents < Number((r.totals as ProposalTotals).contractTotalCents);
+}
+
+/** "Next payment $8,678.33 on Nov 27, 2026" for a plan that's up to date, or "". */
+function planNextText(r: any, bal: PaymentBalance): string {
+  const plan = planOf(r);
+  const next = plan ? planNextDue(plan, bal.paidCents + bal.pendingCents) : null;
+  return next ? `next payment ${formatMoney(next.cents, { cents: true })} on ${dayLabel(next.dueOn)}` : "";
+}
+const dayLabel = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
 async function loadById(id: number) {
   const { rows } = await pool.query(
@@ -153,6 +172,7 @@ function toDetail(r: any): ProposalDetail {
     payment: { method: r.payment_method ?? null, cardFeeCents: r.card_fee_cents ?? 0, status: r.payment_status ?? null, subscriptionId: r.stripe_subscription_id ?? null, scheduleId: r.stripe_schedule_id ?? null },
     payments: toPayments(r), balance: balanceOf(r), autoPayStartsAt: iso(r.autopay_starts_at),
     invoices: { count: Number(r.invoice_count ?? 0), lastAt: iso(r.last_invoice_at), paused: r.reminders_paused === true },
+    paymentPlan: planOf(r),
     events: Array.isArray(r.events) ? r.events : [],
   };
 }
@@ -349,7 +369,9 @@ async function notifyPayment(r: any, part: any, state: "paid" | "processing" | "
   const charged = formatMoney(Number(part.amount_cents) + Number(part.fee_cents ?? 0), { cents: true });
   const how = part.method === "card" ? `card${part.card_last4 ? ` ending ${part.card_last4}` : ""}${Number(part.fee_cents) ? ` (incl. ${formatMoney(Number(part.fee_cents), { cents: true })} card fee)` : ""}`
     : `bank transfer (ACH)${part.card_last4 ? ` ending ${part.card_last4}` : ""}`;
-  const left = bal.remainingCents > 0 ? `${formatMoney(bal.remainingCents, { cents: true })} still due today` : bal.pendingCents > 0 ? "nothing left to pay (ACH clearing)" : "paid in full for today";
+  const next = planNextText(r, bal);
+  const left = bal.remainingCents > 0 ? `${formatMoney(bal.remainingCents, { cents: true })} still due today` : bal.pendingCents > 0 ? "nothing left to pay (ACH clearing)"
+    : next ? `up to date on the payment plan — ${next}` : planOf(r) ? "the payment plan is paid in full" : "paid in full for today";
   const who = r.recipient_name || r.recipient_email || `proposal #${r.id}`;
   const label = state === "paid" ? `Payment received — ${charged}` : state === "processing" ? `ACH payment started — ${charged} (clearing)` : `Payment failed — ${charged}`;
   void textOwner(r, `${state === "paid" ? "💰" : state === "processing" ? "🏦" : "⚠️"} ${label} by ${how}: ${who}. ${left[0].toUpperCase()}${left.slice(1)}.`);
@@ -368,8 +390,10 @@ async function notifyPayment(r: any, part: any, state: "paid" | "processing" | "
       html: emailShell(content, `<p>Hi ${esc(r.recipient_name || "there")},</p><p>We received your payment of <b>${charged}</b> by ${esc(how)}.</p>
         ${bal.remainingCents > 0
           ? `<p>Paid so far: ${formatMoney(bal.paidCents + bal.pendingCents, { cents: true })} of ${formatMoney(bal.dueTodayCents, { cents: true })}. Still due: <b>${formatMoney(bal.remainingCents, { cents: true })}</b>. Please pay the rest as soon as possible — in one or more payments, on any card or bank account.</p>${button(`${link}#pay`, "Pay the rest", content.brand.accent)}`
+          : next ? `<p>You're up to date on your payment plan. Your ${esc(next.replace(/^next payment (\S+) on/, "next payment, $1, is due on"))}.</p>`
+          : planOf(r) ? `<p>That completes your payment plan — your contract is paid in full. Thank you!</p>`
           : `<p>That completes what was due today. We'll be in touch to schedule kickoff.</p>`}`),
-      text: `We received your payment of ${charged}. ${bal.remainingCents > 0 ? `Still due: ${formatMoney(bal.remainingCents, { cents: true })} — ${link}` : "That completes what was due today."}`,
+      text: `We received your payment of ${charged}. ${bal.remainingCents > 0 ? `Still due: ${formatMoney(bal.remainingCents, { cents: true })} — ${link}` : next ? `You're up to date on your payment plan. Your ${next.replace(/^next payment (\S+) on/, "next payment, $1, is due on")}.` : planOf(r) ? "That completes your payment plan — your contract is paid in full." : "That completes what was due today."}`,
     }).catch((e: any) => console.error("[proposals] receipt email failed:", e?.message));
   }
 }
@@ -404,7 +428,7 @@ function payLink(r: any, amountCents: number, bal: PaymentBalance): string {
 
 function invoicePdf(r: any, number: string, amountCents: number, bal: PaymentBalance, statement = false): Promise<Buffer> {
   return buildInvoicePdf({
-    id: Number(r.id), number, statement, issuedAt: new Date(), content: parseContent(r.content),
+    id: Number(r.id), number, statement, issuedAt: new Date(), content: parseContent(r.content), plan: planOf(r),
     recipientName: r.recipient_name, recipientEmail: r.recipient_email, recipientCompany: r.recipient_company,
     totals: r.totals as ProposalTotals, payments: toPayments(r), balance: bal, amountDueCents: amountCents,
     payUrl: payLink(r, amountCents, bal), test: r.is_test === true,
@@ -425,11 +449,14 @@ async function sendInvoice(r: any, opts: { number: number; amountCents: number; 
   const link = payLink(r, opts.amountCents, bal);
   const paid = bal.paidCents + bal.pendingCents;
   const pdf = await invoicePdf(r, no, opts.amountCents, bal);
+  const plan = planOf(r);
   const lead = opts.reminder
-    ? `<p>This is a reminder that the payment due at signing for <b>${esc(title)}</b> is not fully paid. <b>${amount} is still due</b> and needs to be paid as soon as possible.</p>`
+    ? plan
+      ? `<p>This is a reminder that a payment on your payment plan for <b>${esc(title)}</b> is due. <b>${amount} is still due</b> and needs to be paid as soon as possible.</p>`
+      : `<p>This is a reminder that the payment due at signing for <b>${esc(title)}</b> is not fully paid. <b>${amount} is still due</b> and needs to be paid as soon as possible.</p>`
     : `<p>Here is invoice <b>${esc(no)}</b> for <b>${esc(title)}</b>. Amount due: <b>${amount}</b>. Please pay as soon as possible.</p>`;
   const table = `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:14px;margin:8px 0 4px">
-      <tr><td style="padding:6px 0;color:#6b7280">Due at signing</td><td align="right">${formatMoney(bal.dueTodayCents, { cents: true })}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280">${plan ? "Due so far on your payment plan" : "Due at signing"}</td><td align="right">${formatMoney(bal.dueTodayCents, { cents: true })}</td></tr>
       ${paid > 0 ? `<tr><td style="padding:6px 0;color:#6b7280">Paid so far</td><td align="right">−${formatMoney(paid, { cents: true })}</td></tr>` : ""}
       <tr><td style="padding:8px 0;border-top:1px solid #e5e7eb;font-weight:700">Still due</td><td align="right" style="border-top:1px solid #e5e7eb;font-weight:700">${formatMoney(bal.remainingCents, { cents: true })}</td></tr>
     </table>`;
@@ -578,6 +605,15 @@ async function applyPaymentCheckout(session: Stripe.Checkout.Session, eventType:
     [session.id, state, PART_FROM[state], piId, pmId, last4]);
   const part = parts[0];
   if (!part || state === "expired") return;
+  const custId = typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
+  await settlePart(part, state, custId, last4);
+}
+
+/**
+ * A payment that just settled, started clearing or failed (a Checkout above, or a saved card the admin charged):
+ * the proposal's status and totals, the overpayment check, auto-pay, and the notices.
+ */
+async function settlePart(part: any, state: "paid" | "processing" | "failed", custId: string | null, last4: string | null): Promise<void> {
   const r = await loadById(Number(part.proposal_id));
   if (!r?.totals) return;
   const bal = balanceOf(r)!;
@@ -585,10 +621,11 @@ async function applyPaymentCheckout(session: Stripe.Checkout.Session, eventType:
   const settled = all.filter((x: any) => x.status === "paid");
   const paidCharged = settled.reduce((s: number, x: any) => s + Number(x.amount_cents) + Number(x.fee_cents ?? 0), 0);
   const feesPaid = settled.reduce((s: number, x: any) => s + Number(x.fee_cents ?? 0), 0);
-  const next: ProposalStatus = bal.remainingCents > 0
-    ? (bal.paidCents + bal.pendingCents > 0 ? "partial" : "payment_failed")
+  // On a plan, "partial" until the whole contract is paid — also while an ACH payment clears, so an installment
+  // that falls due meanwhile can still be paid.
+  const next: ProposalStatus = bal.paidCents + bal.pendingCents <= 0 ? "payment_failed"
+    : bal.remainingCents > 0 || planOpen(r, bal) ? "partial"
     : bal.pendingCents > 0 ? "processing" : "paid";
-  const custId = typeof session.customer === "string" ? session.customer : session.customer?.id ?? null;
   const charged = formatMoney(Number(part.amount_cents) + Number(part.fee_cents ?? 0), { cents: true });
   const { rows } = await pool.query(
     `UPDATE proposals SET status = $2, payment_status = $2, paid_cents = $3, card_fee_cents = $4, payment_method = $5,
@@ -597,15 +634,17 @@ async function applyPaymentCheckout(session: Stripe.Checkout.Session, eventType:
      WHERE id = $1 RETURNING *`,
     [r.id, next, paidCharged, feesPaid, part.method, custId,
       event(state === "paid" ? "payment_received" : state === "processing" ? "ach_started" : "payment_failed",
-        `${charged} by ${part.method === "card" ? "card" : "ACH"}${last4 ? ` ••${last4}` : ""} · ${formatMoney(bal.remainingCents, { cents: true })} left`)]);
+        `${charged} by ${part.method === "card" ? "card" : "ACH"}${last4 ? ` ••${last4}` : ""}${part.source === "admin" ? " (charged by admin)" : ""} · ${formatMoney(bal.remainingCents, { cents: true })} left`)]);
   const updated = rows[0];
   if (!updated) return;
   // Checkouts are made one at a time (see the route), so this needs two payments settling against one balance —
-  // say so loudly rather than quietly; a refund is the owner's call.
-  const over = bal.paidCents + bal.pendingCents - bal.dueTodayCents;
+  // say so loudly rather than quietly; a refund is the owner's call. On a plan the admin may charge ahead of the
+  // dates, so only more than the contract total is too much.
+  const limit = planOf(r) ? Number((r.totals as ProposalTotals).contractTotalCents) : bal.dueTodayCents;
+  const over = bal.paidCents + bal.pendingCents - limit;
   if (over > 0) {
-    await addEvent(Number(r.id), "overpaid", `${formatMoney(over, { cents: true })} more than was due today — refund it in Stripe`);
-    void textOwner(updated, `⚠️ ${r.recipient_name || `Proposal #${r.id}`} paid ${formatMoney(over, { cents: true })} more than was due today. Refund the extra in Stripe.`);
+    await addEvent(Number(r.id), "overpaid", `${formatMoney(over, { cents: true })} more than was due — refund it in Stripe`);
+    void textOwner(updated, `⚠️ ${r.recipient_name || `Proposal #${r.id}`} paid ${formatMoney(over, { cents: true })} more than was due. Refund the extra in Stripe.`);
   }
   if (next === "paid" && r.status !== "paid") await startAutoPay(updated, part).catch((e: any) => console.error(`[proposals] auto-pay for #${updated.id} failed:`, e?.message));
   await notifyPayment(updated, part, state, bal);
@@ -617,7 +656,8 @@ async function applyPaymentCheckout(session: Stripe.Checkout.Session, eventType:
  * open-ended last phase is released into a plain subscription that bills until cancelled.
  */
 async function startAutoPay(r: any, part: any): Promise<void> {
-  if (r.stripe_schedule_id || r.stripe_subscription_id || !stripeConfigured()) return;
+  // A payment plan is billed by the admin, installment by installment: never a schedule beside it.
+  if (planOf(r) || r.stripe_schedule_id || r.stripe_subscription_id || !stripeConfigured()) return;
   const content = parseContent(r.content);
   const phases = autoPaySchedule(content, r.totals as ProposalTotals);
   if (!phases.length) return;
@@ -679,6 +719,45 @@ async function createSchedule(r: any, part: any, content: ProposalContent, phase
       event("autopay_scheduled", `from ${start.toISOString().slice(0, 10)} — ${autoPayLines(phases, bps).join("; ")}`)]);
 }
 
+/** A saved-card charge's PaymentIntent, as a payment state: null while Stripe has no final answer. */
+function intentState(pi: Stripe.PaymentIntent): "paid" | "processing" | "failed" | null {
+  if (pi.status === "succeeded") return "paid";
+  if (pi.status === "processing") return "processing";
+  if (pi.status === "requires_payment_method" || pi.status === "canceled" || pi.status === "requires_action") return "failed";
+  return null;
+}
+
+/**
+ * A charge the admin ran on a saved card (no Checkout session): read its PaymentIntent and settle the row once
+ * Stripe has answered. An off-session charge that needs the cardholder (3-D Secure) is cancelled and failed; one
+ * never confirmed (the server stopped in between) is cancelled after 10 minutes. Returns the row's state, or null
+ * while it's still unknown.
+ */
+async function settleSavedCharge(part: any): Promise<"paid" | "processing" | "failed" | "expired" | null> {
+  if (!part.payment_intent_id) {
+    // Stopped before Stripe heard of it: nothing was charged.
+    if (Date.now() - new Date(part.created_at).getTime() < 10 * 60_000) return null;
+    await pool.query(`UPDATE proposal_payments SET status = 'expired' WHERE id = $1 AND status = 'open'`, [part.id]);
+    return "expired";
+  }
+  let pi = await stripe.paymentIntents.retrieve(part.payment_intent_id, { expand: ["payment_method"] }).catch(() => null);
+  if (!pi) return null;
+  if (pi.status === "requires_action") pi = await stripe.paymentIntents.cancel(pi.id).catch(() => pi!);
+  else if (pi.status === "requires_confirmation" && Date.now() - new Date(part.created_at).getTime() > 10 * 60_000) {
+    pi = await stripe.paymentIntents.cancel(pi.id).catch(() => pi!);
+    if (pi.status === "canceled") { await pool.query(`UPDATE proposal_payments SET status = 'expired' WHERE id = $1 AND status = 'open'`, [part.id]); return "expired"; }
+  }
+  const state = intentState(pi);
+  if (!state) return null;
+  const pm = pi.payment_method && typeof pi.payment_method !== "string" ? pi.payment_method : null;
+  const { rows } = await pool.query(
+    `UPDATE proposal_payments SET status = $2, card_last4 = COALESCE($4, card_last4), paid_at = CASE WHEN $2 = 'paid' THEN now() ELSE paid_at END
+     WHERE id = $1 AND status = ANY($3) RETURNING *`,
+    [part.id, state, PART_FROM[state], pm?.card?.last4 ?? null]);
+  if (rows[0]) await settlePart(rows[0], state, typeof pi.customer === "string" ? pi.customer : pi.customer?.id ?? null, rows[0].card_last4);
+  return state;
+}
+
 /** Open payments: look each up in Stripe (a return from Checkout can beat the webhook). closeOpen expires the ones
  *  still open, so only one checkout is ever live and what's left can't be paid twice. */
 async function syncPayments(r: any, closeOpen: boolean): Promise<boolean> {
@@ -686,6 +765,11 @@ async function syncPayments(r: any, closeOpen: boolean): Promise<boolean> {
   let closed = true;
   const list = (Array.isArray(r.payments_json) ? r.payments_json : []).filter((x: any) => x.status === "open" || x.status === "processing").slice(-5);
   for (const x of list) {
+    if (!x.stripe_session_id) { // a saved card the admin charged: an unknown one blocks the next payment
+      const state = await settleSavedCharge(x).catch(() => null);
+      if (closeOpen && !state) closed = false;
+      continue;
+    }
     try {
       let s = await stripe.checkout.sessions.retrieve(x.stripe_session_id);
       if (s.status === "open" && closeOpen && x.status === "open") s = await stripe.checkout.sessions.expire(s.id);
@@ -781,8 +865,9 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     const admin = await requirePlatformAdmin(req, res, getDevUser);
     if (!admin) return;
     const id = idParam.safeParse(req.params.id);
-    const r = id.success ? await loadById(id.data) : null;
-    if (!r) return res.status(404).json({ message: "Proposal not found" });
+    const found = id.success ? await loadById(id.data) : null;
+    if (!found) return res.status(404).json({ message: "Proposal not found" });
+    const r = await refreshFromStripe(found); // back from a card the admin ran through Checkout: show it settled
     const out = toDetail(r);
     // The company signature starts as the admin's own name (saved with the next save).
     if (out.kind === "offer" && !out.content.countersign.name.trim() && !r.signed_at) out.content.countersign.name = adminName(admin);
@@ -1090,7 +1175,7 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     }
     // Restoring an archived or voided proposal puts it back where it was: signed stays signed.
     const next = body.data.status === "draft"
-      ? (r.signed_at ? (r.paid_at ? "paid" : Number(r.paid_cents) > 0 ? "partial" : "signed") : r.viewed_at ? "viewed" : r.sent_at ? "sent" : "draft")
+      ? (r.signed_at ? (r.paid_at && !(planOf(r) && planOpen(r, balanceOf(r)!)) ? "paid" : Number(r.paid_cents) > 0 ? "partial" : "signed") : r.viewed_at ? "viewed" : r.sent_at ? "sent" : "draft")
       : body.data.status;
     await pool.query(`UPDATE proposals SET status = $2, updated_at = now(), events = events || $3::jsonb WHERE id = $1`,
       [r.id, next, event(body.data.status === "draft" ? "restored" : body.data.status)]);
@@ -1162,6 +1247,168 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     res.json(toDetail(await loadById(id.data)));
   });
 
+  // ---------- payment plan + payments the admin runs for the client ----------
+  // Owner, 2026-10-27: Dr. Tutty signed a card authorization form; we charge his card for him, on a plan of 6 equal
+  // payments. Card numbers never reach this server: a new card is typed into Stripe Checkout (opened by the admin),
+  // which saves it to the proposal's Stripe customer; later payments charge that saved card off-session.
+  const signedOffer = async (req: any, res: any) => {
+    if (!(await requirePlatformAdmin(req, res, getDevUser))) return null;
+    const id = idParam.safeParse(req.params.id);
+    const r = id.success ? await loadById(id.data) : null;
+    if (!r || r.kind !== "offer") { res.status(404).json({ message: "Proposal not found" }); return null; }
+    if (!r.signed_at || !r.totals) { res.status(409).json({ message: "The client signs the proposal first." }); return null; }
+    if (["void", "archived", "declined"].includes(r.status)) { res.status(409).json({ message: "This proposal is closed." }); return null; }
+    return r;
+  };
+
+  app.put("/api/admin/proposals/:id/plan", async (req, res) => {
+    const r = await signedOffer(req, res);
+    if (!r) return;
+    const body = z.object({ installments: z.array(z.object({ dueOn: z.string().max(10), cents: z.number().int() })).max(60).nullable() }).safeParse(req.body);
+    if (!body.success) return res.status(400).json({ message: "Bad request" });
+    const list = body.data.installments;
+    if (list) {
+      const problem = planProblem(list, Number((r.totals as ProposalTotals).contractTotalCents));
+      if (problem) return res.status(400).json({ message: problem });
+      if (r.stripe_schedule_id || r.stripe_subscription_id) return res.status(409).json({ message: "Auto-pay is already set up in Stripe for this proposal. Cancel it there first, then set the plan." });
+    }
+    // Held like a payment, so a plan never changes while one settles (startAutoPay reads it).
+    const lock = await pool.connect();
+    try {
+    const got = await lock.query(`SELECT pg_try_advisory_lock(hashtext('proposal-pay'), $1::int) AS ok`, [Number(r.id)]);
+    if (!got.rows[0]?.ok) return res.status(409).json({ message: "A payment is going through on this proposal. Try again in a moment." });
+    try {
+    const cur = await loadById(Number(r.id));
+    const paidBefore = balanceOf(cur)!;
+    // Back to the signed terms once money came in under a plan would leave auto-pay unset: change the plan instead.
+    if (!list && planOf(cur) && paidBefore.paidCents + paidBefore.pendingCents > 0) return res.status(409).json({ message: "Payments were made under this plan, so it can't be removed. Change the plan instead." });
+    const plan: InstallmentPlan | null = list ? { installments: list, createdAt: new Date().toISOString() } : null;
+    const detail = plan ? `${plan.installments.length} payments · ${plan.installments.filter((x) => x.dueOn <= isoDay(new Date())).length} due now · last on ${dayLabel(plan.installments[plan.installments.length - 1].dueOn)}` : "back to what was due at signing";
+    await pool.query(`UPDATE proposals SET payment_plan = $2, updated_at = now(), events = events || $3::jsonb WHERE id = $1`,
+      [r.id, plan ? JSON.stringify(plan) : null, event(plan ? "plan_set" : "plan_removed", detail)]);
+    // Money already in under the old terms: the status follows the plan (the same rule as settlePart).
+    const u = await loadById(Number(r.id));
+    const bal = balanceOf(u)!;
+    if (bal.paidCents + bal.pendingCents > 0) {
+      const status: ProposalStatus = bal.remainingCents > 0 || planOpen(u, bal) ? "partial" : bal.pendingCents > 0 ? "processing" : "paid";
+      if (status !== u.status) await pool.query(`UPDATE proposals SET status = $2, payment_status = $2, paid_at = CASE WHEN $2 = 'paid' THEN COALESCE(paid_at, now()) ELSE paid_at END WHERE id = $1`, [r.id, status]);
+    }
+    res.json(toDetail(await loadById(Number(r.id))));
+    } finally { await lock.query(`SELECT pg_advisory_unlock(hashtext('proposal-pay'), $1::int)`, [Number(r.id)]).catch(() => {}); }
+    } finally { lock.release(); }
+  });
+
+  app.get("/api/admin/proposals/:id/cards", async (req, res) => {
+    const r = await signedOffer(req, res);
+    if (!r) return;
+    if (!r.stripe_customer_id || !stripeConfigured()) return res.json([]);
+    try {
+      const list = await stripe.paymentMethods.list({ customer: r.stripe_customer_id, type: "card", limit: 20 });
+      res.json(list.data.map((pm) => ({ id: pm.id, brand: pm.card?.brand ?? "card", last4: pm.card?.last4 ?? "", expMonth: pm.card?.exp_month ?? null, expYear: pm.card?.exp_year ?? null, name: pm.billing_details?.name ?? null })));
+    } catch (e: any) {
+      res.status(502).json({ message: String(e?.message || "Could not load the saved cards").slice(0, 200) });
+    }
+  });
+
+  app.post("/api/admin/proposals/:id/charge", async (req, res) => {
+    const r = await signedOffer(req, res);
+    if (!r) return;
+    if (r.is_test) return res.status(409).json({ message: "This is a test copy — payment is turned off." });
+    if (!stripeConfigured()) return res.status(503).json({ message: "Stripe isn't configured on this server." });
+    const body = z.object({ amountCents: z.number().int(), paymentMethodId: z.string().max(100).optional() }).safeParse(req.body);
+    if (!body.success) return res.status(400).json({ message: "Enter the amount to charge." });
+    const content = parseContent(r.content);
+    const lock = await pool.connect();
+    try {
+    const got = await lock.query(`SELECT pg_try_advisory_lock(hashtext('proposal-pay'), $1::int) AS ok`, [Number(r.id)]);
+    if (!got.rows[0]?.ok) return res.status(409).json({ message: "A payment is already starting for this proposal. Give it a moment, then reload." });
+    try {
+    if (!(await syncPayments(await loadById(Number(r.id)), true))) return res.status(409).json({ message: "A payment is still in progress for this proposal. Finish it, or wait a minute and reload." });
+    const fresh = await loadById(Number(r.id));
+    const bal = balanceOf(fresh)!;
+    // With a plan the admin may charge ahead of the dates, up to the rest of the contract; otherwise up to what's due today.
+    const cap = planOf(fresh) ? Math.max(0, Number((fresh.totals as ProposalTotals).contractTotalCents) - bal.paidCents - bal.pendingCents) : bal.remainingCents;
+    if (cap <= 0) return res.status(409).json({ message: "Nothing is left to pay on this proposal." });
+    const asked = body.data.amountCents;
+    const floor = Math.min(MIN_PAYMENT_CENTS, cap);
+    if (asked < floor || asked > cap) return res.status(400).json({ message: `Enter an amount from ${formatMoney(floor, { cents: true })} to ${formatMoney(cap, { cents: true })}.` });
+    const bps = content.payment.cardEnabled ? content.payment.cardFeeBps : 0;
+    const fee = cardFeeCents(asked, bps);
+    const title = (content.title || r.name).slice(0, 200);
+    const n = (Array.isArray(fresh.payments_json) ? fresh.payments_json : []).filter((x: any) => x.status === "paid" || x.status === "processing").length + 1;
+    let customer = fresh.stripe_customer_id as string | null;
+    if (!customer) {
+      customer = (await stripe.customers.create({
+        email: r.recipient_email || undefined, name: (r.recipient_name || r.recipient_company || "").slice(0, 200) || undefined,
+        metadata: { type: "proposal", proposalId: String(r.id) },
+      })).id;
+      await pool.query(`UPDATE proposals SET stripe_customer_id = $2 WHERE id = $1`, [r.id, customer]);
+    }
+    const metadata = { type: "proposal", part: "1", source: "admin", proposalId: String(r.id), method: "card", amountCents: String(asked), cardFeeCents: String(fee) };
+    const suffix = `PROP ${r.id}`.slice(0, 8);
+
+    if (!body.data.paymentMethodId) {
+      // A new card: the admin types the client's card into Stripe Checkout. Saved for the plan's later payments.
+      const base = getBaseUrl(req);
+      const items: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ quantity: 1, price_data: { currency: "usd", unit_amount: asked, product_data: { name: `Payment ${n} — ${title}`.slice(0, 250) } } }];
+      if (fee > 0) items.push({ quantity: 1, price_data: { currency: "usd", unit_amount: fee, product_data: { name: `Card processing fee (${formatBps(bps)})` } } });
+      try {
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment", customer, line_items: items, payment_method_types: ["card"],
+          billing_address_collection: "required", customer_update: { address: "auto", name: "auto" },
+          success_url: `${base}/admin/proposals/${r.id}?charged=1`, cancel_url: `${base}/admin/proposals/${r.id}?charged=0`,
+          metadata,
+          payment_intent_data: { metadata, description: title, setup_future_usage: "off_session", statement_descriptor_suffix: suffix },
+        });
+        await pool.query(`INSERT INTO proposal_payments (proposal_id, stripe_session_id, method, amount_cents, fee_cents, source) VALUES ($1, $2, 'card', $3, $4, 'admin')`,
+          [r.id, session.id, asked, fee]);
+        await pool.query(`UPDATE proposals SET stripe_session_id = $2, updated_at = now(), events = events || $3::jsonb WHERE id = $1`,
+          [r.id, session.id, event("checkout_started", `${formatMoney(asked, { cents: true })} by card (+${formatMoney(fee, { cents: true })} fee) · entered by admin`)]);
+        return res.json({ url: session.url });
+      } catch (e: any) {
+        console.error("[proposals] admin checkout failed:", e?.message || e);
+        return res.status(502).json({ message: String(e?.message || "Could not start the charge").slice(0, 200) });
+      }
+    }
+
+    // A saved card, charged now without the client (they authorized it in writing).
+    const pm = await stripe.paymentMethods.retrieve(body.data.paymentMethodId).catch(() => null);
+    if (!pm || (typeof pm.customer === "string" ? pm.customer : pm.customer?.id) !== customer) return res.status(400).json({ message: "That card isn't saved for this client." });
+    const { rows: ins } = await pool.query(
+      `INSERT INTO proposal_payments (proposal_id, method, amount_cents, fee_cents, source, payment_method_id, card_last4) VALUES ($1, 'card', $2, $3, 'admin', $4, $5) RETURNING *`,
+      [r.id, asked, fee, pm.id, pm.card?.last4 ?? null]);
+    const part = ins[0];
+    // Created first (that never charges) and recorded, then confirmed: whatever happens next, the row knows its
+    // PaymentIntent, and syncPayments settles it from Stripe — a dropped connection is never taken for a decline.
+    let piId: string;
+    try {
+      piId = (await stripe.paymentIntents.create({
+        // Card only: with the account's automatic methods a confirm here would also ask for a return_url.
+        amount: asked + fee, currency: "usd", customer, payment_method: pm.id, payment_method_types: ["card"],
+        description: `Payment ${n} — ${title}`.slice(0, 250), metadata, statement_descriptor_suffix: suffix,
+      }, { idempotencyKey: `proposal-${r.id}-payment-${part.id}-create` })).id;
+    } catch (e: any) {
+      await pool.query(`UPDATE proposal_payments SET status = 'expired' WHERE id = $1`, [part.id]); // nothing was charged
+      return res.status(502).json({ message: `Couldn't start the charge: ${String(e?.message || "Stripe error").slice(0, 160)}` });
+    }
+    await pool.query(`UPDATE proposal_payments SET payment_intent_id = $2 WHERE id = $1`, [part.id, piId]);
+    let failure = "";
+    try {
+      await stripe.paymentIntents.confirm(piId, { off_session: true }, { idempotencyKey: `proposal-${r.id}-payment-${part.id}-confirm` });
+    } catch (e: any) {
+      failure = e?.code === "authentication_required"
+        ? "The card's bank wants the cardholder to approve this charge (3-D Secure). Charge it as a new card with the client on the phone to read you the code, or send them the pay link."
+        : e?.type === "StripeCardError" ? String(e?.message || "The card was declined.").slice(0, 200) : "";
+    }
+    const state = await settleSavedCharge({ ...part, payment_intent_id: piId });
+    const out = toDetail(await loadById(Number(r.id)));
+    if (state === "failed") return res.status(402).json({ message: failure || "The charge didn't go through.", detail: out });
+    if (!state) return res.status(502).json({ message: "Stripe hasn't confirmed this charge either way yet. Don't charge again — reload in a minute and it will show as paid or failed.", detail: out });
+    res.json({ result: state, detail: out });
+    } finally { await lock.query(`SELECT pg_advisory_unlock(hashtext('proposal-pay'), $1::int)`, [Number(r.id)]).catch(() => {}); }
+    } finally { lock.release(); }
+  });
+
   // ---------- recipient ----------
   app.get("/api/public/proposals/:token", async (req: any, res) => {
     let r = await loadByToken(String(req.params.token || ""));
@@ -1181,7 +1428,7 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
       selection: r.selection ?? null, totals: r.totals ?? null,
       signature: sig ? { name: sig.name, signedAt: sig.signedAt } : null,
       payment: { method: r.payment_method ?? null, cardFeeCents: r.card_fee_cents ?? 0, status: r.payment_status ?? null },
-      payments: toPayments(r), balance: balanceOf(r), autoPayStartsAt: iso(r.autopay_starts_at),
+      payments: toPayments(r), balance: balanceOf(r), autoPayStartsAt: iso(r.autopay_starts_at), paymentPlan: planOf(r),
       stripeReady: stripeConfigured(), preview, isTest: r.is_test === true,
       countersignedAt: iso(r.countersigned_at),
     };

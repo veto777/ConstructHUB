@@ -13,7 +13,7 @@ import { useRoute } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowDown, Info, Building2, CheckCircle2, Clock, CreditCard, Download, ExternalLink, FileText, Landmark, Loader2, Lock, PenLine, ShieldCheck, XCircle } from "lucide-react";
 import {
-  ESIGN_CONSENT, MIN_PAYMENT_CENTS, TAX_NOTE, TYPICAL_CARD_LIMIT_CENTS, allowedPlans, autoPayLines, autoPaySchedule, bodyBlocks, cardFeeCents, ALL_TERMS_ID, initialTargets, defaultSelection, formatBps, formatMoney, initialsOf, priceSelection, selectionProblems,
+  ESIGN_CONSENT, MIN_PAYMENT_CENTS, TAX_NOTE, TYPICAL_CARD_LIMIT_CENTS, allowedPlans, autoPayLines, autoPaySchedule, bodyBlocks, cardFeeCents, ALL_TERMS_ID, initialTargets, defaultSelection, formatBps, formatMoney, initialsOf, priceSelection, selectionProblems, isoDay, planNextDue,
   type PaymentPlan, type ProposalContent, type ProposalGroup, type PublicProposal,
 } from "@shared/proposals";
 import { Button } from "@/components/ui/button";
@@ -167,6 +167,26 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
   return <div className="flex justify-between gap-3"><span className={strong ? "font-semibold text-slate-900" : "text-slate-600"}>{label}</span><span className={cn("tabular-nums", strong ? "font-bold text-slate-900" : "text-slate-700")}>{value}</span></div>;
 }
 
+/** The payment plan we set up with the client (shared/proposals.ts InstallmentPlan): each payment, its date, paid or not. */
+function PlanList({ plan, paidIn }: { plan: NonNullable<PublicProposal["paymentPlan"]>; paidIn: number }) {
+  const today = isoDay(new Date());
+  let covered = 0;
+  return (
+    <ul className="divide-y rounded-xl border text-sm" data-testid="list-plan">
+      {plan.installments.map((x, i) => {
+        covered += x.cents;
+        const done = covered <= paidIn;
+        return (
+          <li key={i} className="flex justify-between gap-3 px-3 py-2">
+            <span className="text-slate-700">Payment {i + 1} of {plan.installments.length} · {new Date(`${x.dueOn}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{done ? " · paid" : x.dueOn <= today ? " · due" : ""}</span>
+            <span className={cn("tabular-nums font-medium", done ? "text-emerald-700" : "text-slate-900")}>{money(x.cents)}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function PayPanel({ token, data }: { token: string; data: PublicProposal }) {
   const { toast } = useToast();
   const t = data.totals!;
@@ -201,11 +221,12 @@ function PayPanel({ token, data }: { token: string; data: PublicProposal }) {
   return (
     <div className="space-y-4" data-testid="panel-pay">
       <div className="rounded-xl p-3 text-sm" style={{ background: "color-mix(in srgb, var(--accent) 8%, white)" }} data-testid="pay-balance">
-        <Row label="Due today" value={money(bal.dueTodayCents)} />
+        <Row label={data.paymentPlan ? "Due so far on your payment plan" : "Due today"} value={money(bal.dueTodayCents)} />
         {bal.paidCents > 0 && <Row label="Paid so far" value={`−${money(bal.paidCents)}`} />}
         {bal.pendingCents > 0 && <Row label="Bank transfer clearing" value={`−${money(bal.pendingCents)}`} />}
         <Row label="Left to pay today" value={money(left)} strong />
       </div>
+      {data.paymentPlan && <PlanList plan={data.paymentPlan} paidIn={bal.paidCents + bal.pendingCents} />}
       {done.length > 0 && (
         <ul className="divide-y rounded-xl border text-sm" data-testid="list-payments">
           {done.map((p, i) => (
@@ -252,7 +273,7 @@ function PayPanel({ token, data }: { token: string; data: PublicProposal }) {
           </button>
         )}
       </div>
-      {autoLines.length > 0 && (
+      {autoLines.length > 0 && !data.paymentPlan && (
         <div className="text-sm text-slate-600" data-testid="text-autopay">
           <p>Auto-pay starts one month after what's due today is fully paid, on the {method === "card" ? "card" : "bank account"} you use for the last payment{method === "card" && pay.cardFeeBps > 0 ? " (including the card fee)" : ""}:</p>
           <ul className="mt-1 list-disc pl-5">{autoLines.map((l) => <li key={l}>{l}</li>)}</ul>
@@ -575,7 +596,7 @@ export default function PublicProposalPage() {
         )}
 
         {/* Pay */}
-        {signed && data.totals && !["paid", "processing", "void"].includes(data.status) && (
+        {signed && data.totals && !["paid", "processing", "void"].includes(data.status) && !(data.paymentPlan && data.balance?.remainingCents === 0) && (
           <section id="pay" className="max-w-3xl space-y-5 rounded-2xl border bg-white p-5 shadow-sm sm:p-8" data-testid="section-pay">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: b.accent }}>Step 3</p>
@@ -631,6 +652,11 @@ function StatusBanner({ data, returnedPaid, token }: { data: PublicProposal; ret
   if (data.status === "void") return box("border-slate-300 bg-slate-100 text-slate-700", XCircle, "This proposal was withdrawn", "Contact us for an updated proposal.");
   if (data.status === "declined") return box("border-slate-300 bg-slate-100 text-slate-700", XCircle, "You declined this proposal", "Changed your mind? Contact us and we'll send a new one.");
   if (data.expired) return box("border-amber-300 bg-amber-50 text-amber-900", Clock, "This proposal has expired", "Contact us for an updated proposal.");
+  // On a payment plan and up to date: nothing to pay until the next date.
+  const next = data.paymentPlan && data.balance ? planNextDue(data.paymentPlan, data.balance.paidCents + data.balance.pendingCents) : null;
+  if (data.paymentPlan && data.balance && data.balance.remainingCents === 0 && next) return box("border-emerald-300 bg-emerald-50 text-emerald-900", CheckCircle2,
+    `${returnedPaid ? "Payment received — " : ""}You're up to date on your payment plan`,
+    `Your next payment, ${money(next.cents)}, is due on ${new Date(`${next.dueOn}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`, signedCopy);
   // Part paid: what's left is due now (owner, 2026-10-25) — the pay panel below takes the next payment, any amount.
   if (data.status === "partial" && data.balance) return box("border-amber-300 bg-amber-50 text-amber-950", returnedPaid ? CheckCircle2 : AlertTriangle,
     `${returnedPaid ? "Payment received — " : ""}${money(data.balance.remainingCents)} still due`,
