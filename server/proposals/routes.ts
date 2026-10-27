@@ -182,9 +182,12 @@ const device = (ua: string) =>
  * The client opened the link — tracked like CRM estimates (server/crm/portal.ts): only once it has been sent (so the
  * admin's own clicks before sending don't count), one counted open per IP per 30 minutes, the creator told at once on
  * the first open (bell + email) and once a day when the client comes back ("a good time to call").
+ * After signing, opens still count while something is due today — the invoice and reminder links land here (owner,
+ * 2026-10-27: text me when the invoice is opened, like the bids).
  */
 async function trackOpen(r: any, req: any): Promise<any> {
-  if (!r.sent_at || r.signed_at || ["void", "declined", "archived"].includes(r.status)) return r;
+  const dueCents = r.signed_at ? balanceOf(r)?.remainingCents ?? 0 : 0;
+  if (!r.sent_at || (r.signed_at && dueCents <= 0) || ["void", "declined", "archived"].includes(r.status)) return r;
   const ip = clientIp(req);
   const ua = String(req.headers["user-agent"] || "");
   const first = !r.viewed_at;
@@ -214,7 +217,16 @@ Opened just now on ${device(ua)}.`, link, actionUrl: link, actionLabel: "Open th
   } else {
     // The once-a-day "they came back" alert: claimed in the database so two opens at once send one.
     const claim = await pool.query(`UPDATE proposals SET reopen_alerted_on = CURRENT_DATE WHERE id = $1 AND reopen_alerted_on IS DISTINCT FROM CURRENT_DATE RETURNING id`, [r.id]);
-    if (claim.rowCount) {
+    if (claim.rowCount && r.signed_at) {
+      const due = formatMoney(dueCents, { cents: true });
+      void textOwner(r, `💳 ${who} opened the payment page for "${title}" on ${device(ua)} — ${due} still due today. Good time to call. ${adminLink}`);
+      notifyUser(Number(r.created_by), "proposal.reopened", {
+        title: `${who} opened the payment page`,
+        body: `${title}
+${due} still due today. Opened just now on ${device(ua)}. A good time to call.`,
+        link, actionUrl: link, actionLabel: "Open the proposal",
+      }).catch((e: any) => console.error("[proposals] payment-page alert failed:", e?.message));
+    } else if (claim.rowCount) {
       void textOwner(r, `🔁 ${who} came back to "${title}" (opened ${u.view_count}×)${newPlace ? " from a different network — possibly forwarded" : ""}. Good time to call. ${adminLink}`);
       notifyUser(Number(r.created_by), "proposal.reopened", {
         title: `${who} came back to your proposal`,
@@ -1156,11 +1168,12 @@ export function registerProposalRoutes(app: Express, getDevUser: GetUser): void 
     if (!r || r.status === "archived") return res.status(404).json({ message: "This proposal link is not valid." });
     const preview = (req.query.preview === "1" && isPlatformAdminEmail(req.user?.email)) || isPreviewKey(r.public_token, req.query.preview);
     // Test copies are tracked too, so a test shows the alerts the owner will get (marked [TEST]).
+    // Stripe first, so a client back from paying isn't reported as opening the page with the old balance.
+    r = await refreshFromStripe(r);
     if (!preview) {
       await trackOpen(r, req);
       r = await loadById(Number(r.id));
     }
-    r = await refreshFromStripe(r);
     const sig = r.signature as any;
     const out: PublicProposal = {
       status: r.status, content: parseContent(r.content), recipientName: r.recipient_name, recipientCompany: r.recipient_company,
