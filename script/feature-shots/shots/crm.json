@@ -294,7 +294,7 @@
   "n": 1,
   "route": "/call-assistant",
   "wait": "calls answered",
-  "alt": "The AI Call Assistant overview with the last 30 days of results: calls answered, estimate requests, urgent calls sent to a person, questions answered and spam blocked.",
+  "alt": "The Call Assistant overview with the last 30 days of results: calls answered, estimate requests, urgent calls sent to a person, questions answered and spam blocked.",
   "caption": "Every call answered, sorted by what happened"
  },
  {
