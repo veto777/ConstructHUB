@@ -20,12 +20,13 @@ import { CALL_ASSISTANT_SPAM } from "@shared/plan-copy";
 import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
 import { CallDetailSheet, EscalationRow } from "./calls-detail";
 import { CallResults } from "./results";
+import { CallerAvatar, OutcomePill, outcomeColor } from "./ca-ui";
 import { lazySample, showSample } from "@/components/sample-preview";
 const SampleCallsPreview = lazySample(() => import("./samples"), "SampleCallsPreview");
 const SampleSpamPreview = lazySample(() => import("./samples"), "SampleSpamPreview");
 import { GooglePill } from "@/components/google";
 import {
-  OUTCOME_LABELS, outcomeLabel, outcomeTone, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, LIVE_REFRESH_MS, callFingerprint,
+  OUTCOME_LABELS, outcomeLabel, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, LIVE_REFRESH_MS, callFingerprint,
   type VoiceCallList, type VoiceCallListRow, type VoiceCallDetail, type VoiceEscalationList, type VoiceSpamEntry, type EscalationReminders,
 } from "./calls-shared";
 
@@ -323,9 +324,12 @@ function CallsTable({ calls, onOpen, testId, numberHint, sort, onSort, onSortCha
               onClick={() => onOpen(c.id)}
               data-testid={`row-call-${c.id}`}
             >
-              <td className={cn(crmTable.td, crmTableCards.td, "whitespace-nowrap font-mono text-xs text-muted-foreground")} data-testid={`text-call-no-${c.id}`}>{c.callNo != null ? `#${c.callNo}` : "—"}</td>
+              <td className={cn(crmTable.td, crmTableCards.td, "whitespace-nowrap font-mono text-xs text-muted-foreground border-l-4")} style={{ borderLeftColor: outcomeColor(c.outcome) }} data-testid={`text-call-no-${c.id}`}>{c.callNo != null ? `#${c.callNo}` : "—"}</td>
               <td className={cn(crmTable.td, crmTableCards.td, "whitespace-nowrap text-muted-foreground")}>{fmtWhen(c.startedAt)}</td>
               <td className={cn(crmTable.td, crmTableCards.td)}>
+                <div className="flex items-center gap-2.5">
+                <CallerAvatar name={c.callerName} outcome={c.outcome} size={32} />
+                <div className="min-w-0">
                 {/* The row is clickable; this button is the keyboard/screen-reader way in. */}
                 <button
                   type="button"
@@ -340,10 +344,12 @@ function CallsTable({ calls, onOpen, testId, numberHint, sort, onSort, onSortCha
                   {c.callerName && c.callerCity ? " · " : null}
                   {c.callerCity}
                 </div>
+                </div>
+                </div>
               </td>
               <td className={cn(crmTable.td, crmTableCards.td)}>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <StatusPill tone={outcomeTone(c.outcome)} data-testid={`pill-call-outcome-${c.id}`}>{outcomeLabel(c.outcome)}</StatusPill>
+                  <OutcomePill outcome={c.outcome} testId={`pill-call-outcome-${c.id}`}>{outcomeLabel(c.outcome)}</OutcomePill>
                   {(c.deliveryLabel || c.deliveryState === "pending" || c.deliveryState === "failed") && (
                     <StatusPill tone={c.deliveryLabel === "Delivery uncertain" ? "warning" : c.deliveryState === "failed" ? "danger" : "warning"} data-testid={`pill-call-delivery-${c.id}`}>{c.deliveryLabel ?? DELIVERY_PILL[c.deliveryState as "pending" | "failed"].label}</StatusPill>
                   )}

@@ -1,7 +1,7 @@
 import { Section } from "@/components/app-ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Activity, ArrowRight, Hash, Phone, PhoneCall, ShieldBan, Sparkles, Timer } from "lucide-react";
+import { ArrowRight, Hash, Headset, Phone, PhoneCall, PhoneIncoming, ShieldBan, Timer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
@@ -14,14 +14,15 @@ import { CALL_ASSISTANT_SEPARATE_LINE, callAssistantOverageStatusLine, callAssis
 import type { VoiceStatus } from "./index";
 import { CallAssistantPausedBanner } from "./paused-banner";
 import { CallResults, type ResultsPick } from "./results";
-import { GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
-import { fmtWhen, outcomeLabel, outcomeTone } from "./calls-shared";
+import { GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { BRAND_ORANGE, CallerAvatar, ColorStat, NAVY, OutcomePill, outcomeColor } from "./ca-ui";
+import { fmtWhen, outcomeLabel } from "./calls-shared";
 import { lazySample, showSample } from "@/components/sample-preview";
 const SampleCallsPreview = lazySample(() => import("./samples"), "SampleCallsPreview");
 const SampleNumbersPreview = lazySample(() => import("./samples"), "SampleNumbersPreview");
 
 type NumberRow = { id?: string | number; phoneNumber?: string; label?: string | null; location?: string | null; status?: string; isTest?: boolean };
-type CallRow = { id: string | number; startedAt?: string; from?: string; fromNumber?: string; outcome?: string; summary?: string | null; durationSeconds?: number };
+type CallRow = { id: string | number; startedAt?: string; from?: string; fromNumber?: string; outcome?: string; summary?: string | null; durationSeconds?: number; callerName?: string | null; serviceNeeded?: string | null };
 
 /**
  * Overview tab — is the add-on on, which numbers ring the assistant, minutes
@@ -86,46 +87,71 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
   return (
     <div data-testid="panel-call-assistant-overview" className="pt-4 space-y-4">
       {paymentPaused && <CallAssistantPausedBanner status={status} />}
-      <Section flush className="border-0 bg-transparent">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="g-stat__label">Next step</div>
-            <div className="g-card__title g-card__title--md" data-testid="text-overview-next-step">{nextStep.text}</div>
+      {/* The navy hero (the facelift standard): what to do next, this month at a glance, and the newest call. */}
+      <section className="relative overflow-hidden rounded-2xl p-5 text-white shadow-md ring-1 ring-white/10 sm:p-6" style={{ background: `linear-gradient(135deg, ${NAVY}, color-mix(in srgb, ${NAVY} 78%, ${BRAND_ORANGE}))` }} data-testid="hero-call-assistant">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: BRAND_ORANGE }}>Next step</div>
+            <div className="text-xl font-semibold leading-snug sm:text-2xl" data-testid="text-overview-next-step">{nextStep.text}</div>
+            <Link href={nextStep.href} className="mt-1 inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold text-white shadow-sm transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ background: BRAND_ORANGE }} data-testid={nextStep.testid}>
+              {nextStep.label} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
           </div>
-          <GooglePill variant="solid" className="w-full sm:w-auto" href={nextStep.href} label={nextStep.label} testId={nextStep.testid} />
+          <dl className="grid shrink-0 grid-cols-3 gap-2 sm:gap-3">
+            {[
+              { label: "Calls this month", value: (extMonth ? extMonth.calls : status.usage?.calls ?? 0).toLocaleString("en-US"), dot: "#38bdf8" },
+              { label: "Minutes", value: (extMonth ? extMonth.minutes : used).toLocaleString("en-US"), dot: BRAND_ORANGE },
+              { label: "Spam stopped", value: (extMonth ? extMonth.spam : spamThisMonth).toLocaleString("en-US"), dot: "#f87171" },
+            ].map((x) => (
+              <div key={x.label} className="rounded-xl bg-white/10 px-3 py-2.5 ring-1 ring-white/10">
+                <dt className="flex items-center gap-1.5 text-[11px] text-white/75"><span className="h-1.5 w-1.5 rounded-full" style={{ background: x.dot }} aria-hidden="true" />{x.label}</dt>
+                <dd className="mt-0.5 text-xl font-semibold tabular-nums sm:text-2xl">{x.value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
-      </Section>
-      <GoogleStatGrid cols={4}>
+        {recent[0] && (
+          <Link href={`/call-assistant/calls?call=${encodeURIComponent(String(recent[0].id))}`} className="mt-5 flex items-center gap-3 rounded-xl bg-white/10 p-3 ring-1 ring-white/10 transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" data-testid="link-hero-latest-call">
+            <CallerAvatar name={recent[0].callerName} outcome={recent[0].outcome} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] uppercase tracking-wide text-white/70">Latest call · {recent[0].startedAt ? fmtWhen(recent[0].startedAt) : ""}</span>
+              <span className="block truncate font-medium">{recent[0].callerName || prettyPhone(recent[0].from ?? recent[0].fromNumber ?? "")}{recent[0].serviceNeeded || recent[0].summary ? ` — ${recent[0].serviceNeeded || recent[0].summary}` : ""}</span>
+            </span>
+            {recent[0].outcome && <span className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold text-white" style={{ background: outcomeColor(recent[0].outcome) }}>{outcomeLabel(recent[0].outcome)}</span>}
+          </Link>
+        )}
+      </section>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {ext && !ownLive ? (
-          <GoogleStat label="Assistant" testId="metric-overview-assistant" href="/call-assistant/calls"
+          <ColorStat label="Assistant" icon={Headset} color={BRAND_ORANGE} testId="metric-overview-assistant" href="/call-assistant/calls"
             value="Live" hint={`${ext.name}, your own receptionist · last call ${new Date(ext.lastCallAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`} />
         ) : (
-          <GoogleStat label="Assistant" testId="metric-overview-assistant" href="/call-assistant/studio"
+          <ColorStat label="Assistant" icon={Headset} color={BRAND_ORANGE} testId="metric-overview-assistant" href="/call-assistant/studio"
             value={paymentPaused ? <span className="text-amber-600 dark:text-amber-400">Paused</span> : <span className="capitalize">{profileStatus}</span>}
             hint={paymentPaused ? "Waiting for a payment" : ownLive ? `Version ${status.profile!.publishedVersion} is live` : "Not published yet"} />
         )}
         {ext && numbers.length === 0 ? (
-          <GoogleStat label="Lines" value={ext.lines.length || 1} testId="metric-overview-numbers" href="/call-assistant/calls"
+          <ColorStat label="Lines" icon={Hash} color="#0284c7" value={ext.lines.length || 1} testId="metric-overview-numbers" href="/call-assistant/calls"
             hint={`${ext.lines.length ? ext.lines.join(" & ") + " · " : ""}answered by ${ext.name}`} />
         ) : (
-          <GoogleStat label="Numbers" value={numbers.length} testId="metric-overview-numbers" href="/call-assistant/numbers"
+          <ColorStat label="Numbers" icon={Hash} color="#0284c7" value={numbers.length} testId="metric-overview-numbers" href="/call-assistant/numbers"
             hint={`${status.allowance.numbers} included`} />
         )}
         {extMonth ? (
-          <GoogleStat label="Minutes this month" value={extMonth.minutes.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant/calls"
+          <ColorStat label="Minutes this month" icon={Timer} color="#ca8a04" value={extMonth.minutes.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant/calls"
             hint={`${extMonth.calls.toLocaleString("en-US")} calls answered by ${ext!.name} · not billed here`} />
         ) : (
-          <GoogleStat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant/calls"
+          <ColorStat label="Minutes this month" icon={Timer} color="#ca8a04" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant/calls"
             hint={`${unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over${inNativeApp() ? "" : ` (${overageCost})`}` : ""}`}${extAlso ? ` · + ${extAlso.minutes.toLocaleString("en-US")} min answered by ${ext!.name}` : ""}`} />
         )}
         {extMonth ? (
-          <GoogleStat label="Spam stopped this month" value={extMonth.spam.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant/calls?view=spam"
+          <ColorStat label="Spam stopped this month" icon={ShieldBan} color="#dc2626" value={extMonth.spam.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant/calls?view=spam"
             hint={`Screened out by ${ext!.name}`} />
         ) : (
-          <GoogleStat label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant/calls?view=spam"
+          <ColorStat label="Spam stopped this month" icon={ShieldBan} color="#dc2626" value={spamThisMonth.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant/calls?view=spam"
             hint={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} />
         )}
-      </GoogleStatGrid>
+      </div>
       {/* "Calls this month" folded into the minutes tile (less is more); the testid stays for links/tests. */}
       <span className="sr-only" data-testid="metric-overview-calls">{extMonth ? extMonth.calls : status.usage?.calls ?? 0} calls this month</span>
 
@@ -179,7 +205,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               <h3 className="g-card__title g-card__title--md">Minutes used</h3>
               <span className="text-sm text-muted-foreground tabular-nums" data-testid="text-overview-minutes-pct">{unlimitedMinutes ? "Unlimited" : `${pct}%`}</span>
             </div>
-            {!unlimitedMinutes && <Progress value={pct} aria-label="Minutes used this month" data-testid="progress-overview-minutes" />}
+            {!unlimitedMinutes && <Progress value={pct} aria-label="Minutes used this month" className="h-2.5 [&>div]:bg-[#f57c00]" data-testid="progress-overview-minutes" />}
             {/* Billing copy — the per-minute price stays out of the app (it sells nothing). */}
             {!inNativeApp() && (
             <details className="text-sm"><summary className="cursor-pointer py-2">Billing details</summary>
@@ -252,22 +278,24 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               {showSample({ isLoading: calls.isLoading, isError: calls.isError, total: calls.isSuccess && !ext ? recent.length + (status.usage?.calls ?? 0) : undefined }) && <SampleCallsPreview compact />}
             </>
           ) : (
-            <GoogleList as="ul" testId="list-overview-calls">
+            <ul className="space-y-2" data-testid="list-overview-calls">
               {recent.map((c, i) => (
-                <GoogleListRow
-                  as="li"
-                  size="md"
-                  key={String(c.id)}
-                  testId={`row-overview-call-${i}`}
-                  leading={<Activity aria-hidden="true" />}
-                  title={<span className="tabular-nums">{prettyPhone(c.from ?? c.fromNumber ?? "")}</span>}
-                  href={`/call-assistant/calls?call=${encodeURIComponent(String(c.id))}`}
-                  titleTestId={`link-overview-call-${i}`}
-                  badges={c.outcome ? <StatusPill tone={outcomeTone(c.outcome)}>{outcomeLabel(c.outcome)}</StatusPill> : undefined}
-                  meta={[c.summary || null, c.startedAt ? fmtWhen(c.startedAt) : null]}
-                />
+                <li key={String(c.id)} className="relative overflow-hidden rounded-xl border bg-card" data-testid={`row-overview-call-${i}`}>
+                  <span className="absolute inset-y-0 left-0 w-1" style={{ background: outcomeColor(c.outcome) }} aria-hidden="true" />
+                  <Link href={`/call-assistant/calls?call=${encodeURIComponent(String(c.id))}`} className="flex min-h-14 items-center gap-3 py-2.5 pl-4 pr-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid={`link-overview-call-${i}`}>
+                    <CallerAvatar name={c.callerName} outcome={c.outcome} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-medium">{c.callerName || <span className="tabular-nums">{prettyPhone(c.from ?? c.fromNumber ?? "")}</span>}</span>
+                        {c.outcome && <OutcomePill outcome={c.outcome}>{outcomeLabel(c.outcome)}</OutcomePill>}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{[c.serviceNeeded || c.summary || null, c.startedAt ? fmtWhen(c.startedAt) : null].filter(Boolean).join(" · ")}</span>
+                    </span>
+                    <PhoneIncoming className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </Link>
+                </li>
               ))}
-            </GoogleList>
+            </ul>
           )}
         </CardContent>
       </Section>
