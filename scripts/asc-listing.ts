@@ -38,7 +38,7 @@ ANSWERS TO THE STANDARD INFORMATION QUESTIONS (2.1)
 2. Devices tested: iPhone (see the recording); builds made with Xcode 26 and the iOS 26 SDK.
 3. Purpose and audience: business tools for construction contractors in the United States (roofers, remodelers, builders) and their office staff.
 4. Setup: none — sign in with the demo account.
-5. Outside services: Google (sign-in; Google Business Profile with the owner's own authorization), Apple (Sign in with Apple, push notifications), SignalWire (phone calls and texts for the AI Call Assistant), Cloudflare (network and storage). Billing happens only on the website and never in the app. AI features run on ConstructHUB's own servers; no personal data is sent to an outside AI company, so no third-party AI consent applies.
+5. Outside services: Google (sign-in; Google Business Profile with the owner's own authorization), Apple (Sign in with Apple, push notifications), SignalWire (phone calls and texts for the Call Assistant), Cloudflare (network and storage). Billing happens only on the website and never in the app. AI features run on ConstructHUB's own servers; no personal data is sent to an outside AI company, so no third-party AI consent applies.
 6. Regional differences: offered in the United States only; the app is the same for every user.
 7. Regulated industry: no — business productivity tools; no health, financial, gambling or other regulated services.`;
 
@@ -63,7 +63,7 @@ WHAT'S IN THE APP
 • Property records: find the county appraiser or assessor office for a property.
 • Site Scan: check your website for speed, search and on-page problems.
 • Social media posting and website traffic protection.
-• AI Call Assistant, for businesses that use it on their phone line: every call it answered, with the caller, a summary and the recording, and each real caller filed as a lead.
+• Call Assistant, for businesses that use it on their phone line: every call it answered, with the caller, a summary and the recording, and each real caller filed as a lead.
 
 MADE FOR YOUR PHONE
 • Notifications for new calls, leads, reviews and profile changes. Tap one to open the exact page.
@@ -76,10 +76,10 @@ Your ConstructHUB account works the same on the web and in the app. Running jobs
     supportUrl: "https://constructhub.us/support", marketingUrl: "https://constructhub.us/", privacyPolicyUrl: "https://constructhub.us/privacy",
     messagingAndChat: false,
     reviewNotes: `WHAT THIS APP IS
-ConstructHUB: Contractor Tools opens a contractor's ConstructHUB account (constructhub.us): the AI Call Assistant dashboard, Google Business Profile tools (Profile Watch, reviews, posts), the ranking grid, the permit office directory, property records and Site Scan. ConstructHUB CRM, submitted separately by the same team, is a different product (clients, estimates, jobs, invoices) — the two apps share only the sign-in.
+ConstructHUB: Contractor Tools opens a contractor's ConstructHUB account (constructhub.us): the Call Assistant dashboard, Google Business Profile tools (Profile Watch, reviews, posts), the ranking grid, the permit office directory, property records and Site Scan. ConstructHUB CRM, submitted separately by the same team, is a different product (clients, estimates, jobs, invoices) — the two apps share only the sign-in.
 
 WHAT TO TRY
-Database Directory (permit offices by city or county), Property Records, Site Scan (enter any website address), Settings → Phone tab bar, Settings → Notifications → "Turn on" (push), Settings → My account → Delete account. Google Business Profile tools show their empty state: they need the business owner's own Google account, which a reviewer can't connect. The AI Call Assistant answers a business's own phone line; the demo account has no phone line connected, so that screen says it isn't on this account.
+Database Directory (permit offices by city or county), Property Records, Site Scan (enter any website address), Settings → Phone tab bar, Settings → Notifications → "Turn on" (push), Settings → My account → Delete account. Google Business Profile tools show their empty state: they need the business owner's own Google account, which a reviewer can't connect. The Call Assistant answers a business's own phone line; the demo account has no phone line connected, so that screen says it isn't on this account.
 
 NATIVE FEATURES (4.2)
 Push notifications (tap opens the exact page), Sign in with Apple, Google sign-in in the system sheet, iPhone share sheet for downloaded files, camera and photo attachments, an offline screen with retry, and a customizable bottom tab bar.
