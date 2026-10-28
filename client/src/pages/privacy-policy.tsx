@@ -74,14 +74,14 @@ export default function PrivacyPolicyPage() {
             <li><strong>Deleting your account</strong>: in ConstructHUB, open Settings → My account → Delete account; in ConstructHUB CRM, open More → Delete account. Billing is cancelled, you are signed out everywhere, any Sign in with Apple grant is revoked, and your data is erased within 30 days (payment records are kept as described in Data Retention).</li>
           </ul>
 
-          <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-call-assistant-data">1.5 AI Features and the AI Call Assistant</h3>
+          <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-call-assistant-data">1.5 AI Features and the Call Assistant</h3>
           <p className="mb-3">
             ConstructHUB's AI features (the Hub assistant, AI review replies, social post and content writing, Site Scan summaries) are answered by ConstructHUB's own AI service first. If it does not answer in time, the same request is sent to OpenAI's API (model gpt-5.4-nano), which processes the request to return the answer. OpenAI's handling of that data is governed by its{" "}
             <a href="https://openai.com/policies/api-data-usage-policies" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-openai-api-data">API data usage policies</a>.
-            The AI Call Assistant's call audio and transcripts are processed by ConstructHUB's own voice engine and AI service and are not sent to OpenAI.
+            The Call Assistant's call audio and transcripts are processed by ConstructHUB's own voice engine and AI service and are not sent to OpenAI.
           </p>
           <p className="mb-3">
-            When the AI Call Assistant answers your business line, we process the caller's phone number, the call audio, a recording, the transcript and a summary to answer the call and file the caller as a lead in your CRM. Calls and texts are carried by our telephone provider, SignalWire. Recordings and transcripts are kept with your account until you delete them or your account is erased.
+            When the Call Assistant answers your business line, we process the caller's phone number, the call audio, a recording, the transcript and a summary to answer the call and file the caller as a lead in your CRM. Calls and texts are carried by our telephone provider, SignalWire. Recordings and transcripts are kept with your account until you delete them or your account is erased.
           </p>
         </section>
 
@@ -281,7 +281,7 @@ export default function PrivacyPolicyPage() {
               <strong>Google Business Profile API</strong> — Used, with your authorization, to access and manage your own Google Business Profile (listing details, reviews, performance insights, and media). Our use of this data adheres to the Google API Services User Data Policy, including the Limited Use requirements (see Section 4).
             </li>
             <li>
-              <strong>AI processing</strong> — AI features run on ConstructHUB's own AI service first, with OpenAI's API as a fallback when it does not answer in time (see Section 1.5). The AI Call Assistant's call audio and transcripts stay with ConstructHUB's own voice engine and AI service.
+              <strong>AI processing</strong> — AI features run on ConstructHUB's own AI service first, with OpenAI's API as a fallback when it does not answer in time (see Section 1.5). The Call Assistant's call audio and transcripts stay with ConstructHUB's own voice engine and AI service.
             </li>
             <li>
               <strong>Social networks</strong> — Meta (Facebook, Instagram, Threads), TikTok, LinkedIn, Google (YouTube), Pinterest, X and Bluesky, used with your authorization to publish the posts you choose and to show you their statistics and comments (see Section 4.4). See{" "}
@@ -293,7 +293,7 @@ export default function PrivacyPolicyPage() {
               <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Apple's Privacy Policy</a>.
             </li>
             <li>
-              <strong>SignalWire</strong> — Carries the phone calls and text messages of the AI Call Assistant and CRM texting.
+              <strong>SignalWire</strong> — Carries the phone calls and text messages of the Call Assistant and CRM texting.
             </li>
             <li>
               <strong>Cloudflare R2</strong> — Used for cloud storage of uploaded photos and processed images. Files are stored securely in Cloudflare's infrastructure.

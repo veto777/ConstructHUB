@@ -642,7 +642,7 @@ const entries: Draft[] = [
 
   /* ══ Tools ════════════════════════════════════════════════════════════════════════════════════ */
   {
-    key: "call-assistant", group: "Tools", route: "/call-assistant", title: "AI Call Assistant",
+    key: "call-assistant", group: "Tools", route: "/call-assistant", title: "Call Assistant",
     whatItIs: "An AI receptionist that answers your business line around the clock, screens out spam, and files real callers as leads in your CRM.",
     whatItDoes: "It answers every call forwarded to it, asks what the call is about, collects the details you chose (address, name, a good email, best time to call) and files a real caller as a lead in the CRM. Emergencies, existing customers and callers who insist on a person are texted or emailed to the teammate you picked, and telemarketers and robocalls are flagged and never reach you. Every call is logged with its outcome, a summary, the transcript and the recording. It has five pages (Overview, Calls, Numbers, Agent studio and Simulator), each with its own “i”.",
     howToUse: [
@@ -1049,7 +1049,7 @@ export const introHelpEntry = (key: string): HelpEntry | undefined => {
   if (!key.startsWith(INTRO_VIDEO_PREFIX)) return undefined;
   const page = FEATURE_PAGES.find((p) => introVideoKey(p.key) === key);
   if (!page) {
-    // A feature with its own hand-built page (the AI Call Assistant): title and lede are all it declares.
+    // A feature with its own hand-built page (the Call Assistant): title and lede are all it declares.
     const ext = EXTERNAL_FEATURE_PAGES.find((p) => introVideoKey(p.key) === key);
     if (!ext) return undefined;
     return { key, title: ext.title, route: ext.app.href, group: INTRO_GROUPS[ext.key] ?? "Tools", unlisted: true,

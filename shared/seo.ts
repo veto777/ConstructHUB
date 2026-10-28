@@ -68,7 +68,7 @@ export const MARKETING_ROUTES: readonly string[] = [
 const PAGE_NAMES: Record<string, string> = {
   [FEATURES_PATH]: "Features",
   [DFY_PATH]: "Done-For-You Services",
-  [CALL_ASSISTANT_PATH]: "AI Call Assistant",
+  [CALL_ASSISTANT_PATH]: "Call Assistant",
   [REINSTATEMENT_PATH]: "GBP Reinstatement",
   "/compliance": "Compliance Dept",
   "/compliance/research": "Research Reports",

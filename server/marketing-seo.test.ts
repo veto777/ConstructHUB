@@ -266,7 +266,7 @@ describe("JSON-LD builders", () => {
     else expect(reinstatement.offers).toBeUndefined();
     // /call-assistant: listed as a feature; an Offer only once the add-on is for sale.
     const ca = node(graphOf("/call-assistant"), "SoftwareApplication");
-    expect(ca.name).toBe("AI Call Assistant");
+    expect(ca.name).toBe("Call Assistant");
     expect(!!ca.offers).toBe(!ADDONS.call_assistant.preview);
   });
 

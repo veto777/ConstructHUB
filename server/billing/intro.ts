@@ -1,5 +1,5 @@
 /**
- * Add-on introductory prices — today only the AI Call Assistant's Solo tier
+ * Add-on introductory prices — today only the Call Assistant's Solo tier
  * (owner, 2026-10-02: "$99 a month for the first 3 months", then the regular
  * price). Lite, Crew and Fleet have no intro; moving between tiers never grants it.
  *

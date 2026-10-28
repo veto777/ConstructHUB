@@ -67,7 +67,7 @@ describe("founding member price baseline", () => {
     expect(snapshot, MESSAGE).toEqual(FOUNDING_BASELINE);
   });
 
-  it("covers the plans and the Agency bands only: the AI Call Assistant (a separate service, repriced 2026-10-08) is not in the snapshot", () => {
+  it("covers the plans and the Agency bands only: the Call Assistant (a separate service, repriced 2026-10-08) is not in the snapshot", () => {
     // The founding lock is the plans' promise. The Call Assistant has its own subscription and its own price
     // book (shared/plans.ts CALL_ASSISTANT_TIERS); its 2026-10-08 repricing moved no founding member and is
     // not something foundingPrice() answers for.

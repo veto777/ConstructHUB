@@ -147,7 +147,7 @@ describe("the release decision (pure)", () => {
     expect(numbersKeptFor(sub("canceled", { call_assistant_lite: 1 }), false)).toEqual({ keep: 0, reason: "subscription_ended" });
     expect(releaseReasonText("subscription_ended")).toBe("the subscription ended");
     expect(releaseReasonText("payment_failed")).toBe("the subscription's payment was not recovered");
-    expect(releaseReasonText("addon_removed")).toBe("the AI Call Assistant tier was removed from the subscription");
+    expect(releaseReasonText("addon_removed")).toBe("the Call Assistant tier was removed from the subscription");
   });
 
   it("a cancellation (or an attempted release) is final; a payment problem or fewer extras is not", () => {
@@ -245,7 +245,7 @@ describe("cancel → the number is released", () => {
     expect(s.decision).toEqual({ keep: 0, reason: "addon_removed" });
     await releaseDueCallNumbers({ ...deps(), orgIds: s.orgIds });
     expect(await row(n.phone)).toMatchObject({ status: "released", release_reason: "addon_removed" });
-    expect((await notifications(a.orgId)).at(-1)!.title).toBe(`Your Call Assistant number ${n.phone} was released because the AI Call Assistant tier was removed from the subscription`);
+    expect((await notifications(a.orgId)).at(-1)!.title).toBe(`Your Call Assistant number ${n.phone} was released because the Call Assistant tier was removed from the subscription`);
   });
 });
 

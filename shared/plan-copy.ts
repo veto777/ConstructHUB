@@ -75,7 +75,7 @@ export const AGENCY_ONLY_MODULES: string[] = (Object.keys(MODULE_NAMES) as Modul
   .filter((module) => planForModule(module) === "agency")
   .map((module) => MODULE_NAMES[module]);
 
-/** The platform's own add-ons: not the AI Call Assistant's (its own subscription) and not retired lines
+/** The platform's own add-ons: not the Call Assistant's (its own subscription) and not retired lines
  * (an add-on sold on no plan and not a preview, like the old extra-location one, reads stored subscriptions only). */
 export const PLATFORM_ADDONS: readonly Addon[] = Object.values(ADDONS).filter(
   (a) => !isCallAssistantAddon(a.key) && (a.availableOn.length > 0 || a.preview === true),
@@ -97,10 +97,10 @@ export function addonLines(): string[] {
   });
 }
 
-// ── AI Call Assistant ────────────────────────────────────────────────────────
+// ── Call Assistant ────────────────────────────────────────────────────────
 
 /**
- * AI Call Assistant pricing — a SEPARATE SERVICE on its own subscription
+ * Call Assistant pricing — a SEPARATE SERVICE on its own subscription
  * (owner, 2026-10-08), four tiers, every figure from the price book
  * (shared/plans.ts CALL_ASSISTANT_TIERS, the same table the Stripe prices and
  * the entitlements are built from): a tier's minutes and local numbers a
@@ -133,7 +133,7 @@ export type CallAssistantTierFacts = {
   addon: AddonKey;
   /** "500 minutes" — the tier is named by the minutes it includes. */
   name: string;
-  /** "AI Call Assistant — 500 minutes" (the add-on's name). */
+  /** "Call Assistant — 500 minutes" (the add-on's name). */
   fullName: string;
   monthly: string;
   annual: string;
@@ -403,7 +403,7 @@ The CRM (clients, estimates, invoices, payments, pipeline) is a SEPARATE product
 The ${CALL_ASSISTANT_NAME} (an AI receptionist on a local number) is a SEPARATE SERVICE with its own subscription, not a plan add-on: none of the plans above or the CRM plans includes it, and no plan is needed to buy it. ${callAssistantPricing().tierCountWord.replace(/^./, (c) => c.toUpperCase())} tiers, one per account: ${callAssistantTiersLine()}. ${callAssistantYearlyNote()}. Extra local numbers are ${callAssistantPricing().extraNumber}/month each, and ${callAssistantSpamAllowanceLine()}. There is no intro or launch price. ${callAssistantAboveTopLine()}
 Competitor Intel is included with ${COMPETITOR_INTEL_PLANS}. Click Guard, IP Tracker and VPN Shield are included with ${PROTECTED_SITE_PLANS}. Texting is sent from the CRM and is included with ${TEXTING_EITHER_LINE}.
 
-### Add-ons (single features are sold only as add-ons to a plan; the AI Call Assistant is a separate service, above)
+### Add-ons (single features are sold only as add-ons to a plan; the Call Assistant is a separate service, above)
 ${addonLines().map((line) => `- ${line}`).join("\n")}
 
 ### Services and anything priced at ${SALES_THRESHOLD_LABEL} or more

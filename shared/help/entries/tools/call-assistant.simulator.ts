@@ -2,7 +2,7 @@ import type { HelpDraft } from "../../types";
 
 /** Written from client/src/pages/crm-call-assistant/simulator.tsx and server/voice/simulator.ts as they run. */
 const entry: HelpDraft = {
-  key: "call-assistant.simulator", parent: "call-assistant", group: "Tools", route: "/call-assistant/simulator", title: "AI Call Assistant → Simulator",
+  key: "call-assistant.simulator", parent: "call-assistant", group: "Tools", route: "/call-assistant/simulator", title: "Call Assistant → Simulator",
   whatItIs: "A typed test call with your assistant, so you can see how it handles callers before a real one does.",
   whatItDoes: "It starts a pretend call against your published version or your draft, and you type as the caller. Each reply shows the decision behind it: whether the call goes on, the alert it would send, the spam score and the details collected so far. Hang up ends the call and shows how it ended: the outcome, or how many turns it ran and whether a lead or an alert would have gone out.",
   howToUse: [

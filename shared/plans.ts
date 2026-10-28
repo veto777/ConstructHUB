@@ -23,7 +23,7 @@
  *   - 2026-10-07: the CRM is a SEPARATE PRODUCT (shared/crm-plans.ts). No
  *     platform plan grants CRM seats, and no CRM plan grants platform tools.
  *     Every plan states what it does NOT include, shown at checkout.
- *   - 2026-10-08: the AI Call Assistant is a SEPARATE SERVICE too, on its own
+ *   - 2026-10-08: the Call Assistant is a SEPARATE SERVICE too, on its own
  *     subscription (CALL_ASSISTANT_TIERS below, server/voice/subscription.ts):
  *     no platform plan includes it, and it is bought with or without one.
  *   - Anything priced at $1,000 or more is "Talk to a sales rep", never a price.
@@ -240,8 +240,8 @@ const AGENCY_MODULES: PlanModules = { ...PRO_MODULES, agencyWorkspace: true, sch
 const ALL_MODULES: PlanModules = { ...AGENCY_MODULES, whiteLabel: true, masterClass: true };
 const CRM_NOT_INCLUDED_LINE = "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $49/mo)";
 
-// ── AI Call Assistant: a SEPARATE SERVICE ───────────────────────────────────
-// Owner, 2026-10-08 (late evening): the AI Call Assistant is sold on its own
+// ── Call Assistant: a SEPARATE SERVICE ───────────────────────────────────
+// Owner, 2026-10-08 (late evening): the Call Assistant is sold on its own
 // subscription (server/voice/subscription.ts), the way the CRM is
 // (shared/crm-plans.ts): no platform plan includes it, and it can be bought
 // with no platform plan at all. Four tiers, one per account, named by what
@@ -302,7 +302,7 @@ export const CALL_ASSISTANT_TIERS: readonly CallAssistantTier[] = [
 ];
 export const CALL_ASSISTANT_TIER_ADDONS: readonly AddonKey[] = CALL_ASSISTANT_TIERS.map((t) => t.addon);
 /** The product's name; each tier's add-on is "<this> — <tier name>". */
-export const CALL_ASSISTANT_NAME = "AI Call Assistant";
+export const CALL_ASSISTANT_NAME = "Call Assistant";
 /** The cheapest tier's monthly price: the "from" price every "separate service" line quotes. */
 export const CALL_ASSISTANT_FROM_CENTS = Math.min(...CALL_ASSISTANT_TIERS.map((t) => t.monthlyCents));
 /** Where the Call Assistant is bought: its own section of the pricing page. */
@@ -678,7 +678,7 @@ export const ADDONS: Record<AddonKey, Addon> = {
   call_assistant_fleet: callAssistantTierAddon("fleet"),
   call_number: {
     key: "call_number", name: "Extra Call Assistant number",
-    description: "One more local number for the AI Call Assistant (a second location or a tracking line).",
+    description: "One more local number for the Call Assistant (a second location or a tracking line).",
     // $50/yr: the old voice contract (unchanged). The owner's 2026-10-08 repricing named the four
     // tiers only; the extra number's prices are unchanged (Codex audit #4).
     monthlyCents: 500, annualCents: 5000, availableOn: CALL_ASSISTANT_SOLD_ON, grants: {},

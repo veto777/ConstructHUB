@@ -28,7 +28,7 @@ export const HOME_META: RouteMeta = {
 export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
   "/": HOME_META,
   "/call-assistant": {
-    title: "AI Call Assistant | ConstructHUB",
+    title: "Call Assistant | ConstructHUB",
     description:
       "An AI receptionist for contractors: a local number in your state, your own lines forwarded, and every call in your CRM with a transcript and recording.",
   },

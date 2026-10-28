@@ -117,7 +117,7 @@ export function PublicPageFooter() {
         <span aria-hidden className="opacity-40">·</span>
         <Link href="/done-for-you" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-dfy">Done-For-You</Link>
         <span aria-hidden className="opacity-40">·</span>
-        <Link href="/call-assistant" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-call-assistant">AI Call Assistant</Link>
+        <Link href="/call-assistant" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-call-assistant">Call Assistant</Link>
         <span aria-hidden className="opacity-40">·</span>
         <Link href="/features/guides" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-help">Help</Link>
         <span aria-hidden className="opacity-40">·</span>

@@ -272,7 +272,7 @@ const googleReviewsItem = { title: "Google Reviews", url: "/google-reviews", ico
 const yelpReviewsItem = { title: "Yelp", url: "/yelp", icon: Star, logoComponent: YelpIcon, badge: "new" as BadgeType };
 
 const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType; crmPath?: string }[] = [
-  // The AI Call Assistant's dashboard is a platform page (/call-assistant signed in); the CRM is a standalone
+  // The Call Assistant's dashboard is a platform page (/call-assistant signed in); the CRM is a standalone
   // service and never hosts it (owner, 2026-10-02). Signed out, /call-assistant is the feature page.
   { title: "Call Assistant", url: "/call-assistant", icon: Phone, logoComponent: CallAssistantIcon, badge: "new" },
   { title: "Social Media", url: "/social-media", icon: Megaphone, logoComponent: SocialMediaIcon },

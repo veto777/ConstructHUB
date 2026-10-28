@@ -186,7 +186,7 @@ export async function requireSmsOrg(req: any, res: any, userId: number): Promise
  * say why, and sell the plan. Beta accounts and ConstructHUB staff pass
  * (getCrmEntitlements). CRM_REQUIRE_PLAN=0 switches the gate off (the demo).
  */
-// The AI Call Assistant's routes (/api/crm/voice/*) are a separate service with its own subscription
+// The Call Assistant's routes (/api/crm/voice/*) are a separate service with its own subscription
 // (owner, 2026-10-08): they gate on THAT subscription (server/voice/context.ts voiceContext), never on a
 // CRM plan, so a Call Assistant customer without the CRM can run their assistant.
 const CRM_OPEN_PATHS = [/^\/api\/crm\/me(\/|$)/, /^\/api\/crm\/billing(\/|$)/, /^\/api\/crm\/orgs(\/|$)/, /^\/api\/crm\/voice(\/|$)/];

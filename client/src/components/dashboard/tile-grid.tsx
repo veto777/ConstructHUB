@@ -54,7 +54,7 @@ function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey | "all";
       </div>
     );
   }
-  // An add-on the account hasn't bought (the AI Call Assistant) is bought on top of a plan, not "on a higher plan".
+  // An add-on the account hasn't bought (the Call Assistant) is bought on top of a plan, not "on a higher plan".
   const anyAddon = tiles.some((t) => t.addon);
   const addonsOnly = tiles.every((t) => t.addon);
   return (
@@ -70,7 +70,7 @@ function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey | "all";
         {tiles.map((t) => {
           const Icon = TILE_ICONS[t.key] ?? LayoutGrid;
           const plan = t.requiredPlan ? PLANS[t.requiredPlan].name : "Paid plan";
-          // The AI Call Assistant is a separate service on its own subscription: no plan name on its chip.
+          // The Call Assistant is a separate service on its own subscription: no plan name on its chip.
           const addon = t.addon ? ADDONS[t.addon as AddonKey] : undefined;
           const addonPlans = addon ? "separate" : null;
           const intro = featureIntroPath(t.key);

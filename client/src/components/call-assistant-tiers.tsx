@@ -1,5 +1,5 @@
 /**
- * The AI Call Assistant's four tiers in the app's own (shadcn) look. The
+ * The Call Assistant's four tiers in the app's own (shadcn) look. The
  * service is sold on its OWN subscription (owner, 2026-10-08), apart from the
  * platform plans — the CRM's pattern (components/crm-plans.tsx). Every figure
  * is the price book's (shared/plans.ts CALL_ASSISTANT_TIERS through

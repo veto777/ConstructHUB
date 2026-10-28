@@ -20,7 +20,7 @@ export function LockedPrompt({
   tileKey: string;
   requiredPlan?: PlanKey;
   module?: ModuleKey;
-  /** The AI Call Assistant: a separate service on its own subscription, so no plan is named. */
+  /** The Call Assistant: a separate service on its own subscription, so no plan is named. */
   addon?: string;
   href?: string;
   surface?: DashboardSurface;

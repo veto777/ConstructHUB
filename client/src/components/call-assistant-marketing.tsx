@@ -1,5 +1,5 @@
 /**
- * The AI Call Assistant on the marketing site, in the landing page's
+ * The Call Assistant on the marketing site, in the landing page's
  * "editorial" language (design B: Fraunces + Plus Jakarta Sans on cream paper,
  * navy grid panels, one orange — the `mkt-editorial` scope in index.css).
  *
@@ -223,7 +223,7 @@ export function CallAssistantSection() {
       <div className="max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-12 gap-6 lg:gap-10 items-end mb-12 lg:mb-14">
           <div className="lg:col-span-7">
-            <Kicker n="New">AI Call Assistant</Kicker>
+            <Kicker n="New">Call Assistant</Kicker>
             <h2 className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3.1rem] leading-[1.05] tracking-[-0.02em] mt-5">
               Every Call Answered. <em className="text-mkt-orange-ink">Every Lead in Your CRM.</em>
             </h2>

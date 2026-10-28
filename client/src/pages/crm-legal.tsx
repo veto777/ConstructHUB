@@ -238,7 +238,7 @@ export function CrmPrivacyPage() {
         your data is erased within 30 days (payment records are kept as the law requires).
       </P>
       <P>
-        <strong>AI:</strong> AI features — including the AI Call Assistant, which answers a Contractor's
+        <strong>AI:</strong> AI features — including the Call Assistant, which answers a Contractor's
         calls and files callers as leads in the CRM — run on ConstructHUB's own servers. Call audio,
         recordings, transcripts and other data are not sent to an outside AI company.
       </P>

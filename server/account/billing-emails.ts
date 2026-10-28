@@ -371,7 +371,7 @@ function labelForRole(price: Stripe.Price | null, fallback: string | null): stri
   const role = roleOfPrice(price);
   switch (role?.kind) {
     case "plan": return `ConstructHUB ${PLANS[role.key].name} plan (${intervalWord(role.interval)})`;
-    // The AI Call Assistant's lines are its own subscription's (a separate service), named as the service.
+    // The Call Assistant's lines are its own subscription's (a separate service), named as the service.
     case "addon": return isCallAssistantAddon(role.key) ? `ConstructHUB ${ADDONS[role.key].name} (${intervalWord(role.interval)})` : `${ADDONS[role.key].name} (${intervalWord(role.interval)})`;
     // The bands are legacy (2026-09-30 Agency): the count they bill against is the legacy 10.
     case "agency_locations": return `Agency locations above ${LEGACY_AGENCY_INCLUDED_LOCATIONS} (${intervalWord(role.interval)})`;

@@ -1,5 +1,5 @@
 /**
- * The AI Call Assistant as its own full-screen tool (owner, 2026-10-12: "create the same format for all other pages
+ * The Call Assistant as its own full-screen tool (owner, 2026-10-12: "create the same format for all other pages
  * like call assistant …"). Every view is a route under /call-assistant (signed in; signed out /call-assistant stays
  * the feature page); the panels are pages/crm-call-assistant`s own. Notifications still link ?tab=calls&call=<id> —
  * the page moves those to /call-assistant/calls?call=<id>.

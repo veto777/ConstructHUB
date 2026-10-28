@@ -18,7 +18,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 /**
- * Settings → Billing: the account's AI Call Assistant subscription — a
+ * Settings → Billing: the account's Call Assistant subscription — a
  * separate service on its own subscription (owner, 2026-10-08), apart from
  * any platform plan — with the tier picker, the extra-number counter, the way
  * to buy it (its own section of Pricing) and the way to cancel it (Stripe's

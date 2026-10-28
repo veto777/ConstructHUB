@@ -118,7 +118,7 @@ export function featurePriceSummary(spec: FeaturePricing): FeaturePriceSummary {
       const addon = ADDONS[spec.addon];
       const setup = addon.setupCents ? ` plus a ${formatUsd(addon.setupCents)} one-time setup fee` : "";
       const soldOn = `the ${joinNames(addon.availableOn.map((k) => PLANS[k].name))} plan${addon.availableOn.length > 1 ? "s" : ""}`;
-      // The AI Call Assistant is a SEPARATE SERVICE sold in tiers on its own subscription (owner, 2026-10-08):
+      // The Call Assistant is a SEPARATE SERVICE sold in tiers on its own subscription (owner, 2026-10-08):
       // priced from its cheapest tier, the note lists every tier — never one middle tier's price as if it were
       // the price — and no platform plan "includes" or "sells" it: the rows say so for every plan.
       const tiers = isCallAssistantAddon(spec.addon) && addon.exclusiveGroup
@@ -288,7 +288,7 @@ export function featurePlanGap(spec: FeaturePricing, ent: FeatureEntitlementsInp
     case "addon": {
       const module = (Object.keys(ADDON_MODULES) as AddonModuleKey[]).find((k) => ADDON_MODULES[k] === spec.addon);
       if (!module || ent.addonModules?.[module]) return null;
-      // The AI Call Assistant is a separate service: no plan upgrade would add it, so point at its own pricing.
+      // The Call Assistant is a separate service: no plan upgrade would add it, so point at its own pricing.
       return { label: "See Call Assistant pricing", href: CALL_ASSISTANT_PRICING_HREF, note: `A separate service, not part of your ${current} plan.` };
     }
     default:

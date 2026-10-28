@@ -9,7 +9,7 @@
  *
  * Each feature's copy lives in its own file, shared/feature-pages/<key>.ts, so
  * writers never touch each other's work. Writing rules: WRITING-GUIDE.md here.
- * The AI Call Assistant keeps its own hand-built page (/call-assistant) and is
+ * The Call Assistant keeps its own hand-built page (/call-assistant) and is
  * listed as an external entry.
  */
 import { DASHBOARD_GROUPS, DASHBOARD_TILES } from "../dashboard";
@@ -89,7 +89,7 @@ export const EXTERNAL_FEATURE_PAGES: readonly ExternalFeaturePage[] = [
   {
     key: "callAssistant",
     group: "run",
-    title: "AI Call Assistant",
+    title: "Call Assistant",
     lede: callAssistantTile?.description ?? "An assistant that answers your calls 24/7 and files the lead in your CRM.",
     path: "/call-assistant",
     app: { href: "/call-assistant", surface: "app" },

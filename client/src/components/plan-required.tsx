@@ -24,7 +24,7 @@ import {
 
 /** The server's 402 body for "your plan doesn't include this" (server/entitlements.ts → sendPlanRequired). */
 export type PlanRequiredBody = { code: "plan_required"; requiredPlan: PlanKey; message: string };
-/** The server's 402 for the AI Call Assistant without its own subscription (server/entitlements.ts → sendModuleRequired). */
+/** The server's 402 for the Call Assistant without its own subscription (server/entitlements.ts → sendModuleRequired). */
 export type CallAssistantRequiredBody = { code: typeof CALL_ASSISTANT_REQUIRED_CODE; addon: string; href: string; message: string };
 
 /** Reads the Call Assistant's own 402 out of an apiRequest error; null for anything else. */

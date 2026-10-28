@@ -2,7 +2,7 @@ import type { HelpDraft } from "../../types";
 
 /** Written from client/src/pages/crm-call-assistant/calls.tsx, calls-detail.tsx and server/voice/calls.ts, spam.ts, escalations.ts as they run. */
 const entry: HelpDraft = {
-  key: "call-assistant.calls", parent: "call-assistant", group: "Tools", route: "/call-assistant/calls", title: "AI Call Assistant → Calls",
+  key: "call-assistant.calls", parent: "call-assistant", group: "Tools", route: "/call-assistant/calls", title: "Call Assistant → Calls",
   whatItIs: "Every call your assistant answered, with what happened on it: the outcome, a summary, the transcript and the recording.",
   whatItDoes: "There are three views. Calls lists each call with its number, time, caller, outcome, topic and length; open one for the summary, details collected, transcript, recording, and the client or project it became. Spam blocked shows this month’s spam count, the numbers being watched or blocked (with Block and Unblock), and the spam calls themselves. Escalations lists the texts and emails sent to your team when a caller needed a person, and whether anyone replied.",
   howToUse: [

@@ -1,5 +1,5 @@
 /**
- * /call-assistant — the AI Call Assistant's marketing page, for signed-out
+ * /call-assistant — the Call Assistant's marketing page, for signed-out
  * visitors (public header + footer). Signed-in users who have the CRM get the
  * in-app tool instead (App.tsx routes /call-assistant to CrmCallAssistantPage,
  * and the CRM host's old /crm/call-assistant link redirects here), so this
@@ -111,7 +111,7 @@ const AFTER_CALL: string[] = [
  * No prices here (they come from the price book, above).
  */
 const IN_DEPTH: string[] = [
-  "The AI Call Assistant is an AI answering service for contractors, part of the ConstructHUB platform. You forward " +
+  "The Call Assistant is an answering service for contractors, part of the ConstructHUB platform. You forward " +
     "your existing lines to its local number, when you don't answer, after hours or always, and it picks up under " +
     "the name and voice you chose. Its job is the call you would otherwise miss: find out what the caller needs, " +
     "take down a real job the way you set it up, and get it to the right person.",
@@ -249,7 +249,7 @@ export default function CallAssistantLandingPage() {
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 lg:grid lg:grid-cols-12 lg:gap-10 lg:items-center">
             <div className="lg:col-span-7 pt-10 sm:pt-14 lg:pt-20 pb-10 lg:pb-20">
               <div className="flex flex-wrap items-center gap-3">
-                <Kicker n="New">AI Call Assistant</Kicker>
+                <Kicker n="New">Call Assistant</Kicker>
                 <ComingSoonTag />
               </div>
               <h1 className="font-display mt-5 font-semibold text-[2.45rem] leading-[1.04] sm:text-[3.3rem] lg:text-[3.85rem] tracking-[-0.02em] text-mkt-ink" data-testid="text-ca-title">
@@ -286,7 +286,7 @@ export default function CallAssistantLandingPage() {
         </section>
 
         {/* The intro film, directly under the hero as on every feature page (owner, 2026-10-11); nothing until its manifest is uploaded. */}
-        <FeatureIntroVideo featureKey="callAssistant" title="AI Call Assistant" />
+        <FeatureIntroVideo featureKey="callAssistant" title="Call Assistant" />
 
         {/* Spam: the owner's lead promise (2026-10-02). Only what the code does: CALL_ASSISTANT_SPAM in shared/plan-copy.ts. */}
         <section id="spam" className="py-16 lg:py-20 px-4 sm:px-6 lg:px-8 scroll-mt-16" data-testid="section-ca-spam">
@@ -347,7 +347,7 @@ export default function CallAssistantLandingPage() {
             </ol>
           </div>
         </section>
-        <ScreensSection page={{ title: "AI Call Assistant" }} screens={FEATURE_SCREENS.callAssistant ?? []} n="02" tone="paper" />
+        <ScreensSection page={{ title: "Call Assistant" }} screens={FEATURE_SCREENS.callAssistant ?? []} n="02" tone="paper" />
 
         {/* The voices */}
         <section id="voices" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 bg-mkt-paper-2 border-b border-mkt-rule scroll-mt-16" data-testid="section-ca-voices">
@@ -571,7 +571,7 @@ export default function CallAssistantLandingPage() {
         </section>
       </div>
       <PublicPageFooter />
-      <TalkToSalesDialog open={salesOpen} onOpenChange={setSalesOpen} topic="AI Call Assistant" />
+      <TalkToSalesDialog open={salesOpen} onOpenChange={setSalesOpen} topic="Call Assistant" />
     </div>
   );
 }

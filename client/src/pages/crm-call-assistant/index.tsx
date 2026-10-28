@@ -23,7 +23,7 @@ import { SimulatorPanel } from "./simulator";
 import { CallsPanel } from "./calls";
 
 /**
- * /call-assistant — the AI Call Assistant's home in the CRM
+ * /call-assistant — the Call Assistant's home in the CRM
  * (docs/call-assistant/SPEC.md § Side ribbon). ARCHITECT-OWNED shell: the
  * tab strip, the plan gate and the deep link (?tab=). Each panel file is a
  * lane's (LANES.md): numbers.tsx and calls.tsx → their server lanes,

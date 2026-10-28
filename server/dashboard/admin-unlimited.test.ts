@@ -82,7 +82,7 @@ describe("dashboard for a platform admin", () => {
     expect(attention.filter((a) => a.key.startsWith("usage."))).toEqual([]);
     expect(attention.some((a) => a.hint === "Over your plan's limit" || a.hint === "Limit reached this month")).toBe(false);
 
-    // Every feature is on: the AI Call Assistant tile opens the CRM's Call Assistant, never "coming soon".
+    // Every feature is on: the Call Assistant tile opens the CRM's Call Assistant, never "coming soon".
     const ca = p.tiles.find((t) => t.key === "callAssistant")!;
     expect(ca.status).not.toBe("coming_soon");
     expect(ca).toMatchObject({ entitled: true, status: "ok", cta: { href: "/call-assistant", surface: "app" } });
@@ -98,7 +98,7 @@ describe("dashboard for a platform admin", () => {
     expect(usage.protectedSites).toMatchObject({ used: 1, limit: PLANS.starter.limits.protectedSites });
     const keys = dashboardAttention(p.tiles, p.account).map((a) => a.key);
     expect(keys).toEqual(expect.arrayContaining(["usage.locations", "usage.searches"]));
-    // Not an admin and the service not bought: the (launched) AI Call Assistant is locked like any tile — not "coming soon", no plan named.
+    // Not an admin and the service not bought: the (launched) Call Assistant is locked like any tile — not "coming soon", no plan named.
     expect(p.tiles.find((t) => t.key === "callAssistant")).toMatchObject({ status: "locked", entitled: false, addon: "call_assistant", metrics: [] });
     expect(p.tiles.find((t) => t.key === "callAssistant")!.requiredPlan).toBeUndefined();
   });

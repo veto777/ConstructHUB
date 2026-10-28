@@ -1,5 +1,5 @@
 /**
- * The AI Call Assistant's own subscription (owner, 2026-10-08: a separate
+ * The Call Assistant's own subscription (owner, 2026-10-08: a separate
  * service, bought with or without a platform plan): the order a request asks
  * for, how a Stripe subscription is read back and told apart from the platform
  * plan, the line items and in-place changes it gets, the row the webhook
@@ -204,7 +204,7 @@ describe("the row and what the client reads", () => {
     expect(joinedColumnsOf(undefined)).toBeNull();
     expect(callAssistantSubscriptionOf(joinedColumnsOf({ id: 1, user_id: 7, stripe_customer_id: null, stripe_subscription_id: "s", stripe_price_id: null, tier: "lite", extra_numbers: 0, status: "active", billing_interval: "month", current_period_end: null, cancel_at_period_end: null })))
       .toMatchObject({ tier: "lite", status: "active", addons: { call_assistant_lite: 1 }, interval: "month", cancelAtPeriodEnd: null });
-    expect(ADDONS.call_assistant_lite.name).toBe("AI Call Assistant — 500 minutes");
+    expect(ADDONS.call_assistant_lite.name).toBe("Call Assistant — 500 minutes");
   });
 });
 

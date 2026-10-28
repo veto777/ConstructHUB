@@ -51,7 +51,7 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
   const portal = useBillingPortal();
   const { data: subscription, isLoading, error } = useQuery<SubscriptionWithStart>({ queryKey: ["/api/stripe/subscription"] });
   const { data: entitlements } = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"] });
-  // The AI Call Assistant is its own subscription (server/voice/subscription.ts): one line of its own on the statement.
+  // The Call Assistant is its own subscription (server/voice/subscription.ts): one line of its own on the statement.
   const { data: callAssistant } = useQuery<CallAssistantSubscriptionInfo>({ queryKey: CALL_ASSISTANT_SUBSCRIPTION_KEY });
   // Tools bought à la carte (shared/alacarte.ts): each its own subscription, one line each, at the tier it is billed at now.
   const { data: alacarte } = useQuery<AlacarteMe>({ queryKey: ["/api/alacarte/me"] });

@@ -142,7 +142,7 @@ describe("platform admin all-access matrix (admin vs agency vs pro)", () => {
     expect(agency.addonModules.callAssistant).toBe(false);
     expect(callAssistantAllowance(agency)).toEqual({ numbers: 0, minutes: 0, overageCentsPerMinute: 0 });
 
-    // The AI Call Assistant is its own subscription (the call_assistant_* columns the account query joins in).
+    // The Call Assistant is its own subscription (the call_assistant_* columns the account query joins in).
     mocks.row = customer("pro", { call_assistant_tier: "solo", call_assistant_status: "active", call_assistant_extra_numbers: 0 });
     const pro = await getEntitlements(7);
     expect(pro.isPlatformAdmin).toBe(false);

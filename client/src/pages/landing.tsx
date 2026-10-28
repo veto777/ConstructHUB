@@ -207,7 +207,7 @@ const services = [
   },
   {
     icon: Phone,
-    title: `AI Call Assistant${callAssistantPricing().comingSoon ? " (coming soon)" : ""}`,
+    title: `Call Assistant${callAssistantPricing().comingSoon ? " (coming soon)" : ""}`,
     description: "An AI receptionist on your own local number answers 24/7, asks the right questions, files the lead in your CRM and pages the right person for emergencies. Every call logged with transcript and recording. Sold as an add-on.",
     href: CALL_ASSISTANT_PATH,
   },
@@ -420,7 +420,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* AI Call Assistant — the voices, a local number, forwarding, Agent Studio, the CRM (components/call-assistant-marketing.tsx). */}
+      {/* Call Assistant — the voices, a local number, forwarding, Agent Studio, the CRM (components/call-assistant-marketing.tsx). */}
       <CallAssistantSection />
 
       {/* Done-For-You */}
@@ -632,7 +632,7 @@ export default function LandingPage() {
               <span aria-hidden className="opacity-40">·</span>
               <Link href="/done-for-you" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-dfy">Done-For-You</Link>
               <span aria-hidden className="opacity-40">·</span>
-              <Link href={CALL_ASSISTANT_PATH} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-call-assistant">AI Call Assistant</Link>
+              <Link href={CALL_ASSISTANT_PATH} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-call-assistant">Call Assistant</Link>
               <span aria-hidden className="opacity-40">·</span>
               <Link href="/features/guides" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-help">Help</Link>
               <span aria-hidden className="opacity-40">·</span>

@@ -59,7 +59,7 @@ describe("Call Assistant price book: a separate service, four tiers (owner, 2026
     for (const t of CALL_ASSISTANT_TIERS) {
       const a = ADDONS[t.addon];
       // The add-on IS the tier: one source for the service's checkout, Stripe prices and the pages — and no plan sells it.
-      expect(a).toMatchObject({ key: t.addon, name: `AI Call Assistant — ${t.name}`, monthlyCents: t.monthlyCents, annualCents: t.annualCents,
+      expect(a).toMatchObject({ key: t.addon, name: `Call Assistant — ${t.name}`, monthlyCents: t.monthlyCents, annualCents: t.annualCents,
         availableOn: [], exclusiveGroup: "call_assistant_tier", grants: {} });
       // Launched (owner, 2026-10-02: "the call assistant is live not coming soon"): every tier is for sale.
       expect(a.preview ?? false).toBe(false);

@@ -78,7 +78,7 @@ vi.mock("./db", () => {
         if (/SELECT cancel_at_period_end/.test(text)) return { rows: [mocks.cancelRow] };
         // The account row getEntitlements reads (server/entitlements.ts accountSubscriptionRow).
         if (/^\s*SELECT u\.email, s\.\*/.test(text)) return { rows: mocks.accountRow ? [mocks.accountRow] : [] };
-        // The AI Call Assistant's own subscription (server/voice/subscription.ts): its row, and the account lookups its webhook makes.
+        // The Call Assistant's own subscription (server/voice/subscription.ts): its row, and the account lookups its webhook makes.
         if (/FROM call_assistant_subscriptions WHERE user_id/.test(text)) return { rows: mocks.callAssistantRow ? [mocks.callAssistantRow] : [] };
         // The attempt row (the checkout lock across processes, server/voice/subscription.ts): in flight, started, moved on.
         if (/FROM call_assistant_checkout_attempts WHERE user_id/.test(text)) return { rows: mocks.attempt ? [mocks.attempt] : [] };
@@ -757,7 +757,7 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
   });
 });
 
-describe("the AI Call Assistant's own subscription (server/voice/subscription.ts): a separate service, with or without a plan", () => {
+describe("the Call Assistant's own subscription (server/voice/subscription.ts): a separate service, with or without a plan", () => {
   const liveCallAssistant = (extra: any = {}) => ({ id: 9, user_id: 42, stripe_customer_id: "cus_test", stripe_subscription_id: "sub_ca", stripe_price_id: "price_x", tier: "solo", extra_numbers: 0, status: "active", billing_interval: "month", current_period_end: null, cancel_at_period_end: false, ...extra });
   const caSubscription = (items: any[], extra: any = {}) => subscription(items, { id: "sub_ca", metadata: { product: "call_assistant", userId: "42" }, ...extra });
   const caInsert = () => mocks.sql.filter((q) => /INSERT INTO call_assistant_subscriptions/.test(q.text)).map((q) => q.values);
@@ -787,7 +787,7 @@ describe("the AI Call Assistant's own subscription (server/voice/subscription.ts
     expect(lineItems().map((l) => [priceOf(l.price).metadata.chub_kind, priceOf(l.price).metadata.chub_key, priceOf(l.price).unit_amount, priceOf(l.price).recurring.interval, l.quantity])).toEqual([
       ["addon", "call_assistant_crew", 493900, "year", 1], ["addon", "call_number", 5000, "year", 2],
     ]);
-    expect(priceOf(lineItems()[0].price).product_data.name).toBe("ConstructHUB AI Call Assistant — 2,000 minutes");
+    expect(priceOf(lineItems()[0].price).product_data.name).toBe("ConstructHUB Call Assistant — 2,000 minutes");
     expect(priceOf(lineItems()[0].price).lookup_key).toBe("chub_v1_addon_call_assistant_crew_year_493900");
     // The platform row is untouched, and no intro grant is recorded.
     expect(mocks.updates).toEqual([]);
@@ -880,7 +880,7 @@ describe("the AI Call Assistant's own subscription (server/voice/subscription.ts
     mocks.accountRow = { email: ADMIN_EMAILS[0], plan: "free", status: "inactive" };
     const res = await request("/api/call-assistant/billing/checkout", { tier: "lite" }, { user: { id: 42, email: ADMIN_EMAILS[0] } });
     expect(res.code).toBe(400);
-    expect(res.body.message).toMatch(/already includes the AI Call Assistant/);
+    expect(res.body.message).toMatch(/already includes the Call Assistant/);
     expect(mocks.checkout).not.toHaveBeenCalled();
     expect(mocks.history).not.toHaveBeenCalled();
     expect(mocks.openSessions).not.toHaveBeenCalled();

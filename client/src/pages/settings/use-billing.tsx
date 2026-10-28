@@ -39,7 +39,7 @@ export function refreshBilling() {
   void queryClient.invalidateQueries({ queryKey: CALL_ASSISTANT_SUBSCRIPTION_KEY });
 }
 
-/** The account's AI Call Assistant subscription — its own subscription, apart from the platform plan (server/voice/subscription.ts). */
+/** The account's Call Assistant subscription — its own subscription, apart from the platform plan (server/voice/subscription.ts). */
 export function useCallAssistantSubscription() {
   return useQuery<CallAssistantSubscriptionInfo>({ queryKey: CALL_ASSISTANT_SUBSCRIPTION_KEY });
 }

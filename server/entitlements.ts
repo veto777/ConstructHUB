@@ -11,7 +11,7 @@
  * Platform admins (server/admin.ts ADMIN_EMAILS — support@ and social@constructhub.us) are
  * all-access, owner 2026-10-02: every module and every add-on module, and every
  * numeric usage limit unlimited (-1, the price book's convention —
- * platformAdminAllowances). The AI Call Assistant keeps a ceiling on numbers
+ * platformAdminAllowances). The Call Assistant keeps a ceiling on numbers
  * (ADMIN_CALL_ASSISTANT_NUMBERS: each one is a real carrier number) with
  * unlimited minutes. Nothing here changes for any other account.
  *
@@ -23,7 +23,7 @@
  * still retrying the card) has NO plan access: the plan pauses until the
  * payment goes through, the same rule as the add-on modules below.
  *
- * Add-on MODULES (the AI Call Assistant) come from the Call Assistant's OWN
+ * Add-on MODULES (the Call Assistant) come from the Call Assistant's OWN
  * subscription (server/voice/subscription-store.ts, owner 2026-10-08: a
  * separate service, bought with or without a platform plan) and are stricter:
  * the module runs only while THAT subscription is active or trialing
@@ -705,7 +705,7 @@ export const planPausedMessage = (module: ModuleKey) =>
 
 /**
  * The 402 for a module the account lacks. A plan module names the plan that
- * includes it (plan_required). An add-on module — the AI Call Assistant — is a
+ * includes it (plan_required). An add-on module — the Call Assistant — is a
  * separate service with its own subscription, so its body is its own code
  * (CALL_ASSISTANT_REQUIRED_CODE), names the add-on and links its pricing
  * section; no plan is "required".
