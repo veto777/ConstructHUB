@@ -1,22 +1,21 @@
-import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
-import { useState, useEffect, useMemo } from "react";
+import { AppPage, PageHeader, Section, appTable, appTableCards } from "@/components/app-ui";
+import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GoogleSurface, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { GoogleSurface } from "@/components/google";
 import { SamplePreview, showSample } from "@/components/sample-preview";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Grid3X3, Search, Loader2, Trash2, Target, TrendingUp, ChevronDown, ChevronUp, Building, ZoomIn, ZoomOut, RotateCcw, FileText, BarChart3, Trophy, MapPin, ArrowLeft, Printer } from "lucide-react";
+import { Grid3X3, Search, Loader2, Trash2, Target, TrendingUp, ChevronDown, ChevronUp, Building, ZoomIn, ZoomOut, RotateCcw, FileText, BarChart3, Trophy, MapPin, ArrowLeft, Printer, Clock, type LucideIcon } from "lucide-react";
 import type { RankingGridScan, RankingGridResult } from "@shared/schema";
 import { creditsLabel, gridCreditCost, usageLine, type EntitlementsInfo } from "@/lib/pricing-display";
 
@@ -63,19 +62,34 @@ function isScannedBusiness(c: { name: string; address: string }, scan: RankingGr
   return scanAddr.includes(compAddr) || compAddr.includes(scanAddr);
 }
 
+/*
+ * Rank colours, one set for the whole page (pins, bars, tiles, badges, thumbnails): green for the first 3, amber
+ * for 4–10, orange for 11–20, red when the business is not in the first 20. Each colour always carries its number
+ * or words beside it, so the colour is never the only signal. The business itself is the brand navy with an
+ * orange ring.
+ */
+type RankBand = "top3" | "top10" | "top20" | "none";
+const BANDS: Record<RankBand, { bg: string; fg: string; label: string; words: string }> = {
+  top3: { bg: "#16a34a", fg: "#fff", label: "1-3", words: "in the top 3" },
+  top10: { bg: "#fbbf24", fg: "#1f2328", label: "4-10", words: "4th to 10th" },
+  top20: { bg: "#ea580c", fg: "#fff", label: "11-20", words: "11th to 20th" },
+  none: { bg: "#dc2626", fg: "#fff", label: "20+", words: "not in the first 20" },
+};
+const BAND_ORDER: RankBand[] = ["top3", "top10", "top20", "none"];
+const NAVY = "hsl(var(--sidebar))";
+const BRAND_ORANGE = "#f57c00";
+
+function rankBand(rank: number | null | undefined): RankBand {
+  if (rank == null || rank <= 0 || rank > 20) return "none";
+  return rank <= 3 ? "top3" : rank <= 10 ? "top10" : "top20";
+}
+
 function getRankBgColor(rank: number | null): string {
-  if (rank === null) return "rgba(156,163,175,0.85)";
-  if (rank <= 3) return "rgba(16,185,129,0.9)";
-  if (rank <= 10) return "rgba(250,204,21,0.9)";
-  if (rank <= 20) return "rgba(239,68,68,0.9)";
-  return "rgba(156,163,175,0.85)";
+  return BANDS[rankBand(rank)].bg;
 }
 
 function getRankTextColor(rank: number | null): string {
-  if (rank === null) return "#fff";
-  if (rank <= 3) return "#fff";
-  if (rank <= 10) return "#1a1a1a";
-  return "#fff";
+  return BANDS[rankBand(rank)].fg;
 }
 
 function getRankLabel(rank: number | null): string {
@@ -83,10 +97,76 @@ function getRankLabel(rank: number | null): string {
   return String(rank);
 }
 
-function getRankBadgeVariant(rank: number): "default" | "secondary" | "destructive" {
-  if (rank <= 3) return "default";
-  if (rank <= 10) return "secondary";
-  return "destructive";
+/** A rank (or an average rank) as a pill in its band's colour. */
+function RankPill({ value, className = "", testId }: { value: number | null | undefined; className?: string; testId?: string }) {
+  const band = BANDS[rankBand(value == null ? null : Math.round(value))];
+  return (
+    <span className={`inline-flex min-w-[2.25rem] items-center justify-center rounded-full px-2.5 py-0.5 text-sm font-bold tabular-nums shadow-sm ${className}`}
+      style={{ background: band.bg, color: band.fg }} data-testid={testId}>
+      {value == null ? "—" : String(Number(value.toFixed(2)))}
+    </span>
+  );
+}
+
+/**
+ * A small heatmap of a scan: one square per grid point in its rank colour, the business in the middle. Decoration
+ * beside the real figures, so it is one image with its summary as the label.
+ */
+function HeatThumb({ size, ranks, px = 72, className = "", testId }: {
+  size: number;
+  /** ranks[row][col]; undefined = not checked yet */
+  ranks: (number | null | undefined)[][];
+  px?: number;
+  className?: string;
+  testId?: string;
+}) {
+  const center = Math.floor(size / 2);
+  const flat = ranks.flat().filter((r) => r !== undefined);
+  const top3 = flat.filter((r) => rankBand(r) === "top3").length;
+  const gap = size > 9 ? 1 : 2;
+  return (
+    <div role="img" aria-label={`Heatmap: ${top3} of ${flat.length} points in the top 3`}
+      className={`grid shrink-0 rounded-lg p-1 ring-1 ring-black/5 ${className}`}
+      style={{ width: px, height: px, gap, gridTemplateColumns: `repeat(${size}, 1fr)`, background: NAVY }} data-testid={testId}>
+      {Array.from({ length: size * size }, (_, i) => {
+        const r = Math.floor(i / size), c = i % size;
+        const rank = ranks[r]?.[c];
+        const isCenter = r === center && c === center;
+        return (
+          <span key={i} className="rounded-[2px]" style={{
+            background: rank === undefined ? "rgba(255,255,255,0.18)" : getRankBgColor(rank),
+            boxShadow: isCenter ? `0 0 0 1.5px ${BRAND_ORANGE}` : undefined,
+          }} />
+        );
+      })}
+    </div>
+  );
+}
+
+/** A scan's results as rows of ranks, for HeatThumb. */
+function ranksOf(size: number, results: RankingGridResult[]): (number | null | undefined)[][] {
+  const out: (number | null | undefined)[][] = Array.from({ length: size }, () => Array<number | null | undefined>(size).fill(undefined));
+  for (const r of results) if (out[r.gridRow] && r.gridCol < size) out[r.gridRow][r.gridCol] = r.rank;
+  return out;
+}
+
+/** A coloured number tile: a band of colour on top, a tinted icon chip, the figure and one line under it. */
+function ColorStat({ label, value, hint, color, icon: Icon, testId }: {
+  label: string; value: ReactNode; hint?: ReactNode; color: string; icon: LucideIcon; testId?: string;
+}) {
+  return (
+    <div className="relative h-full overflow-hidden rounded-xl border bg-card p-3.5 sm:p-4" data-testid={testId} data-ui="stat">
+      <span className="absolute inset-x-0 top-0 h-1" style={{ background: color }} aria-hidden="true" />
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg" style={{ background: `color-mix(in srgb, ${color} 16%, transparent)`, color }} aria-hidden="true">
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className="truncate">{label}</span>
+      </div>
+      <div className="mt-2 truncate text-2xl font-semibold tabular-nums tracking-tight" data-ui="stat-value">{value}</div>
+      {hint && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{hint}</div>}
+    </div>
+  );
 }
 
 function getDefaultZoom(gridSize: number, distanceMiles: number): number {
@@ -101,6 +181,26 @@ function getDefaultZoom(gridSize: number, distanceMiles: number): number {
   if (totalSpanMiles <= 200) return 8;
   if (totalSpanMiles <= 500) return 7;
   return 6;
+}
+
+const ZOOM_BUTTON = "w-9 h-9 rounded-lg text-white shadow-sm ring-1 ring-white/25 flex items-center justify-center transition-[filter] hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
+/** The colour key under a map (and the business's own marker). */
+function RankLegend({ className = "" }: { className?: string }) {
+  return (
+    <div className={`flex flex-wrap items-center gap-1.5 text-xs ${className}`} data-testid="rank-legend">
+      {BAND_ORDER.map((b) => (
+        <span key={b} className="inline-flex items-center gap-1.5 rounded-full border bg-card py-0.5 pl-1 pr-2.5">
+          <span className="h-3.5 w-3.5 rounded-full ring-2 ring-white/70 dark:ring-white/20" style={{ background: BANDS[b].bg }} aria-hidden="true" />
+          <span className="font-medium tabular-nums">{BANDS[b].label}</span>
+        </span>
+      ))}
+      <span className="inline-flex items-center gap-1.5 rounded-full border bg-card py-0.5 pl-1 pr-2.5">
+        <span className="h-3.5 w-3.5 rounded-[4px]" style={{ background: NAVY, boxShadow: `0 0 0 2px ${BRAND_ORANGE}` }} aria-hidden="true" />
+        <span className="font-medium">Your business</span>
+      </span>
+    </div>
+  );
 }
 
 function MapGridView({ scan, results }: { scan: RankingGridScan; results: RankingGridResult[] }) {
@@ -158,7 +258,8 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
       {/* Keep zoom controls outside the point area at every viewport width. */}
       <div className="flex justify-end gap-1 mb-2 print:hidden">
         <button
-          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={ZOOM_BUTTON}
+          style={{ background: NAVY }}
           onClick={() => setZoom(z => Math.min(z + 1, 20))}
           aria-label="Zoom in"
           data-testid="button-zoom-in"
@@ -166,7 +267,8 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
           <ZoomIn className="h-4 w-4" />
         </button>
         <button
-          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={ZOOM_BUTTON}
+          style={{ background: NAVY }}
           onClick={() => setZoom(z => Math.max(z - 1, 5))}
           aria-label="Zoom out"
           data-testid="button-zoom-out"
@@ -174,7 +276,8 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
           <ZoomOut className="h-4 w-4" />
         </button>
         <button
-          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={ZOOM_BUTTON}
+          style={{ background: NAVY }}
           onClick={() => setZoom(defaultZoom)}
           aria-label="Reset zoom"
           data-testid="button-zoom-reset"
@@ -183,7 +286,7 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
         </button>
       </div>
       <div
-        className="relative rounded-xl overflow-hidden shadow-lg border border-border"
+        className="relative rounded-2xl overflow-hidden shadow-lg border border-border"
         style={{ width: "100%", height: mapH }}
       >
         {/* The Static Maps proxy 500s when no Places key is configured; on failure the
@@ -193,14 +296,14 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
             src={mapUrl}
             alt="Map"
             className="absolute inset-0 w-full h-full object-cover"
-            style={{ filter: "brightness(0.85) contrast(1.1)" }}
+            style={{ filter: "saturate(0.55) brightness(1.03)" }}
             onError={() => setMapFailed(true)}
             data-testid="img-ranking-map"
           />
         ) : (
           <>
             <div className="absolute inset-0 bg-muted" aria-hidden="true" />
-            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm rounded-lg px-2.5 py-1.5" data-testid="text-map-unavailable">
+            <div className="absolute top-3 left-3 rounded-lg px-2.5 py-1.5" style={{ background: NAVY }} data-testid="text-map-unavailable">
               <span className="text-[10px] text-white font-medium">Map unavailable</span>
             </div>
           </>
@@ -236,12 +339,12 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
                           width: dotSize,
                           height: dotSize,
                           borderRadius: isCenter ? "4px" : "50%",
-                          backgroundColor: isCenter ? "rgba(74,108,247,0.9)" : (cell ? getRankBgColor(cell.rank) : "rgba(100,100,100,0.5)"),
+                          background: isCenter ? NAVY : (cell ? `radial-gradient(circle at 35% 30%, color-mix(in srgb, ${getRankBgColor(cell.rank)} 70%, #fff), ${getRankBgColor(cell.rank)} 60%)` : "rgba(100,100,100,0.5)"),
                           color: isCenter ? "#fff" : (cell ? getRankTextColor(cell.rank) : "#ccc"),
                           fontSize: dotSize > 36 ? "16px" : dotSize > 24 ? "13px" : dotSize > 16 ? "10px" : "8px",
-                          border: isCenter ? `${Math.max(2, Math.min(3, Math.floor(dotSize / 12)))}px solid #fff` : `${Math.max(1, Math.min(2, Math.floor(dotSize / 14)))}px solid rgba(255,255,255,0.6)`,
+                          border: isCenter ? `${Math.max(2, Math.min(3, Math.floor(dotSize / 12)))}px solid ${BRAND_ORANGE}` : `${Math.max(1, Math.min(2, Math.floor(dotSize / 14)))}px solid rgba(255,255,255,0.9)`,
                           boxShadow: isCenter
-                            ? "0 0 0 3px rgba(74,108,247,0.4), 0 2px 8px rgba(0,0,0,0.4)"
+                            ? `0 0 0 4px color-mix(in srgb, ${BRAND_ORANGE} 35%, transparent), 0 2px 8px rgba(0,0,0,0.4)`
                             : "0 2px 6px rgba(0,0,0,0.35)",
                         }}
                       >
@@ -279,33 +382,11 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
           )}
         </div>
 
-        <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm rounded-lg px-2.5 py-1.5 flex items-center gap-2.5">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "rgba(16,185,129,0.9)" }} />
-            <span className="text-[10px] text-white">1-3</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "rgba(250,204,21,0.9)" }} />
-            <span className="text-[10px] text-white">4-10</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "rgba(239,68,68,0.9)" }} />
-            <span className="text-[10px] text-white">11-20</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "rgba(156,163,175,0.85)" }} />
-            <span className="text-[10px] text-white">20+</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: "rgba(74,108,247,0.9)", border: "1px solid #fff" }} />
-            <span className="text-[10px] text-white">Business</span>
-          </div>
-        </div>
-
-        <div className="hidden sm:block absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1">
+        <div className="hidden sm:block absolute bottom-3 right-3 rounded-lg px-2 py-1" style={{ background: NAVY }}>
           <span className="text-[10px] text-white font-medium">Zoom: {zoom}</span>
         </div>
       </div>
+      <RankLegend className="mt-3" />
     </div>
   );
 }
@@ -363,30 +444,29 @@ function computeRankDistribution(results: RankingGridResult[]) {
 
 function RankDistributionChart({ results }: { results: RankingGridResult[] }) {
   const dist = computeRankDistribution(results);
-  const segments = [
-    { label: "1-3", count: dist.rank1to3, color: "#10b981", pct: dist.total ? Math.round((dist.rank1to3 / dist.total) * 100) : 0 },
-    { label: "4-10", count: dist.rank4to10, color: "#facc15", pct: dist.total ? Math.round((dist.rank4to10 / dist.total) * 100) : 0 },
-    { label: "11-20", count: dist.rank11to20, color: "#ef4444", pct: dist.total ? Math.round((dist.rank11to20 / dist.total) * 100) : 0 },
-    { label: "20+", count: dist.notRanked, color: "#9ca3af", pct: dist.total ? Math.round((dist.notRanked / dist.total) * 100) : 0 },
-  ];
+  const counts: Record<RankBand, number> = { top3: dist.rank1to3, top10: dist.rank4to10, top20: dist.rank11to20, none: dist.notRanked };
+  const segments = BAND_ORDER.map((b) => ({
+    band: b, label: BANDS[b].label, count: counts[b], color: BANDS[b].bg, fg: BANDS[b].fg,
+    pct: dist.total ? Math.round((counts[b] / dist.total) * 100) : 0,
+  }));
 
   return (
     <div className="space-y-3" data-testid="rank-distribution-chart">
       <h3 className="text-sm font-semibold flex items-center gap-2">
-        <BarChart3 className="h-4 w-4" />
+        <BarChart3 className="h-4 w-4" style={{ color: BRAND_ORANGE }} />
         Rank distribution
       </h3>
-      <div className="w-full h-6 rounded-full overflow-hidden flex bg-muted">
+      <div className="w-full h-8 rounded-xl overflow-hidden flex gap-0.5 bg-muted p-0.5">
         {segments.map((seg) => (
           seg.count > 0 && (
             <Tooltip key={seg.label}>
               <TooltipTrigger asChild>
                 <div
-                  style={{ width: `${seg.pct}%`, backgroundColor: seg.color, minWidth: seg.pct > 0 ? "12px" : 0 }}
-                  className="h-full flex items-center justify-center cursor-pointer transition-opacity hover:opacity-80"
+                  style={{ width: `${seg.pct}%`, backgroundColor: seg.color, minWidth: seg.pct > 0 ? "14px" : 0 }}
+                  className="h-full rounded-[9px] flex items-center justify-center cursor-pointer transition-opacity hover:opacity-85"
                 >
                   {seg.pct >= 10 && (
-                    <span className="text-[10px] font-bold text-white drop-shadow-sm">{seg.pct}%</span>
+                    <span className="text-[11px] font-bold" style={{ color: seg.fg }}>{seg.pct}%</span>
                   )}
                 </div>
               </TooltipTrigger>
@@ -397,12 +477,13 @@ function RankDistributionChart({ results }: { results: RankingGridResult[] }) {
           )
         ))}
       </div>
-      <div className="flex flex-wrap gap-3">
+      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(128px, 1fr))" }}>
         {segments.map((seg) => (
-          <div key={seg.label} className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: seg.color }} />
+          <div key={seg.label} className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+            style={{ background: `color-mix(in srgb, ${seg.color} 10%, transparent)`, borderColor: `color-mix(in srgb, ${seg.color} 35%, transparent)` }}>
+            <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: seg.color }} />
             <span className="text-xs text-muted-foreground">
-              {seg.label}: {seg.count} ({seg.pct}%)
+              <span className="font-semibold text-foreground">{seg.label}</span>: {seg.count} ({seg.pct}%)
             </span>
           </div>
         ))}
@@ -435,64 +516,43 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
     <div className="space-y-6 print:space-y-4" data-testid="scan-report">
       <PageHeader title={<span data-testid="text-report-title">Local rankings · {scan.businessName}</span>}
         description="Your Google Maps visibility across the scanned area."
-        actions={<><Button onClick={handlePrint} data-testid="button-print-report"><Printer className="mr-2 h-4 w-4" />Print / PDF</Button><Button variant="ghost" onClick={onBack} data-testid="button-back-to-scans"><ArrowLeft className="mr-2 h-4 w-4" />Back to scans</Button></>} />
+        actions={<><Button className="text-white hover:brightness-110" style={{ background: BRAND_ORANGE }} onClick={handlePrint} data-testid="button-print-report"><Printer className="mr-2 h-4 w-4" />Print / PDF</Button><Button variant="ghost" onClick={onBack} data-testid="button-back-to-scans"><ArrowLeft className="mr-2 h-4 w-4" />Back to scans</Button></>} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <Section flush>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <Building className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-semibold text-base" data-testid="text-report-business">{scan.businessName}</p>
-                  <p className="text-sm text-muted-foreground">{scan.address}</p>
-                </div>
+          {/* The scan at a glance, on the brand navy. */}
+          <section className="relative overflow-hidden rounded-2xl p-5 text-white shadow-md ring-1 ring-white/10" style={{ background: `linear-gradient(135deg, ${NAVY}, color-mix(in srgb, ${NAVY} 78%, ${BRAND_ORANGE}))` }}>
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: BRAND_ORANGE }}>
+                <Building className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="font-semibold text-lg leading-6" data-testid="text-report-business">{scan.businessName}</p>
+                <p className="text-sm text-white/75">{scan.address}</p>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Keyword:</span>
-                  <span className="ml-1 font-medium">{scan.keyword}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Date:</span>
-                  <span className="ml-1 font-medium">{new Date(scan.createdAt!).toLocaleDateString()}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Grid:</span>
-                  <span className="ml-1 font-medium">{scan.gridSize}×{scan.gridSize} ({scan.gridSize * scan.gridSize} points)</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Spacing:</span>
-                  <span className="ml-1 font-medium">{scan.gridDistance} mi</span>
-                </div>
-              </div>
-            </CardContent>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 text-sm">
+              <ReportChip label="Keyword" value={scan.keyword} />
+              <ReportChip label="Date" value={new Date(scan.createdAt!).toLocaleDateString()} />
+              <ReportChip label="Grid" value={`${scan.gridSize}×${scan.gridSize} (${scan.gridSize * scan.gridSize} points)`} />
+              <ReportChip label="Spacing" value={`${scan.gridDistance} mi`} />
+            </div>
+          </section>
+
+          <Section title="Rank summary" icon={Target}>
+            <div className="grid grid-cols-2 gap-2.5">
+              <SummaryTile label="Average Rank" value={avgRank} color={BANDS[rankBand(Math.round(parseFloat(avgRank)))].bg} big />
+              <SummaryTile label="Best Rank" value={bestRank > 0 ? String(bestRank) : "N/A"} color={bestRank > 0 ? BANDS[rankBand(bestRank)].bg : undefined} big />
+              <SummaryTile label="Top 3 Count" value={String(dist.rank1to3)} color={dist.rank1to3 > 0 ? BANDS.top3.bg : undefined} />
+              <SummaryTile label="Ranked Locations" value={`${rankedResults.length} / ${results.length}`} color={rankedResults.length > 0 ? BANDS.top3.bg : undefined} />
+              <SummaryTile label="Un-Ranked Locations" value={String(dist.notRanked)} color={dist.notRanked > 0 ? BANDS.none.bg : undefined} />
+              <SummaryTile label="Total Locations" value={String(results.length)} />
+              <SummaryTile label="Avg Total Rank" value={avgTotalRank} />
+              <SummaryTile label="Max Distance" value={`${maxDistanceMiles} Mi`} />
+            </div>
           </Section>
 
-          <Section flush>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Rank summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="grid grid-cols-2 gap-3">
-                <SummaryRow label="Total Locations" value={String(results.length)} />
-                <SummaryRow label="Ranked Locations" value={`${rankedResults.length} / ${results.length}`} highlight={rankedResults.length > 0 ? "green" : undefined} />
-                <SummaryRow label="Un-Ranked Locations" value={String(dist.notRanked)} />
-                <SummaryRow label="Average Rank" value={avgRank} highlight={parseFloat(avgRank) <= 5 ? "green" : parseFloat(avgRank) <= 10 ? "yellow" : "red"} />
-                <SummaryRow label="Avg Total Rank" value={avgTotalRank} />
-                <SummaryRow label="Best Rank" value={bestRank > 0 ? String(bestRank) : "N/A"} highlight={bestRank === 1 ? "green" : bestRank <= 3 ? "green" : bestRank <= 10 ? "yellow" : undefined} />
-                <SummaryRow label="Max Distance" value={`${maxDistanceMiles} Mi`} />
-                <SummaryRow label="Top 3 Count" value={String(dist.rank1to3)} highlight={dist.rank1to3 > 0 ? "green" : undefined} />
-              </div>
-            </CardContent>
-          </Section>
-
-          <Section flush>
-            <CardContent className="p-4">
-              <RankDistributionChart results={results} />
-            </CardContent>
+          <Section>
+            <RankDistributionChart results={results} />
           </Section>
         </div>
 
@@ -501,17 +561,7 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
         </div>
       </div>
 
-      <Section flush>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Trophy className="h-4 w-4" />
-            Top competitors
-          </CardTitle>
-          <CardDescription>
-            Competitors found across all grid locations, sorted by frequency
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
+      <Section flush title="Top competitors" icon={Trophy} description="Competitors found across all grid locations, sorted by frequency">
           <div className="overflow-x-auto">
             <table className={appTable.table} data-testid="table-competitors">
               <thead className={appTableCards.thead}>
@@ -530,7 +580,10 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
                     : 0;
                   return (
                     <tr key={idx} className={appTableCards.tr + " border-b last:border-0 hover:bg-muted/30 transition-colors"} data-testid={`row-competitor-${idx}`}>
-                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">#: </span>{idx + 1}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">#: </span>
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
+                          style={idx < 3 ? { background: ["#f5b301", "#a7b1bd", "#c47a3d"][idx], color: idx === 0 ? "#1f2328" : "#fff" } : { background: "var(--muted, #eee)" }}>{idx + 1}</span>
+                      </td>
                       <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Name: </span>
                         <p className="font-medium truncate max-w-[300px]">{comp.name}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-[300px]">
@@ -539,25 +592,19 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
                         </p>
                       </td>
                       <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Found At: </span>
-                        <div className="flex flex-col items-center gap-0.5">
+                        <div className="flex flex-col items-center gap-1">
                           <span className="font-semibold">{comp.foundAt}</span>
-                          <Badge
-                            variant={pct >= 50 ? "default" : pct >= 25 ? "secondary" : "destructive"}
-                            className="text-[10px] px-1.5 py-0"
-                          >
-                            {pct}% Locations
-                          </Badge>
+                          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: BRAND_ORANGE }} />
+                          </div>
+                          <span className="text-[10px] font-medium text-muted-foreground">{pct}% Locations</span>
                         </div>
                       </td>
-                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">AR: </span>
-                        <Badge variant={getRankBadgeVariant(Math.round(comp.avgRank))} className="text-sm font-bold px-2.5">
-                          {comp.avgRank.toFixed(2)}
-                        </Badge>
+                      <td className={appTableCards.td + " min-w-0 break-words text-center"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">AR: </span>
+                        <RankPill value={comp.avgRank} />
                       </td>
-                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Best: </span>
-                        <Badge variant={getRankBadgeVariant(comp.bestRank)} className="text-sm font-bold px-2.5">
-                          {comp.bestRank}
-                        </Badge>
+                      <td className={appTableCards.td + " min-w-0 break-words text-center"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Best: </span>
+                        <RankPill value={comp.bestRank} />
                       </td>
                     </tr>
                   );
@@ -572,22 +619,27 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
               </tbody>
             </table>
           </div>
-        </CardContent>
       </Section>
     </div>
   );
 }
 
-function SummaryRow({ label, value, highlight }: { label: string; value: string; highlight?: "green" | "yellow" | "red" }) {
-  const colorClass = highlight === "green" ? "text-emerald-600 dark:text-emerald-400"
-    : highlight === "yellow" ? "text-muted-foreground text-muted-foreground"
-    : highlight === "red" ? "text-red-600 dark:text-red-400"
-    : "";
-
+function ReportChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className={`text-sm font-semibold ${colorClass}`}>{value}</span>
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/15">
+      <span className="text-white/65">{label}</span>
+      <span className="truncate font-medium">{value}</span>
+    </span>
+  );
+}
+
+/** One figure of the rank summary: tinted in its rank colour when the figure has one. */
+function SummaryTile({ label, value, color, big }: { label: string; value: string; color?: string; big?: boolean }) {
+  return (
+    <div className="rounded-xl border border-l-4 px-3 py-2.5"
+      style={color ? { background: `color-mix(in srgb, ${color} 9%, transparent)`, borderColor: `color-mix(in srgb, ${color} 30%, transparent)`, borderLeftColor: color } : undefined}>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`${big ? "text-2xl" : "text-lg"} font-bold tabular-nums`}>{value}</p>
     </div>
   );
 }
@@ -729,31 +781,29 @@ export default function RankingGridPage() {
     return <ReportView scanId={viewingReport} onBack={() => setViewingReport(null)} />;
   }
 
+  // The newest finished scan leads the page (its heatmap and figures); the tiles add up all of them.
+  const latestDone = scans.find((x) => x.status === "completed") ?? null;
+  const averages = scans.filter((x) => x.status === "completed" && x.averageRank).map((x) => parseFloat(x.averageRank!)).filter((n) => Number.isFinite(n));
+  const bestAverage = averages.length ? Math.min(...averages) : null;
+  const running = scans.filter((x) => x.status === "running").length;
+  const sizeN = gridSizeValid ? parseInt(gridSize) : 0;
+  const canStart = !!selectedBusiness && !!keyword.trim() && gridSizeValid && gridDistanceValid && !startScanMutation.isPending;
+
   return (
     <GoogleSurface page><AppPage className="before:hidden [&_button]:min-h-10 max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11">
-      <PageHeader title={<span data-testid="text-page-title">GMB ranking grid</span>} description="See where your business ranks on Google Maps across your service area." actions={            <Button
-              className="w-full"
-              disabled={!selectedBusiness || !keyword.trim() || !gridSizeValid || !gridDistanceValid || startScanMutation.isPending}
-              onClick={() => startScanMutation.mutate()}
-              data-testid="button-start-scan"
-            >
-              {startScanMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Target className="h-4 w-4 mr-2" />
-              )}
-              Start ranking scan
-            </Button>} />
+      <PageHeader title={<span data-testid="text-page-title">GMB ranking grid</span>} description="See where your business ranks on Google Maps across your service area." />
+        {latestDone && <LatestScanHero scan={latestDone} onViewReport={() => setViewingReport(latestDone.id)} />}
         {scans.length > 0 && (
-          <GoogleStatGrid cols={3}>
-            <GoogleStat label="Scans run" value={scans.length.toLocaleString()} testId="stat-scans-run" />
-            <GoogleStat label="Running now" value={scans.filter((x) => x.status === "running").length.toLocaleString()} testId="stat-scans-running" />
-            <GoogleStat label="Credits this month" value={creditsUsage || "—"} hint="Ranking-grid credits reset monthly" testId="stat-scans-credits" />
-          </GoogleStatGrid>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <ColorStat label="Scans run" value={scans.length.toLocaleString()} icon={Grid3X3} color={BRAND_ORANGE} testId="stat-scans-run" />
+            <ColorStat label="Running now" value={<span className="flex items-center gap-2">{running.toLocaleString()}{running > 0 && <Loader2 className="h-4 w-4 animate-spin" style={{ color: BRAND_ORANGE }} />}</span>} icon={Clock} color="#0ea5e9" testId="stat-scans-running" />
+            <ColorStat label="Best average rank" value={bestAverage == null ? "—" : bestAverage.toFixed(1)} hint={bestAverage == null ? "Shows once a scan finishes" : "Your strongest scan so far"} icon={Trophy} color={bestAverage == null ? "#94a3b8" : BANDS[rankBand(Math.round(bestAverage))].bg} testId="stat-best-rank" />
+            <ColorStat label="Credits this month" value={creditsUsage || "—"} hint="Ranking-grid credits reset monthly" icon={Target} color="#f59e0b" testId="stat-scans-credits" />
+          </div>
         )}
-        <Section title="Scan details" contentClassName="space-y-4">
+        <Section title="New scan" icon={Target} description="Pick your business, the search your customers type, and how wide to look." contentClassName="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="input-business-search">Business</Label>
+              <StepLabel n={1} htmlFor="input-business-search">Business</StepLabel>
               {(myLocations ?? []).length > 0 && (
                 <div className="flex flex-wrap items-center gap-2" data-testid="ranking-grid-my-locations">
                   <span className="text-sm text-muted-foreground">Your locations:</span>
@@ -826,9 +876,12 @@ export default function RankingGridPage() {
               </div>
 
               {selectedBusiness && (
-                <div className="flex items-center gap-2 p-2 bg-primary/5 rounded-lg border border-primary/20">
-                  <Building className="h-4 w-4 text-primary shrink-0" />
-                  <div className="min-w-0">
+                <div className="flex items-center gap-2.5 rounded-xl border p-2.5"
+                  style={{ background: `color-mix(in srgb, ${BRAND_ORANGE} 8%, transparent)`, borderColor: `color-mix(in srgb, ${BRAND_ORANGE} 35%, transparent)` }}>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: NAVY }}>
+                    <Building className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm truncate">{selectedBusiness.name}</p>
                     <p className="text-xs text-muted-foreground truncate">{selectedBusiness.address}</p>
                   </div>
@@ -850,7 +903,7 @@ export default function RankingGridPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="input-keyword">Keyword</Label>
+              <StepLabel n={2} htmlFor="input-keyword">Keyword</StepLabel>
               <Input
                 id="input-keyword"
                 placeholder="e.g. Roofing Contractor, Plumber Near Me..."
@@ -860,8 +913,11 @@ export default function RankingGridPage() {
               />
             </div>
 
-            <details><summary className="cursor-pointer py-2 text-sm font-medium">Advanced · Grid size and spacing</summary>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
+            <details className="group rounded-xl border px-3"><summary className="flex cursor-pointer list-none items-center gap-2 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+              <StepNumber n={3} />Grid size and spacing <span className="font-normal text-muted-foreground">· {gridSize}×{gridSize}, {gridDistance} mi apart</span>
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 pt-1">
               <div className="space-y-2">
                 <Label htmlFor="select-grid-size">Grid size</Label>
                 <Select value={gridSizeValid ? gridSize : ""} onValueChange={setGridSize}>
@@ -901,17 +957,43 @@ export default function RankingGridPage() {
             </div>
 
             </details>
-            {gridSizeValid && gridDistanceValid && <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
-              <p>
-                This scan will check <strong>{parseInt(gridSize) * parseInt(gridSize)} grid points</strong> in a {gridSize}×{gridSize} pattern,
-                with <strong>{gridDistance} mile spacing</strong> between each point.
-                Total coverage: ~{((parseInt(gridSize) - 1) * parseFloat(gridDistance)).toFixed(1)} miles across.
-              </p>
-              <p className="mt-1.5" data-testid="text-grid-credits">
-                Uses <strong>{creditsLabel(gridCreditCost(parseInt(gridSize)))}</strong> of your monthly ranking-grid credits
-                {creditsUsage ? ` (${creditsUsage} this month)` : ""}.
-              </p>
-            </div>}
+            <div className="flex flex-col gap-4 rounded-xl border p-3.5 sm:flex-row sm:items-center"
+              style={{ background: `color-mix(in srgb, ${BRAND_ORANGE} 6%, transparent)`, borderColor: `color-mix(in srgb, ${BRAND_ORANGE} 25%, transparent)` }}>
+              {gridSizeValid && (
+                <div className="grid shrink-0 self-center rounded-lg p-1.5" aria-hidden="true"
+                  style={{ gridTemplateColumns: `repeat(${sizeN}, 1fr)`, gap: sizeN > 9 ? 2 : 3, width: 72, height: 72, background: NAVY }}>
+                  {Array.from({ length: sizeN * sizeN }, (_, i) => {
+                    const isCenter = i === Math.floor((sizeN * sizeN) / 2);
+                    return <span key={i} className="rounded-full" style={{ background: isCenter ? BRAND_ORANGE : "rgba(255,255,255,0.55)" }} />;
+                  })}
+                </div>
+              )}
+              {gridSizeValid && gridDistanceValid ? <div className="min-w-0 flex-1 text-xs text-muted-foreground">
+                <p>
+                  This scan will check <strong>{parseInt(gridSize) * parseInt(gridSize)} grid points</strong> in a {gridSize}×{gridSize} pattern,
+                  with <strong>{gridDistance} mile spacing</strong> between each point.
+                  Total coverage: ~{((parseInt(gridSize) - 1) * parseFloat(gridDistance)).toFixed(1)} miles across.
+                </p>
+                <p className="mt-1.5" data-testid="text-grid-credits">
+                  Uses <strong>{creditsLabel(gridCreditCost(parseInt(gridSize)))}</strong> of your monthly ranking-grid credits
+                  {creditsUsage ? ` (${creditsUsage} this month)` : ""}.
+                </p>
+              </div> : <div className="min-w-0 flex-1" />}
+              <Button
+                className="w-full border-transparent text-white shadow-md hover:brightness-110 sm:w-auto"
+                style={{ background: BRAND_ORANGE }}
+                disabled={!canStart}
+                onClick={() => startScanMutation.mutate()}
+                data-testid="button-start-scan"
+              >
+                {startScanMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Target className="h-4 w-4 mr-2" />
+                )}
+                Start ranking scan
+              </Button>
+            </div>
 
 
         </Section>
@@ -929,33 +1011,40 @@ export default function RankingGridPage() {
         ) : showSample({ isLoading: scansLoading, isError: scansError, total: scans.length }) ? (
           <div className="space-y-4">
             <Section flush>
-              <CardContent className="py-12 text-center">
-                <Grid3X3 className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+              <CardContent className="py-10 text-center">
+                <Grid3X3 className="h-12 w-12 mx-auto mb-3" style={{ color: `color-mix(in srgb, ${BRAND_ORANGE} 55%, transparent)` }} />
                 <p className="text-muted-foreground">No scans yet. Start your first ranking scan above.</p>
               </CardContent>
             </Section>
             <SamplePreview what="what a finished scan looks like in your history" testId="sample-scan">
-              <Section flush>
-                <div className="flex flex-wrap items-center justify-between gap-2 p-4">
-                  <div className="flex flex-1 items-center gap-3 min-w-0">
-                    <Target className="h-5 w-5 text-emerald-500 shrink-0" />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap"><p className="font-semibold text-sm truncate">Sample Roofing Co.</p><Badge variant="secondary" className="text-xs shrink-0">roofing contractor</Badge></div>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-0.5"><span className="whitespace-nowrap">5×5 grid</span><span>·</span><span className="whitespace-nowrap">1 mi spacing</span><span>·</span><span className="flex items-center gap-0.5 whitespace-nowrap"><TrendingUp className="h-3 w-3" />Avg rank: 4.6</span><span>·</span><Badge variant="default" className="text-[10px] px-1 py-0">72% Ranked</Badge></div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0"><Badge variant="default">completed</Badge><Button variant="outline" size="sm" className="h-7 text-xs gap-1 hidden sm:flex"><FileText className="h-3 w-3" />Report</Button><ChevronDown className="h-4 w-4" /></div>
-                </div>
-              </Section>
+              <div className="space-y-3">
+                <HeroPanel
+                  eyebrow="Sample · finished scan"
+                  title="Sample Roofing Co."
+                  keyword="roofing contractor"
+                  meta="5×5 grid · 1 mi spacing"
+                  thumb={<HeatThumb size={5} ranks={SAMPLE_RANKS} px={132} />}
+                  figures={sampleFigures()}
+                />
+                <ScanRow
+                  title="Sample Roofing Co." keyword="roofing contractor" meta="5×5 grid · 1 mi spacing" average={SAMPLE_AVERAGE} pctRanked={SAMPLE_PCT}
+                  status="completed" thumb={<HeatThumb size={5} ranks={SAMPLE_RANKS} px={56} />}
+                  trailing={<><Button variant="outline" size="sm" className="h-7 text-xs gap-1 hidden sm:flex" tabIndex={-1}><FileText className="h-3 w-3" />Report</Button><ChevronDown className="h-4 w-4" /></>}
+                />
+              </div>
             </SamplePreview>
           </div>
         ) : (
-          <div className="space-y-4">
-            <h2 className="text-base font-semibold" data-testid="text-scan-history">Scan history</h2>
-            {scans.map((scan) => (
+          <div className="space-y-3">
+            <h2 className="flex items-center gap-2 text-base font-semibold" data-testid="text-scan-history">
+              Scan history
+              <span className="rounded-full px-2 py-0.5 text-xs font-semibold text-white ring-1 ring-white/20" style={{ background: BRAND_ORANGE }}>{scans.length}</span>
+            </h2>
+            {scans.map((scan, i) => (
               <ScanCard
                 key={scan.id}
                 scan={scan}
+                thumb={i < 12}
                 isExpanded={expandedScan === scan.id}
                 onToggle={() => setExpandedScan(expandedScan === scan.id ? null : scan.id)}
                 onDelete={() => setScanToDelete(scan)}
@@ -991,8 +1080,146 @@ export default function RankingGridPage() {
   );
 }
 
-function ScanCard({ scan, isExpanded, onToggle, onDelete, onViewReport }: {
+function StepNumber({ n }: { n: number }) {
+  return <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white" style={{ background: BRAND_ORANGE }} aria-hidden="true">{n}</span>;
+}
+
+function StepLabel({ n, htmlFor, children }: { n: number; htmlFor: string; children: ReactNode }) {
+  return <Label htmlFor={htmlFor} className="flex items-center gap-2"><StepNumber n={n} />{children}</Label>;
+}
+
+// The empty page's sample: a made-up 5×5 scan, strong near the office and weaker toward the edges.
+const SAMPLE_RANKS: number[][] = [
+  [9, 7, 6, 8, 24],
+  [5, 3, 2, 4, 11],
+  [4, 2, 1, 3, 9],
+  [6, 3, 2, 5, 12],
+  [12, 8, 7, 13, 22],
+];
+const SAMPLE_FLAT = SAMPLE_RANKS.flat();
+const SAMPLE_FOUND = SAMPLE_FLAT.filter((r) => r <= 20);
+const SAMPLE_AVERAGE = Math.round((SAMPLE_FOUND.reduce((a, b) => a + b, 0) / SAMPLE_FOUND.length) * 10) / 10;
+const SAMPLE_PCT = Math.round((SAMPLE_FOUND.length / SAMPLE_FLAT.length) * 100);
+function sampleFigures(): HeroFigure[] {
+  return [
+    { label: "Average rank", value: SAMPLE_AVERAGE.toFixed(1), color: BANDS[rankBand(Math.round(SAMPLE_AVERAGE))].bg },
+    { label: "In the top 3", value: `${SAMPLE_FLAT.filter((r) => r <= 3).length} of ${SAMPLE_FLAT.length}`, color: BANDS.top3.bg },
+    { label: "Found in the first 20", value: `${SAMPLE_PCT}%`, color: BRAND_ORANGE },
+  ];
+}
+
+type HeroFigure = { label: string; value: string; color: string };
+
+/** The navy panel at the top of the page: a scan's heatmap beside its three headline figures. */
+function HeroPanel({ eyebrow, title, keyword, meta, thumb, figures, action, testId }: {
+  eyebrow: string; title: string; keyword: string; meta: string; thumb: ReactNode; figures: HeroFigure[]; action?: ReactNode; testId?: string;
+}) {
+  return (
+    <section className="relative overflow-hidden rounded-2xl p-4 text-white shadow-md ring-1 ring-white/10 sm:p-6" data-testid={testId}
+      style={{ background: `radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, ${BRAND_ORANGE} 30%, ${NAVY}) 0%, ${NAVY} 55%)` }}>
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+        <div className="self-center rounded-2xl bg-white/10 p-2 ring-1 ring-white/15">{thumb}</div>
+        <div className="min-w-0 flex-1 space-y-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#ffb74d" }}>{eyebrow}</p>
+            <p className="mt-1 truncate text-xl font-semibold sm:text-2xl">{title}</p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-white/75">
+              <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold text-[#1f2328]" style={{ background: "#ffb74d" }}>{keyword}</span>
+              <span>{meta}</span>
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {figures.map((f) => (
+              <div key={f.label} className="rounded-xl bg-white/10 px-3 py-2 ring-1 ring-white/10">
+                <p className="flex items-center gap-1.5 text-[11px] text-white/70"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: f.color }} aria-hidden="true" /><span className="truncate">{f.label}</span></p>
+                <p className="text-lg font-bold tabular-nums sm:text-2xl">{f.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        {action && <div className="sm:self-end">{action}</div>}
+      </div>
+    </section>
+  );
+}
+
+/** The newest finished scan as the page's hero (its results are the same request the scan's card makes). */
+function LatestScanHero({ scan, onViewReport }: { scan: RankingGridScan; onViewReport: () => void }) {
+  const { data } = useQuery<{ scan: RankingGridScan; results: RankingGridResult[] }>({ queryKey: ["/api/ranking-grid/scans", scan.id] });
+  const results = data?.results ?? [];
+  const found = results.filter((r) => r.rank !== null && r.rank > 0).length;
+  const top3 = results.filter((r) => r.rank !== null && r.rank > 0 && r.rank <= 3).length;
+  const avg = scan.averageRank ? parseFloat(scan.averageRank) : null;
+  return (
+    <HeroPanel
+      testId="ranking-grid-hero"
+      eyebrow={`Latest scan · ${new Date(scan.createdAt!).toLocaleDateString()}`}
+      title={scan.businessName}
+      keyword={scan.keyword}
+      meta={`${scan.gridSize}×${scan.gridSize} grid · ${scan.gridDistance} mi spacing`}
+      thumb={<HeatThumb size={scan.gridSize} ranks={ranksOf(scan.gridSize, results)} px={132} testId="hero-heatmap" />}
+      figures={[
+        { label: "Average rank", value: avg == null || !Number.isFinite(avg) ? "—" : avg.toFixed(1), color: BANDS[rankBand(avg == null ? null : Math.round(avg))].bg },
+        { label: "In the top 3", value: results.length ? `${top3} of ${results.length}` : "—", color: BANDS.top3.bg },
+        { label: "Found in the first 20", value: results.length ? `${Math.round((found / results.length) * 100)}%` : "—", color: BRAND_ORANGE },
+      ]}
+      action={<Button className="w-full text-white shadow-md hover:brightness-110 sm:w-auto" style={{ background: BRAND_ORANGE }} onClick={onViewReport} data-testid="button-hero-report"><FileText className="h-4 w-4 mr-2" />View full report</Button>}
+    />
+  );
+}
+
+const STATUS_COLORS: Record<string, string> = { completed: "#16a34a", running: BRAND_ORANGE, pending: "#0ea5e9" };
+
+/** A scan's row in the history (and the sample's): heatmap, business, keyword, figures, status. */
+function ScanRow({ title, keyword, meta, average, pctRanked, status, thumb, trailing, onClick }: {
+  title: string; keyword: string; meta: string; average: number | null; pctRanked: number | null; status: string;
+  thumb: ReactNode; trailing: ReactNode; onClick?: () => void;
+}) {
+  const statusColor = STATUS_COLORS[status] ?? "#dc2626";
+  const stripe = average == null ? statusColor : BANDS[rankBand(Math.round(average))].bg;
+  return (
+    <div className="relative flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 pl-4 transition-colors hover:bg-accent/40 sm:flex-nowrap"
+      style={{ cursor: onClick ? "pointer" : undefined }} onClick={onClick}>
+      <span className="absolute inset-y-2 left-0 w-1 rounded-r-full" style={{ background: stripe }} aria-hidden="true" />
+      <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
+        {thumb}
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-sm font-semibold">{title}</p>
+            <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+              style={{ background: `color-mix(in srgb, ${BRAND_ORANGE} 14%, transparent)`, color: `color-mix(in srgb, ${BRAND_ORANGE} 75%, currentColor)` }}>{keyword}</span>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span className="whitespace-nowrap">{meta}</span>
+            {average != null && (
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                <TrendingUp className="h-3 w-3" />Avg rank <RankPill value={average} className="!px-2 !py-0 !text-xs" />
+              </span>
+            )}
+            {pctRanked != null && (
+              <span className="whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ background: pctRanked >= 50 ? BANDS.top3.bg : pctRanked >= 25 ? BANDS.top20.bg : BANDS.none.bg }}>
+                {pctRanked}% Ranked
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+          style={{ background: `color-mix(in srgb, ${statusColor} 14%, transparent)`, color: `color-mix(in srgb, ${statusColor} 80%, currentColor)` }}>
+          {status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : <span className="h-1.5 w-1.5 rounded-full" style={{ background: statusColor }} />}
+          {status}
+        </span>
+        {trailing}
+      </div>
+    </div>
+  );
+}
+
+function ScanCard({ scan, thumb, isExpanded, onToggle, onDelete, onViewReport }: {
   scan: RankingGridScan;
+  /** Load the scan's points for its heatmap thumbnail (the first rows of the history). */
+  thumb: boolean;
   isExpanded: boolean;
   onToggle: () => void;
   onDelete: () => void;
@@ -1001,7 +1228,7 @@ function ScanCard({ scan, isExpanded, onToggle, onDelete, onViewReport }: {
   const { data } = useQuery<{ scan: RankingGridScan; results: RankingGridResult[] }>({
     queryKey: ["/api/ranking-grid/scans", scan.id],
     refetchInterval: scan.status === "running" ? 2000 : false,
-    enabled: isExpanded || scan.status === "running",
+    enabled: isExpanded || scan.status === "running" || thumb,
   });
 
   const results = data?.results || [];
@@ -1009,58 +1236,24 @@ function ScanCard({ scan, isExpanded, onToggle, onDelete, onViewReport }: {
 
   const rankedCount = results.filter(r => r.rank !== null && r.rank > 0).length;
   const pctRanked = results.length > 0 ? Math.round((rankedCount / results.length) * 100) : 0;
+  const average = latestScan.averageRank ? parseFloat(latestScan.averageRank) : null;
 
   return (
-    <Section flush testId={`card-scan-${scan.id}`}>
-      <div
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent/50 transition-colors rounded-t-lg"
+    <div className="space-y-0" data-testid={`card-scan-${scan.id}`}>
+      <ScanRow
+        title={scan.businessName}
+        keyword={scan.keyword}
+        meta={`${scan.gridSize}×${scan.gridSize} grid · ${scan.gridDistance} mi spacing`}
+        average={average != null && Number.isFinite(average) ? average : null}
+        pctRanked={latestScan.status === "completed" && results.length > 0 ? pctRanked : null}
+        status={latestScan.status}
         onClick={onToggle}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="shrink-0">
-            {latestScan.status === "running" ? (
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            ) : latestScan.status === "completed" ? (
-              <Target className="h-5 w-5 text-emerald-500" />
-            ) : (
-              <Target className="h-5 w-5 text-red-500" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-semibold text-sm truncate">{scan.businessName}</p>
-              <Badge variant="secondary" className="text-xs shrink-0">
-                {scan.keyword}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-              <span>{scan.gridSize}×{scan.gridSize} grid</span>
-              <span>·</span>
-              <span>{scan.gridDistance} mi spacing</span>
-              {latestScan.averageRank && (
-                <>
-                  <span>·</span>
-                  <span className="flex items-center gap-0.5">
-                    <TrendingUp className="h-3 w-3" />
-                    Avg rank: {latestScan.averageRank}
-                  </span>
-                </>
-              )}
-              {latestScan.status === "completed" && results.length > 0 && (
-                <>
-                  <span>·</span>
-                  <Badge variant={pctRanked >= 50 ? "default" : pctRanked >= 25 ? "secondary" : "destructive"} className="text-[10px] px-1 py-0">
-                    {pctRanked}% Ranked
-                  </Badge>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Badge variant={latestScan.status === "completed" ? "default" : latestScan.status === "running" ? "secondary" : "destructive"}>
-            {latestScan.status}
-          </Badge>
+        thumb={results.length > 0
+          ? <HeatThumb size={latestScan.gridSize} ranks={ranksOf(latestScan.gridSize, results)} px={56} testId={`thumb-scan-${scan.id}`} />
+          : <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: NAVY }} aria-hidden="true">
+              {latestScan.status === "running" ? <Loader2 className="h-5 w-5 animate-spin" style={{ color: BRAND_ORANGE }} /> : <Grid3X3 className="h-5 w-5" style={{ color: BRAND_ORANGE }} />}
+            </span>}
+        trailing={<>
           {latestScan.status === "completed" && (
             <Button
               variant="outline"
@@ -1078,20 +1271,20 @@ function ScanCard({ scan, isExpanded, onToggle, onDelete, onViewReport }: {
             size="sm"
             className="h-7 w-7 p-0"
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            aria-label="Delete scan"
             data-testid={`button-delete-scan-${scan.id}`}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </div>
-      </div>
+        </>}
+      />
 
       {isExpanded && (
-        <CardContent className="pt-0 pb-4">
-          <div className="border-t border-border pt-4">
+        <div className="-mt-2 rounded-b-xl border border-t-0 bg-card px-4 pb-4 pt-5">
             {results.length === 0 && latestScan.status === "running" ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                <Loader2 className="h-6 w-6 animate-spin mr-2" style={{ color: BRAND_ORANGE }} />
                 <span className="text-sm text-muted-foreground">
                   Scanning grid points... ({latestScan.gridSize * latestScan.gridSize} total)
                 </span>
@@ -1108,8 +1301,8 @@ function ScanCard({ scan, isExpanded, onToggle, onDelete, onViewReport }: {
                     </div>
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-primary rounded-full transition-all duration-500"
-                        style={{ width: `${(results.length / (latestScan.gridSize * latestScan.gridSize)) * 100}%` }}
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${(results.length / (latestScan.gridSize * latestScan.gridSize)) * 100}%`, background: `linear-gradient(90deg, ${BRAND_ORANGE}, #ffb74d)` }}
                       />
                     </div>
                   </div>
@@ -1117,20 +1310,20 @@ function ScanCard({ scan, isExpanded, onToggle, onDelete, onViewReport }: {
 
                 {latestScan.status === "completed" && (
                   <>
-                    <StatGrid className="w-full mt-2">
-                      <StatBox label="Grid points" value={String(latestScan.gridSize * latestScan.gridSize)} />
-                      <StatBox label="Average rank" value={latestScan.averageRank || "N/A"} />
-                      <StatBox label="Ranked" value={`${rankedCount} / ${results.length}`} />
-                      <StatBox label="Top 3" value={String(results.filter(r => r.rank !== null && r.rank <= 3).length)} />
-                    </StatGrid>
+                    <div className="grid w-full grid-cols-2 gap-3 lg:grid-cols-4">
+                      <ColorStat label="Grid points" value={String(latestScan.gridSize * latestScan.gridSize)} icon={Grid3X3} color={BRAND_ORANGE} />
+                      <ColorStat label="Average rank" value={latestScan.averageRank || "N/A"} icon={TrendingUp} color={average == null ? "#94a3b8" : BANDS[rankBand(Math.round(average))].bg} />
+                      <ColorStat label="Ranked" value={`${rankedCount} / ${results.length}`} icon={Target} color="#0ea5e9" />
+                      <ColorStat label="Top 3" value={String(results.filter(r => r.rank !== null && r.rank <= 3).length)} icon={Trophy} color={BANDS.top3.bg} />
+                    </div>
 
                     <div className="w-full">
                       <RankDistributionChart results={results} />
                     </div>
 
                     <Button
-                      variant="outline"
-                      className="w-full sm:w-auto"
+                      className="w-full text-white shadow-md hover:brightness-110 sm:w-auto"
+                      style={{ background: BRAND_ORANGE }}
                       onClick={onViewReport}
                       data-testid={`button-full-report-${scan.id}`}
                     >
@@ -1141,10 +1334,9 @@ function ScanCard({ scan, isExpanded, onToggle, onDelete, onViewReport }: {
                 )}
               </div>
             )}
-          </div>
-        </CardContent>
+        </div>
       )}
-    </Section>
+    </div>
   );
 }
 
@@ -1172,8 +1364,4 @@ function ReportView({ scanId, onBack }: { scanId: number; onBack: () => void }) 
   return (
     <GoogleSurface page><AppPage className="before:hidden [&_button]:min-h-10 max-sm:[&_.g-pill]:!min-h-11 max-sm:[&_button.g-chip]:!min-h-11"><ScanReport scan={data.scan} results={data.results} onBack={onBack} /></AppPage></GoogleSurface>
   );
-}
-
-function StatBox({ label, value }: { label: string; value: string }) {
-  return <Stat label={label} value={value} />;
 }
