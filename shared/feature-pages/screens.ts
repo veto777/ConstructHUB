@@ -17,7 +17,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
     {"src":"/feature-shots/agency-3.webp","alt":"Three locations selected in the agency workspace with the Apply to selected locations panel open for a bulk action.","caption":"Bulk actions across selected locations","url":"constructhub.us/agency","width":1600,"height":1000},
   ],
   "callAssistant": [
-    {"src":"/feature-shots/callAssistant-1.webp","alt":"The AI Call Assistant overview with the last 30 days of results: calls answered, estimate requests, urgent calls sent to a person, questions answered and spam blocked.","caption":"Every call answered, sorted by what happened","url":"constructhub.us/call-assistant","width":1600,"height":1000},
+    {"src":"/feature-shots/callAssistant-1.webp","alt":"The Call Assistant overview with the last 30 days of results: calls answered, estimate requests, urgent calls sent to a person, questions answered and spam blocked.","caption":"Every call answered, sorted by what happened","url":"constructhub.us/call-assistant","width":1600,"height":1000},
     {"src":"/feature-shots/callAssistant-2.webp","alt":"The Call Assistant agent studio with the company profile for the sample roofing business and sections for services, service area, policies, persona, intake questions and escalations.","caption":"Agent studio: teach the assistant your business","url":"constructhub.us/call-assistant?tab=studio","width":1600,"height":1000},
     {"src":"/feature-shots/callAssistant-3.webp","alt":"The Call Assistant call log listing recent sample calls with caller, city, outcome and a one-line summary of each call.","caption":"Call log with outcomes and summaries","url":"constructhub.us/call-assistant/calls","width":1600,"height":1000},
   ],

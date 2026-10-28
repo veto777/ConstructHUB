@@ -95,7 +95,7 @@ export function parseAddonQuantities(raw: unknown): AddonQuantities {
 
 /**
  * Refuse add-ons the plan doesn't offer, and extra locations that would make
- * it an Agency-sized account. The AI Call Assistant's add-ons (its tiers and
+ * it an Agency-sized account. The Call Assistant's add-ons (its tiers and
  * the extra number) are sold on no plan at all: they are the lines of the Call
  * Assistant's own subscription (server/voice/subscription.ts), so a platform
  * order that names one is refused and sent to that checkout.

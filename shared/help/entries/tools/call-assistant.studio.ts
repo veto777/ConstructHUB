@@ -2,7 +2,7 @@ import type { HelpDraft } from "../../types";
 
 /** Written from client/src/pages/crm-call-assistant/studio.tsx, studio/*.tsx and server/voice/profile.ts, prompt-compiler.ts as they run. */
 const entry: HelpDraft = {
-  key: "call-assistant.studio", parent: "call-assistant", group: "Tools", route: "/call-assistant/studio", title: "AI Call Assistant → Agent studio",
+  key: "call-assistant.studio", parent: "call-assistant", group: "Tools", route: "/call-assistant/studio", title: "Call Assistant → Agent studio",
   whatItIs: "Where you teach the assistant about your business, choose its voice and questions, and publish it.",
   whatItDoes: "The first time, a step-by-step setup covers company, services, service area, credibility, offers, policies, voice, questions and delivery. It saves a draft at every Next, then shows a review and publishes. After that the editor lists every section on the left, plus the prompt preview (the exact instructions your saved draft gives the assistant) and the version history. Save draft keeps your edits without touching the live assistant; Publish makes them live; Pause stops it answering until you Resume.",
   howToUse: [

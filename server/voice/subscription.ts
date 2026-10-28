@@ -1,5 +1,5 @@
 /**
- * Selling the AI Call Assistant — its own Stripe subscription, apart from the
+ * Selling the Call Assistant — its own Stripe subscription, apart from the
  * platform plan (owner, 2026-10-08: a separate service, bought with or without
  * a platform plan; the CRM's pattern, server/crm/billing.ts).
  *

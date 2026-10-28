@@ -46,7 +46,7 @@ const callAssistant = (tier: string | null, status: string, extraNumbers = 0) =>
 
 beforeEach(() => { mocks.row = undefined; });
 
-describe("price book: the AI Call Assistant, a separate service (owner, 2026-10-08)", () => {
+describe("price book: the Call Assistant, a separate service (owner, 2026-10-08)", () => {
   it("four tiers named by their minutes, one overage rate, yearly at 11 × monthly, no intro, nothing above the top tier", () => {
     expect(CALL_ASSISTANT_TIERS.map((t) => [t.tier, t.addon, t.name, t.monthlyCents, t.annualCents, t.includedMinutes, t.includedNumbers, t.overageCentsPerMinute])).toEqual([
       ["lite", "call_assistant_lite", "500 minutes", 24_900, 273_900, 500, 1, 50],
@@ -61,7 +61,7 @@ describe("price book: the AI Call Assistant, a separate service (owner, 2026-10-
       // The top tier is $999: listed. More minutes than it is a sales conversation, never a tier.
       expect(t.monthlyCents).toBeLessThan(SALES_THRESHOLD_CENTS);
       const a = ADDONS[t.addon];
-      expect(a).toMatchObject({ key: t.addon, name: `AI Call Assistant — ${t.name}`, monthlyCents: t.monthlyCents, annualCents: t.annualCents, availableOn: [], exclusiveGroup: "call_assistant_tier", grants: {} });
+      expect(a).toMatchObject({ key: t.addon, name: `Call Assistant — ${t.name}`, monthlyCents: t.monthlyCents, annualCents: t.annualCents, availableOn: [], exclusiveGroup: "call_assistant_tier", grants: {} });
       expect(a.introMonthlyCents).toBeUndefined();
       expect(a.introMonths).toBeUndefined();
       expect(a.preview ?? false).toBe(false);
@@ -88,7 +88,7 @@ describe("price book: the AI Call Assistant, a separate service (owner, 2026-10-
   });
 
   it("no plan sells it — every platform plan AND every CRM plan says so at checkout, with the real starting price", () => {
-    expect(CALL_ASSISTANT_NOT_INCLUDED_LINE).toBe("The AI Call Assistant — answers your phone 24/7, screens spam and files the lead (a separate service, from $249/mo)");
+    expect(CALL_ASSISTANT_NOT_INCLUDED_LINE).toBe("The Call Assistant — answers your phone 24/7, screens spam and files the lead (a separate service, from $249/mo)");
     for (const key of PLAN_KEYS) {
       // The CRM leads the list (owner, 2026-10-07); the Call Assistant follows it.
       expect(PLANS[key].notIncluded[0], key).toMatch(/ConstructHUB CRM/);
@@ -111,7 +111,7 @@ describe("price book: the AI Call Assistant, a separate service (owner, 2026-10-
     expect(Object.keys(MODULE_NAMES)).not.toContain("callAssistant");
     // On the five-plan book only white-label reports and the Master Class are Unlimited-exclusive.
     expect(AGENCY_ONLY_MODULES).toEqual(["White-label reports", "Master Class"]);
-    expect(moduleName("callAssistant")).toBe("AI Call Assistant");
+    expect(moduleName("callAssistant")).toBe("Call Assistant");
     for (const k of PLAN_KEYS) expect((PLANS[k].modules as any).callAssistant).toBeUndefined();
   });
 
@@ -259,7 +259,7 @@ describe("entitlements: the callAssistant module comes from the service's own su
     expect(r.status).toHaveBeenCalledWith(402);
     expect(r.json).toHaveBeenCalledWith({
       code: "call_assistant_required", addon: "call_assistant", href: "/pricing#call-assistant",
-      message: "AI Call Assistant is a separate service with its own subscription, from $249/mo — no ConstructHUB plan needed. Choose a tier on Pricing to use it.",
+      message: "Call Assistant is a separate service with its own subscription, from $249/mo — no ConstructHUB plan needed. Choose a tier on Pricing to use it.",
     });
     expect(JSON.stringify(r.json.mock.calls[0][0])).not.toMatch(/requiredPlan|plan_required/);
     // The middleware: 401 signed out, 402 without the service (even on Agency), next() with it (even with no plan).

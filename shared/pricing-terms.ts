@@ -136,7 +136,7 @@ export function priceBookAt(startedAt: Date) {
 /**
  * Copy the book in force at subscription start, never at delayed processing.
  * Add-ons, the CRM (its own subscription; shared/crm-plans.ts) and the separate
- * AI Call Assistant subscription are outside the lock: those keep the Stripe
+ * Call Assistant subscription are outside the lock: those keep the Stripe
  * Price they were sold at until the customer changes them.
  */
 export function priceSnapshot(startedAt = new Date()): FoundingPrices {

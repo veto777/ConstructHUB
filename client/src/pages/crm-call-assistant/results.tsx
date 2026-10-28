@@ -14,8 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import { accentClasses, type Accent } from "@/components/app-ui";
+import { BRAND_ORANGE, outcomeColor } from "./ca-ui";
 import { CALL_RESULTS_MAX_DAYS, type CallResultsPreset, type CallResultsRange } from "@shared/call-results-range";
 
 export type ResultsRange = CallResultsPreset;
@@ -40,14 +39,14 @@ const RANGE_LABELS: Record<ResultsRange, string> = { "7d": "Last 7 days", "30d":
 const rangeLabel = (r: RangeParam): string => (r in RANGE_LABELS ? RANGE_LABELS[r as ResultsRange] : `Last ${r.slice(0, -1)} days`);
 
 /** The tiles, in the order an owner reads them: what made money first, spam last. */
-const TILES: { key: ResultsPick; label: string; hint: string; outcomes: string[]; icon: typeof BellRing; tone: Accent }[] = [
-  { key: "lead_submitted", label: "Estimate requests", hint: "Forms filed for your team", outcomes: ["lead_submitted", "booked"], icon: ClipboardCheck, tone: "orange" },
-  { key: "alerted", label: "Sent to a person", hint: "Urgent or follow-up, someone was alerted", outcomes: ["alerted"], icon: BellRing, tone: "orange" },
-  { key: "info", label: "Questions answered", hint: "Callers who only needed information", outcomes: ["info"], icon: Info, tone: "orange" },
-  { key: "declined", label: "Declined", hint: "Work you don't do, or outside your area", outcomes: ["declined", "out_of_area"], icon: XCircle, tone: "orange" },
-  { key: "hangup", label: "Hung up", hint: "Ended before saying what they needed", outcomes: ["hangup"], icon: PhoneMissed, tone: "orange" },
-  { key: "voicemail", label: "Messages taken", hint: "Voicemails left for your team", outcomes: ["voicemail"], icon: Mic, tone: "orange" },
-  { key: "spam", label: "Spam blocked", hint: "You never had to pick up", outcomes: ["spam", "blocked"], icon: ShieldBan, tone: "orange" },
+const TILES: { key: ResultsPick; label: string; hint: string; outcomes: string[]; icon: typeof BellRing }[] = [
+  { key: "lead_submitted", label: "Estimate requests", hint: "Forms filed for your team", outcomes: ["lead_submitted", "booked"], icon: ClipboardCheck },
+  { key: "alerted", label: "Sent to a person", hint: "Urgent or follow-up, someone was alerted", outcomes: ["alerted"], icon: BellRing },
+  { key: "info", label: "Questions answered", hint: "Callers who only needed information", outcomes: ["info"], icon: Info },
+  { key: "declined", label: "Declined", hint: "Work you don't do, or outside your area", outcomes: ["declined", "out_of_area"], icon: XCircle },
+  { key: "hangup", label: "Hung up", hint: "Ended before saying what they needed", outcomes: ["hangup"], icon: PhoneMissed },
+  { key: "voicemail", label: "Messages taken", hint: "Voicemails left for your team", outcomes: ["voicemail"], icon: Mic },
+  { key: "spam", label: "Spam blocked", hint: "You never had to pick up", outcomes: ["spam", "blocked"], icon: ShieldBan },
 ];
 
 const sum = (o: Record<string, number>, keys: string[]) => keys.reduce((n, k) => n + (o[k] ?? 0), 0);
@@ -72,7 +71,7 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
       <CardContent className="space-y-4 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="flex items-center gap-2 text-base font-semibold"><BarChart3 className="h-4 w-4" aria-hidden="true" /> Results</h2>
+            <h2 className="flex items-center gap-2 text-base font-semibold"><BarChart3 className="h-4 w-4" style={{ color: BRAND_ORANGE }} aria-hidden="true" /> Results</h2>
             <p className="text-sm text-muted-foreground">What your assistant did with every call.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -108,29 +107,31 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
         ) : (
           <>
             <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm" data-testid="row-results-headline">
-              <p><span className="text-2xl font-semibold tabular-nums" data-testid="text-results-total">{d.total.toLocaleString("en-US")}</span> calls answered</p>
-              <p><span className="text-2xl font-semibold tabular-nums" data-testid="text-results-real">{real.toLocaleString("en-US")}</span> real callers</p>
+              <p><span className="text-3xl font-bold tabular-nums" style={{ color: "#0284c7" }} data-testid="text-results-total">{d.total.toLocaleString("en-US")}</span> calls answered</p>
+              <p><span className="text-3xl font-bold tabular-nums" style={{ color: BRAND_ORANGE }} data-testid="text-results-real">{real.toLocaleString("en-US")}</span> real callers</p>
               {leadRate !== null && (
-                <p><span className="text-2xl font-semibold tabular-nums text-foreground" data-testid="text-results-lead-rate">{leadRate}%</span> became estimate requests</p>
+                <p><span className="text-3xl font-bold tabular-nums" style={{ color: "#16a34a" }} data-testid="text-results-lead-rate">{leadRate}%</span> became estimate requests</p>
               )}
             </div>
 
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="list-results-outcomes">
               {TILES.map((t) => {
                 const n = t.key === "alerted" ? d.sentToPerson ?? sum(d.outcomes, t.outcomes) : sum(d.outcomes, t.outcomes);
+                const color = outcomeColor(t.outcomes[0]);
                 return (
                   <li key={t.key}>
                     <button
                       type="button"
                       onClick={() => onPick(t.key)}
-                      className="h-full w-full rounded-xl border bg-card p-3 text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="relative h-full w-full overflow-hidden rounded-xl border bg-card p-3 pt-4 text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       data-testid={`tile-results-${t.key}`}
                     >
+                      <span className="absolute inset-x-0 top-0 h-1" style={{ background: color }} aria-hidden="true" />
                       <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                        <span className={cn("flex h-6 w-6 items-center justify-center rounded-md", accentClasses(t.tone).chip)} aria-hidden="true"><t.icon className="h-3.5 w-3.5" /></span>
+                        <span className="flex h-6 w-6 items-center justify-center rounded-md" style={{ background: `color-mix(in srgb, ${color} 16%, transparent)`, color }} aria-hidden="true"><t.icon className="h-3.5 w-3.5" /></span>
                         {t.label}
                       </span>
-                      <span className="mt-1 block text-2xl font-semibold tabular-nums" data-testid={`text-results-${t.key}`}>{n.toLocaleString("en-US")}</span>
+                      <span className="mt-1 block text-2xl font-semibold tabular-nums" style={n > 0 ? { color } : undefined} data-testid={`text-results-${t.key}`}>{n.toLocaleString("en-US")}</span>
                       <span className="block text-xs text-muted-foreground">{t.hint}</span>
                     </button>
                   </li>
@@ -145,7 +146,7 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
                   {d.lines.map((l) => (
                     <li key={l.label} className="text-sm" data-testid="row-results-line">
                       <div className="flex justify-between gap-2"><span className="truncate">{l.label}</span><span className="tabular-nums text-muted-foreground">{l.calls} calls · {l.leads} estimate {l.leads === 1 ? "request" : "requests"}</span></div>
-                      <div className="mt-1 h-1.5 rounded bg-muted"><div className="h-1.5 rounded bg-primary" style={{ width: `${maxLine ? Math.max(4, Math.round((l.calls / maxLine) * 100)) : 0}%` }} /></div>
+                      <div className="mt-1 h-2 rounded-full bg-muted"><div className="h-2 rounded-full" style={{ background: BRAND_ORANGE, width: `${maxLine ? Math.max(4, Math.round((l.calls / maxLine) * 100)) : 0}%` }} /></div>
                     </li>
                   ))}
                 </ul>

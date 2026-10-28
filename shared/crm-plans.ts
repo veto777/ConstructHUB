@@ -96,7 +96,7 @@ export type CrmPlan = {
 };
 
 /**
- * Every CRM plan excludes the whole platform app and the AI Call Assistant (a
+ * Every CRM plan excludes the whole platform app and the Call Assistant (a
  * separate service of its own, shared/plans.ts); tier-specific gaps are added per plan.
  */
 const PLATFORM_NOT_INCLUDED: readonly string[] = [

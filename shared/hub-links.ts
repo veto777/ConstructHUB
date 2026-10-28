@@ -25,7 +25,7 @@ export const HUB_LINKS: readonly HubLink[] = [
   { path: "/lsa-guide", label: "LSA Guide", public: true },
   { path: "/google-ad-fraud", label: "Ad Fraud", public: true },
   { path: "/crm-app", label: "ConstructHub CRM", public: true },
-  { path: "/call-assistant", label: "AI Call Assistant", public: true },
+  { path: "/call-assistant", label: "Call Assistant", public: true },
   { path: "/privacy", label: "Privacy Policy", public: true },
   { path: "/terms", label: "Terms of Use", public: true },
   { path: "/settings", label: "Settings", public: false, variants: ["?tab=profile", "?tab=account", "?tab=notifications", "?tab=security", "?tab=billing"] },
@@ -120,7 +120,7 @@ export const HUB_PAGES: Record<PageKey, { name: string; sections: number[] }> = 
   "settings": { name: "Settings", sections: [25] },
   "master-class": { name: "Master Class", sections: [26] },
   // §30 of the knowledge pack (it lives in the CRM, but §24 would not fit in the same slice).
-  "call-assistant": { name: "AI Call Assistant", sections: [30] },
+  "call-assistant": { name: "Call Assistant", sections: [30] },
 };
 
 const PAGE_ROUTES: [string, PageKey][] = [

@@ -54,7 +54,7 @@ describe("appSalesQuestion", () => {
   const no = [
     "How do I connect my Google Business Profile?",
     "How does Click Guard work?",
-    "What is the AI Call Assistant?",
+    "What is the Call Assistant?",
     "How do I add my crew to the CRM?",
     "I'm a pro roofer — how do I schedule posts?",
     "Where do I forward my calls?",

@@ -101,7 +101,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   const { data: subscription, view } = useSubscription();
   const { addon: addonMutation, salesTopic, setSalesTopic } = useBillingActions();
   const addonChange = useAddonChange(addonMutation);
-  // The AI Call Assistant is its own subscription (server/voice/subscription.ts): its tier and extra numbers change
+  // The Call Assistant is its own subscription (server/voice/subscription.ts): its tier and extra numbers change
   // there, and a change that pays for fewer numbers than the account holds asks first (the numbers are released, not kept).
   const { data: callAssistant } = useCallAssistantSubscription();
   const callAssistantMutation = useCallAssistantChange();
@@ -339,7 +339,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
     const extraNumbers = callAssistant?.extraNumbers ?? 0;
     const caPending = callAssistantMutation.isPending ? callAssistantMutation.variables?.addon ?? null : null;
     groups.push({
-      title: "AI Call Assistant",
+      title: "Call Assistant",
       rows: [
         {
           key: "callAssistantMinutes",

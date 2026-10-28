@@ -22,7 +22,7 @@ import { CLIENT_NUMBER_INCLUDED_PLANS, CRM_TEXTING_PLANS, CRM_TEXT_SEGMENTS_LINE
  *   - the re-engagement alert falls back to email when the month's texts are spent: server/crm/sms.ts
  *   - STOP / START / HELP answered and honoured: server/crm/sms.ts (/api/crm/sms/inbound, isSmsOptedOut)
  *   - client replies are not shown in the CRM: the inbound route only handles STOP/START/HELP and
- *     AI Call Assistant escalation replies
+ *     Call Assistant escalation replies
  *   - usage on the dashboard: server/dashboard/account.ts ("Texts" row)
  *   - the client-texting number: Agency includes one and Unlimited two (limits.clientTexting "included",
  *     textingNumbersIncluded), the Client texting number add-on on the plans in

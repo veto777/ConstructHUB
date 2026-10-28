@@ -29,7 +29,7 @@ function fakeStripe() {
 const quietDb = () => { const queries: string[] = []; return { queries, q: { query: async (text: string) => { queries.push(text); return { rows: [] }; } } }; };
 
 describe("no add-on carries an intro price (owner, 2026-10-08)", () => {
-  it("the price book: every add-on, the AI Call Assistant's four tiers first, has no introMonthlyCents / introMonths", () => {
+  it("the price book: every add-on, the Call Assistant's four tiers first, has no introMonthlyCents / introMonths", () => {
     for (const key of ADDON_KEYS) {
       expect(ADDONS[key].introMonthlyCents, key).toBeUndefined();
       expect(ADDONS[key].introMonths, key).toBeUndefined();

@@ -72,7 +72,7 @@ describe("plan copy helpers", () => {
     expect(CRM_SEATS_LINE).toBe(CRM_PLAN_KEYS.map((k) => `${CRM_PLANS[k].name} ${CRM_PLANS[k].limits.seats}`).join(", ").replace(/, ([^,]*)$/, " and $1"));
   });
 
-  it("lists every PLATFORM add-on with its price and plans (the AI Call Assistant's lines are its own subscription's, listed with the service)", () => {
+  it("lists every PLATFORM add-on with its price and plans (the Call Assistant's lines are its own subscription's, listed with the service)", () => {
     const lines = addonLines();
     expect(lines).toHaveLength(PLATFORM_ADDONS.length);
     // 5 Call Assistant lines (4 tiers + the extra number) and the retired extra-location add-on are not platform add-ons.
@@ -89,7 +89,7 @@ describe("plan copy helpers", () => {
   });
 });
 
-describe("AI Call Assistant: a separate service (owner, 2026-10-08)", () => {
+describe("Call Assistant: a separate service (owner, 2026-10-08)", () => {
   const root = path.resolve(import.meta.dirname, "..");
 
   it("four tiers, every figure from the price book: 500 / 1,000 / 2,000 / 5,000 minutes, one overage rate, yearly 11 × monthly, no intro", () => {
@@ -104,7 +104,7 @@ describe("AI Call Assistant: a separate service (owner, 2026-10-08)", () => {
     expect(tiers.map((t) => t.estimatedCalls)).toEqual(["about 250 calls a month", "about 500 calls a month", "about 1,000 calls a month", "about 2,500 calls a month"]);
     expect(callAssistantTiersLine()).toBe("500 minutes a month with 1 local number for $249/month or $2,739/year, 1,000 minutes a month with 1 local number for $349/month or $3,839/year, 2,000 minutes a month with 2 local numbers for $449/month or $4,939/year and 5,000 minutes a month with 5 local numbers for $999/month or $10,989/year; above the included minutes, $0.50 a minute on every tier");
     expect(callAssistantTiersShortLine()).toBe("500 minutes $249/month, 1,000 minutes $349/month, 2,000 minutes $449/month and 5,000 minutes $999/month");
-    expect(callAssistantYearlyNote()).toBe("Yearly billing is 11 times the monthly price, so one month is free: 500 minutes $2,739/yr, 1,000 minutes $3,839/yr, 2,000 minutes $4,939/yr and 5,000 minutes $10,989/yr. The AI Call Assistant is billed on its own subscription, apart from any plan");
+    expect(callAssistantYearlyNote()).toBe("Yearly billing is 11 times the monthly price, so one month is free: 500 minutes $2,739/yr, 1,000 minutes $3,839/yr, 2,000 minutes $4,939/yr and 5,000 minutes $10,989/yr. The Call Assistant is billed on its own subscription, apart from any plan");
     expect(callAssistantTierAdvice()).toBe("At about 2 minutes a call, 500 minutes covers about 250 calls a month, 1,000 minutes covers about 500 calls a month, 2,000 minutes covers about 1,000 calls a month and 5,000 minutes covers about 2,500 calls a month. These are estimates: your calls may run shorter or longer, and you can move between tiers any time in Settings → Billing. More than 5,000 minutes a month is quoted by a sales rep (Talk to a sales rep): there is no listed price above the 5,000 minutes tier.");
     expect(callAssistantAboveTopLine()).toBe("More than 5,000 minutes a month is quoted by a sales rep (Talk to a sales rep): there is no listed price above the 5,000 minutes tier.");
     const p = callAssistantPricing();
@@ -113,7 +113,7 @@ describe("AI Call Assistant: a separate service (owner, 2026-10-08)", () => {
     expect(p.comingSoon).toBe(ADDONS.call_assistant.preview === true);
     expect(p.separateLine).toBe(CALL_ASSISTANT_SEPARATE_LINE);
     expect(p.pricingHref).toBe("/pricing#call-assistant");
-    expect(CALL_ASSISTANT_SEPARATE_LINE).toBe("The AI Call Assistant is a separate service with its own subscription, from $249/mo: no ConstructHUB plan includes it, and none is needed to buy it.");
+    expect(CALL_ASSISTANT_SEPARATE_LINE).toBe("The Call Assistant is a separate service with its own subscription, from $249/mo: no ConstructHUB plan includes it, and none is needed to buy it.");
     expect(CALL_ASSISTANT_FROM_PRICE).toBe("$249/mo");
     expect(CALL_ASSISTANT_ANNUAL_MONTHS).toBe(11);
     expect(callAssistantOverageLine()).toBe(p.overageLine);
@@ -145,7 +145,7 @@ describe("AI Call Assistant: a separate service (owner, 2026-10-08)", () => {
       callAssistantOverageRule(), CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_SPAM.block, CALL_ASSISTANT_SPAM.forwarding]) expect(pack).toContain(line);
     expect(pack).toContain("four tiers, one per account");
     expect(pack).toContain("There is no intro or launch price");
-    expect(pack).toContain("## 30. AI Call Assistant (a separate service)");
+    expect(pack).toContain("## 30. Call Assistant (a separate service)");
     expect(pack).not.toMatch(/launch price is|for your first 3 months|an add-on to the|\(an add-on,|Call Assistant add-on\b/);
     expect(pack).not.toContain("{{");
     expect(pricingKnowledge()).toContain("a SEPARATE SERVICE with its own subscription, not a plan add-on");
@@ -166,8 +166,8 @@ describe("AI Call Assistant: a separate service (owner, 2026-10-08)", () => {
     expect(filterReply("The Fleet tier costs $799/month or $6,399/year.").ok).toBe(false);
     expect(filterReply("Solo is $99/month for your first 3 months.").ok).toBe(false);
     expect(filterReply("Extra minutes are 10 cents each.").ok).toBe(false);
-    expect(filterReply("The AI Call Assistant is an add-on to the Pro plan.").ok).toBe(false);
-    expect(filterReply("The Agency plan includes the AI Call Assistant.").ok).toBe(false);
+    expect(filterReply("The Call Assistant is an add-on to the Pro plan.").ok).toBe(false);
+    expect(filterReply("The Agency plan includes the Call Assistant.").ok).toBe(false);
   });
 
   it("yearly prices above the $1,000 threshold still show: they are listed prices, not a sales quote", () => {
@@ -176,7 +176,7 @@ describe("AI Call Assistant: a separate service (owner, 2026-10-08)", () => {
     expect(priceBookCents().has(ADDONS.call_assistant_fleet.annualCents)).toBe(true);
     expect(filterReply(`On yearly billing the 5,000 minutes tier is ${formatUsd(ADDONS.call_assistant_fleet.annualCents)}/year.`).ok).toBe(true);
     // A made-up yearly price is still refused.
-    expect(filterReply("The AI Call Assistant costs $1,899/year.").ok).toBe(false);
+    expect(filterReply("The Call Assistant costs $1,899/year.").ok).toBe(false);
   });
 
   it("the spam promise only says what the code does", () => {

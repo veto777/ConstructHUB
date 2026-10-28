@@ -80,10 +80,10 @@ function addonsList(): string {
   });
   lines.push(`- **Extra CRM seat** — ${usd(CRM_EXTRA_SEAT_MONTHLY_CENTS)}/mo or ${usd(CRM_EXTRA_SEAT_ANNUAL_CENTS)}/yr — on: CRM plans (self-serve up to 50)`);
   lines.push(`- **${CRM_ADDONS.jobcam.name}** — ${usd(CRM_ADDONS.jobcam.monthlyCents)}/mo or ${usd(CRM_ADDONS.jobcam.annualCents)}/yr — on: ${CRM_ADDONS.jobcam.availableOn.map((k) => CRM_PLANS[k].name).join(", ")}`);
-  // The AI Call Assistant's lines are its own subscription's, listed with the service (never platform add-ons).
+  // The Call Assistant's lines are its own subscription's, listed with the service (never platform add-ons).
   for (const t of CALL_ASSISTANT_TIERS) {
     const addon = ADDONS[t.addon];
-    lines.push(`- **${addon.name}** — ${usd(t.monthlyCents)}/mo or ${usd(t.annualCents)}/yr — the AI Call Assistant's own subscription (not a platform add-on)`);
+    lines.push(`- **${addon.name}** — ${usd(t.monthlyCents)}/mo or ${usd(t.annualCents)}/yr — the Call Assistant's own subscription (not a platform add-on)`);
   }
   return lines.join("\n");
 }

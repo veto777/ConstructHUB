@@ -66,7 +66,7 @@ test("landing: plans from the price book, services go to a sales rep", async ({ 
   await expect(page.getByText("Create a Free Account")).toHaveCount(0);
 });
 
-test("AI Call Assistant: a separate service, every figure from the price book on every surface, and the ways in", async ({ page }) => {
+test("Call Assistant: a separate service, every figure from the price book on every surface, and the ways in", async ({ page }) => {
   const p = callAssistantPricing();
 
   // Signed in, /call-assistant is the dashboard (owner, 2026-10-02: it lives on the platform, not the CRM); the sales
@@ -125,7 +125,7 @@ test("AI Call Assistant: a separate service, every figure from the price book on
   if (p.comingSoon) await expect(page.getByTestId("badge-call-assistant-coming-soon").first()).toBeVisible();
   else await expect(page.getByTestId("badge-call-assistant-coming-soon")).toHaveCount(0);
   await page.getByTestId("button-ca-sales-hero").click();
-  await expect(page.getByTestId("dialog-talk-to-sales").getByTestId("text-sales-topic")).toContainText("AI Call Assistant");
+  await expect(page.getByTestId("dialog-talk-to-sales").getByTestId("text-sales-topic")).toContainText("Call Assistant");
 
   await page.goto("/landing");
   await expect(page.getByTestId("section-call-assistant")).toBeVisible();

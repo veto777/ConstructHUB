@@ -199,7 +199,7 @@ async function computeTile(
     return { ...rest, status: "empty", message: `You're working in ${owner} workspace. Open it to see the numbers there.`, cta: { label: "Open", ...page } };
   }
   if (!access.entitled) {
-    // The AI Call Assistant (addon gate): a separate service, so no plan is named and the way forward is its own pricing.
+    // The Call Assistant (addon gate): a separate service, so no plan is named and the way forward is its own pricing.
     return { ...base, status: "locked", message: lockedMessage(access.requiredPlan, access.addon), cta: access.addon ? SEPARATE_SERVICE_CTA : { label: "See plans", href: "/pricing", surface: "app" } };
   }
 

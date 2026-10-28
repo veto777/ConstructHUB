@@ -94,7 +94,7 @@ describe("sample payloads", () => {
         if (t.status === "locked") expect((t.requiredPlan || t.addon) && !t.entitled && t.metrics.length === 0).toBeTruthy();
         if (t.status === "error" || t.status === "empty") expect(t.metrics).toEqual([]);
       }
-      // The AI Call Assistant is on sale and none of the samples bought it: a plain lock, never "coming soon", and — a
+      // The Call Assistant is on sale and none of the samples bought it: a plain lock, never "coming soon", and — a
       // separate service — no plan named: the way forward is its own pricing section.
       const ca = p.tiles.find((t) => t.key === "callAssistant")!;
       expect(ca).toMatchObject({ status: "locked", entitled: false, addon: "call_assistant", metrics: [], cta: { label: "See Call Assistant pricing", href: "/pricing#call-assistant" } });

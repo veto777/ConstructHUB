@@ -22,7 +22,7 @@
  *   - `grants` is what an active item adds to the account's allowances and
  *     modules, with or without a plan (server/entitlements.ts applyAlacarteGrants).
  *     Existing per-plan allowances stay; an item only ever adds.
- *   - The AI Call Assistant and the CRM are ALREADY sold on their own
+ *   - The Call Assistant and the CRM are ALREADY sold on their own
  *     subscriptions: the tab links their cards (ALACARTE_LINKED) and never
  *     duplicates their checkout. The client texting number is an add-on only
  *     (ADDONS.texting_number), listed as such (ALACARTE_ADDON_ONLY).
@@ -179,7 +179,7 @@ export const ALACARTE: Record<AlacarteKey, AlacarteItem> = {
     9900, 4900, { modules: ["masterClass"] }, "master-class"),
 };
 
-/** The CRM and the AI Call Assistant: already stand-alone, bought on their own cards — linked from the tab, never duplicated. */
+/** The CRM and the Call Assistant: already stand-alone, bought on their own cards — linked from the tab, never duplicated. */
 export const ALACARTE_LINKED: readonly { key: "crm" | "call_assistant"; name: string; pitch: string; fromMonthlyCents: number; href: string; slug: string }[] = [
   {
     key: "crm", name: "ConstructHUB CRM",

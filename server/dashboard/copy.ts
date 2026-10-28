@@ -19,7 +19,7 @@ export const CTA_START: Partial<Record<DashboardTileKey, string>> = {
 };
 
 /**
- * The AI Call Assistant is a separate service on its own subscription (shared/plans.ts,
+ * The Call Assistant is a separate service on its own subscription (shared/plans.ts,
  * owner 2026-10-08): its lock names no plan and its way forward is its own pricing section.
  */
 export const SEPARATE_SERVICE_MESSAGE = CALL_ASSISTANT_SEPARATE_LINE;

@@ -98,7 +98,7 @@ class VoiceMock {
       enabled: this.opts.enabled !== false,
       // `preview` as server/voice/billing.ts reports it: from the price book (false since the launch). A separate
       // service (owner, 2026-10-08): its own subscription, bought on its own section of Pricing.
-      addon: { key: "call_assistant", name: "AI Call Assistant", preview: ADDONS.call_assistant.preview === true },
+      addon: { key: "call_assistant", name: "Call Assistant", preview: ADDONS.call_assistant.preview === true },
       separateService: true,
       pricingHref: "/pricing#call-assistant",
       subscriptionStatus: "active",
@@ -125,7 +125,7 @@ class VoiceMock {
 
     if (path === "/status") return json(this.statusResponse());
     if (this.opts.enabled === false) {
-      return json({ code: "call_assistant_required", addon: "call_assistant", href: "/pricing#call-assistant", message: "AI Call Assistant is a separate service with its own subscription." }, 402);
+      return json({ code: "call_assistant_required", addon: "call_assistant", href: "/pricing#call-assistant", message: "Call Assistant is a separate service with its own subscription." }, 402);
     }
     if (path === "/profile" && method === "GET") return json(this.profileResponse());
     if (path === "/profile" && method === "PUT") {

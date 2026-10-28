@@ -597,7 +597,7 @@ export async function registerRoutes(
     console.error("Failed to initialize CRM module:", e?.message || e);
   }
 
-  // AI Call Assistant (docs/call-assistant/SPEC.md): org-scoped voice tables,
+  // Call Assistant (docs/call-assistant/SPEC.md): org-scoped voice tables,
   // the CRM routes under /api/crm/voice/* and the engine's internal API under
   // /api/voice-internal/*. The engine itself is the Python service in voice/.
   // A voice schema failure fails the boot (audit #6): the app never runs without the voice tables and routes

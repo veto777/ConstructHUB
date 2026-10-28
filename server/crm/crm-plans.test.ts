@@ -53,8 +53,8 @@ describe("the CRM is a separate product", () => {
     }
   });
 
-  it("every plan of either product says the AI Call Assistant is a separate service, with its real starting price (owner, 2026-10-08)", () => {
-    const line = `The AI Call Assistant — answers your phone 24/7, screens spam and files the lead (a separate service, from $${CALL_ASSISTANT_FROM_CENTS / 100}/mo)`;
+  it("every plan of either product says the Call Assistant is a separate service, with its real starting price (owner, 2026-10-08)", () => {
+    const line = `The Call Assistant — answers your phone 24/7, screens spam and files the lead (a separate service, from $${CALL_ASSISTANT_FROM_CENTS / 100}/mo)`;
     for (const key of PLAN_KEYS) expect(PLANS[key].notIncluded, key).toContain(line);
     for (const key of CRM_PLAN_KEYS) expect(CRM_PLANS[key].notIncluded, key).toContain(line);
     expect(CALL_ASSISTANT_FROM_CENTS).toBe(Math.min(...CALL_ASSISTANT_TIERS.map((t) => t.monthlyCents)));

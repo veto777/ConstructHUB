@@ -81,7 +81,7 @@ function tileFor(scenario: DashboardFixtureScenario, def: (typeof DASHBOARD_TILE
     return { ...base, status: "coming_soon", message: COMING_SOON_MESSAGE, cta: SEPARATE_SERVICE_CTA };
   }
   if (!access.entitled) {
-    // The AI Call Assistant (addon gate): a separate service, so no plan is named and the way forward is its own pricing.
+    // The Call Assistant (addon gate): a separate service, so no plan is named and the way forward is its own pricing.
     return { ...base, status: "locked", message: lockedMessage(access.requiredPlan, access.addon), cta: access.addon ? SEPARATE_SERVICE_CTA : { label: "See plans", href: "/pricing", surface: "app" } };
   }
   // Texting follows the CRM org owner's plan: an org on a plan without texting is locked by the source.

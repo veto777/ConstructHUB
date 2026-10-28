@@ -26,7 +26,7 @@ type Row = {
   /** Plan name when the account's plan doesn't include it (it can be shown or hidden, never unlocked here). */
   lockedPlan: string | null;
   comingSoon: boolean;
-  /** An add-on (the AI Call Assistant): locked means "not bought", so it says "Add-on", not a plan. */
+  /** An add-on (the Call Assistant): locked means "not bought", so it says "Add-on", not a plan. */
   addon: boolean;
 };
 

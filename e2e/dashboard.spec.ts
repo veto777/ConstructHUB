@@ -232,13 +232,13 @@ test.describe("signed-in dashboard: sample scenarios", () => {
     // The "full" sample is the Agency plan and, since e1f35e3e, carries that plan's modules: Cloudflare is
     // included (not set up yet), so the only locked tile here is the add-on below.
     await expect(tile(page, "cloudflare")).toHaveAttribute("data-status", "empty");
-    // The AI Call Assistant is on sale (launched) and the Growth sample hasn't bought it: locked as an add-on — never
+    // The Call Assistant is on sale (launched) and the Growth sample hasn't bought it: locked as an add-on — never
     // "Coming soon", and never "Pro" / "On a higher plan" for an account whose plan already sells it.
     await expect(tile(page, "callAssistant")).toHaveAttribute("data-status", "locked");
     await expect(tile(page, "callAssistant")).not.toContainText("Coming soon");
     await expect(page.getByTestId("status-callAssistant")).toHaveText("Separate service");
     // A separate service on its own subscription since 2e20bffa: no plan names on the chip.
-    await expect(tile(page, "callAssistant")).toHaveAttribute("title", "AI Call Assistant is a separate service with its own subscription");
+    await expect(tile(page, "callAssistant")).toHaveAttribute("title", "Call Assistant is a separate service with its own subscription");
     await expect(tile(page, "callAssistant").getByTestId("link-tile-callAssistant-intro")).toHaveAttribute("href", "/call-assistant");
     // A row holding only the separate-service add-on reads "Not on your account" (2e20bffa).
     await expect(page.getByTestId("locked-row-run")).toContainText("Not on your account");

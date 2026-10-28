@@ -196,7 +196,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
 
       {entitlements?.accessPlan && <UsageCard entitlements={entitlements} />}
 
-      {/* The AI Call Assistant: a separate service on its own subscription, shown with or without a plan. */}
+      {/* The Call Assistant: a separate service on its own subscription, shown with or without a plan. */}
       <CallAssistantBillingCard />
 
       {plan && (

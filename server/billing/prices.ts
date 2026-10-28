@@ -103,7 +103,7 @@ export function planPriceSpec(plan: PlanKey, interval: BillingInterval, cents: n
 }
 
 /**
- * An add-on's price. The AI Call Assistant's add-ons (its tiers and the extra
+ * An add-on's price. The Call Assistant's add-ons (its tiers and the extra
  * number) are the lines of the Call Assistant's OWN subscription
  * (server/voice/subscription.ts), so their Stripe product is named as the
  * service, not as a plan add-on; the lookup key pattern is the same, so a

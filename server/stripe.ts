@@ -277,7 +277,7 @@ export function registerStripeRoutes(app: Express) {
     sendStripeError,
     recentAuthOk,
   });
-  // So is the AI Call Assistant (owner, 2026-10-08): its own subscription, with or without a platform plan.
+  // So is the Call Assistant (owner, 2026-10-08): its own subscription, with or without a platform plan.
   registerCallAssistantBillingRoutes(app, {
     getOrCreateCustomer: (userId, email) => getOrCreateCustomer(userId, email),
     sendStripeError,
@@ -350,7 +350,7 @@ export function registerStripeRoutes(app: Express) {
         // trial is for a customer who never had a subscription.
         let trial = trialEligible(row);
         if (row?.stripeCustomerId) {
-          // The CRM and the AI Call Assistant are their own subscriptions on the same customer
+          // The CRM and the Call Assistant are their own subscriptions on the same customer
           // (server/crm/billing.ts, server/voice/subscription.ts): neither is "the plan" nor a
           // reason to withhold the platform trial.
           const all = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 20 });
@@ -843,7 +843,7 @@ export function registerStripeRoutes(app: Express) {
             await applyCrmSubscription(crmSub, userId);
             sendBillingEmail = false;
           } else if (userId && session.subscription && isCallAssistantCheckoutSession(session)) {
-            // The AI Call Assistant is a separate service: its subscription is recorded in
+            // The Call Assistant is a separate service: its subscription is recorded in
             // call_assistant_subscriptions, never on the platform row — read from Stripe under the
             // account's lock (syncCallAssistantSubscription) — and the number-release decision runs
             // after it (a returning customer's scheduled release is cancelled).

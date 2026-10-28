@@ -1,5 +1,5 @@
 /**
- * The AI Call Assistant's own subscription row — the service is sold apart
+ * The Call Assistant's own subscription row — the service is sold apart
  * from the platform plans (owner, 2026-10-08), the way the CRM is
  * (server/crm/entitlements.ts): one row per account in
  * `call_assistant_subscriptions`, never in `subscriptions`. Every platform

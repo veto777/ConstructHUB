@@ -9,9 +9,10 @@ import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Mic, MicOff, User, FolderKanban, RefreshCw, Send } from "lucide-react";
 import {
-  outcomeTone, outcomeLabel, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, parseServerTime, LIVE_REFRESH_MS, callStillChanging,
+  outcomeLabel, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, parseServerTime, LIVE_REFRESH_MS, callStillChanging,
   type VoiceCallDetail, type VoiceEscalation, type CallDelivery, type CallTaskView,
 } from "./calls-shared";
+import { BRAND_ORANGE, CallerAvatar, NAVY, OutcomePill, outcomeColor } from "./ca-ui";
 
 /** The default intake order first (need → address → … → best time), then any custom keys A–Z. */
 const SLOT_ORDER = ["need", "address", "city", "first_name", "name", "phone", "email", "best_time"];
@@ -42,10 +43,12 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="right" className="flex flex-col w-full sm:max-w-2xl overflow-hidden break-words" data-testid="sheet-call-detail">
         <SheetHeader className="shrink-0 pr-6">
+          <span className="mb-1 block h-1.5 w-16 rounded-full" style={{ background: outcomeColor(call?.outcome) }} aria-hidden="true" />
           <SheetTitle className="flex flex-wrap items-center gap-2" data-testid="text-call-detail-title">
+            {call && <CallerAvatar name={call.callerName} outcome={call.outcome} size={40} />}
             {call?.callNo != null && <span className="font-mono text-base text-muted-foreground" data-testid="text-call-detail-no">Call #{call.callNo}</span>}
             {call ? (call.callerName || fmtPhone(call.fromNumber)) : "Call"}
-            {call?.outcome && <StatusPill tone={outcomeTone(call.outcome)} data-testid="pill-call-detail-outcome">{outcomeLabel(call.outcome)}</StatusPill>}
+            {call?.outcome && <OutcomePill outcome={call.outcome} className="text-sm" testId="pill-call-detail-outcome">{outcomeLabel(call.outcome)}</OutcomePill>}
           </SheetTitle>
           <SheetDescription>
             {call ? `${fmtWhen(call.startedAt)} · ${fmtDuration(call.durationSeconds)} · from ${fmtPhone(call.fromNumber)}${call.number?.label ? ` to ${call.number.label}` : ""}${call.persona ? ` · answered by ${personaName(call.persona)}` : ""}` : "Loading…"}
@@ -130,9 +133,9 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
             )}
 
             {call.summary && (
-              <section>
-                <h3 className="mb-1 font-medium">Summary</h3>
-                <p className="whitespace-pre-wrap text-muted-foreground" data-testid="text-call-summary">{call.summary}</p>
+              <section className="rounded-xl border-l-4 p-3.5" style={{ borderLeftColor: outcomeColor(call.outcome), background: `color-mix(in srgb, ${outcomeColor(call.outcome)} 7%, transparent)` }}>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: outcomeColor(call.outcome) }}>Summary</h3>
+                <p className="whitespace-pre-wrap text-[15px] leading-relaxed" data-testid="text-call-summary">{call.summary}</p>
               </section>
             )}
 
@@ -146,11 +149,11 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
             {call.slots && Object.keys(call.slots).length > 0 && (
               <section>
                 <h3 className="mb-2 font-medium">What was collected</h3>
-                <dl className="grid grid-cols-[minmax(5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1" data-testid="list-call-slots">
+                <dl className="grid gap-2 sm:grid-cols-2" data-testid="list-call-slots">
                   {orderedSlots(call.slots).map(([k, v]) => (
-                    <div key={k} className="contents">
-                      <dt className="text-muted-foreground">{k === "first_name" ? "name" : k.replace(/_/g, " ")}</dt>
-                      <dd className="break-words">{k === "phone" ? fmtPhone(v) : v}</dd>
+                    <div key={k} className="rounded-lg border bg-card px-3 py-2">
+                      <dt className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: BRAND_ORANGE }}>{k === "first_name" ? "name" : k.replace(/_/g, " ")}</dt>
+                      <dd className="break-words font-medium">{k === "phone" ? fmtPhone(v) : v}</dd>
                     </div>
                   ))}
                 </dl>
@@ -172,13 +175,18 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
               {call.transcript.length === 0 ? (
                 <p className="text-muted-foreground">No transcript — the call ended before anyone spoke.</p>
               ) : (
-                <ol className="space-y-2" data-testid="list-call-transcript">
-                  {call.transcript.map((t, i) => (
-                    <li key={i} className={`flex gap-2 ${t.role === "system" ? "text-xs text-muted-foreground italic" : ""}`}>
-                      <span className={`w-16 shrink-0 text-xs font-medium  ${t.role === "assistant" ? "text-foreground" : "text-muted-foreground"}`}>
-                        {t.role === "assistant" ? (call.persona ? personaName(call.persona) : "assistant") : t.role}
-                      </span>
-                      <span className="min-w-0 whitespace-pre-wrap break-words">{t.text}</span>
+                <ol className="space-y-2.5" data-testid="list-call-transcript">
+                  {/* A chat: the assistant on the left in navy, the caller on the right, system notes in between. */}
+                  {call.transcript.map((t, i) => t.role === "system" ? (
+                    <li key={i} className="text-center text-xs italic text-muted-foreground">{t.text}</li>
+                  ) : (
+                    <li key={i} className={`flex ${t.role === "assistant" ? "justify-start" : "justify-end"}`}>
+                      <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 ${t.role === "assistant" ? "rounded-bl-sm text-white" : "rounded-br-sm border bg-card"}`} style={t.role === "assistant" ? { background: NAVY } : undefined}>
+                        <span className={`block text-[11px] font-semibold ${t.role === "assistant" ? "text-white/70" : "text-muted-foreground"}`}>
+                          {t.role === "assistant" ? (call.persona ? personaName(call.persona) : "assistant") : t.role}
+                        </span>
+                        <span className="block min-w-0 whitespace-pre-wrap break-words">{t.text}</span>
+                      </div>
                     </li>
                   ))}
                 </ol>

@@ -3,7 +3,7 @@ import { CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SEPARATE_LINE } from "../..
 
 /** Written from client/src/pages/crm-call-assistant/numbers*.tsx and server/voice/numbers.ts as they run. */
 const entry: HelpDraft = {
-  key: "call-assistant.numbers", parent: "call-assistant", group: "Tools", route: "/call-assistant/numbers", title: "AI Call Assistant → Numbers",
+  key: "call-assistant.numbers", parent: "call-assistant", group: "Tools", route: "/call-assistant/numbers", title: "Call Assistant → Numbers",
   whatItIs: "The phone numbers your assistant answers, and the steps to send your existing line to one of them.",
   whatItDoes: "It lists each number with its label, location, the line forwarded to it, when it was bought and when it can be released, with Edit and Release on each. Getting a local number takes three steps. Pick a state (and an area code or city if you like), choose one of the numbers offered, then name it and buy. Forward your existing line shows the exact steps for your phone carrier with the new number filled in, and a Copy digits button for your phone system.",
   howToUse: [

@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { SamplePreview } from "@/components/sample-preview";
 import { GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { StatusPill } from "@/components/crm-ui";
-import { outcomeLabel, outcomeTone } from "./calls-shared";
+import { outcomeLabel } from "./calls-shared";
+import { CallerAvatar, OutcomePill } from "./ca-ui";
 
 /**
  * The Call Assistant's SAMPLE previews (components/sample-preview.tsx rules): shown only while the real
@@ -46,9 +47,9 @@ export function SampleCallsPreview({ cta, compact }: { cta?: ReactNode; compact?
       <GoogleList as="ul">
         {rows.map((c) => (
           <GoogleListRow as="li" size="md" key={c.no} testId={`sample-call-${c.no}`}
-            leading={<PhoneIncoming aria-hidden="true" />}
+            leading={<CallerAvatar name={c.caller} outcome={c.outcome} size={32} />}
             title={<span>{c.caller} <span className="tabular-nums g-text-2">· {c.phone}</span></span>}
-            badges={<StatusPill tone={outcomeTone(c.outcome)}>{outcomeLabel(c.outcome)}</StatusPill>}
+            badges={<OutcomePill outcome={c.outcome}>{outcomeLabel(c.outcome)}</OutcomePill>}
             meta={[c.about, c.when, c.length]}
           />
         ))}

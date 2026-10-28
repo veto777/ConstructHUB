@@ -4,7 +4,7 @@
  * reports them"). OWNER: numbers+billing lane.
  *
  * Once a week, for the last COMPLETE week (Monday 00:00 → Monday 00:00, UTC),
- * every org whose AI Call Assistant screened at least one spam call gets:
+ * every org whose Call Assistant screened at least one spam call gets:
  *   - an email to the org's account owner (crm_orgs.owner_user_id) — "We
  *     blocked N spam calls for you this week" — listing each call's number,
  *     time, reason and whether the number is now blocked, through the

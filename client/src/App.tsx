@@ -379,7 +379,7 @@ function DashboardRouter() {
       <Route path="/ip-tracker/geo" component={IpTrackerPage} />
       <Route path="/ip-tracker/platforms" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
-      {/* The AI Call Assistant's marketing page; signed in it keeps the sidebar (its "Call Assistant" entry lands here). */}
+      {/* The Call Assistant's marketing page; signed in it keeps the sidebar (its "Call Assistant" entry lands here). */}
       <Route path="/call-assistant" component={CrmCallAssistantPage} />
       <Route path="/call-assistant/calls" component={CrmCallAssistantPage} />
       <Route path="/call-assistant/numbers" component={CrmCallAssistantPage} />

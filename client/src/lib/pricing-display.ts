@@ -47,7 +47,7 @@ export function addonPlanNames(addon: Addon): string {
   return PLAN_KEYS.filter((k) => addon.availableOn.includes(k)).map((k) => PLANS[k].name).join(", ");
 }
 
-/** The platform add-ons a plan sells. The AI Call Assistant's (its tiers, the extra number) are never among them: a separate subscription. */
+/** The platform add-ons a plan sells. The Call Assistant's (its tiers, the extra number) are never among them: a separate subscription. */
 export function addonsForPlan(plan: PlanKey): Addon[] {
   return (Object.keys(ADDONS) as AddonKey[]).map((k) => ADDONS[k]).filter((a) => !isCallAssistantAddon(a.key) && a.availableOn.includes(plan));
 }
@@ -149,7 +149,7 @@ export type EntitlementsInfo = {
   modules: Record<ModuleKey, boolean>;
   /** Add-on modules that are on (every one for platform admins). */
   addonModules?: Partial<Record<AddonModuleKey, boolean>>;
-  /** Bought but paused for a payment (the AI Call Assistant's own subscription). */
+  /** Bought but paused for a payment (the Call Assistant's own subscription). */
   addonModulesPaused?: Partial<Record<AddonModuleKey, boolean>>;
   addons: Partial<Record<AddonKey, number>>;
   locations: UsageMeter;

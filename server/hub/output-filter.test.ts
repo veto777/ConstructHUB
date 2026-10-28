@@ -612,15 +612,15 @@ describe("SEO suites and individual-feature claims; founding offer has no count 
   });
 });
 
-describe("owner 2026-10-08: the AI Call Assistant is a separate service — new prices only, never 'an add-on to a plan'", () => {
+describe("owner 2026-10-08: the Call Assistant is a separate service — new prices only, never 'an add-on to a plan'", () => {
   it("the old prices, the launch intro and the per-tier rates are refused (O8); an add-on or 'included' claim is refused (O10)", () => {
     blocked("The Lite tier is $149/month with 2,000 minutes.", "O8");
     blocked("The Fleet tier is $799/month, or $6,399/year.", "O8");
     blocked("Solo is $99/month for your first 3 months, then $249/month.", "O9");
     blocked("Extra minutes are 10 cents each on Lite and Solo, 5 cents on Crew and Fleet.", "O8");
-    blocked("The AI Call Assistant is an add-on to the Pro plan.", "O10");
+    blocked("The Call Assistant is an add-on to the Pro plan.", "O10");
     blocked("The Call Assistant is an add-on for the Pro, Growth and Agency plans.", "O10");
-    blocked("The Agency plan includes the AI Call Assistant.", "O10");
+    blocked("The Agency plan includes the Call Assistant.", "O10");
     blocked("Every plan comes with the Call Assistant.", "O10");
     blocked("The CRM plans include the Call Assistant.", "O10");
     // $249 is a listed price (the 500 minutes tier), but it is not the Pro plan's: bound to a plan it is wrong (O9).
@@ -629,7 +629,7 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
 
   it("a Call Assistant price is bound to the service and its tier (O9) — Codex audit 2026-10-09: a listed amount that is not the service's, a tier at another tier's price, a priced tier above 5,000 minutes, reversed forms", () => {
     // $29, $79 and $199 are listed prices (Solo, the seo_pro add-on, Agency), none of them the Call Assistant's.
-    blocked("The AI Call Assistant costs $29/month.", "O9");
+    blocked("The Call Assistant costs $29/month.", "O9");
     blocked("The Call Assistant is $79 a month on every tier.", "O9");
     blocked("The assistant's price is $199/year.", "O9");
     blocked("Extra numbers are $29/month each on the Call Assistant.", "O9");
@@ -651,7 +651,7 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
     expect(delivered("$249/month gets you 500 minutes and 1 local number; $999/month gets you 5,000 minutes and 5 numbers.")).toContain("5,000 minutes");
     expect(delivered("Yearly billing is 11 times the monthly price: 500 minutes $2,739/yr, 1,000 minutes $3,839/yr, 2,000 minutes $4,939/yr and 5,000 minutes $10,989/yr.")).toContain("$10,989/yr");
     expect(delivered("The 2,000 minutes tier is $449/month or $4,939/year, then $0.50 a minute above the included minutes.")).toContain("$0.50");
-    expect(delivered("Pro is $99/month; the AI Call Assistant is a separate service from $249/mo, with or without a plan.")).toContain("separate service");
+    expect(delivered("Pro is $99/month; the Call Assistant is a separate service from $249/mo, with or without a plan.")).toContain("separate service");
     expect(delivered("Extra numbers are $5/month each on any Call Assistant tier, and the first 500 spam calls each month never count.")).toContain("$5/month");
     expect(withCents([5000])("Extra numbers are $5/month or $50/year each on any Call Assistant tier.")).toMatchObject({ ok: true });
     expect(delivered("Above 5,000 minutes a month, talk to a sales rep: anything priced at $1,000 or more is never quoted here.")).toContain("sales rep");
@@ -662,19 +662,19 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
     // Codex #2's four: the extra number's amount as the service's price; the dash; a heading then the price on the next line; "one customer".
     blocked("The Call Assistant costs $5/month.", "O9");
     blocked("The Call Assistant offers 10,000 minutes — $999/month.", "O9");
-    blocked("**AI Call Assistant**\n$29/month.", "O9");
+    blocked("**Call Assistant**\n$29/month.", "O9");
     blocked("We have one customer.", "O10");
     // Codex #3: a blank line inside the section does not end it; a qualified count of one is still a count.
-    blocked("**AI Call Assistant**\n\nIt costs $5/month.", "O9");
+    blocked("**Call Assistant**\n\nIt costs $5/month.", "O9");
     blocked("### Call Assistant pricing\n\nFour tiers.\n\nFrom $29 a month.", "O9");
-    blocked("The AI Call Assistant answers every call. It costs $79 a month.", "O9");
+    blocked("The Call Assistant answers every call. It costs $79 a month.", "O9");
     blocked("We have one paying customer.", "O10");
     blocked("There is one active customer on the platform.", "O10");
     blocked("A single happy member signed up.", "O10");
     // Another heading ends the section: Pro's price under its own heading is Pro's.
-    expect(delivered(`**AI Call Assistant**\n\nFrom $249/mo, a separate service.\n\n**Pro**\n\n$99/month, or ${formatUsd(PLANS.pro.annualCents)}/year.`)).toContain("$99/month");
+    expect(delivered(`**Call Assistant**\n\nFrom $249/mo, a separate service.\n\n**Pro**\n\n$99/month, or ${formatUsd(PLANS.pro.annualCents)}/year.`)).toContain("$99/month");
     expect(delivered("### Call Assistant\n\n500 minutes for $249/month.\n\nPlans:\n\nSolo is $29/month.")).toContain("Solo is $29/month");
-    expect(delivered("**AI Call Assistant**\n\nExtra numbers are $5/month each, and minutes above the tier are $0.50 a minute.")).toContain("$5/month");
+    expect(delivered("**Call Assistant**\n\nExtra numbers are $5/month each, and minutes above the tier are $0.50 a minute.")).toContain("$5/month");
     expect(delivered("Each seat is one user, and a team member can be one extra seat for $15/month.")).toContain("one extra seat");
     expect(delivered("One contractor account can run several locations on Agency.")).toContain("One contractor");
     // Codex #4's two: the service stays the subject across a paragraph break; "one local customer" is a count.
@@ -682,17 +682,17 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
     blocked("We have one local customer.", "O10");
     blocked("We have one new customer so far.", "O10");
     blocked("Our first customer signed up last week, one founding contractor.", "O10");
-    blocked("The AI Call Assistant screens spam.\n\nThe price is $199/year.", "O9");
+    blocked("The Call Assistant screens spam.\n\nThe price is $199/year.", "O9");
     // Codex #5: a list marker never hides the continuation; a service price must match its billing unit.
     blocked("The Call Assistant answers your calls.\n\n- It costs $29/month.", "O9");
     blocked("The Call Assistant answers your calls.\n\n1. It costs $29/month.", "O9");
     blocked("The Call Assistant costs $249/year.", "O9");
-    blocked("The AI Call Assistant is $2,739 a month.", "O9");
-    blocked("**AI Call Assistant**\n\n* $349 per year.", "O9");
+    blocked("The Call Assistant is $2,739 a month.", "O9");
+    blocked("**Call Assistant**\n\n* $349 per year.", "O9");
     expect(delivered("- The Call Assistant is $249/month or $2,739/year, a separate service.")).toContain("$2,739/year");
     // Codex #6: naming a plan somewhere in the sentence exempts nothing — the amount is bound to the clause it sits in.
     blocked("The Call Assistant works with Pro and costs $79/month.", "O9");
-    blocked("With Growth, the AI Call Assistant is $199 a month.", "O9");
+    blocked("With Growth, the Call Assistant is $199 a month.", "O9");
     expect(delivered("Pro is $99/month; the Call Assistant is a separate service from $249/month.")).toContain("$249/month");
     expect(delivered("The Call Assistant costs $249/month and works with Pro ($99/month).")).toContain("$99/month");
     // Codex #7: the same for the CRM, the add-ons and the extra number — no sentence-wide exemption; each amount is
@@ -705,19 +705,19 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
     expect(delivered("The CRM is $49/month; the Call Assistant is a separate service from $249/month.")).toContain("$49/month");
     expect(withCents([99000])(`Pro is $99/month or ${formatUsd(PLANS.pro.annualCents)}/year; the Call Assistant is a separate service from $249/month.`)).toMatchObject({ ok: true });
     expect(withCents([1900])("The Call Assistant is a separate service; extra locations are $19/month on your plan.")).toMatchObject({ ok: true });
-    expect(delivered("1. The AI Call Assistant: from $249/mo, no plan needed.")).toContain("$249/mo");
+    expect(delivered("1. The Call Assistant: from $249/mo, no plan needed.")).toContain("$249/mo");
     // Another product named ends the carry: the next paragraph is about Pro.
     expect(delivered("The Call Assistant answers your calls.\n\nPro is $99/month, and it includes Click Guard.")).toContain("Pro is $99/month");
     expect(delivered("The Call Assistant answers your calls.\n\nThe CRM is a separate product with its own plans.")).toContain("separate product");
   });
 
   it("the real wording passes: the tiers, the overage, the yearly rule, 'separate', a negation", () => {
-    expect(delivered("The AI Call Assistant is a separate service with its own subscription, from $249/mo: no plan includes it, and none is needed to buy it.")).toContain("separate service");
+    expect(delivered("The Call Assistant is a separate service with its own subscription, from $249/mo: no plan includes it, and none is needed to buy it.")).toContain("separate service");
     expect(delivered("The four tiers are 500 minutes at $249/month, 1,000 minutes at $349/month, 2,000 minutes at $449/month and 5,000 minutes at $999/month.")).toContain("$999/month");
     expect(delivered("The 500 minutes tier is $249/month or $2,739/year, then $0.50 a minute above the included minutes.")).toContain("$0.50");
     expect(delivered("Above the included minutes it is 50 cents a minute on every tier; extra numbers are $5/month each.")).toContain("50 cents");
     expect(delivered("Yearly billing is 11 times the monthly price, so one month is free: 5,000 minutes is $10,989/yr.")).toContain("$10,989/yr");
-    expect(delivered("No plan includes the AI Call Assistant; it is bought on its own, with or without a plan.")).toContain("No plan includes");
+    expect(delivered("No plan includes the Call Assistant; it is bought on its own, with or without a plan.")).toContain("No plan includes");
     expect(delivered("The Call Assistant tier you pick sets the minutes; the first 500 spam calls each month never count.")).toContain("Call Assistant tier");
     expect(delivered("More than 5,000 minutes a month is quoted by a sales rep: anything priced at $1,000 or more is never quoted here.")).toContain("sales rep");
   });

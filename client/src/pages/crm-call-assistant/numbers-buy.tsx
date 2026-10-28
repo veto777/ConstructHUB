@@ -134,7 +134,7 @@ export function BuyNumberWizard({ minDays, mock, onBought, onCancel }: {
               <>
                 <p className="text-sm" data-testid="text-voice-number-price">
                   {search.data!.monthlyCents === 0
-                    ? "Included in your AI Call Assistant add-on."
+                    ? "Included in your Call Assistant add-on."
                     : `This would be an extra number: ${formatUsd(search.data!.monthlyCents)} a month (the Extra Call Assistant number add-on).`}
                 </p>
                 <RadioGroup value={picked} onValueChange={setPicked} className="grid gap-2 sm:grid-cols-2" aria-label="Available numbers">

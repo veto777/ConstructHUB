@@ -591,7 +591,7 @@ export default function PricingPage() {
           )}
         </div>
 
-        {/* The AI Call Assistant: a separate service on its own subscription (shared/plans.ts CALL_ASSISTANT_TIERS, server/voice/subscription.ts). */}
+        {/* The Call Assistant: a separate service on its own subscription (shared/plans.ts CALL_ASSISTANT_TIERS, server/voice/subscription.ts). */}
         <section id="call-assistant" className="scroll-mt-16" aria-labelledby="call-assistant-heading" data-testid="section-call-assistant-plans">
           <div className="text-center max-w-3xl mx-auto">
             <h2 id="call-assistant-heading" className={H2} data-testid="text-call-assistant-heading">{CALL_ASSISTANT_NAME}: <em className="text-mkt-orange-ink">a separate service</em></h2>
@@ -625,7 +625,7 @@ export default function PricingPage() {
                 </tr>
               </thead>
               <tbody>
-                {/* The AI Call Assistant's lines (its tiers, the extra number) are its own subscription's, listed in its section above. */}
+                {/* The Call Assistant's lines (its tiers, the extra number) are its own subscription's, listed in its section above. */}
                 {listedAddons.map((k) => {
                   const addon = ADDONS[k];
                   return (

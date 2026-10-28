@@ -1,7 +1,7 @@
 /**
  * The server's plan answers (server/entitlements.ts, server/stripe.ts):
  *   402 { code: "plan_required", requiredPlan, message }     — the plan doesn't include this
- *   402 { code: "call_assistant_required", addon, href }      — the AI Call Assistant's own subscription is missing
+ *   402 { code: "call_assistant_required", addon, href }      — the Call Assistant's own subscription is missing
  *   403 { code: "limit_reached", upgradePlan, addon, message } — this month's allowance is used
  *   402 { code: "payment_failed", message }                   — the card couldn't be charged
  *
@@ -28,7 +28,7 @@ export function planPromptFromBody(body: unknown): PlanPrompt | null {
   if (b.code === "plan_required") {
     return { label: isPlanKey(b.requiredPlan) ? `See ${PLANS[b.requiredPlan].name}` : "See plans", href: "/pricing" };
   }
-  // The AI Call Assistant is a separate service: its own section of Pricing, not a plan.
+  // The Call Assistant is a separate service: its own section of Pricing, not a plan.
   if (b.code === CALL_ASSISTANT_REQUIRED_CODE) return { label: "See Call Assistant pricing", href: CALL_ASSISTANT_PRICING_HREF };
   if (b.code === "limit_reached") {
     // An add-on raises the limit without changing plan; it is bought on the subscription in Settings → Billing

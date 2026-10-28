@@ -68,11 +68,11 @@ const STATEMENTS = [
   // (+ its outbox columns) / account_api_keys / account_api_usage
   // (server/account/schema.ts also runs these at boot).
   ...ACCOUNT_SCHEMA_DDL,
-  // AI Call Assistant: voice_profiles / voice_profile_versions / voice_numbers /
+  // Call Assistant: voice_profiles / voice_profile_versions / voice_numbers /
   // voice_calls / voice_escalations / voice_spam / voice_usage
   // (server/voice/schema.ts also runs these at boot).
   ...VOICE_SCHEMA_DDL,
-  // The AI Call Assistant's own subscription (a separate service, server/voice/subscription-store.ts).
+  // The Call Assistant's own subscription (a separate service, server/voice/subscription-store.ts).
   ...CALL_ASSISTANT_SUBSCRIPTION_DDL,
   // Every tool à la carte: one subscription per item (server/billing/alacarte-store.ts).
   ...ALACARTE_SUBSCRIPTION_DDL,

@@ -1,6 +1,6 @@
 /**
  * Learn: Master Class progress; Guides and Reinstatement are link tiles.
- * The AI Call Assistant is "coming_soon" by its gate (server/dashboard/access.ts)
+ * The Call Assistant is "coming_soon" by its gate (server/dashboard/access.ts)
  * and has no source here: no voice table is read (SPEC §3.5).
  *
  * "Modules unlocked" follows the course's own access rule (server/state-guides.ts

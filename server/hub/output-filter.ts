@@ -87,7 +87,7 @@ const PLAN_NAMES = PLAN_KEYS.map((k) => PLANS[k].name);
 // names are sold names too (shared/crm-plans.ts).
 const CRM_PLAN_WORDS = ["CRM", ...CRM_PLAN_KEYS.flatMap((k) => CRM_PLANS[k].name.split(" "))];
 const PLAN_WORD_OK = new Set([
-  // The AI Call Assistant's tiers ("the 500 minutes tier", "the Call Assistant tier") are sold names too (shared/plans.ts CALL_ASSISTANT_TIERS).
+  // The Call Assistant's tiers ("the 500 minutes tier", "the Call Assistant tier") are sold names too (shared/plans.ts CALL_ASSISTANT_TIERS).
   ...PLAN_NAMES, ...CRM_PLAN_WORDS, ...CALL_ASSISTANT_TIERS.map((t) => t.name), "Assistant", "Every", "Each", "Any", "Which", "This", "That", "Your", "The", "No", "Paid", "Monthly", "Annual",
   "Yearly", "Pricing", "A", "An", "One", "Our", "My", "Their", "Current", "New", "Same", "Right", "Cheapest", "Higher",
   "Lower", "Bigger", "Larger", "Smaller", "Other", "Different", "Cloudflare", "Google", "Stripe",
@@ -148,7 +148,7 @@ export const NOT_SOLD: RegExp[] = [
   // (\b does not see "à" as a word character, so the boundary is written out.)
   /\b(rank[- ]?track\w*|keyword[- ]research|backlinks?) (add-?ons?|addon)\b/i,
   /\b(add-?ons?|addon|upgrade) for (the |your )?(seo|rank[- ]?track\w*|keyword[- ]research|backlinks?)\b/i,
-  // Owner, 2026-10-08: the AI Call Assistant is a separate service with its own subscription — never "an add-on to
+  // Owner, 2026-10-08: the Call Assistant is a separate service with its own subscription — never "an add-on to
   // the Pro plan", and no plan or CRM plan includes it.
   /\bcall assistant\b[^.]{0,40}\b(an? )?(add-?on|addon) (to|for|on|of) (the |a |any |your |every )?(?:[\w,]+[- ]){0,6}plans?\b/i,
   /\b(starter|pro|growth|agency|every|any|all|each|crm)( plan)?s? (include|includes|come with|comes with|gets?|has|have)\b[^.]{0,30}\bcall assistant\b/i,
@@ -388,11 +388,11 @@ function priceOk(plan: PlanInfo, cents: number, unit: string | undefined): boole
 
 // ---------------------------------------------------------------- O9 Call Assistant price binding
 /**
- * The AI Call Assistant's prices are bound to the service and to its tiers (Codex audits
+ * The Call Assistant's prices are bound to the service and to its tiers (Codex audits
  * 2026-10-09): in a sentence about the Call Assistant every $ amount must be one of ITS
  * amounts — a tier's monthly or yearly price, the extra number's (only where the sentence says
  * "extra number"), the overage rate (only beside "minute") — unless the sentence also names
- * the plan (or the CRM, or another add-on) the amount belongs to. "The AI Call Assistant
+ * the plan (or the CRM, or another add-on) the amount belongs to. "The Call Assistant
  * costs $29/month" is refused although $29 is a listed price, and so is "costs $5/month".
  * A minutes figure next to a price must be a tier with that price: "the 500 minutes tier is
  * $349/month" is refused, and so is any priced tier the price book doesn't list ("10,000
@@ -402,7 +402,7 @@ function priceOk(plan: PlanInfo, cents: number, unit: string | undefined): boole
  * names it (callAssistantSentences).
  */
 const CA_TOPIC = /\b(call assistant|assistant tier|assistant'?s? (?:price|tier|minutes|subscription)|minutes? tiers?|call minutes?|included minutes|extra (?:local |phone )?numbers?|ai receptionist|answers? (?:the|your) phone)\b/i;
-/** A line that is only the service's name ("**AI Call Assistant**", "### Call Assistant pricing:"): the lines under it are about it. */
+/** A line that is only the service's name ("**Call Assistant**", "### Call Assistant pricing:"): the lines under it are about it. */
 const CA_HEADING = /^\s*(?:#+\s*)?(?:[-*•]\s*)?(?:\*\*)?\s*(?:the )?(?:AI )?Call Assistant(?:'s)?(?: tiers?| pricing| prices?| plans?| subscription)?\s*(?:\*\*)?\s*:?\s*$/i;
 /**
  * Any other heading-like line ends the service's section: a markdown heading, a bold-only line, a short label

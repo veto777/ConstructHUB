@@ -70,7 +70,7 @@ describe("feature page registry", () => {
       expect(featurePageByKey(page.key)).toBe(page);
       expect(featurePagePath(page)).toBe(`/features/${page.slug}`);
     }
-    // The AI Call Assistant keeps its own page and is only listed.
+    // The Call Assistant keeps its own page and is only listed.
     expect(EXTERNAL_FEATURE_PAGES.map((e) => e.key)).toEqual(["callAssistant"]);
     expect(featureIntroPath("callAssistant")).toBe("/call-assistant");
     expect(featurePageByKey("callAssistant")).toBeUndefined();
@@ -283,7 +283,7 @@ describe("feature page prices", () => {
     const keywords = PLAN_KEYS.find((k) => PLANS[k].limits.seoKeywords !== 0)!;
     expect(featurePriceSummary({ kind: "allowance", allowance: { limit: "seoKeywords", unit: "tracked keywords", period: "count" } }).headline)
       .toBe(`Included from the ${PLANS[keywords].name} plan`);
-    // The AI Call Assistant is sold in tiers: the page shows the cheapest tier's price as "from", never one middle tier's.
+    // The Call Assistant is sold in tiers: the page shows the cheapest tier's price as "from", never one middle tier's.
     const ca = featurePriceSummary({ kind: "addon", addon: "call_assistant" });
     const cheapestTier = Math.min(...CALL_ASSISTANT_TIERS.map((t) => t.monthlyCents));
     expect(ca.comingSoon).toBe(ADDONS.call_assistant.preview === true);
@@ -464,7 +464,7 @@ describe("featurePlanGap: signed-in CTA for an account whose plan lacks the feat
     expect(featurePlanGap(featurePageByKey("siteScan")!.pricing, ent("starter"))).toBeNull();
     expect(featurePlanGap(featurePageByKey("cloudflare")!.pricing, ent(null))).toBeNull();
   });
-  it("sends the AI Call Assistant (a separate service) to its own pricing unless its module is on", () => {
+  it("sends the Call Assistant (a separate service) to its own pricing unless its module is on", () => {
     const spec = { kind: "addon", addon: "call_assistant" } as const;
     expect(featurePlanGap(spec, ent("pro"))).toMatchObject({ label: "See Call Assistant pricing", href: "/pricing#call-assistant" });
     expect(featurePlanGap(spec, ent("agency"))).toMatchObject({ href: "/pricing#call-assistant", note: `A separate service, not part of your ${PLANS.agency.name} plan.` });

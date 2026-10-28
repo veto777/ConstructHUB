@@ -26,7 +26,7 @@ async function mockVoice(page: Page, seen: string[]) {
     const p = url.pathname.replace(/^\/api\/crm\/voice/, "");
     if (p === "/calls/summary") return json({ ...SUMMARY, range: url.searchParams.get("range") ?? "30d", total: url.searchParams.get("range") === "7d" ? 0 : SUMMARY.total });
     if (p === "/status") return json({
-      enabled: true, addon: { key: "call_assistant", name: "AI Call Assistant", preview: false, availableOn: ["pro"] }, plan: "pro",
+      enabled: true, addon: { key: "call_assistant", name: "Call Assistant", preview: false, availableOn: ["pro"] }, plan: "pro",
       allowance: { numbers: 1, minutes: 2000 }, pricing: { includedMinutes: 2000, overageCentsPerMinute: 10, freeSpamCalls: 500 },
       tier: null, tiers: [], canManage: true, engine: { configured: true, reachable: true, models: true, checkedAt: "2026-10-02T00:00:00.000Z" },
       numbers: [], profile: { status: "live", publishedVersion: 1 },
