@@ -327,9 +327,9 @@ function CallsTable({ calls, onOpen, testId, numberHint, sort, onSort, onSortCha
               <td className={cn(crmTable.td, crmTableCards.td, "whitespace-nowrap font-mono text-xs text-muted-foreground border-l-4")} style={{ borderLeftColor: outcomeColor(c.outcome) }} data-testid={`text-call-no-${c.id}`}>{c.callNo != null ? `#${c.callNo}` : "—"}</td>
               <td className={cn(crmTable.td, crmTableCards.td, "whitespace-nowrap text-muted-foreground")}>{fmtWhen(c.startedAt)}</td>
               <td className={cn(crmTable.td, crmTableCards.td)}>
-                <div className="flex items-center gap-2.5">
+                <div className="flex min-w-[10rem] items-center gap-2.5">
                 <CallerAvatar name={c.callerName} outcome={c.outcome} size={32} />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                 {/* The row is clickable; this button is the keyboard/screen-reader way in. */}
                 <button
                   type="button"
