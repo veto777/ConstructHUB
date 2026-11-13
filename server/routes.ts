@@ -369,6 +369,9 @@ export async function registerRoutes(
   await ensureYoutubeSchema();
   const { registerYoutubeRoutes } = await import("./youtube/routes");
   registerYoutubeRoutes(app, getDevUser);
+  // Sales Agents (/admin/sales-agents): admin proxy to the outbound AI sales-calling engine (server/sales-agents.ts).
+  const { registerSalesAgentsRoutes } = await import("./sales-agents");
+  registerSalesAgentsRoutes(app, getDevUser);
   // The issue desk (docs/ops/ISSUE-DESK.md): captured failures, /admin/issues,
   // the browser's error reports and the tower's hand-off to Claude.
   const { ensureOpsIssuesSchema } = await import("./ops/schema");

@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   ShieldCheck, Users, Building2, UserCircle, FileText, Receipt, CreditCard, Activity,
-  Search, Mail, Copy, Check, Loader2, Rocket, Ban, MessageCircle, HardDrive, Youtube, Star,
+  Search, Mail, Copy, Check, Loader2, Rocket, Ban, MessageCircle, HardDrive, Youtube, Headset, Star,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { marketingUrl } from "@/lib/site";
@@ -708,6 +708,18 @@ export default function CrmAdminPage() {
             <SectionTitle icon={Youtube} title="YouTube channel"
               description="Connect the company channel once so tutorial videos can be uploaded to it."
               actions={<Button asChild size="sm" variant="outline"><a href={marketingUrl("/admin/youtube")} data-testid="link-admin-youtube">Open YouTube channel</a></Button>} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Sales Agents ─────────────────────────────────────────────────────
+          The outbound AI sales-calling console lives on the main site (/admin/sales-agents). */}
+      {isAdmin && gateOpen && (
+        <Card data-testid="card-admin-sales-agents" id="card-sales-agents" className="scroll-mt-6">
+          <CardContent className="p-4 sm:p-5">
+            <SectionTitle icon={Headset} title="Sales Agents"
+              description="The AI sales callers: campaign on/off, voices in rotation, recent calls and leads."
+              actions={<Button asChild size="sm" variant="outline"><a href={marketingUrl("/admin/sales-agents")} data-testid="link-admin-sales-agents">Open Sales Agents</a></Button>} />
           </CardContent>
         </Card>
       )}

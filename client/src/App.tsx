@@ -154,6 +154,7 @@ const MyReputationPage = lazyPage(() => import("@/pages/my-reputation"));
 const AdminTicketsPage = lazyPage(() => import("@/pages/admin-tickets"));
 const AdminReferralsPage = lazyPage(() => import("@/pages/admin-referrals"));
 const AdminYoutubePage = lazyPage(() => import("@/pages/admin-youtube"));
+const AdminSalesAgentsPage = lazyPage(() => import("@/pages/admin-sales-agents"));
 // "Report an issue" (every footer): the platform page, and the same page inside the CRM frame.
 const ReportIssuePage = lazyPage(() => import("@/pages/report-issue"));
 const CrmReportIssuePage = lazyPage(() => import("@/pages/report-issue").then((m) => ({ default: m.CrmReportIssuePage })));
@@ -425,6 +426,10 @@ function DashboardRouter() {
       <Route path="/admin/referrals" component={AdminReferralsPage} />
       {/* Platform admins: connect the company YouTube channel for tutorial uploads (the API answers 403 to anyone else). */}
       <Route path="/admin/youtube" component={AdminYoutubePage} />
+      <Route path="/admin/sales-agents" component={AdminSalesAgentsPage} />
+      <Route path="/admin/sales-agents/leads" component={AdminSalesAgentsPage} />
+      <Route path="/admin/sales-agents/leads/:id" component={AdminSalesAgentsPage} />
+      <Route path="/admin/sales-agents/call-log" component={AdminSalesAgentsPage} />
       {/* Anyone, signed in or out: a report to the issue desk (POST /api/issues/report) and the reporter's own list. */}
       <Route path="/report-issue" component={ReportIssuePage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
@@ -602,7 +607,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/call-assistant", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings", "/site-scan/history",
-  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/reputation", "/my-reputation", "/admin/backlinks", "/admin/partnerships", "/admin/partnerships/pricing", "/admin/youtube",
+  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/gbp-photos", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/reputation", "/my-reputation", "/admin/backlinks", "/admin/partnerships", "/admin/partnerships/pricing", "/admin/youtube", "/admin/sales-agents",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];
@@ -630,10 +635,10 @@ function SignedOutFallback() {
 
 /** Tab titles for the growth app; pages that set their own title are left alone. */
 const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
-const SELF_TITLED = ["/media-library", "/privacy", "/data-deletion", "/terms", "/support", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/youtube"];
+const SELF_TITLED = ["/media-library", "/privacy", "/data-deletion", "/terms", "/support", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/proposals", "/admin/youtube", "/admin/sales-agents", "/admin/sales-agents/leads", "/admin/sales-agents/call-log"];
 /** Feature and service pages title themselves from their content (seo.title). */
 const isSelfTitled = (location: string) =>
-  SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/admin/proposals/") || location.startsWith("/proposal/") || location === "/reputation" || location.startsWith("/reputation/") || location.startsWith("/admin/reputation/") || location.startsWith("/done-for-you/");
+  SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/admin/proposals/") || location.startsWith("/proposal/") || location === "/reputation" || location.startsWith("/reputation/") || location.startsWith("/admin/reputation/") || location.startsWith("/admin/sales-agents/") || location.startsWith("/done-for-you/");
 
 /** The sidebar's collapsed/expanded choice (ui/sidebar.tsx writes this cookie) survives a reload. */
 function sidebarDefaultOpen(): boolean {
