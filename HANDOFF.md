@@ -7,6 +7,15 @@
 - Options as tabs (crm_estimate_options.is_main / cancelled_at), duplicate / copy to estimate or client, templates
   (crm_estimate_templates), "Customer can approve: one / any" enforced in select-options (server/crm/estimate-options.ts).
 
+## 📞 2026-11-13 — Sales Agents console (/admin/sales-agents) for the outbound AI sales callers
+- New admin section (platform admin + admin passphrase, POSTs origin-checked): campaign start/pause, stats, the 22-voice
+  library (client/public/sales-voices/*.mp3) with in-rotation switches, recent calls, **Leads** (filters, import, the
+  scraper endpoint), **Lead file** (/admin/sales-agents/leads/:id: every call, transcript, consent quotes) and **Call log**.
+- It is a proxy (server/sales-agents.ts) to the ch-sales engine on t3 (https://sales.constructhub.us, source tower2
+  ~/ch-sales). Env on vb11: SALES_AGENTS_API_URL, SALES_AGENTS_API_TOKEN (= SALES_API_TOKEN in t3 ~/ch-sales/.env).
+- Deployed with DEPLOY_ALLOW_UNSAFE=1 because ~/ConstructHUB-release had an uncommitted 3-line CLAUDE.md edit from another
+  session (docs only, not part of the build; left untouched). Type check + build + boot verify ran as normal.
+
 ## 🧾 2026-10-21 — estimate sales tax from the job-site address (official rates + construction treatment)
 - The New estimate dialog pre-fills **Tax %** from the client's (or project's) address and says where the rate came
   from ("Bellingham, WA · 9.2% (WA DOR, Q4 2026)"). FL-style states pre-fill 0, because contractors don't charge sales
