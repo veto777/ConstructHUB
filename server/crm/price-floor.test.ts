@@ -80,6 +80,13 @@ describe("floorCentsForLine (pure)", () => {
       .toBe(Math.ceil(300 * 1.3333));
   });
 
+  it("a price-book line floors on the price book's cost, not the cost sent with the line (audit M7)", () => {
+    // A rep sending unitCostCents: 1 must not turn a 375-cent floor into 2 cents.
+    expect(floorCentsForLine({ name: "Labor", unitPriceCents: 0, unitCostCents: 1 }, index, { enabled: true, floorBps: 2500 })).toBe(375);
+    // A line that is not in the price book still floors on its own cost.
+    expect(floorCentsForLine({ name: "Custom", unitPriceCents: 0, unitCostCents: 200 }, index, { enabled: true, floorBps: 2500 })).toBe(250);
+  });
+
   it("a non-SKU line with a cost floors at cost; with neither, there is no floor", () => {
     expect(floorCentsForLine({ name: "Custom", unitPriceCents: 0, unitCostCents: 200 }, index, { enabled: true })).toBe(200);
     expect(floorCentsForLine({ name: "Custom", unitPriceCents: 0 }, index, { enabled: true })).toBe(0);
