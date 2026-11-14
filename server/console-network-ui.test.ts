@@ -61,7 +61,7 @@ describe("Cloudflare / Search Console connect", () => {
 describe("client page", () => {
   it("loads the message thread only after the client itself resolved", () => {
     const src = read("client/src/pages/crm-client.tsx");
-    expect(src).toMatch(/queryKey: \[`\/api\/crm\/inbox\/\$\{id\}`\],\s*enabled: !!id && !!data && canManageCustomers/);
+    expect(src).toMatch(/queryKey: \["\/api\/crm\/inbox", id\],\s*enabled: !!id && !!data && canManageCustomers/);
   });
 });
 

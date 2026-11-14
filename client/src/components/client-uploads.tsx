@@ -599,7 +599,7 @@ export function CustomerComments({ customerId }: { customerId: string }) {
   // team's own replies (authorMemberId set). The two-way thread the page
   // already loads (managers only — never fetched from here) marks which
   // ones are ours, so they never read as "notes this client sent".
-  const { data: thread } = useQuery<any>({ queryKey: [`/api/crm/inbox/${customerId}`], enabled: false });
+  const { data: thread } = useQuery<any>({ queryKey: ["/api/crm/inbox", customerId], enabled: false });
   const ours = new Set<string>(
     (thread?.messages ?? []).filter((m: any) => m.fromClient === false).map((m: any) => m.id),
   );

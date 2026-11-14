@@ -113,7 +113,7 @@ export default function CrmHomePage() {
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   // The division workspace (null = All divisions); the home page is then that division's dashboard.
   const { active: activeDivision, canSwitch: canSwitchDivision } = useActiveDivision();
-  const { data: ob, isLoading, isError } = useQuery<Onboarding>({ queryKey: ["/api/crm/onboarding"] });
+  const { data: ob, isLoading, isError } = useQuery<Onboarding>({ queryKey: ["/api/crm/onboarding"], staleTime: 0 });
 
   // Dashboard metrics — read-only rollups over endpoints the app already has.
   const { data: clients } = useQuery<any[]>({ queryKey: ["/api/crm/customers"] });
@@ -121,7 +121,8 @@ export default function CrmHomePage() {
   // Company-wide rollups and the team feed are for reporting seats; the API refuses the rest, so they are
   // neither asked for nor shown (a field crew's Home is their own clients, jobs and follow-ups).
   const canSeeReporting = me?.permissions?.seeReporting === true;
-  const { data: stats } = useQuery<any>({ queryKey: ["/api/crm/stats"], enabled: canSeeReporting });
+  // Nothing invalidates these rollups, so they are refetched each time Home opens.
+  const { data: stats } = useQuery<any>({ queryKey: ["/api/crm/stats"], enabled: canSeeReporting, staleTime: 0 });
   const { data: activityData, isError: activityError } = useQuery<{ activity: ActivityItem[] }>({
     queryKey: ["/api/crm/team-activity"],
     refetchInterval: 60_000,
@@ -129,7 +130,7 @@ export default function CrmHomePage() {
   });
   // Needs-attention rollup: follow-ups due, brand-new leads, leads with no
   // estimate yet — one server-side pass, names only.
-  const { data: attention, isError: attentionError } = useQuery<any>({ queryKey: ["/api/crm/attention"] });
+  const { data: attention, isError: attentionError } = useQuery<any>({ queryKey: ["/api/crm/attention"], staleTime: 0 });
   const { data: followUpsData } = useQuery<any>({ queryKey: ["/api/crm/follow-ups"] });
   const canSeePrices = me?.permissions?.seePrices === true;
   const canManageCustomers = me?.permissions?.manageCustomers === true;

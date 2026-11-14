@@ -107,6 +107,7 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
       setDirty(false);
       setStep("review");
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customerId}`] });
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
     },
     onError: (e: any) => toast({ title: "Quick Bid couldn't price this", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -125,6 +126,7 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
       setEstimate(r);
       setDirty(false);
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customerId}`] });
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
       toast({ title: "Bid updated" });
     },
     onError: (e: any) => toast({ title: "Could not save the bid", description: apiErrorMessage(e), variant: "destructive" }),
@@ -155,6 +157,7 @@ export function QuickBid({ customerId, customerEmail, customerAddress }: {
       })).json(),
     onSuccess: async (r: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customerId}`] });
+      queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/estimates") });
       setSendOpen(false);
       setOpen(false);
       setStep("pick");
