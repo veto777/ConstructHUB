@@ -984,7 +984,10 @@ class Call:
             await asyncio.wait_for(self.brain.finish(), 30)
         except Exception as e:  # noqa: BLE001
             log.warning("brain.finish failed: %s", e)
-        dur = int(time.time() - self.started)
+        # The call's length runs to the hang-up (closing_at, set by close() and by the socket handler before this
+        # runs), not to here: the paperwork above can take most of a minute and must never be billed as talk time.
+        ended = self.closing_at or time.time()
+        dur = int(ended - self.started)
         wav_path: Path | None = None
         if self.rec_in:
             try:
@@ -1002,7 +1005,7 @@ class Call:
                     pass
             log.info("support call %s finished (%ss)", sid, dur)
             return
-        report = await self.brain.report(datetime.now(timezone.utc), dur)
+        report = await self.brain.report(datetime.fromtimestamp(ended, timezone.utc), dur)
         has_wav = bool(wav_path and wav_path.exists())
         # Tells the app a recording is on its way, so the call shows "Recording pending" until the upload lands.
         report["recordingPending"] = has_wav

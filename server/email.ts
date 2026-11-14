@@ -429,6 +429,9 @@ function oneClickUnsubscribeHeaders(unsubscribeUrl: string): Record<string, stri
   };
 }
 
+/** Display name for a From header: no quotes, angle brackets or line breaks from a company name. */
+const fromDisplayName = (v: string) => v.replace(/["<>\r\n]+/g, " ").trim();
+
 export async function sendReviewRequestEmail(to: string, clientName: string, companyName: string, companyLogoUrl: string | null, token: string, baseUrl: string, themeName?: string, personalMessage?: string, bccEmail?: string) {
   const feedbackUrl = `${baseUrl}/api/review/${token}/click`;
   const theme = getTheme(themeName);
@@ -438,12 +441,12 @@ export async function sendReviewRequestEmail(to: string, clientName: string, com
     : `Thank you for choosing ${companyName} for your recent project. We genuinely care about your experience and would really appreciate your honest feedback.\n\nIt only takes a minute and your response is completely private. It helps us keep improving our work for customers like you.`;
 
   const bodyHtml = personalMessage
-    ? personalMessage.split("\n").map(line => `<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 12px;">${line || "&nbsp;"}</p>`).join("")
-    : `<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 12px;">Thank you for choosing ${companyName} for your recent project. We genuinely care about your experience and would really appreciate your honest feedback.</p>
+    ? personalMessage.split("\n").map(line => `<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 12px;">${escHtml(line) || "&nbsp;"}</p>`).join("")
+    : `<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 12px;">Thank you for choosing ${escHtml(companyName)} for your recent project. We genuinely care about your experience and would really appreciate your honest feedback.</p>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 24px;">It only takes a minute and your response is completely private. It helps us keep improving our work for customers like you.</p>`;
 
   const mailOptions: any = {
-    from: `"${companyName}" <${process.env.SMTP_EMAIL}>`,
+    from: `"${fromDisplayName(companyName)}" <${process.env.SMTP_EMAIL}>`,
     replyTo: process.env.SMTP_EMAIL,
     to,
     subject: `${clientName}, how did your project go?`,
@@ -455,11 +458,11 @@ export async function sendReviewRequestEmail(to: string, clientName: string, com
     text: `Hi ${clientName},\n\n${bodyText}\n\n${feedbackUrl}\n\nThank you,\n${companyName}`,
     html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin:0;padding:0;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;">
 <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-<p style="color:#111827;font-size:15px;line-height:1.7;margin:0 0 16px;">Hi ${clientName},</p>
+<p style="color:#111827;font-size:15px;line-height:1.7;margin:0 0 16px;">Hi ${escHtml(clientName)},</p>
 ${bodyHtml}
 <p style="margin:0 0 24px;"><a href="${feedbackUrl}" style="background-color:${theme.accentColor};color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;font-size:14px;">Share Your Feedback</a></p>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 4px;">Thank you,</p>
-<p style="color:#111827;font-size:15px;line-height:1.7;margin:0;font-weight:600;">${companyName}</p>
+<p style="color:#111827;font-size:15px;line-height:1.7;margin:0;font-weight:600;">${escHtml(companyName)}</p>
 </div></body></html>`,
   };
   if (bccEmail) {
@@ -497,7 +500,7 @@ export async function sendReviewReminderEmail(to: string, clientName: string, co
   };
 
   const reminderMailOptions: any = {
-    from: `"${companyName}" <${process.env.SMTP_EMAIL}>`,
+    from: `"${fromDisplayName(companyName)}" <${process.env.SMTP_EMAIL}>`,
     replyTo: process.env.SMTP_EMAIL,
     to,
     subject,
@@ -505,11 +508,11 @@ export async function sendReviewReminderEmail(to: string, clientName: string, co
     text: `Hi ${clientName},\n\n${bodyMessage}\n\nShare your feedback here:\n${feedbackUrl}\n\nThank you,\n${companyName}${unsubText}`,
     html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin:0;padding:0;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;">
 <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-<p style="color:#111827;font-size:15px;line-height:1.7;margin:0 0 16px;">Hi ${clientName},</p>
+<p style="color:#111827;font-size:15px;line-height:1.7;margin:0 0 16px;">Hi ${escHtml(clientName)},</p>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 24px;">${bodyMessage}</p>
 <p style="margin:0 0 24px;"><a href="${feedbackUrl}" style="background-color:${theme.accentColor};color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;font-size:14px;">Share Your Feedback</a></p>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 4px;">Thank you,</p>
-<p style="color:#111827;font-size:15px;line-height:1.7;margin:0;font-weight:600;">${companyName}</p>
+<p style="color:#111827;font-size:15px;line-height:1.7;margin:0;font-weight:600;">${escHtml(companyName)}</p>
 ${unsubHtml}
 </div></body></html>`,
   };

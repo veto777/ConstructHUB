@@ -1,4 +1,6 @@
 /**
+ * TURNED OFF FOR EVERYONE since 2026-11-14 (see VOICE_NUDGE_ENABLED below).
+ *
  * Voice calls (SignalWire LaML Calls API) — the optional "check your email"
  * nudge: when an org turns it on, sending an estimate also rings the client
  * with a short recorded message pointing at their inbox.
@@ -27,8 +29,19 @@ export type VoiceResult = {
   error?: string | null;
 };
 
+/**
+ * OWNER ORDER 2026-11-14: the nudge call is OFF for everyone. Bids go out at
+ * all hours and a phone ringing at midnight is not acceptable. While this is
+ * false, voiceNudgeOnEstimate answers false and placeEmailNudgeCall places
+ * nothing, whatever an org has stored in custom_fields->voiceNudge (the
+ * stored value is left alone). Do not flip this back without quiet hours,
+ * one call per estimate at most, and a plan check.
+ */
+export const VOICE_NUDGE_ENABLED: boolean = false;
+
 /** Org toggle (custom_fields->voiceNudge): call the client on estimate send. */
 export function voiceNudgeOnEstimate(customFields: unknown): boolean {
+  if (!VOICE_NUDGE_ENABLED) return false;
   return (customFields as Record<string, unknown> | null | undefined)?.voiceNudge === true;
 }
 
@@ -90,6 +103,8 @@ export async function placeEmailNudgeCall(
   to: string,
   org: Pick<typeof crmOrgs.$inferSelect, "name" | "customFields">,
 ): Promise<VoiceResult> {
+  // Turned off for everyone (see VOICE_NUDGE_ENABLED): no call, no log entry.
+  if (!VOICE_NUDGE_ENABLED) return { ok: false, provider: "log", sid: null, error: "voice nudge is turned off" };
   try {
     const twiml = emailNudgeTwiml(org.name);
     const sender = resolveSmsSender(org.customFields);
